@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Stack, leavesOf, stepTo, type Level } from "../src/stack.js";
+import { Stack, directionOf, leavesOf, stepTo, type Level } from "../src/stack.js";
 
 const root: Level = { at: null, move: null, leaving: null };
 
@@ -97,5 +97,34 @@ describe("both screens are on the surface, and both are identified", () => {
       expect(leavesOf({ at, move: null, leaving: null }, "x")[0]!.key,
         `a screen called ${JSON.stringify(at)} takes the root's key`).not.toBe("/");
     }
+  });
+
+  /*
+    ⚠️ THE ONE THAT WAS WRONG IN USE AND RIGHT IN EVERY TEST. The direction was
+    "is the destination the root", which is only correct for a flat level. With
+    three depths — a list, a product, a document — leaving the document for its
+    product is a destination that is not the root, so the surface played the
+    onward movement: the screen you were returning to slid in from the far side
+    over the one you were leaving, which is the picture of going DEEPER.
+  */
+  it("comes back when the destination is an ancestor, not only when it is the root", () => {
+    expect(directionOf("legal/kova/privacy", "legal/kova")).toBe("back");
+    expect(directionOf("legal/kova", "legal")).toBe("back");
+    expect(directionOf("legal", null)).toBe("back");
+  });
+
+  it("goes onward when the destination is deeper", () => {
+    expect(directionOf("legal", "legal/kova")).toBe("onward");
+    expect(directionOf(null, "legal")).toBe("onward");
+    expect(directionOf("legal/kova", "legal/kova/privacy")).toBe("onward");
+  });
+
+  /* ⚠️ SIDEWAYS IS ONWARD, and the prefix has to be a whole SEGMENT. Without the
+     slash, `legal/kovax` reads as a child of `legal/kova` — two products whose
+     names share a prefix, travelling the wrong way past each other. */
+  it("treats a move between two screens at one depth as onward", () => {
+    expect(directionOf("legal/kova", "legal/scena")).toBe("onward");
+    expect(directionOf("legal/kovax", "legal/kova")).toBe("onward");
+    expect(directionOf("details", "security")).toBe("onward");
   });
 });

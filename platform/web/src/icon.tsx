@@ -36,13 +36,14 @@
 import type { ReactNode } from "react";
 import {
   ArrowLeft, Camera, Check, ChevronRight, Download, FileText, HeartCrack, Info, KeyRound, Languages, Lock,
-  Mail, MonitorSmartphone, Pencil, Plus, Ruler, Share2, Shield, SlidersHorizontal, SunMoon,
+  ArrowUpRight, Globe, Mail, MonitorSmartphone, Pencil, Plus, Ruler, Share2, Shield, SlidersHorizontal, Stars, SunMoon,
   Vibrate, Volume2, X, type LucideIcon,
 } from "lucide-react";
 
 /** The name the stylesheet animates by. Closed: a new icon adds a rule. */
 export type IconName =
   | "key" | "adjust" | "guard" | "save" | "heartbreak" | "letter" | "device" | "others"
+  | "outward" | "globe" | "stars"
   | "edit" | "lens" | "onward" | "close" | "back" | "tick" | "add"
   | "light" | "tongue" | "measure" | "buzz" | "sound" | "locked" | "about" | "paper";
 
@@ -102,7 +103,19 @@ export const Device = draw(MonitorSmartphone, "device", 21);
    furniture two rows down and means the opposite kind of thing. */
 export const Others = draw(Share2, "others", 21);
 
+/* ⚠️ WHERE A THING IS KEPT. Two of them, and they are a PAIR: a globe for
+   wherever the platform places it, a ring of stars for the union. Monochrome and
+   at the same weight as every other icon, because the pair used to be two
+   full-colour illustrations — a blue planet and a navy disc with twelve yellow
+   stars — sitting in a list of grey glyphs and reading as clip art dropped in. */
+export const Global = draw(Globe, "globe", 21);
+export const Union = draw(Stars, "stars", 21);
+
 /* Furniture — the parts of a row rather than a meaning in it. */
+/* ⚠️ IT LEAVES, AND IT IS NOT A CHEVRON. A chevron is a promise of a next screen
+   in this surface; this is a promise of a new tab, and using one for the other is
+   how somebody presses "next" and loses the page they were on. */
+export const Outward = draw(ArrowUpRight, "outward", 16);
 export const Onward = draw(ChevronRight, "onward", 19);
 export const Close = draw(X, "close", 20);
 export const Back = draw(ArrowLeft, "back", 20);
@@ -150,4 +163,22 @@ export const ICON_PARTS: Readonly<Record<IconName, readonly string[]>> = {
   about: ["circle", "path", "path"],
   paper: ["path", "path", "path", "path", "path"],
   others: ["circle", "circle", "circle", "line", "line"],
+  outward: ["path", "path"],
+  globe: ["circle", "path", "path"],
+  stars: ["path", "path", "path", "circle"],
 };
+
+/*
+  ⚠️ THE ONE GLYPH DRAWN BY HAND, AND IT IS HERE RATHER THAN BESIDE THE BUTTON IT
+  SPINS IN. Drawing is what this file is for: a path written at a screen is how a
+  second stroke weight and a second optical size enter the product without anybody
+  choosing them — and it is how four company logos came to be drawn from memory.
+  An arc of a circle is not in the icon set because it is not an icon; it is a
+  ring, and every ring in the platform is this one.
+*/
+export const Spinner = (): ReactNode => (
+  <svg className="button-sign spin" viewBox="0 0 24 24" width="19" height="19" aria-hidden="true" fill="none"
+    stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
+    <path d="M12 3a9 9 0 0 1 9 9" />
+  </svg>
+);

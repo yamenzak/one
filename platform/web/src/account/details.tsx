@@ -20,7 +20,7 @@
 
 import { useState, type ElementType, type ReactNode } from "react";
 import type { Problem } from "@one/kernel";
-import { Face } from "../avatar.js";
+import { Mark } from "../mark.js";
 import { Edit, Lens, Tick } from "../icon.js";
 import { Card, Entry, Unset } from "../list.js";
 import { Screen, Section, Title } from "../screen.js";
@@ -85,8 +85,15 @@ export function AccountDetails({
         <div className="title-row">
           <Title as={Heading}>Your details</Title>
           <button type="button" className="portrait press" onClick={onPickPhoto} aria-label="Change your photo">
-            <Face kind="person" src={person.avatarUrl} name={person.name ?? person.email} className="portrait-face alive" />
-            <span className="portrait-badge" aria-hidden="true"><Lens /></span>
+            <Mark
+              kind="person" size="lg" src={person.avatarUrl}
+              name={person.name ?? person.email} className="alive"
+              /* ⚠️ THE BADGE IS THE MARK'S OWN NOW. Written as a second absolutely
+                 positioned element beside the picture it sat at the bounding box's
+                 corner — which on a CIRCLE is empty space, and is why the camera
+                 looked stuck to the outside of somebody's photograph. */
+              badge={<Lens />}
+            />
           </button>
         </div>
       }

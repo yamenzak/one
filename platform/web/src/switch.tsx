@@ -22,6 +22,7 @@ import { useState, type ReactNode } from "react";
 import * as Toggle from "@radix-ui/react-switch";
 import type { Problem } from "@one/kernel";
 import { feel } from "./feedback.js";
+import { Mark } from "./mark.js";
 
 export interface SwitchRowProps {
   readonly title: string;
@@ -37,7 +38,10 @@ export interface SwitchRowProps {
 export function SwitchRow({ title, detail, icon, on, disabled, onChange }: SwitchRowProps): ReactNode {
   return (
     <label className="item switch-row" data-off={disabled ? "" : undefined}>
-      {icon ? <span className="well">{icon}</span> : null}
+      {/* ⚠️ THE SAME TILE A ROW'S ICON GETS, because a switch row sits in the same
+          card as the rows above it and a second ground at a second size is what
+          makes a column of marks look assembled. */}
+      {icon ? <Mark kind="symbol" glyph={icon} /> : null}
       <span className="item-body">
         <span className="item-title">{title}</span>
         {detail ? <span className="item-detail">{detail}</span> : null}

@@ -16,7 +16,7 @@
     "     stage to shipped is what forces every guard it promised to be built,",
     "     re-targeted with a reason, or dropped on purpose.",
     "",
-    "And the tables in PLAN.md §6 and UI.md §10 are GENERATED from this file, so",
+    "And the tables in PLAN.md §6 and UI.md §4 are GENERATED from this file, so",
     "prose cannot promise a guard that has no entry here — which is the failure",
     "this registry exists for. Documentation claiming enforcement nobody built is",
     "worse than no documentation, because it is expensive to disprove.",
@@ -3453,13 +3453,13 @@
       "fails": "cross-app documents over a single-app disclosure — a person in three products reading one product's recipients under all three products' terms, with nothing on the screen saying which. Each app publishes its ASSEMBLED disclosure beside its documents, assembled because the regions, the inference map and the transfers are computed from the deployment rather than declared"
     },
     {
-      "id": "article-nine-is-marked-on-the-category",
+      "id": "a-category-set-is-a-sentence",
       "group": "interface",
       "stage": "7",
       "status": "live",
       "impl": "web/test/screens.test.tsx",
-      "proves": "marks the category that is Article 9, not the row it is on",
-      "fails": "a badge at the end of a line saying something here is sensitive without saying which — and, on a row that also tags its categories, saying it twice. The special set is the kernel's, so a screen keeping its own copy is how the mark and the transfer's own flag come to disagree on the same row"
+      "proves": "speaks the categories, and names the sensitive one in the sentence",
+      "fails": "a set of things rendered as capsules — seventeen possible values three or four to a row, so the question somebody actually has, is my health data in there, is answered by scanning a stack of grey lozenges rather than by reading. Article 9 marked as a badge is the same failure twice: it says something here is sensitive without saying which"
     },
     {
       "id": "the-account-has-its-own-terms",
@@ -3620,7 +3620,7 @@
       "stage": "7",
       "status": "live",
       "impl": "web/test/screens.test.tsx",
-      "proves": "prints a region nobody has named as itself, with no mark",
+      "proves": "prints a region nobody has named as itself",
       "fails": "a prettified guess at where somebody's data physically is, on the one screen that exists to answer exactly that. The two ids the kernel documents are named; a third has no name and is shown as the identifier it is"
     },
     {
@@ -3646,9 +3646,117 @@
       "group": "interface",
       "stage": "7",
       "status": "live",
-      "impl": "web/test/vendors.test.tsx",
-      "proves": "draws every mark the deployment declares",
+      "impl": "web/test/interface.test.tsx",
+      "proves": "draws every mark a deployment declares",
       "fails": "a mark named in a manifest that nothing draws. The fallback is total by design — an unknown name renders the company's initial — so a typo is a row that looks fine with the wrong thing in it, and the only way to notice is to have seen the right one"
+    },
+    {
+      "id": "a-face-is-drawn-by-one-tile",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/interface.test.tsx",
+      "proves": "imports the picture primitive in one place",
+      "fails": "five avatar treatments, each defensible alone: a circle at 44 and another at 62, an 11-pixel radius beside a 14, two badge offsets and an icon well that was a sixth. Nothing fails — a screen with the wrong radius renders, passes and ships — and no amount of individually careful work fixes it while there are five places to be careful in"
+    },
+    {
+      "id": "a-path-is-drawn-where-drawing-lives",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/interface.test.tsx",
+      "proves": "draws a path only in the icon set, the brand mark and the tile",
+      "fails": "a glyph written at a screen, which is a second stroke weight and a second optical size nobody chose. On this surface it is worse: four company logos were drawn from memory, which is a trademark reproduced wrongly on the one screen that names the company it belongs to"
+    },
+    {
+      "id": "a-mark-derives-its-geometry",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/interface.test.tsx",
+      "proves": "writes no pixel length into a mark",
+      "fails": "a radius, a badge offset or a letter size written in pixels. It drifts the first time somebody adds a size, which is exactly what an 11-pixel radius on one 44-pixel tile and a 14 on another already were — a value somebody nearly got right rather than a decision"
+    },
+    {
+      "id": "a-mark-is-sized-from-the-scale",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/interface.test.tsx",
+      "proves": "sets the size only from the component",
+      "fails": "a screen setting the tile's size variable itself, which is a fourth size in a three-size scale — and it is invisible, because the sheet derives everything else from it and a wrong number still renders a perfectly proportioned mark"
+    },
+    {
+      "id": "nothing-is-drawn-that-nobody-declares",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/interface.test.tsx",
+      "proves": "draws nothing nobody declares",
+      "fails": "a committed brand path shipped to every browser for a company no manifest names. Not a defect a person sees — which is why it accumulates"
+    },
+    {
+      "id": "a-link-out-is-never-a-bare-anchor",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/interface.test.tsx",
+      "proves": "writes a bare anchor nowhere",
+      "fails": "browser blue, browser underline, no press and no motion, on a surface where every other control has a tone and a spring. An anchor is the one element that looks finished with no styling at all, which is why this was every link in the account centre"
+    },
+    {
+      "id": "a-link-out-says-it-leaves",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/interface.test.tsx",
+      "proves": "carries the outward mark and hands nothing to the destination",
+      "fails": "an operative document's address rendered as more of this page, which is how somebody agrees to a summary believing they read the contract. The referrer matters for the same reason: a link out of a screen about somebody's data should not tell the destination which screen they were on"
+    },
+    {
+      "id": "there-is-no-third-capsule",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/interface.test.tsx",
+      "proves": "declares no third capsule",
+      "fails": "a chip, a pill and a tag that are all a rounded rectangle with a grey ground and small text. That is what capsules everywhere is — not too many of them, but no rule about what one MEANS"
+    },
+    {
+      "id": "a-pill-takes-the-tone-scale",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/interface.test.tsx",
+      "proves": "colours a pill only by tone",
+      "fails": "a colour chosen per row, which is how a column of capsules comes to look arbitrary. Four states named for what they mean is the rule that was missing"
+    },
+    {
+      "id": "a-pill-is-not-a-control",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/interface.test.tsx",
+      "proves": "keeps a pill from looking pressable",
+      "fails": "a border, a shadow or a cursor on a thing that cannot be pressed, which makes a list of facts look like a row of buttons"
+    },
+    {
+      "id": "a-marked-rows-detail-is-one-line",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/interface.test.tsx",
+      "proves": "holds a marked row's detail to one line",
+      "fails": "a sentence written for a record used as a row's second line: five wrapped lines with the title clipped above them — the identity truncated so the metadata can run on. It is held by the sheet rather than by the caller, because a payload somebody else composes will eventually arrive longer than it promised"
+    },
+    {
+      "id": "nobody-names-a-colour",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/vocabulary.test.ts",
+      "proves": "declares no colour outside the palette",
+      "fails": "a colour typed at the point of use, which does not move when a theme does — and is invisible to whoever typed it, because they were looking at the theme it happens to be right in. Five hand-written whites on saturated grounds, a scrim and a drop shadow got in this way"
     }
   ]
 }

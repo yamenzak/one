@@ -3,7 +3,7 @@
  * THE GUARD REGISTRY — reader and table emitter.
  *
  * `docs/guards.json` is the data; `guards.test.mjs` is what makes it true. This
- * file is the thing both of them, and the generated blocks in PLAN.md and UI.md,
+ * file is the thing both of them, and the generated blocks in PLAN.md §6 and UI.md §4,
  * read through.
  *
  * ⚠️ THE TABLES IN THE DOCUMENTS ARE GENERATED FROM HERE, and that is the whole

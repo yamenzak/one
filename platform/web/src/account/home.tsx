@@ -18,10 +18,11 @@
  */
 
 import type { CSSProperties, ElementType, ReactNode } from "react";
-import { Face } from "../avatar.js";
+import { Mark } from "../mark.js";
 import { Lockup } from "../brand/mark.js";
 import { Adjust, Guard, Heartbreak, Key, Onward, Save } from "../icon.js";
-import { Blank, Card, Item, Pill, Waiting } from "../list.js";
+import { Pill } from "../capsule.js";
+import { Blank, Card, Item, Waiting } from "../list.js";
 import type { Where } from "./routes.js";
 import { Screen, Section } from "../screen.js";
 
@@ -125,7 +126,7 @@ export function AccountHome({ person, workspaces, sharedCount = null, onGo, onOp
               one is about them, and the same generated face they will see on the
               screen it opens is what says so. */}
           <Item
-            mark={<Face kind="person" src={person.avatarUrl} name={person.name ?? person.email} className="well alive" />}
+            mark={<Mark kind="person" src={person.avatarUrl} name={person.name ?? person.email} className="alive" />}
             title="Your details" detail="Your name, photo and address"
             onGo={() => onGo({ at: "details" })}
           />
@@ -160,7 +161,7 @@ export function AccountHome({ person, workspaces, sharedCount = null, onGo, onOp
             {workspaces.map((w) => (
               <Item
                 key={w.tenantId}
-                mark={<Face kind="workspace" src={w.face} name={w.name} tone={w.product} className="well alive" />}
+                mark={<Mark kind="workspace" src={w.face} name={w.name} product={w.product} className="alive" />}
                 title={w.name}
                 /* ⚠️ THE STANDING SITS ON THE SECOND LINE, WITH THE REST OF THE
                    METADATA. Beside the title it competed with the one thing that
@@ -169,7 +170,7 @@ export function AccountHome({ person, workspaces, sharedCount = null, onGo, onOp
                 detail={
                   <>
                     {PRODUCT_NAME[w.product]} · {w.role}
-                    {w.standing ? <Pill urgent={w.standing.urgent}>{w.standing.label}</Pill> : null}
+                    {w.standing ? <Pill tone={w.standing.urgent ? "warn" : "quiet"}>{w.standing.label}</Pill> : null}
                   </>
                 }
                 onGo={() => onOpenWorkspace(w.tenantId)}

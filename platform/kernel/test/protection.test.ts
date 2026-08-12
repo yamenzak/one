@@ -40,6 +40,7 @@ const PERSONAL = {
 const sub = (o: Partial<Subprocessor> & { id: string }): Subprocessor => ({
   name: "Somebody, Inc.",
   role: "Does one job.",
+  does: "Does one job",
   receives: ["usage"],
   where: "Its network.",
   safeguard: "dpf",

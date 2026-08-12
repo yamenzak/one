@@ -32,7 +32,7 @@ import { Button } from "./button.js";
 import { useCommit } from "./commit.js";
 import { Lockup } from "./brand/mark.js";
 import { Field } from "./field.js";
-import { Tick } from "./icon.js";
+import { Spinner, Tick } from "./icon.js";
 import { Sheet } from "./sheet.js";
 
 /** What a value is, which is all the sheet needs to draw the right control. */
@@ -307,12 +307,3 @@ export function ValueEditorBody({ field, onSave = async () => null, onClose = ()
     </form>
   );
 }
-
-/* ⚠️ A RING, NOT A LABEL THAT SAYS "…". It has to be visibly moving: a button
-   that has changed its word and nothing else is one people press again. */
-const Spinner = (): ReactNode => (
-  <svg className="button-sign spin" viewBox="0 0 24 24" width="19" height="19" aria-hidden="true" fill="none"
-    stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
-    <path d="M12 3a9 9 0 0 1 9 9" />
-  </svg>
-);

@@ -30,7 +30,7 @@ import { AccountDetails } from "../src/account/details.js";
 import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
 import { PreferencesScreen, type Preferences } from "../src/account/preferences.js";
 import { KeptHere, meaning, VaultScreen, type Kept, type Looked, type Where as VaultWhere } from "../src/account/vault.js";
-import { LegalScreen, MustAcceptScreen, ProductScreen, ReceivingScreen, DocScreen, type Owed } from "../src/account/legal.js";
+import { LegalScreen, MustAcceptScreen, ProductScreen, ReceivingScreen, RecipientScreen, DocScreen, type Owed } from "../src/account/legal.js";
 import { ExportScreen, type Taken } from "../src/account/export.js";
 import { CloseAccountScreen } from "../src/account/close.js";
 import { keyOf, parseWhere, pathOf, upFrom, type Where } from "../src/account/routes.js";
@@ -273,6 +273,7 @@ const PRODUCT_SUBPROCESSORS: readonly Subprocessor[] = [
     name: "Google (Gemini API)",
     mark: "google",
     role: "Runs the generation when a model outside our own network is the one that can do it.",
+    does: "Runs models",
     receives: ["content", "health"],
     where: "Google's infrastructure, outside the union.",
     safeguard: "sccs",
@@ -284,6 +285,7 @@ const PRODUCT_SUBPROCESSORS: readonly Subprocessor[] = [
     name: "Stripe, Inc.",
     mark: "stripe",
     role: "Takes a workspace's payment for its own plan. Never involved in what a workspace charges anybody else.",
+    does: "Takes payment",
     receives: ["identity", "contact", "financial"],
     where: "United States and Ireland.",
     safeguard: "dpf",
@@ -553,7 +555,11 @@ function Preview() {
     ) : at === "product" && legalAt ? (
       <ProductScreen of={legalAt} onGo={go} onBack={up} Heading={Heading} />
     ) : at === "receiving" && legalAt ? (
-      <ReceivingScreen of={legalAt} onBack={up} Heading={Heading} />
+      <ReceivingScreen of={legalAt} onBack={up} Heading={Heading}
+        onOpen={(recipient) => go({ at: "recipient", product: legalAt.appId, recipient })} />
+    ) : at === "recipient" && legalAt ? (
+      <RecipientScreen of={legalAt} sub={"recipient" in where ? where.recipient : ""}
+        onBack={up} Heading={Heading} />
     ) : at === "document" && legalAt ? (
       /* ⚠️ THE DOCUMENT IS FOUND IN THE PRODUCT THE PATH NAMES, not across all of
          them. Two products may both publish `terms`, and a search that ignored

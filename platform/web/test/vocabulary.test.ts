@@ -14,10 +14,12 @@
  * a suggestion, and a suggestion loses to whoever is in a hurry — including,
  * especially, whoever wrote the vocabulary.
  *
- * ⚠️ AND IT CHECKS ONLY WHAT WENT WRONG. Colours were tokenised from the first
- * line and have never drifted, so there is no colour rule here. A guard with no
- * defect behind it is a guess about what will go wrong, and the last attempt at
- * this had ninety of those.
+ * ⚠️ AND THE COLOUR RULE IS HERE BECAUSE IT STOPPED BEING HYPOTHETICAL. This file
+ * used to say colours had never drifted, which was true when it was written and
+ * false six screens later: five hand-written whites on saturated grounds, a scrim
+ * whose darkness was one theme's guess, and a drop shadow nobody had decided the
+ * platform had. Every one of them was invisible in the theme its author was
+ * looking at. A guard still needs a defect behind it — this one now has three.
  */
 
 import { describe, expect, it } from "vitest";
@@ -102,6 +104,36 @@ describe("the motion vocabulary is the only source of timing", () => {
       for (const [decl] of css.matchAll(/\banimation(?:-fill-mode)?\s*:[^;]+;/g)) {
         expect(decl, `${file} fills both — use backwards, and see this test for why`)
           .not.toMatch(/\bboth\b/);
+      }
+    }
+  });
+
+  /*
+    ⚠️ AND NOBODY NAMES A COLOUR EITHER. A palette is only a palette while every
+    surface takes its colour FROM it: one white typed onto a button is a white that
+    does not move when a theme does, and it is invisible to whoever typed it
+    because they were looking at the theme it happens to be right in.
+
+    Three places a literal is not a colour, and each is a real distinction:
+
+      A TOKEN'S OWN VALUE. The palette has to say the words once — that is what
+      makes it the palette.
+
+      A VALUE DERIVED FROM A TOKEN. The sky is one hue turned into forty gradient
+      stops; `hsl(var(--sky-h) …)` is arithmetic on a declared value, not a second
+      opinion about what colour the light is.
+
+      A MASK STOP. Black in a mask is opacity — "keep this part" — and would be
+      identical if the platform's whole palette changed. Nothing renders it.
+  */
+  it("declares no colour outside the palette", () => {
+    const derived = /\b(?:rgba?|hsla?|color-mix)\(\s*(?:in\s+\w+\s*,\s*)?var\(/;
+    for (const [file, css] of sheets) {
+      for (const [, prop, value] of css.matchAll(/([\w-]+)\s*:\s*([^;{}]+);/g)) {
+        if (prop!.startsWith("--") || prop!.includes("mask")) continue;
+        if (derived.test(value!)) continue;
+        expect(value, `${file} names a colour on ${prop} — declare it in the palette and refer to it`)
+          .not.toMatch(/#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?)\(/i);
       }
     }
   });

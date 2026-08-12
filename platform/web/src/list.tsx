@@ -20,7 +20,8 @@
  */
 
 import type { ReactNode } from "react";
-import { Onward } from "./icon.js";
+import { Onward, Outward } from "./icon.js";
+import { Mark } from "./mark.js";
 
 export const Card = ({ children, className }: {
   readonly children: ReactNode;
@@ -54,7 +55,7 @@ export interface ItemProps {
    * ⚠️ `alarm` IS DESTRUCTIVE OR BROKEN; `warn` IS UNFINISHED. Using one for the
    * other is how a list of things to read comes to look like a list of errors.
    */
-  readonly tone?: "alarm" | "warn";
+  readonly tone?: "warn" | "alarm";
   /**
    * ⚠️ A ROW EITHER GOES SOMEWHERE OR DOES SOMETHING, NEVER BOTH. With an action
    * on the right the row itself is not pressable: two targets on one line means
@@ -62,6 +63,15 @@ export interface ItemProps {
    * instead — and there is no chevron, because there is nowhere onward.
    */
   readonly onGo?: () => void;
+  /**
+   * WHERE THIS ROW LEAVES FOR — somebody else's address.
+   *
+   * ⚠️ A ROW, NOT A LINK IN A PARAGRAPH, because a card full of external
+   * references is a list and every other list here is rows. What changes is the
+   * mark at the end: a chevron is a promise of a NEXT SCREEN in this surface, and
+   * using one for a new tab is how somebody presses "next" and loses the page.
+   */
+  readonly away?: string;
   readonly action?: ReactNode;
   /**
    * ⚠️ A MARK AT THE END, NOT A CONTROL — which is why it may share a row with
@@ -83,12 +93,16 @@ export interface ItemProps {
   readonly current?: boolean;
 }
 
-export function Item({ icon, mark, title, titleAs, detail, tone, onGo, action, sign, current }: ItemProps): ReactNode {
+export function Item({ icon, mark, title, titleAs, detail, tone, onGo, away, action, sign, current }: ItemProps): ReactNode {
   const body = (
     <>
       {/* ⚠️ THE WELL IS THE ICON'S GROUND, and it is what makes a column of glyphs
           read as a list rather than as loose marks at different optical weights. */}
-      {mark ?? (icon ? <span className="well" data-tone={tone}>{icon}</span> : null)}
+      {/* ⚠️ THE ICON'S GROUND IS THE SAME TILE A FACE GETS. Kept as its own
+          element it was a 999px well beside a face at an 11px radius, in one
+          column, at two sizes — which is most of what made the marks in this
+          interface look assembled rather than designed. */}
+      {mark ?? (icon ? <Mark kind="symbol" glyph={icon} tone={tone} /> : null)}
       <span className="item-body">
         {/* ⚠️ THE CLASS IS SPELLED OUT RATHER THAN INTERPOLATED. The sheet check
             reads the class names a source literally writes — a name assembled at
@@ -104,9 +118,18 @@ export function Item({ icon, mark, title, titleAs, detail, tone, onGo, action, s
           and silently not rendered. An `action` still takes the chevron's place,
           because two targets on one line is the defect that rule exists for. */}
       {sign}
-      {onGo && current === undefined ? <Onward className="chevron" /> : (sign ? null : action)}
+      {away ? <Outward className="chevron" /> : null}
+      {onGo && current === undefined ? <Onward className="chevron" /> : (sign || away ? null : action)}
     </>
   );
+  if (away) {
+    return (
+      /* ⚠️ AN ANCHOR, BECAUSE IT IS ONE. A row that opens somebody else's page has
+         to be copyable, openable in a new tab and readable to anything that walks
+         links — none of which a button with a click handler is. */
+      <a className="item press-flat" href={away} target="_blank" rel="noreferrer">{body}</a>
+    );
+  }
   return onGo
     ? (
       <button
@@ -144,42 +167,16 @@ export function Entry({ label, children, onEdit, affordance }: EntryProps): Reac
     : <div className="entry" data-fixed="">{body}</div>;
 }
 
-/**
- * A face with a symbol over it — the workspace a thing belongs to, and what kind
- * of thing it is.
- *
- * ⚠️ THE FACE IS DIMMED SO THE SYMBOL CAN BE READ. A planet at full strength is
- * the most colourful thing on the row and the badge on it disappears; at
- * two-thirds it is still unmistakably which workspace, and the symbol is legible
- * on top. Identity first, then kind — which is the order somebody scanning a list
- * of sessions actually asks them in.
- */
-export const Marked = ({ face, badge }: {
-  readonly face: ReactNode;
-  readonly badge: ReactNode;
-}): ReactNode => (
-  <span className="marked">
-    {face}
-    <span className="marked-badge" aria-hidden="true">{badge}</span>
-  </span>
-);
-
 /** A value the person has not given yet. Quiet, and not an error. */
 export const Unset = ({ children }: { readonly children: ReactNode }): ReactNode =>
   <span className="entry-unset">{children}</span>;
-
-/** Only on a row that has one — a standing on every row is a column nobody reads. */
-export const Pill = ({ children, urgent }: {
-  readonly children: ReactNode;
-  readonly urgent?: boolean;
-}): ReactNode => <span className="pill" data-urgent={urgent ? "" : undefined}>{children}</span>;
 
 /** The card while the answer is still coming. */
 export const Waiting = ({ rows = 3 }: { readonly rows?: number }): ReactNode => (
   <div className="card" aria-busy="true">
     {Array.from({ length: rows }, (_, i) => (
       <div className="item" key={i}>
-        <span className="well waiting" />
+        <span className="mark waiting" />
         <span className="item-body">
           <span className="waiting line" />
           <span className="waiting line short" />

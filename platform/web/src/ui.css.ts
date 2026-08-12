@@ -48,7 +48,25 @@ html { interpolate-size: allow-keywords; }
   --alarm-well: #fbe6e4;
   --warn: #8a5a00;
   --warn-well: #fdf0d5;
+  /* ⚠️ THE ACCENT HAS A GROUND OF ITS OWN, because a mark toned by it needs one
+     and mixing it at the point of use is how two surfaces come to use two
+     strengths of the same idea. */
+  --accent-well: #e5edff;
   --ok: #0b6f45;
+  /* ⚠️ WHAT SITS ON A SATURATED GROUND — a product's colour, the accent, the
+     alarm, the confirmed green. Every one of them is dark enough to carry white in
+     both themes; stating it ONCE is what stops a letter being white here and
+     inherited-ink two components away, which is what five hand-written whites
+     spread over a button, a tick, a checkbox and a switch already were. */
+  --on-solid: #ffffff;
+  /* ⚠️ WHAT DIMS THE SCREEN BEHIND A PANEL, and it is a colour like any other:
+     written at the point of use it is one theme's guess at how dark is dark. */
+  --scrim: rgb(0 0 0 / 0.62);
+  /* ⚠️ THE ONE DROP SHADOW. Depth in this interface is a card's edge and a well's
+     ground; the single exception is a thumb that has to read as sitting ON its
+     track rather than in it. Stated per theme because a black shadow on a black
+     page is not a softer shadow, it is no shadow. */
+  --lift: 0 1px 3px rgb(0 0 0 / 0.3);
   --p-kova: #2f6bff;
   --p-scena: #00867a;
   --p-tessa: #c2185b;
@@ -69,7 +87,11 @@ html { interpolate-size: allow-keywords; }
     --alarm-well: #3a1512;
     --warn: #f2c25c;
     --warn-well: #3a2c0f;
+    --accent-well: #14224a;
     --ok: #12a065;
+    --on-solid: #ffffff;
+    --scrim: rgb(0 0 0 / 0.72);
+    --lift: 0 1px 3px rgb(0 0 0 / 0.5);
     --p-kova: #4d8bff;
     --p-scena: #14a598;
     --p-tessa: #f0518a;
@@ -87,7 +109,11 @@ html { interpolate-size: allow-keywords; }
   --alarm-well: #3a1512;
   --warn: #f2c25c;
   --warn-well: #3a2c0f;
+  --accent-well: #14224a;
   --ok: #12a065;
+  --on-solid: #ffffff;
+  --scrim: rgb(0 0 0 / 0.72);
+  --lift: 0 1px 3px rgb(0 0 0 / 0.5);
   --p-kova: #4d8bff;
   --p-scena: #14a598;
   --p-tessa: #f0518a;
@@ -242,7 +268,7 @@ h2 { word-spacing: normal; }
    green: green is an outcome somebody caused, and a verified address is a fact
    about the account rather than something that just went well. */
 .verified { flex: none; inline-size: 19px; block-size: 19px; border-radius: var(--radius-well);
-  display: grid; place-items: center; background: var(--accent); color: #fff;
+  display: grid; place-items: center; background: var(--accent); color: var(--on-solid);
   animation: stamp var(--swift) var(--enter) backwards; }
 
 /* ⚠️ "Not set" IS QUIET AND IT IS NOT AN ERROR. Nothing is wrong with an account
@@ -254,7 +280,7 @@ h2 { word-spacing: normal; }
 /* ⚠️ THE SCREEN BEHIND STAYS VISIBLE, which is the whole difference between this
    and the presentation above. Editing one value is not leaving the screen the
    value is on, and dimming rather than covering is what says so. */
-.scrim { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 0.62);
+.scrim { position: fixed; inset: 0; z-index: 50; background: var(--scrim);
   animation: scrim-in var(--swift) var(--enter); }
 /* ⚠️ IT COMES FROM THE BOTTOM EDGE AND STAYS ATTACHED TO IT. A panel floating in
    the middle of a phone is a desktop dialog that was never re-thought; the thumb
@@ -407,13 +433,13 @@ h2 { word-spacing: normal; }
    ⚠️ AND IT ARRIVES WITH A PUSH. A ground that simply changes colour is a state
    being switched; a small overshoot on the same spring every control uses is the
    button answering. */
-.button[data-state='done']:disabled { background: var(--ok); color: #fff;
+.button[data-state='done']:disabled { background: var(--ok); color: var(--on-solid);
   animation: answered var(--settle) var(--spring); }
 @keyframes answered { from { scale: 0.965; } 45% { scale: 1.018; } }
 /* ⚠️ THE ALARM IS ON THE ACTION AND NOWHERE ELSE. A confirm sheet is already the
    product asking whether somebody means it; painting the whole surface red says
    the same thing again, louder, to somebody who has already understood. */
-.button[data-tone-alarm] { background: var(--alarm); color: #fff; }
+.button[data-tone-alarm] { background: var(--alarm); color: var(--on-solid); }
 .button[data-tone-alarm]:disabled { background: var(--well); color: var(--ink-faint); }
 
 /* ⚠️ THE LABEL IS THE TARGET, not a caption beside one. A 20-pixel box next to
@@ -426,7 +452,7 @@ h2 { word-spacing: normal; }
   display: grid; place-items: center; color: transparent;
   background: var(--well);
   transition: background-color var(--swift) var(--move), color var(--swift) var(--move); }
-.check input:checked + .check-box { background: var(--accent); color: #fff; }
+.check input:checked + .check-box { background: var(--accent); color: var(--on-solid); }
 .check input:focus-visible + .check-box { outline: 2px solid var(--accent); outline-offset: 2px; }
 .button-label { line-height: 1; }
 .button-sign { flex: none; }
@@ -484,7 +510,12 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
   color: var(--ink); font-size: 14.5px; font-weight: 500; }
 .crown-foot .chevron { margin-inline-start: auto; }
 
+/* ⚠️ INHERITED INK AND NO UNDERLINE, BECAUSE A ROW MAY BE AN ANCHOR. An element
+   takes a browser's link styling by BEING one, so the moment a row pointed at
+   somebody else's page its title arrived blue and underlined — a link inside a
+   card where nothing else is one. */
 .item { display: flex; align-items: center; gap: 14px; inline-size: 100%;
+  color: inherit; text-decoration: none;
   min-block-size: 64px; padding: 12px var(--pad); border: 0; background: none;
   color: inherit; font: inherit; text-align: start; cursor: pointer; }
 .item:hover { background: color-mix(in oklab, var(--ink) 5%, transparent); }
@@ -504,40 +535,110 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
    room for one. */
 .item-detail { display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
   color: var(--ink-quiet); font-size: 14.5px; line-height: 1.35; }
+/*
+  ⚠️ ONE LINE WHERE SOMETHING SHARES THE ROW, AND THIS IS THE RULE THAT WAS
+  WRITTEN AND NEVER ENFORCED. A destination row's second line may be as long as it
+  needs — there is nothing beside it to push off a scan line. A row with a mark, a
+  capsule or a control has a squeezed middle column, and a sentence in it wraps to
+  five lines while the TITLE clips to make room: the identity truncated so the
+  metadata can run on, which is the wrong way round in every case.
+
+  ⚠️ IT IS ON THE ROW RATHER THAN ON THE LINE, so a caller cannot opt out of it by
+  passing longer words. What a screen chooses is what it puts on the row; how a
+  row holds it is this file's.
+*/
+.item:has(> .pill, > .chevron ~ *, > button, > a) .item-detail { flex-wrap: nowrap; }
+.item:has(> .mark) .item-detail { flex-wrap: nowrap;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ⚠️ DIMMED, NOT COLOURED. It says there is more here; it is not a thing to aim
    at, and at full ink it competes with the row's own words. */
 .chevron { flex: none; color: var(--ink-faint);
   transition: translate var(--swift) var(--spring); }
 
-/* ⚠️ THE WELL IS THE ICON'S GROUND, and it is what makes a column of glyphs read
-   as a list rather than as loose marks at different optical weights. */
-.well { flex: none; inline-size: 44px; block-size: 44px; border-radius: var(--radius-well);
-  display: grid; place-items: center; background: var(--well); color: var(--ink); }
-.well[data-tone='alarm'] { background: var(--alarm-well); color: var(--alarm); }
-/* ⚠️ AMBER IS "THERE IS SOMETHING TO DO"; RED IS "SOMETHING IS WRONG OR GONE". A
-   document waiting to be read is neither a failure nor destructive, and toning it
-   like the row that closes an account says the two are the same kind of thing. */
-.well[data-tone='warn'] { background: var(--warn-well); color: var(--warn); }
+/* ------------------------------------------------------------------- marks */
+
+/*
+  ⚠️ ONE TILE, AND EVERYTHING ABOUT IT IS DERIVED FROM ITS SIZE. There were five
+  of these — an icon well, two faces at two sizes, a company tile and a portrait —
+  and between them four radii, three badge offsets and no shared scale. Every one
+  was defensible alone; together they were what makes an interface look assembled
+  rather than designed.
+
+  ⚠️ THE SHAPE IS THE KIND AND THERE ARE TWO. Round is a person or a symbol —
+  something standing for a class of thing. A rounded square is something with an
+  identity of its own, and a logo in a circle is a logo with its corners cut off.
+*/
+.mark { position: relative; flex: none; display: grid; place-items: center;
+  inline-size: var(--mark); block-size: var(--mark);
+  background: var(--well); color: var(--ink);
+  font-family: var(--font-brand); font-weight: 600;
+  font-size: calc(var(--mark) * 0.38); }
+/* ⚠️ A THIRD OF THE BOX, NOT A PIXEL VALUE. Written in pixels it drifted the
+   moment a second size existed — 11 on one 44-pixel tile and 14 on another. */
+.mark[data-kind='workspace'], .mark[data-kind='product'],
+.mark[data-kind='company'], .mark[data-kind='place'] { border-radius: calc(var(--mark) * 0.32); }
+.mark[data-kind='person'], .mark[data-kind='symbol'] { border-radius: var(--radius-well); }
+
+/* ⚠️ THE PICTURE FILLS THE TILE AND THE TILE DOES THE CLIPPING, so the shape is
+   stated once rather than on the image, the letter and the logo separately. */
+.mark-body { display: block; inline-size: 100%; block-size: 100%;
+  border-radius: inherit; overflow: hidden; }
+.mark-image { inline-size: 100%; block-size: 100%; object-fit: cover; display: block; }
+.mark-letter { display: grid; place-items: center; inline-size: 100%; block-size: 100%;
+  color: var(--ink-quiet); }
+.mark-glyph { display: grid; place-items: center; }
+/* ⚠️ THE LOGO IS INSET, NOT FLUSH. A brand path is drawn to the edge of its own
+   viewbox, so at the tile's full width it touches the corners while an icon in the
+   same column does not — and a column of tiles whose contents are different sizes
+   is the raggedness this whole file exists to remove. */
+.mark-logo { inline-size: 58%; block-size: 58%; display: block; }
+
+/* ⚠️ A GROUND MIXED FROM THE BRAND COLOUR, NEVER THE COLOUR ITSELF. Four
+   saturated logo tiles in a column is a sponsor wall; the same four as tints are a
+   list with identities in it, and the mix survives both themes without a second
+   set of values. */
+.mark[data-kind='company'] { background: color-mix(in oklab, var(--brand, var(--ink)) 15%, var(--card)); }
+.mark[data-kind='company'] .mark-letter { color: var(--ink-quiet); }
 
 /* ⚠️ THE COLOUR IS THE PRODUCT AND THE LETTER IS THE WORKSPACE. The letter alone
-   repeated what the row title already says, and two workspaces starting with the
-   same letter were indistinguishable — while the one thing a cross-product list
-   has to make scannable was readable only as text. */
-/* ⚠️ A ROUNDED SQUARE AMONG CIRCLES, ON PURPOSE. Round is a symbol or a person;
-   a rounded square is a thing with an identity of its own. It also has to hold an
-   uploaded logo, and a logo in a circle is a logo with its corners cut off. The
-   radius is a quarter of the box — far enough from the circles that it reads as a
-   decision rather than as a value somebody nearly got right. */
-.face { display: block; overflow: hidden; color: #fff;
-  font-family: var(--font-brand); font-size: 17px; font-weight: 600; }
-.face[data-kind='workspace'] { border-radius: 11px; }
-.face[data-kind='person'] { border-radius: var(--radius-well); }
-.face-image { inline-size: 100%; block-size: 100%; object-fit: cover; display: block; }
-.face-letter { display: grid; place-items: center; inline-size: 100%; block-size: 100%; }
-.face[data-tone='kova'] { background: var(--p-kova); }
-.face[data-tone='scena'] { background: var(--p-scena); }
-.face[data-tone='tessa'] { background: var(--p-tessa); }
+   repeated the row's title two centimetres away, and two workspaces starting with
+   the same letter were indistinguishable — while the one thing a cross-product
+   list has to make scannable was readable only as text. */
+.mark[data-product='kova'] { background: var(--p-kova); }
+.mark[data-product='scena'] { background: var(--p-scena); }
+.mark[data-product='tessa'] { background: var(--p-tessa); }
+.mark[data-product] .mark-letter { color: var(--on-solid); }
+
+/* ⚠️ THE TONE SCALE, AND NOTHING ELSE MAY GROUND A MARK. Amber is "there is
+   something to do"; red is "something is wrong or gone". A document waiting to be
+   read is neither, and toning it like the row that closes an account says the two
+   are the same kind of thing. */
+.mark[data-tone='warn'] { background: var(--warn-well); color: var(--warn); }
+.mark[data-tone='alarm'] { background: var(--alarm-well); color: var(--alarm); }
+.mark[data-tone='accent'] { background: var(--accent-well); color: var(--accent); }
+
+/*
+  ⚠️ THE BADGE SITS ON THE SHAPE'S EDGE, WHICH IS ARITHMETIC RATHER THAN A NUDGE.
+  At the bounding box's corner it lands ON a rounded square and in EMPTY SPACE
+  beside a circle — which is exactly why a camera on somebody's photograph looked
+  detached while a device on a workspace did not. Nine per cent of the box, outward,
+  is the point on the arc at four o'clock and just past the square's corner: one
+  number, both shapes.
+
+  ⚠️ AND THE RING IS THE SURFACE BEHIND IT, so the badge reads as cut out of the
+  mark rather than laid on top of it.
+*/
+.mark-badge { position: absolute;
+  inset-block-end: calc(var(--mark) * -0.09); inset-inline-end: calc(var(--mark) * -0.09);
+  inline-size: calc(var(--mark) * 0.5); block-size: calc(var(--mark) * 0.5);
+  border-radius: var(--radius-well); display: grid; place-items: center;
+  background: var(--card); color: var(--ink);
+  box-shadow: 0 0 0 calc(var(--mark) * 0.045) var(--card); }
+/* ⚠️ A BADGED MARK STANDS DOWN FOR ITS BADGE. A planet at full strength is the
+   most colourful thing on the row and a symbol laid over it disappears; at
+   two-thirds it is still unmistakably which workspace. */
+.mark:has(> .mark-badge) .mark-body { opacity: 0.66; }
 
 /* ⚠️ THE WHOLE ROW IS THE TARGET. A 50-pixel control at the end of a full-width
    row is the smallest thing on the screen, and the row is a label, so pressing
@@ -559,7 +660,7 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 .switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .switch:disabled { cursor: progress; }
 .switch-thumb { display: block; inline-size: 24px; block-size: 24px; border-radius: var(--radius-well);
-  background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+  background: var(--on-solid); box-shadow: var(--lift);
   transition: translate var(--swift) var(--spring); }
 .switch-thumb[data-state='checked'] { translate: 20px 0; }
 
@@ -568,14 +669,67 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
    about to happen to it. */
 .chosen { flex: none; color: var(--accent); }
 
-/* ⚠️ A FACE CARRIED INTO A LINE OF TEXT, and not a control. No border, no press,
-   a ground barely told from the surface under it: anything more makes a sentence
-   look like a form. It never wraps, because a chip broken across two lines is a
-   face on one and a name on the next. */
+/* --------------------------------------------------------------- capsules */
+
+/*
+  ⚠️ TWO ROUNDED THINGS, AND THE RULE THAT STOPS THERE BEING A THIRD. A chip
+  answers WHICH — it carries a face into a sentence so the thing being talked about
+  appears as itself. A pill answers WHAT STATE — it takes its colour from the tone
+  scale and a row has at most one. They were joined by a tag, which was a data
+  category as a lozenge, and the three were visually identical: one row carried all
+  three and none of them told a reader anything the others did not.
+*/
+/* ⚠️ NEVER COLOURED. The face is the identification; a hue on top would be a
+   second one, and a chip that changes colour reads as a state. */
 .chip { display: inline-flex; align-items: center; gap: 6px; vertical-align: -0.28em;
   max-inline-size: 100%; padding: 3px 10px 3px 4px; border-radius: var(--radius-well);
   background: color-mix(in oklab, var(--ink) 9%, transparent); color: var(--ink);
   word-spacing: normal; }
+.chip .mark { --mark: 22px; }
+.chip-name { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 14.5px; font-weight: 500; }
+
+/* ⚠️ ONLY WHERE THE STATE IS WORTH SAYING. A standing on every row is a column
+   nobody reads, and the one that needs attention stops standing out. */
+.pill { flex: none; padding: 2px 9px; border-radius: var(--radius-well);
+  font-size: 13px; font-weight: 500; white-space: nowrap; word-spacing: normal;
+  background: var(--well); color: var(--ink-quiet); }
+/* ⚠️ THE TONE SCALE AND NOTHING ELSE. A pill that reached for a hue directly is
+   how a column of capsules comes to look arbitrary — which is indistinguishable,
+   to a reader, from meaning nothing. */
+.pill[data-tone='warn'] { background: var(--warn-well); color: var(--warn); }
+.pill[data-tone='alarm'] { background: var(--alarm-well); color: var(--alarm); }
+.pill[data-tone='ok'] { background: color-mix(in oklab, var(--ok) 16%, transparent); color: var(--ok); }
+
+/* ------------------------------------------------------------------ links */
+
+/*
+  ⚠️ IT IS THE ONE PLACE THE INTERFACE STOPPED BEING DESIGNED, and it happened
+  because an anchor is the only element that looks finished with no styling at all:
+  browser blue, browser underline, no press, no motion, on a surface where every
+  other control has a tone and a spring.
+
+  ⚠️ THE UNDERLINE IS DRAWN RATHER THAN INHERITED, SO IT CAN MOVE. A text-decoration
+  sits at a fixed offset, cannot change weight without changing the text metrics and
+  cannot animate; a gradient on the text box does all three — and what it does here
+  is grow from the start of the word, which is the smallest possible way of saying a
+  link is a thing you act on.
+*/
+.away { display: inline-flex; align-items: baseline; gap: 4px;
+  color: var(--accent); text-decoration: none; }
+.away-word { background-image: linear-gradient(var(--accent), var(--accent));
+  background-repeat: no-repeat; background-position: 0 100%;
+  background-size: 100% 1px;
+  transition: background-size var(--swift) var(--move); }
+.away:hover .away-word { background-size: 100% 2px; }
+/* ⚠️ THE MARK LIFTS ALONG ITS OWN AXIS, which is the direction it points. A link
+   out is the one control whose movement can say where it goes. */
+.away-mark { flex: none; translate: 0 1px;
+  transition: translate var(--swift) var(--spring); }
+.away:hover .away-mark { translate: 1.5px -0.5px; }
+.away:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px;
+  border-radius: 3px; }
+
 /* ------------------------------------------------------------------- asks */
 
 /* ⚠️ A CONSENT DECISION IS A PARAGRAPH WITH A CONTROL, NOT A ROW WITH A VALUE.
@@ -612,28 +766,6 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
    and points onward. Drawn as a pill, every answered decision looked like a
    badge nobody could change. */
 .rung-name { white-space: nowrap; font-size: 15px; }
-
-.chip .face { flex: none; inline-size: 22px; block-size: 22px; font-size: 11px; }
-.chip-name { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: 14.5px; font-weight: 500; }
-
-/* ⚠️ THE BADGE SITS ON THE FACE AND THE FACE STANDS DOWN FOR IT. A planet at full
-   strength is the most colourful thing on the row and a symbol laid over it
-   disappears; dimmed, it is still unmistakably which workspace. */
-.marked { position: relative; flex: none; display: block;
-  inline-size: 44px; block-size: 44px; }
-.marked .face { inline-size: 100%; block-size: 100%; opacity: 0.62; }
-.marked-badge { position: absolute; inset-block-end: -3px; inset-inline-end: -3px;
-  inline-size: 24px; block-size: 24px; border-radius: var(--radius-well);
-  display: grid; place-items: center;
-  background: var(--card); color: var(--ink);
-  box-shadow: 0 0 0 2px var(--card); }
-
-/* ⚠️ ONLY ON A ROW THAT HAS ONE. A standing on every row is a column of green
-   nobody reads, and the one that needs attention stops standing out. */
-.pill { flex: none; padding: 2px 9px; border-radius: var(--radius-well);
-  font-size: 13px; font-weight: 500; background: var(--well); color: var(--ink-quiet); }
-.pill[data-urgent] { background: var(--warn-well); color: var(--warn); }
 
 /* ------------------------------------------------------- waiting and blank */
 
@@ -833,6 +965,12 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 */
 .prose { display: grid; gap: 15px; font-size: 16px; line-height: 1.62; color: var(--ink); }
 .prose p { text-wrap: pretty; }
+/* ⚠️ A PARAGRAPH ON A SETTINGS SCREEN IS NOT A DOCUMENT. The document sheet is
+   set for reading a contract — sixteen pixels at a generous measure — and the same size
+   for a sentence explaining who is responsible made six lines of full-ink body
+   copy the first thing on a screen somebody opened to see a list. Quiet, at the
+   size the rest of the interface reads at. */
+.prose-quiet { font-size: 15px; line-height: 1.5; color: var(--ink-quiet); gap: 12px; }
 
 /* ⚠️ AWAY FROM HERE, AND IT LOOKS IT. An address rendered as more of the page is
    how somebody agrees to a summary believing they read the contract. */

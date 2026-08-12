@@ -92,13 +92,37 @@ export function stepTo(level: Level, at: string | null, node: ReactNode): Level 
   if (level.at === at) return level;
   return {
     at,
-    /* ⚠️ THE DIRECTION IS THE STEP, NOT THE DESTINATION. Returning to the level's
-       root is coming back out; everything else is going onward — including a move
-       between two screens of one level, which is onward because that is what
-       pressing something on a surface is. */
-    move: at === null ? "back" : "onward",
+    move: directionOf(level.at, at),
     leaving: { key: keyOf(level.at), node },
   };
+}
+
+/**
+ * WHICH WAY THE STEP GOES.
+ *
+ * ⚠️ IT WAS "IS THE DESTINATION THE ROOT", AND THAT IS ONLY RIGHT FOR A FLAT
+ * LEVEL. The moment a level had three depths — a list, a product, a document —
+ * leaving the document for its product was a destination that is not the root, so
+ * it played the ONWARD movement: the screen you were returning to slid in from the
+ * far side, over the one you were leaving, which is the picture of going deeper.
+ * Nothing failed, every test passed, and the surface simply felt wrong in the one
+ * direction people use most.
+ *
+ * ⚠️ THE KEY IS A PATH, SO DEPTH IS READABLE FROM IT. Every `at` in this platform
+ * is printed by a router as slash-separated segments, and an ancestor is a prefix.
+ * That makes the rule one comparison rather than a hierarchy the stack would have
+ * to be told about — and for a flat level, where no key is a prefix of another, it
+ * is exactly the old behaviour.
+ *
+ * ⚠️ SIDEWAYS IS ONWARD. Two screens at the same depth are neither ancestor nor
+ * descendant, and moving between them is a fresh push: that is what pressing
+ * something on a surface is, and it is the one case where either answer is
+ * defensible and consistency is worth more than either.
+ */
+export function directionOf(from: string | null, to: string | null): Move {
+  if (to === null) return "back";
+  if (from === null) return "onward";
+  return from.startsWith(`${to}/`) ? "back" : "onward";
 }
 
 interface Leaf {

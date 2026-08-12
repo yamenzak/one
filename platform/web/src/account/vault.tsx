@@ -27,13 +27,13 @@
 
 import { useState, type ElementType, type ReactNode } from "react";
 import type { Problem, Reach, Wanted, WantedHere } from "@one/kernel";
-import { Face } from "../avatar.js";
+import { Mark } from "../mark.js";
 import { Lockup } from "../brand/mark.js";
-import { Chip } from "../chip.js";
+import { Pill } from "../capsule.js";
 import { Choose, type Option } from "../choose.js";
 import { Disclose } from "../disclose.js";
 import { About, Onward } from "../icon.js";
-import { Blank, Card, Item as Row, Pill, Waiting } from "../list.js";
+import { Blank, Card, Item as Row, Waiting } from "../list.js";
 import { Screen, Section } from "../screen.js";
 import { Sheet } from "../sheet.js";
 import { Flip } from "../switch.js";
@@ -219,7 +219,7 @@ export function VaultScreen({ wheres, kept, looks, onSet, onBack, Heading = "h1"
               return (
                 <Disclose
                   key={`${w.appId}:${w.tenantId ?? ""}`}
-                  mark={<Face kind="workspace" src={w.face} name={w.name} tone={w.product} className="well alive" />}
+                  mark={<Mark kind="workspace" src={w.face} name={w.name} product={w.product} className="alive" />}
                   title={w.name}
                   detail={w.appName}
                   /* ⚠️ TWO NUMBERS, SO THE WHOLE ROW IS READABLE CLOSED. "2 of 5"
@@ -276,34 +276,28 @@ export function VaultScreen({ wheres, kept, looks, onSet, onBack, Heading = "h1"
         ) : (
           <Card>
             {looks.map((l, i) => (
+              /*
+                ⚠️ ONE LINE PER READ, AND THE MARK IS WHO DID IT. It was four: a
+                title, then a chip on its own line, then a run of grey words, then
+                a pill — two capsule treatments and three lines for one event, so a
+                list of five reads was twenty lines a reader had to reassemble into
+                sentences. The row shape everything else here uses says it in one.
+
+                ⚠️ AND WHO LOOKED IS THE TITLE, NOT WHAT THEY LOOKED AT. The
+                question this list answers is "has anybody been reading my things";
+                filed under the fact, the same person appears three times and no
+                row is about anybody.
+              */
               <Row
                 key={`${l.fact}:${l.where}:${l.on}:${i}`}
-                title={l.label}
-                detail={
-                  <>
-                    {/* ⚠️ THE SAME OBJECT THAT APPEARS IN THE GROUP ABOVE, face
-                        included. As bare words the reader had to match a name they
-                        read here to a planet they saw thirty rows up — which is
-                        the exact work the chip exists to remove. */}
-                    {/* ⚠️ THE READER IS THE CHIP, AND THE PLACE IS THE WORDS. Who
-                        looked is the subject of this list; where they did it is
-                        the qualifier. Where nothing but the app read it there is
-                        no person to show, and the workspace takes the chip — the
-                        two events look different before a word is read. */}
-                    {l.who ? (
-                      <Chip face={<Face kind="person" src={l.whoFace} name={l.who} />}>{l.who}</Chip>
-                    ) : (
-                      <Chip face={<Face kind="workspace" src={l.face} name={l.where} tone={l.product} />}>
-                        {l.where}
-                      </Chip>
-                    )}
-                    {l.who ? `at ${l.where} · ` : null}
-                    {l.on}
-                    {/* ⚠️ ONCE IS NOT WORTH A COUNT. "4 times" is information;
-                        "1 times" is a template showing through. */}
-                    {l.times > 1 ? <Pill>{l.times} times</Pill> : null}
-                  </>
-                }
+                mark={l.who
+                  ? <Mark kind="person" src={l.whoFace} name={l.who} />
+                  : <Mark kind="workspace" src={l.face} name={l.where} product={l.product} />}
+                title={l.who ?? l.where}
+                detail={`Read your ${l.label.toLowerCase()} · ${l.on}`}
+                /* ⚠️ ONCE IS NOT WORTH A COUNT. "4 times" is information;
+                   "1 times" is a template showing through. */
+                sign={l.times > 1 ? <Pill>{l.times} times</Pill> : undefined}
               />
             ))}
           </Card>

@@ -129,6 +129,20 @@ export interface Subprocessor {
   readonly name: string;
   /** One line: what they do for us. */
   readonly role: string;
+  /**
+   * THE SAME THING IN A FEW WORDS, FOR A ROW.
+   *
+   * ⚠️ `role` IS A DECLARATION AND A ROW IS NOT. It is written to be read in a
+   * record — a full sentence, correctly, with the detail a reviewer needs — and
+   * an interface that put it on a list row got five wrapped lines per company and
+   * a title clipped to make room for them. Cutting it at the first clause is
+   * worse: it produces half a sentence, and a screen deciding where somebody
+   * else's words stop is the same class of invention as writing them.
+   *
+   * ⚠️ SO IT IS DECLARED, AND SHORT ENOUGH TO BE CHECKED. Four words or so, no
+   * final stop: a label, not a summary.
+   */
+  readonly does: string;
   /** What of somebody's data reaches them. */
   readonly receives: readonly DataCategory[];
   /** Where they process it, in the words a questionnaire asks for. */
@@ -492,6 +506,25 @@ export function disclosureProblems(
     if (!have.has(id)) out.push({ at: id, why: `${why}, and is declared nowhere — so somebody's data reaches a company no disclosure names` });
   }
   for (const p of declared) {
+    /*
+      ⚠️ A ROW'S LABEL IS A LABEL. `does` is what a list shows before anybody
+      presses anything, and a declaration written as a sentence there is five
+      wrapped lines per company with the name clipped to make room. Six words is
+      the ceiling; a final stop is what turns a label back into a sentence.
+    */
+    /* ⚠️ READ DEFENSIVELY, BECAUSE A MANIFEST IS SOMEBODY ELSE'S OBJECT. An app
+       compiled against an older kernel has no label at all, and a composition
+       check that THROWS on a missing field reports a crash inside the platform
+       where it should be reporting a sentence about the manifest. */
+    const label = (p.does ?? "").trim();
+    const words = label.split(/\s+/).filter(Boolean).length;
+    if (!label) {
+      out.push({ at: p.id, why: "has no short label, so a list has nothing to show but its full declaration" });
+    } else if (words > 6) {
+      out.push({ at: p.id, why: `needs a label a row can hold: ${words} words is a sentence, and six is the ceiling` });
+    } else if (/[.!?]$/.test(label)) {
+      out.push({ at: p.id, why: "ends its label with a stop, which is what makes a label read as a sentence somebody cut short" });
+    }
     if (!need.has(p.id)) {
       out.push({
         at: p.id,

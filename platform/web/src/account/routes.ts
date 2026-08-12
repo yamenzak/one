@@ -37,6 +37,8 @@ export type Where =
   /** One product's documents. `product` is an app id, or "" for the account. */
   | { readonly at: "product"; readonly product: string }
   | { readonly at: "receiving"; readonly product: string }
+  /** One recipient's whole record, under the product whose data reaches them. */
+  | { readonly at: "recipient"; readonly product: string; readonly recipient: string }
   | { readonly at: "document"; readonly product: string; readonly document: string }
   | { readonly at: "export" }
   | { readonly at: "close" };
@@ -67,7 +69,10 @@ export function parseWhere(path: string): Where {
       be unreachable — which is a screen that exists and cannot be opened. It is
       refused at composition rather than handled here; see `legalProblems`.
     */
-    if (three === "who") return { at: "receiving", product };
+    if (three === "who") {
+      const [, , , four] = seg;
+      return four ? { at: "recipient", product, recipient: four } : { at: "receiving", product };
+    }
     return { at: "document", product, document: three };
   }
   return { at: "home" };
@@ -81,6 +86,7 @@ export function pathOf(where: Where): string {
     case "preferences": return where.part ? `preferences/${where.part}` : "preferences";
     case "product": return product(where.product);
     case "receiving": return `${product(where.product)}/who`;
+    case "recipient": return `${product(where.product)}/who/${where.recipient}`;
     case "document": return `${product(where.product)}/${where.document}`;
     default: return where.at;
   }
@@ -105,6 +111,7 @@ export function upFrom(where: Where): Where {
     case "preferences": return where.part ? { at: "preferences" } : { at: "home" };
     case "product": return { at: "legal" };
     case "receiving": return { at: "product", product: where.product };
+    case "recipient": return { at: "receiving", product: where.product };
     case "document": return { at: "product", product: where.product };
     default: return { at: "home" };
   }

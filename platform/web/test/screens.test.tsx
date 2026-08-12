@@ -23,15 +23,17 @@ import { AskForIt, ConsentBody, ConsentSheet, type Asked } from "../src/consent.
 import { AccountDetails } from "../src/account/details.js";
 import { PreferencesScreen, type Preferences, type SetPreference } from "../src/account/preferences.js";
 import { SignInMethods, type Passkey } from "../src/account/signin.js";
-import { Chip } from "../src/chip.js";
-import { Marked, Unset } from "../src/list.js";
+import { Unset } from "../src/list.js";
+import { Chip } from "../src/capsule.js";
+import { Mark, DRAWN_LOGOS } from "../src/mark.js";
+import { UI_CSS } from "../src/ui.css.js";
+import { DEPLOYMENT } from "@one/deployment";
 import { SwitchRow } from "../src/switch.js";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ValueEditor, ValueEditorBody } from "../src/editor.js";
-import { counted, DocScreen, held, LegalScreen, MustAcceptScreen, paragraphs, ProductScreen, receives, ReceivingScreen, said, state } from "../src/account/legal.js";
+import { counted, DocScreen, held, LegalScreen, MustAcceptScreen, paragraphs, ProductScreen, receives, ReceivingScreen, RecipientScreen, said, spoken, state } from "../src/account/legal.js";
 import { ExportScreen } from "../src/account/export.js";
 import { CloseAccountScreen } from "../src/account/close.js";
-import { JurisdictionChip } from "../src/jurisdiction.js";
 import type { Doc, Product } from "../src/account/wire.js";
 import { configureFeedback, feedbackSettings, FEEDBACK_DEFAULT } from "../src/feedback.js";
 import { Device } from "../src/icon.js";
@@ -104,6 +106,63 @@ describe("a switch row", () => {
   });
 });
 
+/* ------------------------------------------------------------------ marks --- */
+
+describe("the one mark", () => {
+  /*
+    ⚠️ THERE WERE FIVE OF THESE AND THEY AGREED ABOUT NOTHING — a person's face at
+    two sizes, a workspace at an 11-pixel radius, a company at 14, an icon in a
+    999-pixel well and two badges hanging off their corners at −1 and −3. Each was
+    defensible alone; together they were four radii and three badge positions in
+    one column, which is what an interface with inconsistent avatars IS.
+  */
+  it("draws a person round and everything with an identity square", () => {
+    expect(html(<Mark kind="person" name="Nadia" />)).toContain(`data-kind="person"`);
+    for (const kind of ["workspace", "product", "company", "place"] as const) {
+      expect(html(<Mark kind={kind} name="X" />), kind).toContain(`data-kind="${kind}"`);
+    }
+    /* ⚠️ ONE RULE IN THE SHEET, keyed off the kind — so a new kind picks a side
+       rather than picking a radius. */
+    expect(UI_CSS).toMatch(/\.mark\[data-kind='person'\][^{]*\{[^}]*radius-well/);
+  });
+
+  /* ⚠️ THE SIZE IS ONE NUMBER ON THE ELEMENT and the radius, the letter, the badge
+     and its ring are all computed from it. Written as pixels the radius drifted
+     the moment a second size existed. */
+  it("carries its size as one value, and derives the rest from it", () => {
+    expect(html(<Mark kind="workspace" name="X" size="sm" />)).toContain("--mark:26px");
+    expect(html(<Mark kind="workspace" name="X" />)).toContain("--mark:44px");
+    expect(html(<Mark kind="person" name="X" size="lg" />)).toContain("--mark:64px");
+    expect(UI_CSS).toMatch(/border-radius: calc\(var\(--mark\)/);
+  });
+
+  /* ⚠️ AN UNKNOWN LOGO IS THE INITIAL, never a drawn office block: beside three
+     real marks that reads as a company nobody could identify. */
+  it("falls back to the initial for a logo it does not have", () => {
+    const out = html(<Mark kind="company" logo="nobody-draws-this" name="Acme" />);
+    expect(out).toContain(">A<");
+    expect(out).not.toContain("<svg");
+  });
+
+  it("draws every logo the deployment declares", () => {
+    for (const sub of DEPLOYMENT.subprocessors) {
+      if (!sub.mark) continue;
+      expect(DRAWN_LOGOS, `${sub.id} names a logo nothing draws`).toContain(sub.mark);
+    }
+  });
+
+  /* ⚠️ THE BADGE IS THE MARK'S OWN. Written as a second positioned element beside
+     the picture it sat at the bounding box's corner — which is ON a rounded square
+     and in EMPTY SPACE beside a circle, and is why a camera on somebody's
+     photograph looked stuck to the outside of it. */
+  it("puts the badge on the mark, hidden from a reader", () => {
+    const out = html(<Mark kind="workspace" name="X" badge={<Device />} />);
+    expect(out).toContain("mark-badge");
+    expect(out).toContain('aria-hidden="true"');
+    expect(UI_CSS).toMatch(/\.mark-badge[^{]*\{[^}]*calc\(var\(--mark\) \* -0\.09\)/);
+  });
+});
+
 /* ------------------------------------------------------------------ chip --- */
 
 describe("a chip", () => {
@@ -114,14 +173,21 @@ describe("a chip", () => {
     expect(out).toContain("Corniche Screens");
     expect(out).not.toContain("<button");
   });
-});
 
-/* ----------------------------------------------------------------- marked --- */
-
-describe("a marked face", () => {
-  it("hides its badge from a reader, because the face already names the thing", () => {
-    const out = html(<Marked face={<span className="face" />} badge={<Device />} />);
-    expect(out).toContain('aria-hidden="true"');
+  /*
+    ⚠️ THE CAPSULES ARE TWO AND THE THIRD IS GONE. A chip, a pill and a tag were
+    all a rounded rectangle with a grey ground and small text, so one row carried
+    all three and none told a reader anything the others did not. A chip answers
+    WHICH; a pill answers WHAT STATE and takes its colour from the tone scale.
+  */
+  it("gives a pill no colour outside the tone scale", () => {
+    const tones = [...UI_CSS.matchAll(/\.pill\[data-tone='([a-z]+)'\]/g)].map((m) => m[1]!);
+    expect(new Set(tones)).toEqual(new Set(["warn", "alarm", "ok"]));
+    /* ⚠️ AND EVERY GROUND IT TAKES IS A TOKEN. A hue written here directly is how
+       a column of capsules comes to look arbitrary, which to a reader is
+       indistinguishable from meaning nothing. */
+    const rules = UI_CSS.slice(UI_CSS.indexOf(".pill {"), UI_CSS.indexOf(".pill {") + 600);
+    expect(rules).not.toMatch(/#[0-9a-f]{3,8}\b/i);
   });
 });
 
@@ -586,8 +652,8 @@ const DOC = (over: Partial<Doc> = {}, doc: Partial<LegalDoc> = {}): Doc => ({
 const RECEIVING: Receiving = {
   controller: "The example controls it.", contact: "privacy@example.test", regions: ["eu"],
   subprocessors: [
-    { id: "billing", name: "The example biller", role: "Taking payment", receives: ["identity", "financial"], where: "Inside the union", safeguard: "eea", terms: "t" },
-    { id: "model", name: "The example model", role: "Generating", receives: ["content", "health"], where: "Outside the union", safeguard: "sccs", terms: "t" },
+    { id: "billing", name: "The example biller", role: "Taking payment", does: "Takes payment", receives: ["identity", "financial"], where: "Inside the union", safeguard: "eea", terms: "t" },
+    { id: "model", name: "The example model", role: "Generating", does: "Runs models", receives: ["content", "health"], where: "Outside the union", safeguard: "sccs", terms: "t" },
   ],
   inference: {},
   transfers: [
@@ -651,29 +717,50 @@ describe("consent and legal", () => {
       onBack={() => undefined}
     />,
   );
+  /* ⚠️ THE RECORD IS ITS OWN SCREEN. Everything a questionnaire asks for is one
+     press away, where somebody who wants it will find it and nobody else has to
+     read past it. */
+  const one_recipient = (sub: string) => renderToStaticMarkup(
+    <RecipientScreen
+      of={{ appId: "hello", appName: "Hello", roles: ["owner"], docs: [], receiving: RECEIVING }}
+      sub={sub} onBack={() => undefined}
+    />,
+  );
 
   it("shows what a company actually gets, not what it claims to", () => {
     /*
-      ⚠️ THE INTERSECTION, WHICH IS THE ONE NUMBER WORTH PRINTING. The biller's own
+      ⚠️ THE INTERSECTION, WHICH IS THE ONE THING WORTH PRINTING. The biller's own
       entry declares `financial`; this deployment holds none, so the transfer says
       `identity` alone. Rendering `receives` instead would let any recipient make
-      its own row larger than the truth — over-disclosure, in the direction
-      nobody checks.
+      its own row larger than the truth — over-disclosure, in the direction nobody
+      checks.
+
+      ⚠️ AND IT IS ON THE RECIPIENT'S OWN SCREEN, because a category set is the
+      record rather than the answer. As a stack of lozenges under every row it was
+      three or four capsules per company, in a list of four, under a paragraph.
     */
-    const html = who(RECEIVING);
-    expect(html).toContain("who you are");
+    const html = one_recipient("billing");
+    expect(html).toContain("Who you are");
     expect(html).not.toContain("what was charged");
   });
 
-  it("counts what leaves Europe by the safeguard, not by the number of recipients", () => {
-    /* ⚠️ `transfersOf` returns a row per recipient whether or not it crosses a
-       border, so counting the list is how "leaves Europe" comes to say yes for a
-       deployment where nothing does. */
-    expect(receives(RECEIVING)).toBe("2 companies receive something. 1 of them is outside Europe. Some of it is sensitive.");
-    expect(counted(RECEIVING)).toBe("2 companies \u00b7 1 outside Europe");
-    /* ⚠️ AND NONE IS A REAL ANSWER, given rather than implied by an absent row. */
-    expect(receives({ ...RECEIVING, transfers: [] })).toBe("Nothing here is shared with any other company.");
-    expect(counted({ ...RECEIVING, transfers: [] })).toBe("Nobody else");
+  /* ⚠️ A SET OF THINGS IS A SENTENCE. Article 9 is NAMED in it rather than marked
+     on a lozenge: a badge saying something here is sensitive does not say which,
+     and a reader looking for one word finds it faster in a line than in a colour. */
+  it("speaks the categories, and names the sensitive one in the sentence", () => {
+    const html = one_recipient("model");
+    expect(html).toContain("What you wrote and your health");
+    expect(html).toContain("some of it sensitive");
+    expect(html).not.toContain("data-special");
+  });
+
+  /* ⚠️ THEIR LINKS, AS ROWS. A card full of external references is a list, and
+     every other list here is rows — with the outward mark where a chevron would
+     be, because a chevron promises a next screen and this promises a new tab. */
+  it("points at what the recipient publishes, and says it leaves", () => {
+    const html = one_recipient("model");
+    expect(html).toContain(`href="t"`);
+    expect(html).toContain(`data-icon="outward"`);
   });
 
   it("says the answer before it shows the evidence", () => {
@@ -750,18 +837,41 @@ describe("consent and legal", () => {
     expect(html).toContain("Scena");
   });
 
-  it("marks the category that is Article 9, not the row it is on", () => {
-    /*
-      ⚠️ THE WORD A READER IS LOOKING FOR. A badge at the end of the line says
-      "something here is sensitive" and does not say which — and the same row
-      carrying both says it twice. The special set is the KERNEL's, so a screen
-      keeping its own copy is how the mark and the transfer's own `special` flag
-      come to disagree on the same row.
-    */
-    const html = who(RECEIVING);
-    expect(html).toMatch(/data-special[^>]*>your health/);
-    /* And an ordinary category is not marked. */
-    expect(html).not.toMatch(/data-special[^>]*>who you are/);
+  /*
+    ⚠️ WHAT LEAVES EUROPE IS COUNTED BY THE SAFEGUARD, NOT BY THE RECIPIENT. A
+    company inside the union and a company outside it under standard clauses are
+    two rows and one transfer each; counting rows answers "how many companies" to a
+    question that asked "how much of this leaves", and the two differ on exactly
+    the deployment where somebody cares.
+  */
+  it("counts what leaves Europe by the safeguard, not by the number of recipients", () => {
+    expect(counted(RECEIVING)).toBe("2 companies · 1 outside Europe");
+    expect(receives(RECEIVING)).toContain("1 of them is outside Europe.");
+    /* ⚠️ AND NOTHING LEAVING SAYS SO OUTRIGHT, rather than saying nothing — which
+       reads as a sentence somebody forgot to finish. */
+    const inside = { ...RECEIVING, transfers: RECEIVING.transfers.map((t) => ({ ...t, safeguard: "eea" as const })) };
+    expect(counted(inside)).toBe("2 companies");
+    expect(receives(inside)).toContain("None of it leaves Europe.");
+  });
+
+  /*
+    ⚠️ A REGION NOBODY HAS NAMED IS PRINTED AS ITSELF. The named set is the
+    kernel's and a deployment may be somewhere it does not list; rendering a blank
+    row, or the word "Unknown", turns a place we simply have no words for into a
+    place we are declining to name — on the one screen whose whole subject is where
+    somebody's data is.
+  */
+  it("prints a region nobody has named as itself", () => {
+    const somewhere: Receiving = {
+      ...RECEIVING,
+      inference: { model: { "ap-south": ["model"], eu: [] } },
+    };
+    const html = who(somewhere);
+    expect(html).toContain("ap-south");
+    expect(html).toContain("European Union");
+    /* ⚠️ AND THE ONE WITH NOTHING IN IT SAYS SO. An empty row reads as a region
+       whose recipients we failed to list. */
+    expect(html).toContain("Nothing is generated here");
   });
 
   it("names the account differently from a product", () => {
@@ -808,20 +918,23 @@ describe("consent and legal", () => {
     )).not.toContain("We named the model.");
   });
 
-  it("shows every recipient's own mark and its own links", () => {
-    /*
-      ⚠️ THE LINKS ARE THE VENDOR'S AND ARE NOT COPIED FROM. Their processing
-      terms and their certification list change on their schedule; a copy in this
-      repository is wrong the first time one lapses, in the most damaging place
-      available — a compliance claim we made about somebody else.
-    */
+  it("gives a company a row it can be identified by, not a paragraph", () => {
     const html = who(RECEIVING);
-    expect(html).toContain(`href="t"`);
+    /*
+      ⚠️ THE DECLARED LABEL, NOT THE DECLARATION. `role` is a sentence written for
+      a record; on a row it wrapped to five lines and clipped the name beside it.
+      `does` is the same thing in four words, declared and held to a length.
+    */
+    expect(html).toContain("Takes payment");
+    expect(html).not.toContain("Taking payment");
     /* ⚠️ AND A COMPANY WITH NO DRAWN MARK STILL HAS A FACE. An unknown name and
        an absent one both fall back to the initial, so nothing here can fail to
        render — and a generic drawn building would read as a company nobody could
        identify. */
-    expect(html).toMatch(/class="vendor-letter">T</);
+    expect(html).toMatch(/class="mark-letter"[^>]*>T</);
+    /* ⚠️ NO CAPSULE. Every company here leaves Europe, so one on every row
+       distinguishes nothing; the count is in the lede. */
+    expect(html).not.toContain(`class="pill"`);
   });
 });
 
@@ -952,35 +1065,6 @@ describe("taking your data and closing the account", () => {
     expect(renderToStaticMarkup(
       <ExportScreen taken={taken} onTake={async () => null} onBack={() => undefined} />,
     )).not.toContain("What could not be read");
-  });
-});
-
-describe("where a workspace's records live", () => {
-  /*
-    ⚠️ IT WAS AN IDENTIFIER EVERYWHERE IT APPEARED. `auto` and `eu` were printed
-    raw because no human name for a region existed anywhere in the platform, and
-    any screen that wanted one would have had to invent it — on the one subject
-    where an invention is a claim about where somebody's data physically is.
-  */
-  it("names the two regions the platform declares", () => {
-    expect(renderToStaticMarkup(<JurisdictionChip region="auto" />)).toContain("Global edge network");
-    expect(renderToStaticMarkup(<JurisdictionChip region="eu" />)).toContain("European Union");
-  });
-
-  /* ⚠️ AND AN UNKNOWN ONE IS PRINTED AS ITSELF. The id is open by design, so a
-     deployment may name a third; a prettified guess would be the screen inventing
-     the answer it exists to give. */
-  it("prints a region nobody has named as itself, with no mark", () => {
-    const html = renderToStaticMarkup(<JurisdictionChip region="ap-south" />);
-    expect(html).toContain("ap-south");
-    expect(html).not.toContain("jurisdiction-face");
-  });
-
-  /* ⚠️ THE SENTENCE ONLY WHERE THE SURFACE IS ABOUT RESIDENCY. In a list it is a
-     paragraph beside every row. */
-  it("explains what choosing it means only where it is asked to", () => {
-    expect(renderToStaticMarkup(<JurisdictionChip region="eu" />)).not.toContain("processing agreement");
-    expect(renderToStaticMarkup(<JurisdictionChip region="eu" explain />)).toContain("processing agreement");
   });
 });
 

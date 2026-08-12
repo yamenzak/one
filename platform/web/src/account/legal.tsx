@@ -40,11 +40,12 @@ import { SPECIAL_CATEGORIES } from "@one/kernel";
 import type { Doc, Product } from "./wire.js";
 import type { Where } from "./routes.js";
 import { Lockup } from "../brand/mark.js";
-import { JurisdictionChip } from "../jurisdiction.js";
-import { Vendor } from "../brand/vendors.js";
+import { jurisdictionOf } from "@one/kernel";
+import { Away } from "../away.js";
+import { Mark } from "../mark.js";
 import { Button } from "../button.js";
 import { useCommit } from "../commit.js";
-import { Others, Paper, Tick } from "../icon.js";
+import { Global, Guard, Others, Paper, Tick, Union } from "../icon.js";
 import { Blank, Card, Entry, Item, Waiting } from "../list.js";
 import { Screen, Section, Title } from "../screen.js";
 
@@ -326,34 +327,27 @@ export const receives = (of: Receiving): string => {
 };
 
 /**
- * ⚠️ ONE PER CATEGORY, MARKED WHERE IT IS ARTICLE 9. Set as a comma list these are
- * prose to be parsed, and the question a person has — "is my health data in
- * there" — is answered by scanning rather than by reading to the end.
+ * EVERY COMPANY THAT RECEIVES SOMETHING.
  *
- * ⚠️ THE SPECIAL SET IS THE KERNEL'S, not a list repeated here. `SPECIAL_CATEGORIES`
- * is what `transfersOf` marks a transfer by, so a screen keeping its own copy is
- * how the tag and the row it is on come to disagree.
- */
-const Tags = ({ of }: { readonly of: readonly DataCategory[] }): ReactNode => (
-  <span className="tags">
-    {of.map((c) => (
-      <span key={c} className="tag" data-special={SPECIAL_CATEGORIES.includes(c) ? "" : undefined}>
-        {CATEGORY[c] ?? c}
-      </span>
-    ))}
-  </span>
-);
-
-/**
- * EVERY COMPANY THAT RECEIVES SOMETHING, AND WHAT COVERS IT.
+ * ⚠️ IT WAS A WALL AND THE WALL WAS THE CONTENT. Each company printed a name, four
+ * lines of role, three category lozenges, three lines of grey place-and-safeguard
+ * text and two bare blue links — about twelve lines each, four times over, under a
+ * seven-line paragraph naming the controller. Everything on it was true and none of
+ * it was readable, which is the specific failure of putting a RECORD on a screen
+ * instead of an ANSWER.
  *
- * ⚠️ A SCREEN, BECAUSE IT IS THE EVIDENCE. Folded under a product's documents it
- * competed with them for the same card and forced its own rows into a shape meant
- * for values; on its own it answers in a sentence and then shows the list, which
- * is the order somebody reading it asks in.
+ * ⚠️ SO A COMPANY IS A ROW AND THE RECORD IS BEHIND IT. The row carries the mark,
+ * the name, and the one line a person came for — what they do and whether it
+ * leaves. Everything a questionnaire wants is one press away, where somebody who
+ * wants it will find it and nobody else has to read past it.
+ *
+ * ⚠️ AND THE CONTROLLER IS A SENTENCE, NOT A FIELD. A paragraph as the value of a
+ * settings row is a paragraph nobody reads in the one place they should.
  */
-export function ReceivingScreen({ of, onBack, Heading = "h1" }: {
+export function ReceivingScreen({ of, onOpen, onBack, Heading = "h1" }: {
   readonly of: Product;
+  /** ⚠️ A recipient's own record. Absent means the rows do not go anywhere. */
+  readonly onOpen?: (to: string) => void;
   readonly onBack: () => void;
   readonly Heading?: ElementType;
 }): ReactNode {
@@ -363,8 +357,6 @@ export function ReceivingScreen({ of, onBack, Heading = "h1" }: {
   const r = of.receiving;
   if (r === null) return null;
 
-  /* ⚠️ The two things a transfer does not carry: what they DO for us, and their
-     own mark and links. All three are on the processor it points at. */
   const byId = new Map(r.subprocessors.map((p) => [p.id, p]));
 
   return (
@@ -374,100 +366,69 @@ export function ReceivingScreen({ of, onBack, Heading = "h1" }: {
          whose second is a table asks the reader to do the summarising. */
       lede={receives(r)}
     >
-      <Section>
-        <Card className="entries">
-          <Entry label="Responsible for your data">{r.controller}</Entry>
-          <Entry label="Who to write to">{r.contact}</Entry>
-        </Card>
-      </Section>
-
       {r.transfers.length ? (
         /*
-          ⚠️ ONE LIST, BUILT FROM `transfers` RATHER THAN FROM `subprocessors`,
-          and the difference is honesty. A subprocessor's `receives` is what THEY
+          ⚠️ ONE LIST, BUILT FROM `transfers` RATHER THAN FROM `subprocessors`, and
+          the difference is honesty. A subprocessor's `receives` is what THEY
           declare; a transfer's `categories` is that crossed with what this product
           actually holds — so a company claiming `financial` in an app with none
           cannot make its own row look larger than it is.
-
-          ⚠️ AND THERE IS NOT A SECOND SECTION FOR WHAT CROSSES A BORDER. There
-          was, and it listed every recipient including the ones whose safeguard is
-          `eea` — a heading reading "what actually leaves" above two companies that
-          do not. Whether it leaves is a property of the row, said on the row.
         */
-        <Section name="What each one gets">
+        <Section>
           <Card>
             {r.transfers.map((t) => {
               const sub = byId.get(t.to);
               return (
-                /*
-                  ⚠️ WHO, THEN WHAT THEY DO, THEN WHAT THEY GET, THEN WHERE AND
-                  UNDER WHAT. Four facts on one dot-separated line is a sentence
-                  somebody has to parse; the categories are a set and read as one.
+                <Item
+                  key={t.to}
+                  mark={<Mark kind="company" logo={sub?.mark} name={t.name} />}
+                  title={t.name}
+                  /*
+                    ⚠️ THE DECLARED LABEL, NOT THE DECLARATION. `role` is a full
+                    sentence written for a record; on a row it was five wrapped
+                    lines per company with the name clipped to make room. `does` is
+                    the same thing in four words, declared beside it and held to a
+                    length — because a screen cutting somebody else's sentence in
+                    half is the same class of invention as writing it.
 
-                  ⚠️ AND IT IS A RECORD RATHER THAN AN `Entry`. As a field the
-                  company's NAME was the quiet label and its job description was
-                  the value — which inverts the one thing somebody scanning "who
-                  has my data" is scanning for.
-
-                  ⚠️ NO "Sensitive" BADGE ON THE ROW. Article 9 is marked on the
-                  category that IS Article 9, which is the word a reader is looking
-                  for; a badge at the end of the line says the same thing again and
-                  does not say which one.
-                */
-                <div className="party" key={t.to}>
-                  <span className="party-head">
-                    {/* ⚠️ THE MARK IS RECOGNITION, NOT IDENTIFICATION. The full
-                        legal name is on the line beside it and is what a reader is
-                        actually told; the logo is what lets somebody who has seen
-                        it on a hundred status pages skip reading. */}
-                    <Vendor mark={sub?.mark} name={t.name} />
-                    <span className="party-said">
-                      <span className="party-name">{t.name}</span>
-                      {sub ? <span className="party-role">{sub.role}</span> : null}
-                    </span>
-                  </span>
-                  <Tags of={t.categories} />
-                  <span className="party-where">{t.where} · {SAFEGUARD[t.safeguard]}</span>
-                  {/* ⚠️ THE LINKS ARE THE VENDOR'S OWN AND ARE NOT COPIED FROM.
-                      Their processing terms and their certification list change on
-                      their schedule; a copy here is wrong the first time one
-                      lapses, in the most damaging place available — a compliance
-                      claim we made about somebody else. */}
-                  {sub ? (
-                    <span className="party-links">
-                      <a href={sub.terms} target="_blank" rel="noreferrer">Their processing terms</a>
-                      {sub.trust ? <a href={sub.trust} target="_blank" rel="noreferrer">What they publish</a> : null}
-                    </span>
-                  ) : null}
-                </div>
+                    ⚠️ AND NO CAPSULE. Every company here leaves Europe, so one on
+                    every row distinguishes nothing — the rule a standing already
+                    lives by. The count is in the lede; the safeguard is on the
+                    record this row opens.
+                  */
+                  detail={sub?.does}
+                  onGo={onOpen ? () => onOpen(t.to) : undefined}
+                />
               );
             })}
           </Card>
         </Section>
       ) : null}
 
+      {/* ⚠️ WHO IS RESPONSIBLE IS LAST AND IS PROSE. It is the answer to a
+          different question from "who else sees this" — one a person asks once and
+          a regulator asks always — and as the first card on the screen its seven
+          lines were what a reader met before anything they came for. */}
+      <Section name="Responsible for your data">
+        <div className="prose prose-quiet">
+          <p>{r.controller}</p>
+        </div>
+        <p className="prose-away"><Away href={`mailto:${r.contact}`}>{r.contact}</Away></p>
+      </Section>
+
       {Object.keys(r.inference).length ? (
         /* ⚠️ PER REGION, BECAUSE RESIDENCY IS NOT ONLY STORAGE. Choosing a region
            chooses where records are STORED; which models a generation reaches is a
-           separate answer, and publishing them together is what lets somebody
+           separate answer, and publishing the two together is what lets somebody
            choose knowing both. */
         <Section name="Where answers are generated">
           <Card>
             {Object.entries(r.inference).flatMap(([binding, byRegion]) =>
               Object.entries(byRegion).map(([region, ids]) => (
-                /* ⚠️ THE REGION IS NAMED, NOT PRINTED. It was the id — `auto`,
-                   `eu` — which is the one field a residency question is asked
-                   about, shown as a database value. The names are the kernel's,
-                   which is a reading of what `RegionId` already documents rather
-                   than a word this screen invented. */
-                <div className="party" key={`${binding}:${region}`}>
-                  <JurisdictionChip region={region} explain />
-                  <span className="party-where">
-                    {ids.length === 0
-                      ? "Nothing is generated for a workspace here."
-                      : `Reaches ${ids.map((id) => byId.get(id)?.name ?? id).join(", ")}.`}
-                  </span>
-                </div>
+                <Region key={`${binding}:${region}`} region={region}
+                  said={ids.length === 0
+                    ? "Nothing is generated here"
+                    : ids.map((id) => byId.get(id)?.name ?? id).join(", ")} />
               )),
             )}
           </Card>
@@ -476,6 +437,88 @@ export function ReceivingScreen({ of, onBack, Heading = "h1" }: {
     </Screen>
   );
 }
+
+/**
+ * ONE RECIPIENT'S WHOLE RECORD.
+ *
+ * ⚠️ THIS IS WHERE THE QUESTIONNAIRE LIVES. Everything a compliance review asks
+ * for — every category, the place, the safeguard, their processing terms and their
+ * own published certifications — on a screen somebody opened on purpose, rather
+ * than in a column everybody else has to read past.
+ */
+export function RecipientScreen({ of, sub, onBack, Heading = "h1" }: {
+  readonly of: Product;
+  readonly sub: string;
+  readonly onBack: () => void;
+  readonly Heading?: ElementType;
+}): ReactNode {
+  const r = of.receiving;
+  const who = r?.subprocessors.find((p) => p.id === sub);
+  const transfer = r?.transfers.find((t) => t.to === sub);
+  if (!r || !who) return null;
+
+  return (
+    <Screen leave="up" onLeave={onBack} name={who.name}
+      title={<Title as={Heading}>{who.name}</Title>}
+      lede={who.role}
+    >
+      <Section>
+        <Card className="entries">
+          {/* ⚠️ SPOKEN, NOT PRINTED. `identity` and `usage` are the schema's words;
+              a person reads "who you are" and "what you did here" — and as a
+              sentence rather than a stack of lozenges, because a set of things is
+              a sentence and a reader parsing capsules is doing the screen's work. */}
+          <Entry label="What they get">{spoken(transfer?.categories ?? [])}</Entry>
+          <Entry label="Where they process it">{who.where}</Entry>
+          <Entry label="What covers it">{SAFEGUARD[who.safeguard]}</Entry>
+        </Card>
+      </Section>
+
+      {/* ⚠️ THEIR LINKS, NOT COPIES OF WHAT IS BEHIND THEM. A certification list
+          changes on their schedule; a copy in this repository is wrong the first
+          time one lapses, in the most damaging place available — a compliance
+          claim we made about somebody else. */}
+      <Section name="What they publish">
+        <Card>
+          <Item icon={<Paper />} title="Their processing terms" away={who.terms} />
+          {who.trust ? <Item icon={<Guard />} title="Their certifications" away={who.trust} /> : null}
+        </Card>
+      </Section>
+    </Screen>
+  );
+}
+
+/**
+ * ⚠️ A SET OF THINGS IS A SENTENCE. Rendered as capsules, seventeen possible
+ * values three-or-four to a row became a stack of grey lozenges a reader had to
+ * parse — and the question they actually have, "is my health data in there", was
+ * answered by scanning rather than by reading. Spoken, it is one line.
+ */
+export const spoken = (of: readonly DataCategory[]): string => {
+  const said = of.map((c) => CATEGORY[c] ?? c);
+  if (said.length === 0) return "Nothing";
+  const joined = said.length === 1 ? said[0]! : `${said.slice(0, -1).join(", ")} and ${said.at(-1)}`;
+  /* ⚠️ SENTENCE CASE, BECAUSE IT IS A VALUE AND NOT A FRAGMENT. The categories are
+     written as phrases — "who you are" — which read correctly inside a sentence
+     and as a lower-case start under a label. */
+  const one = joined.charAt(0).toUpperCase() + joined.slice(1);
+  /* ⚠️ ARTICLE 9 IS NAMED IN THE SENTENCE, not marked on a lozenge. A badge saying
+     something here is sensitive does not say WHICH, and a reader looking for one
+     word finds it faster in a line than in a colour. */
+  return of.some((c) => SPECIAL_CATEGORIES.includes(c)) ? `${one} — some of it sensitive` : one;
+};
+
+/** Where records are kept, as a row. */
+const Region = ({ region, said }: { readonly region: string; readonly said: string }): ReactNode => {
+  const known = jurisdictionOf(region);
+  return (
+    <Item
+      icon={region === "eu" ? <Union /> : <Global />}
+      title={known?.name ?? region}
+      detail={said}
+    />
+  );
+};
 
 /* ------------------------------------------------------------ one of them --- */
 
@@ -535,7 +578,7 @@ export function DocScreen({ item, onAccept, onBack, Heading = "h1" }: {
              document's address as more of this page is how somebody agrees to a
              summary believing they read the contract. */
           <p className="prose-away">
-            <a href={doc.url} target="_blank" rel="noreferrer">Open the full document</a>
+            <Away href={doc.url}>Open the full document</Away>
           </p>
         ) : null}
       </Section>

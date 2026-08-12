@@ -24,6 +24,8 @@ const EVERY: readonly Where[] = [
   { at: "product", product: "kova" },
   { at: "receiving", product: "" },
   { at: "receiving", product: "kova" },
+  { at: "recipient", product: "", recipient: "cloudflare" },
+  { at: "recipient", product: "kova", recipient: "stripe" },
   { at: "document", product: "", document: "account-terms" },
   { at: "document", product: "kova", document: "privacy" },
   { at: "export" },
@@ -50,7 +52,7 @@ describe("every screen in the account centre has an address", () => {
        ACCOUNT — the one product where the empty id means something. */
     expect(parseWhere("legal//")).toEqual({ at: "legal" });
     /* ⚠️ AND A DEEPER PATH IS THE DEEPEST THING IT CAN NAME, not a failure. */
-    expect(parseWhere("legal/kova/who/extra/bits")).toEqual({ at: "receiving", product: "kova" });
+    expect(parseWhere("legal/kova/who/extra/bits")).toEqual({ at: "recipient", product: "kova", recipient: "extra" });
     /* ⚠️ A part nobody declared is the category hub, not a blank category. */
     expect(parseWhere("preferences/nope")).toEqual({ at: "preferences" });
   });

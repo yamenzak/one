@@ -24,9 +24,9 @@ import { useState, type ElementType, type ReactNode } from "react";
 import type { Problem } from "@one/kernel";
 import { Add, Device, Key, Letter } from "../icon.js";
 import { Button } from "../button.js";
-import { Face } from "../avatar.js";
-import { Chip } from "../chip.js";
-import { Blank, Card, Item, Marked, Pill, Waiting } from "../list.js";
+import { Mark } from "../mark.js";
+import { Chip, Pill } from "../capsule.js";
+import { Blank, Card, Item, Waiting } from "../list.js";
 import { Confirm } from "../confirm.js";
 import { Screen, Section, Title } from "../screen.js";
 
@@ -170,8 +170,9 @@ export function SignInMethods({
               <Item
                 key={d.id}
                 mark={
-                  <Marked
-                    face={<Face kind="workspace" src={d.workspaceFace} name={d.workspaceName ?? d.app} tone={d.product} />}
+                  <Mark
+                    kind="workspace" src={d.workspaceFace}
+                    name={d.workspaceName ?? d.app} product={d.product}
                     badge={<Device size={14} />}
                   />
                 }
@@ -209,7 +210,7 @@ export function SignInMethods({
                     the middle of a sentence — the same face that is on the row
                     behind this sheet, so there is nothing to match up. */}
                 Whoever is using{" "}
-                <Chip face={<Face kind="workspace" src={asking.it.workspaceFace} name={asking.it.workspaceName ?? asking.it.app} tone={asking.it.product} />}>
+                <Chip face={<Mark kind="workspace" size="sm" src={asking.it.workspaceFace} name={asking.it.workspaceName ?? asking.it.app} product={asking.it.product} />}>
                   {asking.it.workspaceName ?? asking.it.app}
                 </Chip>{" "}
                 will be signed out. You can sign in again at any time.

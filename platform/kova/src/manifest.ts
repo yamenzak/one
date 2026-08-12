@@ -3664,6 +3664,7 @@ export const kova = defineApp({
           name: "Cloudflare, Inc.",
           mark: "cloudflare",
           role: "Runs the product and stores everything in it — compute, the databases, the object store, the key-value cache and the durable objects.",
+          does: "Runs the platform",
           receives: ["identity", "contact", "credential", "financial", "usage", "content", "health", "biometric"],
           where: "Workers run at the point of presence nearest the request. Databases and object stores are placed in the region a studio chose.",
           safeguard: "dpf",
@@ -3686,6 +3687,7 @@ export const kova = defineApp({
           name: "Cloudflare Email Routing and Email Sending",
           mark: "cloudflare",
           role: "Sends the messages this product sends: a sign-in code, an invitation, a notification somebody asked to be emailed.",
+          does: "Sends the mail",
           receives: ["identity", "contact"],
           where: "Cloudflare's network.",
           safeguard: "dpf",
@@ -3705,6 +3707,7 @@ export const kova = defineApp({
             without anybody remembering to.
           */
           role: "Runs the text models a workspace may choose instead of Google's. Never given a photograph: these models price no image, so nothing that sends one can be pointed at them.",
+          does: "Runs models",
           receives: ["content", "usage"],
           where: "Cloudflare's inference network. Not guaranteed to be EU-only.",
           safeguard: "dpf",
@@ -3723,6 +3726,7 @@ export const kova = defineApp({
             claim about THEIR terms, linked below rather than restated here.
           */
           role: "Reads photographs and drafts text for the features that need a vision model: a meal, a label, a lab report, a body scan.",
+          does: "Runs models",
           receives: ["content", "health", "biometric"],
           where: "Google's infrastructure.",
           safeguard: "sccs",
@@ -3741,6 +3745,7 @@ export const kova = defineApp({
             strongest single sentence in this whole declaration.
           */
           role: "Takes a studio's payment for its own plan and its credits. Never involved in what a studio charges the people it coaches.",
+          does: "Takes payment",
           receives: ["identity", "contact", "financial"],
           where: "United States and Ireland.",
           safeguard: "dpf",
@@ -3757,6 +3762,7 @@ export const kova = defineApp({
             that no other value could reach it.
           */
           role: "Answers a barcode or a food search when a studio has not entered the food itself.",
+          does: "Looks up foods",
           receives: ["usage"],
           where: "France.",
           safeguard: "eea",
@@ -3766,6 +3772,7 @@ export const kova = defineApp({
           id: "wger",
           name: "wger",
           role: "Answers a movement search when a studio would rather not type one out.",
+          does: "Looks up movements",
           receives: ["usage"],
           where: "Germany.",
           safeguard: "eea",

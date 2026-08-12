@@ -20,7 +20,7 @@
  *                forces every guard it promised to be built, re-targeted with a
  *                reason, or dropped on purpose.
  *
- * The fifth is structural rather than a check here: PLAN.md §6 and UI.md §10 are
+ * The fifth is structural rather than a check here: PLAN.md §6 and UI.md §4 are
  * GENERATED from the registry, so prose cannot name a guard with no entry.
  * `docs.test.mjs` re-runs those commands and diffs them.
  *

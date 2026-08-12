@@ -375,6 +375,64 @@ circles beside it to read as a value somebody nearly got right rather than a
 decision. A workspace has a name its owner chose and a logo they will upload, and
 a logo in a circle is a logo with its corners cut off.
 
+**One tile draws every face, logo and symbol, and it is one component.** — There
+were five and they agreed about nothing: a person's face as a circle at 44 and
+another at 62, a workspace at an 11-pixel radius, a company at 14, an icon in a
+fully rounded well, and two badges hanging off their corners at −1 and −3. Every
+one was defensible alone. Together they were five sizes, four radii and three
+badge positions, which is what *inconsistent avatars* is — and no amount of
+individually careful work fixes it while there are five places to be careful in.
+*Checked: `web/test/interface.test.tsx` — the picture primitive is imported in
+one file, and a path is drawn only where drawing lives.*
+
+**A mark's geometry is derived from its size, never written.** — The size is one
+number on the element; the radius, the letter, the glyph, the badge and its ring
+all come out of it in the sheet. That is what makes a new size one value instead
+of five rules — and a pixel radius is what drifted into 11 on one 44-pixel tile
+and 14 on another, close enough to read as a value somebody nearly got right.
+*Checked: `web/test/interface.test.tsx` — no pixel length inside a mark rule, and
+the size variable is set by the component alone.*
+
+**A badge sits on the shape's edge, which takes arithmetic rather than a nudge.**
+— Placed at the bounding box's corner it lands *on* a rounded square and in empty
+space beside a circle, which is exactly why a camera on somebody's photograph
+looked detached while a device on a workspace did not. Nine per cent of the box,
+outward, is the point on the arc at four o'clock and just past the square's
+corner: one number, both shapes.
+
+**There are two capsules and a third is a symptom.** — A chip says WHICH one: it
+carries a face into a sentence, so the thing being talked about appears as itself,
+and it is never coloured because the face is already the identification. A pill
+says WHAT STATE the row is in: it takes the tone scale and nothing else, appears
+only when the state is worth saying, and a row has at most one. The tag was a data
+category rendered as a capsule — seventeen possible values, three or four to a
+row, in a colour picked per row — and what a reader had was a stack of grey
+lozenges to parse instead of a sentence to read. A set of things is a sentence or
+a count.
+*Checked: `web/test/interface.test.tsx` — no third capsule, a pill is coloured
+only by tone, and a pill may not look pressable.*
+
+**Nobody names a colour.** — A palette is only a palette while every surface takes
+its colour from it. One white typed onto a button does not move when a theme does,
+and it is invisible to whoever typed it, because they were looking at the theme it
+happens to be right in. Five of those, a scrim whose darkness was one theme's
+guess, and a drop shadow nobody had decided the platform had.
+*Checked: `web/test/vocabulary.test.ts` — a colour literal appears on a token's
+own declaration, in a value derived from one, or in a mask, where black is
+opacity rather than colour.*
+
+**A link out is a component, and it says it leaves.** — Every link in the account
+centre was a bare anchor: browser blue, browser underline, no press, no motion,
+nothing saying it left, on a surface where every other control has a tone and a
+spring. It happened because an anchor is the one element that looks finished with
+no styling at all. The outward mark is not decoration — rendering an operative
+document's address as more of this page is how somebody agrees to a summary
+believing they read the contract. The underline is drawn rather than inherited so
+it can grow from the start of the word; a browser underline sits at a fixed offset
+and cannot animate at all.
+*Checked: `web/test/interface.test.tsx` — no bare anchor outside the two files
+that own one, and a link out carries the mark and no referrer.*
+
 **One thing on a surface may be a place rather than a setting, and it is lit to
 say so.** — A list of rows says *these are all the same kind of thing*, which is
 exactly what an account centre's settings are and exactly what the vault is not:
@@ -394,7 +452,8 @@ ids — and an unknown or absent name falls back to the initial, never to a draw
 office block, which beside three real logos reads as a company nobody could
 identify. The full legal name is always on the row, so the mark is hidden from a
 reader.
-*Checked: `web/test/vendors.test.tsx` — every declared mark has a drawing.*
+*Checked: `web/test/interface.test.tsx` — every declared mark has a drawing, and
+nothing is drawn that no manifest declares.*
 
 **A link to somebody else's terms is a link, never a copy.** — Their certification
 list changes on their schedule; a copy in this repository is wrong the first time
@@ -479,6 +538,14 @@ device out are both destructive and both sit beside the thing being removed,
 which is the more important half of the line. A red button per row makes a list
 of ordinary facts look like a list of problems, and the one that really is
 dangerous stops standing out. Destruction is confirmed, not coloured.
+
+**A marked row's second line is one line, and the sheet is what holds it there.**
+— A company's declared role is a sentence written for a record; as a row's detail
+it wrapped to five lines while the TITLE clipped to make room — the identity
+truncated so the metadata could run on, which is the wrong way round in every
+case. It is on the row rather than on the line, because what a screen chooses is
+what it puts on the row; how a row holds it is the sheet's.
+*Checked: `web/test/interface.test.tsx`.*
 
 **A row that carries a button has about half a phone for words.** — "Added 4
 March · last used 2 days ago" wrapped to two lines and pushed the standing pill
@@ -663,7 +730,66 @@ What stayed: the centred lockup title, the name-beside-a-face header, and the
 photo control — one use each. The next screen that wants a face beside its title
 is what moves them.
 
-## 4. What is not decided yet
+## 4. What enforces this
+
+⚠️ **GENERATED FROM `docs/guards.json`, so this document cannot promise a check
+that does not exist.** Prose claiming enforcement nobody built is worse than no
+prose: it is authoritative-sounding and expensive to disprove. Every rule in §2
+that names a check appears here; every rule that does not is a rule and nothing
+more, which is the honest state.
+
+<!-- generated: node scripts/guards.mjs table interface -->
+| guard | fails on | |
+|---|---|---|
+| `a-class-is-declared-once` | two unrelated things sharing one class name. `ghost` was the quiet button AND the loading placeholder, so every placeholder bar inherited a 40px minimum height, a border and a pill radius — the loading state rendered as a stack of empty outlined capsules and nothing failed, because both rules were valid CSS | **live** |
+| `the-sheet-and-the-markup-are-one-set-of-names` | a rule nothing wears — an affordance somebody designed, wrote and believed shipped — or a class the sheet never mentions, which renders as a bare box | **live** |
+| `both-themes-in-all-three-scopings` | a colour defined only under the media query or only under the attribute. The viewer has three states, not two, and the missing one renders one theme's text on the other theme's ground | **live** |
+| `a-movement-belongs-to-the-journey` | a direction taken from the screen rather than from the step. The same screen is reached by pressing a row on the surface behind it and by a shortcut from elsewhere in a product; one carrying its own entrance plays a coming-back-out movement while arriving over an app that was never its parent, and a movement in the wrong direction is still a movement | **live** |
+| `a-stack-animates-a-change-and-never-a-mount` | a level that animates its first render. Whatever presented it did the arriving, so a second movement over the top is two things arriving at once — and every deep link slides in from the side over an app that was never behind it. This one rule is the whole of the context-awareness | **live** |
+| `a-screen-leaving-keeps-its-own-key` | the pair rendered as two sibling slots rather than one keyed array. React reconciles by position first, so the screen on its way out lands in a slot that held nothing a moment ago and is mounted afresh — a half-typed field clears and every effect re-runs, in full view, for the whole length of the movement | **live** |
+| `a-sky-is-dimmed-by-a-factor` | a theme rule setting a sky's opacity outright. How much light arrives is a ground's headroom times a placement's ask; set as an opacity the theme wins on specificity, so a card that dims itself dims correctly under one theme and not at all under the other — valid CSS either way, and the broken half is the one whoever wrote it was not looking at | **live** |
+| `no-backtick-inside-a-sheet` | a backtick in a comment inside a CSS template literal — it closes the literal, and the compiler reports a missing , or ; hundreds of lines away in a line that has nothing wrong with it. Scans raw text, so it reports the cause on a file that no longer parses | **live** |
+| `vault-a-control-never-spends-a-rung-unasked` | a want with more than two rungs rendered as a switch. Somebody who chose "the assistant, no people" sees it reading ON, and turning it off and on again silently re-grants at the top of the ladder — nothing throws, the sentence underneath stays correct, and only the control is a lie about what it will do | **live** |
+| `vault-screen-writes-no-copy-of-its-own` | the account centre explaining a fact in its own words. Every reason, recommendation and hides-sentence is read out of a declaration, so an app that declares a thirteenth fact gets a thirteenth row without this screen being opened; the day it stops being true is the day the vault grows a branch per product | **live** |
+| `a-screen-may-not-invent-a-payload` | a screen written against `subprocessor: {name, purpose, region}` where the kernel declares `{id, name, role, receives, where, safeguard, terms}` — two fields nobody has ever sent. It typechecked, every test passed, and the screenshots looked right, because the FIXTURES were written to match the invention. `s.json()` is opaque at the boundary, so the kernel type the handler returns is the only place the shape is written down: name it, never describe it | **live** |
+| `an-old-acceptance-is-not-a-missing-one` | a boolean where four states are needed. "Accepted an earlier version" is what everybody sees the day terms change, and collapsing it into agreed-or-not misreports the record on precisely the day it matters | **live** |
+| `an-acceptance-is-matched-on-its-version` | "Accepted 2 March" shown against terms published in June — a screen quietly claiming somebody agreed to something they have never been shown | **live** |
+| `agreeing-requires-opening-the-document` | a tick beside a link, which is worth nothing as evidence — the only defensible record of an acceptance is one where the text was on the screen | **live** |
+| `a-recipient-is-shown-the-intersection` | rendering a subprocessor's own `receives` instead of the transfer's `categories`, which lets any recipient make its row larger than the truth — over-disclosure, in the direction nobody checks | **live** |
+| `leaving-europe-is-counted-by-safeguard` | `transfersOf` returning a row per recipient whether or not it crosses a border, so counting the list says yes for a deployment where nothing leaves | **live** |
+| `a-declared-document-is-text-not-markup` | bold headings bought at the price of making every app's manifest a way into every reader's page | **live** |
+| `documents-are-named-by-their-product` | an ungrouped list, which cannot say whose terms these are once a person belongs to more than one product | **live** |
+| `a-category-set-is-a-sentence` | a set of things rendered as capsules — seventeen possible values three or four to a row, so the question somebody actually has, is my health data in there, is answered by scanning a stack of grey lozenges rather than by reading. Article 9 marked as a badge is the same failure twice: it says something here is sensitive without saying which | **live** |
+| `the-account-is-named-as-yours` | the account's own section headed like a product's. Under the deployment's name it reads as a fourth product in a list of three, and the documents everybody owes look like ones only some people do | **live** |
+| `the-answer-comes-before-the-evidence` | a disclosure written as a table — "Stored in", "Companies with access" and "Leaves Europe" were three label/value rows a person had to assemble into one fact, and the first of them was a claim the payload cannot support: the regions the PRODUCT can be deployed in, under a label saying where THIS PERSON'S data is | **live** |
+| `a-disclosure-is-worth-not-opening` | a row saying only "Who else sees this" — a door, with everything behind it one press further away for nothing. The same rule the vault's groups and the preferences hub live by, and the reason the count is on the row rather than only on the screen it opens | **live** |
+| `an-unpublished-disclosure-says-so` | a product whose disclosure has not published rendering nothing at all, which is indistinguishable from one that shares with nobody — the opposite claim, made silently, on the screen where the difference matters most | **live** |
+| `a-product-is-a-place-not-a-fold` | a hub of disclosures. A product with four documents and a disclosure of its own is a PLACE, and unfolding one pushed the next product half a screen down — so a person in three of them was reading a list that moved under them. The state stays on the row, which is what keeps the hub readable without opening anything | **live** |
+| `a-group-counts-what-is-owed` | "3 of 4" — a fraction whose remainder may be documents nobody ever has to accept. The number a person is looking for is how many are waiting on them, and the settled state has to be true of a product that never asked them for anything | **live** |
+| `a-version-says-what-moved` | a republished document shown as the same wall of text with a different number on it. Versioning was already real — the ledger re-asks everybody the day it changes — so somebody re-agreeing without being told what moved is a signature collected rather than a consent given | **live** |
+| `a-refusal-to-continue-has-a-surface` | a 451 with a list of document ids and nowhere to go. The server refused every write for outstanding consent and there was no screen for it, so a person met an error on whatever they happened to be doing — a dead end with a citation | **live** |
+| `declining-still-lets-you-leave` | a consent wall that only offers agreement. The exit lane survives every gate in the platform precisely so somebody who will not agree can take their account and go, and a screen that does not say so pretends otherwise | **live** |
+| `closing-waits-for-what-it-would-strand` | a working Close in front of somebody whose workspaces would be left with nobody who can manage them — `null` and `[]` read as the same answer, on the one screen where the difference is a workspace nobody can re-enter | **live** |
+| `an-export-says-what-is-missing` | an export that prints only what it managed to gather. It arrives, it is full of somebody's data, and nothing in it says what is not there — which is the omission that makes an export dangerous rather than merely incomplete | **live** |
+| `a-region-is-named-or-printed-as-itself` | a prettified guess at where somebody's data physically is, on the one screen that exists to answer exactly that. The two ids the kernel documents are named; a third has no name and is shown as the identifier it is | **live** |
+| `every-destination-has-an-address` | two screens printing to one path, so one of them is unreachable — and, before this, an account centre whose inner screens were component state: no link to a vault, no address for a refusal to send anybody to, and a back button that left the whole surface | **live** |
+| `a-route-parses-back-to-where-it-was` | a printer and a parser that do not invert each other — a surface that works until somebody reloads, and then opens somewhere else, once, with nothing in the console | **live** |
+| `a-declared-mark-is-drawn` | a mark named in a manifest that nothing draws. The fallback is total by design — an unknown name renders the company's initial — so a typo is a row that looks fine with the wrong thing in it, and the only way to notice is to have seen the right one | **live** |
+| `a-face-is-drawn-by-one-tile` | five avatar treatments, each defensible alone: a circle at 44 and another at 62, an 11-pixel radius beside a 14, two badge offsets and an icon well that was a sixth. Nothing fails — a screen with the wrong radius renders, passes and ships — and no amount of individually careful work fixes it while there are five places to be careful in | **live** |
+| `a-path-is-drawn-where-drawing-lives` | a glyph written at a screen, which is a second stroke weight and a second optical size nobody chose. On this surface it is worse: four company logos were drawn from memory, which is a trademark reproduced wrongly on the one screen that names the company it belongs to | **live** |
+| `a-mark-derives-its-geometry` | a radius, a badge offset or a letter size written in pixels. It drifts the first time somebody adds a size, which is exactly what an 11-pixel radius on one 44-pixel tile and a 14 on another already were — a value somebody nearly got right rather than a decision | **live** |
+| `a-mark-is-sized-from-the-scale` | a screen setting the tile's size variable itself, which is a fourth size in a three-size scale — and it is invisible, because the sheet derives everything else from it and a wrong number still renders a perfectly proportioned mark | **live** |
+| `nothing-is-drawn-that-nobody-declares` | a committed brand path shipped to every browser for a company no manifest names. Not a defect a person sees — which is why it accumulates | **live** |
+| `a-link-out-is-never-a-bare-anchor` | browser blue, browser underline, no press and no motion, on a surface where every other control has a tone and a spring. An anchor is the one element that looks finished with no styling at all, which is why this was every link in the account centre | **live** |
+| `a-link-out-says-it-leaves` | an operative document's address rendered as more of this page, which is how somebody agrees to a summary believing they read the contract. The referrer matters for the same reason: a link out of a screen about somebody's data should not tell the destination which screen they were on | **live** |
+| `there-is-no-third-capsule` | a chip, a pill and a tag that are all a rounded rectangle with a grey ground and small text. That is what capsules everywhere is — not too many of them, but no rule about what one MEANS | **live** |
+| `a-pill-takes-the-tone-scale` | a colour chosen per row, which is how a column of capsules comes to look arbitrary. Four states named for what they mean is the rule that was missing | **live** |
+| `a-pill-is-not-a-control` | a border, a shadow or a cursor on a thing that cannot be pressed, which makes a list of facts look like a row of buttons | **live** |
+| `a-marked-rows-detail-is-one-line` | a sentence written for a record used as a row's second line: five wrapped lines with the title clipped above them — the identity truncated so the metadata can run on. It is held by the sheet rather than by the caller, because a payload somebody else composes will eventually arrive longer than it promised | **live** |
+| `nobody-names-a-colour` | a colour typed at the point of use, which does not move when a theme does — and is invisible to whoever typed it, because they were looking at the theme it happens to be right in. Five hand-written whites on saturated grounds, a scrim and a drop shadow got in this way | **live** |
+<!-- /generated -->
+
+## 5. What is not decided yet
 
 Named so that nobody assumes it was. Each becomes a rule when a screen needs it:
 
