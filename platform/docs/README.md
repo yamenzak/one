@@ -24,6 +24,7 @@ than from recall — that is the whole design.
 | | |
 |---|---|
 | `@one/cli` | `one new` — a whole app from one word. Plain JavaScript, so it runs in a fresh checkout before anything is installed. |
+| `@one/deployment` | WHO RUNS THIS DEPLOYMENT — the one thing in platform/ that is not product-agnostic. Every worker imports it; no shared package may. |
 | `@one/hello` | a manifest, one collection, three operations. It exists to boot — every stage's exit criterion is asserted against it. |
 | `@one/kernel` | primitives, bindings, problems, collections, operations and defineApp. TYPES ONLY — stage 0 proves the shape before anything implements it. |
 | `@one/kova` | A ONE app. Everything it does beyond one collection is the platform's. |

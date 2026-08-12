@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@one/kernel": "workspace:*",
-    "@one/runtime": "workspace:*"
+    "@one/runtime": "workspace:*",
+    "@one/deployment": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.8.55",

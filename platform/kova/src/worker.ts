@@ -12,6 +12,7 @@
  * argument for having built it.
  */
 
+import { DEPLOYMENT } from "@one/deployment";
 import { deriveSchema, PLATFORM_CONFIG } from "@one/kernel";
 import {
   applySchema, createRuntime, publishLegalSpec, publishVaultSpec,
@@ -74,6 +75,10 @@ const runtime = createRuntime(kova, {
   objectsBinding: "media",
   /* ⚠️ Export and erasure are derived from these, so a module added later is
      covered by both paths on the same commit. */
+  /* ⚠️ WHO RUNS THIS, imported rather than retyped. Every worker passes the same
+     object; a copy per manifest is the same company written twice and drifted by
+     the second edit. */
+  deployment: DEPLOYMENT,
   regionalModules: REGIONAL_MODULES,
   /* ⚠️ AND THE GLOBAL ONES, because a PERSON's export is derived from these
      rather than from the regional list — an account's vault, consents and

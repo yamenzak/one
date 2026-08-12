@@ -89,7 +89,11 @@ export function LegalScreen({
                      recorded per account, so somebody in two studios of the same
                      product has one obligation — listing it under each would show
                      two rows that tick together. */
-                  <Section key={p.appId} name={p.appName}>
+                  /* ⚠️ THE ACCOUNT'S OWN SECTION IS FIRST AND IS NOT A PRODUCT.
+                     It arrives with an empty `appId`, which is what the runtime
+                     uses to say "this is the deployment" — the thing that exists
+                     before any product and outlives all of them. */
+                  <Section key={p.appId || "account"} name={p.appId ? p.appName : `Your ${p.appName} account`}>
                     <Card>
                       {p.docs.map((d) => (
                         <Item
@@ -214,11 +218,19 @@ const Receivers = ({ of }: { readonly of: Receiving }): ReactNode => {
         {/* DEFER(one-188) stage:7 — a region has no human name. Every surface that
             shows one shows an id, and any prettier answer would have to be
             invented by whichever screen wanted it. */}
-        <Entry label="Stored in">{of.regions.join(", ")}</Entry>
-        <Entry label="Companies with access">{of.subprocessors.length}</Entry>
+        {/*
+          ⚠️ A ROW ONLY WHERE THERE IS SOMETHING TO SAY. The account's own
+          disclosure has no regions and no recipients — it is a controller and an
+          address — and rendering the other three anyway produced a blank "Stored
+          in", which reads as a value that failed to load, above two rows
+          answering questions nobody asked about it.
+        */}
+        {of.regions.length ? <Entry label="Stored in">{of.regions.join(", ")}</Entry> : null}
+        {of.subprocessors.length ? <Entry label="Companies with access">{of.subprocessors.length}</Entry> : null}
         {/* ⚠️ THE QUESTION EVERY PERSON AND EVERY QUESTIONNAIRE ASKS, answered in
             one row. "None" is a real answer and has to be given rather than
             implied by the row being missing. */}
+        {of.transfers.length ? (
         <Entry label="Leaves Europe">
           {leaving.length === 0 ? "No" : `Yes — ${leaving.length} of ${of.transfers.length}`}
           {/* ⚠️ A MARK ON A VALUE, NOT A ROW OF ITS OWN. Article 9 qualifies a
@@ -226,6 +238,7 @@ const Receivers = ({ of }: { readonly of: Receiving }): ReactNode => {
               stated twice and countable once. */}
           {special ? <Pill urgent>Includes sensitive data</Pill> : null}
         </Entry>
+        ) : null}
       </Card>
 
       {of.transfers.length ? (

@@ -246,18 +246,32 @@ describe("what a person is asked to agree to", () => {
   it("asks an owner's documents of owners, and not of somebody in no workspace", async () => {
     const cookie = await clean();
     const r = await get(ID, "/api/legal.list", cookie);
-    expect((r.body.outstanding as unknown as { id: string }[]).map((d) => d.id)).toEqual([]);
+    const owed = (r.body.outstanding as unknown as { id: string }[]).map((d) => d.id);
+    /*
+      ⚠️ WHAT THE DEPLOYMENT ASKS, AND NOT WHAT THE APP DOES. `hello` asks its
+      terms of its OWNER; this person is nobody's owner. The account documents are
+      owed for having an account at all, which is the one obligation reaching
+      somebody in no product — and before they existed this returned nothing,
+      which meant an address and a passkey held against nothing agreed.
+    */
+    expect(owed).toContain("account-terms");
+    expect(owed).toContain("account-privacy");
+    expect(owed).not.toContain("terms");
     /* And the documents are still published — withheld obligation, not withheld text. */
     expect((r.body.documents as unknown as unknown[]).length).toBeGreaterThan(0);
   });
 
-  it("lets them use their own account while owing nothing", async () => {
+  it("lets them use their own account once the account's own terms are accepted", async () => {
     /* ⚠️ 451 IS THE SYMPTOM THIS EXISTS TO CATCH. It is not a permission failure
        and does not read like one — "There is something to read first", about a
        document that was never theirs. */
     const cookie = await clean();
-    const r = await send(ID, "/api/me.preferences.set", cookie, { theme: "dark" });
-    expect(r.status).toBe(200);
+    /* ⚠️ THE ACCOUNT'S OWN, WHICH THEY DO OWE. The point is that they are held to
+       what is theirs rather than to an owner's — accepting these is enough. */
+    for (const id of ["account-terms", "account-privacy"]) {
+      expect((await send(ID, "/api/legal.accept", cookie, { document: id, version: "2026-01-01" })).status).toBe(200);
+    }
+    expect((await send(ID, "/api/me.preferences.set", cookie, { theme: "dark" })).status).toBe(200);
   });
 });
 
@@ -297,7 +311,30 @@ describe("what every product you belong to asks of you", () => {
       to the terms of one they do not.
     */
     const cookie = await signIn(`stranger.${SLUG}@example.com`, ID);
-    expect((await get(ID, "/api/legal.mine", cookie)).body.apps as unknown as unknown[]).toEqual([]);
+    const apps = (await get(ID, "/api/legal.mine", cookie)).body.apps as unknown as { appId: string }[];
+    /* ⚠️ THE ACCOUNT ITSELF IS ALWAYS THERE — it is what they have — and no
+       product is, because they are in none. */
+    expect(apps.map((a) => a.appId)).toEqual([""]);
+  });
+
+  it("puts the account itself first, and not as a product", async () => {
+    /*
+      ⚠️ IT IS NOT A PRODUCT AND MUST NOT BE LISTED AS ONE. The account exists
+      before any product and outlives all of them — the vault is the proof, since
+      a fact there survives leaving every workspace — so an app's declaration
+      structurally cannot cover it. An empty `appId` is how the runtime says which
+      row this is, and the screen names it differently because of that.
+    */
+    const cookie = await signIn(`first.${SLUG}@example.com`, ID);
+    const apps = (await get(ID, "/api/legal.mine", cookie)).body.apps as unknown as {
+      appId: string; roles: string[]; documents: { id: string }[]; receiving: { controller: string } | null;
+    }[];
+    expect(apps[0]!.appId).toBe("");
+    expect(apps[0]!.roles).toEqual(["account"]);
+    expect(apps[0]!.documents.map((d) => d.id)).toEqual(["account-terms", "account-privacy"]);
+    /* ⚠️ AND IT NAMES A CONTROLLER. The account and the vault are held by
+       somebody, and no product's declaration says who. */
+    expect(apps[0]!.receiving!.controller.length).toBeGreaterThan(0);
   });
 
   it("carries each product's own disclosure, not the serving app's", async () => {

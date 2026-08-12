@@ -273,6 +273,44 @@ export interface LegalDoc {
 }
 
 /**
+ * ⚠️ THE ROLE A PLATFORM DOCUMENT IS ASKED OF, AND IT IS NOT A WORKSPACE ROLE.
+ * Everything else in `mustAccept` names something somebody is inside a product —
+ * an owner, a client, a coach. What the deployment asks is owed by anybody who
+ * has an ACCOUNT, including somebody who has never opened a product and belongs
+ * to nothing, which is a real state and the one where nothing else applies.
+ */
+export const ACCOUNT_HOLDER = "account";
+
+/**
+ * WHO RUNS THIS DEPLOYMENT, AND WHAT THEY ASK OF EVERYBODY WITH AN ACCOUNT.
+ *
+ * ⚠️ THE SHAPE IS THE PLATFORM'S; THE CONTENT IS NOT. Naming a company in a
+ * product-agnostic package is the same mistake as putting one product's nouns in
+ * a shared component library — so this type lives here and the one object that
+ * fills it lives in the deployment's own module, injected once.
+ *
+ * ⚠️ IT EXISTS BECAUSE AN APP'S DECLARATION STRUCTURALLY CANNOT COVER THIS. A
+ * vault fact outlives every workspace somebody leaves and every product they stop
+ * using — that is what the vault IS — so the app that asked to read it is not the
+ * party holding it. Nor can an app's terms cover an account with no workspaces in
+ * it, which is a state somebody can sit in indefinitely while we hold their
+ * address, their passkeys and the record of who read their facts.
+ */
+export interface DeploymentSpec {
+  /** What the operator is called where a person would recognise it. */
+  readonly name: string;
+  /** ⚠️ The controller of the ACCOUNT and the VAULT. Not any product's. */
+  readonly controller: string;
+  /** Where a data-protection question goes. An address, not a form. */
+  readonly contact: string;
+  /**
+   * ⚠️ ASKED OF `ACCOUNT_HOLDER`, NOT OF A ROLE. `legalProblems` still applies —
+   * a version, a title, text or an address, and somebody it is required of.
+   */
+  readonly legal: readonly LegalDoc[];
+}
+
+/**
  * WHAT ONE PRODUCT ASKS OF ONE PERSON, ACROSS EVERY WORKSPACE THEY ARE IN IT.
  *
  * ⚠️ IT IS A KERNEL TYPE BECAUSE TWO SIDES HAVE TO AGREE ON IT. The runtime

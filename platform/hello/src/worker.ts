@@ -12,6 +12,7 @@
  * argument for having built it.
  */
 
+import { DEPLOYMENT } from "@one/deployment";
 import { deriveSchema, PLATFORM_CONFIG } from "@one/kernel";
 import {
   applySchema, createRuntime, publishLegalSpec, publishVaultSpec,
@@ -90,6 +91,10 @@ const runtime = createRuntime(hello, {
     shipping product named seven tables against a declaration of twenty-five, and
     the sweep reported success while a deleted workspace kept eighteen.
   */
+  /* ⚠️ WHO RUNS THIS, imported rather than retyped. Every worker passes the same
+     object; a copy per manifest is the same company written twice and drifted by
+     the second edit. */
+  deployment: DEPLOYMENT,
   regionalModules: REGIONAL_MODULES,
   /* ⚠️ AND THE GLOBAL ONES, because a PERSON's export is derived from these. An
      app that adds a global module gets it covered on the same commit; without

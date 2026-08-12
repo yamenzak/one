@@ -21,8 +21,8 @@
  * by the platform, so a registry added later cannot join this list quietly.
  */
 
-import type { AnyOperation, AppSpec, BindingSpec, Instant, LegalDoc, LegalForApp, Receiving, SchemaModule, Session, SqlHandle } from "@one/kernel";
-import { PUBLIC, operation, ropaOf, s, transfersOf, vaultActivities } from "@one/kernel";
+import type { AnyOperation, AppSpec, BindingSpec, DeploymentSpec, Instant, LegalDoc, LegalForApp, Receiving, SchemaModule, Session, SqlHandle } from "@one/kernel";
+import { ACCOUNT_HOLDER, PUBLIC, operation, ropaOf, s, transfersOf, vaultActivities } from "@one/kernel";
 
 /** ⚠️ A symbol, so an app cannot reach the ledger by writing a property name. */
 export const REFERENCE = Symbol.for("one.runtime.reference");
@@ -51,6 +51,16 @@ export interface ReferenceDeps {
    * answered from the door they happen to be standing at.
    */
   workspaces(): Promise<readonly WorkspacePlace[]>;
+  /**
+   * ⚠️ WHO RUNS THIS DEPLOYMENT, INJECTED. The content names a company, so it
+   * cannot live in a product-agnostic package — but the obligation it carries is
+   * owed by everybody with an account, including somebody in no product at all,
+   * which is the one person no app's declaration reaches.
+   *
+   * Null where a deployment has not declared one, which is a self-host that has
+   * not got there yet rather than an error.
+   */
+  readonly deployment: DeploymentSpec | null;
 }
 
 /** One place somebody belongs, as the legal surface needs it. */
@@ -323,7 +333,14 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
     idempotency: { mode: "none" },
     async handler(ctx) {
       const d = deps(ctx);
-      const documents = app.governance.legal;
+      /*
+        ⚠️ THE DEPLOYMENT'S OWN DOCUMENTS TRAVEL WITH THE APP'S, on every door. The
+        account terms are owed by anybody with an account and are enforced by the
+        same consent gate — so a lane that answered only the app's would report an
+        obligation the gate holds people to and no screen ever showed.
+      */
+      const ours = d.deployment?.legal ?? [];
+      const documents = [...ours, ...app.governance.legal];
       if (!d.session) return { documents, outstanding: [], accepted: [] };
       const accepted = await consentsOf(d.directory, d.session.accountId);
       /*
@@ -337,7 +354,16 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
         ledger that showed only the current row would quietly rewrite what
         somebody signed up to.
       */
-      return { documents, outstanding: outstandingFor(documents, d.role, accepted), accepted };
+      return {
+        documents,
+        /* ⚠️ TWO ROLES, ONE LIST. What the deployment asks is owed for HAVING an
+           account; what the app asks is owed for being something inside it. */
+        outstanding: [
+          ...outstandingFor(ours, ACCOUNT_HOLDER, accepted),
+          ...outstandingFor(app.governance.legal, d.role, accepted),
+        ],
+        accepted,
+      };
     },
   });
 
@@ -414,7 +440,27 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
           };
         });
 
-      return { apps, accepted };
+      /*
+        ⚠️ THE DEPLOYMENT COMES FIRST, AND IT IS NOT A PRODUCT. It is the account
+        itself — the thing that exists before any product and outlives all of
+        them — so it is listed the same way rather than in a shape of its own,
+        and it is first because that is the order the two things stand in.
+      */
+      const ours = d.deployment;
+      const mineHere: readonly LegalForApp[] = ours
+        ? [{
+          appId: "", appName: ours.name,
+          roles: [ACCOUNT_HOLDER],
+          documents: ours.legal,
+          outstanding: outstandingFor(ours.legal, ACCOUNT_HOLDER, accepted),
+          /* ⚠️ ONE DISCLOSURE FOR THE ACCOUNT AND THE VAULT, and no recipients of
+             its own: the deployment holds them itself. Every recipient in this
+             platform receives a PRODUCT's data, and each product says so. */
+          receiving: { controller: ours.controller, contact: ours.contact, subprocessors: [], regions: [], inference: {}, transfers: [] },
+        }]
+        : [];
+
+      return { apps: [...mineHere, ...apps], accepted };
     },
   });
 
@@ -451,7 +497,10 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
         row that satisfies the obligation and refers to nothing, and it satisfies
         it forever.
       */
-      const known = app.governance.legal.some((l) => l.id === input.document && l.version === input.version);
+      /* ⚠️ THE DEPLOYMENT'S COUNT AS KNOWN. Without this the one document
+         everybody is asked for is the one nobody can accept. */
+      const known = [...(d.deployment?.legal ?? []), ...app.governance.legal]
+        .some((l) => l.id === input.document && l.version === input.version);
       if (!known) ctx.fail("platform.not_found", { field: "document" });
 
       await d.directory.run(

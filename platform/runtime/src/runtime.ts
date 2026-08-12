@@ -15,7 +15,7 @@
 
 import type {
   Actor, AnyOperation, AppSpec, AuditEntry, BindingSpec, Caller, Ctx, Instant, Problem,
-  ConfigRegistry, InferenceHandle, ObjectHandle, ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, SchemaModule, Session, SqlHandle, StandingState, TenantId,
+  ConfigRegistry, DeploymentSpec, InferenceHandle, ObjectHandle, ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, SchemaModule, Session, SqlHandle, StandingState, TenantId,
 } from "@one/kernel";
 import {
   ALWAYS_ALLOWED, CONSENT_EXEMPT_LANES, accountCascade, assertComposable, auditFor, check, consentGate, cookieDomainFor, gateFor, laneOf, weekStarting, PLATFORM_PROBLEMS, SEATS_ENTITLEMENT, STORAGE_ENTITLEMENT, SUPPORT_SESSION,
@@ -295,6 +295,18 @@ export interface RuntimeOptions<B extends BindingSpec> {
    * somebody's account export with nothing anywhere saying so.
    */
   readonly globalModules?: readonly SchemaModule[];
+  /**
+   * WHO RUNS THIS DEPLOYMENT — the operator, their contact, and what they ask of
+   * everybody with an account.
+   *
+   * ⚠️ INJECTED BECAUSE IT NAMES A COMPANY. This package is product-agnostic and
+   * a deployment is not; the shape is the kernel's and the one object filling it
+   * lives in the deployment's own module, imported by every worker.
+   *
+   * ⚠️ ABSENT MEANS NOBODY IS ASKED FOR ACCOUNT TERMS, which is a self-host that
+   * has not declared any rather than a mistake to refuse at boot.
+   */
+  readonly deployment?: DeploymentSpec;
   /** Where files live. `media` by convention, named so an app may differ. */
   readonly objectsBinding?: keyof B & string;
   /**
@@ -1513,6 +1525,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         [REFERENCE]: {
           directory: directoryDb, regional: regionalDb,
           tenantId: at.tenant?.tenantId ?? "", session, role: personRole,
+          deployment: opts.deployment ?? null,
           /* ⚠️ THE SAME WALK THE VAULT'S SURFACE USES, and deliberately the same
              one: both screens answer "everywhere I belong", and two derivations
              of that is two answers to the question the account centre exists to

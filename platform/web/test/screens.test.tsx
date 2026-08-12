@@ -678,6 +678,26 @@ describe("consent and legal", () => {
     expect(html).not.toMatch(/data-special[^>]*>who you are/);
   });
 
+  it("names the account differently from a product", () => {
+    /*
+      ⚠️ AN EMPTY `appId` IS THE DEPLOYMENT. Rendering it under its own name like
+      any other row would make the account look like one more product somebody
+      signed up for, when it is the thing every product is reached through — and
+      the one that holds the vault.
+    */
+    const html = renderToStaticMarkup(
+      <LegalScreen
+        products={[
+          { appId: "", appName: "4°", roles: ["account"], docs: [DOC()], receiving: null },
+          { appId: "kova", appName: "Kova", roles: ["owner"], docs: [DOC({}, { id: "k" })], receiving: null },
+        ]}
+        onAccept={async () => null} onBack={() => undefined}
+      />,
+    );
+    expect(html).toContain("Your 4° account");
+    expect(html).toContain(">Kova<");
+  });
+
   it("renders a declared document as text, never as markup", () => {
     /* ⚠️ A manifest is not an injection surface. */
     const html = renderToStaticMarkup(<>{paragraphs("<img src=x onerror=alert(1)>\n\nsecond")}</>);

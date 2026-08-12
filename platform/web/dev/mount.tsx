@@ -288,6 +288,21 @@ const LEGAL_RECEIVING: Receiving = {
    not matter. The second asks nothing outstanding, which is what most products a
    person belongs to look like. */
 const LEGAL_PRODUCTS: readonly Product[] = [
+  /* ⚠️ THE ACCOUNT FIRST, WITH AN EMPTY `appId` — how the runtime says "this is
+     the deployment rather than a product". It has a controller and a contact and
+     no recipients: every recipient in this platform receives a PRODUCT's data. */
+  {
+    appId: "", appName: "4°", roles: ["account"],
+    docs: [
+      { doc: { id: "account-terms", version: "2026-01-01", title: "Account terms", mustAccept: ["account"], body: "This covers your account itself, not any product you use it with.\n\nThe account is yours. You can take everything it holds, close it, and be forgotten." }, acceptedOn: "2 March", outstanding: false },
+      { doc: { id: "account-privacy", version: "2026-01-01", title: "Privacy notice", mustAccept: ["account"], body: "We hold what your account is made of, and your vault — the sensitive things you record about yourself.\n\nThese are yours rather than any product's, which is why they survive leaving a workspace. No product sees one unless you grant it." }, acceptedOn: null, outstanding: true },
+    ],
+    receiving: {
+      controller: "The example controls your account and your vault.",
+      contact: "privacy@example.test",
+      subprocessors: [], regions: [], inference: {}, transfers: [],
+    },
+  },
   { appId: "kova", appName: "Kova", roles: ["client", "owner"], docs: HELLO_DOCS, receiving: LEGAL_RECEIVING },
   {
     appId: "scena", appName: "Scena", roles: ["owner"],

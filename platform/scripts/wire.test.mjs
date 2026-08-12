@@ -178,6 +178,35 @@ if (!bad) {
   ok(`wire: ${interfaces} interface(s) across ${wires.length} module(s), ${referenced} kernel reference(s), no shape described twice`);
 }
 
+/* ------------------------------------------------------- the deployment ---- */
+
+/**
+ * ⚠️ EVERY WORKER PASSES THE DEPLOYMENT, AND ITS ABSENCE IS SILENT. `deployment`
+ * is optional on purpose — a self-host that has declared no operator is a real
+ * thing rather than a boot failure — so a worker that simply never passes it
+ * serves perfectly, asks nobody for account terms, and holds an address, a
+ * passkey and a vault against nothing agreed. Nothing else would ever say so.
+ *
+ * ⚠️ AND IT MUST BE THE IMPORTED OBJECT, NEVER AN INLINE ONE. The whole reason
+ * the declaration is a package is that one company written twice is one company
+ * drifted by the second edit — and each app's screen would show its own copy and
+ * agree with itself.
+ */
+for (const dir of readdirSync(ROOT, { withFileTypes: true }).filter((e) => e.isDirectory())) {
+  const worker = join(ROOT, dir.name, "src", "worker.ts");
+  if (!existsSync(worker)) continue;
+  const src = stripComments(readFileSync(worker, "utf8"));
+  if (!/createRuntime\s*\(/.test(src)) continue;
+  const rel = relative(ROOT, worker);
+  if (!/deployment:\s*DEPLOYMENT\b/.test(src)) {
+    fail(`${rel}: passes no \`deployment: DEPLOYMENT\` to createRuntime, so nobody using this app is asked for the account's own terms.`);
+  } else if (!/from\s+"@one\/deployment"/.test(src)) {
+    fail(`${rel}: names DEPLOYMENT without importing it from "@one/deployment" — a second copy of the operator is a second copy to drift.`);
+  } else {
+    ok(`deployment: ${dir.name} passes the imported declaration`);
+  }
+}
+
 console.log(
   bad
     ? `\n${bad} wire failure(s). A screen may not describe a payload; it may only name one.`

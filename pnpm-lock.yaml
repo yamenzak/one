@@ -1212,8 +1212,24 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)(tsx@4.23.9)
 
+  platform/deployment:
+    dependencies:
+      '@one/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)(tsx@4.23.9)
+
   platform/hello:
     dependencies:
+      '@one/deployment':
+        specifier: workspace:*
+        version: link:../deployment
       '@one/kernel':
         specifier: workspace:*
         version: link:../kernel
@@ -1254,6 +1270,9 @@ importers:
 
   platform/kova:
     dependencies:
+      '@one/deployment':
+        specifier: workspace:*
+        version: link:../deployment
       '@one/kernel':
         specifier: workspace:*
         version: link:../kernel

@@ -3381,13 +3381,13 @@
       "fails": "calling every signed-in person an owner on a door with no workspace. The consent gate believed it: a Kova client opening the account centre was told they owed the Terms of service and the data processing agreement — both `mustAccept: [\"owner\"]` — and answered 451 on their own preferences until they agreed to a contract between the platform and a studio"
     },
     {
-      "id": "a-person-owing-nothing-can-use-their-account",
+      "id": "a-person-is-held-to-what-is-theirs",
       "group": "platform",
       "stage": "7",
       "status": "live",
       "impl": "hello/test/account.test.ts",
-      "proves": "lets them use their own account while owing nothing",
-      "fails": "451 `platform.consent_required` on the account door — not a permission failure, does not read like one, and about a document that was never theirs"
+      "proves": "lets them use their own account once the account's own terms are accepted",
+      "fails": "451 `platform.consent_required` on the account door over a document that was never theirs — an owner's terms asked of somebody who is in no workspace. What they do owe is the account's own, and accepting those is enough: the obligation is theirs, so the refusal is escapable"
     },
     {
       "id": "agreeing-survives-a-closed-gate",
@@ -3460,6 +3460,60 @@
       "impl": "web/test/screens.test.tsx",
       "proves": "marks the category that is Article 9, not the row it is on",
       "fails": "a badge at the end of a line saying something here is sensitive without saying which — and, on a row that also tags its categories, saying it twice. The special set is the kernel's, so a screen keeping its own copy is how the mark and the transfer's own flag come to disagree on the same row"
+    },
+    {
+      "id": "the-account-has-its-own-terms",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "deployment/test/declaration.test.ts",
+      "proves": "asks them of anybody with an account, not of a role inside a product",
+      "fails": "an account holder who belongs to no product being asked to agree to nothing at all. Every other document here is owed for being an owner or a client of something; an address, a passkey and a vault are held for having an account, and that is the obligation nobody could express until there was a role for it"
+    },
+    {
+      "id": "the-deployment-declaration-survives-composition",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "deployment/test/declaration.test.ts",
+      "proves": "declares documents that would survive composition",
+      "fails": "the one set of documents everybody is asked for being the one set nothing checks. `defineApp` runs `legalProblems` over every app's; the deployment's is imported rather than composed, so a document with no version or no text would ship past the check that exists to refuse it"
+    },
+    {
+      "id": "the-account-privacy-notice-covers-the-vault",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "deployment/test/declaration.test.ts",
+      "proves": "says the vault is the account's rather than a product's",
+      "fails": "a vault nobody's privacy notice speaks for. A vault fact outlives every workspace somebody leaves — that is what the vault IS — so an app's notice structurally cannot cover it, and a separate vault document would imply you could decline it and keep the account"
+    },
+    {
+      "id": "every-worker-passes-the-declaration",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/wire.test.mjs",
+      "proves": "so nobody using this app is asked for the account's own terms",
+      "fails": "an app built from the template that never passes `deployment`, whose account holders are therefore asked for no terms at all. Unpassed it is `null` and `legal.list` merges nothing — every suite green, the screen showing each product's documents, and the account's own missing with nothing saying so"
+    },
+    {
+      "id": "the-account-is-not-a-product",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/account.test.ts",
+      "proves": "puts the account itself first, and not as a product",
+      "fails": "the deployment listed as one more product somebody signed up for. It exists before any product and outlives all of them, so an empty `appId` is how the runtime says which row this is — and a reader who cannot tell reads the terms of the thing every product is reached through as optional"
+    },
+    {
+      "id": "the-account-is-named-as-yours",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "names the account differently from a product",
+      "fails": "the account's own section headed like a product's. Under the deployment's name it reads as a fourth product in a list of three, and the documents everybody owes look like ones only some people do"
     }
   ]
 }

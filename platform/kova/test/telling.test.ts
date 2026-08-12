@@ -161,7 +161,11 @@ describe("the documents this product asks you to agree to", () => {
   it("are readable by somebody who is not signed in", async () => {
     const out = await stranger.get("/api/legal.list");
     expect(out.status).toBe(200);
-    expect((out.body.documents as unknown as { id: string }[]).map((d) => d.id)).toEqual(["terms", "privacy", "dpa"]);
+    /* ⚠️ THE ACCOUNT'S OWN COME FIRST AND ARE NOT KOVA'S. They are asked of
+       anybody with an account — including somebody in no product at all — which
+       is the one obligation a product's declaration cannot carry. */
+    expect((out.body.documents as unknown as { id: string }[]).map((d) => d.id))
+      .toEqual(["account-terms", "account-privacy", "terms", "privacy", "dpa"]);
   });
 
   /* ⚠️ And what one person has agreed to is theirs — an unsigned reader is told
@@ -177,13 +181,14 @@ describe("the documents this product asks you to agree to", () => {
        PROCESSING AGREEMENT, which only the owner is asked for — it is the one
        document here that is an agreement between two businesses rather than a
        notice to a person. */
-    expect(outstanding.map((d) => d.id).sort()).toEqual(["dpa", "privacy", "terms"]);
+    expect(outstanding.map((d) => d.id).sort())
+      .toEqual(["account-privacy", "account-terms", "dpa", "privacy", "terms"]);
   });
 
   it("stops asking once they have", async () => {
     expect((await unsigned.call("/api/legal.accept", { document: "terms", version: "2026-01-01" })).status).toBe(200);
     const outstanding = (await unsigned.get("/api/legal.list")).body.outstanding as unknown as { id: string }[];
-    expect(outstanding.map((d) => d.id)).toEqual(["privacy", "dpa"]);
+    expect(outstanding.map((d) => d.id)).toEqual(["account-terms", "account-privacy", "privacy", "dpa"]);
   });
 
   /*
