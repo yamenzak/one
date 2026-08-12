@@ -93,6 +93,13 @@ export interface Looked {
   readonly product?: string;
   /** Who looked. Absent where the app itself was computing and no person saw it. */
   readonly who?: string;
+  /**
+   * ⚠️ THEIR OWN FACE, AND IT IS THE PERSON THE CHIP THEN CARRIES. A read by a
+   * person and a read by the app are different events, and the face is what tells
+   * them apart before a word is read — so where somebody looked, the chip is
+   * them, and the workspace stays in the words beside it.
+   */
+  readonly whoFace?: string;
   readonly on: string;
   readonly times: number;
 }
@@ -278,14 +285,19 @@ export function VaultScreen({ wheres, kept, looks, onSet, onBack, Heading = "h1"
                         included. As bare words the reader had to match a name they
                         read here to a planet they saw thirty rows up — which is
                         the exact work the chip exists to remove. */}
-                    <Chip face={<Face kind="workspace" src={l.face} name={l.where} tone={l.product} />}>
-                      {l.where}
-                    </Chip>
-                    {/* ⚠️ THE PERSON IS NAMED BESIDE IT, NOT INSTEAD OF IT. Both
-                        matter and they are different questions: a coach read this,
-                        and they read it at that studio. Showing only the person
-                        loses the one thing somebody can end. */}
-                    {l.who ? `${l.who} · ` : null}
+                    {/* ⚠️ THE READER IS THE CHIP, AND THE PLACE IS THE WORDS. Who
+                        looked is the subject of this list; where they did it is
+                        the qualifier. Where nothing but the app read it there is
+                        no person to show, and the workspace takes the chip — the
+                        two events look different before a word is read. */}
+                    {l.who ? (
+                      <Chip face={<Face kind="person" src={l.whoFace} name={l.who} />}>{l.who}</Chip>
+                    ) : (
+                      <Chip face={<Face kind="workspace" src={l.face} name={l.where} tone={l.product} />}>
+                        {l.where}
+                      </Chip>
+                    )}
+                    {l.who ? `at ${l.where} · ` : null}
                     {l.on}
                     {/* ⚠️ ONCE IS NOT WORTH A COUNT. "4 times" is information;
                         "1 times" is a template showing through. */}

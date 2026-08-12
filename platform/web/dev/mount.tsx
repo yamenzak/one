@@ -40,6 +40,12 @@ import { configureFeedback, feel, FEEDBACK_DEFAULT } from "../src/feedback.js";
    workspace by its id, a person by the name they are known here by. */
 declare const __FACES__: Readonly<Record<string, string>>;
 const face = (seed: string): string | undefined => __FACES__[seed];
+/* ⚠️ THE STILL ONE, FOR CHIPS. A generated face breathes, which reads as alive at
+   44 pixels beside a name and as a twitch at 22 inside a sentence — three of them
+   in one paragraph is a page that will not sit still while somebody reads it. The
+   animation is a `<style>` inside the SVG, so it cannot be turned off by CSS: a
+   still face is a different picture, which the API will serve as a second URL. */
+const still = (seed: string): string | undefined => __FACES__[`still:${seed}`];
 
 /* ⚠️ ONE PERSON, PLAUSIBLE, WITH A REAL SPREAD ACROSS PRODUCTS. Lorem in a screen
    review is a way of not looking at it: names are what overflows, roles are what
@@ -189,11 +195,11 @@ const VAULT_KEPT: readonly Kept[] = [
    AT ALL — the three rows that render differently, and the third is the one a
    fixture full of names would never show. */
 const VAULT_LOOKS: readonly Looked[] = [
-  { fact: "body.mass", label: "Weight", where: "Haddad Strength", face: face("t1"), product: "kova",
-    who: "Shujaa Haddad", on: "Yesterday", times: 4 },
-  { fact: "goal.training", label: "Your goal", where: "Haddad Strength", face: face("t1"), product: "kova",
-    who: "Shujaa Haddad", on: "Yesterday", times: 1 },
-  { fact: "body.mass", label: "Weight", where: "Beirut Barre Collective", face: face("t2"), product: "kova",
+  { fact: "body.mass", label: "Weight", where: "Haddad Strength", face: still("t1"), product: "kova",
+    who: "Shujaa Haddad", whoFace: still("Shujaa Haddad"), on: "Yesterday", times: 4 },
+  { fact: "goal.training", label: "Your goal", where: "Haddad Strength", face: still("t1"), product: "kova",
+    who: "Shujaa Haddad", whoFace: still("Shujaa Haddad"), on: "Yesterday", times: 1 },
+  { fact: "body.mass", label: "Weight", where: "Beirut Barre Collective", face: still("t2"), product: "kova",
     on: "3 August", times: 12 },
 ];
 

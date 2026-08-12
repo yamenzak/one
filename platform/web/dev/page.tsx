@@ -55,15 +55,30 @@ const PLANETS = styleOf("planets");
    pot it stands in is exactly what a circular crop takes off. Scaling it down
    inside its own canvas is the fix; moving the crop is not, because the shape is
    what says person. */
-const faceOf = (kind: "person" | "workspace", seed: string) =>
+const faceOf = (kind: "person" | "workspace", seed: string, still = false) =>
   new Avatar(kind === "person" ? SPROUTS : PLANETS, {
-    seed, size: 128, animationVariant: ["slow"],
+    seed, size: 128,
+    /* ⚠️ THE ANIMATION IS INSIDE THE SVG, so it cannot be turned off by CSS. It is
+       a `<style>` element in the picture — which is what makes it survive being
+       used as an image, and what means a still one has to be a different picture.
+       The API will serve this as a second URL rather than a second file. */
+    ...(still ? {} : { animationVariant: ["slow"] as const }),
     ...(kind === "person" ? { scale: 0.82 } : {}),
   }).toDataUri();
 
+/*
+  ⚠️ EVERY FACE IS BAKED TWICE, AND THE STILL ONE IS FOR CHIPS. A generated face
+  breathes, which reads as alive at 44 pixels beside a name and as a twitch at 22
+  inside a sentence — three of them in one paragraph is a page that will not sit
+  still while somebody reads it.
+*/
+const PEOPLE = ["Nadia Haddad", "b.okonkwo@gmail.com", "Shujaa Haddad"];
+const PLACES = ["t1", "t2", "t3", "t4"];
 const FACES = Object.fromEntries([
-  ...["Nadia Haddad", "b.okonkwo@gmail.com"].map((s) => [s, faceOf("person", s)]),
-  ...["t1", "t2", "t3", "t4"].map((s) => [s, faceOf("workspace", s)]),
+  ...PEOPLE.map((s) => [s, faceOf("person", s)]),
+  ...PLACES.map((s) => [s, faceOf("workspace", s)]),
+  ...PEOPLE.map((s) => [`still:${s}`, faceOf("person", s, true)]),
+  ...PLACES.map((s) => [`still:${s}`, faceOf("workspace", s, true)]),
 ]);
 
 /*
