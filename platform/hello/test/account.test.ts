@@ -24,8 +24,11 @@ const ORIGIN = `https://${SLUG}.hello.4dl.app`;
   found which one yet.
 */
 // DEFER(one-187) stage:7 — `mail:no_sender` on the identity door under a full
-//   run only, with the config row already written. Suspect a config read cached
-//   across requests in one isolate.
+//   run only, with the config row written and awaited. Narrowed: `readAll` holds
+//   no cache, so the row is genuinely absent to the worker. `booted` in
+//   createRuntime is module-level and survives across test FILES while Miniflare
+//   storage does not — the hazard this fixture's own header warns about. Not
+//   proven; the mechanism is still open.
 const ID = "https://id.4dl.app";
 const WHO = `me.${SLUG}@example.com`;
 
