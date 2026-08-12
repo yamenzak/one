@@ -37,8 +37,13 @@ export interface ItemProps {
   readonly mark?: ReactNode;
   readonly title: string;
   readonly detail?: ReactNode;
-  /** The one row on a card that is not like the others. */
-  readonly tone?: "alarm";
+  /**
+   * The rows on a card that are not like the others.
+   *
+   * ⚠️ `alarm` IS DESTRUCTIVE OR BROKEN; `warn` IS UNFINISHED. Using one for the
+   * other is how a list of things to read comes to look like a list of errors.
+   */
+  readonly tone?: "alarm" | "warn";
   /**
    * ⚠️ A ROW EITHER GOES SOMEWHERE OR DOES SOMETHING, NEVER BOTH. With an action
    * on the right the row itself is not pressable: two targets on one line means

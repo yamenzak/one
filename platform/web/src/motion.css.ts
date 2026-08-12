@@ -222,6 +222,11 @@ export const MOTION_CSS = `
    one is the device somebody is signed in on. */
 .item:active [data-icon='device'] > :nth-child(4) { scale: 1.14; }
 
+/* ⚠️ THE CORNER LIFTS, AND THE LINES OF TEXT DO NOT. A page opening is the fold
+   coming away from the sheet; moving the whole glyph is a document sliding, which
+   is filing rather than reading. */
+.item:active [data-icon='paper'] > :nth-child(2) { translate: 1.1px -1.1px; }
+
 /* A plus turns towards being a cross, which is what adding then cancelling is. */
 .button:active [data-icon='add'] { rotate: 90deg; }
 

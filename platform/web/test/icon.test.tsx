@@ -27,6 +27,7 @@ const drawn: Readonly<Record<IconName, (p: Icons.IconProps) => unknown>> = {
   onward: Icons.Onward, close: Icons.Close, back: Icons.Back, tick: Icons.Tick,
   light: Icons.Light, tongue: Icons.Tongue, measure: Icons.Measure,
   buzz: Icons.Buzz, sound: Icons.Sound, locked: Icons.Locked, about: Icons.About,
+  paper: Icons.Paper,
 };
 
 const partsOf = (name: IconName): readonly string[] => {

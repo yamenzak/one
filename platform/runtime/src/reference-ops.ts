@@ -162,7 +162,7 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
     kind: "read",
     summary: "The documents this product asks you to agree to, and which you have.",
     input: s.object({}),
-    output: s.object({ documents: s.json(), outstanding: s.json() }),
+    output: s.object({ documents: s.json(), outstanding: s.json(), accepted: s.json() }),
     /*
       ⚠️ THE DOCUMENTS ARE PUBLIC AND THE ACCEPTANCES ARE NOT. Somebody deciding
       whether to sign up must be able to read the terms first; what they have
@@ -175,9 +175,20 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
     async handler(ctx) {
       const d = deps(ctx);
       const documents = app.governance.legal;
-      if (!d.session) return { documents, outstanding: [] };
+      if (!d.session) return { documents, outstanding: [], accepted: [] };
       const accepted = await consentsOf(d.directory, d.session.accountId);
-      return { documents, outstanding: outstandingFor(documents, d.role, accepted) };
+      /*
+        ⚠️ WHAT WAS AGREED AND WHEN, NOT JUST WHAT IS OUTSTANDING. `outstanding`
+        answers "may this person carry on"; a person looking at their own record
+        is asking the opposite question — which of these did I agree to, and on
+        what day. Without the dates the screen can only say "accepted", which is
+        the one part of an acceptance nobody disputes.
+
+        ⚠️ EVERY VERSION, NOT THE LATEST. Agreeing to v3 does not unsay v1, and a
+        ledger that showed only the current row would quietly rewrite what
+        somebody signed up to.
+      */
+      return { documents, outstanding: outstandingFor(documents, d.role, accepted), accepted };
     },
   });
 

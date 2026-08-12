@@ -15,6 +15,17 @@ import { post, SETUP, signIn } from "./session.js";
 
 const SLUG = `acct${Math.random().toString(36).slice(2, 8)}`;
 const ORIGIN = `https://${SLUG}.hello.4dl.app`;
+/*
+  ⚠️ THE TWO TESTS BELOW THAT SIGN IN HERE FAIL INTERMITTENTLY IN A FULL-SUITE
+  RUN AND NEVER ON THIS FILE'S OWN FILTER. The worker logs `mail:no_sender`, so
+  the sign-in code could not be sent — while `seedMail` has already written
+  `email.from` and awaited it. A row that is present and read as absent is a
+  cache, not a race in the fixture, and the honest state is that nobody has
+  found which one yet.
+*/
+// DEFER(one-187) stage:7 — `mail:no_sender` on the identity door under a full
+//   run only, with the config row already written. Suspect a config read cached
+//   across requests in one isolate.
 const ID = "https://id.4dl.app";
 const WHO = `me.${SLUG}@example.com`;
 

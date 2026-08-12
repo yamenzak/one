@@ -21,6 +21,7 @@
 
 import type { Instant, Wanted } from "@one/kernel";
 import type { Item, Kept, Looked, Where } from "./vault.js";
+import type { Doc } from "./legal.js";
 
 /** Exactly what `vault.mine` answers with. */
 export interface VaultReply {
@@ -100,3 +101,42 @@ export interface LookReply {
 
 export const looksFrom = (reply: LookReply, read: Reading): readonly Looked[] =>
   reply.looks.map((l) => ({ ...l, on: day(l.on, read) ?? l.on.slice(0, 10) }));
+
+/* ---------------------------------------------------------------- legal --- */
+
+/** Exactly what `legal.list` answers with, before its days are spoken. */
+export interface LegalReply {
+  readonly documents: readonly {
+    readonly id: string; readonly version: string; readonly title: string;
+    readonly body?: string; readonly url?: string;
+  }[];
+  /** The ones this person still has to accept, resolved from their ROLE. */
+  readonly outstanding: readonly { readonly id: string }[];
+  /** Every acceptance, every version — agreeing to v3 does not unsay v1. */
+  readonly accepted: readonly { readonly document: string; readonly version: string; readonly at: Instant }[];
+}
+
+/**
+ * ⚠️ THE ACCEPTANCE IS MATCHED ON DOCUMENT **AND** VERSION, which is the whole
+ * reason the ledger is keyed that way. Matching on the document alone would show
+ * "Accepted 2 March" against terms published in June — a screen quietly claiming
+ * somebody agreed to something they have never been shown.
+ */
+export const legalFrom = (reply: LegalReply, read: Reading): readonly Doc[] => {
+  const owed = new Set(reply.outstanding.map((d) => d.id));
+  return reply.documents.map((d) => {
+    const held = reply.accepted.find((a) => a.document === d.id && a.version === d.version)
+      /* ⚠️ FALLING BACK TO ANY VERSION IS WHAT MAKES "New version" POSSIBLE. A
+         person who accepted v2 of a document now at v3 has a date worth showing;
+         reporting them as never having agreed loses the distinction the screen
+         exists to draw. */
+      ?? [...reply.accepted].filter((a) => a.document === d.id).sort((a, b) => (a.at < b.at ? 1 : -1))[0];
+    return {
+      id: d.id, version: d.version, title: d.title,
+      ...(d.body ? { body: d.body } : {}),
+      ...(d.url ? { url: d.url } : {}),
+      acceptedOn: held ? day(held.at, read) : null,
+      outstanding: owed.has(d.id),
+    };
+  });
+};

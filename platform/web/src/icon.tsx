@@ -35,7 +35,7 @@
 
 import type { ReactNode } from "react";
 import {
-  ArrowLeft, Camera, Check, ChevronRight, Download, HeartCrack, Info, KeyRound, Languages, Lock,
+  ArrowLeft, Camera, Check, ChevronRight, Download, FileText, HeartCrack, Info, KeyRound, Languages, Lock,
   Mail, MonitorSmartphone, Pencil, Plus, Ruler, Shield, SlidersHorizontal, SunMoon,
   Vibrate, Volume2, X, type LucideIcon,
 } from "lucide-react";
@@ -44,7 +44,7 @@ import {
 export type IconName =
   | "key" | "adjust" | "guard" | "save" | "heartbreak" | "letter" | "device"
   | "edit" | "lens" | "onward" | "close" | "back" | "tick" | "add"
-  | "light" | "tongue" | "measure" | "buzz" | "sound" | "locked" | "about";
+  | "light" | "tongue" | "measure" | "buzz" | "sound" | "locked" | "about" | "paper";
 
 export interface IconProps {
   readonly size?: number;
@@ -91,6 +91,9 @@ export const Heartbreak = draw(HeartCrack, "heartbreak", 21);
 export const Edit = draw(Pencil, "edit", 17);
 export const Lens = draw(Camera, "lens", 14);
 export const Letter = draw(Mail, "letter", 21);
+/* ⚠️ `Paper` rather than the drawing's own name, for the reason at the top of
+   this block: a document is what it is HERE, and the shape may change. */
+export const Paper = draw(FileText, "paper", 21);
 export const Device = draw(MonitorSmartphone, "device", 21);
 
 /* Furniture — the parts of a row rather than a meaning in it. */
@@ -139,4 +142,5 @@ export const ICON_PARTS: Readonly<Record<IconName, readonly string[]>> = {
   buzz: ["path", "path", "rect"],
   sound: ["path", "path", "path"],
   about: ["circle", "path", "path"],
+  paper: ["path", "path", "path", "path", "path"],
 };

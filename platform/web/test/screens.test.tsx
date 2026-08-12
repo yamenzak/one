@@ -28,6 +28,7 @@ import { Marked, Unset } from "../src/list.js";
 import { SwitchRow } from "../src/switch.js";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ValueEditor, ValueEditorBody } from "../src/editor.js";
+import { LegalScreen, paragraphs, said, type Doc } from "../src/account/legal.js";
 import { configureFeedback, feedbackSettings, FEEDBACK_DEFAULT } from "../src/feedback.js";
 import { Device } from "../src/icon.js";
 
@@ -556,5 +557,70 @@ describe("a field bound to a vault fact", () => {
        something no reader will ever see. */
     const words = out.replace(/<[^>]*>/g, " ");
     expect(words).not.toMatch(/\b(height|weight|goal|allergies)\b/i);
+  });
+});
+
+/* ------------------------------------------------------------ the law --- */
+
+const DOC = (over: Partial<Doc> = {}): Doc => ({
+  id: "terms", version: "4", title: "Terms of service",
+  acceptedOn: null, outstanding: false, ...over,
+});
+
+describe("consent and legal", () => {
+  /*
+    ⚠️ FOUR STATES, AND THE ONE THAT MATTERS IS "ACCEPTED AN EARLIER VERSION".
+    That is what everybody sees on the day terms change, and it is neither
+    "you agreed" nor "you never did" — a boolean loses it, and loses it on
+    precisely the day the record is worth having.
+  */
+  it("tells an old acceptance from a missing one", () => {
+    expect(said(DOC({ acceptedOn: "2 March", outstanding: false }))).toBe("Accepted 2 March");
+    expect(said(DOC({ acceptedOn: "2 March", outstanding: true }))).toBe("New version");
+    expect(said(DOC({ acceptedOn: null, outstanding: true }))).toBe("Not accepted");
+    /* ⚠️ AND A DOCUMENT NOBODY IS ASKED FOR SAYS NOTHING, rather than explaining
+       an absence nobody had noticed. */
+    expect(said(DOC({ acceptedOn: null, outstanding: false }))).toBe("");
+  });
+
+  const screen = (docs: readonly Doc[]) => renderToStaticMarkup(
+    <LegalScreen docs={docs} protection={null} onAccept={async () => null} onBack={() => undefined} />,
+  );
+
+  it("marks only what is unfinished, and not in the colour of a mistake", () => {
+    /*
+      ⚠️ TONED EVERYWHERE IS TONED NOWHERE, and the tone itself is a claim: red is
+      what the row that closes an account wears. A document waiting to be read is
+      not that kind of thing.
+    */
+    const html = screen([DOC({ acceptedOn: "2 March" }), DOC({ id: "privacy", title: "Privacy", outstanding: true })]);
+    expect(html).toContain(`data-tone="warn"`);
+    expect(html).not.toContain(`data-tone="alarm"`);
+    expect([...html.matchAll(/data-tone="warn"/g)]).toHaveLength(1);
+  });
+
+  it("offers no way to agree without opening the document", () => {
+    /*
+      ⚠️ A TICK BESIDE A LINK IS WORTH NOTHING AS EVIDENCE. The only defensible
+      record of an acceptance is one where the text was on the screen, so the list
+      navigates and the agreement lives at the end of what it says.
+    */
+    const html = screen([DOC({ outstanding: true })]);
+    expect(html).not.toMatch(/I agree/);
+  });
+
+  it("renders a declared document as text, never as markup", () => {
+    /*
+      ⚠️ A MANIFEST IS NOT AN INJECTION SURFACE. The body is text somebody wrote in
+      a declaration; rendering it as HTML would buy bold headings at the price of
+      making every app's manifest a way into every reader's page.
+    */
+    const html = renderToStaticMarkup(
+      <>{paragraphs("<img src=x onerror=alert(1)>\n\nsecond")}</>,
+    );
+    expect(html).not.toContain("<img");
+    expect(html).toContain("&lt;img");
+    /* And a blank line is still a paragraph, which is the whole formatting. */
+    expect([...html.matchAll(/<p>/g)]).toHaveLength(2);
   });
 });

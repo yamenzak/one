@@ -18,3 +18,5 @@ kind: index
   <sub>docs/VAULT.md:443</sub>
 - `one-185` — Kova declares these and reads none of them yet: the  
   <sub>kova/src/manifest.ts:712</sub>
+- `one-187` — `mail:no_sender` on the identity door under a full  
+  <sub>hello/test/account.test.ts:26</sub>

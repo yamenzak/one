@@ -30,6 +30,7 @@ import { AccountDetails } from "../src/account/details.js";
 import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
 import { PreferencesScreen, type Preferences } from "../src/account/preferences.js";
 import { KeptHere, meaning, VaultScreen, type Kept, type Looked, type Where } from "../src/account/vault.js";
+import { LegalScreen, type Doc, type Protection } from "../src/account/legal.js";
 import { ValueEditor, type EditableField } from "../src/editor.js";
 import { Card, Entry } from "../src/list.js";
 import { Edit } from "../src/icon.js";
@@ -190,6 +191,52 @@ const VAULT_WHERES: readonly Where[] = [
 
 /* ⚠️ RECORDED AND WANTED BY NOBODY — the row that proves the vault is yours
    rather than an app's. It is what somebody who has left every workspace sees. */
+/*
+  ⚠️ ONE OUTSTANDING DOCUMENT, ONE ACCEPTED AT AN OLDER VERSION, ONE CURRENT, and
+  one required of somebody else. Four rows because those are the four things the
+  detail line can say — a fixture where every document is accepted is a picture of
+  the only state that needs no attention.
+*/
+const LEGAL_DOCS: readonly Doc[] = [
+  {
+    id: "terms", version: "4", title: "Terms of service",
+    acceptedOn: "2 March", outstanding: false,
+    body: "You may use this product for what it is for.\n\nWe will keep it running, tell you when it changes, and let you take your things and leave at any time.\n\nIf you stop paying we stop serving the product. We do not hold your records over an invoice.",
+  },
+  {
+    /* ⚠️ THE ONE THAT NEEDS SOMETHING. Accepted before, at a version that is no
+       longer the one being asked about — which is what everybody sees the day
+       terms change, and the state a boolean cannot express. */
+    id: "privacy", version: "3", title: "Privacy notice",
+    acceptedOn: "2 March", outstanding: true,
+    body: "We hold what you give us and what you make while using this.\n\nWe do not sell it. We do not use it to train anything. Where a model is involved we name what is sent to it, on the screen you are reading now.\n\nYou can take all of it, or ask for all of it to be forgotten, from your account.",
+    url: "https://example.test/privacy",
+  },
+  {
+    id: "processing", version: "2", title: "Data processing agreement",
+    acceptedOn: null, outstanding: false,
+    url: "https://example.test/dpa",
+  },
+  {
+    id: "cookies", version: "1", title: "Cookies",
+    acceptedOn: null, outstanding: true,
+    body: "One cookie, for staying signed in. Nothing measures you.",
+  },
+];
+
+const LEGAL_PROTECTION: Protection = {
+  controller: "4DL Software UG, Berlin",
+  contact: "privacy@4dl.app",
+  regions: ["Germany", "Ireland"],
+  subprocessors: [
+    { name: "Cloudflare", purpose: "Serving and storage", region: "Germany" },
+    { name: "Stripe", purpose: "Taking payment", region: "Ireland" },
+    { name: "Google", purpose: "Generating text and images", region: "United States" },
+  ],
+  inference: ["What you type into an assistant", "Photographs you ask to have read"],
+  transfers: [{ to: "United States", basis: "Standard contractual clauses" }],
+};
+
 const VAULT_KEPT: readonly Kept[] = [
   { fact: "body.girths", label: "Measurements" },
 ];
@@ -245,7 +292,11 @@ const asked = new URLSearchParams(location.hash.slice(1));
 
 function Preview() {
   const [open, setOpen] = useState(true);
-  const [at, setAt] = useState<"home" | "details" | "signin" | "prefs" | "vault">("home");
+  /* ⚠️ IN THE HASH LIKE THE OTHER TWO, because the header above promises a state
+     is a link and this was the one dial the promise did not cover — so every
+     review of an inner screen began with three taps somebody had to be told. */
+  const [at, setAt] = useState((asked.get("screen") ?? "home") as
+    "home" | "details" | "signin" | "prefs" | "vault" | "legal");
   const [asking, setAsking] = useState(false);
   const [which, setWhich] = useState((asked.get("state") ?? "four") as keyof typeof CASES);
   const [outcome, setOutcome] = useState((asked.get("save") ?? "ok") as keyof typeof OUTCOMES);
@@ -323,6 +374,14 @@ function Preview() {
         onSignOut={save}
         onBack={() => setAt("home")}
       />
+    ) : at === "legal" ? (
+      <LegalScreen
+        docs={which === "waiting" ? null : LEGAL_DOCS}
+        protection={which === "waiting" ? null : LEGAL_PROTECTION}
+        onAccept={save}
+        onBack={() => setAt("home")}
+        Heading={Heading}
+      />
     ) : at === "home" ? (
       <AccountHome
         {...CASES[which] ?? CASES.four}
@@ -340,6 +399,7 @@ function Preview() {
           if (to === "account.security") setAt("signin");
           if (to === "account.preferences") setAt("prefs");
           if (to === "account.vault") setAt("vault");
+          if (to === "account.privacy") setAt("legal");
         }}
         onClose={() => setOpen(false)}
       />
@@ -389,7 +449,7 @@ function Preview() {
       />
       <div className="dial" data-open={dial ? "" : undefined} onPointerDown={(e) => e.stopPropagation()}>
         <div className="dial-panel">
-          <Group label="screen" value={at} options={["home", "details", "signin", "prefs", "vault"] as const} onPick={setAt} />
+          <Group label="screen" value={at} options={["home", "details", "signin", "prefs", "vault", "legal"] as const} onPick={setAt} />
           <Group label="workspaces" value={which} options={Object.keys(CASES) as (keyof typeof CASES)[]} onPick={setWhich} />
           <Group label="save" value={outcome} options={Object.keys(OUTCOMES) as (keyof typeof OUTCOMES)[]} onPick={setOutcome} />
           <Group label="theme" value={theme} options={["dark", "light"] as const} onPick={setTheme} />
