@@ -213,7 +213,7 @@ export async function publishVaultSpec(
 ): Promise<void> {
   try {
     if (!app.vault) {
-      await db.run(`DELETE FROM vault_specs WHERE app_id = ?`, [app.id]);
+      await db.run(`DELETE FROM vault_specs WHERE app_id = ?`, app.id);
       return;
     }
     /* ⚠️ NO TIMESTAMP. Nothing reads when a declaration was published — it is
@@ -223,9 +223,19 @@ export async function publishVaultSpec(
     await db.run(
       `INSERT INTO vault_specs (app_id, app_name, wants) VALUES (?, ?, ?)
        ON CONFLICT(app_id) DO UPDATE SET app_name = excluded.app_name, wants = excluded.wants`,
-      [app.id, app.name, JSON.stringify(app.vault.wants)],
+      app.id, app.name, JSON.stringify(app.vault.wants),
     );
-  } catch { /* see above: an app that cannot say what it wants still serves. */ }
+  } catch (why) {
+    /*
+      ⚠️ IT STILL SERVES, AND IT SAYS SO. Boot must not throw over a screen in
+      another product — but a bare `catch {}` here swallowed a `D1_TYPE_ERROR`
+      for as long as this has existed: the parameters were passed as an ARRAY
+      where `run` takes them one by one, so every publish failed, `vault_specs`
+      stayed empty, and the account centre showed nobody's vault at all. Nothing
+      anywhere said a word.
+    */
+    console.error("vault spec not published", app.id, why);
+  }
 }
 
 /** Every app's declaration, for the surface that renders all of them at once. */

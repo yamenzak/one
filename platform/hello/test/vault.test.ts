@@ -18,6 +18,8 @@ import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import worker from "../src/worker.js";
 import { accountIds, joinAs, post, SETUP, signIn } from "./session.js";
+import { sql, type ResolvedRegion } from "@one/kernel";
+import { bindingsFor } from "@one/runtime";
 
 const SLUG = `vault${Math.random().toString(36).slice(2, 8)}`;
 const ORIGIN = `https://${SLUG}.hello.4dl.app`;
@@ -89,10 +91,20 @@ describe("your own facts", () => {
     whose product has declared nothing is a row that could only ever say
     "nothing", and the vault leaves it out rather than listing it.
   */
-  it("groups by workspace and lists no app that wants nothing", async () => {
+  it("groups by workspace, from the declaration this product published", async () => {
+    /*
+      ⚠️ THIS ASSERTED THE OPPOSITE AND PASSED, because `vault_specs` was empty:
+      `publishVaultSpec` bound its parameters as an array where `run` takes them
+      one at a time, D1 refused, and a bare catch swallowed it. An empty registry
+      lists no app, so "lists no app" was true for the wrong reason — on a
+      deployment where `hello` declares three wants.
+    */
     const r = await get(ORIGIN, "/api/vault.mine", client);
-    const wheres = r.body.wheres as unknown as { appId: string }[];
-    expect(wheres.every((w) => w.appId !== "hello")).toBe(true);
+    const wheres = r.body.wheres as unknown as { appId: string; items: { fact: string }[] }[];
+    const here = wheres.find((w) => w.appId === "hello");
+    expect(here, "the workspace this person is in, under the app that asked").toBeDefined();
+    expect(here!.items.map((i) => i.fact).sort())
+      .toEqual(["body.height", "body.mass", "goal.training"]);
   });
 
   /*
@@ -102,10 +114,14 @@ describe("your own facts", () => {
     fact they have recorded.
   */
   it("keeps what nothing is asking for", async () => {
-    await send(ORIGIN, "/api/vault.record", client, { fact: "body.height", value: "178", at: "2026-08-01" });
+    /* ⚠️ A FACT NO APP HERE DECLARES. This recorded `body.height`, which `hello`
+       asks for — so once the declarations actually published, the fact was
+       correctly under the workspace rather than kept, and the test that had been
+       green against an empty registry failed. */
+    await send(ORIGIN, "/api/vault.record", client, { fact: "health.allergies", value: "none", at: "2026-08-01" });
     const r = await get(ORIGIN, "/api/vault.mine", client);
     const kept = r.body.kept as unknown as { fact: string }[];
-    expect(kept.some((k) => k.fact === "body.height")).toBe(true);
+    expect(kept.some((k) => k.fact === "health.allergies")).toBe(true);
   });
 
   it("records and reads back one of your own", async () => {
@@ -320,5 +336,34 @@ describe("taking your own data with you, which is not a workspace's export", () 
     expect((r.body.account as unknown as { email: string }).email).toBe(OWNER.toLowerCase());
     const facts = (r.body.tables as unknown as Record<string, unknown[]>).vault_facts!;
     expect(facts).toEqual([]);
+  });
+});
+
+/* ------------------------------------------------------- the declaration --- */
+
+describe("a product's declaration reaches the account centre", () => {
+  /*
+    ⚠️ IT NEVER DID. `publishVaultSpec` passed its parameters as an ARRAY where
+    `run` takes them one by one, D1 answered `D1_TYPE_ERROR`, and a bare
+    `catch {}` swallowed it — so `vault_specs` was empty for the life of the
+    feature and the account centre showed nobody's vault at all. Every suite was
+    green: the publish is total by design, the read falls back to an empty list,
+    and an empty account centre looks exactly like an account centre for somebody
+    who has shared nothing.
+
+    ⚠️ SO THE ASSERTION IS ABOUT THE ROW, not about the screen. A test that asked
+    the screen would have passed then too.
+  */
+  it("is in the global store after boot, not merely attempted", async () => {
+    /* ⚠️ Any request boots the global store; asking for the door does. */
+    await signIn(`spec.${SLUG}@example.com`, ID);
+    const db = bindingsFor({ db: sql() }, { DB: (env as Record<string, unknown>).DIRECTORY }, { defaultRegion: "auto" })("auto" as ResolvedRegion).db;
+
+    const vault = await db.all<{ app_id: string }>(`SELECT app_id FROM vault_specs`).catch(() => []);
+    expect(vault.map((r) => r.app_id)).toContain("hello");
+
+    /* And the same for what it asks people to agree to. */
+    const legal = await db.all<{ app_id: string }>(`SELECT app_id FROM legal_specs`).catch(() => []);
+    expect(legal.map((r) => r.app_id)).toContain("hello");
   });
 });

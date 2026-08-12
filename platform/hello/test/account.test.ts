@@ -260,3 +260,43 @@ describe("what a person is asked to agree to", () => {
     expect(r.status).toBe(200);
   });
 });
+
+/* ------------------------------------------------ every product's law --- */
+
+describe("what every product you belong to asks of you", () => {
+  /*
+    ⚠️ `legal.list` ANSWERS FOR THE APP SERVING THE REQUEST, which on the account
+    centre is whichever product happens to be behind that door. A person is an
+    owner in one studio, a client in another and a member of a third product
+    entirely, and they owe three different sets — so the one screen that exists to
+    answer across products could not.
+
+    ⚠️ THE DECLARATIONS ARE PUBLISHED ON BOOT, exactly as the vault's are. A
+    worker knows its own manifest and nothing about the product beside it.
+  */
+  it("answers from the published declarations rather than the serving app", async () => {
+    const slug = `owed${Math.random().toString(36).slice(2, 7)}`;
+    const founding = await signIn(`${slug}@example.test`, SETUP);
+    await post(SETUP, "/api/identity.workspace.create", { slug }, founding);
+    const cookie = await signIn(`${slug}@example.test`, ID);
+
+    const r = await get(ID, "/api/legal.mine", cookie);
+    expect(r.status).toBe(200);
+    const apps = r.body.apps as unknown as { appId: string; roles: string[]; documents: unknown[] }[];
+    /* ⚠️ Named from the registry, not from the door: this reached the account
+       centre without the account centre knowing which product it came from. */
+    expect(apps.map((a) => a.appId)).toContain("hello");
+    expect(apps.find((a) => a.appId === "hello")!.roles).toEqual(["owner"]);
+    expect(apps.find((a) => a.appId === "hello")!.documents.length).toBeGreaterThan(0);
+  });
+
+  it("says nothing about a product somebody has never opened", async () => {
+    /*
+      ⚠️ EVERY APP ON THE DEPLOYMENT PUBLISHES HERE. Listing all of them would
+      tell somebody about products they have never used — and ask them to agree
+      to the terms of one they do not.
+    */
+    const cookie = await signIn(`stranger.${SLUG}@example.com`, ID);
+    expect((await get(ID, "/api/legal.mine", cookie)).body.apps as unknown as unknown[]).toEqual([]);
+  });
+});

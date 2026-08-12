@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { Instant } from "@one/kernel";
-import { day, legalFrom, looksFrom, vaultFrom, type Reading, type VaultReply } from "../src/account/wire.js";
+import { day, legalFrom, looksFrom, mineFrom, vaultFrom, type MineReply, type Reading, type VaultReply } from "../src/account/wire.js";
 
 const at = (iso: string) => iso as Instant;
 const read: Reading = { locale: "en-GB", zone: "UTC", now: at("2026-08-12T10:00:00.000Z") };
@@ -144,5 +144,41 @@ describe("what somebody agreed to, and when", () => {
     /* ⚠️ Null, never a guess. An empty string renders as a blank where a date
        goes, which reads as a date that failed to load. */
     expect(legalFrom(reply, read).find((d) => d.doc.id === "cookies")!.acceptedOn).toBe(null);
+  });
+});
+
+describe("every product a person belongs to", () => {
+  const doc = (id: string, version: string) => ({ id, version, title: id, mustAccept: ["owner"], body: "x" });
+
+  it("takes the outstanding set from the handler rather than recomputing it", () => {
+    /*
+      ⚠️ THE HANDLER RESOLVED THE UNION OF THIS PERSON'S ROLES ACROSS EVERY
+      WORKSPACE IN THAT PRODUCT — inputs this module cannot see. Re-deriving
+      "outstanding" here from `documents` and `mustAccept` would be a second
+      answer built from less, and it would differ for exactly the person the
+      union exists for: an owner of one studio and a client of another.
+    */
+    const reply: MineReply = {
+      apps: [{
+        appId: "kova", appName: "Kova", roles: ["client", "owner"],
+        documents: [doc("terms", "4"), doc("privacy", "3")],
+        /* ⚠️ The handler says only `privacy` is owed, though both name `owner`. */
+        outstanding: [doc("privacy", "3")],
+      }],
+      accepted: [{ document: "terms", version: "4", at: at("2026-03-02T09:00:00.000Z") }],
+    };
+    const products = mineFrom(reply, read);
+
+    const kova = products.find((p) => p.appId === "kova")!;
+    expect(kova.docs.find((d) => d.doc.id === "terms")).toMatchObject({ outstanding: false, acceptedOn: "2 March" });
+    expect(kova.docs.find((d) => d.doc.id === "privacy")!.outstanding).toBe(true);
+  });
+
+  it("carries the roles through, because they are what the obligation followed", () => {
+    const products = mineFrom({
+      apps: [{ appId: "kova", appName: "Kova", roles: ["client", "owner"], documents: [], outstanding: [] }],
+      accepted: [],
+    }, read);
+    expect(products[0]!.roles).toEqual(["client", "owner"]);
   });
 });

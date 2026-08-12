@@ -273,6 +273,28 @@ export interface LegalDoc {
 }
 
 /**
+ * WHAT ONE PRODUCT ASKS OF ONE PERSON, ACROSS EVERY WORKSPACE THEY ARE IN IT.
+ *
+ * ⚠️ IT IS A KERNEL TYPE BECAUSE TWO SIDES HAVE TO AGREE ON IT. The runtime
+ * assembles it and a screen renders it, and the screen cannot see the handler —
+ * so a shape described in both places is one that is checked in neither.
+ *
+ * ⚠️ ROLES ARE A LIST BECAUSE A PERSON HOLDS SEVERAL. An owner of one studio and
+ * a client of another owes what EITHER role owes, and accepting is recorded per
+ * account, so it is one obligation rather than two lists.
+ */
+export interface LegalForApp {
+  readonly appId: string;
+  readonly appName: string;
+  /** Every role this person holds in this product, sorted. */
+  readonly roles: readonly string[];
+  /** Everything the product publishes, whether or not it is asked of them. */
+  readonly documents: readonly LegalDoc[];
+  /** The subset any of their roles still owes. */
+  readonly outstanding: readonly LegalDoc[];
+}
+
+/**
  * ⚠️ EVERY ONE OF THESE IS A CONSENT THAT WOULD BE RECORDED AGAINST NOTHING.
  *
  * A version is part of the ledger's key, so a document whose version changes

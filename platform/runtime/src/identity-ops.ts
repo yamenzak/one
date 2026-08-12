@@ -47,11 +47,16 @@ export interface PlatformDeps {
   /** Injected: the platform owns the code, an app owns how it travels. */
   deliverCode(email: string, code: string): Promise<void>;
   /**
-   * ⚠️ WHICH OF THESE WORKSPACES THIS PERSON IS IN, asked of the regions rather
-   * than guessed. Memberships are regional and the directory is global, so
-   * "where do I belong" is a question one store cannot answer alone.
+   * ⚠️ WHICH OF THESE WORKSPACES THIS PERSON IS IN **AND AS WHAT**, asked of the
+   * regions rather than guessed. Memberships are regional and the directory is
+   * global, so "where do I belong" is a question one store cannot answer alone.
+   *
+   * ⚠️ A MAP RATHER THAN A SET, because the role decides which documents somebody
+   * is asked to accept — and a second walk to fetch it is a second chance to
+   * disagree with this one. `Map` answers `has`, so every caller that only asked
+   * the first question still asks it the same way.
    */
-  mineIn(tenantIds: readonly string[]): Promise<ReadonlySet<string>>;
+  mineIn(tenantIds: readonly string[]): Promise<ReadonlyMap<string, string>>;
   /**
    * ⚠️ ONE WORKSPACE'S MEMBERS, FOUND ONCE AND HANDED BACK STILL OPEN. Leaving
    * is a WRITE into a region this door does not know, and the read that decides

@@ -3397,6 +3397,51 @@
       "impl": "hello/test/exit.test.ts",
       "proves": "lets a workspace with a closed gate accept what it owes",
       "fails": "a deadlock: `legal` was exempt from the CONSENT gate and not from the STANDING one. A workspace held read-only cannot write, accepting is a write, and the document is what stands between it and being able to act — so a studio that never chose a plan could not accept the terms that would let it choose one, and the refusal said nothing about documents"
+    },
+    {
+      "id": "a-declaration-reaches-the-account-centre",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/vault.test.ts",
+      "proves": "is in the global store after boot, not merely attempted",
+      "fails": "`publishVaultSpec` binding its parameters as an ARRAY where `run` takes them one at a time — D1 answered D1_TYPE_ERROR and a bare `catch {}` swallowed it, so `vault_specs` was empty for the life of the feature and the account centre showed nobody's vault. Every suite was green: the publish is total by design, the read falls back to an empty list, and an empty account centre looks exactly like one belonging to somebody who has shared nothing"
+    },
+    {
+      "id": "legal-answers-for-every-product",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/account.test.ts",
+      "proves": "answers from the published declarations rather than the serving app",
+      "fails": "`legal.list` answering for the app behind whichever door was used. A person is an owner in one studio, a client in another and a member of a third product, and they owe three different sets — so the one screen that exists to answer across products could not"
+    },
+    {
+      "id": "legal-says-nothing-about-a-product-you-are-not-in",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/account.test.ts",
+      "proves": "says nothing about a product somebody has never opened",
+      "fails": "every app on the deployment publishes here, so listing all of them tells somebody about products they have never used — and asks them to agree to the terms of one they do not"
+    },
+    {
+      "id": "a-workspace-you-left-is-not-yours",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/membership.test.ts",
+      "proves": "lets a member out, and frees the seat behind them",
+      "fails": "`mineIn` reading membership without `revoked_at IS NULL`. The row is revoked rather than deleted — deliberately, so who was in a workspace and when survives — so every reader has to say it means a PAST membership, or a workspace somebody left stays on their list for ever"
+    },
+    {
+      "id": "documents-are-named-by-their-product",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "names the product each document belongs to",
+      "fails": "an ungrouped list, which cannot say whose terms these are once a person belongs to more than one product"
     }
   ]
 }

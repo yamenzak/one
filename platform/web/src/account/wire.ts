@@ -19,7 +19,7 @@
  * missing value is a binding that hides a route which stopped sending one.
  */
 
-import type { Instant, LegalDoc, Subprocessor, Transfer, Wanted } from "@one/kernel";
+import type { Instant, LegalDoc, LegalForApp, Subprocessor, Transfer, Wanted } from "@one/kernel";
 import type { Item, Kept, Looked, Where } from "./vault.js";
 
 /** Exactly what `vault.mine` answers with. */
@@ -182,3 +182,39 @@ export const legalFrom = (reply: LegalReply, read: Reading): readonly Doc[] => {
     };
   });
 };
+
+/** Exactly what `legal.mine` answers with. */
+export interface MineReply {
+  readonly apps: readonly LegalForApp[];
+  /** ⚠️ Account-wide, not per app — an acceptance is recorded once per person. */
+  readonly accepted: readonly Accepted[];
+}
+
+/** One product, as the screen takes it. */
+export interface Product {
+  readonly appId: string;
+  readonly appName: string;
+  readonly roles: readonly string[];
+  readonly docs: readonly Doc[];
+}
+
+/**
+ * ⚠️ THE OUTSTANDING SET IS THE HANDLER'S, NOT RECOMPUTED HERE. It resolved the
+ * union of this person's roles across every workspace in that product, which is
+ * a question this module cannot see the inputs to — so re-deriving it from
+ * `documents` would be a second answer built from less.
+ */
+export const mineFrom = (reply: MineReply, read: Reading): readonly Product[] =>
+  reply.apps.map((a) => {
+    const owed = new Set(a.outstanding.map((d) => d.id));
+    return {
+      appId: a.appId,
+      appName: a.appName,
+      roles: a.roles,
+      docs: a.documents.map((d) => {
+        const held = reply.accepted.find((x) => x.document === d.id && x.version === d.version)
+          ?? [...reply.accepted].filter((x) => x.document === d.id).sort((x, y) => (x.at < y.at ? 1 : -1))[0];
+        return { doc: d, acceptedOn: held ? day(held.at, read) : null, outstanding: owed.has(d.id) };
+      }),
+    };
+  });

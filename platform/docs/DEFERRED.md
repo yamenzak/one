@@ -11,7 +11,7 @@ kind: index
 ## Stage 7 — Kova migration
 
 - `one-172` — the operator door admits any signed-in  
-  <sub>runtime/src/runtime.ts:937</sub>
+  <sub>runtime/src/runtime.ts:950</sub>
 - `one-182` — a `person` seal with a real key. The type exists,  
   <sub>docs/VAULT.md:441</sub>
 - `one-183` — a fact belongs to an ACCOUNT, so somebody a  
@@ -21,6 +21,8 @@ kind: index
 - `one-187` — `mail:no_sender` on the identity door under a full  
   <sub>hello/test/account.test.ts:28</sub>
 - `one-188` — a region has no human name. Every surface that  
-  <sub>web/src/account/legal.tsx:178</sub>
+  <sub>web/src/account/legal.tsx:208</sub>
 - `one-189` — an operator is called `owner` on their own  
-  <sub>runtime/src/runtime.ts:1040</sub>
+  <sub>runtime/src/runtime.ts:1053</sub>
+- `one-190` — publish each app's ProtectionSpec beside  
+  <sub>web/src/account/legal.tsx:120</sub>

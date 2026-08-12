@@ -14,7 +14,7 @@
 
 import { deriveSchema, PLATFORM_CONFIG } from "@one/kernel";
 import {
-  applySchema, createRuntime, publishVaultSpec,
+  applySchema, createRuntime, publishLegalSpec, publishVaultSpec,
   PLATFORM_GLOBAL, PLATFORM_REGIONAL, type RawEnv,
 } from "@one/runtime";
 import { entries, hello, notes, receipts } from "./manifest.js";
@@ -142,6 +142,9 @@ const runtime = createRuntime(hello, {
     global: async (directory) => {
       await applySchema(directory, GLOBAL_MODULES);
       await publishVaultSpec(directory, hello);
+      /* ⚠️ AND WHAT THIS PRODUCT ASKS PEOPLE TO AGREE TO, for the same reason:
+         the account centre renders every app's, and a worker knows only its own. */
+      await publishLegalSpec(directory, hello);
     },
     region: (bind) => applySchema(bind.db, REGIONAL_MODULES).then(() => undefined),
   },

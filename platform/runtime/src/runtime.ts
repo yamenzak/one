@@ -707,15 +707,28 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           would be every workspace on the deployment.
         */
         mineIn: async (tenantIds) => {
-          const out = new Set<string>();
+          const out = new Map<string, string>();
           if (!session || tenantIds.length === 0) return out;
           for (const region of app.tenancy.regions) {
             const there = regional(env)(region as ResolvedRegion);
             if (opts.onBoot) await once(region, () => opts.onBoot!.region(there, region));
-            const rows = await (there.db as SqlHandle).all<{ tenant_id: string }>(
-              `SELECT DISTINCT tenant_id FROM membership WHERE account_id = ?`, session.accountId,
+            /*
+              ⚠️ `revoked_at IS NULL`, WHICH WAS MISSING. Without it a workspace
+              somebody LEFT stayed on their list for ever — the row is revoked
+              rather than deleted, deliberately, so that "who was in this
+              workspace and when" survives, and every reader has to say it means
+              a past membership.
+
+              ⚠️ AND THE ROLE TRAVELS, because the question upstairs is no longer
+              only "am I in this" — it is "what am I here", which decides which
+              documents this person is asked to accept. A second walk to fetch it
+              would be a second chance to disagree with the first.
+            */
+            const rows = await (there.db as SqlHandle).all<{ tenant_id: string; role: string }>(
+              `SELECT tenant_id, role FROM membership WHERE account_id = ? AND revoked_at IS NULL`,
+              session.accountId,
             ).catch(() => []);
-            for (const row of rows) if (tenantIds.includes(row.tenant_id)) out.add(row.tenant_id);
+            for (const row of rows) if (tenantIds.includes(row.tenant_id)) out.set(row.tenant_id, row.role);
           }
           return out;
         },
@@ -1497,7 +1510,24 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           ⚠️ THE ROLE TRAVELS, because which documents somebody must accept
           depends on what they are acting as here rather than on who they are.
         */
-        [REFERENCE]: { directory: directoryDb, regional: regionalDb, tenantId: at.tenant?.tenantId ?? "", session, role: personRole },
+        [REFERENCE]: {
+          directory: directoryDb, regional: regionalDb,
+          tenantId: at.tenant?.tenantId ?? "", session, role: personRole,
+          /* ⚠️ THE SAME WALK THE VAULT'S SURFACE USES, and deliberately the same
+             one: both screens answer "everywhere I belong", and two derivations
+             of that is two answers to the question the account centre exists to
+             ask. */
+          workspaces: async () => {
+            if (!session) return [];
+            const rows = await directoryDb.all<{ tenant_id: string; slug: string; app_id: string | null }>(
+              `SELECT tenant_id, slug, app_id FROM tenant_directory ORDER BY slug LIMIT 200`,
+            ).catch(() => []);
+            const mine = await platform.mineIn(rows.map((r) => r.tenant_id));
+            return rows
+              .filter((r) => mine.has(r.tenant_id) && r.app_id)
+              .map((r) => ({ appId: r.app_id!, tenantId: r.tenant_id, name: r.slug, role: mine.get(r.tenant_id)! }));
+          },
+        },
         /*
           ⚠️ THE DIRECTORY, NEVER THE REGIONAL STORE. A vault fact belongs to
           the ACCOUNT — it outlives every workspace the person is in — and a
@@ -1536,7 +1566,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             const mine = await platform.mineIn(rows.map((r) => r.tenant_id));
             return rows
               .filter((r) => mine.has(r.tenant_id) && r.app_id)
-              .map((r) => ({ appId: r.app_id!, tenantId: r.tenant_id, name: r.slug }));
+              .map((r) => ({ appId: r.app_id!, tenantId: r.tenant_id, name: r.slug, role: mine.get(r.tenant_id)! }));
           },
         },
         [SETTINGS]: {

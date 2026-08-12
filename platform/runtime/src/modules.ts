@@ -25,7 +25,7 @@ import { MILESTONE_SCHEMA } from "./milestone.js";
 import { GENERATION_SCHEMA } from "./generate.js";
 import { SETTINGS_SCHEMA } from "./settings.js";
 import { REPLAY_SCHEMA } from "./replay.js";
-import { CONSENT_SCHEMA, SUBJECT_CONSENT_SCHEMA } from "./reference-ops.js";
+import { CONSENT_SCHEMA, LEGAL_SPEC_SCHEMA, SUBJECT_CONSENT_SCHEMA } from "./reference-ops.js";
 import { AUDIT_SCHEMA } from "./audit.js";
 import { LIMIT_SCHEMA } from "./limit.js";
 import { IMPERSONATION_SCHEMA } from "./impersonation.js";
@@ -89,6 +89,10 @@ export const PLATFORM_GLOBAL: readonly SchemaModule[] = [
      account centre answers for every product a person belongs to, and one app's
      worker knows only its own manifest. */
   VAULT_SPEC_SCHEMA,
+  /* ⚠️ AND THE SAME FOR WHAT EACH PRODUCT ASKS PEOPLE TO AGREE TO. `legal.list`
+     answers for the app serving the request, which on the account centre is
+     whichever one happens to be behind that door. */
+  LEGAL_SPEC_SCHEMA,
   /*
     ⚠️ GLOBAL, AND THAT IS THE WHOLE DESIGN. A vault fact belongs to the person
     rather than to a workspace, so it outlives every app they use and every

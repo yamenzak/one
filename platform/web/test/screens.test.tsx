@@ -598,8 +598,13 @@ describe("consent and legal", () => {
     expect(said(DOC({ acceptedOn: null, outstanding: false }))).toBe("");
   });
 
+  /* ⚠️ ONE PRODUCT UNLESS A TEST SAYS OTHERWISE — the grouping is the subject of
+     its own test rather than a fixture every other one has to carry. */
   const screen = (docs: readonly Doc[], receiving: Receiving | null = null) => renderToStaticMarkup(
-    <LegalScreen docs={docs} receiving={receiving} onAccept={async () => null} onBack={() => undefined} />,
+    <LegalScreen
+      products={[{ appId: "hello", appName: "Hello", roles: ["owner"], docs }]}
+      receiving={receiving} onAccept={async () => null} onBack={() => undefined}
+    />,
   );
 
   it("marks only what is unfinished, and not in the colour of a mistake", () => {
@@ -637,6 +642,26 @@ describe("consent and legal", () => {
        border, so counting the list is how "Leaves Europe" comes to say yes for a
        deployment where nothing does. */
     expect(screen([DOC()], RECEIVING)).toContain("1 of 2");
+  });
+
+  it("names the product each document belongs to", () => {
+    /*
+      ⚠️ A PERSON BELONGS TO SEVERAL AND EACH ASKS DIFFERENT THINGS. `legal.list`
+      answers for the app serving the request, which on the account centre is
+      whichever one happens to be behind that door — so an ungrouped list is a
+      list that cannot say whose terms these are.
+    */
+    const html = renderToStaticMarkup(
+      <LegalScreen
+        products={[
+          { appId: "kova", appName: "Kova", roles: ["owner"], docs: [DOC({ outstanding: true })] },
+          { appId: "scena", appName: "Scena", roles: ["owner"], docs: [DOC({ acceptedOn: "11 May" }, { id: "s" })] },
+        ]}
+        receiving={null} onAccept={async () => null} onBack={() => undefined}
+      />,
+    );
+    expect(html).toContain("Kova");
+    expect(html).toContain("Scena");
   });
 
   it("renders a declared document as text, never as markup", () => {

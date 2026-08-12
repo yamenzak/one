@@ -21,7 +21,7 @@
  * by the platform, so a registry added later cannot join this list quietly.
  */
 
-import type { AnyOperation, AppSpec, BindingSpec, Instant, LegalDoc, SchemaModule, Session, SqlHandle } from "@one/kernel";
+import type { AnyOperation, AppSpec, BindingSpec, Instant, LegalDoc, LegalForApp, SchemaModule, Session, SqlHandle } from "@one/kernel";
 import { PUBLIC, operation, ropaOf, s, transfersOf, vaultActivities } from "@one/kernel";
 
 /** ⚠️ A symbol, so an app cannot reach the ledger by writing a property name. */
@@ -43,6 +43,21 @@ export interface ReferenceDeps {
   readonly directory: SqlHandle;
   readonly session: Session | null;
   /** What this caller is acting as here. Decides which documents they must accept. */
+  readonly role: string;
+  /**
+   * ⚠️ EVERY WORKSPACE THIS PERSON IS IN, AND WHAT THEY ARE IN EACH. An
+   * obligation follows a ROLE, and a person is an owner in one studio and
+   * somebody's client in another — so "which documents do I owe" cannot be
+   * answered from the door they happen to be standing at.
+   */
+  workspaces(): Promise<readonly WorkspacePlace[]>;
+}
+
+/** One place somebody belongs, as the legal surface needs it. */
+export interface WorkspacePlace {
+  readonly appId: string;
+  readonly tenantId: string;
+  readonly name: string;
   readonly role: string;
 }
 
@@ -76,6 +91,71 @@ export const CONSENT_SCHEMA: SchemaModule = {
   */
   scoped: { tenantColumn: "account_id", tenantTables: ["consents"] },
 };
+
+/**
+ * EVERY APP'S LEGAL DECLARATION, IN THE GLOBAL STORE.
+ *
+ * ⚠️ A WORKER KNOWS ITS OWN MANIFEST AND NOTHING ABOUT THE PRODUCT BESIDE IT, so
+ * the account centre — which answers for every workspace somebody belongs to —
+ * could only ever show the documents of whichever app happened to serve the
+ * request. That is the problem the vault had, and this is its answer:
+ * declarations published on boot, read by whoever renders all of them.
+ *
+ * ⚠️ NO TIMESTAMP, for the reason `vault_specs` has none: nothing reads when a
+ * declaration was published — it is whatever the running bundle says — and the
+ * column would make boot read the wall clock, which the injected-clock guard
+ * correctly refuses.
+ */
+export const LEGAL_SPEC_SCHEMA: SchemaModule = {
+  id: "legal_specs",
+  ddl: [
+    `CREATE TABLE IF NOT EXISTS legal_specs (app_id TEXT PRIMARY KEY, app_name TEXT NOT NULL, documents TEXT NOT NULL);`,
+  ],
+};
+
+/**
+ * ⚠️ TOTAL, LIKE THE VAULT'S. An app that cannot publish what it asks people to
+ * agree to still has to serve — a boot that throws here takes a whole product
+ * down over a screen in another one.
+ */
+export async function publishLegalSpec(
+  db: SqlHandle,
+  app: { readonly id: string; readonly name: string; readonly governance?: { readonly legal: readonly LegalDoc[] } },
+): Promise<void> {
+  try {
+    const legal = app.governance?.legal ?? [];
+    if (legal.length === 0) {
+      await db.run(`DELETE FROM legal_specs WHERE app_id = ?`, app.id);
+      return;
+    }
+    await db.run(
+      `INSERT INTO legal_specs (app_id, app_name, documents) VALUES (?, ?, ?)
+       ON CONFLICT(app_id) DO UPDATE SET app_name = excluded.app_name, documents = excluded.documents`,
+      app.id, app.name, JSON.stringify(legal),
+    );
+  } catch (why) {
+    /* ⚠️ SERVES ANYWAY, AND SAYS SO — see `publishVaultSpec`, whose silent
+       version of this catch hid a type error for the life of the feature. */
+    console.error("legal spec not published", app.id, why);
+  }
+}
+
+/** Every app's documents, for the surface that renders all of them at once. */
+export async function publishedLegal(
+  db: SqlHandle,
+): Promise<readonly { appId: string; appName: string; documents: readonly LegalDoc[] }[]> {
+  const rows = await db.all<{ app_id: string; app_name: string; documents: string }>(
+    `SELECT app_id, app_name, documents FROM legal_specs ORDER BY app_id LIMIT 200`,
+  ).catch(() => []);
+  return rows.flatMap((r) => {
+    /* ⚠️ A ROW THAT WILL NOT PARSE IS DROPPED, not thrown on. It was written by
+       another worker, possibly a version ahead, and one product's bad row must
+       not take the whole account centre down with it. */
+    try {
+      return [{ appId: r.app_id, appName: r.app_name, documents: JSON.parse(r.documents) as readonly LegalDoc[] }];
+    } catch { return []; }
+  });
+}
 
 /* --------------------------------------------------------------- reading --- */
 
@@ -189,6 +269,81 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
         somebody signed up to.
       */
       return { documents, outstanding: outstandingFor(documents, d.role, accepted), accepted };
+    },
+  });
+
+  /**
+   * WHAT EVERY PRODUCT ASKS OF THIS PERSON, WHEREVER THEY BELONG.
+   *
+   * ⚠️ `legal.list` ANSWERS FOR ONE APP AND ONE ROLE — the app serving the
+   * request, and whatever the caller is on the door they are standing at. That is
+   * right inside a product and useless on the account centre, which exists
+   * precisely to answer across products: a person is an owner in one studio, a
+   * client in another and a member of a third product entirely, and they owe
+   * three different sets.
+   *
+   * ⚠️ ROLES ARE UNIONED PER APP, NOT LISTED PER WORKSPACE. An acceptance is
+   * recorded per ACCOUNT per document per version, so accepting once satisfies
+   * every workspace at once — listing the same document under each would show
+   * somebody four rows that are one obligation, and ticking one would tick them
+   * all. What a person owes an app is what ANY of their roles there owes.
+   */
+  const mine = operation({
+    id: "legal.mine",
+    kind: "read",
+    summary: "Every product you belong to, what it asks you to agree to, and what you have.",
+    input: s.object({}),
+    output: s.object({ apps: s.json(), accepted: s.json() }),
+    /*
+      ⚠️ PUBLIC IS THE LANE AND THE SESSION IS THE ANSWER. Signed out this is an
+      empty list rather than a refusal, for the same reason `legal.list` is
+      public: nothing here is anybody's data until there is a person to attach it
+      to.
+    */
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    async handler(ctx) {
+      const d = deps(ctx);
+      if (!d.session) return { apps: [], accepted: [] };
+
+      const [published, places, accepted] = await Promise.all([
+        publishedLegal(d.directory),
+        d.workspaces(),
+        consentsOf(d.directory, d.session.accountId),
+      ]);
+
+      /* Which roles this person holds in each app, across every workspace. */
+      const rolesByApp = new Map<string, Set<string>>();
+      for (const place of places) {
+        const set = rolesByApp.get(place.appId) ?? new Set<string>();
+        set.add(place.role);
+        rolesByApp.set(place.appId, set);
+      }
+
+      const apps: readonly LegalForApp[] = published
+        /*
+          ⚠️ ONLY THE PRODUCTS THEY ARE ACTUALLY IN. Every app on the deployment
+          publishes here, and showing all of them would tell somebody about
+          products they have never opened — and ask them to agree to the terms of
+          one they do not use.
+        */
+        .filter((a) => rolesByApp.has(a.appId))
+        .map((a) => {
+          const roles = [...(rolesByApp.get(a.appId) ?? [])].sort();
+          /* ⚠️ THE UNION, computed by asking the same function once per role
+             rather than by re-implementing its rule here. */
+          const owed = new Map<string, LegalDoc>();
+          for (const role of roles) {
+            for (const doc of outstandingFor(a.documents, role, accepted)) owed.set(doc.id, doc);
+          }
+          return {
+            appId: a.appId, appName: a.appName, roles,
+            documents: a.documents,
+            outstanding: [...owed.values()],
+          };
+        });
+
+      return { apps, accepted };
     },
   });
 
@@ -444,7 +599,7 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
   */
   const consentOps = guarded.length ? [consentRead, give, withdraw] : [];
 
-  return [help, changes, legal, accept, disclosure, record, ...consentOps] as unknown as readonly AnyOperation[];
+  return [help, changes, legal, mine, accept, disclosure, record, ...consentOps] as unknown as readonly AnyOperation[];
 }
 
 /* ------------------------------------------------- article 9 consent --- */

@@ -26,7 +26,7 @@ import type { DataCategory, Problem, Subprocessor } from "@one/kernel";
 /* ⚠️ THE SHAPES COME FROM THE SEAM, which is the module `scripts/wire.test.mjs`
    holds to the kernel. A screen that declared its own would be outside the one
    check that exists to stop it inventing a field. */
-import type { Doc, Receiving } from "./wire.js";
+import type { Doc, Product, Receiving } from "./wire.js";
 import { Button } from "../button.js";
 import { useCommit } from "../commit.js";
 import { Disclose } from "../disclose.js";
@@ -36,8 +36,16 @@ import { Screen, Section, Title } from "../screen.js";
 import { Stack } from "../stack.js";
 
 export interface LegalScreenProps {
-  /** ⚠️ Null until known. `[]` is "this product declares none", which is a fact. */
-  readonly docs: readonly Doc[] | null;
+  /**
+   * ⚠️ ONE SECTION PER PRODUCT, because a person belongs to several and each asks
+   * different things of them. `legal.list` answers for the app serving the
+   * request, which on the account centre is whichever one happens to be behind
+   * that door — so this takes what every app PUBLISHED, resolved against the
+   * roles this person actually holds in each.
+   *
+   * Null until known. `[]` is "you are in no product", which is a fact.
+   */
+  readonly products: readonly Product[] | null;
   readonly receiving: Receiving | null;
   readonly onAccept: (id: string, version: string) => Promise<Problem | null>;
   readonly onBack: () => void;
@@ -45,10 +53,10 @@ export interface LegalScreenProps {
 }
 
 export function LegalScreen({
-  docs, receiving, onAccept, onBack, Heading = "h1",
+  products, receiving, onAccept, onBack, Heading = "h1",
 }: LegalScreenProps): ReactNode {
   const [reading, setReading] = useState<string | null>(null);
-  const open = docs?.find((d) => d.doc.id === reading) ?? null;
+  const open = products?.flatMap((p) => p.docs).find((d) => d.doc.id === reading) ?? null;
 
   return (
     <Stack at={open ? open.doc.id : null}>
@@ -66,14 +74,24 @@ export function LegalScreen({
             title={<Title as={Heading}>Consent and legal</Title>}
             lede="What you have agreed to, and who else receives what is held here."
           >
-            <Section>
-              {docs === null
-                ? <Waiting />
-                : docs.length === 0
-                  ? <Blank title="Nothing to agree to">This product asks you to accept no documents.</Blank>
-                  : (
+            {products === null
+              ? <Section><Waiting /></Section>
+              : products.length === 0
+                ? (
+                  <Section>
+                    <Blank title="Nothing to agree to">
+                      You are not in any product that asks you to accept anything.
+                    </Blank>
+                  </Section>
+                )
+                : products.map((p) => (
+                  /* ⚠️ NAMED BY THE PRODUCT, NOT BY THE WORKSPACE. An acceptance is
+                     recorded per account, so somebody in two studios of the same
+                     product has one obligation — listing it under each would show
+                     two rows that tick together. */
+                  <Section key={p.appId} name={p.appName}>
                     <Card>
-                      {docs.map((d) => (
+                      {p.docs.map((d) => (
                         <Item
                           key={d.doc.id}
                           icon={<Paper />}
@@ -87,9 +105,21 @@ export function LegalScreen({
                         />
                       ))}
                     </Card>
-                  )}
-            </Section>
+                  </Section>
+                ))}
 
+            {/*
+              ⚠️ ONE PRODUCT'S DISCLOSURE UNDER EVERY PRODUCT'S DOCUMENTS, which is
+              the half of this screen that is still asymmetric. `protection.list`
+              answers for the app serving the request; each product has its own
+              recipients, regions and transfers, and a person in three of them is
+              being shown one. The documents above were the same problem and
+              `legal_specs` is its answer — the protection declaration needs the
+              same treatment.
+            */}
+            {/* DEFER(one-190) stage:7 — publish each app's ProtectionSpec beside
+                its legal documents, so the disclosure covers every product
+                somebody is in rather than the one behind this door. */}
             <Section name="Where your data goes">
               {receiving === null ? <Waiting rows={3} /> : <Receivers of={receiving} />}
             </Section>
