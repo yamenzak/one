@@ -299,4 +299,29 @@ describe("what every product you belong to asks of you", () => {
     const cookie = await signIn(`stranger.${SLUG}@example.com`, ID);
     expect((await get(ID, "/api/legal.mine", cookie)).body.apps as unknown as unknown[]).toEqual([]);
   });
+
+  it("carries each product's own disclosure, not the serving app's", async () => {
+    /*
+      ⚠️ THE DOCUMENTS WERE CROSS-APP AND THE DISCLOSURE WAS NOT, which is worse
+      than either being wrong on its own: a person in three products read one
+      product's recipients under all three products' terms, and nothing on the
+      screen said which. Each app publishes its ASSEMBLED disclosure beside its
+      documents — assembled, because the regions, the inference map and the
+      transfers are computed from the deployment rather than declared.
+    */
+    const slug = `discl${Math.random().toString(36).slice(2, 7)}`;
+    const founding = await signIn(`${slug}@example.test`, SETUP);
+    await post(SETUP, "/api/identity.workspace.create", { slug }, founding);
+    const cookie = await signIn(`${slug}@example.test`, ID);
+
+    const apps = (await get(ID, "/api/legal.mine", cookie)).body.apps as unknown as {
+      appId: string; receiving: { controller: string; transfers: unknown[] } | null;
+    }[];
+    const here = apps.find((a) => a.appId === "hello")!;
+    expect(here.receiving, "published beside the documents").not.toBeNull();
+    expect(here.receiving!.controller.length).toBeGreaterThan(0);
+    /* ⚠️ And the COMPUTED half, which a stored `ProtectionSpec` could not carry:
+       a transfer per recipient, crossed with what this deployment holds. */
+    expect(here.receiving!.transfers.length).toBeGreaterThan(0);
+  });
 });

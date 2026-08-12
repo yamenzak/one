@@ -174,6 +174,31 @@ export interface ProtectionSpec {
   readonly assessment: { readonly required: boolean; readonly note: string };
 }
 
+/**
+ * WHO ELSE RECEIVES WHAT IS HELD, ASSEMBLED — the declaration crossed with what
+ * this deployment actually is.
+ *
+ * ⚠️ IT IS NOT `ProtectionSpec`. That is what a manifest WRITES; this is what a
+ * person is shown, and three of its fields are computed rather than declared: the
+ * regions come from the tenancy, the inference map from the bindings, and the
+ * transfers from what the collections hold crossed with what each recipient
+ * claims. A declaration alone cannot answer "does anything leave".
+ *
+ * ⚠️ AND IT IS A KERNEL TYPE BECAUSE FOUR PLACES AGREE ON IT: the operation that
+ * answers it, the boot that publishes it for every other product, the module that
+ * hands it to a screen, and the screen. A shape described in four places is one
+ * checked in none.
+ */
+export interface Receiving {
+  readonly controller: string;
+  readonly contact: string;
+  readonly subprocessors: readonly Subprocessor[];
+  readonly regions: readonly string[];
+  /** Per binding, per region, as subprocessor ids — never a list of sentences. */
+  readonly inference: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>>;
+  readonly transfers: readonly Transfer[];
+}
+
 /* ------------------------------------------------------------ refusals --- */
 
 export interface ProtectionProblem { readonly at: string; readonly why: string }

@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { LegalDoc, Problem } from "@one/kernel";
+import type { LegalDoc, Problem, Receiving } from "@one/kernel";
 
 import { AccountCenter, type AccountCenterProps } from "../src/account/center.js";
 import { AboutBody, KeptHere, meaning, VaultScreen, type Item, type Kept, type Looked, type Where } from "../src/account/vault.js";
@@ -29,7 +29,7 @@ import { SwitchRow } from "../src/switch.js";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ValueEditor, ValueEditorBody } from "../src/editor.js";
 import { LegalScreen, paragraphs, said } from "../src/account/legal.js";
-import type { Doc, Receiving } from "../src/account/wire.js";
+import type { Doc } from "../src/account/wire.js";
 import { configureFeedback, feedbackSettings, FEEDBACK_DEFAULT } from "../src/feedback.js";
 import { Device } from "../src/icon.js";
 
@@ -602,8 +602,8 @@ describe("consent and legal", () => {
      its own test rather than a fixture every other one has to carry. */
   const screen = (docs: readonly Doc[], receiving: Receiving | null = null) => renderToStaticMarkup(
     <LegalScreen
-      products={[{ appId: "hello", appName: "Hello", roles: ["owner"], docs }]}
-      receiving={receiving} onAccept={async () => null} onBack={() => undefined}
+      products={[{ appId: "hello", appName: "Hello", roles: ["owner"], docs, receiving }]}
+      onAccept={async () => null} onBack={() => undefined}
     />,
   );
 
@@ -654,10 +654,10 @@ describe("consent and legal", () => {
     const html = renderToStaticMarkup(
       <LegalScreen
         products={[
-          { appId: "kova", appName: "Kova", roles: ["owner"], docs: [DOC({ outstanding: true })] },
-          { appId: "scena", appName: "Scena", roles: ["owner"], docs: [DOC({ acceptedOn: "11 May" }, { id: "s" })] },
+          { appId: "kova", appName: "Kova", roles: ["owner"], docs: [DOC({ outstanding: true })], receiving: null },
+          { appId: "scena", appName: "Scena", roles: ["owner"], docs: [DOC({ acceptedOn: "11 May" }, { id: "s" })], receiving: null },
         ]}
-        receiving={null} onAccept={async () => null} onBack={() => undefined}
+        onAccept={async () => null} onBack={() => undefined}
       />,
     );
     expect(html).toContain("Kova");

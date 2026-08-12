@@ -19,7 +19,7 @@
  * missing value is a binding that hides a route which stopped sending one.
  */
 
-import type { Instant, LegalDoc, LegalForApp, Subprocessor, Transfer, Wanted } from "@one/kernel";
+import type { Instant, LegalDoc, LegalForApp, Receiving, Wanted } from "@one/kernel";
 import type { Item, Kept, Looked, Where } from "./vault.js";
 
 /** Exactly what `vault.mine` answers with. */
@@ -144,22 +144,6 @@ export interface Accepted {
   readonly at: Instant;
 }
 
-/** Exactly what `protection.list` answers with. */
-export interface Receiving {
-  readonly controller: string;
-  readonly contact: string;
-  readonly subprocessors: readonly Subprocessor[];
-  readonly regions: readonly string[];
-  /**
-   * ⚠️ PER BINDING, PER REGION, AS SUBPROCESSOR IDS — not a list of sentences.
-   * Residency is not only storage: a workspace choosing a region chooses where
-   * its records are STORED, and which models its generations reach is a separate
-   * answer. Flattening the two is what makes a residency promise untrue.
-   */
-  readonly inference: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>>;
-  readonly transfers: readonly Transfer[];
-}
-
 /**
  * ⚠️ THE ACCEPTANCE IS MATCHED ON DOCUMENT **AND** VERSION, which is the whole
  * reason the ledger is keyed that way. Matching on the document alone would show
@@ -196,6 +180,8 @@ export interface Product {
   readonly appName: string;
   readonly roles: readonly string[];
   readonly docs: readonly Doc[];
+  /** ⚠️ THIS product's recipients, not the serving app's. Null where unpublished. */
+  readonly receiving: Receiving | null;
 }
 
 /**
@@ -211,6 +197,7 @@ export const mineFrom = (reply: MineReply, read: Reading): readonly Product[] =>
       appId: a.appId,
       appName: a.appName,
       roles: a.roles,
+      receiving: a.receiving,
       docs: a.documents.map((d) => {
         const held = reply.accepted.find((x) => x.document === d.id && x.version === d.version)
           ?? [...reply.accepted].filter((x) => x.document === d.id).sort((x, y) => (x.at < y.at ? 1 : -1))[0];

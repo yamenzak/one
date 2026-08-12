@@ -22,11 +22,11 @@
  */
 
 import { useState, type ElementType, type ReactNode } from "react";
-import type { DataCategory, Problem, Subprocessor } from "@one/kernel";
+import type { DataCategory, Problem, Receiving, Subprocessor } from "@one/kernel";
 /* ⚠️ THE SHAPES COME FROM THE SEAM, which is the module `scripts/wire.test.mjs`
    holds to the kernel. A screen that declared its own would be outside the one
    check that exists to stop it inventing a field. */
-import type { Doc, Product, Receiving } from "./wire.js";
+import type { Doc, Product } from "./wire.js";
 import { Button } from "../button.js";
 import { useCommit } from "../commit.js";
 import { Disclose } from "../disclose.js";
@@ -46,14 +46,13 @@ export interface LegalScreenProps {
    * Null until known. `[]` is "you are in no product", which is a fact.
    */
   readonly products: readonly Product[] | null;
-  readonly receiving: Receiving | null;
   readonly onAccept: (id: string, version: string) => Promise<Problem | null>;
   readonly onBack: () => void;
   readonly Heading?: ElementType;
 }
 
 export function LegalScreen({
-  products, receiving, onAccept, onBack, Heading = "h1",
+  products, onAccept, onBack, Heading = "h1",
 }: LegalScreenProps): ReactNode {
   const [reading, setReading] = useState<string | null>(null);
   const open = products?.flatMap((p) => p.docs).find((d) => d.doc.id === reading) ?? null;
@@ -105,24 +104,14 @@ export function LegalScreen({
                         />
                       ))}
                     </Card>
+                    {/* ⚠️ THIS PRODUCT'S OWN RECIPIENTS, UNDER THIS PRODUCT'S
+                        DOCUMENTS. One app's disclosure shown under every app's
+                        documents told somebody in three products about the one
+                        behind whichever door they came through. */}
+                    {p.receiving ? <Receivers of={p.receiving} /> : null}
                   </Section>
                 ))}
 
-            {/*
-              ⚠️ ONE PRODUCT'S DISCLOSURE UNDER EVERY PRODUCT'S DOCUMENTS, which is
-              the half of this screen that is still asymmetric. `protection.list`
-              answers for the app serving the request; each product has its own
-              recipients, regions and transfers, and a person in three of them is
-              being shown one. The documents above were the same problem and
-              `legal_specs` is its answer — the protection declaration needs the
-              same treatment.
-            */}
-            {/* DEFER(one-190) stage:7 — publish each app's ProtectionSpec beside
-                its legal documents, so the disclosure covers every product
-                somebody is in rather than the one behind this door. */}
-            <Section name="Where your data goes">
-              {receiving === null ? <Waiting rows={3} /> : <Receivers of={receiving} />}
-            </Section>
           </Screen>
         )}
     </Stack>

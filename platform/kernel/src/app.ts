@@ -30,7 +30,7 @@ import { momentProblems } from "./moment.js";
 import { marketProblems } from "./market.js";
 import { MILESTONE_EARNED, milestoneProblems } from "./milestone.js";
 import { danglingHelp, helpProblems } from "./help.js";
-import { agreementProblems, disclosureProblems, holdingProblems, protectionProblems, ropaOf, type ProtectionSpec, type Record30 } from "./protection.js";
+import { agreementProblems, disclosureProblems, holdingProblems, protectionProblems, ropaOf, type ProtectionSpec, type Receiving, type Record30 } from "./protection.js";
 import type { VaultSpec } from "./vault.js";
 import { shadowProblems, vaultActivities, wantProblems } from "./vault.js";
 import type { NotificationRegistry } from "./notify.js";
@@ -292,6 +292,16 @@ export interface LegalForApp {
   readonly documents: readonly LegalDoc[];
   /** The subset any of their roles still owes. */
   readonly outstanding: readonly LegalDoc[];
+  /**
+   * ⚠️ THIS PRODUCT'S OWN DISCLOSURE, because each has different recipients.
+   * Showing one app's under every app's documents is the asymmetry the published
+   * declaration exists to remove — a person in three products was being told
+   * about the one behind whichever door they came through.
+   *
+   * Null where a row predates the column, which is a real state and not an
+   * absence to render as "nobody is responsible".
+   */
+  readonly receiving: Receiving | null;
 }
 
 /**

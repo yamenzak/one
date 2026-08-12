@@ -21,7 +21,7 @@
  * by the platform, so a registry added later cannot join this list quietly.
  */
 
-import type { AnyOperation, AppSpec, BindingSpec, Instant, LegalDoc, LegalForApp, SchemaModule, Session, SqlHandle } from "@one/kernel";
+import type { AnyOperation, AppSpec, BindingSpec, Instant, LegalDoc, LegalForApp, Receiving, SchemaModule, Session, SqlHandle } from "@one/kernel";
 import { PUBLIC, operation, ropaOf, s, transfersOf, vaultActivities } from "@one/kernel";
 
 /** ⚠️ A symbol, so an app cannot reach the ledger by writing a property name. */
@@ -111,6 +111,17 @@ export const LEGAL_SPEC_SCHEMA: SchemaModule = {
   ddl: [
     `CREATE TABLE IF NOT EXISTS legal_specs (app_id TEXT PRIMARY KEY, app_name TEXT NOT NULL, documents TEXT NOT NULL);`,
   ],
+  /*
+    ⚠️ AN ALTER, BECAUSE A `CREATE TABLE IF NOT EXISTS` CARRYING IT DOES NOTHING
+    WHERE THE TABLE IS ALREADY THERE — a column that exists on fresh databases and
+    nowhere else, and a read that comes back undefined for every deployment that
+    was already running.
+
+    ⚠️ AND IT IS THE ASSEMBLED `Receiving`, NOT THE DECLARATION. Three of its
+    fields are computed from the tenancy, the bindings and the collections, so a
+    stored `ProtectionSpec` could not answer "does anything leave".
+  */
+  alters: [`ALTER TABLE legal_specs ADD COLUMN protection TEXT NOT NULL DEFAULT '{}';`],
 };
 
 /**
@@ -118,9 +129,8 @@ export const LEGAL_SPEC_SCHEMA: SchemaModule = {
  * agree to still has to serve — a boot that throws here takes a whole product
  * down over a screen in another one.
  */
-export async function publishLegalSpec(
-  db: SqlHandle,
-  app: { readonly id: string; readonly name: string; readonly governance?: { readonly legal: readonly LegalDoc[] } },
+export async function publishLegalSpec<B extends BindingSpec>(
+  db: SqlHandle, app: AppSpec<B>,
 ): Promise<void> {
   try {
     const legal = app.governance?.legal ?? [];
@@ -129,9 +139,10 @@ export async function publishLegalSpec(
       return;
     }
     await db.run(
-      `INSERT INTO legal_specs (app_id, app_name, documents) VALUES (?, ?, ?)
-       ON CONFLICT(app_id) DO UPDATE SET app_name = excluded.app_name, documents = excluded.documents`,
-      app.id, app.name, JSON.stringify(legal),
+      `INSERT INTO legal_specs (app_id, app_name, documents, protection) VALUES (?, ?, ?, ?)
+       ON CONFLICT(app_id) DO UPDATE SET app_name = excluded.app_name,
+         documents = excluded.documents, protection = excluded.protection`,
+      app.id, app.name, JSON.stringify(legal), JSON.stringify(receivingOf(app)),
     );
   } catch (why) {
     /* ⚠️ SERVES ANYWAY, AND SAYS SO — see `publishVaultSpec`, whose silent
@@ -143,18 +154,76 @@ export async function publishLegalSpec(
 /** Every app's documents, for the surface that renders all of them at once. */
 export async function publishedLegal(
   db: SqlHandle,
-): Promise<readonly { appId: string; appName: string; documents: readonly LegalDoc[] }[]> {
-  const rows = await db.all<{ app_id: string; app_name: string; documents: string }>(
-    `SELECT app_id, app_name, documents FROM legal_specs ORDER BY app_id LIMIT 200`,
+): Promise<readonly { appId: string; appName: string; documents: readonly LegalDoc[]; receiving: Receiving | null }[]> {
+  const rows = await db.all<{ app_id: string; app_name: string; documents: string; protection: string | null }>(
+    `SELECT app_id, app_name, documents, protection FROM legal_specs ORDER BY app_id LIMIT 200`,
   ).catch(() => []);
   return rows.flatMap((r) => {
     /* ⚠️ A ROW THAT WILL NOT PARSE IS DROPPED, not thrown on. It was written by
        another worker, possibly a version ahead, and one product's bad row must
        not take the whole account centre down with it. */
     try {
-      return [{ appId: r.app_id, appName: r.app_name, documents: JSON.parse(r.documents) as readonly LegalDoc[] }];
+      /* ⚠️ THE DISCLOSURE IS ALLOWED TO BE ABSENT AND THE DOCUMENTS ARE NOT. A
+         row written before the column existed has `{}`, and a screen that showed
+         an empty controller would be stating that nobody is responsible. */
+      const receiving = JSON.parse(r.protection ?? "{}") as Partial<Receiving>;
+      return [{
+        appId: r.app_id, appName: r.app_name,
+        documents: JSON.parse(r.documents) as readonly LegalDoc[],
+        receiving: receiving.controller ? (receiving as Receiving) : null,
+      }];
     } catch { return []; }
   });
+}
+
+/**
+ * ⚠️ ONE ASSEMBLY, TWO CALLERS, AND THAT IS THE WHOLE REASON IT IS A FUNCTION.
+ * `protection.list` answers it for the app serving the request; boot publishes it
+ * so every OTHER product's account centre can show it. Written twice, the two
+ * would agree until the first feature that changed one — and the disagreement
+ * would be between what a person is told inside a product and what they are told
+ * about it from their account.
+ */
+export function receivingOf<B extends BindingSpec>(app: AppSpec<B>): Receiving {
+  const p = app.governance.protection;
+  return {
+    controller: p.controller,
+    contact: p.contact,
+    subprocessors: p.subprocessors,
+    /*
+      ⚠️ THE REGIONS ARE THE ANSWER TO "WHERE IS IT", and they come from the
+      tenancy declaration rather than from a sentence. A page that names a region
+      the deployment does not have, or omits one it does, is wrong in the one
+      field a residency question is asked about.
+    */
+    regions: app.tenancy.regions,
+    /*
+      ⚠️ RESIDENCY IS NOT ONLY STORAGE. A workspace choosing a region is choosing
+      where its records are STORED; which models its generations reach is a
+      separate question with a separate answer, and publishing the two together is
+      what lets somebody choose knowing both. Read off the binding rather than
+      described, so a region that permits everything says so plainly.
+    */
+    inference: Object.fromEntries(
+      Object.entries(app.bindings as Record<string, { kind?: string; byRegion?: Record<string, readonly string[]>; subprocessors?: readonly string[] }>)
+        .filter(([, store]) => store?.kind === "inference")
+        .map(([name, store]) => [
+          name,
+          Object.fromEntries(app.tenancy.regions.map((r) => [r, store.byRegion?.[r] ?? store.subprocessors ?? []])),
+        ]),
+    ),
+    /*
+      ⚠️ THE ANSWER EVERY QUESTIONNAIRE ASKS, joined rather than written. "Do you
+      transfer personal data outside the EEA and on what basis" needs what is HELD
+      crossed with who RECEIVES it, and in every company that has both documents
+      the answer is written from memory once and is wrong by the next feature.
+
+      ⚠️ IT IS THE INTERSECTION, so a recipient's own entry cannot over-disclose: a
+      company claiming to receive `financial` in an app that holds none would make
+      the transfer look larger than it is, in the direction nobody checks.
+    */
+    transfers: transfersOf({ collections: app.collections, subprocessors: p.subprocessors }),
+  };
 }
 
 /* --------------------------------------------------------------- reading --- */
@@ -340,6 +409,8 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
             appId: a.appId, appName: a.appName, roles,
             documents: a.documents,
             outstanding: [...owed.values()],
+            /* ⚠️ THIS PRODUCT'S OWN, published beside its documents. */
+            receiving: a.receiving,
           };
         });
 
@@ -409,51 +480,8 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
     permission: PUBLIC,
     idempotency: { mode: "none" },
     async handler() {
-      const p = app.governance.protection;
-      return {
-        controller: p.controller,
-        contact: p.contact,
-        subprocessors: p.subprocessors,
-        /*
-          ⚠️ THE REGIONS ARE THE ANSWER TO "WHERE IS IT", and they come from the
-          tenancy declaration rather than from a sentence. A page that names a
-          region the deployment does not have, or omits one it does, is wrong in
-          the one field a residency question is asked about.
-        */
-        regions: app.tenancy.regions,
-        /*
-          ⚠️ RESIDENCY IS NOT ONLY STORAGE, AND THIS IS WHERE THAT STOPS BEING A
-          SENTENCE IN A COMMENT. A workspace choosing a region is choosing where
-          its records are STORED; which models its generations reach is a
-          separate question with a separate answer, and publishing the two
-          together is what lets somebody choose knowing both.
-
-          It is read off the binding rather than described, so a region that
-          permits everything says so plainly instead of implying otherwise by
-          being absent.
-        */
-        /*
-          ⚠️ THE ANSWER TO THE QUESTION EVERY QUESTIONNAIRE ASKS, joined rather
-          than written. "Do you transfer personal data outside the EEA and on
-          what basis" needs what is HELD crossed with who RECEIVES it, and in
-          every company that has both documents the answer is written from
-          memory once and is wrong by the next feature.
-
-          ⚠️ IT IS THE INTERSECTION, so a recipient's own entry cannot
-          over-disclose: a company claiming to receive `financial` in an app that
-          holds none would make the transfer look larger than it is, in the
-          direction nobody checks.
-        */
-        transfers: transfersOf({ collections: app.collections, subprocessors: p.subprocessors }),
-        inference: Object.fromEntries(
-          Object.entries(app.bindings as Record<string, { kind?: string; byRegion?: Record<string, readonly string[]>; subprocessors?: readonly string[] }>)
-            .filter(([, store]) => store?.kind === "inference")
-            .map(([name, store]) => [
-              name,
-              Object.fromEntries(app.tenancy.regions.map((r) => [r, store.byRegion?.[r] ?? store.subprocessors ?? []])),
-            ]),
-        ),
-      };
+      /* ⚠️ THE SAME ASSEMBLY BOOT PUBLISHES. See `receivingOf`. */
+      return receivingOf(app);
     },
   });
 

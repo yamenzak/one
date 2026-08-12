@@ -31,8 +31,8 @@ import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
 import { PreferencesScreen, type Preferences } from "../src/account/preferences.js";
 import { KeptHere, meaning, VaultScreen, type Kept, type Looked, type Where } from "../src/account/vault.js";
 import { LegalScreen } from "../src/account/legal.js";
-import type { Doc, Product, Receiving } from "../src/account/wire.js";
-import { transfersOf, type Held, type Subprocessor } from "@one/kernel";
+import type { Doc, Product } from "../src/account/wire.js";
+import { transfersOf, type Held, type Receiving, type Subprocessor } from "@one/kernel";
 import { ValueEditor, type EditableField } from "../src/editor.js";
 import { Card, Entry } from "../src/list.js";
 import { Edit } from "../src/icon.js";
@@ -268,20 +268,6 @@ const LEGAL_HELD: readonly Held[] = [
     holding: { kind: "personal", categories: ["content", "health"], subjects: ["member", "customer"], purpose: "What somebody records about themselves", basis: "consent", condition: "explicit_consent" } },
 ];
 
-/* ⚠️ TWO PRODUCTS, because one is a picture of the state where the grouping does
-   not matter. The second asks nothing outstanding, which is what most products a
-   person belongs to look like. */
-const LEGAL_PRODUCTS: readonly Product[] = [
-  { appId: "kova", appName: "Kova", roles: ["client", "owner"], docs: HELLO_DOCS },
-  {
-    appId: "scena", appName: "Scena", roles: ["owner"],
-    docs: [{
-      doc: { id: "terms", version: "2", title: "Terms of service", mustAccept: ["owner"], body: "Short and unremarkable." },
-      acceptedOn: "11 May", outstanding: false,
-    }],
-  },
-];
-
 const LEGAL_RECEIVING: Receiving = {
   controller: "The example controls it.",
   contact: "privacy@example.test",
@@ -297,6 +283,25 @@ const LEGAL_RECEIVING: Receiving = {
   */
   transfers: transfersOf({ collections: LEGAL_HELD, subprocessors: LEGAL_SUBPROCESSORS }),
 };
+
+/* ⚠️ TWO PRODUCTS, because one is a picture of the state where the grouping does
+   not matter. The second asks nothing outstanding, which is what most products a
+   person belongs to look like. */
+const LEGAL_PRODUCTS: readonly Product[] = [
+  { appId: "kova", appName: "Kova", roles: ["client", "owner"], docs: HELLO_DOCS, receiving: LEGAL_RECEIVING },
+  {
+    appId: "scena", appName: "Scena", roles: ["owner"],
+    docs: [{
+      doc: { id: "terms", version: "2", title: "Terms of service", mustAccept: ["owner"], body: "Short and unremarkable." },
+      acceptedOn: "11 May", outstanding: false,
+    }],
+    /* ⚠️ A PRODUCT WHOSE DISCLOSURE HAS NOT PUBLISHED YET — a real state once a
+       row predates the column, and the one the screen must not render as
+       "nobody is responsible". */
+    receiving: null,
+  },
+];
+
 
 const VAULT_KEPT: readonly Kept[] = [
   { fact: "body.girths", label: "Measurements" },
@@ -438,7 +443,6 @@ function Preview() {
     ) : at === "legal" ? (
       <LegalScreen
         products={which === "waiting" ? null : LEGAL_PRODUCTS}
-        receiving={which === "waiting" ? null : LEGAL_RECEIVING}
         onAccept={save}
         onBack={() => setAt("home")}
         Heading={Heading}

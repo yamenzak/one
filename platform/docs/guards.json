@@ -3442,6 +3442,15 @@
       "impl": "web/test/screens.test.tsx",
       "proves": "names the product each document belongs to",
       "fails": "an ungrouped list, which cannot say whose terms these are once a person belongs to more than one product"
+    },
+    {
+      "id": "a-disclosure-belongs-to-its-own-product",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/account.test.ts",
+      "proves": "carries each product's own disclosure, not the serving app's",
+      "fails": "cross-app documents over a single-app disclosure — a person in three products reading one product's recipients under all three products' terms, with nothing on the screen saying which. Each app publishes its ASSEMBLED disclosure beside its documents, assembled because the regions, the inference map and the transfers are computed from the deployment rather than declared"
     }
   ]
 }

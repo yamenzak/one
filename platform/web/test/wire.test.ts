@@ -164,6 +164,7 @@ describe("every product a person belongs to", () => {
         documents: [doc("terms", "4"), doc("privacy", "3")],
         /* ⚠️ The handler says only `privacy` is owed, though both name `owner`. */
         outstanding: [doc("privacy", "3")],
+        receiving: null,
       }],
       accepted: [{ document: "terms", version: "4", at: at("2026-03-02T09:00:00.000Z") }],
     };
@@ -176,7 +177,7 @@ describe("every product a person belongs to", () => {
 
   it("carries the roles through, because they are what the obligation followed", () => {
     const products = mineFrom({
-      apps: [{ appId: "kova", appName: "Kova", roles: ["client", "owner"], documents: [], outstanding: [] }],
+      apps: [{ appId: "kova", appName: "Kova", roles: ["client", "owner"], documents: [], outstanding: [], receiving: null }],
       accepted: [],
     }, read);
     expect(products[0]!.roles).toEqual(["client", "owner"]);
