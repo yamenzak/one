@@ -13,11 +13,12 @@
  * "what does this studio know about me" is the one people ask, and it is the one
  * they can act on — a workspace is a relationship you can end.
  *
- * ⚠️ AN ITEM IS A SWITCH, NOT A MENU OF FOUR RUNGS. A want declares what it NEEDS,
- * so for that item the rungs above buy the app nothing and the rungs between are
- * indistinguishable to the person holding the phone. Off is always "only you"; on
- * is the one rung the want asked for — and the line underneath says, in the
- * workspace's own name, what that means.
+ * ⚠️ AN ITEM IS A SWITCH ONLY WHERE IT HAS TWO RUNGS, and the want says how many.
+ * A fact an app merely computes with has one meaningful setting either side of
+ * off, so a switch is the honest control. A fact it wants the VALUE of can also be
+ * held at "the assistant, no people" — a rung somebody chooses deliberately, and
+ * one a boolean spends without asking. Whichever it is, the line underneath says
+ * in the workspace's own name what is true right now.
  *
  * ⚠️ AND THE THIRD QUESTION IS THE ONE NO PRODUCT ANSWERS. What is held, who can
  * see it — and who HAS. A permission list says what could happen; somebody
