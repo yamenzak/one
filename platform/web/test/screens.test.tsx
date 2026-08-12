@@ -664,6 +664,20 @@ describe("consent and legal", () => {
     expect(html).toContain("Scena");
   });
 
+  it("marks the category that is Article 9, not the row it is on", () => {
+    /*
+      ⚠️ THE WORD A READER IS LOOKING FOR. A badge at the end of the line says
+      "something here is sensitive" and does not say which — and the same row
+      carrying both says it twice. The special set is the KERNEL's, so a screen
+      keeping its own copy is how the mark and the transfer's own `special` flag
+      come to disagree on the same row.
+    */
+    const html = screen([DOC()], RECEIVING);
+    expect(html).toMatch(/data-special[^>]*>your health/);
+    /* And an ordinary category is not marked. */
+    expect(html).not.toMatch(/data-special[^>]*>who you are/);
+  });
+
   it("renders a declared document as text, never as markup", () => {
     /* ⚠️ A manifest is not an injection surface. */
     const html = renderToStaticMarkup(<>{paragraphs("<img src=x onerror=alert(1)>\n\nsecond")}</>);

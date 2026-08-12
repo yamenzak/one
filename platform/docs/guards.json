@@ -3451,6 +3451,15 @@
       "impl": "hello/test/account.test.ts",
       "proves": "carries each product's own disclosure, not the serving app's",
       "fails": "cross-app documents over a single-app disclosure — a person in three products reading one product's recipients under all three products' terms, with nothing on the screen saying which. Each app publishes its ASSEMBLED disclosure beside its documents, assembled because the regions, the inference map and the transfers are computed from the deployment rather than declared"
+    },
+    {
+      "id": "article-nine-is-marked-on-the-category",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "marks the category that is Article 9, not the row it is on",
+      "fails": "a badge at the end of a line saying something here is sensitive without saying which — and, on a row that also tags its categories, saying it twice. The special set is the kernel's, so a screen keeping its own copy is how the mark and the transfer's own flag come to disagree on the same row"
     }
   ]
 }

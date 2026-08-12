@@ -23,6 +23,7 @@
 
 import { useState, type ElementType, type ReactNode } from "react";
 import type { DataCategory, Problem, Receiving, Subprocessor } from "@one/kernel";
+import { SPECIAL_CATEGORIES } from "@one/kernel";
 /* ⚠️ THE SHAPES COME FROM THE SEAM, which is the module `scripts/wire.test.mjs`
    holds to the kernel. A screen that declared its own would be outside the one
    check that exists to stop it inventing a field. */
@@ -162,8 +163,24 @@ const CATEGORY: Readonly<Record<DataCategory, string>> = {
   criminal: "criminal matters",
 };
 
-const spoken = (of: readonly DataCategory[]): string =>
-  of.map((c) => CATEGORY[c] ?? c).join(", ");
+/**
+ * ⚠️ ONE PER CATEGORY, MARKED WHERE IT IS ARTICLE 9. Set as a comma list these are
+ * prose to be parsed, and the question a person has — "is my health data in
+ * there" — is answered by scanning rather than by reading to the end.
+ *
+ * ⚠️ THE SPECIAL SET IS THE KERNEL'S, not a list repeated here. `SPECIAL_CATEGORIES`
+ * is what `transfersOf` marks a transfer by, so a screen keeping its own copy is
+ * how the tag and the badge on the same row come to disagree.
+ */
+const Tags = ({ of }: { readonly of: readonly DataCategory[] }): ReactNode => (
+  <span className="tags">
+    {of.map((c) => (
+      <span key={c} className="tag" data-special={SPECIAL_CATEGORIES.includes(c) ? "" : undefined}>
+        {CATEGORY[c] ?? c}
+      </span>
+    ))}
+  </span>
+);
 
 /**
  * ⚠️ THE SUMMARY IS THE ANSWER; THE LIST IS THE EVIDENCE. Somebody opening this
@@ -227,10 +244,24 @@ const Receivers = ({ of }: { readonly of: Receiving }): ReactNode => {
         <Disclose title="Every company, and what it gets" said={String(of.transfers.length)}>
           <Card className="entries">
             {of.transfers.map((t) => (
+              /*
+                ⚠️ WHAT THEY DO, THEN WHAT THEY GET, THEN WHERE AND UNDER WHAT.
+                Four facts on one dot-separated line is a sentence somebody has to
+                parse; the categories are a set and now read as one.
+
+                ⚠️ AND THE ROW'S "Sensitive" BADGE IS GONE WITH THEM. Article 9 is
+                marked on the category that IS Article 9, which is the word a
+                reader is looking for — a badge at the end of the line says the
+                same thing a second time and does not say which one. The summary
+                above still carries it, because up there nothing names a category
+                at all.
+              */
               <Entry key={t.to} label={t.name}>
-                {roleOf.get(t.to) ? <>{roleOf.get(t.to)} · </> : null}
-                {spoken(t.categories)} · {t.where} · {SAFEGUARD[t.safeguard]}
-                {t.special ? <Pill urgent>Sensitive</Pill> : null}
+                <span className="party">
+                  <span className="party-role">{roleOf.get(t.to)}</span>
+                  <Tags of={t.categories} />
+                  <span className="party-where">{t.where} · {SAFEGUARD[t.safeguard]}</span>
+                </span>
               </Entry>
             ))}
           </Card>
