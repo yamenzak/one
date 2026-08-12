@@ -923,3 +923,117 @@ export function vaultActivities(spec: VaultSpec | undefined): readonly VaultActi
     }];
   });
 }
+
+/* ------------------------------------------------------- what a want stands at */
+
+/**
+ * THE VAULT AS A RENDERER — one declared want, resolved against what somebody
+ * actually granted, with everything a screen needs and nothing it has to look up.
+ *
+ * ⚠️ THIS EXISTS SO NO SCREEN EVER LEARNS WHAT A FACT IS. A vault built the
+ * obvious way grows a branch per fact — a sentence for height, another for
+ * weight, a special case for the one that is a series — and then every app that
+ * declares a thirteenth fact needs the account centre edited. Everything below
+ * is copied out of the manifest and the fact registry; the renderer's only job is
+ * to lay it out.
+ */
+export interface Wanted {
+  readonly fact: string;
+  readonly label: string;
+  /** ⚠️ The app's own sentence, from its manifest. Never written by a screen. */
+  readonly why: string;
+  readonly need: Need;
+  readonly required: boolean;
+  /**
+   * ⚠️ THE ONE RUNG THIS WANT TURNS ON, which is what makes an item a switch
+   * rather than a menu of four. A want declares what it NEEDS — arithmetic, a
+   * derivation, or the value itself — so for any single item the rungs above that
+   * buy the app nothing and the rungs between are indistinguishable to the person.
+   * Off is always `self`; on is this.
+   */
+  readonly asks: Reach;
+  /** Where it stands now. `self` when nothing is granted, or a grant has lapsed. */
+  readonly reach: Reach;
+  readonly granted: boolean;
+  readonly expiresAt: Instant | null;
+  /** ⚠️ WHETHER ANYTHING IS RECORDED, never the value. */
+  readonly held: boolean;
+  readonly recommend?: Reach;
+  /** Why the recommendation is what it is, in the reader's own interest. */
+  readonly because?: string;
+  readonly categories: readonly DataCategory[];
+  /**
+   * ⚠️ A DERIVED WANT IS SEVERAL SWITCHES, NOT ONE. Each reading discloses a
+   * different amount and says so in its own words, so collapsing them into one
+   * control would make the person grant the most revealing to get the least.
+   */
+  readonly readings: readonly Reading[];
+}
+
+/** Every want one app declared, resolved for one person in one workspace. */
+export interface WantedHere {
+  readonly appId: string;
+  readonly tenantId: string | null;
+  readonly items: readonly Wanted[];
+}
+
+/**
+ * ⚠️ THE RUNG A WANT ASKS FOR IS DERIVED FROM WHAT IT NEEDS, not declared twice.
+ * An app that could name its own rung could name one its need does not justify,
+ * and nothing would catch it — the sheet would simply ask for more.
+ */
+export const asksFor = (need: Need): Reach => (need === "raw" ? "staff" : ARITHMETIC);
+
+export function wantedHere(input: {
+  readonly spec: VaultSpec;
+  readonly appId: string;
+  readonly tenantId: string | null;
+  readonly grants: readonly Grant[];
+  readonly held: ReadonlySet<string>;
+  readonly now: Instant;
+  readonly facts?: readonly Fact[];
+}): WantedHere {
+  const { spec, appId, tenantId, grants, held, now } = input;
+  const facts = input.facts ?? FACTS;
+  const byId = new Map(facts.map((f) => [f.id, f]));
+
+  const items = spec.wants.flatMap((want): Wanted[] => {
+    const fact = byId.get(want.fact);
+    /* ⚠️ A want naming no fact is dropped rather than rendered blank.
+       `wantProblems` refuses it at composition, so reaching here is a registry
+       edited under a running app, and half a row is worse than no row. */
+    if (!fact) return [];
+    const live = grants.filter(
+      (g) => g.fact === want.fact && g.appId === appId && g.tenantId === tenantId
+        && (g.expiresAt === null || g.expiresAt > now),
+    );
+    /* ⚠️ THE HIGHEST LIVE GRANT WINS, and the walk is the same one `mayRead`
+       does. Two resolvers over one question is how a screen comes to promise
+       what a route refuses. */
+    const at = live.reduce<Grant | null>(
+      (best, g) => (best === null || REACH.indexOf(g.reach) > REACH.indexOf(best.reach) ? g : best),
+      null,
+    );
+    return [{
+      fact: want.fact,
+      label: fact.label,
+      why: want.why,
+      need: want.need,
+      required: want.required === true,
+      asks: asksFor(want.need),
+      reach: at?.reach ?? "self",
+      granted: at !== null,
+      expiresAt: at?.expiresAt ?? null,
+      held: held.has(want.fact),
+      recommend: want.recommend ?? fact.suggests,
+      because: fact.because,
+      categories: fact.categories,
+      /* ⚠️ ONLY THE READINGS THIS WANT NAMED. A fact may offer several and an app
+         may want one of them; listing the rest would offer somebody a control
+         over a disclosure nothing is asking to make. */
+      readings: (fact.readings ?? []).filter((r) => (want.readings ?? []).includes(r.id)),
+    }];
+  });
+
+  return { appId, tenantId, items };
+}

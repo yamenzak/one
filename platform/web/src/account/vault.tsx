@@ -1,52 +1,67 @@
 /**
  * YOUR VAULT — everything held about you, everyone who can see it, and who has.
  *
- * ⚠️ THREE QUESTIONS, AND EVERY PRODUCT ANSWERS AT MOST THE FIRST. What is held
- * about me; who can see each part; and who has actually looked. The third is the
- * one that turns a settings screen into something worth opening — a permission
- * list says what COULD happen, and a person deciding whether to keep sharing
- * wants to know what DID.
+ * ⚠️ THIS FILE KNOWS WHAT A FACT IS FOR EXACTLY NOWHERE. Every name, every reason,
+ * every recommendation and every sentence about what a derivation cannot reveal is
+ * copied out of a declaration — the app's manifest for why it wants a thing, the
+ * fact registry for what the thing is. The screen lays them out. That is the whole
+ * design: an app that declares a thirteenth fact gets a thirteenth row here, with
+ * its own explanation, without this file being opened.
  *
- * ⚠️ IT IS THE ACCOUNT'S, NOT AN APP'S, so it answers on `id.` with no workspace
- * anywhere. Somebody reviewing what they have shared is the person most likely
- * to have left every workspace they were in — and a screen that needed one would
- * be unreachable for exactly them.
+ * ⚠️ SO IT IS ORGANISED BY WORKSPACE, NOT BY FACT, because that is the question
+ * somebody actually has. "Who knows my weight" is answered by a list of facts;
+ * "what does this studio know about me" is the one people ask, and it is the one
+ * they can act on — a workspace is a relationship you can end.
  *
- * ⚠️ NO ICON COLUMN ON ANY OF THESE LISTS. Every row would carry the same glyph,
- * which is a column repeating what the section heading already said — and both
- * candidates were borrowed meanings: a shield is protection and a download arrow
- * is a download.
+ * ⚠️ AN ITEM IS A SWITCH, NOT A MENU OF FOUR RUNGS. A want declares what it NEEDS,
+ * so for that item the rungs above buy the app nothing and the rungs between are
+ * indistinguishable to the person holding the phone. Off is always "only you"; on
+ * is the one rung the want asked for — and the line underneath says, in the
+ * workspace's own name, what that means.
  *
- * ⚠️ A LAPSED GRANT IS SHOWN, NOT HIDDEN. "It ran out" and "I never gave it" are
- * the two answers somebody most wants to tell apart, and filtering the first out
- * makes them the same screen.
+ * ⚠️ AND THE THIRD QUESTION IS THE ONE NO PRODUCT ANSWERS. What is held, who can
+ * see it — and who HAS. A permission list says what could happen; somebody
+ * deciding whether to keep sharing wants to know what did.
  */
 
 import { useState, type ElementType, type ReactNode } from "react";
-import type { Problem } from "@one/kernel";
+import type { Problem, Reach, Wanted, WantedHere } from "@one/kernel";
+import { Face } from "../avatar.js";
+import { Lockup } from "../brand/mark.js";
 import { Chip } from "../chip.js";
-import { Confirm } from "../confirm.js";
-import { Blank, Card, Item, Pill, Unset, Waiting } from "../list.js";
-import { Screen, Section, Title } from "../screen.js";
-import type { Reach } from "../consent.js";
+import { Disclose } from "../disclose.js";
+import { About } from "../icon.js";
+import { Blank, Card, Item as Row, Pill, Waiting } from "../list.js";
+import { Screen, Section } from "../screen.js";
+import { Sheet } from "../sheet.js";
+import { Flip } from "../switch.js";
 
-export interface Grant {
-  readonly appId: string;
+/**
+ * ⚠️ THE VAULT'S OWN LIGHT, and it is the same number the card on the account
+ * home carries. A place is recognised by being lit the way it was lit the last
+ * time you were in it, so the two are one value or they are two places.
+ */
+export const VAULT_TINT = 268;
+
+/**
+ * ⚠️ THE KERNEL RESOLVES AND THE WIRE FORMATS, and the expiry is where the two
+ * meet. A `Wanted` carries a real instant, because that is what a comparison
+ * against "now" needs; a screen carries "1 December", because that is what
+ * somebody deciding whether to extend needs — and a component that formatted it
+ * would be a component that had to be told a locale and a time zone to render a
+ * list. Everything else on the item is the declaration, verbatim.
+ */
+export type Item = Omit<Wanted, "expiresAt"> & { readonly expiresAt: string | null };
+
+/** A workspace, and every want the app behind it declared. */
+export interface Where extends Omit<WantedHere, "items"> {
+  readonly items: readonly Item[];
+  readonly name: string;
   readonly appName: string;
-  /** The workspace, where the grant is narrowed to one. */
-  readonly where?: string;
-  readonly reach: Reach;
-  /** ⚠️ Null is "until I change it", which is a real answer rather than absence. */
-  readonly until: string | null;
-  readonly live: boolean;
-}
-
-export interface Held {
-  readonly fact: string;
-  readonly label: string;
-  /** ⚠️ Whether anything is recorded. The VALUE is not on this screen. */
-  readonly held: boolean;
-  readonly grants: readonly Grant[];
+  /** The workspace's own mark, or the generated face standing in for one. */
+  readonly face?: string;
+  /** The product, for the fallback's colour. Never shown as a word. */
+  readonly product?: string;
 }
 
 export interface Looked {
@@ -59,103 +74,145 @@ export interface Looked {
   readonly times: number;
 }
 
+/** A fact somebody recorded that no workspace has asked for. */
+export interface Kept {
+  readonly fact: string;
+  readonly label: string;
+}
+
 export interface VaultScreenProps {
   /** ⚠️ `null` is not answered yet; `[]` is answered and empty. */
-  readonly held: readonly Held[] | null;
+  readonly wheres: readonly Where[] | null;
+  readonly kept: readonly Kept[] | null;
   readonly looks: readonly Looked[] | null;
-  readonly onOpen: (fact: string) => void;
-  readonly onStop: (fact: string, appId: string) => Promise<Problem | null>;
+  /**
+   * ⚠️ ONE WRITE FOR EVERY CONTROL ON THE SCREEN, so a row cannot grow a second
+   * shape. `reach` is what it becomes — the want's own rung, or `self` for off.
+   */
+  readonly onSet: (
+    at: { readonly appId: string; readonly tenantId: string | null; readonly fact: string; readonly reach: Reach },
+  ) => Promise<Problem | null>;
   readonly onBack: () => void;
   readonly Heading?: ElementType;
 }
 
-const NAME: Record<Reach, string> = {
-  self: "Only you", compute: "Calculations only", agent: "The assistant", staff: "People there",
+/* --------------------------------------------------------------------- copy */
+
+/**
+ * WHAT THE CURRENT STATE MEANS, IN THE WORKSPACE'S OWN NAME.
+ *
+ * ⚠️ IT NAMES THE PLACE RATHER THAN THE ROLE. "Not shared with your coach" is one
+ * product's word for the person on the other side, and this screen stands over a
+ * studio, a clinic and a company's staff list alike. "Nobody at Haddad Strength"
+ * is both true everywhere and more precise — it is the actual boundary.
+ *
+ * ⚠️ AND IT SAYS WHAT IS TRUE NOW, not what would happen if you flipped it. A
+ * line that describes the other state reads as the current one to anybody
+ * skimming, which on a screen about disclosure is the worst available error.
+ */
+function meaning(item: Item, where: string): string {
+  if (!item.granted) {
+    return item.need === "compute"
+      ? `Kept to you. Not used for anything here, and nobody at ${where} can see it.`
+      : `Kept to you. Nobody at ${where} can see it.`;
+  }
+  const now =
+    item.reach === "compute" ? `Used for calculations here. Nobody at ${where} can see the value itself.`
+    : item.reach === "agent" ? `The assistant can use it. Nobody at ${where} can see it.`
+    : `People at ${where} can see it.`;
+  /* ⚠️ THE EXPIRY IS PART OF THE SENTENCE, not a pill beside it. As a pill it
+     competed with the switch for the same line and truncated the name to an
+     ellipsis; and it is not a separate fact anyway — "until December" is when the
+     sentence above it stops being true. */
+  return item.expiresAt === null ? now : `${now.replace(/\.$/, "")}, until ${item.expiresAt}.`;
+}
+
+const RUNG: Record<Reach, string> = {
+  self: "Only you", compute: "Calculations", agent: "The assistant", staff: "People there",
 };
 
-export function VaultScreen({ held, looks, onOpen, onStop, onBack, Heading = "h1" }: VaultScreenProps): ReactNode {
-  const [stopping, setStopping] = useState<{ fact: string; label: string; appId: string; appName: string } | null>(null);
+/* --------------------------------------------------------------------- view */
 
-  /*
-    ⚠️ SHARED FIRST, THEN THE REST. A list ordered by the registry buries the
-    three things somebody actually came to check under nine they have never
-    filled in — and this screen is opened when somebody wants to stop something,
-    which is a thing they are already sharing.
-  */
-  const shared = (held ?? []).filter((h) => h.grants.some((g) => g.live));
-  const rest = (held ?? []).filter((h) => !h.grants.some((g) => g.live));
+export function VaultScreen({ wheres, kept, looks, onSet, onBack, Heading = "h1" }: VaultScreenProps): ReactNode {
+  const [about, setAbout] = useState<{ item: Item; where: string } | null>(null);
 
   return (
     <Screen
       leave="up"
       onLeave={onBack}
-      name="Your vault"
-      title={<Title as={Heading}>Your vault</Title>}
-      lede="What is held about you, and who can see it. Nothing here belongs to an app."
+      /* ⚠️ THE SAME TWO DEVICES THE ACCOUNT CENTRE NAMES ITSELF WITH — its own
+         light and its own lockup — because this is a place of the same order and
+         not a settings page inside one.
+
+         ⚠️ SILK, LIKE EVERY PAGE, AND THE HUE IS WHAT DIFFERS. The card on the
+         account home is aurora because aurora is what still reads as light at
+         card size; a page is wide enough for the ribbons, and using the card's
+         variant here made a full-width field of magenta rather than a light
+         somewhere off the screen. Same variant as the surface it was opened
+         from, one number moved — which is the whole of how a place is told
+         from another place. */
+      sky="silk"
+      tint={VAULT_TINT}
+      name="Vault"
+      title={<Heading className="page-title"><Lockup word="Vault" /></Heading>}
+      lede="What each place you belong to can know about you, and what it cannot."
     >
-      <Section name="Shared right now">
-        {held === null ? <Waiting rows={3} /> : shared.length === 0 ? (
-          <Blank title="You are not sharing anything">
-            Everything here is yours alone until you say otherwise. An app that
-            wants something will ask, and you can say no.
+      <Section>
+        {wheres === null ? <Waiting rows={3} /> : wheres.length === 0 ? (
+          <Blank title="Nothing is asking for anything">
+            When an app wants to know something about you it will ask, and it will
+            appear here for you to change your mind about.
           </Blank>
         ) : (
           <Card>
-            {shared.flatMap((h) =>
-              h.grants.filter((g) => g.live).map((g) => (
-                <Item
-                  key={`${h.fact}:${g.appId}:${g.where ?? ""}`}
-                  title={h.label}
-                  detail={
-                    <>
-                      <Chip>{g.where ? `${g.appName} · ${g.where}` : g.appName}</Chip>
-                      {NAME[g.reach]}
-                      {/* ⚠️ AN EXPIRY IS SHOWN AS A DATE, not as "expires soon".
-                          Somebody deciding whether to extend needs the day. */}
-                      {g.until ? <Pill>Until {g.until}</Pill> : null}
-                    </>
-                  }
-                  action={
-                    <button
-                      type="button"
-                      className="pill press"
-                      onClick={() => setStopping({ fact: h.fact, label: h.label, appId: g.appId, appName: g.appName })}
-                    >
-                      Stop
-                    </button>
-                  }
-                />
-              )),
-            )}
-          </Card>
-        )}
-      </Section>
-
-      <Section name="Everything else">
-        {held === null ? <Waiting rows={4} /> : (
-          <Card>
-            {rest.map((h) => (
-              <Item
-                key={h.fact}
-                title={h.label}
-                /* ⚠️ WHETHER ANYTHING IS RECORDED, never what it is. This screen
-                   is about who can see things; showing the values here would put
-                   somebody's whole body on one scrollable page. */
-                detail={h.held ? "Recorded · shared with nobody" : <Unset>Nothing recorded</Unset>}
-                onGo={() => onOpen(h.fact)}
-              />
-            ))}
+            {wheres.map((w) => {
+              const on = w.items.filter((i) => i.granted).length;
+              return (
+                <Disclose
+                  key={`${w.appId}:${w.tenantId ?? ""}`}
+                  mark={<Face kind="workspace" src={w.face} name={w.name} tone={w.product} className="well alive" />}
+                  title={w.name}
+                  detail={w.appName}
+                  /* ⚠️ TWO NUMBERS, SO THE WHOLE ROW IS READABLE CLOSED. "2 of 5"
+                     answers both halves of the question somebody came with — how
+                     much have I given, and how much was asked. */
+                  said={<span className="disclose-count">{on} of {w.items.length}</span>}
+                >
+                  {w.items.map((item) => (
+                    <Ask
+                      key={item.fact}
+                      item={item}
+                      where={w.name}
+                      onOpen={() => setAbout({ item, where: w.name })}
+                      onSet={(next) => onSet({
+                        appId: w.appId, tenantId: w.tenantId, fact: item.fact,
+                        reach: next ? item.asks : "self",
+                      })}
+                    />
+                  ))}
+                </Disclose>
+              );
+            })}
           </Card>
         )}
       </Section>
 
       {/*
-        ⚠️ THE THIRD QUESTION, AND THE ONE NO PRODUCT ANSWERS. A permission list
-        says what COULD happen; this says what did. One row per reader per fact
-        per day — a row per read would be a write on every render, which is a
-        cost somebody eventually turns off, and a log that is off is worth
-        nothing at all.
+        ⚠️ WHAT NOBODY ASKED FOR IS STILL YOURS, and it is on the screen for the
+        person this whole thing is built for: somebody who has left every workspace
+        they were in. A vault that listed only what an app wanted would go empty at
+        exactly the moment it became the only copy.
       */}
+      {kept !== null && kept.length > 0 ? (
+        <Section name="Yours alone">
+          <Card>
+            {kept.map((k) => (
+              <Row key={k.fact} title={k.label} detail="Recorded. Nothing is asking for it." />
+            ))}
+          </Card>
+        </Section>
+      ) : null}
+
       <Section name="Who has looked">
         {looks === null ? <Waiting rows={3} /> : looks.length === 0 ? (
           <Blank title="Nobody has read anything of yours">
@@ -165,7 +222,7 @@ export function VaultScreen({ held, looks, onOpen, onStop, onBack, Heading = "h1
         ) : (
           <Card>
             {looks.map((l, i) => (
-              <Item
+              <Row
                 key={`${l.fact}:${l.appName}:${l.on}:${i}`}
                 title={l.label}
                 detail={
@@ -183,26 +240,129 @@ export function VaultScreen({ held, looks, onOpen, onStop, onBack, Heading = "h1
         )}
       </Section>
 
-      {/*
-        ⚠️ A PLAIN PRESS, NOT A TYPED CONFIRMATION. Stopping is reversible in one
-        tap and takes nothing away — friction here would train people to tick
-        through the ones that matter. What it does need is a sentence saying what
-        stops working, because that is the part somebody cannot see.
-      */}
-      <Confirm
-        open={stopping !== null}
-        title={`Stop sharing ${stopping?.label ?? ""}?`}
-        lede={
-          <>
-            <Chip>{stopping?.appName}</Chip> will stop being able to read it from
-            the next time it looks. Anything it worked out from it before now is
-            already theirs, and this does not delete what you recorded.
-          </>
-        }
-        verb="Stop sharing"
-        onConfirm={async () => (stopping ? onStop(stopping.fact, stopping.appId) : null)}
-        onClose={() => setStopping(null)}
-      />
+      <AboutSheet at={about} onClose={() => setAbout(null)} />
     </Screen>
   );
 }
+
+/**
+ * ONE THING AN APP WOULD LIKE TO KNOW, AND WHERE IT STANDS.
+ *
+ * ⚠️ A BLOCK, NOT A ROW, AND THAT IS THE SECOND TIME. Built as a row — name and
+ * sentence on the left, switch on the right — the sentence gets about half a
+ * phone, so "Your goal" wraps to five lines and then truncates to an ellipsis
+ * while the switch sits in white space. The name and the control share the top
+ * line because both are short and fixed; the sentence gets the full width
+ * underneath, because it is the only part whose length is not knowable.
+ *
+ * ⚠️ AND THE EXPLAIN MARK IS BESIDE THE NAME, NOT BESIDE THE SWITCH. Next to the
+ * control it reads as part of the control — somebody reaching for one lands on
+ * the other, and the two do opposite things.
+ */
+const Ask = ({ item, where, onOpen, onSet }: {
+  readonly item: Item;
+  readonly where: string;
+  readonly onOpen: () => void;
+  readonly onSet: (next: boolean) => Promise<Problem | null>;
+}): ReactNode => (
+  <div className="share">
+    <span className="share-name">{item.label}</span>
+    <button
+      type="button"
+      className="share-about press"
+      aria-label={`Why ${item.label.toLowerCase()} is asked for`}
+      onClick={onOpen}
+    >
+      <About />
+    </button>
+    {/* ⚠️ NEEDED HERE IS A FACT ABOUT THE APP, so it sits with the name rather
+        than in the sentence about what is disclosed. It is the app's claim that a
+        refusal takes a feature away, and it is the only claim on this screen an
+        app makes about itself. */}
+    {item.required ? <span className="share-needed">Needed here</span> : null}
+    <Flip on={item.granted} onChange={onSet} label={`Share ${item.label.toLowerCase()} with ${where}`} />
+    <span className="share-said">{meaning(item, where)}</span>
+  </div>
+);
+
+/**
+ * WHY IT IS BEING ASKED FOR — the app's own words, and the platform's.
+ *
+ * ⚠️ EVERY SENTENCE IN HERE IS A DECLARATION READ ALOUD. The app said what it
+ * wants the thing for; the fact registry said what the platform recommends and
+ * why; a derivation said what it cannot reveal. None of it is written here, which
+ * is what makes this sheet correct for an app nobody has built yet.
+ */
+const AboutSheet = ({ at, onClose }: {
+  readonly at: { readonly item: Item; readonly where: string } | null;
+  readonly onClose: () => void;
+}): ReactNode => (
+  <Sheet open={at !== null} dismissible label={at ? `Why ${at.item.label.toLowerCase()} is asked for` : ""} onClose={onClose}>
+    {at === null ? null : <AboutBody item={at.item} where={at.where} />}
+  </Sheet>
+);
+
+/**
+ * ⚠️ THE BODY IS SEPARATE FROM THE PRESENTATION, and the reason is that a portal
+ * renders nothing outside a browser. Welded to the sheet, every sentence in here —
+ * which is the whole point of the sheet — would be unreachable by any check, and
+ * "the screen writes no copy of its own" would be a claim rather than a property.
+ */
+export const AboutBody = ({ item, where }: {
+  readonly item: Item;
+  readonly where: string;
+}): ReactNode => {
+  const at = { item, where };
+  return (
+      <div className="about">
+        <h2 className="sheet-title">{at.item.label}</h2>
+        <p className="about-why">{at.item.why}</p>
+
+        {/* ⚠️ WHAT IT WOULD ACTUALLY REACH, spelled out, because "on" is not a
+            quantity. The same switch means arithmetic on one row and a person
+            reading it on the next. */}
+        <p className="about-line">
+          <span className="about-key">Switched on</span>
+          {at.item.need === "compute"
+            ? `Used to work things out. The value itself stays here — nobody at ${at.where} sees it.`
+            : `People at ${at.where} can read it.`}
+        </p>
+
+        {at.item.recommend ? (
+          <p className="about-line">
+            <span className="about-key">Suggested</span>
+            {RUNG[at.item.recommend]}
+            {at.item.because ? ` — ${at.item.because}` : null}
+          </p>
+        ) : null}
+
+        {at.item.required ? (
+          <p className="about-line">
+            <span className="about-key">If it is off</span>
+            Something here stops working. Everything else carries on.
+          </p>
+        ) : (
+          <p className="about-line">
+            <span className="about-key">If it is off</span>
+            Nothing breaks. This part just has less to go on.
+          </p>
+        )}
+
+        {/* ⚠️ A DERIVATION STATES WHAT IT CANNOT REVEAL, IN WRITING, and the
+            registry refuses an empty one — so this is never a reassurance
+            somebody typed to make a screen feel safe. */}
+        {at.item.readings.map((r) => (
+          <div className="about-reading" key={r.id}>
+            <p className="about-line"><span className="about-key">{r.label}</span>{r.says}</p>
+            <p className="about-hides">{r.hides}</p>
+          </div>
+        ))}
+
+        <p className="about-foot">
+          You can switch this off at any time. What was worked out before you did
+          is already theirs, and switching off does not delete what you recorded.
+        </p>
+      </div>
+  );
+};
+

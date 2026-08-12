@@ -249,6 +249,13 @@ export const MOTION_CSS = `
 .switch-row:active [data-icon='buzz'] > :nth-child(2) { translate: 2px 0; }
 .switch-row:active [data-icon='sound'] > :nth-child(3) { scale: 1.2; }
 
+/* ⚠️ THE DOT OF AN i IS A SEPARATE THING, and this is the one icon whose parts
+   already say so. The ring holds still and the dot lifts off its stem — which is
+   both what the shape would do and, on a mark whose whole job is "there is more
+   to say here", the smallest possible way of saying it. Its own press, because
+   this one sits beside a switch rather than on a row. */
+.share-about:active [data-icon='about'] > :nth-child(3) { translate: 0 -2px; }
+
 /* Furniture: it points where the press goes. */
 .item:active [data-icon='onward'], .item:active .chevron { translate: 3.5px 0; }
 

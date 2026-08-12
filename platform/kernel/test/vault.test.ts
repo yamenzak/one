@@ -10,8 +10,8 @@
 import { describe, expect, it } from "vitest";
 import type { Fact, Grant, Instant, Reach, UserId } from "../src/index.js";
 import {
-  REACH, FACTS, factOf, live, mayDerive, mayRead, reaches, readingOf,
-  registryProblems, shadowProblems, vaultActivities, wantProblems,
+  REACH, FACTS, asksFor, factOf, live, mayDerive, mayRead, reaches, readingOf,
+  registryProblems, shadowProblems, vaultActivities, wantedHere, wantProblems,
 } from "../src/index.js";
 
 const NOW = "2026-08-11T10:00:00.000Z" as Instant;
@@ -438,5 +438,90 @@ describe("lookups", () => {
 
   it("treats an absent expiry as forever", () => {
     expect(live(grant({ fact: "x", reach: "self" }), NOW)).toBe(true);
+  });
+});
+
+describe("a want, resolved for one person in one workspace", () => {
+  /*
+    ⚠️ THIS IS THE WHOLE "THE VAULT IS A RENDERER" CLAIM, AS A FUNCTION. Every
+    sentence a screen shows about a want comes out of a declaration, so a screen
+    that had to be edited for a new fact would be a screen that stopped reading
+    them. What that costs, if it is ever lost, is not a layout bug: it is the
+    account centre growing a branch per product.
+  */
+  const spec = { wants: [
+    { fact: "body.height", need: "compute" as const, why: "To work out an energy target." },
+    { fact: "goal.training", need: "raw" as const, why: "To write your programme.", required: true },
+  ] };
+  const at = (ms: number) => new Date(ms).toISOString() as unknown as Instant;
+  const given = (over: Partial<Grant>): Grant => ({
+    accountId: WHO, fact: "body.height", appId: "kova", tenantId: "t1",
+    reach: "compute", expiresAt: null, grantedAt: at(0), via: "sheet", ...over,
+  });
+
+  it("carries the app's own reason through untouched", () => {
+    const out = wantedHere({ spec, appId: "kova", tenantId: "t1", grants: [], held: new Set(), now: at(10) });
+    expect(out.items.map((i) => i.why))
+      .toEqual(["To work out an energy target.", "To write your programme."]);
+  });
+
+  /* ⚠️ THE RUNG IS DERIVED FROM THE NEED, NEVER DECLARED TWICE. An app that could
+     name its own rung could name one its need does not justify, and nothing would
+     catch it — the sheet would simply ask for more. */
+  it("derives the rung a want turns on from what it needs", () => {
+    expect(asksFor("compute")).toBe("compute");
+    expect(asksFor("derived")).toBe("compute");
+    expect(asksFor("raw")).toBe("staff");
+  });
+
+  it("stands at self with nothing granted, and reports what is held", () => {
+    const out = wantedHere({
+      spec, appId: "kova", tenantId: "t1", grants: [],
+      held: new Set(["body.height"]), now: at(10),
+    });
+    expect(out.items[0]).toMatchObject({ reach: "self", granted: false, held: true });
+    expect(out.items[1]).toMatchObject({ reach: "self", granted: false, held: false });
+  });
+
+  /* ⚠️ A LAPSED GRANT IS NOT A GRANT, and the walk is the same one `mayRead` does.
+     Two resolvers over one question is how a screen comes to promise what a route
+     refuses. */
+  it("ignores a grant that has run out", () => {
+    const out = wantedHere({
+      spec, appId: "kova", tenantId: "t1", now: at(10), held: new Set(),
+      grants: [given({ expiresAt: at(5) })],
+    });
+    expect(out.items[0]).toMatchObject({ reach: "self", granted: false });
+  });
+
+  it("takes the highest live grant when there is more than one", () => {
+    const out = wantedHere({
+      spec, appId: "kova", tenantId: "t1", now: at(10), held: new Set(),
+      grants: [given({ reach: "compute" }), given({ reach: "staff" })],
+    });
+    expect(out.items[0]).toMatchObject({ reach: "staff", granted: true });
+  });
+
+  /* ⚠️ ANOTHER WORKSPACE'S GRANT IS ANOTHER WORKSPACE'S. Resolving without the
+     tenant would show one studio's disclosure on every studio's screen. */
+  it("never reads a grant made to a different workspace", () => {
+    const out = wantedHere({
+      spec, appId: "kova", tenantId: "t2", now: at(10), held: new Set(),
+      grants: [given({ tenantId: "t1", reach: "staff" })],
+    });
+    expect(out.items[0]).toMatchObject({ reach: "self", granted: false });
+  });
+
+  /*
+    ⚠️ ONLY THE READINGS THE WANT NAMED. A fact may offer several and an app may
+    want one; listing the rest would offer somebody a control over a disclosure
+    nothing is asking to make.
+  */
+  it("carries only the readings the want asked for", () => {
+    const out = wantedHere({
+      spec: { wants: [{ fact: "body.mass", need: "derived", why: "To show a direction.", readings: ["body.mass.trend"] }] },
+      appId: "kova", tenantId: "t1", grants: [], held: new Set(), now: at(10),
+    });
+    expect(out.items[0]!.readings.map((r) => r.id)).toEqual(["body.mass.trend"]);
   });
 });

@@ -18,7 +18,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { Problem } from "@one/kernel";
 
 import { AccountCenter, type AccountCenterProps } from "../src/account/center.js";
-import { VaultScreen, type Held, type Looked } from "../src/account/vault.js";
+import { AboutBody, VaultScreen, type Item, type Kept, type Looked, type Where } from "../src/account/vault.js";
 import { AskForIt, ConsentBody, ConsentSheet, type Asked } from "../src/consent.js";
 import { AccountDetails } from "../src/account/details.js";
 import { PreferencesScreen, type Preferences, type SetPreference } from "../src/account/preferences.js";
@@ -247,14 +247,22 @@ describe("the account centre's presentation", () => {
 
 /* ------------------------------------------------------------- the vault --- */
 
-const HELD: readonly Held[] = [
-  {
-    fact: "body.mass", label: "Weight", held: true,
-    grants: [{ appId: "kova", appName: "Kova", where: "Haddad Strength", reach: "compute", until: null, live: true }],
-  },
-  { fact: "body.height", label: "Height", held: true, grants: [] },
-  { fact: "health.allergies", label: "Allergies", held: false, grants: [] },
-];
+const ITEM = (over: Partial<Item>): Item => ({
+  fact: "body.height", label: "Height", need: "compute", asks: "compute",
+  why: "Used to work out an energy target.",
+  required: false, reach: "self", granted: false, expiresAt: null,
+  held: true, categories: [], readings: [], ...over,
+});
+
+const WHERES: readonly Where[] = [{
+  appId: "kova", appName: "Kova", tenantId: "t1", name: "Haddad Strength",
+  items: [
+    ITEM({ fact: "body.height", label: "Height", reach: "compute", granted: true }),
+    ITEM({ fact: "goal.training", label: "Your goal", need: "raw", asks: "staff" }),
+  ],
+}];
+
+const KEPT: readonly Kept[] = [{ fact: "body.girths", label: "Measurements" }];
 
 const LOOKS: readonly Looked[] = [
   { fact: "body.mass", label: "Weight", appName: "Kova", who: "Shujaa", on: "9 August", times: 4 },
@@ -262,53 +270,102 @@ const LOOKS: readonly Looked[] = [
 ];
 
 describe("your vault", () => {
-  const render = (held: readonly Held[] | null, looks: readonly Looked[] | null) => html(
-    <VaultScreen
-      held={held} looks={looks}
-      onOpen={() => undefined} onStop={nothing} onBack={() => undefined}
-    />,
-  );
+  const render = (
+    wheres: readonly Where[] | null,
+    looks: readonly Looked[] | null,
+    kept: readonly Kept[] | null = KEPT,
+  ) => html(<VaultScreen wheres={wheres} kept={kept} looks={looks} onSet={nothing} onBack={() => undefined} />);
 
   /* ⚠️ `null` IS NOT ANSWERED YET AND `[]` IS ANSWERED AND EMPTY. */
-  it("waits rather than claiming somebody shares nothing", () => {
-    const out = render(null, null);
+  it("waits rather than claiming nothing is asking", () => {
+    const out = render(null, null, null);
     expect(out).toContain("waiting");
-    expect(out).not.toContain("You are not sharing anything");
+    expect(out).not.toContain("Nothing is asking for anything");
   });
 
-  it("says nothing is shared only once it knows", () => {
-    expect(render([], [])).toContain("You are not sharing anything");
+  it("says nothing is asking only once it knows", () => {
+    expect(render([], [], [])).toContain("Nothing is asking for anything");
   });
 
   /*
-    ⚠️ WHAT IS SHARED COMES FIRST. A list in registry order buries the three
-    things somebody came to check under nine they never filled in — and this
-    screen is opened by somebody who wants to stop something.
+    ⚠️ THE SCREEN IS A RENDERER, AND THIS IS THE CHECK THAT SAYS SO. Every
+    sentence explaining a want comes out of the declaration — so a want whose
+    `why` the app wrote appears verbatim, and the day this stops being true is the
+    day somebody has started writing product copy into the account centre.
   */
-  it("puts what is shared above what is not", () => {
-    const out = render(HELD, LOOKS);
-    expect(out.indexOf("Haddad Strength")).toBeLessThan(out.indexOf("Nothing recorded"));
+  it("shows the app's own reason rather than one of its own", () => {
+    const out = html(<AboutBody where="Haddad Strength" item={ITEM({
+      why: "A sentence no screen could have invented.",
+      because: "And a recommendation it did not write either.",
+      recommend: "self",
+    })} />);
+    expect(out).toContain("A sentence no screen could have invented.");
+    expect(out).toContain("And a recommendation it did not write either.");
+  });
+
+  /*
+    ⚠️ A DERIVATION STATES WHAT IT CANNOT REVEAL, and the sheet reads that sentence
+    out. The registry refuses an empty one, so this is never a reassurance somebody
+    typed to make a screen feel safe — dropping it here would quietly turn it into
+    one.
+  */
+  it("reads out what a derivation cannot reveal", () => {
+    const out = html(<AboutBody where="Haddad Strength" item={ITEM({
+      need: "derived",
+      readings: [{
+        id: "body.mass.trend", label: "Weight trend", from: ["body.mass"],
+        says: "Which way it is going.",
+        hides: "Every absolute weight.",
+      }],
+    })} />);
+    expect(out).toContain("Which way it is going.");
+    expect(out).toContain("Every absolute weight.");
+  });
+
+  /*
+    ⚠️ THE STATE LINE NAMES THE WORKSPACE, NOT A ROLE. "Your coach" is one
+    product's word for the person on the other side, and this screen stands over a
+    studio, a clinic and a company's staff list alike.
+  */
+  it("says what the state means in the workspace's own name", () => {
+    expect(render(WHERES, [])).toContain("Nobody at Haddad Strength can see");
+  });
+
+  /* ⚠️ THE WHOLE ROW IS READABLE CLOSED, which is what earns a disclosure. */
+  it("counts what is on against what was asked, without opening anything", () => {
+    expect(render(WHERES, [])).toContain("1 of 2");
   });
 
   /*
     ⚠️ THE VALUES ARE NOT ON THIS SCREEN. It answers who can see what — showing
     the numbers here would put somebody's whole body on one scrollable page.
   */
-  it("says whether something is recorded and never what it is", () => {
-    const out = render(HELD, LOOKS);
-    expect(out).toContain("Nothing recorded");
+  it("never shows a value, only whether something is recorded", () => {
+    const out = render(WHERES, LOOKS);
     expect(out).toContain("Recorded");
+    expect(out).not.toMatch(/\d+ ?kg|\d+ ?cm/);
+  });
+
+  /*
+    ⚠️ WHAT NOBODY ASKED FOR IS STILL YOURS. A vault that listed only what an app
+    wanted would go empty at exactly the moment it became the only copy — which is
+    the person this whole thing is built for.
+  */
+  it("keeps what nothing is asking for", () => {
+    const out = render([], [], KEPT);
+    expect(out).toContain("Yours alone");
+    expect(out).toContain("Measurements");
   });
 
   /* ⚠️ "1 times" is a template showing through. */
   it("counts a repeat and stays silent about a single look", () => {
-    const out = render(HELD, LOOKS);
+    const out = render(WHERES, LOOKS);
     expect(out).toContain("4 times");
     expect(out).not.toContain("1 times");
   });
 
   it("answers the third question at all, which is the one that earns the screen", () => {
-    expect(render(HELD, LOOKS)).toContain("Who has looked");
+    expect(render(WHERES, LOOKS)).toContain("Who has looked");
   });
 });
 

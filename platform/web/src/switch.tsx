@@ -35,9 +35,38 @@ export interface SwitchRowProps {
 }
 
 export function SwitchRow({ title, detail, icon, on, disabled, onChange }: SwitchRowProps): ReactNode {
-  /* ⚠️ OPTIMISTIC, AND THAT IS NOT A SHORTCUT. A switch that waits for a round
-     trip before moving is a switch that feels broken on a slow connection — the
-     thumb has already left the screen. It moves, then it is corrected. */
+  return (
+    <label className="item switch-row" data-off={disabled ? "" : undefined}>
+      {icon ? <span className="well">{icon}</span> : null}
+      <span className="item-body">
+        <span className="item-title">{title}</span>
+        {detail ? <span className="item-detail">{detail}</span> : null}
+      </span>
+      <Flip on={on} disabled={disabled} onChange={onChange} />
+    </label>
+  );
+}
+
+/**
+ * THE CONTROL ON ITS OWN, for the surfaces where a row is the wrong shape.
+ *
+ * ⚠️ IT EXISTS BECAUSE THE STATE MACHINE IS THE VALUABLE PART, and it is not
+ * obvious. Optimistic, rolled back on a `Problem`, locked while in flight, with a
+ * tick on the way out and a knock on the way back — a second copy written beside a
+ * different layout gets one of those wrong, and the one it gets wrong is the
+ * rollback, which is invisible until a save fails.
+ *
+ * ⚠️ AND IT IS OPTIMISTIC ON PURPOSE. A switch that waits for a round trip before
+ * moving is a switch that feels broken on a slow connection — the thumb has
+ * already left the screen. It moves, then it is corrected.
+ */
+export function Flip({ on, disabled, onChange, label }: {
+  readonly on: boolean;
+  readonly disabled?: boolean;
+  readonly onChange: (next: boolean) => Promise<Problem | null> | void;
+  /** Only where no label element wraps it. A row's own text names it otherwise. */
+  readonly label?: string;
+}): ReactNode {
   const [shown, setShown] = useState(on);
   const [busy, setBusy] = useState(false);
 
@@ -53,20 +82,14 @@ export function SwitchRow({ title, detail, icon, on, disabled, onChange }: Switc
   };
 
   return (
-    <label className="item switch-row" data-off={disabled ? "" : undefined}>
-      {icon ? <span className="well">{icon}</span> : null}
-      <span className="item-body">
-        <span className="item-title">{title}</span>
-        {detail ? <span className="item-detail">{detail}</span> : null}
-      </span>
-      <Toggle.Root
-        className="switch"
-        checked={shown}
-        disabled={busy || disabled === true}
-        onCheckedChange={(next) => void flip(next)}
-      >
-        <Toggle.Thumb className="switch-thumb" />
-      </Toggle.Root>
-    </label>
+    <Toggle.Root
+      className="switch"
+      aria-label={label}
+      checked={shown}
+      disabled={busy || disabled === true}
+      onCheckedChange={(next) => void flip(next)}
+    >
+      <Toggle.Thumb className="switch-thumb" />
+    </Toggle.Root>
   );
 }

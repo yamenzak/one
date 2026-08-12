@@ -29,7 +29,7 @@ import { AccountCenter } from "../src/account/center.js";
 import { AccountDetails } from "../src/account/details.js";
 import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
 import { PreferencesScreen, type Preferences } from "../src/account/preferences.js";
-import { VaultScreen, type Held, type Looked } from "../src/account/vault.js";
+import { VaultScreen, type Kept, type Looked, type Where } from "../src/account/vault.js";
 import { ConsentSheet, type Asked } from "../src/consent.js";
 import { SignInMethods } from "../src/account/signin.js";
 import { Stack } from "../src/stack.js";
@@ -92,19 +92,86 @@ const OUTCOMES = {
   rows that render differently, because a fixture where everything is shared is a
   picture of one state.
 */
-const VAULT_HELD: readonly Held[] = [
+/*
+  ⚠️ ONE WORKSPACE SHARING SOME OF WHAT IT ASKED FOR, one sharing none, and a
+  fact nobody has asked for at all — the three shapes that render differently. A
+  fixture where every workspace looks the same is a picture of one state.
+
+  ⚠️ AND IT IS SHAPED LIKE A MANIFEST, because that is where it comes from. Every
+  `why`, every `recommend` and every reading below is copied from a declaration in
+  the real thing; the screen writes none of it.
+*/
+const VAULT_WHERES: readonly Where[] = [
   {
-    fact: "body.mass", label: "Weight", held: true,
-    grants: [{ appId: "kova", appName: "Kova", where: "Haddad Strength", reach: "compute", until: null, live: true }],
+    appId: "kova", appName: "Kova", tenantId: "t1", name: "Haddad Strength",
+    face: face("t1"), product: "kova",
+    items: [
+      {
+        fact: "goal.training", label: "Your goal", need: "raw", asks: "staff",
+        why: "Your coach writes your programme against this.",
+        required: true, reach: "staff", granted: true, expiresAt: "1 December",
+        held: true, recommend: "staff", categories: [], readings: [],
+        because: "The one thing somebody helping you genuinely cannot plan without.",
+      },
+      {
+        fact: "body.height", label: "Height", need: "compute", asks: "compute",
+        why: "Used with your weight to work out an energy target and a body-mass index.",
+        required: false, reach: "compute", granted: true, expiresAt: null,
+        held: true, recommend: "self", categories: [], readings: [],
+        because: "Only needed to work out an energy target, which the platform can do without showing it.",
+      },
+      {
+        fact: "body.mass", label: "Weight", need: "derived", asks: "compute",
+        why: "Used to work out your energy target, and to show your coach which way things are going.",
+        required: false, reach: "self", granted: false, expiresAt: null,
+        held: true, recommend: "self", categories: [],
+        because: "Somebody helping you can plan from the change without ever seeing the number.",
+        readings: [
+          { id: "body.mass.trend", label: "Weight trend", from: ["body.mass"],
+            says: "Which way it is going, and how fast, over the last few weeks.",
+            hides: "Every absolute weight — a direction and a rate, with no starting point to add them to." },
+        ],
+      },
+      {
+        fact: "health.injuries", label: "Injuries", need: "raw", asks: "staff",
+        why: "So a programme does not ask you to do something that hurts.",
+        required: false, reach: "self", granted: false, expiresAt: null,
+        held: false, recommend: "staff", categories: [], readings: [],
+      },
+      {
+        fact: "person.sex", label: "Sex at birth", need: "compute", asks: "compute",
+        why: "Changes the energy-target arithmetic and nothing else.",
+        required: false, reach: "self", granted: false, expiresAt: null,
+        held: true, recommend: "self", categories: [], readings: [],
+        because: "The arithmetic needs it; nobody there does.",
+      },
+    ],
   },
   {
-    fact: "goal.training", label: "Your goal", held: true,
-    grants: [{ appId: "kova", appName: "Kova", where: "Haddad Strength", reach: "staff", until: "1 December", live: true }],
+    appId: "kova", appName: "Kova", tenantId: "t2", name: "Beirut Barre Collective",
+    face: face("t2"), product: "kova",
+    items: [
+      {
+        fact: "goal.training", label: "Your goal", need: "raw", asks: "staff",
+        why: "Your coach writes your programme against this.",
+        required: true, reach: "self", granted: false, expiresAt: null,
+        held: true, recommend: "staff", categories: [], readings: [],
+        because: "The one thing somebody helping you genuinely cannot plan without.",
+      },
+      {
+        fact: "health.allergies", label: "Allergies", need: "raw", asks: "staff",
+        why: "So nothing they suggest contains something you react to.",
+        required: false, reach: "self", granted: false, expiresAt: null,
+        held: false, recommend: "staff", categories: [], readings: [],
+      },
+    ],
   },
-  { fact: "body.height", label: "Height", held: true, grants: [] },
-  { fact: "person.sex", label: "Sex at birth", held: true, grants: [] },
-  { fact: "health.allergies", label: "Allergies", held: false, grants: [] },
-  { fact: "health.injuries", label: "Injuries", held: false, grants: [] },
+];
+
+/* ⚠️ RECORDED AND WANTED BY NOBODY — the row that proves the vault is yours
+   rather than an app's. It is what somebody who has left every workspace sees. */
+const VAULT_KEPT: readonly Kept[] = [
+  { fact: "body.girths", label: "Measurements" },
 ];
 
 const VAULT_LOOKS: readonly Looked[] = [
@@ -194,11 +261,11 @@ function Preview() {
   const screen = ({ Heading }: { readonly Heading: ElementType }) =>
     at === "vault" ? (
       <VaultScreen
-        held={VAULT_HELD}
-        looks={VAULT_LOOKS}
+        wheres={which === "waiting" ? null : VAULT_WHERES}
+        kept={which === "waiting" ? null : VAULT_KEPT}
+        looks={which === "waiting" ? null : VAULT_LOOKS}
         Heading={Heading}
-        onOpen={() => setAsking(true)}
-        onStop={save}
+        onSet={save}
         onBack={() => setAt("home")}
       />
     ) :
@@ -239,7 +306,7 @@ function Preview() {
         sharedCount={
           which === "waiting" ? null
           : which === "new" ? 0
-          : VAULT_HELD.filter((h) => h.grants.length > 0).length
+          : VAULT_WHERES.flatMap((w) => w.items).filter((i) => i.granted).length
         }
         Heading={Heading}
         onGo={(to) => {

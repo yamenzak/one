@@ -35,7 +35,7 @@
 
 import type { ReactNode } from "react";
 import {
-  ArrowLeft, Camera, Check, ChevronRight, Download, HeartCrack, KeyRound, Languages, Lock,
+  ArrowLeft, Camera, Check, ChevronRight, Download, HeartCrack, Info, KeyRound, Languages, Lock,
   Mail, MonitorSmartphone, Pencil, Plus, Ruler, Shield, SlidersHorizontal, SunMoon,
   Vibrate, Volume2, X, type LucideIcon,
 } from "lucide-react";
@@ -44,7 +44,7 @@ import {
 export type IconName =
   | "key" | "adjust" | "guard" | "save" | "heartbreak" | "letter" | "device"
   | "edit" | "lens" | "onward" | "close" | "back" | "tick" | "add"
-  | "light" | "tongue" | "measure" | "buzz" | "sound" | "locked";
+  | "light" | "tongue" | "measure" | "buzz" | "sound" | "locked" | "about";
 
 export interface IconProps {
   readonly size?: number;
@@ -99,6 +99,9 @@ export const Close = draw(X, "close", 20);
 export const Back = draw(ArrowLeft, "back", 20);
 export const Tick = draw(Check, "tick", 19);
 export const Add = draw(Plus, "add", 18);
+/* ⚠️ THE ONE MARK THAT MEANS "EXPLAIN THIS", and it is worth its own entry
+   because the alternative is a paragraph on every row it would sit beside. */
+export const About = draw(Info, "about", 19);
 
 /* Preferences — each one is the thing it sets, not a symbol borrowed from a
    neighbour. Sliders for a theme, an envelope for a language and a shield for a
@@ -135,4 +138,5 @@ export const ICON_PARTS: Readonly<Record<IconName, readonly string[]>> = {
   measure: ["path", "path", "path", "path", "path"],
   buzz: ["path", "path", "rect"],
   sound: ["path", "path", "path"],
+  about: ["circle", "path", "path"],
 };

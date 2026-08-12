@@ -622,4 +622,100 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 
 .blank { padding: 30px var(--pad) 34px; gap: 6px; text-align: center; }
 .blank-title { font-size: 17px; font-weight: 500; }
+
+/* ------------------------------------------------------------- disclosure */
+
+/* ⚠️ THE SUMMARY IS THE CARD'S OWN ROW, so a closed list of disclosures is
+   indistinguishable from a list of rows — which is the point: it is one until
+   somebody wants more. Both the flex and the marker reset are load-bearing: a
+   summary is display:list-item by default, so without them the face, the name and
+   the count stack vertically with a native triangle over them. */
+.disclose { display: block; }
+.disclose + .disclose { border-block-start: 1px solid var(--edge); }
+.disclose-head { display: flex; align-items: center; gap: 14px; inline-size: 100%;
+  min-block-size: 64px; padding: 12px var(--pad); cursor: pointer;
+  list-style: none; }
+.disclose-head::marker { content: none; }
+.disclose-head::-webkit-details-marker { display: none; }
+.disclose-head:hover { background: color-mix(in oklab, var(--ink) 5%, transparent); }
+.disclose-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.disclose-mark { flex: none; display: flex; }
+.disclose-said { flex: 1; min-inline-size: 0; display: flex; flex-direction: column; gap: 2px; }
+.disclose-name { font-weight: 500; }
+.disclose-state { flex: none; }
+/* ⚠️ TABULAR, because these are read down a column and proportional digits make
+   a stack of counts look bent. */
+.disclose-count { color: var(--ink-quiet); font-size: 14.5px;
+  font-variant-numeric: tabular-nums; }
+/* ⚠️ THE CHEVRON TURNS DOWN RATHER THAN BEING SWAPPED. Same glyph, same meaning,
+   one rotation — two icons for open and closed is two things to recognise. */
+.disclose-turn { flex: none; color: var(--ink-faint);
+  transition: rotate var(--swift) var(--move); }
+.disclose[open] > .disclose-head .disclose-turn { rotate: 90deg; }
+/* ⚠️ INSET BY A HAIR, NOT BY THE WIDTH OF THE FACE. Lined up under the workspace
+   NAME it read as correct in a mockup and starved every sentence in practice —
+   seventy-four pixels off a phone, on the one screen whose whole content is
+   sentences. A rule down the inside says "these belong to the row above" in two
+   pixels rather than in seventy-four. */
+.disclose-body { padding: 0 var(--pad) 6px calc(var(--pad) + 10px); }
+.disclose-body > * { border-inline-start: 2px solid var(--edge); padding-inline-start: 14px; }
+.disclose-body > * + * { border-block-start: 1px solid var(--edge); }
+
+/* ------------------------------------------------- one thing being shared */
+
+/* ⚠️ NOT THE ASK CLASS, WHICH THE CONSENT SHEET ALREADY OWNS. Two unrelated things under
+   one class name is how a loading placeholder came to inherit a button's border;
+   these two are neighbours in meaning and would have merged in silence.
+
+   ⚠️ A GRID, BECAUSE THE NAME AND THE SENTENCE HAVE DIFFERENT WIDTHS. The name and
+   the controls share the top line — both short, both fixed — and the sentence
+   takes the whole width underneath, because it is the only part whose length is
+   not knowable in advance. Laid out as a row instead, the sentence gets half a
+   phone: "Your goal" wrapped to five lines and then truncated to an ellipsis while
+   the switch sat in white space. */
+.share { display: grid; grid-template-columns: auto auto 1fr auto;
+  align-items: center; column-gap: 6px; row-gap: 3px; padding-block: 13px; }
+/* ⚠️ EVERY PART NAMES ITS OWN COLUMN, because three of the four are optional and
+   flow order is not placement: with no "needed here" to fill the third column the
+   switch fell into it and sat halfway across the row, left-aligned against
+   nothing. */
+.share-name { grid-column: 1; font-weight: 500; }
+.share > .switch { grid-column: 4; justify-self: end; }
+.share-said { grid-column: 1 / -1; color: var(--ink-quiet); font-size: 14px;
+  line-height: 1.45; padding-inline-end: 8px; }
+/* ⚠️ THE APP'S OWN CLAIM, AND IT IS QUIET. It is the one thing on this screen a
+   product asserts about itself, so it is marked as a note rather than as a
+   warning — a coloured pill here would read as something being wrong. */
+.share-needed { grid-column: 3; justify-self: start; color: var(--ink-faint); font-size: 12.5px;
+  padding-inline: 7px; padding-block: 2px; border-radius: var(--radius-well);
+  background: var(--well); white-space: nowrap; }
+/* ⚠️ THIRTY-EIGHT SQUARE AND BESIDE THE NAME. An info mark drawn at its own size
+   is a nineteen-pixel target, which is a decoration with an onClick; and next to
+   the switch it would read as part of the switch, so a thumb reaching for one
+   lands on the other and the two do opposite things. */
+.share-about { grid-column: 2; display: grid; place-items: center;
+  inline-size: 38px; block-size: 38px; margin-inline-start: -4px;
+  border: 0; border-radius: 50%; background: none; color: var(--ink-faint);
+  cursor: pointer; }
+.share-about:hover { color: var(--ink); background: var(--well); }
+.share-about:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* ------------------------------------------------------------------ about */
+
+/* ⚠️ THE APP'S OWN SENTENCE FIRST AND AT FULL INK, because it is the answer to
+   the question the mark was pressed to ask. Everything under it is the platform's
+   qualification of that answer, and reads as such. */
+.about { display: flex; flex-direction: column; gap: 14px; }
+.about-why { font-size: 16.5px; line-height: 1.45; }
+.about-line { color: var(--ink-quiet); font-size: 14.5px; line-height: 1.5; }
+/* ⚠️ THE KEY IS A LEAD-IN, NOT A COLUMN. Two columns at phone width give the
+   value about eighteen characters, and every line wraps to three. */
+.about-key { display: block; color: var(--ink-faint); font-size: 12.5px;
+  text-transform: uppercase; letter-spacing: 0.06em; margin-block-end: 2px; }
+.about-reading { padding-inline-start: 12px; border-inline-start: 2px solid var(--edge); }
+/* ⚠️ WHAT IT CANNOT REVEAL IS THE HALF WORTH READING, so it is not the smaller of
+   the two. It is the sentence somebody checks the arithmetic against. */
+.about-hides { color: var(--ink-quiet); font-size: 14.5px; line-height: 1.5;
+  margin-block-start: 4px; }
+.about-foot { color: var(--ink-faint); font-size: 13.5px; line-height: 1.5; }
 `.trim();

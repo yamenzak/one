@@ -20,7 +20,7 @@
  * also why the small one is not a heading element.
  */
 
-import { useEffect, useRef, type ElementType, type ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ElementType, type ReactNode } from "react";
 import { RoundButton } from "./button.js";
 import { Back, Close } from "./icon.js";
 import type { Sky } from "./sky.css.js";
@@ -77,6 +77,14 @@ export interface ScreenProps {
    * a tint the product wears.
    */
   readonly sky?: Sky;
+  /**
+   * ⚠️ THE SCREEN'S OWN HUE, AS ONE NUMBER, and it is the only colour decision a
+   * screen is allowed to make. A surface that belongs to itself rather than to
+   * the product around it — the vault is one — says so by being lit differently,
+   * and doing that with a second sky would be a second pile of gradients to keep
+   * in step. Omitted, the light is the platform's.
+   */
+  readonly tint?: number;
   /** The heading, large and in flow. */
   readonly title: ReactNode;
   /**
@@ -101,7 +109,7 @@ export interface ScreenProps {
   readonly children: ReactNode;
 }
 
-export function Screen({ leave, onLeave, sky, title, name, lede, action, children }: ScreenProps): ReactNode {
+export function Screen({ leave, onLeave, sky, tint, title, name, lede, action, children }: ScreenProps): ReactNode {
   const page = useRef<HTMLDivElement>(null);
   useCollapse(page);
 
@@ -109,7 +117,8 @@ export function Screen({ leave, onLeave, sky, title, name, lede, action, childre
     /* ⚠️ THE STAGGER IS ON THE FRAME, so every screen's sections arrive in
        sequence without anybody remembering to ask. */
     <div className="page stagger" ref={page}>
-      {sky ? <div className="sky" data-sky={sky} aria-hidden="true" /> : null}
+      {sky ? <div className="sky" data-sky={sky} aria-hidden="true"
+        style={tint === undefined ? undefined : ({ "--sky-h": tint } as CSSProperties)} /> : null}
       <div className="topbar">
         <RoundButton label={leave === "dismiss" ? "Close" : "Back"} onClick={onLeave}>
           {leave === "dismiss" ? <Close /> : <Back />}
