@@ -18,7 +18,7 @@ import type {
   ConfigRegistry, InferenceHandle, ObjectHandle, ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, SchemaModule, Session, SqlHandle, StandingState, TenantId,
 } from "@one/kernel";
 import {
-  ALWAYS_ALLOWED, CONSENT_EXEMPT_LANES, assertComposable, auditFor, check, consentGate, cookieDomainFor, gateFor, laneOf, weekStarting, PLATFORM_PROBLEMS, SEATS_ENTITLEMENT, STORAGE_ENTITLEMENT, SUPPORT_SESSION,
+  ALWAYS_ALLOWED, CONSENT_EXEMPT_LANES, accountCascade, assertComposable, auditFor, check, consentGate, cookieDomainFor, gateFor, laneOf, weekStarting, PLATFORM_PROBLEMS, SEATS_ENTITLEMENT, STORAGE_ENTITLEMENT, SUPPORT_SESSION,
   catalogueOf, detailFor, floorPlan, fromQuery, PUBLIC, relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
 } from "@one/kernel";
 import { bindingsFor, globalSql, secretFor, type RawEnv } from "./env.js";
@@ -76,7 +76,7 @@ function deliverVia(env: RawEnv, binding: string | undefined): Deliver | null {
     }
   };
 }
-import { SHARED_MODULES } from "./modules.js";
+import { PLATFORM_GLOBAL, SHARED_MODULES } from "./modules.js";
 import { GUIDE, guideOperations, type GuideCarrier } from "./guide-ops.js";
 import { MILESTONES, milestoneOperations, type MilestoneCarrier } from "./milestone-ops.js";
 import { MILESTONE_EARNED, dayIn, earnerOf, recognise } from "./milestone.js";
@@ -95,7 +95,7 @@ import { identityOperations, PLATFORM, type PlatformCarrier, type PlatformDeps }
 import { identityStore, readCookie, SESSION_COOKIE, sessionStore } from "./identity.js";
 import { REFERENCE, referenceOperations, type ReferenceCarrier } from "./reference-ops.js";
 import { VAULT, vaultOperations, type VaultCarrier } from "./vault-ops.js";
-import { keptBy, retentionJob } from "./data.js";
+import { exportScoped, keptBy, retentionJob } from "./data.js";
 import { auditJob, recordAudit } from "./audit.js";
 import { countRequest, limitJob } from "./limit.js";
 import { liveFor } from "./impersonation.js";
@@ -284,6 +284,17 @@ export interface RuntimeOptions<B extends BindingSpec> {
    * and the sweep reported success while a deleted workspace kept eighteen.
    */
   readonly regionalModules?: readonly SchemaModule[];
+  /**
+   * The GLOBAL modules this app composes — the store that holds an account.
+   *
+   * ⚠️ THE PERSON'S OWN EXPORT IS DERIVED FROM THESE, and it is separate from the
+   * regional list because a person is not a workspace: their vault, their
+   * consents and their passkeys are keyed by account and live in one store for
+   * every product. Absent, the platform's own list is used — which is right until
+   * an app adds a global module of its own, and then it is a table missing from
+   * somebody's account export with nothing anywhere saying so.
+   */
+  readonly globalModules?: readonly SchemaModule[];
   /** Where files live. `media` by convention, named so an app may differ. */
   readonly objectsBinding?: keyof B & string;
   /**
@@ -747,6 +758,40 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           "you cannot close" from a different rule than the one that refuses is
           how a screen comes to offer a button that always fails.
         */
+        /*
+          ⚠️ TWO STORES, AND NEITHER IS OPTIONAL. Everything scoped to an account
+          — the vault, its disclosure log, the consents, the passkeys, the
+          sessions — is in the GLOBAL store; where somebody belongs is in every
+          REGION. An export that read one of them would be complete-looking and
+          wrong in the half nobody checks.
+
+          ⚠️ THE ACCOUNT'S OWN ROW IS FETCHED SEPARATELY, and it is the one honest
+          special case in here: a cascade filters `WHERE <column> = ?`, and this
+          row is keyed by `id`. Everything else is derived.
+        */
+        exportMe: async (at) => {
+          if (!session) return { at, tables: {}, dropped: {}, account: null, workspaces: [] };
+          const whole = await exportScoped(
+            directoryDb, accountCascade(opts.globalModules ?? PLATFORM_GLOBAL), session.accountId, at,
+          );
+          const account = await directoryDb.first<Record<string, unknown>>(
+            `SELECT * FROM accounts WHERE id = ?`, session.accountId,
+          ).catch(() => null);
+          const belongs: Record<string, unknown>[] = [];
+          for (const region of app.tenancy.regions) {
+            const there = regional(env)(region as ResolvedRegion);
+            if (opts.onBoot) await once(region, () => opts.onBoot!.region(there, region));
+            const rows = await (there.db as SqlHandle).all<Record<string, unknown>>(
+              `SELECT tenant_id, role, invited_at, accepted_at, revoked_at FROM membership WHERE account_id = ?`,
+              session.accountId,
+            ).catch(() => []);
+            /* ⚠️ REVOKED ONES TOO. "I used to be in that workspace" is a fact
+               about them that we still hold, so withholding it from their own
+               export is the omission this whole shape exists to prevent. */
+            for (const row of rows) belongs.push({ ...row, region });
+          }
+          return { ...whole, account: account ?? null, workspaces: belongs };
+        },
         wouldStrandOnLeaving: async () => {
           if (!session) return [];
           const stuck: string[] = [];

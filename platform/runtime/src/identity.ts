@@ -90,6 +90,18 @@ export const IDENTITY_SCHEMA: SchemaModule = {
     */
     `ALTER TABLE accounts ADD COLUMN closing_at TEXT NOT NULL DEFAULT '';`,
   ],
+  /*
+    ⚠️ A PASSKEY AND A CHALLENGE BELONG TO THE PERSON, and declaring so is what
+    puts them in the export and the erasure without either being hand-listed.
+    Undeclared, a credential is a public key tied to somebody's account that
+    survives them closing it — and nothing anywhere would have said so.
+
+    ⚠️ `accounts` ITSELF IS NOT HERE, and cannot be: the cascade deletes `WHERE
+    <column> = ?`, and the account's own row is keyed by `id`. It is handled by
+    the operations that read and erase a person directly, which is the one row
+    that genuinely is a special case rather than a forgotten one.
+  */
+  scoped: { tenantColumn: "account_id", tenantTables: ["credentials", "challenges"] },
 };
 
 /**

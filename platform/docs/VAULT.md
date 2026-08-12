@@ -444,6 +444,3 @@ is two answers that eventually disagree about somebody's.
      workspace records without inviting has no vault. Kova's roster can hold such
      a person; what a coach may record about them before they have an account is
      an open product question, not a gap in this mechanism. -->
-<!-- DEFER(one-184) stage:7 — the disclosure log is not yet exported with the
-     rest of somebody's data. It is derived-erasable and readable in the account
-     centre; it is not in the portability payload. -->

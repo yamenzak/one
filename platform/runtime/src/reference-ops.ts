@@ -67,12 +67,14 @@ export const CONSENT_SCHEMA: SchemaModule = {
     `CREATE INDEX IF NOT EXISTS idx_consents_account ON consents(account_id);`,
   ],
   /*
-    ⚠️ NO TENANT SCOPE, AND THAT IS DELIBERATE RATHER THAN FORGOTTEN. This table
-    lives in the GLOBAL store beside `accounts`, and neither is a workspace's to
-    erase: closing one workspace must not delete the record that a person — who
-    may still be in three others — agreed to the terms. It goes when the ACCOUNT
-    goes.
+    ⚠️ SCOPED TO THE ACCOUNT, NOT TO A WORKSPACE, and the distinction is the whole
+    of it. This table lives in the GLOBAL store beside `accounts`, and closing one
+    workspace must not delete the record that a person — who may still be in three
+    others — agreed to the terms. It goes when the ACCOUNT goes, and saying so in
+    a declaration is what puts it in the export and the erasure rather than in a
+    sentence somebody has to remember.
   */
+  scoped: { tenantColumn: "account_id", tenantTables: ["consents"] },
 };
 
 /* --------------------------------------------------------------- reading --- */

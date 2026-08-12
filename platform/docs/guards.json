@@ -3280,6 +3280,33 @@
       "impl": "hello/test/exit.test.ts",
       "proves": "is on the lane that survives every rung, like everything else that is a way out",
       "fails": "naming these `me.*` — a write outside the `exit` lane is refused by the standing gate on a suspended workspace and by the consent gate for anybody who has not accepted a new document, so leaving would be withheld from exactly the two groups most likely to want it, and neither refusal mentions leaving"
+    },
+    {
+      "id": "a-person-can-take-their-own-data",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "hello/test/vault.test.ts",
+      "proves": "carries every account-scoped table a module declares, with nothing hand-listed",
+      "fails": "the only export in the product being the WORKSPACE's — `exit.export` wants `workspace:close`, so an ordinary member may not ask for it, and what it returns is mostly not theirs"
+    },
+    {
+      "id": "an-export-includes-who-read-the-vault",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "hello/test/vault.test.ts",
+      "proves": "includes who has been reading their vault",
+      "fails": "an export missing the only part somebody cannot reconstruct. Their own facts they know; who looked at them, and when, exists nowhere else"
+    },
+    {
+      "id": "an-export-is-nobody-elses-to-ask-for",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "hello/test/vault.test.ts",
+      "proves": "is nobody else's to ask for",
+      "fails": "an export keyed by an id in the input, where the access check is a line somebody has to remember. Keyed by the session there is nothing to forget"
     }
   ]
 }

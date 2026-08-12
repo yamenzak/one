@@ -75,6 +75,10 @@ const runtime = createRuntime(kova, {
   /* ⚠️ Export and erasure are derived from these, so a module added later is
      covered by both paths on the same commit. */
   regionalModules: REGIONAL_MODULES,
+  /* ⚠️ AND THE GLOBAL ONES, because a PERSON's export is derived from these
+     rather than from the regional list — an account's vault, consents and
+     passkeys are keyed by account and live in one store for every product. */
+  globalModules: GLOBAL_MODULES,
   /* ⚠️ No secret, so the payment endpoint refuses and `chargeable` stays false —
      which is the honest state of a deployment with no provider. */
   webhookSecretVar: "PROVIDER_WEBHOOK_SECRET",

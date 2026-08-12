@@ -1263,6 +1263,9 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `closing-an-account-never-closes-a-workspace` | an account closure that takes colleagues offline with it — a workspace has people, records and a bill, and the person surprised by it pressed nothing. Refused and NAMED, so it is a decision the person can act on rather than an opaque no | **live** |
 | `closing-an-account-is-reversible` | a delete behind a confirmation dialog, which is a reflex rather than a decision. The way back is cancelling, not signing up again — that would be a different account | **live** |
 | `leaving-is-on-the-lane-that-always-survives` | naming these `me.*` — a write outside the `exit` lane is refused by the standing gate on a suspended workspace and by the consent gate for anybody who has not accepted a new document, so leaving would be withheld from exactly the two groups most likely to want it, and neither refusal mentions leaving | **live** |
+| `a-person-can-take-their-own-data` | the only export in the product being the WORKSPACE's — `exit.export` wants `workspace:close`, so an ordinary member may not ask for it, and what it returns is mostly not theirs | **live** |
+| `an-export-includes-who-read-the-vault` | an export missing the only part somebody cannot reconstruct. Their own facts they know; who looked at them, and when, exists nowhere else | **live** |
+| `an-export-is-nobody-elses-to-ask-for` | an export keyed by an id in the input, where the access check is a line somebody has to remember. Keyed by the session there is nothing to forget | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

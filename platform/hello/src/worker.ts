@@ -91,6 +91,11 @@ const runtime = createRuntime(hello, {
     the sweep reported success while a deleted workspace kept eighteen.
   */
   regionalModules: REGIONAL_MODULES,
+  /* ⚠️ AND THE GLOBAL ONES, because a PERSON's export is derived from these. An
+     app that adds a global module gets it covered on the same commit; without
+     this the platform's own list is used and an app-added account-scoped table
+     is missing from somebody's own data with nothing saying so. */
+  globalModules: GLOBAL_MODULES,
   /*
     ⚠️ NO SECRET, SO THE WEBHOOK REFUSES AND `chargeable` STAYS FALSE. That is
     the honest state of a deployment with no payment provider: a workspace that

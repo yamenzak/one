@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { erasurePlan, eraseTenant, exportTenant, keptBy, mustLeaveWith, sweepRetention } from "../src/data.js";
+import { erasurePlan, eraseTenant, exportScoped, keptBy, mustLeaveWith, sweepRetention } from "../src/data.js";
 import { OPEN, PLATFORM_STATE_SCHEMA, readMaintenance, refuses, setMaintenance, SURVIVES_MAINTENANCE } from "../src/maintenance.js";
 import { dataOperations } from "../src/data-ops.js";
 
@@ -68,13 +68,13 @@ describe("taking everything with you", () => {
   */
   it("says how much it dropped when a table is over the ceiling", async () => {
     const many = Array.from({ length: 12 }, (_, i) => ({ i }));
-    const out = await exportTenant(store({ notes: many }), erasurePlan(modules), "t", AT, 5);
+    const out = await exportScoped(store({ notes: many }), erasurePlan(modules), "t", AT, 5);
     expect(out.tables.notes!.length).toBe(5);
     expect(out.dropped).toEqual({ notes: 7 });
   });
 
   it("says nothing about a table that fitted", async () => {
-    const out = await exportTenant(store({ notes: [{ i: 1 }] }), erasurePlan(modules), "t", AT, 5);
+    const out = await exportScoped(store({ notes: [{ i: 1 }] }), erasurePlan(modules), "t", AT, 5);
     expect(out.dropped).toEqual({});
   });
 
@@ -85,7 +85,7 @@ describe("taking everything with you", () => {
     ones with the most to lose.
   */
   it("still exports everything else when one table is not there", async () => {
-    const out = await exportTenant(store({ notes: [{ i: 1 }] }, ["receipts"]), erasurePlan(modules), "t", AT);
+    const out = await exportScoped(store({ notes: [{ i: 1 }] }, ["receipts"]), erasurePlan(modules), "t", AT);
     expect(out.tables.notes!.length).toBe(1);
     expect(out.tables.receipts).toEqual([]);
   });

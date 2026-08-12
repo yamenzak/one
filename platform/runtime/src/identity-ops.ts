@@ -73,6 +73,26 @@ export interface PlatformDeps {
    * which is the one thing an operation is not allowed to know about.
    */
   wouldStrandOnLeaving(): Promise<readonly string[]>;
+  /**
+   * ⚠️ THE WHOLE PERSON, ASSEMBLED WHERE THE STORES ARE. The account-scoped
+   * tables live in the global store and the memberships live in every region, so
+   * the one thing an operation may not know — where anything is — is exactly what
+   * this needs. The DERIVATION stays in the kernel; only the walking is here.
+   */
+  exportMe(at: Instant): Promise<AccountExport>;
+}
+
+/** What `exit.account.export` answers with. */
+export interface AccountExport {
+  readonly at: Instant;
+  /** Every account-scoped table a module declares, with its rows. */
+  readonly tables: Readonly<Record<string, readonly unknown[]>>;
+  /** ⚠️ What a per-table ceiling left out. Silence here would read as "all of it". */
+  readonly dropped: Readonly<Record<string, number>>;
+  /** The person's own row, which no cascade can carry — it is keyed by `id`. */
+  readonly account: Readonly<Record<string, unknown>> | null;
+  /** Where they belong, from every region: the workspace, the role, the dates. */
+  readonly workspaces: readonly Readonly<Record<string, unknown>>[];
 }
 
 /** Who is in a workspace, and the one write this door may make against them. */
@@ -848,6 +868,44 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     },
   });
 
+  /**
+   * EVERYTHING THIS PLATFORM HOLDS ABOUT ONE PERSON, IN ONE DOCUMENT.
+   *
+   * ⚠️ `exit.export` IS THE WORKSPACE'S, AND WANTS `workspace:close`. So the row
+   * on the account centre offering somebody their own data had nothing behind it
+   * that they could reach — the only export in the product was one an ordinary
+   * member is not allowed to ask for, about records that are mostly not theirs.
+   *
+   * ⚠️ DERIVED FROM THE DECLARATIONS, exactly as the workspace one is, and the
+   * argument is stronger here. A workspace missing a table from its export is a
+   * company with an incomplete backup; a PERSON missing one is being told in
+   * writing, at the moment they are leaving, that this is everything they had.
+   * The omission is invisible from either side: the file arrives, it is full of
+   * their data, and nothing in it says what is not there.
+   */
+  const exportAccount = operation({
+    id: "exit.account.export",
+    kind: "read",
+    summary: "Everything your account holds about you, in one document.",
+    input: nothing(),
+    output: s.object({ at: s.instant(), tables: s.json(), dropped: s.json(), account: s.json(), workspaces: s.json() }),
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    fails: ["platform.forbidden"],
+    /*
+      ⚠️ NOT A TOOL. This is every row the platform has about somebody — their
+      vault, who read it, what they agreed to and where they are signed in — and
+      a model that can request one can be asked to summarise it somewhere it
+      should not go.
+    */
+    tool: false,
+    async handler(ctx) {
+      const d = deps(ctx);
+      if (!d.session) ctx.fail("platform.forbidden", { reason: "sign in first" });
+      return d.exportMe(ctx.now());
+    },
+  });
+
   const close = operation({
     id: "exit.account.close",
     kind: "write",
@@ -912,7 +970,7 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     },
   });
 
-  return [requestCode, verifyCode, registerBegin, registerFinish, signInBegin, signInFinish, whoami, signOut, preferences, setPreferences, sessionList, endSession, keyList, keyRemove, workspaces, leave, closing, close, reopen] as unknown as readonly AnyOperation[];
+  return [requestCode, verifyCode, registerBegin, registerFinish, signInBegin, signInFinish, whoami, signOut, preferences, setPreferences, sessionList, endSession, keyList, keyRemove, workspaces, leave, closing, exportAccount, close, reopen] as unknown as readonly AnyOperation[];
 }
 
 /* ⚠️ An unreadable copy is no branding rather than a throw on a list somebody

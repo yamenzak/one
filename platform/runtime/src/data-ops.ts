@@ -16,7 +16,7 @@
 import type { AnyOperation, AppSpec, BindingSpec, Instant, ObjectHandle, SchemaModule, SqlHandle } from "@one/kernel";
 import { operation, s } from "@one/kernel";
 import { OPERATE } from "./operator-ops.js";
-import { erasurePlan, eraseSubject, exportTenant, subjectPlan, eraseTenant, mustLeaveWith, type Forgotten, type Keeping } from "./data.js";
+import { erasurePlan, eraseSubject, exportScoped, subjectPlan, eraseTenant, mustLeaveWith, type Forgotten, type Keeping } from "./data.js";
 import { jobHistory } from "./jobs.js";
 import { auditTrail } from "./audit.js";
 
@@ -78,7 +78,7 @@ export function dataOperations<B extends BindingSpec>(_app: AppSpec<B>): readonl
         it — and writing it into a document somebody downloads is exactly the
         thing that declaration forbids, done by the feature meant to honour it.
       */
-      return exportTenant(d.db, erasurePlan(d.modules), d.tenantId, ctx.now());
+      return exportScoped(d.db, erasurePlan(d.modules), d.tenantId, ctx.now());
     },
   });
 

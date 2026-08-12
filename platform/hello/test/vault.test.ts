@@ -261,3 +261,64 @@ describe("what the person can see about their own data", () => {
     expect(wants.every((w) => w.why.length > 0)).toBe(true);
   });
 });
+
+/* --------------------------------------------------------------- export --- */
+
+describe("taking your own data with you, which is not a workspace's export", () => {
+  /*
+    ⚠️ `exit.export` IS THE WORKSPACE'S AND WANTS `workspace:close`. So the only
+    export in the product was one an ordinary member may not ask for, about
+    records that are mostly not theirs — and the account centre's own "Download
+    your data" row had nothing behind it that the person reading it could reach.
+  */
+  it("carries every account-scoped table a module declares, with nothing hand-listed", async () => {
+    const mine = await signIn(CLIENT, ID);
+    const r = await get(ID, "/api/exit.account.export", mine);
+    expect(r.status).toBe(200);
+
+    const tables = r.body.tables as unknown as Record<string, unknown[]>;
+    /* ⚠️ NAMED HERE RATHER THAN DERIVED, ON PURPOSE, and it is the one list in
+       this repository that is allowed to be. Asserting the export matches the
+       derivation proves the two agree and nothing about whether either is right;
+       these are the four tables a person would say are theirs, so a derivation
+       that stops producing one fails here. */
+    for (const table of ["vault_facts", "vault_grants", "vault_disclosures", "consents"]) {
+      expect(Object.keys(tables), table).toContain(table);
+    }
+  });
+
+  it("includes who has been reading their vault", async () => {
+    /*
+      ⚠️ THE DISCLOSURE LOG IS THE HALF SOMEBODY CANNOT RECONSTRUCT. Their own
+      facts they know; who looked at them, and when, exists nowhere else — so an
+      export without it is missing the only part that is not already theirs.
+    */
+    const mine = await signIn(CLIENT, ID);
+    const rows = (await get(ID, "/api/exit.account.export", mine))
+      .body.tables as unknown as Record<string, { fact?: string }[]>;
+    expect(rows.vault_disclosures!.some((x) => x.fact === "body.mass")).toBe(true);
+  });
+
+  it("says where they belong, and where they used to", async () => {
+    const mine = await signIn(CLIENT, ID);
+    const r = await get(ID, "/api/exit.account.export", mine);
+    const belongs = r.body.workspaces as unknown as { tenant_id: string; role: string }[];
+    expect(belongs.length).toBeGreaterThan(0);
+    /* And their own row, which no cascade can carry — it is keyed by `id`. */
+    expect((r.body.account as unknown as { email: string }).email).toBe(CLIENT.toLowerCase());
+  });
+
+  it("is nobody else's to ask for", async () => {
+    /*
+      ⚠️ IT TAKES NO SUBJECT, AND THAT IS THE WHOLE ACCESS CONTROL. An export
+      keyed by an id in the input is one where the check is a line somebody has to
+      remember; keyed by the session, there is nothing to forget. The owner asking
+      gets their OWN account, never the client's.
+    */
+    const theirs = await signIn(OWNER, ID);
+    const r = await get(ID, "/api/exit.account.export", theirs);
+    expect((r.body.account as unknown as { email: string }).email).toBe(OWNER.toLowerCase());
+    const facts = (r.body.tables as unknown as Record<string, unknown[]>).vault_facts!;
+    expect(facts).toEqual([]);
+  });
+});

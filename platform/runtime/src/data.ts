@@ -56,17 +56,25 @@ export interface Export {
 }
 
 /**
- * Everything a workspace has, in one document.
+ * Everything under one scope, in one document.
+ *
+ * ⚠️ THE SCOPE IS THE PLAN'S, NOT THIS FUNCTION'S. It walks a cascade and reads
+ * `WHERE <that plan's column> = ?`, so the same walk serves a workspace and a
+ * person — and it has to, because "here is everything we hold" is one promise
+ * whether the subject is a company or a human being. Two implementations would
+ * be two ceilings, two ways of reporting what was dropped, and one of them
+ * quietly better than the other.
  *
  * ⚠️ THE CEILING IS PER TABLE AND IS REPORTED. Unbounded, one large workspace
  * exhausts the worker and the export fails entirely — which is worse than a
  * partial one, because a failed export is usually retried at exactly the same
  * size and fails again.
  */
-export async function exportTenant(
+export async function exportScoped(
   db: SqlHandle,
   plan: readonly Erasable[],
-  tenantId: string,
+  /** The id every step is filtered by — a workspace's or a person's. */
+  scopeId: string,
   at: Instant,
   perTable = 5000,
   /** Only these tables, where a caller wants a subset. Empty means all of them. */
@@ -82,10 +90,10 @@ export async function exportTenant(
       absent table would make the feature unavailable to exactly the oldest
       workspaces — the ones with the most to lose.
     */
-    const rows = await db.all<Record<string, unknown>>(`SELECT * FROM ${table} WHERE ${column} = ? LIMIT ?`, tenantId, perTable + 1).catch(() => []);
+    const rows = await db.all<Record<string, unknown>>(`SELECT * FROM ${table} WHERE ${column} = ? LIMIT ?`, scopeId, perTable + 1).catch(() => []);
     tables[table] = rows.slice(0, perTable);
     if (rows.length > perTable) {
-      const total = await db.first<{ n: number }>(`SELECT COUNT(*) AS n FROM ${table} WHERE ${column} = ?`, tenantId).catch(() => null);
+      const total = await db.first<{ n: number }>(`SELECT COUNT(*) AS n FROM ${table} WHERE ${column} = ?`, scopeId).catch(() => null);
       dropped[table] = Math.max(0, (total?.n ?? rows.length) - perTable);
     }
   }
@@ -161,7 +169,7 @@ export async function eraseTenant(
     objects have gone is one whose media rows point at files that no longer
     exist — which is the shape of a promise kept in the wrong order.
   */
-  const taken = takeFirst.size ? await exportTenant(db, plan, tenantId, at, 5000, takeFirst) : null;
+  const taken = takeFirst.size ? await exportScoped(db, plan, tenantId, at, 5000, takeFirst) : null;
 
   const bytes = await eraseObjects(db, objects, tenantId);
   if (bytes.stranded > 0) {
