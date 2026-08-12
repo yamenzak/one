@@ -202,6 +202,12 @@ export function VaultScreen({ wheres, kept, looks, onSet, onBack, Heading = "h1"
                       onSet={(reach) => onSet({
                         appId: w.appId, tenantId: w.tenantId, fact: item.fact, reach,
                       })}
+                      /* ⚠️ THE SAME WRITE, KEYED ON THE READING. A grant over a
+                         reading is stored under the reading's own id, which is
+                         exactly how `mayDerive` looks it up. */
+                      onReading={(reading, reach) => onSet({
+                        appId: w.appId, tenantId: w.tenantId, fact: reading, reach,
+                      })}
                     />
                   ))}
                 </Disclose>
@@ -273,11 +279,12 @@ export function VaultScreen({ wheres, kept, looks, onSet, onBack, Heading = "h1"
  * control it reads as part of the control — somebody reaching for one lands on
  * the other, and the two do opposite things.
  */
-const Ask = ({ item, where, onOpen, onSet }: {
+const Ask = ({ item, where, onOpen, onSet, onReading }: {
   readonly item: Item;
   readonly where: string;
   readonly onOpen: () => void;
   readonly onSet: (reach: Reach) => Promise<Problem | null>;
+  readonly onReading: (reading: string, reach: Reach) => Promise<Problem | null>;
 }): ReactNode => {
   const [choosing, setChoosing] = useState(false);
   /*
@@ -290,6 +297,7 @@ const Ask = ({ item, where, onOpen, onSet }: {
   */
   const binary = item.rungs.length === 2;
   return (
+    <>
     <div className="share">
       <span className="share-name">{item.label}</span>
       <button
@@ -327,6 +335,66 @@ const Ask = ({ item, where, onOpen, onSet }: {
           title={item.label}
           options={RUNGS.filter((r) => item.rungs.includes(r.value))}
           value={item.reach}
+          onPick={onSet}
+          onClose={() => setChoosing(false)}
+        />
+      )}
+    </div>
+    {/*
+      ⚠️ A READING IS ITS OWN CONTROL, because it is its own grant. Shown only
+      inside the explain sheet it was readable and not changeable, so a trend
+      granted once could be narrowed only by the app asking again — and the
+      derivation is the whole reason somebody chose this fact's setting in the
+      first place. Indented under the fact, because what it discloses is bounded
+      by what the fact allows.
+    */}
+    {item.readings.map((r) => (
+      <Reads key={r.id} reading={r} where={where} onSet={(reach) => onReading(r.id, reach)} />
+    ))}
+    </>
+  );
+};
+
+/**
+ * ⚠️ IT SAYS WHAT IT HIDES, ON THE ROW. A reading's whole claim is that it
+ * discloses less than its input — and the registry refuses an empty `hides`, so
+ * that sentence is never a reassurance somebody typed. Putting it one press away
+ * behind the explain mark would leave the row saying only that something is
+ * shared, which is the half that is not the point.
+ */
+const Reads = ({ reading, where, onSet }: {
+  readonly reading: Item["readings"][number];
+  readonly where: string;
+  readonly onSet: (reach: Reach) => Promise<Problem | null>;
+}): ReactNode => {
+  const [choosing, setChoosing] = useState(false);
+  const binary = reading.rungs.length === 2;
+  return (
+    <div className="share reads">
+      <span className="share-name">{reading.label}</span>
+      {binary ? (
+        <Flip
+          on={reading.granted}
+          onChange={(next) => onSet(next ? reading.asks : "self")}
+          label={`Share ${reading.label.toLowerCase()} with ${where}`}
+        />
+      ) : (
+        <button type="button" className="share-rung press" onClick={() => setChoosing(true)}>
+          <span>{RUNG[reading.reach]}</span>
+          <Onward className="chevron" />
+        </button>
+      )}
+      <span className="share-said">
+        {reading.granted
+          ? `${reading.says} ${reading.hides}`
+          : `Not shared. ${reading.says}`}
+      </span>
+      {binary ? null : (
+        <Choose
+          open={choosing}
+          title={reading.label}
+          options={RUNGS.filter((x) => reading.rungs.includes(x.value))}
+          value={reading.reach}
           onPick={onSet}
           onClose={() => setChoosing(false)}
         />

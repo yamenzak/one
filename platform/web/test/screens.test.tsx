@@ -319,6 +319,7 @@ describe("your vault", () => {
         id: "body.mass.trend", label: "Weight trend", from: ["body.mass"],
         says: "Which way it is going.",
         hides: "Every absolute weight.",
+        asks: "staff", rungs: RUNGS_RAW, reach: "self", granted: false, expiresAt: null,
       }],
     })} />);
     expect(out).toContain("Which way it is going.");

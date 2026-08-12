@@ -687,6 +687,16 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
    with the control left to auto-placement it landed on the row AFTER the note —
    three rows for one item, the control adrift under a chip. */
 .share-name { grid-row: 1; grid-column: 1; min-inline-size: 0; font-weight: 500; }
+/* ⚠️ A READING SITS UNDER THE FACT IT COMES FROM, indented and quieter, because
+   what it can disclose is bounded by what the fact allows — a row at the same
+   weight beside it would read as a second, unrelated thing to decide. The rule
+   down the inside is the same one the disclosure body uses, one level in. */
+.reads { padding-inline-start: 30px; margin-block-start: -6px; }
+.reads .share-name { font-weight: 400; color: var(--ink-quiet); }
+/* ⚠️ NO SECOND RULE DOWN THE INSIDE. The disclosure body already draws one on
+   every child, so a reading with its own would be two lines a millimetre apart —
+   the indent alone is what says this belongs to the row above it. */
+.reads .share-said { color: var(--ink-faint); }
 .share > .switch { grid-row: 1; grid-column: 3; justify-self: end; }
 /* ⚠️ IT NAMES THE RUNG IT IS AT, so a control with four settings is readable
    without being opened. It sits where the switch sits, because on any one row it

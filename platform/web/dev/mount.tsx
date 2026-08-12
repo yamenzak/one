@@ -134,9 +134,13 @@ const VAULT_WHERES: readonly Where[] = [
         held: true, recommend: "self", categories: [],
         because: "Somebody helping you can plan from the change without ever seeing the number.",
         readings: [
+          /* ⚠️ THE READING IS SHARED WHILE THE NUMBER IS NOT — the state the whole
+             derived idea exists for, and the one a fixture that granted both
+             would never show. */
           { id: "body.mass.trend", label: "Weight trend", from: ["body.mass"],
             says: "Which way it is going, and how fast, over the last few weeks.",
-            hides: "Every absolute weight — a direction and a rate, with no starting point to add them to." },
+            hides: "Every absolute weight — a direction and a rate, with no starting point to add them to.",
+            asks: "staff", rungs: RUNGS_RAW, reach: "staff", granted: true, expiresAt: null },
         ],
       },
       {

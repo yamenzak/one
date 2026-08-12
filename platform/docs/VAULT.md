@@ -397,16 +397,24 @@ produce it.
      the identity door can group the vault by workspace. `wantedHere` and
      `VaultScreen` already take that shape; `vault.mine` still answers with FACTS. -->
 
-⚠️ **A reading is not separately grantable from the review screen.** §4 says a
-reading is granted in its own right, and the consent sheet offers one control per
-reading; the vault renders a derived want as a single control over the base fact
-and lists its readings only in the explain sheet. So somebody can grant a trend at
-the sheet and cannot narrow it afterwards without the app asking again — which is
-the same gap the rung control had, one level further in.
+⚠️ **A reading IS separately grantable from the review screen**, as of the
+per-reading controls. Each one resolves on its own grant — keyed on the reading id,
+exactly as `mayDerive` reads it — and renders its own control indented under the
+fact it comes from. Resolved from the fact's grant instead, which is the obvious
+shortcut since a reading is computed from it, the screen would show a trend as
+shared the moment the number was and the route would refuse it.
 
-<!-- DEFER(one-187) stage:7 — per-reading controls on the vault review screen. The
-     consent sheet grants a reading in its own right; the vault shows them read-only
-     inside the explain sheet, so a derived grant cannot be narrowed after the fact. -->
+⚠️ **And a reading asks at a different rung from its inputs.** The derivation runs
+on the server, so the base fact only ever asks at `compute`; the reading asks at
+whoever consumes it — `readingAsksFor` — which is what makes "the coach sees a
+direction, the number stays here" a state somebody can actually be in. It is also
+why `by` is meaningful on a `derived` want and refused only on a `compute` one: a
+derived want has a reader, it is just reading the output rather than the input.
+
+⚠️ **The row says what it hides.** A reading's whole claim is that it discloses
+less than its input, and the registry refuses an empty `hides` — so that sentence
+is never a reassurance somebody typed. Behind the explain mark the row would say
+only that something is shared, which is the half that is not the point.
 
 ---
 

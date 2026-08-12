@@ -500,6 +500,53 @@ describe("a want, resolved for one person in one workspace", () => {
     expect(wantProblems({ wants: [
       { fact: "goal.training", need: "raw", why: "A programme.", by: "agent" },
     ] }, "kova")).toEqual([]);
+    /* ⚠️ A DERIVED WANT HAS A READER TOO — the derivation runs on the server, and
+       then somebody looks at what came out. Refusing it there took away the one
+       thing a trend most needs to say. */
+    expect(wantProblems({ wants: [
+      { fact: "body.mass", need: "derived", why: "A direction.", readings: ["body.mass.trend"], by: "agent" },
+    ] }, "kova")).toEqual([]);
+  });
+
+  /*
+    ⚠️ A READING IS RESOLVED IN ITS OWN RIGHT, on its own grant, keyed exactly as
+    `mayDerive` reads it. Resolved from the FACT's grant instead — the obvious
+    shortcut, since a reading is computed from it — the screen would show a trend
+    as shared the moment the number was, and the route would refuse it.
+  */
+  it("resolves a reading on its own grant, not on the fact's", () => {
+    const spec = { wants: [{
+      fact: "body.mass", need: "derived" as const, why: "A direction.",
+      readings: ["body.mass.trend"],
+    }] };
+    const shared = wantedHere({
+      spec, appId: "kova", tenantId: "t1", held: new Set(), now: at(10),
+      grants: [given({ fact: "body.mass.trend", reach: "staff" })],
+    });
+    expect(shared.items[0]).toMatchObject({ reach: "self", granted: false });
+    expect(shared.items[0]!.readings[0]).toMatchObject({ reach: "staff", granted: true });
+
+    /* And the other way: the number shared does not share the direction. */
+    const number = wantedHere({
+      spec, appId: "kova", tenantId: "t1", held: new Set(), now: at(10),
+      grants: [given({ fact: "body.mass", reach: "compute" })],
+    });
+    expect(number.items[0]!.readings[0]).toMatchObject({ reach: "self", granted: false });
+  });
+
+  /* ⚠️ A READING IS READ BY SOMEBODY ELSE THAN ITS INPUTS ARE. The base fact only
+     ever asks at `compute`; the reading asks at whoever consumes it. */
+  it("asks for a reading at its reader and the fact at the server", () => {
+    const out = wantedHere({
+      spec: { wants: [{
+        fact: "body.mass", need: "derived", why: "A direction.",
+        readings: ["body.mass.trend"], by: "agent",
+      }] },
+      appId: "kova", tenantId: "t1", grants: [], held: new Set(), now: at(10),
+    });
+    expect(out.items[0]!.asks).toBe("compute");
+    expect(out.items[0]!.readings[0]!.asks).toBe("agent");
+    expect(out.items[0]!.readings[0]!.rungs).toEqual(["self", "compute", "agent"]);
   });
 
   /*

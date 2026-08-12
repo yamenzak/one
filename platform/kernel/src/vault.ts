@@ -794,10 +794,14 @@ export function wantProblems(spec: VaultSpec | undefined, appId: string): readon
     if (!w.why.trim()) {
       out.push({ at: w.fact, why: "is asked for with no reason, and a permission prompt with no reason is the one everybody dismisses" });
     }
-    if (w.by && w.need !== "raw") {
+    /* ⚠️ ONLY A `compute` WANT HAS NO READER TO NAME. A raw want's reader looks at
+       the value; a DERIVED want's reader looks at the reading — the derivation
+       runs on the server, but somebody consumes what comes out, and refusing the
+       field there took away the one thing a trend most needs to say. */
+    if (w.by && w.need === "compute") {
       out.push({
         at: w.fact,
-        why: `names a reader on a ${w.need} want, where nothing but the server ever reads the value — a declaration that does nothing is one somebody believes is working`,
+        why: "names a reader on a compute want, where nothing but the server ever sees anything — a declaration that does nothing is one somebody believes is working",
       });
     }
     if (w.recommend && REACH.indexOf(w.recommend) > REACH.indexOf(fact.suggests ?? "self")) {
@@ -986,11 +990,22 @@ export interface Wanted {
   readonly because?: string;
   readonly categories: readonly DataCategory[];
   /**
-   * ⚠️ A DERIVED WANT IS SEVERAL SWITCHES, NOT ONE. Each reading discloses a
+   * ⚠️ A DERIVED WANT IS SEVERAL CONTROLS, NOT ONE. Each reading discloses a
    * different amount and says so in its own words, so collapsing them into one
-   * control would make the person grant the most revealing to get the least.
+   * would make the person grant the most revealing to get the least — and each is
+   * resolved here, with its own rung, because a reading is granted in its own
+   * right and has to be narrowable after the fact rather than only at the sheet.
    */
-  readonly readings: readonly Reading[];
+  readonly readings: readonly WantedReading[];
+}
+
+/** One reading of a fact, resolved the same way the fact itself is. */
+export interface WantedReading extends Reading {
+  readonly asks: Reach;
+  readonly rungs: readonly Reach[];
+  readonly reach: Reach;
+  readonly granted: boolean;
+  readonly expiresAt: Instant | null;
 }
 
 /** Every want one app declared, resolved for one person in one workspace. */
@@ -1034,6 +1049,14 @@ export const asksFor = (w: Reads): Reach =>
   (w.need === "raw" ? (w.by ?? "staff") : ARITHMETIC);
 
 /**
+ * ⚠️ A READING IS READ BY SOMEBODY ELSE THAN ITS INPUTS ARE. The derivation runs
+ * on the server — so the base fact only ever asks at `compute` — and then a person
+ * or a model looks at what came out. That second rung is the whole point of a
+ * derived want: a coach seeing a direction while the number stays here.
+ */
+export const readingAsksFor = (w: Reads): Reach => w.by ?? "staff";
+
+/**
  * WHICH RUNGS A WANT MAY STAND AT — the one list, for every surface that offers
  * a choice.
  *
@@ -1061,6 +1084,22 @@ export const asksFor = (w: Reads): Reach =>
 export const rungsFor = (w: Reads): readonly Reach[] =>
   REACH.slice(0, REACH.indexOf(asksFor(w)) + 1);
 
+/**
+ * ⚠️ THE HIGHEST LIVE GRANT WINS, and the walk is the same one `mayRead` does.
+ * Two resolvers over one question is how a screen comes to promise what a route
+ * refuses — so a fact and a reading go through this one function, keyed the same
+ * way each is stored.
+ */
+function highest(
+  grants: readonly Grant[], fact: string, appId: string, tenantId: string | null, now: Instant,
+): Grant | null {
+  return grants.reduce<Grant | null>((best, g) => {
+    if (g.fact !== fact || g.appId !== appId || g.tenantId !== tenantId) return best;
+    if (g.expiresAt !== null && g.expiresAt <= now) return best;
+    return best === null || REACH.indexOf(g.reach) > REACH.indexOf(best.reach) ? g : best;
+  }, null);
+}
+
 export function wantedHere(input: {
   readonly spec: VaultSpec;
   readonly appId: string;
@@ -1080,17 +1119,7 @@ export function wantedHere(input: {
        `wantProblems` refuses it at composition, so reaching here is a registry
        edited under a running app, and half a row is worse than no row. */
     if (!fact) return [];
-    const live = grants.filter(
-      (g) => g.fact === want.fact && g.appId === appId && g.tenantId === tenantId
-        && (g.expiresAt === null || g.expiresAt > now),
-    );
-    /* ⚠️ THE HIGHEST LIVE GRANT WINS, and the walk is the same one `mayRead`
-       does. Two resolvers over one question is how a screen comes to promise
-       what a route refuses. */
-    const at = live.reduce<Grant | null>(
-      (best, g) => (best === null || REACH.indexOf(g.reach) > REACH.indexOf(best.reach) ? g : best),
-      null,
-    );
+    const at = highest(grants, want.fact, appId, tenantId, now);
     return [{
       fact: want.fact,
       label: fact.label,
@@ -1109,7 +1138,24 @@ export function wantedHere(input: {
       /* ⚠️ ONLY THE READINGS THIS WANT NAMED. A fact may offer several and an app
          may want one of them; listing the rest would offer somebody a control
          over a disclosure nothing is asking to make. */
-      readings: (fact.readings ?? []).filter((r) => (want.readings ?? []).includes(r.id)),
+      readings: (fact.readings ?? [])
+        .filter((r) => (want.readings ?? []).includes(r.id))
+        .map((r): WantedReading => {
+          /* ⚠️ THE READING'S OWN GRANT, keyed on the reading id exactly as
+             `mayDerive` reads it. Resolving it from the fact's grant instead
+             would make the two disagree, and the resolver is the half nobody
+             looks at. */
+          const at = highest(grants, r.id, appId, tenantId, now);
+          const asks = readingAsksFor(want);
+          return {
+            ...r,
+            asks,
+            rungs: REACH.slice(0, REACH.indexOf(asks) + 1),
+            reach: at?.reach ?? "self",
+            granted: at !== null,
+            expiresAt: at?.expiresAt ?? null,
+          };
+        }),
     }];
   });
 
