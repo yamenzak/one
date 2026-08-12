@@ -3514,6 +3514,51 @@
       "impl": "web/test/screens.test.tsx",
       "proves": "names the account differently from a product",
       "fails": "the account's own section headed like a product's. Under the deployment's name it reads as a fourth product in a list of three, and the documents everybody owes look like ones only some people do"
+    },
+    {
+      "id": "the-answer-comes-before-the-evidence",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "says the answer before it shows the evidence",
+      "fails": "a disclosure written as a table — \"Stored in\", \"Companies with access\" and \"Leaves Europe\" were three label/value rows a person had to assemble into one fact, and the first of them was a claim the payload cannot support: the regions the PRODUCT can be deployed in, under a label saying where THIS PERSON'S data is"
+    },
+    {
+      "id": "a-disclosure-is-worth-not-opening",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "carries the whole disclosure into one row, worth not opening",
+      "fails": "a row saying only \"Who else sees this\" — a door, with everything behind it one press further away for nothing. The same rule the vault's groups and the preferences hub live by, and the reason the count is on the row rather than only on the screen it opens"
+    },
+    {
+      "id": "an-unpublished-disclosure-says-so",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "says so when a product has published no disclosure at all",
+      "fails": "a product whose disclosure has not published rendering nothing at all, which is indistinguishable from one that shares with nobody — the opposite claim, made silently, on the screen where the difference matters most"
+    },
+    {
+      "id": "a-group-opens-on-what-it-owes",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "opens the product that is owed something, and leaves the settled ones shut",
+      "fails": "every group shut, so the document somebody came to accept is behind a press — or every group open, which is the wall this screen was. The alternative that looks obvious is a \"needs your attention\" section above the list, and that is the same rows twice, ticking in two places at once"
+    },
+    {
+      "id": "a-group-counts-what-is-owed",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "counts what is owed rather than what was agreed",
+      "fails": "\"3 of 4\" — a fraction whose remainder may be documents nobody ever has to accept. The number a person is looking for is how many are waiting on them, and the settled state has to be true of a product that never asked them for anything"
     }
   ]
 }

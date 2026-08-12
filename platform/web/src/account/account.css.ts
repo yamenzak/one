@@ -63,10 +63,19 @@ export const ACCOUNT_CSS = `
    badge at the end of the line. */
 .tag[data-special] { background: var(--warn-well); color: var(--warn); }
 
-/* ⚠️ THREE LINES, IN THE ORDER SOMEBODY ASKS THEM: what this company does, what
-   it gets, and where it goes with it. The first two are what a person wants; the
-   third is what a questionnaire wants, so it is last and quiet. */
-.party { display: grid; gap: 4px; }
-.party-role { font-size: 15px; }
-.party-where { color: var(--ink-quiet); font-size: 13.5px; }
+/*
+  ⚠️ FOUR LINES, IN THE ORDER SOMEBODY ASKS THEM: who this is, what they do, what
+  they get, and where they go with it. The first two are what a person wants; the
+  last is what a questionnaire wants, so it is quiet and at the bottom.
+
+  ⚠️ IT IS A RECORD, NOT A FIELD, WHICH IS WHY IT IS NOT AN ENTRY. Written as
+  one, the company NAME was the label — quiet, small, above — and its job
+  description was the value, at full ink. That inverts the one thing somebody
+  scanning "who has my data" is scanning FOR: they were reading a column of grey
+  company names under a column of white sentences about hosting and payment.
+*/
+.party { display: grid; gap: 4px; padding: 13px var(--pad); }
+.party-name { font-size: 17px; line-height: 1.35; }
+.party-role { color: var(--ink-quiet); font-size: 15px; }
+.party-where { color: var(--ink-faint); font-size: 13.5px; }
 `.trim();

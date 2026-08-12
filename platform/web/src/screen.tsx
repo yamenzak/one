@@ -136,8 +136,18 @@ export function Screen({ leave, onLeave, sky, tint, title, name, lede, action, c
 }
 
 export interface SectionProps {
-  /** Absent means the section has no sign over it, which is a decision. */
-  readonly name?: string;
+  /**
+   * Absent means the section has no sign over it, which is a decision.
+   *
+   * ⚠️ MARKUP IS ALLOWED HERE FOR ONE REASON: a section that is a PLACE with a
+   * mark of its own is named by that mark. The account's own documents sit above
+   * three products' in one list, and "Your 4° account" as words is a fourth
+   * product with a longer name — the lockup is the platform's only device for
+   * saying this one is a different order of thing. It is not a licence to
+   * decorate a heading; a section named by anything other than what it is
+   * already had the wrong name.
+   */
+  readonly name?: ReactNode;
   readonly children: ReactNode;
 }
 

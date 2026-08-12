@@ -99,6 +99,19 @@ the workspace.
 column of green nobody reads, and the one that needs attention stops being the
 thing that stands out.
 
+**A record is not a field.** — A field is a quiet label with its value under it,
+which is right for an address and wrong for a company: written that way the
+recipient's NAME was the small grey label and its job description was the value at
+full ink, so somebody scanning "who has my data" read a column of grey names under
+a column of white sentences about hosting and payment. The identity goes at the
+top, at the weight of an identity.
+
+**A group opens on what it owes.** — Somebody with nothing outstanding wants one
+line per group saying so; somebody who owes something wants it in front of them.
+Opening exactly the groups with something outstanding is both, and it is what
+removes the alternative: a "needs your attention" section above the list, which is
+the same rows twice, ticking in two places at once.
+
 **Destructive is the words, not the whole row.** — A red bar in a list of
 settings reads as an error somebody has to fix. Red text on the one row that
 cannot be undone reads as a warning about that row.
@@ -114,6 +127,19 @@ second line.
 email wrapped mid-word — `b.okonkwo@gmail.` / `com` — because an address has no
 spaces to break at. With no name the heading *is* the address and is set as one;
 and the action beside it is not "Edit", it is "Add your name".
+
+**A summary is a sentence; a table is the summarising the reader had to do.** —
+"Stored in", "Companies with access" and "Leaves Europe" were three label/value
+rows a person assembled into one fact — *three companies receive something, one of
+them is outside Europe, some of it is sensitive.* Write the fact. The rows behind
+it are the evidence and belong under it, not in place of it. It is computed from
+the same declaration the list is, in one place, because a summary that can
+disagree with the list under it is worse than no summary.
+
+**A label promises whose fact it is.** — "Stored in" over `auto, eu` was the
+regions the PRODUCT can be deployed in, under a label saying where THIS PERSON'S
+data is. Nothing was malformed and nothing failed; the value was simply an answer
+to a different question, which is the one kind of wrong a screen cannot show.
 
 ### 2.5 Theme
 
@@ -296,6 +322,14 @@ carries its own light, its own lockup and its whole surface as the target — an
 the light is the page's own variant at a different hue, one number moved, so it
 is unmistakably its own without being a second design. At most one per surface;
 a second crown is a list of crowns, which is a list.
+
+**A section that is a place with a mark of its own is named by the mark.** — The
+account's own documents sit above three products' in one list. Set as words,
+"Your 4° account" is a fourth product with a longer name — and the lockup is the
+platform's only device for saying this one is a different order of thing: it
+exists before any product, outlives all of them, and holds the vault. It is not a
+licence to decorate a heading; a section named by anything other than what it is
+already had the wrong name.
 
 **A card's light is a placement, never a second sky.** — The same field, differing
 only in where it starts, how far it reaches and how much of it arrives. Written as

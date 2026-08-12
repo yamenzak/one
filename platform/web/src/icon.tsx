@@ -36,13 +36,13 @@
 import type { ReactNode } from "react";
 import {
   ArrowLeft, Camera, Check, ChevronRight, Download, FileText, HeartCrack, Info, KeyRound, Languages, Lock,
-  Mail, MonitorSmartphone, Pencil, Plus, Ruler, Shield, SlidersHorizontal, SunMoon,
+  Mail, MonitorSmartphone, Pencil, Plus, Ruler, Share2, Shield, SlidersHorizontal, SunMoon,
   Vibrate, Volume2, X, type LucideIcon,
 } from "lucide-react";
 
 /** The name the stylesheet animates by. Closed: a new icon adds a rule. */
 export type IconName =
-  | "key" | "adjust" | "guard" | "save" | "heartbreak" | "letter" | "device"
+  | "key" | "adjust" | "guard" | "save" | "heartbreak" | "letter" | "device" | "others"
   | "edit" | "lens" | "onward" | "close" | "back" | "tick" | "add"
   | "light" | "tongue" | "measure" | "buzz" | "sound" | "locked" | "about" | "paper";
 
@@ -95,6 +95,12 @@ export const Letter = draw(Mail, "letter", 21);
    this block: a document is what it is HERE, and the shape may change. */
 export const Paper = draw(FileText, "paper", 21);
 export const Device = draw(MonitorSmartphone, "device", 21);
+/* ⚠️ `Others` RATHER THAN A SHARE VERB. The row it names answers "who else
+   receives this", which is a set of companies rather than an action somebody
+   takes — and a share glyph read as a control is a control that would send
+   something. It is also deliberately not one letter from `Onward`, which is the
+   furniture two rows down and means the opposite kind of thing. */
+export const Others = draw(Share2, "others", 21);
 
 /* Furniture — the parts of a row rather than a meaning in it. */
 export const Onward = draw(ChevronRight, "onward", 19);
@@ -143,4 +149,5 @@ export const ICON_PARTS: Readonly<Record<IconName, readonly string[]>> = {
   sound: ["path", "path", "path"],
   about: ["circle", "path", "path"],
   paper: ["path", "path", "path", "path", "path"],
+  others: ["circle", "circle", "circle", "line", "line"],
 };

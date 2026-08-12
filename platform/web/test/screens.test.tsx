@@ -28,7 +28,7 @@ import { Marked, Unset } from "../src/list.js";
 import { SwitchRow } from "../src/switch.js";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ValueEditor, ValueEditorBody } from "../src/editor.js";
-import { LegalScreen, paragraphs, said } from "../src/account/legal.js";
+import { counted, held, LegalScreen, paragraphs, receives, ReceivingScreen, said, state } from "../src/account/legal.js";
 import type { Doc } from "../src/account/wire.js";
 import { configureFeedback, feedbackSettings, FEEDBACK_DEFAULT } from "../src/feedback.js";
 import { Device } from "../src/icon.js";
@@ -569,18 +569,27 @@ const DOC = (over: Partial<Doc> = {}, doc: Partial<LegalDoc> = {}): Doc => ({
   acceptedOn: null, outstanding: false, ...over,
 });
 
-/* ⚠️ A COMPANY CLAIMING MORE THAN THIS APP HOLDS. `receives` says `financial`;
-   the transfer's `categories` is the intersection and does not. */
+/*
+  ⚠️ A COMPANY CLAIMING MORE THAN THIS APP HOLDS. `receives` says `financial`;
+  the transfer's `categories` is the intersection and does not.
+
+  ⚠️ AND EVERY NAME IN IT IS UNREAL, WHICH ON THIS SUBJECT IS NOT A STYLE CHOICE.
+  A disclosure fixture states who controls somebody's data, where it is processed
+  and what covers a transfer — so a real company, a real address or a real
+  controller written here is a claim about a real business that nobody declared,
+  one copy-and-paste from a screen. `hello`'s own governance declaration and the
+  preview both use `example.test`; this had simply not been held to it.
+*/
 const RECEIVING: Receiving = {
-  controller: "4DL", contact: "privacy@4dl.app", regions: ["eu-central"],
+  controller: "The example controls it.", contact: "privacy@example.test", regions: ["eu"],
   subprocessors: [
-    { id: "stripe", name: "Stripe", role: "Taking payment", receives: ["identity", "financial"], where: "Ireland", safeguard: "eea", terms: "t" },
-    { id: "google", name: "Google", role: "Generating", receives: ["content", "health"], where: "United States", safeguard: "sccs", terms: "t" },
+    { id: "billing", name: "The example biller", role: "Taking payment", receives: ["identity", "financial"], where: "Inside the union", safeguard: "eea", terms: "t" },
+    { id: "model", name: "The example model", role: "Generating", receives: ["content", "health"], where: "Outside the union", safeguard: "sccs", terms: "t" },
   ],
   inference: {},
   transfers: [
-    { to: "stripe", name: "Stripe", where: "Ireland", safeguard: "eea", categories: ["identity"], special: false, subjects: ["member"] },
-    { to: "google", name: "Google", where: "United States", safeguard: "sccs", categories: ["content", "health"], special: true, subjects: ["member"] },
+    { to: "billing", name: "The example biller", where: "Inside the union", safeguard: "eea", categories: ["identity"], special: false, subjects: ["member"] },
+    { to: "model", name: "The example model", where: "Outside the union", safeguard: "sccs", categories: ["content", "health"], special: true, subjects: ["member"] },
   ],
 };
 
@@ -624,24 +633,108 @@ describe("consent and legal", () => {
     expect(screen([DOC({ outstanding: true })])).not.toMatch(/I agree/);
   });
 
+  /* ⚠️ THE DISCLOSURE IS ITS OWN SCREEN NOW, so it is rendered as one. Folded
+     under every product's documents it was five label/value rows plus two more
+     foldouts, and the answer somebody came for was assembled by reading a table. */
+  const who = (receiving: Receiving | null) => renderToStaticMarkup(
+    <ReceivingScreen
+      of={{ appId: "hello", appName: "Hello", roles: ["owner"], docs: [], receiving }}
+      onBack={() => undefined}
+    />,
+  );
+
   it("shows what a company actually gets, not what it claims to", () => {
     /*
-      ⚠️ THE INTERSECTION, WHICH IS THE ONE NUMBER WORTH PRINTING. Stripe's own
+      ⚠️ THE INTERSECTION, WHICH IS THE ONE NUMBER WORTH PRINTING. The biller's own
       entry declares `financial`; this deployment holds none, so the transfer says
       `identity` alone. Rendering `receives` instead would let any recipient make
       its own row larger than the truth — over-disclosure, in the direction
       nobody checks.
     */
-    const html = screen([DOC()], RECEIVING);
+    const html = who(RECEIVING);
     expect(html).toContain("who you are");
     expect(html).not.toContain("what was charged");
   });
 
   it("counts what leaves Europe by the safeguard, not by the number of recipients", () => {
     /* ⚠️ `transfersOf` returns a row per recipient whether or not it crosses a
-       border, so counting the list is how "Leaves Europe" comes to say yes for a
+       border, so counting the list is how "leaves Europe" comes to say yes for a
        deployment where nothing does. */
-    expect(screen([DOC()], RECEIVING)).toContain("1 of 2");
+    expect(receives(RECEIVING)).toBe("2 companies receive something. 1 of them is outside Europe. Some of it is sensitive.");
+    expect(counted(RECEIVING)).toBe("2 companies \u00b7 1 outside Europe");
+    /* ⚠️ AND NONE IS A REAL ANSWER, given rather than implied by an absent row. */
+    expect(receives({ ...RECEIVING, transfers: [] })).toBe("Nothing here is shared with any other company.");
+    expect(counted({ ...RECEIVING, transfers: [] })).toBe("Nobody else");
+  });
+
+  it("says the answer before it shows the evidence", () => {
+    /* ⚠️ A SCREEN WHOSE FIRST LINE IS A HEADING AND WHOSE SECOND IS A TABLE asks
+       the reader to do the summarising. Three rows — "Stored in", "Companies with
+       access", "Leaves Europe" — were exactly that, and the first of them was a
+       claim the payload cannot support: it carried the regions this PRODUCT can be
+       deployed in, under a label saying where THIS PERSON'S data is. */
+    const html = who(RECEIVING);
+    expect(html).toContain("2 companies receive something.");
+    expect(html).not.toContain("Stored in");
+  });
+
+  it("carries the whole disclosure into one row, worth not opening", () => {
+    /* ⚠️ THE SUMMARY HAS TO BE WORTH NOT OPENING — the rule the vault's groups and
+       the preferences hub already live by. A row saying only "Who else sees this"
+       is a door, and everything behind it is one press further away for nothing. */
+    expect(screen([DOC()], RECEIVING)).toContain("2 companies \u00b7 1 outside Europe");
+  });
+
+  it("says so when a product has published no disclosure at all", () => {
+    /* ⚠️ A ROW THAT PREDATES THE COLUMN IS A REAL STATE, and rendering nothing
+       makes it indistinguishable from a product that shares with nobody — which is
+       the opposite claim. The row is there and does not go anywhere. */
+    const html = screen([DOC()], null);
+    expect(html).toContain("Not published yet");
+    expect(html).not.toContain("Nobody else");
+  });
+
+  it("opens the product that is owed something, and leaves the settled ones shut", () => {
+    /*
+      ⚠️ BOTH READERS, WITH NO SECOND LIST. Somebody with nothing outstanding wants
+      one line per product saying so; somebody who owes a document wants it in
+      front of them. A "needs your attention" section at the top would be the same
+      rows twice, ticking in two places at once.
+    */
+    const html = renderToStaticMarkup(
+      <LegalScreen
+        products={[
+          { appId: "kova", appName: "Kova", roles: ["owner"], docs: [DOC({ outstanding: true })], receiving: null },
+          { appId: "scena", appName: "Scena", roles: ["owner"], docs: [DOC({ acceptedOn: "11 May" }, { id: "s" })], receiving: null },
+        ]}
+        onAccept={async () => null} onBack={() => undefined}
+      />,
+    );
+    /* One open, and it is the one before Scena in the markup. */
+    expect([...html.matchAll(/<details class="disclose" open/g)]).toHaveLength(1);
+    expect(html.indexOf("open=")).toBeLessThan(html.indexOf("Scena"));
+  });
+
+  it("names the roles a document is owed of, spoken", () => {
+    /* ⚠️ THE ROLES ARE WHAT DECIDES WHICH DOCUMENTS ARE OWED — the same person is
+       a client in one studio and an owner in another, and reads a different set
+       for it. Sentence case, because the stored word is a registry key; commas
+       until the last one, because joining three with "and" is a chant. */
+    expect(held(["owner"])).toBe("Owner");
+    expect(held(["client", "owner"])).toBe("Client and owner");
+    expect(held(["owner", "assistant", "client"])).toBe("Owner, assistant and client");
+  });
+
+  it("counts what is owed rather than what was agreed", () => {
+    /* ⚠️ "3 of 4" IS A FRACTION WHOSE REMAINDER MAY BE DOCUMENTS NOBODY EVER HAS
+       TO ACCEPT. The number a person is looking for is how many are waiting on
+       them — and "Up to date" is true of a product that never asked, where
+       "Agreed" would not be. */
+    const owed = (docs: readonly Doc[]) =>
+      state({ appId: "a", appName: "A", roles: ["owner"], docs, receiving: null });
+    expect(owed([DOC({ outstanding: true }), DOC({}, { id: "b" })])).toBe("1 to read");
+    expect(owed([DOC({ acceptedOn: "2 March" })])).toBe("Up to date");
+    expect(owed([DOC()])).toBe("Up to date");
   });
 
   it("names the product each document belongs to", () => {
@@ -672,7 +765,7 @@ describe("consent and legal", () => {
       keeping its own copy is how the mark and the transfer's own `special` flag
       come to disagree on the same row.
     */
-    const html = screen([DOC()], RECEIVING);
+    const html = who(RECEIVING);
     expect(html).toMatch(/data-special[^>]*>your health/);
     /* And an ordinary category is not marked. */
     expect(html).not.toMatch(/data-special[^>]*>who you are/);
@@ -694,8 +787,14 @@ describe("consent and legal", () => {
         onAccept={async () => null} onBack={() => undefined}
       />,
     );
-    expect(html).toContain("Your 4° account");
+    /* ⚠️ THE LOCKUP, WHICH IS THE PLATFORM'S ONE DEVICE FOR "this belongs to the
+       account" — the same object that names the account centre and the vault. As
+       words it is a fourth product with a longer name. */
+    expect(html).toContain(`<span class="lockup-word">Account</span>`);
     expect(html).toContain(">Kova<");
+    /* ⚠️ AND IT IS NOT ONE OF THE PRODUCTS. It has no disclosure of its own to
+       fold, because it is not a group among groups. */
+    expect(html.indexOf("lockup-word")).toBeLessThan(html.indexOf("Products"));
   });
 
   it("renders a declared document as text, never as markup", () => {

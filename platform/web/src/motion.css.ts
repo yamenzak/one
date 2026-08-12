@@ -227,6 +227,14 @@ export const MOTION_CSS = `
    is filing rather than reading. */
 .item:active [data-icon='paper'] > :nth-child(2) { translate: 1.1px -1.1px; }
 
+/* ⚠️ THE HUB STAYS AND THE TWO IT REACHES SWELL. The same gesture as the
+   download and the envelope, read the other way round: something arriving AT
+   something that does not move. Translating the outer nodes would pull them off
+   the ends of their own links, which at this size is two circles and two lines
+   coming apart. */
+.item:active [data-icon='others'] > :nth-child(1),
+.item:active [data-icon='others'] > :nth-child(3) { scale: 1.18; }
+
 /* A plus turns towards being a cross, which is what adding then cancelling is. */
 .button:active [data-icon='add'] { rotate: 90deg; }
 
