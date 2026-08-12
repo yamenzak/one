@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { Instant } from "@one/kernel";
-import { day, looksFrom, vaultFrom, type Reading, type VaultReply } from "../src/account/wire.js";
+import { day, legalFrom, looksFrom, vaultFrom, type Reading, type VaultReply } from "../src/account/wire.js";
 
 const at = (iso: string) => iso as Instant;
 const read: Reading = { locale: "en-GB", zone: "UTC", now: at("2026-08-12T10:00:00.000Z") };
@@ -107,3 +107,42 @@ describe("what a screen is handed", () => {
   });
 });
 
+
+describe("what somebody agreed to, and when", () => {
+  const doc = (id: string, version: string) => ({ id, version, title: id, mustAccept: ["member"], body: "x" });
+  const reply = {
+    documents: [doc("terms", "4"), doc("privacy", "3"), doc("cookies", "1")],
+    outstanding: [doc("privacy", "3"), doc("cookies", "1")],
+    accepted: [
+      { document: "terms", version: "4", at: at("2026-03-02T09:00:00.000Z") },
+      /* Two versions of the same document, out of order on purpose. */
+      { document: "privacy", version: "1", at: at("2025-01-04T09:00:00.000Z") },
+      { document: "privacy", version: "2", at: at("2026-03-02T09:00:00.000Z") },
+    ],
+  };
+
+  it("matches an acceptance on the version, not just the document", () => {
+    /*
+      ⚠️ MATCHING ON THE DOCUMENT ALONE WOULD SHOW "Accepted 2 March" AGAINST
+      TERMS PUBLISHED IN JUNE — a screen quietly claiming somebody agreed to
+      something they have never been shown. The ledger is keyed by version for
+      exactly this, and reading it by document throws that away.
+    */
+    const docs = legalFrom(reply, read);
+    expect(docs.find((d) => d.doc.id === "terms")).toMatchObject({ acceptedOn: "2 March", outstanding: false });
+    expect(docs.find((d) => d.doc.id === "privacy")!.outstanding).toBe(true);
+  });
+
+  it("keeps the date of the version they DID accept", () => {
+    /* ⚠️ THE MOST RECENT ONE, which is why the fixture is out of order: falling
+       to whichever row came back first reports 2025 for somebody who re-accepted
+       in 2026 — older than the truth, on the screen that exists to state it. */
+    expect(legalFrom(reply, read).find((d) => d.doc.id === "privacy")!.acceptedOn).toBe("2 March");
+  });
+
+  it("reports a document they have never accepted as having no date at all", () => {
+    /* ⚠️ Null, never a guess. An empty string renders as a blank where a date
+       goes, which reads as a date that failed to load. */
+    expect(legalFrom(reply, read).find((d) => d.doc.id === "cookies")!.acceptedOn).toBe(null);
+  });
+});

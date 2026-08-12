@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { Problem } from "@one/kernel";
+import type { LegalDoc, Problem } from "@one/kernel";
 
 import { AccountCenter, type AccountCenterProps } from "../src/account/center.js";
 import { AboutBody, KeptHere, meaning, VaultScreen, type Item, type Kept, type Looked, type Where } from "../src/account/vault.js";
@@ -28,6 +28,8 @@ import { Marked, Unset } from "../src/list.js";
 import { SwitchRow } from "../src/switch.js";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ValueEditor, ValueEditorBody } from "../src/editor.js";
+import { LegalScreen, paragraphs, said } from "../src/account/legal.js";
+import type { Doc, Receiving } from "../src/account/wire.js";
 import { configureFeedback, feedbackSettings, FEEDBACK_DEFAULT } from "../src/feedback.js";
 import { Device } from "../src/icon.js";
 
@@ -559,3 +561,89 @@ describe("a field bound to a vault fact", () => {
   });
 });
 
+
+/* ------------------------------------------------------------ the law --- */
+
+const DOC = (over: Partial<Doc> = {}, doc: Partial<LegalDoc> = {}): Doc => ({
+  doc: { id: "terms", version: "4", title: "Terms of service", mustAccept: ["member"], body: "x", ...doc },
+  acceptedOn: null, outstanding: false, ...over,
+});
+
+/* ⚠️ A COMPANY CLAIMING MORE THAN THIS APP HOLDS. `receives` says `financial`;
+   the transfer's `categories` is the intersection and does not. */
+const RECEIVING: Receiving = {
+  controller: "4DL", contact: "privacy@4dl.app", regions: ["eu-central"],
+  subprocessors: [
+    { id: "stripe", name: "Stripe", role: "Taking payment", receives: ["identity", "financial"], where: "Ireland", safeguard: "eea", terms: "t" },
+    { id: "google", name: "Google", role: "Generating", receives: ["content", "health"], where: "United States", safeguard: "sccs", terms: "t" },
+  ],
+  inference: {},
+  transfers: [
+    { to: "stripe", name: "Stripe", where: "Ireland", safeguard: "eea", categories: ["identity"], special: false, subjects: ["member"] },
+    { to: "google", name: "Google", where: "United States", safeguard: "sccs", categories: ["content", "health"], special: true, subjects: ["member"] },
+  ],
+};
+
+describe("consent and legal", () => {
+  /*
+    ⚠️ FOUR STATES, AND THE ONE THAT MATTERS IS "ACCEPTED AN EARLIER VERSION".
+    That is what everybody sees the day terms change, and it is neither "you
+    agreed" nor "you never did" — a boolean loses it on precisely the day the
+    record is worth having.
+  */
+  it("tells an old acceptance from a missing one", () => {
+    expect(said(DOC({ acceptedOn: "2 March", outstanding: false }))).toBe("Accepted 2 March");
+    expect(said(DOC({ acceptedOn: "2 March", outstanding: true }))).toBe("New version");
+    expect(said(DOC({ acceptedOn: null, outstanding: true }))).toBe("Not accepted");
+    expect(said(DOC({ acceptedOn: null, outstanding: false }))).toBe("");
+  });
+
+  const screen = (docs: readonly Doc[], receiving: Receiving | null = null) => renderToStaticMarkup(
+    <LegalScreen docs={docs} receiving={receiving} onAccept={async () => null} onBack={() => undefined} />,
+  );
+
+  it("marks only what is unfinished, and not in the colour of a mistake", () => {
+    const html = screen([
+      DOC({ acceptedOn: "2 March" }),
+      DOC({ outstanding: true }, { id: "privacy", title: "Privacy" }),
+    ]);
+    expect(html).toContain(`data-tone="warn"`);
+    /* ⚠️ Red is what the row that closes an account wears. */
+    expect(html).not.toContain(`data-tone="alarm"`);
+    expect([...html.matchAll(/data-tone="warn"/g)]).toHaveLength(1);
+  });
+
+  it("offers no way to agree without opening the document", () => {
+    /* ⚠️ A tick beside a link is worth nothing as evidence: the only defensible
+       record is one where the text was on the screen. */
+    expect(screen([DOC({ outstanding: true })])).not.toMatch(/I agree/);
+  });
+
+  it("shows what a company actually gets, not what it claims to", () => {
+    /*
+      ⚠️ THE INTERSECTION, WHICH IS THE ONE NUMBER WORTH PRINTING. Stripe's own
+      entry declares `financial`; this deployment holds none, so the transfer says
+      `identity` alone. Rendering `receives` instead would let any recipient make
+      its own row larger than the truth — over-disclosure, in the direction
+      nobody checks.
+    */
+    const html = screen([DOC()], RECEIVING);
+    expect(html).toContain("who you are");
+    expect(html).not.toContain("what was charged");
+  });
+
+  it("counts what leaves Europe by the safeguard, not by the number of recipients", () => {
+    /* ⚠️ `transfersOf` returns a row per recipient whether or not it crosses a
+       border, so counting the list is how "Leaves Europe" comes to say yes for a
+       deployment where nothing does. */
+    expect(screen([DOC()], RECEIVING)).toContain("1 of 2");
+  });
+
+  it("renders a declared document as text, never as markup", () => {
+    /* ⚠️ A manifest is not an injection surface. */
+    const html = renderToStaticMarkup(<>{paragraphs("<img src=x onerror=alert(1)>\n\nsecond")}</>);
+    expect(html).not.toContain("<img");
+    expect(html).toContain("&lt;img");
+    expect([...html.matchAll(/<p>/g)]).toHaveLength(2);
+  });
+});

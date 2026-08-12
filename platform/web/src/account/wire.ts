@@ -19,7 +19,7 @@
  * missing value is a binding that hides a route which stopped sending one.
  */
 
-import type { Instant, Wanted } from "@one/kernel";
+import type { Instant, LegalDoc, Subprocessor, Transfer, Wanted } from "@one/kernel";
 import type { Item, Kept, Looked, Where } from "./vault.js";
 
 /** Exactly what `vault.mine` answers with. */
@@ -101,3 +101,84 @@ export interface LookReply {
 export const looksFrom = (reply: LookReply, read: Reading): readonly Looked[] =>
   reply.looks.map((l) => ({ ...l, on: day(l.on, read) ?? l.on.slice(0, 10) }));
 
+
+/* ---------------------------------------------------------------- legal --- */
+
+/**
+ * ⚠️ EVERY FIELD BELOW IS A KERNEL TYPE OR A PRIMITIVE, AND THAT IS ENFORCED.
+ * `scripts/wire.test.mjs` refuses an inline shape here, because the previous
+ * version of this module described a subprocessor as `{name, purpose, region}`
+ * against a kernel that declares `{id, name, role, receives, where, safeguard,
+ * terms, trust}` — two fields nobody has ever sent, rendered convincingly for a
+ * week because the fixtures were written to match.
+ */
+export interface LegalReply {
+  readonly documents: readonly LegalDoc[];
+  /** The ones this person still has to accept, resolved from their ROLE. */
+  readonly outstanding: readonly LegalDoc[];
+  /** ⚠️ Every version, because agreeing to v3 does not unsay v1. */
+  readonly accepted: readonly Accepted[];
+}
+
+/**
+ * ONE DOCUMENT AS THE SCREEN TAKES IT — the declaration, plus what this person
+ * did about it.
+ *
+ * ⚠️ IT CARRIES THE `LegalDoc` WHOLE rather than copying its fields across. A
+ * copy is where a field that does not exist gets introduced, which is what
+ * happened to the disclosure half of this screen and is why this module is
+ * guarded.
+ */
+export interface Doc {
+  readonly doc: LegalDoc;
+  /** ⚠️ The day a version was accepted, spoken here, or null for never. */
+  readonly acceptedOn: string | null;
+  /** ⚠️ Whether they still have to. Derived by the kernel from their ROLE. */
+  readonly outstanding: boolean;
+}
+
+/** One acceptance, as the ledger keys it: per person, per document, per VERSION. */
+export interface Accepted {
+  readonly document: string;
+  readonly version: string;
+  readonly at: Instant;
+}
+
+/** Exactly what `protection.list` answers with. */
+export interface Receiving {
+  readonly controller: string;
+  readonly contact: string;
+  readonly subprocessors: readonly Subprocessor[];
+  readonly regions: readonly string[];
+  /**
+   * ⚠️ PER BINDING, PER REGION, AS SUBPROCESSOR IDS — not a list of sentences.
+   * Residency is not only storage: a workspace choosing a region chooses where
+   * its records are STORED, and which models its generations reach is a separate
+   * answer. Flattening the two is what makes a residency promise untrue.
+   */
+  readonly inference: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>>;
+  readonly transfers: readonly Transfer[];
+}
+
+/**
+ * ⚠️ THE ACCEPTANCE IS MATCHED ON DOCUMENT **AND** VERSION, which is the whole
+ * reason the ledger is keyed that way. Matching on the document alone would show
+ * "Accepted 2 March" against terms published in June — a screen quietly claiming
+ * somebody agreed to something they have never been shown.
+ */
+export const legalFrom = (reply: LegalReply, read: Reading): readonly Doc[] => {
+  const owed = new Set(reply.outstanding.map((d) => d.id));
+  return reply.documents.map((d) => {
+    const held = reply.accepted.find((a) => a.document === d.id && a.version === d.version)
+      /* ⚠️ FALLING BACK TO ANY VERSION IS WHAT MAKES "New version" POSSIBLE. A
+         person who accepted v2 of a document now at v3 has a date worth showing;
+         reporting them as never having agreed loses the distinction the screen
+         exists to draw. Most recent first, because an older one understates it. */
+      ?? [...reply.accepted].filter((a) => a.document === d.id).sort((a, b) => (a.at < b.at ? 1 : -1))[0];
+    return {
+      doc: d,
+      acceptedOn: held ? day(held.at, read) : null,
+      outstanding: owed.has(d.id),
+    };
+  });
+};

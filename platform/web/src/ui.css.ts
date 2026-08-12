@@ -780,4 +780,25 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
    back, one state later. */
 .kept-sign:hover .lockup { color: var(--ink); }
 .kept-sign:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* -------------------------------------------------------------------- prose */
+
+/*
+  ⚠️ THE RHYTHM IS THE WHOLE COMPONENT. A legal document is one nobody finishes
+  unless the lines are short and the paragraphs have room; the page is already
+  capped at 560px, so what is left to fix is the leading and the gap.
+
+  ⚠️ NO CARD AROUND IT. A card says "one item among several"; a document IS the
+  screen, and a ground behind it makes the text an inset panel somebody scrolls
+  inside another thing they are scrolling.
+*/
+.prose { display: grid; gap: 15px; font-size: 16px; line-height: 1.62; color: var(--ink); }
+.prose p { text-wrap: pretty; }
+
+/* ⚠️ AWAY FROM HERE, AND IT LOOKS IT. An address rendered as more of the page is
+   how somebody agrees to a summary believing they read the contract. */
+.prose-away { margin-block-start: 18px; font-size: 15px; }
+.prose-away a { color: var(--accent); text-underline-offset: 3px; }
+
+/* What was agreed, where the button would have been. Same place, same question. */
+.prose-said { color: var(--ink-quiet); font-size: 15px; }
 `.trim();

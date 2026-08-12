@@ -30,6 +30,9 @@ import { AccountDetails } from "../src/account/details.js";
 import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
 import { PreferencesScreen, type Preferences } from "../src/account/preferences.js";
 import { KeptHere, meaning, VaultScreen, type Kept, type Looked, type Where } from "../src/account/vault.js";
+import { LegalScreen } from "../src/account/legal.js";
+import type { Doc, Receiving } from "../src/account/wire.js";
+import { transfersOf, type Held, type Subprocessor } from "@one/kernel";
 import { ValueEditor, type EditableField } from "../src/editor.js";
 import { Card, Entry } from "../src/list.js";
 import { Edit } from "../src/icon.js";
@@ -190,6 +193,85 @@ const VAULT_WHERES: readonly Where[] = [
 
 /* ⚠️ RECORDED AND WANTED BY NOBODY — the row that proves the vault is yours
    rather than an app's. It is what somebody who has left every workspace sees. */
+/*
+  ⚠️ TYPED AS `Doc` AND `Receiving`, WHICH CARRY THE KERNEL'S OWN SHAPES. The
+  version of this fixture that preceded it invented `purpose`, `region` and
+  `basis` and was believed because the screen was written to match — so the
+  screenshots were photographs of a fiction. Nothing here can drift now without
+  failing to compile.
+
+  ⚠️ ONE OUTSTANDING DOCUMENT, ONE ACCEPTED AT AN OLDER VERSION, ONE CURRENT and
+  one required of somebody else — the four things the detail line can say.
+*/
+const LEGAL_DOCS: readonly Doc[] = [
+  {
+    doc: {
+      id: "terms", version: "4", title: "Terms of service", mustAccept: ["owner", "member"],
+      body: "You may use this product for what it is for.\n\nWe will keep it running, tell you when it changes, and let you take your things and leave at any time.\n\nIf you stop paying we stop serving the product. We do not hold your records over an invoice.",
+    },
+    acceptedOn: "2 March", outstanding: false,
+  },
+  {
+    /* ⚠️ Accepted before, at a version no longer being asked about — what
+       everybody sees the day terms change, and the state a boolean loses. */
+    doc: {
+      id: "privacy", version: "3", title: "Privacy notice", mustAccept: ["owner", "member"],
+      body: "We hold what you give us and what you make while using this.\n\nWe do not sell it. We do not use it to train anything. Where a model is involved we name what is sent to it, on the screen you are reading now.\n\nYou can take all of it, or ask for all of it to be forgotten, from your account.",
+      url: "https://example.test/privacy",
+    },
+    acceptedOn: "2 March", outstanding: true,
+  },
+  {
+    doc: { id: "processing", version: "2", title: "Data processing agreement", mustAccept: ["operator"], url: "https://example.test/dpa" },
+    acceptedOn: null, outstanding: false,
+  },
+  {
+    doc: { id: "cookies", version: "1", title: "Cookies", mustAccept: ["owner", "member"], body: "One cookie, for staying signed in. Nothing measures you." },
+    acceptedOn: null, outstanding: true,
+  },
+];
+
+/*
+  ⚠️ ONE RECIPIENT INSIDE EUROPE, ONE UNDER AN ADEQUACY DECISION AND ONE UNDER
+  CLAUSES CARRYING ARTICLE 9 DATA — because "does anything leave, and is any of
+  it sensitive" is the question the summary answers, and a fixture where
+  everything stays in the EEA is a picture of the one state that needs no answer.
+*/
+/* ⚠️ IRELAND IS `eea`, NOT `adequacy` — an adequacy decision is what covers a
+   country OUTSIDE the union, so declaring one for Dublin is a contradiction the
+   summary then reports as a transfer that never happens. The first fixture said
+   `adequacy` and read "Leaves Europe: Yes" for a company that does not. */
+const LEGAL_SUBPROCESSORS: readonly Subprocessor[] = [
+  { id: "cloudflare", name: "Cloudflare", role: "Serving and storage", receives: ["identity", "usage", "content"], where: "Germany", safeguard: "eea", terms: "https://example.test/cf-dpa" },
+  { id: "stripe", name: "Stripe", role: "Taking payment", receives: ["identity", "contact", "financial"], where: "Ireland", safeguard: "eea", terms: "https://example.test/stripe-dpa" },
+  { id: "google", name: "Google", role: "Generating text and images", receives: ["content", "health"], where: "United States", safeguard: "sccs", terms: "https://example.test/google-dpa", trust: "https://example.test/google-trust" },
+];
+
+/* What this product declares it holds — the other half `transfersOf` crosses. */
+const LEGAL_HELD: readonly Held[] = [
+  { id: "people", fields: {}, retention: { days: null, onTenantClose: "export-then-purge" },
+    holding: { kind: "personal", categories: ["identity", "contact", "usage"], subjects: ["member"], purpose: "Running the product", basis: "contract" } },
+  { id: "entries", fields: {}, retention: { days: null, onTenantClose: "export-then-purge" },
+    holding: { kind: "personal", categories: ["content", "health"], subjects: ["member", "customer"], purpose: "What somebody records about themselves", basis: "consent", condition: "explicit_consent" } },
+];
+
+const LEGAL_RECEIVING: Receiving = {
+  controller: "4DL Software UG, Berlin",
+  contact: "privacy@4dl.app",
+  regions: ["eu-central", "eu-west"],
+  subprocessors: LEGAL_SUBPROCESSORS,
+  inference: { ai: { "eu-central": ["google"], "eu-west": [] } },
+  /*
+    ⚠️ DERIVED BY THE KERNEL, NOT TYPED HERE. `transfersOf` crosses what this
+    product HOLDS with what each recipient claims to receive, so a fixture that
+    listed transfers by hand could show a company receiving a category the app
+    does not have — over-disclosure in the direction nobody checks — or, as the
+    first attempt did, two transfers against three recipients, which made the
+    summary read "2 of 2" and mean nothing.
+  */
+  transfers: transfersOf({ collections: LEGAL_HELD, subprocessors: LEGAL_SUBPROCESSORS }),
+};
+
 const VAULT_KEPT: readonly Kept[] = [
   { fact: "body.girths", label: "Measurements" },
 ];
@@ -249,7 +331,7 @@ function Preview() {
      is a link and this was the one dial the promise did not cover — so every
      review of an inner screen began with three taps somebody had to be told. */
   const [at, setAt] = useState((asked.get("screen") ?? "home") as
-    "home" | "details" | "signin" | "prefs" | "vault");
+    "home" | "details" | "signin" | "prefs" | "vault" | "legal");
   const [asking, setAsking] = useState(false);
   const [which, setWhich] = useState((asked.get("state") ?? "four") as keyof typeof CASES);
   const [outcome, setOutcome] = useState((asked.get("save") ?? "ok") as keyof typeof OUTCOMES);
@@ -327,6 +409,14 @@ function Preview() {
         onSignOut={save}
         onBack={() => setAt("home")}
       />
+    ) : at === "legal" ? (
+      <LegalScreen
+        docs={which === "waiting" ? null : LEGAL_DOCS}
+        receiving={which === "waiting" ? null : LEGAL_RECEIVING}
+        onAccept={save}
+        onBack={() => setAt("home")}
+        Heading={Heading}
+      />
     ) : at === "home" ? (
       <AccountHome
         {...CASES[which] ?? CASES.four}
@@ -344,6 +434,7 @@ function Preview() {
           if (to === "account.security") setAt("signin");
           if (to === "account.preferences") setAt("prefs");
           if (to === "account.vault") setAt("vault");
+          if (to === "account.privacy") setAt("legal");
         }}
         onClose={() => setOpen(false)}
       />
@@ -393,7 +484,7 @@ function Preview() {
       />
       <div className="dial" data-open={dial ? "" : undefined} onPointerDown={(e) => e.stopPropagation()}>
         <div className="dial-panel">
-          <Group label="screen" value={at} options={["home", "details", "signin", "prefs", "vault"] as const} onPick={setAt} />
+          <Group label="screen" value={at} options={["home", "details", "signin", "prefs", "vault", "legal"] as const} onPick={setAt} />
           <Group label="workspaces" value={which} options={Object.keys(CASES) as (keyof typeof CASES)[]} onPick={setWhich} />
           <Group label="save" value={outcome} options={Object.keys(OUTCOMES) as (keyof typeof OUTCOMES)[]} onPick={setOutcome} />
           <Group label="theme" value={theme} options={["dark", "light"] as const} onPick={setTheme} />

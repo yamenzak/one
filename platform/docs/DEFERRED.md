@@ -20,3 +20,5 @@ kind: index
   <sub>kova/src/manifest.ts:712</sub>
 - `one-187` — `mail:no_sender` on the identity door under a full  
   <sub>hello/test/account.test.ts:26</sub>
+- `one-188` — a region has no human name. Every surface that  
+  <sub>web/src/account/legal.tsx:178</sub>

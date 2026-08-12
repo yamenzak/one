@@ -3316,6 +3316,60 @@
       "impl": "scripts/wire.test.mjs",
       "proves": "spells out a",
       "fails": "a screen written against `subprocessor: {name, purpose, region}` where the kernel declares `{id, name, role, receives, where, safeguard, terms}` — two fields nobody has ever sent. It typechecked, every test passed, and the screenshots looked right, because the FIXTURES were written to match the invention. `s.json()` is opaque at the boundary, so the kernel type the handler returns is the only place the shape is written down: name it, never describe it"
+    },
+    {
+      "id": "an-old-acceptance-is-not-a-missing-one",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "tells an old acceptance from a missing one",
+      "fails": "a boolean where four states are needed. \"Accepted an earlier version\" is what everybody sees the day terms change, and collapsing it into agreed-or-not misreports the record on precisely the day it matters"
+    },
+    {
+      "id": "an-acceptance-is-matched-on-its-version",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/wire.test.ts",
+      "proves": "matches an acceptance on the version, not just the document",
+      "fails": "\"Accepted 2 March\" shown against terms published in June — a screen quietly claiming somebody agreed to something they have never been shown"
+    },
+    {
+      "id": "agreeing-requires-opening-the-document",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "offers no way to agree without opening the document",
+      "fails": "a tick beside a link, which is worth nothing as evidence — the only defensible record of an acceptance is one where the text was on the screen"
+    },
+    {
+      "id": "a-recipient-is-shown-the-intersection",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "shows what a company actually gets, not what it claims to",
+      "fails": "rendering a subprocessor's own `receives` instead of the transfer's `categories`, which lets any recipient make its row larger than the truth — over-disclosure, in the direction nobody checks"
+    },
+    {
+      "id": "leaving-europe-is-counted-by-safeguard",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "counts what leaves Europe by the safeguard, not by the number of recipients",
+      "fails": "`transfersOf` returning a row per recipient whether or not it crosses a border, so counting the list says yes for a deployment where nothing leaves"
+    },
+    {
+      "id": "a-declared-document-is-text-not-markup",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "renders a declared document as text, never as markup",
+      "fails": "bold headings bought at the price of making every app's manifest a way into every reader's page"
     }
   ]
 }
