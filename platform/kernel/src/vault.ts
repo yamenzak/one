@@ -1003,12 +1003,21 @@ export const asksFor = (need: Need): Reach => (need === "raw" ? "staff" : ARITHM
  * control that escalates a disclosure the person narrowed is the worst thing this
  * screen could do, and it typechecked.
  *
- * ⚠️ AN APP THAT ONLY COMPUTES IS OFFERED NO RUNG IT COULD SPEND. Showing it
- * `staff` would be the product asking for more than it can use, which is what
- * teaches people the rungs are theatre.
+ * ⚠️ AN APP IS OFFERED NO RUNG IT COULD NOT SPEND — every rung from `self` up to
+ * the one its need asks for, and none above. Showing a compute-only want `staff`
+ * would be the product asking for more than it can use, which is what teaches
+ * people the rungs are theatre.
+ *
+ * ⚠️ AND IT IS DERIVED FROM `asksFor` RATHER THAN LISTED BESIDE IT. Written as its
+ * own table the two disagreed within a day: `asksFor` had a DERIVED want asking at
+ * `compute` — the derivation runs server-side and the app never sees the value —
+ * while this offered it all four, so the vault invited somebody to hand over a raw
+ * number for a feature that had only ever asked for a direction. Two answers to
+ * "how far does this want reach" is the same defect the copy of this list in the
+ * consent sheet already caused, one level down.
  */
 export const rungsFor = (need: Need): readonly Reach[] =>
-  need === "compute" ? ["self", ARITHMETIC] : REACH;
+  REACH.slice(0, REACH.indexOf(asksFor(need)) + 1);
 
 export function wantedHere(input: {
   readonly spec: VaultSpec;

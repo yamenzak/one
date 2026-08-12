@@ -298,11 +298,22 @@ whole thing is built for.
 offer it and they must not disagree**. The consent sheet asks for the first time;
 the vault changes it later.
 
-| need | rungs offered |
-|---|---|
-| `compute` | `self`, `compute` |
-| `derived` | every rung — the derivation runs server-side, and each reading carries its own |
-| `raw` | every rung |
+| need | asks at | rungs offered |
+|---|---|---|
+| `compute` | `compute` | `self`, `compute` |
+| `derived` | `compute` | `self`, `compute` |
+| `raw` | `staff` | `self`, `compute`, `agent`, `staff` |
+
+⚠️ **The list is DERIVED from `asksFor`, not written beside it** — every rung from
+`self` up to the one the need asks for, and none above. Written as its own table
+the two disagreed within a day: `asksFor` had a `derived` want asking at `compute`,
+because the derivation runs server-side and the app never sees the value, while
+the table offered it all four — so the vault invited somebody to hand over a raw
+number for a feature that had only ever asked for a direction. Two answers to "how
+far does this want reach" is the same defect the copy of this list in the consent
+sheet had already caused, one level down.
+*Checked: `kernel/test/vault.test.ts` — "offers every rung up to the one a want
+asks for, and none above", mutation-tested.*
 
 ⚠️ **A boolean control silently spends a rung the person chose.** With a copy of
 this list in each surface, the vault collapsed a `raw` want to on-or-off: somebody
@@ -362,6 +373,17 @@ produce it.
 <!-- DEFER(one-186) stage:7 — publish each app's VaultSpec to the shared store so
      the identity door can group the vault by workspace. `wantedHere` and
      `VaultScreen` already take that shape; `vault.mine` still answers with FACTS. -->
+
+⚠️ **A reading is not separately grantable from the review screen.** §4 says a
+reading is granted in its own right, and the consent sheet offers one control per
+reading; the vault renders a derived want as a single control over the base fact
+and lists its readings only in the explain sheet. So somebody can grant a trend at
+the sheet and cannot narrow it afterwards without the app asking again — which is
+the same gap the rung control had, one level further in.
+
+<!-- DEFER(one-187) stage:7 — per-reading controls on the vault review screen. The
+     consent sheet grants a reading in its own right; the vault shows them read-only
+     inside the explain sheet, so a derived grant cannot be narrowed after the fact. -->
 
 ---
 

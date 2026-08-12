@@ -10,7 +10,8 @@
 import { describe, expect, it } from "vitest";
 import type { Fact, Grant, Instant, Reach, UserId } from "../src/index.js";
 import {
-  REACH, FACTS, asksFor, factOf, live, mayDerive, mayRead, reaches, readingOf,
+  REACH, FACTS, NEEDS, asksFor, factOf, live, mayDerive, mayRead, reaches, readingOf,
+  rungsFor,
   registryProblems, shadowProblems, vaultActivities, wantedHere, wantProblems,
 } from "../src/index.js";
 
@@ -472,6 +473,26 @@ describe("a want, resolved for one person in one workspace", () => {
     expect(asksFor("compute")).toBe("compute");
     expect(asksFor("derived")).toBe("compute");
     expect(asksFor("raw")).toBe("staff");
+  });
+
+  /*
+    ⚠️ NO WANT IS OFFERED A RUNG IT COULD NOT SPEND, and the check is that the two
+    derivations AGREE rather than that each is right on its own. Listed as its own
+    table this offered a DERIVED want all four rungs while `asksFor` had it asking
+    at `compute` — so the vault invited somebody to hand over a raw number for a
+    feature that had only ever asked for a direction. Every rung up to the one it
+    asks for, and none above.
+  */
+  it("offers every rung up to the one a want asks for, and none above", () => {
+    for (const need of NEEDS) {
+      const rungs = rungsFor(need);
+      expect(rungs[0], `${need} cannot be switched off`).toBe("self");
+      expect(rungs.at(-1), `${need} is offered a rung it cannot spend`).toBe(asksFor(need));
+      expect(rungs.every((r) => reaches(asksFor(need), r)), `${need} offers past what it asks`).toBe(true);
+    }
+    expect(rungsFor("compute")).toEqual(["self", "compute"]);
+    expect(rungsFor("derived")).toEqual(["self", "compute"]);
+    expect(rungsFor("raw")).toEqual(["self", "compute", "agent", "staff"]);
   });
 
   it("stands at self with nothing granted, and reports what is held", () => {

@@ -102,7 +102,9 @@ const OUTCOMES = {
   the real thing; the screen writes none of it.
 */
 /* ⚠️ THE SAME TWO LISTS THE KERNEL DERIVES, so a fixture cannot show a control
-   the real resolver would never offer. */
+   the real resolver would never offer. A DERIVED want takes the compute one: the
+   arithmetic runs server-side and the app never sees the value, so it is offered
+   no rung it could not spend. */
 const RUNGS_COMPUTE = ["self", "compute"] as const;
 const RUNGS_RAW = ["self", "compute", "agent", "staff"] as const;
 
