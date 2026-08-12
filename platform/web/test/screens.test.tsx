@@ -18,7 +18,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { Problem } from "@one/kernel";
 
 import { AccountCenter, type AccountCenterProps } from "../src/account/center.js";
-import { AboutBody, meaning, VaultScreen, type Item, type Kept, type Looked, type Where } from "../src/account/vault.js";
+import { AboutBody, KeptHere, meaning, VaultScreen, type Item, type Kept, type Looked, type Where } from "../src/account/vault.js";
 import { AskForIt, ConsentBody, ConsentSheet, type Asked } from "../src/consent.js";
 import { AccountDetails } from "../src/account/details.js";
 import { PreferencesScreen, type Preferences, type SetPreference } from "../src/account/preferences.js";
@@ -26,7 +26,8 @@ import { SignInMethods, type Passkey } from "../src/account/signin.js";
 import { Chip } from "../src/chip.js";
 import { Marked, Unset } from "../src/list.js";
 import { SwitchRow } from "../src/switch.js";
-import { ValueEditor } from "../src/editor.js";
+import * as Dialog from "@radix-ui/react-dialog";
+import { ValueEditor, ValueEditorBody } from "../src/editor.js";
 import { configureFeedback, feedbackSettings, FEEDBACK_DEFAULT } from "../src/feedback.js";
 import { Device } from "../src/icon.js";
 
@@ -515,5 +516,45 @@ describe("asking at the moment of use", () => {
     expect(out).toContain("is not shared here");
     expect(out).toContain("Choose what to share");
     expect(out).not.toContain("alarm");
+  });
+});
+
+/* --------------------------------------------------- a field that is a fact --- */
+
+describe("a field bound to a vault fact", () => {
+  const FIELD = { name: "height", kind: "text" as const, title: "Height", label: "Height", value: "178" };
+
+  /*
+    ⚠️ A VAULT FACT HANDLED SILENTLY TEACHES NOBODY THAT IT IS DIFFERENT, and the
+    whole value of the vault is that the person knows. The editor is the moment
+    they give it, so it is the moment to say where it goes — reported, never
+    decided: the rung is changed in the vault, which is the only place that
+    control is defined.
+  */
+  it("says where it goes, and only when it goes there", () => {
+    /* ⚠️ INSIDE A DIALOG ROOT, because the body names the sheet it labels — that
+       is what makes the title exist once rather than twice to a reader. */
+    const editor = (field: Parameters<typeof ValueEditorBody>[0]["field"]) =>
+      html(<Dialog.Root open><ValueEditorBody field={field} /></Dialog.Root>);
+    const bound = editor({ ...FIELD, fact: "body.height", kept: "Calculations only." });
+    expect(bound).toContain("Vault");
+    expect(bound).toContain("Calculations only.");
+    expect(editor(FIELD), "an ordinary field claims a vault").not.toContain("Vault");
+  });
+
+  /*
+    ⚠️ ONCE PER SECTION, NEVER PER FIELD. An intake form is six vault facts, and
+    six badges is a column of texture in which the one that matters stops standing
+    out. And the copy names no field: "your height and weight" is one product's
+    vocabulary in a package every product draws from.
+  */
+  it("signs the group without naming what is in it", () => {
+    const out = html(<KeptHere onOpen={() => undefined} />);
+    expect(out).toContain("Kept by your account");
+    /* ⚠️ THE WORDS, NOT THE MARKUP. Matching the HTML caught `height="1.15em"` on
+       the mark's own SVG — an attribute, not copy — which is a guard failing on
+       something no reader will ever see. */
+    const words = out.replace(/<[^>]*>/g, " ");
+    expect(words).not.toMatch(/\b(height|weight|goal|allergies)\b/i);
   });
 });

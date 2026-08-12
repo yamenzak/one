@@ -536,3 +536,30 @@ export const AboutBody = ({ item }: { readonly item: Item }): ReactNode => {
   );
 };
 
+
+/**
+ * A SECTION OF FIELDS THAT ARE VAULT FACTS — said once, over the group.
+ *
+ * ⚠️ ONCE PER SECTION, NEVER PER FIELD. An intake form is six vault facts, and six
+ * badges is a column of texture in which the one that matters stops standing out —
+ * the same argument the workspace standing lives by. What is different about these
+ * fields is true of all of them, so it is stated where it is true.
+ *
+ * ⚠️ IT IS A SIGN, NOT A CONTROL. The rung is changed in the vault, which is one
+ * press away and is the only place that control is defined. A second control here
+ * is a second thing to keep in step with the first, and disclosure is the subject
+ * where two of them disagreeing matters most.
+ *
+ * ⚠️ AND THE COPY DOES NOT LIST WHAT IS INSIDE. "Your height and weight" is one
+ * product's fields written into a package every product draws from; the fields
+ * are directly underneath and they name themselves.
+ */
+export const KeptHere = ({ onOpen }: { readonly onOpen: () => void }): ReactNode => (
+  <button type="button" className="kept-sign press" onClick={onOpen}>
+    <Lockup word="Vault" />
+    <span className="kept-said">
+      Kept by your account, not by this app. You choose who sees each one.
+    </span>
+    <Onward className="chevron" />
+  </button>
+);

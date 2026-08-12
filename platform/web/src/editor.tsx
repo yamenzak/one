@@ -30,6 +30,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import type { Problem } from "@one/kernel";
 import { Button } from "./button.js";
 import { useCommit } from "./commit.js";
+import { Lockup } from "./brand/mark.js";
 import { Field } from "./field.js";
 import { Tick } from "./icon.js";
 import { Sheet } from "./sheet.js";
@@ -52,6 +53,26 @@ export interface EditableField {
    *  retype what is already there, and a blank field reads as "unset". */
   readonly value: string;
   readonly maxLength?: number;
+  /**
+   * THE VAULT FACT THIS FIELD **IS**, where it is one.
+   *
+   * ⚠️ SET FROM A DECLARATION, NEVER BY A SCREEN. An app cannot store a vault
+   * fact in its own table — `shadowProblems` refuses the collection at boot — so
+   * a field bound to one has nowhere else to save to. The binding is not an
+   * option somebody remembers to take; it is the only thing that composes.
+   *
+   * ⚠️ AND IT IS WHY A VAULT FIELD CANNOT BE AN APP'S OWN FIELD. An app that asked
+   * for a fact at `compute` cannot READ IT BACK, so it cannot populate the value
+   * it just collected — the form would open empty next time. The value comes from
+   * the person's own vault read, which the app never sees.
+   */
+  readonly fact?: string;
+  /**
+   * ⚠️ WHERE IT STANDS, IN THE WORDS THE VAULT ALREADY USES. Passed in rather than
+   * derived here, because the sentence belongs to one function and a second copy
+   * is how an editor comes to promise what the vault screen refuses.
+   */
+  readonly kept?: string;
   /** Refuse before the round trip. Returns the reason, or null when it is fine. */
   readonly check?: (next: string) => string | null;
 }
@@ -182,12 +203,20 @@ export function ValueEditor({ field, onSave, onClose }: ValueEditorProps): React
           rather than the previous one with its value swapped underneath — which is
           how a failure from the last field ends up displayed under the next one's
           input. */}
-      {field ? <Editing key={field.name} field={field} onSave={onSave} onClose={onClose} /> : null}
+      {field ? <ValueEditorBody key={field.name} field={field} onSave={onSave} onClose={onClose} /> : null}
     </Sheet>
   );
 }
 
-function Editing({ field, onSave, onClose }: { readonly field: EditableField } & Omit<ValueEditorProps, "field">) {
+/**
+ * ⚠️ THE BODY IS SEPARATE FROM THE PRESENTATION, and the reason is that a portal
+ * renders nothing outside a browser. Welded to the sheet, everything it says —
+ * including where a vault fact goes, which is the whole point of saying it — would
+ * be unreachable by any check.
+ */
+export function ValueEditorBody({ field, onSave = async () => null, onClose = () => undefined }: {
+  readonly field: EditableField;
+} & Partial<Omit<ValueEditorProps, "field">>) {
   const [value, setValue] = useState(field.value);
   /* ⚠️ THE SAME LIFECYCLE THE CONFIRM SHEET USES, not one that resembles it. */
   const { state, run, reset } = useCommit(
@@ -243,6 +272,24 @@ function Editing({ field, onSave, onClose }: { readonly field: EditableField } &
           <strong>{general.title}</strong>
           {general.detail ? <> {general.detail}</> : null}
           <span className="note-ref">{general.ref}</span>
+        </p>
+      ) : null}
+
+      {/*
+        ⚠️ WHERE IT GOES, AT THE MOMENT SOMEBODY GIVES IT. A vault fact handled
+        silently would teach nobody that it is different — and the whole value of
+        the vault is that the person knows. It sits UNDER the input rather than
+        beside it: a control next to a field reads as part of the field, and
+        deciding a disclosure while filling a form is the moment somebody is least
+        equipped to think about it.
+
+        ⚠️ IT REPORTS AND DOES NOT DECIDE. The rung is changed in the vault, which
+        is one press away and is the only place that control is defined.
+      */}
+      {field.fact ? (
+        <p className="note kept">
+          <Lockup word="Vault" />
+          {field.kept ? <span className="kept-said">{field.kept}</span> : null}
         </p>
       ) : null}
 

@@ -747,4 +747,32 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
    the two. It is the sentence somebody checks the arithmetic against. */
 .about-hides { color: var(--ink-quiet); font-size: 14.5px; line-height: 1.5;
   margin-block-start: 4px; }
+
+/* ------------------------------------------------------ a field is a fact */
+
+/* ⚠️ IT REPORTS, IT DOES NOT DECIDE, so it is a note rather than a control. A
+   switch under an input reads as part of the input, and deciding a disclosure
+   while filling a form is the moment somebody is least equipped to think about
+   it — the rung is changed in the vault, where that control is defined once. */
+.note.kept { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  color: var(--ink-quiet); }
+/* ⚠️ THE LOCKUP IS THE SIGN, AND IT IS SMALL. It is the same mark the card and
+   the screen carry, so the person recognises where this went rather than reading
+   that it went somewhere; at note size it is a signature, not a heading. */
+.note.kept .lockup { font-size: 15px; color: var(--ink); }
+.kept-said { font-size: 13.5px; line-height: 1.45; }
+
+/* ⚠️ A SIGN OVER A GROUP, AND IT GOES SOMEWHERE. It is the one row on a form that
+   is not a field, so it is set apart by its ground rather than by a rule — a line
+   above a group of inputs reads as a fieldset border, which is a form inside a
+   form. */
+.kept-sign { display: grid; grid-template-columns: 1fr auto; align-items: center;
+  gap: 4px 10px; inline-size: 100%; padding: 12px 14px; text-align: start;
+  border: 0; border-radius: var(--radius-card); background: var(--well);
+  color: inherit; font: inherit; cursor: pointer; }
+.kept-sign .lockup { grid-column: 1; font-size: 15px; }
+.kept-sign .kept-said { grid-column: 1 / -1; color: var(--ink-quiet); }
+.kept-sign .chevron { grid-column: 2; grid-row: 1; color: var(--ink-faint); }
+.kept-sign:hover { background: color-mix(in oklab, var(--ink) 12%, transparent); }
+.kept-sign:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 `.trim();
