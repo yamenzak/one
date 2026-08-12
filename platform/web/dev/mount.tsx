@@ -232,11 +232,20 @@ function Preview() {
     ) : at === "home" ? (
       <AccountHome
         {...CASES[which] ?? CASES.four}
+        /* ⚠️ COUNTED FROM THE VAULT FIXTURE RATHER THAN TYPED BESIDE IT, so the
+           card and the screen it opens cannot disagree about how many things are
+           shared — which is the one thing a reviewer would take on trust. */
+        sharedCount={
+          which === "waiting" ? null
+          : which === "new" ? 0
+          : VAULT_HELD.filter((h) => h.grants.length > 0).length
+        }
         Heading={Heading}
         onGo={(to) => {
           if (to === "account.profile") setAt("details");
           if (to === "account.security") setAt("signin");
           if (to === "account.preferences") setAt("prefs");
+          if (to === "account.vault") setAt("vault");
         }}
         onClose={() => setOpen(false)}
       />

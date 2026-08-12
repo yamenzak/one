@@ -125,6 +125,18 @@ the attribute does not apply to the default. Getting this wrong renders one
 theme's text on the other theme's ground.
 *Checked: `web/test/css.test.tsx` — "defines every colour in all three theme scopings".*
 
+**What a theme adjusts, it adjusts through a factor the rest can still multiply.**
+— How much of a sky arrives is a ground's headroom times a placement's ask: black
+takes the field whole, white takes a third of it, and a card takes half of
+whatever its ground allows. Written as an opacity the theme sets outright, the
+theme wins — it is `.sky` under two attribute selectors against a placement's
+one — so the card dims correctly on white and not at all on black. Both are valid
+CSS, both typecheck, and the half that breaks is the half whoever wrote it was
+not looking at. Two named factors and one product: the ground sets one, the
+placement sets the other, and neither has to win.
+*Checked: `web/test/css.test.tsx` — "dims a sky by a factor, so no theme rule can
+outrank a placement".*
+
 ### 2.6 Motion
 
 **Nobody invents a duration or a curve.** — Before the motion module one screen's
@@ -194,6 +206,27 @@ its own.** — The workspace mark was 14px on a 44px box, close enough to the
 circles beside it to read as a value somebody nearly got right rather than a
 decision. A workspace has a name its owner chose and a logo they will upload, and
 a logo in a circle is a logo with its corners cut off.
+
+**One thing on a surface may be a place rather than a setting, and it is lit to
+say so.** — A list of rows says *these are all the same kind of thing*, which is
+exactly what an account centre's settings are and exactly what the vault is not:
+it is the one part of an account that keeps its meaning for somebody who has left
+every product. Making it a taller row would have said it was a bigger setting. It
+carries its own light, its own lockup and its whole surface as the target — and
+the light is the page's own variant at a different hue, one number moved, so it
+is unmistakably its own without being a second design. At most one per surface;
+a second crown is a list of crowns, which is a list.
+
+**A card's light is a placement, never a second sky.** — The same field, differing
+only in where it starts, how far it reaches and how much of it arrives. Written as
+a variant it would be two piles of gradients to keep in step, and it would go
+wrong in the direction nobody checks: the card's copy, months later, still lit the
+way the page was lit when it was copied. What genuinely differs is that a card is
+a fifth of the width — every source overlaps at that size, so the field saturates
+and what read as light becomes paint — and that a bounded card on white can take
+*more* tint than a page can, because what a page's light must not become is a
+coloured header, and a card has an edge and a shadow so a tint inside it reads as
+what the card is made of.
 
 **A single row of interactive content is a pill; a container of rows is a card.**
 — A 15px rounded rectangle sat directly above a fully rounded action, in the same

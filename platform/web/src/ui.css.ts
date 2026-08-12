@@ -432,6 +432,36 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 .card { background: var(--card); border-radius: var(--radius-card); overflow: hidden;
   display: flex; flex-direction: column; }
 
+/* ------------------------------------------------------------- the crown --- */
+
+/* ⚠️ ONE CARD ON A SCREEN MAY BE A PLACE RATHER THAN A LIST, and exactly one.
+   The rows above it are things to go and do; this is somewhere to go and BE, so
+   it is named by a lockup instead of by a row title and it carries its own
+   light. A second card like it on the same screen makes both of them ordinary.
+
+   ⚠️ IT ISOLATES, WHICH IS NOT OPTIONAL. Without a stacking context of its own
+   the light inside it is compared against everything on the page, and a sticky
+   bar somewhere else ends up behind it. */
+.crown { position: relative; isolation: isolate; overflow: hidden;
+  display: block; inline-size: 100%; text-align: start;
+  border: 0; border-radius: var(--radius-card); background: var(--card);
+  color: inherit; font: inherit; cursor: pointer;
+  padding: 22px var(--pad) 18px; }
+/* ⚠️ EVERYTHING READ SITS ABOVE THE LIGHT. Stated once here rather than as a
+   z-index on each thing that turned out to need one — the same rule the page
+   states about its own sky. */
+.crown > *:not(.sky) { position: relative; z-index: 1; }
+.crown:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+/* ⚠️ THE LOCKUP IS THE HEADING, so it is set at heading size and full ink. A
+   card that carried both a lockup and a title would be naming itself twice. */
+.crown-name { display: block; font-size: 23px; margin-block-end: 8px; }
+.crown-said { color: var(--ink-quiet); font-size: 14.5px; line-height: 1.45; }
+/* ⚠️ THE FOOT IS A FACT AND A WAY ON, not a button. The whole card is the
+   target; a button inside it would be a second target on one surface. */
+.crown-foot { display: flex; align-items: center; gap: 8px; margin-block-start: 16px;
+  color: var(--ink); font-size: 14.5px; font-weight: 500; }
+.crown-foot .chevron { margin-inline-start: auto; }
+
 .item { display: flex; align-items: center; gap: 14px; inline-size: 100%;
   min-block-size: 64px; padding: 12px var(--pad); border: 0; background: none;
   color: inherit; font: inherit; text-align: start; cursor: pointer; }

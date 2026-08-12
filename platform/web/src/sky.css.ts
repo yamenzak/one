@@ -33,17 +33,63 @@ export const SKY_CSS = `
   translate: -50% 0; inline-size: 100vw; block-size: 360px;
   z-index: 0; pointer-events: none; overflow: hidden;
   --sky-h: 224;
-  /* ⚠️ A PALE GROUND TAKES FAR LESS OF IT. Light has almost no headroom below
-     it, so the field that reads as light on black reads as PAINT on white — a
-     coloured header rather than something falling on the page. One number on
-     the layer, not a second set of gradients, and it sits on the sky itself so
-     a variant animating its children's opacity is unaffected. */
-  opacity: 0.34;
+  /*
+    ⚠️ HOW MUCH ARRIVES IS TWO FACTORS, NOT ONE OPACITY, and the split is what
+    lets a ground and a placement each say their piece without overwriting the
+    other. The pale factor is what this GROUND can take; the lit factor is what
+    this PLACEMENT asks for. The dark rules below set the first and a placement sets
+    the second, so neither has to win an argument about a single number — which
+    is what it would be, because a theme rule outranks a placement rule and the
+    placement would silently lose in exactly one of the two themes.
+
+    ⚠️ A PALE GROUND TAKES FAR LESS OF IT. Light has almost no headroom below
+    it, so the field that reads as light on black reads as PAINT on white — a
+    coloured header rather than something falling on the page. It is one number
+    rather than a second set of gradients, and it sits on the sky itself so a
+    variant animating its children's opacity is unaffected.
+  */
+  --sky-pale: 0.34;
+  --sky-lit: 1;
+  opacity: calc(var(--sky-pale) * var(--sky-lit));
   -webkit-mask-image: linear-gradient(to bottom, #000 38%, transparent 100%);
   mask-image: linear-gradient(to bottom, #000 38%, transparent 100%); }
 
-@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .sky { opacity: 1; } }
-:root[data-theme='dark'] .sky { opacity: 1; }
+/* ⚠️ BLACK HAS ALL THE HEADROOM THERE IS, so the dark ground takes the field
+   whole — and it says so by raising the GROUND's factor, which outranks every
+   placement, rather than by setting an opacity that would erase one. */
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .sky { --sky-pale: 1; } }
+:root[data-theme='dark'] .sky { --sky-pale: 1; }
+
+/* ⚠️ THE SAME LIGHT, INSIDE SOMETHING, and it is a PLACEMENT rather than a
+   second sky. A page's light is full-bleed because the page is a capped column
+   and the ground under it is not; a card's light belongs to the card, so the
+   only things that change are where it starts and how far it reaches.
+
+   Writing it as a variant instead would mean two piles of gradients to keep in
+   step — which is the thing this file exists to prevent, and it would go wrong
+   in the direction nobody checks: the card's copy, months later, still lit the
+   way the page was lit when it was copied. */
+.sky[data-in='card'] { inset: 0; translate: none; inline-size: auto; block-size: auto;
+  /* ⚠️ AND IT ARRIVES DIMMER, WHICH IS ABOUT SIZE RATHER THAN TASTE. Every
+     variant is a few broad sources with a wide falloff, drawn to be read across
+     a page — at a fifth of the width they all overlap, so the field saturates
+     and what was light becomes paint. Half of it is the same light in a smaller
+     room; full strength is a gradient in a box. */
+  --sky-lit: 0.5;
+  /* ⚠️ BUT A PALE GROUND GIVES A CARD MORE THAN IT GIVES A PAGE, which is the
+     opposite adjustment and is not a contradiction. What a page's light must
+     not become on white is a coloured HEADER — a band the eye reads as chrome
+     bolted above the content. A card has an edge and a shadow, so a tint inside
+     it reads as what the card is MADE of, and at the page's own factor this one
+     is the faintest thing on a screen it is supposed to be the crown of. The
+     dark rule above outranks this, so it applies on white only. */
+  --sky-pale: 0.62;
+  /* ⚠️ IT REACHES FURTHER DOWN THAN A PAGE'S. A page fades out before its
+     content starts, because the light is behind a heading and nothing else; a
+     card IS the lit thing, so cutting at the same place leaves the bottom half
+     looking like a different surface joined on. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent 96%);
+  mask-image: linear-gradient(to bottom, #000 30%, transparent 96%); }
 
 /* ⚠️ BOTH LAYERS ARE OVERSIZED AND ROTATED. A rotated layer at its own size
    leaves bare corners, and the bare corner is on a black page the one thing that

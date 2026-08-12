@@ -123,4 +123,24 @@ describe("the stylesheet and the markup are the same set of names", () => {
       expect(explicit, `${name} has no dark value under an explicit choice`).toContain(`${name}:`);
     }
   });
+
+  /*
+    ⚠️ A SKY IS DIMMED BY A FACTOR, NEVER BY AN OPACITY, and the difference is a
+    thing that fails in exactly one theme. How much light arrives is a ground's
+    factor times a placement's — the dark rules raise the first, a card lowers
+    the second, and the product is set once. Written the obvious way instead,
+    the dark rule is `.sky` under two attribute selectors and the card's is
+    `.sky` under one, so the theme outranks it: the card dims correctly on white
+    and not at all on black. Both are valid CSS, both typecheck, and the half
+    that breaks is the half whoever wrote it was not looking at.
+  */
+  it("dims a sky by a factor, so no theme rule can outrank a placement", () => {
+    /* Keyframes animate opacity by design; one level of nesting is all they have. */
+    const declared = SKY_CSS
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/@keyframes[^{]*\{(?:[^{}]*\{[^}]*\})*[^}]*\}/g, "");
+    const set = [...declared.matchAll(/opacity:\s*([^;]+);/g)].map((m) => m[1]!.trim());
+    expect(set, "a sky's opacity is set outright — a placement's factor is erased under one theme")
+      .toEqual(["calc(var(--sky-pale) * var(--sky-lit))"]);
+  });
 });

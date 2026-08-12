@@ -17,10 +17,10 @@
  * — which is what makes the next screen an afternoon rather than a week.
  */
 
-import type { ElementType, ReactNode } from "react";
+import type { CSSProperties, ElementType, ReactNode } from "react";
 import { Face } from "../avatar.js";
 import { Lockup } from "../brand/mark.js";
-import { Adjust, Guard, Heartbreak, Key, Locked, Save } from "../icon.js";
+import { Adjust, Guard, Heartbreak, Key, Onward, Save } from "../icon.js";
 import { Blank, Card, Item, Pill, Waiting } from "../list.js";
 import { Screen, Section } from "../screen.js";
 
@@ -60,6 +60,19 @@ export interface AccountHomeProps {
   readonly person: Person;
   /** ⚠️ `null` is NOT ANSWERED YET. `[]` is answered, and empty. */
   readonly workspaces: readonly Workspace[] | null;
+  /**
+   * HOW MANY OF THEIR OWN FACTS ARE SHARED WITH ANYBODY, RIGHT NOW.
+   *
+   * ⚠️ A COUNT AND NOTHING ELSE. Which facts and with whom is the vault's own
+   * screen; putting either on a card here would be somebody's body on the first
+   * page of their account, readable by whoever is standing behind them.
+   *
+   * ⚠️ AND `null` IS NOT ANSWERED YET, which keeps the card whole while the
+   * number is coming. The card is a DESTINATION — it renders and is pressable
+   * with no answer at all — so only the fact waits, and "Nothing shared" is
+   * never shown to somebody who is sharing four things.
+   */
+  readonly sharedCount?: number | null;
   readonly onGo: (to: string) => void;
   readonly onClose: () => void;
   /**
@@ -74,7 +87,7 @@ export interface AccountHomeProps {
 
 const PRODUCT_NAME: Record<Product, string> = { kova: "Kova", scena: "Scena", tessa: "Tessa" };
 
-export function AccountHome({ person, workspaces, onGo, onClose, Heading = "h1" }: AccountHomeProps): ReactNode {
+export function AccountHome({ person, workspaces, sharedCount = null, onGo, onClose, Heading = "h1" }: AccountHomeProps): ReactNode {
   return (
     <Screen
       leave="dismiss"
@@ -103,14 +116,22 @@ export function AccountHome({ person, workspaces, onGo, onClose, Heading = "h1" 
           />
           <Item icon={<Key />} title="Sign-in methods" detail="Passkeys, codes and devices" onGo={() => onGo("account.security")} />
           <Item icon={<Adjust />} title="Preferences" detail="Theme, language, units and feedback" onGo={() => onGo("account.preferences")} />
-          {/* ⚠️ ON THE ACCOUNT'S OWN CARD RATHER THAN UNDER AN APP, because that
-              is where it lives: a fact here belongs to the person and outlives
-              every product they use. A vault reachable only from inside the app
-              that wanted the data would be a control the person could lose by
-              leaving. */}
-          <Item icon={<Locked />} title="Your vault" detail="Who can see what about you" onGo={() => onGo("account.vault")} />
         </Card>
       </Section>
+
+      {/*
+        ⚠️ A CARD OF ITS OWN, AND NOT A ROW, because it is not the same kind of
+        thing as the three above it. Those are settings — somewhere to go and
+        change something. This is a PLACE: the one part of the account that is
+        not about using a product, and the only part that keeps its meaning for
+        somebody who has left every product.
+
+        ⚠️ ON THE ACCOUNT'S OWN SURFACE RATHER THAN UNDER AN APP, for the same
+        reason. A fact here belongs to the person and outlives every product they
+        use; a vault reachable only from inside the app that wanted the data
+        would be a control somebody loses by leaving.
+      */}
+      <VaultCrown shared={sharedCount} onGo={() => onGo("account.vault")} />
 
       <Section name="Workspaces">
         {workspaces === null ? (
@@ -164,3 +185,50 @@ export function AccountHome({ person, workspaces, onGo, onClose, Heading = "h1" 
     </Screen>
   );
 }
+
+/**
+ * THE VAULT, AS A PLACE.
+ *
+ * ⚠️ IT CARRIES ITS OWN LIGHT AND ITS OWN LOCKUP, which is what makes it read as
+ * somewhere rather than as a row that got bigger. The account centre's own name
+ * is set the same way one screen up — mark and word as one object — so a second
+ * lockup inside it says, in the only vocabulary the surface has, that this is a
+ * thing of the same order and not a setting.
+ *
+ * ⚠️ THE LIGHT IS A DIFFERENT HUE FROM THE PAGE'S, AND ONLY THE HUE. Same
+ * mechanism, same variant, one number moved — so it is unmistakably its own
+ * without being a second design. A card lit exactly like the page behind it
+ * would be a card with a gradient in it.
+ *
+ * ⚠️ AND THE WHOLE CARD IS THE TARGET. A button inside it would be a second
+ * thing to hit on one surface, and the surface is already the thing being
+ * offered.
+ */
+const VaultCrown = ({ shared, onGo }: {
+  readonly shared: number | null;
+  readonly onGo: () => void;
+}): ReactNode => (
+  <button type="button" className="crown press" onClick={onGo}>
+    {/*
+      ⚠️ AURORA RATHER THAN THE PAGE'S SILK. Silk is ribbons across a wide field
+      and needs the width to read as fabric; at card size it is two bright
+      streaks. Aurora is three broad sources with a wide falloff, which is what
+      still reads as light in something small.
+    */}
+    <div className="sky" data-sky="aurora" data-in="card" style={{ "--sky-h": 268 } as CSSProperties} aria-hidden="true" />
+    <span className="crown-name"><Lockup word="Vault" /></span>
+    <span className="crown-said">
+      Your body, your health, your goals — kept here rather than in any app that
+      asks. You choose who sees each one, and for how long.
+    </span>
+    <span className="crown-foot">
+      {/* ⚠️ THE FACT WAITS AND THE CARD DOES NOT. A destination renders with no
+          answer at all; only the number is unknown, and "Nothing shared" shown
+          to somebody sharing four things is worse than showing nothing. */}
+      {shared === null ? <span className="waiting line short" /> : null}
+      {shared === 0 ? "Nothing is shared" : null}
+      {shared !== null && shared > 0 ? `${shared} ${shared === 1 ? "thing is" : "things are"} shared` : null}
+      <Onward className="chevron" />
+    </span>
+  </button>
+);

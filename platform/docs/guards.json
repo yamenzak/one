@@ -3030,6 +3030,15 @@
       "fails": "a colour defined only under the media query or only under the attribute. The viewer has three states, not two, and the missing one renders one theme's text on the other theme's ground"
     },
     {
+      "id": "a-sky-is-dimmed-by-a-factor",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/css.test.tsx",
+      "proves": "dims a sky by a factor, so no theme rule can outrank a placement",
+      "fails": "a theme rule setting a sky's opacity outright. How much light arrives is a ground's headroom times a placement's ask; set as an opacity the theme wins on specificity, so a card that dims itself dims correctly under one theme and not at all under the other — valid CSS either way, and the broken half is the one whoever wrote it was not looking at"
+    },
+    {
       "id": "no-backtick-inside-a-sheet",
       "group": "interface",
       "stage": "7",
