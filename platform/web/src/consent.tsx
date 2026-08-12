@@ -24,6 +24,7 @@
 import { useState, type ReactNode } from "react";
 import type { Problem } from "@one/kernel";
 import { Button } from "./button.js";
+import { rungsFor } from "@one/kernel";
 import { Choose, type Option } from "./choose.js";
 import { Onward, Tick } from "./icon.js";
 import { Card } from "./list.js";
@@ -112,8 +113,10 @@ const NAME: Record<Reach, string> = {
  * product asking for more than it can spend — which is the thing that teaches
  * people the rungs are theatre.
  */
-const rungsFor = (need: Asked["need"]): readonly Option<Reach>[] =>
-  need === "compute" ? RUNGS.filter((r) => r.value === "self" || r.value === "compute") : RUNGS;
+const offered = (need: Asked["need"]): readonly Option<Reach>[] => {
+  const may = rungsFor(need);
+  return RUNGS.filter((r) => may.includes(r.value));
+};
 
 export function ConsentSheet({ open, app, where, asks, onShare, onClose }: ConsentSheetProps): ReactNode {
   return (
@@ -197,7 +200,7 @@ export function ConsentBody({ app, where, asks, onShare, onClose }: Omit<Consent
           key={row.id}
           open={choosing === row.id}
           title={row.label}
-          options={rungsFor(row.need)}
+          options={offered(row.need)}
           value={row.reach}
           onPick={(reach) => onShare(row.id, reach)}
           onClose={() => setChoosing(null)}

@@ -266,16 +266,66 @@ take access away, and the account centre has to reach apps somebody is not insid
 
 ---
 
-## 12. What the person sees
+## 12. What the person sees, and why the screen is a renderer
 
 `web/src/consent.tsx` is the sheet an app raises; `web/src/account/vault.tsx` is
 the review screen on the account centre's own door.
 
+⚠️ **The screen knows what a fact is for exactly nowhere.** Every name, every
+reason, every recommendation and every sentence about what a derivation cannot
+reveal is copied out of a declaration — the app's manifest for why it wants a
+thing, the fact registry for what the thing is. `wantedHere` in
+`kernel/src/vault.ts` is what makes that a property rather than a claim: it takes
+a `VaultSpec`, the person's grants and what they hold, and returns a `Wanted` per
+declared want with everything a screen needs and nothing it has to look up. An app
+that declares a thirteenth fact gets a thirteenth row, with its own explanation,
+without the account centre being opened.
+
+⚠️ **It is organised by workspace, not by fact.** "Who knows my weight" is
+answered by a list of facts; "what does this studio know about me" is the question
+people actually have, and it is the one they can act on — a workspace is a
+relationship you can end. Every group is one `appId` × one `tenantId`, which is
+also the pair a grant is keyed on.
+
+⚠️ **What nobody asked for is still yours.** The screen keeps a section for facts
+held that no want names. A vault that listed only what an app wanted would go
+empty at exactly the moment it became the only copy — which is the person this
+whole thing is built for.
+
+### 12a. Two rungs is a switch; more than two is a choice
+
+`rungsFor(need)` is the one list, and it is in the kernel because **two surfaces
+offer it and they must not disagree**. The consent sheet asks for the first time;
+the vault changes it later.
+
+| need | rungs offered |
+|---|---|
+| `compute` | `self`, `compute` |
+| `derived` | every rung — the derivation runs server-side, and each reading carries its own |
+| `raw` | every rung |
+
+⚠️ **A boolean control silently spends a rung the person chose.** With a copy of
+this list in each surface, the vault collapsed a `raw` want to on-or-off: somebody
+who had deliberately picked "the assistant, no people" in the sheet saw a switch
+reading **on**, and turning it off and on again re-granted at `staff`. Nothing
+threw, nothing failed, and the state sentence underneath was still correct — only
+the control was a lie about what it would do. A screen that escalates a disclosure
+the person narrowed is the worst thing this surface could do.
+*Checked: `web/test/screens.test.tsx` — "offers a choice wherever a want has more
+than two rungs", mutation-tested.*
+
+⚠️ **And the rung a want asks for is derived, never declared.** `asksFor(need)` —
+`raw` asks at `staff`, everything else at `compute`. An app that could name its own
+rung could name one its need does not justify, and nothing would catch it: the
+sheet would simply ask for more.
+
+### 12b. The rest of the screen's rules
+
 ⚠️ **It is a decision screen, not a permission prompt.** A permission prompt has
 two buttons and a sentence written to get past it; the only control afterwards is
-uninstalling. Here each row is a separate decision with a rung rather than a
-switch, each says what would be shown and what would be hidden, and every one can
-be moved again from the account centre without opening the app.
+uninstalling. Here each row is a separate decision, each says what would be shown
+and what would be hidden, and every one can be moved again from the account centre
+without opening the app.
 
 ⚠️ **Nothing is pre-selected.** Not "recommended" as a default, not a switch
 already on. Every fact starts at `self` and the recommendation appears as an
@@ -284,10 +334,34 @@ disclosure nobody made.
 
 ⚠️ **"Done", never "Allow".** Nothing was allowed as a whole.
 
+⚠️ **The state line names the workspace, never a role.** "Not shared with your
+coach" is one product's word for the person on the other side; the same screen
+stands over a studio, a clinic and a company's staff list. "Nobody at Haddad
+Strength can see it" is both true everywhere and more precise — it is the actual
+boundary.
+
+⚠️ **The expiry is part of that sentence, not a pill beside it.** As a pill it
+competed with the control for one line and truncated the name to an ellipsis, and
+it is not a separate fact anyway: "until December" is when the sentence above it
+stops being true.
+
 The review screen answers three questions, and every other product answers at
 most the first: what is held about me, who can see each part, and **who has
 actually looked**. The third is what turns a settings screen into something worth
 opening.
+
+### 12c. What the screen is NOT wired to yet
+
+⚠️ **`vault.mine` still answers with the platform's whole fact registry**, not
+with any app's declared wants. Grouping by workspace needs every app's `VaultSpec`
+at the identity door, and one worker only knows its own manifest — so it needs the
+shared-store publication the platform already uses for config and the AI catalog.
+The resolver and the screen take the grouped shape today; the transport does not
+produce it.
+
+<!-- DEFER(one-186) stage:7 — publish each app's VaultSpec to the shared store so
+     the identity door can group the vault by workspace. `wantedHere` and
+     `VaultScreen` already take that shape; `vault.mine` still answers with FACTS. -->
 
 ---
 

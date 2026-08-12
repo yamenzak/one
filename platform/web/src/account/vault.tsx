@@ -29,8 +29,9 @@ import type { Problem, Reach, Wanted, WantedHere } from "@one/kernel";
 import { Face } from "../avatar.js";
 import { Lockup } from "../brand/mark.js";
 import { Chip } from "../chip.js";
+import { Choose, type Option } from "../choose.js";
 import { Disclose } from "../disclose.js";
-import { About } from "../icon.js";
+import { About, Onward } from "../icon.js";
 import { Blank, Card, Item as Row, Pill, Waiting } from "../list.js";
 import { Screen, Section } from "../screen.js";
 import { Sheet } from "../sheet.js";
@@ -87,7 +88,7 @@ export interface VaultScreenProps {
   readonly looks: readonly Looked[] | null;
   /**
    * ⚠️ ONE WRITE FOR EVERY CONTROL ON THE SCREEN, so a row cannot grow a second
-   * shape. `reach` is what it becomes — the want's own rung, or `self` for off.
+   * shape. `reach` is the rung it becomes; `self` is off.
    */
   readonly onSet: (
     at: { readonly appId: string; readonly tenantId: string | null; readonly fact: string; readonly reach: Reach },
@@ -127,9 +128,22 @@ function meaning(item: Item, where: string): string {
   return item.expiresAt === null ? now : `${now.replace(/\.$/, "")}, until ${item.expiresAt}.`;
 }
 
-const RUNG: Record<Reach, string> = {
-  self: "Only you", compute: "Calculations", agent: "The assistant", staff: "People there",
-};
+/**
+ * ⚠️ THE RUNGS, IN THE PERSON'S OWN INTEREST RATHER THAN THE SYSTEM'S. Each line
+ * says who ends up able to read the thing — "compute" and "agent" are
+ * indistinguishable to anybody who has not been told, and somebody choosing
+ * between four unexplained words picks the one they recognise.
+ */
+const RUNGS: readonly Option<Reach>[] = [
+  { value: "self", label: "Only you", detail: "Nobody else, and nothing computed from it" },
+  { value: "compute", label: "Calculations only", detail: "Used to work things out. Nobody is shown it" },
+  { value: "agent", label: "The assistant", detail: "A model answering you may read it. No person" },
+  { value: "staff", label: "People there", detail: "Anybody with a role in this workspace" },
+];
+
+const RUNG: Record<Reach, string> = Object.fromEntries(
+  RUNGS.map((r) => [r.value, r.label]),
+) as Record<Reach, string>;
 
 /* --------------------------------------------------------------------- view */
 
@@ -184,9 +198,8 @@ export function VaultScreen({ wheres, kept, looks, onSet, onBack, Heading = "h1"
                       item={item}
                       where={w.name}
                       onOpen={() => setAbout({ item, where: w.name })}
-                      onSet={(next) => onSet({
-                        appId: w.appId, tenantId: w.tenantId, fact: item.fact,
-                        reach: next ? item.asks : "self",
+                      onSet={(reach) => onSet({
+                        appId: w.appId, tenantId: w.tenantId, fact: item.fact, reach,
                       })}
                     />
                   ))}
@@ -263,27 +276,63 @@ const Ask = ({ item, where, onOpen, onSet }: {
   readonly item: Item;
   readonly where: string;
   readonly onOpen: () => void;
-  readonly onSet: (next: boolean) => Promise<Problem | null>;
-}): ReactNode => (
-  <div className="share">
-    <span className="share-name">{item.label}</span>
-    <button
-      type="button"
-      className="share-about press"
-      aria-label={`Why ${item.label.toLowerCase()} is asked for`}
-      onClick={onOpen}
-    >
-      <About />
-    </button>
-    {/* ⚠️ NEEDED HERE IS A FACT ABOUT THE APP, so it sits with the name rather
-        than in the sentence about what is disclosed. It is the app's claim that a
-        refusal takes a feature away, and it is the only claim on this screen an
-        app makes about itself. */}
-    {item.required ? <span className="share-needed">Needed here</span> : null}
-    <Flip on={item.granted} onChange={onSet} label={`Share ${item.label.toLowerCase()} with ${where}`} />
-    <span className="share-said">{meaning(item, where)}</span>
-  </div>
-);
+  readonly onSet: (reach: Reach) => Promise<Problem | null>;
+}): ReactNode => {
+  const [choosing, setChoosing] = useState(false);
+  /*
+    ⚠️ A SWITCH ONLY WHERE THERE ARE TWO RUNGS, and the want says how many. A fact
+    an app only computes with has one meaningful setting either side of off, so a
+    switch is the honest control. A fact it wants the value of can also be held at
+    "the assistant, no people" — and a boolean spends that rung without asking:
+    somebody who chose it in the consent sheet would see a switch reading ON, and
+    turning it off and on again would silently re-grant at the top of the ladder.
+  */
+  const binary = item.rungs.length === 2;
+  return (
+    <div className="share">
+      <span className="share-name">{item.label}</span>
+      <button
+        type="button"
+        className="share-about press"
+        aria-label={`Why ${item.label.toLowerCase()} is asked for`}
+        onClick={onOpen}
+      >
+        <About />
+      </button>
+      {/* ⚠️ NEEDED HERE IS A FACT ABOUT THE APP, so it sits with the name rather
+          than in the sentence about what is disclosed. It is the app's claim that
+          a refusal takes a feature away, and it is the only claim on this screen
+          an app makes about itself. */}
+      {item.required ? <span className="share-needed">Needed here</span> : null}
+      {binary ? (
+        <Flip
+          on={item.granted}
+          onChange={(next) => onSet(next ? item.asks : "self")}
+          label={`Share ${item.label.toLowerCase()} with ${where}`}
+        />
+      ) : (
+        /* ⚠️ IT NAMES THE RUNG IT IS AT, so the control is readable without being
+           opened — a button saying only "Change" makes somebody press it to learn
+           what they already chose. */
+        <button type="button" className="share-rung press" onClick={() => setChoosing(true)}>
+          <span>{RUNG[item.reach]}</span>
+          <Onward className="chevron" />
+        </button>
+      )}
+      <span className="share-said">{meaning(item, where)}</span>
+      {binary ? null : (
+        <Choose
+          open={choosing}
+          title={item.label}
+          options={RUNGS.filter((r) => item.rungs.includes(r.value))}
+          value={item.reach}
+          onPick={onSet}
+          onClose={() => setChoosing(false)}
+        />
+      )}
+    </div>
+  );
+};
 
 /**
  * WHY IT IS BEING ASKED FOR — the app's own words, and the platform's.

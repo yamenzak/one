@@ -101,27 +101,32 @@ const OUTCOMES = {
   `why`, every `recommend` and every reading below is copied from a declaration in
   the real thing; the screen writes none of it.
 */
+/* ⚠️ THE SAME TWO LISTS THE KERNEL DERIVES, so a fixture cannot show a control
+   the real resolver would never offer. */
+const RUNGS_COMPUTE = ["self", "compute"] as const;
+const RUNGS_RAW = ["self", "compute", "agent", "staff"] as const;
+
 const VAULT_WHERES: readonly Where[] = [
   {
     appId: "kova", appName: "Kova", tenantId: "t1", name: "Haddad Strength",
     face: face("t1"), product: "kova",
     items: [
       {
-        fact: "goal.training", label: "Your goal", need: "raw", asks: "staff",
+        fact: "goal.training", label: "Your goal", need: "raw", asks: "staff", rungs: RUNGS_RAW,
         why: "Your coach writes your programme against this.",
         required: true, reach: "staff", granted: true, expiresAt: "1 December",
         held: true, recommend: "staff", categories: [], readings: [],
         because: "The one thing somebody helping you genuinely cannot plan without.",
       },
       {
-        fact: "body.height", label: "Height", need: "compute", asks: "compute",
+        fact: "body.height", label: "Height", need: "compute", asks: "compute", rungs: RUNGS_COMPUTE,
         why: "Used with your weight to work out an energy target and a body-mass index.",
         required: false, reach: "compute", granted: true, expiresAt: null,
         held: true, recommend: "self", categories: [], readings: [],
         because: "Only needed to work out an energy target, which the platform can do without showing it.",
       },
       {
-        fact: "body.mass", label: "Weight", need: "derived", asks: "compute",
+        fact: "body.mass", label: "Weight", need: "derived", asks: "compute", rungs: RUNGS_COMPUTE,
         why: "Used to work out your energy target, and to show your coach which way things are going.",
         required: false, reach: "self", granted: false, expiresAt: null,
         held: true, recommend: "self", categories: [],
@@ -133,13 +138,13 @@ const VAULT_WHERES: readonly Where[] = [
         ],
       },
       {
-        fact: "health.injuries", label: "Injuries", need: "raw", asks: "staff",
+        fact: "health.injuries", label: "Injuries", need: "raw", asks: "staff", rungs: RUNGS_RAW,
         why: "So a programme does not ask you to do something that hurts.",
         required: false, reach: "self", granted: false, expiresAt: null,
         held: false, recommend: "staff", categories: [], readings: [],
       },
       {
-        fact: "person.sex", label: "Sex at birth", need: "compute", asks: "compute",
+        fact: "person.sex", label: "Sex at birth", need: "compute", asks: "compute", rungs: RUNGS_COMPUTE,
         why: "Changes the energy-target arithmetic and nothing else.",
         required: false, reach: "self", granted: false, expiresAt: null,
         held: true, recommend: "self", categories: [], readings: [],
@@ -152,14 +157,14 @@ const VAULT_WHERES: readonly Where[] = [
     face: face("t2"), product: "kova",
     items: [
       {
-        fact: "goal.training", label: "Your goal", need: "raw", asks: "staff",
+        fact: "goal.training", label: "Your goal", need: "raw", asks: "staff", rungs: RUNGS_RAW,
         why: "Your coach writes your programme against this.",
         required: true, reach: "self", granted: false, expiresAt: null,
         held: true, recommend: "staff", categories: [], readings: [],
         because: "The one thing somebody helping you genuinely cannot plan without.",
       },
       {
-        fact: "health.allergies", label: "Allergies", need: "raw", asks: "staff",
+        fact: "health.allergies", label: "Allergies", need: "raw", asks: "staff", rungs: RUNGS_RAW,
         why: "So nothing they suggest contains something you react to.",
         required: false, reach: "self", granted: false, expiresAt: null,
         held: false, recommend: "staff", categories: [], readings: [],

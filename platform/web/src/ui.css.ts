@@ -673,27 +673,47 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
    not knowable in advance. Laid out as a row instead, the sentence gets half a
    phone: "Your goal" wrapped to five lines and then truncated to an ellipsis while
    the switch sat in white space. */
-.share { display: grid; grid-template-columns: auto auto 1fr auto;
+/* ⚠️ THREE COLUMNS AND THE NAME TAKES THE SLACK. With the app's own note on the
+   top line too, a four-rung control left "Your goal" about ten characters and it
+   wrapped — so the note went below, where it belongs anyway: it is a fact about
+   the app rather than about this line's control. */
+.share { display: grid; grid-template-columns: 1fr auto auto;
   align-items: center; column-gap: 6px; row-gap: 3px; padding-block: 13px; }
 /* ⚠️ EVERY PART NAMES ITS OWN COLUMN, because three of the four are optional and
    flow order is not placement: with no "needed here" to fill the third column the
    switch fell into it and sat halfway across the row, left-aligned against
    nothing. */
-.share-name { grid-column: 1; font-weight: 500; }
-.share > .switch { grid-column: 4; justify-self: end; }
+/* ⚠️ THE TOP LINE IS PINNED, THE REST FLOWS. The note spans every column, so
+   with the control left to auto-placement it landed on the row AFTER the note —
+   three rows for one item, the control adrift under a chip. */
+.share-name { grid-row: 1; grid-column: 1; min-inline-size: 0; font-weight: 500; }
+.share > .switch { grid-row: 1; grid-column: 3; justify-self: end; }
+/* ⚠️ IT NAMES THE RUNG IT IS AT, so a control with four settings is readable
+   without being opened. It sits where the switch sits, because on any one row it
+   is the switch — a want with more than two rungs simply has more than two
+   states, and moving the control would make the column ragged. */
+.share-rung { grid-row: 1; grid-column: 3; justify-self: end; display: flex; align-items: center;
+  gap: 2px; max-inline-size: 46vw; padding: 5px 6px 5px 10px;
+  border: 0; border-radius: var(--radius-well); background: var(--well);
+  color: var(--ink); font: inherit; font-size: 14.5px; text-align: end;
+  cursor: pointer; }
+.share-rung > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-rung .chevron { flex: none; color: var(--ink-faint); }
+.share-rung:hover { background: color-mix(in oklab, var(--ink) 12%, transparent); }
+.share-rung:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .share-said { grid-column: 1 / -1; color: var(--ink-quiet); font-size: 14px;
   line-height: 1.45; padding-inline-end: 8px; }
 /* ⚠️ THE APP'S OWN CLAIM, AND IT IS QUIET. It is the one thing on this screen a
    product asserts about itself, so it is marked as a note rather than as a
    warning — a coloured pill here would read as something being wrong. */
-.share-needed { grid-column: 3; justify-self: start; color: var(--ink-faint); font-size: 12.5px;
+.share-needed { grid-column: 1 / -1; justify-self: start; color: var(--ink-faint); font-size: 12.5px;
   padding-inline: 7px; padding-block: 2px; border-radius: var(--radius-well);
   background: var(--well); white-space: nowrap; }
 /* ⚠️ THIRTY-EIGHT SQUARE AND BESIDE THE NAME. An info mark drawn at its own size
    is a nineteen-pixel target, which is a decoration with an onClick; and next to
    the switch it would read as part of the switch, so a thumb reaching for one
    lands on the other and the two do opposite things. */
-.share-about { grid-column: 2; display: grid; place-items: center;
+.share-about { grid-row: 1; grid-column: 2; display: grid; place-items: center;
   inline-size: 38px; block-size: 38px; margin-inline-start: -4px;
   border: 0; border-radius: 50%; background: none; color: var(--ink-faint);
   cursor: pointer; }

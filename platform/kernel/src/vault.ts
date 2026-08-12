@@ -952,6 +952,13 @@ export interface Wanted {
    * Off is always `self`; on is this.
    */
   readonly asks: Reach;
+  /**
+   * ⚠️ EVERY RUNG THIS WANT MAY STAND AT, so a surface offers a CHOICE where
+   * there is one and a switch only where there is not. A want needing the value
+   * itself can be held at "the assistant, no people" — a rung somebody chooses
+   * deliberately, and one that a boolean control silently spends.
+   */
+  readonly rungs: readonly Reach[];
   /** Where it stands now. `self` when nothing is granted, or a grant has lapsed. */
   readonly reach: Reach;
   readonly granted: boolean;
@@ -983,6 +990,25 @@ export interface WantedHere {
  * and nothing would catch it — the sheet would simply ask for more.
  */
 export const asksFor = (need: Need): Reach => (need === "raw" ? "staff" : ARITHMETIC);
+
+/**
+ * WHICH RUNGS A WANT MAY STAND AT — the one list, for every surface that offers
+ * a choice.
+ *
+ * ⚠️ IT LIVES HERE BECAUSE TWO SURFACES OFFER IT AND THEY MUST NOT DISAGREE. The
+ * consent sheet asks for the first time; the vault changes it later. With a copy
+ * each, the vault collapsed a `raw` want to on-or-off — so somebody who had
+ * deliberately chosen "the assistant, no people" in the sheet saw a switch that
+ * was ON, and turning it off and on again silently re-granted at `staff`. A
+ * control that escalates a disclosure the person narrowed is the worst thing this
+ * screen could do, and it typechecked.
+ *
+ * ⚠️ AN APP THAT ONLY COMPUTES IS OFFERED NO RUNG IT COULD SPEND. Showing it
+ * `staff` would be the product asking for more than it can use, which is what
+ * teaches people the rungs are theatre.
+ */
+export const rungsFor = (need: Need): readonly Reach[] =>
+  need === "compute" ? ["self", ARITHMETIC] : REACH;
 
 export function wantedHere(input: {
   readonly spec: VaultSpec;
@@ -1021,6 +1047,7 @@ export function wantedHere(input: {
       need: want.need,
       required: want.required === true,
       asks: asksFor(want.need),
+      rungs: rungsFor(want.need),
       reach: at?.reach ?? "self",
       granted: at !== null,
       expiresAt: at?.expiresAt ?? null,

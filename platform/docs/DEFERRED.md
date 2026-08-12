@@ -13,10 +13,12 @@ kind: index
 - `one-172` — the operator door admits any signed-in  
   <sub>runtime/src/runtime.ts:835</sub>
 - `one-182` — a `person` seal with a real key. The type exists,  
-  <sub>docs/VAULT.md:296</sub>
+  <sub>docs/VAULT.md:370</sub>
 - `one-183` — a fact belongs to an ACCOUNT, so somebody a  
-  <sub>docs/VAULT.md:298</sub>
+  <sub>docs/VAULT.md:372</sub>
 - `one-184` — the disclosure log is not yet exported with the  
-  <sub>docs/VAULT.md:302</sub>
+  <sub>docs/VAULT.md:376</sub>
 - `one-185` — Kova declares these and reads none of them yet: the  
   <sub>kova/src/manifest.ts:712</sub>
+- `one-186` — publish each app's VaultSpec to the shared store so  
+  <sub>docs/VAULT.md:362</sub>

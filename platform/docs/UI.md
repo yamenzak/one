@@ -239,6 +239,46 @@ person who has turned motion down is not asking for the same motion faster. The
 rule uses `*` rather than a list of classes, because a rule that names what it
 knows about silently stops covering the next thing somebody writes.
 
+### 2.6a Feedback
+
+**A tick you feel and a note you hear, and only on a result.** — A press already
+has feedback: the control moved because the finger moved. What has no feedback is
+the moment a round trip comes back, which is the moment the person has looked away
+and the only one worth spending an interruption on. Two notes — `done` and
+`wrong` — and there will not be a third without a moment that earns it.
+`web/src/feedback.ts` is the whole of it: `feel(note)` fires one,
+`configureFeedback(settings)` is called once by the app.
+
+**Sound is off until somebody asks; vibration is on.** — An interface that makes a
+noise nobody chose is the most complained-about behaviour there is, and the person
+who finds out in a meeting does not go looking for the setting, they stop using
+the feature. A tick is silent, is what every native app on the device already
+does, and is what a phone in a pocket can actually perceive. `FEEDBACK_DEFAULT` is
+`{ haptics: true, sound: false }`, and the preferences screen says which is which
+rather than leaving it to be discovered.
+
+**Vibration is Android-only on the web, and the row says so about THIS device.** —
+Safari implements no `navigator.vibrate` on any iOS version, so on an iPhone the
+control changed a stored value and did nothing anybody could feel: the same lie as
+a switch that silently fails. The row asks the browser once, at module scope —
+whether a device can vibrate is a fact about the device, not about a render — and
+disables itself with a reason where the answer is no.
+
+**The note is synthesised, never a file.** — An asset is a request that can fail,
+a decode that can be slow and a byte cost on a page that already inlines its
+fonts, for two hundred milliseconds of sine wave. It is also why there is no
+silent-first-play problem: nothing has to load before the first save.
+
+**It is configured once, not threaded as a prop.** — This is a device-wide
+preference — true of the person, not of the sheet they happen to be in — and
+passing it through four components to reach a callback is how one screen ends up
+being the one that forgot.
+
+**And a preview needs a way to play one.** — Haptics and a sound cannot be
+photographed, and there is no way to feel a save without a control to turn it on;
+that is why the dial in `web/dev/mount.tsx` survives, and why it has a *play* row.
+A vocabulary nobody can experience is a vocabulary nobody reviews.
+
 ### 2.7 Shape
 
 **Round is a symbol or a person; a rounded square is a thing with an identity of

@@ -247,8 +247,11 @@ describe("the account centre's presentation", () => {
 
 /* ------------------------------------------------------------- the vault --- */
 
+const RUNGS_COMPUTE = ["self", "compute"] as const;
+const RUNGS_RAW = ["self", "compute", "agent", "staff"] as const;
+
 const ITEM = (over: Partial<Item>): Item => ({
-  fact: "body.height", label: "Height", need: "compute", asks: "compute",
+  fact: "body.height", label: "Height", need: "compute", asks: "compute", rungs: RUNGS_COMPUTE,
   why: "Used to work out an energy target.",
   required: false, reach: "self", granted: false, expiresAt: null,
   held: true, categories: [], readings: [], ...over,
@@ -329,6 +332,25 @@ describe("your vault", () => {
   */
   it("says what the state means in the workspace's own name", () => {
     expect(render(WHERES, [])).toContain("Nobody at Haddad Strength can see");
+  });
+
+  /*
+    ⚠️ THE CONTROL NEVER SPENDS A RUNG THE PERSON DID NOT. A want needing the value
+    itself can be held at "the assistant, no people" — a rung chosen deliberately
+    in the consent sheet. Rendered as a switch, that reads as ON and turning it off
+    and on again silently re-grants at the top of the ladder, which is the worst
+    thing a screen about disclosure can do and it typechecks. Four rungs means a
+    named choice; two means a switch.
+  */
+  it("offers a choice wherever a want has more than two rungs", () => {
+    const raw = render([{ ...WHERES[0]!, items: [ITEM({
+      need: "raw", asks: "staff", rungs: RUNGS_RAW, reach: "agent", granted: true,
+    })] }], []);
+    expect(raw, "a four-rung want is a switch, so agent is spent as staff").toContain("share-rung");
+    expect(raw).toContain("The assistant");
+
+    const compute = render([{ ...WHERES[0]!, items: [ITEM({})] }], []);
+    expect(compute, "a two-rung want asks a question with one answer").not.toContain("share-rung");
   });
 
   /* ⚠️ THE WHOLE ROW IS READABLE CLOSED, which is what earns a disclosure. */
