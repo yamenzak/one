@@ -36,14 +36,14 @@
 import type { ReactNode } from "react";
 import {
   ArrowLeft, Camera, Check, ChevronRight, Download, FileText, HeartCrack, Info, KeyRound, Languages, Lock,
-  ArrowUpRight, Globe, Mail, MonitorSmartphone, Pencil, Plus, Ruler, Share2, Shield, SlidersHorizontal, Stars, SunMoon,
+  ArrowUpRight, Mail, MonitorSmartphone, Pencil, Plus, Ruler, Share2, Shield, SlidersHorizontal, SunMoon,
   Vibrate, Volume2, X, type LucideIcon,
 } from "lucide-react";
 
 /** The name the stylesheet animates by. Closed: a new icon adds a rule. */
 export type IconName =
   | "key" | "adjust" | "guard" | "save" | "heartbreak" | "letter" | "device" | "others"
-  | "outward" | "globe" | "stars"
+  | "outward"
   | "edit" | "lens" | "onward" | "close" | "back" | "tick" | "add"
   | "light" | "tongue" | "measure" | "buzz" | "sound" | "locked" | "about" | "paper";
 
@@ -103,13 +103,13 @@ export const Device = draw(MonitorSmartphone, "device", 21);
    furniture two rows down and means the opposite kind of thing. */
 export const Others = draw(Share2, "others", 21);
 
-/* ⚠️ WHERE A THING IS KEPT. Two of them, and they are a PAIR: a globe for
-   wherever the platform places it, a ring of stars for the union. Monochrome and
-   at the same weight as every other icon, because the pair used to be two
-   full-colour illustrations — a blue planet and a navy disc with twelve yellow
-   stars — sitting in a list of grey glyphs and reading as clip art dropped in. */
-export const Global = draw(Globe, "globe", 21);
-export const Union = draw(Stars, "stars", 21);
+/* ⚠️ THERE IS NO ICON FOR A PLACE, AND THERE WERE TWO. A globe stood for the edge
+   network and a ring of stars for the union — shapes a drawing library happened to
+   have, doing duty as emblems, in a column where every other tile is a company's
+   own logo or a symbol that means what it draws. Nothing an icon set contains
+   means "European Union"; a region is a label rather than a tile, and it is one
+   now — see `Region` in `account/legal.tsx`. Written down because the next person
+   to want one will reach for the same two shapes. */
 
 /* Furniture — the parts of a row rather than a meaning in it. */
 /* ⚠️ IT LEAVES, AND IT IS NOT A CHEVRON. A chevron is a promise of a next screen
@@ -164,8 +164,6 @@ export const ICON_PARTS: Readonly<Record<IconName, readonly string[]>> = {
   paper: ["path", "path", "path", "path", "path"],
   others: ["circle", "circle", "circle", "line", "line"],
   outward: ["path", "path"],
-  globe: ["circle", "path", "path"],
-  stars: ["path", "path", "path", "circle"],
 };
 
 /*

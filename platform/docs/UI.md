@@ -421,6 +421,43 @@ guess, and a drop shadow nobody had decided the platform had.
 own declaration, in a value derived from one, or in a mask, where black is
 opacity rather than colour.*
 
+**A place has no mark.** — A globe stood for the edge network and a ring of
+sparkles for the European Union: shapes a drawing library happened to have, doing
+duty as emblems, in a column where every other tile is a company's own logo or a
+symbol that means what it draws. Nothing an icon set contains means "European
+Union", and the honest response to that is not the nearest shape — it is a label.
+A region and what happens inside it are a question and its answer, which is what
+an entry already is.
+
+**There is one focus ring, and it is declared once.** — It was written out
+fourteen times: two pixels of accent, by hand, per control. What stays per control
+is the OFFSET, because a ring inside a row and a ring around a pill are different
+shapes, not different rings. Every pressable thing has one — the consent sheet's
+own picker did not, and nothing but a keyboard would ever have found that.
+*Checked: `web/test/interface.test.tsx` — one ring, and no control without it.*
+
+**A field that opens focused wears a quieter ring than one you tabbed to.** — An
+editor's field is focused the moment the sheet arrives, so a full-strength accent
+ring is not an answer to anything somebody did: it is a band of colour across a
+surface whose entire content is one value, and it was most of what made that sheet
+read as a browser dialog. Three states on one shape — nothing at rest, the accent
+at half voice while it is being typed in, the alarm at full strength when what is
+in it cannot be saved.
+
+**Selected text is ours.** — Every value editor opens with its content selected,
+so the first thing on that sheet was a solid block of the browser's blue behind
+our own ring. The ink is left alone: repainting the text is a second decision
+about legibility on a colour we did not choose.
+
+**A control takes the page's word space back.** — The text face sets wide letters
+against a narrow word space and the platform corrects it once, on the body. The
+font shorthand resets that correction, and every row, field and button in this
+product takes the page's font through it — so the correction reached paragraphs
+and nothing else. Measured: 1.28px on a paragraph, 0 on every row title and every
+row detail, which is most of the words in the account centre. It read as bad
+rendering rather than as a choice, which is what the original rule says about it.
+*Checked: `web/test/interface.test.tsx`.*
+
 **A link out is a component, and it says it leaves.** — Every link in the account
 centre was a bare anchor: browser blue, browser underline, no press, no motion,
 nothing saying it left, on a surface where every other control has a tone and a
@@ -787,6 +824,10 @@ more, which is the honest state.
 | `a-pill-is-not-a-control` | a border, a shadow or a cursor on a thing that cannot be pressed, which makes a list of facts look like a row of buttons | **live** |
 | `a-marked-rows-detail-is-one-line` | a sentence written for a record used as a row's second line: five wrapped lines with the title clipped above them — the identity truncated so the metadata can run on. It is held by the sheet rather than by the caller, because a payload somebody else composes will eventually arrive longer than it promised | **live** |
 | `nobody-names-a-colour` | a colour typed at the point of use, which does not move when a theme does — and is invisible to whoever typed it, because they were looking at the theme it happens to be right in. Five hand-written whites on saturated grounds, a scrim and a drop shadow got in this way | **live** |
+| `there-is-one-focus-ring` | a focus ring written out per control — two pixels of accent, fourteen times, by hand. It is the same failure as fourteen durations: not a ring anybody chose, and the first person who wants a softer one has fourteen places to change | **live** |
+| `every-control-can-be-seen-when-focused` | a pressable thing with no focus indicator, which is a control somebody navigating by keyboard has lost — and which is invisible to everybody testing with a pointer, meaning everybody. The consent sheet's own picker was one | **live** |
+| `a-control-keeps-the-pages-word-space` | the font shorthand resetting the word space inside a control. The text face sets wide letters against a narrow word space and the platform corrects it once on the body; every row, field and button then silently undid the correction. Measured: 1.28px on a paragraph and 0 on every row title and detail, which is most of the words in the account centre | **live** |
+| `a-link-out-tells-mail-from-a-page` | an address opened through the web treatment: a new tab that never arrives, under the outward mark whose entire value is that it is honest | **live** |
 <!-- /generated -->
 
 ## 5. What is not decided yet

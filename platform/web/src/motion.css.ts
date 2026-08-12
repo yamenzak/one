@@ -311,15 +311,6 @@ export const MOTION_CSS = `
 .alive:nth-child(2n) { animation-delay: -2.9s; animation-duration: 10.5s; }
 .alive:nth-child(3n) { animation-delay: -5.2s; animation-duration: 8.2s; }
 
-/* ⚠️ THE TWO PLACES A THING CAN BE KEPT. The globe turns — its own axis, on the
-   weather scale, so it is a fact rather than a control — and the ring of stars
-   settles the way a seal does. Both are icons in a row's tile now, drawn at the
-   same weight as every other one: they were full-colour illustrations, and a blue
-   planet beside a navy disc of yellow stars in a list of grey glyphs is clip art
-   dropped into an interface. */
-.item:active [data-icon='globe'] > :nth-child(2) { translate: -1.5px 0; }
-.item:active [data-icon='globe'] > :nth-child(3) { translate: 1.5px 0; }
-.item:active [data-icon='stars'] > :nth-child(3) { scale: 1.3; }
 
 /* ⚠️ EVERY ANIMATION IN THE PLATFORM STOPS HERE, INCLUDING ONES ADDED LATER.
    The universal selector is deliberate: a rule that lists the classes it knows

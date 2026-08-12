@@ -70,6 +70,12 @@ html { interpolate-size: allow-keywords; }
   --p-kova: #2f6bff;
   --p-scena: #00867a;
   --p-tessa: #c2185b;
+  /* ⚠️ ONE FOCUS RING, DECLARED ONCE. It was written out fourteen times — two
+     pixels of accent, every time, by hand — which is the same failure as fourteen
+     durations: not a ring anybody chose, just the absence of a decision. What
+     stays per control is the OFFSET, because a ring inside a row and a ring
+     around a pill are different shapes, not different rings. */
+  --ring: 2px solid var(--accent);
   --radius-card: 22px;
   --radius-well: 999px;
   --pad: 18px;
@@ -131,6 +137,24 @@ body { margin: 0; background: var(--page); color: var(--ink);
   -webkit-font-smoothing: antialiased; }
 h1, h2, p { margin: 0; padding: 0; }
 h2 { word-spacing: normal; }
+/* ⚠️ SELECTED TEXT IS OURS TOO, AND IT WAS THE BROWSER'S. Every value editor
+   opens with its content selected — so the first thing on that sheet was a solid
+   block of somebody else's blue behind our own accent ring, which is most of what
+   made the editor read as a browser dialog rather than as this product. The ink
+   is kept, because a selection that also repaints the text is a second decision
+   about legibility on a colour we did not choose. */
+::selection { background: color-mix(in oklab, var(--accent) 26%, transparent); }
+/* ⚠️ AND EVERY CONTROL HAS TO SAY IT AGAIN, WHICH IS WHY IT APPEARS NINE TIMES
+   BELOW. The font shorthand resets word spacing to its initial value, so every
+   font shorthand on a control — which is every row, every field and every button
+   in this product — silently undid the line above. Measured: 1.28px on a
+   paragraph and 0 on every row title and every row detail, which is most of the
+   words in the account centre; it read as bad rendering rather than as a choice,
+   which is exactly what the rule above says about it. A rule of its own cannot fix
+   it: this is a shorthand inside a more specific block, so the block has to be the
+   place. The interface conformance suite fails on a font shorthand that does not
+   restate it, because the next control will be written by somebody who has not
+   read this paragraph. */
 
 /* ------------------------------------------------------------ the overlay */
 
@@ -237,7 +261,7 @@ h2 { word-spacing: normal; }
   display: grid; place-items: center; align-self: flex-start;
   border: 0; background: var(--card); color: var(--ink); cursor: pointer; }
 .round-button:hover { background: var(--well); }
-.round-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.round-button:focus-visible { outline: var(--ring); outline-offset: 2px; }
 
 .lede { color: var(--ink-quiet); font-size: 15px; line-height: 1.45; }
 
@@ -249,9 +273,9 @@ h2 { word-spacing: normal; }
 .entries { padding-block: 6px; }
 .entry { display: flex; flex-direction: column; align-items: stretch; gap: 5px;
   inline-size: 100%; padding: 13px var(--pad); border: 0; background: none;
-  color: inherit; font: inherit; text-align: start; cursor: pointer; }
+  color: inherit; font: inherit; word-spacing: inherit; text-align: start; cursor: pointer; }
 .entry:hover { background: color-mix(in oklab, var(--ink) 5%, transparent); }
-.entry:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.entry:focus-visible { outline: var(--ring); outline-offset: -3px; }
 /* ⚠️ NOT A BUTTON, SO IT MUST NOT BEHAVE LIKE ONE. A read-only fact that lights
    up under the finger is a control that does nothing. */
 .entry[data-fixed] { cursor: default; }
@@ -365,11 +389,25 @@ h2 { word-spacing: normal; }
    form ends up saying "wrong" in red text under a field that looks unchanged. */
 .field-box { display: flex; align-items: center; gap: 6px; min-block-size: 56px;
   padding-inline: 18px 8px; border-radius: var(--radius-well); background: var(--well);
-  outline: 2px solid transparent; outline-offset: -2px; }
-.field-box:focus-within { outline-color: var(--accent); }
+  outline: var(--ring); outline-color: transparent; outline-offset: -2px; }
+/*
+  ⚠️ THE FOCUSED RING IS QUIETER THAN THE KEYBOARD ONE, AND THAT IS THE POINT. An
+  editor opens with its field focused, so a full-strength accent ring is not an
+  answer to anything somebody did — it is permanent furniture, a band of colour
+  across a sheet whose entire content is one value, and it is most of what made
+  this read as a browser dialog rather than as this product.
+
+  ⚠️ AND WRONG STAYS LOUD, which is the hierarchy this buys. Three states on one
+  shape: nothing at rest, the accent at half voice while it is being typed in, and
+  the alarm at full strength when what is in it cannot be saved.
+*/
+.field-box:focus-within { outline-color: color-mix(in oklab, var(--accent) 55%, transparent); }
 .field-box[data-wrong] { outline-color: var(--alarm); }
 .field-input { flex: 1; min-inline-size: 0; border: 0; background: none; color: inherit;
-  font: inherit; font-size: 17px; padding: 0; }
+  font: inherit; word-spacing: inherit; font-size: 17px; padding: 0;
+  /* ⚠️ THE CARET IS AN ACCENT, because it is the one part of a field that moves
+     and the only thing on the sheet saying where typing will land. */
+  caret-color: var(--accent); }
 .field-input:focus { outline: none; }
 .field-input::placeholder { color: var(--ink-faint); }
 /* ⚠️ ONLY WHEN THERE IS SOMETHING TO CLEAR. A control that is always there and
@@ -377,7 +415,7 @@ h2 { word-spacing: normal; }
 .field-clear { flex: none; inline-size: 30px; block-size: 30px; border: 0; cursor: pointer;
   border-radius: var(--radius-well); display: grid; place-items: center;
   background: color-mix(in oklab, var(--ink) 14%, transparent); color: var(--ink-quiet); }
-.field-clear:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.field-clear:focus-visible { outline: var(--ring); outline-offset: 2px; }
 
 .note { color: var(--ink-quiet); font-size: 14px; line-height: 1.45; }
 .wrong { color: var(--alarm); }
@@ -408,12 +446,15 @@ h2 { word-spacing: normal; }
 /* ⚠️ FULL WIDTH IS A PLACE, NOT A SIZE: it means the button owns the row, which
    is what the action at the foot of a sheet does. */
 .button[data-wide] { inline-size: 100%; min-block-size: 54px; font-size: 17px; }
-.button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.button:focus-visible { outline: var(--ring); outline-offset: 3px; }
 /* ⚠️ OFF IS A DIFFERENT GROUND, NOT A FADED ONE. A translucent control on a card
    inherits whatever is behind it, and at 40% opacity the label falls under every
    contrast floor there is — so it looks broken to everyone and is unreadable to
    some. */
-.button:disabled { background: var(--well); color: var(--ink-faint); cursor: default; }
+/* ⚠️ AND OFF IS STILL READ. The faint ink is for a value nobody has given yet,
+   on a card; on the well's ground it is 1.6 to 1, which is a label people report
+   as blurry rather than as disabled. Quiet ink is the same statement and legible. */
+.button:disabled { background: var(--well); color: var(--ink-quiet); cursor: default; }
 /* ⚠️ WORKING IS NOT OFF, and sharing one disabled look made it read as one. The
    button is refusing a second press for the length of a round trip — which is the
    same attribute and the opposite meaning — so it keeps its own ground and the
@@ -453,7 +494,7 @@ h2 { word-spacing: normal; }
   background: var(--well);
   transition: background-color var(--swift) var(--move), color var(--swift) var(--move); }
 .check input:checked + .check-box { background: var(--accent); color: var(--on-solid); }
-.check input:focus-visible + .check-box { outline: 2px solid var(--accent); outline-offset: 2px; }
+.check input:focus-visible + .check-box { outline: var(--ring); outline-offset: 2px; }
 .button-label { line-height: 1; }
 .button-sign { flex: none; }
 
@@ -493,13 +534,13 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 .crown { position: relative; isolation: isolate; overflow: hidden;
   display: block; inline-size: 100%; text-align: start;
   border: 0; border-radius: var(--radius-card); background: var(--card);
-  color: inherit; font: inherit; cursor: pointer;
+  color: inherit; font: inherit; word-spacing: inherit; cursor: pointer;
   padding: 22px var(--pad) 18px; }
 /* ⚠️ EVERYTHING READ SITS ABOVE THE LIGHT. Stated once here rather than as a
    z-index on each thing that turned out to need one — the same rule the page
    states about its own sky. */
 .crown > *:not(.sky) { position: relative; z-index: 1; }
-.crown:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.crown:focus-visible { outline: var(--ring); outline-offset: -3px; }
 /* ⚠️ THE LOCKUP IS THE HEADING, so it is set at heading size and full ink. A
    card that carried both a lockup and a title would be naming itself twice. */
 .crown-name { display: block; font-size: 23px; margin-block-end: 8px; }
@@ -517,10 +558,10 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 .item { display: flex; align-items: center; gap: 14px; inline-size: 100%;
   color: inherit; text-decoration: none;
   min-block-size: 64px; padding: 12px var(--pad); border: 0; background: none;
-  color: inherit; font: inherit; text-align: start; cursor: pointer; }
+  color: inherit; font: inherit; word-spacing: inherit; text-align: start; cursor: pointer; }
 .item:hover { background: color-mix(in oklab, var(--ink) 5%, transparent); }
 .item:active { background: color-mix(in oklab, var(--ink) 8%, transparent); }
-.item:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.item:focus-visible { outline: var(--ring); outline-offset: -3px; }
 
 .item-body { flex: 1; min-inline-size: 0; display: flex; flex-direction: column; gap: 2px; }
 /* ⚠️ A LONG NAME TRUNCATES: the title is an identity, and a row that grows to two
@@ -548,8 +589,15 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
   row holds it is this file's.
 */
 .item:has(> .pill, > .chevron ~ *, > button, > a) .item-detail { flex-wrap: nowrap; }
-.item:has(> .mark) .item-detail { flex-wrap: nowrap;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ⚠️ AND ONLY WHERE THE ROW IS ONE OF A LIST TO BE SCANNED. A row that goes
+   somewhere or does something is read as part of a column, and a sentence in it
+   pushes the next row down while the title clips to make room. A row that is a
+   mark and words — this address, and the sentence saying what it is for — is not
+   in a hurry: nothing shares its line, so clipping it mid-sentence withholds the
+   only content it has. That was the state of "A code is sent here when you sign
+   in without", which is a sentence cut before the word that mattered. */
+.item:has(> .mark):has(> .chevron, > .pill, > button, > a) .item-detail {
+  flex-wrap: nowrap; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ⚠️ DIMMED, NOT COLOURED. It says there is more here; it is not a thing to aim
    at, and at full ink it competes with the row's own words. */
@@ -657,7 +705,7 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
   border-radius: var(--radius-well); cursor: pointer; background: var(--well);
   transition: background-color var(--swift) var(--move); }
 .switch[data-state='checked'] { background: var(--accent); }
-.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.switch:focus-visible { outline: var(--ring); outline-offset: 3px; }
 .switch:disabled { cursor: progress; }
 .switch-thumb { display: block; inline-size: 24px; block-size: 24px; border-radius: var(--radius-well);
   background: var(--on-solid); box-shadow: var(--lift);
@@ -727,7 +775,7 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 .away-mark { flex: none; translate: 0 1px;
   transition: translate var(--swift) var(--spring); }
 .away:hover .away-mark { translate: 1.5px -0.5px; }
-.away:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px;
+.away:focus-visible { outline: var(--ring); outline-offset: 3px;
   border-radius: 3px; }
 
 /* ------------------------------------------------------------------- asks */
@@ -757,8 +805,12 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
    sentence — and so a thumb can reach it without aiming. */
 .ask-answer { display: flex; align-items: center; gap: 8px; inline-size: 100%;
   min-block-size: 44px; padding: 0 14px; border: 0; border-radius: var(--radius-well);
-  background: var(--well); color: var(--ink); font: inherit; text-align: start; cursor: pointer; }
+  background: var(--well); color: var(--ink); font: inherit; word-spacing: inherit; text-align: start; cursor: pointer; }
 .ask-answer[data-open] { color: var(--accent); }
+/* ⚠️ IT HAD NO RING, WHICH IS THE ONE CONTROL ON THE CONSENT SHEET. Found by the
+   conformance check rather than by anybody looking: a keyboard reached it, and
+   nothing on the screen said where it was. */
+.ask-answer:focus-visible { outline: var(--ring); outline-offset: 2px; }
 .ask-answer .chevron { margin-inline-start: auto; }
 
 /* ⚠️ THE CURRENT ANSWER, IN WORDS, AND IT IS NOT A PILL. A pill is a standing —
@@ -796,7 +848,7 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 .disclose-head::marker { content: none; }
 .disclose-head::-webkit-details-marker { display: none; }
 .disclose-head:hover { background: color-mix(in oklab, var(--ink) 5%, transparent); }
-.disclose-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.disclose-head:focus-visible { outline: var(--ring); outline-offset: -3px; }
 .disclose-mark { flex: none; display: flex; }
 .disclose-said { flex: 1; min-inline-size: 0; display: flex; flex-direction: column; gap: 2px; }
 .disclose-name { font-weight: 500; }
@@ -881,12 +933,12 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 .share-rung { grid-row: 1; grid-column: 3; justify-self: end; display: flex; align-items: center;
   gap: 2px; max-inline-size: 46vw; padding: 5px 6px 5px 10px;
   border: 0; border-radius: var(--radius-well); background: var(--well);
-  color: var(--ink); font: inherit; font-size: 14.5px; text-align: end;
+  color: var(--ink); font: inherit; word-spacing: inherit; font-size: 14.5px; text-align: end;
   cursor: pointer; }
 .share-rung > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .share-rung .chevron { flex: none; color: var(--ink-faint); }
 .share-rung:hover { background: color-mix(in oklab, var(--ink) 12%, transparent); }
-.share-rung:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.share-rung:focus-visible { outline: var(--ring); outline-offset: 2px; }
 .share-said { grid-column: 1 / -1; color: var(--ink-quiet); font-size: 14px;
   line-height: 1.45; padding-inline-end: 8px; }
 /* ⚠️ THE APP'S OWN CLAIM, AND IT IS QUIET. It is the one thing on this screen a
@@ -904,7 +956,7 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
   border: 0; border-radius: 50%; background: none; color: var(--ink-faint);
   cursor: pointer; }
 .share-about:hover { color: var(--ink); background: var(--well); }
-.share-about:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.share-about:focus-visible { outline: var(--ring); outline-offset: -2px; }
 
 /* ------------------------------------------------------------------ about */
 
@@ -944,14 +996,14 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
    carries no ground of its own and sits in the margin the card already has. */
 .kept-sign { display: grid; grid-template-columns: 1fr auto; align-items: center;
   gap: 3px 10px; inline-size: 100%; padding: 4px 14px 0; text-align: start;
-  border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+  border: 0; background: none; color: inherit; font: inherit; word-spacing: inherit; cursor: pointer; }
 .kept-sign .lockup { grid-column: 1; font-size: 14px; color: var(--ink-quiet); }
 .kept-sign .kept-said { grid-column: 1 / -1; color: var(--ink-faint); }
 .kept-sign .chevron { grid-column: 2; grid-row: 1; color: var(--ink-faint); }
 /* ⚠️ THE MARK BRIGHTENS RATHER THAN THE GROUND. A hover ground would put the card
    back, one state later. */
 .kept-sign:hover .lockup { color: var(--ink); }
-.kept-sign:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.kept-sign:focus-visible { outline: var(--ring); outline-offset: 2px; }
 /* -------------------------------------------------------------------- prose */
 
 /*

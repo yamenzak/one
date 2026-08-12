@@ -45,7 +45,7 @@ import { Away } from "../away.js";
 import { Mark } from "../mark.js";
 import { Button } from "../button.js";
 import { useCommit } from "../commit.js";
-import { Global, Guard, Others, Paper, Tick, Union } from "../icon.js";
+import { Guard, Others, Paper, Tick } from "../icon.js";
 import { Blank, Card, Entry, Item, Waiting } from "../list.js";
 import { Screen, Section, Title } from "../screen.js";
 
@@ -459,7 +459,16 @@ export function RecipientScreen({ of, sub, onBack, Heading = "h1" }: {
 
   return (
     <Screen leave="up" onLeave={onBack} name={who.name}
-      title={<Title as={Heading}>{who.name}</Title>}
+      /* ⚠️ THE SAME MARK THE ROW CARRIED. A recognisable thing is recognised by
+         its logo and then named by its words; arriving on a screen that has only
+         the words, a reader has to check they pressed the right row. It is the
+         one device that says this screen is about THAT company. */
+      title={
+        <div className="title-row">
+          <Title as={Heading}>{who.name}</Title>
+          <Mark kind="company" size="lg" logo={who.mark} name={who.name} />
+        </div>
+      }
       lede={who.role}
     >
       <Section>
@@ -508,17 +517,24 @@ export const spoken = (of: readonly DataCategory[]): string => {
   return of.some((c) => SPECIAL_CATEGORIES.includes(c)) ? `${one} — some of it sensitive` : one;
 };
 
-/** Where records are kept, as a row. */
-const Region = ({ region, said }: { readonly region: string; readonly said: string }): ReactNode => {
-  const known = jurisdictionOf(region);
-  return (
-    <Item
-      icon={region === "eu" ? <Union /> : <Global />}
-      title={known?.name ?? region}
-      detail={said}
-    />
-  );
-};
+/**
+ * WHERE ANSWERS ARE GENERATED, AS A LABEL AND A VALUE.
+ *
+ * ⚠️ A PLACE HAS NO MARK, AND TWO WERE INVENTED FOR IT. A globe stood for the
+ * edge network and a ring of sparkles for the union — a glyph a drawing library
+ * happened to have, doing duty as an emblem, in a column where every other tile is
+ * a company's own logo or a symbol that means what it draws. Nothing an icon set
+ * contains means "European Union", and the honest response to that is not the
+ * nearest shape: it is a label. A region and the companies inside it are a
+ * question and its answer, which is what an entry already is.
+ *
+ * ⚠️ AND A NAME NOBODY HAS DECLARED IS PRINTED AS ITSELF. The named set is the
+ * kernel's and a deployment may be somewhere it does not list; a blank, or the
+ * word "Unknown", turns a place we have no words for into one we are declining to
+ * name — on the screen whose whole subject is where somebody's data is.
+ */
+const Region = ({ region, said }: { readonly region: string; readonly said: string }): ReactNode =>
+  <Entry label={jurisdictionOf(region)?.name ?? region}>{said}</Entry>;
 
 /* ------------------------------------------------------------ one of them --- */
 

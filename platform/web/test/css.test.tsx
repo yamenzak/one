@@ -125,12 +125,23 @@ describe("the stylesheet and the markup are the same set of names", () => {
   */
   it("defines every colour in all three theme scopings", () => {
     const block = (selector: string) => rules.split(selector)[1]?.split("}")[0] ?? "";
-    const light = [...block(":root {").matchAll(/(--[a-z0-9-]+):/g)].map((m) => m[1]!);
+    const light = [...block(":root {").matchAll(/(--[a-z0-9-]+):\s*([^;]+);/g)]
+      .map((m) => [m[1]!, m[2]!] as const);
     expect(light.length).toBeGreaterThan(8);
     const media = block(":root:not([data-theme='light']) {");
     const explicit = block(":root[data-theme='dark'] {");
-    /* Only the colours invert. A radius, a gap and a typeface are the same in both. */
-    const colours = light.filter((n) => !/radius|gap|pad|font/.test(n));
+    /*
+      Only the colours invert. A radius, a gap and a typeface are the same in both.
+
+      ⚠️ AND A VALUE BUILT OUT OF ANOTHER TOKEN IS ALREADY PER-THEME. The focus
+      ring is two pixels of the accent; copying it into both dark blocks would be
+      two more places to edit and nothing gained, and demanding the copy is how a
+      guard starts producing work rather than catching defects.
+    */
+    const colours = light
+      .filter(([n]) => !/radius|gap|pad|font/.test(n))
+      .filter(([, v]) => !v.includes("var("))
+      .map(([n]) => n);
     for (const name of colours) {
       expect(media, `${name} has no dark value under prefers-color-scheme`).toContain(`${name}:`);
       expect(explicit, `${name} has no dark value under an explicit choice`).toContain(`${name}:`);

@@ -3757,6 +3757,42 @@
       "impl": "web/test/vocabulary.test.ts",
       "proves": "declares no colour outside the palette",
       "fails": "a colour typed at the point of use, which does not move when a theme does — and is invisible to whoever typed it, because they were looking at the theme it happens to be right in. Five hand-written whites on saturated grounds, a scrim and a drop shadow got in this way"
+    },
+    {
+      "id": "there-is-one-focus-ring",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/interface.test.tsx",
+      "proves": "declares the ring once and never writes another",
+      "fails": "a focus ring written out per control — two pixels of accent, fourteen times, by hand. It is the same failure as fourteen durations: not a ring anybody chose, and the first person who wants a softer one has fourteen places to change"
+    },
+    {
+      "id": "every-control-can-be-seen-when-focused",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/interface.test.tsx",
+      "proves": "gives every pressable thing a ring",
+      "fails": "a pressable thing with no focus indicator, which is a control somebody navigating by keyboard has lost — and which is invisible to everybody testing with a pointer, meaning everybody. The consent sheet's own picker was one"
+    },
+    {
+      "id": "a-control-keeps-the-pages-word-space",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/interface.test.tsx",
+      "proves": "restates the word space wherever it takes the page's font",
+      "fails": "the font shorthand resetting the word space inside a control. The text face sets wide letters against a narrow word space and the platform corrects it once on the body; every row, field and button then silently undid the correction. Measured: 1.28px on a paragraph and 0 on every row title and detail, which is most of the words in the account centre"
+    },
+    {
+      "id": "a-link-out-tells-mail-from-a-page",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/interface.test.tsx",
+      "proves": "promises mail rather than a page when the address is one",
+      "fails": "an address opened through the web treatment: a new tab that never arrives, under the outward mark whose entire value is that it is honest"
     }
   ]
 }

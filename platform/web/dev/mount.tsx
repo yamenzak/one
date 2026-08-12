@@ -464,7 +464,12 @@ function Preview() {
   const [asking, setAsking] = useState(false);
   const [which, setWhich] = useState((asked.get("state") ?? "four") as keyof typeof CASES);
   const [outcome, setOutcome] = useState((asked.get("save") ?? "ok") as keyof typeof OUTCOMES);
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  /* ⚠️ IN THE HASH LIKE THE SCREEN, because a review of a light-theme surface is
+     otherwise a screenshot somebody has to remember to take by hand — and the one
+     that never gets taken is the one where a colour was declared in a single
+     scoping. */
+  const [theme, setTheme] = useState<"dark" | "light">(() =>
+    asked.get("theme") === "light" ? "light" : "dark");
   const [prefs, setPrefs] = useState<Preferences>({
     /* ⚠️ THE SHIPPED DEFAULTS, not a convenient pair. Sound on in the fixture
        makes every screenshot a picture of a setting nobody chose. */

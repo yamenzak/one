@@ -28,7 +28,7 @@ export const ACCOUNT_CSS = `
    photograph. What is left here is the press, which is all a button contributes. */
 .portrait { position: relative; flex: none; border: 0; padding: 0; background: none;
   cursor: pointer; border-radius: var(--radius-well); }
-.portrait:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.portrait:focus-visible { outline: var(--ring); outline-offset: 3px; }
 
 .page-title { align-self: center; font-size: 25px; line-height: 1;
   margin-block: 10px 4px; word-spacing: normal; }

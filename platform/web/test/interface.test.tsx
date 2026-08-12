@@ -27,6 +27,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Away } from "../src/away.js";
 import { LOGOS } from "../src/brand/logos.js";
 import { UI_CSS } from "../src/ui.css.js";
+import { ACCOUNT_CSS } from "../src/account/account.css.js";
 
 /** Every source file in this package, by the path it is reached at. */
 const sources = readdirSync("src", { recursive: true, encoding: "utf8" })
@@ -36,7 +37,11 @@ const sources = readdirSync("src", { recursive: true, encoding: "utf8" })
 /** The same, with comments removed — a rule's own paragraph would match it. */
 const code = sources.map(([f, src]) => [f, src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")] as const);
 
-const declarations = UI_CSS.replace(/\/\*[\s\S]*?\*\//g, "");
+/** The shared vocabulary, and the one screen-local sheet beside it. */
+const sheets: readonly (readonly [string, string])[] = [
+  ["ui.css.ts", UI_CSS], ["account/account.css.ts", ACCOUNT_CSS],
+].map(([f, css]) => [f!, css!.replace(/\/\*[\s\S]*?\*\//g, "")] as const);
+const declarations = sheets[0]![1];
 
 it("has sources to read", () => {
   expect(sources.length).toBeGreaterThan(12);
@@ -161,6 +166,17 @@ describe("a link out is a component, and it says it leaves", () => {
     expect(html).toContain(`rel="noreferrer"`);
     expect(html).toContain(`target="_blank"`);
   });
+
+  /*
+    ⚠️ AND AN ADDRESS IS NOT A NEW TAB. A mailto opens somebody's mail client;
+    through the web treatment it promised a page that never arrives — and the
+    outward mark, whose entire value is that it is honest, was the part that lied.
+  */
+  it("promises mail rather than a page when the address is one", () => {
+    const html = renderToStaticMarkup(<Away href="mailto:legal@example.test">legal@example.test</Away> as never);
+    expect(html).toContain(`data-icon="letter"`);
+    expect(html).not.toContain("_blank");
+  });
 });
 
 /* --------------------------------------------------------------- capsules --- */
@@ -224,6 +240,72 @@ describe("a row is one line of words, whatever it is about", () => {
     const rule = rulesOf(declarations).find(([s]) => s.includes(".item-detail") && s.includes(".mark"));
     expect(rule?.[1], "a marked row's detail may wrap — a paragraph in a list").toMatch(/text-overflow:\s*ellipsis/);
     expect(rule?.[1]).toMatch(/white-space:\s*nowrap/);
+  });
+});
+
+/* ------------------------------------------------------------------ focus --- */
+
+describe("there is one focus ring", () => {
+  /*
+    ⚠️ IT WAS WRITTEN OUT FOURTEEN TIMES. Two pixels of accent, by hand, on every
+    control — which is the same failure as fourteen durations: not a ring anybody
+    chose, just the absence of a decision, and the first person to want a softer
+    one has fourteen places to change. What stays per control is the OFFSET,
+    because a ring inside a row and a ring around a pill are different shapes.
+  */
+  it("declares the ring once and never writes another", () => {
+    for (const [file, css] of sheets) {
+      for (const [decl] of css.matchAll(/outline:[^;]+;/g)) {
+        if (/var\(--ring\)|outline:\s*none/.test(decl)) continue;
+        expect.fail(`${file} draws a focus ring of its own: ${decl.trim()}`);
+      }
+    }
+  });
+
+  /*
+    ⚠️ AND EVERY CONTROL HAS ONE. A control that cannot be seen when it is focused
+    is one somebody navigating by keyboard has lost — and it is invisible to
+    everybody testing with a pointer, which is everybody.
+  */
+  it("gives every pressable thing a ring", () => {
+    const pressable = new Set(
+      [...declarations.matchAll(/\.([a-z][a-z0-9-]*)[^{}]*\{[^{}]*cursor:\s*pointer/g)].map((m) => m[1]!),
+    );
+    const rung = new Set(
+      [...declarations.matchAll(/\.([a-z][a-z0-9-]*)[^{}]*:focus(?:-visible|-within)?[^{}]*\{[^{}]*outline/g)]
+        .map((m) => m[1]!),
+    );
+    /* A label wrapping a control, and a row that is a target for the control
+       inside it — the ring belongs to the thing that takes focus. */
+    const bearer: Readonly<Record<string, string>> = {
+      "switch-row": "switch", "check": "check-box", "portrait": "portrait",
+      "field-box": "field-box", "ask": "share-rung",
+    };
+    for (const c of pressable) {
+      if (rung.has(c) || rung.has(bearer[c] ?? "")) continue;
+      expect.fail(`.${c} is pressable and has no focus ring`);
+    }
+  });
+});
+
+/* ------------------------------------------------------------------ words --- */
+
+describe("a control is set in the same words as the page", () => {
+  /*
+    ⚠️ THE FONT SHORTHAND RESETS THE WORD SPACE, AND EVERY ROW IS A CONTROL. The
+    text face sets wide letters against a narrow word space, so the platform
+    corrects it once on the body — and every `font: inherit` on a button, a field
+    or a row silently undid that correction inside a more specific block. Measured
+    before the fix: 1.28px on a paragraph, 0 on every row title and every row
+    detail, which is most of the words in the account centre. Nothing renders
+    wrongly; it just reads as bad rendering, on every screen, forever.
+  */
+  it("restates the word space wherever it takes the page's font", () => {
+    for (const [selector, body] of rulesOf(declarations)) {
+      if (!/font:\s*inherit/.test(body)) continue;
+      expect(body, `${selector.trim()} takes the font and loses the word space`)
+        .toMatch(/word-spacing:/);
+    }
   });
 });
 
