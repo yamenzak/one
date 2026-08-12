@@ -122,32 +122,34 @@ export interface VaultScreenProps {
 /* --------------------------------------------------------------------- copy */
 
 /**
- * WHAT THE CURRENT STATE MEANS, IN THE WORKSPACE'S OWN NAME.
+ * WHAT IS TRUE RIGHT NOW, IN AS FEW WORDS AS IT TAKES.
  *
- * ⚠️ IT NAMES THE PLACE RATHER THAN THE ROLE. "Not shared with your coach" is one
- * product's word for the person on the other side, and this screen stands over a
- * studio, a clinic and a company's staff list alike. "Nobody at Haddad Strength"
- * is both true everywhere and more precise — it is the actual boundary.
+ * ⚠️ IT SAYS "HERE", BECAUSE THE GROUP ABOVE IT ALREADY SAID WHERE. Naming the
+ * workspace in every sentence put its face and its name five times down one card,
+ * under a header carrying both — and each line then wrapped around a chip it did
+ * not need. The chip earns its place where the list is FLAT and mixes workspaces,
+ * which is what "Who has looked" is; inside a group filed under one name it is
+ * the row repeating what the row above it already says.
  *
- * ⚠️ AND IT SAYS WHAT IS TRUE NOW, not what would happen if you flipped it. A
- * line that describes the other state reads as the current one to anybody
- * skimming, which on a screen about disclosure is the worst available error.
+ * ⚠️ AND IT SAYS WHAT IS TRUE, NOT WHAT WOULD HAPPEN IF YOU FLIPPED IT. A line
+ * describing the other state reads as the current one to anybody skimming, which
+ * on a screen about disclosure is the worst error available.
+ *
+ * ⚠️ SHORT ENOUGH TO BE READ, WHICH IS THE ONLY WAY IT WORKS. These ran to two
+ * clauses each — "Used for calculations here. Nobody at Haddad Strength can see
+ * the value itself." — and a column of them is a wall nobody reads, so the screen
+ * conveys nothing at all.
  */
-function meaning(item: Item, where: string): string {
-  if (!item.granted) {
-    return item.need === "compute"
-      ? `Kept to you. Not used for anything here, and nobody at ${where} can see it.`
-      : `Kept to you. Nobody at ${where} can see it.`;
-  }
-  const now =
-    item.reach === "compute" ? `Used for calculations here. Nobody at ${where} can see the value itself.`
-    : item.reach === "agent" ? `The assistant can use it. Nobody at ${where} can see it.`
-    : `People at ${where} can see it.`;
+function meaning(item: Item): string {
+  const said =
+    !item.granted ? "Not shared."
+    : item.reach === "compute" ? "Calculations only. Nobody here sees it."
+    : item.reach === "agent" ? "The assistant only. Nobody here sees it."
+    : "Everyone here can see it.";
   /* ⚠️ THE EXPIRY IS PART OF THE SENTENCE, not a pill beside it. As a pill it
-     competed with the switch for the same line and truncated the name to an
-     ellipsis; and it is not a separate fact anyway — "until December" is when the
-     sentence above it stops being true. */
-  return item.expiresAt === null ? now : `${now.replace(/\.$/, "")}, until ${item.expiresAt}.`;
+     competed with the control for one line and truncated the name to an ellipsis;
+     and it is not a separate fact — it is when the clause before it stops. */
+  return item.expiresAt === null ? said : `${said} Until ${item.expiresAt}.`;
 }
 
 /**
@@ -360,7 +362,7 @@ const Ask = ({ item, where, onOpen, onSet, onReading }: {
           <Onward className="chevron" />
         </button>
       )}
-      <span className="share-said">{meaning(item, where)}</span>
+      <span className="share-said">{meaning(item)}</span>
       {binary ? null : (
         <Choose
           open={choosing}
@@ -416,11 +418,10 @@ const Reads = ({ reading, where, onSet }: {
           <Onward className="chevron" />
         </button>
       )}
-      <span className="share-said">
-        {reading.granted
-          ? `${reading.says} ${reading.hides}`
-          : `Not shared. ${reading.says}`}
-      </span>
+      {/* ⚠️ WHAT IT SHOWS, HERE; WHAT IT CANNOT SHOW, IN THE SHEET. Both on the
+          row ran to four lines under a control, and the second sentence — the one
+          that is the whole reassurance — is where a reader had already stopped. */}
+      <span className="share-said">{reading.says}</span>
       {binary ? null : (
         <Choose
           open={choosing}
@@ -448,7 +449,7 @@ const AboutSheet = ({ at, onClose }: {
   readonly onClose: () => void;
 }): ReactNode => (
   <Sheet open={at !== null} dismissible label={at ? `Why ${at.item.label.toLowerCase()} is asked for` : ""} onClose={onClose}>
-    {at === null ? null : <AboutBody item={at.item} where={at.where} />}
+    {at === null ? null : <AboutBody item={at.item} />}
   </Sheet>
 );
 
@@ -458,60 +459,38 @@ const AboutSheet = ({ at, onClose }: {
  * which is the whole point of the sheet — would be unreachable by any check, and
  * "the screen writes no copy of its own" would be a claim rather than a property.
  */
-export const AboutBody = ({ item, where }: {
-  readonly item: Item;
-  readonly where: string;
-}): ReactNode => {
-  const at = { item, where };
+export const AboutBody = ({ item }: { readonly item: Item }): ReactNode => {
   return (
       <div className="about">
-        <h2 className="sheet-title">{at.item.label}</h2>
-        <p className="about-why">{at.item.why}</p>
+        <h2 className="sheet-title">{item.label}</h2>
 
-        {/* ⚠️ WHAT IT WOULD ACTUALLY REACH, spelled out, because "on" is not a
-            quantity. The same switch means arithmetic on one row and a person
-            reading it on the next. */}
-        <p className="about-line">
-          <span className="about-key">Switched on</span>
-          {at.item.need === "compute"
-            ? `Used to work things out. The value itself stays here — nobody at ${at.where} sees it.`
-            : `People at ${at.where} can read it.`}
-        </p>
+        {/* ⚠️ EVERY SENTENCE BELOW IS A DECLARATION READ ALOUD — the app's reason,
+            the platform's recommendation and what a derivation cannot reveal. The
+            three blocks that used to sit between them were prose written here:
+            what "on" would reach, what happens if it is off, and a closing
+            reassurance. All three restated what the row already said, in more
+            words, on the one surface that has to be read to be worth opening. */}
+        <p className="about-why">{item.why}</p>
 
-        {at.item.recommend ? (
+        {item.recommend ? (
           <p className="about-line">
             <span className="about-key">Suggested</span>
-            {RUNG[at.item.recommend]}
-            {at.item.because ? ` — ${at.item.because}` : null}
+            {RUNG[item.recommend]}
+            {item.because ? ` — ${item.because}` : null}
           </p>
         ) : null}
 
-        {at.item.required ? (
-          <p className="about-line">
-            <span className="about-key">If it is off</span>
-            Something here stops working. Everything else carries on.
-          </p>
-        ) : (
-          <p className="about-line">
-            <span className="about-key">If it is off</span>
-            Nothing breaks. This part just has less to go on.
-          </p>
-        )}
-
         {/* ⚠️ A DERIVATION STATES WHAT IT CANNOT REVEAL, IN WRITING, and the
-            registry refuses an empty one — so this is never a reassurance
-            somebody typed to make a screen feel safe. */}
-        {at.item.readings.map((r) => (
+            registry refuses an empty one — so this is never a reassurance somebody
+            typed to make a screen feel safe. It is here rather than on the row
+            because it is the sentence somebody checks the arithmetic against, and
+            that is a thing you open a sheet to do. */}
+        {item.readings.map((r) => (
           <div className="about-reading" key={r.id}>
             <p className="about-line"><span className="about-key">{r.label}</span>{r.says}</p>
             <p className="about-hides">{r.hides}</p>
           </div>
         ))}
-
-        <p className="about-foot">
-          You can switch this off at any time. What was worked out before you did
-          is already theirs, and switching off does not delete what you recorded.
-        </p>
       </div>
   );
 };

@@ -747,5 +747,4 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
    the two. It is the sentence somebody checks the arithmetic against. */
 .about-hides { color: var(--ink-quiet); font-size: 14.5px; line-height: 1.5;
   margin-block-start: 4px; }
-.about-foot { color: var(--ink-faint); font-size: 13.5px; line-height: 1.5; }
 `.trim();

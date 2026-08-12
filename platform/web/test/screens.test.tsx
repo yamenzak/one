@@ -297,7 +297,7 @@ describe("your vault", () => {
     day somebody has started writing product copy into the account centre.
   */
   it("shows the app's own reason rather than one of its own", () => {
-    const out = html(<AboutBody where="Haddad Strength" item={ITEM({
+    const out = html(<AboutBody item={ITEM({
       why: "A sentence no screen could have invented.",
       because: "And a recommendation it did not write either.",
       recommend: "self",
@@ -313,7 +313,7 @@ describe("your vault", () => {
     one.
   */
   it("reads out what a derivation cannot reveal", () => {
-    const out = html(<AboutBody where="Haddad Strength" item={ITEM({
+    const out = html(<AboutBody item={ITEM({
       need: "derived",
       readings: [{
         id: "body.mass.trend", label: "Weight trend", from: ["body.mass"],
@@ -327,12 +327,35 @@ describe("your vault", () => {
   });
 
   /*
-    ⚠️ THE STATE LINE NAMES THE WORKSPACE, NOT A ROLE. "Your coach" is one
+    ⚠️ THE STATE LINE NAMES NO ROLE, AND REPEATS NO PLACE. "Your coach" is one
     product's word for the person on the other side, and this screen stands over a
-    studio, a clinic and a company's staff list alike.
+    studio, a clinic and a company's staff list alike — so it says "here", which
+    the group above it has already named. Naming the workspace per row put its
+    face and name five times down one card under a header carrying both.
   */
-  it("says what the state means in the workspace's own name", () => {
-    expect(render(WHERES, [])).toContain("Nobody at Haddad Strength can see");
+  it("says what is true here, in one clause, naming no role", () => {
+    const out = render(WHERES, []);
+    expect(out).toContain("Nobody here sees it.");
+    expect(out, "a role is one product's word for the other side")
+      .not.toMatch(/coach|trainer|client|doctor/i);
+  });
+
+  /*
+    ⚠️ THE SHEET IS DECLARATIONS AND NOTHING ELSE. Three blocks of prose written
+    in the component used to sit between them — what "on" would reach, what
+    happens if it is off, and a closing reassurance — each restating what the row
+    already said, in more words, on the one surface that has to be read to be
+    worth opening. A screen that explains a fact in its own words is a screen that
+    has to be edited for every fact.
+  */
+  it("explains a fact only in the words something declared", () => {
+    const out = html(<AboutBody item={ITEM({
+      why: "A reason the app wrote.", because: "A reason the registry wrote.", recommend: "self",
+      required: true,
+    })} />);
+    expect(out).toContain("A reason the app wrote.");
+    expect(out).toContain("A reason the registry wrote.");
+    expect(out, "the sheet restates what the row already said").not.toMatch(/Switched on|If it is off|switch this off/);
   });
 
   /*
