@@ -11,7 +11,7 @@ kind: index
 ## Stage 7 — Kova migration
 
 - `one-172` — the operator door admits any signed-in  
-  <sub>runtime/src/runtime.ts:835</sub>
+  <sub>runtime/src/runtime.ts:863</sub>
 - `one-182` — a `person` seal with a real key. The type exists,  
   <sub>docs/VAULT.md:441</sub>
 - `one-183` — a fact belongs to an ACCOUNT, so somebody a  

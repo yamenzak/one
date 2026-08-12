@@ -169,3 +169,106 @@ describe("nobody may grant what they do not hold", () => {
     expect(out.body.permissions as unknown as string[]).toContain("note:read");
   });
 });
+
+describe("leaving, which is the way out an ordinary member did not have", () => {
+  /*
+    ⚠️ THE TWO OPERATIONS EITHER SIDE OF THIS ONE BOTH REFUSE. `member.remove`
+    wants `member:manage`, which somebody removing themselves does not have, and
+    `exit.close` wants `workspace:close` and takes the workspace down for
+    everybody in it. So a reader invited once was in for life and had to ask the
+    people they were leaving to let them out.
+
+    ⚠️ AND IT IS DRIVEN FROM THE ACCOUNT DOOR, which is the whole point. Leaving
+    somewhere must not require going there — a workspace whose standing has closed
+    its own origin is precisely one somebody wants out of.
+  */
+  const HOME = "https://leaving.hello.4dl.app";
+  const ID = "https://id.4dl.app";
+  const call = (origin: string) => (cookie: string) => async (path: string, body?: unknown) => {
+    const res = await worker.fetch(
+      new Request(`${origin}${path}`, {
+        method: body === undefined ? "GET" : "POST",
+        headers: { "content-type": "application/json", cookie },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      }),
+      env as never,
+    );
+    return { status: res.status, body: (await res.json()) as Record<string, never> };
+  };
+  const here = call(HOME);
+  const account = call(ID);
+
+  let boss: ReturnType<typeof here>;
+  let home = "";
+
+  beforeAll(async () => {
+    const founding = await signIn("leaving@example.test", SETUP);
+    const made = await post(SETUP, "/api/identity.workspace.create", { slug: "leaving" }, founding);
+    home = made.body.tenantId as string;
+    boss = here(await signIn("leaving@example.test", HOME));
+    await boss("/api/member.invite", { email: "goer@example.test", role: "reader" });
+  });
+
+  it("lets a member out, and frees the seat behind them", async () => {
+    /* ⚠️ Signing in at the workspace is what CLAIMS the invitation — a membership
+       with no account behind it is not somebody who can leave. */
+    const goer = await signIn("goer@example.test", HOME);
+    expect((await here(goer)("/api/note.list")).status).toBe(200);
+
+    const before = ((await boss("/api/member.list")).body as unknown as Roster);
+    expect(before.seats.used).toBe(2);
+
+    /*
+      ⚠️ AND A SECOND SESSION FOR THE ACCOUNT DOOR, because the product's cookie
+      does not travel to `id.4dl.app` — it sits beside `hello.4dl.app` rather than
+      under it. What crosses is the ACCOUNT. Reusing the workspace's cookie here
+      is a test that would pass on a deployment where one product's session opened
+      every other product's account controls.
+    */
+    const mine = await signIn("goer@example.test", ID);
+    expect((await account(goer)("/api/me.leave", { tenantId: home })).status).toBe(403);
+    expect((await account(mine)("/api/me.leave", { tenantId: home })).status).toBe(200);
+
+    const after = ((await boss("/api/member.list")).body as unknown as Roster);
+    expect(after.members.some((m) => m.email === "goer@example.test")).toBe(false);
+    expect(after.seats.used).toBe(1);
+    /* ⚠️ And the door shuts with them. */
+    expect((await here(goer)("/api/note.list")).status).toBe(403);
+  });
+
+  it("refuses the last person who can let anybody back in", async () => {
+    /*
+      ⚠️ A WORKSPACE WHOSE LAST ADMINISTRATOR WALKS OUT IS NOT CLOSED — it is
+      unreachable, with its records intact, its bill running, and nobody able to
+      invite anybody into it. This is the same rule `member.remove` asks, which is
+      why it is one function: the doors differ in who may knock, never in the
+      answer.
+    */
+    const owner = await signIn("leaving@example.test", ID);
+    const out = await account(owner)("/api/me.leave", { tenantId: home });
+    expect(out.status).toBe(409);
+
+    const roster = ((await boss("/api/member.list")).body as unknown as Roster);
+    expect(roster.members.some((m) => m.email === "leaving@example.test")).toBe(true);
+  });
+
+  it("answers a workspace somebody is not in exactly as it answers one that is not there", async () => {
+    /*
+      ⚠️ OR THIS IS AN EXISTENCE ORACLE. Two different refusals would let any
+      signed-in account discover which workspace ids are real, one guess at a
+      time, from a door every account can reach.
+    */
+    const stranger = await signIn("not-in-it@example.test", ID);
+    const real = await account(stranger)("/api/me.leave", { tenantId: home });
+    const invented = await account(stranger)("/api/me.leave", { tenantId: "t_no_such_thing" });
+    expect(real.status).toBe(404);
+    expect(invented.status).toBe(404);
+    /* ⚠️ EVERYTHING BUT THE `ref`, which is one request's own id and is SUPPOSED
+       to differ — it is what joins a refusal somebody saw to the line in the log
+       that explains it. Comparing the whole body asserts that two requests are
+       the same request. */
+    const { ref: _one, ...said } = real.body as Record<string, unknown>;
+    const { ref: _two, ...alsoSaid } = invented.body as Record<string, unknown>;
+    expect(said).toEqual(alsoSaid);
+  });
+});

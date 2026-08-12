@@ -3217,6 +3217,33 @@
       "status": "live",
       "impl": "web/test/screens.test.tsx",
       "proves": "shows the app's own reason rather than one of its own"
+    },
+    {
+      "id": "a-member-can-leave",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "hello/test/membership.test.ts",
+      "proves": "lets a member out, and frees the seat behind them",
+      "fails": "a workspace nobody but an administrator can get out of — `member.remove` wants `member:manage`, which somebody removing themselves does not have, and `exit.close` wants `workspace:close` and takes the workspace down for everybody, so a reader invited once was in for life"
+    },
+    {
+      "id": "leaving-cannot-strand-a-workspace",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "hello/test/membership.test.ts",
+      "proves": "refuses the last person who can let anybody back in",
+      "fails": "a workspace that is not closed but unreachable — records intact, bill running, and nobody left who can invite anybody into it. One rule (`wouldStrand`) asked by both doors, so it cannot hold on the administrator's and not on the account's"
+    },
+    {
+      "id": "leaving-is-not-an-existence-oracle",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "hello/test/membership.test.ts",
+      "proves": "answers a workspace somebody is not in exactly as it answers one that is not there",
+      "fails": "any signed-in account discovering which workspace ids are real, one guess at a time, from a door every account can reach"
     }
   ]
 }

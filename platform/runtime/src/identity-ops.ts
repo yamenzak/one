@@ -20,6 +20,7 @@ import type { AnyOperation, AppSpec, BindingSpec, Credential, Instant, Session, 
 import { nothing, operation, PUBLIC, s, shouldOfferRootCredential } from "@one/kernel";
 import { b64u, verifyAssertion, verifyRegistration } from "./webauthn.js";
 import type { IdentityStore, SessionStore } from "./identity.js";
+import { type Membership, wouldStrand } from "./membership.js";
 import { sessionCookie, clearedCookie, SESSION_RECHECK_MS } from "./identity.js";
 
 /** ⚠️ A symbol, so an app cannot reach the platform's stores by writing a name. */
@@ -51,6 +52,23 @@ export interface PlatformDeps {
    * "where do I belong" is a question one store cannot answer alone.
    */
   mineIn(tenantIds: readonly string[]): Promise<ReadonlySet<string>>;
+  /**
+   * ⚠️ ONE WORKSPACE'S MEMBERS, FOUND ONCE AND HANDED BACK STILL OPEN. Leaving
+   * is a WRITE into a region this door does not know, and the read that decides
+   * whether it is allowed must land in the same store as the write it decides —
+   * two lookups is a second chance to find a different region, which is a rule
+   * checked against one list of members and applied to another.
+   *
+   * Null where the workspace is unknown here, so a caller cannot tell a
+   * workspace with no members from one that does not exist.
+   */
+  membershipIn(tenantId: string): Promise<WorkspaceMembership | null>;
+}
+
+/** Who is in a workspace, and the one write this door may make against them. */
+export interface WorkspaceMembership {
+  readonly members: readonly Membership[];
+  revoke(id: string, at: Instant): Promise<boolean>;
 }
 
 export interface PlatformCarrier { readonly [PLATFORM]: PlatformDeps }
@@ -709,7 +727,75 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     },
   });
 
-  return [requestCode, verifyCode, registerBegin, registerFinish, signInBegin, signInFinish, whoami, signOut, preferences, setPreferences, sessionList, endSession, keyList, keyRemove, workspaces] as unknown as readonly AnyOperation[];
+  /**
+   * LEAVING, WHICH NOBODY BUT AN ADMINISTRATOR COULD DO.
+   *
+   * ⚠️ THE ONE WAY OUT THAT WAS MISSING. `member.remove` needs `member:manage`,
+   * which a person removing themselves does not have, and `exit.close` needs
+   * `workspace:close` and closes the workspace for everybody. So an ordinary
+   * member — a client, a coach, anybody invited once — could be in a workspace
+   * for life and had to ask the people they were leaving to let them out.
+   *
+   * ⚠️ IT IS ON THE ACCOUNT'S DOOR, NOT THE WORKSPACE'S. Leaving somewhere you no
+   * longer want to be must not require going there, and the list you are leaving
+   * from is the account centre's — a workspace whose standing has closed its own
+   * origin is exactly one somebody wants out of.
+   *
+   * ⚠️ AND IT NAMES THE WORKSPACE IN THE INPUT, which is safe only because the
+   * list of members is asked afterwards: the caller says where, and their own membership
+   * there is what authorises it. Nothing about the id itself is trusted.
+   */
+  const leave = operation({
+    id: "me.leave",
+    kind: "write",
+    summary: "Leave a workspace you are in.",
+    input: s.object({ tenantId: s.text({ max: 40 }) }),
+    output: s.object({ left: s.text() }),
+    /*
+      ⚠️ PUBLIC IS THE LANE, AND THE SESSION IS THE AUTHORISATION. There is no
+      permission that means "may leave": every member may, by definition, and a
+      workspace that could withhold it would be one nobody can get out of. The
+      handler refuses without a session, like every other `me.*` write.
+    */
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    audit: (i: { tenantId: string }) => ({ subject: i.tenantId, verb: "leave" }),
+    outcome: { message: "You have left", tone: "success", invalidates: ["me.workspaces"] },
+    fails: ["platform.forbidden", "platform.not_found", "platform.conflict"],
+    /*
+      ⚠️ NOT A TOOL. Leaving is irreversible without an invitation from people
+      you have just left, so a model that can do it from a sentence in something
+      it was asked to read can lock somebody out of their own coach.
+    */
+    tool: false,
+    async handler(ctx, input: { tenantId: string }) {
+      const d = deps(ctx);
+      if (!d.session) ctx.fail("platform.forbidden", { reason: "sign in first" });
+
+      const there = await d.membershipIn(input.tenantId);
+      /*
+        ⚠️ NOT A MEMBER AND NOT A WORKSPACE ARE THE SAME ANSWER, deliberately.
+        Distinguishing them turns this into a way of asking whether a workspace
+        exists, one id at a time, from any signed-in account.
+      */
+      const mine = there?.members.find((m) => m.accountId === d.session!.accountId) ?? null;
+      if (!mine) ctx.fail("platform.not_found", { field: "tenantId" });
+
+      /*
+        ⚠️ THE SAME RULE THE ADMINISTRATOR'S DOOR ASKS, and it is not a courtesy
+        here — it is the whole reason this operation is safe to expose. The last
+        person who can manage members walking out leaves the workspace running,
+        billed, and impossible to re-enter.
+      */
+      if (wouldStrand(app.access.roles, there!.members, mine!.id)) {
+        ctx.fail("platform.conflict", { field: "tenantId", reason: "last_administrator" });
+      }
+      await there!.revoke(mine!.id, ctx.now());
+      return { left: input.tenantId };
+    },
+  });
+
+  return [requestCode, verifyCode, registerBegin, registerFinish, signInBegin, signInFinish, whoami, signOut, preferences, setPreferences, sessionList, endSession, keyList, keyRemove, workspaces, leave] as unknown as readonly AnyOperation[];
 }
 
 /* ⚠️ An unreadable copy is no branding rather than a throw on a list somebody

@@ -1,5 +1,11 @@
 /**
- * THE ROSTER'S SURFACE — invite, re-role, remove, and leave.
+ * THE ROSTER'S SURFACE — invite, re-role, and remove.
+ *
+ * ⚠️ LEAVING IS NOT HERE. It is `me.leave` in `identity-ops.ts`, on the ACCOUNT's
+ * door, because everything in this file wants `member:manage` — which is exactly
+ * what somebody removing themselves does not have. The two share `wouldStrand`
+ * and nothing else: one rule, asked by both doors, so a workspace cannot be
+ * stranded through the one nobody re-checked.
  *
  * ⚠️ THERE IS NO `member.create`. A membership is made by inviting an ADDRESS
  * and claimed by whoever signs in with it; an operation that took an account id
@@ -14,7 +20,7 @@
 
 import type { AnyOperation, AppSpec, BindingSpec, Instant, SqlHandle, TenantId, UserId } from "@one/kernel";
 import { canGrant, operation, s, withinQuota } from "@one/kernel";
-import { invite, membersOf, permissionsOf, revoke, seatsUsed, setPermissions } from "./membership.js";
+import { invite, membersOf, permissionsOf, revoke, seatsUsed, setPermissions, wouldStrand } from "./membership.js";
 
 /** ⚠️ A symbol, so an app cannot reach the store by writing a property name. */
 export const MEMBERS = Symbol.for("one.runtime.members");
@@ -164,16 +170,11 @@ export function membershipOperations<B extends BindingSpec>(app: AppSpec<B>): re
       const target = members.find((m) => m.id === input.id);
       if (!target) ctx.fail("platform.not_found", { field: "id" });
       /*
-        ⚠️ THE LAST HOLDER OF A ROLE THAT CAN MANAGE MEMBERS MAY NOT BE REMOVED.
-        A workspace whose last owner leaves is not closed — it is unreachable,
-        with its data intact and nobody able to invite anybody back into it. The
-        way out of a workspace is closing it, which is a different operation with
-        a different confirmation and an export attached.
+        ⚠️ THE SAME RULE `me.leave` ASKS, and asking it here in its own words is
+        what this call replaced. Stranding a workspace is one question about one
+        table; the two doors differ in who may knock, never in the answer.
       */
-      const managers = new Set(
-        roles.filter((r) => (app.access.roles[r] ?? []).includes("member:manage")),
-      );
-      if (managers.has(target!.role) && members.filter((m) => managers.has(m.role)).length === 1) {
+      if (wouldStrand(app.access.roles, members, input.id)) {
         ctx.fail("platform.conflict", { field: "id", reason: "last_administrator" });
       }
       await revoke(d.db, d.tenantId, target!.id, ctx.now());

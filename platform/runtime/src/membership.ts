@@ -257,6 +257,37 @@ export async function revoke(db: SqlHandle, tenantId: TenantId, id: string, at: 
 }
 
 /**
+ * WHETHER TAKING THIS MEMBER OUT WOULD STRAND THE WORKSPACE.
+ *
+ * ⚠️ A WORKSPACE WITH NOBODY WHO CAN MANAGE MEMBERS IS NOT CLOSED — IT IS
+ * UNREACHABLE. Its data is intact, its bill keeps running, and there is nobody
+ * left who can invite anybody back in. Closing is a different operation with a
+ * different confirmation and an export attached; this is the accident that looks
+ * like it and cannot be undone from inside.
+ *
+ * ⚠️ ONE ANSWER, ASKED BY BOTH DOORS. An administrator removing somebody and a
+ * person removing themselves are the same question about the same table, reached
+ * through different permissions — and two implementations of it is how a
+ * workspace comes to be strandable through the door nobody re-checked. It is pure
+ * so that both can ask it having already read the roster once.
+ *
+ * ⚠️ AND IT ASKS THE MANIFEST WHICH ROLES COUNT, rather than naming an owner. An
+ * app whose administrators are called something else is the ordinary case, and a
+ * hardcoded role name fails open — every removal allowed, silently.
+ */
+export function wouldStrand(
+  roles: RoleRegistry,
+  members: readonly Membership[],
+  id: string,
+): boolean {
+  const target = members.find((m) => m.id === id);
+  if (!target) return false;
+  const manages = (role: string) => (roles[role] ?? []).includes("member:manage");
+  if (!manages(target.role)) return false;
+  return members.filter((m) => manages(m.role)).length === 1;
+}
+
+/**
  * Narrow or widen one member within their role.
  *
  * ⚠️ A DIFF, NOT A REPLACEMENT SET. "Everything the role gives, except this one
