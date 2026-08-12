@@ -101,8 +101,14 @@ const DEV = `
 .host { min-block-size: 100dvh; display: grid; place-content: center; gap: 14px; justify-items: center;
   background: #101014; color: #6c6c76;
   font: 400 14px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
-.host button { appearance: none; border: 1px solid #303038; background: #1b1b21; color: #c9c9d2;
+.host > button { appearance: none; border: 1px solid #303038; background: #1b1b21; color: #c9c9d2;
   border-radius: 8px; padding: 9px 14px; font: inherit; cursor: pointer; }
+/* ⚠️ THE DEMO INSIDE THE HOST IS PRODUCT, NOT CHROME. The monospace above says
+   "this is scaffolding"; inherited by the app form it would make every judgement
+   about that form a judgement about a typeface the product does not use. */
+.app-form { inline-size: min(100%, 420px); padding-inline: 16px;
+  display: grid; gap: 10px; color: var(--ink);
+  font: 400 16px/1.45 var(--font-text); word-spacing: 0.08em; }
 .dial { position: fixed; inset-block-end: 16px; inset-inline-start: 16px; z-index: 999;
   pointer-events: auto;
   display: flex; flex-direction: column; align-items: flex-start; gap: 10px;

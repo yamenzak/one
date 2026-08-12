@@ -557,9 +557,11 @@ export const AboutBody = ({ item }: { readonly item: Item }): ReactNode => {
 export const KeptHere = ({ onOpen }: { readonly onOpen: () => void }): ReactNode => (
   <button type="button" className="kept-sign press" onClick={onOpen}>
     <Lockup word="Vault" />
-    <span className="kept-said">
-      Kept by your account, not by this app. You choose who sees each one.
-    </span>
+    {/* ⚠️ THE HALF NOBODY KNOWS, AND NOT THE OTHER HALF. "You choose who sees each
+        one" is true and is already said by the card, the screen and the sheet
+        this chevron opens — said a fourth time under a form it is a second line
+        of caption spending its length on something the next tap explains. */}
+    <span className="kept-said">Kept by your account, not by this app.</span>
     <Onward className="chevron" />
   </button>
 );

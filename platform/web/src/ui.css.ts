@@ -762,17 +762,18 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 .note.kept .lockup { font-size: 15px; color: var(--ink); }
 .kept-said { font-size: 13.5px; line-height: 1.45; }
 
-/* ⚠️ A SIGN OVER A GROUP, AND IT GOES SOMEWHERE. It is the one row on a form that
-   is not a field, so it is set apart by its ground rather than by a rule — a line
-   above a group of inputs reads as a fieldset border, which is a form inside a
-   form. */
+/* ⚠️ A SIGN UNDER A GROUP IS A CAPTION, NOT A ROW. Given the card's ground it
+   reads as one more thing on the form — a peer of the fields, inviting the guess
+   that it is another one — when what it does is explain the ones above it. So it
+   carries no ground of its own and sits in the margin the card already has. */
 .kept-sign { display: grid; grid-template-columns: 1fr auto; align-items: center;
-  gap: 4px 10px; inline-size: 100%; padding: 12px 14px; text-align: start;
-  border: 0; border-radius: var(--radius-card); background: var(--well);
-  color: inherit; font: inherit; cursor: pointer; }
-.kept-sign .lockup { grid-column: 1; font-size: 15px; }
-.kept-sign .kept-said { grid-column: 1 / -1; color: var(--ink-quiet); }
+  gap: 3px 10px; inline-size: 100%; padding: 4px 14px 0; text-align: start;
+  border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.kept-sign .lockup { grid-column: 1; font-size: 14px; color: var(--ink-quiet); }
+.kept-sign .kept-said { grid-column: 1 / -1; color: var(--ink-faint); }
 .kept-sign .chevron { grid-column: 2; grid-row: 1; color: var(--ink-faint); }
-.kept-sign:hover { background: color-mix(in oklab, var(--ink) 12%, transparent); }
+/* ⚠️ THE MARK BRIGHTENS RATHER THAN THE GROUND. A hover ground would put the card
+   back, one state later. */
+.kept-sign:hover .lockup { color: var(--ink); }
 .kept-sign:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 `.trim();

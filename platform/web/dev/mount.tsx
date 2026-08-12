@@ -29,7 +29,10 @@ import { AccountCenter } from "../src/account/center.js";
 import { AccountDetails } from "../src/account/details.js";
 import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
 import { PreferencesScreen, type Preferences } from "../src/account/preferences.js";
-import { VaultScreen, type Kept, type Looked, type Where } from "../src/account/vault.js";
+import { KeptHere, meaning, VaultScreen, type Kept, type Looked, type Where } from "../src/account/vault.js";
+import { ValueEditor, type EditableField } from "../src/editor.js";
+import { Card, Entry } from "../src/list.js";
+import { Edit } from "../src/icon.js";
 import { ConsentSheet, type Asked } from "../src/consent.js";
 import { SignInMethods } from "../src/account/signin.js";
 import { Stack } from "../src/stack.js";
@@ -359,6 +362,10 @@ function Preview() {
           as laid over an app or as having navigated away from one. */}
       <div className="host">
         <p>the app the person was in</p>
+        {/* ⚠️ THE SIGN GOES SOMEWHERE, and this is the whole reason it is a
+            button: an app field bound to the vault is the one place a person
+            meets the vault without having gone looking for it. */}
+        <AppFields onSave={save} onOpenVault={() => { setAt("vault"); setOpen(true); }} />
         <button type="button" onClick={() => setOpen(true)}>Open the account centre</button>
       </div>
 
@@ -399,6 +406,59 @@ function Preview() {
           aria-expanded={dial} onClick={() => setDial((d) => !d)}>⚙</button>
       </div>
     </>
+  );
+}
+
+/**
+ * AN APP'S OWN FORM, WITH ONE FIELD THAT IS A VAULT FACT.
+ *
+ * ⚠️ THE POINT IS THAT THEY LOOK THE SAME. A vault fact is not a special control
+ * an app opts into — it is an ordinary row that happens to save somewhere else,
+ * and the only difference visible anywhere is a sign over the group and a line in
+ * the sheet. A preview that gave it its own styling would be arguing for the
+ * design the binding exists to avoid.
+ *
+ * ⚠️ AND THE SENTENCE COMES FROM `meaning`, not from here — the same function the
+ * vault screen renders, given the same item. Typing the words beside the fixture
+ * would make this picture prove that two copies agree, which is the one thing it
+ * must not be able to show.
+ */
+function AppFields({ onSave, onOpenVault }: {
+  readonly onSave: (name: string, value: string) => Promise<Problem | null>;
+  readonly onOpenVault: () => void;
+}) {
+  const [editing, setEditing] = useState<string | null>(null);
+  const height = VAULT_WHERES[0]!.items.find((i) => i.fact === "body.height")!;
+
+  const fields: readonly EditableField[] = [
+    {
+      name: "gym", kind: "text", title: "Where you train", label: "Gym",
+      value: "Haddad Strength, Achrafieh",
+    },
+    {
+      name: "height", kind: "text", title: "Your height", label: "Height",
+      value: "178 cm", fact: height.fact, kept: meaning(height, height.reach),
+    },
+  ];
+
+  return (
+    <div className="app-form">
+      <Card className="entries">
+        {fields.map((f) => (
+          <Entry key={f.name} label={f.label} affordance={<Edit className="pencil" />} onEdit={() => setEditing(f.name)}>
+            {f.value}
+          </Entry>
+        ))}
+      </Card>
+      {/* ⚠️ ONCE, UNDER THE GROUP. Said per row it is five repetitions of one fact
+          about the account; said here it is a sign on a drawer. */}
+      <KeptHere onOpen={onOpenVault} />
+      <ValueEditor
+        field={fields.find((f) => f.name === editing) ?? null}
+        onSave={onSave}
+        onClose={() => setEditing(null)}
+      />
+    </div>
   );
 }
 
