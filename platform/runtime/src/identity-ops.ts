@@ -20,7 +20,7 @@ import type { AnyOperation, AppSpec, BindingSpec, Credential, Instant, Session, 
 import { nothing, operation, PUBLIC, s, shouldOfferRootCredential } from "@one/kernel";
 import { b64u, verifyAssertion, verifyRegistration } from "./webauthn.js";
 import type { IdentityStore, SessionStore } from "./identity.js";
-import { sessionCookie, clearedCookie } from "./identity.js";
+import { sessionCookie, clearedCookie, SESSION_RECHECK_MS } from "./identity.js";
 
 /** ⚠️ A symbol, so an app cannot reach the platform's stores by writing a name. */
 export const PLATFORM = Symbol.for("one.runtime.platform");
@@ -410,16 +410,25 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
   const preferences = operation({
     id: "me.preferences",
     kind: "read",
-    summary: "How you read weights and measures.",
+    summary: "How you read things, and how the app answers.",
     input: nothing(),
-    output: s.object({ units: s.text(), layout: s.json() }),
+    output: s.object({
+      units: s.text(), layout: s.json(), theme: s.text(), locale: s.text(),
+      sound: s.bool(), haptics: s.bool(),
+    }),
     permission: PUBLIC,
     idempotency: { mode: "none" },
     async handler(ctx) {
       const d = deps(ctx);
-      if (!d.session) return { units: "", layout: [] };
-      const row = await d.directory.first<{ units: string | null; layout: string | null }>(
-        `SELECT units, layout FROM accounts WHERE id = ?`, d.session.accountId,
+      /* ⚠️ THE SAME SHAPE SIGNED OUT AS SIGNED IN. A response missing half its
+         keys makes a client branch on presence rather than on value, and the
+         branch that forgets renders `undefined` as a theme. */
+      if (!d.session) return { units: "", layout: [], theme: "", locale: "", sound: false, haptics: true };
+      const row = await d.directory.first<{
+        units: string | null; layout: string | null; theme: string | null;
+        locale: string | null; sound: number | null; haptics: number | null;
+      }>(
+        `SELECT units, layout, theme, locale, sound, haptics FROM accounts WHERE id = ?`, d.session.accountId,
       ).catch(() => null);
       /* ⚠️ Empty means "whatever this deployment's format says", which is the
          honest answer for somebody who has never chosen. Substituting one here
@@ -430,16 +439,43 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
         it is ignored by whoever renders it, which is what keeps a rename from
         blanking somebody's dashboard.
       */
-      return { units: row?.units ?? "", layout: parseLayout(row?.layout ?? "") };
+      /*
+        ⚠️ THE FEEDBACK DEFAULTS ARE HAPTICS ON AND SOUND OFF, AND THEY LIVE
+        HERE RATHER THAN IN THE SCREEN. A default applied by whichever surface
+        renders first is a default that differs between a phone and a desktop,
+        and nobody can tell which one they last saw.
+
+        An interface that makes a noise nobody chose is the most
+        complained-about behaviour there is; a tick you feel is silent and is
+        what every native app on the device already does.
+      */
+      return {
+        units: row?.units ?? "",
+        layout: parseLayout(row?.layout ?? ""),
+        theme: row?.theme ?? "",
+        locale: row?.locale ?? "",
+        sound: row?.sound === 1,
+        haptics: row?.haptics !== 0,
+      };
     },
   });
 
   const setPreferences = operation({
     id: "me.preferences.set",
     kind: "write",
-    summary: "Change how you read weights and measures, and what you see first.",
+    summary: "Change how you read things, and how the app answers.",
     input: s.object({
       units: s.optional(s.enum(["", "metric", "imperial"])),
+      /* ⚠️ `""` IS A REAL ANSWER AND IT IS THE DEFAULT: "follow this device".
+         A three-member enum with no empty member would make "system" the one
+         choice somebody could not go back to. */
+      theme: s.optional(s.enum(["", "light", "dark"])),
+      /* ⚠️ BCP 47, and the SET is not checked here. Which languages exist is a
+         fact about what has been translated rather than about a person, and a
+         kernel that policed it would be a kernel with a translation table. */
+      locale: s.optional(s.text({ max: 12 })),
+      sound: s.optional(s.bool()),
+      haptics: s.optional(s.bool()),
       /* ⚠️ Bounded, because it is a list of what to show first rather than a
          place to keep things. */
       layout: s.optional(s.array(s.text({ max: 40 }), { max: 20 })),
@@ -450,7 +486,10 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     outcome: { message: "Saved", tone: "success", invalidates: ["me.preferences"] },
     fails: ["platform.forbidden"],
     tool: false,
-    async handler(ctx, input: { units?: string; layout?: readonly string[] }) {
+    async handler(ctx, input: {
+      units?: string; layout?: readonly string[]; theme?: string;
+      locale?: string; sound?: boolean; haptics?: boolean;
+    }) {
       const d = deps(ctx);
       /*
         ⚠️ PUBLIC IS THE LANE, NOT THE AUDIENCE. Every operation here answers on
@@ -467,10 +506,165 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
       if (input.layout !== undefined) {
         await d.directory.run(`UPDATE accounts SET layout = ? WHERE id = ?`, JSON.stringify(input.layout), d.session!.accountId);
       }
+      if (input.theme !== undefined) {
+        await d.directory.run(`UPDATE accounts SET theme = ? WHERE id = ?`, input.theme, d.session!.accountId);
+      }
+      if (input.locale !== undefined) {
+        await d.directory.run(`UPDATE accounts SET locale = ? WHERE id = ?`, input.locale, d.session!.accountId);
+      }
+      /* ⚠️ Stored as 0/1 rather than as text, so a reader comparing to `1` and
+         one comparing to `"true"` cannot disagree about the same row. */
+      if (input.sound !== undefined) {
+        await d.directory.run(`UPDATE accounts SET sound = ? WHERE id = ?`, input.sound ? 1 : 0, d.session!.accountId);
+      }
+      if (input.haptics !== undefined) {
+        await d.directory.run(`UPDATE accounts SET haptics = ? WHERE id = ?`, input.haptics ? 1 : 0, d.session!.accountId);
+      }
       return { ok: true };
     },
   });
 
+
+  /**
+   * WHERE THIS PERSON IS SIGNED IN, ACROSS EVERY PRODUCT.
+   *
+   * ⚠️ IT READS THE GLOBAL DIRECTORY RATHER THAN THIS APP'S SESSIONS, and that
+   * is the whole point of the surface. A list of one product's sessions answers
+   * a question nobody asked; "where am I signed in" spans apps and regions by
+   * definition, and the regional store structurally cannot see another product.
+   */
+  const sessionList = operation({
+    id: "me.sessions",
+    kind: "read",
+    summary: "Every device and product you are signed in on.",
+    input: nothing(),
+    output: s.object({ sessions: s.json() }),
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    /* ⚠️ Never a tool: it is a map of somebody's devices. */
+    tool: false,
+    async handler(ctx) {
+      const d = deps(ctx);
+      if (!d.session) return { sessions: [] };
+      const rows = await d.directory.all<{
+        id: string; app_id: string; origin: string; created_at: string; expires_at: string; agent: string;
+      }>(
+        `SELECT id, app_id, origin, created_at, expires_at, agent FROM session_directory
+         WHERE account_id = ? ORDER BY created_at DESC LIMIT 100`,
+        d.session.accountId,
+      ).catch(() => []);
+      return {
+        sessions: rows.map((r) => ({
+          id: r.id,
+          appId: r.app_id,
+          origin: r.origin,
+          since: r.created_at,
+          until: r.expires_at,
+          agent: r.agent,
+          /*
+            ⚠️ WHICH ONE IS THE ONE IN YOUR HAND, marked rather than hidden. A
+            list that omitted it would make "sign out everywhere else" the only
+            offered action and leave somebody unable to tell whether the device
+            they are holding is even in the list.
+          */
+          current: r.id === d.session!.id,
+        })),
+      };
+    },
+  });
+
+  const endSession = operation({
+    id: "me.session.revoke",
+    kind: "write",
+    summary: "Sign out one device.",
+    input: s.object({ id: s.text({ max: 128 }) }),
+    output: s.object({ ok: s.bool(), within: s.number() }),
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    outcome: { message: "Signed out", tone: "success", invalidates: ["me.sessions"] },
+    tool: false,
+    fails: ["platform.forbidden"],
+    async handler(ctx, input: { id: string }) {
+      const d = deps(ctx);
+      if (!d.session) ctx.fail("platform.forbidden", { reason: "sign in first" });
+      /*
+        ⚠️ ONE CALL, AND IT SCOPES BOTH STORES TO THIS ACCOUNT. Written as two
+        statements it was two DIFFERENT checks: the directory delete carried the
+        account and the regional one did not, so anybody signed in could end any
+        session in their region whose id they had — the listed row survived and
+        the session stopped working, which is the half that is invisible.
+      */
+      await d.sessions.revokeOwn(input.id, d.session!.accountId);
+      return { ok: true, within: Math.round(SESSION_RECHECK_MS / 1000) };
+    },
+  });
+
+  /**
+   * THE PASSKEYS THIS PERSON HOLDS.
+   *
+   * ⚠️ EVERY ONE OF THEM, NOT THE ONES THIS DOOR COULD PROMPT FOR. `offerable`
+   * narrows to the relying party — which is correct for a sign-in screen and
+   * wrong for a list somebody manages: a credential registered under one product
+   * before the relying party was raised is still theirs, still works there, and
+   * would be invisible here, so they could not remove it from anywhere.
+   */
+  const keyList = operation({
+    id: "me.passkeys",
+    kind: "read",
+    summary: "The passkeys on your account.",
+    input: nothing(),
+    output: s.object({ passkeys: s.json() }),
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    tool: false,
+    async handler(ctx) {
+      const d = deps(ctx);
+      if (!d.session) return { passkeys: [] };
+      const all = await d.identity.credentials(d.session.accountId).catch(() => []);
+      return {
+        passkeys: all.map((c) => ({
+          id: c.id,
+          label: c.label,
+          added: c.createdAt,
+          /* ⚠️ WHERE IT WORKS, in the words of the thing it works on. A
+             credential bound to one product and one bound to the platform are
+             different objects to somebody deciding which to keep. */
+          relyingParty: c.relyingParty,
+        })),
+      };
+    },
+  });
+
+  const keyRemove = operation({
+    id: "me.passkey.remove",
+    kind: "write",
+    summary: "Remove a passkey.",
+    input: s.object({ id: s.text({ max: 255 }) }),
+    output: s.object({ ok: s.bool() }),
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    outcome: { message: "Removed", tone: "success", invalidates: ["me.passkeys"] },
+    tool: false,
+    fails: ["platform.forbidden", "platform.conflict"],
+    async handler(ctx, input: { id: string }) {
+      const d = deps(ctx);
+      if (!d.session) ctx.fail("platform.forbidden", { reason: "sign in first" });
+      const all = await d.identity.credentials(d.session!.accountId).catch(() => []);
+      if (!all.some((c) => c.id === input.id)) ctx.fail("platform.forbidden", { reason: "not yours" });
+      /*
+        ⚠️ THE LAST ONE IS REFUSED, AND THIS IS NOT PATERNALISM. Sign-in is
+        passkeys and an emailed code; removing the last passkey leaves the code,
+        which is a real lane — but somebody who has also lost access to that
+        address has locked themselves out of every product at once with one tap
+        and no warning. The refusal is cheap and the mistake is not reversible.
+      */
+      if (all.length <= 1) {
+        ctx.fail("platform.conflict", { reason: "this is your only passkey" });
+      }
+      await d.identity.removeCredential(input.id, d.session!.accountId);
+      return { ok: true };
+    },
+  });
 
   /**
    * Every workspace this person belongs to.
@@ -515,7 +709,7 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     },
   });
 
-  return [requestCode, verifyCode, registerBegin, registerFinish, signInBegin, signInFinish, whoami, signOut, preferences, setPreferences, workspaces] as unknown as readonly AnyOperation[];
+  return [requestCode, verifyCode, registerBegin, registerFinish, signInBegin, signInFinish, whoami, signOut, preferences, setPreferences, sessionList, endSession, keyList, keyRemove, workspaces] as unknown as readonly AnyOperation[];
 }
 
 /* ⚠️ An unreadable copy is no branding rather than a throw on a list somebody

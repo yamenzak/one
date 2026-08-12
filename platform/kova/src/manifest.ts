@@ -719,7 +719,7 @@ export const KOVA_VAULT = {
       why: "Your coach writes your programme against this. It is the one thing they genuinely cannot work around, and it is still yours to withhold.",
     },
     {
-      fact: "goal.nutrition",
+      fact: "goal.eating",
       need: "raw",
       recommend: "staff",
       why: "So a week of meals is one you would actually eat, rather than one you have to keep declining.",

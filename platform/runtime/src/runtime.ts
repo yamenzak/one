@@ -652,12 +652,16 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       if (sharedConfigDb) await once("shared-config", () => applySchema(sharedConfigDb, SHARED_MODULES).then(() => undefined));
 
       const identity = identityStore(identityDb);
-      const sessions = sessionStore(bind[opts.sessionsBinding] as SqlHandle);
+      /* ⚠️ THE DIRECTORY TRAVELS WITH THE STORE, because signing in indexes a
+         session globally and reading one weighs it against that index. Without
+         it a session is invisible to the account centre and unrevokable from
+         there — which is exactly the session somebody would want to end. */
+      const sessions = sessionStore(bind[opts.sessionsBinding] as SqlHandle, identityDb);
       const cookieId = readCookie(request.headers.get("cookie"), SESSION_COOKIE);
       let session: Session | null = null;
       if (cookieId) {
-        const found = await sessions.read(cookieId);
         const now = new Date().toISOString() as Instant;
+        const found = await sessions.read(cookieId, now);
         if (found) {
           const verdict = validateSession(found, { origin: url.origin, appId: app.id }, now);
           if (verdict.ok) session = verdict.session;

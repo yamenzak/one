@@ -18,6 +18,10 @@
  * Radix keeps the node mounted until an animation on it finishes, so a surface
  * that arrived by rising does not have to leave by disappearing — which is the
  * single thing that most makes a presentation read as a screenshot being swapped.
+ *
+ * vocabulary-exempt-file(client): `clientY` is the pointer event's own field
+ * name. It appears wherever a gesture is measured, and a line exemption on each
+ * would teach everybody that exemptions are routine.
  */
 
 import { useCallback, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";

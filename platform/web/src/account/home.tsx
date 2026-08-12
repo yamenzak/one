@@ -20,7 +20,7 @@
 import type { ElementType, ReactNode } from "react";
 import { Face } from "../avatar.js";
 import { Lockup } from "../brand/mark.js";
-import { Adjust, Guard, Heartbreak, Key, Save } from "../icon.js";
+import { Adjust, Guard, Heartbreak, Key, Locked, Save } from "../icon.js";
 import { Blank, Card, Item, Pill, Waiting } from "../list.js";
 import { Screen, Section } from "../screen.js";
 
@@ -102,7 +102,13 @@ export function AccountHome({ person, workspaces, onGo, onClose, Heading = "h1" 
             onGo={() => onGo("account.profile")}
           />
           <Item icon={<Key />} title="Sign-in methods" detail="Passkeys, codes and devices" onGo={() => onGo("account.security")} />
-          <Item icon={<Adjust />} title="Preferences" detail="Units, language and dates" onGo={() => onGo("account.preferences")} />
+          <Item icon={<Adjust />} title="Preferences" detail="Theme, language, units and feedback" onGo={() => onGo("account.preferences")} />
+          {/* ⚠️ ON THE ACCOUNT'S OWN CARD RATHER THAN UNDER AN APP, because that
+              is where it lives: a fact here belongs to the person and outlives
+              every product they use. A vault reachable only from inside the app
+              that wanted the data would be a control the person could lose by
+              leaving. */}
+          <Item icon={<Locked />} title="Your vault" detail="Who can see what about you" onGo={() => onGo("account.vault")} />
         </Card>
       </Section>
 

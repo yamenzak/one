@@ -25,13 +25,17 @@
  * one fragile thing here and is guarded rather than hoped about. `test/icon.test.tsx`
  * pins the shape of every icon — how many children and in what order — because
  * Lucide redraws icons between versions and a redrawn one does not fail: it moves
- * the wrong part, quietly, forever. Both `KeyRound` and `SlidersHorizontal` have
+ * the wrong part, quietly, forever. Both `KeyRound` and the sliders glyph have
  * already been redrawn once since this file was written.
+ *
+ * vocabulary-exempt-file(slide): Lucide's own component names. `SlidersHorizontal`
+ * is a symbol from a dependency, so it cannot be renamed where it is imported —
+ * and it IS renamed at the boundary, which is what `Adjust` below is.
  */
 
 import type { ReactNode } from "react";
 import {
-  ArrowLeft, Camera, Check, ChevronRight, Download, HeartCrack, KeyRound, Languages,
+  ArrowLeft, Camera, Check, ChevronRight, Download, HeartCrack, KeyRound, Languages, Lock,
   Mail, MonitorSmartphone, Pencil, Plus, Ruler, Shield, SlidersHorizontal, SunMoon,
   Vibrate, Volume2, X, type LucideIcon,
 } from "lucide-react";
@@ -40,7 +44,7 @@ import {
 export type IconName =
   | "key" | "adjust" | "guard" | "save" | "heartbreak" | "letter" | "device"
   | "edit" | "lens" | "onward" | "close" | "back" | "tick" | "add"
-  | "light" | "tongue" | "measure" | "buzz" | "sound";
+  | "light" | "tongue" | "measure" | "buzz" | "sound" | "locked";
 
 export interface IconProps {
   readonly size?: number;
@@ -67,7 +71,8 @@ const draw = (Glyph: LucideIcon, name: IconName, defaultSize: number) =>
 
 /*
   ⚠️ NAMED FOR WHAT THEY MEAN HERE, NOT FOR WHAT LUCIDE CALLS THEM. `Adjust`
-  rather than `SlidersHorizontal`: `slide` is another product's core noun, and the
+  rather than the drawing's own name: that name carries another product's core
+  noun, and the
   kernel's vocabulary guard refuses it in platform code precisely so a shared
   control and a product's own object cannot end up one letter apart in the same
   file. Renaming at the boundary is also what makes swapping a shape later a
@@ -76,6 +81,11 @@ const draw = (Glyph: LucideIcon, name: IconName, defaultSize: number) =>
 export const Key = draw(KeyRound, "key", 21);
 export const Adjust = draw(SlidersHorizontal, "adjust", 21);
 export const Guard = draw(Shield, "guard", 21);
+/* ⚠️ NOT THE SHIELD. A shield is protection — what the platform does — and the
+   account home carries both a vault row and a consent row, so reusing it would
+   put one glyph on two rows meaning different things on the same screen. A lock
+   is what a person's own things are kept behind. */
+export const Locked = draw(Lock, "locked", 21);
 export const Save = draw(Download, "save", 21);
 export const Heartbreak = draw(HeartCrack, "heartbreak", 21);
 export const Edit = draw(Pencil, "edit", 17);
@@ -119,6 +129,7 @@ export const ICON_PARTS: Readonly<Record<IconName, readonly string[]>> = {
   back: ["path", "path"],
   tick: ["path"],
   add: ["path", "path"],
+  locked: ["rect", "path"],
   light: ["path", "path", "path", "path", "path"],
   tongue: ["path", "path", "path", "path", "path", "path"],
   measure: ["path", "path", "path", "path", "path"],

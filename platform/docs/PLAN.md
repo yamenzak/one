@@ -189,7 +189,7 @@ configuration change.
 | **Single credential** — passkey RP = `4dl.app` | **yes** | first sign-in to a second product is one biometric tap, on that product's own branded screen |
 | **Single session** — one cookie across products | **no** | nothing needed, in exchange for an XSS in signage reaching a health record |
 
-#### Why there is no `id.4dl.app`, and no redirect to hide
+#### Why there is no IdP at `id.4dl.app`, and no redirect to hide
 
 Google runs `accounts.google.com` because its properties sit on **different
 registrable domains** — `google.com`, `youtube.com`, `android.com`. Neither
@@ -213,6 +213,40 @@ RP reverses that deliberately. It is defensible because all four relying parties
 are ours and one worker serves each — but it must be a decision recorded here,
 not a side effect of an edit, and it means **anything third-party must never be
 hosted under `4dl.app`.**
+
+#### ⚠️ There IS an `id.4dl.app`, and it is not what the section above rejects
+
+**Answered 2026-08-12, and the two questions are genuinely different.** What is
+rejected above is an *identity provider* — a place a product SENDS you to sign in
+and then sends you back. Nothing does that here: the ceremony still runs on each
+product's own origin against a credential scoped to the platform root.
+
+What is BUILT is a **destination**. A person's relationship with their own data
+does not end when they stop using a product — their facts, their grants, their
+credentials, the record of who read what — so there has to be an address for it
+that no app owns. `identity` is a door in `classifyHost`, it resolves no tenant,
+and it is where the account centre and the vault answer.
+
+Three consequences worth stating once:
+
+- **One passkey reaches it with no second registration.** `relyingPartyFor`
+  returns the platform root there, which is the whole point of raising the RP.
+- **It does NOT share a session with any product.** `id.4dl.app` sits beside
+  `kova.4dl.app` rather than under it, so the cookie does not travel and signing
+  in there is one tap rather than a widened session. That is the §2.4 trade
+  applied consistently rather than a gap.
+- **A second registrable domain cannot share the credential, and no configuration
+  changes that.** `4dl.app` is not a registrable-domain suffix of
+  `fourdegreelabs.com`, so `tenancy.aliases` declares what an alias IS: `redirect`
+  (canonical, nothing served, nothing to sign into) or `origin` (its own relying
+  party, its own cookie jar, and a person needs a second passkey). Redirect is the
+  default and should stay that way for almost every alias — a serving origin buys
+  a nicer URL and costs somebody a credential.
+
+⚠️ **Declaring them is also a security control.** A hostname the classifier does
+not recognise falls through to the CUSTOM-DOMAIN lookup, which asks which tenant
+registered it — so a domain we own and did not declare is one a tenant's claim can
+be served at. `id.4dl.app` and every sibling product's root are `unclaimed` now.
 
 #### The migration is additive
 
@@ -505,7 +539,8 @@ Your list, answered. Where a row says **new**, no app has it today.
 
 | Subsystem | Design | Source today |
 |---|---|---|
-| **Identity** | Shared identity D1 bound into every worker; passkey RP raised to `4dl.app`; sessions stay per-app and per-region. No IdP, no redirect (§2.4). | `@4dl/auth`, per-app RP |
+| **Identity** | Shared identity D1 bound into every worker; passkey RP raised to `4dl.app`; sessions stay per-app and per-region. No IdP, no redirect (§2.4). The account centre has its own DOOR at `id.4dl.app` — a destination, not an IdP (§2.4a). | `@4dl/auth`, per-app RP |
+| **The 4° Vault** | A person's sensitive facts held once, at the ACCOUNT, disclosed per app at a rung they chose and for as long as they chose. Readings computed inside it, granted separately from their inputs. [VAULT.md](VAULT.md). | **new** |
 | **Tenancy + doors** | Five doors kept — they are correct. Region added as a tenant property resolved at the host gate. | `@4dl/tenancy` |
 | **Regions (EU/global)** | §4.1 — the hardest item on the list | **new** |
 | **Standing + dunning** | One ladder, one set of rungs, per-app copy in the manifest. Reads never gated at any rung; leaving always allowed. | `@4dl/billing` + `@4dl/tenancy` |
@@ -1207,6 +1242,17 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `the-transfer-register-is-a-join` | a transfer register written from what recipients CLAIM to receive rather than from what the product holds — over-disclosure in the direction nobody checks, making a transfer look larger than it is | **live** |
 | `every-recipient-appears-in-the-transfers` | a sub-processor disclosed in one place and absent from the transfer register — the artefact every questionnaire asks for, answerable only by joining what is held to who receives it, and wrong by the next feature in every company that writes it by hand | **live** |
 | `a-missing-send-binding-has-its-own-name` | a deployment configured to send through Cloudflare on a worker with no send_email binding, reported as a refused send — which sends an operator to look at DNS for one line of wrangler.jsonc | **live** |
+| `vault-registry-is-coherent` | a fact declared twice, a reading not namespaced under its fact or not listing it as an input, a device-sealed fact claiming a server-side derivation, or a recommendation with no argument beside it | **live** |
+| `vault-reading-states-what-it-hides` | a derivation that does not say in writing what it cannot reveal — a derivation discloses less than its input only if somebody checked, and that sentence is the check | **live** |
+| `vault-sealed-facts-derive-nothing` | a fact sealed to the person's own device that declares a reading, which no server can compute — a promise the arithmetic cannot keep rather than one merely unimplemented | **live** |
+| `vault-owns-the-fact` | a collection field that shadows a vault fact — a second copy is a disclosure that outlives every grant over it, and the consent controls go on working against data no screen reads | **live** |
+| `vault-want-says-why` | an app asking for a fact with no reason, asking twice for one fact, or recommending more exposure than the fact's own registry entry does | **live** |
+| `vault-columns-exist` | a statement in the vault store naming a column its table does not have — a rename swept every occurrence of one word except the one inside an ON CONFLICT clause, which typechecked, passed fifty resolver tests and threw only on a re-share | **live** |
+| `a-reading-discloses-less-than-its-input` | a derivation that hands back a value it was built to withhold — the natural way to write "how much have they changed" is to return the two endpoints | **live** |
+| `emptiness-is-not-disclosed-to-a-stranger` | a reader with no grant being told the person has recorded nothing, which is itself a fact about them and one nobody granted | **live** |
+| `a-session-is-revoked-in-both-stores` | an account-scoped delete on one store paired with an unscoped one on the other — anybody signed in could end any session in their region whose id they had, leaving the row listed and the session dead | **live** |
+| `our-own-domains-are-not-a-tenant-claim` | a hostname we own falling through to the custom-domain lookup, which asks which TENANT registered it — the sharpest form of the takeover the reserved list exists to prevent | **live** |
+| `an-alias-cannot-borrow-a-credential` | a second registrable domain asserting the platform's relying party — WebAuthn cannot span registrable domains, so the sign-in screen would offer a passkey the browser will never find | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

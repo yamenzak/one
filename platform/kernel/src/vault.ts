@@ -34,7 +34,7 @@
  * the reason this is a mechanism rather than a policy.
  */
 
-import type { Instant, PlainDate, UserId } from "./primitives.js";
+import type { Instant, UserId } from "./primitives.js";
 import type { DataCategory } from "./protection.js";
 
 /* -------------------------------------------------------------- the reach --- */
@@ -268,7 +268,7 @@ export const FACTS: readonly Fact[] = [
     series: true,
     shadows: ["weight", "bodyweight", "bodymass"],
     suggests: "self",
-    because: "A coach can plan from the change without ever seeing the number.",
+    because: "Somebody helping you can plan from the change without ever seeing the number.",
     readings: [
       {
         id: "body.mass.trend",
@@ -381,7 +381,7 @@ export const FACTS: readonly Fact[] = [
     series: false,
     shadows: ["allergies", "allergens", "allergy"],
     suggests: "staff",
-    because: "Somebody planning your meals cannot avoid what they do not know about.",
+    because: "Somebody planning what you eat cannot avoid what they have not been told about.",
   },
   {
     id: "health.injuries",
@@ -392,30 +392,30 @@ export const FACTS: readonly Fact[] = [
     series: false,
     shadows: ["injuries", "injury"],
     suggests: "staff",
-    because: "A coach who does not know cannot program around it.",
+    because: "Somebody planning what you do cannot work around what they have not been told about.",
   },
   /* -------------------------------------------------------------- intent */
   {
     id: "goal.training",
-    label: "What you are working towards",
+    label: "Your goal",
     kind: "text",
     categories: ["health"],
     seal: "server",
     series: false,
     shadows: ["traininggoal", "fitnessgoal"],
     suggests: "staff",
-    because: "This is the one a coach genuinely cannot plan without. It is still yours to withhold.",
+    because: "The one thing somebody helping you genuinely cannot plan without. It is still yours to withhold.",
   },
   {
-    id: "goal.nutrition",
-    label: "How you want to eat",
+    id: "goal.eating",
+    label: "How you eat",
     kind: "text",
     categories: ["health"],
     seal: "server",
     series: false,
-    shadows: ["nutritiongoal", "dietgoal", "dietarypreference"],
+    shadows: ["eatinggoal", "dietgoal", "dietarypreference"],
     suggests: "staff",
-    because: "Nobody can write you a week of meals against a preference they have not been told.",
+    because: "Nobody can plan a week of it against a preference they have not been told.",
   },
 ];
 
@@ -453,16 +453,6 @@ export type Need =
  * part the person needed to read.
  */
 export const NEEDS: readonly Need[] = ["compute", "derived", "raw"];
-
-/**
- * The lowest rung a need requires of the FACT itself.
- *
- * ⚠️ A READING IS GRANTED SEPARATELY, so `derived` asks no more of the value
- * than `compute` does: the arithmetic runs, and what is shown is governed by the
- * reading's own grant. That asymmetry is the whole reason a coach can watch a
- * trend without ever being handed a weight.
- */
-export const needsAtLeast = (need: Need): Reach => (need === "raw" ? "staff" : ARITHMETIC);
 
 /**
  * ONE LINE IN AN APP'S ASK.
@@ -932,45 +922,4 @@ export function vaultActivities(spec: VaultSpec | undefined): readonly VaultActi
       special: fact.categories.some((k) => SPECIAL.has(k)),
     }];
   });
-}
-
-/* ------------------------------------------------------------- the value --- */
-
-/**
- * ONE STORED FACT.
- *
- * ⚠️ `at` IS A PLAIN DATE AND THAT IS DELIBERATE. Every series here is a fact
- * about a day in the person's own reckoning — a weight on Tuesday morning — and
- * an instant would move it across a boundary for anybody east or west of us. The
- * same rule day-bucketed rows already follow.
- */
-export interface Kept {
-  readonly accountId: UserId;
-  readonly fact: string;
-  /** ⚠️ Opaque outside the vault. Today it is the value; tomorrow it is sealed. */
-  readonly sealed: string;
-  readonly seal: Seal;
-  readonly at: PlainDate;
-  readonly recordedAt: Instant;
-}
-
-/**
- * A DISCLOSURE THAT ACTUALLY HAPPENED.
- *
- * ⚠️ ONE ROW PER READER PER FACT PER DAY, NOT ONE PER READ. A row per read is a
- * write on every render, which is a cost nobody accepts and therefore a log
- * somebody turns off. A row per day answers the question a person actually asks
- * — "who has been looking at this" — at a hundredth of the cost, and a log that
- * stays on is worth more than one that is exact.
- */
-export interface Disclosure {
-  readonly accountId: UserId;
-  readonly fact: string;
-  readonly appId: string;
-  readonly tenantId: string | null;
-  /** ⚠️ Who looked. Null where the reader was the app itself computing. */
-  readonly readerId: UserId | null;
-  readonly reach: Reach;
-  readonly on: PlainDate;
-  readonly reads: number;
 }

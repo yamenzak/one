@@ -29,6 +29,8 @@ import { AccountCenter } from "../src/account/center.js";
 import { AccountDetails } from "../src/account/details.js";
 import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
 import { PreferencesScreen, type Preferences } from "../src/account/preferences.js";
+import { VaultScreen, type Held, type Looked } from "../src/account/vault.js";
+import { ConsentSheet, type Asked } from "../src/consent.js";
 import { SignInMethods } from "../src/account/signin.js";
 import { configureFeedback, feel, FEEDBACK_DEFAULT } from "../src/feedback.js";
 
@@ -84,6 +86,64 @@ const OUTCOMES = {
   },
 } satisfies Record<string, Problem | null>;
 
+/*
+  ⚠️ ONE FACT SHARED, ONE HELD AND UNSHARED, ONE NOT RECORDED AT ALL — the three
+  rows that render differently, because a fixture where everything is shared is a
+  picture of one state.
+*/
+const VAULT_HELD: readonly Held[] = [
+  {
+    fact: "body.mass", label: "Weight", held: true,
+    grants: [{ appId: "kova", appName: "Kova", where: "Haddad Strength", reach: "compute", until: null, live: true }],
+  },
+  {
+    fact: "goal.training", label: "Your goal", held: true,
+    grants: [{ appId: "kova", appName: "Kova", where: "Haddad Strength", reach: "staff", until: "1 December", live: true }],
+  },
+  { fact: "body.height", label: "Height", held: true, grants: [] },
+  { fact: "person.sex", label: "Sex at birth", held: true, grants: [] },
+  { fact: "health.allergies", label: "Allergies", held: false, grants: [] },
+  { fact: "health.injuries", label: "Injuries", held: false, grants: [] },
+];
+
+const VAULT_LOOKS: readonly Looked[] = [
+  { fact: "body.mass", label: "Weight", appName: "Kova", who: "Shujaa Haddad", on: "Yesterday", times: 4 },
+  { fact: "goal.training", label: "Your goal", appName: "Kova", who: "Shujaa Haddad", on: "Yesterday", times: 1 },
+  { fact: "body.mass", label: "Weight", appName: "Kova", on: "3 August", times: 12 },
+];
+
+/*
+  ⚠️ THE SHEET AS AN APP WOULD RAISE IT, with one row of each need. A preview
+  with only `raw` asks is one where the rung nobody understands is never drawn.
+*/
+const VAULT_ASKS: readonly Asked[] = [
+  {
+    fact: "body.mass", label: "Weight",
+    why: "Used to work out your energy target, and to show your coach which way things are going.",
+    need: "derived", required: false, recommend: "self",
+    because: "Somebody helping you can plan from the change without ever seeing the number.",
+    reach: "compute",
+    readings: [
+      { id: "body.mass.trend", label: "Weight trend", says: "Which way it is going, and how fast, over the last few weeks.", hides: "Every absolute weight — a direction and a rate, with no starting point to add them to.", reach: "staff" },
+      { id: "body.mass.progress", label: "Change since you started", says: "How much you have changed, as a percentage of where you began.", hides: "Both weights. A percentage of a start the reader does not know is one equation in two unknowns.", reach: "self" },
+    ],
+  },
+  {
+    fact: "goal.training", label: "Your goal",
+    why: "Your coach writes your programme against this.",
+    need: "raw", required: true, recommend: "staff",
+    because: "The one thing somebody helping you genuinely cannot plan without.",
+    reach: "staff", readings: [],
+  },
+  {
+    fact: "body.height", label: "Height",
+    why: "Used with your weight to work out an energy target and a body-mass index.",
+    need: "compute", required: false, recommend: "self",
+    because: "Only needed to work out an energy target, which the platform can do without showing it.",
+    reach: "self", readings: [],
+  },
+];
+
 /** Long enough to see the spinner and know it is a wait, not a stutter. */
 const ROUND_TRIP_MS = 900;
 
@@ -91,7 +151,8 @@ const asked = new URLSearchParams(location.hash.slice(1));
 
 function Preview() {
   const [open, setOpen] = useState(true);
-  const [at, setAt] = useState<"home" | "details" | "signin" | "prefs">("home");
+  const [at, setAt] = useState<"home" | "details" | "signin" | "prefs" | "vault">("home");
+  const [asking, setAsking] = useState(false);
   const [which, setWhich] = useState((asked.get("state") ?? "four") as keyof typeof CASES);
   const [outcome, setOutcome] = useState((asked.get("save") ?? "ok") as keyof typeof OUTCOMES);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
@@ -130,6 +191,16 @@ function Preview() {
   ];
 
   const screen = ({ Heading }: { readonly Heading: ElementType }) =>
+    at === "vault" ? (
+      <VaultScreen
+        held={VAULT_HELD}
+        looks={VAULT_LOOKS}
+        Heading={Heading}
+        onOpen={() => setAsking(true)}
+        onStop={save}
+        onBack={() => setAt("home")}
+      />
+    ) :
     at === "prefs" ? (
       <PreferencesScreen
         prefs={prefs}
@@ -195,9 +266,17 @@ function Preview() {
         {screen}
       </AccountCenter>
 
+      <ConsentSheet
+        open={asking}
+        app="Kova"
+        where="Haddad Strength"
+        asks={VAULT_ASKS}
+        onShare={save}
+        onClose={() => setAsking(false)}
+      />
       <div className="dial" data-open={dial ? "" : undefined} onPointerDown={(e) => e.stopPropagation()}>
         <div className="dial-panel">
-          <Group label="screen" value={at} options={["home", "details", "signin", "prefs"] as const} onPick={setAt} />
+          <Group label="screen" value={at} options={["home", "details", "signin", "prefs", "vault"] as const} onPick={setAt} />
           <Group label="workspaces" value={which} options={Object.keys(CASES) as (keyof typeof CASES)[]} onPick={setWhich} />
           <Group label="save" value={outcome} options={Object.keys(OUTCOMES) as (keyof typeof OUTCOMES)[]} onPick={setOutcome} />
           <Group label="theme" value={theme} options={["dark", "light"] as const} onPick={setTheme} />

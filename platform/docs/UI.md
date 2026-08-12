@@ -1,6 +1,6 @@
 ---
 kind: contract
-verified: 2026-08-11
+verified: 2026-08-12
 ---
 
 # The interface language
@@ -302,6 +302,41 @@ and that screen is exactly where they will be.
 The email code row carried an "Always on" pill *and* a sentence saying the same
 thing, and the pill cost a third line.
 
+### 2.8a Consent
+
+**A decision is a paragraph with a control, not a row with a value.** — Built on
+the row shape, a consent line had a title, a reason, a sentence about what would
+be hidden and a rung all competing for one line: the rung took a third of a phone
+and the words wrapped into a four-word column. A row is for scanning a list; this
+is for reading one thing and deciding about it, so the control goes underneath at
+full width — where it is also a better target.
+
+**The recommendation is an argument, never a default.** — Nothing is
+pre-selected, no switch is already on. Every fact starts at "only me" and the
+suggestion appears beside the choice with its reason. A default that applied
+itself would be a disclosure nobody made, and the whole value of the screen is
+that somebody had to move something.
+
+**A derivation says what it cannot reveal, in writing.** — "Which way it is
+going" and "your weight" are different disclosures, and the second sentence —
+*a direction and a rate, with no starting point to add them to* — is what earns
+the smaller one. Without it a reader has to take on trust that the arithmetic
+gives less away than its input.
+
+**"Done", never "Allow".** — Nothing was allowed as a whole. Every row was
+answered on its own, and one button implying otherwise is the permission prompt
+this screen exists instead of.
+
+**The current answer is always shown, in words.** — A chevron alone makes every
+block look unanswered, so somebody who has already decided cannot see that they
+have and the screen reads as a form they failed to fill in.
+
+**Asking happens where the blank is.** — A consent screen shown once during
+onboarding is answered by somebody who has not seen the feature and cannot weigh
+it. The same question asked where the value would have gone, by a surface that
+says what would fill it, is one somebody can actually answer — and it is an
+invitation, not an error: a withheld fact is a decision the person is entitled to.
+
 ### 2.9 Settings
 
 **A switch for what is on or off, a sheet for one of a few, and neither has a
@@ -335,6 +370,24 @@ already reads English, which is precisely not the person looking for it.
 
 **A summary names what is on, not how many things are.** — "2 of 3" is a count
 somebody would still have to open the screen to identify.
+
+**A list whose rows would all carry the same icon carries none.** — Two
+candidates for the vault's lists were both borrowed meanings — a shield is
+protection, a download arrow is a download — and either way the column repeats
+what the section heading already said.
+
+**Shared first, then the rest.** — A list in registry order buries the three
+things somebody came to check under nine they have never filled in. The screen is
+opened by somebody who wants to stop something, which is a thing they are already
+sharing.
+
+**A lapsed grant is shown, with its date.** — "It ran out" and "I never gave it"
+are the two answers somebody most wants to tell apart, and filtering the first out
+makes them the same screen. The same reason an expiry is a date rather than
+"expires soon": somebody deciding whether to extend needs the day.
+
+**Once is not worth a count.** — "4 times" is information; "1 times" is a
+template showing through.
 
 ### 2.10 Looking
 

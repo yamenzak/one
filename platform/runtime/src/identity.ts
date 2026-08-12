@@ -56,6 +56,21 @@ export const IDENTITY_SCHEMA: SchemaModule = {
   alters: [
     `ALTER TABLE accounts ADD COLUMN units TEXT NOT NULL DEFAULT '';`,
     /*
+      ⚠️ `''` IS "FOLLOW THIS DEVICE" AND IT IS THE DEFAULT, not an unset value
+      somebody has to interpret. A person who has never chosen a theme wants the
+      one their phone is already in, and a stored `light` would override a
+      device that went dark at sunset.
+    */
+    `ALTER TABLE accounts ADD COLUMN theme TEXT NOT NULL DEFAULT '';`,
+    /*
+      ⚠️ HAPTICS ON, SOUND OFF, AS COLUMN DEFAULTS — so every reader agrees
+      without any of them applying a default of its own. An interface that makes
+      a noise nobody chose is the most complained-about behaviour there is; a
+      tick you feel is silent and is what every native app already does.
+    */
+    `ALTER TABLE accounts ADD COLUMN sound INTEGER NOT NULL DEFAULT 0;`,
+    `ALTER TABLE accounts ADD COLUMN haptics INTEGER NOT NULL DEFAULT 1;`,
+    /*
       ⚠️ WHAT THIS PERSON WANTS TO SEE FIRST, and it is theirs rather than the
       workspace's for the same reason units are: two coaches in one studio check
       different things hourly, and a shared order is one that is wrong for
@@ -70,12 +85,59 @@ export const IDENTITY_SCHEMA: SchemaModule = {
  * foreign key here would be a cross-region join on the hot path of every
  * request, which is the cost the whole design exists to avoid.
  */
+/**
+ * WHERE A PERSON IS SIGNED IN, ACROSS EVERY PRODUCT.
+ *
+ * ⚠️ GLOBAL, AND IT IS AN INDEX RATHER THAN AN AUTHORITY. The session itself
+ * stays regional and is read per request with no cross-region hop — that split
+ * is what makes a single identity store affordable and it is not being undone.
+ * What this adds is the one question the regional store structurally cannot
+ * answer: "where am I signed in", which spans apps and regions by definition.
+ *
+ * ⚠️ AND IT IS WHAT MAKES REVOCATION REACH ANOTHER PRODUCT. Signing a device out
+ * from the account centre cannot delete a row in an app's regional store — the
+ * account centre is not that app and may not be in that region. So it deletes
+ * the row HERE, and each app re-checks against this table on a bounded interval.
+ * See `SESSION_RECHECK_MS` for the size of that bound and what it costs.
+ */
+export const SESSION_DIRECTORY_SCHEMA: SchemaModule = {
+  id: "session_directory",
+  after: ["identity"],
+  ddl: [
+    `CREATE TABLE IF NOT EXISTS session_directory (id TEXT PRIMARY KEY, account_id TEXT NOT NULL, app_id TEXT NOT NULL, origin TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, agent TEXT NOT NULL DEFAULT '');`,
+    `CREATE INDEX IF NOT EXISTS idx_session_directory_account ON session_directory(account_id, created_at DESC);`,
+  ],
+  scoped: { tenantColumn: "account_id", tenantTables: ["session_directory"] },
+};
+
+/**
+ * ⚠️ HOW LONG A REVOKED SESSION MAY SURVIVE IN ANOTHER PRODUCT, AND THE NUMBER
+ * IS A TRADE RATHER THAN A DEFAULT.
+ *
+ * Checking the directory per request would put a cross-region read on the hot
+ * path of every request in the platform, which is the one cost this whole design
+ * exists to avoid. Checking never would make "sign this device out" a promise
+ * that comes true at the next sign-in, which is not what anybody means by it.
+ *
+ * Five minutes is the window. It is stated here rather than tuned in three
+ * places, and the account centre says so where somebody signs a device out — a
+ * security control whose delay is a surprise is worse than one that is honest
+ * about it.
+ */
+export const SESSION_RECHECK_MS = 5 * 60_000;
+
 export const SESSION_SCHEMA: SchemaModule = {
   id: "sessions",
   ddl: [
     `CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, account_id TEXT NOT NULL, origin TEXT NOT NULL, app_id TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, email TEXT NOT NULL, name TEXT, avatar_url TEXT, locale TEXT NOT NULL, profile_version INTEGER NOT NULL);`,
     `CREATE INDEX IF NOT EXISTS idx_sessions_account ON sessions(account_id);`,
   ],
+  /*
+    ⚠️ WHEN THIS ROW WAS LAST WEIGHED AGAINST THE DIRECTORY. Without it every
+    request either pays a cross-region read or a revoked session lives until it
+    expires — and the second is what "sign out this device" would quietly mean.
+  */
+  alters: [`ALTER TABLE sessions ADD COLUMN checked_at TEXT NOT NULL DEFAULT '';`],
   scoped: { tenantColumn: "account_id", tenantTables: [] },
 };
 
@@ -105,6 +167,13 @@ export interface IdentityStore {
   /** Which of a person's credentials THIS door may prompt for. */
   offerable(accountId: UserId, relyingParty: string): Promise<readonly Credential[]>;
   addCredential(c: Credential): Promise<void>;
+  /**
+   * ⚠️ SCOPED TO THE ACCOUNT IN THE STATEMENT, not checked by the caller. A
+   * read-then-delete is two statements with a window between them, and the
+   * window is where somebody else's credential id gets removed by a caller who
+   * guessed one.
+   */
+  removeCredential(id: string, accountId: UserId): Promise<void>;
   advanceCounter(credentialId: string, counter: number): Promise<void>;
   issueChallenge(purpose: string, origin: string, accountId: UserId | null, now: Instant): Promise<string>;
   /** ⚠️ Reads AND deletes. A challenge that survives its use is not a challenge. */
@@ -160,6 +229,9 @@ export function identityStore(db: SqlHandle): IdentityStore {
         c.id, c.accountId, c.relyingParty, c.publicKey, c.counter, c.createdAt, c.label,
       );
     },
+    async removeCredential(id, accountId) {
+      await db.run(`DELETE FROM credentials WHERE id = ? AND account_id = ?`, id, accountId);
+    },
     async advanceCounter(credentialId, counter) {
       await db.run(`UPDATE credentials SET counter = ? WHERE id = ?`, counter, credentialId);
     },
@@ -192,15 +264,32 @@ export function identityStore(db: SqlHandle): IdentityStore {
 /* --------------------------------------------------------------- sessions --- */
 
 export interface SessionStore {
-  create(account: Account, at: { origin: string; appId: string }, now: Instant, days: number): Promise<Session>;
-  read(id: string): Promise<Session | null>;
+  create(account: Account, at: { origin: string; appId: string; agent?: string }, now: Instant, days: number): Promise<Session>;
+  /**
+   * ⚠️ `now` IS REQUIRED, because reading a session is also where it is weighed
+   * against the directory. A signature without it is one where the recheck is a
+   * separate call somebody has to remember — and the request that forgets is a
+   * request serving a session somebody signed out.
+   */
+  read(id: string, now?: Instant): Promise<Session | null>;
   revoke(id: string): Promise<void>;
+  /**
+   * ⚠️ THE ONE A PERSON'S OWN "SIGN THIS DEVICE OUT" MUST USE, and the account
+   * in the statement is the whole of the check.
+   *
+   * `revoke` takes an id alone because its callers already know whose it is —
+   * a sign-out ends the session in the cookie. A surface that lets somebody name
+   * an id has no such guarantee, and pairing an account-scoped delete on one
+   * store with an unscoped one on the other is a check that half applies: the
+   * row a caller may not see stays listed and stops working.
+   */
+  revokeOwn(id: string, accountId: UserId): Promise<void>;
   revokeAllFor(accountId: UserId): Promise<void>;
 }
 
 interface SessionRow {
   id: string; account_id: string; origin: string; app_id: string;
-  created_at: string; expires_at: string;
+  created_at: string; expires_at: string; checked_at?: string;
   email: string; name: string | null; avatar_url: string | null; locale: string; profile_version: number;
 }
 
@@ -213,7 +302,13 @@ const toSession = (r: SessionRow): Session => ({
   },
 });
 
-export function sessionStore(db: SqlHandle): SessionStore {
+/**
+ * @param directory the GLOBAL store. ⚠️ Optional so a caller with no global
+ * handle still works — a suite driving one region, a job — and absent means the
+ * directory is neither written nor consulted. It is passed everywhere it exists,
+ * and `runtime.ts` is the one place that matters.
+ */
+export function sessionStore(db: SqlHandle, directory?: SqlHandle): SessionStore {
   return {
     async create(account, at, now, days) {
       const snapshot: AccountSnapshot = snapshotOf(account);
@@ -229,20 +324,81 @@ export function sessionStore(db: SqlHandle): SessionStore {
         session.id, session.accountId, session.origin, session.appId, session.createdAt, session.expiresAt,
         snapshot.email, snapshot.name, snapshot.avatarUrl, snapshot.locale, snapshot.profileVersion,
       );
+      /*
+        ⚠️ AND IT IS INDEXED GLOBALLY, IN THE SAME BREATH. Not `.catch(() =>
+        undefined)`: a directory write that failed silently would produce a
+        session this app honours and the account centre cannot see — invisible in
+        "where you are signed in" and unrevokable from there, which is exactly
+        the session somebody would most want to end.
+      */
+      if (directory) {
+        await directory.run(
+          `INSERT INTO session_directory (id, account_id, app_id, origin, created_at, expires_at, agent) VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO NOTHING`,
+          session.id, session.accountId, session.appId, session.origin, session.createdAt, session.expiresAt,
+          at.agent ?? "",
+        );
+      }
       return session;
     },
-    async read(id) {
+    async read(id, now) {
       const r = await db.first<SessionRow>(
-        `SELECT id, account_id, origin, app_id, created_at, expires_at, email, name, avatar_url, locale, profile_version FROM sessions WHERE id = ?`,
+        `SELECT id, account_id, origin, app_id, created_at, expires_at, email, name, avatar_url, locale, profile_version, checked_at FROM sessions WHERE id = ?`,
         id,
       );
-      return r ? toSession(r) : null;
+      if (!r) return null;
+      const session = toSession(r);
+      if (!directory || !now) return session;
+
+      /*
+        ⚠️ THE RECHECK, AND IT IS SKIPPED ON ALMOST EVERY REQUEST. A session
+        weighed less than `SESSION_RECHECK_MS` ago is served from the regional
+        row alone, which is the hot path staying local. Only the first request
+        after the window pays for a cross-region read.
+      */
+      const last = Date.parse(r.checked_at ?? "");
+      if (Number.isFinite(last) && Date.parse(now) - last < SESSION_RECHECK_MS) return session;
+
+      const listed = await directory
+        .first<{ id: string }>(`SELECT id FROM session_directory WHERE id = ?`, id)
+        /*
+          ⚠️ AN UNREACHABLE DIRECTORY LEAVES THE SESSION ALONE. Failing closed
+          here would sign every person on the platform out of every product the
+          moment one cross-region read failed — a far larger harm than a revoked
+          session surviving a few more minutes, and one nobody could act on.
+          The bound is what makes that trade acceptable rather than open-ended.
+        */
+        .catch(() => ({ id }));
+      if (!listed) {
+        await db.run(`DELETE FROM sessions WHERE id = ?`, id).catch(() => undefined);
+        return null;
+      }
+      await db.run(`UPDATE sessions SET checked_at = ? WHERE id = ?`, now, id).catch(() => undefined);
+      return session;
     },
     async revoke(id) {
       await db.run(`DELETE FROM sessions WHERE id = ?`, id);
+      if (directory) await directory.run(`DELETE FROM session_directory WHERE id = ?`, id).catch(() => undefined);
+    },
+    async revokeOwn(id, accountId) {
+      await db.run(`DELETE FROM sessions WHERE id = ? AND account_id = ?`, id, accountId);
+      if (directory) {
+        await directory.run(
+          `DELETE FROM session_directory WHERE id = ? AND account_id = ?`, id, accountId,
+        ).catch(() => undefined);
+      }
     },
     async revokeAllFor(accountId) {
       await db.run(`DELETE FROM sessions WHERE account_id = ?`, accountId);
+      /*
+        ⚠️ THE DIRECTORY IS CLEARED FOR EVERY APP, not only this one. "Sign out
+        everywhere" said from inside one product means everywhere — and the other
+        products learn about it on their next recheck, which is the whole reason
+        the directory is the thing being written.
+      */
+      if (directory) {
+        await directory.run(`DELETE FROM session_directory WHERE account_id = ?`, accountId).catch(() => undefined);
+      }
     },
   };
 }

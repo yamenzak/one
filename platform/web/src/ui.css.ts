@@ -520,6 +520,43 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
   max-inline-size: 100%; padding: 3px 10px 3px 4px; border-radius: var(--radius-well);
   background: color-mix(in oklab, var(--ink) 9%, transparent); color: var(--ink);
   word-spacing: normal; }
+/* ------------------------------------------------------------------- asks */
+
+/* ⚠️ A CONSENT DECISION IS A PARAGRAPH WITH A CONTROL, NOT A ROW WITH A VALUE.
+   Built on the ROW shape it had a title, a reason, a sentence about what is hidden and
+   a rung, all competing for one line — the rung took a third of a phone and the
+   words wrapped into a four-word column. A row is for scanning a list; this is
+   for reading one thing and deciding about it, so the control goes underneath at
+   full width where it is also a better target. */
+.ask { display: flex; flex-direction: column; gap: 10px; padding: 16px var(--pad); }
+.ask + .ask { border-block-start: 1px solid color-mix(in oklab, var(--ink) 9%, transparent); }
+/* ⚠️ A READING IS INSET UNDER THE FACT IT COMES FROM, because it is a second
+   decision ABOUT that fact rather than a peer of it. */
+.ask[data-under] { padding-inline-start: calc(var(--pad) + 14px); }
+.ask[data-under]::before { content: ""; position: absolute; }
+/* ⚠️ THE TITLE WRAPS HERE, unlike a row's. There is nothing to its right to push
+   off a line, and clipping "What you are working towards" to "What you are
+   worki…" withholds the whole question. */
+.ask-title { font-size: 16.5px; font-weight: 600; letter-spacing: -0.01em; }
+.ask-why { color: var(--ink-quiet); font-size: 14.5px; line-height: 1.4; }
+/* ⚠️ WHAT IT CANNOT REVEAL, SET APART. It is the sentence that earns the
+   decision, and in the same voice as the reason it reads as more of the pitch. */
+.ask-hides { color: var(--ink-faint); font-size: 13.5px; line-height: 1.4; font-style: italic; }
+.ask-note { color: var(--warn); font-size: 13.5px; }
+/* ⚠️ FULL WIDTH, so the answer is a control rather than a value at the end of a
+   sentence — and so a thumb can reach it without aiming. */
+.ask-answer { display: flex; align-items: center; gap: 8px; inline-size: 100%;
+  min-block-size: 44px; padding: 0 14px; border: 0; border-radius: var(--radius-well);
+  background: var(--well); color: var(--ink); font: inherit; text-align: start; cursor: pointer; }
+.ask-answer[data-open] { color: var(--accent); }
+.ask-answer .chevron { margin-inline-start: auto; }
+
+/* ⚠️ THE CURRENT ANSWER, IN WORDS, AND IT IS NOT A PILL. A pill is a standing —
+   something the thing IS — while this is what somebody CHOSE, which is editable
+   and points onward. Drawn as a pill, every answered decision looked like a
+   badge nobody could change. */
+.rung-name { white-space: nowrap; font-size: 15px; }
+
 .chip .face { flex: none; inline-size: 22px; block-size: 22px; font-size: 11px; }
 .chip-name { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: 14.5px; font-weight: 500; }

@@ -263,11 +263,53 @@ Grouped by what it governs. **Bold** entries have day-zero consequences (§9).
 | **`legal`** | documents, versions, and ⚠️ **who must accept which version, recorded**. `terms` is owed always; `privacy` and `dpa` become owed the moment a collection holds somebody's data — §7a |
 | **`holding`** | per collection: what it holds, whose it is, why, and on what lawful basis. ⚠️ Required with an explicit `{ kind: "none", why }` — §7a |
 | **`protection`** | the controller, the contact, the sub-processor list, and whether an impact assessment is owed. ⚠️ Checked against what the manifest REACHES — §7a |
+| **`vault`** | what this app ASKS to see of somebody's own facts, why, and at what rung. ⚠️ It does not HOLD any of it — the account does. Declaring a want is also what makes the fact unavailable any other way: a collection field that shadows one is refused. [VAULT.md](VAULT.md) |
 | **`audit`** | what is recorded, retention, who may read it |
 | `jobs` | scheduled work: per-tenant, idempotent, with a visible failure surface |
 | `onboarding` | the wizard's steps; the tenant is created between them so Back is lossless |
 | `analytics` | events, and a per-region sub-processor allow-list |
 | `health` | what "up" means for this app |
+
+---
+
+## 6a. ⚠️ What the vault takes off the table
+
+A product asking somebody their height has, until now, had exactly one option:
+a column. The consequence is that the person has no relationship with the fact —
+they cannot see who reads it, take it back, carry it to the next product, or find
+out it existed once they have stopped using the app.
+
+**A sensitive fact belongs to the account and is stored once.** An app declares
+what it wants to SEE, in the words it would have to justify to whoever is
+deciding, and is granted a view at a rung that person chose:
+
+```ts
+vault: {
+  wants: [
+    { fact: "goal.training", need: "raw", recommend: "staff",
+      why: "Your coach writes your programme against this." },
+    { fact: "body.mass", need: "derived", readings: ["body.mass.trend"],
+      why: "So a direction can be shown without a weight." },
+    { fact: "body.height", need: "compute",
+      why: "Used in a calculation whose answer is shown." },
+  ],
+}
+```
+
+Three things fall out of that, and each is a refusal rather than a convention:
+
+- **The registry is the PLATFORM's and it is closed.** An app that could declare
+  its own facts is one that declares `height` a second time — and then one person
+  has two heights, two grants and two erasure paths, which is the situation this
+  replaces. Adding a fact is one entry, reviewed once, available to every product.
+- **A collection may not shadow a fact.** Asking politely and quietly keeping a
+  column is exactly what an app would do, because a column is easier than a grant.
+- **The record of processing includes it.** A fact the app never stores appears in
+  no collection, so without this an app reading health data through a grant would
+  produce an Article 30 record saying it holds none.
+
+[VAULT.md](VAULT.md) is the whole argument, including why `compute` is a rung of
+the ladder rather than a property of the ask.
 
 ---
 
@@ -415,6 +457,7 @@ retroactively.
 | `locale` + tenant timezone | columns, and every stored timestamp's meaning |
 | `units` | what a stored number means |
 | `media.exifStrip` | ⚠️ **stripping later does not fix what is already stored** |
+| `vault` over a column | ⚠️ **the same shape of mistake as exif.** A fact stored in this app's own table is a copy that outlives every grant over it, and moving it to the vault next year does nothing for the copies already made — or for the person who cannot see who read them. Ask for it; do not hold it. |
 | `legal` consent ledger | a table, and a legal record you cannot backfill |
 | `audit` | a table, and evidence you cannot reconstruct |
 | `retention` | informs the schema and the erasure cascade |

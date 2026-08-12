@@ -13,7 +13,7 @@ kind: index
 |---|---|
 | active | **7** — Kova migration |
 | shipped | 0, 1, 2, 3, 4, 5, 6, 6.5 |
-| open deferrals | 2 — see [DEFERRED.md](DEFERRED.md) |
+| open deferrals | 5 — see [DEFERRED.md](DEFERRED.md) |
 
 ⚠️ Resuming after a break, or after a compressed conversation?
 [STANDARDS.md §9](STANDARDS.md) is the checklist, in order. Start there rather
@@ -49,7 +49,8 @@ Invariants and rationale. Do not rot; carry a `verified:` date.
 - [docs/KOVA-INVENTORY.md](../docs/KOVA-INVENTORY.md) — verified 2026-08-10
 - [docs/MANIFEST.md](../docs/MANIFEST.md) — verified 2026-08-09
 - [docs/STANDARDS.md](../docs/STANDARDS.md) — verified 2026-08-09
-- [docs/UI.md](../docs/UI.md) — verified 2026-08-11
+- [docs/UI.md](../docs/UI.md) — verified 2026-08-12
+- [docs/VAULT.md](../docs/VAULT.md) — verified 2026-08-12
 
 ## plan
 

@@ -110,7 +110,7 @@ export const MOTION_CSS = `
 /* ⚠️ EACH ICON MOVES THE WAY ITS OWN PARTS WOULD, and the shared thing is the
    TIMING rather than the movement. Four generic verbs across a set makes every
    icon move like every other one — tidy, and dead. A key turns about its hole; a
-   download's arrow falls into a tray that stays; a lens closes. That is where an
+   download's arrow falls into a base that stays; a lens closes. That is where an
    icon says what it is.
 
    ⚠️ THEY PLAY ON THE ROW'S PRESS, not the icon's. The row is the target, and an
@@ -144,8 +144,8 @@ export const MOTION_CSS = `
 /* A shield seals: it settles onto its own point rather than growing. */
 .item:active [data-icon='guard'] { scale: 0.94 1.08; transform-origin: 50% 100%; }
 
-/* ⚠️ THE TRAY STAYS. That is the whole gesture — something arriving INTO
-   something. Moving both is a picture sliding. */
+/* ⚠️ THE BASE STAYS. That is the whole gesture — something arriving INTO
+   something. Moving both is a picture drifting. */
 .item:active [data-icon='save'] > :nth-child(1) { translate: 0 2.5px; }
 .item:active [data-icon='save'] > :nth-child(3) { translate: 0 2.5px; }
 
@@ -160,7 +160,7 @@ export const MOTION_CSS = `
 .portrait:active [data-icon='lens'] > :nth-child(2) { scale: 0.45; }
 
 /* ⚠️ THE FLAP LIFTS AND THE ENVELOPE STAYS. The code arrives IN it, which is the
-   same gesture as the download's tray one card up — and it is the shape of the
+   same gesture as the download's base one card up — and it is the shape of the
    thing, not a verb borrowed from a list of four. */
 .item:active [data-icon='letter'] > :nth-child(1) { translate: 0 -1.6px; }
 
@@ -179,7 +179,12 @@ export const MOTION_CSS = `
 /* The second alphabet steps forward. */
 .item:active [data-icon='tongue'] > :nth-child(6) { translate: 1.5px 1.5px; }
 
-/* A rule measures: its ticks slide along it. */
+/* ⚠️ A LOCK OPENS BY LIFTING ITS SHACKLE, and the body stays. The same gesture
+   as the download and the envelope: something moving relative to something that
+   does not. */
+.item:active [data-icon='locked'] > :nth-child(2) { translate: 0 -1.5px; }
+
+/* A rule measures: its ticks travel along it. */
 .item:active [data-icon='measure'] > :nth-child(3) { translate: 0 1.6px; }
 .item:active [data-icon='measure'] > :nth-child(4) { translate: 0 -1.6px; }
 

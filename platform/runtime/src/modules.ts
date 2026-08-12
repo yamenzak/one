@@ -13,7 +13,7 @@
  */
 
 import type { SchemaModule } from "@one/kernel";
-import { SESSION_SCHEMA } from "./identity.js";
+import { SESSION_DIRECTORY_SCHEMA, SESSION_SCHEMA } from "./identity.js";
 import { MEMBERSHIP_SCHEMA } from "./membership.js";
 import { ACTIVITY_SCHEMA } from "./collection-ops.js";
 import { LEDGER_SCHEMA } from "./ledger.js";
@@ -76,6 +76,12 @@ export const PLATFORM_GLOBAL: readonly SchemaModule[] = [
   DIRECTORY_SCHEMA,
   DOMAIN_SCHEMA,
   IDENTITY_SCHEMA,
+  /*
+    ⚠️ GLOBAL, WHILE THE SESSION ITSELF STAYS REGIONAL. This is the index that
+    answers "where am I signed in" — a question that spans apps and regions by
+    definition, and one no regional store can answer about another product.
+  */
+  SESSION_DIRECTORY_SCHEMA,
   /* ⚠️ After identity: a consent belongs to an account, and the ledger is only
      meaningful beside the record of who that is. */
   CONSENT_SCHEMA,

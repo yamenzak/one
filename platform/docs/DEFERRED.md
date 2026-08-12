@@ -11,6 +11,12 @@ kind: index
 ## Stage 7 — Kova migration
 
 - `one-172` — the operator door admits any signed-in  
-  <sub>runtime/src/runtime.ts:831</sub>
+  <sub>runtime/src/runtime.ts:835</sub>
 - `one-181` — `accounts` has locale, units and layout but no theme  
   <sub>web/src/account/preferences.tsx:35</sub>
+- `one-182` — a `person` seal with a real key. The type exists,  
+  <sub>docs/VAULT.md:296</sub>
+- `one-183` — a fact belongs to an ACCOUNT, so somebody a  
+  <sub>docs/VAULT.md:298</sub>
+- `one-184` — the disclosure log is not yet exported with the  
+  <sub>docs/VAULT.md:302</sub>

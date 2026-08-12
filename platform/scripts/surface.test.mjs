@@ -343,6 +343,14 @@ const READ_BY_A_PERSON = {
   help: "app.help",
   releases: "app.releases",
   governance: "app.governance.legal",
+  /*
+    ⚠️ THE CONSENT SHEET IS THE SURFACE, AND IT IS WHY THIS IS HERE RATHER THAN
+    UNDER "consumed". A vault ask is not configuration the platform applies — it
+    is a question put to a person in words the app wrote, and an ask nothing
+    renders is a product reading somebody's health data against a consent screen
+    that was never shown.
+  */
+  vault: "app.vault?.wants",
 };
 
 /**

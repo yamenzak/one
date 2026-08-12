@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { Fact, Grant, Instant, PlainDate, Reach, UserId } from "../src/index.js";
+import type { Fact, Grant, Instant, Reach, UserId } from "../src/index.js";
 import {
   REACH, FACTS, factOf, live, mayDerive, mayRead, reaches, readingOf,
   registryProblems, shadowProblems, vaultActivities, wantProblems,
@@ -440,7 +440,3 @@ describe("lookups", () => {
     expect(live(grant({ fact: "x", reach: "self" }), NOW)).toBe(true);
   });
 });
-
-/* ⚠️ Unused import guard: `PlainDate` is part of the stored shape and is asserted
-   by the runtime suite rather than here. Named so the import cannot rot. */
-export type _Day = PlainDate;
