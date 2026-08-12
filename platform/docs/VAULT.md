@@ -406,37 +406,33 @@ alongside somebody's body measurements.
 published — it is whatever the running bundle says — and the column made boot read
 the wall clock, which the injected-clock guard correctly refused.
 
-⚠️ **The read half is blocked on one column, and it is a real one.**
-`vault.mine` still answers with the platform's whole fact registry. Grouping by
-workspace needs a workspace's APP, and `tenant_directory` does not have one — its
-columns are a guarded allow-list, deliberately, so adding `app_id` is a change to
-the store that residency does not govern and belongs in its own diff with its own
-argument. Everything above it is ready: `wantedHere` resolves, `VaultScreen`
-renders, and both take the grouped shape today.
+**And the read half is wired.** `vault.mine` answers with one group per workspace,
+resolved through `wantedHere` from the published declarations — so the account
+centre shows every place a person belongs to, whichever app they happened to open
+it from.
 
-<!-- DEFER(one-186) stage:7 — group the vault by workspace. The declarations are
-     published and readable (`publishVaultSpec`/`publishedSpecs`); what is missing
-     is `app_id` on `tenant_directory`, without which a workspace cannot be mapped
-     to the product that serves it. `vault.mine` still answers with FACTS. -->
+⚠️ **`tenant_directory` gained `app_id`, and the argument is the point of that
+allow-list.** It is the name of a bundle rather than a fact about anybody —
+routing, like the region beside it — and without it a workspace cannot be matched
+to the declaration of what its product wants to know. Every future addition has to
+make an argument of that shape, in a diff, which is exactly what
+`DIRECTORY_FIELDS` and its conformance test exist to force.
 
-⚠️ **A reading IS separately grantable from the review screen**, as of the
-per-reading controls. Each one resolves on its own grant — keyed on the reading id,
-exactly as `mayDerive` reads it — and renders its own control indented under the
-fact it comes from. Resolved from the fact's grant instead, which is the obvious
-shortcut since a reading is computed from it, the screen would show a trend as
-shared the moment the number was and the route would refuse it.
+⚠️ **It is an ALTER, not a line in the CREATE.** A database that already exists
+never re-runs the create, so a column added there exists on a fresh deployment and
+on nothing else — fine in every test, an error in production. It defaults to empty
+rather than to a product: a row written before the column existed belongs to
+whichever app wrote it, and guessing would attribute somebody's workspace to the
+wrong one.
 
-⚠️ **And a reading asks at a different rung from its inputs.** The derivation runs
-on the server, so the base fact only ever asks at `compute`; the reading asks at
-whoever consumes it — `readingAsksFor` — which is what makes "the coach sees a
-direction, the number stays here" a state somebody can actually be in. It is also
-why `by` is meaningful on a `derived` want and refused only on a `compute` one: a
-derived want has a reader, it is just reading the output rather than the input.
+⚠️ **A workspace whose app has declared nothing is left out**, and so is one with
+no app recorded. Both are rows that could only ever say "nothing", and a list of
+those is what makes somebody stop reading the ones that matter.
 
-⚠️ **The row says what it hides.** A reading's whole claim is that it discloses
-less than its input, and the registry refuses an empty `hides` — so that sentence
-is never a reassurance somebody typed. Behind the explain mark the row would say
-only that something is shared, which is the half that is not the point.
+⚠️ **The membership walk is the runtime's, not this file's.** The directory is
+global and memberships are regional, so "which workspaces are mine" is a question
+neither store answers alone — and a second implementation of it beside the first
+is two answers that eventually disagree about somebody's.
 
 ---
 

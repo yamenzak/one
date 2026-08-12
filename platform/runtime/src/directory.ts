@@ -14,7 +14,7 @@
 import type { Directory, DirectoryEntry, Instant, RegionId, SchemaModule, SqlHandle, Standing, TenantId } from "@one/kernel";
 
 /** Every column, and the list is the point. Nothing about a PERSON is here. */
-export const DIRECTORY_COLUMNS = ["tenant_id", "slug", "region", "standing", "standing_reason", "standing_next_at", "domains", "branding"] as const;
+export const DIRECTORY_COLUMNS = ["tenant_id", "slug", "region", "standing", "standing_reason", "standing_next_at", "domains", "branding", "app_id"] as const;
 
 export const DIRECTORY_SCHEMA: SchemaModule = {
   id: "directory",
@@ -30,6 +30,25 @@ export const DIRECTORY_SCHEMA: SchemaModule = {
     `CREATE TABLE IF NOT EXISTS tenant_directory (tenant_id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, region TEXT NOT NULL, standing TEXT NOT NULL, standing_reason TEXT NOT NULL, standing_next_at TEXT, domains TEXT NOT NULL DEFAULT '[]', branding TEXT NOT NULL DEFAULT '{}');`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_directory_slug ON tenant_directory(slug);`,
   ],
+  /*
+    ⚠️ WHICH PRODUCT SERVES THIS WORKSPACE, and it is routing like everything else
+    here — the name of a bundle, not a fact about anybody. It earns its place
+    because the account centre answers for every product a person belongs to, and
+    without it a workspace cannot be matched to the declaration of what that
+    product wants to know: the vault could group by nothing.
+
+    ⚠️ IT IS AN ALTER, NOT A LINE IN THE CREATE, because a database that already
+    exists never re-runs the create — so a column added there is a column that
+    exists on a fresh deployment and on nothing else, and every read of it is
+    fine in every test and an error in production.
+
+    ⚠️ AND IT DEFAULTS TO EMPTY RATHER THAN TO A PRODUCT. A row written before
+    this column existed belongs to whichever app wrote it, and guessing would
+    attribute somebody's workspace to the wrong one — an empty string is a
+    workspace the vault leaves out until its app writes the row again, which is
+    the safe direction on a screen about disclosure.
+  */
+  alters: [`ALTER TABLE tenant_directory ADD COLUMN app_id TEXT NOT NULL DEFAULT '';`],
 };
 
 /**
@@ -48,6 +67,7 @@ interface Row {
   standing: string; standing_reason: string; standing_next_at: string | null;
   domains: string;
   branding: string | null;
+  app_id: string | null;
 }
 
 const toEntry = (r: Row): DirectoryEntry => ({
@@ -64,6 +84,7 @@ const toEntry = (r: Row): DirectoryEntry => ({
      ordinary case — so an unreadable value is the empty one rather than a throw
      on every request to that host. */
   branding: parseOr(r.branding),
+  appId: r.app_id ?? "",
 });
 
 const parseOr = (text: string | null): Readonly<Record<string, string>> => {
@@ -97,13 +118,14 @@ export function sqlDirectory(db: SqlHandle): Directory {
  */
 export async function placeTenant(db: SqlHandle, entry: DirectoryEntry): Promise<void> {
   await db.run(
-    `INSERT INTO tenant_directory (tenant_id, slug, region, standing, standing_reason, standing_next_at, domains)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO tenant_directory (tenant_id, slug, region, standing, standing_reason, standing_next_at, domains, app_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(tenant_id) DO UPDATE SET slug = excluded.slug, region = excluded.region,
        standing = excluded.standing, standing_reason = excluded.standing_reason,
-       standing_next_at = excluded.standing_next_at, domains = excluded.domains`,
+       standing_next_at = excluded.standing_next_at, domains = excluded.domains,
+       app_id = excluded.app_id`,
     entry.tenantId, entry.slug, entry.region,
     entry.standing.standing, entry.standing.reason, entry.standing.nextAt ?? null,
-    JSON.stringify(entry.domains),
+    JSON.stringify(entry.domains), entry.appId,
   );
 }

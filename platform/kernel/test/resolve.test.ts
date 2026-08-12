@@ -28,6 +28,7 @@ const cfg: ResolveConfig = {
 const entry = (over: Partial<DirectoryEntry> = {}): DirectoryEntry => ({
   tenantId: "t_1" as TenantId,
   slug: "gym",
+  appId: "hello",
   region: "auto" as RegionId,
   standing: { standing: "active", reason: "ok" },
   domains: [],

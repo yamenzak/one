@@ -31,6 +31,13 @@ export interface DirectoryEntry {
   readonly tenantId: TenantId;
   readonly slug: string;
   readonly region: RegionId;
+  /**
+   * ⚠️ WHICH PRODUCT SERVES IT — routing, like everything else in this store: the
+   * name of a bundle rather than a fact about anybody. The account centre answers
+   * for every product a person belongs to, and without this a workspace cannot be
+   * matched to the declaration of what that product wants to know.
+   */
+  readonly appId: string;
   readonly standing: StandingState;
   /** Custom domains pointing here. Hostnames, not people. */
   readonly domains: readonly string[];
@@ -57,7 +64,15 @@ export interface DirectoryEntry {
   regional row is authoritative and this is refreshed from it on write, so there
   is no second answer to migrate.
 */
-export const DIRECTORY_FIELDS = ["tenantId", "slug", "region", "standing", "domains", "branding"] as const;
+/*
+  ⚠️ `appId` EARNED ITS PLACE AND THE ARGUMENT IS THE POINT OF THIS LIST. It is the
+  name of a bundle, not a fact about anybody — routing, like the region beside it —
+  and without it the account centre cannot match a workspace to the declaration of
+  what its product wants to know, so the vault could group by nothing. Every future
+  addition has to make an argument of that shape, in a diff, which is exactly what
+  this list exists to force.
+*/
+export const DIRECTORY_FIELDS = ["tenantId", "slug", "region", "appId", "standing", "domains", "branding"] as const;
 
 /**
  * How the directory is read. Injected, so the resolution logic is pure and the

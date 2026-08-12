@@ -22,8 +22,10 @@
 import type {
   AnyOperation, AppSpec, Reach, BindingSpec, Grant, Instant, PlainDate, Session, SqlHandle, UserId,
 } from "@one/kernel";
-import { REACH, FACTS, factOf, operation, PUBLIC, readingOf, s } from "@one/kernel";
-import { derive, readDerived, readFact, stateOf, vaultStore, type VaultStore } from "./vault.js";
+import { REACH, factOf, operation, PUBLIC, readingOf, s, wantedHere } from "@one/kernel";
+import {
+  derive, publishedSpecs, readDerived, readFact, vaultStore, type VaultStore,
+} from "./vault.js";
 
 /** ⚠️ A symbol, so an app cannot reach the vault by writing a property name. */
 export const VAULT = Symbol.for("one.runtime.vault");
@@ -38,6 +40,18 @@ export interface VaultDeps {
   readonly now: Instant;
   /** ⚠️ The reader's own day, from their device. A vault series is day-bucketed. */
   readonly today: PlainDate;
+  /**
+   * EVERY WORKSPACE THIS PERSON IS IN, ACROSS EVERY PRODUCT.
+   *
+   * ⚠️ IT IS A DEP RATHER THAN A QUERY HERE because the answer spans two stores
+   * that cannot be joined: the directory is global and memberships are regional.
+   * The runtime already knows how to ask both — asking again in this file would
+   * be a second implementation of "which workspaces are mine", and the two would
+   * eventually disagree about somebody's.
+   */
+  readonly workspaces: () => Promise<readonly {
+    readonly appId: string; readonly tenantId: string; readonly name: string;
+  }[]>;
 }
 
 export interface VaultCarrier { readonly [VAULT]: VaultDeps }
@@ -81,9 +95,9 @@ export function vaultOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
   const mine = operation({
     id: "vault.mine",
     kind: "read",
-    summary: "Your own facts, and who you have shared each one with.",
+    summary: "Every place you belong to, and what each one can know about you.",
     input: s.object({}),
-    output: s.object({ facts: s.json() }),
+    output: s.object({ wheres: s.json(), kept: s.json() }),
     permission: PUBLIC,
     idempotency: { mode: "none" },
     /*
@@ -95,29 +109,60 @@ export function vaultOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
     tool: false,
     async handler(ctx) {
       const d = deps(ctx);
-      if (!d.session) return { facts: [] };
-      const state = await stateOf(store(d), d.session.accountId, d.now);
-      const byFact = new Map(state.map((f) => [f.fact, f]));
-      /* ⚠️ EVERY DECLARED FACT, NOT ONLY THE ONES HELD. A vault that showed only
-         what somebody had already filled in would be a screen that starts empty
-         and never explains what it is for. */
-      return {
-        facts: FACTS.map((f) => ({
-          fact: f.id,
-          label: f.label,
-          kind: f.kind,
-          ...(f.values ? { values: f.values } : {}),
-          ...(f.dimension ? { dimension: f.dimension } : {}),
-          series: f.series,
-          suggests: f.suggests ?? "self",
-          ...(f.because ? { because: f.because } : {}),
-          readings: (f.readings ?? []).map((r) => ({ id: r.id, label: r.label, says: r.says, hides: r.hides })),
-          held: byFact.get(f.id)?.held ?? false,
-          grants: byFact.get(f.id)?.grants ?? [],
-          /* What THIS app asked for, so the screen can say why it is here. */
-          ...(wants.has(f.id) ? { asked: wants.get(f.id) } : {}),
-        })),
-      };
+      if (!d.session) return { wheres: [], kept: [] };
+      const st = store(d);
+
+      /*
+        ⚠️ EVERY APP'S DECLARATION, NOT THIS ONE'S. A worker knows its own wants
+        and nothing about the product beside it, so answering from the local
+        manifest would show somebody the app they happened to open rather than
+        every place they belong to — which is the one question this screen exists
+        for. The declarations are published into the global store on boot.
+      */
+      const [specs, grants, held, mine] = await Promise.all([
+        publishedSpecs(d.directory),
+        st.grants(d.session.accountId),
+        st.holds(d.session.accountId),
+        d.workspaces(),
+      ]);
+      const byApp = new Map(specs.map((x) => [x.appId, x]));
+
+      /*
+        ⚠️ ONE GROUP PER WORKSPACE, AND ONLY WHERE ITS APP WANTS SOMETHING. A
+        workspace whose product has declared nothing is a row that could only ever
+        say "nothing", and a list of those is what makes somebody stop reading the
+        ones that matter. It is also what an unattributed row falls into — a
+        directory entry written before apps were recorded belongs to no product,
+        and guessing would put somebody's workspace under the wrong one.
+      */
+      const wheres = mine.flatMap((w) => {
+        const app = byApp.get(w.appId);
+        if (!app || app.spec.wants.length === 0) return [];
+        return [{
+          appId: w.appId,
+          appName: app.appName,
+          tenantId: w.tenantId,
+          name: w.name,
+          items: wantedHere({
+            spec: app.spec, appId: w.appId, tenantId: w.tenantId,
+            grants, held, now: d.now,
+          }).items,
+        }];
+      });
+
+      /*
+        ⚠️ WHAT NOBODY ASKED FOR IS STILL YOURS. A vault that listed only what an
+        app wanted would go empty at exactly the moment it became the only copy —
+        which is the person this whole thing is built for.
+      */
+      const asked = new Set(wheres.flatMap((w) => w.items.map((i) => i.fact)));
+      const kept = [...held].flatMap((f) => {
+        if (asked.has(f)) return [];
+        const fact = factOf(f);
+        return fact ? [{ fact: f, label: fact.label }] : [];
+      });
+
+      return { wheres, kept };
     },
   });
 

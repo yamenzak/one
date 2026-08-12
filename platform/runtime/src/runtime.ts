@@ -1382,6 +1382,28 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           tenantId: at.tenant?.tenantId ?? null,
           now: new Date().toISOString() as Instant,
           today: dayIn(new Date().toISOString() as Instant, zone),
+          /*
+            ⚠️ THE SAME TWO-STORE WALK `me.workspaces` DOES, and reusing it is the
+            point: the directory is global, memberships are regional, and a second
+            implementation of "which workspaces are mine" is two answers that
+            eventually disagree about somebody's.
+
+            ⚠️ AN UNATTRIBUTED ROW IS DROPPED. A directory entry written before
+            apps were recorded belongs to no product, and the vault would have
+            nothing to match its declaration against — so it is left out rather
+            than guessed at, which is the safe direction on a screen about
+            disclosure.
+          */
+          workspaces: async () => {
+            if (!session) return [];
+            const rows = await directoryDb.all<{ tenant_id: string; slug: string; app_id: string | null }>(
+              `SELECT tenant_id, slug, app_id FROM tenant_directory ORDER BY slug LIMIT 200`,
+            ).catch(() => []);
+            const mine = await platform.mineIn(rows.map((r) => r.tenant_id));
+            return rows
+              .filter((r) => mine.has(r.tenant_id) && r.app_id)
+              .map((r) => ({ appId: r.app_id!, tenantId: r.tenant_id, name: r.slug }));
+          },
         },
         [SETTINGS]: {
           db: regionalDb,

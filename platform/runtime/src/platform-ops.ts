@@ -141,6 +141,11 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
         tenantId,
         slug: input.slug,
         region,
+        /* ⚠️ THE APP THAT MADE IT, recorded once and never inferred. It is what
+           lets the account centre match a workspace to the declaration of what
+           its product wants to know — a workspace with no app is one the vault
+           cannot speak for. */
+        appId: app.id,
         /*
           ⚠️ A NEW WORKSPACE IS `active`, NOT `incomplete`. A parking status is a
           default, and a gate that reads a default as a verdict holds every

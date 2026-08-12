@@ -102,7 +102,14 @@ else {
   if (!allow || !create) fail(`runtime/src/directory.ts: could not read DIRECTORY_COLUMNS or the CREATE that must match it.`);
   else {
     const declared = [...allow[1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1]).sort();
-    const actual = create[1].split(",").map((c) => c.trim().split(/\s+/)[0]).sort();
+    /*
+      ⚠️ A COLUMN ADDED BY AN ALTER IS A COLUMN THE TABLE HAS. Reading the CREATE
+      alone made the allow-list and the table disagree the first time one grew
+      after a deployment existed — and the CREATE is exactly where a late column
+      may NOT go, because a database that already exists never re-runs it.
+    */
+    const added = [...src.matchAll(/ALTER TABLE tenant_directory ADD COLUMN (\w+)/g)].map((m) => m[1]);
+    const actual = [...create[1].split(",").map((c) => c.trim().split(/\s+/)[0]), ...added].sort();
     const extra = actual.filter((c) => !declared.includes(c));
     const missing = declared.filter((c) => !actual.includes(c));
     if (extra.length) {

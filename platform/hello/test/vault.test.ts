@@ -79,14 +79,33 @@ describe("your own facts", () => {
     */
     const r = await get(ID, "/api/vault.mine", client);
     expect(r.status).toBe(200);
-    expect(Array.isArray(r.body.facts)).toBe(true);
+    expect(Array.isArray(r.body.wheres)).toBe(true);
+    expect(Array.isArray(r.body.kept)).toBe(true);
   });
 
-  it("lists every fact the platform knows, not only the ones filled in", async () => {
+  /*
+    ⚠️ IT ANSWERS FOR EVERY PLACE, NOT FOR THIS APP. `hello` declares no vault
+    wants at all, so it contributes no group — which is the point: a workspace
+    whose product has declared nothing is a row that could only ever say
+    "nothing", and the vault leaves it out rather than listing it.
+  */
+  it("groups by workspace and lists no app that wants nothing", async () => {
     const r = await get(ORIGIN, "/api/vault.mine", client);
-    const facts = r.body.facts as unknown as { fact: string; held: boolean }[];
-    expect(facts.some((f) => f.fact === "body.mass")).toBe(true);
-    expect(facts.every((f) => f.held === false)).toBe(true);
+    const wheres = r.body.wheres as unknown as { appId: string }[];
+    expect(wheres.every((w) => w.appId !== "hello")).toBe(true);
+  });
+
+  /*
+    ⚠️ WHAT NOBODY ASKED FOR IS STILL YOURS. A vault that listed only what an app
+    wanted would go empty at exactly the moment it became the only copy — which is
+    the person this whole thing is built for, and on this deployment it is every
+    fact they have recorded.
+  */
+  it("keeps what nothing is asking for", async () => {
+    await send(ORIGIN, "/api/vault.record", client, { fact: "body.height", value: "178", at: "2026-08-01" });
+    const r = await get(ORIGIN, "/api/vault.mine", client);
+    const kept = r.body.kept as unknown as { fact: string }[];
+    expect(kept.some((k) => k.fact === "body.height")).toBe(true);
   });
 
   it("records and reads back one of your own", async () => {
