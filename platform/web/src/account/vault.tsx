@@ -135,16 +135,20 @@ export interface VaultScreenProps {
  * describing the other state reads as the current one to anybody skimming, which
  * on a screen about disclosure is the worst error available.
  *
+ * ⚠️ THE RUNG IS PASSED IN RATHER THAN READ OFF THE ITEM, so the sentence and
+ * the control are one statement. Reading `item.reach` here left the switch ON
+ * above the words "Not shared." for the length of a round trip.
+ *
  * ⚠️ SHORT ENOUGH TO BE READ, WHICH IS THE ONLY WAY IT WORKS. These ran to two
  * clauses each — "Used for calculations here. Nobody at Haddad Strength can see
  * the value itself." — and a column of them is a wall nobody reads, so the screen
  * conveys nothing at all.
  */
-function meaning(item: Item): string {
+export function meaning(item: Item, reach: Reach): string {
   const said =
-    !item.granted ? "Not shared."
-    : item.reach === "compute" ? "Calculations only. Nobody here sees it."
-    : item.reach === "agent" ? "The assistant only. Nobody here sees it."
+    reach === "self" ? "Not shared."
+    : reach === "compute" ? "Calculations only. Nobody here sees it."
+    : reach === "agent" ? "The assistant only. Nobody here sees it."
     : "Everyone here can see it.";
   /* ⚠️ THE EXPIRY IS PART OF THE SENTENCE, not a pill beside it. As a pill it
      competed with the control for one line and truncated the name to an ellipsis;
@@ -322,6 +326,31 @@ const Ask = ({ item, where, onOpen, onSet, onReading }: {
 }): ReactNode => {
   const [choosing, setChoosing] = useState(false);
   /*
+    ⚠️ THE SENTENCE MOVES WITH THE CONTROL, AND THAT TOOK OWNING THE RUNG HERE.
+    The switch is optimistic — it has to be, a control that waits for a round trip
+    feels broken — but the line underneath read the prop, which only changes when
+    a refetch lands. So flipping something on left the switch reading ON above the
+    words "Not shared.", for as long as the network took. Two contradictory
+    statements about one disclosure is worse than either of them alone.
+
+    ⚠️ IT IS AN OVERLAY, NOT A COPY. `pending ?? item.reach` means the moment the
+    server's answer arrives the row is showing the server's answer — a copy taken
+    at mount would keep showing what this tab did, and quietly disagree with
+    another tab, the sheet, and the route.
+  */
+  const [pending, setPending] = useState<Reach | null>(null);
+  const reach = pending ?? item.reach;
+  const granted = reach !== "self";
+  /* ⚠️ THE SAME WRITE FOR BOTH CONTROLS, so neither can grow its own rollback.
+     A refusal puts the row back on the prop rather than on a remembered value. */
+  const set = (next: Reach) => {
+    setPending(next);
+    return onSet(next).then((problem) => {
+      if (problem) setPending(null);
+      return problem;
+    });
+  };
+  /*
     ⚠️ A SWITCH ONLY WHERE THERE ARE TWO RUNGS, and the want says how many. A fact
     an app only computes with has one meaningful setting either side of off, so a
     switch is the honest control. A fact it wants the value of can also be held at
@@ -349,8 +378,8 @@ const Ask = ({ item, where, onOpen, onSet, onReading }: {
       {item.required ? <span className="share-needed">Needed here</span> : null}
       {binary ? (
         <Flip
-          on={item.granted}
-          onChange={(next) => onSet(next ? item.asks : "self")}
+          on={granted}
+          onChange={(next) => set(next ? item.asks : "self")}
           label={`Share ${item.label.toLowerCase()} with ${where}`}
         />
       ) : (
@@ -358,18 +387,18 @@ const Ask = ({ item, where, onOpen, onSet, onReading }: {
            opened — a button saying only "Change" makes somebody press it to learn
            what they already chose. */
         <button type="button" className="share-rung press" onClick={() => setChoosing(true)}>
-          <span>{RUNG[item.reach]}</span>
+          <span>{RUNG[reach]}</span>
           <Onward className="chevron" />
         </button>
       )}
-      <span className="share-said">{meaning(item)}</span>
+      <span className="share-said">{meaning(item, reach)}</span>
       {binary ? null : (
         <Choose
           open={choosing}
           title={item.label}
           options={RUNGS.filter((r) => item.rungs.includes(r.value))}
-          value={item.reach}
-          onPick={onSet}
+          value={reach}
+          onPick={set}
           onClose={() => setChoosing(false)}
         />
       )}

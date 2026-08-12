@@ -18,7 +18,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { Problem } from "@one/kernel";
 
 import { AccountCenter, type AccountCenterProps } from "../src/account/center.js";
-import { AboutBody, VaultScreen, type Item, type Kept, type Looked, type Where } from "../src/account/vault.js";
+import { AboutBody, meaning, VaultScreen, type Item, type Kept, type Looked, type Where } from "../src/account/vault.js";
 import { AskForIt, ConsentBody, ConsentSheet, type Asked } from "../src/consent.js";
 import { AccountDetails } from "../src/account/details.js";
 import { PreferencesScreen, type Preferences, type SetPreference } from "../src/account/preferences.js";
@@ -375,6 +375,24 @@ describe("your vault", () => {
 
     const compute = render([{ ...WHERES[0]!, items: [ITEM({})] }], []);
     expect(compute, "a two-rung want asks a question with one answer").not.toContain("share-rung");
+  });
+
+  /*
+    ⚠️ THE SENTENCE AND THE CONTROL ARE ONE STATEMENT. The switch is optimistic —
+    it has to be, a control that waits for a round trip feels broken — and the line
+    under it read the prop, which only changes when a refetch lands. So flipping
+    something on left the switch reading ON above the words "Not shared." for as
+    long as the network took. Two contradictory statements about one disclosure is
+    worse than either alone, and neither of them throws.
+  */
+  it("reads the rung it is showing, not the one it was given", () => {
+    /* ⚠️ THE TWO DISAGREE ON PURPOSE, which is the only way this can be checked
+       without a browser: mid-flight the row is showing a rung the prop has not
+       caught up to, and the sentence has to be the one on screen. Rendering both
+       in agreement — the obvious test — passes either way. */
+    const stale = ITEM({ reach: "self", granted: false });
+    expect(meaning(stale, "compute")).toBe("Calculations only. Nobody here sees it.");
+    expect(meaning(ITEM({ reach: "staff", granted: true }), "self")).toBe("Not shared.");
   });
 
   /* ⚠️ THE WHOLE ROW IS READABLE CLOSED, which is what earns a disclosure. */
