@@ -237,36 +237,48 @@ const LEGAL_DOCS: readonly Doc[] = [
   it sensitive" is the question the summary answers, and a fixture where
   everything stays in the EEA is a picture of the one state that needs no answer.
 */
-/* ⚠️ IRELAND IS `eea`, NOT `adequacy` — an adequacy decision is what covers a
-   country OUTSIDE the union, so declaring one for Dublin is a contradiction the
-   summary then reports as a transfer that never happens. The first fixture said
-   `adequacy` and read "Leaves Europe: Yes" for a company that does not. */
+/*
+  ⚠️ EVERY NAME HERE IS DELIBERATELY UNREAL, AND ON THIS SCREEN THAT IS NOT A
+  STYLE CHOICE. A disclosure surface renders a claim about who controls somebody's
+  data, where it is processed and what covers a transfer — so a fixture carrying a
+  real company's name states, in a picture anybody may be shown, facts about a real
+  business that nobody declared. The first version of this named a legal entity, a
+  jurisdiction, a contact address on a live domain and an infrastructure footprint,
+  all invented.
+
+  ⚠️ IT FOLLOWS THE CONVENTION THE MANIFESTS ALREADY USE — `example.test`, and a
+  controller that says it is an example. `hello`'s own governance declaration is
+  written that way for the same reason, and this preview had simply not been held
+  to it.
+*/
 const LEGAL_SUBPROCESSORS: readonly Subprocessor[] = [
-  { id: "cloudflare", name: "Cloudflare", role: "Serving and storage", receives: ["identity", "usage", "content"], where: "Germany", safeguard: "eea", terms: "https://example.test/cf-dpa" },
-  { id: "stripe", name: "Stripe", role: "Taking payment", receives: ["identity", "contact", "financial"], where: "Ireland", safeguard: "eea", terms: "https://example.test/stripe-dpa" },
-  { id: "google", name: "Google", role: "Generating text and images", receives: ["content", "health"], where: "United States", safeguard: "sccs", terms: "https://example.test/google-dpa", trust: "https://example.test/google-trust" },
+  { id: "host", name: "The example host", role: "Runs it and stores what is in it", receives: ["identity", "usage", "content"], where: "Wherever the example runs", safeguard: "eea", terms: "https://example.test/host-dpa" },
+  /* ⚠️ `eea` rather than `adequacy`, which is what covers a country OUTSIDE the
+     union — declaring one for somewhere inside it is a contradiction the summary
+     then reports as a transfer that never happens. */
+  { id: "billing", name: "The example biller", role: "Takes payment", receives: ["identity", "contact", "financial"], where: "Inside the union", safeguard: "eea", terms: "https://example.test/billing-dpa" },
+  { id: "model", name: "The example model", role: "Generates text and images", receives: ["content", "health"], where: "Outside the union", safeguard: "sccs", terms: "https://example.test/model-dpa", trust: "https://example.test/model-trust" },
 ];
 
-/* What this product declares it holds — the other half `transfersOf` crosses. */
+/* What this example declares it holds — the other half `transfersOf` crosses. */
 const LEGAL_HELD: readonly Held[] = [
   { id: "people", fields: {}, retention: { days: null, onTenantClose: "export-then-purge" },
-    holding: { kind: "personal", categories: ["identity", "contact", "usage"], subjects: ["member"], purpose: "Running the product", basis: "contract" } },
+    holding: { kind: "personal", categories: ["identity", "contact", "usage"], subjects: ["member"], purpose: "Running the example", basis: "contract" } },
   { id: "entries", fields: {}, retention: { days: null, onTenantClose: "export-then-purge" },
     holding: { kind: "personal", categories: ["content", "health"], subjects: ["member", "customer"], purpose: "What somebody records about themselves", basis: "consent", condition: "explicit_consent" } },
 ];
 
 const LEGAL_RECEIVING: Receiving = {
-  controller: "4DL Software UG, Berlin",
-  contact: "privacy@4dl.app",
-  regions: ["eu-central", "eu-west"],
+  controller: "The example controls it.",
+  contact: "privacy@example.test",
+  regions: ["auto", "eu"],
   subprocessors: LEGAL_SUBPROCESSORS,
-  inference: { ai: { "eu-central": ["google"], "eu-west": [] } },
+  inference: { ai: { auto: ["model"], eu: [] } },
   /*
     ⚠️ DERIVED BY THE KERNEL, NOT TYPED HERE. `transfersOf` crosses what this
-    product HOLDS with what each recipient claims to receive, so a fixture that
-    listed transfers by hand could show a company receiving a category the app
-    does not have — over-disclosure in the direction nobody checks — or, as the
-    first attempt did, two transfers against three recipients, which made the
+    product HOLDS with what each recipient claims to receive, so a hand-written
+    list can show a company receiving a category the app does not have — or, as
+    the first attempt did, two transfers against three recipients, which made the
     summary read "2 of 2" and mean nothing.
   */
   transfers: transfersOf({ collections: LEGAL_HELD, subprocessors: LEGAL_SUBPROCESSORS }),
