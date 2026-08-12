@@ -241,6 +241,20 @@ describe("a row is one line of words, whatever it is about", () => {
     expect(rule?.[1], "a marked row's detail may wrap — a paragraph in a list").toMatch(/text-overflow:\s*ellipsis/);
     expect(rule?.[1]).toMatch(/white-space:\s*nowrap/);
   });
+
+  /*
+    ⚠️ AND THERE IS ONE LABEL STYLE. Small tracked capitals is the device an
+    interface reaches for when a label has to LOOK like something — and this one
+    already has a label: quiet ink, sentence case, smaller. Two of them had
+    appeared, one of them in amber on the screen somebody is asked to read most
+    carefully.
+  */
+  it("sets no label in small capitals", () => {
+    for (const [file, css] of sheets) {
+      expect(css, `${file} tracks a label into capitals — the label style is quiet ink, sentence case`)
+        .not.toMatch(/text-transform:\s*uppercase/);
+    }
+  });
 });
 
 /* ------------------------------------------------------------------ focus --- */

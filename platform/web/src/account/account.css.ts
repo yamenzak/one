@@ -59,6 +59,9 @@ export const ACCOUNT_CSS = `
 */
 .changed { display: grid; gap: 4px; padding: 14px 16px; border-radius: var(--radius-card);
   background: var(--warn-well); color: var(--ink); font-size: 15px; line-height: 1.5; }
-.changed-what { color: var(--warn); font-size: 13px; font-weight: 600;
-  letter-spacing: 0.02em; text-transform: uppercase; }
+/* ⚠️ SENTENCE CASE, LIKE EVERY OTHER SIGN IN THE PRODUCT. Small tracked capitals
+   is the one typographic device this interface does not use anywhere else — it is
+   a label on a form — and it was here, in amber, on the one screen somebody is
+   asked to read carefully. The tone and the weight already say it is a sign. */
+.changed-what { color: var(--warn); font-size: 13.5px; font-weight: 600; }
 `.trim();

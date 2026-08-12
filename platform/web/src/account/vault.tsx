@@ -294,7 +294,7 @@ export function VaultScreen({ wheres, kept, looks, onSet, onBack, Heading = "h1"
                   ? <Mark kind="person" src={l.whoFace} name={l.who} />
                   : <Mark kind="workspace" src={l.face} name={l.where} product={l.product} />}
                 title={l.who ?? l.where}
-                detail={`Read your ${l.label.toLowerCase()} · ${l.on}`}
+                detail={`${readAs(l.label)} · ${l.on}`}
                 /* ⚠️ ONCE IS NOT WORTH A COUNT. "4 times" is information;
                    "1 times" is a template showing through. */
                 sign={l.times > 1 ? <Pill>{l.times} times</Pill> : undefined}
@@ -559,3 +559,19 @@ export const KeptHere = ({ onOpen }: { readonly onOpen: () => void }): ReactNode
     <Onward className="chevron" />
   </button>
 );
+
+/**
+ * WHAT A READ IS CALLED, IN A SENTENCE.
+ *
+ * ⚠️ A LABEL MAY ALREADY OWN ITS POSSESSIVE, AND HALF OF THEM DO. The words are
+ * the app's — "Weight" beside "Your goal" — so a template that always prefixed
+ * one produced "Read your your goal", which shipped and which nothing could catch
+ * but a person looking at the screen. Lower-cased as well, because a label is
+ * written to head a row and this is the middle of a sentence.
+ */
+export const readAs = (label: string): string => {
+  const said = label.trim();
+  const inside = said.charAt(0).toLowerCase() + said.slice(1);
+  return /^your\b/i.test(said) ? `Read ${inside}` : `Read your ${inside}`;
+};
+

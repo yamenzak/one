@@ -18,7 +18,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { LegalDoc, Problem, Receiving } from "@one/kernel";
 
 import { AccountCenter, type AccountCenterProps } from "../src/account/center.js";
-import { AboutBody, KeptHere, meaning, VaultScreen, type Item, type Kept, type Looked, type Where } from "../src/account/vault.js";
+import { AboutBody, KeptHere, meaning, readAs, VaultScreen, type Item, type Kept, type Looked, type Where } from "../src/account/vault.js";
 import { AskForIt, ConsentBody, ConsentSheet, type Asked } from "../src/consent.js";
 import { AccountDetails } from "../src/account/details.js";
 import { PreferencesScreen, type Preferences, type SetPreference } from "../src/account/preferences.js";
@@ -661,6 +661,20 @@ const RECEIVING: Receiving = {
     { to: "model", name: "The example model", where: "Outside the union", safeguard: "sccs", categories: ["content", "health"], special: true, subjects: ["member"] },
   ],
 };
+
+/*
+  ⚠️ A LABEL MAY ALREADY OWN ITS POSSESSIVE, AND HALF OF THEM DO. The words on a
+  vault fact are the app's — "Weight" beside "Your goal" — and a template that
+  always prefixed one shipped "Read your your goal". Nothing but a person looking
+  at the screen could have caught it, which is what makes it worth a test.
+*/
+describe("what a read is called", () => {
+  it("does not say your twice", () => {
+    expect(readAs("Your goal")).toBe("Read your goal");
+    expect(readAs("Weight")).toBe("Read your weight");
+    expect(readAs("Resting heart rate")).toBe("Read your resting heart rate");
+  });
+});
 
 describe("consent and legal", () => {
   /*

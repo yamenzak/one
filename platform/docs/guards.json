@@ -3793,6 +3793,15 @@
       "impl": "web/test/interface.test.tsx",
       "proves": "promises mail rather than a page when the address is one",
       "fails": "an address opened through the web treatment: a new tab that never arrives, under the outward mark whose entire value is that it is honest"
+    },
+    {
+      "id": "there-is-one-label-style",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/interface.test.tsx",
+      "proves": "sets no label in small capitals",
+      "fails": "small tracked capitals — the device an interface reaches for when a label has to LOOK like something. This one already has a label: quiet ink, sentence case, smaller. Two had appeared, one of them in amber on the screen somebody is asked to read most carefully"
     }
   ]
 }

@@ -968,8 +968,12 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 .about-line { color: var(--ink-quiet); font-size: 14.5px; line-height: 1.5; }
 /* ⚠️ THE KEY IS A LEAD-IN, NOT A COLUMN. Two columns at phone width give the
    value about eighteen characters, and every line wraps to three. */
-.about-key { display: block; color: var(--ink-faint); font-size: 12.5px;
-  text-transform: uppercase; letter-spacing: 0.06em; margin-block-end: 2px; }
+/* ⚠️ AND IT IS SET LIKE EVERY OTHER LABEL HERE. Small tracked capitals was a
+   second label style in a product that already has one — the entry's — and it is
+   the device an interface reaches for when a label has to look like something.
+   Quiet ink at a smaller size says the same thing in the same voice. */
+.about-key { display: block; color: var(--ink-faint); font-size: 13px;
+  margin-block-end: 2px; }
 .about-reading { padding-inline-start: 12px; border-inline-start: 2px solid var(--edge); }
 /* ⚠️ WHAT IT CANNOT REVEAL IS THE HALF WORTH READING, so it is not the smaller of
    the two. It is the sentence somebody checks the arithmetic against. */

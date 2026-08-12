@@ -421,6 +421,13 @@ guess, and a drop shadow nobody had decided the platform had.
 own declaration, in a value derived from one, or in a mask, where black is
 opacity rather than colour.*
 
+**There is one label style, and small tracked capitals is not it.** — A key, an
+eyebrow, a callout's sign: all of them are quiet ink, sentence case, a size
+smaller. Capitals with letter-spacing is what an interface reaches for when a
+label has to LOOK like something, and it had appeared twice — once in amber, on
+the screen somebody is asked to read most carefully.
+*Checked: `web/test/interface.test.tsx`.*
+
 **A place has no mark.** — A globe stood for the edge network and a ring of
 sparkles for the European Union: shapes a drawing library happened to have, doing
 duty as emblems, in a column where every other tile is a company's own logo or a
@@ -828,6 +835,7 @@ more, which is the honest state.
 | `every-control-can-be-seen-when-focused` | a pressable thing with no focus indicator, which is a control somebody navigating by keyboard has lost — and which is invisible to everybody testing with a pointer, meaning everybody. The consent sheet's own picker was one | **live** |
 | `a-control-keeps-the-pages-word-space` | the font shorthand resetting the word space inside a control. The text face sets wide letters against a narrow word space and the platform corrects it once on the body; every row, field and button then silently undid the correction. Measured: 1.28px on a paragraph and 0 on every row title and detail, which is most of the words in the account centre | **live** |
 | `a-link-out-tells-mail-from-a-page` | an address opened through the web treatment: a new tab that never arrives, under the outward mark whose entire value is that it is honest | **live** |
+| `there-is-one-label-style` | small tracked capitals — the device an interface reaches for when a label has to LOOK like something. This one already has a label: quiet ink, sentence case, smaller. Two had appeared, one of them in amber on the screen somebody is asked to read most carefully | **live** |
 <!-- /generated -->
 
 ## 5. What is not decided yet
