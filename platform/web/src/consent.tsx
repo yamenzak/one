@@ -120,9 +120,21 @@ const NAME: Record<Reach, string> = {
  * product asking for more than it can spend — which is the thing that teaches
  * people the rungs are theatre.
  */
-const offered = (ask: Pick<Asked, "need" | "by">): readonly Option<Reach>[] => {
+/*
+  ⚠️ THE RECOMMENDATION'S ARGUMENT BELONGS BESIDE THE RUNG IT ARGUES FOR. In the
+  list it was a third grey sentence under every decision — read before anybody had
+  a choice in front of them, which is where a paragraph goes unread — and four of
+  those turned a sheet with four questions on it into twenty lines of prose. Here
+  it is one sentence on one option, at the moment somebody is picking.
+*/
+export const offered = (
+  ask: Pick<Asked, "need" | "by">,
+  recommend?: Reach | null,
+  because?: string | null,
+): readonly Option<Reach>[] => {
   const may = rungsFor(ask);
-  return RUNGS.filter((r) => may.includes(r.value));
+  return RUNGS.filter((r) => may.includes(r.value)).map((r) =>
+    because && r.value === recommend ? { ...r, detail: `${r.detail} ${because}` } : r);
 };
 
 export function ConsentSheet({ open, app, where, asks, onShare, onClose }: ConsentSheetProps): ReactNode {
@@ -168,7 +180,6 @@ export function ConsentBody({ app, where, asks, onShare, onClose }: Omit<Consent
             <Ask
               title={ask.label}
               why={ask.why}
-              because={ask.recommend !== "self" ? ask.because : null}
               required={ask.required}
               reach={ask.reach}
               onOpen={() => setChoosing(ask.fact)}
@@ -200,14 +211,23 @@ export function ConsentBody({ app, where, asks, onShare, onClose }: Omit<Consent
       </div>
 
       {[...asks.flatMap((a) => [
-        { id: a.fact, label: a.label, need: a.need, reach: a.reach },
-        ...a.readings.map((r) => ({ id: r.id, label: r.label, need: "derived" as const, reach: r.reach })),
+        {
+          id: a.fact, label: a.label, need: a.need, reach: a.reach,
+          /* ⚠️ THE ARGUMENT IS OFFERED ONLY WHERE IT ARGUES FOR SOMETHING. A
+             recommendation of "only me" recommends the state somebody is already
+             in, so the sentence would be an argument for changing nothing. */
+          recommend: a.recommend !== "self" ? a.recommend : null, because: a.because,
+        },
+        ...a.readings.map((r) => ({
+          id: r.id, label: r.label, need: "derived" as const, reach: r.reach,
+          recommend: null, because: null,
+        })),
       ])].map((row) => (
         <Choose
           key={row.id}
           open={choosing === row.id}
           title={row.label}
-          options={offered(row)}
+          options={offered(row, row.recommend, row.because)}
           value={row.reach}
           onPick={(reach) => onShare(row.id, reach)}
           onClose={() => setChoosing(null)}
@@ -224,11 +244,10 @@ export function ConsentBody({ app, where, asks, onShare, onClose }: Omit<Consent
  * block look unanswered — so somebody who has already decided cannot see that
  * they have, and the sheet reads as a form they failed to fill in.
  */
-const Ask = ({ title, why, hides, because, required, reach, under, onOpen }: {
+const Ask = ({ title, why, hides, required, reach, under, onOpen }: {
   readonly title: string;
   readonly why: string;
   readonly hides?: string;
-  readonly because?: string | null;
   readonly required?: boolean;
   readonly reach: Reach;
   readonly under?: boolean;
@@ -240,9 +259,6 @@ const Ask = ({ title, why, hides, because, required, reach, under, onOpen }: {
     {/* ⚠️ WHAT IT CANNOT REVEAL. The sentence that earns the decision, and the
         reason a reading is a smaller ask rather than a differently-worded one. */}
     {hides ? <span className="ask-hides">{hides}</span> : null}
-    {/* ⚠️ THE RECOMMENDATION IS AN ARGUMENT, NOT A DEFAULT. It sits beside the
-        choice with its reason, and nothing is moved on anybody's behalf. */}
-    {because ? <span className="ask-hides">{because}</span> : null}
     {required ? <span className="ask-note">Without this, that part of the app will not work.</span> : null}
     <button
       type="button"

@@ -19,7 +19,7 @@ import type { LegalDoc, Problem, Receiving } from "@one/kernel";
 
 import { AccountCenter, type AccountCenterProps } from "../src/account/center.js";
 import { AboutBody, KeptHere, meaning, readAs, VaultScreen, type Item, type Kept, type Looked, type Where } from "../src/account/vault.js";
-import { AskForIt, ConsentBody, ConsentSheet, type Asked } from "../src/consent.js";
+import { AskForIt, ConsentBody, ConsentSheet, offered, type Asked } from "../src/consent.js";
 import { AccountDetails } from "../src/account/details.js";
 import { PreferencesScreen, type Preferences, type SetPreference } from "../src/account/preferences.js";
 import { SignInMethods, type Passkey } from "../src/account/signin.js";
@@ -673,6 +673,31 @@ describe("what a read is called", () => {
     expect(readAs("Your goal")).toBe("Read your goal");
     expect(readAs("Weight")).toBe("Read your weight");
     expect(readAs("Resting heart rate")).toBe("Read your resting heart rate");
+  });
+});
+
+/*
+  ⚠️ THE RECOMMENDATION IS AN ARGUMENT AND IT BELONGS WHERE THE CHOICE IS. As a
+  third grey sentence under every decision it was read before anybody had a choice
+  in front of them — four of those turned a sheet with four questions on it into
+  twenty lines of prose. It is one sentence, on one option, at the moment somebody
+  is picking; and it is offered only where it argues for a CHANGE, because a
+  recommendation of "only me" recommends the state they are already in.
+*/
+describe("where a recommendation is made", () => {
+  const ask = { need: "raw", by: undefined } as never;
+  it("puts the argument on the rung it argues for, and nowhere else", () => {
+    const rows = offered(ask, "staff", "Nobody can plan without it.");
+    const staff = rows.find((r) => r.value === "staff");
+    expect(staff?.detail).toContain("Nobody can plan without it.");
+    for (const r of rows) {
+      if (r.value !== "staff") expect(r.detail).not.toContain("Nobody can plan without it.");
+    }
+  });
+
+  it("says nothing when there is nothing to argue for", () => {
+    const rows = offered(ask, null, "Unused.");
+    for (const r of rows) expect(r.detail).not.toContain("Unused.");
   });
 });
 

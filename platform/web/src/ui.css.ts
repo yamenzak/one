@@ -799,7 +799,11 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 .ask-why { color: var(--ink-quiet); font-size: 14.5px; line-height: 1.4; }
 /* ⚠️ WHAT IT CANNOT REVEAL, SET APART. It is the sentence that earns the
    decision, and in the same voice as the reason it reads as more of the pitch. */
-.ask-hides { color: var(--ink-faint); font-size: 13.5px; line-height: 1.4; font-style: italic; }
+/* ⚠️ IT IS THE SENTENCE THAT EARNS THE DECISION, SO IT IS NOT FINE PRINT. Faint
+   and italic is the typography of a disclaimer — the one register a consent sheet
+   must never use, because it is what a sheet nobody is meant to read looks like.
+   The same voice as the reason above it, one step quieter. */
+.ask-hides { color: var(--ink-quiet); font-size: 14px; line-height: 1.45; }
 .ask-note { color: var(--warn); font-size: 13.5px; }
 /* ⚠️ FULL WIDTH, so the answer is a control rather than a value at the end of a
    sentence — and so a thumb can reach it without aiming. */

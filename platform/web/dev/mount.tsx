@@ -40,7 +40,7 @@ import { DEPLOYMENT } from "@one/deployment";
 import { ValueEditor, type EditableField } from "../src/editor.js";
 import { Card, Entry } from "../src/list.js";
 import { Edit } from "../src/icon.js";
-import { ConsentSheet, type Asked } from "../src/consent.js";
+import { AskForIt, ConsentSheet, type Asked } from "../src/consent.js";
 import { SignInMethods } from "../src/account/signin.js";
 import { Stack } from "../src/stack.js";
 import { configureFeedback, feel, FEEDBACK_DEFAULT } from "../src/feedback.js";
@@ -642,7 +642,8 @@ function Preview() {
         {/* ⚠️ THE SIGN GOES SOMEWHERE, and this is the whole reason it is a
             button: an app field bound to the vault is the one place a person
             meets the vault without having gone looking for it. */}
-        <AppFields onSave={save} onOpenVault={() => { go({ at: "vault" }); setOpen(true); }} />
+        <AppFields onSave={save} onOpenVault={() => { go({ at: "vault" }); setOpen(true); }}
+          onAsk={() => setAsking(true)} />
         <button type="button" onClick={() => setOpen(true)}>Open the account centre</button>
       </div>
 
@@ -705,9 +706,13 @@ function Preview() {
  * would make this picture prove that two copies agree, which is the one thing it
  * must not be able to show.
  */
-function AppFields({ onSave, onOpenVault }: {
+function AppFields({ onSave, onOpenVault, onAsk }: {
   readonly onSave: (name: string, value: string) => Promise<Problem | null>;
   readonly onOpenVault: () => void;
+  /* ⚠️ THE ONE SURFACE THIS PREVIEW COULD NOT REACH, WHICH IS THE ONE AN APP
+     SPAWNS. The consent sheet was mounted here from the day it was written and
+     nothing ever opened it — so every review of it was a review of the code. */
+  readonly onAsk: () => void;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   const height = VAULT_WHERES[0]!.items.find((i) => i.fact === "body.height")!;
@@ -735,6 +740,14 @@ function AppFields({ onSave, onOpenVault }: {
       {/* ⚠️ ONCE, UNDER THE GROUP. Said per row it is five repetitions of one fact
           about the account; said here it is a sign on a drawer. */}
       <KeptHere onOpen={onOpenVault} />
+      {/* ⚠️ WHAT AN APP SHOWS WHERE A VAULT FACT IS NOT SHARED WITH IT: the empty
+          state IS the ask, because a field that is simply missing teaches nobody
+          that it could be filled. */}
+      <AskForIt
+        what="Your weight"
+        then="Kova can chart it and set targets from it once you choose what it may see."
+        onAsk={onAsk}
+      />
       <ValueEditor
         field={fields.find((f) => f.name === editing) ?? null}
         onSave={onSave}
