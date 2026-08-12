@@ -185,10 +185,16 @@ const VAULT_KEPT: readonly Kept[] = [
   { fact: "body.girths", label: "Measurements" },
 ];
 
+/* ⚠️ A PERSON READING, THE SAME PERSON AGAIN, AND THE APP READING WITH NO PERSON
+   AT ALL — the three rows that render differently, and the third is the one a
+   fixture full of names would never show. */
 const VAULT_LOOKS: readonly Looked[] = [
-  { fact: "body.mass", label: "Weight", appName: "Kova", who: "Shujaa Haddad", on: "Yesterday", times: 4 },
-  { fact: "goal.training", label: "Your goal", appName: "Kova", who: "Shujaa Haddad", on: "Yesterday", times: 1 },
-  { fact: "body.mass", label: "Weight", appName: "Kova", on: "3 August", times: 12 },
+  { fact: "body.mass", label: "Weight", where: "Haddad Strength", face: face("t1"), product: "kova",
+    who: "Shujaa Haddad", on: "Yesterday", times: 4 },
+  { fact: "goal.training", label: "Your goal", where: "Haddad Strength", face: face("t1"), product: "kova",
+    who: "Shujaa Haddad", on: "Yesterday", times: 1 },
+  { fact: "body.mass", label: "Weight", where: "Beirut Barre Collective", face: face("t2"), product: "kova",
+    on: "3 August", times: 12 },
 ];
 
 /*

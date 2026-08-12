@@ -79,7 +79,18 @@ export interface Where extends Omit<WantedHere, "items"> {
 export interface Looked {
   readonly fact: string;
   readonly label: string;
-  readonly appName: string;
+  /**
+   * ⚠️ THE WORKSPACE IT WAS READ IN, NOT THE PRODUCT. "Kova" is true of half this
+   * list and answers nothing; "Haddad Strength" is the place somebody can act on,
+   * and it is the same name the group above this section is filed under — so the
+   * two halves of the screen are talking about one thing. Where a read had no
+   * workspace behind it, this is the app.
+   */
+  readonly where: string;
+  /** Its own mark, or the generated face standing in for one. */
+  readonly face?: string;
+  /** The product, for the fallback's colour. Never shown as a word. */
+  readonly product?: string;
   /** Who looked. Absent where the app itself was computing and no person saw it. */
   readonly who?: string;
   readonly on: string;
@@ -253,11 +264,22 @@ export function VaultScreen({ wheres, kept, looks, onSet, onBack, Heading = "h1"
           <Card>
             {looks.map((l, i) => (
               <Row
-                key={`${l.fact}:${l.appName}:${l.on}:${i}`}
+                key={`${l.fact}:${l.where}:${l.on}:${i}`}
                 title={l.label}
                 detail={
                   <>
-                    <Chip>{l.who ?? l.appName}</Chip>
+                    {/* ⚠️ THE SAME OBJECT THAT APPEARS IN THE GROUP ABOVE, face
+                        included. As bare words the reader had to match a name they
+                        read here to a planet they saw thirty rows up — which is
+                        the exact work the chip exists to remove. */}
+                    <Chip face={<Face kind="workspace" src={l.face} name={l.where} tone={l.product} />}>
+                      {l.where}
+                    </Chip>
+                    {/* ⚠️ THE PERSON IS NAMED BESIDE IT, NOT INSTEAD OF IT. Both
+                        matter and they are different questions: a coach read this,
+                        and they read it at that studio. Showing only the person
+                        loses the one thing somebody can end. */}
+                    {l.who ? `${l.who} · ` : null}
                     {l.on}
                     {/* ⚠️ ONCE IS NOT WORTH A COUNT. "4 times" is information;
                         "1 times" is a template showing through. */}

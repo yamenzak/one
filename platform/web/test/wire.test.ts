@@ -100,7 +100,7 @@ describe("what a screen is handed", () => {
 
   it("speaks the day somebody looked", () => {
     const looks = looksFrom({ looks: [{
-      fact: "body.mass", label: "Weight", appName: "Kova", times: 4,
+      fact: "body.mass", label: "Weight", where: "Haddad Strength", times: 4,
       on: at("2026-08-11T09:00:00.000Z"),
     }] }, read);
     expect(looks[0]!.on).toBe("11 August");

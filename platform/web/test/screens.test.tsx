@@ -268,8 +268,8 @@ const WHERES: readonly Where[] = [{
 const KEPT: readonly Kept[] = [{ fact: "body.girths", label: "Measurements" }];
 
 const LOOKS: readonly Looked[] = [
-  { fact: "body.mass", label: "Weight", appName: "Kova", who: "Shujaa", on: "9 August", times: 4 },
-  { fact: "body.mass", label: "Weight", appName: "Kova", on: "8 August", times: 1 },
+  { fact: "body.mass", label: "Weight", where: "Haddad Strength", who: "Shujaa", on: "9 August", times: 4 },
+  { fact: "body.mass", label: "Weight", where: "Haddad Strength", on: "8 August", times: 1 },
 ];
 
 describe("your vault", () => {
