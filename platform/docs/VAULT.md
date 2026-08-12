@@ -386,16 +386,38 @@ opening.
 
 ### 12c. What the screen is NOT wired to yet
 
-⚠️ **`vault.mine` still answers with the platform's whole fact registry**, not
-with any app's declared wants. Grouping by workspace needs every app's `VaultSpec`
-at the identity door, and one worker only knows its own manifest — so it needs the
-shared-store publication the platform already uses for config and the AI catalog.
-The resolver and the screen take the grouped shape today; the transport does not
-produce it.
+**The publication half is built.** `vault_specs` is a global table in
+`PLATFORM_GLOBAL`, and every app writes its own declaration into it on boot —
+`publishVaultSpec`, called beside `applySchema`, which is the one moment a worker
+is certainly running its own current manifest. `publishedSpecs` reads all of them
+back. Both are total: a worker that cannot publish still serves, and one product's
+unparseable row is a product missing from the screen rather than a screen that
+fails to render.
 
-<!-- DEFER(one-186) stage:7 — publish each app's VaultSpec to the shared store so
-     the identity door can group the vault by workspace. `wantedHere` and
-     `VaultScreen` already take that shape; `vault.mine` still answers with FACTS. -->
+⚠️ **It holds declarations, never data.** Rows are copied out of manifests that
+ship in the bundle — the same text that is in the repository — so the table is as
+public as the app is. It has its own column list rather than joining
+`VAULT_COLUMNS`, because everything on that list is a person's, tenant-scoped and
+erased with them; this is scoped to nobody and must survive an account being
+deleted. On that list, the erasure guard would have demanded it be shredded
+alongside somebody's body measurements.
+
+⚠️ **And it carries no timestamp.** Nothing reads when a declaration was
+published — it is whatever the running bundle says — and the column made boot read
+the wall clock, which the injected-clock guard correctly refused.
+
+⚠️ **The read half is blocked on one column, and it is a real one.**
+`vault.mine` still answers with the platform's whole fact registry. Grouping by
+workspace needs a workspace's APP, and `tenant_directory` does not have one — its
+columns are a guarded allow-list, deliberately, so adding `app_id` is a change to
+the store that residency does not govern and belongs in its own diff with its own
+argument. Everything above it is ready: `wantedHere` resolves, `VaultScreen`
+renders, and both take the grouped shape today.
+
+<!-- DEFER(one-186) stage:7 — group the vault by workspace. The declarations are
+     published and readable (`publishVaultSpec`/`publishedSpecs`); what is missing
+     is `app_id` on `tenant_directory`, without which a workspace cannot be mapped
+     to the product that serves it. `vault.mine` still answers with FACTS. -->
 
 ⚠️ **A reading IS separately grantable from the review screen**, as of the
 per-reading controls. Each one resolves on its own grant — keyed on the reading id,

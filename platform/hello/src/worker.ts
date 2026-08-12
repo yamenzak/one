@@ -14,7 +14,7 @@
 
 import { deriveSchema, PLATFORM_CONFIG } from "@one/kernel";
 import {
-  applySchema, createRuntime,
+  applySchema, createRuntime, publishVaultSpec,
   PLATFORM_GLOBAL, PLATFORM_REGIONAL, type RawEnv,
 } from "@one/runtime";
 import { entries, hello, notes, receipts } from "./manifest.js";
@@ -130,7 +130,14 @@ const runtime = createRuntime(hello, {
     residency does not govern.
   */
   onBoot: {
-    global: (directory) => applySchema(directory, GLOBAL_MODULES).then(() => undefined),
+    /* ⚠️ THE VAULT DECLARATION IS PUBLISHED WITH THE SCHEMA, because boot is the
+       one moment this worker is certainly running its own current manifest. The
+       account centre reads every app's; a publication behind a deploy step is one
+       somebody forgets on the app that mattered. */
+    global: async (directory) => {
+      await applySchema(directory, GLOBAL_MODULES);
+      await publishVaultSpec(directory, hello);
+    },
     region: (bind) => applySchema(bind.db, REGIONAL_MODULES).then(() => undefined),
   },
 });

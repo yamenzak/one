@@ -33,7 +33,7 @@ import { DOMAIN_CLAIM_SCHEMA } from "./settings-ops.js";
 import { CATALOGUE_SCHEMA } from "./operator-ops.js";
 import { CONFIG_SCHEMA, MODEL_SCHEMA } from "./config.js";
 import { DIRECTORY_SCHEMA, DOMAIN_SCHEMA } from "./directory.js";
-import { VAULT_SCHEMA } from "./vault.js";
+import { VAULT_SCHEMA, VAULT_SPEC_SCHEMA } from "./vault.js";
 import { IDENTITY_SCHEMA } from "./identity.js";
 import { OTP_SCHEMA } from "./identity-ops.js";
 import { PROVIDER_SCHEMA } from "./provider.js";
@@ -85,6 +85,10 @@ export const PLATFORM_GLOBAL: readonly SchemaModule[] = [
   /* ⚠️ After identity: a consent belongs to an account, and the ledger is only
      meaningful beside the record of who that is. */
   CONSENT_SCHEMA,
+  /* ⚠️ DECLARATIONS, NOT DATA, and global for the same reason the vault is: the
+     account centre answers for every product a person belongs to, and one app's
+     worker knows only its own manifest. */
+  VAULT_SPEC_SCHEMA,
   /*
     ⚠️ GLOBAL, AND THAT IS THE WHOLE DESIGN. A vault fact belongs to the person
     rather than to a workspace, so it outlives every app they use and every

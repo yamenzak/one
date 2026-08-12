@@ -15,8 +15,19 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { Instant, PlainDate } from "@one/kernel";
-import { derive, VAULT_COLUMNS, VAULT_SCHEMA, type StoredFact } from "../src/vault.js";
+import type { Instant, PlainDate, SqlHandle } from "@one/kernel";
+import {
+  derive, publishedSpecs, VAULT_COLUMNS, VAULT_SCHEMA, VAULT_SPEC_COLUMNS, VAULT_SPEC_SCHEMA,
+  type StoredFact,
+} from "../src/vault.js";
+
+/* ⚠️ EVERY TABLE THIS FILE WRITES TO, whichever module declares it. The scanner
+   below reads statements, and a statement does not know which schema its table
+   came from — so a second map that the scanner did not consult would be a table
+   whose columns nothing checked. */
+const ALL_COLUMNS: Readonly<Record<string, readonly string[]>> = {
+  ...VAULT_COLUMNS, vault_specs: VAULT_SPEC_COLUMNS,
+};
 
 /* --------------------------------------------------------------- columns --- */
 
@@ -47,7 +58,7 @@ describe("every statement names a column that exists", () => {
     const code = store.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
     for (const [, table, list] of code.matchAll(/INSERT INTO (vault_\w+)\s*\(([^)]+)\)/g)) {
-      const known = VAULT_COLUMNS[table!];
+      const known = ALL_COLUMNS[table!];
       expect(known, `INSERT names an unknown table ${table}`).toBeDefined();
       for (const raw of list!.split(",")) {
         const c = raw.trim();
@@ -64,7 +75,7 @@ describe("every statement names a column that exists", () => {
     */
     for (const [, clause] of code.matchAll(/DO UPDATE SET ([^`]+?)(?:`|,\s*$)/g)) {
       for (const [, column] of clause!.matchAll(/(\w+)\s*=\s*excluded\./g)) {
-        const anywhere = Object.values(VAULT_COLUMNS).some((cols) => cols.includes(column!));
+        const anywhere = Object.values(ALL_COLUMNS).some((cols) => cols.includes(column!));
         expect(anywhere, `DO UPDATE SET names ${column}, which is not a column of any vault table`).toBe(true);
       }
     }
@@ -137,5 +148,84 @@ describe("what a reading refuses to say", () => {
 
   it("survives a value that is not a number", () => {
     expect(derive("body.mass.trend", [day("2026-08-01", "heavy"), day("2026-08-15", "heavier")], NOW)!.value).toBeNull();
+  });
+});
+
+describe("what every app wants, where every app can see it", () => {
+  /*
+    ⚠️ THE VAULT IS ONE PERSON'S, SO IT CANNOT BE RENDERED FROM ONE APP'S MANIFEST.
+    A worker knows its own wants and nothing about the product beside it — so the
+    account centre could only ever have shown the app it happened to be running
+    inside, which is not the question it exists to answer. Every app publishes its
+    declaration into the global store; whoever renders the vault reads all of them.
+
+    ⚠️ AND EVERY STATEMENT IS READ AGAINST THE COLUMNS IT NAMES, which is the same
+    check the grant table has and for the same reason: a rename swept every
+    occurrence except the one inside an `ON CONFLICT` clause, it typechecked, it
+    passed every unit test, and it threw only on the second write.
+  */
+  const columns = new Set<string>(VAULT_SPEC_COLUMNS);
+
+  it("declares one table, and every column it uses is in it", () => {
+    const ddl = VAULT_SPEC_SCHEMA.ddl.join("\n");
+    expect(ddl).toContain("CREATE TABLE IF NOT EXISTS vault_specs");
+    for (const c of columns) expect(ddl, `${c} is named and never created`).toContain(c);
+    const created = [...ddl.matchAll(/\b([a-z_]+) (?:TEXT|INTEGER)\b/g)].map((m) => m[1]!);
+    for (const c of created) expect(columns, `${c} is created and not on the allow-list`).toContain(c);
+  });
+
+  /*
+    ⚠️ NOTHING ABOUT A PERSON IS IN IT, and the list is how that stays true. Rows
+    here are copied out of manifests that ship in the bundle — as public as the app
+    is — and one convenient addition would silently make this a global store of
+    something residency governs, with nothing failing.
+  */
+  it("holds declarations and nothing that belongs to anybody", () => {
+    expect([...columns]).toEqual(["app_id", "app_name", "wants"]);
+    expect(VAULT_SPEC_SCHEMA.ddl.join("\n")).not.toMatch(/account_id|user_id|tenant_id|email/);
+  });
+
+  /* ⚠️ GLOBAL, LIKE THE VAULT ITSELF. Declared regionally, an account centre in
+     one region would answer for a subset of the products somebody uses and say
+     nothing about the rest. */
+  it("names no dependency that would put it in a region", () => {
+    expect(VAULT_SPEC_SCHEMA.after ?? []).toEqual([]);
+    expect(VAULT_SPEC_SCHEMA.scoped).toBeUndefined();
+  });
+});
+
+describe("reading every app's declaration back", () => {
+  /* A handle that answers one query, which is all this reader does. */
+  const answering = (rows: unknown[]): SqlHandle =>
+    ({ all: async () => rows } as unknown as SqlHandle);
+
+  it("hands back each app's wants, parsed", async () => {
+    const back = await publishedSpecs(answering([
+      { app_id: "kova", app_name: "Kova", wants: '[{"fact":"body.mass","need":"derived","why":"A direction."}]' },
+    ]));
+    expect(back).toEqual([{
+      appId: "kova", appName: "Kova",
+      spec: { wants: [{ fact: "body.mass", need: "derived", why: "A direction." }] },
+    }]);
+  });
+
+  /*
+    ⚠️ ONE PRODUCT'S BAD ROW MUST NOT TAKE THE ACCOUNT CENTRE DOWN WITH IT. Every
+    row here was written by a different worker, possibly a version ahead — so a
+    value this one cannot read is a product missing from the screen, never a screen
+    that fails to render.
+  */
+  it("drops a row it cannot parse rather than throwing on it", async () => {
+    const back = await publishedSpecs(answering([
+      { app_id: "scena", app_name: "Scena", wants: "{not json" },
+      { app_id: "kova", app_name: "Kova", wants: "[]" },
+    ]));
+    expect(back.map((x) => x.appId)).toEqual(["kova"]);
+  });
+
+  /* ⚠️ AND A STORE THAT WILL NOT ANSWER IS AN EMPTY VAULT, not a broken one. */
+  it("answers with nothing when the store refuses the read", async () => {
+    const broken = { all: async () => { throw new Error("no"); } } as unknown as SqlHandle;
+    expect(await publishedSpecs(broken)).toEqual([]);
   });
 });

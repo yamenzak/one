@@ -25,7 +25,7 @@
  */
 
 import type {
-  Reach, Grant, Instant, PlainDate, SchemaModule, SqlHandle, UserId, VaultRefusal,
+  Reach, Grant, Instant, PlainDate, SchemaModule, SqlHandle, UserId, VaultRefusal, VaultSpec,
 } from "@one/kernel";
 import { factOf, mayDerive, mayRead, readingOf } from "@one/kernel";
 
@@ -47,6 +47,43 @@ export const VAULT_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   vault_disclosures: ["account_id", "fact", "app_id", "tenant_id", "reader_id", "reach", "on_day", "reads"],
   vault_grant_log: ["id", "account_id", "fact", "app_id", "tenant_id", "verb", "reach", "expires_at", "at"],
 };
+
+/**
+ * WHAT EVERY APP WANTS, WHERE EVERY APP CAN SEE IT.
+ *
+ * ⚠️ THE VAULT IS ONE PERSON'S, SO IT CANNOT BE RENDERED FROM ONE APP'S MANIFEST.
+ * A worker knows its own wants and nothing about the product next to it — so the
+ * account centre, which exists precisely to answer "what does each place I belong
+ * to know about me", could only ever have shown the app it happened to be running
+ * inside. Each app publishes its declaration into the global store on boot, and
+ * whoever renders the vault reads all of them.
+ *
+ * ⚠️ IT HOLDS DECLARATIONS, NEVER DATA. Rows here are copied out of manifests that
+ * ship in the bundle — the same text that is in the repository — so this table is
+ * as public as the app is. Nothing about a person is in it, which is the same rule
+ * the tenant directory beside it lives by.
+ *
+ * ⚠️ AND IT IS REPLACED WHOLE, NOT MERGED. A want removed from a manifest has to
+ * disappear from the vault, or somebody keeps being shown a control for a
+ * disclosure nothing can make any more — and a merge is exactly how that row
+ * survives forever.
+ */
+/**
+ * ⚠️ ITS OWN LIST, BECAUSE IT IS ITS OWN KIND OF TABLE. Everything in
+ * `VAULT_COLUMNS` is a person's, tenant-scoped and erased with them; this holds
+ * declarations copied out of manifests, is scoped to nobody, and must survive an
+ * account being deleted — putting it on that list would have made the erasure
+ * guard demand it be shredded with somebody's body measurements.
+ */
+export const VAULT_SPEC_COLUMNS = ["app_id", "app_name", "wants"] as const;
+
+export const VAULT_SPEC_SCHEMA: SchemaModule = {
+  id: "vault_specs",
+  ddl: [
+    `CREATE TABLE IF NOT EXISTS vault_specs (app_id TEXT PRIMARY KEY, app_name TEXT NOT NULL, wants TEXT NOT NULL);`,
+  ],
+};
+
 
 export const VAULT_SCHEMA: SchemaModule = {
   id: "vault",
@@ -158,6 +195,54 @@ interface FactRow { fact: string; at: string; sealed: string; recorded_at: strin
 interface GrantRow {
   account_id: string; fact: string; app_id: string; tenant_id: string;
   reach: string; expires_at: string | null; granted_at: string; via: string;
+}
+
+/**
+ * ⚠️ PUBLISHED ON BOOT, BESIDE THE SCHEMA, because that is the one moment an app
+ * is certainly running its own current manifest. A publication behind a deploy
+ * step is one somebody forgets on the app that mattered; a publication on every
+ * request is a write on the hot path for a value that changes when the bundle
+ * does.
+ *
+ * ⚠️ AND IT NEVER THROWS. A vault declaration is not what an app is for — a
+ * worker that cannot publish it should still serve, and the vault shows one app
+ * fewer rather than every app failing to boot.
+ */
+export async function publishVaultSpec(
+  db: SqlHandle, app: { readonly id: string; readonly name: string; readonly vault?: VaultSpec },
+): Promise<void> {
+  try {
+    if (!app.vault) {
+      await db.run(`DELETE FROM vault_specs WHERE app_id = ?`, [app.id]);
+      return;
+    }
+    /* ⚠️ NO TIMESTAMP. Nothing reads when a declaration was published — it is
+       whatever the running bundle says — and the column would have made boot read
+       the wall clock, which the injected-clock guard correctly refuses. A column
+       nothing reads is the thing this file's own comments keep warning about. */
+    await db.run(
+      `INSERT INTO vault_specs (app_id, app_name, wants) VALUES (?, ?, ?)
+       ON CONFLICT(app_id) DO UPDATE SET app_name = excluded.app_name, wants = excluded.wants`,
+      [app.id, app.name, JSON.stringify(app.vault.wants)],
+    );
+  } catch { /* see above: an app that cannot say what it wants still serves. */ }
+}
+
+/** Every app's declaration, for the surface that renders all of them at once. */
+export async function publishedSpecs(
+  db: SqlHandle,
+): Promise<readonly { appId: string; appName: string; spec: VaultSpec }[]> {
+  const rows = await db.all<{ app_id: string; app_name: string; wants: string }>(
+    `SELECT app_id, app_name, wants FROM vault_specs ORDER BY app_id LIMIT 200`,
+  ).catch(() => []);
+  return rows.flatMap((r) => {
+    /* ⚠️ A ROW THAT WILL NOT PARSE IS DROPPED, not thrown on. It was written by
+       another worker, possibly a version ahead — and one product's bad row must
+       not take the whole account centre down with it. */
+    try {
+      return [{ appId: r.app_id, appName: r.app_name, spec: { wants: JSON.parse(r.wants) as VaultSpec["wants"] } }];
+    } catch { return []; }
+  });
 }
 
 export function vaultStore(db: SqlHandle): VaultStore {
