@@ -27,8 +27,8 @@
 import { useState, type ElementType, type ReactNode } from "react";
 import type { Instant, Problem } from "@one/kernel";
 import { Button } from "../button.js";
-import { Save, Tick } from "../icon.js";
-import { Card, Entry } from "../list.js";
+import { Key, Locked, Others, Save, Tick } from "../icon.js";
+import { Card, Entry, Item } from "../list.js";
 import { Screen, Section, Title } from "../screen.js";
 
 /**
@@ -89,16 +89,23 @@ export function ExportScreen({ taken, onTake, onSave, onBack, Heading = "h1" }: 
       title={<Title as={Heading}>Download your data</Title>}
       lede="Everything your account holds about you, in one document, whenever you want it."
     >
+      {/*
+        ⚠️ WHAT IT COVERS, AS ROWS. It was one paragraph of five lines saying three
+        separate things — what an account holds, what a vault holds, and whose the
+        records inside a workspace are — which is a list somebody has to take apart
+        before they can answer the question they came with. Every other list in
+        this product is rows; a person scans three of them and stops.
+
+        ⚠️ AND THE THIRD ROW IS THE ONE THAT MATTERS, because it is the limit. It
+        reads as a fact about who runs a workspace rather than as an apology, which
+        is what it becomes at the end of a paragraph.
+      */}
       <Section>
-        {/* ⚠️ WHAT IT COVERS, IN THE PERSON'S OWN TERMS, AND SAID ONCE. Every
-            sentence here is about what an account IS rather than about which
-            tables exist — the table names arrive below, from the answer. */}
-        <p className="note">
-          It covers your account itself — how you sign in, what you have agreed to,
-          the notifications you have had — and your vault, including who has read
-          each fact in it. Records inside a workspace belong to that workspace and
-          are exported by whoever runs it.
-        </p>
+        <Card>
+          <Item icon={<Key />} title="Your account" detail="How you sign in and what you agreed to" />
+          <Item icon={<Locked />} title="Your vault" detail="Every fact in it, and who has read each one" />
+          <Item icon={<Others />} title="A workspace's records" detail="Exported by whoever runs that workspace" />
+        </Card>
       </Section>
 
       {taken === null ? null : (

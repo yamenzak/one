@@ -428,6 +428,23 @@ label has to LOOK like something, and it had appeared twice — once in amber, o
 the screen somebody is asked to read most carefully.
 *Checked: `web/test/interface.test.tsx`.*
 
+**Three things said in one paragraph is a list.** — "It covers your account
+itself — how you sign in, what you have agreed to, the notifications you have had
+— and your vault, including who has read each fact in it. Records inside a
+workspace belong to that workspace and are exported by whoever runs it" is five
+lines a reader has to take apart before they can answer the question they arrived
+with. As three rows it is scanned and finished, and the limit — whose the records
+in a workspace are — reads as a fact rather than as an apology at the end of a
+paragraph.
+
+**Fine print is a register, and a consent sheet may not use it.** — What a
+reading conceals was set faint and italic, which is the typography of a
+disclaimer: it is what a sheet nobody is meant to read looks like, on the one
+surface whose entire job is being read. Same voice as the sentence above it, one
+step quieter. And the recommendation's argument moved to the picker, beside the
+option it argues for — in the list it was a third grey sentence read before
+anybody had a choice in front of them.
+
 **A place has no mark.** — A globe stood for the edge network and a ring of
 sparkles for the European Union: shapes a drawing library happened to have, doing
 duty as emblems, in a column where every other tile is a company's own logo or a

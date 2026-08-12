@@ -159,7 +159,10 @@ describe("the one mark", () => {
     const out = html(<Mark kind="workspace" name="X" badge={<Device />} />);
     expect(out).toContain("mark-badge");
     expect(out).toContain('aria-hidden="true"');
-    expect(UI_CSS).toMatch(/\.mark-badge[^{]*\{[^}]*calc\(var\(--mark\) \* -0\.09\)/);
+    /* ⚠️ OUTWARD BY THE TILE'S OWN OVERHANG, which is declared once and used
+       twice — here, and to inset a badged mark sitting at the edge of a column. */
+    expect(UI_CSS).toMatch(/--mark-out: calc\(var\(--mark\) \* 0\.09\)/);
+    expect(UI_CSS).toMatch(/\.mark-badge[^{]*\{[^}]*calc\(var\(--mark-out\) \* -1\)/);
   });
 });
 

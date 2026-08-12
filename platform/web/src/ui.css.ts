@@ -619,6 +619,10 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 */
 .mark { position: relative; flex: none; display: grid; place-items: center;
   inline-size: var(--mark); block-size: var(--mark);
+  /* ⚠️ HOW FAR THE BADGE BREAKS THE TILE'S EDGE, DECLARED ONCE. It is used twice —
+     to place the badge, and to inset a badged mark that sits at the edge of a
+     column — and two copies of the same fraction is how a nudge becomes a drift. */
+  --mark-out: calc(var(--mark) * 0.09);
   background: var(--well); color: var(--ink);
   font-family: var(--font-brand); font-weight: 600;
   font-size: calc(var(--mark) * 0.38); }
@@ -678,7 +682,7 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
   mark rather than laid on top of it.
 */
 .mark-badge { position: absolute;
-  inset-block-end: calc(var(--mark) * -0.09); inset-inline-end: calc(var(--mark) * -0.09);
+  inset-block-end: calc(var(--mark-out) * -1); inset-inline-end: calc(var(--mark-out) * -1);
   inline-size: calc(var(--mark) * 0.5); block-size: calc(var(--mark) * 0.5);
   border-radius: var(--radius-well); display: grid; place-items: center;
   background: var(--card); color: var(--ink);
@@ -687,6 +691,11 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
    most colourful thing on the row and a symbol laid over it disappears; at
    two-thirds it is still unmistakably which workspace. */
 .mark:has(> .mark-badge) .mark-body { opacity: 0.66; }
+/* ⚠️ AND A BADGED MARK AT THE EDGE OF A COLUMN IS INSET BY ITS OWN OVERHANG.
+   Otherwise the tile lines up with the cards below it and the badge does not —
+   six pixels into the page's margin, which reads as a photograph pushed against
+   the edge of the screen rather than as a considered placement. */
+.title-row .mark:has(> .mark-badge) { margin-inline-end: var(--mark-out); }
 
 /* ⚠️ THE WHOLE ROW IS THE TARGET. A 50-pixel control at the end of a full-width
    row is the smallest thing on the screen, and the row is a label, so pressing
