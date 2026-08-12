@@ -217,9 +217,17 @@ const VaultCrown = ({ shared, onGo }: {
     */}
     <div className="sky" data-sky="aurora" data-in="card" style={{ "--sky-h": 268 } as CSSProperties} aria-hidden="true" />
     <span className="crown-name"><Lockup word="Vault" /></span>
+    {/*
+      ⚠️ IT DESCRIBES THE MECHANISM, NEVER THE CONTENTS. It said "your body, your
+      health, your goals", which is one product's list of data categories written
+      into a package every product draws from — and the vault is not a coaching
+      feature: the same card stands over a company's record of an employee. A
+      surface that enumerates what it holds also has to be edited every time an
+      app declares a fact, and no app can edit this file.
+    */}
     <span className="crown-said">
-      Your body, your health, your goals — kept here rather than in any app that
-      asks. You choose who sees each one, and for how long.
+      Sensitive things about you, held by your account — you choose who sees each
+      one, and for how long.
     </span>
     <span className="crown-foot">
       {/* ⚠️ THE FACT WAITS AND THE CARD DOES NOT. A destination renders with no

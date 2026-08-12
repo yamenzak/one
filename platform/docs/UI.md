@@ -181,6 +181,46 @@ fifty-four seconds and a face breathing over nine are weather: nothing is
 responding to anybody, and their rate *is* the effect. The line is two seconds,
 and it is a distinction rather than a convenience.
 
+**A movement belongs to the journey, never to the screen.** — The same screen is
+reached by pressing a row on the surface behind it and by a shortcut from
+somewhere else in a product, and those are not the same arrival. A screen
+carrying its own entrance would play a coming-back-out movement while arriving
+over an app that was never its parent. The direction is derived from how the
+level changed; the screens declare nothing.
+*Checked: `web/test/stack.test.tsx` — "goes onward away from the root and back to
+it", "treats a move between two screens as onward".*
+
+**Which makes the shortcut the default rather than the case.** — A stack animates
+a CHANGE and never a first render: whatever presented the level did the arriving,
+and a second movement over the top of it is two things arriving at once. That one
+rule is the whole of the context-awareness — nothing anywhere has to know that a
+screen was deep-linked to.
+*Checked: `web/test/stack.test.tsx` — "plays no movement until something changes".*
+
+**A screen that travelled does not also assemble itself.** — Sliding in while its
+sections rise one after another is two entrances for one arrival, and the sections
+finish long after the screen has stopped. The suppression lasts the life of that
+screen, not the life of the movement: released at the end — the obvious tidy-up,
+since the movement is over — every section plays its entrance half a second late.
+*Checked: `web/test/stack.test.tsx` — "keeps the direction after the screen leaving
+has gone".*
+
+**Both screens are on the surface, and both keep their own identity.** — Written
+as a conditional beside a fixed child, React reconciles by POSITION first: the
+screen on its way out lands in a slot that held nothing a moment ago and is
+mounted afresh, so a half-typed field clears and every effect re-runs, in full
+view, for the whole length of the movement it is playing. One keyed array. And the
+root's key is in a different namespace from every screen's, because a single
+reserved word for it is a word some screen may one day be called — that collision
+fails nowhere and hands the screen arriving the state of the root it replaced.
+*Checked: `web/test/stack.test.tsx` — "carries the screen leaving under its own
+key", "keys the root out of every namespace a screen can be in".*
+
+**Onward is a direction, not a sign.** — Going deeper travels the other way in
+Arabic, and no transform has a logical form — so the sign is the one thing a level
+has to be told, and everything multiplies by it. Sixteen hand-written translates
+each getting it right is sixteen chances not to.
+
 **An entrance fills `backwards`, never `both`.** — `both` keeps the animation's
 final values applied forever and they silently win over the element's own
 declarations. A collapsing header whose opacity and scale are computed from scroll
@@ -241,6 +281,15 @@ behind it.
 
 **A grabber is a claim, so it appears only where it is true.** — A bar at the top
 of a sheet is the one piece of furniture that means *pull me*.
+
+**Each screen is its own scroller, and coming back puts you where you were.** —
+One scroller behind a level would have to be forced to the top on the way in, and
+could not be put back on the way out without dragging the screen still leaving
+along with it — so a half-read list comes back at the top. Separate scrollers make
+the restore a number written to an element nothing else is looking at, before the
+frame is painted. Only the step just taken is remembered: coming BACK resumes,
+going ONWARD to a screen visited earlier starts at the top, which is what each of
+those two words means.
 
 **A card inside a sheet bleeds to the sheet's edges.** — The sheet is already the
 card — same fill — so the element contributes no ground at all, and the only

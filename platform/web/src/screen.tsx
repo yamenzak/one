@@ -39,14 +39,17 @@ const OVER = 86;
  * into an animation frame, and every rule that depends on it interpolates in CSS.
  *
  * ⚠️ AND IT FINDS ITS OWN SCROLLER. Presented over an app the page scrolls inside
- * the presentation; opened as a route it scrolls the window. A frame that assumed
- * one would silently do nothing in the other.
+ * the presentation; inside a stack each screen scrolls itself, so a level can be
+ * left and come back still half-read; opened as a route it scrolls the window. A
+ * frame that assumed any one of the three would silently do nothing in the other
+ * two — and it is the NEAREST that wins, because a stack inside a presentation
+ * has both.
  */
 function useCollapse(page: { current: HTMLDivElement | null }): void {
   useEffect(() => {
     const node = page.current;
     if (!node) return;
-    const scroller = node.closest<HTMLElement>(".over-content");
+    const scroller = node.closest<HTMLElement>("[data-scroll]");
     const target: HTMLElement | Window = scroller ?? window;
     let queued = 0;
     const read = () => {

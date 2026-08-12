@@ -30,6 +30,7 @@ import { Choose, type Option } from "../choose.js";
 import { Buzz, Light, Measure, Sound, Tongue } from "../icon.js";
 import { Card, Item } from "../list.js";
 import { Screen, Title } from "../screen.js";
+import { Stack } from "../stack.js";
 import { SwitchRow } from "../switch.js";
 
 export type Theme = "system" | "light" | "dark";
@@ -106,10 +107,26 @@ export function PreferencesScreen({ prefs, onSet, onBack, Heading = "h1" }: Pref
   const back = () => setWhere(null);
   const inner = { prefs, onSet, onBack: back, Heading };
 
-  if (where === "appearance") return <AppearanceScreen {...inner} />;
-  if (where === "reading") return <ReadingScreen {...inner} />;
-  if (where === "feedback") return <FeedbackScreen {...inner} />;
+  /* ⚠️ A LEVEL OF ITS OWN, NESTED INSIDE THE ONE THAT BROUGHT US HERE. A stack
+     only knows its own step, so a category travels onward from the hub exactly
+     the way the hub travelled onward from the account — one movement, declared
+     once, and this screen never learns how deep it is. */
+  return (
+    <Stack at={where}>
+      {where === "appearance" ? <AppearanceScreen {...inner} /> :
+       where === "reading" ? <ReadingScreen {...inner} /> :
+       where === "feedback" ? <FeedbackScreen {...inner} /> :
+       <PreferencesHub prefs={prefs} onGo={setWhere} onBack={onBack} Heading={Heading} />}
+    </Stack>
+  );
+}
 
+function PreferencesHub({ prefs, onGo, onBack, Heading }: {
+  readonly prefs: Preferences;
+  readonly onGo: (to: "appearance" | "reading" | "feedback") => void;
+  readonly onBack: () => void;
+  readonly Heading: ElementType;
+}): ReactNode {
   return (
     <Screen
       leave="up"
@@ -123,7 +140,7 @@ export function PreferencesScreen({ prefs, onSet, onBack, Heading = "h1" }: Pref
           icon={<Light />}
           title="Appearance"
           detail={NAME.theme[prefs.theme]}
-          onGo={() => setWhere("appearance")}
+          onGo={() => onGo("appearance")}
         />
         {/* ⚠️ TWO VALUES, ONE LINE, in the order the rows appear behind it — so
             the summary is read as a list of what is set rather than as a sentence
@@ -132,13 +149,13 @@ export function PreferencesScreen({ prefs, onSet, onBack, Heading = "h1" }: Pref
           icon={<Tongue />}
           title="Language and units"
           detail={`${NAME.language[prefs.language]} · ${NAME.units[prefs.units]}`}
-          onGo={() => setWhere("reading")}
+          onGo={() => onGo("reading")}
         />
         <Item
           icon={<Buzz />}
           title="Feedback"
           detail={feedbackSummary(prefs)}
-          onGo={() => setWhere("feedback")}
+          onGo={() => onGo("feedback")}
         />
       </Card>
     </Screen>

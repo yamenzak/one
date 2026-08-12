@@ -92,6 +92,60 @@ export const MOTION_CSS = `
    top. Everything from here on shares the last step. */
 .stagger > *:nth-child(n + 8) { animation-delay: calc(var(--step) * 7); }
 
+/* -------------------------------------------------------------- travelling */
+
+/* ⚠️ A LEVEL IS ONE PLACE AND ITS SCREENS OVERLAP IN IT. Both are in the same
+   grid cell for the length of a movement, so the one arriving can travel over the
+   one leaving without either being taken out of flow and measured by hand. The
+   clip is what stops a screen mid-travel from widening the surface it is
+   travelling across, which on a phone is a horizontal scrollbar appearing for
+   half a second on every navigation. */
+.stack { display: grid; grid-template: 1fr / 1fr; block-size: 100%; overflow: hidden;
+  /* ⚠️ ONWARD IS A DIRECTION, NOT A SIGN. In Arabic, going deeper into something
+     travels the other way — and a translate has no logical form, so the sign is
+     the one thing a stack has to be told. Everything below multiplies by it. */
+  --onward: 1; }
+.stack:dir(rtl) { --onward: -1; }
+/* ⚠️ EACH SCREEN IS ITS OWN SCROLLER, which is what makes a half-read list still
+   half-read when you come back to it. Marked rather than assumed: the frame finds
+   the nearest thing carrying this, so the same screen works presented over an app
+   and mounted as a route. */
+.stack-leaf { grid-area: 1 / 1; overflow-y: auto; min-block-size: 0; }
+
+/* ⚠️ THE SCREEN UNDERNEATH MOVES A QUARTER AS FAR, and that ratio is the whole
+   effect. Held still, it reads as a card being dealt over a picture; moved the
+   same distance, the two are one filmstrip in motion and neither has depth. A
+   quarter with a little of the light taken out of it reads as something being
+   covered up. */
+@keyframes onward-in { from { translate: calc(100% * var(--onward)) 0; } }
+@keyframes onward-out { to { translate: calc(-25% * var(--onward)) 0; opacity: 0.55; } }
+@keyframes back-in { from { translate: calc(-25% * var(--onward)) 0; opacity: 0.55; } }
+@keyframes back-out { to { translate: calc(100% * var(--onward)) 0; } }
+
+/* ⚠️ THE MOVE CURVE, WHICH IS WHAT THIS IS FOR. A screen travelling is not
+   arriving from nowhere and not being dismissed — it is being moved, and the move
+   curve is the one in the set with a flat middle, so most of the distance is
+   covered at an even speed and the ends are where it eases. */
+.stack-leaf[data-move='onward'] { animation: onward-in var(--settle) var(--move) backwards; }
+.stack-leaf[data-move='back'] { animation: back-in var(--settle) var(--move) backwards; }
+/* ⚠️ FORWARDS, AND ONLY HERE. Everything that arrives fills BACKWARDS so it
+   leaves the element's future alone; a screen on its way OUT has no future — it
+   is removed the instant this ends — and without the fill it snaps back to where
+   it started for the frames in between. */
+.stack-leaf[data-going][data-move='onward'] { animation: onward-out var(--settle) var(--move) forwards; }
+.stack-leaf[data-going][data-move='back'] { animation: back-out var(--settle) var(--move) forwards; }
+/* ⚠️ COMING BACK, THE SCREEN LEAVING IS THE ONE ON TOP. It is being taken off to
+   reveal what was underneath; painted below, it would leave from behind its own
+   parent, which is the same movement read as the wrong one. */
+.stack-leaf[data-going][data-move='back'] { z-index: 1; }
+
+/* ⚠️ A SCREEN THAT TRAVELLED DOES NOT ALSO ASSEMBLE ITSELF. Sliding in while its
+   sections rise one after another is two entrances for one arrival, and the
+   sections finish long after the screen has stopped. It stays suppressed for the
+   life of that screen rather than for the life of the movement — released at the
+   end, every section would play its entrance half a second late. */
+.stack-leaf[data-move] .stagger > * { animation: none; }
+
 /* --------------------------------------------------------------- reacting */
 
 /* ⚠️ A PRESS ANSWERS IMMEDIATELY AND RELEASES SLOWLY. The whole feeling of a

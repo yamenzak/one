@@ -32,6 +32,7 @@ import { PreferencesScreen, type Preferences } from "../src/account/preferences.
 import { VaultScreen, type Held, type Looked } from "../src/account/vault.js";
 import { ConsentSheet, type Asked } from "../src/consent.js";
 import { SignInMethods } from "../src/account/signin.js";
+import { Stack } from "../src/stack.js";
 import { configureFeedback, feel, FEEDBACK_DEFAULT } from "../src/feedback.js";
 
 /* ⚠️ BAKED AT BUILD TIME BY `dev/page.tsx`, standing in for the route that will
@@ -271,8 +272,14 @@ function Preview() {
         <button type="button" onClick={() => setOpen(true)}>Open the account centre</button>
       </div>
 
+      {/* ⚠️ THE LEVEL IS THE CALLER'S, WHICH IS WHY THE STACK IS HERE AND NOT
+          INSIDE THE PRESENTATION. Navigation is the router's state in the real
+          app and this preview's state here; a presentation that owned it would
+          be a presentation that had to be told about every screen. */}
       <AccountCenter open={open} onClose={() => { setOpen(false); setAt("home"); }}>
-        {screen}
+        {({ Heading }) => (
+          <Stack at={at === "home" ? null : at}>{screen({ Heading })}</Stack>
+        )}
       </AccountCenter>
 
       <ConsentSheet

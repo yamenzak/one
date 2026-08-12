@@ -3030,6 +3030,33 @@
       "fails": "a colour defined only under the media query or only under the attribute. The viewer has three states, not two, and the missing one renders one theme's text on the other theme's ground"
     },
     {
+      "id": "a-movement-belongs-to-the-journey",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/stack.test.tsx",
+      "proves": "goes onward away from the root and back to it",
+      "fails": "a direction taken from the screen rather than from the step. The same screen is reached by pressing a row on the surface behind it and by a shortcut from elsewhere in a product; one carrying its own entrance plays a coming-back-out movement while arriving over an app that was never its parent, and a movement in the wrong direction is still a movement"
+    },
+    {
+      "id": "a-stack-animates-a-change-and-never-a-mount",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/stack.test.tsx",
+      "proves": "plays no movement until something changes",
+      "fails": "a level that animates its first render. Whatever presented it did the arriving, so a second movement over the top is two things arriving at once — and every deep link slides in from the side over an app that was never behind it. This one rule is the whole of the context-awareness"
+    },
+    {
+      "id": "a-screen-leaving-keeps-its-own-key",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/stack.test.tsx",
+      "proves": "carries the screen leaving under its own key",
+      "fails": "the pair rendered as two sibling slots rather than one keyed array. React reconciles by position first, so the screen on its way out lands in a slot that held nothing a moment ago and is mounted afresh — a half-typed field clears and every effect re-runs, in full view, for the whole length of the movement"
+    },
+    {
       "id": "a-sky-is-dimmed-by-a-factor",
       "group": "interface",
       "stage": "7",

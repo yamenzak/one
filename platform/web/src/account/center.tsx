@@ -54,6 +54,11 @@ export function AccountCenter({ open, onClose, children }: AccountCenterProps): 
             and a reader is told "Close" before it is told where it is. */}
         <Dialog.Content
           className="over-content"
+          /* ⚠️ IT SAYS IT SCROLLS RATHER THAN BEING KNOWN TO. A screen's frame
+             reads its scroll to collapse its title, and it finds the nearest
+             thing carrying this — so a level that scrolls its own screens takes
+             over from the presentation without either knowing about the other. */
+          data-scroll=""
           aria-describedby={undefined}
           onOpenAutoFocus={(e) => {
             e.preventDefault();
