@@ -485,6 +485,16 @@ export interface Want {
   readonly required?: boolean;
   /** Named readings this want covers, when `need` is `derived`. */
   readonly readings?: readonly string[];
+  /**
+   * WHO DOES THE READING — a model, or a person at the workspace.
+   *
+   * ⚠️ ONLY ON A `raw` WANT, AND IT LOWERS WHAT IS ASKED FOR RATHER THAN RAISING
+   * IT. An app whose assistant needs a value declares `agent` and the person is
+   * never offered the human rung at all; left out, a raw want asks at `staff`,
+   * which is the safe reading of silence. `wantProblems` refuses it anywhere else,
+   * because a field that quietly does nothing is one somebody believes is working.
+   */
+  readonly by?: Reader;
 }
 
 /** What an app declares in its manifest. */
@@ -784,6 +794,12 @@ export function wantProblems(spec: VaultSpec | undefined, appId: string): readon
     if (!w.why.trim()) {
       out.push({ at: w.fact, why: "is asked for with no reason, and a permission prompt with no reason is the one everybody dismisses" });
     }
+    if (w.by && w.need !== "raw") {
+      out.push({
+        at: w.fact,
+        why: `names a reader on a ${w.need} want, where nothing but the server ever reads the value — a declaration that does nothing is one somebody believes is working`,
+      });
+    }
     if (w.recommend && REACH.indexOf(w.recommend) > REACH.indexOf(fact.suggests ?? "self")) {
       out.push({
         at: w.fact,
@@ -989,7 +1005,33 @@ export interface WantedHere {
  * An app that could name its own rung could name one its need does not justify,
  * and nothing would catch it — the sheet would simply ask for more.
  */
-export const asksFor = (need: Need): Reach => (need === "raw" ? "staff" : ARITHMETIC);
+/**
+ * ⚠️ WHO READS IT, WHICH IS NOT THE SAME QUESTION AS WHAT THE APP DOES WITH IT.
+ * `need` says the app wants the value itself; this says whether a MODEL or a
+ * PERSON is the one who ends up looking. Both are readers and they are not
+ * interchangeable — "an assistant may know this, no human may" is the single
+ * disclosure people most want to make, and it is unavailable to an app that
+ * cannot say which of the two it is.
+ */
+export type Reader = "agent" | "staff";
+
+/** The shape both derivations below need, which a `Want` satisfies structurally. */
+export interface Reads {
+  readonly need: Need;
+  /** ⚠️ Only meaningful on a `raw` want; everything else is read by the server. */
+  readonly by?: Reader;
+}
+
+/**
+ * ⚠️ THE RUNG A WANT ASKS AT, AND `staff` IS A DEFAULT RATHER THAN A LAW. Every
+ * raw want asked at `staff` when this took only the need — so an app whose ONLY
+ * reader is its own assistant had to ask for the human rung to get the model one,
+ * and the person was asked to expose a fact to a roomful of people so that a model
+ * could read it. Over-asking is the thing the whole ladder exists to prevent, and
+ * the platform was structurally forcing it.
+ */
+export const asksFor = (w: Reads): Reach =>
+  (w.need === "raw" ? (w.by ?? "staff") : ARITHMETIC);
 
 /**
  * WHICH RUNGS A WANT MAY STAND AT — the one list, for every surface that offers
@@ -1016,8 +1058,8 @@ export const asksFor = (need: Need): Reach => (need === "raw" ? "staff" : ARITHM
  * "how far does this want reach" is the same defect the copy of this list in the
  * consent sheet already caused, one level down.
  */
-export const rungsFor = (need: Need): readonly Reach[] =>
-  REACH.slice(0, REACH.indexOf(asksFor(need)) + 1);
+export const rungsFor = (w: Reads): readonly Reach[] =>
+  REACH.slice(0, REACH.indexOf(asksFor(w)) + 1);
 
 export function wantedHere(input: {
   readonly spec: VaultSpec;
@@ -1055,8 +1097,8 @@ export function wantedHere(input: {
       why: want.why,
       need: want.need,
       required: want.required === true,
-      asks: asksFor(want.need),
-      rungs: rungsFor(want.need),
+      asks: asksFor(want),
+      rungs: rungsFor(want),
       reach: at?.reach ?? "self",
       granted: at !== null,
       expiresAt: at?.expiresAt ?? null,

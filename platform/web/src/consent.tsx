@@ -24,7 +24,7 @@
 import { useState, type ReactNode } from "react";
 import type { Problem } from "@one/kernel";
 import { Button } from "./button.js";
-import { rungsFor } from "@one/kernel";
+import { rungsFor, type Reader } from "@one/kernel";
 import { Choose, type Option } from "./choose.js";
 import { Onward, Tick } from "./icon.js";
 import { Card } from "./list.js";
@@ -56,6 +56,13 @@ export interface Asked {
   /** Written by whoever wants the data, in what they will DO with it. */
   readonly why: string;
   readonly need: "compute" | "derived" | "raw";
+  /**
+   * ⚠️ WHO DOES THE READING, where the app wants the value itself. An app whose
+   * assistant is the only reader says so, and the person is never offered the
+   * human rung — asking for it to reach a model is the over-asking the ladder
+   * exists to prevent.
+   */
+  readonly by?: Reader;
   /**
    * ⚠️ A STRONG CLAIM, AND THE COPY SAYS SO IN THOSE WORDS. `true` means a
    * refusal takes a feature away rather than degrading it — everything else has
@@ -113,8 +120,8 @@ const NAME: Record<Reach, string> = {
  * product asking for more than it can spend — which is the thing that teaches
  * people the rungs are theatre.
  */
-const offered = (need: Asked["need"]): readonly Option<Reach>[] => {
-  const may = rungsFor(need);
+const offered = (ask: Pick<Asked, "need" | "by">): readonly Option<Reach>[] => {
+  const may = rungsFor(ask);
   return RUNGS.filter((r) => may.includes(r.value));
 };
 
@@ -200,7 +207,7 @@ export function ConsentBody({ app, where, asks, onShare, onClose }: Omit<Consent
           key={row.id}
           open={choosing === row.id}
           title={row.label}
-          options={offered(row.need)}
+          options={offered(row)}
           value={row.reach}
           onPick={(reach) => onShare(row.id, reach)}
           onClose={() => setChoosing(null)}

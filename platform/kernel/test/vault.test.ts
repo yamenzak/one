@@ -470,9 +470,36 @@ describe("a want, resolved for one person in one workspace", () => {
      name its own rung could name one its need does not justify, and nothing would
      catch it — the sheet would simply ask for more. */
   it("derives the rung a want turns on from what it needs", () => {
-    expect(asksFor("compute")).toBe("compute");
-    expect(asksFor("derived")).toBe("compute");
-    expect(asksFor("raw")).toBe("staff");
+    expect(asksFor({ need: "compute" })).toBe("compute");
+    expect(asksFor({ need: "derived" })).toBe("compute");
+    expect(asksFor({ need: "raw" })).toBe("staff");
+  });
+
+  /*
+    ⚠️ AN APP WHOSE ONLY READER IS ITS ASSISTANT ASKS FOR THE ASSISTANT. Inferred
+    from the need alone, every raw want asked at `staff` — so a model that needed a
+    value could only get there by having the person expose it to a roomful of
+    people first. Over-asking is what the whole ladder exists to prevent, and the
+    platform was structurally forcing it.
+  */
+  it("asks at the reader a want names, never above it", () => {
+    expect(asksFor({ need: "raw", by: "agent" })).toBe("agent");
+    expect(rungsFor({ need: "raw", by: "agent" })).toEqual(["self", "compute", "agent"]);
+    expect(rungsFor({ need: "raw", by: "agent" }))
+      .not.toContain("staff");
+  });
+
+  /* ⚠️ AND IT IS REFUSED WHERE IT WOULD DO NOTHING. Only a raw want has a reader
+     to name; on anything else the server is the only thing that ever looks, so the
+     field would be a declaration somebody believed was working. */
+  it("refuses a reader on a want nothing but the server reads", () => {
+    const bad = wantProblems({ wants: [
+      { fact: "body.height", need: "compute", why: "An energy target.", by: "agent" },
+    ] }, "kova");
+    expect(bad.map((p) => p.why).join(" ")).toContain("names a reader");
+    expect(wantProblems({ wants: [
+      { fact: "goal.training", need: "raw", why: "A programme.", by: "agent" },
+    ] }, "kova")).toEqual([]);
   });
 
   /*
@@ -485,14 +512,14 @@ describe("a want, resolved for one person in one workspace", () => {
   */
   it("offers every rung up to the one a want asks for, and none above", () => {
     for (const need of NEEDS) {
-      const rungs = rungsFor(need);
+      const rungs = rungsFor({ need });
       expect(rungs[0], `${need} cannot be switched off`).toBe("self");
-      expect(rungs.at(-1), `${need} is offered a rung it cannot spend`).toBe(asksFor(need));
-      expect(rungs.every((r) => reaches(asksFor(need), r)), `${need} offers past what it asks`).toBe(true);
+      expect(rungs.at(-1), `${need} is offered a rung it cannot spend`).toBe(asksFor({ need }));
+      expect(rungs.every((r) => reaches(asksFor({ need }), r)), `${need} offers past what it asks`).toBe(true);
     }
-    expect(rungsFor("compute")).toEqual(["self", "compute"]);
-    expect(rungsFor("derived")).toEqual(["self", "compute"]);
-    expect(rungsFor("raw")).toEqual(["self", "compute", "agent", "staff"]);
+    expect(rungsFor({ need: "compute" })).toEqual(["self", "compute"]);
+    expect(rungsFor({ need: "derived" })).toEqual(["self", "compute"]);
+    expect(rungsFor({ need: "raw" })).toEqual(["self", "compute", "agent", "staff"]);
   });
 
   it("stands at self with nothing granted, and reports what is held", () => {

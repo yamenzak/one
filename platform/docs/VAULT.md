@@ -298,11 +298,34 @@ whole thing is built for.
 offer it and they must not disagree**. The consent sheet asks for the first time;
 the vault changes it later.
 
-| need | asks at | rungs offered |
-|---|---|---|
-| `compute` | `compute` | `self`, `compute` |
-| `derived` | `compute` | `self`, `compute` |
-| `raw` | `staff` | `self`, `compute`, `agent`, `staff` |
+| need | `by` | asks at | rungs offered |
+|---|---|---|---|
+| `compute` | — | `compute` | `self`, `compute` |
+| `derived` | — | `compute` | `self`, `compute` |
+| `raw` | *(omitted)* | `staff` | `self`, `compute`, `agent`, `staff` |
+| `raw` | `agent` | `agent` | `self`, `compute`, `agent` |
+
+⚠️ **`need` is what the app DOES with it; `by` is who ends up LOOKING.** They are
+different questions and conflating them cost the assistant its own rung. Inferred
+from the need alone, every `raw` want asked at `staff` — so an app whose only
+reader was its own assistant could reach a value only by first having the person
+expose it to everybody with a role in the workspace. *"An assistant may know this,
+no human may"* is the single disclosure people most want to make, and the platform
+was structurally forcing them past it.
+
+`by` only lowers what is asked for; it can never raise it, and `wantProblems`
+refuses it on a `compute` or `derived` want, where nothing but the server ever
+reads the value — a field that quietly changes no rung is one somebody believes is
+working.
+
+⚠️ **A fact both a person and an assistant read is ONE want at `staff`.** The
+ladder already covers it: `staff` reaches `agent`. `by: "agent"` is for a fact
+*only* a model reads. No app in this repo declares one yet — both of Kova's raw
+wants are genuinely read by a coach — so the field is proved by the kernel's tests
+rather than by a product, and that is the honest state rather than a reason to
+invent a requirement.
+*Checked: `kernel/test/vault.test.ts` — "asks at the reader a want names, never
+above it" and "refuses a reader on a want nothing but the server reads".*
 
 ⚠️ **The list is DERIVED from `asksFor`, not written beside it** — every rung from
 `self` up to the one the need asks for, and none above. Written as its own table
