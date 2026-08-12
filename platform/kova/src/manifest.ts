@@ -709,6 +709,10 @@ export const mealChoices = collection({
  * recommendation — the sheet pre-highlights it and every rung remains the
  * person's to pick.
  */
+// DEFER(one-185) stage:7 — Kova declares these and reads none of them yet: the
+// energy-target operation the four `compute` facts exist for is not written, so
+// nothing calls `subject.fact`. The asks are correct and the consent sheet is
+// answerable; what is missing is the arithmetic that was going to consume them.
 export const KOVA_VAULT = {
   wants: [
     {

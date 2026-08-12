@@ -32,8 +32,6 @@ import { Card, Item } from "../list.js";
 import { Screen, Title } from "../screen.js";
 import { SwitchRow } from "../switch.js";
 
-// DEFER(one-181) stage:7 — `accounts` has locale, units and layout but no theme
-// column, so the choice below has nowhere to be written yet. One ADD COLUMN.
 export type Theme = "system" | "light" | "dark";
 export type Units = "metric" | "imperial";
 export type Language = "en" | "de";
