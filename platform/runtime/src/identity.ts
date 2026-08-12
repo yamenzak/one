@@ -77,6 +77,18 @@ export const IDENTITY_SCHEMA: SchemaModule = {
       whoever did not set it.
     */
     `ALTER TABLE accounts ADD COLUMN layout TEXT NOT NULL DEFAULT '';`,
+    /*
+      ⚠️ THE DAY THIS ACCOUNT IS FORGOTTEN, OR EMPTY. Same shape as a workspace's
+      `closing_at` and for the same reason: leaving has to be a decision somebody
+      can sleep on, and a delete with a confirmation dialog in front of it is not
+      one. Empty rather than null so every reader agrees what "not closing" is
+      without a default of its own.
+
+      ⚠️ ON THE ACCOUNT ROW, WHICH IS GLOBAL. An account spans every product and
+      every region; a per-region copy would be a person who is closed in one
+      product and open in another, which is not a state that means anything.
+    */
+    `ALTER TABLE accounts ADD COLUMN closing_at TEXT NOT NULL DEFAULT '';`,
   ],
 };
 

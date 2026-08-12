@@ -86,7 +86,7 @@ import { readMaintenance, refuses } from "./maintenance.js";
 import { runDue, type RunReport } from "./jobs.js";
 import { dispatch, interpolatable, type Delivery } from "./inbox.js";
 import { customerFlagsFor, PARKED, readSubscription, standingFor } from "./commerce.js";
-import { claim, memberOf, membersOf, permissionsOf, revoke, seatsUsed, subjectFor } from "./membership.js";
+import { claim, memberOf, membersOf, permissionsOf, revoke, seatsUsed, subjectFor, wouldStrand } from "./membership.js";
 import { MEMBERS, membershipOperations, type MemberCarrier } from "./membership-ops.js";
 import { sqlDirectory } from "./directory.js";
 import { collectionOperations } from "./collection-ops.js";
@@ -735,6 +735,35 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             };
           }
           return null;
+        },
+        /*
+          ⚠️ EVERY WORKSPACE THIS PERSON IS THE LAST ADMINISTRATOR OF, asked of
+          every region because that is where memberships live. Bounded by the
+          number of workspaces one account is in, which is the only ceiling that
+          means anything here — a cap would silently understate the answer, and
+          the whole value of this list is that it is complete.
+
+          ⚠️ IT ASKS `wouldStrand`, WHICH IS ALSO WHAT REFUSES THE LEAVE. Deriving
+          "you cannot close" from a different rule than the one that refuses is
+          how a screen comes to offer a button that always fails.
+        */
+        wouldStrandOnLeaving: async () => {
+          if (!session) return [];
+          const stuck: string[] = [];
+          for (const region of app.tenancy.regions) {
+            const there = regional(env)(region as ResolvedRegion);
+            if (opts.onBoot) await once(region, () => opts.onBoot!.region(there, region));
+            const db = there.db as SqlHandle;
+            const rows = await db.all<{ tenant_id: string; id: string }>(
+              `SELECT tenant_id, id FROM membership WHERE account_id = ? AND revoked_at IS NULL`,
+              session.accountId,
+            ).catch(() => []);
+            for (const row of rows) {
+              const members = await membersOf(db, row.tenant_id as TenantId);
+              if (wouldStrand(app.access.roles, members, row.id)) stuck.push(row.tenant_id);
+            }
+          }
+          return stuck;
         },
         /*
           ⚠️ THE DEPLOYMENT'S OWN LANE UNLESS THE APP INSISTS. A refusal here is

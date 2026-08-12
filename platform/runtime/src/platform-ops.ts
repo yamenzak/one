@@ -12,10 +12,10 @@
  * region validation and standing default are the platform's.
  */
 
-import type { AnyOperation, AppSpec, BindingSpec, Caller, Instant, RegionId, SqlHandle, TenantId } from "@one/kernel";
+import type { AnyOperation, AppSpec, BindingSpec, Caller, Instant, RegionId, SqlHandle, TenantId, UserId } from "@one/kernel";
 import { check, nothing, operation, PUBLIC, s, toolNameFor, toolsFor, UNIVERSAL_RESERVED } from "@one/kernel";
 import { placeTenant } from "./directory.js";
-import { invite } from "./membership.js";
+import { claim, invite } from "./membership.js";
 
 /**
  * ⚠️ A SYMBOL, so an app cannot reach it by writing the property name.
@@ -168,12 +168,31 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
       const founder = (ctx as unknown as FounderCarrier)[FOUNDER];
       const owner = foundingRole(app);
       if (owner && founder?.email) {
+        const store = await founder.sessionsIn(region);
         await invite(
-          await founder.sessionsIn(region),
+          store,
           tenantId,
           { email: founder.email, role: owner, invitedBy: founder.userId as never },
           ctx.now() as Instant,
         );
+        /*
+          ⚠️ AND IT IS THEIRS IMMEDIATELY, because they are standing here. `invite`
+          writes an address with no account behind it — right for an invitation,
+          where the person may not have signed up yet — and every cross-workspace
+          question is asked by ACCOUNT: which workspaces am I in, where am I the
+          last administrator, what may I leave. Left unclaimed, somebody who made
+          a workspace from the setup door and had not yet visited it was absent
+          from their own account centre, and closing their account would have
+          stranded a workspace nothing could see they were alone in.
+
+          ⚠️ IT STILL GOES THROUGH `claim`, whose `account_id IS NULL` predicate is
+          what stops an address that has changed hands from being taken over. The
+          row was written a statement ago, so the claim is theirs by construction
+          rather than by permission.
+        */
+        if (founder.userId) {
+          await claim(store, tenantId, founder.userId as UserId, founder.email, ctx.now() as Instant);
+        }
       }
       return { tenantId, slug: input.slug, region };
     },

@@ -3244,6 +3244,42 @@
       "impl": "hello/test/membership.test.ts",
       "proves": "answers a workspace somebody is not in exactly as it answers one that is not there",
       "fails": "any signed-in account discovering which workspace ids are real, one guess at a time, from a door every account can reach"
+    },
+    {
+      "id": "a-founder-is-in-their-own-workspace",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "hello/test/membership.test.ts",
+      "proves": "lists it in the account centre before they have ever opened it",
+      "fails": "`invite` writes an address with no account behind it — right for an invitation, wrong for the founder, who is standing there. Every cross-workspace question is asked by account, so an unclaimed founding row makes somebody absent from their own account centre and lets closing their account strand a workspace nothing can see they are alone in"
+    },
+    {
+      "id": "closing-an-account-never-closes-a-workspace",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "hello/test/exit.test.ts",
+      "proves": "refuses while somebody is the last person who can let anybody in, and says which",
+      "fails": "an account closure that takes colleagues offline with it — a workspace has people, records and a bill, and the person surprised by it pressed nothing. Refused and NAMED, so it is a decision the person can act on rather than an opaque no"
+    },
+    {
+      "id": "closing-an-account-is-reversible",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "hello/test/exit.test.ts",
+      "proves": "closes with seven days to change your mind, and gives them back",
+      "fails": "a delete behind a confirmation dialog, which is a reflex rather than a decision. The way back is cancelling, not signing up again — that would be a different account"
+    },
+    {
+      "id": "leaving-is-on-the-lane-that-always-survives",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "hello/test/exit.test.ts",
+      "proves": "is on the lane that survives every rung, like everything else that is a way out",
+      "fails": "naming these `me.*` — a write outside the `exit` lane is refused by the standing gate on a suspended workspace and by the consent gate for anybody who has not accepted a new document, so leaving would be withheld from exactly the two groups most likely to want it, and neither refusal mentions leaving"
     }
   ]
 }

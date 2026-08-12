@@ -63,6 +63,16 @@ export interface PlatformDeps {
    * workspace with no members from one that does not exist.
    */
   membershipIn(tenantId: string): Promise<WorkspaceMembership | null>;
+  /**
+   * ⚠️ THE WORKSPACES THIS PERSON CANNOT WALK OUT OF, BY NAME. Every one where
+   * they are the last member who can manage members — so closing an account can
+   * refuse and SAY WHICH, instead of either failing opaquely or quietly taking
+   * somebody's colleagues offline with them.
+   *
+   * It is a dep rather than a walk in the handler because it spans every region,
+   * which is the one thing an operation is not allowed to know about.
+   */
+  wouldStrandOnLeaving(): Promise<readonly string[]>;
 }
 
 /** Who is in a workspace, and the one write this door may make against them. */
@@ -746,7 +756,7 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
    * there is what authorises it. Nothing about the id itself is trusted.
    */
   const leave = operation({
-    id: "me.leave",
+    id: "exit.leave",
     kind: "write",
     summary: "Leave a workspace you are in.",
     input: s.object({ tenantId: s.text({ max: 40 }) }),
@@ -795,7 +805,114 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     },
   });
 
-  return [requestCode, verifyCode, registerBegin, registerFinish, signInBegin, signInFinish, whoami, signOut, preferences, setPreferences, sessionList, endSession, keyList, keyRemove, workspaces, leave] as unknown as readonly AnyOperation[];
+  /* ------------------------------------------------------------- closing --- */
+
+  /**
+   * ⚠️ THE SAME SEVEN DAYS A WORKSPACE GETS, AND THE SAME REASON. Leaving has to
+   * be a decision somebody can sleep on; a confirmation dialog in front of a
+   * delete is a reflex, not a decision. The way back is CANCELLING rather than
+   * signing up again, because signing up again is a different account.
+   */
+  const CLOSING_DAYS = 7;
+
+  /**
+   * WHAT CLOSING WOULD MEAN, BEFORE ANYTHING IS DONE.
+   *
+   * ⚠️ THE WORKSPACES THAT STAND IN THE WAY ARE THE POINT OF THIS READ. An
+   * account is not a thing on its own — it is somebody's memberships — and
+   * closing one where they are the last person who can manage members would leave
+   * those workspaces running, billed, and impossible to re-enter. Naming them
+   * before the button is pressed is the difference between a refusal that teaches
+   * and one that just says no.
+   */
+  const closing = operation({
+    id: "exit.account.status",
+    kind: "read",
+    summary: "Whether your account is closing, and what stands in the way of closing it.",
+    input: nothing(),
+    output: s.object({ closesAt: s.optional(s.text()), blocking: s.json() }),
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    async handler(ctx) {
+      const d = deps(ctx);
+      /* ⚠️ The same shape signed out as signed in, so a client branches on value
+         rather than on presence. */
+      if (!d.session) return { blocking: [] };
+      const row = await d.directory.first<{ closing_at: string | null }>(
+        `SELECT closing_at FROM accounts WHERE id = ?`, d.session.accountId,
+      ).catch(() => null);
+      return {
+        ...(row?.closing_at ? { closesAt: row.closing_at } : {}),
+        blocking: await d.wouldStrandOnLeaving(),
+      };
+    },
+  });
+
+  const close = operation({
+    id: "exit.account.close",
+    kind: "write",
+    summary: "Close your account. Reversible for seven days.",
+    input: s.object({ reason: s.optional(s.text({ max: 500 })) }),
+    output: s.object({ closesAt: s.instant() }),
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    audit: () => ({ subject: "account", verb: "close" }),
+    outcome: { message: "Your account is closing", tone: "warning", invalidates: ["exit.account.status"] },
+    fails: ["platform.forbidden", "platform.conflict"],
+    /*
+      ⚠️ NOT A TOOL, and this is the clearest case in the file. A model that can
+      close somebody's account can be talked into it by a sentence in something it
+      was asked to read.
+    */
+    tool: false,
+    async handler(ctx, input: { reason?: string }) {
+      const d = deps(ctx);
+      if (!d.session) ctx.fail("platform.forbidden", { reason: "sign in first" });
+
+      /*
+        ⚠️ CLOSING AN ACCOUNT MAY NEVER CLOSE A WORKSPACE. They are different
+        things with different consequences for different people — a workspace has
+        colleagues, records and a bill — so this refuses and names them rather
+        than deciding on somebody's behalf. Handing over or closing each is the
+        person's own call, and both are operations they already have.
+      */
+      const blocking = await d.wouldStrandOnLeaving();
+      if (blocking.length) {
+        ctx.fail("platform.conflict", { field: "account", reason: "last_administrator", workspaces: blocking.join(", ") });
+      }
+
+      const closesAt = new Date(Date.parse(ctx.now()) + CLOSING_DAYS * 86_400_000).toISOString() as Instant;
+      await d.directory.run(
+        `UPDATE accounts SET closing_at = ? WHERE id = ?`, closesAt, d.session!.accountId,
+      );
+      /* ⚠️ The reason is audited and not stored on the account: it is a thing
+         somebody said once, not a property of them. */
+      void input.reason;
+      return { closesAt };
+    },
+  });
+
+  const reopen = operation({
+    id: "exit.account.cancel",
+    kind: "write",
+    summary: "Change your mind about closing your account.",
+    input: nothing(),
+    output: s.object({ ok: s.bool() }),
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    audit: () => ({ subject: "account", verb: "reopen" }),
+    /* ⚠️ Somebody changed their mind about leaving. That is worth saying properly. */
+    outcome: { message: "Welcome back", tone: "success", moment: "welcome", invalidates: ["exit.account.status"] },
+    fails: ["platform.forbidden"],
+    async handler(ctx) {
+      const d = deps(ctx);
+      if (!d.session) ctx.fail("platform.forbidden", { reason: "sign in first" });
+      await d.directory.run(`UPDATE accounts SET closing_at = '' WHERE id = ?`, d.session!.accountId);
+      return { ok: true };
+    },
+  });
+
+  return [requestCode, verifyCode, registerBegin, registerFinish, signInBegin, signInFinish, whoami, signOut, preferences, setPreferences, sessionList, endSession, keyList, keyRemove, workspaces, leave, closing, close, reopen] as unknown as readonly AnyOperation[];
 }
 
 /* ⚠️ An unreadable copy is no branding rather than a throw on a list somebody

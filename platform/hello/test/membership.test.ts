@@ -170,6 +170,35 @@ describe("nobody may grant what they do not hold", () => {
   });
 });
 
+describe("the person who makes a workspace is in it, by account and not just by address", () => {
+  /*
+    ⚠️ `invite` WRITES AN ADDRESS WITH NO ACCOUNT BEHIND IT, which is right for an
+    invitation and wrong for the founder — they are standing there. Every
+    cross-workspace question is asked by ACCOUNT: which workspaces am I in, where
+    am I the last administrator, what may I leave. So a founding row left
+    unclaimed made somebody absent from their own account centre until they
+    happened to visit the workspace, and made closing their account willing to
+    strand a workspace nothing could see they were alone in.
+
+    ⚠️ IT WAS INVISIBLE BECAUSE NOTHING READ `me.workspaces`. Every suite reached
+    a workspace by its own origin, where the sign-in claims the row on the way
+    past — so the one path that does not go through a workspace was the one path
+    with no test.
+  */
+  it("lists it in the account centre before they have ever opened it", async () => {
+    const ID = "https://id.4dl.app";
+    const founding = await signIn("founder@example.test", SETUP);
+    const made = await post(SETUP, "/api/identity.workspace.create", { slug: "founded" }, founding);
+
+    const mine = await signIn("founder@example.test", ID);
+    const res = await worker.fetch(
+      new Request(`${ID}/api/me.workspaces`, { headers: { cookie: mine } }), env as never,
+    );
+    const listed = ((await res.json()) as { workspaces: { tenantId: string }[] }).workspaces;
+    expect(listed.map((w) => w.tenantId)).toContain(made.body.tenantId as string);
+  });
+});
+
 describe("leaving, which is the way out an ordinary member did not have", () => {
   /*
     ⚠️ THE TWO OPERATIONS EITHER SIDE OF THIS ONE BOTH REFUSE. `member.remove`
@@ -226,8 +255,8 @@ describe("leaving, which is the way out an ordinary member did not have", () => 
       every other product's account controls.
     */
     const mine = await signIn("goer@example.test", ID);
-    expect((await account(goer)("/api/me.leave", { tenantId: home })).status).toBe(403);
-    expect((await account(mine)("/api/me.leave", { tenantId: home })).status).toBe(200);
+    expect((await account(goer)("/api/exit.leave", { tenantId: home })).status).toBe(403);
+    expect((await account(mine)("/api/exit.leave", { tenantId: home })).status).toBe(200);
 
     const after = ((await boss("/api/member.list")).body as unknown as Roster);
     expect(after.members.some((m) => m.email === "goer@example.test")).toBe(false);
@@ -245,7 +274,7 @@ describe("leaving, which is the way out an ordinary member did not have", () => 
       answer.
     */
     const owner = await signIn("leaving@example.test", ID);
-    const out = await account(owner)("/api/me.leave", { tenantId: home });
+    const out = await account(owner)("/api/exit.leave", { tenantId: home });
     expect(out.status).toBe(409);
 
     const roster = ((await boss("/api/member.list")).body as unknown as Roster);
@@ -259,8 +288,8 @@ describe("leaving, which is the way out an ordinary member did not have", () => 
       time, from a door every account can reach.
     */
     const stranger = await signIn("not-in-it@example.test", ID);
-    const real = await account(stranger)("/api/me.leave", { tenantId: home });
-    const invented = await account(stranger)("/api/me.leave", { tenantId: "t_no_such_thing" });
+    const real = await account(stranger)("/api/exit.leave", { tenantId: home });
+    const invented = await account(stranger)("/api/exit.leave", { tenantId: "t_no_such_thing" });
     expect(real.status).toBe(404);
     expect(invented.status).toBe(404);
     /* ⚠️ EVERYTHING BUT THE `ref`, which is one request's own id and is SUPPOSED
