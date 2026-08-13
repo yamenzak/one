@@ -22,12 +22,7 @@ import { Pill } from "../capsule.js";
 import { Confirm } from "../confirm.js";
 import { Blank, Card, Item, Waiting } from "../list.js";
 import { Screen, Section, Title } from "../screen.js";
-import { priceOf } from "./market.js";
-
-/** ⚠️ A pack is a one-off, so it has no period — the shelf's own formatter with
- *  the recurrence taken off, rather than a second way of writing money. */
-const money = (price: { readonly minor: number; readonly currency: string }): string =>
-  priceOf(price, "month").replace(/ a month$/, "");
+import { dayOf, money } from "./offer.js";
 
 /* ------------------------------------------------------------------ shape --- */
 
@@ -76,10 +71,6 @@ export const saidAs = (reason: string): string => {
 
 const titled = (id: string): string => id.replace(/^./, (c) => c.toUpperCase());
 
-/** ⚠️ Grouped by day, because a run of generations is one afternoon of work. */
-const dayOf = (at: string): string =>
-  new Date(at).toLocaleDateString(undefined, { day: "numeric", month: "long" });
-
 /* ----------------------------------------------------------------- screen --- */
 
 export interface CreditsProps {
@@ -101,24 +92,44 @@ export function CreditsScreen({
   return (
     <Screen leave="up" onLeave={onBack} name="Credits" sky="silk"
       title={<Title as={Heading}>Credits</Title>}
-      lede="One balance, spendable in every product."
     >
+      {/*
+        ⚠️ THE TOTAL IS THE HERO, NOT A ROW CALLED "Balance". It is the one number
+        somebody opened this screen for, and as a row it was the same size and
+        weight as "Bought" — a label and a figure, third in a stack of three,
+        indistinguishable from its own components.
+
+        ⚠️ AND IT WAITS RATHER THAN SHOWING A ZERO. `0` is a real answer and the
+        one most likely to send somebody to support; shown for the length of a
+        round trip it is a wrong answer wearing a loading state's excuse.
+      */}
+      <div className="hero">
+        <span className="hero-name value">
+          {balance === null ? <span className="waiting line short" /> : balance.total.toLocaleString()}
+        </span>
+        <span className="hero-said">
+          {balance === null ? "" : balance.expiring
+            ? `${balance.expiring.amount.toLocaleString()} expire on ${dayOf(balance.expiring.at)}`
+            : "Credits, spendable in every product"}
+        </span>
+      </div>
+
       <Section>
         {balance === null ? <Waiting rows={2} /> : (
           <Card>
             {/*
-              ⚠️ THE TOTAL FIRST AND THE TWO HALVES UNDER IT. Somebody arriving
-              wants one number; somebody arriving because the number changed wants
-              the other two, and burying them behind a control means the second
-              person leaves without an answer.
+              ⚠️ THE TWO HALVES UNDER THE TOTAL. Somebody arriving wants one
+              number; somebody arriving because the number changed wants these
+              two, and burying them behind a control means the second person
+              leaves without an answer.
             */}
-            <Item title="Balance" action={<span className="value">{balance.total.toLocaleString()}</span>} />
+            {/* ⚠️ THE EXPIRY IS SAID ONCE, IN THE HERO. Repeated on this row it
+                was the same sentence twice on one screen, forty pixels apart —
+                which reads as two facts that happen to agree. */}
             {balance.granted > 0 ? (
               <Item
                 title="From your plan"
-                detail={balance.expiring
-                  ? `${balance.expiring.amount.toLocaleString()} expire on ${dayOf(balance.expiring.at)}`
-                  : undefined}
+                detail="Renewed every month, and does not roll over"
                 action={<span className="value">{balance.granted.toLocaleString()}</span>}
               />
             ) : null}

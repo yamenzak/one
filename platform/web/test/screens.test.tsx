@@ -19,7 +19,11 @@ import type { LegalDoc, Problem, Receiving } from "@one/kernel";
 
 import { Hub, type HubProps } from "../src/hub/hub.js";
 import { HubHome, type HubHomeProps } from "../src/hub/home.js";
-import { MarketScreen, ShelfScreen, priceOf } from "../src/hub/market.js";
+import { AccountScreen } from "../src/hub/account.js";
+import { WorkspacesScreen } from "../src/hub/workspaces.js";
+import { MarketScreen, ShelfScreen } from "../src/hub/market.js";
+import { PlanScreen, consequenceOf, standsAs } from "../src/hub/plan.js";
+import { priceOf } from "../src/hub/offer.js";
 import { CreditsScreen, saidAs } from "../src/hub/credits.js";
 import { AboutBody, KeptHere, meaning, readAs, VaultScreen, type Item, type Kept, type Looked, type Where } from "../src/hub/vault.js";
 import { AskForIt, ConsentBody, ConsentSheet, offered, type Asked } from "../src/consent.js";
@@ -112,52 +116,81 @@ describe("a switch row", () => {
 /* ----------------------------------------------------------- provisioning --- */
 
 describe("starting something new", () => {
-  const OPENABLE = [
-    { id: "kova", name: "Kova", does: "Coaching, for a studio.", setupAt: "https://setup.kova.4dl.app" },
-    { id: "scena", name: "Scena", does: "Screens, everywhere at once.", setupAt: "https://setup.scena.4dl.app" },
+  const WORKSPACES = [
+    { tenantId: "t_1", slug: "haddad", name: "Haddad Strength", product: "kova" as const, role: "Owner" },
   ];
-  const home = (over: Partial<HubHomeProps> = {}) => html(
-    <HubHome
-      person={{ name: "Nadia", email: "n@example.test" }}
-      workspaces={[]}
-      onGo={() => undefined} onOpenWorkspace={() => undefined} onClose={() => undefined}
+  const list = (over: Partial<Parameters<typeof WorkspacesScreen>[0]> = {}) => html(
+    <WorkspacesScreen
+      workspaces={WORKSPACES}
+      email="n@example.test"
+      onOpen={() => undefined} onBack={() => undefined}
       {...over}
     />,
   );
 
   /*
-    ⚠️ MOST PEOPLE WITH AN ACCOUNT HERE ARE SOMEBODY'S CLIENT. A "New workspace"
-    button on their hub offers them a thing they cannot do and would
-    not want — and the refusal they would meet says so long after they have
-    decided the product is confusing.
+    ⚠️ MOST PEOPLE WITH AN ACCOUNT HERE ARE SOMEBODY'S CLIENT. Offering them a
+    workspace of their own is offering a thing they cannot do and would not want
+    — and the refusal they would meet says so long after they have decided the
+    product is confusing. `onStart` is the server's answer, from the
+    provisioning grant, and never a guess a screen makes.
   */
   it("offers nothing to somebody who may open nothing", () => {
-    expect(home()).not.toContain("New workspace");
+    expect(list({ workspaces: [] })).not.toContain("Start one");
   });
 
-  it("offers it to somebody who may, with no workspaces at all", () => {
-    const out = home({ openable: OPENABLE });
-    expect(out).toContain("New workspace");
+  /*
+    ⚠️ AND ONCE THERE IS A LIST, THE OFFER IS NOT ON IT. Starting one is the
+    Marketplace's, one level up: a workspace is created against a subscription
+    somebody buys, so the control belongs where the buying is. This screen
+    carried "New workspace" while the Marketplace carried "Start something new"
+    — one destination, two vocabularies, and the area that named it read as
+    decoration.
+  */
+  it("keeps the offer out of a list that already has something in it", () => {
+    expect(list({ onStart: () => undefined })).not.toContain("Start one");
+  });
+
+  /*
+    ⚠️ EXCEPT IN THE EMPTY STATE, where there is nothing else on the screen.
+    Making somebody go back up and find a section header before they can act is
+    making them read the page first.
+  */
+  it("offers it in an empty list, where there is nothing else to press", () => {
+    const out = list({ workspaces: [], onStart: () => undefined });
+    expect(out).toContain("Start one");
     /*
-      ⚠️ AND IT SAYS THE NEXT STEP IS A PLAN, because that is now what stands
+      ⚠️ AND IT SAYS THE NEXT STEP IS A PLAN, because that is what stands
       between somebody and a workspace. It used to open a picker of products and
       hand straight to a setup door, which skipped the one question that has to
       be answered before a workspace can exist at all.
     */
-    expect(out).toContain("Choose a plan");
+    expect(out).toContain("Choose a product and a plan");
   });
 
   /*
-    ⚠️ AND THE CONTROL IS NOT WHAT MAKES IT SAFE. `identity.workspace.create`
-    refuses an address with no grant on a product that is sold, and refuses again
-    where no subscription is waiting; this row is what stops somebody being
-    offered it, which is a different job. A screen that was the only control would
-    be a decoration in front of a route in the API document — see
-    `hello/test/provisioning.test.ts` and `hello/test/marketplace.test.ts` for the
-    halves that refuse.
+    ⚠️ AND THE SCREEN IS NOT WHAT MAKES IT SAFE. `identity.workspace.create`
+    refuses an address with no grant on a product that is sold, and refuses
+    again where no subscription is waiting; this row is what stops somebody
+    being offered it, which is a different job. A screen that was the only
+    control would be a decoration in front of a route in the API document — see
+    `hello/test/provisioning.test.ts` and `hello/test/marketplace.test.ts` for
+    the halves that refuse.
   */
-  it("offers nothing to somebody who may open nothing, whatever else is on the screen", () => {
-    expect(home({ openable: [] })).not.toContain("New workspace");
+  it("names where an invitation arrives, which is the other way in", () => {
+    expect(list({ workspaces: [] })).toContain("n@example.test");
+  });
+
+  /*
+    ⚠️ THE STANDING IS ON THE SECOND LINE, WITH THE REST OF THE METADATA. Beside
+    the title it competed with the one thing that identifies the row, and a
+    workspace called "Corniche Screens" was clipped to make room for a pill.
+  */
+  it("says which workspace stopped paying, on the row's own second line", () => {
+    const out = list({
+      workspaces: [{ ...WORKSPACES[0]!, standing: { label: "Payment failed", urgent: true } }],
+    });
+    expect(out).toMatch(/item-detail[^]*?Payment failed/);
   });
 });
 
@@ -1211,6 +1244,12 @@ describe("the marketplace", () => {
     { id: "kova", name: "Kova", does: "Coaching, for a studio.", open: true },
     { id: "tessa", name: "Tessa", does: "A clinic's own practice.", open: false },
   ];
+  const HOLDING = {
+    id: "sub_1", productId: "kova", productName: "Kova", planName: "Pro",
+    price: { minor: 1900, currency: "usd" }, period: "month" as const,
+    standing: { standing: "active", reason: "ok" } as const,
+    includes: [],
+  };
   const PLAN = {
     id: "pro", name: "Pro", price: { minor: 2900, currency: "usd" }, period: "month" as const, trialDays: 14,
     includes: [
@@ -1235,6 +1274,47 @@ describe("the marketplace", () => {
     const out = html(<MarketScreen products={PRODUCTS} onGo={() => undefined} onBack={() => undefined} />);
     expect(out).toContain("Tessa");
     expect(out).toContain("Not open to you");
+    /* ⚠️ AND IT IS NOT A DISABLED BUTTON. Rendered as one it is announced as a
+       control somebody cannot use; rendered as a plain element it is what it is —
+       a thing on a shelf, with a word saying why it is not for them. */
+    expect(out).toMatch(/<div class="tile" data-off=""/);
+  });
+
+  /*
+    ⚠️ THE PRODUCTS ARE A GRID AND THE HOLDINGS ARE ROWS, and the split is what
+    each carries. A product on a shelf has a logo and a name; a subscription has a
+    price, a standing and a renewal date — facts somebody scans for, and the
+    reason one is set as tiles and the other is not.
+  */
+  it("sets what you could start as a grid and what you are on as rows", () => {
+    const out = html(
+      <MarketScreen
+        products={PRODUCTS} holdings={[HOLDING]}
+        onGo={() => undefined} onBack={() => undefined}
+      />,
+    );
+    expect(out).toContain('class="tiles"');
+    expect(out).toMatch(/item-detail[^]*?\$19 a month/);
+    /* ⚠️ WHAT YOU ARE ON COMES FIRST. Somebody opening the marketplace has
+       usually come to deal with something they already pay for. */
+    expect(out.indexOf("What you are on")).toBeLessThan(out.indexOf("Start something new"));
+  });
+
+  /* ⚠️ `null` WAITS AND `[]` IS AN ANSWER. An account on nothing gets no section
+     at all rather than an empty one. */
+  it("tells holding nothing from not knowing yet", () => {
+    const bare = { products: PRODUCTS, onGo: () => undefined, onBack: () => undefined };
+    expect(html(<MarketScreen {...bare} holdings={[]} />)).not.toContain("What you are on");
+    expect(html(<MarketScreen {...bare} holdings={null} />)).toContain("aria-busy");
+  });
+
+  /* ⚠️ CREDITS ARE HERE BECAUSE THEY ARE BOUGHT — and absent entirely on a
+     deployment that has none, which is what `undefined` means. */
+  it("carries the balance where the buying is", () => {
+    const bare = { products: PRODUCTS, onGo: () => undefined, onBack: () => undefined };
+    expect(html(<MarketScreen {...bare} balance={{ total: 900, granted: 0, purchased: 900, expiring: null }} />))
+      .toContain("Credits");
+    expect(html(<MarketScreen {...bare} />)).not.toContain("Credits");
   });
 
   /*
@@ -1319,6 +1399,22 @@ describe("credits", () => {
     expect(out).toContain("No expiry");
   });
 
+  /*
+    ⚠️ THE TOTAL IS THE HERO, AND IT IS THE SIZE OF ONE. As a row it was the same
+    weight as "Bought" — a label and a figure, third in a stack of three,
+    indistinguishable from its own components. It also carries lining figures,
+    which is the one thing it wants from the value class and not its size: the two
+    combined once rendered a balance headline at the size of a table cell.
+  */
+  it("sets the balance as the hero rather than as a row", () => {
+    const out = credits();
+    expect(out).toMatch(/class="hero-name value"[^>]*>1,000/);
+    expect(out).not.toContain(">Balance<");
+    /* ⚠️ AND THE EXPIRY IS SAID ONCE. Twice on one screen, forty pixels apart, it
+       reads as two facts that happen to agree. */
+    expect([...out.matchAll(/900 expire on/g)]).toHaveLength(1);
+  });
+
   it("says nothing about expiry for an account holding only what it bought", () => {
     expect(credits({ balance: { total: 100, granted: 0, purchased: 100, expiring: null } })).not.toContain("expire on");
   });
@@ -1354,6 +1450,99 @@ describe("credits", () => {
   });
 });
 
+/* ----------------------------------------------------------------- a plan --- */
+
+describe("one subscription", () => {
+  const HOLDING = {
+    id: "sub_1", productId: "scena", productName: "Scena", planName: "Wall",
+    price: { minor: 1900, currency: "usd" }, period: "month" as const,
+    standing: { standing: "active", reason: "ok" } as const,
+    workspace: { tenantId: "t3", name: "Corniche Screens", at: "https://corniche.scena.4dl.app" },
+    includes: [{ key: "screens", label: "Screens", value: 12, unlimited: false }],
+  };
+  const plan = (over: Partial<React.ComponentProps<typeof PlanScreen>> = {}) => html(
+    <PlanScreen
+      holding={HOLDING} chargeable
+      onGo={() => undefined} onCancel={async () => null} onBack={() => undefined}
+      {...over}
+    />,
+  );
+  const arrears = (standing: "grace" | "read_only" | "blocked", nextAt?: string) => ({
+    ...HOLDING,
+    standing: { standing, reason: "arrears", ...(nextAt ? { nextAt } : {}) } as never,
+    payAt: "https://pay.example.test",
+  });
+  const day = (at: string) => new Date(at).toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+
+  /*
+    ⚠️ THE STATE IS A LABEL AND THE CONSEQUENCE IS A SENTENCE, and keeping them
+    apart is not tidiness. One string carrying both rendered as "Payment failed —
+    this workspace is rea…" in the marketplace's row, because a row's second line
+    is one line and a sentence is not.
+  */
+  it("says the state in a label and the consequence in a sentence", () => {
+    expect(standsAs(arrears("read_only", "2026-09-04T00:00:00.000Z"), day)).toBe("Payment failed");
+    expect(consequenceOf(arrears("read_only", "2026-09-04T00:00:00.000Z"), day))
+      .toBe("This workspace is read-only — nothing is lost, until 4 September.");
+    /* ⚠️ AND A SUBSCRIPTION IN GOOD STANDING HAS NO CONSEQUENCE AT ALL. A
+       sentence on every state is a screen that always looks like it is warning
+       somebody. */
+    expect(consequenceOf(HOLDING, day)).toBeNull();
+  });
+
+  /* ⚠️ EACH RUNG READS DIFFERENTLY, because "everything still works" and "this
+     workspace is closed" are not the same news. */
+  it("tells the rungs of the ladder apart", () => {
+    expect(consequenceOf(arrears("grace"), day)).toContain("Everything still works");
+    expect(consequenceOf(arrears("read_only"), day)).toContain("read-only");
+    expect(consequenceOf(arrears("blocked"), day)).toContain("closed");
+  });
+
+  /*
+    ⚠️ AND THERE IS AN ADDRESS THAT FIXES IT. A screen that says "payment failed"
+    with nothing to press has told somebody they have a problem and left them to
+    find the door, which is how arrears reach support instead of the provider.
+  */
+  it("offers paying only where paying is the problem", () => {
+    expect(plan({ holding: arrears("read_only") })).toContain("Pay now");
+    expect(plan()).not.toContain("Pay now");
+  });
+
+  /*
+    ⚠️ A SUBSCRIPTION WITH NO WORKSPACE IS THE STATE THAT HAD NO SCREEN. Bought,
+    paid, pointed at nothing — it was on the wire and nowhere a person could look,
+    so somebody who closed the tab after paying had an empty workspace list and no
+    address that would finish it.
+  */
+  it("gives a paid subscription with no workspace the door that finishes it", () => {
+    const out = plan({ holding: { ...HOLDING, workspace: null, setupAt: "https://setup.tessa.4dl.app" } });
+    expect(out).toContain("https://setup.tessa.4dl.app");
+    expect(out).toContain("Making the workspace is the last step");
+    /* ⚠️ ONCE. A circle labelled "Set it up" above a row labelled "Set it up" is
+       one destination offered twice — the thing the workspace list stopped
+       doing. */
+    expect([...out.matchAll(/Set it up/g)].length).toBeLessThanOrEqual(2);
+  });
+
+  /*
+    ⚠️ THE WAY OUT IS ABSENT WHILE IT IS ALREADY ON ITS WAY OUT. Offering somebody
+    the thing they have already done is how a second confirmation gets pressed by
+    a person trying to undo the first.
+  */
+  it("stops offering the cancel to a subscription already closing", () => {
+    expect(plan()).toContain("Cancel this subscription");
+    expect(plan({
+      holding: { ...HOLDING, standing: { standing: "closing", reason: "closing", nextAt: "2026-09-04T00:00:00.000Z" } as never },
+    })).not.toContain("Cancel this subscription");
+  });
+
+  /* ⚠️ THE PLAN'S OWN LINES, from the same declarations the gate enforces. */
+  it("says what the plan includes", () => {
+    expect(plan()).toContain("Screens");
+    expect(plan()).toContain("12");
+  });
+});
+
 /* ------------------------------------------------------------------- hub --- */
 
 describe("the hub's three areas", () => {
@@ -1361,7 +1550,7 @@ describe("the hub's three areas", () => {
     <HubHome
       person={{ name: "Nadia", email: "n@example.test" }}
       workspaces={[]}
-      onGo={() => undefined} onOpenWorkspace={() => undefined} onClose={() => undefined}
+      onGo={() => undefined} onClose={() => undefined}
       {...over}
     />,
   );
@@ -1373,10 +1562,25 @@ describe("the hub's three areas", () => {
     language", which is a purchase and a preference wearing the same row.
   */
   it("names what you are, what you belong to and what you may start", () => {
-    const out = hub({ openable: [{ id: "kova", name: "Kova", does: "Coaching.", setupAt: "https://setup.kova.4dl.app" }] });
+    const out = hub({ openable: [{ id: "kova" }] });
     expect(out).toContain("Account Center");
-    expect(out).toContain("Workspace Hub");
+    expect(out).toContain("Workspaces");
     expect(out).toContain("Marketplace");
+    expect(out.indexOf("Account Center")).toBeLessThan(out.indexOf("Workspaces"));
+    expect(out.indexOf("Workspaces")).toBeLessThan(out.indexOf("Marketplace"));
+  });
+
+  /*
+    ⚠️ AND NOTHING ELSE IS ON IT. Every setting the hub used to list is now
+    behind one of the three, which is the whole of the split — a fourth row
+    beside three areas reads as a fourth area, and the page goes back to being
+    read instead of scanned.
+  */
+  it("carries no settings of its own", () => {
+    const out = hub({ openable: [{ id: "kova" }] });
+    for (const gone of ["Preferences", "Sign-in methods", "Close your account", "Download your data"]) {
+      expect(out).not.toContain(gone);
+    }
   });
 
   /*
@@ -1389,44 +1593,122 @@ describe("the hub's three areas", () => {
     expect(hub()).not.toContain("Marketplace");
   });
 
+  /* ⚠️ A deployment that sells credits and nothing else still has one. */
+  it("draws it for somebody who may open nothing but holds a balance", () => {
+    expect(hub({ balance: { total: 900, granted: 0, purchased: 900, expiring: null } })).toContain("Marketplace");
+  });
+
   /*
-    ⚠️ CREDITS ARE UNDER THE MARKETPLACE BECAUSE THEY ARE BOUGHT. Grouped with
-    the workspaces they are spent in, a balance reads as one workspace's — which
-    is how somebody comes to top up the wrong one.
+    ⚠️ THE FOOT IS THE ONE FACT THAT SAVES OPENING THE CARD, and `null` waits
+    rather than answering. Somebody with four workspaces told "None yet" for the
+    length of a round trip is the defect this platform has a written rule about.
   */
-  it("keeps the balance with the things you buy, not with the things you are in", () => {
-    const out = hub({ balance: { total: 900, granted: 0, purchased: 900, expiring: null } });
-    expect(out.indexOf("Marketplace")).toBeLessThan(out.indexOf("Credits"));
-    expect(out.indexOf("Workspace Hub")).toBeLessThan(out.indexOf("Marketplace"));
+  it("waits rather than saying none, while the answer is unknown", () => {
+    const out = hub({ workspaces: null });
+    expect(out).not.toContain("None yet");
+    expect(out).toContain("waiting");
+  });
+
+  /*
+    ⚠️ AND A PROBLEM WINS THE LINE. A count of workspaces is a fact; one that
+    needs attention is a reason, and only one of the two is worth the outside of
+    the card.
+  */
+  it("says what needs attention rather than how many there are", () => {
+    const out = hub({
+      workspaces: [
+        { tenantId: "t_1", slug: "a", name: "A", product: "kova" as const, role: "Owner" },
+        { tenantId: "t_2", slug: "b", name: "B", product: "kova" as const, role: "Owner", standing: { label: "Payment failed", urgent: true } },
+      ],
+    });
+    expect(out).toContain("1 needs attention");
+    expect(out).not.toContain("2 workspaces");
   });
 });
 
 /*
-  ⚠️ ONE CONTROL PER DESTINATION. The workspace list carried "New workspace"
-  while the Marketplace section carried "Start something new" — two controls,
-  one destination, the same thing said twice in two vocabularies. The named area
-  wins, except in the empty state, where making somebody read a section header
-  before they can act is making them read the page first.
+  ⚠️ ONE CONTROL PER DESTINATION, AND THE AREA IS THE CONTROL. A crown is the
+  whole card, so the three areas are three targets and no more — a button inside
+  one would be a second thing to hit on a surface that is already the offer.
 */
-describe("starting one, said once", () => {
-  const hub = (over: Partial<HubHomeProps> = {}) => html(
-    <HubHome
+describe("an area is one target", () => {
+  it("draws each area as a single control, its own surface included", () => {
+    const out = html(
+      <HubHome
+        person={{ name: "Nadia", email: "n@example.test" }}
+        workspaces={[]}
+        openable={[{ id: "kova" }]}
+        onGo={() => undefined} onClose={() => undefined}
+      />,
+    );
+    expect([...out.matchAll(/class="crown press"/g)]).toHaveLength(3);
+    /* ⚠️ Nothing nested: a button inside a button is markup no browser agrees on. */
+    for (const after of out.split('class="crown press">').slice(1)) {
+      expect(after.slice(0, after.indexOf("</button>"))).not.toContain("<button");
+    }
+  });
+
+  /*
+    ⚠️ AND THE HUE IS THE ONLY THING THAT VARIES BETWEEN THEM. Given free rein
+    each would grow its own gradient and the screen would stop reading as a set;
+    three of one mechanism is what makes it one page.
+  */
+  it("varies one number between them and nothing else", () => {
+    const out = html(
+      <HubHome
+        person={{ name: "Nadia", email: "n@example.test" }}
+        workspaces={[]}
+        openable={[{ id: "kova" }]}
+        onGo={() => undefined} onClose={() => undefined}
+      />,
+    );
+    const hues = [...out.matchAll(/--sky-h:\s*(\d+)/g)].map((m) => m[1]);
+    expect(hues).toHaveLength(3);
+    expect(new Set(hues).size).toBe(3);
+    expect([...out.matchAll(/data-sky="aurora"/g)]).toHaveLength(3);
+  });
+});
+
+/*
+  ⚠️ THE VAULT IS INSIDE THE ACCOUNT CENTRE, NOT BESIDE THE THREE AREAS. It is
+  not a setting — it is a place, which is why it keeps its crown — but it is a
+  place about the PERSON. Left at the top it would be a fourth crown beside
+  three areas, which reads as a fourth area.
+*/
+describe("the account centre", () => {
+  const centre = (over: Partial<Parameters<typeof AccountScreen>[0]> = {}) => html(
+    <AccountScreen
       person={{ name: "Nadia", email: "n@example.test" }}
-      workspaces={[{ tenantId: "t_1", slug: "haddad", name: "Haddad", product: "kova" as const, role: "owner" }]}
-      openable={[{ id: "kova", name: "Kova", does: "Coaching.", setupAt: "https://setup.kova.4dl.app" }]}
-      onGo={() => undefined} onOpenWorkspace={() => undefined} onClose={() => undefined}
+      onGo={() => undefined} onBack={() => undefined}
       {...over}
     />,
   );
 
-  it("offers it once to somebody who already has a workspace", () => {
-    const out = hub();
-    expect(out).not.toContain("New workspace");
-    expect(out).toContain("Start something new");
+  it("holds who you are, what you agreed to, and the way out", () => {
+    const out = centre();
+    for (const there of ["Your details", "Sign-in methods", "Preferences", "Consent and legal", "Download your data", "Close your account"]) {
+      expect(out).toContain(there);
+    }
   });
 
-  it("puts it in the empty list too, where there is nothing else on the screen", () => {
-    const out = hub({ workspaces: [] });
-    expect(out).toContain("New workspace");
+  it("keeps the vault a place rather than a row", () => {
+    expect(centre()).toContain('class="crown press"');
+  });
+
+  /*
+    ⚠️ AND NOTHING ABOUT WHAT YOU USE THE ACCOUNT FOR. A workspace or a balance
+    on this screen is what the split was for — "change my language" and "start a
+    business" as adjacent rows.
+  */
+  it("says nothing about workspaces or money", () => {
+    const out = centre();
+    expect(out).not.toContain("Workspaces");
+    expect(out).not.toContain("Credits");
+  });
+
+  /* ⚠️ Null waits. A confident "Nothing is shared" is worse than a wait. */
+  it("waits for the shared count rather than claiming nothing is", () => {
+    expect(centre()).not.toContain("Nothing is shared");
+    expect(centre({ sharedCount: 0 })).toContain("Nothing is shared");
   });
 });

@@ -621,6 +621,58 @@ the only mark it ever carries. `Item` derives this rather than taking a third
 prop: a row only knows whether it is *current* when it is one of several, and a
 row that is one of several never goes anywhere.
 
+### 2.7-i Places, tiles and quick actions
+
+**A crown is a PLACE; a row is a setting.** — The difference is carried by the
+light, the lockup-scale name and the fact that the entire card is the target. A
+button inside one would be a second thing to hit on a surface that is already the
+offer. Use it where the destination is somewhere rather than something to change:
+the hub's three areas, the vault.
+*Checked: `web/test/screens.test.tsx` — three crowns, three targets, nothing
+nested.*
+
+**Only the hue varies between crowns on one screen.** — Same mechanism, same sky
+variant, one number moved, so a set of them reads as a set. Given free rein each
+grows its own gradient and the screen stops being one page. Chosen together, never
+apart: picked one at a time, two of them land within fifteen degrees and nobody
+can tell the cards apart at a glance, which is the one job the hue is doing.
+*Checked: `web/test/screens.test.tsx` — three distinct hues, one sky variant.*
+
+**The mark goes on what is actually named after the brand.** — The hub drew its
+three areas as lockups and its own title as a fourth, so one screen carried the
+mark four times; that does not make three areas look important, it makes the mark
+furniture. "4° Vault" is a name. "4° Marketplace" is a page with a logo on it.
+
+**A grid where the mark is the content; rows where the second line is.** — A
+product on a shelf has a logo and a name and nothing else worth a line, and set as
+rows that is a column of mostly empty space where the eye reads every label to
+find one it recognises. A subscription has a price, a standing and a renewal date
+— facts somebody scans for — and set as a tile all three are gone. Three across,
+which is not a breakpoint: two is a list with gaps, four puts the mark below the
+size at which a logo is a logo.
+*Checked: `web/test/screens.test.tsx`.*
+
+**Something on offer that is not open to this person is shown and said, never
+hidden.** — Hidden, the grid is a different shape per person and "where is the
+other one" has no answer anybody can act on. And it is not rendered as a disabled
+button: that announces it as a control they cannot use, when it is a thing on a
+shelf with a word saying why it is not theirs. A truncated grid says how many
+there are, because one truncated silently reads as the whole set.
+
+**A quick row is the two-to-four things somebody came to do.** — It earns its
+place as the alternative to full-width buttons stacked down a screen, which is a
+screen that looks like a decision when it is a menu. The label is part of the
+target, not a caption beside it, and the circles are a fixed width so four of them
+still read as a row rather than as a sentence of buttons. Nothing destructive goes
+in one — that gets its own card at the bottom, which is what says it is not one of
+the things above.
+
+**A hero is a STATE, not a heading.** — What am I on, is it fine, when does the
+next thing happen. A screen that opens with a list of features has answered the
+fourth question first. Its supporting line is narrower than the page because it is
+centred; centred text at full width is read by moving the eye back to a different
+starting point on every line.
+
 ### 2.7a The door
 
 **A sign-in screen never says whether an address is known here.** — Both
@@ -735,6 +787,28 @@ a plan that omits what it does not include cannot be compared with one that does
 **A deployment that cannot charge says so before the price list, once.** — Every
 button refusing is somebody's decision spent before they are told it could not
 have been made.
+
+**A state is a label; a consequence is a sentence; they go in different places.**
+— "Payment failed" fits under a plan name and in a row's second line. "This
+workspace is read-only until 4 September" fits in neither, and one string carrying
+both renders as `Payment failed — this workspace is rea…`. The label may change
+colour; a pill repeating the sentence it sits under is the same fact twice.
+*Checked: `web/test/screens.test.tsx`.*
+
+**Arrears carry the address that fixes them.** — A screen saying "payment failed"
+with nothing to press has told somebody they have a problem and left them to find
+the door, which is how arrears reach support instead of the provider's own portal.
+Its opposite is also a rule: a pay control on a subscription in good standing is
+an invitation to pay twice.
+*Checked: `web/test/screens.test.tsx`.*
+
+**A paid subscription with nowhere to point is a state, and it needs a surface.**
+— Somebody buys, is handed to the product's setup door, and closes the tab: what
+they hold is money taken with nothing to show for it until a screen says
+otherwise. Modelled as an error the recovery is a support conversation; modelled
+as a state it is a row that says "you have paid for this, making the workspace is
+the last step".
+*Checked: `web/test/screens.test.tsx`.*
 
 ### 2.8 Failure
 
@@ -994,7 +1068,16 @@ more, which is the honest state.
 | `nothing-chargeable-is-said-before-a-price-list` | a price list whose every button refuses — somebody's decision spent before they are told it could not have been made | **live** |
 | `the-hub-names-its-three-areas` | three questions flattened into one list of settings, where "new workspace" sits beside "change your language" — a purchase and a preference wearing the same row | **live** |
 | `an-empty-area-is-not-drawn` | a named section promising something that is not there — and most people holding an account here are a customer of somebody else's workspace | **live** |
-| `one-control-per-destination` | two controls for one destination in two vocabularies — which also makes the section header that names the area read as decoration. The exception the same test pins: the empty list keeps it, because making somebody read a section header before they can act is making them read the page first | **live** |
+| `one-control-per-destination` | two controls for one destination in two vocabularies — the workspace list said "New workspace" while the marketplace said "Start something new", which also makes the area that names it read as decoration. The exception the same block pins: an empty list keeps the offer, because making somebody read a section header before they can act is making them read the page first | **live** |
+| `an-area-is-one-target` | a button inside a crown — markup no browser agrees on, and a second thing to hit on a surface that is already the offer. The same test pins the hues apart, because three cards given free rein each grow their own gradient and the screen stops reading as a set | **live** |
+| `the-account-centre-holds-only-the-account` | the split undone one row at a time — a workspace or a balance on the screen about who you are is how "change my language" and "start a business" came to be adjacent rows | **live** |
+| `a-state-is-a-label-and-a-consequence-is-a-sentence` | one string carrying both, which renders in a row's second line as "Payment failed — this workspace is rea…". A row's second line is one line and a consequence is not | **live** |
+| `arrears-carry-the-address-that-fixes-them` | a screen that says "payment failed" with nothing to press — it has told somebody they have a problem and left them to find the door, which is how arrears reach support instead of the provider's own portal. The same test pins its opposite: a pay control on a subscription in good standing is an invitation to pay twice | **live** |
+| `a-paid-subscription-with-no-workspace-has-a-screen` | money taken with nothing to show for it. The state is on the wire — bought, paid, pointed at nothing — and had no surface at all, so somebody who closed the tab after paying met an empty workspace list and no address that would finish it | **live** |
+| `a-hero-is-the-size-of-a-hero` | a balance headline rendered at the size of a table cell, because the class that gives it lining figures also carries a 15px row size and silently won. The same test pins the expiry to one place — twice on a screen, forty pixels apart, it reads as two facts that happen to agree | **live** |
+| `a-shelf-is-a-grid-and-a-holding-is-a-row` | a product set as a row — a column of mostly empty space where the eye reads every label to find one it recognises — or a subscription set as a tile, which drops the price, the standing and the renewal date that are the reason somebody opened the screen | **live** |
+| `an-inert-tile-is-not-a-disabled-button` | a product hidden from somebody it is not open to, so the grid is a different shape per person and "where is the other one" has no answer anybody can act on — or shown as a disabled button, which announces it as a control they cannot use rather than as a thing on a shelf | **live** |
+| `up-is-the-area-not-the-hub` | somebody who opened their passkeys from the account centre being dropped two levels by one press — the back button doing something other than undoing what they did | **live** |
 <!-- /generated -->
 
 ## 5. What is not decided yet

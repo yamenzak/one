@@ -28,6 +28,8 @@ import type { Problem } from "@one/kernel";
 import { Hub } from "../src/hub/hub.js";
 import { AccountDetails } from "../src/hub/details.js";
 import { HubHome, type HubHomeProps } from "../src/hub/home.js";
+import { AccountScreen } from "../src/hub/account.js";
+import { WorkspacesScreen } from "../src/hub/workspaces.js";
 import { PreferencesScreen, type Preferences } from "../src/hub/preferences.js";
 import { KeptHere, meaning, VaultScreen, type Kept, type Looked, type Where as VaultWhere } from "../src/hub/vault.js";
 import { LegalScreen, MustAcceptScreen, ProductScreen, ReceivingScreen, RecipientScreen, DocScreen, type Owed } from "../src/hub/legal.js";
@@ -35,7 +37,7 @@ import { ExportScreen, type Taken } from "../src/hub/export.js";
 import { CloseAccountScreen } from "../src/hub/close.js";
 import { keyOf, parseWhere, pathOf, upFrom, type Where } from "../src/hub/routes.js";
 import type { Doc, Product } from "../src/hub/wire.js";
-import { accountReceiving, transfersOf, type Held, type Receiving, type Subprocessor } from "@one/kernel";
+import { accountReceiving, transfersOf, type Held, type Instant, type Receiving, type Subprocessor } from "@one/kernel";
 import { DEPLOYMENT } from "@one/deployment";
 import { ValueEditor, type EditableField } from "../src/editor.js";
 import { Card, Entry } from "../src/list.js";
@@ -43,7 +45,9 @@ import { Edit } from "../src/icon.js";
 import { AskForIt, ConsentSheet, type Asked } from "../src/consent.js";
 import { Door, type DoorWire } from "../src/door.js";
 import { SetupScreen, type Place } from "../src/setup.js";
-import { MarketScreen, ShelfScreen, type Plan, type Sellable } from "../src/hub/market.js";
+import { MarketScreen, ShelfScreen, type Sellable } from "../src/hub/market.js";
+import { PlanScreen, type Holding } from "../src/hub/plan.js";
+import type { Plan } from "../src/hub/offer.js";
 import { CreditsScreen, type Balance, type Movement, type Pack } from "../src/hub/credits.js";
 import { ProveIt } from "../src/prove.js";
 import type { Ceremony } from "../src/passkey.js";
@@ -487,6 +491,52 @@ const MOVEMENTS: readonly Movement[] = [
   { kind: "purchased", amount: 50_000, reason: "pack:top", productId: "kova", at: "2026-07-19T11:41:00.000Z" },
 ];
 
+/*
+  ⚠️ THREE SUBSCRIPTIONS IN THE THREE STATES THAT RENDER DIFFERENTLY — one paying
+  and fine, one whose card failed, and one paid for with no workspace on it. The
+  third is the one that had no screen at all, and a fixture without it is a
+  preview of the two states that were never broken.
+*/
+const HOLDINGS: readonly Holding[] = [
+  {
+    id: "sub_1", productId: "kova", productName: "Kova", planName: "Pro",
+    price: { minor: 2900, currency: "usd" }, period: "month",
+    standing: { standing: "active", reason: "ok" },
+    workspace: { tenantId: "t1", name: "Haddad Strength", at: "https://haddad.kova.4dl.app" },
+    payAt: "https://billing.example.test/portal",
+    includes: PLANS[1]!.includes,
+  },
+  {
+    id: "sub_2", productId: "scena", productName: "Scena", planName: "Wall",
+    price: { minor: 1900, currency: "usd" }, period: "month",
+    standing: { standing: "read_only", reason: "arrears", nextAt: "2026-09-04T00:00:00.000Z" as Instant },
+    workspace: { tenantId: "t3", name: "Corniche Screens", at: "https://corniche.scena.4dl.app" },
+    /* ⚠️ THE PROVIDER'S OWN PORTAL, which is the only thing on this screen that
+       fixes the state it is reporting. */
+    payAt: "https://billing.example.test/portal",
+    /* ⚠️ THE PRODUCT'S OWN ENTITLEMENTS, not the shelf fixture's. A screen
+       photographed with one product's lines under another product's name is a
+       picture that reviews nothing. */
+    includes: [
+      { key: "screens", label: "Screens", value: 12, unlimited: false },
+      { key: "boards", label: "Live boards", value: 3, unlimited: false },
+      { key: "history", label: "Manifest history", value: true, unlimited: false },
+    ],
+  },
+  {
+    id: "sub_3", productId: "tessa", productName: "Tessa", planName: "Practice",
+    price: { minor: 4900, currency: "usd" }, period: "month",
+    standing: { standing: "active", reason: "ok" },
+    workspace: null,
+    setupAt: "https://setup.tessa.4dl.app",
+    includes: [
+      { key: "patients", label: "People on your list", value: 200, unlimited: false },
+      { key: "letters", label: "Letters a month", value: 0, unlimited: true },
+      { key: "seats", label: "Colleagues", value: 4, unlimited: false },
+    ],
+  },
+];
+
 /** Long enough to see the spinner and know it is a wait, not a stutter. */
 const ROUND_TRIP_MS = 900;
 
@@ -700,7 +750,24 @@ function Preview() {
         Heading={Heading}
       />
     ) : at === "market" ? (
-      <MarketScreen products={SELLABLE} onGo={go} onBack={up} Heading={Heading} />
+      <MarketScreen
+        products={SELLABLE}
+        holdings={which === "waiting" ? null : which === "new" ? [] : HOLDINGS}
+        balance={which === "waiting" ? null : BALANCE}
+        onGo={go} onBack={up} Heading={Heading}
+      />
+    ) : at === "plan" ? (
+      <PlanScreen
+        /* ⚠️ FALLS BACK RATHER THAN BLANKS. An address naming a subscription this
+           account does not hold is a link somebody was sent, and the total-parse
+           rule the paths follow has to hold for what they resolve TO as well. */
+        holding={HOLDINGS.find((h) => h.id === where.subscription) ?? HOLDINGS[0]!}
+        chargeable={asked.get("pay") !== "no"}
+        onGo={go}
+        onCancel={save}
+        onBack={up}
+        Heading={Heading}
+      />
     ) : at === "shelf" ? (
       <ShelfScreen
         product={SELLABLE.find((p) => p.id === where.product) ?? SELLABLE[0]!}
@@ -736,6 +803,36 @@ function Preview() {
         onCancel={save}
         onBack={up}
         Heading={Heading}
+      />
+    /*
+      ⚠️ THE THREE AREAS ARE SCREENS IN THE PREVIEW LIKE ANY OTHER, and that is
+      the point of splitting them out of the home: each is reachable at its own
+      address, so a review of "what you belong to" is not a review of the hub
+      with everything else on it.
+    */
+    ) : at === "account" ? (
+      <AccountScreen
+        person={(CASES[which] ?? CASES.four).person}
+        sharedCount={
+          which === "waiting" ? null
+          : which === "new" ? 0
+          : VAULT_WHERES.flatMap((w) => w.items).filter((i) => i.granted).length
+        }
+        Heading={Heading}
+        onGo={go}
+        onBack={up}
+      />
+    ) : at === "workspaces" ? (
+      <WorkspacesScreen
+        workspaces={(CASES[which] ?? CASES.four).workspaces}
+        email={(CASES[which] ?? CASES.four).person.email}
+        /* ⚠️ A WORKSPACE ROW LEAVES THIS SURFACE, which is why it is not a route
+           in the preview either. In the product it is a full navigation to
+           another origin. */
+        onOpen={() => undefined}
+        onStart={asked.get("open") === "none" ? undefined : () => go({ at: "market" })}
+        Heading={Heading}
+        onBack={up}
       />
     ) : at === "details" ? (
       <AccountDetails
@@ -773,7 +870,6 @@ function Preview() {
         /* ⚠️ The balance the hub shows. `undefined` is a deployment with no
            credits at all; `null` is one that has them and has not answered yet. */
         balance={which === "waiting" ? null : { total: 41_200, granted: 28_000, purchased: 13_200, expiring: { at: "2026-09-01T00:00:00.000Z", amount: 28_000 } }}
-        onOpenWorkspace={() => setOpen(false)}
         onClose={() => setOpen(false)}
       />
     );
@@ -891,7 +987,11 @@ function Preview() {
           <Group
             label="screen"
             value={pathOf(where)}
-            options={["", "details", "security", "preferences", "vault", "legal", "export", "close"] as const}
+            /* ⚠️ THE THREE AREAS COME FIRST AND THE HUB IS "", because that is
+               the order somebody walks them. A dial that listed only the leaves
+               would make the split invisible in the one place it is reviewed. */
+            options={["", "account", "workspaces", "market", "market/kova", "plan/sub_2", "credits",
+              "details", "security", "preferences", "vault", "legal", "export", "close"] as const}
             onPick={(path) => go(parseWhere(path))}
           />
           <Group label="workspaces" value={which} options={Object.keys(CASES) as (keyof typeof CASES)[]} onPick={setWhich} />

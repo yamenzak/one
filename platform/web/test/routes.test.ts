@@ -92,9 +92,24 @@ describe("every screen in the hub has an address", () => {
     expect(upFrom({ at: "document", product: "kova", document: "terms" })).toEqual({ at: "product", product: "kova" });
     expect(upFrom({ at: "receiving", product: "kova" })).toEqual({ at: "product", product: "kova" });
     expect(upFrom({ at: "product", product: "kova" })).toEqual({ at: "legal" });
-    expect(upFrom({ at: "legal" })).toEqual({ at: "home" });
     expect(upFrom({ at: "preferences", part: "appearance" })).toEqual({ at: "preferences" });
-    expect(upFrom({ at: "preferences" })).toEqual({ at: "home" });
+    /*
+      ⚠️ AND "UP" IS THE AREA, NOT THE HUB. Everything the account centre holds
+      goes up to the account centre, everything the marketplace sells goes up to
+      the marketplace — sent straight home, somebody who opened their passkeys
+      from one area is dropped two levels by one press, which is the back button
+      doing something other than undoing what they did.
+    */
+    expect(upFrom({ at: "legal" })).toEqual({ at: "account" });
+    expect(upFrom({ at: "preferences" })).toEqual({ at: "account" });
+    expect(upFrom({ at: "vault" })).toEqual({ at: "account" });
+    expect(upFrom({ at: "close" })).toEqual({ at: "account" });
+    expect(upFrom({ at: "credits" })).toEqual({ at: "market" });
+    expect(upFrom({ at: "shelf", product: "kova" })).toEqual({ at: "market" });
+    /* ⚠️ The three areas themselves are the level under the hub. */
+    for (const area of ["account", "workspaces", "market"] as const) {
+      expect(upFrom({ at: area })).toEqual({ at: "home" });
+    }
   });
 
   /*

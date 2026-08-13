@@ -4313,8 +4313,8 @@
       "stage": "7",
       "status": "live",
       "impl": "web/test/screens.test.tsx",
-      "proves": "offers it once to somebody who already has a workspace",
-      "fails": "two controls for one destination in two vocabularies — which also makes the section header that names the area read as decoration. The exception the same test pins: the empty list keeps it, because making somebody read a section header before they can act is making them read the page first"
+      "proves": "keeps the offer out of a list that already has something in it",
+      "fails": "two controls for one destination in two vocabularies — the workspace list said \"New workspace\" while the marketplace said \"Start something new\", which also makes the area that names it read as decoration. The exception the same block pins: an empty list keeps the offer, because making somebody read a section header before they can act is making them read the page first"
     },
     {
       "id": "the-identity-door-cannot-be-declined",
@@ -4324,6 +4324,87 @@
       "impl": "scripts/owned.test.mjs",
       "proves": "mounted: platform, identity and marketplace operations, for every app, unconditionally",
       "fails": "an app that can decline the identity door, which is an app that can grow its own — and in the old codebase three did, one of them mounting the send-guard AFTER the catch-all: a bypass that typechecks, passes every test and looks identical in a route list. Here nothing is mounted by an app at all, and this is one `if` away from being a per-app decision again"
+    },
+    {
+      "id": "an-area-is-one-target",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "draws each area as a single control, its own surface included",
+      "fails": "a button inside a crown — markup no browser agrees on, and a second thing to hit on a surface that is already the offer. The same test pins the hues apart, because three cards given free rein each grow their own gradient and the screen stops reading as a set"
+    },
+    {
+      "id": "the-account-centre-holds-only-the-account",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "says nothing about workspaces or money",
+      "fails": "the split undone one row at a time — a workspace or a balance on the screen about who you are is how \"change my language\" and \"start a business\" came to be adjacent rows"
+    },
+    {
+      "id": "a-state-is-a-label-and-a-consequence-is-a-sentence",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "says the state in a label and the consequence in a sentence",
+      "fails": "one string carrying both, which renders in a row's second line as \"Payment failed — this workspace is rea…\". A row's second line is one line and a consequence is not"
+    },
+    {
+      "id": "arrears-carry-the-address-that-fixes-them",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "offers paying only where paying is the problem",
+      "fails": "a screen that says \"payment failed\" with nothing to press — it has told somebody they have a problem and left them to find the door, which is how arrears reach support instead of the provider's own portal. The same test pins its opposite: a pay control on a subscription in good standing is an invitation to pay twice"
+    },
+    {
+      "id": "a-paid-subscription-with-no-workspace-has-a-screen",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "gives a paid subscription with no workspace the door that finishes it",
+      "fails": "money taken with nothing to show for it. The state is on the wire — bought, paid, pointed at nothing — and had no surface at all, so somebody who closed the tab after paying met an empty workspace list and no address that would finish it"
+    },
+    {
+      "id": "a-hero-is-the-size-of-a-hero",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "sets the balance as the hero rather than as a row",
+      "fails": "a balance headline rendered at the size of a table cell, because the class that gives it lining figures also carries a 15px row size and silently won. The same test pins the expiry to one place — twice on a screen, forty pixels apart, it reads as two facts that happen to agree"
+    },
+    {
+      "id": "a-shelf-is-a-grid-and-a-holding-is-a-row",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "sets what you could start as a grid and what you are on as rows",
+      "fails": "a product set as a row — a column of mostly empty space where the eye reads every label to find one it recognises — or a subscription set as a tile, which drops the price, the standing and the renewal date that are the reason somebody opened the screen"
+    },
+    {
+      "id": "an-inert-tile-is-not-a-disabled-button",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "shows a product that is not open, rather than hiding it",
+      "fails": "a product hidden from somebody it is not open to, so the grid is a different shape per person and \"where is the other one\" has no answer anybody can act on — or shown as a disabled button, which announces it as a control they cannot use rather than as a thing on a shelf"
+    },
+    {
+      "id": "up-is-the-area-not-the-hub",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/routes.test.ts",
+      "proves": "goes up one level rather than out",
+      "fails": "somebody who opened their passkeys from the account centre being dropped two levels by one press — the back button doing something other than undoing what they did"
     }
   ]
 }

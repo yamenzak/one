@@ -86,7 +86,7 @@ export function AccountDetails({
           <Title as={Heading}>Your details</Title>
           <button type="button" className="portrait press" onClick={onPickPhoto} aria-label="Change your photo">
             <Mark
-              kind="person" size="lg" src={person.avatarUrl}
+              kind="person" size="lg" src={person.avatarUrl ?? undefined}
               name={person.name ?? person.email} className="alive"
               /* ⚠️ THE BADGE IS THE MARK'S OWN NOW. Written as a second absolutely
                  positioned element beside the picture it sat at the bounding box's

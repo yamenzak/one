@@ -26,7 +26,17 @@ import { Disclose } from "../disclose.js";
 import { Card, Item, Blank, Waiting } from "../list.js";
 import { Mark } from "../mark.js";
 import { Screen, Section, Title } from "../screen.js";
+import { Tiles } from "../tiles.js";
+import { CreditsRow, type Balance } from "./credits.js";
+import { dayOf, priceOf, type Included, type Plan } from "./offer.js";
+import { standsAs, type Holding } from "./plan.js";
 import type { Where } from "./routes.js";
+
+/* ⚠️ RE-EXPORTED RATHER THAN MOVED OUT OF SIGHT. `offer.ts` exists to break an
+   import cycle (see its header); the shelf is still where a reader looks for what
+   a plan is, and a barrel that renamed them at the same time would be two
+   vocabularies for one catalogue. */
+export { priceOf, type Included, type Plan };
 
 /* ------------------------------------------------------------------ shape --- */
 
@@ -39,74 +49,103 @@ export interface Sellable {
   readonly open: boolean;
 }
 
-/** One line on a plan card, from the same declarations the gate enforces. */
-export interface Included {
-  readonly key: string;
-  readonly label: string;
-  readonly value: number | boolean;
-  readonly unlimited: boolean;
-}
-
-export interface Plan {
-  readonly id: string;
-  readonly name: string;
-  readonly price: { readonly minor: number; readonly currency: string };
-  readonly period: "month" | "year";
-  readonly trialDays: number;
-  readonly includes: readonly Included[];
-}
-
-/**
- * ⚠️ MINOR UNITS, FORMATTED ONCE. A price divided by a hundred at each render
- * site is a price that is wrong in one place — and it is always the place nobody
- * looks at, which on a storefront is the one that took the money.
- */
-export const priceOf = (price: { readonly minor: number; readonly currency: string }, period: "month" | "year"): string => {
-  const amount = (price.minor / 100).toFixed(price.minor % 100 === 0 ? 0 : 2);
-  const symbol = price.currency === "usd" ? "$" : price.currency === "gbp" ? "£" : price.currency === "eur" ? "€" : "";
-  return `${symbol}${amount}${symbol ? "" : ` ${price.currency.toUpperCase()}`} a ${period}`;
-};
-
 /* ----------------------------------------------------------------- picker --- */
 
 export interface MarketProps {
   readonly products: readonly Sellable[];
+  /**
+   * ⚠️ WHAT THIS ACCOUNT IS ALREADY ON, ABOVE WHAT IT COULD START. Somebody
+   * opening the marketplace has usually come to deal with something they already
+   * pay for — a card that failed, a trial about to end, a subscription bought
+   * with no workspace on it — and a screen that opens with a shop makes them
+   * look for the one screen that answers that. `null` waits.
+   */
+  readonly holdings?: readonly Holding[] | null;
+  /** ⚠️ `undefined` is a deployment with no credits; `null` is "not yet known". */
+  readonly balance?: Balance | null;
   readonly onGo: (to: Where) => void;
   readonly onBack: () => void;
   readonly Heading?: ElementType;
 }
+
 
 /**
  * ⚠️ A PRODUCT SOMEBODY IS NOT LET INTO IS SHOWN AND SAID SO, NOT HIDDEN. Hiding
  * it makes the marketplace a different shape per person, so "where is Scena" has
  * no answer anybody can act on; saying so is one word and it names the way in.
  */
-export function MarketScreen({ products, onGo, onBack, Heading = "h1" }: MarketProps): ReactNode {
+export function MarketScreen({
+  products, holdings = null, balance, onGo, onBack, Heading = "h1",
+}: MarketProps): ReactNode {
   return (
     <Screen leave="up" onLeave={onBack} name="Marketplace" sky="silk"
       title={<Title as={Heading}>Marketplace</Title>}
       lede="Everything you can start, on one account."
     >
-      <Section>
+      {/*
+        ⚠️ WHAT YOU ARE ON COMES FIRST, and a subscription with no workspace is
+        the row this section exists for. Bought, paid, pointed at nothing — it was
+        on the wire and on no screen, so somebody who closed the tab after paying
+        had an empty workspace list and no address that would finish it.
+      */}
+      {holdings === null || holdings.length > 0 ? (
+        <Section name="What you are on">
+          {holdings === null ? <Waiting rows={1} /> : (
+            <Card>
+              {holdings.map((h) => (
+                <Item
+                  key={h.id}
+                  mark={<Mark kind="product" name={h.productName} />}
+                  title={h.productName}
+                  titleAs="wordmark"
+                  /* ⚠️ THE STATE ON THE SECOND LINE, from the same function the
+                     plan screen's hero uses — two ways of saying "past due" is
+                     two screens that can disagree about somebody's standing. */
+                  detail={standsAs(h, dayOf)}
+                  onGo={() => onGo({ at: "plan", subscription: h.id })}
+                />
+              ))}
+            </Card>
+          )}
+        </Section>
+      ) : null}
+
+      {/*
+        ⚠️ THE PRODUCTS ARE A GRID, NOT ROWS. A product on a shelf has a logo and
+        a name and nothing else worth a line; set as rows that is a column of
+        mostly empty space where the eye reads every label to find one it
+        recognises. What it sells is on the shelf, which is one press away.
+      */}
+      <Section name={products.length > 0 ? "Start something new" : undefined}>
         {products.length === 0 ? (
           <Blank title="Nothing to start yet">No product on this deployment is being sold.</Blank>
         ) : (
-          <Card>
-            {products.map((p) => (
-              <Item
-                key={p.id}
-                mark={<Mark kind="product" name={p.name} />}
-                title={p.name}
-                titleAs="wordmark"
-                detail={p.does}
-                {...(p.open
-                  ? { onGo: () => onGo({ at: "shelf", product: p.id }) }
-                  : { action: <Pill>Not open to you</Pill> })}
-              />
-            ))}
-          </Card>
+          <Tiles
+            tiles={products.map((p) => ({
+              id: p.id,
+              name: p.name,
+              mark: <Mark kind="product" name={p.name} />,
+              /* ⚠️ SHOWN AND SAID, NEVER HIDDEN. Hidden, the grid is a different
+                 shape per person, so "where is Scena" has no answer anybody can
+                 act on. */
+              ...(p.open ? { onGo: () => onGo({ at: "shelf", product: p.id }) } : { said: "Not open to you" }),
+            }))}
+          />
         )}
       </Section>
+
+      {/*
+        ⚠️ CREDITS ARE HERE BECAUSE THEY ARE BOUGHT. Grouped with the workspaces
+        they are spent in, a balance reads as one workspace's — which is how
+        somebody comes to top up the wrong one.
+      */}
+      {balance !== undefined ? (
+        <Section>
+          <Card>
+            <CreditsRow balance={balance} onGo={() => onGo({ at: "credits" })} />
+          </Card>
+        </Section>
+      ) : null}
     </Screen>
   );
 }

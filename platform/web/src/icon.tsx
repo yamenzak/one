@@ -35,7 +35,8 @@
 
 import type { ReactNode } from "react";
 import {
-  ArrowLeft, Camera, Check, ChevronRight, Download, FileText, HeartCrack, Info, KeyRound, Languages, Lock,
+  ArrowLeft, ArrowLeftRight, Camera, Check, ChevronRight, Download, FileText, HeartCrack, Info, KeyRound, Languages, Lock,
+  Wallet as Wallet_,
   ArrowUpRight, Mail, MonitorSmartphone, Pencil, Plus, Ruler, Share2, Shield, SlidersHorizontal, SunMoon,
   Vibrate, Volume2, X, type LucideIcon,
 } from "lucide-react";
@@ -44,7 +45,7 @@ import {
 export type IconName =
   | "key" | "adjust" | "guard" | "save" | "heartbreak" | "letter" | "device" | "others"
   | "outward"
-  | "edit" | "lens" | "onward" | "close" | "back" | "tick" | "add"
+  | "edit" | "lens" | "onward" | "close" | "back" | "tick" | "add" | "swap" | "wallet"
   | "light" | "tongue" | "measure" | "buzz" | "sound" | "locked" | "about" | "paper";
 
 export interface IconProps {
@@ -102,6 +103,16 @@ export const Device = draw(MonitorSmartphone, "device", 21);
    something. It is also deliberately not one letter from `Onward`, which is the
    furniture two rows down and means the opposite kind of thing. */
 export const Others = draw(Share2, "others", 21);
+/* ⚠️ TWO ARROWS PASSING, NOT THE SLIDERS. Changing a plan is a trade — this for
+   that — and the sliders already mean "preferences" two screens away; a glyph
+   doing duty for both makes a subscription change look like a setting somebody
+   nudges. */
+export const Swap = draw(ArrowLeftRight, "swap", 21);
+/* ⚠️ NOT THE ARROW THAT LEAVES. Paying and opening a workspace both go to another
+   origin, so both wanted the same outward arrow — two identical circles side by
+   side on a plan screen, one of which settles a bill. What distinguishes them is
+   what they are FOR, and money has a shape. */
+export const Wallet = draw(Wallet_, "wallet", 21);
 
 /* ⚠️ THERE IS NO ICON FOR A PLACE, AND THERE WERE TWO. A globe stood for the edge
    network and a ring of stars for the union — shapes a drawing library happened to
@@ -154,6 +165,8 @@ export const ICON_PARTS: Readonly<Record<IconName, readonly string[]>> = {
   back: ["path", "path"],
   tick: ["path"],
   add: ["path", "path"],
+  swap: ["path", "path", "path", "path"],
+  wallet: ["path", "path"],
   locked: ["rect", "path"],
   light: ["path", "path", "path", "path", "path"],
   tongue: ["path", "path", "path", "path", "path", "path"],

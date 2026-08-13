@@ -269,12 +269,70 @@ export const MOTION_CSS = `
    this one sits beside a switch rather than on a row. */
 .share-about:active [data-icon='about'] > :nth-child(3) { translate: 0 -2px; }
 
+/* ⚠️ THE TWO ARROWS TRADE PLACES, AND THE RAILS THEY RUN ON DO NOT. A plan
+   change is this for that; moving the whole glyph would be the pair sliding, and
+   the one thing the gesture has to say is that they SWAP. */
+.item:active [data-icon='swap'] > :nth-child(1),
+.quick-act:active [data-icon='swap'] > :nth-child(1) { translate: -2.2px 0; }
+.item:active [data-icon='swap'] > :nth-child(3),
+.quick-act:active [data-icon='swap'] > :nth-child(3) { translate: 2.2px 0; }
+
+/* ⚠️ A QUICK ACTION PRESSES BY ITS CIRCLE, NOT BY ITS LABEL. The whole control is
+   the target — circle and word together — but scaling the word with it makes the
+   text ripple, so the movement is on the ring and the icon inside it moves the
+   way it does everywhere else. */
+.quick-act:active [data-icon='add'] { rotate: 90deg; }
+.quick-act:active [data-icon='outward'] { translate: 2.5px -2.5px; }
+/* ⚠️ THE CARD GOES IN. The body stays and the card travels into it, which is
+   same gesture as the download and the envelope — something arriving INTO
+   something that does not move. */
+.quick-act:active [data-icon='wallet'] > :nth-child(2) { translate: -2px 0; }
+
 /* Furniture: it points where the press goes. */
 .item:active [data-icon='onward'], .item:active .chevron { translate: 3.5px 0; }
 /* ⚠️ AND THE ONE THAT LEAVES POINTS OUT OF THE PAGE, along its own axis. A row
    that opens somebody else's site and a row that opens the next screen must not
    move the same way, or the mark distinguishing them is decoration. */
 .item:active [data-icon='outward'] { translate: 2.5px -2.5px; }
+
+/* ------------------------------------------------------------- assembling */
+
+/*
+  ⚠️ A GRID ASSEMBLES ACROSS, NOT DOWN, and it is the same rise the page uses —
+  one entrance in the platform, given a different order to run in. A grid whose
+  cells arrived top-to-bottom in three columns would read as three lists starting
+  at once, which is the shape a grid exists to not be.
+
+  ⚠️ AND IT IS DELAYED PAST ITS OWN SECTION'S ARRIVAL. Nested inside a stagger's
+  child that is itself rising, cells starting at zero move while their ground is
+  still moving — two speeds in one gesture, which reads as a stutter rather than
+  as depth.
+*/
+.tiles > li { animation: rise var(--settle) var(--enter) backwards; }
+.tiles > li:nth-child(1) { animation-delay: var(--step); }
+.tiles > li:nth-child(2) { animation-delay: calc(var(--step) * 1.5); }
+.tiles > li:nth-child(3) { animation-delay: calc(var(--step) * 2); }
+.tiles > li:nth-child(4) { animation-delay: calc(var(--step) * 2.5); }
+.tiles > li:nth-child(5) { animation-delay: calc(var(--step) * 3); }
+.tiles > li:nth-child(n + 6) { animation-delay: calc(var(--step) * 3.5); }
+
+/* ⚠️ THE SAME, ONE ROW WIDE. Three circles arriving together is one object; three
+   arriving in sequence is three things somebody can do. */
+/* ⚠️ ADDRESSED THROUGH ITS ROW, because a bare second declaration of a class is
+   two things wearing one name and the sheet merges them without a word — see
+   the stylesheet test. A quick action only ever exists inside a quick row, so
+   naming the row is a refinement rather than a workaround. */
+.quick > .quick-act { animation: rise var(--settle) var(--enter) backwards; }
+.quick-act:nth-child(1) { animation-delay: var(--step); }
+.quick-act:nth-child(2) { animation-delay: calc(var(--step) * 1.6); }
+.quick-act:nth-child(n + 3) { animation-delay: calc(var(--step) * 2.2); }
+
+/* ⚠️ AND A SCREEN THAT TRAVELLED DOES NOT ALSO ASSEMBLE ITSELF — the same rule
+   the page's own stagger states, and it has to be repeated for anything that
+   animates inside one. Sliding in while its parts fall into place is two
+   movements at once, and the second is the one that looks broken. */
+.stack-leaf[data-move] .tiles > li,
+.stack-leaf[data-move] .quick-act { animation: none; }
 
 /* ------------------------------------------------------------------ alive */
 

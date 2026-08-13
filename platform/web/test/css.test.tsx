@@ -25,7 +25,6 @@ const props: HubHomeProps = {
     { tenantId: "t2", slug: "b", name: "B", product: "scena", role: "Coach", standing: { label: "Payment failed", urgent: true } },
   ],
   onGo: () => undefined,
-  onOpenWorkspace: () => undefined,
   onClose: () => undefined,
 };
 

@@ -44,6 +44,8 @@ export { Confirm } from "./confirm.js";
 export { Disclose } from "./disclose.js";
 export { Field } from "./field.js";
 export { Blank, Card, Entry, Item, Unset, Waiting } from "./list.js";
+export { Crown, HUES, type CrownProps } from "./crown.js";
+export { Tiles, Quick, type Act, type Tile, type TilesProps } from "./tiles.js";
 export { Mark, type MarkKind, type MarkSize, type MarkTone } from "./mark.js";
 export { Screen, Section, Title } from "./screen.js";
 export { Sheet } from "./sheet.js";
@@ -54,10 +56,22 @@ export { useCommit, type Commit } from "./commit.js";
 export { configureFeedback, feel, FEEDBACK_DEFAULT } from "./feedback.js";
 export * as Icon from "./icon.js";
 
-/* The hub — Account Center, Workspace Hub and Marketplace — and the consent sheet an app raises. */
+/*
+  The hub — Account Center, Workspaces and Marketplace — and the consent sheet an
+  app raises.
+
+  ⚠️ THE AREA IS "Workspaces" RATHER THAN "Workspace Hub", and the surface it sits
+  in is the Hub. Two hubs, one inside the other, is a name that has to be
+  disambiguated every time it is said — and the area is a list of the workspaces
+  somebody is in, which is what the plural already says.
+*/
 export { Hub } from "./hub/hub.js";
-export { HubHome, type HubHomeProps } from "./hub/home.js";
-export { MarketScreen, ShelfScreen, priceOf, type Sellable, type Plan, type Included } from "./hub/market.js";
+export { HubHome, type HubHomeProps, type Person } from "./hub/home.js";
+export { AccountScreen, type AccountProps } from "./hub/account.js";
+export { WorkspacesScreen, type Workspace, type WorkspacesProps, type Product as WorkspaceProduct } from "./hub/workspaces.js";
+export { MarketScreen, ShelfScreen, type Sellable } from "./hub/market.js";
+export { PlanScreen, standsAs, type Holding, type PlanProps } from "./hub/plan.js";
+export { priceOf, money, dayOf, type Included, type Money, type Plan } from "./hub/offer.js";
 export { CreditsScreen, CreditsRow, saidAs, type Balance, type Pack, type Movement } from "./hub/credits.js";
 export { AccountDetails } from "./hub/details.js";
 export { SignInMethods, type Device, type Passkey } from "./hub/signin.js";

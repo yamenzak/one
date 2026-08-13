@@ -32,15 +32,25 @@ export type Where =
   /*
     ⚠️ THREE AREAS UNDER ONE ROOF, AND THEY ARE NOT THE SAME KIND OF THING. The
     ACCOUNT CENTRE is who you are — profile, sign-in, preferences, the vault, the
-    legal record. The WORKSPACE HUB is what you belong to. The MARKETPLACE is what
+    legal record. WORKSPACES is what you belong to. The MARKETPLACE is what
     you may start, and it is the only one of the three that takes money.
 
     Kept as one flat list of settings pages, "new workspace" sat beside "change
     your language" — a purchase and a preference wearing the same row.
   */
+  | { readonly at: "account" }
+  | { readonly at: "workspaces" }
   | { readonly at: "market" }
   /** One product's shelf: its plans, its trial, and the button that starts one. */
   | { readonly at: "shelf"; readonly product: string }
+  /**
+   * ⚠️ ONE SUBSCRIPTION, ADDRESSED BY ITS OWN ID RATHER THAN BY ITS PRODUCT. An
+   * account may hold several of one product — a second studio is a second
+   * subscription on the same card — so a path naming the product would send two
+   * of them to one screen, and the one somebody was looking at would depend on
+   * the order a list came back in.
+   */
+  | { readonly at: "plan"; readonly subscription: string }
   | { readonly at: "credits" }
   | { readonly at: "details" }
   | { readonly at: "security" }
@@ -65,9 +75,12 @@ export function parseWhere(path: string): Where {
   if (!one) return { at: "home" };
   if (one === "details") return { at: "details" };
   if (one === "security") return { at: "security" };
+  if (one === "account") return { at: "account" };
+  if (one === "workspaces") return { at: "workspaces" };
   if (one === "vault") return { at: "vault" };
   if (one === "credits") return { at: "credits" };
   if (one === "market") return two ? { at: "shelf", product: two } : { at: "market" };
+  if (one === "plan") return two ? { at: "plan", subscription: two } : { at: "market" };
   if (one === "export") return { at: "export" };
   if (one === "close") return { at: "close" };
   if (one === "preferences") {
@@ -99,6 +112,7 @@ export function pathOf(where: Where): string {
   switch (where.at) {
     case "home": return "";
     case "shelf": return `market/${where.product}`;
+    case "plan": return `plan/${where.subscription}`;
     case "preferences": return where.part ? `preferences/${where.part}` : "preferences";
     case "product": return product(where.product);
     case "receiving": return `${product(where.product)}/who`;
@@ -124,8 +138,17 @@ export const keyOf = (where: Where): string | null => pathOf(where) || null;
 export function upFrom(where: Where): Where {
   switch (where.at) {
     case "home": return { at: "home" };
-    case "shelf": return { at: "market" };
-    case "preferences": return where.part ? { at: "preferences" } : { at: "home" };
+    case "shelf": case "plan": return { at: "market" };
+    /*
+      ⚠️ THE THREE AREAS GO UP TO THE HUB, and everything inside one goes up to
+      its area rather than to the hub. Sent straight home, somebody who opened
+      their passkeys from the Account Center is dropped two levels by one press —
+      which is the back button doing something other than undoing what they did.
+    */
+    case "details": case "security": case "vault": case "legal": case "export": case "close":
+      return { at: "account" };
+    case "credits": return { at: "market" };
+    case "preferences": return where.part ? { at: "preferences" } : { at: "account" };
     case "product": return { at: "legal" };
     case "receiving": return { at: "product", product: where.product };
     case "recipient": return { at: "receiving", product: where.product };

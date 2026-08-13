@@ -110,6 +110,14 @@ export function marketOperations<B extends BindingSpec>(app: AppSpec<B>): readon
             /* ⚠️ Where to go and finish, for the ordinary case of having paid and
                not yet made anything. Without it the only route back is memory. */
             ...(sub.tenantId === null ? { setupAt: product ? setupDoorFor(product) : setupFor(app, d.products) } : {}),
+            /*
+              ⚠️ AND WHERE TO GO AND PAY, ON EVERY ROW RATHER THAN ONLY THE ONES
+              IN ARREARS. A screen that says "payment failed" with no address
+              that fixes it is a screen that has told somebody they have a
+              problem and left them to find the door — and deciding here which
+              rows deserve one would put the ladder in two places.
+            */
+            ...(d.portalUrl ? { payAt: d.portalUrl } : {}),
           };
         }),
       };

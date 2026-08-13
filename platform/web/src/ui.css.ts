@@ -553,15 +553,114 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
    states about its own sky. */
 .crown > *:not(.sky) { position: relative; z-index: 1; }
 .crown:focus-visible { outline: var(--ring); outline-offset: -3px; }
-/* ⚠️ THE LOCKUP IS THE HEADING, so it is set at heading size and full ink. A
-   card that carried both a lockup and a title would be naming itself twice. */
-.crown-name { display: block; font-size: 23px; margin-block-end: 8px; }
+/* ⚠️ THE NAME IS THE HEADING, so it is set at heading size and full ink. A card
+   that carried both a name and a title would be naming itself twice.
+
+   ⚠️ AND IT IS SET IN THE BRAND FACE WHETHER OR NOT IT CARRIES THE MARK. A
+   crown without one is still the largest word on its card; letting it fall back
+   to body type made an area read as a paragraph heading, and made the one crown
+   that does carry a mark look like a different component. */
+.crown-name { display: block; font-size: 23px; margin-block-end: 8px;
+  font-family: var(--font-brand); font-weight: 600; letter-spacing: -0.035em; }
 .crown-said { color: var(--ink-quiet); font-size: 14.5px; line-height: 1.45; }
 /* ⚠️ THE FOOT IS A FACT AND A WAY ON, not a button. The whole card is the
    target; a button inside it would be a second target on one surface. */
 .crown-foot { display: flex; align-items: center; gap: 8px; margin-block-start: 16px;
   color: var(--ink); font-size: 14.5px; font-weight: 500; }
 .crown-foot .chevron { margin-inline-start: auto; }
+
+/* ------------------------------------------------------------------ tiles --- */
+
+/*
+  ⚠️ A GRID BECAUSE THE MARK IS THE CONTENT. A row is right when its second line
+  carries a fact somebody needs; a product on a shelf has a logo, a name and
+  nothing else worth a line — set as rows that is a column of mostly empty space
+  where the eye reads every label to find one it recognises.
+
+  ⚠️ THREE ACROSS, AND IT IS NOT A BREAKPOINT. Two is a list with gaps; four puts
+  the mark below the size at which a logo is a logo.
+*/
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  list-style: none; margin: 0; padding: 0; }
+.tiles > li { display: flex; }
+.tile { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  border: 0; border-radius: var(--radius-card); background: var(--card);
+  color: inherit; font: inherit; word-spacing: inherit; cursor: pointer;
+  padding: 18px 8px 14px; text-align: center; }
+.tile[data-off] { cursor: default; }
+/* ⚠️ THE MARK GOES QUIET RATHER THAN AWAY. Something not open to this person is
+   shown and said — hidden, the grid is a different shape per person and "where
+   is the other one" has no answer anybody can act on. */
+.tile[data-off] .tile-mark { opacity: 0.4; }
+.tile[data-off] .tile-name { color: var(--ink-quiet); }
+.tile:focus-visible { outline: var(--ring); outline-offset: 2px; }
+.tile-mark { display: flex; }
+.tile-name { font-size: 14px; line-height: 1.25; }
+.tile-said { color: var(--ink-quiet); font-size: 12.5px; line-height: 1.2; }
+.tiles-wrap { display: flex; flex-direction: column; gap: 10px; }
+/* ⚠️ THE CEILING IS SHOWN, NEVER SILENT. A grid truncated with no way on reads
+   as the whole set, and somebody looking for the seventh concludes it is not
+   there — so the row says how many there are rather than "more". */
+.tiles-more { border: 0; background: var(--card); border-radius: var(--radius-card);
+  color: var(--ink); font: inherit; word-spacing: inherit; font-weight: 500;
+  padding: 14px; cursor: pointer; }
+.tiles-more:hover { background: var(--lift); }
+.tiles-more:focus-visible { outline: var(--ring); outline-offset: 2px; }
+
+/* ------------------------------------------------------------------ quick --- */
+
+/*
+  ⚠️ THE TWO OR THREE THINGS SOMEBODY CAME TO DO. It earns its place as the
+  alternative to three full-width buttons stacked down a screen, which is a
+  screen that looks like a decision when it is a menu.
+
+  ⚠️ THE LABEL IS PART OF THE TARGET, not a caption beside it. A circle with a
+  word under it where only the circle is pressable is a control with a mis-sized
+  hit area and no way to tell from looking.
+*/
+.quick { display: flex; justify-content: center; gap: 14px; }
+/* ⚠️ A FIXED WIDTH, SO FOUR OF THEM STILL READ AS A ROW. Sized by their labels,
+   "Change plan" is three times "Open" and the circles land at uneven intervals —
+   which stops being a row of equal choices and becomes a sentence of buttons. */
+.quick-act { display: flex; flex-direction: column; align-items: center; gap: 9px;
+  inline-size: 78px; border: 0; background: none; color: inherit; font: inherit;
+  word-spacing: inherit; cursor: pointer; padding: 0; }
+.quick-ring { display: grid; place-items: center; inline-size: 56px; block-size: 56px;
+  border-radius: 999px; background: var(--card); }
+.quick-act:hover .quick-ring { background: var(--lift); }
+.quick-act:focus-visible { outline: var(--ring); outline-offset: 4px; border-radius: 16px; }
+.quick-label { font-size: 13.5px; font-weight: 500; line-height: 1.2; text-wrap: balance; }
+
+/* ------------------------------------------------------------------- hero --- */
+
+/*
+  ⚠️ A HERO IS A STATE, NOT A HEADING. It names what somebody is ON and says in
+  one line where that stands — which is the question a plan screen is opened
+  with, and the reason it is centred and large rather than a row at the top of a
+  list. A screen that opened with a list of features answers the second question
+  first.
+*/
+.hero { display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding-block: 26px 22px; text-align: center; }
+/* ⚠️ IT SETS ITS OWN SIZE LAST, because a hero may also be a NUMBER — and
+   the value class carries a 15px row size that silently won when the two were combined,
+   rendering a balance headline at the size of a table cell. Lining figures are
+   what a hero wants from it; its size is not. */
+.hero-name { font-size: 46px; line-height: 1.05; letter-spacing: -0.02em; font-weight: 600; }
+.hero-name.value { font-size: 46px; }
+.hero-said { color: var(--ink-quiet); font-size: 15.5px; }
+/* ⚠️ THE ONE STATE THAT CHANGES COLOUR, and it is the line rather than a capsule
+   beside it. A pill saying "needs attention" over a sentence saying what needs it
+   is the same fact twice. */
+.hero-said[data-tone='warn'] { color: var(--warn); }
+/* ⚠️ NARROWER THAN THE PAGE, because it is centred. Centred text at full width is
+   read by moving the eye back to a different starting point on every line, which
+   is why every other paragraph in this interface is ranged left. */
+/* ⚠️ IT IS A BLOCK, AND THAT IS NOT A DETAIL. A max width on a bare inline
+   element does nothing at all — the sentence ran the full width of the page,
+   centred, which is the exact shape this rule exists to prevent. */
+.hero-note { display: block; color: var(--ink-quiet); font-size: 14.5px;
+  line-height: 1.45; max-inline-size: 34ch; margin-block-start: 4px; }
 
 /* ⚠️ INHERITED INK AND NO UNDERLINE, BECAUSE A ROW MAY BE AN ANCHOR. An element
    takes a browser's link styling by BEING one, so the moment a row pointed at

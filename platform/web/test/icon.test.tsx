@@ -24,6 +24,7 @@ const drawn: Readonly<Record<IconName, (p: Icons.IconProps) => unknown>> = {
   key: Icons.Key, adjust: Icons.Adjust, guard: Icons.Guard,
   save: Icons.Save, heartbreak: Icons.Heartbreak, edit: Icons.Edit, lens: Icons.Lens,
   letter: Icons.Letter, device: Icons.Device, others: Icons.Others, add: Icons.Add,
+  swap: Icons.Swap, wallet: Icons.Wallet,
   outward: Icons.Outward,
   onward: Icons.Onward, close: Icons.Close, back: Icons.Back, tick: Icons.Tick,
   light: Icons.Light, tongue: Icons.Tongue, measure: Icons.Measure,
