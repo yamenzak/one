@@ -558,6 +558,8 @@ function Preview() {
         onAddPasskey={() => undefined}
         onRemovePasskey={save}
         onSignOut={save}
+        onSignOutHere={save}
+        onSignOutEverywhere={save}
         onBack={up}
       />
     ) : at === "legal" ? (

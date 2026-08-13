@@ -241,7 +241,8 @@ describe("sign-in methods", () => {
     const out = html(
       <SignInMethods
         passkeys={[]} devices={[]} email="b@example.com"
-        onAddPasskey={() => undefined} onRemovePasskey={nothing} onSignOut={nothing} onBack={() => undefined}
+        onAddPasskey={() => undefined} onRemovePasskey={nothing} onSignOut={nothing}
+        onSignOutHere={nothing} onSignOutEverywhere={nothing} onBack={() => undefined}
       />,
     );
     expect(out.toLowerCase()).toContain("passkey");
@@ -253,17 +254,45 @@ describe("sign-in methods", () => {
     const out = html(
       <SignInMethods
         passkeys={null} devices={null} email="b@example.com"
-        onAddPasskey={() => undefined} onRemovePasskey={nothing} onSignOut={nothing} onBack={() => undefined}
+        onAddPasskey={() => undefined} onRemovePasskey={nothing} onSignOut={nothing}
+        onSignOutHere={nothing} onSignOutEverywhere={nothing} onBack={() => undefined}
       />,
     );
     expect(out).toContain("waiting");
+  });
+
+  /*
+    ⚠️ THERE WAS NO WAY TO SIGN OUT ANYWHERE IN THE PRODUCT. The row for the
+    device in your hand carried no control, and the comment beside it said leaving
+    was "the avatar menu's job" — a menu this account centre does not have. On a
+    shared computer that is not a missing affordance, it is a person who cannot
+    leave.
+
+    ⚠️ AND THE ROW SOMEBODY LOOKS FOR AFTER LOSING A PHONE IS IN THE SAME LIST.
+    Quiet rather than red, because it is a DEFENSIVE action: a list of ordinary
+    facts with a red control in it teaches people to ignore red.
+  */
+  it("can be left, on this device and on every device", () => {
+    const out = html(
+      <SignInMethods
+        passkeys={[]} email="b@example.com"
+        devices={[{ id: "d1", app: "Kova", since: "4 March", current: true }]}
+        onAddPasskey={() => undefined} onRemovePasskey={nothing} onSignOut={nothing}
+        onSignOutHere={nothing} onSignOutEverywhere={nothing} onBack={() => undefined}
+      />,
+    );
+    expect(out).toContain("Sign out everywhere");
+    /* ⚠️ The device in your hand has a control of its own — the list is not a
+       list of other people's devices. */
+    expect([...out.matchAll(/Sign out/g)].length).toBeGreaterThan(1);
   });
 
   it("marks the device in your hand, so the list is readable", () => {
     const out = html(
       <SignInMethods
         passkeys={KEYS} devices={[]} email="b@example.com"
-        onAddPasskey={() => undefined} onRemovePasskey={nothing} onSignOut={nothing} onBack={() => undefined}
+        onAddPasskey={() => undefined} onRemovePasskey={nothing} onSignOut={nothing}
+        onSignOutHere={nothing} onSignOutEverywhere={nothing} onBack={() => undefined}
       />,
     );
     expect(out).toContain("MacBook Pro");

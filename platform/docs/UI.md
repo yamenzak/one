@@ -908,6 +908,7 @@ more, which is the honest state.
 | `a-cooldown-is-the-servers-number` | a countdown the screen invented. The runtime decides when another code may be asked for and reports what is left; a local timer comes back before the endpoint will answer, which teaches people to press a button that fails | **live** |
 | `a-proof-is-raised-by-a-refusal` | a screen deciding for itself which actions need a recent proof — a second copy of a rule the operations declare, and the copy is the one that goes out of date the first time a fourth operation is added | **live** |
 | `a-proof-never-asks-who-you-are` | a form demanding the address the session already knows, standing between somebody and something they were in the middle of doing | **live** |
+| `the-product-can-be-left` | an account centre with no way to sign out. The row for the device in your hand carried no control and the comment beside it said leaving was the avatar menu's job — a menu this platform does not have — so on a shared computer there was no way out at all, on the one screen whose subject is where you are signed in | **live** |
 <!-- /generated -->
 
 ## 5. What is not decided yet

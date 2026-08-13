@@ -22,7 +22,7 @@
 
 import { useState, type ElementType, type ReactNode } from "react";
 import type { Problem } from "@one/kernel";
-import { Add, Device, Key, Letter } from "../icon.js";
+import { Add, Device, Key, Letter, Locked } from "../icon.js";
 import { Button } from "../button.js";
 import { Mark } from "../mark.js";
 import { Chip, Pill } from "../capsule.js";
@@ -69,12 +69,27 @@ export interface SignInMethodsProps {
   /** ⚠️ RESOLVES TO A `Problem` OR TO NULL. Never throws, never a string. */
   readonly onRemovePasskey: (id: string) => Promise<Problem | null>;
   readonly onSignOut: (id: string) => Promise<Problem | null>;
+  /**
+   * ⚠️ LEAVING THE DEVICE YOU ARE HOLDING, WHICH NOTHING OFFERED. The row for
+   * this device carried no control and the comment beside it said leaving was
+   * "the avatar menu's job" — a menu this platform's account centre does not
+   * have. So there was no way to sign out anywhere in the product, on the one
+   * screen whose subject is where you are signed in.
+   */
+  readonly onSignOutHere: () => Promise<Problem | null>;
+  /**
+   * ⚠️ EVERY DEVICE AND EVERY PRODUCT, WHICH IS WHAT SOMEBODY WHO LOST A PHONE
+   * IS LOOKING FOR. It is a defensive action, so it is offered plainly and asks
+   * for nothing beyond the press — friction here helps whoever has the phone.
+   */
+  readonly onSignOutEverywhere: () => Promise<Problem | null>;
   readonly onBack: () => void;
   readonly Heading?: ElementType;
 }
 
 export function SignInMethods({
-  email, passkeys, devices, onAddPasskey, onRemovePasskey, onSignOut, onBack, Heading = "h1",
+  email, passkeys, devices, onAddPasskey, onRemovePasskey, onSignOut,
+  onSignOutHere, onSignOutEverywhere, onBack, Heading = "h1",
 }: SignInMethodsProps): ReactNode {
   /* ⚠️ ONE ASK AT A TIME, HELD AS WHAT IS BEING ASKED rather than as a boolean
      plus an id. A flag and an id kept apart is how a sheet comes to be open with
@@ -82,6 +97,8 @@ export function SignInMethods({
   const [asking, setAsking] = useState<
     | { readonly kind: "passkey"; readonly it: Passkey }
     | { readonly kind: "device"; readonly it: Device }
+    | { readonly kind: "here" }
+    | { readonly kind: "everywhere" }
     | null
   >(null);
   const last = passkeys !== null && passkeys.length === 1;
@@ -183,12 +200,33 @@ export function SignInMethods({
                     {d.current ? <Pill>This device</Pill> : null}
                   </>
                 }
-                /* ⚠️ THE ONE YOU ARE ON HAS NO BUTTON. Signing yourself out from a
-                   list of devices is a control that closes the screen it is on,
-                   which reads as a crash. Leaving is the avatar menu's job. */
-                action={d.current ? undefined : <Button tone="quiet" onClick={() => setAsking({ kind: "device", it: d })}>Sign out</Button>}
+                /* ⚠️ THE ONE YOU ARE ON HAS A BUTTON TOO, AND IT USED NOT TO.
+                   The argument was that signing yourself out closes the screen it
+                   is on and reads as a crash — true, and answered by saying what
+                   will happen rather than by removing the only way to leave a
+                   shared computer. Nothing else in this platform signs anybody
+                   out. */
+                action={
+                  <Button tone="quiet" onClick={() => setAsking(d.current ? { kind: "here" } : { kind: "device", it: d })}>
+                    Sign out
+                  </Button>
+                }
               />
             ))}
+            {/* ⚠️ THE ROW SOMEBODY LOOKS FOR AFTER LOSING A PHONE, and it is at
+                the end of this list rather than in a menu because this is where
+                they are already looking. Quiet rather than red: it is a
+                DEFENSIVE action, and a list of ordinary facts with a red control
+                in it teaches people to ignore red. */}
+            <Item
+              icon={<Locked />}
+              title="Sign out everywhere"
+              /* ⚠️ SHORT BECAUSE THE ROW IS. A marked row that goes somewhere holds one
+                 line, and the title already says everywhere; the sentence that
+                 matters — which products, and how soon — is on the sheet. */
+              detail="Including this one"
+              onGo={() => setAsking({ kind: "everywhere" })}
+            />
           </Card>
         )}
       </Section>
@@ -201,9 +239,21 @@ export function SignInMethods({
           reading, which is what makes the gate on the row that matters useless. */}
       <Confirm
         open={asking !== null}
-        title={asking?.kind === "device" ? "Sign out of this workspace?" : "Remove this passkey?"}
+        title={
+          asking?.kind === "here" ? "Sign out on this device?"
+            : asking?.kind === "everywhere" ? "Sign out everywhere?"
+              : asking?.kind === "device" ? "Sign out of this workspace?"
+                : "Remove this passkey?"
+        }
         lede={
-          asking?.kind === "device"
+          /* ⚠️ IT SAYS WHAT IT DOES *NOT* DO. Sessions are per origin by design,
+             so leaving here leaves nothing else — and somebody on a shared
+             computer who believes otherwise walks away from an open product. */
+          asking?.kind === "here"
+            ? "You will be signed out of your account on this device. The products you are signed into are not affected \u2014 use \u201CSign out everywhere\u201D for those."
+            : asking?.kind === "everywhere"
+              ? "Every device signs out, including this one, and every product with it. Others may take a few minutes to notice. You can sign back in at any time."
+              : asking?.kind === "device"
             ? (
               <>
                 {/* ⚠️ THE WORKSPACE APPEARS AS ITSELF rather than as its name in
@@ -220,12 +270,15 @@ export function SignInMethods({
               ? "This is your last passkey. You will sign in with a code sent to your email until you add another."
               : `${asking?.kind === "passkey" ? asking.it.label : "This device"} will no longer sign you in. You can add it again later.`
         }
-        verb={asking?.kind === "device" ? "Sign out" : "Remove"}
+        verb={asking?.kind === "passkey" ? "Remove" : "Sign out"}
         gate={asking?.kind === "passkey" && last ? { kind: "tick", label: "I understand I will sign in by email until I add another passkey." } : undefined}
         tone={asking?.kind === "passkey" && last ? "alarm" : undefined}
         onConfirm={async () =>
           asking === null ? null
-            : asking.kind === "device" ? onSignOut(asking.it.id) : onRemovePasskey(asking.it.id)
+            : asking.kind === "here" ? onSignOutHere()
+              : asking.kind === "everywhere" ? onSignOutEverywhere()
+                : asking.kind === "device" ? onSignOut(asking.it.id)
+                  : onRemovePasskey(asking.it.id)
         }
         onClose={() => setAsking(null)}
       />

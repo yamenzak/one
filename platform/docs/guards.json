@@ -3946,6 +3946,15 @@
       "impl": "web/test/door.test.tsx",
       "proves": "shows the address rather than asking for it",
       "fails": "a form demanding the address the session already knows, standing between somebody and something they were in the middle of doing"
+    },
+    {
+      "id": "the-product-can-be-left",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "can be left, on this device and on every device",
+      "fails": "an account centre with no way to sign out. The row for the device in your hand carried no control and the comment beside it said leaving was the avatar menu's job — a menu this platform does not have — so on a shared computer there was no way out at all, on the one screen whose subject is where you are signed in"
     }
   ]
 }
