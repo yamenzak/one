@@ -29,7 +29,7 @@ import { INBOX, inboxOperations, type InboxCarrier } from "./inbox-ops.js";
 import { DATA, dataOperations, type DataCarrier } from "./data-ops.js";
 import { FILES, fileOperations, allowanceFrom, type FilesCarrier } from "./files-ops.js";
 import { GENERATION, generationOperations, type GenerationCarrier } from "./generate-ops.js";
-import { choicesOf, disabledFrom } from "./generate.js";
+import { choicesOf } from "./generate.js";
 import { consentsOf, outstandingFor } from "./reference-ops.js";
 import { OPERATE, OPERATOR, operatorOperations, planOverrides, type OperatorCarrier } from "./operator-ops.js";
 import { CONFIG, configOperations, type ConfigCarrier } from "./config-ops.js";
@@ -37,7 +37,7 @@ import { SETTINGS, settingsFor, settingsOperations, domainAdminOperations, type 
 import { readSettings, wordingFor } from "./settings.js";
 import { remember, replayed, replayKeyOf, REPLAY_HEADER } from "./replay.js";
 import { LOOKUP, type Fetcher, type LookupCarrier } from "./lookup.js";
-import { chargeableFrom, DEPLOYMENT_SCOPE, readAll, readRates } from "./config.js";
+import { chargeableFrom, DEPLOYMENT_SCOPE, readAll, readCatalogue } from "./config.js";
 
 /* ⚠️ NON-EMPTY WINS, NOT PRESENT WINS — `kernel/config.ts` states why, and a
    second reader that got it wrong would silently switch off a shared key for one
@@ -1581,24 +1581,21 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           accountId: accountSub?.accountId ?? "",
           productId: app.id,
           /*
-            ⚠️ THE DEPLOYMENT'S OWN RATES, READ LAZILY. Only a request that
+            ⚠️ THE DEPLOYMENT'S WHOLE CATALOGUE, READ LAZILY. Only a request that
             actually generates pays for the query — and the shared store is where
-            they live, because a price change is not a deploy.
+            it lives, because a model an operator adds has to reach every product
+            without any of them being redeployed.
           */
-          rates: () => readRates(sharedConfigDb),
+          catalogue: () => readCatalogue(sharedConfigDb),
           /*
-            ⚠️ THE WORKSPACE'S OWN PICKS AND THE OPERATOR'S OWN TOGGLES, both
-            read lazily for the same reason the rates are: a request that never
-            generates should not pay for either query.
+            ⚠️ AND WHAT THIS WORKSPACE DECIDED, read lazily for the same reason:
+            a request that never generates should not pay for the query.
 
-            They are separate because they are separate people's decisions. The
-            choice is a row in the tenant's own region; the disabled list is this
-            deployment's configuration, and it is deliberately NOT shared —
-            turning a model off for one product must not take it away from the
-            others.
+            It is a row in the TENANT'S OWN REGION, because which company reads a
+            workspace's data — and what that workspace wants said first — is the
+            workspace's decision and is about the workspace's own records.
           */
           chosen: () => choicesOf(regionalDb, at.tenant?.tenantId ?? ""),
-          disabled: async () => disabledFrom((await readAll(directoryDb, app.id))["ai.models.disabled"]),
           /*
             ⚠️ NULL WHERE NOTHING IS BOUND. `generate` refuses on it; nothing
             anywhere substitutes an answer.

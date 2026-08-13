@@ -8,7 +8,7 @@
 
 import { env } from "cloudflare:test";
 import { sql, type ResolvedRegion } from "@one/kernel";
-import { bindingsFor, CONFIG_SCHEMA, seedOne } from "@one/runtime";
+import { bindingsFor, CONFIG_SCHEMA, MODEL_SCHEMA, seedOne, writeModel } from "@one/runtime";
 import worker, { recorded } from "../src/worker.js";
 
 /* ⚠️ Whose configuration. The directory is bound with the same id into every
@@ -61,6 +61,36 @@ const seedMail = async () => {
   }
 };
 
+/*
+  ⚠️ AND THE MODEL CATALOGUE, WHICH IS THE DEPLOYMENT'S NOW.
+
+  Kova declares no models — an action names a LANE and the catalogue is one list
+  an operator types for every product behind the deployment. So a suite that
+  seeds nothing has a deployment with no models, and every AI action correctly
+  refuses with `unconfigured`: there is nothing for it to run on.
+
+  ⚠️ THE RATES ARE KOVA'S OLD DECLARED ONES AND THE MARKUP IS 1, so every
+  arithmetic assertion in these suites still reads directly. The markup has its
+  own tests where the multiplication happens.
+*/
+const seedModels = async () => {
+  const db = bindingsFor({ db: sql() }, /* ⚠️ THE SHARED STORE, NOT THE DIRECTORY. The catalogue is what every product
+     behind the deployment reads, so it lives where `sharedConfigBinding` points —
+     and seeding the wrong one leaves every AI action refusing with nothing wrong. */
+  { DB: (env as Record<string, unknown>).SHARED }, { defaultRegion: "auto" })("auto" as ResolvedRegion).db;
+  await db.batch([...MODEL_SCHEMA.ddl]);
+  const at = new Date().toISOString() as never;
+  for (const m of [
+    { id: "gemini-2.5-flash", provider: "gemini", lane: "text" as const, rate: { input: 1, output: 4 }, markup: 1, enabled: true },
+    { id: "gemini-2.5-pro", provider: "gemini", lane: "text" as const, rate: { input: 4, output: 16 }, thinking: true, markup: 1, enabled: true },
+    { id: "gemini-2.5-flash-vision", provider: "gemini", lane: "vision" as const, rate: { input: 1, output: 4 }, attachmentUnits: 1_100, markup: 1, enabled: true },
+    { id: "gemini-2.5-pro-vision", provider: "gemini", lane: "vision" as const, rate: { input: 4, output: 16 }, thinking: true, attachmentUnits: 1_100, markup: 1, enabled: true },
+    { id: "gemini-2.5-flash-image", provider: "gemini", lane: "image" as const, rate: { input: 1, output: 4 }, perOutput: 600, markup: 1, enabled: true },
+  ]) {
+    await writeModel(db, m, at);
+  }
+};
+
 export const SETUP = "https://setup.kova.4dl.app";
 
 /**
@@ -102,6 +132,7 @@ export const accountIds = new Map<string, string>();
 /** Returns the cookie for that origin. Sessions are per origin, so it matters. */
 export async function signIn(email: string, origin: string, opts: { accept?: boolean } = {}): Promise<string> {
   await seedMail();
+  await seedModels();
   /*
     ⚠️ ONE RETRY OF THE WHOLE CEREMONY, AND THE REASON IS THE STORE RATHER THAN
     THE CODE.

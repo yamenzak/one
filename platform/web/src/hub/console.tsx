@@ -26,6 +26,7 @@ import { Choose } from "../choose.js";
 import { Field } from "../field.js";
 import { Mark } from "../mark.js";
 import { Screen, Section, Title } from "../screen.js";
+import { SwitchRow } from "../switch.js";
 import { Tiles } from "../tiles.js";
 import { money, type Included } from "./offer.js";
 import type { Where } from "./routes.js";
@@ -92,6 +93,14 @@ export function ConsoleScreen({ products, onGo, onBack, Heading = "h1" }: Consol
             detail="The one Stripe account, the one mail lane, the one Turnstile widget"
             onGo={() => onGo({ at: "shared-config" })}
           />
+          {/*
+            ⚠️ AND THE MODEL CATALOGUE, WHICH IS SHARED FOR THE SAME REASON THE
+            KEYS ARE. A product declares what it ASKS a model for; which models
+            exist, what they cost and what they are sold for is one list behind
+            every one of them. It used to be per app, so a model added here
+            reached nobody until each product was edited and redeployed.
+          */}
+          <Item title="Models" detail="Every model this deployment can run, what it costs and what it is sold for" onGo={() => onGo({ at: "models" })} />
           <Item title="Workspaces" detail="Every workspace on the deployment, whoever serves it" onGo={() => onGo({ at: "tenants" })} />
           <Item title="Maintenance" detail="Close every door, and say why" onGo={() => onGo({ at: "maintenance" })} />
         </Card>
@@ -434,6 +443,161 @@ export function MaintenanceScreen({ mode, message, onSet, onBack, Heading = "h1"
         onPick={(next) => onSet(next, said)}
         onClose={() => setChoosing(false)}
       />
+    </Screen>
+  );
+}
+
+/* ---------------------------------------------------------------- models --- */
+
+/** One model in the deployment's catalogue, as `admin.models` answers. */
+export interface Model {
+  readonly id: string;
+  readonly provider: string;
+  readonly lane: string;
+  readonly enabled: boolean;
+  readonly markup: number;
+  readonly thinking: boolean;
+  readonly cost: { readonly input: number; readonly output: number; readonly perOutput: number | null };
+  readonly price: { readonly input: number; readonly output: number; readonly perOutput: number | null };
+  /** ⚠️ Why this row cannot be metered, if it cannot. Said, never hidden. */
+  readonly problems: readonly string[];
+}
+
+export interface ModelsProps {
+  readonly models: readonly Model[] | null;
+  /** ⚠️ Handed over rather than written here — see `laneNames`. */
+  readonly lanes: readonly string[];
+  readonly onEdit: (id: string | null) => void;
+  readonly onEnabled: (id: string, enabled: boolean) => Promise<Problem | null>;
+  readonly onBack: () => void;
+  readonly Heading?: ElementType;
+  /** ⚠️ False on a deployment that binds no shared store — said, never hidden. */
+  readonly hasShared?: boolean;
+}
+
+/**
+ * ⚠️ WHAT A LANE IS, IN THE WORDS OF WHOEVER PICKS ONE. `transcribe` is a column
+ * name; "a recording in, words out" is the thing an operator is deciding about.
+ *
+ * ⚠️ AND AN UNKNOWN LANE PRINTS ITSELF rather than falling back to a friendly
+ * word. The list travels from the platform, so a lane this bundle has not
+ * learned yet is a deployment that is ahead of it — and showing it as "Text"
+ * would be a confident wrong answer about what a model does.
+ */
+export const laneNames: Readonly<Record<string, string>> = {
+  text: "Words in, words out",
+  vision: "A picture in, words out",
+  image: "Words in, pictures out",
+  speech: "Words in, a voice out",
+  transcribe: "A recording in, words out",
+  video: "Words in, video out",
+};
+
+/**
+ * ⚠️ THE MARGIN, AS A PERCENTAGE, because that is how anybody thinks about it. A
+ * multiplier is what the arithmetic wants and `1.4` is not what somebody means
+ * when they say "forty per cent".
+ */
+export const marginOf = (markup: number): string => `${Math.round((markup - 1) * 100)}%`;
+
+/**
+ * EVERY MODEL THIS DEPLOYMENT CAN RUN.
+ *
+ * ⚠️ COST AND PRICE ON THE SAME ROW. Either one alone answers neither question an
+ * operator has — "are we losing money on this" needs both, and a markup shown
+ * without the number it multiplies is a percentage of something invisible.
+ *
+ * ⚠️ AND A ROW THAT CANNOT BE METERED SAYS SO RATHER THAN BEING HIDDEN. Hidden,
+ * an operator sees a model they added simply not appear, with nothing anywhere
+ * saying why — and the row it is missing from is the one that decides whether
+ * every call to it is free.
+ */
+export function ModelsScreen({
+  models, lanes, onEdit, onEnabled, onBack, Heading = "h1", hasShared = true,
+}: ModelsProps): ReactNode {
+  const byLane = lanes
+    .map((lane) => [lane, (models ?? []).filter((m) => m.lane === lane)] as const)
+    .filter(([, rows]) => rows.length > 0);
+
+  return (
+    <Screen leave="up" onLeave={onBack} name="Models" sky="silk"
+      title={<Title as={Heading}>Models</Title>}
+      lede="Every model this deployment can run. Products ask for a lane; what is in one is this list."
+    >
+      {hasShared ? (
+        <Section>
+          <Card>
+            <Item title="Add a model" detail="A provider path, what it costs, and what it is sold for" onGo={() => onEdit(null)} />
+          </Card>
+        </Section>
+      ) : null}
+
+      {!hasShared ? (
+        <Section>
+          <p className="note">This deployment binds no shared configuration store, so there is nowhere to keep a catalogue.</p>
+        </Section>
+      ) : null}
+
+      {models === null ? <Section><Waiting rows={4} /></Section> : models.length === 0 ? (
+        <Section>
+          {/*
+            ⚠️ AN EMPTY CATALOGUE IS THE STARTING STATE, NOT A FAULT — and it is
+            also the state in which every AI action in every product refuses. A
+            blank that did not say so would be a deployment quietly unable to
+            generate anything, on a screen that looked finished.
+          */}
+          <Blank title="No models yet">
+            Until one is added, every product's AI actions refuse — there is nothing for them to run on.
+          </Blank>
+        </Section>
+      ) : byLane.map(([lane, rows]) => (
+        <Section key={lane} name={laneNames[lane] ?? lane}>
+          <Card>
+            {rows.map((m) => (
+              <Item
+                key={m.id}
+                title={m.id}
+                detail={
+                  <>
+                    {m.provider}
+                    {m.thinking ? <Pill tone="quiet">Reasons</Pill> : null}
+                    {!m.enabled ? <Pill tone="quiet">Off</Pill> : null}
+                    {/*
+                      ⚠️ THE MARGIN IS THE NUMBER THIS SCREEN EXISTS FOR, so it is
+                      on the row rather than one press away. An operator scanning
+                      a catalogue is checking exactly this.
+                    */}
+                    {m.enabled && !m.problems.length ? ` · ${marginOf(m.markup)} margin` : ""}
+                    {m.problems.length ? <Pill tone="alarm">{m.problems[0]}</Pill> : null}
+                  </>
+                }
+                onGo={() => onEdit(m.id)}
+              />
+            ))}
+          </Card>
+        </Section>
+      ))}
+
+      {/*
+        ⚠️ TAKING ONE OUT OF SERVICE IS ITS OWN CONTROL, and it is not a delete.
+        The row carries the rate every past generation was settled against, so
+        deleting it makes a bill unreadable to answer a question a switch answers.
+      */}
+      {models && models.length > 0 ? (
+        <Section name="In service">
+          <Card>
+            {models.map((m) => (
+              <SwitchRow
+                key={m.id}
+                title={m.id}
+                detail={m.enabled ? "Offered to every product" : "Offered to nobody; workspaces on it fall back"}
+                on={m.enabled}
+                onChange={(next) => onEnabled(m.id, next)}
+              />
+            ))}
+          </Card>
+        </Section>
+      ) : null}
     </Screen>
   );
 }

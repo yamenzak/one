@@ -1,290 +1,223 @@
 /**
- * THE CATALOGUE, AND WHAT IT REFUSES BEFORE A REQUEST EXISTS.
+ * WHAT ONE CALL HOLDS, AND WHAT A DECLARATION CAN GET WRONG.
  *
- * ⚠️ EVERY FAILURE HERE IS A TRANSFER RATHER THAN AN ERROR. A feature pointed at
- * an undeclared model cannot compute a reserve; a rate of zero holds nothing and
- * charges nothing while the provider still invoices; an absent per-person ceiling
- * is a balance one person empties in an afternoon. None of them throws, none of
- * them is visible in a green suite, and each produces a perfectly successful
- * generation.
+ * ⚠️ EVERY REFUSAL HERE IS A FAILURE THAT COSTS MONEY RATHER THAN THROWING. An
+ * action with no system text computes its reserve from a document that is not
+ * the one sent; a catalogue row priced at zero is unmetered while the provider
+ * invoices as usual; an attaching lane with no attachment price SUCCEEDS every
+ * time and the platform pays for every picture. None is visible in a green
+ * suite, because each produces a perfectly good generation.
  */
 
 import { describe, expect, it } from "vitest";
-import { aiProblems, modelFor, planFeature, type AiSpec } from "../src/generation.js";
+import {
+  aiProblems, catalogueProblems, modelProblems, planAction, priced,
+  type AiSpec, type Catalogue, type ModelSpec,
+} from "../src/generation.js";
 
-const spec = (over: Partial<AiSpec> = {}): AiSpec => ({
-  models: [{ id: "gemini-2.5-flash", provider: "google", rate: { input: 1, output: 4 } }],
-  features: {
-    draft: { summary: "Draft", model: "gemini-2.5-flash", system: "You draft things.", maxOutput: 1_000, dailyPerPerson: 20 },
-  },
-  ...over,
+const model = (over: Partial<ModelSpec> & Pick<ModelSpec, "id" | "lane">): ModelSpec => ({
+  provider: "gemini", rate: { input: 1, output: 4 }, markup: 1, enabled: true, ...over,
 });
 
-/* -------------------------------------------------------------- reserves --- */
+const TEXT = priced(model({ id: "m", lane: "text", rate: { input: 1, output: 4 } }));
+const THINKS = priced(model({ id: "m", lane: "text", rate: { input: 1, output: 4 }, thinking: true }));
+const SEES = priced(model({ id: "v", lane: "vision", rate: { input: 1, output: 4 }, attachmentUnits: 1_100 }));
+const DRAWS = priced(model({ id: "d", lane: "image", perOutput: 600 }));
+
+const app = (actions: AiSpec["actions"]): AiSpec => ({ actions });
+
+const DRAFT = app({
+  draft: { summary: "Draft", lane: "text", system: "S".repeat(100), maxOutput: 1_000, dailyPerPerson: 10 },
+});
+
+/* ------------------------------------------------------------- the reserve --- */
 
 describe("what one call holds", () => {
-  /*
-    ⚠️ THE OUTPUT SIDE IS THE CEILING THE REQUEST ASKS FOR, not what a typical
-    answer costs. Budgeting the typical one makes every long answer partly free,
-    and long answers are what the expensive requests produce.
-  */
   it("holds the whole of what the request may return", () => {
-    const run = planFeature(spec(), "draft", "a four-week block for a beginner")!;
-    expect(run.reserve).toBeGreaterThanOrEqual(1_000 * 4);
+    /* 100 system + 5 prompt over the Latin ratio = 27 input units, and the full
+       thousand on the output side because that is what the request may ask for. */
+    expect(planAction(DRAFT, "draft", "hello", TEXT)!.reserve).toBe(Math.ceil(27 * 1 + 1_000 * 4));
   });
 
-  /*
-    ⚠️ THE TEXT AND THE RESERVE COME FROM ONE CALL. Two functions — one producing
-    what is sent, one producing what is held — is a shape in which a caller may
-    hand a different document to each, and unit tests over the halves separately
-    stay green through it.
-  */
-  it("returns exactly the text that will be sent", () => {
-    expect(planFeature(spec(), "draft", "x")!.system).toBe("You draft things.");
+  it("returns exactly the two texts that will be sent", () => {
+    const run = planAction(DRAFT, "draft", "hello", TEXT)!;
+    expect(run.system).toBe("S".repeat(100));
+    expect(run.prompt).toBe("hello");
   });
 
   it("widens for a model that reasons before answering", () => {
-    const plain = planFeature(spec(), "draft", "x")!.reserve;
-    const thinking = planFeature(spec({
-      models: [{ id: "gemini-2.5-flash", provider: "google", rate: { input: 1, output: 4 }, thinking: true }],
-    }), "draft", "x")!.reserve;
-    expect(thinking).toBeGreaterThan(plain);
+    expect(planAction(DRAFT, "draft", "hello", THINKS)!.reserve)
+      .toBeGreaterThan(planAction(DRAFT, "draft", "hello", TEXT)!.reserve);
   });
 
-  it("says nothing rather than guessing for a feature or a model it does not have", () => {
-    expect(planFeature(spec(), "nonesuch", "x")).toBeNull();
-    expect(planFeature(spec({ features: { draft: { summary: "D", model: "ghost", system: "s", maxOutput: 1, dailyPerPerson: 1 } } }), "draft", "x")).toBeNull();
+  it("says nothing rather than guessing for an action it does not have", () => {
+    expect(planAction(DRAFT, "nope", "hello", TEXT)).toBeNull();
   });
 });
 
-/* -------------------------------------------------------------- refusals --- */
+/* ------------------------------------------------------------ attachments --- */
 
-describe("a catalogue that cannot be trusted with money", () => {
-  it("accepts one that can", () => {
-    expect(aiProblems(spec())).toEqual([]);
+describe("a picture, which is nowhere in the text", () => {
+  const READ = app({ read: { summary: "Read", lane: "vision", system: "S", maxOutput: 500, dailyPerPerson: 5 } });
+
+  /*
+    ⚠️ THE ATTACHMENT'S UNITS COME FROM THE LANE. Providers bill a picture as a
+    flat block of input units — more than most prompts — and a vision call
+    metered on its words alone holds almost nothing, settles at almost nothing,
+    and the platform pays for every photograph. It scales with use, so the
+    cheapest-looking row runs the largest invoice.
+  */
+  it("adds the picture's units to the reserve", () => {
+    const blind = priced(model({ id: "v", lane: "vision", rate: { input: 1, output: 4 }, attachmentUnits: 0 }));
+    expect(planAction(READ, "read", "what is this", SEES)!.reserve)
+      .toBe(planAction(READ, "read", "what is this", blind)!.reserve + 1_100);
   });
 
+  it("adds nothing to an action in a lane that attaches nothing", () => {
+    const one = planAction(DRAFT, "draft", "hello", TEXT)!.reserve;
+    const two = planAction(DRAFT, "draft", "hello", { ...TEXT, attachmentUnits: 5_000 })!.reserve;
+    expect(two).toBe(one);
+  });
+
+  it("refuses a catalogue row that is given attachments and prices none", () => {
+    expect(modelProblems(model({ id: "v", lane: "vision" })))
+      .toEqual([expect.stringContaining("prices none")]);
+  });
+
+  it("says nothing about the same price on a lane that does not attach", () => {
+    expect(modelProblems(model({ id: "m", lane: "text" }))).toEqual([]);
+  });
+});
+
+/* --------------------------------------------------------------- pictures --- */
+
+describe("a lane that produces things", () => {
+  const DRAW = app({ draw: { summary: "Draw", lane: "image", system: "S", maxOutput: 1, dailyPerPerson: 2 } });
+
+  /*
+    ⚠️ PRICED PER THING PRODUCED. Through the unit arithmetic a picture is billed
+    at the cost of the sentence that asked for it, so the cap settles at that
+    fraction and the platform pays the rest on every image anybody makes.
+  */
+  it("holds the per-output price rather than the price of the prompt", () => {
+    expect(planAction(DRAW, "draw", "a gym at dawn", DRAWS)!.reserve).toBe(600);
+  });
+
+  it("holds the same whatever the prompt is", () => {
+    expect(planAction(DRAW, "draw", "x".repeat(5_000), DRAWS)!.reserve).toBe(600);
+  });
+
+  it("counts every output asked for", () => {
+    const four = app({ draw: { summary: "Draw", lane: "image", system: "S", maxOutput: 1, dailyPerPerson: 2, outputs: 4 } });
+    expect(planAction(four, "draw", "x", DRAWS)!.reserve).toBe(2_400);
+  });
+
+  it("refuses a catalogue row that produces things and prices none of them", () => {
+    expect(modelProblems(model({ id: "d", lane: "image" })))
+      .toEqual([expect.stringContaining("prices none of them")]);
+  });
+
+  it("does not demand an output ceiling of an action that produces things", () => {
+    const noCeiling = app({ draw: { summary: "Draw", lane: "image", system: "S", maxOutput: 0, dailyPerPerson: 2 } });
+    expect(aiProblems(noCeiling)).toEqual([]);
+  });
+
+  it("refuses half a picture", () => {
+    const half = app({ draw: { summary: "Draw", lane: "image", system: "S", maxOutput: 1, dailyPerPerson: 2, outputs: 1.5 } });
+    expect(aiProblems(half)).toEqual([{ id: "draw", why: expect.stringContaining("whole number") }]);
+  });
+});
+
+/* ---------------------------------------------------- what an app declares --- */
+
+describe("what an app's own declaration can get wrong", () => {
   it("says nothing about an app that generates nothing", () => {
     expect(aiProblems(undefined)).toEqual([]);
   });
 
-  it("refuses a feature naming a model this app does not declare", () => {
-    const out = aiProblems(spec({ features: { draft: { summary: "D", model: "ghost", system: "s", maxOutput: 10, dailyPerPerson: 5 } } }));
-    expect(out.map((p) => p.id)).toEqual(["draft"]);
-    expect(out[0]!.why).toContain("ghost");
+  it("accepts a declaration that is complete", () => {
+    expect(aiProblems(DRAFT)).toEqual([]);
   });
 
   /*
-    ⚠️ A ZERO RATE IS NOT "FREE", IT IS UNMETERED. The reserve is zero, the
-    settle is zero, the balance never moves and the provider still invoices — so
-    the model looks like the cheapest in the catalogue until the end of the month.
+    ⚠️ NO SYSTEM TEXT MEANS THE RESERVE IS COMPUTED FROM A DIFFERENT DOCUMENT
+    than the one sent — which is the defect `planRun` returning both halves
+    exists to make impossible, arriving from the declaration instead.
   */
-  it("refuses a model priced at nothing, on either side", () => {
-    for (const rate of [{ input: 0, output: 4 }, { input: 1, output: 0 }, { input: -1, output: 4 }]) {
-      const out = aiProblems(spec({ models: [{ id: "gemini-2.5-flash", provider: "google", rate }] }));
-      expect(out.some((p) => p.why.includes("unmetered")), JSON.stringify(rate)).toBe(true);
-    }
+  it("refuses an action that sends no system text", () => {
+    const blank = app({ a: { summary: "A", lane: "text", system: "   ", maxOutput: 10, dailyPerPerson: 1 } });
+    expect(aiProblems(blank)).toEqual([{ id: "a", why: expect.stringContaining("no system text") }]);
   });
 
-  it("refuses the same model declared twice, because which rate applies depends on order", () => {
-    const twice = spec({
-      models: [
-        { id: "gemini-2.5-flash", provider: "google", rate: { input: 1, output: 4 } },
-        { id: "gemini-2.5-flash", provider: "google", rate: { input: 9, output: 9 } },
-      ],
-    });
-    expect(aiProblems(twice).some((p) => p.why.includes("twice"))).toBe(true);
+  it("refuses an action with no bounded output", () => {
+    const loose = app({ a: { summary: "A", lane: "text", system: "S", maxOutput: 0, dailyPerPerson: 1 } });
+    expect(aiProblems(loose)).toEqual([{ id: "a", why: expect.stringContaining("no bounded output") }]);
+  });
+
+  it("refuses an action with no daily ceiling per person", () => {
+    const loose = app({ a: { summary: "A", lane: "text", system: "S", maxOutput: 10, dailyPerPerson: 0 } });
+    expect(aiProblems(loose)).toEqual([{ id: "a", why: expect.stringContaining("daily ceiling") }]);
   });
 
   /*
-    ⚠️ AN EMPTY SYSTEM TEXT IS NOT A CHEAP FEATURE, it is a reserve computed from
-    a document that is not the one sent — because a handler with nothing declared
-    to send is a handler that will assemble something.
+    ⚠️ AND A LANE THE METER CANNOT PRICE. It arrives from a hand-written
+    manifest or a widened union, and an action in one would fall through the
+    producing check into the unit arithmetic — which is the wrong shape, applied
+    silently.
   */
-  it("refuses a feature that declares no system text", () => {
-    const out = aiProblems(spec({ features: { draft: { summary: "D", model: "gemini-2.5-flash", system: "   ", maxOutput: 10, dailyPerPerson: 5 } } }));
-    expect(out.some((p) => p.why.includes("system text"))).toBe(true);
-  });
-
-  it("refuses a feature with no bounded output", () => {
-    for (const maxOutput of [0, -5, 1.5]) {
-      const out = aiProblems(spec({ features: { draft: { summary: "D", model: "gemini-2.5-flash", system: "s", maxOutput, dailyPerPerson: 5 } } }));
-      expect(out.some((p) => p.why.includes("bounded output")), String(maxOutput)).toBe(true);
-    }
+  it("refuses a lane the meter cannot price", () => {
+    const alien = app({ a: { summary: "A", lane: "hologram" as never, system: "S", maxOutput: 10, dailyPerPerson: 1 } });
+    expect(aiProblems(alien)).toEqual([{ id: "a", why: expect.stringContaining("not one the meter can price") }]);
   });
 
   /*
-    ⚠️ THE PER-PERSON CEILING IS NOT OPTIONAL. An app-wide balance is spent by
-    whoever asks first: one person looping a draft empties a workspace's credits
-    before anybody else opens the product, and the only signal is a bill.
+    ⚠️ IT NO LONGER CHECKS MODELS, and that is the point of the split. An app
+    declares none, so a manifest cannot name one that does not exist — and what
+    a catalogue can get wrong is checked where a catalogue is WRITTEN.
   */
-  it("refuses a feature with no daily ceiling per person", () => {
-    for (const dailyPerPerson of [0, -1, 2.5]) {
-      const out = aiProblems(spec({ features: { draft: { summary: "D", model: "gemini-2.5-flash", system: "s", maxOutput: 10, dailyPerPerson } } }));
-      expect(out.some((p) => p.why.includes("daily ceiling")), String(dailyPerPerson)).toBe(true);
-    }
+  it("asks nothing about models, because an app declares none", () => {
+    expect(Object.keys(DRAFT)).toEqual(["actions"]);
   });
 });
 
-/* --------------------------------------------------------------- rates --- */
+/* --------------------------------------------------- what a catalogue can --- */
 
-/**
- * ⚠️ THE DECLARED CATALOGUE IS A FLOOR. A manifest is a deploy and a price change
- * is not, so a shared, correctable rate wins — and an out-of-date rate is not a
- * cosmetic error: the reserve caps what may be charged, so every unit it fails to
- * count is a unit the platform pays for and nobody is billed.
- */
-describe("what a model costs, corrected centrally", () => {
-  it("uses what the app shipped with until somebody says otherwise", () => {
-    expect(modelFor(spec(), "gemini-2.5-flash")!.rate).toEqual({ input: 1, output: 4 });
-  });
+describe("what a catalogue row can get wrong", () => {
+  const ok: Catalogue = [model({ id: "m", lane: "text" }), model({ id: "d", lane: "image", perOutput: 600 })];
 
-  it("prefers the published rate", () => {
-    const live = modelFor(spec(), "gemini-2.5-flash", { "gemini-2.5-flash": { rate: { input: 3, output: 9 } } })!;
-    expect(live.rate).toEqual({ input: 3, output: 9 });
-    /* ⚠️ And nothing else about the model moves with it. */
-    expect(live.provider).toBe("google");
-  });
-
-  it("holds more once the published rate is higher", () => {
-    const before = planFeature(spec(), "draft", "x")!.reserve;
-    const after = planFeature(spec(), "draft", "x", { "gemini-2.5-flash": { rate: { input: 3, output: 12 } } })!.reserve;
-    expect(after).toBeGreaterThan(before);
+  it("accepts a catalogue that can be metered", () => {
+    expect(catalogueProblems(ok)).toEqual([]);
   });
 
   /*
-    ⚠️ WHETHER A MODEL REASONS IS A FACT ABOUT THE MODEL, so it travels with the
-    rate — a model that starts thinking and is still budgeted as one that does
-    not is an under-count on every call to it.
+    ⚠️ A ZERO RATE IS NOT "FREE", IT IS UNMETERED. Reserve zero, settle zero,
+    balance never moves, provider invoices as usual — so the model looks like
+    the cheapest row in the catalogue right up to the end of the month.
   */
-  it("carries whether it reasons, and leaves the app's answer alone when silent", () => {
-    expect(modelFor(spec(), "gemini-2.5-flash", { "gemini-2.5-flash": { rate: { input: 1, output: 4 }, thinking: true } })!.thinking).toBe(true);
-    const quiet = spec({ models: [{ id: "gemini-2.5-flash", provider: "google", rate: { input: 1, output: 4 }, thinking: true }] });
-    expect(modelFor(quiet, "gemini-2.5-flash", { "gemini-2.5-flash": { rate: { input: 2, output: 8 } } })!.thinking).toBe(true);
+  it("refuses a rate of nothing, on either side", () => {
+    expect(modelProblems(model({ id: "m", lane: "text", rate: { input: 0, output: 4 } })))
+      .toEqual([expect.stringContaining("unmetered")]);
+    expect(modelProblems(model({ id: "m", lane: "text", rate: { input: 1, output: 0 } })))
+      .toEqual([expect.stringContaining("unmetered")]);
   });
 
   /*
-    ⚠️ AND A RATE NEVER INVENTS A MODEL. The system text, the output ceiling and
-    the daily bound are the app's, and nothing in a catalogue can supply them —
-    so a row for something this app does not declare is ignored rather than
-    turned into something it can be asked for.
+    ⚠️ AND A MARKUP OF ZERO SELLS EVERY CALL AT COST. It is the one refusal here
+    that costs no money to the platform's provider and all of the margin — and
+    it is the likeliest to be typed, because zero is what an empty box means.
   */
-  it("ignores a rate for a model this app does not declare", () => {
-    expect(modelFor(spec(), "gpt-9-ultra", { "gpt-9-ultra": { rate: { input: 1, output: 1 } } })).toBeNull();
-  });
-});
-
-
-/* ------------------------------------------------------------- a picture --- */
-
-/**
- * ⚠️ A PHOTOGRAPH IS A FLAT BLOCK OF INPUT UNITS AND NONE OF IT IS IN THE TEXT.
- *
- * Providers bill hundreds to thousands of them per picture — more than most
- * prompts — so a vision call metered on its words holds a fraction of what it
- * costs. The cap then settles at that fraction and the platform pays the rest,
- * on every call, with every call succeeding. Nothing throws, nothing logs, and
- * the failure scales with USE: photographing a meal is the feature people reach
- * for most, so the cheapest-looking line runs up the largest invoice.
- */
-describe("what a picture costs on the way in", () => {
-  const spec: AiSpec = {
-    models: [
-      { id: "sees", provider: "p", rate: { input: 1, output: 4 }, imageUnits: 1_100 },
-      { id: "blind", provider: "p", rate: { input: 1, output: 4 } },
-    ],
-    features: {
-      read: { summary: "s", model: "sees", system: "SYSTEM", maxOutput: 100, dailyPerPerson: 5, takes: "image" },
-      words: { summary: "s", model: "sees", system: "SYSTEM", maxOutput: 100, dailyPerPerson: 5 },
-    },
-  };
-
-  it("adds the picture's units to the reserve", () => {
-    const withPicture = planFeature(spec, "read", "porridge")!.reserve;
-    const wordsOnly = planFeature(spec, "words", "porridge")!.reserve;
-    expect(withPicture - wordsOnly).toBe(1_100);
+  it("refuses a markup that sells at or below cost", () => {
+    expect(modelProblems(model({ id: "m", lane: "text", markup: 0 })))
+      .toEqual([expect.stringContaining("at or below cost")]);
   });
 
-  /* ⚠️ Only where the FEATURE declared it. A reserve that guessed from the call
-     could be computed for one request and an image attached to another. */
-  it("adds nothing to a feature that takes no picture", () => {
-    expect(planFeature(spec, "words", "porridge")!.reserve)
-      .toBe(planFeature({ ...spec, models: [spec.models[1]!, spec.models[0]!] }, "words", "porridge")!.reserve);
+  it("refuses the same model twice, because which rate applies depends on order", () => {
+    expect(catalogueProblems([...ok, model({ id: "m", lane: "text" })]))
+      .toEqual([{ id: "m", why: expect.stringContaining("twice") }]);
   });
 
-  /*
-    ⚠️ A VISION FEATURE ON A MODEL THAT PRICES NO PICTURE IS REFUSED AT
-    COMPOSITION, because at runtime it is a successful call that silently
-    under-charges — the one failure class nothing else here would find.
-  */
-  it("refuses a manifest whose vision feature runs on a model that prices no picture", () => {
-    const bad: AiSpec = {
-      models: [{ id: "blind", provider: "p", rate: { input: 1, output: 4 } }],
-      features: { read: { summary: "s", model: "blind", system: "S", maxOutput: 10, dailyPerPerson: 1, takes: "image" } },
-    };
-    expect(aiProblems(bad).map((p) => p.why).join()).toMatch(/prices none/);
-  });
-
-  it("says nothing about the same model used without a picture", () => {
-    const fine: AiSpec = {
-      models: [{ id: "blind", provider: "p", rate: { input: 1, output: 4 } }],
-      features: { words: { summary: "s", model: "blind", system: "S", maxOutput: 10, dailyPerPerson: 1 } },
-    };
-    expect(aiProblems(fine)).toEqual([]);
-  });
-});
-
-describe("what a picture costs on the way out", () => {
-  const spec: AiSpec = {
-    models: [{ id: "draws", provider: "p", rate: { input: 1, output: 4 }, perImage: 600 }],
-    features: {
-      one: { summary: "s", model: "draws", system: "S", maxOutput: 1, dailyPerPerson: 5, produces: "image" },
-      four: { summary: "s", model: "draws", system: "S", maxOutput: 1, dailyPerPerson: 5, produces: "image", images: 4 },
-    },
-  };
-
-  /*
-    ⚠️ PRICED PER PICTURE, NOT PER UNIT. Through the token arithmetic an image
-    holds the cost of the sentence that asked for it — a fraction of the real
-    price — and the platform pays the rest every time.
-  */
-  it("holds the per-picture price rather than the price of the prompt", () => {
-    expect(planFeature(spec, "one", "a kettlebell")!.reserve).toBe(600);
-  });
-
-  it("holds the same whatever the prompt is", () => {
-    expect(planFeature(spec, "one", "a kettlebell on a gym floor ".repeat(50))!.reserve).toBe(600);
-  });
-
-  /* ⚠️ Asking for several at once is the ordinary case, and three of four
-     unbudgeted is three the platform pays for. */
-  it("counts every picture asked for", () => {
-    expect(planFeature(spec, "four", "a kettlebell")!.reserve).toBe(2_400);
-  });
-
-  it("refuses a manifest that produces images on a model pricing none", () => {
-    const bad: AiSpec = {
-      models: [{ id: "text", provider: "p", rate: { input: 1, output: 4 } }],
-      features: { one: { summary: "s", model: "text", system: "S", maxOutput: 1, dailyPerPerson: 1, produces: "image" } },
-    };
-    expect(aiProblems(bad).map((p) => p.why).join()).toMatch(/produces images.*prices none/);
-  });
-
-  /* ⚠️ An output ceiling means nothing for a picture, so demanding one would be
-     a formality — but a count that is not a whole number of pictures is real. */
-  it("does not demand an output ceiling of an image feature", () => {
-    const noCeiling: AiSpec = {
-      models: [{ id: "draws", provider: "p", rate: { input: 1, output: 4 }, perImage: 600 }],
-      features: { one: { summary: "s", model: "draws", system: "S", maxOutput: 0, dailyPerPerson: 1, produces: "image" } },
-    };
-    expect(aiProblems(noCeiling).map((p) => p.why).join()).not.toMatch(/bounded output/);
-  });
-
-  it("refuses half a picture", () => {
-    const bad: AiSpec = {
-      models: [{ id: "draws", provider: "p", rate: { input: 1, output: 4 }, perImage: 600 }],
-      features: { one: { summary: "s", model: "draws", system: "S", maxOutput: 1, dailyPerPerson: 1, produces: "image", images: 0 } },
-    };
-    expect(aiProblems(bad).map((p) => p.why).join()).toMatch(/whole number of images/);
+  it("refuses a lane it cannot price", () => {
+    expect(modelProblems(model({ id: "m", lane: "hologram" as never })))
+      .toContainEqual(expect.stringContaining("not one the meter can price"));
   });
 });

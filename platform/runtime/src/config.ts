@@ -17,7 +17,8 @@
  * values and nothing else, which is what a self-host and every test run are.
  */
 
-import type { Instant, ConfigRegistry, Rates, SchemaModule, SqlHandle } from "@one/kernel";
+import type { Catalogue, ConfigRegistry, Instant, ModelSpec, SchemaModule, SqlHandle } from "@one/kernel";
+import { modelProblems } from "@one/kernel";
 import { redactConfig, resolveConfig, writableToShared } from "@one/kernel";
 
 /**
@@ -180,51 +181,78 @@ export const MODEL_SCHEMA: SchemaModule = {
   global: "deployment",
   id: "ai_model",
   ddl: [
-    `CREATE TABLE IF NOT EXISTS ai_model (id TEXT PRIMARY KEY, provider TEXT NOT NULL, rate_input REAL NOT NULL, rate_output REAL NOT NULL, thinking INTEGER, at TEXT NOT NULL);`,
+    `CREATE TABLE IF NOT EXISTS ai_model (id TEXT PRIMARY KEY, provider TEXT NOT NULL, lane TEXT NOT NULL DEFAULT 'text', rate_input REAL NOT NULL, rate_output REAL NOT NULL, per_output REAL, attachment_units REAL, markup REAL NOT NULL DEFAULT 1, thinking INTEGER, enabled INTEGER NOT NULL DEFAULT 1, at TEXT NOT NULL);`,
   ],
 };
 
-export async function readRates(db: SqlHandle | null): Promise<Rates> {
-  if (!db) return {};
-  const rows = await db.all<{ id: string; rate_input: number; rate_output: number; thinking: number | null }>(
-    `SELECT id, rate_input, rate_output, thinking FROM ai_model`,
+/**
+ * The whole catalogue, as every product behind this deployment sees it.
+ *
+ * ⚠️ NOT FILTERED BY APP, and that is the change. It used to answer with rates
+ * for models an app had already declared, so an operator adding one reached
+ * nobody until every manifest was edited and redeployed. An app declares
+ * ACTIONS; which models can serve them is this table.
+ */
+export async function readCatalogue(db: SqlHandle | null): Promise<Catalogue> {
+  if (!db) return [];
+  const rows = await db.all<{
+    id: string; provider: string; lane: string; rate_input: number; rate_output: number;
+    per_output: number | null; attachment_units: number | null; markup: number; thinking: number | null; enabled: number;
+  }>(
+    /* unbounded-read: a deployment's model catalogue, typed in by an operator —
+       tens of rows, and there is no per-workspace growth behind it. */
+    `SELECT id, provider, lane, rate_input, rate_output, per_output, attachment_units, markup, thinking, enabled FROM ai_model ORDER BY lane, id`,
   ).catch(() => []);
-  const out: Record<string, { rate: { input: number; output: number }; thinking?: boolean }> = {};
-  for (const row of rows) {
-    out[row.id] = {
-      rate: { input: row.rate_input, output: row.rate_output },
-      /* ⚠️ Null is "the app's declaration stands", not "false". */
-      ...(row.thinking === null ? {} : { thinking: row.thinking === 1 }),
-    };
-  }
-  return out;
+  return rows.map((r) => ({
+    id: r.id,
+    provider: r.provider,
+    lane: r.lane as ModelSpec["lane"],
+    rate: { input: r.rate_input, output: r.rate_output },
+    ...(r.per_output === null ? {} : { perOutput: r.per_output }),
+    ...(r.attachment_units === null ? {} : { attachmentUnits: r.attachment_units }),
+    markup: r.markup,
+    /* ⚠️ Null is "not a reasoning model", which is also what absent means. */
+    ...(r.thinking === null ? {} : { thinking: r.thinking === 1 }),
+    enabled: r.enabled === 1,
+  }));
 }
-
-export type RateRefusal = "unmetered";
 
 /**
- * Publish one rate.
+ * Write one catalogue row.
  *
- * ⚠️ ZERO IS REFUSED HERE TOO, and not as a copy of the composition check. That
- * one reads a manifest at boot; this one is a live write from a console, and
- * a rate of zero saved into the shared store makes a model unmetered for EVERY
- * app behind it — the reserve is zero, the settle is zero, the balance never
- * moves, and the provider invoices as usual.
+ * ⚠️ EVERY REFUSAL IS CHECKED HERE TOO, AND NOT AS A COPY OF THE COMPOSITION
+ * CHECK. That one reads a manifest at boot; this is a live write from a console,
+ * and a bad row is wrong for every app behind this store at once — a rate of
+ * zero makes a model unmetered everywhere, a markup of zero sells every call at
+ * cost, and an attaching lane with no attachment price succeeds while the
+ * platform pays for every picture.
  */
-export function refuseRate(rate: { readonly input: number; readonly output: number }): RateRefusal | null {
-  return rate.input > 0 && rate.output > 0 ? null : "unmetered";
+export function refuseModel(m: ModelSpec): readonly string[] {
+  return modelProblems(m);
 }
 
-export async function writeRate(
-  db: SqlHandle,
-  model: { readonly id: string; readonly provider: string; readonly rate: { readonly input: number; readonly output: number }; readonly thinking?: boolean },
-  at: Instant,
-): Promise<void> {
+export async function writeModel(db: SqlHandle, m: ModelSpec, at: Instant): Promise<void> {
   await db.run(
-    `INSERT INTO ai_model (id, provider, rate_input, rate_output, thinking, at) VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET provider = excluded.provider, rate_input = excluded.rate_input,
-       rate_output = excluded.rate_output, thinking = excluded.thinking, at = excluded.at`,
-    model.id, model.provider, model.rate.input, model.rate.output,
-    model.thinking === undefined ? null : model.thinking ? 1 : 0, at,
+    `INSERT INTO ai_model (id, provider, lane, rate_input, rate_output, per_output, attachment_units, markup, thinking, enabled, at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET provider = excluded.provider, lane = excluded.lane,
+       rate_input = excluded.rate_input, rate_output = excluded.rate_output,
+       per_output = excluded.per_output, attachment_units = excluded.attachment_units,
+       markup = excluded.markup, thinking = excluded.thinking, enabled = excluded.enabled, at = excluded.at`,
+    m.id, m.provider, m.lane, m.rate.input, m.rate.output,
+    m.perOutput ?? null, m.attachmentUnits ?? null, m.markup,
+    m.thinking === undefined ? null : m.thinking ? 1 : 0, m.enabled ? 1 : 0, at,
   );
+}
+
+/**
+ * ⚠️ TURNING A MODEL OFF IS NOT DELETING IT. The row carries the rate every past
+ * generation was settled against and the history that explains a bill; deleting
+ * it makes those unreadable to answer a question that a flag answers.
+ */
+export async function setModelEnabled(db: SqlHandle, id: string, enabled: boolean, at: Instant): Promise<boolean> {
+  const found = await db.first<{ id: string }>(`SELECT id FROM ai_model WHERE id = ?`, id).catch(() => null);
+  if (!found) return false;
+  await db.run(`UPDATE ai_model SET enabled = ?, at = ? WHERE id = ?`, enabled ? 1 : 0, at, id);
+  return true;
 }

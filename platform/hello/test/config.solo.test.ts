@@ -12,7 +12,7 @@
 import { env } from "cloudflare:test";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import worker, { recorded } from "../src/worker.js";
-import { post, SETUP, signIn } from "./session.js";
+import { post, restoreMail, SETUP, signIn } from "./session.js";
 
 const ORIGIN = "https://alone.hello.4dl.app";
 const ADMIN = "https://admin.hello.4dl.app";
@@ -71,13 +71,37 @@ describe("configuration with no shared store", () => {
   });
 
   /*
-    ⚠️ AND AN APP THAT ASKS NO MODEL ANYTHING GETS NO CATALOGUE SCREEN. A surface
-    that can only ever be wrong is one somebody will try to make work — and
-    mounting it would make "which models are on" a question about a deployment
-    rather than about a product.
+    ⚠️ THE CATALOGUE IS MOUNTED WHETHER OR NOT THIS APP GENERATES ANYTHING, and
+    that is the opposite of what it used to be. It was mounted only where an app
+    declared models — correct while the models WERE the app's. They are the
+    DEPLOYMENT's now, so a product that asks no model anything is served by the
+    same catalogue as one that does, and a deployment which has not added a model
+    yet is exactly the deployment that most needs the screen.
+
+    ⚠️ AND WITH NO SHARED STORE IT SAYS SO rather than answering with an empty
+    catalogue. Empty and unreachable look identical on a screen, and only one of
+    them is somebody's mistake.
   */
-  it("mounts no model catalogue, because this app generates nothing", async () => {
-    expect((await operator("/api/admin.models")).status).toBe(404);
+  it("mounts the model catalogue even where this app generates nothing", async () => {
+    const out = await operator("/api/admin.models");
+    expect(out.status).toBe(200);
+    expect(out.body.models).toEqual([]);
+    expect(out.body.shared).toBe(false);
+  });
+
+  /* ⚠️ Every lane the meter can price travels with it, so a console renders the
+     choice from what the platform supports rather than from a list of its own. */
+  it("hands the console every lane rather than letting it write its own list", async () => {
+    expect((await operator("/api/admin.models")).body.lanes)
+      .toEqual(["text", "vision", "image", "speech", "transcribe", "video"]);
+  });
+
+  /* ⚠️ And a write with nowhere to write it is refused, not swallowed. */
+  it("refuses to publish a model when there is no shared store to publish it to", async () => {
+    const out = await operator("/api/admin.models.set", {
+      id: "m", provider: "p", lane: "text", input: 1, output: 2, markup: 1.5,
+    });
+    expect(out.status).toBe(503);
   });
 
   it("is not reachable from inside a workspace", async () => {
@@ -214,13 +238,14 @@ describe("proving the mail lane", () => {
     failing assertion became a different test failing in a different file, with
     nothing naming the cause.
 
-    ⚠️ AND IT IS THE OPERATOR ROUTE RATHER THAN A DIRECT WRITE, because the
-    fixture that seeds this uses `seedOne` — which does nothing where a row
-    exists, correctly, so a blank row is not something a later sign-in repairs.
+    ⚠️ AND IT IS A DIRECT WRITE RATHER THAN THE OPERATOR ROUTE, which it used to
+    be. The route needs a session, and a restore that can fail for a reason
+    unrelated to what it is restoring is a restore that leaves the deployment
+    with no sender exactly when something has already gone wrong. The fixture
+    that seeds this uses `seedOne` — which correctly does nothing where a row
+    exists — so a blank row is not something a later sign-in repairs.
   */
-  afterAll(async () => {
-    await operator("/api/admin.config.set", { key: "email.from", value: "Hello <noreply@4dl.app>", scope: "app" });
-  });
+  afterAll(restoreMail);
 
   it("is not reachable from inside a workspace", async () => {
     expect((await member("/api/admin.email.test", { to: "check@example.test" })).status).toBe(403);

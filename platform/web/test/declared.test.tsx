@@ -14,8 +14,9 @@ import { DeclaredSettings, groupsOf, shownAs, type Declaration } from "../src/hu
 import { SettingsScreen } from "../src/hub/settings.js";
 import { WorkspaceScreen, amountOf, type Resolved } from "../src/hub/workspace.js";
 import {
-  ConsoleScreen, KeysScreen, CatalogueScreen, TenantsScreen, MaintenanceScreen, saidAs,
+  ConsoleScreen, KeysScreen, CatalogueScreen, TenantsScreen, MaintenanceScreen, ModelsScreen, marginOf, saidAs,
 } from "../src/hub/console.js";
+import { AiScreen, refusalOf } from "../src/hub/ai.js";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node as never);
 const nothing = async () => null;
@@ -375,5 +376,171 @@ describe("the switch that closes every door", () => {
     );
     expect(out).toContain("draining");
     expect(out).not.toContain("Everything works");
+  });
+});
+
+/* ----------------------------------------------------------- the models --- */
+
+describe("the deployment's model catalogue", () => {
+  const MODELS = [
+    { id: "llama", provider: "workers-ai", lane: "text", enabled: true, markup: 1.4, thinking: false,
+      cost: { input: 1, output: 2, perOutput: null }, price: { input: 1.4, output: 2.8, perOutput: null }, problems: [] },
+    { id: "pro", provider: "gemini", lane: "text", enabled: false, markup: 1.25, thinking: true,
+      cost: { input: 4, output: 16, perOutput: null }, price: { input: 5, output: 20, perOutput: null }, problems: [] },
+    { id: "free", provider: "gemini", lane: "image", enabled: true, markup: 1, thinking: false,
+      cost: { input: 1, output: 4, perOutput: 600 }, price: { input: 1, output: 4, perOutput: 600 },
+      problems: ["has a markup of zero or less, which sells every call at or below cost"] },
+  ];
+  const LANES = ["text", "vision", "image", "speech", "transcribe", "video"];
+
+  const shown = (models: typeof MODELS | null, over: { hasShared?: boolean } = {}) => html(
+    <ModelsScreen models={models} lanes={LANES} onEdit={() => undefined}
+      onEnabled={async () => null} onBack={() => undefined} {...over} />,
+  );
+
+  /*
+    ⚠️ A LANE WITH NOTHING IN IT DRAWS NO HEADING. Every lane the platform can
+    price is handed over, and rendering all six on a deployment with two models
+    is four empty sections that read as something broken.
+  */
+  it("groups by lane and skips the ones nothing is in", () => {
+    const out = shown(MODELS);
+    expect(out).toContain("Words in, words out");
+    expect(out).toContain("Words in, pictures out");
+    expect(out).not.toContain("A recording in, words out");
+  });
+
+  /*
+    ⚠️ THE MARGIN IS WHAT THIS SCREEN IS FOR. It is a percentage because that is
+    how anybody thinks about it — `1.4` is not what somebody means when they say
+    forty per cent — and it is on the row rather than one press away, because an
+    operator scanning a catalogue is checking exactly this.
+  */
+  it("says the margin as a percentage rather than as a multiplier", () => {
+    expect(marginOf(1.4)).toBe("40%");
+    expect(marginOf(1)).toBe("0%");
+    expect(shown(MODELS)).toContain("40% margin");
+  });
+
+  /*
+    ⚠️ A ROW THAT CANNOT BE METERED IS SHOWN AND FLAGGED, never hidden. Hidden,
+    an operator sees a model they added simply not appear — and the fault it is
+    hiding is the one that makes every call to that model free.
+  */
+  it("shows a row that would be unmetered, and says why", () => {
+    const out = shown(MODELS);
+    expect(out).toContain("at or below cost");
+    /* ⚠️ And it does not also claim a margin for it — nor for the one that is
+       out of service. Counted rather than matched on "0% margin", which "40%
+       margin" happens to contain. */
+    expect([...out.matchAll(/% margin/g)]).toHaveLength(1);
+  });
+
+  /*
+    ⚠️ AN EMPTY CATALOGUE IS THE STARTING STATE AND ALSO A DEPLOYMENT THAT CANNOT
+    GENERATE. A blank that did not say the second is a screen that looks finished
+    over a product whose every AI action refuses.
+  */
+  it("tells still-loading from a deployment that cannot generate at all", () => {
+    expect(shown(null)).toContain("aria-busy");
+    /* ⚠️ Matched short of the apostrophe, which `renderToStaticMarkup` escapes. */
+    expect(shown([])).toContain("every product");
+  });
+
+  it("says when there is nowhere to keep a catalogue", () => {
+    expect(shown([], { hasShared: false })).toContain("binds no shared configuration store");
+  });
+});
+
+/* --------------------------------------------------- a workspace's own AI --- */
+
+describe("what a workspace asks a model for", () => {
+  const ACTIONS = [
+    { action: "draft", summary: "Draft a plan", lane: "text",
+      options: [{ id: "llama", provider: "workers-ai" }, { id: "pro", provider: "gemini" }],
+      inEffect: "pro", decidedBy: "workspace" as const, why: null, stale: false, prompt: "Always in German." },
+    { action: "chosen-for-you", summary: "Read a meal", lane: "text",
+      options: [{ id: "llama", provider: "workers-ai" }],
+      inEffect: "llama", decidedBy: "catalogue" as const, why: null, stale: false, prompt: "" },
+    { action: "capable", summary: "Read a lab report", lane: "vision", prefer: "capable" as const,
+      options: [{ id: "sees", provider: "gemini" }],
+      inEffect: "sees", decidedBy: "catalogue" as const, why: null, stale: false, prompt: "" },
+    { action: "gone", summary: "Read a picture", lane: "vision",
+      options: [{ id: "sees", provider: "gemini" }],
+      inEffect: "sees", decidedBy: "workspace" as const, why: null, stale: true, prompt: "" },
+    { action: "nothing", summary: "Draw a picture", lane: "image",
+      options: [], inEffect: null, decidedBy: null, why: "none_in_lane", stale: false, prompt: "" },
+  ];
+
+  const shown = (actions: typeof ACTIONS | null, mayWrite = true) => html(
+    <AiScreen actions={actions} onChoose={async () => null} onPrompt={async () => null}
+      mayWrite={mayWrite} onBack={() => undefined} />,
+  );
+
+  /*
+    ⚠️ THE ACTIONS COME FROM THE MANIFEST, so this screen names none of them. An
+    action added to a product appears here and one removed stops appearing, which
+    is why there is no list anywhere to forget to update.
+  */
+  it("renders whatever the product declares, naming nothing itself", () => {
+    const out = shown(ACTIONS);
+    for (const a of ACTIONS) expect(out).toContain(a.summary);
+  });
+
+  /*
+    ⚠️ WHO DECIDED IS THE COLUMN THIS SCREEN EXISTS FOR. A pick that is no longer
+    offered shown as though it were running is the state an operator's switch
+    creates silently, months later — and the only other symptom is an answer that
+    quietly changed.
+  */
+  it("says when a pick is no longer offered, and when nobody picked", () => {
+    const out = shown(ACTIONS);
+    expect(out).toContain("no longer offered");
+    expect(out).toContain("Chosen for you");
+  });
+
+  /*
+    ⚠️ AND WHY NOTHING RUNS, IN WORDS SOMEBODY CAN ACT ON. An operator who has
+    added no model and a region that permits none are different problems with
+    different owners; one "unavailable" makes both the same shrug.
+  */
+  it("tells an empty lane from a region that permits nothing", () => {
+    expect(refusalOf("none_in_lane")).toContain("deployment");
+    expect(refusalOf("none_permitted")).toContain("region");
+    expect(shown(ACTIONS)).toContain("Nothing on this deployment can do this yet");
+  });
+
+  /*
+    ⚠️ THE SYSTEM PROMPT IS NOWHERE ON THIS SCREEN. A workspace that could rewrite
+    it could turn the product into anything at all with the product's name still
+    on the answer — so what it edits is what goes IN FRONT of a request.
+  */
+  it("offers the words in front of a request, and never the product's own", () => {
+    const out = shown(ACTIONS);
+    expect(out).toContain("What to mention first");
+    expect(out).toContain("Always in German.");
+    expect(out).not.toMatch(/system/i);
+  });
+
+  /*
+    ⚠️ AN ACTION THAT ASKS FOR THE DEAR MODEL SAYS SO. It otherwise reads as a
+    model somebody chose badly, when what happened is that the product said this
+    one has to be good — which is the whole of what `prefer` is for.
+  */
+  it("says when the product asked for the best model rather than the cheapest", () => {
+    expect(shown(ACTIONS)).toContain("Uses the best available");
+  });
+
+  it("tells still-loading from a product that generates nothing", () => {
+    expect(shown(null)).toContain("aria-busy");
+    expect(shown([])).toContain("asks no model anything");
+  });
+
+  /* ⚠️ Somebody who may not change it still SEES it — what a workspace has
+     chosen is not a secret from the people it applies to. */
+  it("shows everything to somebody who may change nothing", () => {
+    const out = shown(ACTIONS, false);
+    expect(out).toContain("Draft a plan");
+    expect(out).toContain("pro");
   });
 });

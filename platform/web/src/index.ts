@@ -74,10 +74,13 @@ export {
 } from "./hub/declared.js";
 export { SettingsScreen, type SettingsProps } from "./hub/settings.js";
 export { WorkspaceScreen, amountOf, type Resolved, type WorkspaceProps } from "./hub/workspace.js";
+export { AiScreen, laneOf, refusalOf, type Action, type AiProps } from "./hub/ai.js";
 export {
   ConsoleScreen, KeysScreen, CatalogueScreen, TenantsScreen, MaintenanceScreen, saidAs as keySaidAs,
   type CatalogueProps, type ConsoleProps, type Key, type KeysProps, type Product as ConsoleProduct,
+  ModelsScreen, laneNames, marginOf,
   type Plan as CataloguePlan, type MaintenanceProps, type Mode as MaintenanceMode,
+  type Model, type ModelsProps,
   type Tenant, type TenantsProps,
 } from "./hub/console.js";
 export { WorkspacesScreen, type Workspace, type WorkspacesProps, type Product as WorkspaceProduct } from "./hub/workspaces.js";

@@ -44,17 +44,20 @@ export const bindings = defineBindings({
     charges for it.
   */
   /*
-    ⚠️ EVERY MODEL THIS APP MAY REACH, NAMED. A region carries a sub-processor
-    allow-list, and one not on it is REFUSED rather than quietly run somewhere a
-    workspace was promised its data would not go — so adding a model to the
-    catalogue and forgetting this line is a feature that answers "not permitted
-    in this region" and nothing else.
+    ⚠️ EVERY COMPANY THIS APP MAY REACH, NAMED — and it is PROVIDERS rather than
+    models. Models are the deployment's catalogue now, so a list of model ids
+    here would be a manifest that had to be redeployed every time an operator
+    added a row, and a model added and forgotten would answer "not permitted in
+    this region" and nothing else. A provider is stable, is what a processing
+    agreement actually names, and is the only one of the two an app can honestly
+    promise.
+
+    ⚠️ IT IS ALSO THE FILTER THAT STOPS AN OPERATOR ROUTING KOVA'S DATA SOMEWHERE
+    KOVA NEVER DISCLOSED. A provider added to the catalogue and not named here is
+    refused for this product, whatever the operator enabled.
   */
   ai: inference({
-    subprocessors: [
-      "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-image",
-      "@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/qwen/qwen2.5-coder-32b-instruct",
-    ],
+    subprocessors: ["gemini", "workers-ai"],
     /*
       ⚠️ THE SAME SET IN BOTH REGIONS, AND SAYING SO IS THE POINT.
 
@@ -76,14 +79,8 @@ export const bindings = defineBindings({
       shorter list and nothing else in this file changes.
     */
     byRegion: {
-      auto: [
-        "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-image",
-        "@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/qwen/qwen2.5-coder-32b-instruct",
-      ],
-      eu: [
-        "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-image",
-        "@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/qwen/qwen2.5-coder-32b-instruct",
-      ],
+      auto: ["gemini", "workers-ai"],
+      eu: ["gemini", "workers-ai"],
     },
     optional: true,
   }),
@@ -2656,42 +2653,32 @@ export const movementSearch = operation<
  * operation reaching into the manifest that contains it is a circular type, and
  * a catalogue is exactly the small thing it actually needs.
  */
+/**
+ * ⚠️ KOVA DECLARES NO MODELS, AND THAT IS THE WHOLE OF THE CHANGE. It used to
+ * carry five, so a model an operator added reached nobody until this file was
+ * edited and redeployed, and a model a provider retired left every studio
+ * pointing at something that had stopped answering. An action names a LANE; what
+ * is in a lane is the deployment's catalogue, typed once for every product.
+ *
+ * ⚠️ WHAT STAYS HERE IS THE HALF NOBODY ELSE CAN SUPPLY: the system text, the
+ * output ceiling and the per-person daily bound. Those are what make the action
+ * do what Kova promises and what stop one person emptying a studio's balance —
+ * and a platform that held them would be a platform every product had to be
+ * edited into.
+ *
+ * ⚠️ AND THE DAILY CEILING IS PER PERSON, NOT PER STUDIO. A studio-wide balance
+ * is spent by whoever asks first: one coach looping a draft empties it before
+ * anybody else opens the product, and the only signal is a bill.
+ *
+ * ⚠️ IT IS DECLARED BEFORE THE OPERATIONS THAT USE IT, deliberately: an
+ * operation reaching into the manifest that contains it is a circular type, and
+ * the actions are exactly the small thing it actually needs.
+ */
 export const KOVA_AI: AiSpec = {
-  models: [
-    /*
-      ⚠️ `imageUnits` IS WHAT A PICTURE COSTS ON THE INPUT SIDE, and it is not
-      in the text anywhere. A vision call metered on its prompt alone holds
-      almost nothing, settles at almost nothing, and every photograph is one the
-      platform pays for in full — on the feature people use most.
-    */
-    { id: "gemini-2.5-flash", provider: "gemini", rate: { input: 1, output: 4 }, imageUnits: 1_100 },
-    /*
-      ⚠️ A REASONING MODEL FOR THE ONE READING THAT MATTERS CLINICALLY. A lab
-      report misread is a number a coach acts on, and `thinking` widens the
-      reserve because such a model spends units the request does not show.
-    */
-    { id: "gemini-2.5-pro", provider: "gemini", rate: { input: 4, output: 16 }, thinking: true, imageUnits: 1_100 },
-    /* ⚠️ Priced per PICTURE. There is no output ceiling here that means anything. */
-    { id: "gemini-2.5-flash-image", provider: "gemini", rate: { input: 1, output: 4 }, perImage: 600 },
-    /*
-      ⚠️ THE SECOND LANE, AND IT IS WHY THE CATALOGUE IS A CATALOGUE. A product
-      that named one provider would be a product where "which company reads my
-      clients' records" was decided by whoever wrote the manifest — and there is
-      no version of that answer that is right for every studio in every country.
-
-      These are text-only: no `imageUnits`, so `modelSuits` will not offer them
-      for a feature that sends a photograph, and no `perImage`, so they are never
-      offered for one that draws. That is derived from the METER rather than
-      declared beside it, because a capability field can disagree with the
-      arithmetic and it disagrees in the expensive direction.
-    */
-    { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", provider: "workers-ai", rate: { input: 1, output: 2 } },
-    { id: "@cf/qwen/qwen2.5-coder-32b-instruct", provider: "workers-ai", rate: { input: 1, output: 2 } },
-  ],
-  features: {
+  actions: {
     "draft-plan": {
       summary: "A training plan from a sentence",
-      model: "gemini-2.5-flash",
+      lane: "text",
       system: [
         "You draft strength-training programmes for a coach to edit. Answer with JSON only.",
         "Shape: { \"weeks\": [{ \"days\": [{ \"name\": string, \"movements\": [{ \"movement\": string, \"sets\": number, \"reps\": number, \"note\": string }] }] }] }.",
@@ -2703,7 +2690,7 @@ export const KOVA_AI: AiSpec = {
     },
     "parse-food": {
       summary: "A meal described in words, as foods and portions",
-      model: "gemini-2.5-flash",
+      lane: "text",
       system: [
         "You turn a sentence about a meal into foods and portions. Answer with JSON only.",
         "Shape: { \"foods\": [{ \"name\": string, \"grams\": number, \"confident\": boolean }] }.",
@@ -2715,7 +2702,7 @@ export const KOVA_AI: AiSpec = {
 
     "draft-meals": {
       summary: "A meal plan from a sentence",
-      model: "gemini-2.5-flash",
+      lane: "text",
       system: [
         "You draft eating plans for a coach to edit. Answer with JSON only.",
         "Shape: { \"weeks\": [{ \"days\": [{ \"name\": string, \"meals\": [{ \"name\": string, \"foods\": [{ \"name\": string, \"grams\": number }] }] }] }] }.",
@@ -2729,15 +2716,16 @@ export const KOVA_AI: AiSpec = {
     /* ------------------------------------------------------ from a picture --- */
 
     /*
-      ⚠️ THE THREE BELOW DECLARE `takes: "image"`, AND THE DECLARATION IS WHAT
-      MAKES THEM SAFE TO PRICE. A feature that decided per request whether a
-      picture was attached would compute its reserve from the text and then send
-      a photograph — succeeding every time, and costing the platform the
-      difference on every call.
+      ⚠️ THE FOUR BELOW ARE IN THE `vision` LANE, AND THE LANE IS WHAT MAKES THEM
+      SAFE TO PRICE. An action that decided per request whether a picture was
+      attached would compute its reserve from the text and then send a
+      photograph — succeeding every time, and costing the platform the difference
+      on every call. The lane is also what stops a studio choosing a text model
+      for one of these: a model that prices no attachment is not in the lane.
     */
     "snap-meal": {
       summary: "A photograph of a meal, as foods and portions",
-      model: "gemini-2.5-flash",
+      lane: "vision",
       system: [
         "You read a photograph of a meal and answer with foods and portions. JSON only.",
         "Shape: { \"foods\": [{ \"name\": string, \"grams\": number, \"confident\": boolean }] }.",
@@ -2746,11 +2734,10 @@ export const KOVA_AI: AiSpec = {
       ].join("\n"),
       maxOutput: 600,
       dailyPerPerson: 30,
-      takes: "image",
     },
     "label-reader": {
       summary: "A photograph of a nutrition label, as a food",
-      model: "gemini-2.5-flash",
+      lane: "vision",
       system: [
         "You read a nutrition label and answer with one food. JSON only.",
         "Shape: { \"name\": string, \"per100g\": { \"kcal\": number, \"protein\": number, \"carbs\": number, \"fat\": number }, \"confident\": boolean }.",
@@ -2759,11 +2746,18 @@ export const KOVA_AI: AiSpec = {
       ].join("\n"),
       maxOutput: 400,
       dailyPerPerson: 30,
-      takes: "image",
     },
     "lab-extract": {
+      /*
+        ⚠️ THE ONE ACTION THAT ASKS FOR THE DEAREST MODEL RATHER THAN THE
+        CHEAPEST. A lab report misread is a number a coach acts on, and answering
+        it with whichever model happened to cost least is the failure that
+        matters here. What "capable" means is decided by the deployment's
+        catalogue; that it is worth paying for is Kova's decision.
+      */
+      prefer: "capable",
       summary: "A photograph of a lab report, as values",
-      model: "gemini-2.5-pro",
+      lane: "vision",
       system: [
         "You read a laboratory report and answer with the values it carries. JSON only.",
         "Shape: { \"values\": [{ \"name\": string, \"value\": number, \"unit\": string, \"low\": number, \"high\": number, \"legible\": boolean }] }.",
@@ -2773,14 +2767,13 @@ export const KOVA_AI: AiSpec = {
       ].join("\n"),
       maxOutput: 2_000,
       dailyPerPerson: 10,
-      takes: "image",
     },
 
     /* ------------------------------------------------------ writing things --- */
 
     "exercise-guide": {
       summary: "How to do a movement, in the studio's voice",
-      model: "gemini-2.5-flash",
+      lane: "text",
       system: [
         "You write short how-to text for one strength movement, for a client to read on a phone mid-session.",
         "Setup, execution, and the two mistakes people actually make. Plain prose, no headings, under 180 words.",
@@ -2792,7 +2785,7 @@ export const KOVA_AI: AiSpec = {
     },
     "supplement-guide": {
       summary: "Guidance on a supplement, with its basis stated",
-      model: "gemini-2.5-flash",
+      lane: "text",
       system: [
         "You write a short note on one supplement for a coach to review before it reaches anybody.",
         "Say what the evidence actually supports and how strong it is. Where the evidence is thin, say that plainly rather than hedging into a recommendation.",
@@ -2804,7 +2797,7 @@ export const KOVA_AI: AiSpec = {
     },
     "client-summary": {
       summary: "A month of somebody's training and eating, read back",
-      model: "gemini-2.5-flash",
+      lane: "text",
       system: [
         "You summarise one client's month from the figures given, for their coach.",
         "What changed, what held, and what is worth asking them about. Under 200 words, plain prose.",
@@ -2816,7 +2809,7 @@ export const KOVA_AI: AiSpec = {
     },
     "article": {
       summary: "A draft article for the studio's own feed",
-      model: "gemini-2.5-flash",
+      lane: "text",
       system: [
         "You draft a short article for a personal-training studio to publish, for a coach to edit before it goes out.",
         "Plain prose under 700 words. No headings, no lists, no calls to action.",
@@ -2843,7 +2836,7 @@ export const KOVA_AI: AiSpec = {
     */
     "body-scan": {
       summary: "Body composition estimated from a photograph",
-      model: "gemini-2.5-flash",
+      lane: "vision",
       system: [
         "You estimate body-fat percentage from a photograph, for a coach and a client to consider. JSON only.",
         "Shape: { \"bodyFat\": number, \"confident\": boolean, \"basis\": string }.",
@@ -2853,18 +2846,16 @@ export const KOVA_AI: AiSpec = {
       ].join("\n"),
       maxOutput: 400,
       dailyPerPerson: 10,
-      takes: "image",
     },
 
     "image": {
       summary: "A picture for the studio's own use",
-      model: "gemini-2.5-flash-image",
+      lane: "image",
       system: "You draw a single photographic image for a personal-training studio to use in its own material. No text in the image, no logos, and no recognisable real person.",
       /* ⚠️ Meaningless for a picture, and kept truthful rather than zero. */
       maxOutput: 1,
       dailyPerPerson: 10,
-      produces: "image",
-      images: 1,
+      outputs: 1,
     },
   },
 };

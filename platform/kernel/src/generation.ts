@@ -1,13 +1,20 @@
 /**
- * GENERATION — what an app may ask a model for, declared.
+ * GENERATION — what an app may ASK a model for, declared.
  *
  * Layer 2. Imports primitives and the metering arithmetic.
  *
- * ⚠️ THE CATALOGUE IS THE PLATFORM'S AND THE PROMPT IS THE APP'S, and the split
- * is not stylistic. Rates are a fact about a provider's price list, identical in
- * every product, and getting one wrong is a transfer rather than a bug. What to
- * ask for is the whole of what makes a product different, and a platform that
- * held prompts would be a platform every app had to be edited into.
+ * ⚠️ THE CATALOGUE IS THE PLATFORM'S AND THE ACTION IS THE APP'S, and the split
+ * is the whole design. Rates are a fact about a provider's price list, identical
+ * in every product, and getting one wrong is a transfer rather than a bug. What
+ * to ask for is what makes a product different, and a platform that held prompts
+ * would be a platform every app had to be edited into.
+ *
+ * ⚠️ SO AN APP DECLARES NO MODELS AT ALL. It used to declare both, with the
+ * shared store correcting the RATES of models the app had already named — which
+ * meant a model added by an operator reached nobody until every app's manifest
+ * was edited and redeployed. An action names a LANE, and which models are in a
+ * lane is one row an operator types once for every product behind the
+ * deployment.
  *
  * ⚠️ A MODEL'S ID IS ITS PROVIDER PATH. A short slug beside a `path` column is
  * one indirection and it is the one that kept a shipping product's catalogue
@@ -19,57 +26,168 @@
 import type { Run } from "./meter.js";
 import { planImages, planRun } from "./meter.js";
 
+/* --------------------------------------------------------------- the lane --- */
+
+/**
+ * WHAT SHAPE GOES IN AND WHAT SHAPE COMES OUT.
+ *
+ * ⚠️ A LANE IS A MODALITY, AND THAT IS WHY THE METER CAN READ IT. Three of these
+ * are priced per unit of text and three per thing produced, and picking the
+ * wrong arithmetic is not a rounding error — an image run through the unit
+ * arithmetic is billed at the cost of the sentence that asked for it. Deriving
+ * the shape from the lane makes it one decision instead of one per action.
+ *
+ * ⚠️ "SHORT TEXT" IS NOT A LANE, AND IT WAS ASKED FOR. It is a SIZE, and an
+ * action already declares its own in `maxOutput`. As a lane it would be a filter
+ * that refuses every capable model — a large model can produce a short answer,
+ * so a `brief` action offered only `brief` models would hide the whole catalogue
+ * behind a distinction with no fact under it.
+ */
+export type Lane = "text" | "vision" | "image" | "speech" | "transcribe" | "video";
+
+export const LANES: readonly Lane[] = ["text", "vision", "image", "speech", "transcribe", "video"];
+
+/**
+ * ⚠️ WHICH LANES ARE PRICED PER THING PRODUCED. A picture, a spoken clip and a
+ * video are billed per output by every provider that sells them; there is no
+ * output ceiling that means anything and no usage report that would make one
+ * cheaper.
+ */
+export const PRODUCING: readonly Lane[] = ["image", "speech", "video"];
+
+/** ⚠️ Which lanes are given something besides text, and therefore priced for it. */
+export const ATTACHING: readonly Lane[] = ["vision", "transcribe"];
+
+export const produces = (lane: Lane): boolean => PRODUCING.includes(lane);
+export const attaches = (lane: Lane): boolean => ATTACHING.includes(lane);
+
 /* -------------------------------------------------------------- the model --- */
 
+/**
+ * One model in the DEPLOYMENT's catalogue. Typed here, stored by the runtime,
+ * entered by an operator — never declared by an app.
+ */
 export interface ModelSpec {
   /** ⚠️ The provider path, exactly. `@cf/meta/llama-3.1-8b-instruct`, `gemini-2.5-flash`. */
   readonly id: string;
-  /** Which lane runs it. One catalogue may hold several. */
+  /** Which lane runs it — the Workers AI binding, the Gemini key, whatever comes next. */
   readonly provider: string;
+  /** ⚠️ What it does. The meter reads this to decide which arithmetic applies. */
+  readonly lane: Lane;
   /**
-   * ⚠️ CREDITS PER UNIT, INPUT AND OUTPUT SEPARATELY, because every provider
-   * prices them differently and a single blended rate is wrong in whichever
-   * direction the request is unbalanced — which for generation is always the
-   * output side.
+   * ⚠️ WHAT THE PROVIDER CHARGES, in credits per unit, input and output
+   * separately — because every provider prices them differently and a single
+   * blended rate is wrong in whichever direction the request is unbalanced,
+   * which for generation is always the output side.
+   *
+   * ⚠️ THIS IS COST, NOT PRICE. `markup` is what turns one into the other, and
+   * nothing may compute money from this field directly — see `priced`.
    */
   readonly rate: { readonly input: number; readonly output: number };
   /**
+   * ⚠️ COST PER THING PRODUCED, for the three lanes that are billed that way. A
+   * picture, a spoken clip and a video are priced per output by every provider
+   * that sells them; forcing one through the unit arithmetic bills it at the
+   * cost of the sentence that asked for it.
+   */
+  readonly perOutput?: number;
+  /**
+   * ⚠️ INPUT UNITS ONE ATTACHMENT COSTS. Providers bill a picture or a recording
+   * as a flat block of input units — more than most prompts — and none of it is
+   * visible in the text. A vision call metered on its words alone holds almost
+   * nothing, the cap settles at almost nothing, and every photograph is one the
+   * platform pays for in full.
+   */
+  readonly attachmentUnits?: number;
+  /**
    * ⚠️ A MODEL THAT REASONS BEFORE ANSWERING SPENDS UNITS THE REQUEST DOES NOT
-   * SHOW, so the reserve widens for it. Declared per model because it is a
-   * property of the model rather than of the thing being asked.
+   * SHOW, so the reserve widens for it. A property of the model rather than of
+   * the thing being asked.
    */
   readonly thinking?: boolean;
   /**
-   * ⚠️ INPUT UNITS ONE ATTACHED IMAGE COSTS. Absent means this model cannot be
-   * given one — declared per model because a provider prices a picture as a flat
-   * block of input units and every provider picks a different block.
+   * ⚠️ WHAT THE PLATFORM CHARGES ON TOP, as a multiplier. `1` is at cost.
    *
-   * A vision feature on a model with no figure here is refused at composition,
-   * because the reserve would be computed from the text alone: it would hold
-   * almost nothing, the cap would settle at almost nothing, and every photograph
-   * anybody sends is one the platform pays for in full.
+   * It is on the MODEL rather than deployment-wide because margins are not
+   * uniform: a model that is cheap to run and expensive to support is not the
+   * same trade as one where the provider takes most of the price. One number for
+   * everything means the operator sets it by the worst case and overcharges for
+   * the rest.
+   *
+   * ⚠️ AND IT IS APPLIED EXACTLY ONCE, IN `priced`. Applied at the reserve and
+   * again at the settle it doubles; applied at one and not the other, the cap
+   * and the charge disagree and the difference is silently the platform's.
    */
-  readonly imageUnits?: number;
+  readonly markup: number;
   /**
-   * ⚠️ CREDITS PER GENERATED IMAGE. A picture is priced per picture, and forcing
-   * it through the unit arithmetic bills it at the cost of the sentence that
-   * asked for it.
+   * ⚠️ WHETHER THE OPERATOR HAS IT ON. Stored as ENABLED rather than as a
+   * disabled list, which is the opposite of what this was: a list of exceptions
+   * was right while the catalogue shipped inside an app, because a model added
+   * upstream had to reach people without anybody enabling it. The catalogue is
+   * typed in by an operator now, so a row exists because somebody meant it, and
+   * an explicit switch is what lets one be taken out of service without losing
+   * its rate and its history.
    */
-  readonly perImage?: number;
+  readonly enabled: boolean;
 }
 
-/* ------------------------------------------------------------ the feature --- */
+export type Catalogue = readonly ModelSpec[];
 
-export interface FeatureSpec {
+/* ------------------------------------------------------------- the price --- */
+
+declare const PRICED: unique symbol;
+
+/**
+ * A model whose numbers are what the WORKSPACE pays, not what the provider
+ * charges.
+ *
+ * ⚠️ THE BRAND EXISTS BECAUSE MARKUP IS THE KIND OF THING THAT GETS APPLIED
+ * TWICE OR NOT AT ALL. Both failures are silent and neither is visible in a
+ * green suite: not at all is every generation sold at cost forever, twice is a
+ * reserve that holds double and a workspace whose credits drain at twice the
+ * rate it was quoted. Reserve and settle both read this type, so there is one
+ * place the multiplication can happen and nothing else can reach the raw rate.
+ */
+export type Priced = ModelSpec & { readonly [PRICED]: true };
+
+/**
+ * Cost → price.
+ *
+ * ⚠️ IDEMPOTENT ON PURPOSE. The markup is spent into the numbers and the field
+ * is left at 1, so a second application is arithmetic that changes nothing —
+ * which is the cheapest possible defence against the one mistake this whole type
+ * exists for.
+ */
+export function priced(model: ModelSpec): Priced {
+  const m = model.markup > 0 ? model.markup : 1;
+  return {
+    ...model,
+    rate: { input: model.rate.input * m, output: model.rate.output * m },
+    ...(model.perOutput === undefined ? {} : { perOutput: model.perOutput * m }),
+    markup: 1,
+  } as Priced;
+}
+
+/* ------------------------------------------------------------- the action --- */
+
+/**
+ * One thing an app asks a model for.
+ *
+ * ⚠️ IT NAMES A LANE AND NEVER A MODEL. Naming one made the app's manifest the
+ * catalogue: a model an operator added reached nobody until every product was
+ * edited and redeployed, and a model an operator retired left every app pointing
+ * at something the provider had stopped answering.
+ */
+export interface ActionSpec {
   /** One line, in the words of whoever pays for it. */
   readonly summary: string;
-  /** ⚠️ Names a declared model. Refused at composition otherwise. */
-  readonly model: string;
+  /** ⚠️ What shape this asks for. Which models can serve it follows from this. */
+  readonly lane: Lane;
   /**
-   * ⚠️ EXACTLY THE TEXT THAT WILL BE SENT. It is measured to compute the
-   * reserve, so a caller that appended to it afterwards would be sending one
-   * document and paying for another — which is the shape `planRun` exists to
-   * make impossible, carried up to the declaration.
+   * ⚠️ EXACTLY THE TEXT THAT WILL BE SENT, and the app's alone. A workspace may
+   * put its own words in front of the PROMPT; the system text is the product's
+   * and is not editable anywhere, because it is what makes the action do what
+   * the product promises rather than what one workspace felt like today.
    */
   readonly system: string;
   /**
@@ -82,134 +200,93 @@ export interface FeatureSpec {
    * ⚠️ A CEILING PER PERSON PER DAY, and it is not optional. An app-wide balance
    * is spent by whoever asks first: one person looping a draft empties a
    * workspace's credits before anybody else opens the product, and the only
-   * signal is a bill. Per person per day is the bound that makes the balance a
-   * budget rather than a race.
+   * signal is a bill.
    */
   readonly dailyPerPerson: number;
   /**
-   * ⚠️ WHETHER THIS FEATURE IS GIVEN A PICTURE, DECLARED RATHER THAN INFERRED
-   * FROM THE CALL.
-   *
-   * Deciding per request means a caller can attach one to a feature whose model
-   * cannot take it, or to a feature whose reserve did not budget for it — and
-   * the second is the expensive one, because it succeeds. Declaring it makes the
-   * catalogue answerable before anybody calls anything: a feature that takes an
-   * image is refused unless its model prices one.
+   * ⚠️ HOW MANY THINGS ONE CALL ASKS FOR, in a producing lane, and it is part of
+   * the reserve. A request for four that held the price of one is three the
+   * platform pays for.
    */
-  readonly takes?: "image";
+  readonly outputs?: number;
   /**
-   * What comes back. `text` unless stated.
+   * ⚠️ WHETHER THIS ONE HAS TO BE GOOD, and it defaults to cheapest.
    *
-   * ⚠️ AN IMAGE IS A DIFFERENT METERING SHAPE, not a different content type on
-   * the same one. It is priced per picture, there is no output ceiling that
-   * means anything, and what comes back is BYTES — which have to be stored,
-   * counted against the workspace's quota and erased with it, none of which a
-   * text answer needs.
+   * Naming a model was how a product used to say "read this lab report with the
+   * one that reasons" — and losing that with the catalogue was a real regression,
+   * not a simplification: a clinical reading answered by whichever model happened
+   * to be cheapest is a number a coach acts on, produced by the wrong model, with
+   * nothing anywhere saying so.
+   *
+   * ⚠️ "CAPABLE" MEANS DEAREST IN THE LANE, and the proxy is deliberate. Price is
+   * the only signal a catalogue actually carries, and providers do price by
+   * capability — a quality score would be a second opinion an operator has to
+   * maintain and would be wrong the week after it was typed. An app says which
+   * of its actions is worth paying more for; the deployment decides what the
+   * options are.
    */
-  readonly produces?: "text" | "image";
-  /**
-   * ⚠️ HOW MANY IMAGES ONE CALL ASKS FOR, and it is part of the reserve. A
-   * request for four that held the price of one is three the platform pays for.
-   */
-  readonly images?: number;
+  readonly prefer?: "cheapest" | "capable";
 }
 
 export interface AiSpec {
-  readonly models: readonly ModelSpec[];
-  readonly features: Readonly<Record<string, FeatureSpec>>;
+  readonly actions: Readonly<Record<string, ActionSpec>>;
 }
 
 /* ------------------------------------------------------------- the reserve --- */
 
 /**
- * What one call to a feature will hold.
+ * What one call to an action will hold, and exactly the two texts it will send.
  *
- * ⚠️ ONE CALL RETURNS THE TEXT AND THE RESERVE TOGETHER, for the reason
- * `planRun` states: two functions, one producing what is sent and one producing
- * what is held, is a shape in which a caller may hand a different document to
- * each — and unit tests over the halves separately stay green through it.
+ * ⚠️ ONE CALL RETURNS ALL THREE, for the reason `planRun` states: separate
+ * functions for what is sent and what is held is a shape in which a caller may
+ * hand a different document to each, and unit tests over the halves stay green
+ * through it.
+ *
+ * ⚠️ THE MODEL IS PASSED IN AND IS ALREADY PRICED. A reserve is a ceiling on
+ * revenue, so it must be computed from the model that is actually going to run
+ * and from the numbers actually going to be charged. Looking one up here would
+ * be a second decision that can differ from the first.
  */
-export function planFeature(
-  spec: AiSpec, featureId: string, prompt: string, rates: Rates = {},
+export function planAction(
+  spec: AiSpec, actionId: string, prompt: string, model: Priced,
   /**
-   * ⚠️ WHICH MODEL IS ACTUALLY GOING TO RUN, because a reserve is a ceiling on
-   * revenue and the manifest's default is not always what runs. A workspace may
-   * choose a dearer model from the catalogue; budgeting the default would hold
-   * the cheap one's price, cap the settle there, and the platform would pay the
-   * difference on every call — silently, because nothing fails.
-   *
-   * It is a parameter rather than a second lookup for the reason `planRun`
-   * exists: one call decides the model, and the same decision is used for the
-   * reserve and for the run.
+   * ⚠️ THE WORKSPACE'S OWN WORDS, MEASURED. It is prepended to the prompt rather
+   * than replacing it, and the composed text comes back on the `Run` — sent
+   * unmeasured it would be a document the reserve never saw, which for a long
+   * preamble on a busy action is a standing discount nobody chose to give.
    */
-  modelId?: string,
+  preamble = "",
 ): Run | null {
-  const feature = spec.features[featureId];
-  if (!feature) return null;
-  const model = modelFor(spec, modelId ?? feature.model, rates);
-  if (!model) return null;
+  const action = spec.actions[actionId];
+  if (!action) return null;
+  const asked = preamble.trim() ? `${preamble.trim()}\n\n${prompt}` : prompt;
+
   /*
-    ⚠️ A PICTURE IS PRICED PER PICTURE. Running it through the unit arithmetic
-    would hold the cost of the sentence that asked for it, which is a fraction
-    of a per-image price — so the cap settles at that fraction and the platform
-    pays the rest on every image anybody generates.
+    ⚠️ A PRODUCING LANE IS PRICED PER THING PRODUCED. Running it through the unit
+    arithmetic would hold the cost of the sentence that asked for it, which is a
+    fraction of a per-output price — so the cap settles at that fraction and the
+    platform pays the rest on every picture, clip and video anybody makes.
   */
-  if (feature.produces === "image") {
-    return planImages({ perImage: model.perImage ?? 0, count: feature.images ?? 1 });
+  if (produces(action.lane)) {
+    return planImages({
+      perImage: model.perOutput ?? 0, count: action.outputs ?? 1,
+      system: action.system, prompt: asked,
+    });
   }
   return planRun({
-    system: feature.system,
-    prompt,
-    maxOutput: feature.maxOutput,
+    system: action.system,
+    prompt: asked,
+    maxOutput: action.maxOutput,
     thinking: model.thinking ?? false,
     rate: model.rate,
     /*
-      ⚠️ THE PICTURE'S OWN UNITS, WHICH ARE NOWHERE IN THE TEXT. Declared on the
-      FEATURE rather than passed by the caller, so a reserve cannot be computed
-      for one request and an image attached to another.
+      ⚠️ THE ATTACHMENT'S OWN UNITS, WHICH ARE NOWHERE IN THE TEXT. Taken from
+      the LANE rather than from the caller, so a reserve cannot be computed for
+      one request and a picture attached to another.
     */
-    ...(feature.takes === "image" ? { imageUnits: model.imageUnits ?? 0 } : {}),
+    ...(attaches(action.lane) ? { imageUnits: model.attachmentUnits ?? 0 } : {}),
   });
 }
-
-/**
- * What one model costs, with the deployment's own answer preferred.
- *
- * ⚠️ A RATE IS A FACT ABOUT A PROVIDER'S PRICE LIST, IDENTICAL IN EVERY PRODUCT,
- * and getting one wrong is a transfer rather than a bug: the reserve is the cap
- * on what may be charged, so every unit an out-of-date rate fails to count is a
- * unit the platform pays for and nobody is billed. A manifest is a deploy; a
- * price change is not. So the declared catalogue is a FLOOR — what an app ships
- * knowing — and a shared, correctable rate wins over it.
- *
- * ⚠️ IT NEVER INVENTS A MODEL. A rate for something the app does not declare is
- * ignored, because the system text, the output ceiling and the daily bound are
- * the app's and there is nothing here to supply them. A catalogue entry cannot
- * turn into a feature.
- */
-export function modelFor(spec: AiSpec, modelId: string, rates: Rates = {}): ModelSpec | null {
-  const declared = spec.models.find((m) => m.id === modelId);
-  if (!declared) return null;
-  const shared = rates[modelId];
-  if (!shared) return declared;
-  return {
-    ...declared,
-    rate: shared.rate,
-    /* ⚠️ Whether a model reasons is a fact about the model, so it travels too. */
-    ...(shared.thinking === undefined ? {} : { thinking: shared.thinking }),
-  };
-}
-
-/**
- * Rates a deployment holds centrally, by model id.
- *
- * ⚠️ THE KEY IS THE PROVIDER PATH, which is why the id IS the path. A short slug
- * beside a `path` column is one indirection, and it is the one that kept a
- * shipping product's catalogue from ever being shared: two apps chose different
- * slugs for the same model, so a rate published by one was invisible to the
- * other.
- */
-export type Rates = Readonly<Record<string, { readonly rate: { readonly input: number; readonly output: number }; readonly thinking?: boolean }>>;
 
 /* -------------------------------------------------------------- refusals --- */
 
@@ -219,67 +296,91 @@ export interface AiProblem {
 }
 
 /**
- * Everything decidable about a catalogue before a request exists.
+ * Everything decidable about an APP's declaration before a request exists.
  *
- * ⚠️ EVERY ONE OF THESE IS A FAILURE THAT COSTS MONEY RATHER THAN THROWING. A
- * feature pointed at a model nobody declared cannot compute a reserve; a rate of
- * zero holds nothing and charges nothing, so the platform pays for every call;
- * an absent ceiling is a balance one person can empty. None of them is visible
- * in a green suite, because each produces a perfectly successful generation.
+ * ⚠️ EVERY ONE OF THESE COSTS MONEY RATHER THAN THROWING. An action with no
+ * system text computes its reserve from a document that is not the one sent; an
+ * absent output ceiling is a balance one call can empty; an absent daily bound
+ * is one person emptying it before anybody else opens the product. None is
+ * visible in a green suite, because each produces a perfectly successful
+ * generation.
+ *
+ * ⚠️ IT NO LONGER CHECKS MODELS, because an app declares none. What a catalogue
+ * can get wrong is `catalogueProblems`, and it is checked where the catalogue is
+ * WRITTEN — an operator typing a rate, rather than a developer shipping one.
  */
 export function aiProblems(spec: AiSpec | undefined): readonly AiProblem[] {
   if (!spec) return [];
   const out: AiProblem[] = [];
 
-  const seen = new Set<string>();
-  for (const model of spec.models) {
-    if (seen.has(model.id)) out.push({ id: model.id, why: "is declared twice, so which rate applies depends on order" });
-    seen.add(model.id);
-    /*
-      ⚠️ A ZERO RATE IS NOT "FREE", IT IS UNMETERED. The reserve is zero, the
-      settle is zero, the balance never moves and the provider still invoices —
-      so the model looks like the cheapest one in the catalogue right up to the
-      end of the month.
-    */
-    if (!(model.rate.input > 0) || !(model.rate.output > 0)) {
-      out.push({ id: model.id, why: "prices a unit at zero or less, so every call to it is unmetered" });
+  for (const [id, action] of Object.entries(spec.actions)) {
+    if (!LANES.includes(action.lane)) {
+      out.push({ id, why: `asks for lane "${action.lane}", which is not one the meter can price` });
     }
-  }
-
-  for (const [id, feature] of Object.entries(spec.features)) {
-    if (!seen.has(feature.model)) {
-      out.push({ id, why: `names model "${feature.model}", which this app does not declare` });
-    }
-    if (feature.system.trim().length === 0) {
+    if (action.system.trim().length === 0) {
       out.push({ id, why: "sends no system text, so the reserve is computed from a document that is not the one sent" });
     }
-    if (feature.produces !== "image" && (!Number.isInteger(feature.maxOutput) || feature.maxOutput < 1)) {
+    if (!produces(action.lane) && (!Number.isInteger(action.maxOutput) || action.maxOutput < 1)) {
       out.push({ id, why: "asks for no bounded output, so nothing caps what one call can spend" });
     }
-    const model = spec.models.find((m) => m.id === feature.model);
-    /*
-      ⚠️ A VISION FEATURE ON A MODEL THAT DOES NOT PRICE A PICTURE. The reserve
-      is then computed from the text alone: it holds almost nothing, the cap
-      settles at almost nothing, and every photograph is one the platform pays
-      for in full. It succeeds every time, which is why nothing else would find
-      it — and it scales with USE, so the cheapest-looking line in the catalogue
-      runs up the largest invoice.
-    */
-    if (feature.takes === "image" && model && !(model.imageUnits! > 0)) {
-      out.push({ id, why: `is given a picture and its model "${feature.model}" prices none, so every image on it is unmetered` });
+    if (produces(action.lane) && action.outputs !== undefined && (!Number.isInteger(action.outputs) || action.outputs < 1)) {
+      out.push({ id, why: "asks for a number of outputs that is not a whole number of them" });
     }
-    /* ⚠️ The same failure on the other side: an image produced and not priced. */
-    if (feature.produces === "image" && model && !(model.perImage! > 0)) {
-      out.push({ id, why: `produces images and its model "${feature.model}" prices none, so every one is unmetered` });
-    }
-    if (feature.produces === "image" && feature.images !== undefined && (!Number.isInteger(feature.images) || feature.images < 1)) {
-      out.push({ id, why: "asks for a number of images that is not a whole number of images" });
-    }
-    if (!Number.isInteger(feature.dailyPerPerson) || feature.dailyPerPerson < 1) {
+    if (!Number.isInteger(action.dailyPerPerson) || action.dailyPerPerson < 1) {
       out.push({ id, why: "sets no daily ceiling per person, so one person can empty the balance before anybody else opens the product" });
     }
   }
 
+  return out;
+}
+
+/**
+ * Everything a catalogue ROW can get wrong.
+ *
+ * ⚠️ CHECKED ON THE WAY IN, because this is a live write from a console rather
+ * than a manifest read at boot — and a bad row here is wrong for every product
+ * behind the deployment at once.
+ */
+export function catalogueProblems(catalogue: Catalogue): readonly AiProblem[] {
+  const out: AiProblem[] = [];
+  const seen = new Set<string>();
+  for (const m of catalogue) {
+    if (seen.has(m.id)) out.push({ id: m.id, why: "is in the catalogue twice, so which rate applies depends on order" });
+    seen.add(m.id);
+    for (const p of modelProblems(m)) out.push({ id: m.id, why: p });
+  }
+  return out;
+}
+
+/**
+ * ⚠️ ONE ROW'S FAULTS, SHARED BY THE WRITE PATH AND THE SWEEP. Two copies of
+ * "what makes a rate wrong" is one copy that gets a case added to it.
+ */
+export function modelProblems(m: ModelSpec): readonly string[] {
+  const out: string[] = [];
+  if (!LANES.includes(m.lane)) out.push(`is in lane "${m.lane}", which is not one the meter can price`);
+  /*
+    ⚠️ A ZERO RATE IS NOT "FREE", IT IS UNMETERED. The reserve is zero, the
+    settle is zero, the balance never moves and the provider still invoices — so
+    the model looks like the cheapest one in the catalogue right up to the end of
+    the month.
+  */
+  if (produces(m.lane)) {
+    if (!((m.perOutput ?? 0) > 0)) out.push("produces things and prices none of them, so every one is unmetered");
+  } else if (!(m.rate.input > 0) || !(m.rate.output > 0)) {
+    out.push("prices a unit at zero or less, so every call to it is unmetered");
+  }
+  /*
+    ⚠️ AND AN ATTACHING LANE WITH NO ATTACHMENT PRICE IS THE EXPENSIVE ONE,
+    because it SUCCEEDS: the reserve is computed from the words alone, holds
+    almost nothing, settles at almost nothing, and the platform pays for every
+    picture. It scales with use, so the cheapest-looking row runs the largest
+    invoice.
+  */
+  if (attaches(m.lane) && !((m.attachmentUnits ?? 0) > 0)) {
+    out.push("is given attachments and prices none, so every picture or recording on it is unmetered");
+  }
+  if (!(m.markup > 0)) out.push("has a markup of zero or less, which sells every call at or below cost");
   return out;
 }
 
@@ -288,68 +389,77 @@ export function aiProblems(spec: AiSpec | undefined): readonly AiProblem[] {
 /**
  * WHO DECIDED WHICH MODEL RUNS THIS.
  *
- * ⚠️ FOUR LAYERS, AND EACH IS A DIFFERENT PERSON'S DECISION. The manifest names
- * a default because a product has an opinion; the operator turns models on and
- * off because a deployment has a contract and a bill; a workspace picks from
- * what is left because "which company reads my clients' photographs" is its
- * decision and nobody else's; and the region refuses what it does not permit,
- * because residency outranks all three.
+ * ⚠️ FOUR LAYERS, AND EACH IS A DIFFERENT PERSON'S DECISION. The operator fills
+ * and enables the catalogue, because a deployment has a contract and a bill; a
+ * workspace picks from what is left, because "which company reads my clients'
+ * photographs" is its decision and nobody else's; the region refuses what it
+ * does not permit, because residency outranks the other two; and where nobody
+ * picked, the cheapest eligible model runs.
  *
- * They were one line — `feature.model` — so a product could offer a catalogue of
- * two providers and every workspace on every deployment got whichever one the
- * manifest happened to name.
+ * ⚠️ THE DEFAULT IS THE CHEAPEST RATHER THAN THE FIRST. A catalogue's order is
+ * whatever an operator typed, so "first" means a price nobody decided — and it
+ * is charged to every workspace that never opened the screen, which is most of
+ * them. An action that says `prefer: "capable"` inverts that for itself and
+ * nothing else; see `ActionSpec`.
  */
-export type ModelSource = "manifest" | "workspace";
+export type ModelSource = "catalogue" | "workspace";
 
 export type ModelChoice =
-  | { readonly ok: true; readonly model: ModelSpec; readonly source: ModelSource }
+  | { readonly ok: true; readonly model: Priced; readonly source: ModelSource }
   /**
-   * ⚠️ A REFUSAL SAYS WHICH LAYER REFUSED, because the four are different things
-   * to go and do: ask an operator to enable one, pick a different one, or accept
-   * that this region does not permit any. "Unavailable" makes all three the same
+   * ⚠️ A REFUSAL SAYS WHICH LAYER REFUSED, because they are different things to
+   * go and do: ask an operator to add or enable one, pick a different one, or
+   * accept that this region permits none. "Unavailable" makes all three the same
    * shrug.
    */
-  | { readonly ok: false; readonly why: "unknown_feature" | "unknown_model" | "none_permitted" };
+  | { readonly ok: false; readonly why: "unknown_action" | "none_in_lane" | "none_permitted" };
+
+/** ⚠️ Whether a model can do what an action asks — one comparison, no inference. */
+export const modelSuits = (model: ModelSpec, action: ActionSpec): boolean => model.lane === action.lane;
+
+export interface Eligibility {
+  readonly ai: AiSpec;
+  readonly catalogue: Catalogue;
+  readonly action: string;
+  /**
+   * ⚠️ THE REGION'S ALLOW-LIST, BY PROVIDER RATHER THAN BY MODEL. By model id it
+   * was a manifest that had to be redeployed whenever an operator added a
+   * catalogue row — which is the thing the catalogue move exists to remove. A
+   * provider is stable, is what a processing agreement names, and is the only
+   * one of the two an app can honestly promise. Empty narrows nothing.
+   */
+  readonly permitted?: readonly string[];
+}
 
 /**
- * ⚠️ WHETHER A MODEL CAN DO WHAT A FEATURE ASKS, DERIVED RATHER THAN DECLARED.
- *
- * A model that prices no image cannot be given one, and a model with no
- * per-picture price cannot produce one — both are already in the catalogue
- * because the METER needs them, so a second `capabilities` field would be a
- * declaration that can disagree with the arithmetic. It would disagree in the
- * expensive direction: a vision feature on a text model holds a reserve computed
- * from the prompt alone, settles at almost nothing, and the platform pays for
- * every picture.
+ * Every model a workspace may legitimately choose for one action, cheapest
+ * first — PRICED, because every number a screen shows beside a model is a number
+ * somebody is deciding to spend.
  */
-export function modelSuits(model: ModelSpec, feature: FeatureSpec): boolean {
-  if (feature.takes === "image" && (model.imageUnits ?? 0) <= 0) return false;
-  if (feature.produces === "image" && (model.perImage ?? 0) <= 0) return false;
-  /* ⚠️ And a model that prices pictures is not therefore a text model. */
-  if (feature.produces !== "image" && (model.perImage ?? 0) > 0) return false;
-  return true;
+export function modelsFor(input: Eligibility): readonly Priced[] {
+  const action = input.ai.actions[input.action];
+  if (!action) return [];
+  /* ⚠️ Dearest first where the action says it has to be good — see `prefer`. */
+  const way = action.prefer === "capable" ? -1 : 1;
+  const permitted = input.permitted ?? [];
+  return input.catalogue
+    .filter((m) => m.enabled)
+    .filter((m) => permitted.length === 0 || permitted.includes(m.provider))
+    .filter((m) => modelSuits(m, action))
+    .filter((m) => modelProblems(m).length === 0)
+    .map(priced)
+    .sort((a, b) => way * (costOf(a, action) - costOf(b, action)) || a.id.localeCompare(b.id));
 }
 
-/** Every model a workspace may legitimately choose for one feature. */
-export function modelsFor(input: {
-  readonly ai: AiSpec;
-  readonly feature: string;
-  /** Turned off by the operator, deployment-wide. Absent means all are offered. */
-  readonly disabled?: readonly string[];
-  /** The region's allow-list. Empty means the region narrows nothing. */
-  readonly permitted?: readonly string[];
-  readonly rates?: Rates;
-}): readonly ModelSpec[] {
-  const feature = input.ai.features[input.feature];
-  if (!feature) return [];
-  const off = new Set(input.disabled ?? []);
-  const permitted = input.permitted ?? [];
-  return input.ai.models
-    .map((m) => modelFor(input.ai, m.id, input.rates ?? {})!)
-    .filter((m) => !off.has(m.id))
-    .filter((m) => permitted.length === 0 || permitted.includes(m.id))
-    .filter((m) => modelSuits(m, feature));
-}
+/**
+ * ⚠️ ONE COMPARABLE NUMBER PER MODEL, so "cheapest" means something across two
+ * lanes that are priced differently. It is a ranking rather than a quote — the
+ * reserve is the quote — which is why it is deliberately crude and never shown.
+ */
+const costOf = (m: Priced, action: ActionSpec): number =>
+  produces(action.lane)
+    ? (m.perOutput ?? 0) * (action.outputs ?? 1)
+    : m.rate.input * 1_000 + m.rate.output * action.maxOutput;
 
 /**
  * The one model this call will run, and who decided.
@@ -360,41 +470,27 @@ export function modelsFor(input: {
  * failure would be one workspace whose generation stopped working, reported as a
  * provider error, months after the change that caused it.
  *
- * ⚠️ AND FALLING BACK IS NOT SILENT ELSEWHERE: `source` says `manifest` whenever
- * the workspace's pick did not decide, so a screen can say the choice is no
- * longer available rather than showing it as though it were in effect.
+ * ⚠️ AND FALLING BACK IS NOT SILENT: `source` says `catalogue` whenever the
+ * workspace's pick did not decide, so a screen can say the choice is no longer
+ * available rather than showing it as though it were in effect.
  */
-export function chooseModel(input: {
-  readonly ai: AiSpec;
-  readonly feature: string;
-  readonly chosen?: string | null;
-  readonly disabled?: readonly string[];
-  readonly permitted?: readonly string[];
-  readonly rates?: Rates;
-}): ModelChoice {
-  const feature = input.ai.features[input.feature];
-  if (!feature) return { ok: false, why: "unknown_feature" };
+export function chooseModel(input: Eligibility & { readonly chosen?: string | null }): ModelChoice {
+  if (!input.ai.actions[input.action]) return { ok: false, why: "unknown_action" };
 
   const eligible = modelsFor(input);
   if (input.chosen) {
     const picked = eligible.find((m) => m.id === input.chosen);
     if (picked) return { ok: true, model: picked, source: "workspace" };
   }
+  const cheapest = eligible[0];
+  if (cheapest) return { ok: true, model: cheapest, source: "catalogue" };
 
   /*
-    ⚠️ THE MANIFEST'S DEFAULT STILL HAS TO BE ELIGIBLE. A product's opinion does
-    not outrank a region: an app naming a model the EU does not permit would
-    otherwise run it there for every workspace that never chose one, which is the
-    exact promise residency is.
+    ⚠️ NOTHING ELIGIBLE SPLITS TWO WAYS, and they are different problems. A lane
+    with models that this region refuses is a residency decision somebody has to
+    accept; a lane with no models at all is an operator who has not added one,
+    which is a thing to go and do.
   */
-  const declared = eligible.find((m) => m.id === feature.model);
-  if (declared) return { ok: true, model: declared, source: "manifest" };
-
-  /*
-    ⚠️ AND NOTHING IS PICKED FOR THEM. Quietly substituting another model would
-    send a workspace's data to a company it did not choose, at a price nobody
-    quoted, and the only signal would be the bill.
-  */
-  if (!input.ai.models.some((m) => m.id === feature.model)) return { ok: false, why: "unknown_model" };
-  return { ok: false, why: "none_permitted" };
+  const anyInLane = input.catalogue.some((m) => m.enabled && modelSuits(m, input.ai.actions[input.action]!));
+  return { ok: false, why: anyInLane ? "none_permitted" : "none_in_lane" };
 }

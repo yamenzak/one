@@ -11,18 +11,27 @@
 import { describe, expect, it } from "vitest";
 import { CREDITS, dayOf, generate, judge, spending, spentToday, usageOf } from "../src/generate.js";
 import { balanceFor, grantCredits } from "../src/account-billing.js";
-import type { AiSpec, InferenceHandle, Instant, SqlHandle } from "@one/kernel";
+import type { AiSpec, Catalogue, InferenceHandle, Instant, SqlHandle } from "@one/kernel";
 
 const AT = "2026-01-10T09:00:00.000Z" as Instant;
 const LATER = "2026-01-10T18:00:00.000Z" as Instant;
 const TOMORROW = "2026-01-11T09:00:00.000Z" as Instant;
 
 const ai: AiSpec = {
-  models: [{ id: "gemini-2.5-flash", provider: "google", rate: { input: 1, output: 2 } }],
-  features: {
-    draft: { summary: "Draft", model: "gemini-2.5-flash", system: "You draft things.", maxOutput: 100, dailyPerPerson: 2 },
+  actions: {
+    draft: { summary: "Draft", lane: "text", system: "You draft things.", maxOutput: 100, dailyPerPerson: 2 },
   },
 };
+
+/*
+  ⚠️ THE CATALOGUE IS THE DEPLOYMENT'S NOW, so every call here hands one over
+  rather than reading it off the manifest. `markup: 1` is at cost, which keeps
+  the arithmetic in these tests readable — the markup has its own tests in the
+  kernel, where the multiplication happens.
+*/
+const CATALOGUE: Catalogue = [
+  { id: "gemini-2.5-flash", provider: "google", lane: "text", rate: { input: 1, output: 2 }, markup: 1, enabled: true },
+];
 
 /* -------------------------------------------------------------- fixtures --- */
 
@@ -116,7 +125,7 @@ const fund = async (w: ReturnType<typeof world>, amount: number) =>
   grantCredits(w.db, "acc", { kind: "purchased", amount, reason: "bought" }, AT);
 
 const ask = (w: ReturnType<typeof world>, inference: InferenceHandle | null, over: Partial<Parameters<typeof generate>[0]> = {}) =>
-  generate({ db: w.db, global: w.db, accountId: "acc", productId: "hello", ai, inference, tenantId: "t", actorId: "u", feature: "draft", prompt: "four weeks", at: AT, ...over });
+  generate({ db: w.db, global: w.db, accountId: "acc", productId: "hello", ai, catalogue: CATALOGUE, inference, tenantId: "t", actorId: "u", feature: "draft", prompt: "four weeks", at: AT, ...over });
 
 /* ---------------------------------------------------------------- happy --- */
 
@@ -267,8 +276,8 @@ describe("two calls at once against one call's worth of credits", () => {
     await fund(fresh, reserve);
     const provider = counting({ output: "x" });
     const both = await Promise.all([
-      generate({ db: fresh.db, global: fresh.db, accountId: "acc", productId: "hello", ai, inference: provider.handle, tenantId: "t", actorId: "a", feature: "draft", prompt: "four weeks", at: AT }),
-      generate({ db: fresh.db, global: fresh.db, accountId: "acc", productId: "hello", ai, inference: provider.handle, tenantId: "t", actorId: "b", feature: "draft", prompt: "four weeks", at: AT }),
+      generate({ db: fresh.db, global: fresh.db, accountId: "acc", productId: "hello", ai, catalogue: CATALOGUE, inference: provider.handle, tenantId: "t", actorId: "a", feature: "draft", prompt: "four weeks", at: AT }),
+      generate({ db: fresh.db, global: fresh.db, accountId: "acc", productId: "hello", ai, catalogue: CATALOGUE, inference: provider.handle, tenantId: "t", actorId: "b", feature: "draft", prompt: "four weeks", at: AT }),
     ]);
 
     expect(provider.calls).toHaveLength(1);
@@ -406,19 +415,22 @@ describe("what the credits were spent on", () => {
  */
 describe("a picture and the feature that did or did not ask for one", () => {
   const sees: AiSpec = {
-    models: [{ id: "sees", provider: "p", rate: { input: 1, output: 2 }, imageUnits: 1_000 }],
-    features: {
-      read: { summary: "Read", model: "sees", system: "You read pictures.", maxOutput: 100, dailyPerPerson: 5, takes: "image" },
-      words: { summary: "Words", model: "sees", system: "You read words.", maxOutput: 100, dailyPerPerson: 5 },
+    actions: {
+      read: { summary: "Read", lane: "vision", system: "You read pictures.", maxOutput: 100, dailyPerPerson: 5 },
+      words: { summary: "Words", lane: "text", system: "You read words.", maxOutput: 100, dailyPerPerson: 5 },
     },
   };
+  const seeing: Catalogue = [
+    { id: "sees", provider: "p", lane: "vision", rate: { input: 1, output: 2 }, attachmentUnits: 1_000, markup: 1, enabled: true },
+    { id: "reads", provider: "p", lane: "text", rate: { input: 1, output: 2 }, markup: 1, enabled: true },
+  ];
   const picture = { bytes: new Uint8Array([1, 2, 3]).buffer, contentType: "image/jpeg" };
 
   const call = async (feature: string, image?: { bytes: ArrayBuffer; contentType: string }) => {
     const w = world();
     await grantCredits(w.db, "acc", { kind: "purchased", amount: 100_000, reason: "test" }, AT);
     const out = await generate({
-      db: w.db, global: w.db, accountId: "acc", productId: "hello", ai: sees, inference: runner({ output: "ok" }),
+      db: w.db, global: w.db, accountId: "acc", productId: "hello", ai: sees, catalogue: seeing, inference: runner({ output: "ok" }),
       tenantId: "t_1", actorId: "u_1", feature, prompt: "what is this",
       ...(image ? { image } : {}), at: AT,
     });

@@ -1150,6 +1150,8 @@ more, which is the honest state.
 | `two-workspaces-may-share-a-slug` | a list showing what reads as a duplicate. A slug is unique per PRODUCT rather than per deployment — the whole point of the app column added to the directory — so an operator acting on "the haddad one" has a one-in-two chance of the right business | **live** |
 | `a-region-that-is-down-is-not-a-workspace-on-nothing` | a row with no plan on it, produced by a region that would not answer, reading as a workspace that is on no plan. The plan and the standing are read from each workspace's own region one at a time, and those two states want opposite responses from whoever is looking | **live** |
 | `an-unknown-maintenance-rung-is-never-open` | a CLOSED deployment reported as open, on the one screen whose entire job is saying which it is. The mode arrives off the wire, so a deployment ahead of this bundle can send a word the list does not carry — and falling back to the first rung is the one wrong answer that matters here | **live** |
+| `the-ai-settings-screen-discovers-its-own-actions` | a hand-written list of a product's AI actions, which goes out of date in the direction nobody notices: an action added and not listed is one nobody can configure, on a screen that looks complete. It names no models either — what a workspace may pick is decided by four server-side layers, so a screen offering a list of its own would offer what the save refuses | **live** |
+| `an-unmetered-model-is-shown-and-flagged` | an operator seeing a model they added simply not appear, with nothing anywhere saying why — and the fault being hidden is the one that decides whether every call to that model is free | **live** |
 <!-- /generated -->
 
 ## 5. What is not decided yet

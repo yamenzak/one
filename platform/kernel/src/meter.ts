@@ -35,6 +35,16 @@
 export interface Run {
   /** Exactly the text that will be sent. */
   readonly system: string;
+  /**
+   * ⚠️ AND EXACTLY THE PROMPT THAT WILL BE SENT, for the same reason.
+   *
+   * A workspace may put its own words in front of what the caller asks — that is
+   * the whole of the per-workspace prompt — and a caller free to send its own
+   * string while this one was measured is the two-document defect above with a
+   * second author. Both halves of what goes over the wire come back from one
+   * call, so there is nothing to keep in step.
+   */
+  readonly prompt: string;
   /** What must be held before it is. */
   readonly reserve: number;
 }
@@ -99,7 +109,7 @@ export function planRun(e: Estimate): Run {
   const text = Math.ceil((e.system.length + e.prompt.length) / charsPerUnit(e.system + e.prompt));
   const input = text + (e.imageUnits ?? 0);
   const output = e.thinking ? Math.ceil(e.maxOutput * THINKING_WIDENING) : e.maxOutput;
-  return { system: e.system, reserve: Math.ceil(input * e.rate.input + output * e.rate.output) };
+  return { system: e.system, prompt: e.prompt, reserve: Math.ceil(input * e.rate.input + output * e.rate.output) };
 }
 
 /* ------------------------------------------------------------- pictures --- */
@@ -117,8 +127,8 @@ export function planRun(e: Estimate): Run {
  * the price of one is three images the platform pays for, and asking for several
  * at once is the ordinary case rather than the exotic one.
  */
-export function planImages(e: { readonly perImage: number; readonly count: number }): Run {
-  return { system: "", reserve: Math.ceil(e.perImage * Math.max(1, e.count)) };
+export function planImages(e: { readonly perImage: number; readonly count: number; readonly system?: string; readonly prompt?: string }): Run {
+  return { system: e.system ?? "", prompt: e.prompt ?? "", reserve: Math.ceil(e.perImage * Math.max(1, e.count)) };
 }
 
 /* ------------------------------------------------------------- settlement --- */

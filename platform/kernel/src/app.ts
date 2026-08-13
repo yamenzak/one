@@ -954,6 +954,23 @@ export function defineApp<
  * every app genuinely passes through, and a check that can be sidestepped by not
  * using the constructor is a check with an opt-out nobody documented.
  */
+/**
+ * Which companies an app's generations may reach, read off its inference
+ * binding.
+ *
+ * ⚠️ IT IS A LIST OF PROVIDERS AND NOT OF MODELS, and that changed. A model-id
+ * allow-list in a manifest is the thing the catalogue move exists to remove:
+ * an operator adding a model would find it permitted by nobody until every
+ * product was edited and redeployed. A provider is stable, is what a DPA names,
+ * and is the only one of the two an app can honestly promise.
+ */
+export function providersOf(bindings: Readonly<Record<string, unknown>> | undefined): readonly string[] {
+  return Object.values(bindings ?? {})
+    .filter((b): b is { readonly kind: string; readonly subprocessors?: readonly string[]; readonly byRegion?: Readonly<Record<string, readonly string[]>> } =>
+      typeof b === "object" && b !== null && (b as { kind?: unknown }).kind === "inference")
+    .flatMap((b) => [...(b.subprocessors ?? []), ...Object.values(b.byRegion ?? {}).flat()]);
+}
+
 export function assertComposable(spec: {
   readonly id: string;
   readonly access: AccessSpec;
@@ -1113,9 +1130,17 @@ export function assertComposable(spec: {
     in this manifest, and the composition that adds one refuses to boot until the
     disclosure names it.
   */
+  /*
+    ⚠️ THE PROVIDERS COME FROM THE BINDING, NOT FROM A LIST OF MODELS. An app
+    declares no models — the catalogue is the deployment's — so the only stable
+    thing it CAN disclose is which companies its generations may reach, and that
+    is exactly what a processing agreement names. It is also the filter that
+    stops an operator adding a provider from silently routing one product's data
+    to a company that product never disclosed.
+  */
   const disclosure = disclosureProblems(
     {
-      models: (spec.ai?.models ?? []).map((m) => m.provider),
+      models: spec.ai ? providersOf(spec.bindings) : [],
       services: Object.keys(spec.services ?? {}),
       charges:
         spec.access.plans.some((p) => p.price.minor > 0) ||

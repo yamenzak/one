@@ -1703,7 +1703,7 @@
       "stage": "7",
       "status": "live",
       "impl": "kernel/test/generation.test.ts",
-      "proves": "refuses a model priced at nothing, on either side",
+      "proves": "refuses a rate of nothing, on either side",
       "fails": "a rate of zero holding nothing and charging nothing while the provider still invoices, so the model looks like the cheapest in the catalogue until the end of the month"
     },
     {
@@ -1874,7 +1874,7 @@
       "stage": "7",
       "status": "live",
       "impl": "kova/test/operating.solo.test.ts",
-      "proves": "charges at the published rate once one exists",
+      "proves": "takes a new model and offers it to the actions in its lane",
       "fails": "a price change that waits for a deploy per app — and while it waits, the reserve under-counts and the platform pays the difference on every call"
     },
     {
@@ -1891,9 +1891,9 @@
       "group": "platform",
       "stage": "7",
       "status": "live",
-      "impl": "kova/test/operating.solo.test.ts",
-      "proves": "refuses a model this app does not declare",
-      "fails": "a rate saved for something no reserve reads, because the system text, the output ceiling and the daily bound are the app's and nothing here supplies them"
+      "impl": "kernel/test/generation.test.ts",
+      "proves": "refuses a lane it cannot price",
+      "fails": "a catalogue row becoming a capability. It used to be checked by refusing a rate for a model the app did not declare; an app declares no models now, so the check moved to the LANE — a row in a lane the meter cannot price is refused on the way in, and a row in a lane no action asks for is simply never offered. Nothing in a catalogue can supply a system text, an output ceiling or a daily bound, so it still cannot become an action"
     },
     {
       "id": "unbound-changes-nothing",
@@ -2054,7 +2054,7 @@
       "stage": "7",
       "status": "live",
       "impl": "kernel/test/generation.test.ts",
-      "proves": "refuses a manifest whose vision feature runs on a model that prices no picture",
+      "proves": "refuses a catalogue row that is given attachments and prices none",
       "fails": "a catalogue where the cheapest-looking line is the one running up the largest invoice, because nothing at runtime would ever report it"
     },
     {
@@ -2063,7 +2063,7 @@
       "stage": "7",
       "status": "live",
       "impl": "kernel/test/generation.test.ts",
-      "proves": "holds the per-picture price rather than the price of the prompt",
+      "proves": "holds the per-output price rather than the price of the prompt",
       "fails": "an image forced through the token arithmetic, holding the cost of the sentence that asked for it — and a request for four that held the price of one"
     },
     {
@@ -2837,7 +2837,7 @@
       "stage": "7",
       "status": "live",
       "impl": "kernel/test/model-choice.test.ts",
-      "proves": "uses the workspace's choice over the product's opinion",
+      "proves": "uses the workspace's choice over the deployment's cheapest",
       "fails": "a manifest naming one model for every workspace on every deployment — 'which company reads my clients' records' decided by whoever wrote the catalogue"
     },
     {
@@ -2846,7 +2846,7 @@
       "stage": "7",
       "status": "live",
       "impl": "kernel/test/model-choice.test.ts",
-      "proves": "falls back to the default when the workspace's pick was turned off",
+      "proves": "falls back, and says it fell back, when the pick was taken out of service",
       "fails": "a workspace pinned to a model an operator disabled or a region stopped permitting, surfacing as a provider error months after the change that caused it"
     },
     {
@@ -2855,8 +2855,8 @@
       "stage": "7",
       "status": "live",
       "impl": "kernel/test/model-choice.test.ts",
-      "proves": "refuses rather than running the manifest's default where the region forbids it",
-      "fails": "a product's default model running in a region that does not permit it, for every workspace that never chose one — which is the exact promise residency is"
+      "proves": "drops what the region does not permit, by provider",
+      "fails": "a workspace that chose the EU having its photographs sent to exactly the same models as everybody else. The allow-list is by PROVIDER rather than by model id, and that changed with the catalogue: by id it was a manifest that had to be redeployed whenever an operator added a row, and a provider is what a processing agreement actually names. It is also the filter that stops an operator adding a provider from silently routing one product's data to a company that product never disclosed"
     },
     {
       "id": "a-model-is-never-substituted",
@@ -2864,7 +2864,7 @@
       "stage": "7",
       "status": "live",
       "impl": "kernel/test/model-choice.test.ts",
-      "proves": "picks nothing for a workspace when nothing is permitted",
+      "proves": "tells an empty lane from a region that permits nothing",
       "fails": "quietly running a different model than the one decided — a workspace's data sent to a company it did not choose, at a price nobody quoted, with the bill as the only signal"
     },
     {
@@ -2873,7 +2873,7 @@
       "stage": "7",
       "status": "live",
       "impl": "kernel/test/model-choice.test.ts",
-      "proves": "holds more for a dearer model than for the default",
+      "proves": "is in the reserve, because the reserve is the ceiling on revenue",
       "fails": "a reserve computed for the manifest's model while a workspace's dearer choice runs — the cap settles at the cheap price and the platform pays the difference on every call, silently"
     },
     {
@@ -2882,7 +2882,7 @@
       "stage": "7",
       "status": "live",
       "impl": "kernel/test/model-choice.test.ts",
-      "proves": "refuses a model that prices no picture for a feature that sends one",
+      "proves": "matches an action to its own lane and nothing else",
       "fails": "a vision feature pointed at a text model, whose reserve is computed from the prompt alone and settles at almost nothing while the platform pays for every picture"
     },
     {
@@ -4639,6 +4639,87 @@
       "impl": "scripts/scoped.test.mjs",
       "proves": "what a workspace chose is stored in its own region",
       "fails": "a workspace's settings moved into the store every worker binds by the same id. Four reasons, none visible from a table's shape: RESIDENCY — its settings are its records, and they live where its records live; ACROSS — the global store is bound into every product's worker, and unlike the vault there is no grant algebra in front of these rows; HOT PATH — branding and wording are read per request by the app to draw its own sign-in screen; ERASURE — `scoped` declares these tables regionally and the purge cascade is derived from it, so a table that changed store without the cascade following is a deleted workspace that keeps its configuration while the sweep reports success. Where something is genuinely needed before a region is known the answer is to publish a COPY and keep the regional row authoritative, as `publishBranding` does — never the reverse"
+    },
+    {
+      "id": "the-catalogue-is-the-deployments-not-the-apps",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/generation.test.ts",
+      "proves": "asks nothing about models, because an app declares none",
+      "fails": "a model an operator adds reaching nobody. The catalogue used to be declared per app, with the shared store correcting the RATES of models an app had already named — so adding one meant editing and redeploying every product, and a model a provider retired left each of them pointed at something that had stopped answering. An app declares an ACTION and the LANE it needs; what is in a lane is one list, typed once, behind every product"
+    },
+    {
+      "id": "a-markup-is-applied-exactly-once",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/model-choice.test.ts",
+      "proves": "is not applied twice",
+      "fails": "both directions, and both are silent. Not applied at all is every generation sold at cost forever — a defect with no symptom but the revenue nobody sees. Applied twice is a workspace whose credits drain at double the rate it was quoted. The `Priced` type is what makes one place responsible: `chooseModel` is the only way to a model and it marks up on the way out, and `priced` is idempotent so a second application is arithmetic that changes nothing"
+    },
+    {
+      "id": "the-reserve-is-computed-from-the-price",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/model-choice.test.ts",
+      "proves": "is in the reserve, because the reserve is the ceiling on revenue",
+      "fails": "a reserve held at COST. `settle` caps the charge at what was held, so a reserve computed from the provider's rate caps the charge there too and the platform's margin is silently zero on every call — the reserve is a ceiling on revenue, not an estimate"
+    },
+    {
+      "id": "a-workspaces-preamble-is-measured",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/model-choice.test.ts",
+      "proves": "is measured into the reserve",
+      "fails": "a standing discount on every call, growing with however much somebody typed into a settings box once. The words a workspace puts in front of a request are sent, so they are priced — and `planAction` returns the COMPOSED prompt beside the reserve, so there is no path on which a caller sends one document and pays for another"
+    },
+    {
+      "id": "an-action-may-ask-for-the-capable-model",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/seeing.test.ts",
+      "proves": "sends a lab report to a dearer model than an ordinary read",
+      "fails": "a clinical reading answered by whichever model happened to be cheapest. Naming a model was how a product used to say this, and losing it with the catalogue was a real regression rather than a simplification — a misread lab figure is a number a coach acts on. `prefer: \"capable\"` means dearest in the lane, and price is the only capability signal a catalogue actually carries"
+    },
+    {
+      "id": "a-catalogue-row-that-cannot-be-metered-is-refused",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/operating.solo.test.ts",
+      "proves": "refuses a vision model that prices no picture",
+      "fails": "a row that succeeds and is unmetered, for every product behind the store at once. A rate of zero makes the reserve zero, the settle zero and the balance never move while the provider invoices as usual; a markup of zero sells every call at cost; and an attaching lane with no attachment price is the expensive one because it SUCCEEDS — the reserve is computed from the words alone and the platform pays for every picture, scaling with use"
+    },
+    {
+      "id": "one-writer-for-both-halves-of-a-choice",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/telling.test.ts",
+      "proves": "does not lose the model when the prompt is set, or the prompt when the model is",
+      "fails": "a workspace's model quietly cleared by saving its wording. The two share a row, so two `INSERT … ON CONFLICT` statements each naming their own column is the shape where the second one's column defaults overwrite the first — and what it produces is a setting that saved successfully and reverted"
+    },
+    {
+      "id": "the-ai-settings-screen-discovers-its-own-actions",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "renders whatever the product declares, naming nothing itself",
+      "fails": "a hand-written list of a product's AI actions, which goes out of date in the direction nobody notices: an action added and not listed is one nobody can configure, on a screen that looks complete. It names no models either — what a workspace may pick is decided by four server-side layers, so a screen offering a list of its own would offer what the save refuses"
+    },
+    {
+      "id": "an-unmetered-model-is-shown-and-flagged",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "shows a row that would be unmetered, and says why",
+      "fails": "an operator seeing a model they added simply not appear, with nothing anywhere saying why — and the fault being hidden is the one that decides whether every call to that model is free"
     }
   ]
 }

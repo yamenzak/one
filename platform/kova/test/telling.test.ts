@@ -407,51 +407,63 @@ describe("a studio chooses where its clients' records live", () => {
  * carries two providers precisely so that "which company reads my clients'
  * records" is a decision somebody can make.
  */
-describe("which model runs a feature here", () => {
+describe("which model runs an action here", () => {
   it("says what is in effect, who decided it, and what else could be picked", async () => {
     const out = await owner.get("/api/ai.models.list");
     expect(out.status).toBe(200);
-    const features = out.body.features as unknown as {
-      feature: string; inEffect: string | null; decidedBy: string | null; options: { id: string; provider: string }[];
+    const actions = out.body.actions as unknown as {
+      action: string; lane: string; inEffect: string | null; decidedBy: string | null;
+      options: { id: string; provider: string }[]; prompt: string;
     }[];
-    const draft = features.find((f) => f.feature === "draft-plan")!;
-    expect(draft.decidedBy).toBe("manifest");
-    expect(draft.inEffect).toBe("gemini-2.5-flash");
-    /* ⚠️ BOTH LANES ARE OFFERED for a text feature — that is the catalogue being
-       a catalogue rather than one provider with a second one disclosed. */
-    expect(new Set(draft.options.map((o) => o.provider))).toEqual(new Set(["gemini", "workers-ai"]));
+    const draft = actions.find((a) => a.action === "draft-plan")!;
+    /*
+      ⚠️ `catalogue` RATHER THAN `manifest`, AND THAT IS THE WHOLE CHANGE. Kova
+      names no model; where nobody chose, the deployment's cheapest eligible one
+      runs. A product's opinion about which model is worth paying for is now one
+      word — `prefer` — rather than an id that goes stale.
+    */
+    expect(draft.decidedBy).toBe("catalogue");
+    expect(draft.lane).toBe("text");
+    expect(draft.inEffect).not.toBeNull();
+    expect(draft.options.length).toBeGreaterThan(0);
   });
 
   /*
-    ⚠️ AND NOT FOR A FEATURE THAT SENDS A PHOTOGRAPH. The Workers AI rows price
-    no image, so `modelSuits` will not offer them — derived from the meter rather
-    than declared, because a capability field can disagree with the arithmetic
-    and it disagrees in the direction the platform pays for.
+    ⚠️ AND NOT FOR AN ACTION THAT SENDS A PHOTOGRAPH. A lane is one comparison
+    rather than three inferences off the meter, so a text model is not offered
+    for a vision action — and, unlike the inference it replaced, it cannot be
+    fooled by a catalogue row that happens to carry a per-picture price.
   */
-  it("does not offer a text model for a feature that reads a picture", async () => {
-    const features = (await owner.get("/api/ai.models.list")).body.features as unknown as
-      { feature: string; options: { id: string }[] }[];
-    const vision = features.find((f) => f.feature === "label-reader")!;
-    expect(vision.options.map((o) => o.id).some((id) => id.startsWith("@cf/"))).toBe(false);
+  it("offers only the vision lane for an action that reads a picture", async () => {
+    const actions = (await owner.get("/api/ai.models.list")).body.actions as unknown as
+      { action: string; lane: string; options: { id: string }[] }[];
+    const vision = actions.find((a) => a.action === "label-reader")!;
+    expect(vision.lane).toBe("vision");
     expect(vision.options.length).toBeGreaterThan(0);
+    const text = actions.find((a) => a.action === "draft-plan")!;
+    for (const o of vision.options) expect(text.options.map((t) => t.id)).not.toContain(o.id);
   });
 
   it("takes a choice, reports who decided, and takes it back", async () => {
-    const set = await owner.call("/api/ai.models.choose", { feature: "draft-plan", model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast" });
-    expect(set.status).toBe(200);
+    const actions = (await owner.get("/api/ai.models.list")).body.actions as unknown as
+      { action: string; inEffect: string | null; options: { id: string }[] }[];
+    const draft = actions.find((a) => a.action === "draft-plan")!;
+    const other = draft.options.find((o) => o.id !== draft.inEffect)!;
 
-    const after = (await owner.get("/api/ai.models.list")).body.features as unknown as
-      { feature: string; inEffect: string | null; decidedBy: string | null }[];
-    const draft = after.find((f) => f.feature === "draft-plan")!;
-    expect(draft.inEffect).toBe("@cf/meta/llama-3.3-70b-instruct-fp8-fast");
-    expect(draft.decidedBy).toBe("workspace");
+    expect((await owner.call("/api/ai.models.choose", { action: "draft-plan", model: other.id })).status).toBe(200);
 
-    /* ⚠️ Clearing is expressible, or going back to the product's default would
-       be a thing a workspace could do once and never undo. */
-    expect((await owner.call("/api/ai.models.choose", { feature: "draft-plan" })).status).toBe(200);
-    const back = (await owner.get("/api/ai.models.list")).body.features as unknown as
-      { feature: string; decidedBy: string | null }[];
-    expect(back.find((f) => f.feature === "draft-plan")!.decidedBy).toBe("manifest");
+    const after = (await owner.get("/api/ai.models.list")).body.actions as unknown as
+      { action: string; inEffect: string | null; decidedBy: string | null }[];
+    const picked = after.find((a) => a.action === "draft-plan")!;
+    expect(picked.inEffect).toBe(other.id);
+    expect(picked.decidedBy).toBe("workspace");
+
+    /* ⚠️ Clearing is expressible, or going back to the deployment's own pick
+       would be a thing a workspace could do once and never undo. */
+    expect((await owner.call("/api/ai.models.choose", { action: "draft-plan" })).status).toBe(200);
+    const back = (await owner.get("/api/ai.models.list")).body.actions as unknown as
+      { action: string; decidedBy: string | null }[];
+    expect(back.find((a) => a.action === "draft-plan")!.decidedBy).toBe("catalogue");
   });
 
   /*
@@ -459,13 +471,52 @@ describe("which model runs a feature here", () => {
     be a row resolving to the default forever — a setting that appears to have
     been saved and changes nothing.
   */
-  it("refuses a model that cannot do what the feature asks", async () => {
-    const out = await owner.call("/api/ai.models.choose", { feature: "label-reader", model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast" });
-    expect(out.status).toBe(400);
+  it("refuses a model that cannot do what the action asks", async () => {
+    const actions = (await owner.get("/api/ai.models.list")).body.actions as unknown as
+      { action: string; options: { id: string }[] }[];
+    const textOnly = actions.find((a) => a.action === "draft-plan")!.options[0]!.id;
+    expect((await owner.call("/api/ai.models.choose", { action: "label-reader", model: textOnly })).status).toBe(400);
   });
 
-  it("refuses a feature this product does not have", async () => {
-    expect((await owner.call("/api/ai.models.choose", { feature: "invented", model: "gemini-2.5-flash" })).status).toBe(400);
+  it("refuses an action this product does not have", async () => {
+    expect((await owner.call("/api/ai.models.choose", { action: "invented", model: "gemini-2.5-flash" })).status).toBe(400);
+    expect((await owner.call("/api/ai.prompt.set", { action: "invented", prompt: "hello" })).status).toBe(400);
+  });
+
+  /*
+    ⚠️ THE WORKSPACE'S OWN WORDS, AND ONLY THE USER HALF. A studio that could
+    rewrite the system text could turn a nutrition assistant into anything at all
+    with Kova's name still on the answer; what it decides is what goes in FRONT
+    of a request — measured and paid for like any other words.
+  */
+  it("keeps what this workspace wants mentioned, and sends it in front of the request", async () => {
+    expect((await owner.call("/api/ai.prompt.set", { action: "draft-plan", prompt: "Everything in German." })).status).toBe(200);
+
+    const actions = (await owner.get("/api/ai.models.list")).body.actions as unknown as
+      { action: string; prompt: string }[];
+    expect(actions.find((a) => a.action === "draft-plan")!.prompt).toBe("Everything in German.");
+  });
+
+  /*
+    ⚠️ AND SETTING ONE DOES NOT CLEAR THE OTHER. The model and the preamble share
+    a row, so two `INSERT … ON CONFLICT` statements each naming their own column
+    is the shape where the second one's defaults silently overwrite the first.
+  */
+  it("does not lose the model when the prompt is set, or the prompt when the model is", async () => {
+    const first = (await owner.get("/api/ai.models.list")).body.actions as unknown as
+      { action: string; inEffect: string | null; options: { id: string }[] }[];
+    const draft = first.find((a) => a.action === "draft-plan")!;
+    const other = draft.options.find((o) => o.id !== draft.inEffect) ?? draft.options[0]!;
+
+    await owner.call("/api/ai.models.choose", { action: "parse-food", model: other.id });
+    await owner.call("/api/ai.prompt.set", { action: "parse-food", prompt: "Metric only." });
+
+    const after = (await owner.get("/api/ai.models.list")).body.actions as unknown as
+      { action: string; inEffect: string | null; decidedBy: string | null; prompt: string }[];
+    const food = after.find((a) => a.action === "parse-food")!;
+    expect(food.decidedBy).toBe("workspace");
+    expect(food.inEffect).toBe(other.id);
+    expect(food.prompt).toBe("Metric only.");
   });
 });
 

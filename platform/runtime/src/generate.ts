@@ -15,8 +15,8 @@
  * production by getting a config wrong and the other is not reachable at all.
  */
 
-import type { AiSpec, InferenceHandle, Instant, Rates, SchemaModule, SqlHandle } from "@one/kernel";
-import { chooseModel, planFeature, settle } from "@one/kernel";
+import type { AiSpec, Catalogue, InferenceHandle, Instant, SchemaModule, SqlHandle } from "@one/kernel";
+import { attaches, chooseModel, planAction, produces, settle } from "@one/kernel";
 import { balanceFor, refundCredits, spendCredits } from "./account-billing.js";
 
 /** The unit every generation is priced in. One word, so two apps cannot disagree. */
@@ -44,34 +44,45 @@ export const GENERATION_SCHEMA: SchemaModule = {
       which is why there is nothing to migrate when a catalogue changes and why a
       workspace that never opened the screen behaves like every other one.
     */
-    `CREATE TABLE IF NOT EXISTS ai_choice (tenant_id TEXT NOT NULL, feature TEXT NOT NULL, model_id TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (tenant_id, feature));`,
+    /*
+      ⚠️ AND THE WORDS IT PUTS IN FRONT OF EVERY REQUEST. The system text stays
+      the app's — it is what makes an action do what the product promises — but
+      what a workspace wants emphasised is the workspace's, and without somewhere
+      to say it the only way to change an answer's shape is to fork the product.
+
+      ⚠️ MEASURED WITH THE PROMPT, never appended after. See `planAction`: a
+      preamble the reserve never saw is a standing discount on every call.
+    */
+    `CREATE TABLE IF NOT EXISTS ai_choice (tenant_id TEXT NOT NULL, feature TEXT NOT NULL, model_id TEXT NOT NULL DEFAULT '', prompt TEXT NOT NULL DEFAULT '', at TEXT NOT NULL, PRIMARY KEY (tenant_id, feature));`,
   ],
   scoped: { tenantColumn: "tenant_id", tenantTables: ["generation", "ai_choice"] },
 };
 
 /* ------------------------------------------------------------- the choice --- */
 
-/** What this workspace has picked, by feature. Absent keys mean the default. */
-export async function choicesOf(db: SqlHandle, tenantId: string): Promise<Readonly<Record<string, string>>> {
-  const rows = await db.all<{ feature: string; model_id: string }>(
-    /* unbounded-read: one row per feature this app declares, which is a
-       manifest-sized constant rather than anything a workspace can grow. */
-    `SELECT feature, model_id FROM ai_choice WHERE tenant_id = ?`, tenantId,
-  ).catch(() => []);
-  return Object.fromEntries(rows.map((r) => [r.feature, r.model_id]));
+/** What one workspace has decided about one action. */
+export interface Choice {
+  readonly model: string;
+  readonly prompt: string;
 }
 
+export const NO_CHOICE: Choice = { model: "", prompt: "" };
+
 /**
- * ⚠️ WHAT THE OPERATOR TURNED OFF, NOT WHAT THEY TURNED ON.
+ * What this workspace has decided, by action. Absent keys mean the default.
  *
- * Storing the enabled set would mean a model added to the catalogue is invisible
- * until somebody goes and enables it — so shipping a new model would silently
- * reach nobody, which is the same failure as shipping one nobody disclosed. A
- * disabled list is empty on a fresh deployment and every catalogue entry is
- * offered, which is what an operator who has expressed no view means.
+ * ⚠️ ONE READ FOR BOTH HALVES. The model and the preamble are decided on the
+ * same screen and needed by the same call, and two lookups is two chances to run
+ * one workspace's model against another's words.
  */
-export const disabledFrom = (value: string | undefined): readonly string[] =>
-  (value ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+export async function choicesOf(db: SqlHandle, tenantId: string): Promise<Readonly<Record<string, Choice>>> {
+  const rows = await db.all<{ feature: string; model_id: string; prompt: string }>(
+    /* unbounded-read: one row per action this app declares, which is a
+       manifest-sized constant rather than anything a workspace can grow. */
+    `SELECT feature, model_id, prompt FROM ai_choice WHERE tenant_id = ?`, tenantId,
+  ).catch(() => []);
+  return Object.fromEntries(rows.map((r) => [r.feature, { model: r.model_id, prompt: r.prompt }]));
+}
 
 /* -------------------------------------------------------------- the day --- */
 
@@ -113,13 +124,12 @@ export interface GenerateInput {
   readonly db: SqlHandle;
   readonly ai: AiSpec | undefined;
   /**
-   * ⚠️ THE DEPLOYMENT'S OWN RATES, WHICH WIN OVER THE MANIFEST'S. A manifest is
-   * a deploy and a price change is not, so the declared catalogue is a floor and
-   * a shared, correctable rate is preferred — because an out-of-date rate is not
-   * a cosmetic error: the reserve caps what may be charged, so every unit it
-   * fails to count is one the platform pays for and nobody is billed.
+   * ⚠️ THE DEPLOYMENT'S CATALOGUE, WHICH IS THE ONLY PLACE MODELS COME FROM. An
+   * app declares actions and no models at all: a manifest is a deploy and a
+   * price change is not, and a model an operator adds has to reach every product
+   * without one of them being edited.
    */
-  readonly rates?: Rates;
+  readonly catalogue: Catalogue;
   /** ⚠️ Null where the deployment binds no model runner. Refused, never mocked. */
   readonly inference: InferenceHandle | null;
   /**
@@ -129,8 +139,13 @@ export interface GenerateInput {
    * as a provider error months after the change that caused it.
    */
   readonly chosenModel?: string | null;
-  /** What the operator turned off, deployment-wide. */
-  readonly disabledModels?: readonly string[];
+  /**
+   * ⚠️ THE WORKSPACE'S OWN WORDS IN FRONT OF THE PROMPT, and they are MEASURED.
+   * `planAction` composes and prices them together and hands back exactly what
+   * will be sent, so there is no path on which a preamble reaches a provider
+   * without having reached the reserve first.
+   */
+  readonly preamble?: string;
   readonly tenantId: string;
   /**
    * ⚠️ THE GLOBAL STORE, BECAUSE THE BALANCE IS THE ACCOUNT'S. Credits are bought
@@ -175,8 +190,8 @@ export interface GenerateInput {
  * `try` quietly skips.
  */
 export async function generate(input: GenerateInput): Promise<Generated> {
-  const feature = input.ai?.features[input.feature];
-  if (!feature || !input.ai) return { ok: false, why: "unknown_feature" };
+  const action = input.ai?.actions[input.feature];
+  if (!action || !input.ai) return { ok: false, why: "unknown_feature" };
 
   /*
     ⚠️ NO RUNNER IS A REFUSAL AND NEVER A FALLBACK. This is the whole reason the
@@ -195,25 +210,31 @@ export async function generate(input: GenerateInput): Promise<Generated> {
   */
   const decided = chooseModel({
     ai: input.ai,
-    feature: input.feature,
+    catalogue: input.catalogue,
+    action: input.feature,
     chosen: input.chosenModel ?? null,
-    disabled: input.disabledModels ?? [],
     permitted: input.inference.permitted,
-    rates: input.rates ?? {},
   });
   if (!decided.ok) {
-    /* ⚠️ Which layer refused travels with the refusal: asking an operator to
-       enable one, picking another, and accepting that a region permits none are
-       three different things to go and do. */
-    if (decided.why === "unknown_feature") return { ok: false, why: "unknown_feature" };
+    /* ⚠️ Which layer refused travels with the refusal: asking an operator to add
+       or enable one, picking another, and accepting that a region permits none
+       are three different things to go and do. */
+    if (decided.why === "unknown_action") return { ok: false, why: "unknown_feature" };
     return {
       ok: false, why: "unconfigured",
-      meta: { reason: decided.why === "none_permitted" ? "no model this region permits can do this" : "the model this feature names is not in the catalogue" },
+      meta: {
+        reason: decided.why === "none_permitted"
+          ? "no model this region permits can do this"
+          : "this deployment has no model in that lane",
+      },
     };
   }
+  /* ⚠️ ALREADY PRICED — `chooseModel` is the only way to a model, and it applies
+     the markup on the way out. The reserve below and the settle at the bottom
+     read the same numbers because there is only one set. */
   const model = decided.model;
 
-  const run = planFeature(input.ai, input.feature, input.prompt, input.rates ?? {}, model.id);
+  const run = planAction(input.ai, input.feature, input.prompt, model, input.preamble ?? "");
   if (!run) return { ok: false, why: "unknown_feature" };
 
   /*
@@ -223,16 +244,16 @@ export async function generate(input: GenerateInput): Promise<Generated> {
     A feature that declared one and was sent nothing is a request the model
     cannot answer, refused here rather than as a provider error somebody retries.
   */
-  if (feature.takes === "image" && !input.image) {
+  if (attaches(action.lane) && !input.image) {
     return { ok: false, why: "unconfigured", meta: { reason: "this asks for a picture and none was given" } };
   }
-  if (feature.takes !== "image" && input.image) {
+  if (!attaches(action.lane) && input.image) {
     return { ok: false, why: "unconfigured", meta: { reason: "this takes no picture" } };
   }
 
   const used = await spentToday(input.db, input.tenantId, input.actorId, input.feature, input.at);
-  if (used >= feature.dailyPerPerson) {
-    return { ok: false, why: "daily_ceiling", meta: { limit: String(feature.dailyPerPerson), used: String(used) } };
+  if (used >= action.dailyPerPerson) {
+    return { ok: false, why: "daily_ceiling", meta: { limit: String(action.dailyPerPerson), used: String(used) } };
   }
 
   const held = run.reserve;
@@ -261,12 +282,18 @@ export async function generate(input: GenerateInput): Promise<Generated> {
   let reported: number | null = null;
   let failed = false;
   try {
+    /*
+      ⚠️ BOTH TEXTS COME OFF THE `Run`, NEVER OFF THE INPUT. `run.prompt` is the
+      workspace's preamble and the caller's request composed — and priced. Sending
+      `input.prompt` here would send one document and charge for another, which is
+      the shape the whole `planRun`/`planAction` return value exists to prevent.
+    */
     const answer = await input.inference.run(model.id, {
       system: run.system,
-      prompt: input.prompt,
-      maxOutput: feature.maxOutput,
+      prompt: run.prompt,
+      maxOutput: action.maxOutput,
       ...(input.image ? { image: input.image } : {}),
-      ...(feature.produces === "image" ? { produces: "image" as const, images: feature.images ?? 1 } : {}),
+      ...(produces(action.lane) ? { produces: action.lane, outputs: action.outputs ?? 1 } : {}),
     });
     output = (answer as { output?: unknown })?.output ?? answer;
     /*
@@ -275,7 +302,14 @@ export async function generate(input: GenerateInput): Promise<Generated> {
       reading a usage block here would let a provider that returns one for its
       text models discount every image by whatever happened to be in it.
     */
-    reported = feature.produces === "image" ? null : usageOf(answer, model.rate);
+    /*
+      ⚠️ A PRODUCING LANE SETTLES AT THE RESERVE, ALWAYS. There are no units to
+      report and nothing a provider could say that would make the picture, the
+      clip or the video cheaper — so reading a usage block here would let a
+      provider that returns one for its text models discount every image by
+      whatever happened to be in it.
+    */
+    reported = produces(action.lane) ? null : usageOf(answer, model.rate);
   } catch {
     failed = true;
   }

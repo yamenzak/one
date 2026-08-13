@@ -212,12 +212,26 @@ describe("a photograph handed to a model", () => {
     expect((out.body.read as unknown as { name: string }).name).toBe("Oats");
   });
 
-  /* ⚠️ A lab report goes to the reasoning model, because a misread digit here is
-     a clinical figure somebody acts on. */
-  it("sends a lab report to the model that reasons", async () => {
+  /*
+    ⚠️ A LAB REPORT GOES TO THE DEAREST MODEL IN ITS LANE, because a misread digit
+    here is a clinical figure somebody acts on. Kova no longer names a model —
+    the catalogue is the deployment's — so what it says instead is
+    `prefer: "capable"`, and the assertion is that this action is answered by a
+    different, dearer model than the ordinary reads beside it.
+
+    ⚠️ ASSERTED AGAINST ITS NEIGHBOUR RATHER THAN AGAINST AN ID. A pinned id
+    would pass on a deployment whose catalogue named that model the cheapest,
+    which is the exact regression this replaced.
+  */
+  it("sends a lab report to a dearer model than an ordinary read", async () => {
     provider.answer = { output: { values: [] } };
     await coach.call("/api/ai.lab-extract", { photo: meal });
-    expect(provider.calls[0]!.model).toBe("gemini-2.5-pro");
+    const clinical = provider.calls[0]!.model;
+
+    provider.calls.length = 0;
+    provider.answer = { output: { foods: [] } };
+    await coach.call("/api/ai.snap-meal", { photo: meal });
+    expect(provider.calls[0]!.model).not.toBe(clinical);
   });
 
   /*

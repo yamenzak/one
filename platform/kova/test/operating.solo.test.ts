@@ -483,44 +483,54 @@ describe("what a model costs", () => {
   const balance = async () =>
     Number((await coach("/api/ai.spending")).body.balance);
 
-  it("shows the app's own models, priced by the manifest until somebody says otherwise", async () => {
+  /*
+    ⚠️ THE CATALOGUE IS THE DEPLOYMENT'S, AND KOVA DECLARES NO MODELS. It used to
+    declare five, so a model an operator added reached nobody until this app was
+    edited and redeployed, and a model a provider retired left every studio
+    pointing at something that had stopped answering. What Kova declares is an
+    ACTION and the LANE it needs; what is in a lane is this screen.
+  */
+  it("lists what the deployment has, not what the app declares", async () => {
     const out = await operator("/api/admin.models");
     expect(out.status).toBe(200);
-    const models = out.body.models as unknown as { id: string; rate: { input: number; output: number }; source: string }[];
-    const flash = models.find((m) => m.id === "gemini-2.5-flash")!;
-    expect(flash.rate).toEqual({ input: 1, output: 4 });
-    expect(flash.source).toBe("app");
-  });
-
-  it("charges at the manifest's rate before anything is published", async () => {
-    attach();
-    await operator("/api/admin.topup", { tenantId, amount: 200_000, reason: "for the rate test", ref: "rates-1" });
-    const before = await balance();
-    /* 10 × 1 + 10 × 4 = 50 */
-    expect((await coach("/api/ai.draft-plan", { brief: "four weeks for a beginner, twice a week" })).status).toBe(200);
-    expect(before - (await balance())).toBe(50);
+    const models = out.body.models as unknown as { id: string; lane: string; enabled: boolean }[];
+    expect(models.find((m) => m.id === "gemini-2.5-flash")).toBeTruthy();
+    /* ⚠️ And every lane the meter can price travels with it, so the console
+       renders the choice from what the platform supports. */
+    expect(out.body.lanes).toContain("vision");
   });
 
   /*
-    ⚠️ AND PUBLISHING ONE CHANGES WHAT IS CHARGED, WITHOUT A DEPLOY. That is the
-    difference between a price list a person can correct in a minute and one that
-    waits for a release — and while it waits, the platform is paying.
+    ⚠️ ADDING ONE CHANGES WHAT EVERY PRODUCT CAN RUN, WITHOUT A DEPLOY. That is
+    the difference between a catalogue a person can correct in a minute and one
+    that waits for a release — and while it waits, every product is stuck with
+    whatever shipped.
   */
-  it("charges at the published rate once one exists", async () => {
-    attach();
-    expect((await operator("/api/admin.models.rate", { id: "gemini-2.5-flash", input: 2, output: 8 })).status).toBe(200);
+  it("takes a new model and offers it to the actions in its lane", async () => {
+    expect((await operator("/api/admin.models.set", {
+      id: "brand-new-model", provider: "gemini", lane: "text", input: 1, output: 3, markup: 1.5,
+    })).status).toBe(200);
 
-    const models = (await operator("/api/admin.models")).body.models as unknown as { id: string; rate: { input: number; output: number }; source: string; declared: { input: number } }[];
-    const flash = models.find((m) => m.id === "gemini-2.5-flash")!;
-    expect(flash.rate).toEqual({ input: 2, output: 8 });
-    expect(flash.source).toBe("shared");
-    /* ⚠️ What the app shipped with is still shown, so a stale rate is visible. */
-    expect(flash.declared.input).toBe(1);
+    const actions = (await coach("/api/ai.models.list")).body.actions as unknown as
+      { action: string; options: { id: string }[] }[];
+    expect(actions.find((a) => a.action === "draft-plan")!.options.map((o) => o.id)).toContain("brand-new-model");
+  });
 
-    const before = await balance();
-    /* 10 × 2 + 10 × 8 = 100 */
-    expect((await coach("/api/ai.draft-plan", { brief: "four weeks for a beginner, twice a week" })).status).toBe(200);
-    expect(before - (await balance())).toBe(100);
+  /*
+    ⚠️ COST AND PRICE ON THE SAME ROW. Either alone answers neither question an
+    operator has — "are we losing money on this" needs both, and a markup shown
+    without the number it multiplies is a percentage of something invisible.
+  */
+  it("shows what a model costs beside what it is sold for", async () => {
+    await operator("/api/admin.models.set", {
+      id: "marked-up", provider: "gemini", lane: "text", input: 2, output: 10, markup: 1.5,
+    });
+    const models = (await operator("/api/admin.models")).body.models as unknown as
+      { id: string; cost: { input: number }; price: { input: number; output: number }; markup: number }[];
+    const m = models.find((x) => x.id === "marked-up")!;
+    expect(m.cost.input).toBe(2);
+    expect(m.price).toMatchObject({ input: 3, output: 15 });
+    expect(m.markup).toBe(1.5);
   });
 
   /*
@@ -529,25 +539,61 @@ describe("what a model costs", () => {
     the provider invoices as usual.
   */
   it("refuses a rate of zero", async () => {
-    const out = await operator("/api/admin.models.rate", { id: "gemini-2.5-flash", input: 0, output: 8 });
+    const out = await operator("/api/admin.models.set", {
+      id: "gemini-2.5-flash", provider: "gemini", lane: "text", input: 0, output: 8, markup: 1.4,
+    });
     expect(out.status).toBe(400);
-    expect(out.body.meta).toMatchObject({ field: "rate" });
   });
 
   /*
-    ⚠️ AND A RATE CANNOT INVENT A MODEL. Nothing here supplies a system text, an
-    output ceiling or a daily bound, so a catalogue row saved for a model this
-    app does not declare is a number an operator can see and no reserve reads.
+    ⚠️ AND A MARKUP OF ZERO SELLS EVERY CALL AT COST. It is the likeliest of the
+    refusals to be typed, because zero is what an empty box means.
   */
-  it("refuses a model this app does not declare", async () => {
-    const out = await operator("/api/admin.models.rate", { id: "gpt-9-ultra", input: 1, output: 1 });
-    expect(out.status).toBe(400);
-    expect(out.body.meta).toMatchObject({ field: "id" });
+  it("refuses a markup that sells at or below cost", async () => {
+    expect((await operator("/api/admin.models.set", {
+      id: "gemini-2.5-flash", provider: "gemini", lane: "text", input: 1, output: 4, markup: 0,
+    })).status).toBe(400);
+  });
+
+  /*
+    ⚠️ AND AN ATTACHING LANE WITH NO ATTACHMENT PRICE IS THE EXPENSIVE ONE,
+    because it SUCCEEDS: the reserve is computed from the words alone and the
+    platform pays for every picture, scaling with use.
+  */
+  it("refuses a vision model that prices no picture", async () => {
+    expect((await operator("/api/admin.models.set", {
+      id: "blind", provider: "gemini", lane: "vision", input: 1, output: 4, markup: 1.4,
+    })).status).toBe(400);
+  });
+
+  /*
+    ⚠️ TAKING ONE OUT OF SERVICE IS NOT DELETING IT. The row carries the rate
+    every past generation was settled against; deleting it makes a bill
+    unreadable to answer a question a switch answers.
+  */
+  it("takes a model out of service without losing it", async () => {
+    await operator("/api/admin.models.set", {
+      id: "retiring", provider: "gemini", lane: "text", input: 1, output: 4, markup: 1.4,
+    });
+    expect((await operator("/api/admin.models.enabled", { id: "retiring", enabled: false })).status).toBe(200);
+
+    const models = (await operator("/api/admin.models")).body.models as unknown as { id: string; enabled: boolean }[];
+    expect(models.find((m) => m.id === "retiring")!.enabled).toBe(false);
+
+    const actions = (await coach("/api/ai.models.list")).body.actions as unknown as
+      { action: string; options: { id: string }[] }[];
+    expect(actions.find((a) => a.action === "draft-plan")!.options.map((o) => o.id)).not.toContain("retiring");
+  });
+
+  it("refuses to take out of service a model nobody added", async () => {
+    expect((await operator("/api/admin.models.enabled", { id: "never-existed", enabled: false })).status).toBe(400);
   });
 
   it("is not reachable from inside a studio", async () => {
     expect((await coach("/api/admin.models")).status).toBe(403);
-    expect((await coach("/api/admin.models.rate", { id: "gemini-2.5-flash", input: 1, output: 1 })).status).toBe(403);
+    expect((await coach("/api/admin.models.set", {
+      id: "gemini-2.5-flash", provider: "gemini", lane: "text", input: 1, output: 1, markup: 1.4,
+    })).status).toBe(403);
   });
 });
 

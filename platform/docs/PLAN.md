@@ -1329,7 +1329,7 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-refusal-is-not-a-crash` | reaching for a store that is not there, which throws into the same 503 a stated refusal produces — so the status alone cannot tell 'we told you' from 'it fell over' | **live** |
 | `a-rate-is-corrected-in-one-place` | a price change that waits for a deploy per app — and while it waits, the reserve under-counts and the platform pays the difference on every call | **live** |
 | `a-published-rate-cannot-be-unmetered` | one row making a model free for every app behind the store, while the provider invoices as usual | **live** |
-| `a-catalogue-row-cannot-become-a-feature` | a rate saved for something no reserve reads, because the system text, the output ceiling and the daily bound are the app's and nothing here supplies them | **live** |
+| `a-catalogue-row-cannot-become-a-feature` | a catalogue row becoming a capability. It used to be checked by refusing a rate for a model the app did not declare; an app declares no models now, so the check moved to the LANE — a row in a lane the meter cannot price is refused on the way in, and a row in a lane no action asks for is simply never offered. Nothing in a catalogue can supply a system text, an output ceiling or a daily bound, so it still cannot become an action | **live** |
 | `unbound-changes-nothing` | a single-app deployment broken by a sharing mechanism it does not use | **live** |
 | `nothing-leaves-while-anything-is-missing` | a best-effort send to nobody, or a queued retry — either way a person waiting for a code that was never addressed to anybody | **live** |
 | `the-recorded-provider-is-a-choice` | a fallback reachable by getting config wrong — a production deployment recording its sign-in codes in a map and answering as though the mail went out | **live** |
@@ -1436,7 +1436,7 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `an-undeclared-region-is-refused` | a workspace quietly placed somewhere other than where it asked to be, which is the one failure residency cannot have and a default is exactly how it happens | **live** |
 | `the-model-is-the-workspace-s-decision` | a manifest naming one model for every workspace on every deployment — 'which company reads my clients' records' decided by whoever wrote the catalogue | **live** |
 | `a-stale-choice-does-not-pin-a-workspace` | a workspace pinned to a model an operator disabled or a region stopped permitting, surfacing as a provider error months after the change that caused it | **live** |
-| `the-region-outranks-the-manifest` | a product's default model running in a region that does not permit it, for every workspace that never chose one — which is the exact promise residency is | **live** |
+| `the-region-outranks-the-manifest` | a workspace that chose the EU having its photographs sent to exactly the same models as everybody else. The allow-list is by PROVIDER rather than by model id, and that changed with the catalogue: by id it was a manifest that had to be redeployed whenever an operator added a row, and a provider is what a processing agreement actually names. It is also the filter that stops an operator adding a provider from silently routing one product's data to a company that product never disclosed | **live** |
 | `a-model-is-never-substituted` | quietly running a different model than the one decided — a workspace's data sent to a company it did not choose, at a price nobody quoted, with the bill as the only signal | **live** |
 | `the-reserve-budgets-what-runs` | a reserve computed for the manifest's model while a workspace's dearer choice runs — the cap settles at the cheap price and the platform pays the difference on every call, silently | **live** |
 | `a-model-suits-what-it-is-priced-for` | a vision feature pointed at a text model, whose reserve is computed from the prompt alone and settles at almost nothing while the platform pays for every picture | **live** |
@@ -1534,6 +1534,13 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `one-table-one-store` | a table name declared on both sides reading as a duplicate when it is a silent divergence. Every statement is `CREATE TABLE IF NOT EXISTS`, so whichever runner reaches it first decides the shape and the loser's columns never exist — no error, no warning, and the first symptom is a query naming a column that is simply not there. It has happened one store over, and it took every route touching the database down rather than degrading a feature | **live** |
 | `a-global-module-says-which-of-five-reasons-put-it-there` | the NEXT settings-shaped table added to the store every worker shares. Naming one module catches the decision already taken and nothing about the next one, and the difference cannot be derived from a table's shape — `membership_directory` is tenant-scoped and correctly global. So the question is asked of the author instead, and it works because the vocabulary is CLOSED: a required free-text reason is a required sentence, and a sentence can be written about anything, so whoever was moving the wrong table would have written a true one. Five words — routing, account, money, declaration, deployment — none of which means "a workspace's own records", so a table that belongs in a region has nothing to say. `GlobalReason` refuses a sixth at compile time | **live** |
 | `what-a-workspace-chose-stays-in-its-region` | a workspace's settings moved into the store every worker binds by the same id. Four reasons, none visible from a table's shape: RESIDENCY — its settings are its records, and they live where its records live; ACROSS — the global store is bound into every product's worker, and unlike the vault there is no grant algebra in front of these rows; HOT PATH — branding and wording are read per request by the app to draw its own sign-in screen; ERASURE — `scoped` declares these tables regionally and the purge cascade is derived from it, so a table that changed store without the cascade following is a deleted workspace that keeps its configuration while the sweep reports success. Where something is genuinely needed before a region is known the answer is to publish a COPY and keep the regional row authoritative, as `publishBranding` does — never the reverse | **live** |
+| `the-catalogue-is-the-deployments-not-the-apps` | a model an operator adds reaching nobody. The catalogue used to be declared per app, with the shared store correcting the RATES of models an app had already named — so adding one meant editing and redeploying every product, and a model a provider retired left each of them pointed at something that had stopped answering. An app declares an ACTION and the LANE it needs; what is in a lane is one list, typed once, behind every product | **live** |
+| `a-markup-is-applied-exactly-once` | both directions, and both are silent. Not applied at all is every generation sold at cost forever — a defect with no symptom but the revenue nobody sees. Applied twice is a workspace whose credits drain at double the rate it was quoted. The `Priced` type is what makes one place responsible: `chooseModel` is the only way to a model and it marks up on the way out, and `priced` is idempotent so a second application is arithmetic that changes nothing | **live** |
+| `the-reserve-is-computed-from-the-price` | a reserve held at COST. `settle` caps the charge at what was held, so a reserve computed from the provider's rate caps the charge there too and the platform's margin is silently zero on every call — the reserve is a ceiling on revenue, not an estimate | **live** |
+| `a-workspaces-preamble-is-measured` | a standing discount on every call, growing with however much somebody typed into a settings box once. The words a workspace puts in front of a request are sent, so they are priced — and `planAction` returns the COMPOSED prompt beside the reserve, so there is no path on which a caller sends one document and pays for another | **live** |
+| `an-action-may-ask-for-the-capable-model` | a clinical reading answered by whichever model happened to be cheapest. Naming a model was how a product used to say this, and losing it with the catalogue was a real regression rather than a simplification — a misread lab figure is a number a coach acts on. `prefer: "capable"` means dearest in the lane, and price is the only capability signal a catalogue actually carries | **live** |
+| `a-catalogue-row-that-cannot-be-metered-is-refused` | a row that succeeds and is unmetered, for every product behind the store at once. A rate of zero makes the reserve zero, the settle zero and the balance never move while the provider invoices as usual; a markup of zero sells every call at cost; and an attaching lane with no attachment price is the expensive one because it SUCCEEDS — the reserve is computed from the words alone and the platform pays for every picture, scaling with use | **live** |
+| `one-writer-for-both-halves-of-a-choice` | a workspace's model quietly cleared by saving its wording. The two share a row, so two `INSERT … ON CONFLICT` statements each naming their own column is the shape where the second one's column defaults overwrite the first — and what it produces is a setting that saved successfully and reverted | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 
@@ -1778,6 +1785,7 @@ written.
 | `ConfigRegistry` (`kernel/config.ts`) | the deployment's configuration, per app and shared, with a secret write-only |
 | `app.access.plans` + `entitlements` | the catalogue: price, trial, ceilings, and what an edit is allowed to move |
 | the customer rail's sellable flags | what a workspace may sell its own customers, and what a package includes |
+| `AiSpec.actions` (`kernel/generation.ts`) | a workspace's AI settings: every action a product declares, which model answers it, and what the workspace wants mentioned first |
 
 **Shipped 2026-08-13.** `publishApp` puts each product's declaration in the store
 every product reads — one call, because three publishers is two too many to
@@ -1815,6 +1823,86 @@ from quietly rendering an empty card in place of an answer.
      it does not bind. Until then it is the app door's own act. -->
 
 ---
+
+
+### 7.8 The model catalogue is the deployment's
+
+**Shipped 2026-08-14.** An app used to declare its own models AND its own
+features, with the shared store correcting the RATES of models the app had
+already named. Every consequence of that was in the wrong direction:
+
+- a model an operator added reached **nobody** until every product was edited and
+  redeployed — `admin.models.rate` explicitly refused a model the app did not
+  declare;
+- a model a provider retired left every product pointing at something that had
+  stopped answering;
+- and there was **no markup anywhere**. Rates were the provider's cost, so the
+  platform charged a tenant exactly what it paid.
+
+**An app declares an ACTION and the LANE it needs.** The catalogue is one list an
+operator types once for every product behind the deployment, and the six lanes
+are the modalities the meter can price:
+
+| lane | shape | priced |
+|---|---|---|
+| `text` | words in, words out | per unit |
+| `vision` | a picture in, words out | per unit + the attachment's own units |
+| `transcribe` | a recording in, words out | per unit + the attachment's own units |
+| `image` | words in, pictures out | per thing produced |
+| `speech` | words in, a voice out | per thing produced |
+| `video` | words in, video out | per thing produced |
+
+⚠️ **"Short text" is not a lane, and it was asked for.** It is a SIZE, and an
+action already declares its own in `maxOutput`. As a lane it would refuse every
+capable model — a large model produces a short answer perfectly well — so a
+`brief` action offered only `brief` models would hide the catalogue behind a
+distinction with no fact under it.
+
+**Four layers decide which model runs**, and each is a different person's:
+the operator fills and enables the catalogue; the region refuses providers it
+does not permit; the workspace picks from what is left, because *which company
+reads my clients' photographs* is its decision; and where nobody picked, the
+**cheapest** eligible model runs — cheapest rather than first, because a
+catalogue's order is whatever an operator typed and "first" is a price nobody
+decided, charged to every workspace that never opened the screen.
+
+⚠️ **`prefer: "capable"` is what an app says instead of naming a model**, and
+losing it was a real regression rather than a simplification. Kova's
+`lab-extract` reads a lab report; a misread digit is a clinical figure a coach
+acts on, and answering it with whichever model happened to cost least is the
+failure that matters. "Capable" means dearest in the lane — price is the only
+capability signal a catalogue actually carries, and a quality score would be a
+second opinion an operator has to maintain and would be wrong the week after it
+was typed.
+
+⚠️ **THE ALLOW-LIST IS BY PROVIDER NOW, NOT BY MODEL.** By id it was a manifest
+that had to be redeployed whenever an operator added a row — the exact problem
+the catalogue move exists to remove. A provider is stable and is what a
+processing agreement names, so the disclosure check derives from it
+(`providersOf`); and it is the filter that stops an operator adding a provider
+from silently routing one product's data to a company that product never
+disclosed.
+
+**The markup is per model and applied exactly once.** Per model rather than
+deployment-wide because margins are not uniform — one number means the operator
+sets it by the worst case and overcharges for the rest. Exactly once because
+both failures are silent: never applied is every generation sold at cost
+forever, twice is a workspace whose credits drain at double the quoted rate.
+`Priced` is a branded type only `chooseModel` mints, `priced` is idempotent, and
+the reserve is computed from the price — held at cost, `settle` caps the charge
+there and the margin is silently zero on every call.
+
+**A workspace also sets the USER prompt, and only that half.** The system text is
+the product's and is editable nowhere: a workspace that could rewrite it could
+turn a nutrition assistant into anything at all with the product's name still on
+the answer. What it decides is what goes in FRONT of a request — and it is
+MEASURED, because `planAction` composes and prices both texts and returns them
+together. Appended after the reserve it would be a standing discount on every
+call, growing with however much somebody typed into a settings box once.
+
+The surfaces are `ModelsScreen` (the operator's, on the hub's console beside the
+shared keys) and `AiScreen` (the workspace's, which names no action and no model
+— both come from the server, so a screen cannot offer what a save refuses).
 
 ## 8. Stages
 

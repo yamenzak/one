@@ -187,6 +187,21 @@ export function WorkspaceScreen({
         ⚠️ AND THE SETTINGS ARE WHATEVER THE PRODUCT DECLARES. Nothing below names
         one — see the header.
       */}
+      {/*
+        ⚠️ AND WHAT IT ASKS A MODEL FOR IS ONE LEVEL AWAY rather than on this
+        screen. It is a list per action with a picker and a text box each — a
+        settings screen's worth on its own — and putting it here would bury a
+        workspace's ordinary settings under it.
+      */}
+      {managedHere ? (
+        <Section>
+          <Card>
+            <Item title="AI" detail="Which model answers each thing this product asks, and what to mention first"
+              onGo={() => onGo({ at: "ai", tenant: workspace.tenantId })} />
+          </Card>
+        </Section>
+      ) : null}
+
       {managedHere ? (
         <DeclaredSettings declared={declared} values={values} onSet={onSet} {...(mayWrite ? { mayWrite } : {})} />
       ) : null}

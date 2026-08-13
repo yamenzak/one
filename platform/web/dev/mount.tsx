@@ -49,9 +49,10 @@ import { MarketScreen, ShelfScreen, type Sellable } from "../src/hub/market.js";
 import { PlanScreen, type Holding } from "../src/hub/plan.js";
 import { WorkspaceScreen, type Resolved } from "../src/hub/workspace.js";
 import {
-  ConsoleScreen, KeysScreen, CatalogueScreen, TenantsScreen, MaintenanceScreen, MODES,
-  type Key as ConfigKey, type Tenant,
+  ConsoleScreen, KeysScreen, CatalogueScreen, TenantsScreen, MaintenanceScreen, ModelsScreen, MODES,
+  type Key as ConfigKey, type Model, type Tenant,
 } from "../src/hub/console.js";
+import { AiScreen, type Action } from "../src/hub/ai.js";
 import { SettingsScreen } from "../src/hub/settings.js";
 import type { Declaration } from "../src/hub/declared.js";
 import type { Plan } from "../src/hub/offer.js";
@@ -599,6 +600,64 @@ const CONSOLE_PRODUCTS = [
   renders differently — a workspace with no plan on it, for a reason that is ours
   rather than theirs.
 */
+/*
+  ⚠️ EVERY ROW THAT RENDERS DIFFERENTLY: two lanes, one model turned off, one
+  reasoning model, and one an operator has priced at nothing — which is the row
+  the screen exists to make visible, because it is the one that would otherwise
+  sell every call for free.
+*/
+const MODELS: readonly Model[] = [
+  {
+    id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", provider: "workers-ai", lane: "text", enabled: true,
+    markup: 1.4, thinking: false,
+    cost: { input: 1, output: 2, perOutput: null }, price: { input: 1.4, output: 2.8, perOutput: null }, problems: [],
+  },
+  {
+    id: "gemini-2.5-pro", provider: "gemini", lane: "text", enabled: true, markup: 1.25, thinking: true,
+    cost: { input: 4, output: 16, perOutput: null }, price: { input: 5, output: 20, perOutput: null }, problems: [],
+  },
+  {
+    id: "gemini-2.5-flash", provider: "gemini", lane: "vision", enabled: false, markup: 1.4, thinking: false,
+    cost: { input: 1, output: 4, perOutput: null }, price: { input: 1.4, output: 5.6, perOutput: null }, problems: [],
+  },
+  {
+    id: "gemini-2.5-flash-image", provider: "gemini", lane: "image", enabled: true, markup: 1, thinking: false,
+    cost: { input: 1, output: 4, perOutput: 600 }, price: { input: 1, output: 4, perOutput: 600 },
+    problems: ["has a markup of zero or less, which sells every call at or below cost"],
+  },
+];
+
+const LANES = ["text", "vision", "image", "speech", "transcribe", "video"];
+
+/*
+  ⚠️ AND EVERY STATE AN ACTION CAN BE IN: one the workspace chose, one the
+  deployment chose for it, one whose pick has since been taken out of service,
+  and one nothing on this deployment can run. The last two are the reason this
+  screen says who decided.
+*/
+const ACTIONS: readonly Action[] = [
+  {
+    action: "draft-plan", summary: "A training plan from a sentence", lane: "text",
+    options: [{ id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", provider: "workers-ai" }, { id: "gemini-2.5-pro", provider: "gemini" }],
+    inEffect: "gemini-2.5-pro", decidedBy: "workspace", why: null, stale: false,
+    prompt: "Always answer in German, and never suggest barbell work.",
+  },
+  {
+    action: "parse-food", summary: "A meal described in words, as foods and portions", lane: "text",
+    options: [{ id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", provider: "workers-ai" }],
+    inEffect: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", decidedBy: "catalogue", why: null, stale: false, prompt: "",
+  },
+  {
+    action: "snap-meal", summary: "A photograph of a meal, as foods and portions", lane: "vision",
+    options: [{ id: "gemini-2.5-flash", provider: "gemini" }],
+    inEffect: "gemini-2.5-flash", decidedBy: "workspace", why: null, stale: true, prompt: "",
+  },
+  {
+    action: "image", summary: "A picture for the studio's own use", lane: "image",
+    options: [], inEffect: null, decidedBy: null, why: "none_in_lane", stale: false, prompt: "",
+  },
+];
+
 const CONSOLE_TENANTS: readonly Tenant[] = [
   { tenantId: "t1", appId: "kova", slug: "haddad", region: "eu", standing: "active", reason: "", plan: "Pro", status: "active", reachable: true },
   { tenantId: "t2", appId: "scena", slug: "haddad", region: "eu", standing: "active", reason: "", plan: "Free", status: "active", reachable: true },
@@ -927,6 +986,25 @@ function Preview() {
         product={{ id: where.product, name: titledId(where.product) }}
         plans={which === "waiting" ? null : PLANS.map((p, i) => ({ ...p, ...(i === 1 ? { edited: true } : {}) }))}
         onEdit={() => undefined} onBack={up} Heading={Heading}
+      />
+    ) : at === "models" ? (
+      <ModelsScreen
+        models={which === "waiting" ? null : which === "new" ? [] : MODELS}
+        lanes={LANES}
+        hasShared={asked.get("shared") !== "no"}
+        onEdit={() => undefined}
+        onEnabled={async () => null}
+        onBack={up} Heading={Heading}
+      />
+    ) : at === "ai" ? (
+      <AiScreen
+        actions={which === "waiting" ? null : which === "new" ? [] : ACTIONS}
+        onChoose={async () => null}
+        onPrompt={async () => null}
+        /* ⚠️ `#write=no` is somebody who is not the workspace's owner — the
+           ordinary case, where every control stands down and nothing is hidden. */
+        mayWrite={asked.get("write") !== "no"}
+        onBack={up} Heading={Heading}
       />
     ) : at === "tenants" ? (
       <TenantsScreen

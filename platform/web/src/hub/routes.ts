@@ -62,10 +62,14 @@ export type Where =
   | { readonly at: "product-config"; readonly product: string }
   | { readonly at: "catalogue"; readonly product: string }
   | { readonly at: "shared-config" }
+  /** The deployment's model catalogue — shared, like the keys, and for the same reason. */
+  | { readonly at: "models" }
   | { readonly at: "tenants" }
   | { readonly at: "maintenance" }
   /** One workspace's own settings, rendered from what its product declares. */
   | { readonly at: "workspace"; readonly tenant: string }
+  /** And what it asks a model for — discovered from the same declaration. */
+  | { readonly at: "ai"; readonly tenant: string }
   | { readonly at: "details" }
   | { readonly at: "security" }
   | { readonly at: "preferences"; readonly part?: "appearance" | "reading" | "feedback" }
@@ -95,10 +99,14 @@ export function parseWhere(path: string): Where {
   if (one === "credits") return { at: "credits" };
   if (one === "market") return two ? { at: "shelf", product: two } : { at: "market" };
   if (one === "plan") return two ? { at: "plan", subscription: two } : { at: "market" };
-  if (one === "workspace") return two ? { at: "workspace", tenant: two } : { at: "workspaces" };
+  if (one === "workspace") {
+    if (!two) return { at: "workspaces" };
+    return three === "ai" ? { at: "ai", tenant: two } : { at: "workspace", tenant: two };
+  }
   if (one === "console") {
     if (!two) return { at: "console" };
     if (two === "shared") return { at: "shared-config" };
+    if (two === "models") return { at: "models" };
     if (two === "workspaces") return { at: "tenants" };
     if (two === "maintenance") return { at: "maintenance" };
     /* ⚠️ `console/<product>` is its configuration and `console/<product>/plans`
@@ -138,9 +146,11 @@ export function pathOf(where: Where): string {
     case "shelf": return `market/${where.product}`;
     case "plan": return `plan/${where.subscription}`;
     case "workspace": return `workspace/${where.tenant}`;
+    case "ai": return `workspace/${where.tenant}/ai`;
     case "product-config": return `console/${where.product}`;
     case "catalogue": return `console/${where.product}/plans`;
     case "shared-config": return "console/shared";
+    case "models": return "console/models";
     case "tenants": return "console/workspaces";
     case "maintenance": return "console/maintenance";
     case "preferences": return where.part ? `preferences/${where.part}` : "preferences";
@@ -170,9 +180,10 @@ export function upFrom(where: Where): Where {
     case "home": return { at: "home" };
     case "shelf": case "plan": return { at: "market" };
     case "workspace": return { at: "workspaces" };
+    case "ai": return { at: "workspace", tenant: where.tenant };
     /* ⚠️ Everything in the console goes up to the console, and the catalogue goes
        up to the product whose catalogue it is — one press, one level. */
-    case "product-config": case "shared-config": case "tenants": case "maintenance":
+    case "product-config": case "shared-config": case "models": case "tenants": case "maintenance":
       return { at: "console" };
     case "catalogue": return { at: "product-config", product: where.product };
     /*

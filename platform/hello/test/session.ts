@@ -8,7 +8,7 @@
 
 import { env } from "cloudflare:test";
 import { sql, type ResolvedRegion } from "@one/kernel";
-import { bindingsFor, CONFIG_SCHEMA, seedOne, SESSION_COOKIE } from "@one/runtime";
+import { bindingsFor, CONFIG_SCHEMA, seedOne, SESSION_COOKIE, writeOne } from "@one/runtime";
 import worker, { recorded } from "../src/worker.js";
 
 /* ⚠️ Whose configuration. The directory is bound with the same id into every
@@ -57,6 +57,25 @@ const seedMail = async () => {
     */
     await seedOne(db, APP, key, value, new Date().toISOString() as never);
   }
+};
+
+/**
+ * ⚠️ PUT THE SENDER BACK WITHOUT A SESSION.
+ *
+ * The configuration suite blanks it deliberately — there is no way to prove "the
+ * mail lane is not working, and here is why" without the lane actually not
+ * working — and `seedMail` cannot repair it, because seeding correctly does
+ * nothing where a row already exists. Restoring through the operator route needs
+ * a session, and a restore that can fail for a reason unrelated to what it is
+ * restoring leaves the whole deployment senderless exactly when something else
+ * has already gone wrong: the next file's sign-in gets a 503 and the one after
+ * that gets the OTP cooldown on its retry, surfacing as an unrelated test in an
+ * unrelated file.
+ */
+export const restoreMail = async (): Promise<void> => {
+  const db = bindingsFor({ db: sql() }, { DB: (env as Record<string, unknown>).DIRECTORY }, { defaultRegion: "auto" })("auto" as ResolvedRegion).db;
+  await writeOne(db, APP, "email.from", "Hello <noreply@4dl.app>", new Date().toISOString() as never);
+  await writeOne(db, APP, "email.provider", "recorded", new Date().toISOString() as never);
 };
 
 export const SETUP = "https://setup.hello.4dl.app";

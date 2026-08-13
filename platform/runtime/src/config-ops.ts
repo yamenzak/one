@@ -9,9 +9,9 @@
  * cannot. What this surface is for is the second day and every day after.
  */
 
-import type { AnyOperation, AppSpec, BindingSpec, ConfigRegistry, Instant, SqlHandle } from "@one/kernel";
-import { modelFor, operation, s } from "@one/kernel";
-import { DEPLOYMENT_SCOPE, lines, readAll, readRates, refuseRate, refuseWrite, writeOne, writeRate } from "./config.js";
+import type { AnyOperation, AppSpec, BindingSpec, ConfigRegistry, Instant, ModelSpec, SqlHandle } from "@one/kernel";
+import { LANES, modelProblems, operation, priced, s } from "@one/kernel";
+import { DEPLOYMENT_SCOPE, lines, readAll, readCatalogue, refuseModel, refuseWrite, setModelEnabled, writeModel, writeOne } from "./config.js";
 import { chooseProvider, send, type Deliver } from "./mail.js";
 import { OPERATE } from "./operator-ops.js";
 
@@ -168,88 +168,130 @@ export function configOperations<B extends BindingSpec>(app: AppSpec<B>): readon
     would make "which models are on" a question about a deployment rather than
     about a product.
   */
-  const catalogue = app.ai
-    ? [
-        operation({
-          id: "admin.models",
-          kind: "read",
-          summary: "What each model this app uses costs, and where that number came from.",
-          input: s.object({}),
-          output: s.object({ models: s.json() }),
-          permission: OPERATE,
-          idempotency: { mode: "none" },
-          async handler(ctx) {
-            const d = deps(ctx);
-            const rates = await readRates(d.shared);
-            /*
-              ⚠️ THE APP'S OWN LIST IS WHAT IS SHOWN, priced by the shared
-              catalogue where it has an answer. Listing every row in the shared
-              store instead would show an operator models this product cannot
-              ask anything — which reads as a feature that is switched off.
-            */
+  /*
+    ⚠️ THE CATALOGUE IS THE DEPLOYMENT'S AND SO IS THIS SCREEN — mounted on every
+    operator door, whether or not the app behind it generates anything. It used
+    to be mounted only where an app declared models, which was correct while the
+    models WERE the app's; now a deployment that has not yet added one is exactly
+    the deployment that most needs the screen.
+  */
+  const catalogue = [
+    operation({
+      id: "admin.models",
+      kind: "read",
+      summary: "Every model this deployment can run, what it costs, and what it is sold for.",
+      input: s.object({}),
+      output: s.object({ models: s.json(), lanes: s.json(), shared: s.bool() }),
+      permission: OPERATE,
+      idempotency: { mode: "none" },
+      async handler(ctx) {
+        const d = deps(ctx);
+        const rows = await readCatalogue(d.shared);
+        return {
+          /*
+            ⚠️ COST AND PRICE ON THE SAME ROW. A console that showed only one of
+            them cannot answer either question an operator has — "are we losing
+            money on this" needs both, and a markup shown without the number it
+            multiplies is a percentage of something invisible.
+          */
+          models: rows.map((m) => {
+            const sold = priced(m);
             return {
-              models: app.ai!.models.map((declared) => {
-                const live = modelFor(app.ai!, declared.id, rates)!;
-                return {
-                  id: live.id, provider: live.provider,
-                  rate: live.rate, thinking: live.thinking ?? false,
-                  /* ⚠️ Which number is in force, so a stale shared rate is visible. */
-                  source: rates[declared.id] ? "shared" : "app",
-                  declared: declared.rate,
-                };
-              }),
+              id: m.id, provider: m.provider, lane: m.lane, enabled: m.enabled,
+              markup: m.markup, thinking: m.thinking ?? false,
+              cost: { input: m.rate.input, output: m.rate.output, perOutput: m.perOutput ?? null, attachmentUnits: m.attachmentUnits ?? null },
+              price: { input: sold.rate.input, output: sold.rate.output, perOutput: sold.perOutput ?? null },
+              /* ⚠️ A row that cannot be metered says so rather than being hidden:
+                 hidden, an operator sees a model they added simply not appear. */
+              problems: modelProblems(m),
             };
-          },
-        }),
-        operation({
-          id: "admin.models.rate",
-          kind: "write",
-          summary: "Publish what a model costs, for every app behind this deployment.",
-          input: s.object({
-            id: s.text({ min: 1, max: 200 }),
-            input: s.number({ min: 0 }),
-            output: s.number({ min: 0 }),
-            thinking: s.optional(s.bool()),
           }),
-          output: s.object({ id: s.text() }),
-          permission: OPERATE,
-          idempotency: { mode: "natural", key: "id" },
-          audit: (i: { id: string }) => ({ subject: i.id, verb: "price" }),
-          outcome: { message: "Published", tone: "success", invalidates: ["admin.models"] },
-          fails: ["platform.invalid", "platform.unavailable"],
-          tool: false,
-          async handler(ctx, input: { id: string; input: number; output: number; thinking?: boolean }) {
-            const d = deps(ctx);
-            /*
-              ⚠️ A RATE FOR A MODEL THIS APP DOES NOT DECLARE IS REFUSED. Nothing
-              here can supply the system text, the output ceiling or the daily
-              bound, so a catalogue row cannot become a feature — and one saved
-              for a model nobody asks is a number an operator can see and no
-              reserve will ever read.
-            */
-            const declared = app.ai!.models.find((m) => m.id === input.id);
-            if (!declared) ctx.fail("platform.invalid", { field: "id", reason: "not a model this app declares" });
-            /*
-              ⚠️ ZERO IS REFUSED ON THE WAY IN. Saved, it makes the model
-              unmetered for EVERY app behind this store: the reserve is zero, the
-              settle is zero, the balance never moves, and the provider invoices
-              as usual.
-            */
-            if (refuseRate({ input: input.input, output: input.output })) {
-              ctx.fail("platform.invalid", { field: "rate", reason: "a rate of zero is not free, it is unmetered" });
-            }
-            if (!d.shared) ctx.fail("platform.unavailable", { reason: "this deployment binds no shared configuration store" });
+          lanes: LANES,
+          shared: Boolean(d.shared),
+        };
+      },
+    }),
+    operation({
+      id: "admin.models.set",
+      kind: "write",
+      summary: "Add a model, or change what it costs and what it is sold for.",
+      input: s.object({
+        id: s.text({ min: 1, max: 200 }),
+        provider: s.text({ min: 1, max: 60 }),
+        lane: s.text({ min: 1, max: 20 }),
+        input: s.number({ min: 0 }),
+        output: s.number({ min: 0 }),
+        perOutput: s.optional(s.number({ min: 0 })),
+        attachmentUnits: s.optional(s.number({ min: 0 })),
+        markup: s.number({ min: 0 }),
+        thinking: s.optional(s.bool()),
+      }),
+      output: s.object({ id: s.text() }),
+      permission: OPERATE,
+      idempotency: { mode: "natural", key: "id" },
+      audit: (i: { id: string }) => ({ subject: i.id, verb: "price" }),
+      outcome: { message: "Published", tone: "success", invalidates: ["admin.models"] },
+      fails: ["platform.invalid", "platform.unavailable"],
+      tool: false,
+      async handler(ctx, input: {
+        id: string; provider: string; lane: string; input: number; output: number;
+        perOutput?: number; attachmentUnits?: number; markup: number; thinking?: boolean;
+      }) {
+        const d = deps(ctx);
+        if (!d.shared) ctx.fail("platform.unavailable", { reason: "this deployment binds no shared configuration store" });
 
-            await writeRate(d.shared!, {
-              id: input.id, provider: declared!.provider,
-              rate: { input: input.input, output: input.output },
-              ...(input.thinking === undefined ? {} : { thinking: input.thinking }),
-            }, ctx.now() as Instant);
-            return { id: input.id };
-          },
-        }),
-      ]
-    : [];
+        const model: ModelSpec = {
+          id: input.id, provider: input.provider, lane: input.lane as ModelSpec["lane"],
+          rate: { input: input.input, output: input.output },
+          ...(input.perOutput === undefined ? {} : { perOutput: input.perOutput }),
+          ...(input.attachmentUnits === undefined ? {} : { attachmentUnits: input.attachmentUnits }),
+          markup: input.markup,
+          ...(input.thinking === undefined ? {} : { thinking: input.thinking }),
+          enabled: true,
+        };
+        /*
+          ⚠️ REFUSED ON THE WAY IN, and every one of these is a row that would
+          have worked. A rate of zero makes the model unmetered for EVERY app
+          behind this store — reserve zero, settle zero, balance never moves,
+          provider invoices as usual. A markup of zero sells every call at cost.
+          An attaching lane with no attachment price is the expensive one,
+          because it SUCCEEDS and scales with use.
+        */
+        const wrong = refuseModel(model);
+        if (wrong.length) ctx.fail("platform.invalid", { field: "rate", reason: wrong[0]! });
+
+        await writeModel(d.shared!, model, ctx.now() as Instant);
+        return { id: input.id };
+      },
+    }),
+    operation({
+      id: "admin.models.enabled",
+      kind: "write",
+      summary: "Take a model in or out of service, everywhere.",
+      input: s.object({ id: s.text({ min: 1, max: 200 }), enabled: s.bool() }),
+      output: s.object({ id: s.text(), enabled: s.bool() }),
+      permission: OPERATE,
+      idempotency: { mode: "natural", key: "id" },
+      audit: (i: { id: string; enabled: boolean }) => ({ subject: i.id, verb: i.enabled ? "enable" : "disable" }),
+      outcome: { message: "Saved", tone: "success", invalidates: ["admin.models"] },
+      fails: ["platform.invalid", "platform.unavailable"],
+      tool: false,
+      async handler(ctx, input: { id: string; enabled: boolean }) {
+        const d = deps(ctx);
+        if (!d.shared) ctx.fail("platform.unavailable", { reason: "this deployment binds no shared configuration store" });
+        /*
+          ⚠️ TURNING ONE OFF IS NOT DELETING IT. The row carries the rate every
+          past generation settled against; deleting it makes a bill unreadable to
+          answer a question a flag answers. Workspaces pinned to it fall back to
+          the cheapest eligible model and their screen says the pick is no longer
+          offered — see `chooseModel`.
+        */
+        const found = await setModelEnabled(d.shared!, input.id, input.enabled, ctx.now() as Instant);
+        if (!found) ctx.fail("platform.invalid", { field: "id", reason: "no model in the catalogue goes by that" });
+        return { id: input.id, enabled: input.enabled };
+      },
+    }),
+  ];
 
   /* --------------------------------------------------------------- mail --- */
 

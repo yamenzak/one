@@ -14,11 +14,11 @@
  * wrong.
  */
 
-import type { AiSpec, AnyOperation, AppSpec, BindingSpec, InferenceHandle, Instant, OperationSpec, Rates, SqlHandle } from "@one/kernel";
+import type { AiSpec, AnyOperation, AppSpec, BindingSpec, Catalogue, InferenceHandle, Instant, OperationSpec, SqlHandle } from "@one/kernel";
 import { chooseModel, modelsFor, operation, s } from "@one/kernel";
 import { FILES, type FilesCarrier } from "./files-ops.js";
 import { fetchMedia, storeMedia } from "./files.js";
-import { generate, judge, spending, type Generated } from "./generate.js";
+import { generate, judge, spending, NO_CHOICE, type Choice, type Generated } from "./generate.js";
 import { balanceFor } from "./account-billing.js";
 import { CREDITS } from "./generate.js";
 
@@ -28,19 +28,18 @@ export const GENERATION = Symbol.for("one.runtime.generation");
 export interface GenerationDeps {
   readonly db: SqlHandle;
   readonly inference: InferenceHandle | null;
-  /** ⚠️ Read lazily: only a request that actually generates pays for the query. */
-  rates(): Promise<Rates>;
   /**
-   * ⚠️ THE TWO LAYERS BETWEEN THE MANIFEST'S DEFAULT AND THE REGION'S REFUSAL,
-   * and both are read lazily for the same reason the rates are.
-   *
-   * `chosen` is this workspace's own pick per feature; `disabled` is what the
-   * operator turned off across the deployment. Neither is a fallback for the
-   * other — they are two different people's decisions, and `chooseModel` is
-   * where the four of them meet.
+   * ⚠️ THE DEPLOYMENT'S WHOLE CATALOGUE. Read lazily: only a request that
+   * actually generates pays for the query.
    */
-  chosen(): Promise<Readonly<Record<string, string>>>;
-  disabled(): Promise<readonly string[]>;
+  catalogue(): Promise<Catalogue>;
+  /**
+   * ⚠️ WHAT THIS WORKSPACE DECIDED — its model per action and the words it puts
+   * in front of every request. Read lazily for the same reason, and read
+   * TOGETHER, because two lookups is two chances to run one workspace's model
+   * against another's words.
+   */
+  chosen(): Promise<Readonly<Record<string, Choice>>>;
   readonly tenantId: string;
   /** ⚠️ The global store and the paying account — the balance is not the workspace's. */
   readonly global: SqlHandle;
@@ -52,6 +51,50 @@ export interface GenerationDeps {
 export interface GenerationCarrier { readonly [GENERATION]: GenerationDeps }
 
 const deps = (ctx: unknown): GenerationDeps => (ctx as GenerationCarrier)[GENERATION];
+
+/**
+ * ⚠️ ONE PLACE THE WORKSPACE'S TWO DECISIONS BECOME ARGUMENTS. Spread by hand at
+ * each call site, one of them eventually gets the model and not the preamble —
+ * and a preamble silently dropped is a workspace whose configuration does
+ * nothing, on a screen that saved successfully.
+ */
+/**
+ * ⚠️ A CEILING ON THE PREAMBLE, because it is measured into every reserve. Left
+ * unbounded, a workspace that pasted a document into the box would pay for it on
+ * every call — which is correct, and is also a bill nobody would connect to a
+ * settings screen they filled in once.
+ */
+export const PROMPT_MAX = 2_000;
+
+/**
+ * ⚠️ ONE WRITER FOR BOTH HALVES OF A CHOICE, so setting the prompt cannot clear
+ * the model. Two `INSERT … ON CONFLICT` statements, each naming its own column,
+ * is the shape where the second one's defaults quietly overwrite the first.
+ */
+async function upsertChoice(
+  db: SqlHandle, tenantId: string, action: string,
+  patch: { readonly model_id?: string; readonly prompt?: string }, at: Instant,
+): Promise<void> {
+  if (patch.model_id !== undefined) {
+    await db.run(
+      `INSERT INTO ai_choice (tenant_id, feature, model_id, prompt, at) VALUES (?, ?, ?, '', ?)
+       ON CONFLICT(tenant_id, feature) DO UPDATE SET model_id = excluded.model_id, at = excluded.at`,
+      tenantId, action, patch.model_id, at,
+    );
+  }
+  if (patch.prompt !== undefined) {
+    await db.run(
+      `INSERT INTO ai_choice (tenant_id, feature, model_id, prompt, at) VALUES (?, ?, '', ?, ?)
+       ON CONFLICT(tenant_id, feature) DO UPDATE SET prompt = excluded.prompt, at = excluded.at`,
+      tenantId, action, patch.prompt, at,
+    );
+  }
+}
+
+const decidedFor = (chosen: Readonly<Record<string, Choice>>, action: string) => {
+  const c = chosen[action] ?? NO_CHOICE;
+  return { chosenModel: c.model || null, preamble: c.prompt };
+};
 
 /**
  * Ask for a generation from inside an app's own handler.
@@ -74,8 +117,8 @@ export async function generateWith(
 ): Promise<Generated> {
   const d = deps(ctx);
   return generate({
-    db: d.db, global: d.global, accountId: d.accountId, productId: d.productId, ai, inference: d.inference, rates: await d.rates(),
-    chosenModel: (await d.chosen())[feature] ?? null, disabledModels: await d.disabled(),
+    db: d.db, global: d.global, accountId: d.accountId, productId: d.productId, ai, inference: d.inference,
+    catalogue: await d.catalogue(), ...decidedFor(await d.chosen(), feature),
     tenantId: d.tenantId, actorId: d.actorId,
     feature, prompt, at: ctx.now(),
   });
@@ -112,8 +155,8 @@ export async function generateAbout(
   */
   if (!found) return { ok: false, why: "unconfigured", meta: { reason: "that picture is not in this workspace" } };
   return generate({
-    db: d.db, global: d.global, accountId: d.accountId, productId: d.productId, ai, inference: d.inference, rates: await d.rates(),
-    chosenModel: (await d.chosen())[feature] ?? null, disabledModels: await d.disabled(),
+    db: d.db, global: d.global, accountId: d.accountId, productId: d.productId, ai, inference: d.inference,
+    catalogue: await d.catalogue(), ...decidedFor(await d.chosen(), feature),
     tenantId: d.tenantId, actorId: d.actorId,
     feature, prompt, image: { bytes: found.body, contentType: found.row.contentType }, at: ctx.now(),
   });
@@ -148,8 +191,8 @@ export async function drawWith(
 ): Promise<Drawn> {
   const d = deps(ctx);
   const made = await generate({
-    db: d.db, global: d.global, accountId: d.accountId, productId: d.productId, ai, inference: d.inference, rates: await d.rates(),
-    chosenModel: (await d.chosen())[feature] ?? null, disabledModels: await d.disabled(),
+    db: d.db, global: d.global, accountId: d.accountId, productId: d.productId, ai, inference: d.inference,
+    catalogue: await d.catalogue(), ...decidedFor(await d.chosen(), feature),
     tenantId: d.tenantId, actorId: d.actorId,
     feature, prompt, at: ctx.now(),
   });
@@ -377,43 +420,58 @@ export function generationOperations<B extends BindingSpec>(app: AppSpec<B>): re
   const models = operation({
     id: "ai.models.list",
     kind: "read",
-    summary: "Which model runs each feature here, and what else this workspace could pick.",
+    summary: "Which model runs each action here, what else this workspace could pick, and what it says first.",
     input: s.object({}),
-    output: s.object({ features: s.json() }),
+    output: s.object({ actions: s.json() }),
     permission: "ai:read",
     idempotency: { mode: "none" },
     async handler(ctx) {
       const d = deps(ctx);
-      const [chosen, disabled, rates] = await Promise.all([d.chosen(), d.disabled(), d.rates()]);
-      const features = Object.entries(app.ai!.features).map(([id, feature]) => {
-        const decided = chooseModel({ ai: app.ai!, feature: id, chosen: chosen[id] ?? null, disabled, permitted: d.inference?.permitted ?? [], rates });
+      const [chosen, catalogue] = await Promise.all([d.chosen(), d.catalogue()]);
+      /*
+        ⚠️ EVERY ACTION THE MANIFEST DECLARES, WALKED HERE. This is the whole of
+        "the AI settings screen discovers itself": an action added to a product
+        appears, one removed stops appearing, and no screen anywhere names one.
+      */
+      const actions = Object.entries(app.ai!.actions).map(([id, action]) => {
+        const where = { ai: app.ai!, catalogue, action: id, permitted: d.inference?.permitted ?? [] };
+        const decided = chooseModel({ ...where, chosen: chosen[id]?.model ?? null });
         return {
-          feature: id,
-          summary: feature.summary,
+          action: id,
+          summary: action.summary,
+          lane: action.lane,
+          /*
+            ⚠️ WHETHER THE PRODUCT ASKED FOR THE DEAR ONE. Without it, an owner
+            looking at an action that costs several times what its neighbours do
+            sees a model somebody apparently chose badly — when what happened is
+            that the product said this one has to be good, and said why.
+          */
+          prefer: action.prefer ?? "cheapest",
           /* ⚠️ What is OFFERED, after every layer. A list containing something a
              region refuses is a control that produces a failure on save. */
-          options: modelsFor({ ai: app.ai!, feature: id, disabled, permitted: d.inference?.permitted ?? [], rates })
-            .map((m) => ({ id: m.id, provider: m.provider })),
+          options: modelsFor(where).map((m) => ({ id: m.id, provider: m.provider })),
           inEffect: decided.ok ? decided.model.id : null,
           decidedBy: decided.ok ? decided.source : null,
-          /* ⚠️ And the refusal travels, because "none" and "none this region
-             permits" are different things to go and do something about. */
+          /* ⚠️ And the refusal travels, because "the operator has added no model
+             that can do this" and "no model this region permits can" are
+             different things to go and do. */
           why: decided.ok ? null : decided.why,
           /* ⚠️ A pick that is no longer eligible is REPORTED rather than shown
              as though it were running. */
-          stale: Boolean(chosen[id] && decided.ok && decided.model.id !== chosen[id]),
+          stale: Boolean(chosen[id]?.model && decided.ok && decided.model.id !== chosen[id]!.model),
+          prompt: chosen[id]?.prompt ?? "",
         };
       });
-      return { features };
+      return { actions };
     },
   });
 
   const pick = operation({
     id: "ai.models.choose",
     kind: "write",
-    summary: "Choose which model runs one feature for this workspace.",
-    input: s.object({ feature: s.text({ max: 60 }), model: s.optional(s.text({ max: 120 })) }),
-    output: s.object({ feature: s.text(), model: s.text() }),
+    summary: "Choose which model runs one action for this workspace.",
+    input: s.object({ action: s.text({ max: 60 }), model: s.optional(s.text({ max: 200 })) }),
+    output: s.object({ action: s.text(), model: s.text() }),
     /*
       ⚠️ THE SETTINGS PERMISSION, NOT `ai:use`. Choosing which company reads a
       workspace's data is a decision about the workspace, and somebody who may
@@ -421,42 +479,70 @@ export function generationOperations<B extends BindingSpec>(app: AppSpec<B>): re
       one to a different provider.
     */
     permission: "workspace:settings",
-    idempotency: { mode: "natural", key: "feature" },
-    audit: (i: { feature: string; model?: string }) => ({ subject: i.feature, verb: `model:${i.model ?? "default"}` }),
+    idempotency: { mode: "natural", key: "action" },
+    audit: (i: { action: string; model?: string }) => ({ subject: i.action, verb: `model:${i.model ?? "default"}` }),
     outcome: { message: "Saved", tone: "success", invalidates: ["ai.models.list"] },
     fails: ["platform.invalid"],
-    async handler(ctx, input: { feature: string; model?: string }) {
+    async handler(ctx, input: { action: string; model?: string }) {
       const d = deps(ctx);
-      if (!app.ai!.features[input.feature]) ctx.fail("platform.invalid", { field: "feature", reason: "not a feature this product has" });
-
-      /* ⚠️ NO MODEL CLEARS THE CHOICE rather than setting an empty one, so
-         going back to the product's default is expressible at all. */
-      if (!input.model) {
-        await d.db.run(`DELETE FROM ai_choice WHERE tenant_id = ? AND feature = ?`, d.tenantId, input.feature);
-        return { feature: input.feature, model: "" };
-      }
+      if (!app.ai!.actions[input.action]) ctx.fail("platform.invalid", { field: "action", reason: "not an action this product has" });
 
       /*
         ⚠️ REFUSED AT THE DOOR IF IT IS NOT ELIGIBLE. Storing a pick the region
         does not permit, the operator turned off, or that cannot do what the
-        feature asks would be a row that resolves to the default forever — a
+        action asks would be a row that resolves to the default forever — a
         setting that appears to have been saved and changes nothing.
+
+        ⚠️ NO MODEL CLEARS THE PICK rather than storing an empty one, so going
+        back to the deployment's own choice is expressible at all.
       */
-      const offered = modelsFor({
-        ai: app.ai!, feature: input.feature,
-        disabled: await d.disabled(), permitted: d.inference?.permitted ?? [], rates: await d.rates(),
-      });
-      if (!offered.some((m) => m.id === input.model)) {
-        ctx.fail("platform.invalid", { field: "model", reason: "not offered for this feature here" });
+      if (input.model) {
+        const offered = modelsFor({
+          ai: app.ai!, catalogue: await d.catalogue(), action: input.action,
+          permitted: d.inference?.permitted ?? [],
+        });
+        if (!offered.some((m) => m.id === input.model)) {
+          ctx.fail("platform.invalid", { field: "model", reason: "not offered for this action here" });
+        }
       }
-      await d.db.run(
-        `INSERT INTO ai_choice (tenant_id, feature, model_id, at) VALUES (?, ?, ?, ?)
-         ON CONFLICT(tenant_id, feature) DO UPDATE SET model_id = excluded.model_id, at = excluded.at`,
-        d.tenantId, input.feature, input.model, ctx.now() as Instant,
-      );
-      return { feature: input.feature, model: input.model };
+      await upsertChoice(d.db, d.tenantId, input.action, { model_id: input.model ?? "" }, ctx.now() as Instant);
+      return { action: input.action, model: input.model ?? "" };
     },
   });
 
-  return [spend, wrong, models, pick] as unknown as readonly AnyOperation[];
+  /*
+    ⚠️ THE WORKSPACE'S OWN WORDS, AND ONLY THE USER HALF.
+
+    The system text is the product's and is editable nowhere: it is what makes an
+    action do what the product promises, and a workspace that could rewrite it
+    could turn a nutrition assistant into anything at all with the product's name
+    still on the answer. What a workspace legitimately wants is to say what it
+    emphasises — a house style, a language, something to always mention — and
+    that belongs in front of the prompt.
+
+    ⚠️ IT IS MEASURED. `planAction` composes the preamble with the request and
+    prices them together, so a long one costs what it costs. Appended after the
+    reserve it would be a standing discount on every call, growing with how much
+    somebody typed.
+  */
+  const phrase = operation({
+    id: "ai.prompt.set",
+    kind: "write",
+    summary: "Say what this workspace wants mentioned, in front of every request to one action.",
+    input: s.object({ action: s.text({ max: 60 }), prompt: s.text({ max: PROMPT_MAX }) }),
+    output: s.object({ action: s.text(), prompt: s.text() }),
+    permission: "workspace:settings",
+    idempotency: { mode: "natural", key: "action" },
+    audit: (i: { action: string }) => ({ subject: i.action, verb: "prompt" }),
+    outcome: { message: "Saved", tone: "success", invalidates: ["ai.models.list"] },
+    fails: ["platform.invalid"],
+    async handler(ctx, input: { action: string; prompt: string }) {
+      const d = deps(ctx);
+      if (!app.ai!.actions[input.action]) ctx.fail("platform.invalid", { field: "action", reason: "not an action this product has" });
+      await upsertChoice(d.db, d.tenantId, input.action, { prompt: input.prompt.trim() }, ctx.now() as Instant);
+      return { action: input.action, prompt: input.prompt.trim() };
+    },
+  });
+
+  return [spend, wrong, models, pick, phrase] as unknown as readonly AnyOperation[];
 }
