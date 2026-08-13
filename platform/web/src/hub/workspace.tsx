@@ -17,6 +17,20 @@
  * ⚠️ AND THE SETTINGS ARE THE PRODUCT'S DECLARATION, rendered. Nothing on this
  * screen names a setting; `declared.tsx` turns the manifest into controls, so a
  * setting added to a product appears here and one removed stops appearing.
+ *
+ * ⚠️ BUT NOT EVERY WORKSPACE CAN BE MANAGED FROM HERE, AND IT SAYS SO. Settings
+ * and ceilings are REGIONAL and per-product — they are about one workspace's own
+ * records and live where those records live — so the worker serving the hub can
+ * answer for its own product and no other. That is the same boundary the
+ * membership index exists because of, and unlike memberships it must not be
+ * crossed by copying: a workspace's settings are its data, and publishing them
+ * into the store every product reads would put one business's configuration
+ * where another product's worker can read it.
+ *
+ * So a workspace this hub cannot manage gets a row saying where it IS managed,
+ * rather than an empty card. `managedHere: false` is that state, and it is
+ * explicit precisely because the alternative — passing an empty declaration —
+ * renders as a workspace that has nothing to configure.
  */
 
 import type { ElementType, ReactNode } from "react";
@@ -77,6 +91,13 @@ export interface WorkspaceProps {
    * people it applies to — and every control is stood down.
    */
   readonly mayWrite?: (key: string) => boolean;
+  /**
+   * ⚠️ WHETHER THIS HUB CAN ANSWER FOR THIS WORKSPACE AT ALL — see the header.
+   * Absent is `true`, because the ordinary case is a workspace of the product
+   * serving the request; `false` is a workspace of another product, whose
+   * settings and ceilings live in a store this worker does not bind.
+   */
+  readonly managedHere?: boolean;
   readonly onGo: (to: Where) => void;
   readonly onBack: () => void;
   readonly Heading?: ElementType;
@@ -89,7 +110,7 @@ export const amountOf = (line: Resolved): string =>
       : line.value.toLocaleString();
 
 export function WorkspaceScreen({
-  workspace, included, plan, declared, values, onSet, mayWrite, onGo, onBack, Heading = "h1",
+  workspace, included, plan, declared, values, onSet, mayWrite, managedHere = true, onGo, onBack, Heading = "h1",
 }: WorkspaceProps): ReactNode {
   return (
     <Screen leave="up" onLeave={onBack} name={workspace.name} sky="silk"
@@ -116,6 +137,26 @@ export function WorkspaceScreen({
         </Card>
       </Section>
 
+      {/*
+        ⚠️ A WORKSPACE THIS HUB CANNOT ANSWER FOR SAYS SO ONCE AND SENDS SOMEBODY
+        WHERE IT CAN BE ANSWERED. Drawing an empty "What it includes" card would
+        be indistinguishable from a plan that includes nothing — which is a
+        sentence about somebody's bill, made up by a screen that simply could not
+        reach the answer.
+      */}
+      {!managedHere ? (
+        <Section>
+          <Card>
+            <Item
+              title={`Managed in ${workspace.productName}`}
+              detail="What this workspace includes and what it has chosen live with its own records."
+              away={workspace.at}
+            />
+          </Card>
+        </Section>
+      ) : null}
+
+      {managedHere ? (
       <Section name="What it includes">
         {included === null ? <Waiting rows={3} /> : (
           <Card>
@@ -140,12 +181,15 @@ export function WorkspaceScreen({
           </Card>
         )}
       </Section>
+      ) : null}
 
       {/*
         ⚠️ AND THE SETTINGS ARE WHATEVER THE PRODUCT DECLARES. Nothing below names
         one — see the header.
       */}
-      <DeclaredSettings declared={declared} values={values} onSet={onSet} {...(mayWrite ? { mayWrite } : {})} />
+      {managedHere ? (
+        <DeclaredSettings declared={declared} values={values} onSet={onSet} {...(mayWrite ? { mayWrite } : {})} />
+      ) : null}
     </Screen>
   );
 }

@@ -4549,6 +4549,15 @@
       "impl": "web/test/declared.test.tsx",
       "proves": "tells an edited price from the one the product shipped",
       "fails": "every price looking like the one the product was built with, so an operator cannot tell their own change from the app's default. It is also the whole reason each product publishes its declaration: without the shipped catalogue beside the overrides there is nothing to compare"
+    },
+    {
+      "id": "a-hub-says-what-it-cannot-answer",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "says where a workspace is managed rather than showing it as empty",
+      "fails": "an empty \"What it includes\" card, which is indistinguishable from a plan that includes nothing — a sentence about somebody's bill invented by a screen that simply could not reach the answer. Settings and ceilings are regional and per-product by design, and unlike memberships they must not be crossed by copying: a workspace's settings are its data, and publishing them into the store every product reads would put one business's configuration where another product's worker can read it"
     }
   ]
 }

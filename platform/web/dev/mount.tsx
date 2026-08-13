@@ -877,6 +877,10 @@ function Preview() {
         /* ⚠️ `#write=no` is somebody in a workspace who is not its owner — the
            ordinary case, and the one where every control stands down. */
         {...(asked.get("write") === "no" ? { mayWrite: () => false } : {})}
+        /* ⚠️ `#managed=no` is a workspace of ANOTHER product — the state where
+           this hub genuinely cannot answer, and the one a screen would otherwise
+           render as a workspace with nothing in it. */
+        managedHere={asked.get("managed") !== "no"}
         onGo={go} onBack={up} Heading={Heading}
       />
     ) : at === "console" ? (

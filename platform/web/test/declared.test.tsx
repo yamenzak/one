@@ -179,6 +179,22 @@ describe("one workspace", () => {
   it("carries whatever the product declares", () => {
     expect(screen()).toContain("How your messages sign off");
   });
+
+  /*
+    ⚠️ A WORKSPACE THIS HUB CANNOT ANSWER FOR SAYS SO, and does not draw an empty
+    card. Settings and ceilings are regional and per-product — they live where
+    that workspace's records live — so the worker serving the hub can answer for
+    its own product and no other. An empty "What it includes" is indistinguishable
+    from a plan that includes nothing, which is a sentence about somebody's bill
+    invented by a screen that could not reach the answer.
+  */
+  it("says where a workspace is managed rather than showing it as empty", () => {
+    const out = screen({ managedHere: false });
+    expect(out).toContain("Managed in Kova");
+    expect(out).toContain("https://haddad.kova.4dl.app");
+    expect(out).not.toContain("What it includes");
+    expect(out).not.toContain("How your messages sign off");
+  });
 });
 
 /* --------------------------------------------------------------- console --- */
