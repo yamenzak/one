@@ -29,6 +29,7 @@ export { ACCOUNT_CSS } from "./account/account.css.js";
 /* The way in. */
 export { Door, nextDoor, waitFrom, type DoorAt, type DoorProps, type DoorStep, type DoorWire } from "./door.js";
 export { ProveIt, ProveItBody, needsProof, NEEDS_PROOF, type ProveItProps } from "./prove.js";
+export { SetupScreen, slugFrom, fieldOf, type Place, type SetupProps, type SetupWire } from "./setup.js";
 export {
   browserCeremony, outcomeOf, registerPasskey, signInWithPasskey,
   type Asserted, type Attempt, type Ceremony, type RegisterOffer, type Registered, type SignInOffer,

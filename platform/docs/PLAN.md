@@ -335,6 +335,16 @@ somebody else's workspace — a "New workspace" button on their account centre
 offers a thing they cannot do, and the refusal that says so arrives long after they
 have decided the product is confusing.
 
+⚠️ **The setup door takes the NAME as well as the address, and writes it twice.**
+`brand.name` is the one field a workspace cannot sensibly be asked for later:
+collected on a settings screen afterwards, the first thing every customer sees on
+their own address is the product's name where theirs should be, and most never go
+and change it. It goes to the workspace's own regional `tenant_settings` — which
+is authoritative — and to the copy on the directory row, which is what the
+sign-in screen reads before there is a session to resolve a region with. Written
+to the copy alone it would survive until the first branding edit and then be
+replaced by a republish of a row that never existed, silently.
+
 ⚠️ **The machine lane is one endpoint and its key is the whole door.**
 `platform.provisioning.grant` / `.revoke` take a bearer key from config — rotated
 by a person in a console, not by a deploy — compared in constant time, and a
@@ -1387,6 +1397,8 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-second-purchase-does-not-revoke-the-first` | a grant written as a replacement, so the day somebody buys a second product is the day the first is revoked — silently, and noticed only when they try to open a workspace they already paid for | **live** |
 | `a-grant-can-be-taken-back-and-nothing-else-is` | a switch with no off — and the opposite failure, an endpoint a website can call that makes an existing workspace, its members and its records disappear. What is taken back is the ability to open a NEW one | **live** |
 | `the-account-centre-offers-only-what-was-granted` | an account centre listing every product on the deployment to everybody signed in, and the address to go to assembled by hand — the setup door is derived from the product's own root, so the account centre and the product cannot disagree about the one thing that has to be right | **live** |
+| `one-address-rule-for-the-field-and-the-route` | a second regular expression in the screen that agrees today. `slugProblem` is in the kernel so the field and the route cannot drift — copied, the field says an address is fine and the only opinion that counts refuses it, which reaches somebody as a spinner and then a message about something they cannot see | **live** |
+| `the-name-a-workspace-was-given-survives` | the name written only to the directory's branding COPY, which is republished from the regional settings row on every branding write — so it survives until the first time anybody changes a logo or a colour and is then replaced by a copy of a row that never existed, with nothing reporting it | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

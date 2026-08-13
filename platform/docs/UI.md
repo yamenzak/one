@@ -664,6 +664,46 @@ button that fails.
 pixels apart: a screen saying one thing twice, with nothing on it saying what the
 thing is for.
 
+### 2.7b Starting something
+
+**Nobody is offered what they cannot do.** — Most people holding an account here
+are a customer of somebody else's workspace. A "New workspace" button on their
+account centre offers a thing they cannot do, and the refusal that says so
+arrives long after they have decided the product is confusing. The control
+appears only for somebody a grant or an open front door lets in — and the control
+is not what makes it safe: `identity.workspace.create` refuses regardless, which
+is a different job from not offering.
+*Checked: `web/test/screens.test.tsx`, `hello/test/provisioning.test.ts`.*
+
+**A picker with one option is a question with one answer.** — One product to
+open goes straight to it; one region to keep records in draws no region row at
+all. This is the same rule everywhere it comes up, and it comes up on every
+screen that hands over.
+*Checked: `web/test/screens.test.tsx`, `web/test/setup.test.tsx`.*
+
+**The permanent decision is made above the button that commits it.** — An
+address and a region can never be changed afterwards. A row for either placed
+under the create control is one the ordinary path presses past without scrolling
+to.
+*Checked: `web/test/setup.test.tsx`.*
+
+**A suggestion derived from what somebody typed stops following the moment they
+touch it.** — An address derived from a name is a courtesy; one that keeps
+re-deriving overwrites what was deliberately typed on the next keystroke
+somewhere else, which reads as the form fighting back.
+
+**A field's helper line lives inside the field.** — Written as the form's next
+child it inherits the form's gap, which is the same distance as the gap to the
+button below — so a line about the field above reads as a line about the control
+beneath it. `Field`'s `under` is where it goes, and a refusal REPLACES it rather
+than joining it: two lines under one box, in the one place somebody is trying to
+fix something, and only one of them is what they need to read.
+*Checked: `web/test/setup.test.tsx`.*
+
+**A public address is shown whole.** — A field showing `my-gym` with the rest of
+the hostname in a help page reads as a nickname, and somebody picks one they
+would not have chosen written out.
+
 ### 2.8 Failure
 
 **A failure is a `Problem`, never a string.** — The platform already refuses to
@@ -910,6 +950,9 @@ more, which is the honest state.
 | `a-proof-never-asks-who-you-are` | a form demanding the address the session already knows, standing between somebody and something they were in the middle of doing | **live** |
 | `the-product-can-be-left` | an account centre with no way to sign out. The row for the device in your hand carried no control and the comment beside it said leaving was the avatar menu's job — a menu this platform does not have — so on a shared computer there was no way out at all, on the one screen whose subject is where you are signed in | **live** |
 | `nobody-is-offered-what-they-cannot-open` | a New workspace button on the account centre of somebody who is a customer of a workspace rather than the owner of one. It offers a thing they cannot do, and the refusal that says so arrives long after they have decided the product is confusing | **live** |
+| `a-workspace-can-actually-be-created` | the whole platform being behind having a workspace with no screen that makes one — `identity.workspace.create` was written, audited and tested and only a test harness ever called it. The narrower failure the same test pins: a business name sent through unchanged, so the first thing a new customer meets is a refusal for typing their own name correctly | **live** |
+| `a-permanent-choice-is-made-before-it-is-committed` | where a workspace's records live sitting under the control that creates it — a decision that can never be changed afterwards, which the ordinary path presses past without scrolling to | **live** |
+| `a-refusal-lands-on-what-caused-it` | every refusal sent to the same place. A taken address belongs under the address; not being let in is not something retyping fixes, and putting it there is an instruction to keep trying | **live** |
 <!-- /generated -->
 
 ## 5. What is not decided yet

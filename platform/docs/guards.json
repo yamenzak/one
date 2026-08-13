@@ -4018,6 +4018,51 @@
       "impl": "web/test/screens.test.tsx",
       "proves": "offers nothing to somebody who may open nothing",
       "fails": "a New workspace button on the account centre of somebody who is a customer of a workspace rather than the owner of one. It offers a thing they cannot do, and the refusal that says so arrives long after they have decided the product is confusing"
+    },
+    {
+      "id": "a-workspace-can-actually-be-created",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/setup.test.tsx",
+      "proves": "turns a business name into something a hostname can be",
+      "fails": "the whole platform being behind having a workspace with no screen that makes one — `identity.workspace.create` was written, audited and tested and only a test harness ever called it. The narrower failure the same test pins: a business name sent through unchanged, so the first thing a new customer meets is a refusal for typing their own name correctly"
+    },
+    {
+      "id": "one-address-rule-for-the-field-and-the-route",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/setup.test.tsx",
+      "proves": "checks the address with the server's own rule, reserved labels included",
+      "fails": "a second regular expression in the screen that agrees today. `slugProblem` is in the kernel so the field and the route cannot drift — copied, the field says an address is fine and the only opinion that counts refuses it, which reaches somebody as a spinner and then a message about something they cannot see"
+    },
+    {
+      "id": "a-permanent-choice-is-made-before-it-is-committed",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/setup.test.tsx",
+      "proves": "asks where it is kept before the button that commits it",
+      "fails": "where a workspace's records live sitting under the control that creates it — a decision that can never be changed afterwards, which the ordinary path presses past without scrolling to"
+    },
+    {
+      "id": "a-refusal-lands-on-what-caused-it",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/setup.test.tsx",
+      "proves": "does not put being un-provisioned under a field",
+      "fails": "every refusal sent to the same place. A taken address belongs under the address; not being let in is not something retyping fixes, and putting it there is an instruction to keep trying"
+    },
+    {
+      "id": "the-name-a-workspace-was-given-survives",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/provisioning.test.ts",
+      "proves": "keeps the name after somebody edits their branding",
+      "fails": "the name written only to the directory's branding COPY, which is republished from the regional settings row on every branding write — so it survives until the first time anybody changes a logo or a colour and is then replaced by a copy of a row that never existed, with nothing reporting it"
     }
   ]
 }

@@ -13,10 +13,11 @@
  */
 
 import type { AnyOperation, AppSpec, BindingSpec, Caller, Instant, RegionId, SqlHandle, TenantId, UserId } from "@one/kernel";
-import { check, nothing, operation, PUBLIC, s, toolNameFor, toolsFor, UNIVERSAL_RESERVED } from "@one/kernel";
+import { check, nothing, operation, PUBLIC, s, slugProblem, toolNameFor, toolsFor } from "@one/kernel";
 import { placeTenant } from "./directory.js";
+import { writeSetting } from "./settings.js";
 import { claim, invite } from "./membership.js";
-import { EVERY_PRODUCT, grantOpens, mayCreateHere, setupDoorFor, type Product } from "@one/kernel";
+import { BRANDING, EVERY_PRODUCT, grantOpens, mayCreateHere, setupDoorFor, type Product } from "@one/kernel";
 import { sameSecret, type ProvisioningStore } from "./provisioning.js";
 
 /**
@@ -89,19 +90,6 @@ export interface ProvisionDeps {
 }
 
 export interface ProvisionCarrier { readonly [PROVISION]: ProvisionDeps }
-
-/** `hello`, `my-gym`, `north-clinic` — a DNS label, and never a door. */
-export function slugProblem(slug: string, reserved: readonly string[]): string | null {
-  if (!/^[a-z0-9]([a-z0-9-]{1,30}[a-z0-9])?$/.test(slug)) return "not a valid address";
-  /*
-    ⚠️ THE RESERVED LIST IS A SECURITY CONTROL, NOT TIDINESS. A workspace at
-    `admin` is the operator console; at `autodiscover` it is mail configuration;
-    at `_acme-challenge` it is certificate issuance. Each is a takeover with a
-    friendly name.
-  */
-  if (UNIVERSAL_RESERVED.includes(slug) || reserved.includes(slug)) return "that address is taken";
-  return null;
-}
 
 /**
  * Which role the person who creates a workspace holds in it.
@@ -243,7 +231,15 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
     id: "identity.workspace.create",
     kind: "write",
     summary: "Create a workspace at a given address.",
-    input: s.object({ slug: s.text({ min: 2, max: 32 }), region: s.optional(s.text({ max: 16 })) }),
+    /*
+      ⚠️ THE NAME IS TAKEN HERE BECAUSE THIS IS THE ONLY MOMENT IT IS FREE. It is
+      `brand.name`, which the directory row carries — so it reaches `/api/host`
+      on the very first request and the sign-in screen wears the business's own
+      name from a cold start. Collected on a settings screen afterwards instead,
+      the first thing every customer sees on their own address is the product's
+      name where theirs should be, and most never go and change it.
+    */
+    input: s.object({ slug: s.text({ min: 2, max: 32 }), name: s.optional(s.text({ max: 80 })), region: s.optional(s.text({ max: 16 })) }),
     output: s.object({ tenantId: s.text(), slug: s.text(), region: s.text() }),
     permission: "workspace:create",
     idempotency: { mode: "natural", key: "slug" },
@@ -264,8 +260,9 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
       worth the sentence.
     */
     tool: false,
-    async handler(ctx, input: { slug: string; region?: string }) {
+    async handler(ctx, input: { slug: string; name?: string; region?: string }) {
       const directory = (ctx as unknown as DirectoryCarrier)[DIRECTORY];
+      const name = (input.name ?? "").trim();
       /*
         ⚠️ THE GRANT IS CHECKED HERE, NOT IN THE SCREEN THAT OFFERS THE BUTTON. A
         control the account centre does not draw is a decoration: this route is in
@@ -317,9 +314,32 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
         */
         standing: { standing: "active", reason: "ok" },
         domains: [],
-        /* ⚠️ Nothing chosen yet. The three keys are published as they are set. */
-        branding: {},
+        /*
+          ⚠️ THE NAME IF THERE IS ONE, AND NOTHING ELSE. The mark and the accent
+          are chosen later; an empty string here would be a value, and every
+          consumer reads an absent key as "the product's own" while reading a
+          blank one as a name that is blank.
+        */
+        branding: name ? { "brand.name": name } : {},
       });
+
+      const founder = (ctx as unknown as FounderCarrier)[FOUNDER];
+
+      /*
+        ⚠️ THE NAME IS WRITTEN TO THE WORKSPACE'S OWN STORE, NOT ONLY TO THE
+        DIRECTORY COPY — and this is the half that would have gone missing
+        silently. `branding` on the directory row is a COPY, republished from the
+        regional `tenant_settings` on every settings write; written only there, the
+        name a business typed here would survive until the first time anybody
+        changed their logo or their colour, and then be replaced by the copy of a
+        row that never existed. Nothing would report it: the settings screen would
+        show an empty name field, which is exactly what an un-named workspace
+        looks like.
+      */
+      if (name && founder) {
+        const store = await founder.sessionsIn(region);
+        await writeSetting(store, BRANDING, tenantId, "brand.name", name, ctx.now());
+      }
 
       /*
         ⚠️ THE CREATOR IS ITS FIRST MEMBER, WRITTEN HERE OR NOWHERE. A workspace
@@ -328,7 +348,6 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
         because the caller belongs to nothing. There is no later step that could
         fix it either — inviting somebody requires being a member.
       */
-      const founder = (ctx as unknown as FounderCarrier)[FOUNDER];
       const owner = foundingRole(app);
       if (owner && founder?.email) {
         const store = await founder.sessionsIn(region);

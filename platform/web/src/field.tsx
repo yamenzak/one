@@ -27,9 +27,20 @@ export interface FieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
   /** ⚠️ ONLY WHERE THERE IS SOMETHING TO CLEAR. A control that is always there
    *  and does nothing half the time is one people learn to distrust. */
   readonly clearable?: boolean;
+  /**
+   * One line under the box, in the field's own spacing — a preview of what was
+   * typed, not an instruction.
+   *
+   * ⚠️ IT IS INSIDE THE FIELD BECAUSE OF WHERE IT ENDS UP OTHERWISE. Written as
+   * the next child of the form it inherits the form's gap, which is the same
+   * distance as the gap to the button below — so a line about the field above
+   * reads as a line about the control beneath it. This is the whole reason the
+   * prop exists rather than each screen putting a paragraph after the field.
+   */
+  readonly under?: ReactNode;
 }
 
-export function Field({ label, value, onValue, wrong, clearable, ...rest }: FieldProps): ReactNode {
+export function Field({ label, value, onValue, wrong, clearable, under, ...rest }: FieldProps): ReactNode {
   const id = useId();
   const noteId = useId();
   return (
@@ -51,7 +62,10 @@ export function Field({ label, value, onValue, wrong, clearable, ...rest }: Fiel
           </button>
         ) : null}
       </div>
-      {wrong ? <p className="note wrong" id={noteId}>{wrong}</p> : null}
+      {/* ⚠️ A REFUSAL REPLACES THE HINT RATHER THAN JOINING IT. Two lines under
+          one box is a wall in the one place a person is trying to fix something,
+          and only one of the two is what they need to read. */}
+      {wrong ? <p className="note wrong" id={noteId}>{wrong}</p> : under ? <p className="note">{under}</p> : null}
     </div>
   );
 }

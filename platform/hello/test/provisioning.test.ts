@@ -173,3 +173,55 @@ describe("what the account centre may offer", () => {
     expect(products.map((p) => p.id).sort()).toEqual(["kova", "scena", "tessa"]);
   });
 });
+
+/* --------------------------------------------------------- what it is called --- */
+
+/**
+ * ⚠️ THE NAME IS THE ONE THING THE SETUP DOOR TAKES THAT NOTHING ELSE COULD.
+ *
+ * A workspace's name lives in TWO places on purpose — the regional
+ * `tenant_settings` row, which is authoritative, and a copy on the directory row,
+ * which is what the sign-in screen reads before there is a session to resolve a
+ * region with. Written to the copy alone it survives until the first branding
+ * edit and is then replaced by a republish of a row that never existed, with
+ * nothing anywhere reporting it.
+ */
+describe("naming a workspace while creating it", () => {
+  /* ⚠️ FRESH PER ATTEMPT, because the suite retries once and a slug is
+     unique forever — a retry of a test that got as far as creating would fail
+     on the conflict rather than on whatever it was actually about. */
+  const named = () => `named${Math.random().toString(36).slice(2, 8)}`;
+
+  it("keeps the name after somebody edits their branding", async () => {
+    const NAMED = named();
+    const setup = await signIn(`founder.${NAMED}@example.test`, "https://setup.hello.4dl.app");
+    const made = await worker.fetch(new Request("https://setup.hello.4dl.app/api/identity.workspace.create", {
+      method: "POST", headers: { "content-type": "application/json", cookie: setup },
+      body: JSON.stringify({ slug: NAMED, name: "Haddad Strength" }),
+    }), env as never);
+    expect(made.status).toBe(200);
+
+    const origin = `https://${NAMED}.hello.4dl.app`;
+    const here = await signIn(`founder.${NAMED}@example.test`, origin);
+
+    /* ⚠️ THE SETTING, NOT THE COPY. This is the row a republish reads from. */
+    const before = await worker.fetch(
+      new Request(`${origin}/api/settings.read`, { headers: { cookie: here } }), env as never,
+    );
+    const values = ((await before.json()) as { values?: Record<string, string> }).values ?? {};
+    expect(values["brand.name"]).toBe("Haddad Strength");
+
+    /* ⚠️ THE EDIT THAT WOULD HAVE LOST IT — any branding key republishes all
+       three from the regional store. */
+    const wrote = await worker.fetch(new Request(`${origin}/api/settings.write`, {
+      method: "POST", headers: { "content-type": "application/json", cookie: here },
+      body: JSON.stringify({ key: "brand.accent", value: "#3355ff" }),
+    }), env as never);
+    expect(wrote.status).toBe(200);
+
+    const row = await directory().first<{ branding: string }>(
+      `SELECT branding FROM tenant_directory WHERE slug = ?`, NAMED,
+    );
+    expect(JSON.parse(row?.branding ?? "{}")["brand.name"]).toBe("Haddad Strength");
+  });
+});

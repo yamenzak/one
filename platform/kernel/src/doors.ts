@@ -165,6 +165,28 @@ export const UNIVERSAL_RESERVED: readonly string[] = [
   "help", "support", "docs", "blog", "legal", "privacy", "terms",
 ];
 
+/**
+ * `hello`, `my-gym`, `north-clinic` — a DNS label, and never a door.
+ *
+ * ⚠️ IT IS IN THE KERNEL SO BOTH HALVES CAN ASK IT. The route that creates a
+ * workspace has to refuse a bad address, and the field somebody types it into has
+ * to say so before they press anything — and those are the same question. Written
+ * twice, the screen and the route disagree the first time either is edited, and
+ * the way that shows up is somebody being told their address is fine and then
+ * refused.
+ */
+export function slugProblem(slug: string, reserved: readonly string[]): string | null {
+  if (!/^[a-z0-9]([a-z0-9-]{1,30}[a-z0-9])?$/.test(slug)) return "not a valid address";
+  /*
+    ⚠️ THE RESERVED LIST IS A SECURITY CONTROL, NOT TIDINESS. A workspace at
+    `admin` is the operator console; at `autodiscover` it is mail configuration;
+    at `_acme-challenge` it is certificate issuance. Each is a takeover with a
+    friendly name.
+  */
+  if (UNIVERSAL_RESERVED.includes(slug) || reserved.includes(slug)) return "that address is taken";
+  return null;
+}
+
 const label = (hostname: string, root: string): string | null => {
   if (!hostname.endsWith(`.${root}`)) return null;
   return hostname.slice(0, -(root.length + 1));

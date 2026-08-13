@@ -42,6 +42,7 @@ import { Card, Entry } from "../src/list.js";
 import { Edit } from "../src/icon.js";
 import { AskForIt, ConsentSheet, type Asked } from "../src/consent.js";
 import { Door, type DoorWire } from "../src/door.js";
+import { SetupScreen, type Place } from "../src/setup.js";
 import { ProveIt } from "../src/prove.js";
 import type { Ceremony } from "../src/passkey.js";
 import { SignInMethods } from "../src/account/signin.js";
@@ -410,6 +411,16 @@ const PRODUCTS = [
   { id: "tessa", name: "Tessa", does: "A clinic's own practice, run end to end.", setupAt: "https://setup.tessa.4dl.app" },
 ];
 
+/*
+  ⚠️ TWO, BECAUSE THE PICKER ONLY EXISTS ABOVE ONE. A fixture with a single
+  region draws a screen with no region row at all, which is the ordinary
+  deployment and the one the default mode shows.
+*/
+const PLACES: readonly Place[] = [
+  { id: "eu", label: "Europe", detail: "Frankfurt" },
+  { id: "us", label: "United States", detail: "Virginia" },
+];
+
 /** Long enough to see the spinner and know it is a wait, not a stutter. */
 const ROUND_TRIP_MS = 900;
 
@@ -498,6 +509,14 @@ function Preview() {
     `#door=1` — and `#door=passkey` for a browser that has one.
   */
   const doorAs = asked.get("door");
+  /*
+    ⚠️ THE SCREEN AT THE OTHER END OF THE ACCOUNT CENTRE'S HAND-OVER. It is on a
+    product's own `setup.` host in the product, which means it is the one surface
+    in this preview that cannot be reached from any other — so it gets its own
+    mode. `#setup=1`, and `#setup=places` for a deployment with a region to
+    choose between.
+  */
+  const setupAs = asked.get("setup");
 
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
   /* ⚠️ THE DIAL AND THE SCREEN SET THE SAME THING, which is the point: the
@@ -672,6 +691,30 @@ function Preview() {
     `#prove=1`, and `#prove=passkey` for a device that has one.
   */
   const proveAs = asked.get("prove");
+
+  if (setupAs) {
+    return (
+      <SetupScreen
+        product="Kova"
+        root="kova.4dl.app"
+        places={setupAs === "places" ? PLACES : []}
+        /* ⚠️ A WIRE THAT REFUSES THE OBVIOUS ADDRESS, because the taken one is
+           the interesting screen: an address somebody typed, refused, with the
+           message under the field it is about. */
+        wire={{
+          create: async ({ slug }) => {
+            await new Promise((r) => setTimeout(r, ROUND_TRIP_MS));
+            return slug === "kova" || slug === "gym"
+              ? ({ code: "platform.conflict", status: 409, retryable: false, ref: "req_7",
+                   title: "That address is taken", detail: "Somebody already has it. Try another.",
+                   meta: { field: "slug" } } as never)
+              : { slug };
+          },
+        }}
+        onMade={() => undefined}
+      />
+    );
+  }
 
   if (doorAs || proveAs) {
     /*
