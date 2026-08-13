@@ -3802,6 +3802,105 @@
       "impl": "web/test/interface.test.tsx",
       "proves": "sets no label in small capitals",
       "fails": "small tracked capitals — the device an interface reaches for when a label has to LOOK like something. This one already has a label: quiet ink, sentence case, smaller. Two had appeared, one of them in amber on the screen somebody is asked to read most carefully"
+    },
+    {
+      "id": "a-door-is-not-an-oracle",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/door.test.tsx",
+      "proves": "says nothing about whether an address is known here",
+      "fails": "a sign-in screen that adds back what its endpoints refuse to say. Both operations behind it answer identically for an address with an account and one without — telling them apart is a membership oracle, which on a clinical product is a disclosure on its own — and a 'no account found' or a 'sign up' would hand that over from the screen instead"
+    },
+    {
+      "id": "a-door-arms-the-field-for-a-passkey",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/door.test.tsx",
+      "proves": "arms the address field for a passkey",
+      "fails": "an address field with no webauthn token in its autocomplete. The conditional request then resolves nowhere, the suggestion never appears, and the entire passkey lane is silently dead on the browsers that support it best"
+    },
+    {
+      "id": "a-door-asks-for-no-password",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/door.test.tsx",
+      "proves": "asks for no password, because there is none",
+      "fails": "a password field on a passwordless platform — offered to a manager which would then save one, for a credential nothing here can check"
+    },
+    {
+      "id": "a-dismissal-is-not-a-failure",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/door.test.tsx",
+      "proves": "reads a dismissal as a dismissal",
+      "fails": "a browser's NotAllowedError rendered as an error. It is what a dismissal, a timeout and a superseded conditional request all raise — the three most ordinary things that can happen — so the product accuses somebody of a mistake they did not make, in red, on the screen where they cannot get in"
+    },
+    {
+      "id": "a-ceremony-is-not-offered-where-it-cannot-run",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/door.test.tsx",
+      "proves": "does not prompt a device that cannot hold a passkey",
+      "fails": "a create call on a device with no authenticator, which throws in the middle of an offer somebody just accepted — so it reads as the product breaking rather than as a device that was never going to work"
+    },
+    {
+      "id": "a-credential-carries-the-account-not-the-address",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/door.test.tsx",
+      "proves": "puts the account id on the authenticator and the address in front of the person",
+      "fails": "the user handle and the display name written the wrong way round. What goes in user.id is stored on the authenticator forever and cannot be rewritten by us, so an address there is a permanent copy of something a person is allowed to change"
+    },
+    {
+      "id": "a-passkey-works-where-windows-does",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/door.test.tsx",
+      "proves": "offers the algorithm Windows Hello actually produces",
+      "fails": "a registration offering ES256 alone. Windows Hello produces RS256, so the product 'does not work on Windows' and nothing in it says why"
+    },
+    {
+      "id": "a-passkey-sign-in-needs-no-address",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/door.test.tsx",
+      "proves": "asks for any credential when it has been given no address",
+      "fails": "an allow list where an empty one belongs. Empty means any credential for this relying party, which is what lets a discoverable passkey open the door before anybody types — a populated list turns the passkey lane into something that begins by asking for the thing a passkey exists to avoid typing"
+    },
+    {
+      "id": "the-passkey-offer-is-the-servers-answer",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/door.test.tsx",
+      "proves": "offers a passkey only when the answer said to",
+      "fails": "a screen deciding for itself whether to suggest a credential. It knows neither what this person holds nor which relying party this door prompts for, so it nags somebody who already has one, on every sign-in, forever"
+    },
+    {
+      "id": "a-cooldown-is-the-servers-number",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/door.test.tsx",
+      "proves": "takes the wait from the refusal rather than inventing one",
+      "fails": "a countdown the screen invented. The runtime decides when another code may be asked for and reports what is left; a local timer comes back before the endpoint will answer, which teaches people to press a button that fails"
+    },
+    {
+      "id": "a-discoverable-passkey-needs-no-address",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/identity.test.ts",
+      "proves": "issues a challenge with no address, so a discoverable passkey can answer",
+      "fails": "a sign-in operation that demands a non-empty address. The door arms the address field before anybody types, so the request would 400 before the ceremony started, the suggestion would never appear, and nothing anywhere would fail"
     }
   ]
 }

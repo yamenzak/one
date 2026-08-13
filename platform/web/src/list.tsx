@@ -91,9 +91,17 @@ export interface ItemProps {
    * announcing it as `aria-current` tells a screen reader the wrong thing.
    */
   readonly current?: boolean;
+  /**
+   * ⚠️ THE ROW SAYS WHAT IT WILL DO AND CANNOT DO IT YET, which is a different
+   * thing from a row that is simply a fact. The door's resend is the case: at
+   * full ink, "Send another code in 60s" is indistinguishable from the pressable
+   * row beneath it, so the one thing it is saying — not yet — is carried by four
+   * characters at the end of a sentence.
+   */
+  readonly off?: boolean;
 }
 
-export function Item({ icon, mark, title, titleAs, detail, tone, onGo, away, action, sign, current }: ItemProps): ReactNode {
+export function Item({ icon, mark, title, titleAs, detail, tone, onGo, away, action, sign, current, off }: ItemProps): ReactNode {
   const body = (
     <>
       {/* ⚠️ THE WELL IS THE ICON'S GROUND, and it is what makes a column of glyphs
@@ -141,7 +149,7 @@ export function Item({ icon, mark, title, titleAs, detail, tone, onGo, away, act
         {body}
       </button>
     )
-    : <div className="item" aria-current={current ? "true" : undefined}>{body}</div>;
+    : <div className="item" data-off={off ? "" : undefined} aria-current={current ? "true" : undefined}>{body}</div>;
 }
 
 export interface EntryProps {

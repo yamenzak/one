@@ -621,6 +621,49 @@ the only mark it ever carries. `Item` derives this rather than taking a third
 prop: a row only knows whether it is *current* when it is one of several, and a
 row that is one of several never goes anywhere.
 
+### 2.7a The door
+
+**A sign-in screen never says whether an address is known here.** — Both
+operations behind it answer identically for an address with an account and one
+without, because telling them apart is a membership oracle: type an address,
+learn whether that person uses a clinical product. A screen with "no account
+found", or with a sign-up button beside the field, hands over exactly what the
+endpoints refuse to.
+*Checked: `web/test/door.test.tsx`.*
+
+**The passkey is offered in the field, not announced.** — Conditional mediation
+puts the credential in the address field's own suggestions, so somebody who has
+one taps it and is in, and somebody who does not sees an ordinary field. A "sign
+in with a passkey" button asks everybody to know what a passkey is in order to
+find out whether they have one. The explicit row appears only where the browser
+cannot suggest.
+
+**A dismissal is not a failure, and this is the distinction every naive passkey
+flow loses.** — `NotAllowedError` is what a browser raises when somebody
+dismisses the sheet, when the ceremony times out, and when a conditional request
+is superseded. Shown as an error, the product accuses somebody of a mistake they
+did not make, in red, on the screen where they cannot get in. Four outcomes —
+worked, dismissed, unsupported, failed — and only the last one is anybody's
+problem.
+*Checked: `web/test/door.test.tsx`.*
+
+**The offer to add a passkey is a suggestion, so both answers are the same
+size.** — Somebody standing on it is already signed in; the product has what it
+needs. A "Not now" set small and grey would be asking for a decision the screen
+has already made. And it is shown when the SERVER says so: it knows what
+credentials this person holds and which relying party this door prompts for, and
+a screen that guessed would nag somebody who already has one.
+
+**A countdown belongs to whoever refuses.** — The runtime declines a second code
+inside a minute and reports the seconds remaining; a timer the screen invented
+comes back before the endpoint will answer it, which teaches people to press a
+button that fails.
+
+**The title is the value and the button is the action.** — The passkey offer had
+"Add a passkey" as its heading and "Add a passkey" as its button, two hundred
+pixels apart: a screen saying one thing twice, with nothing on it saying what the
+thing is for.
+
 ### 2.8 Failure
 
 **A failure is a `Problem`, never a string.** — The platform already refuses to
@@ -853,6 +896,16 @@ more, which is the honest state.
 | `a-control-keeps-the-pages-word-space` | the font shorthand resetting the word space inside a control. The text face sets wide letters against a narrow word space and the platform corrects it once on the body; every row, field and button then silently undid the correction. Measured: 1.28px on a paragraph and 0 on every row title and detail, which is most of the words in the account centre | **live** |
 | `a-link-out-tells-mail-from-a-page` | an address opened through the web treatment: a new tab that never arrives, under the outward mark whose entire value is that it is honest | **live** |
 | `there-is-one-label-style` | small tracked capitals — the device an interface reaches for when a label has to LOOK like something. This one already has a label: quiet ink, sentence case, smaller. Two had appeared, one of them in amber on the screen somebody is asked to read most carefully | **live** |
+| `a-door-is-not-an-oracle` | a sign-in screen that adds back what its endpoints refuse to say. Both operations behind it answer identically for an address with an account and one without — telling them apart is a membership oracle, which on a clinical product is a disclosure on its own — and a 'no account found' or a 'sign up' would hand that over from the screen instead | **live** |
+| `a-door-arms-the-field-for-a-passkey` | an address field with no webauthn token in its autocomplete. The conditional request then resolves nowhere, the suggestion never appears, and the entire passkey lane is silently dead on the browsers that support it best | **live** |
+| `a-door-asks-for-no-password` | a password field on a passwordless platform — offered to a manager which would then save one, for a credential nothing here can check | **live** |
+| `a-dismissal-is-not-a-failure` | a browser's NotAllowedError rendered as an error. It is what a dismissal, a timeout and a superseded conditional request all raise — the three most ordinary things that can happen — so the product accuses somebody of a mistake they did not make, in red, on the screen where they cannot get in | **live** |
+| `a-ceremony-is-not-offered-where-it-cannot-run` | a create call on a device with no authenticator, which throws in the middle of an offer somebody just accepted — so it reads as the product breaking rather than as a device that was never going to work | **live** |
+| `a-credential-carries-the-account-not-the-address` | the user handle and the display name written the wrong way round. What goes in user.id is stored on the authenticator forever and cannot be rewritten by us, so an address there is a permanent copy of something a person is allowed to change | **live** |
+| `a-passkey-works-where-windows-does` | a registration offering ES256 alone. Windows Hello produces RS256, so the product 'does not work on Windows' and nothing in it says why | **live** |
+| `a-passkey-sign-in-needs-no-address` | an allow list where an empty one belongs. Empty means any credential for this relying party, which is what lets a discoverable passkey open the door before anybody types — a populated list turns the passkey lane into something that begins by asking for the thing a passkey exists to avoid typing | **live** |
+| `the-passkey-offer-is-the-servers-answer` | a screen deciding for itself whether to suggest a credential. It knows neither what this person holds nor which relying party this door prompts for, so it nags somebody who already has one, on every sign-in, forever | **live** |
+| `a-cooldown-is-the-servers-number` | a countdown the screen invented. The runtime decides when another code may be asked for and reports what is left; a local timer comes back before the endpoint will answer, which teaches people to press a button that fails | **live** |
 <!-- /generated -->
 
 ## 5. What is not decided yet

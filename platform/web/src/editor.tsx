@@ -293,7 +293,7 @@ export function ValueEditorBody({ field, onSave = async () => null, onClose = ()
         </p>
       ) : null}
 
-      <div className="sheet-actions">
+      <div className="actions">
         <Button tone="loud" wide type="submit" data-state={state.at}
           disabled={unchanged || local !== null || state.at === "working" || state.at === "done"}
           sign={state.at === "working" ? <Spinner /> : state.at === "done" ? <Tick className="button-sign" size={21} /> : undefined}>

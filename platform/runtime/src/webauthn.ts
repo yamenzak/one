@@ -29,17 +29,15 @@
 
 /* ------------------------------------------------------------- base64url --- */
 
-export const b64u = {
-  encode(bytes: Uint8Array): string {
-    let s = "";
-    for (const b of bytes) s += String.fromCharCode(b);
-    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  },
-  decode(text: string): Uint8Array {
-    const s = atob(text.replace(/-/g, "+").replace(/_/g, "/"));
-    return Uint8Array.from(s, (c) => c.charCodeAt(0));
-  },
-};
+/*
+  ⚠️ THE KERNEL'S, BECAUSE THE BROWSER USES THE SAME ONE. A challenge is bytes,
+  the wire is text, and this side verifies what the other side encoded — two
+  copies of an encoder is a pair that can disagree, and base64 against base64url
+  disagrees on about one challenge in eight. Re-exported so the callers here read
+  as they always did.
+*/
+export { b64u } from "@one/kernel";
+import { b64u } from "@one/kernel";
 
 const sha256 = async (data: Uint8Array): Promise<Uint8Array> =>
   new Uint8Array(await crypto.subtle.digest("SHA-256", data as BufferSource));

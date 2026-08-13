@@ -127,7 +127,7 @@ function Asking({ title, lede, verb, gate = { kind: "press" }, tone, onConfirm, 
         </p>
       ) : null}
 
-      <div className="sheet-actions">
+      <div className="actions">
         <Button
           tone="loud" wide data-tone-alarm={tone === "alarm" ? "" : undefined}
           data-state={state.at}

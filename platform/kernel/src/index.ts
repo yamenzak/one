@@ -16,6 +16,7 @@ export * from "./measure.js";
 export * from "./protection.js";
 export * from "./vault.js";
 export * from "./primitives.js";
+export * from "./bytes.js";
 export * from "./validate.js";
 export * from "./bindings.js";
 export * from "./doors.js";

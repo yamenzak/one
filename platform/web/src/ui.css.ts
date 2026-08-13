@@ -426,7 +426,19 @@ h2 { word-spacing: normal; }
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
   color: var(--ink-faint); word-spacing: normal; }
 
-.sheet-actions { display: flex; flex-direction: column; gap: 10px; }
+/* ⚠️ A FORM IS A COLUMN, AND IT HAS TO SAY SO. A form is a block element with no
+   spacing of its own, so a field and the action under it sat edge to edge — the
+   one place in the product where two controls touch, on the screen somebody meets
+   first. The sheet's body already carried this rule under its own name; the door
+   is the second form, which is when a shape moves. */
+.form { display: flex; flex-direction: column; gap: var(--pad); }
+
+/* ⚠️ A COLUMN OF FULL-WIDTH ACTIONS, AND IT IS NOT THE SHEET'S ANY MORE. It was
+   the sheet's own while a sheet was the only surface that ended in one; the door
+   is the second, and a screen that copied the sheet's class would be a screen
+   inheriting a rule named for somewhere it is not. Moved at its second use, which
+   is the only moment this vocabulary allows. */
+.actions { display: flex; flex-direction: column; gap: 10px; }
 /* ⚠️ ONE BUTTON, AND THE TONE SAYS WHAT IT IS RATHER THAN HOW IT LOOKS. LOUD
    leads — one per surface, the thing the person came to do. QUIET sits on a row
    beside something more important than itself, which is why removing a passkey is
@@ -704,8 +716,16 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 /* ⚠️ THE WHOLE ROW STANDS DOWN, not just the control. A full-strength title over
    a dead switch reads as a switch that is broken rather than as a setting this
    device cannot have. */
-.switch-row[data-off] { cursor: default; color: var(--ink-quiet); }
-.switch-row[data-off]:hover { background: none; }
+/* ⚠️ A ROW THAT STANDS DOWN IS ANY ROW, NOT A SWITCH'S. It was written for the
+   one control that can be off; the door's resend is the second — a row that says
+   what it will do and cannot do it yet, which at full ink is indistinguishable
+   from the pressable row beneath it. */
+.item[data-off] { cursor: default; color: var(--ink-quiet); }
+.item[data-off]:hover, .item[data-off]:active { background: none; }
+/* ⚠️ THE TILE STANDS DOWN WITH THE WORDS. A mark sets its own ink so it is legible
+   on its own ground, which means a quiet row kept a full-strength glyph — and a
+   symbol at full ink beside grey words reads as a row that is half-alive. */
+.item[data-off] .mark { color: var(--ink-quiet); }
 .switch-row:hover { background: color-mix(in oklab, var(--ink) 5%, transparent); }
 /* ⚠️ THE TRACK CARRIES THE STATE AND THE THUMB CARRIES THE MOVEMENT. Off is the
    same well every other control sits in, so a column of them reads as a column of

@@ -19,6 +19,10 @@ const SRC = join(import.meta.dirname, "..", "src");
 /** Lower may not import higher. Equal may not import equal. */
 const LAYER: Record<string, number> = {
   "primitives.ts": 0,
+  /* ⚠️ Beside primitives because it is one: an encoder with no dependencies, and
+     the reason it is in the kernel at all is that BOTH halves of a ceremony have
+     to use the same one — the browser's and the worker's. */
+  "bytes.ts": 0,
   "bindings.ts": 1,
   "validate.ts": 1,
   "problem.ts": 1,

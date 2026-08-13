@@ -141,6 +141,25 @@ describe("the passkey ceremony", () => {
     expect(done.body.relyingParty).toBe(RP);
   });
 
+  /*
+    ⚠️ AND IT BEGINS WITH NO ADDRESS AT ALL, WHICH IS THE WHOLE PASSKEY LANE. A
+    discoverable credential is selected by the authenticator, not by us — so the
+    door arms the address field before anybody types, and the browser resolves the
+    sign-in from an empty allow list. The moment this operation demands a non-empty
+    address, that lane stops existing: the request 400s before the ceremony starts,
+    the suggestion never appears, and nothing anywhere fails.
+  */
+  it("issues a challenge with no address, so a discoverable passkey can answer", async () => {
+    const started = await call("/api/identity.passkey.begin", { email: "" }, { cookie: "" });
+    expect(started.status).toBe(200);
+    expect(started.body.challenge).toBeTruthy();
+    /* ⚠️ AND IT OFFERS NOTHING, which is what stops it being an oracle: an empty
+       list here is the same answer a stranger's address gets. */
+    expect(started.body.allow).toEqual([]);
+    const assertion = await fake.assert({ challenge: started.body.challenge as string, origin: ORIGIN, rpId: RP });
+    expect((await call("/api/identity.passkey.finish", assertion, { cookie: "" })).status).toBe(200);
+  });
+
   it("signs in with it", async () => {
     const started = await call("/api/identity.passkey.begin", { email: "alan@example.test" }, { cookie: "" });
     expect(started.body.allow).toContain(fake.credentialId);

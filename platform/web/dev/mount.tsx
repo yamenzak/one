@@ -41,6 +41,8 @@ import { ValueEditor, type EditableField } from "../src/editor.js";
 import { Card, Entry } from "../src/list.js";
 import { Edit } from "../src/icon.js";
 import { AskForIt, ConsentSheet, type Asked } from "../src/consent.js";
+import { Door, type DoorWire } from "../src/door.js";
+import type { Ceremony } from "../src/passkey.js";
 import { SignInMethods } from "../src/account/signin.js";
 import { Stack } from "../src/stack.js";
 import { configureFeedback, feel, FEEDBACK_DEFAULT } from "../src/feedback.js";
@@ -476,6 +478,13 @@ function Preview() {
     theme: "dark", units: "metric", language: "en", ...FEEDBACK_DEFAULT,
   });
   const [dial, setDial] = useState(false);
+  /*
+    ⚠️ THE DOOR IS NOT PRESENTED OVER ANYTHING, so it is a mode rather than a
+    screen in the dial. Everything else in this preview is laid over an app the
+    person was already in; a sign-in screen is what there is instead of that.
+    `#door=1` — and `#door=passkey` for a browser that has one.
+  */
+  const doorAs = asked.get("door");
 
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
   /* ⚠️ THE DIAL AND THE SCREEN SET THE SAME THING, which is the point: the
@@ -631,6 +640,39 @@ function Preview() {
         onClose={() => setOpen(false)}
       />
     );
+
+  if (doorAs) {
+    /*
+      ⚠️ A WIRE THAT REFUSES AS OFTEN AS IT AGREES. A door reviewed against a
+      wire that always says yes is a door whose cooldown, whose wrong code and
+      whose dismissed ceremony have never been looked at — and those are three of
+      its five screens. `000000` is accepted and everything else is not.
+    */
+    const wire: DoorWire = {
+      sendCode: async () => { await new Promise((r) => setTimeout(r, ROUND_TRIP_MS)); return null; },
+      verifyCode: async (_email, code) => {
+        await new Promise((r) => setTimeout(r, ROUND_TRIP_MS));
+        return code === "000000"
+          ? { offerPasskey: doorAs !== "plain" }
+          : OUTCOMES.field!;
+      },
+      beginPasskey: async () => ({ challenge: "AQID", relyingParty: "4dl.app", allow: [] }),
+      finishPasskey: async () => null,
+      beginRegister: async () => ({ challenge: "AQID", relyingParty: "4dl.app", accountId: "acc_1", exclude: [] }),
+      finishRegister: async () => { await new Promise((r) => setTimeout(r, ROUND_TRIP_MS)); return null; },
+    };
+    /* ⚠️ A BROWSER THAT CANNOT, BY DEFAULT. Most people arriving at a door have
+       no passkey, and a preview that assumes one is a preview of the rarer half. */
+    const ceremony: Ceremony = {
+      available: async () => doorAs === "passkey",
+      autofill: async () => false,
+      create: async () => null,
+      get: async () => null,
+    };
+    return (
+      <Door name="Kova" wire={wire} ceremony={ceremony} onIn={() => undefined} />
+    );
+  }
 
   return (
     <>

@@ -68,9 +68,20 @@ function useCollapse(page: { current: HTMLDivElement | null }): void {
 }
 
 export interface ScreenProps {
-  /** ⚠️ `dismiss` closes the presentation; `up` returns inside it. */
-  readonly leave: "dismiss" | "up";
-  readonly onLeave: () => void;
+  /**
+   * ⚠️ `dismiss` closes the presentation; `up` returns inside it; `none` is a
+   * screen with nowhere to go back to.
+   *
+   * ⚠️ THE THIRD ONE IS THE DOOR, AND IT IS A SCREEN LIKE ANY OTHER. A sign-in
+   * screen has no parent — there is no product behind it yet — so a back button
+   * there is a control that either does nothing or leaves the person outside the
+   * thing they were trying to get into. Giving the door its own page shape
+   * instead would be a second frame to keep in step with this one, which is how
+   * two surfaces come to disagree about a margin nobody can find.
+   */
+  readonly leave: "dismiss" | "up" | "none";
+  /** ⚠️ Never called for `none`, and not required for it. */
+  readonly onLeave?: () => void;
   /**
    * ⚠️ A WORD, NEVER A GRADIENT, AND ONLY WHERE A SCREEN ARRIVES. The light is
    * the arrival; on every screen inside one it stops being an arrival and becomes
@@ -120,9 +131,14 @@ export function Screen({ leave, onLeave, sky, tint, title, name, lede, action, c
       {sky ? <div className="sky" data-sky={sky} aria-hidden="true"
         style={tint === undefined ? undefined : ({ "--sky-h": tint } as CSSProperties)} /> : null}
       <div className="topbar">
-        <RoundButton label={leave === "dismiss" ? "Close" : "Back"} onClick={onLeave}>
-          {leave === "dismiss" ? <Close /> : <Back />}
-        </RoundButton>
+        {/* ⚠️ THE SLOT IS KEPT EVEN WHEN IT IS EMPTY. The bar is a three-column
+            grid; dropping the first child moves the name and the action left, so
+            a door and a screen would set their titles at two different places. */}
+        {leave === "none" ? <span /> : (
+          <RoundButton label={leave === "dismiss" ? "Close" : "Back"} onClick={onLeave}>
+            {leave === "dismiss" ? <Close /> : <Back />}
+          </RoundButton>
+        )}
         {name ? <span className="topbar-name" aria-hidden="true">{name}</span> : <span />}
         {action}
       </div>
