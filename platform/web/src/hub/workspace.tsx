@@ -196,6 +196,14 @@ export function WorkspaceScreen({
       {managedHere ? (
         <Section>
           <Card>
+            {/*
+              ⚠️ AND WHO IS IN IT IS ONE LEVEL AWAY TOO, for the same reason. A
+              roster with an invite flow, a role picker and a permission builder
+              is a screen's worth on its own, and putting it here would bury a
+              workspace's settings under it.
+            */}
+            <Item title="People" detail="Who is in this workspace, and the roles it hands out"
+              onGo={() => onGo({ at: "people", tenant: workspace.tenantId })} />
             <Item title="AI" detail="Which model answers each thing this product asks, and what to mention first"
               onGo={() => onGo({ at: "ai", tenant: workspace.tenantId })} />
           </Card>

@@ -38,6 +38,7 @@ import { DIRECTORY_SCHEMA, DOMAIN_SCHEMA } from "./directory.js";
 import { VAULT_SCHEMA, VAULT_SPEC_SCHEMA } from "./vault.js";
 import { IDENTITY_SCHEMA } from "./identity.js";
 import { API_TOKEN_SCHEMA } from "./api-token.js";
+import { TENANT_ROLE_SCHEMA } from "./tenant-role.js";
 import { OTP_SCHEMA } from "./identity-ops.js";
 import { PROVISIONING_SCHEMA } from "./provisioning.js";
 import { ACCOUNT_BILLING_SCHEMA } from "./account-billing.js";
@@ -49,6 +50,9 @@ import { JOB_SCHEMA } from "./jobs.js";
 export const PLATFORM_REGIONAL: readonly SchemaModule[] = [
   SESSION_SCHEMA,
   MEMBERSHIP_SCHEMA,
+  /* ⚠️ After membership: a role is refused while somebody holds it, which is a
+     count over that table. */
+  TENANT_ROLE_SCHEMA,
   ACTIVITY_SCHEMA,
   LEDGER_SCHEMA,
   COMMERCE_SCHEMA,

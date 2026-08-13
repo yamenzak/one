@@ -321,6 +321,32 @@ export function wouldStrand(
 }
 
 /**
+ * Move somebody into a different role.
+ *
+ * ⚠️ THE INDEX CARRIES THE ROLE TOO, and it is what the hub prints under a
+ * workspace's name. Written here and not there, somebody's own list says they
+ * are a reader in a workspace they now administer — and the disagreement is
+ * invisible from either side, because each is reading a row that is internally
+ * consistent.
+ *
+ * ⚠️ AND THE GRANTS ARE LEFT ALONE, deliberately. They are a diff against the
+ * role rather than a copy of it, so "everything this role gives except one
+ * thing" survives the move — which is what a workspace that narrowed somebody
+ * meant, and re-deciding it for them is a permission change nobody asked for.
+ */
+export async function setRole(
+  db: SqlHandle, index: Indexing, tenantId: TenantId, id: string, role: string, at: Instant,
+): Promise<void> {
+  await db.run(
+    `UPDATE membership SET role = ?, updated_at = ? WHERE tenant_id = ? AND id = ? AND revoked_at IS NULL`,
+    role, at, tenantId, id,
+  );
+  const row = await db.first<Row>(`SELECT ${COLUMNS} FROM membership WHERE tenant_id = ? AND id = ?`, tenantId, id);
+  const moved = row ? toMembership(row) : null;
+  if (moved?.accountId) await noteBelonging(index.db, moved.accountId as UserId, tenantId, index.appId, moved.role, at);
+}
+
+/**
  * Narrow or widen one member within their role.
  *
  * ⚠️ A DIFF, NOT A REPLACEMENT SET. "Everything the role gives, except this one

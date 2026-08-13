@@ -41,6 +41,7 @@ import { chargeableFrom, DEPLOYMENT_SCOPE, readAll, readCatalogue } from "./conf
 import { catalogueJob } from "./catalogue-sync.js";
 import { noteTokenUse, resolveToken, TOKEN_PREFIX } from "./api-token.js";
 import { TOKENS, tokenOperations, type TokenCarrier } from "./api-token-ops.js";
+import { registryWith, rolesOf } from "./tenant-role.js";
 
 /* ⚠️ NON-EMPTY WINS, NOT PRESENT WINS — `kernel/config.ts` states why, and a
    second reader that got it wrong would silently switch off a shared key for one
@@ -1016,8 +1017,21 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         differently in the next one.
       */
       let membership = null as Awaited<ReturnType<typeof memberOf>>;
+      /*
+        ⚠️ THE ROLES A WORKSPACE MADE FOR ITSELF, MERGED WITH THE APP'S. A role
+        registry is already a `Record<string, string[]>`, so a custom role is one
+        more entry in it and nothing downstream changes — `canGrant`,
+        `canAssignRole` and the per-member grants were never about where a role
+        came from.
+
+        ⚠️ READ ONLY WHERE THERE IS A MEMBER TO RESOLVE. On a door with no
+        tenancy there is nobody to hold one, and a query per request to merge an
+        empty list into a registry nobody reads is a query for nothing.
+      */
+      let roles = app.access.roles;
       if (session && at.tenant) {
         membership = await memberOf(regionalDb, at.tenant.tenantId, session.accountId);
+        roles = registryWith(app.access.roles, await rolesOf(regionalDb, at.tenant.tenantId));
         /*
           ⚠️ AND AN UNCLAIMED INVITATION IS PICKED UP ON SIGHT. An invitation
           that needed a separate "accept" call is one a person can only redeem
@@ -1091,7 +1105,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
               */
               ? acting
                 ? new Set(app.access.roles[foundingRole(app) ?? ""] ?? [])
-                : permissionsOf(app.access.roles, membership)
+                : permissionsOf(roles, membership)
               : !session
                 ? new Set<string>()
                 : at.door === "admin" && app.access.roles.operator
@@ -1882,6 +1896,12 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           tenantId: (at.tenant?.tenantId ?? "") as TenantId,
           userId: session?.accountId ?? null,
           permissions: caller.permissions,
+          /*
+            ⚠️ THE MERGED REGISTRY, THE SAME ONE THE CALLER WAS RESOLVED AGAINST.
+            Handing the manifest's roles here instead would make the roster refuse
+            a role the workspace had just made and can see on its own screen.
+          */
+          roles,
           /*
             ⚠️ THE CEILING COMES FROM THE RESOLVED WALK, not from the plan row. A
             grandfathered or operator-adjusted seat count is the whole reason

@@ -43,6 +43,7 @@ export * from "./operator-ops.js";
 export * from "./api-token.js";
 export * from "./api-token-ops.js";
 export * from "./config.js";
+export * from "./tenant-role.js";
 export * from "./catalogue-sync.js";
 export * from "./app-spec.js";
 export * from "./membership-directory.js";

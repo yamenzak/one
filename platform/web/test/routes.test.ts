@@ -23,6 +23,7 @@ const EVERY: readonly Where[] = [
   { at: "workspaces" },
   { at: "workspace", tenant: "t1" },
   { at: "ai", tenant: "t1" },
+  { at: "people", tenant: "t1" },
   { at: "plan", subscription: "sub_1" },
   { at: "console" },
   { at: "product-config", product: "kova" },

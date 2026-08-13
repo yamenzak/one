@@ -53,6 +53,7 @@ import {
   type Key as ConfigKey, type Model, type Tenant,
 } from "../src/hub/console.js";
 import { AiScreen, type Action } from "../src/hub/ai.js";
+import { PeopleScreen, type Member, type Role } from "../src/hub/people.js";
 import { SettingsScreen } from "../src/hub/settings.js";
 import type { Declaration } from "../src/hub/declared.js";
 import type { Plan } from "../src/hub/offer.js";
@@ -667,6 +668,28 @@ const ACTIONS: readonly Action[] = [
   },
 ];
 
+/*
+  ⚠️ A ROSTER WITH BOTH STATES ON IT, because "invited" and "accepted" are the
+  two rows a member list has to draw differently and the pending half is the one
+  a screen forgets. The last row is somebody in a role this workspace made.
+*/
+const MEMBERS: readonly Member[] = [
+  { id: "m1", email: "rana@haddad.test", role: "owner", state: "accepted" },
+  { id: "m2", email: "sami@haddad.test", role: "reader", state: "accepted" },
+  { id: "m3", email: "new-hire@haddad.test", role: "front-desk", state: "invited" },
+];
+
+const ROLES: readonly Role[] = [
+  { id: "owner", name: "owner", permissions: ["note:read", "note:write", "member:read", "member:manage"], source: "app", editable: true, held: 1 },
+  { id: "reader", name: "reader", permissions: ["note:read"], source: "app", editable: true, held: 1 },
+  /* ⚠️ One this workspace composed itself, which is the whole feature. */
+  { id: "front-desk", name: "Front desk", permissions: ["note:read", "member:read"], source: "workspace", editable: true, held: 1 },
+  /* ⚠️ And one carrying a key the reader does not hold — shown, and stood down. */
+  { id: "bookkeeper", name: "Bookkeeper", permissions: ["note:read", "member:manage"], source: "workspace", editable: false, held: 0 },
+];
+
+const PERMISSIONS: readonly string[] = ["note:read", "note:write", "member:read", "member:manage", "file:read", "file:write"];
+
 const CONSOLE_TENANTS: readonly Tenant[] = [
   { tenantId: "t1", appId: "kova", slug: "haddad", region: "eu", standing: "active", reason: "", plan: "Pro", status: "active", reachable: true },
   { tenantId: "t2", appId: "scena", slug: "haddad", region: "eu", standing: "active", reason: "", plan: "Free", status: "active", reachable: true },
@@ -1014,6 +1037,23 @@ function Preview() {
         /* ⚠️ `#write=no` is somebody who is not the workspace's owner — the
            ordinary case, where every control stands down and nothing is hidden. */
         mayWrite={asked.get("write") !== "no"}
+        onBack={up} Heading={Heading}
+      />
+    ) : at === "people" ? (
+      <PeopleScreen
+        workspace={{ name: "Haddad Studio", tenantId: where.tenant }}
+        members={which === "waiting" ? null : which === "new" ? [] : MEMBERS}
+        roles={which === "waiting" ? null : ROLES}
+        permissions={PERMISSIONS}
+        seats={which === "waiting" ? null : { used: 3, allowed: 10 }}
+        onInvite={async () => null}
+        onRole={async () => null}
+        onRemove={async () => null}
+        onSaveRole={async () => null}
+        onRemoveRole={async () => null}
+        /* ⚠️ `#write=no` is somebody who is not an administrator — the ordinary
+           case, where the roster is shown whole and every control stands down. */
+        mayManage={asked.get("write") !== "no"}
         onBack={up} Heading={Heading}
       />
     ) : at === "tenants" ? (

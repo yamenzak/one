@@ -17,6 +17,7 @@ import {
   ConsoleScreen, KeysScreen, CatalogueScreen, TenantsScreen, MaintenanceScreen, ModelsScreen, marginOf, saidAs,
 } from "../src/hub/console.js";
 import { AiScreen, refusalOf } from "../src/hub/ai.js";
+import { PeopleScreen, roleIdFrom, seatsSaid, subjectOfKey, verbOfKey, type PeopleProps } from "../src/hub/people.js";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node as never);
 const nothing = async () => null;
@@ -577,5 +578,105 @@ describe("what a workspace asks a model for", () => {
     const out = shown(ACTIONS, false);
     expect(out).toContain("Draft a plan");
     expect(out).toContain("pro");
+  });
+});
+
+/* ------------------------------------------------ a workspace's own people --- */
+
+/**
+ * ⚠️ WHAT THESE PROVE IS THAT NOTHING ON THE ROSTER NAMES A ROLE OR A PERMISSION.
+ * Both come from `role.list`, which reads the product's manifest merged with what
+ * the workspace made for itself — so a role added to a product appears here and
+ * one removed stops appearing, exactly as a declared setting does.
+ */
+describe("who is in a workspace, and what each of them may do", () => {
+  const MEMBERS = [
+    { id: "m1", email: "rana@studio.test", role: "owner", state: "accepted" as const },
+    { id: "m2", email: "waiting@studio.test", role: "desk", state: "invited" as const },
+  ];
+  const ROLES = [
+    { id: "owner", name: "owner", permissions: ["note:read", "member:manage"], source: "app" as const, editable: true, held: 1 },
+    { id: "desk", name: "Front desk", permissions: ["note:read"], source: "workspace" as const, editable: true, held: 1 },
+    { id: "books", name: "Bookkeeper", permissions: ["member:manage"], source: "workspace" as const, editable: false, held: 0 },
+  ];
+  const PERMISSIONS = ["note:read", "note:write", "member:manage"];
+
+  const shown = (
+    members: typeof MEMBERS | null, roles: typeof ROLES | null, mayManage = true,
+  ) => html(
+    <PeopleScreen
+      workspace={{ name: "Haddad", tenantId: "t1" }}
+      members={members} roles={roles} permissions={PERMISSIONS}
+      seats={{ used: 2, allowed: 10 }}
+      onInvite={async () => null} onRole={async () => null} onRemove={async () => null}
+      onSaveRole={async () => null} onRemoveRole={async () => null}
+      mayManage={mayManage} onBack={() => undefined}
+    />,
+  );
+
+  it("names no role of its own, and draws the ones it was given", () => {
+    const out = shown(MEMBERS, ROLES);
+    for (const r of ROLES) expect(out).toContain(r.name);
+  });
+
+  /*
+    ⚠️ "INVITED" AND "ACCEPTED" ARE TWO ROWS, and the pending half is the one a
+    roster forgets — which is how somebody re-invites a colleague who is already
+    waiting, and how a seat ceiling counts one state while the other grows.
+  */
+  it("draws somebody who has not accepted differently from somebody who has", () => {
+    expect(shown(MEMBERS, ROLES)).toContain("Not accepted");
+  });
+
+  /*
+    ⚠️ A ROLE THIS PERSON MAY NOT GRANT IS SHOWN AND STOOD DOWN, never hidden. A
+    screen that dropped it leaves an administrator wondering why their list is
+    shorter than the one their colleague is describing.
+  */
+  it("shows a role it cannot hand out rather than hiding it", () => {
+    expect(shown(MEMBERS, ROLES)).toContain("Bookkeeper");
+  });
+
+  /* ⚠️ The product's own roles are fixed here: redefining `owner` is a workspace
+     rewriting what the product means by owner. */
+  it("marks the product's roles as its own and not the workspace's", () => {
+    expect(shown(MEMBERS, ROLES)).toContain("This product");
+  });
+
+  it("tells still-loading from a workspace of one", () => {
+    expect(shown(null, null)).toContain("aria-busy");
+    expect(shown([], ROLES)).toContain("Nobody else yet");
+  });
+
+  /* ⚠️ Who else is in a workspace is not a secret from the people in it. */
+  it("shows the whole roster to somebody who may change none of it", () => {
+    const out = shown(MEMBERS, ROLES, false);
+    expect(out).toContain("rana@studio.test");
+    expect(out).not.toContain(">Invite<");
+  });
+
+  /*
+    ⚠️ A ROLE ID IS DERIVED AND NEVER TYPED. It is a key in a merged registry, so
+    a space or a dot in it resolves to nothing — a role somebody made, assigned,
+    and that grants nothing at all.
+  */
+  it("makes a usable id out of whatever somebody calls a role", () => {
+    expect(roleIdFrom("Front Desk")).toBe("front-desk");
+    expect(roleIdFrom("  Book keeper!  ")).toBe("book-keeper");
+    expect(roleIdFrom("!!!")).toBe("role");
+  });
+
+  /* ⚠️ A permission key is grouped and read from itself — never from a lookup
+     table, which is a second vocabulary to keep in step with the manifest. */
+  it("reads a permission's own words out of the key", () => {
+    expect(subjectOfKey("note:write")).toBe("Note");
+    expect(verbOfKey("note:write")).toBe("Write");
+    expect(verbOfKey("standalone")).toBe("Standalone");
+  });
+
+  it("says how many seats are in use, and says nothing about a ceiling there is not", () => {
+    expect(seatsSaid({ used: 2, allowed: 10 })).toBe("2 of 10 in use");
+    expect(seatsSaid({ used: 2, allowed: true })).toBe("2 in use");
+    expect(seatsSaid({ used: 2, allowed: -1 })).toBe("2 in use");
   });
 });

@@ -4927,6 +4927,69 @@
       "impl": "hello/test/token.test.ts",
       "proves": "refuses a string that was never a token",
       "fails": "an oracle for which strings were ever real. Unknown, revoked and expired are three reasons in the log and one answer to the caller"
+    },
+    {
+      "id": "a-custom-role-reaches-every-door",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/roles.test.ts",
+      "proves": "can be invited into, and moved into",
+      "fails": "a role builder whose roles work on the screen that made them and nowhere else. The roster's role check was captured when the surface was composed — the app's declarations and nothing else — so a workspace could compose a role, see it listed, and be told on invite that it is \"not a role here\""
+    },
+    {
+      "id": "a-role-may-not-carry-what-its-author-lacks",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/roles.test.ts",
+      "proves": "refuses a role carrying a key its author does not hold",
+      "fails": "the two-step escalation `canGrant` closes on a per-key grant, with a longer first step: make a role carrying the key you lack, then assign it to yourself. The same bound applies to deleting one, or somebody who cannot compose a role can still destroy one carrying keys they do not hold"
+    },
+    {
+      "id": "an-invitation-is-bounded-by-what-the-inviter-holds",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/roles.test.ts",
+      "proves": "refuses them an invitation into a role beyond them",
+      "fails": "becoming an owner by inviting a second address of your own as one. `canAssignRole` is the kernel's answer to exactly this and had no caller at all, so every other bound on granting was reachable around"
+    },
+    {
+      "id": "a-held-role-is-refused-rather-than-deleted",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/roles.test.ts",
+      "proves": "refuses while it is held, and allows once it is not",
+      "fails": "every member on a deleted role resolving to no permissions at all — signed in, in the workspace, able to do nothing, with nothing on any screen saying why. Moving them automatically is worse: a permission change nobody asked for, applied to people who are not in the room"
+    },
+    {
+      "id": "a-re-role-cannot-strand-a-workspace",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/roles.test.ts",
+      "proves": "refuses to move the last administrator out of the role that administers",
+      "fails": "a workspace nobody can administer, reached through the door nobody re-checked. `wouldStrand` guarded removal and leaving; moving the last administrator into a role that cannot manage members is the same outcome and the quieter of the three, because everybody is still in the room"
+    },
+    {
+      "id": "the-roster-has-a-screen",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "names no role of its own, and draws the ones it was given",
+      "fails": "a roster reachable by anybody who can compose an HTTP request and by nobody else. It also names no role or permission itself — both come from `role.list`, so one added to a product appears here and one removed stops appearing"
+    },
+    {
+      "id": "a-re-role-is-bounded-by-where-they-are-going",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/roles.test.ts",
+      "proves": "allows the last administrator into another role that administers",
+      "fails": "a workspace's own administrator role being the one role its administrator can never hold. The strand check asked whether the person MANAGES rather than whether the role they are moving INTO does, so promoting the last owner into a custom role carrying the same keys was refused as stranding"
     }
   ]
 }

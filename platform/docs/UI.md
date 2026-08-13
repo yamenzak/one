@@ -841,6 +841,25 @@ and "we decided this" are the difference the screen exists to show.
 another. Derived, so a new group is a key name rather than a second registry to
 keep in step.
 
+**A roster names no role and no permission of its own.** — Both come from the
+manifest merged with what the workspace made for itself, so a role added to a
+product appears on the screen and one removed stops appearing. The same rule as a
+settings screen, for the same reason — and the permission's own words are read
+out of its key rather than from a lookup table, which would be a second
+vocabulary to keep in step with the manifest.
+*Checked: `web/test/declared.test.tsx`.*
+
+**A role somebody may not hand out is shown and stood down, never hidden.** — The
+server refuses to grant a role carrying keys the granter does not hold, so
+dropping it from the list leaves an administrator wondering why their screen is
+shorter than the one a colleague is describing. The same rule as a narrower
+setting, one screen over.
+
+**A permission is a checkbox, and the sheet saves once.** — A write per toggle
+turns composing a role into fifteen requests, any of which can fail alone and
+leave a role that is half of what somebody meant — with no moment they could
+point at and say "that is what I decided".
+
 ### 2.7e An operator console
 
 **It is the deployment's, not one product's.** — There is one payment account,
@@ -1154,6 +1173,7 @@ more, which is the honest state.
 | `an-unmetered-model-is-shown-and-flagged` | an operator seeing a model they added simply not appear, with nothing anywhere saying why — and the fault being hidden is the one that decides whether every call to that model is free | **live** |
 | `a-model-shows-under-every-lane-it-serves` | a catalogue whose vision section looks empty while a vision model sits in it. One model serves several modalities — a Gemini text model is priced for pictures on the same row — which is why a model carries a LIST of lanes rather than one, and why one row per lane is not the alternative: the id is the provider path and there is only one of it | **live** |
 | `a-retirement-is-said-before-it-happens` | an operator learning about a retirement from a failing generation — one they had a month of warning about, on a screen that never showed it. The replacement is named because the provider names it | **live** |
+| `the-roster-has-a-screen` | a roster reachable by anybody who can compose an HTTP request and by nobody else. It also names no role or permission itself — both come from `role.list`, so one added to a product appears here and one removed stops appearing | **live** |
 <!-- /generated -->
 
 ## 5. What is not decided yet

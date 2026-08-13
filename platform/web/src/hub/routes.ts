@@ -70,6 +70,8 @@ export type Where =
   | { readonly at: "workspace"; readonly tenant: string }
   /** And what it asks a model for — discovered from the same declaration. */
   | { readonly at: "ai"; readonly tenant: string }
+  /** Who is in it, and the roles it hands out — including the ones it made itself. */
+  | { readonly at: "people"; readonly tenant: string }
   | { readonly at: "details" }
   | { readonly at: "security" }
   | { readonly at: "preferences"; readonly part?: "appearance" | "reading" | "feedback" }
@@ -101,7 +103,9 @@ export function parseWhere(path: string): Where {
   if (one === "plan") return two ? { at: "plan", subscription: two } : { at: "market" };
   if (one === "workspace") {
     if (!two) return { at: "workspaces" };
-    return three === "ai" ? { at: "ai", tenant: two } : { at: "workspace", tenant: two };
+    if (three === "ai") return { at: "ai", tenant: two };
+    if (three === "people") return { at: "people", tenant: two };
+    return { at: "workspace", tenant: two };
   }
   if (one === "console") {
     if (!two) return { at: "console" };
@@ -147,6 +151,7 @@ export function pathOf(where: Where): string {
     case "plan": return `plan/${where.subscription}`;
     case "workspace": return `workspace/${where.tenant}`;
     case "ai": return `workspace/${where.tenant}/ai`;
+    case "people": return `workspace/${where.tenant}/people`;
     case "product-config": return `console/${where.product}`;
     case "catalogue": return `console/${where.product}/plans`;
     case "shared-config": return "console/shared";
@@ -180,7 +185,7 @@ export function upFrom(where: Where): Where {
     case "home": return { at: "home" };
     case "shelf": case "plan": return { at: "market" };
     case "workspace": return { at: "workspaces" };
-    case "ai": return { at: "workspace", tenant: where.tenant };
+    case "ai": case "people": return { at: "workspace", tenant: where.tenant };
     /* ⚠️ Everything in the console goes up to the console, and the catalogue goes
        up to the product whose catalogue it is — one press, one level. */
     case "product-config": case "shared-config": case "models": case "tenants": case "maintenance":

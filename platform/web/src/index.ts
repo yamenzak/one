@@ -76,6 +76,10 @@ export { SettingsScreen, type SettingsProps } from "./hub/settings.js";
 export { WorkspaceScreen, amountOf, type Resolved, type WorkspaceProps } from "./hub/workspace.js";
 export { AiScreen, laneOf, refusalOf, type Action, type AiProps } from "./hub/ai.js";
 export {
+  PeopleScreen, REMOVE as REMOVE_MEMBER, roleIdFrom, seatsSaid, subjectOfKey, verbOfKey,
+  type Member, type PeopleProps, type Role,
+} from "./hub/people.js";
+export {
   ConsoleScreen, KeysScreen, CatalogueScreen, TenantsScreen, MaintenanceScreen, saidAs as keySaidAs,
   type CatalogueProps, type ConsoleProps, type Key, type KeysProps, type Product as ConsoleProduct,
   ModelsScreen, laneNames, marginOf,

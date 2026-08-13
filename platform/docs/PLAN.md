@@ -1562,6 +1562,12 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-secret-exists-once` | a console that can display a live credential, which leaks one through a screen share, a support session or any read of the database — and the whole reason a token exists rather than a password is that it can be destroyed without disturbing the person. The store holds a hash; the list carries the last four characters so two tokens can be told apart | **live** |
 | `a-revoked-token-stops-immediately` | a credential that half works after being destroyed. A presented token that does not resolve refuses the request 401 rather than falling through to anonymous — which is wrong twice over: 403 tells a client "you may not" when its actual problem is "who you say you are is not valid", so it never re-authenticates; and a revoked token quietly becomes an anonymous caller with whatever the public lanes allow | **live** |
 | `a-tokens-refusals-are-one-answer` | an oracle for which strings were ever real. Unknown, revoked and expired are three reasons in the log and one answer to the caller | **live** |
+| `a-custom-role-reaches-every-door` | a role builder whose roles work on the screen that made them and nowhere else. The roster's role check was captured when the surface was composed — the app's declarations and nothing else — so a workspace could compose a role, see it listed, and be told on invite that it is "not a role here" | **live** |
+| `a-role-may-not-carry-what-its-author-lacks` | the two-step escalation `canGrant` closes on a per-key grant, with a longer first step: make a role carrying the key you lack, then assign it to yourself. The same bound applies to deleting one, or somebody who cannot compose a role can still destroy one carrying keys they do not hold | **live** |
+| `an-invitation-is-bounded-by-what-the-inviter-holds` | becoming an owner by inviting a second address of your own as one. `canAssignRole` is the kernel's answer to exactly this and had no caller at all, so every other bound on granting was reachable around | **live** |
+| `a-held-role-is-refused-rather-than-deleted` | every member on a deleted role resolving to no permissions at all — signed in, in the workspace, able to do nothing, with nothing on any screen saying why. Moving them automatically is worse: a permission change nobody asked for, applied to people who are not in the room | **live** |
+| `a-re-role-cannot-strand-a-workspace` | a workspace nobody can administer, reached through the door nobody re-checked. `wouldStrand` guarded removal and leaving; moving the last administrator into a role that cannot manage members is the same outcome and the quieter of the three, because everybody is still in the room | **live** |
+| `a-re-role-is-bounded-by-where-they-are-going` | a workspace's own administrator role being the one role its administrator can never hold. The strand check asked whether the person MANAGES rather than whether the role they are moving INTO does, so promoting the last owner into a custom role carrying the same keys was refused as stranding | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 
@@ -1977,6 +1983,96 @@ rows are also priced by tile, by step and by the minute, none of which is "one
 thing produced", so they import at zero: visible, in their lane, refused by
 `modelProblems`, and priced by hand in ten seconds. Inventing a conversion would
 be a number nobody could check deciding a bill.
+
+---
+
+
+### 7.10 Eight things an operation gets for being declared
+
+**Shipped 2026-08-13/14.** The claim §3.4 makes is that writing an operation is
+all anybody does: the route, the tool, the webhook, the audit entry, the
+document, the gates. Asked of the code, six of the eight were true and two were
+not — and both failed in the same direction, which is the direction this whole
+document is about: **present, correct, and reaching nobody.**
+
+| what a declared operation gets | how |
+|---|---|
+| an HTTP route | `routeFor` |
+| an AI tool | `toolsFor` — the same catalogue, the same runner, opt-out with `tool: false` |
+| a webhook event | the dispatcher over the same registry |
+| every gate | `check()`: standing → permission → proof → entitlement → customer flag → quota |
+| **an audit entry** | `auditFor`, **derived** — see below |
+| **an OpenAPI entry** | `openApiFor`, **served** — see below |
+| a typed client method | the generated client |
+| an idempotency contract | `idempotency` |
+
+⚠️ **AUDIT WAS OPT-IN, WHICH MADE THE TRAIL A THING PEOPLE REMEMBERED.**
+`auditFor` returned null for any operation that declared nothing, so twenty of
+the platform's own writes were recorded nowhere with every suite green — a
+missing entry is indistinguishable from an action nobody took. Absent now
+derives one: the verb from the operation's own id, the subject from its row scope
+or its input's `id`. A declared function still wins and says more. `{ why }` is
+the only way out, in the shape `tool` already uses, and
+`every-write-says-what-to-record-or-why-not` fails on a write with neither.
+
+⚠️ **`openApiFor` WAS WRITTEN, TESTED, AND SERVED BY NOTHING** — the same shape
+as every finding in `PLATFORM-AUDIT.md`, one layer down. A described API nobody
+can fetch the description of is a document in a test file.
+
+⚠️ **AND TWO CAPABILITIES WERE MISSING OUTRIGHT.**
+
+**API tokens** (`runtime/api-token.ts`) — issued by the **hub**, because a token
+is a credential belonging to a PERSON: it outlives any one workspace they are in
+and is the same kind of thing as a passkey. Per-app issuance means four places to
+look for a credential somebody forgot, which is how a forgotten one stays live.
+It is scoped to ONE workspace, because a token reaching every workspace somebody
+is in is a single string whose blast radius is their whole working life.
+
+  - **It stores no permissions at all**, and that is the design. A scope list
+    frozen at issue is the shape where somebody loses a role and their token
+    keeps it — silently, until an audit finds a machine doing what its owner no
+    longer may. Every request resolves the member's reach live, through the same
+    runner, so the gates, the row scope, the quota and the audit are the same
+    ones a browser gets.
+  - **It proves nothing recent, ever.** `proof: "recent"` exists against a
+    borrowed laptop with an open tab and the answer is a code to an inbox, which
+    a machine cannot give — so closing an account, moving money and minting
+    another credential stay things a person does in front of a screen.
+  - **An invalid bearer is 401 and stops.** Falling through to anonymous is wrong
+    twice: 403 tells a client "you may not" when its problem is "who you say you
+    are is not valid", and a revoked token quietly becomes an anonymous caller
+    with whatever the public lanes allow.
+
+**Custom roles** (`runtime/tenant-role.ts`) — a workspace names a bundle of the
+product's own permissions, and every app gets the builder without declaring
+anything, because every app declares permissions already. A role registry is
+already a `Record<string, string[]>`, so a custom role is one more entry in it
+and nothing downstream changes.
+
+  - **The app's own roles win the merge**, and the order is the security property
+    rather than a preference: spread the other way, a workspace could define
+    `owner` and every owner in it would hold whatever that workspace said.
+  - **Nobody may build their way past what they hold.** `refuseRole` bounds a
+    role by its author's own permissions, and deleting one is bounded the same
+    way — otherwise somebody who cannot compose a role can still destroy one
+    carrying keys they lack, which is a permission change to everybody on it.
+  - **⚠️ AND `canAssignRole` HAD NO CALLER AT ALL.** The kernel has said since it
+    was written that a role is grantable only when the granter holds every
+    permission it carries — and the invite door checked nothing, so the way to
+    become an owner was to invite a second address of your own as one. Both doors
+    are bounded now, and `member.role` is the second of them: without it the only
+    way to change what somebody does was to remove and re-invite them, which
+    frees and re-takes a seat and asks a colleague to accept twice for access
+    they already have.
+  - **A role somebody holds is refused, never deleted.** Deleting it leaves every
+    member on it resolving to nothing — signed in, in the workspace, able to do
+    nothing, with no screen saying why.
+
+The roster itself had **no screen at all** before this: `member.invite`,
+`member.remove` and `member.permissions` were reachable by anybody who could
+compose an HTTP request and by nobody else. `people.tsx` is the surface, and it
+names no role and no permission of its own — both come from `role.list`, so one
+added to a product appears there and one removed stops appearing.
 
 ## 8. Stages
 
