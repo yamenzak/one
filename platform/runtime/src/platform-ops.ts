@@ -19,6 +19,8 @@ import { writeSetting } from "./settings.js";
 import { claim, invite } from "./membership.js";
 import { BRANDING, EVERY_PRODUCT, grantOpens, mayCreateHere, setupDoorFor, type Product } from "@one/kernel";
 import { sameSecret, type ProvisioningStore } from "./provisioning.js";
+import { claimSubscription, claimableFor } from "./account-billing.js";
+import { MARKET, type MarketCarrier } from "./market-ops.js";
 
 /**
  * ⚠️ A SYMBOL, so an app cannot reach it by writing the property name.
@@ -252,7 +254,7 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
     */
     outcome: { message: "Workspace created", tone: "success", moment: "welcome", invalidates: ["workspaces"] },
     emits: ["workspace.created"],
-    fails: ["platform.invalid", "platform.conflict", "platform.not_provisioned"],
+    fails: ["platform.invalid", "platform.conflict", "platform.not_provisioned", "platform.payment_required"],
     /*
       ⚠️ NOT REACHABLE BY A TOOL. An assistant that can mint tenants can mint
       them in a loop, and every one is a real address somebody else can no longer
@@ -281,6 +283,38 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
         const held = founder?.email ? await provision.store.read(founder.email) : null;
         if (!mayCreateHere(app.tenancy.creation, held, app.id)) ctx.fail("platform.not_provisioned", { product: app.name });
       }
+
+      /*
+        ⚠️ A WORKSPACE IS CREATED AGAINST A SUBSCRIPTION SOMEBODY ALREADY STARTED,
+        AND THIS IS WHERE THE PARKING STATE WENT.
+
+        The old order was: create, park on no plan, gate the product until
+        somebody pays. That is a product given away — every workspace usable
+        enough to be worth having before any money moves, kept alive by a state
+        whose whole job is to be escapable. Buying first removes the state and the
+        gate together: what somebody holds after paying is a subscription looking
+        for a workspace, and this is the moment it finds one.
+
+        ⚠️ AND IT IS REFUSED ONLY WHERE PAYING IS POSSIBLE. On a self-host, before
+        the deploy guide's payment step, and in every test in this repo there is
+        nothing to buy — so demanding a purchase would make the platform
+        unusable over OUR missing configuration rather than their non-payment.
+      */
+      /*
+        ⚠️ A WAITING SUBSCRIPTION IS ALWAYS CLAIMED; ONLY THE REFUSAL DEPENDS ON
+        WHETHER WE CAN CHARGE. Written as one condition, somebody who started a
+        trial on a deployment with no payment provider would create a workspace
+        that ignored it — the subscription stays pointing at nothing, the trial
+        runs out against no workspace, and the hub shows both a workspace with no
+        plan and a plan with no workspace.
+      */
+      const market = (ctx as unknown as MarketCarrier)[MARKET];
+      const founding = (ctx as unknown as FounderCarrier)[FOUNDER];
+      const waiting = market && founding?.userId
+        ? await claimableFor(market.global, founding.userId, app.id, ctx.now())
+        : null;
+      if (!waiting && market?.chargeable) ctx.fail("platform.payment_required", { product: app.name });
+      const claiming = waiting?.id ?? null;
       const bad = slugProblem(input.slug, app.tenancy.reservedSlugs);
       if (bad) ctx.fail("platform.invalid", { field: "slug", reason: bad });
 
@@ -324,6 +358,17 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
       });
 
       const founder = (ctx as unknown as FounderCarrier)[FOUNDER];
+
+      /*
+        ⚠️ CLAIMED AFTER THE WORKSPACE EXISTS AND BEFORE ANYTHING ELSE, and the
+        write is CONDITIONAL. Two setup doors open in two tabs both read the same
+        claimable subscription; written as an unguarded update, one subscription
+        pays for two workspaces and the unique index refuses at a moment nobody is
+        watching. The loser here is told to buy again, which is true.
+      */
+      if (claiming && !(await claimSubscription(market.global, claiming, tenantId, ctx.now()))) {
+        ctx.fail("platform.conflict", { field: "slug", reason: "that subscription was just used for another workspace" });
+      }
 
       /*
         ⚠️ THE NAME IS WRITTEN TO THE WORKSPACE'S OWN STORE, NOT ONLY TO THE

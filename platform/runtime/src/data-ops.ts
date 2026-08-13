@@ -15,6 +15,7 @@
 
 import type { AnyOperation, AppSpec, BindingSpec, Instant, ObjectHandle, SchemaModule, SqlHandle } from "@one/kernel";
 import { operation, s } from "@one/kernel";
+import { markClosing } from "./account-billing.js";
 import { OPERATE } from "./operator-ops.js";
 import { erasurePlan, eraseSubject, exportScoped, subjectPlan, eraseTenant, mustLeaveWith, type Forgotten, type Keeping } from "./data.js";
 import { jobHistory } from "./jobs.js";
@@ -139,11 +140,13 @@ export function dataOperations<B extends BindingSpec>(_app: AppSpec<B>): readonl
         there is no arrears to settle, so the copy cannot be shared — and the
         way back is cancelling rather than paying.
       */
-      await d.db.run(
-        `INSERT INTO subscription (tenant_id, status, closing_at, updated_at) VALUES (?, 'none', ?, ?)
-         ON CONFLICT(tenant_id) DO UPDATE SET closing_at = excluded.closing_at, updated_at = excluded.updated_at`,
-        d.tenantId, erasesAt, ctx.now(),
-      );
+      /*
+        ⚠️ WRITTEN ON THE ACCOUNT'S SUBSCRIPTION, WHICH IS WHERE THE GATE READS.
+        Written to a regional table nothing resolves against, "close this
+        workspace" would answer 200, schedule nothing, and leave the product
+        running — a destructive intention silently not recorded.
+      */
+      await markClosing(d.global, d.tenantId, erasesAt, ctx.now());
       return { erasesAt };
     },
   });
@@ -161,7 +164,7 @@ export function dataOperations<B extends BindingSpec>(_app: AppSpec<B>): readonl
     outcome: { message: "Welcome back", tone: "success", moment: "welcome", invalidates: ["billing.standing"] },
     async handler(ctx) {
       const d = deps(ctx);
-      await d.db.run(`UPDATE subscription SET closing_at = NULL, updated_at = ? WHERE tenant_id = ?`, ctx.now(), d.tenantId);
+      await markClosing(d.global, d.tenantId, null, ctx.now());
       return { ok: true };
     },
   });

@@ -18,12 +18,13 @@ import type {
   ConfigRegistry, DeploymentSpec, InferenceHandle, ObjectHandle, ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, SchemaModule, Session, SqlHandle, StandingState, TenantId,
 } from "@one/kernel";
 import {
-  ACCOUNT_HOLDER, ALWAYS_ALLOWED, CONSENT_EXEMPT_LANES, accountCascade, assertComposable, auditFor, check, consentGate, cookieDomainFor, gateFor, laneOf, weekStarting, PLATFORM_PROBLEMS, SEATS_ENTITLEMENT, STORAGE_ENTITLEMENT, SUPPORT_SESSION,
+  ACCOUNT_HOLDER, ALWAYS_ALLOWED, CONSENT_EXEMPT_LANES, accountCascade, assertComposable, auditFor, check, consentGate, cookieDomainFor, gateFor, laneOf, standingOf, weekStarting, PLATFORM_PROBLEMS, SEATS_ENTITLEMENT, STORAGE_ENTITLEMENT, SUPPORT_SESSION,
   catalogueOf, detailFor, floorPlan, fromQuery, provenRecently, PUBLIC, relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
 } from "@one/kernel";
 import { bindingsFor, globalSql, secretFor, type RawEnv } from "./env.js";
 import { applySchema } from "./schema.js";
 import { COMMERCE, commerceOperations, customerOperations, providerOperations, type CommerceCarrier } from "./commerce-ops.js";
+import { MARKET, marketOperations, type MarketCarrier } from "./market-ops.js";
 import { INBOX, inboxOperations, type InboxCarrier } from "./inbox-ops.js";
 import { DATA, dataOperations, type DataCarrier } from "./data-ops.js";
 import { FILES, fileOperations, allowanceFrom, type FilesCarrier } from "./files-ops.js";
@@ -85,7 +86,8 @@ import { fetchMedia, usedBytes } from "./files.js";
 import { readMaintenance, refuses } from "./maintenance.js";
 import { runDue, type RunReport } from "./jobs.js";
 import { dispatch, interpolatable, type Delivery } from "./inbox.js";
-import { customerFlagsFor, PARKED, readSubscription, standingFor } from "./commerce.js";
+import { customerFlagsFor, PARKED } from "./commerce.js";
+import { subscriptionForTenant } from "./account-billing.js";
 import { claim, memberOf, membersOf, permissionsOf, revoke, seatsUsed, subjectFor, wouldStrand } from "./membership.js";
 import { MEMBERS, membershipOperations, type MemberCarrier } from "./membership-ops.js";
 import { sqlDirectory } from "./directory.js";
@@ -374,7 +376,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...generationOperations(app), ...operatorOperations(app), ...configOperations(app), ...settingsOperations(app), ...domainAdminOperations(OPERATE), ...guideOperations(app), ...milestoneOperations(app), ...membershipOperations(app), ...referenceOperations(app), ...vaultOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app), ...marketOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...generationOperations(app), ...operatorOperations(app), ...configOperations(app), ...settingsOperations(app), ...domainAdminOperations(OPERATE), ...guideOperations(app), ...milestoneOperations(app), ...membershipOperations(app), ...referenceOperations(app), ...vaultOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
 
   /*
     ⚠️ A COLLECTION'S OPERATIONS ARE DERIVED HERE, NOT BY THE APP. Leaving it to
@@ -1007,9 +1009,23 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         were told would not happen.
       */
       const selling = catalogueOf(app.access.plans, await planOverrides(directoryDb));
-      const sub = at.tenant ? await readSubscription(regionalDb, at.tenant.tenantId) : PARKED;
+      /*
+        ⚠️ THE SUBSCRIPTION IS THE ACCOUNT'S AND IT IS READ FROM THE GLOBAL STORE.
+        The payer is an account, so the row lives where accounts do — and it has
+        to, because the hub that shows it is a different worker from the one that
+        enforces it, and one webhook settles for every product.
+
+        ⚠️ A WORKSPACE WITH NO SUBSCRIPTION IS PARKED RATHER THAN BROKEN. Made
+        before this rail existed, or by an operator, it resolves to the parking
+        allowances and a `setup` standing — the same treatment an unfinished
+        signup gets, which is the honest one: nothing was taken and there is
+        nothing to settle.
+      */
+      const accountSub = at.tenant ? await subscriptionForTenant(directoryDb, at.tenant.tenantId) : null;
+      const sub = accountSub ?? PARKED;
       const standingState = at.tenant
-        ? standingFor(sub, new Date().toISOString() as Instant, chargeable)
+        ? standingOf(accountSub ?? { planId: null, status: "none", trialEndsAt: null, pastDueAt: null, closingAt: null },
+                     new Date().toISOString() as Instant, chargeable)
         : ({ standing: "active", reason: "ok" } as StandingState);
       const gate = gateFor(standingState);
       const entitlements = resolveEntitlements({
@@ -1437,7 +1453,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       };
       const audit: AuditEntry[] = [];
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & ConfigCarrier & SettingsCarrier & LookupCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier & ProvisionCarrier & ReferenceCarrier & VaultCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & ConfigCarrier & SettingsCarrier & LookupCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier & ProvisionCarrier & MarketCarrier & ReferenceCarrier & VaultCarrier = {
         [CONFIG]: {
           own: directoryDb,
           /*
@@ -1500,6 +1516,20 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         },
         [GENERATION]: {
           db: regionalDb,
+          /*
+            ⚠️ THE PAYING ACCOUNT IS THE WORKSPACE'S, NOT THE CALLER'S. A coach
+            generating inside a studio spends the studio's credits; billed to
+            whoever made the request, a member of somebody else's workspace pays
+            for work they do not own out of a balance they bought for their own.
+
+            ⚠️ AND WITH NO SUBSCRIPTION THERE IS NO ACCOUNT TO CHARGE, so the
+            empty string is handed down and every spend is refused for want of a
+            balance. That is the correct refusal — an unpaid workspace generating
+            on credit is the platform paying a provider on its behalf.
+          */
+          global: directoryDb,
+          accountId: accountSub?.accountId ?? "",
+          productId: app.id,
           /*
             ⚠️ THE DEPLOYMENT'S OWN RATES, READ LAZILY. Only a request that
             actually generates pays for the query — and the shared store is where
@@ -1640,7 +1670,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           userId: session?.accountId ?? "",
           role: personRole,
           facts: async () => ({
-            plan_chosen: Boolean(sub.planId ?? sub.pendingPlanId),
+            plan_chosen: Boolean(sub.planId ?? accountSub?.pendingPlanId),
             passkey_registered: session ? (await identity.credentials(session.accountId).catch(() => [])).length > 0 : false,
             file_stored: ((await regionalDb.first<{ n: number }>(
               `SELECT COUNT(*) AS n FROM media WHERE tenant_id = ?`, at.tenant?.tenantId ?? "",
@@ -1718,9 +1748,27 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           presented: (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "") || null,
           products: opts.deployment?.products ?? [],
         },
+        /*
+          ⚠️ THE MARKETPLACE ANSWERS WITH NO TENANT AT ALL, which is why its
+          dependencies are an ACCOUNT and the global store rather than the
+          regional handle beside it. Somebody who has never created a workspace
+          is exactly who this is for.
+        */
+        [MARKET]: {
+          global: directoryDb,
+          accountId: session?.accountId ?? null,
+          products: opts.deployment?.products ?? [],
+          selling,
+          declared: app.access.entitlements as never,
+          chargeable,
+          portalUrl: (await readAll(directoryDb))["billing.portal_url"] ?? null,
+        },
         [COMMERCE]: {
           db: regionalDb,
           tenantId: at.tenant?.tenantId ?? "",
+          /* ⚠️ Who pays for this workspace. Empty where nothing does yet, which is
+             a workspace on a deployment that cannot charge — see the gate above. */
+          accountId: accountSub?.accountId ?? session?.accountId ?? "",
           chargeable,
           /* ⚠️ The same list the gate resolved against. Two reads is how a shelf
              comes to show a price the gate does not enforce. */

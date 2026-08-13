@@ -72,6 +72,14 @@ export interface ProviderEvent {
   readonly appId: string | null;
   readonly tenantId: string | null;
   readonly planId: string | null;
+  /**
+   * ⚠️ THE SUBSCRIPTION THIS PAYMENT IS FOR, where the checkout named one. It is
+   * the only attribution that works before a workspace exists — which is the
+   * ordinary case now that buying comes first.
+   */
+  readonly subscriptionRef: string | null;
+  /** Which credit pack, where the payment was for credits rather than access. */
+  readonly packId: string | null;
   /** The provider's identifier for the payer — how an event with no metadata is claimed. */
   readonly customerRef: string | null;
   readonly paidMinor: number;

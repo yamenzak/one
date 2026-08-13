@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import { CREDITS, dayOf, generate, judge, spending, spentToday, usageOf } from "../src/generate.js";
-import { balance, record } from "../src/ledger.js";
+import { balanceFor, grantCredits } from "../src/account-billing.js";
 import type { AiSpec, InferenceHandle, Instant, SqlHandle } from "@one/kernel";
 
 const AT = "2026-01-10T09:00:00.000Z" as Instant;
@@ -26,16 +26,26 @@ const ai: AiSpec = {
 
 /* -------------------------------------------------------------- fixtures --- */
 
-/** Enough of a store to answer the ledger's three statements and the audit row. */
+/**
+ * Enough of a store to answer the credit ledger's statements and the audit row.
+ *
+ * ⚠️ THE CONDITIONAL DEBIT IS MODELLED AS ONE STATEMENT, which is what it is in
+ * the store. A fake that read a balance and then pushed would make the racing
+ * test pass against an implementation that does not — and overspending is the
+ * one failure here that costs real money.
+ */
 function world() {
-  const ledger: { id: string; unit: string; amount: number; ref: string | null }[] = [];
+  const credits: { id: string; kind: string; amount: number; expires: string | null; ref: string | null }[] = [];
   const gens: Record<string, unknown>[] = [];
+  const live = (now: string) =>
+    credits.filter((e) => e.kind === "purchased" || (e.expires !== null && e.expires > now)).reduce((n, e) => n + e.amount, 0);
   const db = {
     async first<T>(sql: string, ...p: readonly unknown[]) {
-      if (sql.includes("SUM(amount)")) return { total: ledger.filter((e) => e.unit === p[1]).reduce((n, e) => n + e.amount, 0) } as T;
-      if (sql.includes("COUNT(*) AS n FROM ledger")) return { n: ledger.filter((e) => e.unit === p[1]).length } as T;
-      /* ⚠️ Whether the conditional debit landed. The only way to tell it apart. */
-      if (sql.includes("SELECT id FROM ledger")) return (ledger.find((e) => e.id === p[0]) ?? null) as T | null;
+      if (sql.includes("SUM(amount) AS total FROM account_credit")) {
+        return { total: credits.filter((e) => e.kind === "purchased").reduce((n, e) => n + e.amount, 0) } as T;
+      }
+      if (sql.includes("COUNT(*) AS n FROM account_credit")) return { n: credits.length } as T;
+      if (sql.includes("SELECT id FROM account_credit")) return (credits.find((e) => e.id === p[0]) ?? null) as T | null;
       if (sql.includes("FROM generation") && sql.includes("COUNT(*)")) {
         const [, actor, feature, since] = p as [string, string, string, string];
         return { n: gens.filter((g) => g.actor_id === actor && g.feature === feature && String(g.at) >= since).length } as T;
@@ -43,21 +53,28 @@ function world() {
       if (sql.includes("FROM generation")) return (gens.find((g) => g.id === p[1]) ?? null) as T | null;
       return null as T | null;
     },
-    async all<T>(sql: string, _t: unknown, limit: number) {
-      if (sql.includes("FROM generation")) return [...gens].reverse().slice(0, limit) as T[];
+    async all<T>(sql: string, ...p: readonly unknown[]) {
+      if (sql.includes("GROUP BY expires_at")) {
+        const byDate = new Map<string | null, number>();
+        for (const e of credits.filter((c) => c.kind === "granted")) byDate.set(e.expires, (byDate.get(e.expires) ?? 0) + e.amount);
+        return [...byDate].map(([expires_at, left]) => ({ expires_at, left })) as T[];
+      }
+      if (sql.includes("FROM generation")) return [...gens].reverse().slice(0, p[1] as number) as T[];
       return [] as T[];
     },
     async run(sql: string, ...p: readonly unknown[]) {
-      if (sql.includes("INSERT OR IGNORE INTO ledger")) ledger.push({ id: p[0] as string, unit: p[2] as string, amount: p[3] as number, ref: (p[5] ?? null) as string | null });
-      /*
-        ⚠️ THE CONDITIONAL DEBIT, MODELLED AS ONE STATEMENT — which is what it
-        is in the store. A fake that read the balance and then pushed would make
-        the racing test pass against an implementation that does not.
-      */
-      if (sql.includes("INSERT INTO ledger") && sql.includes("WHERE (SELECT")) {
-        const unit = p[2] as string;
-        const covered = ledger.filter((e) => e.unit === unit).reduce((n, e) => n + e.amount, 0) >= (p[10] as number);
-        if (covered) ledger.push({ id: p[0] as string, unit, amount: p[3] as number, ref: (p[5] ?? null) as string | null });
+      if (sql.includes("INSERT OR IGNORE INTO account_credit")) {
+        const ref = (p[6] ?? null) as string | null;
+        if (ref === null || !credits.some((e) => e.ref === ref)) {
+          credits.push({ id: p[0] as string, kind: p[2] as string, amount: p[3] as number, expires: (p[4] ?? null) as string | null, ref });
+        }
+      } else if (sql.includes("INSERT INTO account_credit") && sql.includes("WHERE (SELECT")) {
+        const now = p[10] as string;
+        if (live(now) >= (p[11] as number)) {
+          credits.push({ id: p[0] as string, kind: p[2] as string, amount: p[3] as number, expires: (p[4] ?? null) as string | null, ref: null });
+        }
+      } else if (sql.includes("INSERT INTO account_credit")) {
+        credits.push({ id: p[0] as string, kind: p[2] as string, amount: p[3] as number, expires: (p[4] ?? null) as string | null, ref: null });
       }
       if (sql.startsWith("INSERT INTO generation")) {
         gens.push({ id: p[0], tenant_id: p[1], feature: p[2], model: p[3], actor_id: p[4], held: p[5], charged: p[6], verdict: null, at: p[7] });
@@ -68,7 +85,7 @@ function world() {
       }
     },
   } as unknown as SqlHandle;
-  return { db, ledger, gens };
+  return { db, credits, gens };
 }
 
 const runner = (answer: unknown, permitted: readonly string[] = []): InferenceHandle => ({
@@ -96,10 +113,10 @@ const counting = (answer: unknown, delayTicks = 3) => {
 };
 
 const fund = async (w: ReturnType<typeof world>, amount: number) =>
-  record(w.db, "t", { unit: CREDITS, amount, reason: "bought", actorId: "op" }, AT);
+  grantCredits(w.db, "acc", { kind: "purchased", amount, reason: "bought" }, AT);
 
 const ask = (w: ReturnType<typeof world>, inference: InferenceHandle | null, over: Partial<Parameters<typeof generate>[0]> = {}) =>
-  generate({ db: w.db, ai, inference, tenantId: "t", actorId: "u", feature: "draft", prompt: "four weeks", at: AT, ...over });
+  generate({ db: w.db, global: w.db, accountId: "acc", productId: "hello", ai, inference, tenantId: "t", actorId: "u", feature: "draft", prompt: "four weeks", at: AT, ...over });
 
 /* ---------------------------------------------------------------- happy --- */
 
@@ -111,7 +128,7 @@ describe("one metered generation", () => {
     expect(out.ok).toBe(true);
     /* 10 × 1 + 20 × 2 = 50 */
     expect((out as { charged: number }).charged).toBe(50);
-    expect(await balance(w.db, "t", CREDITS)).toBe(10_000 - 50);
+    expect((await balanceFor(w.db, "acc", AT)).total).toBe(10_000 - 50);
     expect((out as { output: unknown }).output).toBe("a plan");
   });
 
@@ -126,7 +143,7 @@ describe("one metered generation", () => {
     const out = await ask(w, runner({ output: "a plan" }));
     const held = w.gens[0]!.held as number;
     expect((out as { charged: number }).charged).toBe(held);
-    expect(await balance(w.db, "t", CREDITS)).toBe(10_000 - held);
+    expect((await balanceFor(w.db, "acc", AT)).total).toBe(10_000 - held);
   });
 
   /*
@@ -155,7 +172,7 @@ describe("what stops a call before it costs anything", () => {
     await fund(w, 10_000);
     const out = await ask(w, null);
     expect(out).toMatchObject({ ok: false, why: "unconfigured" });
-    expect(await balance(w.db, "t", CREDITS)).toBe(10_000);
+    expect((await balanceFor(w.db, "acc", AT)).total).toBe(10_000);
   });
 
   it("refuses a feature the manifest does not declare", async () => {
@@ -174,7 +191,7 @@ describe("what stops a call before it costs anything", () => {
     await fund(w, 10_000);
     const out = await ask(w, runner({ output: "x" }, ["some-eu-model"]));
     expect(out).toMatchObject({ ok: false, why: "unconfigured" });
-    expect(await balance(w.db, "t", CREDITS)).toBe(10_000);
+    expect((await balanceFor(w.db, "acc", AT)).total).toBe(10_000);
   });
 
   /*
@@ -250,14 +267,14 @@ describe("two calls at once against one call's worth of credits", () => {
     await fund(fresh, reserve);
     const provider = counting({ output: "x" });
     const both = await Promise.all([
-      generate({ db: fresh.db, ai, inference: provider.handle, tenantId: "t", actorId: "a", feature: "draft", prompt: "four weeks", at: AT }),
-      generate({ db: fresh.db, ai, inference: provider.handle, tenantId: "t", actorId: "b", feature: "draft", prompt: "four weeks", at: AT }),
+      generate({ db: fresh.db, global: fresh.db, accountId: "acc", productId: "hello", ai, inference: provider.handle, tenantId: "t", actorId: "a", feature: "draft", prompt: "four weeks", at: AT }),
+      generate({ db: fresh.db, global: fresh.db, accountId: "acc", productId: "hello", ai, inference: provider.handle, tenantId: "t", actorId: "b", feature: "draft", prompt: "four weeks", at: AT }),
     ]);
 
     expect(provider.calls).toHaveLength(1);
     expect(both.filter((r) => r.ok)).toHaveLength(1);
     expect(both.find((r) => !r.ok)).toMatchObject({ why: "no_credits" });
-    expect(await balance(fresh.db, "t", CREDITS)).toBeGreaterThanOrEqual(0);
+    expect((await balanceFor(fresh.db, "acc", AT)).total).toBeGreaterThanOrEqual(0);
   });
 });
 
@@ -274,7 +291,7 @@ describe("when the provider fails", () => {
     await fund(w, 10_000);
     const out = await ask(w, runner(new Error("upstream")));
     expect(out).toMatchObject({ ok: false, why: "provider" });
-    expect(await balance(w.db, "t", CREDITS)).toBe(10_000);
+    expect((await balanceFor(w.db, "acc", AT)).total).toBe(10_000);
   });
 
   /*
@@ -399,13 +416,13 @@ describe("a picture and the feature that did or did not ask for one", () => {
 
   const call = async (feature: string, image?: { bytes: ArrayBuffer; contentType: string }) => {
     const w = world();
-    await record(w.db, "t_1", { unit: CREDITS, amount: 100_000, reason: "test", actorId: "op" }, AT);
+    await grantCredits(w.db, "acc", { kind: "purchased", amount: 100_000, reason: "test" }, AT);
     const out = await generate({
-      db: w.db, ai: sees, inference: runner({ output: "ok" }),
+      db: w.db, global: w.db, accountId: "acc", productId: "hello", ai: sees, inference: runner({ output: "ok" }),
       tenantId: "t_1", actorId: "u_1", feature, prompt: "what is this",
       ...(image ? { image } : {}), at: AT,
     });
-    return { out, spent: 100_000 - (await balance(w.db, "t_1", CREDITS)) };
+    return { out, spent: 100_000 - (await balanceFor(w.db, "acc", AT)).total };
   };
 
   it("runs a vision feature given a picture", async () => {

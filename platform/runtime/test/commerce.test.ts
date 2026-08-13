@@ -295,7 +295,7 @@ describe("the provider lane comes with the surface that makes parking a recovery
  * the worst outcome available, and the one that looks most like it worked.
  */
 describe("whose event is this", () => {
-  const event = { id: "e", kind: "paid" as const, appId: null, tenantId: null, planId: null, customerRef: "cus_1", paidMinor: 900, refundedMinorTotal: 0 };
+  const event = { id: "e", kind: "paid" as const, appId: null, tenantId: null, planId: null, subscriptionRef: null, packId: null, customerRef: "cus_1", paidMinor: 900, refundedMinorTotal: 0 };
   const claims = (appId: string) => async () => ({ tenantId: "t_1", appId });
 
   it("trusts metadata we wrote ourselves over any lookup", async () => {

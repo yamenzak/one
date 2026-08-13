@@ -66,26 +66,33 @@ const as = (cookie: string) => async (path: string, body?: unknown) => {
  * purchase is what will put them here, and it is not built. Reaching past the
  * surface is honest for a fixture standing in for one; it would not be for an
  * assertion.
+ *
+ * ⚠️ AND THE BALANCE IS THE ACCOUNT'S, IN THE GLOBAL STORE. Credits are bought
+ * once and spent in any product, so a fixture funding a workspace would be
+ * funding something that no longer holds money — and every assertion below would
+ * read zero while the code under test was perfectly correct.
  */
 interface RawDb { prepare(sql: string): { bind(...p: unknown[]): { run(): Promise<unknown>; first<T>(): Promise<T | null> } } }
 
 const fund = async (amount: number) => {
-  const db = (env as unknown as { DB: RawDb }).DB;
+  const db = (env as unknown as { DIRECTORY: RawDb }).DIRECTORY;
   await db.prepare(
-    `INSERT INTO ledger (id, tenant_id, unit, amount, reason, ref, actor_id, at) VALUES (?, ?, 'credits', ?, 'test', NULL, 'op', ?)`,
-  ).bind(crypto.randomUUID(), tenantId, amount, new Date().toISOString()).run();
+    `INSERT INTO account_credit (id, account_id, kind, amount, expires_at, reason, ref, product_id, at) VALUES (?, ?, 'purchased', ?, NULL, 'test', NULL, 'kova', ?)`,
+  ).bind(crypto.randomUUID(), payerId, amount, new Date().toISOString()).run();
 };
 
 const balance = async (): Promise<number> => {
-  const db = (env as unknown as { DB: RawDb }).DB;
-  const row = await db.prepare(`SELECT COALESCE(SUM(amount), 0) AS n FROM ledger WHERE tenant_id = ? AND unit = 'credits'`)
-    .bind(tenantId).first<{ n: number }>();
+  const db = (env as unknown as { DIRECTORY: RawDb }).DIRECTORY;
+  const row = await db.prepare(`SELECT COALESCE(SUM(amount), 0) AS n FROM account_credit WHERE account_id = ?`)
+    .bind(payerId).first<{ n: number }>();
   return row?.n ?? 0;
 };
 
 let coach: ReturnType<typeof as>;
 let coachCookie = "";
 let tenantId = "";
+/** ⚠️ The account that PAYS for the studio — the balance is not the workspace's. */
+let payerId = "";
 
 beforeAll(async () => {
   attach();
@@ -95,6 +102,19 @@ beforeAll(async () => {
   expect(tenantId, "the studio fixture must have been created").toBeTruthy();
   coachCookie = await signIn(`${SLUG}@example.test`, STUDIO);
   coach = as(coachCookie);
+  /*
+    ⚠️ THE STUDIO IS PUT ON A SUBSCRIPTION, WHICH IS WHAT NAMES ITS PAYER. On a
+    deployment that can charge, buying is what creates the workspace at all and
+    the payer is known before it exists; this one cannot charge, so the row
+    arrives the other way — the same route a self-host takes. Without it there is
+    no account to spend from, and every generation below would be refused for
+    want of a balance that was funded to the wrong place.
+  */
+  expect((await coach("/api/billing.choose", { planId: "solo" })).status).toBe(200);
+  const db = (env as unknown as { DIRECTORY: RawDb }).DIRECTORY;
+  payerId = (await db.prepare(`SELECT account_id AS a FROM account_subscription WHERE tenant_id = ?`)
+    .bind(tenantId).first<{ a: string }>())?.a ?? "";
+  expect(payerId, "the studio must have a paying account").toBeTruthy();
 });
 
 afterEach(() => {

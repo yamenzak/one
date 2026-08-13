@@ -74,22 +74,27 @@ const photo = (tag: number): ArrayBuffer =>
 
 interface RawDb { prepare(sql: string): { bind(...p: unknown[]): { run(): Promise<unknown>; first<T>(): Promise<T | null> } } }
 
+/* ⚠️ THE ACCOUNT'S BALANCE, IN THE GLOBAL STORE. Credits are bought once and
+   spent in any product, so funding the workspace would fund something that holds
+   no money — and every assertion here would read zero against correct code. */
 const fund = async (amount: number) => {
-  const db = (env as unknown as { DB: RawDb }).DB;
+  const db = (env as unknown as { DIRECTORY: RawDb }).DIRECTORY;
   await db.prepare(
-    `INSERT INTO ledger (id, tenant_id, unit, amount, reason, ref, actor_id, at) VALUES (?, ?, 'credits', ?, 'test', NULL, 'op', ?)`,
-  ).bind(crypto.randomUUID(), tenantId, amount, new Date().toISOString()).run();
+    `INSERT INTO account_credit (id, account_id, kind, amount, expires_at, reason, ref, product_id, at) VALUES (?, ?, 'purchased', ?, NULL, 'test', NULL, 'kova', ?)`,
+  ).bind(crypto.randomUUID(), payerId, amount, new Date().toISOString()).run();
 };
 
 const balance = async (): Promise<number> => {
-  const db = (env as unknown as { DB: RawDb }).DB;
-  const row = await db.prepare(`SELECT COALESCE(SUM(amount), 0) AS n FROM ledger WHERE tenant_id = ? AND unit = 'credits'`)
-    .bind(tenantId).first<{ n: number }>();
+  const db = (env as unknown as { DIRECTORY: RawDb }).DIRECTORY;
+  const row = await db.prepare(`SELECT COALESCE(SUM(amount), 0) AS n FROM account_credit WHERE account_id = ?`)
+    .bind(payerId).first<{ n: number }>();
   return row?.n ?? 0;
 };
 
 let coach: ReturnType<typeof as>;
 let tenantId = "";
+/** ⚠️ The account that PAYS for the studio — the balance is not the workspace's. */
+let payerId = "";
 let meal = "";
 
 beforeAll(async () => {
@@ -99,6 +104,18 @@ beforeAll(async () => {
   tenantId = made.body.tenantId as string;
   expect(tenantId, "the studio fixture must have been created").toBeTruthy();
   coach = as(await signIn(`${SLUG}@example.test`, STUDIO));
+
+  /*
+    ⚠️ THE STUDIO IS PUT ON A SUBSCRIPTION, WHICH IS WHAT NAMES ITS PAYER. On a
+    deployment that can charge, buying is what creates the workspace at all;
+    this one cannot, so the row arrives the other way — the same route a
+    self-host takes. Without it there is no account to spend from.
+  */
+  expect((await coach.call("/api/billing.choose", { planId: "solo" })).status).toBe(200);
+  const dir = (env as unknown as { DIRECTORY: RawDb }).DIRECTORY;
+  payerId = (await dir.prepare(`SELECT account_id AS a FROM account_subscription WHERE tenant_id = ?`)
+    .bind(tenantId).first<{ a: string }>())?.a ?? "";
+  expect(payerId, "the studio must have a paying account").toBeTruthy();
 
   const up = await coach.upload(photo(1), "purpose=meal&name=lunch.jpg", "image/jpeg");
   expect(up.status, "the picture fixture must have uploaded").toBe(200);

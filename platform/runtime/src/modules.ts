@@ -37,6 +37,7 @@ import { VAULT_SCHEMA, VAULT_SPEC_SCHEMA } from "./vault.js";
 import { IDENTITY_SCHEMA } from "./identity.js";
 import { OTP_SCHEMA } from "./identity-ops.js";
 import { PROVISIONING_SCHEMA } from "./provisioning.js";
+import { ACCOUNT_BILLING_SCHEMA } from "./account-billing.js";
 import { PROVIDER_SCHEMA } from "./provider.js";
 import { PLATFORM_STATE_SCHEMA } from "./maintenance.js";
 import { JOB_SCHEMA } from "./jobs.js";
@@ -113,6 +114,13 @@ export const PLATFORM_GLOBAL: readonly SchemaModule[] = [
     all of them.
   */
   PROVISIONING_SCHEMA as SchemaModule,
+  /*
+    ⚠️ GLOBAL BECAUSE THE PAYER IS AN ACCOUNT AND THE HUB SPANS EVERY PRODUCT.
+    A regional table could answer only for the workspaces in its own region, so a
+    hub would show three of somebody's four. It is also what lets ONE webhook
+    settle everything: whichever worker a notification arrives at writes here.
+  */
+  ACCOUNT_BILLING_SCHEMA,
   PROVIDER_SCHEMA,
   PLATFORM_STATE_SCHEMA,
   JOB_SCHEMA,

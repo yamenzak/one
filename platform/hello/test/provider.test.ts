@@ -97,6 +97,13 @@ beforeAll(async () => {
   member = await signIn("rail@example.test", ORIGIN);
   operator = await signIn("op@rail.example.test", ADMIN);
   expect(accountIds.get("rail@example.test")).toBeTruthy();
+  /*
+    ⚠️ THE WORKSPACE IS GIVEN A SUBSCRIPTION, because a payment settles against
+    one. On a deployment that can charge, buying is what creates the workspace at
+    all; this one cannot charge, so the row arrives the other way — which is the
+    same route a self-host takes.
+  */
+  expect((await call("/api/billing.choose", { planId: "keeper" })).status).toBe(200);
 });
 
 /* ---------------------------------------------------------- verification --- */
@@ -249,8 +256,11 @@ describe("an event this worker cannot place is parked, never answered clean", ()
 /* --------------------------------------------------------------- ladder --- */
 
 describe("what a payment event does to standing", () => {
+  /* ⚠️ THE GLOBAL STORE, because the payer is an account and the subscription
+     lives where accounts do — which is also why a settlement no longer has to
+     find the right region before it can be applied. */
   const anchorOf = async () =>
-    (await handle("DB").first<{ a: string | null }>(`SELECT past_due_at AS a FROM subscription WHERE tenant_id = ?`, tenantId))?.a ?? null;
+    (await global_().first<{ a: string | null }>(`SELECT past_due_at AS a FROM account_subscription WHERE tenant_id = ?`, tenantId))?.a ?? null;
 
   /*
     ⚠️ THE LADDER IS ANCHORED ON WHEN THE CHARGE FIRST FAILED. A provider retries
@@ -280,7 +290,7 @@ describe("what a payment event does to standing", () => {
       what a re-stamp would silently undo.
     */
     const aged = new Date(Date.now() - 6 * 86_400_000).toISOString();
-    await handle("DB").run(`UPDATE subscription SET past_due_at = ? WHERE tenant_id = ?`, aged, tenantId);
+    await global_().run(`UPDATE account_subscription SET past_due_at = ? WHERE tenant_id = ?`, aged, tenantId);
 
     await deliver({ id: `evt_fail_2_${attempt}`, type: "invoice.payment_failed", data: { object: { metadata: { app: "hello", tenant: tenantId } } } });
     expect(await anchorOf(), "a retry must not push the workspace back to day zero").toBe(aged);
@@ -304,17 +314,32 @@ describe("what a payment event does to standing", () => {
     implied writes the row into the wrong database — where nothing throws, the
     workspace never sees its plan, and the event is recorded as applied.
   */
-  it("settles a workspace that lives in another region", async () => {
+  /*
+    ⚠️ A PAYMENT NO LONGER HAS TO FIND A REGION BEFORE IT CAN BE APPLIED, and
+    that is the point of this one. The subscription is the ACCOUNT's, so it is in
+    the one store every worker binds — a workspace on another continent settles
+    from whichever worker the provider happened to reach, with no cross-region
+    handle in the path at all. The failure this replaces was real and worse: a
+    settlement written to the default region for a workspace that lives elsewhere
+    looks correct in both places and takes effect in neither.
+  */
+  it("settles a workspace that lives in another region, with no region in the path", async () => {
     const staff = await signIn("rail-eu@example.test", SETUP);
     const made = await post(SETUP, "/api/identity.workspace.create", { slug: "rail-eu", region: "eu" }, staff);
     const far = made.body.tenantId as string;
+    const far_ = await signIn("rail-eu@example.test", "https://rail-eu.hello.4dl.app");
+    await worker.fetch(new Request("https://rail-eu.hello.4dl.app/api/billing.choose", {
+      method: "POST", headers: { "content-type": "application/json", cookie: far_ },
+      body: JSON.stringify({ planId: "keeper" }),
+    }), env as never);
 
     expect((await deliver(paid("evt_eu", { app: "hello", tenant: far, plan: "keeper" }))).body.outcome).toBe("applied:paid");
 
-    const there = await handle("DB_EU").first<{ p: string }>(`SELECT plan_id AS p FROM subscription WHERE tenant_id = ?`, far);
-    expect(there?.p).toBe("keeper");
-    const here = await handle("DB").first<{ p: string }>(`SELECT plan_id AS p FROM subscription WHERE tenant_id = ?`, far);
-    expect(here, "the default region must not have been written instead").toBeNull();
+    const row = await global_().first<{ p: string; s: string }>(
+      `SELECT plan_id AS p, status AS s FROM account_subscription WHERE tenant_id = ?`, far,
+    );
+    expect(row?.p).toBe("keeper");
+    expect(row?.s).toBe("active");
   });
 });
 

@@ -27,6 +27,11 @@ let subject = "";
 const db = () =>
   bindingsFor({ db: sql() }, { DB: (env as Record<string, unknown>).DB }, { defaultRegion: "auto" })("auto" as ResolvedRegion).db;
 
+/* ⚠️ THE SUBSCRIPTION IS THE ACCOUNT'S AND LIVES WHERE ACCOUNTS DO. Aged and
+   adjusted here rather than in the regional store, which no longer holds it. */
+const directory = () =>
+  bindingsFor({ db: sql() }, { DB: (env as Record<string, unknown>).DIRECTORY }, { defaultRegion: "auto" })("auto" as ResolvedRegion).db;
+
 const call = async (path: string, body?: unknown, cookie = member) => {
   const res = await worker.fetch(
     new Request(`${ORIGIN}${path}`, {
@@ -111,19 +116,19 @@ describe("where a workspace stands", () => {
     has, including the billing surface somebody would use to fix it.
   */
   it("falls back to no overrides rather than throwing on a malformed blob", async () => {
-    await db().run(`UPDATE subscription SET grandfathered_json = ? WHERE tenant_id = ?`, "{not json", tenantId);
+    await directory().run(`UPDATE account_subscription SET grandfathered_json = ? WHERE tenant_id = ?`, "{not json", tenantId);
     /*
       ⚠️ READ IT BACK FIRST. A test whose setup silently wrote to the wrong
       database, or matched no row, asserts that a healthy path is healthy — which
       is a pass produced by nothing, and the failure mode this whole suite is
       about.
     */
-    const stored = await db().first<{ g: string }>(`SELECT grandfathered_json AS g FROM subscription WHERE tenant_id = ?`, tenantId);
+    const stored = await directory().first<{ g: string }>(`SELECT grandfathered_json AS g FROM account_subscription WHERE tenant_id = ?`, tenantId);
     expect(stored?.g).toBe("{not json");
     const res = await call("/api/billing.standing");
     expect(res.status).toBe(200);
     expect((res.body.entitlements as unknown as Record<string, { value: unknown }>).receiptsStored!.value).toBe(5);
-    await db().run(`UPDATE subscription SET grandfathered_json = '{}' WHERE tenant_id = ?`, tenantId);
+    await directory().run(`UPDATE account_subscription SET grandfathered_json = '{}' WHERE tenant_id = ?`, tenantId);
   });
 
   it("refuses a plan that is not in the catalogue", async () => {
@@ -178,8 +183,8 @@ describe("paying is a way out, never the only one", () => {
     ladder has quietly become a trap.
   */
   it("serves the billing surface to a workspace the gate has closed", async () => {
-    await db().run(
-      `UPDATE subscription SET plan_id = 'keeper', status = 'past_due', past_due_at = ? WHERE tenant_id = ?`,
+    await directory().run(
+      `UPDATE account_subscription SET plan_id = 'keeper', status = 'past_due', past_due_at = ? WHERE tenant_id = ?`,
       "2020-01-01T00:00:00.000Z", tenantId,
     );
     const shut = await call("/api/note.create", { title: "while blocked" });
@@ -187,7 +192,7 @@ describe("paying is a way out, never the only one", () => {
 
     expect((await call("/api/billing.standing")).status).toBe(200);
     expect((await call("/api/billing.choose", { planId: "free" })).status).toBe(200);
-    await db().run(`UPDATE subscription SET plan_id = NULL, status = 'none', past_due_at = NULL WHERE tenant_id = ?`, tenantId);
+    await directory().run(`UPDATE account_subscription SET plan_id = NULL, status = 'none', past_due_at = NULL WHERE tenant_id = ?`, tenantId);
   });
 });
 
@@ -287,11 +292,11 @@ describe("what the workspace sells its own customers", () => {
     who was sold it, and says which entitlement did it.
   */
   it("withholds a sold capability when the workspace itself loses the entitlement", async () => {
-    await db().run(`UPDATE subscription SET adjusted_json = ? WHERE tenant_id = ?`, JSON.stringify({ notes: false }), tenantId);
+    await directory().run(`UPDATE account_subscription SET adjusted_json = ? WHERE tenant_id = ?`, JSON.stringify({ notes: false }), tenantId);
     expect((await call("/api/notes.digest")).status).toBe(403);
     const caps = (await call(`/api/commerce.capabilities?subjectId=${subject}`)).body.flags as unknown as Record<string, { from: string; blockedBy?: string }>;
     expect(caps.digest).toMatchObject({ value: false, from: "not_sold", blockedBy: "notes" });
-    await db().run(`UPDATE subscription SET adjusted_json = '{}' WHERE tenant_id = ?`, tenantId);
+    await directory().run(`UPDATE account_subscription SET adjusted_json = '{}' WHERE tenant_id = ?`, tenantId);
   });
 });
 

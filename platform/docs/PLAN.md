@@ -355,6 +355,73 @@ every product on the deployment to any address the caller names. A grant MERGES
 ability to open a NEW workspace: an endpoint a website can call must never be able
 to make somebody's existing workspace disappear.
 
+#### The account is the payer, and the parking state is gone
+
+**Answered 2026-08-13, and it is one decision with five consequences.** A
+subscription and a credit balance both used to belong to a WORKSPACE. They belong
+to an ACCOUNT now, and everything below follows from that.
+
+**A workspace could never have been the payer, because it does not exist at the
+moment somebody decides to buy.** The purchase is what lets them make one. Held
+on the workspace, the only expressible order is *create first, pay later* — which
+is the parking state: a product given away, kept usable by a state whose entire
+job is to be escapable, with a gate on top to stop it being useful. Buying first
+removes the state and the gate together. `identity.workspace.create` claims a
+subscription the account already started and refuses with
+`platform.payment_required` (402) where there is none.
+
+**A subscription is `(account × product × workspace)`, and one of those three is
+allowed to be missing.** Somebody buys in the hub, is handed to the product's
+setup door and closes the tab: what they hold is a paid subscription looking for
+a workspace. It is theirs, the hub shows it with the address to finish at, and the
+next workspace they create in that product claims it — with a guarded UPDATE,
+because two tabs otherwise attach one subscription to two workspaces and a unique
+index refuses at a moment nobody is watching. **One subscription is one
+workspace**: a plan's ceilings are written per workspace, so a second studio is a
+second subscription on the same card.
+
+**Credits are ONE balance for the account, spendable in every product** — and
+they are two kinds of credit wearing one number, which is the whole of
+`kernel/src/credit.ts`. A plan GRANTS an allowance every period and it does not
+roll over; a pack is BOUGHT and never expires. Held as one total they cannot be
+told apart, so either every credit expires (destroying money somebody paid for) or
+none does (an allowance silently becoming cumulative — a year of generation for
+anybody who waits). Three rules keep that honest:
+
+- **Perishable first, soonest-perishing before the rest.** Any other order lets a
+  cohort lapse unused, which is a quiet loss no screen shows.
+- **A charge carries the same expiry as the grant it drew from**, so the two leave
+  the sum together. Written unexpiring, the ledger goes NEGATIVE by whatever was
+  spent the moment a grant lapses.
+- **Expiry is a predicate, not a sweep.** A job that zeroed lapsed cohorts makes
+  the balance depend on whether that job ran.
+
+**A settlement no longer has to find a region before it can be applied**, which is
+what makes ONE webhook work for every product. `account_subscription` and
+`account_credit` are in the global directory, so whichever worker a provider
+reaches writes the same rows — and an event now names its *subscription* first,
+because the ordinary successful payment happens before any workspace exists and
+would otherwise be parked as `no_tenant`.
+
+**The charge lands on the account that PAYS for the workspace, not on whoever
+made the request.** A coach generating inside a studio spends the studio's
+credits; billed to the actor, a member of somebody else's workspace pays for work
+they do not own out of a balance they bought for their own.
+
+⚠️ **`chargeable` gates exactly one branch, and getting that wrong is a whole
+class of bug in either direction.** Never having chosen a plan on a deployment
+that cannot charge is OUR missing configuration, so it stands down — otherwise
+every self-host is read-only with nothing to pay. A *reported failed charge* is
+evidence a payment rail exists, so the arrears ladder must run regardless: read as
+"this deployment cannot charge", every workspace that stopped paying sits at
+`active` while the provider retries, looking correct at every individual moment
+and never arriving.
+
+⚠️ **The last rung is destructive and has a floor.** grace → read-only → blocked →
+**erased**, and erasure is the one step paying cannot undo, so it sits at 60 days
+with a 30-day floor the ladder validator enforces. Somebody who missed a payment
+while travelling has to come back to a product rather than to an apology.
+
 #### The migration is additive
 
 A credential bound to `<app>.4dl.app` keeps working on that app. New
@@ -1399,6 +1466,18 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `the-account-centre-offers-only-what-was-granted` | an account centre listing every product on the deployment to everybody signed in, and the address to go to assembled by hand — the setup door is derived from the product's own root, so the account centre and the product cannot disagree about the one thing that has to be right | **live** |
 | `one-address-rule-for-the-field-and-the-route` | a second regular expression in the screen that agrees today. `slugProblem` is in the kernel so the field and the route cannot drift — copied, the field says an address is fine and the only opinion that counts refuses it, which reaches somebody as a spinner and then a message about something they cannot see | **live** |
 | `the-name-a-workspace-was-given-survives` | the name written only to the directory's branding COPY, which is republished from the regional settings row on every branding write — so it survives until the first time anybody changes a logo or a colour and is then replaced by a copy of a row that never existed, with nothing reporting it | **live** |
+| `granted-credits-are-spent-before-purchased-ones` | charging purchased credits while granted ones expire beside them — money somebody paid for, taken in a way no screen shows and no error reports. The same test pins the second half: soonest-perishing first, or the earlier cohort lapses unused | **live** |
+| `an-allowance-does-not-roll-over` | expiry implemented as a sweep, so the balance depends on whether that sweep ran — a wedged scheduler keeps handing out an allowance that lapsed in March and every ledger row agrees it was correct to | **live** |
+| `an-allowance-arrives-once-a-period` | a redelivered renewal, a re-run sweep or an operator pressing twice granting a second month's credits inside one month, with a correct-looking 200 each time | **live** |
+| `the-arrears-ladder-does-not-stand-down-for-our-configuration` | reading `chargeable` as permission to ignore a reported failed charge — every workspace that stopped paying sits at `active` while the provider retries, correct-looking at every individual moment and never arriving. The other half is the opposite error: holding a self-host read-only for never having chosen a plan it cannot buy | **live** |
+| `a-lapsed-subscription-cannot-be-claimed` | "you cannot start until you have paid" walked around by starting a trial, letting it die, and creating a workspace on the corpse | **live** |
+| `one-trial-per-account-per-product` | clearing the trial's end date when it ends, so cancelling earns a fresh free fortnight — a free product with extra steps | **live** |
+| `buying-comes-before-creating` | the parking state — a workspace created first, held on no plan and gated until somebody pays, which is a product given away and kept alive by a state whose only job is to be escapable. The narrower failure the same test pins: a claim that is skipped where the deployment cannot charge, leaving a trial pointing at nothing beside a workspace with no plan | **live** |
+| `paying-twice-for-one-workspace-is-refused` | somebody who paid and closed the tab being charged again when they come back, and told they had bought one | **live** |
+| `the-shelf-says-whether-a-trial-is-left` | a card offering a free fortnight to somebody who has already had it — a promise the next screen takes back | **live** |
+| `credits-are-one-balance-across-every-product` | one total wearing two kinds of credit, so either every credit expires — destroying money somebody paid for — or none does and the monthly allowance silently becomes cumulative | **live** |
+| `buying-credits-still-grants-none` | a balance anybody refills by calling the purchase endpoint — and it is worse here than on the old rail, because this balance is spendable in every product at once | **live** |
+| `a-payment-settles-with-no-region-in-the-path` | a settlement written to the default region for a workspace that lives elsewhere — correct-looking in both places and taking effect in neither | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

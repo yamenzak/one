@@ -62,6 +62,16 @@ export function parseStripeEvent(body: string, metadataPrefix: string): Provider
     appId: str(metadata.app) ?? str(metadata[`${metadataPrefix}_app`]),
     tenantId: str(metadata.tenant) ?? str(metadata[`${metadataPrefix}_tenant`]),
     planId: str(metadata.plan) ?? str(metadata[`${metadataPrefix}_plan`]),
+    /*
+      ⚠️ THE SUBSCRIPTION IS NAMED WHERE WE MADE THE CHECKOUT, and it is the only
+      attribution that survives a workspace not existing yet. Somebody pays and
+      then closes the tab: there is no tenant to route by and no customer record
+      to look up, so an event carrying only the customer would be parked — money
+      taken with nothing granted, recoverable only by hand.
+    */
+    subscriptionRef: str(metadata.subscription) ?? str(metadata[`${metadataPrefix}_subscription`]),
+    /* ⚠️ Which pack, where the payment was for credits rather than for access. */
+    packId: str(metadata.pack) ?? str(metadata[`${metadataPrefix}_pack`]),
     customerRef: str(object.customer),
     paidMinor: num(object.amount_paid) || num(object.amount) || num(object.amount_total),
     refundedMinorTotal: num(object.amount_refunded),

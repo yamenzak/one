@@ -17,7 +17,7 @@ import type { Allowance, AnyOperation, AppSpec, BindingSpec, EntitlementDef, Ins
 import {
   DESTRUCTIVE_FLOOR_DAYS, discountUsable, explainCustomerFlags, explainEntitlements, extendBudget, gateFor,
   heldEntitlements, ladderProblems, MAX_DISCOUNT_PERCENT, mayPurchase, MIN_DISCOUNT_PERCENT,
-  packageLines, operation, packageContradictions, PUBLIC, refuseDiscount, runwayFor, s,
+  packageLines, operation, packageContradictions, PUBLIC, refuseDiscount, runwayFor, s, standingOf,
 } from "@one/kernel";
 import {
   applyPackage, applyPayment, choosePlan, claimCode, codesFor, grantsFor, issueCode, listPackages,
@@ -31,15 +31,30 @@ import { attribute, claimByCustomer, claimEvent, listParked, park, rememberCusto
 import { OPERATE } from "./operator-ops.js";
 import { balance } from "./ledger.js";
 import { CREDITS } from "./generate.js";
+import { applyToSubscription, choosePlanFor, grantAllowance, grantCredits, rememberProviderRef, subscriptionById, subscriptionForTenant } from "./account-billing.js";
 import { parseStripeEvent } from "./provider-stripe.js";
 import { previewOf, shelf } from "./market.js";
 
 /** ⚠️ A symbol, so an app cannot reach the store by writing a property name. */
 export const COMMERCE = Symbol.for("one.runtime.commerce");
 
+/**
+ * ⚠️ THE PARKING SUBSCRIPTION IS A VALUE, NOT A ROW. Materialising one on first
+ * read puts a default into storage where the next reader takes it for a decision
+ * — which is how an ordinary write once came to answer 402 on a deployment with
+ * no payment provider at all.
+ */
+const PARKED_SUB = {
+  planId: null, pendingPlanId: null, status: "none" as const,
+  trialEndsAt: null, pastDueAt: null, closingAt: null,
+  overrides: { grandfathered: {}, adjusted: {} },
+};
+
 export interface CommerceDeps {
   readonly db: SqlHandle;
   readonly tenantId: string;
+  /** ⚠️ Who pays for this workspace. Empty where nothing does — see the runtime. */
+  readonly accountId: string;
   /**
    * ⚠️ WHETHER THIS DEPLOYMENT CAN ACTUALLY TAKE MONEY.
    *
@@ -160,8 +175,14 @@ export function commerceOperations<B extends BindingSpec>(app: AppSpec<B>): read
     idempotency: { mode: "none" },
     async handler(ctx) {
       const d = deps(ctx);
-      const sub = await readSubscription(d.db, d.tenantId);
-      const state = standingFor(sub, ctx.now(), d.chargeable);
+      /*
+        ⚠️ THE ACCOUNT'S ROW, NOT A REGIONAL COPY. The payer is an account and the
+        subscription lives where accounts do — read from the regional table this
+        screen would show a plan the gate is not enforcing, which is the exact
+        drift every other rule in this file exists to prevent.
+      */
+      const sub = (await subscriptionForTenant(d.global, d.tenantId)) ?? PARKED_SUB;
+      const state = standingOf(sub, ctx.now(), d.chargeable);
       const plan = d.selling.find((p) => p.id === sub.planId) ?? null;
       /*
         ⚠️ THE EXPLAINED WALK, NOT A SECOND ONE. This is the same function the
@@ -207,7 +228,16 @@ export function commerceOperations<B extends BindingSpec>(app: AppSpec<B>): read
     async handler(ctx, input: { planId: string }) {
       const d = deps(ctx);
       if (!d.selling.some((p) => p.id === input.planId)) ctx.fail("platform.not_found", { field: "planId" });
-      await choosePlan(d.db, d.tenantId, input.planId, ctx.now());
+      /*
+        ⚠️ IT WRITES A PENDING PLAN ON THE ACCOUNT'S SUBSCRIPTION, and creates one
+        where the workspace has none — which is the ordinary state on a deployment
+        with no payment provider, where nothing was bought before creating.
+        Written to a regional table nothing reads, this control would report
+        success and change nothing anywhere.
+      */
+      await choosePlanFor(d.global, {
+        tenantId: d.tenantId, accountId: d.accountId, productId: app.id, planId: input.planId,
+      }, ctx.now());
       return { pendingPlanId: input.planId, chargeable: d.chargeable };
     },
   });
@@ -1060,6 +1090,62 @@ export function customerOperations<B extends BindingSpec>(app: AppSpec<B>): read
 /* ------------------------------------------------------------- the wire --- */
 
 /**
+ * WHAT A PAYMENT DOES TO AN ACCOUNT.
+ *
+ * ⚠️ ONE PLACE, BECAUSE THERE ARE TWO WAYS IN. An event that names its
+ * subscription and one attributed through a workspace arrive at different
+ * branches and must do exactly the same thing — two settlement paths disagree
+ * eventually, and the disagreement is always about money.
+ *
+ * ⚠️ AND A PACK IS NOT A PLAN. Credits bought outright never expire; a plan's
+ * allowance is granted for the period and does not roll over. Applying one as
+ * the other either destroys money somebody paid for or makes an allowance
+ * permanent, and neither reports anything.
+ */
+async function settleOnAccount<B extends BindingSpec>(
+  global: SqlHandle,
+  sub: { readonly id: string; readonly accountId: string; readonly planId: string | null; readonly pendingPlanId: string | null },
+  event: { readonly kind: "paid" | "failed" | "cancelled" | "refunded" | "other"; readonly planId: string | null; readonly packId: string | null; readonly customerRef: string | null },
+  app: AppSpec<B>,
+  at: Instant,
+): Promise<void> {
+  if (event.customerRef) await rememberProviderRef(global, sub.id, event.customerRef, at);
+
+  /*
+    ⚠️ A CREDIT PURCHASE MUST NOT TOUCH THE SUBSCRIPTION. Somebody topping up
+    while past due would otherwise be marked paid up by buying credits — the
+    ladder reset by a payment that settled nothing it was measuring.
+  */
+  if (event.packId) {
+    const pack = (app.access.creditPacks ?? []).find((p) => p.id === event.packId);
+    if (pack && event.kind === "paid") {
+      await grantCredits(global, sub.accountId, {
+        kind: "purchased", amount: pack.credits, reason: `pack:${pack.id}`,
+        ref: `pack:${sub.id}:${event.packId}:${at}`, productId: app.id,
+      }, at);
+    }
+    return;
+  }
+
+  await applyToSubscription(global, sub.id, event.kind, event.planId ?? sub.pendingPlanId, at);
+
+  /*
+    ⚠️ THE ALLOWANCE ARRIVES WITH THE PAYMENT, KEYED TO THE PERIOD. A renewal
+    redelivered is a second month's credits inside one month unless the entry
+    carries the period it is for; the ledger's own uniqueness is what stops it,
+    so there is no counter anybody has to keep.
+  */
+  if (event.kind === "paid") {
+    const planId = event.planId ?? sub.planId ?? sub.pendingPlanId;
+    const plan = app.access.plans.find((p) => p.id === planId);
+    const allowance = plan ? Number(plan.entitlements[CREDITS] ?? 0) : 0;
+    if (allowance > 0) {
+      await grantAllowance(global, { accountId: sub.accountId, subscriptionId: sub.id, productId: app.id, credits: allowance }, at);
+    }
+  }
+}
+
+/**
  * THE PAYMENT PROVIDER'S ENDPOINT, AND THE ONLY TWO ANSWERS IT HAS.
  *
  * ⚠️ APPLIED, OR PARKED. There is no third. A handler that could not work out
@@ -1111,6 +1197,24 @@ export function providerOperations<B extends BindingSpec>(app: AppSpec<B>): read
       const event = parseStripeEvent(d.body, app.stripeMetadataPrefix);
       if (!event) ctx.fail("platform.invalid", { reason: "unreadable" });
 
+      /*
+        ⚠️ THE SUBSCRIPTION IS TRIED FIRST, AND IT IS THE ONLY ATTRIBUTION THAT
+        WORKS BEFORE A WORKSPACE EXISTS. Buying now comes before creating, so the
+        ordinary successful payment names a subscription and no tenant at all —
+        routed by tenant alone, every first purchase on the platform would be
+        parked as `no_tenant`, which is money taken and nothing granted.
+      */
+      const named = event!.subscriptionRef
+        ? await subscriptionById(d.global, event!.subscriptionRef)
+        : null;
+      if (named) {
+        if (!(await claimEvent(d.global, event!.id, named.tenantId ?? named.id, event!.kind, at))) {
+          return { outcome: "already_applied" };
+        }
+        await settleOnAccount(d.global, named, event!, app, at);
+        return { outcome: `applied:${event!.kind}` };
+      }
+
       const who = await attribute(event!, app.id, async (ref) => (await claimByCustomer(d.global)(ref)) ?? null);
       if (!who.ok) {
         await park(d.global, { id: event!.id, kind: event!.kind }, who.why, d.body, at);
@@ -1136,12 +1240,18 @@ export function providerOperations<B extends BindingSpec>(app: AppSpec<B>): read
 
       if (!(await claimEvent(d.global, event!.id, who.tenantId, event!.kind, at))) return { outcome: "already_applied" };
 
-      const db = await d.forTenant(who.tenantId);
-      if (!db) {
+      /*
+        ⚠️ IT SETTLES ON THE ACCOUNT'S SUBSCRIPTION, WHICH IS GLOBAL — so the
+        region a workspace lives in no longer decides whether a payment can be
+        applied at all. What still needs the region is the app's own reaction to
+        it, and there is none here.
+      */
+      const forTenant = await subscriptionForTenant(d.global, who.tenantId);
+      if (!forTenant) {
         await park(d.global, { id: event!.id, kind: event!.kind }, "no_tenant", d.body, at);
         return { outcome: "parked:no_tenant" };
       }
-      await applyPayment(db, who.tenantId, event!, at);
+      await settleOnAccount(d.global, forTenant, event!, app, at);
       return { outcome: `applied:${event!.kind}` };
     },
   });

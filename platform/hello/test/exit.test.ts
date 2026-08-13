@@ -90,8 +90,8 @@ describe("closing, and changing your mind", () => {
     open, and it is only ever tested by closing the gate first.
   */
   it("still works when the workspace has been blocked over an unpaid charge", async () => {
-    await handle("DB").run(
-      `UPDATE subscription SET plan_id = 'keeper', status = 'past_due', past_due_at = ? WHERE tenant_id = ?`,
+    await handle("DIRECTORY").run(
+      `UPDATE account_subscription SET plan_id = 'keeper', status = 'past_due', past_due_at = ? WHERE tenant_id = ?`,
       "2020-01-01T00:00:00.000Z", tenantId,
     );
     expect((await call("/api/note.create", { title: "blocked" })).status, "an ordinary write must be refused, or this proves nothing").toBe(402);
@@ -99,7 +99,7 @@ describe("closing, and changing your mind", () => {
     expect((await call("/api/exit.export")).status).toBe(200);
     expect((await call("/api/exit.close", {})).status).toBe(200);
     await call("/api/exit.cancel", {});
-    await handle("DB").run(`UPDATE subscription SET plan_id = NULL, status = 'none', past_due_at = NULL WHERE tenant_id = ?`, tenantId);
+    await handle("DIRECTORY").run(`UPDATE account_subscription SET plan_id = NULL, status = 'none', past_due_at = NULL WHERE tenant_id = ?`, tenantId);
   });
 });
 

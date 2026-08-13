@@ -17,7 +17,7 @@
 
 import type { AiSpec, InferenceHandle, Instant, Rates, SchemaModule, SqlHandle } from "@one/kernel";
 import { chooseModel, planFeature, settle } from "@one/kernel";
-import { balance, hold as holdCredits, record } from "./ledger.js";
+import { balanceFor, refundCredits, spendCredits } from "./account-billing.js";
 
 /** The unit every generation is priced in. One word, so two apps cannot disagree. */
 export const CREDITS = "credits";
@@ -132,6 +132,21 @@ export interface GenerateInput {
   /** What the operator turned off, deployment-wide. */
   readonly disabledModels?: readonly string[];
   readonly tenantId: string;
+  /**
+   * ⚠️ THE GLOBAL STORE, BECAUSE THE BALANCE IS THE ACCOUNT'S. Credits are bought
+   * once and spent in any product, so they cannot live in a regional table that
+   * only one product's worker can reach.
+   */
+  readonly global: SqlHandle;
+  /**
+   * ⚠️ THE ACCOUNT THAT PAYS FOR THIS WORKSPACE, NOT THE PERSON WHO ASKED. A
+   * coach running a generation inside a studio spends the studio's money; billed
+   * to the actor, a member of somebody else's workspace pays for work they do not
+   * own, out of a balance they bought for their own.
+   */
+  readonly accountId: string;
+  /** Which product spent it, so the hub's history can say where it went. */
+  readonly productId: string;
   readonly actorId: string;
   readonly feature: string;
   readonly prompt: string;
@@ -228,9 +243,19 @@ export async function generate(input: GenerateInput): Promise<Generated> {
     a second call to a provider that the platform pays for in full. A conditional
     debit closes it; a debit after the run does not close it at all.
   */
-  const before = await balance(input.db, input.tenantId, CREDITS);
-  const took = await holdCredits(input.db, input.tenantId, { unit: CREDITS, amount: -held, reason: `hold:${input.feature}`, actorId: input.actorId }, input.at);
-  if (!took) return { ok: false, why: "no_credits", meta: { need: String(held), have: String(before) } };
+  /*
+    ⚠️ THE BALANCE IS THE ACCOUNT'S, NOT THE WORKSPACE'S. Credits are bought once
+    and spent wherever somebody works, so the charge lands on the account that
+    PAYS for this workspace — resolved from its subscription rather than from
+    whoever happened to make the request. Charging the actor would mean a coach
+    running a generation paid for it out of their own balance while the studio
+    that owns the work paid nothing.
+  */
+  const before = (await balanceFor(input.global, input.accountId, input.at)).total;
+  const took = await spendCredits(input.global, input.accountId, {
+    amount: held, reason: `hold:${input.feature}`, productId: input.productId,
+  }, input.at);
+  if (!took.ok) return { ok: false, why: "no_credits", meta: { need: String(held), have: String(before) } };
 
   let output: unknown;
   let reported: number | null = null;
@@ -261,8 +286,14 @@ export async function generate(input: GenerateInput): Promise<Generated> {
     doing work is the provider's problem with us, not ours with the workspace.
   */
   const charged = failed ? 0 : settle(held, reported);
+  /*
+    ⚠️ THE REFUND GOES BACK TO THE COHORTS IT CAME OUT OF. Put back as purchased
+    credits, an over-estimated reserve on a granted spend quietly converts an
+    expiring allowance into permanent credits — every generation minting a little
+    money, in the direction nobody audits.
+  */
   if (charged !== held) {
-    await record(input.db, input.tenantId, { unit: CREDITS, amount: held - charged, reason: `settle:${input.feature}`, actorId: input.actorId }, input.at);
+    await refundCredits(input.global, input.accountId, unwind(took.spent, held - charged), `settle:${input.feature}`, input.at);
   }
 
   /*
@@ -280,6 +311,35 @@ export async function generate(input: GenerateInput): Promise<Generated> {
 
   if (failed) return { ok: false, why: "provider" };
   return { ok: true, id, output, charged, balance: before - charged };
+}
+
+/**
+ * Put a settlement's difference back where it came from.
+ *
+ * ⚠️ PROPORTIONAL, AND AGAINST THE COHORTS THAT WERE ACTUALLY CHARGED. A reserve
+ * settles downwards on most calls, so this runs constantly — refunded flat to
+ * `purchased`, every generation would convert a slice of an expiring allowance
+ * into permanent credits, which is the platform minting money for itself in the
+ * one direction nobody audits.
+ *
+ * ⚠️ AND THE LAST SHARE ABSORBS THE ROUNDING. Rounding each share independently
+ * refunds either more or less than was taken, forever, a credit at a time.
+ */
+export function unwind(
+  spent: readonly { readonly kind: "granted" | "purchased"; readonly expiresAt: Instant | null; readonly amount: number }[],
+  back: number,
+): readonly { readonly kind: "granted" | "purchased"; readonly expiresAt: Instant | null; readonly amount: number }[] {
+  const total = spent.reduce((n, s) => n + s.amount, 0);
+  if (total <= 0 || back <= 0) return [];
+  if (back >= total) return spent;
+  const out: { kind: "granted" | "purchased"; expiresAt: Instant | null; amount: number }[] = [];
+  let given = 0;
+  spent.forEach((share, i) => {
+    const amount = i === spent.length - 1 ? back - given : Math.floor((share.amount * back) / total);
+    given += amount;
+    if (amount > 0) out.push({ kind: share.kind, expiresAt: share.expiresAt, amount });
+  });
+  return out;
 }
 
 /**

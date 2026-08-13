@@ -196,6 +196,19 @@ export const PLATFORM_PROBLEMS = declareProblems({
     detail: (m) => `Ask for access to ${m.product} and it will be enabled on this address.`,
     retryable: false,
   },
+  /*
+    ⚠️ 402, AND IT NAMES THE PRODUCT RATHER THAN THE ROUTE. It is answered at the
+    one moment somebody is trying to start — so the sentence has to be about the
+    thing they were doing, and the way out has to be the thing they came to do.
+    "Forbidden" here would be true and useless: nothing about their permissions
+    is wrong, they simply have not bought it yet.
+  */
+  "platform.payment_required": {
+    status: 402,
+    title: "Start a subscription first",
+    detail: (m) => `A ${m.product} workspace is created against a subscription. Choose a plan — a trial counts.`,
+    retryable: false,
+  },
   "platform.not_shared": {
     status: 409,
     title: "That is not shared with you",

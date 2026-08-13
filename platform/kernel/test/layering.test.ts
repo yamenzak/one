@@ -28,6 +28,10 @@ const LAYER: Record<string, number> = {
   "problem.ts": 1,
   "doors.ts": 1,
   "standing.ts": 1,
+  /* ⚠️ Beside standing rather than above it: two kinds of credit, a pure
+     allocation and an expiry predicate, with nothing under them but primitives.
+     The ledger that stores them is the runtime's. */
+  "credit.ts": 1,
   "identity.ts": 1,
   "config.ts": 1,
   "measure.ts": 1,
@@ -59,6 +63,10 @@ const LAYER: Record<string, number> = {
   "help.ts": 3,
   "guide.ts": 3,
   "market.ts": 3,
+  /* ⚠️ Above entitlement because it holds `Overrides`, and beside market rather
+     than under it — what an account holds and what a shelf shows are two
+     questions, and neither answers the other. */
+  "subscription.ts": 3,
   "release.ts": 3,
   "operation.ts": 3,
   "resolve.ts": 3,

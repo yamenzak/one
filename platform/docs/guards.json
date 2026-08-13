@@ -4063,6 +4063,114 @@
       "impl": "hello/test/provisioning.test.ts",
       "proves": "keeps the name after somebody edits their branding",
       "fails": "the name written only to the directory's branding COPY, which is republished from the regional settings row on every branding write — so it survives until the first time anybody changes a logo or a colour and is then replaced by a copy of a row that never existed, with nothing reporting it"
+    },
+    {
+      "id": "granted-credits-are-spent-before-purchased-ones",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/credit.test.ts",
+      "proves": "spends granted credits before purchased ones",
+      "fails": "charging purchased credits while granted ones expire beside them — money somebody paid for, taken in a way no screen shows and no error reports. The same test pins the second half: soonest-perishing first, or the earlier cohort lapses unused"
+    },
+    {
+      "id": "an-allowance-does-not-roll-over",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/credit.test.ts",
+      "proves": "stops counting a cohort the moment it lapses, with nothing having run",
+      "fails": "expiry implemented as a sweep, so the balance depends on whether that sweep ran — a wedged scheduler keeps handing out an allowance that lapsed in March and every ledger row agrees it was correct to"
+    },
+    {
+      "id": "an-allowance-arrives-once-a-period",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/credit.test.ts",
+      "proves": "keys the grant to the subscription and the period",
+      "fails": "a redelivered renewal, a re-run sweep or an operator pressing twice granting a second month's credits inside one month, with a correct-looking 200 each time"
+    },
+    {
+      "id": "the-arrears-ladder-does-not-stand-down-for-our-configuration",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/credit.test.ts",
+      "proves": "stands down for an unchosen plan, and never for arrears",
+      "fails": "reading `chargeable` as permission to ignore a reported failed charge — every workspace that stopped paying sits at `active` while the provider retries, correct-looking at every individual moment and never arriving. The other half is the opposite error: holding a self-host read-only for never having chosen a plan it cannot buy"
+    },
+    {
+      "id": "a-lapsed-subscription-cannot-be-claimed",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/credit.test.ts",
+      "proves": "is claimable while paid or on a live trial, and never once it has lapsed",
+      "fails": "\"you cannot start until you have paid\" walked around by starting a trial, letting it die, and creating a workspace on the corpse"
+    },
+    {
+      "id": "one-trial-per-account-per-product",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/credit.test.ts",
+      "proves": "remembers a trial that has already been had",
+      "fails": "clearing the trial's end date when it ends, so cancelling earns a fresh free fortnight — a free product with extra steps"
+    },
+    {
+      "id": "buying-comes-before-creating",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/marketplace.test.ts",
+      "proves": "attaches the waiting subscription to the workspace, once",
+      "fails": "the parking state — a workspace created first, held on no plan and gated until somebody pays, which is a product given away and kept alive by a state whose only job is to be escapable. The narrower failure the same test pins: a claim that is skipped where the deployment cannot charge, leaving a trial pointing at nothing beside a workspace with no plan"
+    },
+    {
+      "id": "paying-twice-for-one-workspace-is-refused",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/marketplace.test.ts",
+      "proves": "refuses a second subscription while one is still waiting for a workspace",
+      "fails": "somebody who paid and closed the tab being charged again when they come back, and told they had bought one"
+    },
+    {
+      "id": "the-shelf-says-whether-a-trial-is-left",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/marketplace.test.ts",
+      "proves": "stops offering a trial to somebody who has had one",
+      "fails": "a card offering a free fortnight to somebody who has already had it — a promise the next screen takes back"
+    },
+    {
+      "id": "credits-are-one-balance-across-every-product",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/marketplace.test.ts",
+      "proves": "tells granted credits from purchased ones, and says when the granted go",
+      "fails": "one total wearing two kinds of credit, so either every credit expires — destroying money somebody paid for — or none does and the monthly allowance silently becomes cumulative"
+    },
+    {
+      "id": "buying-credits-still-grants-none",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/marketplace.test.ts",
+      "proves": "opens an intent and moves no balance, and refuses where nothing can be paid",
+      "fails": "a balance anybody refills by calling the purchase endpoint — and it is worse here than on the old rail, because this balance is spendable in every product at once"
+    },
+    {
+      "id": "a-payment-settles-with-no-region-in-the-path",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/provider.test.ts",
+      "proves": "settles a workspace that lives in another region, with no region in the path",
+      "fails": "a settlement written to the default region for a workspace that lives elsewhere — correct-looking in both places and taking effect in neither"
     }
   ]
 }

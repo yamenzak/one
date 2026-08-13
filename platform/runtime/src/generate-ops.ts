@@ -19,7 +19,7 @@ import { chooseModel, modelsFor, operation, s } from "@one/kernel";
 import { FILES, type FilesCarrier } from "./files-ops.js";
 import { fetchMedia, storeMedia } from "./files.js";
 import { generate, judge, spending, type Generated } from "./generate.js";
-import { balance } from "./ledger.js";
+import { balanceFor } from "./account-billing.js";
 import { CREDITS } from "./generate.js";
 
 /** ⚠️ A symbol, so an app cannot reach the model runner by writing a property name. */
@@ -42,6 +42,10 @@ export interface GenerationDeps {
   chosen(): Promise<Readonly<Record<string, string>>>;
   disabled(): Promise<readonly string[]>;
   readonly tenantId: string;
+  /** ⚠️ The global store and the paying account — the balance is not the workspace's. */
+  readonly global: SqlHandle;
+  readonly accountId: string;
+  readonly productId: string;
   readonly actorId: string;
 }
 
@@ -70,7 +74,7 @@ export async function generateWith(
 ): Promise<Generated> {
   const d = deps(ctx);
   return generate({
-    db: d.db, ai, inference: d.inference, rates: await d.rates(),
+    db: d.db, global: d.global, accountId: d.accountId, productId: d.productId, ai, inference: d.inference, rates: await d.rates(),
     chosenModel: (await d.chosen())[feature] ?? null, disabledModels: await d.disabled(),
     tenantId: d.tenantId, actorId: d.actorId,
     feature, prompt, at: ctx.now(),
@@ -108,7 +112,7 @@ export async function generateAbout(
   */
   if (!found) return { ok: false, why: "unconfigured", meta: { reason: "that picture is not in this workspace" } };
   return generate({
-    db: d.db, ai, inference: d.inference, rates: await d.rates(),
+    db: d.db, global: d.global, accountId: d.accountId, productId: d.productId, ai, inference: d.inference, rates: await d.rates(),
     chosenModel: (await d.chosen())[feature] ?? null, disabledModels: await d.disabled(),
     tenantId: d.tenantId, actorId: d.actorId,
     feature, prompt, image: { bytes: found.body, contentType: found.row.contentType }, at: ctx.now(),
@@ -144,7 +148,7 @@ export async function drawWith(
 ): Promise<Drawn> {
   const d = deps(ctx);
   const made = await generate({
-    db: d.db, ai, inference: d.inference, rates: await d.rates(),
+    db: d.db, global: d.global, accountId: d.accountId, productId: d.productId, ai, inference: d.inference, rates: await d.rates(),
     chosenModel: (await d.chosen())[feature] ?? null, disabledModels: await d.disabled(),
     tenantId: d.tenantId, actorId: d.actorId,
     feature, prompt, at: ctx.now(),
@@ -324,7 +328,10 @@ export function generationOperations<B extends BindingSpec>(app: AppSpec<B>): re
     async handler(ctx, input: { limit?: number }) {
       const d = deps(ctx);
       return {
-        balance: await balance(d.db, d.tenantId, CREDITS),
+        /* ⚠️ THE PAYING ACCOUNT'S BALANCE, which is the number the generations
+           beside it actually came out of. Read from the workspace, this screen
+           would show a total nothing spends and every row would look unexplained. */
+        balance: (await balanceFor(d.global, d.accountId, ctx.now())).total,
         spends: await spending(d.db, d.tenantId, Math.min(input.limit ?? 50, 200)),
       };
     },
