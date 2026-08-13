@@ -18,7 +18,7 @@ import type { Problem } from "@one/kernel";
 import { b64u } from "@one/kernel";
 import { Door, nextDoor, waitFrom, type DoorAt, type DoorWire } from "../src/door.js";
 import { outcomeOf, registerPasskey, signInWithPasskey, type Ceremony } from "../src/passkey.js";
-import { needsProof, ProveItBody } from "../src/prove.js";
+import { needsProof, ProveIt, ProveItBody } from "../src/prove.js";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node as never);
 
@@ -314,5 +314,16 @@ describe("proving it is you, again", () => {
      product being suspicious of somebody for no stated reason. */
   it("names the thing it is asking about", () => {
     expect(asked()).toMatch(/Before closing your account/);
+  });
+
+  /* ⚠️ THE BODY IS SEPARATE FROM THE SHEET FOR THE SAME REASON EVERY OTHER ONE
+     IS: a portal renders nothing outside a browser, so a body welded to one is a
+     body whose words are asserted against an empty string, forever, in a test
+     that passes. Closed, the presentation is nothing at all. */
+  it("is presented in a sheet, which renders nothing while it is closed", () => {
+    expect(html(
+      <ProveIt open={false} email="n@example.test" toDo="x" wire={WIRE}
+        onProven={() => undefined} onClose={() => undefined} ceremony={willing()} />,
+    )).toBe("");
   });
 });
