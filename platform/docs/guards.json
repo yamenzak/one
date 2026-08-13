@@ -4234,6 +4234,60 @@
       "impl": "web/test/screens.test.tsx",
       "proves": "says when nothing can be charged yet",
       "fails": "a price list whose every button refuses — somebody's decision spent before they are told it could not have been made"
+    },
+    {
+      "id": "an-app-never-answers-a-platform-question",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/owned.test.mjs",
+      "proves": "reach(es) past the runtime",
+      "fails": "an app reading money, identity or addressing for itself — a SECOND answer to a question the runtime already resolves, and it goes out of date by continuing to work. It has happened: a sweep asked whether a workspace was in arrears by reading a `subscription` row; the payer moved to the account, the row stopped being written, the read kept succeeding, and every suspended workspace resumed acting on records it could no longer see"
+    },
+    {
+      "id": "the-answer-is-there-to-ask-for",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/owned.test.mjs",
+      "proves": "a scoped job is handed its workspace's standing",
+      "fails": "a rule forbidding an app from resolving standing itself, on a runtime that never hands standing down — which forces every app to break it. The sibling assertion is worse if it goes: a declared field the runner never fills is read by every handler as \"nothing is wrong\", so the freeze it exists for never fires"
+    },
+    {
+      "id": "the-last-rung-is-actually-walked",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/jobs.solo.test.ts",
+      "proves": "erases one that is past it, and takes its subscription with it",
+      "fails": "a destructive rung with a pure function and nothing calling it — a workspace that stopped paying stays withheld forever, its records kept, and the deployment pays to store them. It is a mechanism with no surface where the surface is a SWEEP, which nobody notices because there is no screen to be missing. The same test pins the other half: the subscription goes too, or the next run finds a workspace with no rows and reports success every day forever"
+    },
+    {
+      "id": "erasure-waits-for-the-last-rung",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/jobs.solo.test.ts",
+      "proves": "leaves a blocked workspace alone until the ladder says otherwise",
+      "fails": "erasing at the blocked rung — three weeks before the ladder says it may, while every screen said sixty days. Every rung before the last is reversible by paying"
+    },
+    {
+      "id": "a-workspace-nobody-charged-is-never-erased",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/jobs.solo.test.ts",
+      "proves": "never erases a workspace nobody ever charged",
+      "fails": "reading an absent subscription as \"unpaid forever\", which deletes exactly the workspaces nobody ever charged — one made before this rail existed, or by an operator"
+    },
+    {
+      "id": "a-closure-is-erased-on-its-own-date",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/jobs.solo.test.ts",
+      "proves": "erases one the owner closed, on the date they were given",
+      "fails": "somebody who decided to leave waiting out the arrears ladder's sixty days for a decision they already made — or, worse, a second erasure branch for it, because two branches disagree eventually and the disagreement is about whether records still exist"
     }
   ]
 }

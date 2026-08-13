@@ -15,7 +15,7 @@ import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import worker from "../src/worker.js";
 import { post, SETUP, signIn } from "./session.js";
-import { bindingsFor, jobHistory, lastSuccess, runDue } from "@one/runtime";
+import { arrearsJob, bindingsFor, jobHistory, lastSuccess, runDue } from "@one/runtime";
 import { job, sql, type Instant, type RegionId, type ResolvedRegion, type SqlHandle, type TenantId } from "@one/kernel";
 
 const ORIGIN = "https://sweep.hello.4dl.app";
@@ -35,6 +35,8 @@ const deps = (now: string) => ({
   regions: ["auto"] as RegionId[],
   now: () => now as Instant,
   bindingsFor: () => ({ db: handle("DB") }),
+  /* ⚠️ Resolved by the platform, so a handler never reads a billing table. */
+  standingOf: async () => ({ standing: "active" as const, reason: "ok" as const }),
   tenants: async () => [{ tenantId: "t_sweep" as TenantId, region: "auto" as RegionId }],
 });
 
@@ -113,5 +115,118 @@ describe("the app's own sweep", () => {
       env as never,
     );
     expect(refused.status).toBe(403);
+  });
+});
+
+/* --------------------------------------------------------------- the last rung --- */
+
+/**
+ * THE ONLY SWEEP IN THE PLATFORM THAT DESTROYS ANYTHING.
+ *
+ * ⚠️ IT HAD A PURE FUNCTION AND NOTHING CALLING IT. `standingOf` reported
+ * `blocked` from the tenth day and `dueForErasure` was never invoked — so a
+ * workspace that stopped paying stayed withheld forever, its records kept, and
+ * the deployment paid to store them. That is a mechanism with no surface where
+ * the surface is a SWEEP, which nobody notices because there is no screen to be
+ * missing.
+ */
+describe("erasing a workspace that never paid", () => {
+  const NOW = "2026-08-13T00:00:00.000Z";
+  const ago = (days: number) => new Date(Date.parse(NOW) - days * 86_400_000).toISOString();
+
+  const arrears = async (over: { pastDueAt?: string | null; closingAt?: string | null } = {}) => {
+    const slug = `gone${Math.random().toString(36).slice(2, 7)}`;
+    const staff = await signIn(`${slug}@example.test`, SETUP);
+    const made = await post(SETUP, "/api/identity.workspace.create", { slug }, staff);
+    const tenantId = made.body.tenantId as string;
+    await handle("DIRECTORY").run(
+      `INSERT INTO account_subscription (id, account_id, product_id, tenant_id, plan_id, status, past_due_at, closing_at, started_at, updated_at)
+       VALUES (?, 'acc', 'hello', ?, 'keeper', ?, ?, ?, ?, ?)`,
+      `sub_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`, tenantId,
+      over.closingAt ? "active" : "past_due", over.pastDueAt ?? null, over.closingAt ?? null, NOW, NOW,
+    );
+    return { tenantId, slug };
+  };
+
+  const stillThere = async (tenantId: string) =>
+    (await handle("DIRECTORY").first<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM tenant_directory WHERE tenant_id = ?`, tenantId,
+    ))?.n === 1;
+
+  /*
+    ⚠️ A DAY OF ITS OWN PER SWEEP, because `runDue` is DAILY and every call in
+    this block shares one deployment. Run on one clock, the first sweep succeeds
+    and the next three report `ran: false` — so three assertions about a
+    destructive path would pass against a job that never executed, which is the
+    exact shape of pass this suite exists to refuse.
+  */
+  let day = 0;
+  const sweep = async (tenantId: string) =>
+    runDue([arrearsJob(() => ({
+      global: handle("DIRECTORY"),
+      objectsFor: () => null,
+      modules: [],
+      keeping: [],
+    }))], {
+      ...deps(new Date(Date.parse(NOW) + day++ * 86_400_000).toISOString()),
+      tenants: async () => [{ tenantId: tenantId as TenantId, region: "auto" as RegionId }],
+    });
+
+  /*
+    ⚠️ NOT BEFORE THE LAST RUNG. Every rung before this one is reversible by
+    paying, and erasing at the blocked rung would take a workspace three weeks
+    before the ladder says it may — while every screen said sixty days.
+  */
+  it("leaves a blocked workspace alone until the ladder says otherwise", async () => {
+    const { tenantId } = await arrears({ pastDueAt: ago(40) });
+    await sweep(tenantId);
+    expect(await stillThere(tenantId)).toBe(true);
+  });
+
+  it("erases one that is past it, and takes its subscription with it", async () => {
+    const { tenantId } = await arrears({ pastDueAt: ago(70) });
+    const out = await sweep(tenantId);
+    expect(out[0]!.done).toBe(1);
+    expect(await stillThere(tenantId)).toBe(false);
+    /* ⚠️ OR THE NEXT RUN FINDS A WORKSPACE WITH NO ROWS, erases nothing, and
+       reports success every day forever. */
+    expect((await handle("DIRECTORY").first<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM account_subscription WHERE tenant_id = ?`, tenantId,
+    ))?.n).toBe(0);
+  });
+
+  /*
+    ⚠️ AND A WORKSPACE ITS OWNER CLOSED GOES ON ITS OWN DATE. Somebody who
+    decided to leave is not in arrears and must not wait two months for a
+    decision they already made — but it is the same erasure, because two branches
+    disagree eventually and the disagreement is about whether records still exist.
+  */
+  it("erases one the owner closed, on the date they were given", async () => {
+    const { tenantId } = await arrears({ closingAt: ago(1) });
+    await sweep(tenantId);
+    expect(await stillThere(tenantId)).toBe(false);
+  });
+
+  it("waits while a closure is still in its notice period", async () => {
+    /* ⚠️ Well clear of the clock this block advances, so what is asserted is the
+       notice period rather than the order the tests happen to run in. */
+    const { tenantId } = await arrears({ closingAt: new Date(Date.parse(NOW) + 30 * 86_400_000).toISOString() });
+    await sweep(tenantId);
+    expect(await stillThere(tenantId)).toBe(true);
+  });
+
+  /*
+    ⚠️ A WORKSPACE WITH NO SUBSCRIPTION IS NEVER ERASED. One made before this
+    rail existed, or by an operator, has no row — and reading that absence as
+    "unpaid forever" would delete exactly the workspaces nobody ever charged.
+  */
+  it("never erases a workspace nobody ever charged", async () => {
+    const slug = `kept${Math.random().toString(36).slice(2, 7)}`;
+    const staff = await signIn(`${slug}@example.test`, SETUP);
+    const made = await post(SETUP, "/api/identity.workspace.create", { slug }, staff);
+    const tenantId = made.body.tenantId as string;
+    await handle("DIRECTORY").run(`DELETE FROM account_subscription WHERE tenant_id = ?`, tenantId);
+    await sweep(tenantId);
+    expect(await stillThere(tenantId)).toBe(true);
   });
 });

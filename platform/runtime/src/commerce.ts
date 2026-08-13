@@ -191,25 +191,14 @@ const parseOverrides = (text: string): Readonly<Record<string, Allowance>> => {
   }
 };
 
-export async function readSubscription(db: SqlHandle, tenantId: string): Promise<Subscription> {
-  const row = await db.first<Row>(
-    `SELECT plan_id, pending_plan_id, status, trial_ends_at, past_due_at, closing_at, grandfathered_json, adjusted_json FROM subscription WHERE tenant_id = ?`,
-    tenantId,
-  );
-  if (!row) return PARKED;
-  return {
-    planId: row.plan_id,
-    pendingPlanId: row.pending_plan_id,
-    status: row.status as PaymentStatus,
-    trialEndsAt: row.trial_ends_at as Instant | null,
-    pastDueAt: row.past_due_at as Instant | null,
-    closingAt: row.closing_at as Instant | null,
-    overrides: {
-      grandfathered: parseOverrides(row.grandfathered_json),
-      adjusted: parseOverrides(row.adjusted_json) as Readonly<Record<string, Allowance | null>>,
-    },
-  };
-}
+/*
+  ⚠️ THE REGIONAL `subscription` TABLE AND ITS READER ARE GONE, not left beside
+  the account rail. The payer is an account, so the row lives in the global
+  store — and a reader still answering from the regional one would answer
+  plausibly, forever, about a table nothing writes. That is the exact defect
+  this move was made to end, and keeping the old reader "just in case" is how
+  the defect keeps a way back in.
+*/
 
 /*
   ⚠️ CHOOSING A PLAN MOVED TO THE ACCOUNT RAIL AND ITS OLD WRITER IS GONE, not
@@ -708,8 +697,25 @@ export async function saveLadder(db: SqlHandle, tenantId: string, ladder: Ladder
  * provider exists — so on a self-host, where nobody can pay and no row is ever
  * stamped, using it would freeze every ladder on the deployment forever.
  */
-export function laddersFrozen(sub: Subscription): boolean {
-  return sub.pastDueAt !== null || sub.closingAt !== null || sub.status === "cancelled";
+/**
+ * Whether a workspace's own ladders are frozen because OURS is running.
+ *
+ * ⚠️ IT TAKES A STANDING RATHER THAN A SUBSCRIPTION, AND THAT IS THE FIX. Given
+ * the row, every app had to fetch one — so when the payer moved from the
+ * workspace to the account, each of those fetches kept succeeding against a table
+ * nothing writes and every freeze silently stopped firing. A standing is resolved
+ * once, by the platform, and handed to the handler.
+ *
+ * ⚠️ ANYTHING BUT `active` FREEZES, INCLUDING THE NOTICE PERIOD. Exempting
+ * `grace` is tempting and wrong: the workspace is working normally, so the
+ * argument goes, and three days is nothing. But the rung is not what this is
+ * about — the rule is that whatever is going on between the platform and a
+ * workspace is not a reason to act on ITS customers' records on its behalf, and
+ * the actions on the other side of this check are archive and delete. A
+ * destructive path narrowed for tidiness is a destructive path narrowed.
+ */
+export function frozenAt(standing: StandingState | null): boolean {
+  return standing !== null && standing.standing !== "active";
 }
 
 /** Everybody whose access has run out, with how long ago. One query. */
@@ -841,36 +847,11 @@ export async function customerFlagsFor(
  * FIRST failed; re-stamping it on every retry means a workspace never advances
  * past the first rung however long it stays unpaid, and the ladder is decorative.
  */
-export async function applyPayment(
-  db: SqlHandle,
-  tenantId: string,
-  event: { readonly kind: "paid" | "failed" | "cancelled" | "refunded" | "other"; readonly planId: string | null },
-  at: Instant,
-): Promise<void> {
-  const ensure = `INSERT INTO subscription (tenant_id, status, updated_at) VALUES (?, 'none', ?) ON CONFLICT(tenant_id) DO NOTHING`;
-  await db.run(ensure, tenantId, at);
-
-  switch (event.kind) {
-    case "paid":
-      await db.run(
-        `UPDATE subscription SET plan_id = COALESCE(?, plan_id, pending_plan_id), pending_plan_id = NULL, status = 'active', past_due_at = NULL, updated_at = ? WHERE tenant_id = ?`,
-        event.planId, at, tenantId,
-      );
-      return;
-    case "failed":
-      await db.run(
-        `UPDATE subscription SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?), updated_at = ? WHERE tenant_id = ?`,
-        at, at, tenantId,
-      );
-      return;
-    case "cancelled":
-      await db.run(`UPDATE subscription SET status = 'cancelled', updated_at = ? WHERE tenant_id = ?`, at, tenantId);
-      return;
-    case "refunded":
-    case "other":
-      return;
-  }
-}
+/*
+  ⚠️ AND SO IS `applyPayment`. A payment settles on the account's subscription —
+  see `settleOnAccount` in `commerce-ops.ts`, which is the ONE place a provider's
+  word changes what somebody is on.
+*/
 
 /* ---------------------------------------------------------- discounts --- */
 

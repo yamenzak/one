@@ -15,7 +15,7 @@
 
 import {
   isDue, type Instant, type JobCtx, type JobResult, type JobSpec,
-  type RegionId, type SchemaModule, type SqlHandle, type TenantId,
+  type RegionId, type SchemaModule, type SqlHandle, type StandingState, type TenantId,
 } from "@one/kernel";
 
 export const JOB_SCHEMA: SchemaModule = {
@@ -74,6 +74,17 @@ export interface RunDeps<B> {
   tenants(region: RegionId): Promise<readonly { readonly tenantId: TenantId; readonly region: RegionId }[]>;
   regions: readonly RegionId[];
   bindingsFor(region: RegionId): B;
+  /**
+   * WHERE A WORKSPACE STANDS WITH US, RESOLVED ONCE BY THE PLATFORM.
+   *
+   * ⚠️ AN APP MUST NEVER ANSWER THIS FOR ITSELF, and the reason is a defect that
+   * was live: a sweep acting on a workspace's own customers asked whether the
+   * workspace was in arrears by reading a subscription row directly. When the
+   * payer moved from the workspace to the account, that row stopped being
+   * written — the read kept succeeding, and every suspended workspace quietly
+   * resumed acting on records it could no longer see. Nothing failed.
+   */
+  standingOf(tenantId: TenantId): Promise<StandingState>;
   now(): Instant;
 }
 
@@ -160,11 +171,15 @@ export async function runDue<B>(
   return reports;
 }
 
-const one = <B>(spec: JobSpec, deps: RunDeps<B>, region: RegionId, tenantId: TenantId | null): Promise<JobResult> =>
+const one = async <B>(spec: JobSpec, deps: RunDeps<B>, region: RegionId, tenantId: TenantId | null): Promise<JobResult> =>
   spec.handler({
     bind: deps.bindingsFor(region),
     tenantId,
     region,
+    /* ⚠️ RESOLVED PER TENANT, HERE, so no handler has a reason to look it up —
+       and a platform-scoped job has no workspace, which is `null` rather than a
+       default somebody could mistake for "in good standing". */
+    standing: tenantId ? await deps.standingOf(tenantId) : null,
     now: deps.now,
     batch: spec.batch,
   } as unknown as JobCtx<never>);

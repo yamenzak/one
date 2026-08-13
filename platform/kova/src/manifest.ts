@@ -15,7 +15,7 @@
 
 import { energyOf, overDays, portionOf, totalOf, type Macros } from "./nutrition.js";
 import { bestOf, needing, prescribedPerWeek } from "./reading.js";
-import { drawWith, forgetSubject, generateAbout, generateWith, draftsFrom, readsAPicture, lapsedAcross, lookUp, lookupProblem, readSettings, recordSubjectConsent, laddersFrozen, readLadder, readSubscription, refusalProblem, runwayAcross } from "@one/runtime";
+import { drawWith, forgetSubject, generateAbout, generateWith, draftsFrom, readsAPicture, lapsedAcross, lookUp, lookupProblem, readSettings, recordSubjectConsent, frozenAt, readLadder, refusalProblem, runwayAcross } from "@one/runtime";
 import { progressWeek, weekAt, WEEKS_SHAPE, type Week } from "./plans.js";
 import { FASTING_ZONES, wellnessOf, zoneAt } from "./living.js";
 import { roundsOf } from "./plans.js";
@@ -3999,9 +3999,14 @@ export const kova = defineApp({
           platform has suspended must not be quietly shredding a roster it can no
           longer see — whatever is going on between us and them, it is not a
           reason to act on their clients' records on their behalf.
+
+          ⚠️ AND THE ANSWER IS THE PLATFORM'S, HANDED DOWN. This read a
+          subscription row itself until the payer moved from the workspace to the
+          account: the row stopped being written, the read kept succeeding, and
+          the freeze silently never fired again. Nothing failed — the sweep
+          reported clean runs while every suspended studio resumed shredding.
         */
-        const sub = await readSubscription(db, tenantId);
-        if (laddersFrozen(sub)) return { done: 0, more: false, idle: 1 };
+        if (frozenAt(ctx.standing)) return { done: 0, more: false, idle: 1 };
 
         /*
           ⚠️ A STUDIO THAT HAS CONFIGURED NO LADDER IS NOT SWEPT AT ALL, and it

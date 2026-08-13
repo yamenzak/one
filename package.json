@@ -19,7 +19,7 @@
     "clean": "turbo run clean && rm -rf node_modules",
     "one:test": "turbo run test --filter='./platform/*'",
     "one:typecheck": "turbo run typecheck --filter='./platform/*'",
-    "one:gate": "node platform/scripts/sheets.mjs platform/web/src && node platform/scripts/docs.test.mjs && node platform/scripts/guards.test.mjs && node platform/scripts/kernel.test.mjs && node platform/scripts/bindings.test.mjs && node platform/scripts/surface.test.mjs && node platform/scripts/handlers.test.mjs && node platform/scripts/budget.test.mjs && node platform/scripts/capabilities.test.mjs && node platform/scripts/wire.test.mjs"
+    "one:gate": "node platform/scripts/sheets.mjs platform/web/src && node platform/scripts/docs.test.mjs && node platform/scripts/guards.test.mjs && node platform/scripts/kernel.test.mjs && node platform/scripts/bindings.test.mjs && node platform/scripts/surface.test.mjs && node platform/scripts/handlers.test.mjs && node platform/scripts/owned.test.mjs && node platform/scripts/budget.test.mjs && node platform/scripts/capabilities.test.mjs && node platform/scripts/wire.test.mjs"
   },
   "devDependencies": {
     "turbo": "^2.5.9",

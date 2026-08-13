@@ -1054,6 +1054,35 @@ Regional Services costs at your plan.
 Written down per app so that the boundary in §3.6 is a fact rather than a
 judgement call in a code review.
 
+### 5.0 The other direction: what an app may never answer for itself
+
+⚠️ **Money, identity and addressing are the platform's, and the rule is
+structural.** `scripts/owned.test.mjs` refuses an app that names a
+platform-owned table or calls a platform-owned store function. What an app gets
+instead is an answer resolved once by the runtime and handed to it —
+`ctx.standing` on a job, `caller.entitlements` and `caller.gate` on a request.
+
+**The failure it exists for has happened in both directions, and neither time
+did anything fail.** A sweep that acts on a workspace's own customers asked
+whether the workspace was in arrears by reading a `subscription` row directly.
+When the payer moved from the workspace to the account that row stopped being
+written — the read kept succeeding against a table nothing maintains, the freeze
+silently never fired again, and every suspended workspace resumed acting on
+records it could no longer see. The sweep reported clean runs throughout. In the
+old repository the same shape ran the other way: three apps each grew their own
+copy of the identity door, and one mounted the send-guard after the catch-all,
+which typechecks, passes every test and is invisible in a route list.
+
+⚠️ **A rule like this is only honest if the answer is there to ask for**, so the
+same guard asserts the seam: `JobCtx.standing` exists, and the runner actually
+resolves it per tenant. A declared field the runner never fills is worse than no
+field — every handler reads it as "nothing is wrong".
+
+⚠️ **The exemption is a marker in the comment attached to the statement**, not a
+list at the top of a script. It reads the whole enclosing comment block rather
+than a fixed two lines, because the reasons this guard accepts are the ones that
+take a paragraph — a fixed window makes the fix "write less about why".
+
 **Scena:** the player render loop, the timeline engine, the manifest compiler,
 the widget renderer, the pairing/device door, the board and kiosk surfaces.
 **Kova:** the body scan (camera + pose), Snap-a-Meal and the label reader
@@ -1286,7 +1315,7 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-deployment-key-is-not-held-inside-a-workspace` | a workspace owner holding the key to the payment dead letter and the scheduler's run table — both of which are the whole deployment's, so it is a cross-tenant read with a screen in front of it | **live** |
 | `a-secret-is-write-only` | a console that can display a payment provider's key — leaked through a screen share, a support session, or any read vulnerability | **live** |
 | `an-unshared-key-cannot-reach-the-shared-store` | a per-endpoint secret written where every app resolves it, invisible until a second product fails verification with no trace of where the value came from | **live** |
-| `chargeable-is-read-not-declared` | a gate claiming the deployment can charge while the payment provider has no key — every workspace on a self-host stranded in setup over our own misconfiguration | **live** |
+| `chargeable-is-read-not-declared` | the parking state, which this used to assert and which no longer exists: a workspace is created against a subscription somebody already started, so the refusal moved from the first write to the creation itself. The half that still bites hardest is the stand-down — with no payment provider there is nothing to buy, so demanding a purchase would make the platform unusable over OUR missing configuration on every self-host and before the deploy guide's payment step | **live** |
 | `the-mode-picks-the-lane` | a checkout that fails at the till, because both lanes are stored at once and a deployment answered yes on the strength of the wrong one | **live** |
 | `an-undeclared-key-is-refused-not-stored` | a row an operator can see on a screen and no consumer will ever read, which is indistinguishable from a setting that does not work | **live** |
 | `a-refusal-is-not-a-crash` | reaching for a store that is not there, which throws into the same 503 a stated refusal produces — so the status alone cannot tell 'we told you' from 'it fell over' | **live** |
@@ -1478,6 +1507,12 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `credits-are-one-balance-across-every-product` | one total wearing two kinds of credit, so either every credit expires — destroying money somebody paid for — or none does and the monthly allowance silently becomes cumulative | **live** |
 | `buying-credits-still-grants-none` | a balance anybody refills by calling the purchase endpoint — and it is worse here than on the old rail, because this balance is spendable in every product at once | **live** |
 | `a-payment-settles-with-no-region-in-the-path` | a settlement written to the default region for a workspace that lives elsewhere — correct-looking in both places and taking effect in neither | **live** |
+| `an-app-never-answers-a-platform-question` | an app reading money, identity or addressing for itself — a SECOND answer to a question the runtime already resolves, and it goes out of date by continuing to work. It has happened: a sweep asked whether a workspace was in arrears by reading a `subscription` row; the payer moved to the account, the row stopped being written, the read kept succeeding, and every suspended workspace resumed acting on records it could no longer see | **live** |
+| `the-answer-is-there-to-ask-for` | a rule forbidding an app from resolving standing itself, on a runtime that never hands standing down — which forces every app to break it. The sibling assertion is worse if it goes: a declared field the runner never fills is read by every handler as "nothing is wrong", so the freeze it exists for never fires | **live** |
+| `the-last-rung-is-actually-walked` | a destructive rung with a pure function and nothing calling it — a workspace that stopped paying stays withheld forever, its records kept, and the deployment pays to store them. It is a mechanism with no surface where the surface is a SWEEP, which nobody notices because there is no screen to be missing. The same test pins the other half: the subscription goes too, or the next run finds a workspace with no rows and reports success every day forever | **live** |
+| `erasure-waits-for-the-last-rung` | erasing at the blocked rung — three weeks before the ladder says it may, while every screen said sixty days. Every rung before the last is reversible by paying | **live** |
+| `a-workspace-nobody-charged-is-never-erased` | reading an absent subscription as "unpaid forever", which deletes exactly the workspaces nobody ever charged — one made before this rail existed, or by an operator | **live** |
+| `a-closure-is-erased-on-its-own-date` | somebody who decided to leave waiting out the arrears ladder's sixty days for a decision they already made — or, worse, a second erasure branch for it, because two branches disagree eventually and the disagreement is about whether records still exist | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

@@ -24,6 +24,7 @@ export * from "./data.js";
 export * from "./data-ops.js";
 export * from "./maintenance.js";
 export * from "./jobs.js";
+export * from "./arrears-job.js";
 export * from "./guide.js";
 export * from "./guide-ops.js";
 export * from "./milestone.js";

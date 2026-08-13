@@ -99,6 +99,7 @@ import { identityStore, readCookie, SESSION_COOKIE, sessionStore } from "./ident
 import { REFERENCE, referenceOperations, type ReferenceCarrier } from "./reference-ops.js";
 import { VAULT, vaultOperations, type VaultCarrier } from "./vault-ops.js";
 import { exportScoped, keptBy, retentionJob } from "./data.js";
+import { arrearsJob } from "./arrears-job.js";
 import { auditJob, recordAudit } from "./audit.js";
 import { countRequest, limitJob } from "./limit.js";
 import { liveFor } from "./impersonation.js";
@@ -574,11 +575,30 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         of them: `CollectionSpec.retention` is a declaration every app makes and
         nothing read, so a limit written in a manifest deleted nothing.
       */
-      return runDue([...(app.jobs ?? []), retentionJob(app.collections), auditJob(app.governance.auditRetentionDays), limitJob()], {
+      return runDue([...(app.jobs ?? []), retentionJob(app.collections), auditJob(app.governance.auditRetentionDays), limitJob(), arrearsJob(() => ({
+        global: directoryDb,
+        objectsFor: (region) => (regional(env)(region as ResolvedRegion)[opts.objectsBinding ?? "media"] as ObjectHandle | undefined) ?? null,
+        modules: opts.regionalModules ?? [],
+        keeping: keptBy(app.collections),
+      }))], {
         global: directoryDb,
         regions: app.tenancy.regions,
         now: () => new Date().toISOString() as Instant,
         bindingsFor: (region) => regional(env)(region as ResolvedRegion),
+        /*
+          ⚠️ THE SAME WALK EVERY REQUEST TAKES. A sweep resolving standing its own
+          way is a second answer to "is this workspace in good order with us", and
+          the two disagree the first time either is edited — on the one code path
+          that acts on somebody's records without a person watching.
+        */
+        standingOf: async (tenantId) => {
+          const sub = await subscriptionForTenant(directoryDb, tenantId).catch(() => null);
+          return standingOf(
+            sub ?? { planId: null, status: "none", trialEndsAt: null, pastDueAt: null, closingAt: null },
+            new Date().toISOString() as Instant,
+            chargeableFrom(await readAll(directoryDb).catch(() => ({}))),
+          );
+        },
         tenants: async (region) => {
           const rows = await directoryDb.all<{ tenant_id: string }>(
             `SELECT tenant_id FROM tenant_directory WHERE region = ? ORDER BY tenant_id LIMIT ?`,

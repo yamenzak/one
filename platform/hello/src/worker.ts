@@ -121,6 +121,11 @@ const runtime = createRuntime(hello, {
       and carries no tenant column — see `runtime/test/scope.test.ts`, which
       exempts the same table from the erasure cascade for the same reason.
       unbounded-read: bounded below rather than by the predicate.
+      platform-owned-exempt: this is the ONE thing a framework cannot supply —
+      who belongs to a workspace. A product with a roster reads its own; `hello`
+      has none by design, so everybody who has signed in here is its owner. It
+      reads identity to answer an APP question, which is the opposite of the
+      case this guard exists for: an app answering a PLATFORM question itself.
     */
     const rows = await db.all<{ account_id: string }>(`SELECT DISTINCT account_id FROM sessions LIMIT 500`);
     return rows.map((r) => ({ userId: r.account_id, role: "owner" }));

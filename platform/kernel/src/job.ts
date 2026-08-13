@@ -15,6 +15,7 @@
  */
 
 import type { BindingSpec, ResolvedBindings } from "./bindings.js";
+import type { StandingState } from "./standing.js";
 import type { Instant, RegionId, TenantId } from "./primitives.js";
 
 /**
@@ -57,6 +58,20 @@ export interface JobCtx<B extends BindingSpec> {
   readonly bind: ResolvedBindings<B>;
   /** Absent for a platform-scoped job, which is the whole difference. */
   readonly tenantId: TenantId | null;
+  /**
+   * WHERE THIS WORKSPACE STANDS WITH US, RESOLVED BY THE PLATFORM.
+   *
+   * ⚠️ IT IS HERE SO AN APP NEVER READS A BILLING TABLE, and the failure that
+   * makes this non-optional was live: a sweep that acted on a workspace's own
+   * customers first asked whether the workspace was in arrears — by reading a
+   * subscription row directly. When the payer moved from the workspace to the
+   * account that row stopped being written, the read kept succeeding, and every
+   * suspended studio quietly resumed shredding a roster it could no longer see.
+   * Nothing failed; the sweep reported clean runs throughout.
+   *
+   * Null for a platform-scoped job, which has no workspace to stand anywhere.
+   */
+  readonly standing: StandingState | null;
   readonly region: RegionId;
   /** ⚠️ Injected, so a sweep's arithmetic is testable without waiting a day. */
   now(): Instant;

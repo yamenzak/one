@@ -45,6 +45,8 @@ const deps = (g: ReturnType<typeof global_>, tenants: string[], now: string) => 
   regions: ["auto"] as RegionId[],
   now: () => AT(now),
   bindingsFor: () => ({}),
+  /* ⚠️ Resolved by the platform, so a handler never reads a billing table. */
+  standingOf: async () => ({ standing: "active" as const, reason: "ok" as const }),
   tenants: async () => tenants.map((t) => ({ tenantId: t as TenantId, region: "auto" as RegionId })),
 });
 

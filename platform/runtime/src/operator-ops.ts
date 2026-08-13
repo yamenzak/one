@@ -23,7 +23,6 @@ import { balance, record } from "./ledger.js";
 import { begin, end, historyFor } from "./impersonation.js";
 import { CREDITS } from "./generate.js";
 import { OPEN, readMaintenance, setMaintenance, type Maintenance } from "./maintenance.js";
-import { readSubscription } from "./commerce.js";
 import { compSubscription, grantCredits, setAdjustments, subscriptionForTenant } from "./account-billing.js";
 
 /** ⚠️ Held by the operator role and by nothing a workspace can grant. */

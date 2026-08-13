@@ -20,12 +20,12 @@ import {
   packageLines, operation, packageContradictions, PUBLIC, refuseDiscount, runwayFor, s, standingOf,
 } from "@one/kernel";
 import {
-  applyPackage, applyPayment, claimCode, codesFor, grantsFor, issueCode, listPackages,
+  applyPackage, claimCode, codesFor, grantsFor, issueCode, listPackages,
   openPurchase, priorGrants, purchasesFor, readAccess, readLadder, readPackage, readPayments,
   readPurchase, savePayments, saveLadder, setOverrides, setRemainingDays, settlePurchase,
   credentialProblem, verifySecretOf,
   discountsFor, readDiscount, saveDiscount, spendDiscount,
-  readSubscription, savePackage, standingFor,
+  savePackage,
 } from "./commerce.js";
 import { attribute, claimByCustomer, claimEvent, listParked, park, rememberCustomer, resolveParked, verifySignature } from "./provider.js";
 import { OPERATE } from "./operator-ops.js";
@@ -1323,11 +1323,18 @@ export function providerOperations<B extends BindingSpec>(app: AppSpec<B>): read
       const event = parseStripeEvent(row!.payload, app.stripeMetadataPrefix);
       if (!event) ctx.fail("platform.not_found", { field: "eventId" });
 
-      const db = await d.forTenant(input.tenantId);
-      if (!db) ctx.fail("platform.not_found", { field: "tenantId" });
+      /*
+        ⚠️ REPLAYED THROUGH THE SAME SETTLEMENT THE WEBHOOK USES, and it needs no
+        region at all now — the subscription is the account's. A second apply
+        here would be a second answer to "what did this payment do", reachable
+        only from the operator console, which is the worst place for the two to
+        disagree.
+      */
+      const sub = await subscriptionForTenant(d.global, input.tenantId);
+      if (!sub) ctx.fail("platform.not_found", { field: "tenantId" });
 
       if (await claimEvent(d.global, event!.id, input.tenantId, event!.kind, at)) {
-        await applyPayment(db!, input.tenantId, event!, at);
+        await settleOnAccount(d.global, sub!, event!, app, at);
       }
       /*
         ⚠️ RESOLVED RATHER THAN DELETED. What was parked and later replayed is

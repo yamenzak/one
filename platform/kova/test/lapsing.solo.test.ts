@@ -241,18 +241,31 @@ describe("the sweep", () => {
     await coach("/api/commerce.grant", { subjectId: held, packageId: "month" });
     await lapsedSince(held, daysAgo(400));
 
-    /* ⚠️ Upserted: a studio that never chose a plan has no row at all, and an
-       UPDATE against nothing leaves the sweep unfrozen and the test green. */
-    await db().run(
-      `INSERT INTO subscription (tenant_id, status, past_due_at, updated_at) VALUES (?, 'past_due', ?, ?)
-       ON CONFLICT(tenant_id) DO UPDATE SET status = 'past_due', past_due_at = excluded.past_due_at`,
-      tenantId, daysAgo(2), daysAgo(2),
+    /*
+      ⚠️ THE ACCOUNT'S ROW, AND UPSERTED. The payer is an account, so the studio's
+      standing is resolved from the global store — aged in the regional one this
+      would set a ladder nothing reads, the sweep would run unfrozen, and the
+      test would pass by asserting that a healthy path is healthy.
+    */
+    const existing = await global().first<{ id: string }>(
+      `SELECT id FROM account_subscription WHERE tenant_id = ?`, tenantId,
     );
+    if (existing) {
+      await global().run(
+        `UPDATE account_subscription SET status = 'past_due', past_due_at = ? WHERE id = ?`, daysAgo(2), existing.id,
+      );
+    } else {
+      await global().run(
+        `INSERT INTO account_subscription (id, account_id, product_id, tenant_id, status, past_due_at, started_at, updated_at)
+         VALUES (?, '', 'kova', ?, 'past_due', ?, ?, ?)`,
+        `sub_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`, tenantId, daysAgo(2), daysAgo(2), daysAgo(2),
+      );
+    }
     await sweep();
     expect(await db().first(`SELECT id FROM clients WHERE id = ?`, held)).not.toBeNull();
 
     /* And it resumes the moment the studio is square again. */
-    await db().run(`UPDATE subscription SET status = 'active', past_due_at = NULL WHERE tenant_id = ?`, tenantId);
+    await global().run(`UPDATE account_subscription SET status = 'active', past_due_at = NULL WHERE tenant_id = ?`, tenantId);
     await sweep();
     expect(await db().first(`SELECT id FROM clients WHERE id = ?`, held)).toBeNull();
   });
