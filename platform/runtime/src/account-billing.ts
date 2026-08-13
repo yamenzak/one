@@ -23,7 +23,7 @@
 
 import type { Instant, SchemaModule, SqlHandle, Overrides, Cohort } from "@one/kernel";
 import {
-  NO_OVERRIDES, allocateCredits, creditBalance, grantRef, periodOf, claimable,
+  allocateCredits, creditBalance, grantRef, periodOf, claimable,
   type CreditBalance, type CreditShare, type PaymentStatus, type Subscription,
 } from "@one/kernel";
 
@@ -281,6 +281,59 @@ export async function markClosing(
   );
 }
 
+/**
+ * Put a workspace on a plan with no payment behind it.
+ *
+ * ⚠️ IT CREATES A ROW WHERE THERE IS NONE, because the workspaces an operator
+ * comps are exactly the ones that never bought anything — a demonstration
+ * account, a workspace made before this rail existed, a customer being made
+ * whole. An update that found nothing to update would report success and change
+ * nothing, on the one path whose whole purpose is to override the rules.
+ *
+ * ⚠️ AND THE ACCOUNT MAY BE UNKNOWN, which is honest rather than a gap. A
+ * workspace with no subscription has no recorded payer; the comp attaches to the
+ * workspace, and a top-up for it is refused until somebody's account is on it.
+ */
+export async function compSubscription(
+  global: SqlHandle,
+  input: { readonly tenantId: string; readonly productId: string; readonly planId: string },
+  at: Instant,
+): Promise<void> {
+  const existing = await subscriptionForTenant(global, input.tenantId);
+  if (existing) {
+    await global.run(
+      `UPDATE account_subscription SET plan_id = ?, status = 'active', past_due_at = NULL, trial_ends_at = NULL, updated_at = ? WHERE id = ?`,
+      input.planId, at, existing.id,
+    );
+    return;
+  }
+  await global.run(
+    `INSERT INTO account_subscription (id, account_id, product_id, tenant_id, plan_id, status, started_at, updated_at)
+     VALUES (?, '', ?, ?, ?, 'active', ?, ?)`,
+    `sub_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`,
+    input.productId, input.tenantId, input.planId, at, at,
+  );
+}
+
+/** One workspace's operator-set ceilings — absolute, either direction, per key. */
+export async function setAdjustments(
+  global: SqlHandle, tenantId: string, adjusted: Readonly<Record<string, unknown>>, at: Instant,
+): Promise<void> {
+  const existing = await subscriptionForTenant(global, tenantId);
+  if (existing) {
+    await global.run(
+      `UPDATE account_subscription SET adjusted_json = ?, updated_at = ? WHERE id = ?`,
+      JSON.stringify(adjusted), at, existing.id,
+    );
+    return;
+  }
+  await global.run(
+    `INSERT INTO account_subscription (id, account_id, product_id, tenant_id, status, adjusted_json, started_at, updated_at)
+     VALUES (?, '', '', ?, 'none', ?, ?, ?)`,
+    `sub_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`, tenantId, JSON.stringify(adjusted), at, at,
+  );
+}
+
 /** Find the subscription a provider's own reference belongs to. */
 export async function subscriptionByProviderRef(global: SqlHandle, ref: string): Promise<Subscription | null> {
   const row = await global.first<SubRow>(`SELECT ${COLUMNS} FROM account_subscription WHERE provider_ref = ?`, ref);
@@ -479,5 +532,3 @@ export async function creditHistory(
   );
   return rows.map((r) => ({ kind: r.kind, amount: r.amount, reason: r.reason, productId: r.product_id, at: r.at }));
 }
-
-export const NO_SUBSCRIPTION_OVERRIDES = NO_OVERRIDES;

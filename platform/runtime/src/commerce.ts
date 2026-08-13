@@ -211,13 +211,14 @@ export async function readSubscription(db: SqlHandle, tenantId: string): Promise
   };
 }
 
-export async function choosePlan(db: SqlHandle, tenantId: string, planId: string, at: Instant): Promise<void> {
-  await db.run(
-    `INSERT INTO subscription (tenant_id, pending_plan_id, status, updated_at) VALUES (?, ?, 'none', ?)
-     ON CONFLICT(tenant_id) DO UPDATE SET pending_plan_id = excluded.pending_plan_id, updated_at = excluded.updated_at`,
-    tenantId, planId, at,
-  );
-}
+/*
+  ⚠️ CHOOSING A PLAN MOVED TO THE ACCOUNT RAIL AND ITS OLD WRITER IS GONE, not
+  kept beside it. The payer is an account, so `choosePlanFor` in
+  `account-billing.ts` is the one writer; a second function still writing the
+  regional row would be a control that reports success and changes nothing the
+  gate reads — which is the exact shape of every defect this repo is arranged
+  around.
+*/
 
 /* ---------------------------------------------------------------- ladder --- */
 

@@ -19,6 +19,8 @@ import type { LegalDoc, Problem, Receiving } from "@one/kernel";
 
 import { AccountCenter, type AccountCenterProps } from "../src/account/center.js";
 import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
+import { MarketScreen, ShelfScreen, priceOf } from "../src/account/market.js";
+import { CreditsScreen, saidAs } from "../src/account/credits.js";
 import { AboutBody, KeptHere, meaning, readAs, VaultScreen, type Item, type Kept, type Looked, type Where } from "../src/account/vault.js";
 import { AskForIt, ConsentBody, ConsentSheet, offered, type Asked } from "../src/consent.js";
 import { AccountDetails } from "../src/account/details.js";
@@ -134,29 +136,28 @@ describe("starting something new", () => {
   });
 
   it("offers it to somebody who may, with no workspaces at all", () => {
-    const out = home({ openable: OPENABLE, onOpenProduct: () => undefined });
+    const out = home({ openable: OPENABLE });
     expect(out).toContain("New workspace");
-    /* ⚠️ AND SAYS THE NEXT SCREEN IS A QUESTION, because there is more than one
-       product. With a single one it goes straight there — a picker with one
-       option is a question with one answer. */
-    expect(out).toContain("Choose which product");
-  });
-
-  it("says nothing about choosing when there is one product", () => {
-    const out = home({ openable: [OPENABLE[0]!], onOpenProduct: () => undefined });
-    expect(out).toContain("New workspace");
-    expect(out).not.toContain("Choose which product");
+    /*
+      ⚠️ AND IT SAYS THE NEXT STEP IS A PLAN, because that is now what stands
+      between somebody and a workspace. It used to open a picker of products and
+      hand straight to a setup door, which skipped the one question that has to
+      be answered before a workspace can exist at all.
+    */
+    expect(out).toContain("Choose a plan");
   });
 
   /*
     ⚠️ AND THE CONTROL IS NOT WHAT MAKES IT SAFE. `identity.workspace.create`
-    refuses an address with no grant on a product that is sold; this row is what
-    stops somebody being offered it, which is a different job. A screen that was
-    the only control would be a decoration in front of a route in the API
-    document — see `hello/test/provisioning.test.ts` for the half that refuses.
+    refuses an address with no grant on a product that is sold, and refuses again
+    where no subscription is waiting; this row is what stops somebody being
+    offered it, which is a different job. A screen that was the only control would
+    be a decoration in front of a route in the API document — see
+    `hello/test/provisioning.test.ts` and `hello/test/marketplace.test.ts` for the
+    halves that refuse.
   */
-  it("draws nothing when nobody can be handed over to", () => {
-    expect(home({ openable: OPENABLE })).not.toContain("New workspace");
+  it("offers nothing to somebody who may open nothing, whatever else is on the screen", () => {
+    expect(home({ openable: [] })).not.toContain("New workspace");
   });
 });
 
@@ -1200,5 +1201,155 @@ describe("the rest of the account centre", () => {
     expect(html).not.toContain("<img");
     expect(html).toContain("&lt;img");
     expect([...html.matchAll(/<p>/g)]).toHaveLength(2);
+  });
+});
+
+/* ------------------------------------------------------------ marketplace --- */
+
+describe("the marketplace", () => {
+  const PRODUCTS = [
+    { id: "kova", name: "Kova", does: "Coaching, for a studio.", open: true },
+    { id: "tessa", name: "Tessa", does: "A clinic's own practice.", open: false },
+  ];
+  const PLAN = {
+    id: "pro", name: "Pro", price: { minor: 2900, currency: "usd" }, period: "month" as const, trialDays: 14,
+    includes: [
+      { key: "clients", label: "People", value: 40, unlimited: false },
+      { key: "chat", label: "Messaging", value: false, unlimited: false },
+      { key: "seats", label: "Staff", value: -1, unlimited: true },
+    ],
+  };
+  const shelf = (over: Partial<React.ComponentProps<typeof ShelfScreen>> = {}) => html(
+    <ShelfScreen
+      product={PRODUCTS[0]!} plans={[PLAN]} trialAvailable chargeable
+      onStart={async () => null} onBack={() => undefined} {...over}
+    />,
+  );
+
+  /*
+    ⚠️ A PRODUCT SOMEBODY IS NOT LET INTO IS SHOWN AND SAID SO. Hidden, the
+    marketplace is a different shape per person and "where is Tessa" has no answer
+    anybody can act on; said, it is one phrase and it names the way in.
+  */
+  it("shows a product that is not open, rather than hiding it", () => {
+    const out = html(<MarketScreen products={PRODUCTS} onGo={() => undefined} onBack={() => undefined} />);
+    expect(out).toContain("Tessa");
+    expect(out).toContain("Not open to you");
+  });
+
+  /*
+    ⚠️ THE PRICE IS ON THE ROW AND IT IS FORMATTED ONCE. A price divided by a
+    hundred at each render site is wrong in one place, and it is always the place
+    nobody looks at — which on a storefront is the one that took the money.
+  */
+  it("prints money from minor units, once", () => {
+    expect(priceOf({ minor: 2900, currency: "usd" }, "month")).toBe("$29 a month");
+    expect(priceOf({ minor: 499, currency: "usd" }, "month")).toBe("$4.99 a month");
+    expect(priceOf({ minor: 1000, currency: "aed" }, "year")).toBe("10 AED a year");
+    expect(shelf()).toContain("$29 a month");
+  });
+
+  /*
+    ⚠️ THE TRIAL IS IN THE DETAIL AND NOT IN THE ACTION SLOT, and the reason is a
+    real defect rather than taste: a row either goes somewhere or carries an
+    action, never both — with the pill on the right the row stopped being
+    pressable and the pill was the only thing on it.
+  */
+  it("says a trial is on offer, on a row that still goes somewhere", () => {
+    expect(shelf()).toContain("14 days free");
+    expect(shelf({ trialAvailable: false })).not.toContain("14 days free");
+    expect(shelf()).toMatch(/item-detail[^]*?14 days free/);
+  });
+
+  /*
+    ⚠️ WHAT A PLAN INCLUDES IS UNDER IT RATHER THAN ON THE PAGE. Flat, three plans
+    of three entitlements is nine rows repeating three labels — and a real
+    catalogue is four plans of eight, which is a wall somebody scrolls past to
+    reach a button.
+  */
+  it("keeps what a plan includes inside the plan", () => {
+    const out = shelf();
+    expect(out).toContain("disclose");
+    expect(out).toContain("Unlimited");
+    /* ⚠️ A switch that is OFF is an em dash, not a missing row. A plan that
+       silently omits what it does not include cannot be compared against one
+       that does. */
+    expect(out).toContain("—");
+  });
+
+  /*
+    ⚠️ A DEPLOYMENT THAT CANNOT CHARGE SAYS SO AT THE TOP, ONCE. A price list whose
+    every button refuses wastes somebody's decision before telling them it could
+    not have been made.
+  */
+  it("says when nothing can be charged yet", () => {
+    expect(shelf({ chargeable: false })).toContain("no payment provider");
+    expect(shelf()).not.toContain("no payment provider");
+  });
+
+  /* ⚠️ `[]` IS "SELLS NOTHING" AND `null` IS "NOT YET". Rendering the first for
+     the second is a confident empty state over a round trip. */
+  it("tells a shelf that is empty from one that has not arrived", () => {
+    expect(shelf({ plans: null })).toContain("aria-busy");
+    expect(shelf({ plans: [] })).toContain("Not on sale");
+  });
+});
+
+/* ---------------------------------------------------------------- credits --- */
+
+describe("credits", () => {
+  const BALANCE = { total: 1000, granted: 900, purchased: 100, expiring: { at: "2026-09-01T00:00:00.000Z", amount: 900 } };
+  const credits = (over: Partial<React.ComponentProps<typeof CreditsScreen>> = {}) => html(
+    <CreditsScreen
+      balance={BALANCE} history={[]} packs={[]} chargeable
+      onBuy={async () => null} onBack={() => undefined} {...over}
+    />,
+  );
+
+  /*
+    ⚠️ ONE TOTAL IS A NUMBER THAT DROPS OVERNIGHT. An allowance expires and a pack
+    does not; shown as one figure, somebody watches it fall on the first of the
+    month with nothing having said it would — and the conversation that follows is
+    about whether we took their credits.
+  */
+  it("says what expires and when, beside what does not", () => {
+    const out = credits();
+    expect(out).toContain("1,000");
+    expect(out).toContain("900 expire on");
+    expect(out).toContain("No expiry");
+  });
+
+  it("says nothing about expiry for an account holding only what it bought", () => {
+    expect(credits({ balance: { total: 100, granted: 0, purchased: 100, expiring: null } })).not.toContain("expire on");
+  });
+
+  /* ⚠️ `0` IS A REAL ANSWER AND MUST NOT BE SHOWN WHILE FETCHING. A confident zero
+     during a round trip is the same defect as an empty list rendered as a fact. */
+  it("waits rather than showing a confident zero", () => {
+    expect(credits({ balance: null })).toContain("aria-busy");
+  });
+
+  /*
+    ⚠️ THE LEDGER'S OWN STRING NEVER REACHES A SCREEN. `hold:draft-plan` is right
+    to store and wrong to print: it makes somebody's own spending look like a log
+    file, which is the surest way to make a balance feel like something being done
+    to them.
+  */
+  it("says what a movement was for in words", () => {
+    expect(saidAs("hold:draft-plan")).toBe("Draft plan");
+    expect(saidAs("allowance:kova")).toBe("Monthly allowance");
+    expect(saidAs("pack:top")).toBe("Credits bought");
+    expect(saidAs("topup:goodwill")).toBe("Added by support");
+  });
+
+  /*
+    ⚠️ A SHOPPING ROW WITHOUT A PRICE IS THE ONE OMISSION THAT MAY NEVER HAPPEN,
+    and it did: the price was in the action slot, which made the row unpressable
+    and dropped the price entirely.
+  */
+  it("puts the price on the pack row, on a row that still goes somewhere", () => {
+    const out = credits({ packs: [{ id: "small", name: "Small", price: { minor: 900, currency: "usd" }, credits: 10_000 }] });
+    expect(out).toContain("$9");
+    expect(out).toMatch(/item-detail[^]*?\$9/);
   });
 });

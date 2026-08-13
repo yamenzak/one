@@ -704,6 +704,38 @@ fix something, and only one of them is what they need to read.
 the hostname in a help page reads as a nickname, and somebody picks one they
 would not have chosen written out.
 
+### 2.7c Money on a screen
+
+**A row either goes somewhere or carries something on the right, never both.** —
+This is `Item`'s own rule and it bites hardest here: a price or a trial pill put
+in the action slot makes the row unpressable AND is silently dropped, which is
+how a credit-pack row shipped with no price on it. Money and state go in the
+detail line, which already takes a capsule.
+*Checked: `web/test/screens.test.tsx`.*
+
+**A price is formatted once, from minor units.** — Divided by a hundred at each
+render site it is wrong in one place, and it is always the place nobody looks at
+— which on a storefront is the one that took the money.
+
+**A balance says what expires and when, beside what does not.** — One figure
+covering a perishable allowance and a permanent purchase is a number that drops
+overnight, and the conversation that follows is about whether we took somebody's
+credits.
+
+**A ledger's own string never reaches a screen.** — `hold:draft-plan` is right to
+store and wrong to print: it makes somebody's own spending read as a machine's
+notes about them.
+
+**What a plan includes belongs inside the plan.** — Three plans of three
+entitlements rendered flat is nine rows repeating three labels; a real catalogue
+is four plans of eight. Disclosed, the shelf is three lines and comparing is
+something somebody chooses to do. **And a switch that is off is drawn**, because
+a plan that omits what it does not include cannot be compared with one that does.
+
+**A deployment that cannot charge says so before the price list, once.** — Every
+button refusing is somebody's decision spent before they are told it could not
+have been made.
+
 ### 2.8 Failure
 
 **A failure is a `Problem`, never a string.** — The platform already refuses to
@@ -953,6 +985,13 @@ more, which is the honest state.
 | `a-workspace-can-actually-be-created` | the whole platform being behind having a workspace with no screen that makes one — `identity.workspace.create` was written, audited and tested and only a test harness ever called it. The narrower failure the same test pins: a business name sent through unchanged, so the first thing a new customer meets is a refusal for typing their own name correctly | **live** |
 | `a-permanent-choice-is-made-before-it-is-committed` | where a workspace's records live sitting under the control that creates it — a decision that can never be changed afterwards, which the ordinary path presses past without scrolling to | **live** |
 | `a-refusal-lands-on-what-caused-it` | every refusal sent to the same place. A taken address belongs under the address; not being let in is not something retyping fixes, and putting it there is an instruction to keep trying | **live** |
+| `a-product-not-open-to-you-is-said-not-hidden` | a marketplace that is a different shape per person, so "where is Tessa" has no answer anybody can act on | **live** |
+| `money-is-formatted-once` | a price divided by a hundred at each render site — wrong in one place, and always the place nobody looks at, which on a storefront is the one that took the money | **live** |
+| `a-row-goes-somewhere-or-carries-something` | a shopping row with no price on it. The action slot makes a row unpressable, so a price put there is silently dropped AND the row stops working — which is how a pack row shipped with neither. The same test's sibling pins the trial pill on a plan row | **live** |
+| `a-plan-carries-what-it-includes` | three plans of three entitlements rendered flat — nine rows repeating three labels, and a real catalogue is four plans of eight. The same test pins that a switch which is OFF is drawn rather than omitted, because a plan that silently leaves out what it does not include cannot be compared with one that does | **live** |
+| `a-balance-says-what-expires` | one figure covering an allowance that lapses and a pack that does not — somebody watches the number fall on the first of the month with nothing having said it would, and the conversation that follows is about whether we took their credits | **live** |
+| `a-ledger-string-never-reaches-a-screen` | `hold:draft-plan` printed on the page — right to store, wrong to show, and it makes somebody's own spending read as a machine's notes about them | **live** |
+| `nothing-chargeable-is-said-before-a-price-list` | a price list whose every button refuses — somebody's decision spent before they are told it could not have been made | **live** |
 <!-- /generated -->
 
 ## 5. What is not decided yet

@@ -24,6 +24,7 @@ import { begin, end, historyFor } from "./impersonation.js";
 import { CREDITS } from "./generate.js";
 import { OPEN, readMaintenance, setMaintenance, type Maintenance } from "./maintenance.js";
 import { readSubscription } from "./commerce.js";
+import { compSubscription, grantCredits, setAdjustments, subscriptionForTenant } from "./account-billing.js";
 
 /** ⚠️ Held by the operator role and by nothing a workspace can grant. */
 export const OPERATE = "platform:operate";
@@ -110,7 +111,10 @@ export function operatorOperations<B extends BindingSpec>(app: AppSpec<B>): read
       const out = [];
       for (const row of rows) {
         const db = await d.regionalIn(row.region as RegionId).catch(() => null);
-        const sub = db ? await readSubscription(db, row.tenant_id).catch(() => null) : null;
+        /* ⚠️ THE ACCOUNT'S SUBSCRIPTION, which is the one the gate resolves. Read
+           from the region, this list would show a plan nothing enforces — and an
+           operator screen that disagrees with the gate is worse than none. */
+        const sub = await subscriptionForTenant(d.global, row.tenant_id).catch(() => null);
         out.push({
           tenantId: row.tenant_id, slug: row.slug, region: row.region,
           standing: row.standing, reason: row.standing_reason,
@@ -272,17 +276,18 @@ export function operatorOperations<B extends BindingSpec>(app: AppSpec<B>): read
       */
       if (!plans.has(input.planId)) ctx.fail("platform.invalid", { field: "planId" });
 
-      const db = await d.regionalIn(where!.region as RegionId);
       /*
         ⚠️ `active`, AND `past_due_at` CLEARED. A workspace comped while the
         dunning ladder was counting would keep its anchor and be suspended on
         schedule for an invoice nobody is waiting for.
+
+        ⚠️ AND IT IS WRITTEN ON THE ACCOUNT'S SUBSCRIPTION, WHICH IS WHERE THE
+        GATE READS. Written to a regional table nothing resolves against, comping
+        a workspace would answer 200, record an audit entry, and change nothing
+        anybody could see — which is the shape this whole rail exists to make
+        impossible.
       */
-      await db.run(
-        `INSERT INTO subscription (tenant_id, plan_id, status, past_due_at, updated_at) VALUES (?, ?, 'active', NULL, ?)
-         ON CONFLICT(tenant_id) DO UPDATE SET plan_id = excluded.plan_id, status = 'active', past_due_at = NULL, updated_at = excluded.updated_at`,
-        input.tenantId, input.planId, ctx.now(),
-      );
+      await compSubscription(d.global, { tenantId: input.tenantId, productId: app.id, planId: input.planId }, ctx.now());
       return { plan: input.planId };
     },
   });
@@ -326,19 +331,15 @@ export function operatorOperations<B extends BindingSpec>(app: AppSpec<B>): read
         }
       }
 
-      const db = await d.regionalIn(where!.region as RegionId);
-      const current = await readSubscription(db, input.tenantId);
-      const next: Record<string, unknown> = { ...current.overrides.adjusted };
+      const current = await subscriptionForTenant(d.global, input.tenantId);
+      const next: Record<string, unknown> = { ...(current?.overrides.adjusted ?? {}) };
       for (const [key, value] of Object.entries(changes)) {
         if (value === null) delete next[key];
         else next[key] = value;
       }
 
-      await db.run(
-        `INSERT INTO subscription (tenant_id, status, adjusted_json, updated_at) VALUES (?, 'none', ?, ?)
-         ON CONFLICT(tenant_id) DO UPDATE SET adjusted_json = excluded.adjusted_json, updated_at = excluded.updated_at`,
-        input.tenantId, JSON.stringify(next), ctx.now(),
-      );
+      /* ⚠️ The account's row, for the same reason `admin.comp` writes there. */
+      await setAdjustments(d.global, input.tenantId, next, ctx.now());
       return { adjusted: next };
     },
   });
@@ -372,16 +373,23 @@ export function operatorOperations<B extends BindingSpec>(app: AppSpec<B>): read
       const where = await placeOf(d.global, input.tenantId);
       if (!where) ctx.fail("platform.not_found", { field: "tenantId" });
 
-      const db = await d.regionalIn(where!.region as RegionId);
-      const done = await record(db, input.tenantId, {
-        unit: CREDITS, amount: input.amount, reason: `topup:${input.reason}`, ref: input.ref, actorId: d.actorId,
+      /*
+        ⚠️ CREDITS GO TO THE ACCOUNT THAT PAYS FOR THE WORKSPACE, because that is
+        the balance every product spends from. A top-up written against the
+        workspace would land somewhere nothing draws on — money given and never
+        arriving, with a 200 and an audit row saying it did.
+      */
+      const sub = await subscriptionForTenant(d.global, input.tenantId);
+      if (!sub) ctx.fail("platform.not_found", { field: "tenantId" });
+      const done = await grantCredits(d.global, sub!.accountId, {
+        kind: "purchased", amount: input.amount, reason: `topup:${input.reason}`, ref: input.ref, productId: app.id,
       }, ctx.now());
       /*
         ⚠️ `applied: false` IS A SUCCESS. A redelivered intent that was already
         recorded is not an error — but a caller reading a 200 as "it happened"
         would tell somebody credits were added twice.
       */
-      return { applied: done.applied, balance: await balance(db, input.tenantId, CREDITS) };
+      return { applied: done.applied, balance: done.balance };
     },
   });
 
@@ -589,8 +597,10 @@ function catalogueOperations<B extends BindingSpec>(app: AppSpec<B>): readonly A
 }
 
 /**
- * ⚠️ EVERY WORKSPACE ON THE PLAN, ACROSS EVERY REGION. A snapshot written only
- * where the operator happens to be is a promise kept for some customers.
+ * ⚠️ EVERY WORKSPACE ON THE PLAN, IN ONE QUERY. Subscriptions are the account's
+ * and live in the global store, so a sweep that once had to visit every region —
+ * and quietly kept the promise for some customers when one would not open — is a
+ * single statement that either runs or does not.
  */
 async function holdExisting(
   d: OperatorDeps,
@@ -600,22 +610,19 @@ async function holdExisting(
   at: Instant,
 ): Promise<number> {
   let held = 0;
-  for (const region of d.regions) {
-    const db = await d.regionalIn(region);
-    const rows = await db.all<{ tenant_id: string; grandfathered_json: string }>(
-      `SELECT tenant_id, grandfathered_json FROM subscription WHERE plan_id = ?`, planId,
-    ).catch(() => []);
-    for (const row of rows) {
-      const kept = snapshotDowngrade(before, after, parseAllowances(row.grandfathered_json));
-      /* ⚠️ Only where something actually moved. A write per workspace per edit
-         would rewrite the whole subscriber table to change a trial length. */
-      if (JSON.stringify(kept) === JSON.stringify(parseAllowances(row.grandfathered_json))) continue;
-      await db.run(
-        `UPDATE subscription SET grandfathered_json = ?, updated_at = ? WHERE tenant_id = ?`,
-        JSON.stringify(kept), at, row.tenant_id,
-      ).catch(() => undefined);
-      held++;
-    }
+  const rows = await d.global.all<{ id: string; grandfathered_json: string }>(
+    `SELECT id, grandfathered_json FROM account_subscription WHERE plan_id = ?`, planId,
+  ).catch(() => []);
+  for (const row of rows) {
+    const kept = snapshotDowngrade(before, after, parseAllowances(row.grandfathered_json));
+    /* ⚠️ Only where something actually moved. A write per workspace per edit
+       would rewrite the whole subscriber table to change a trial length. */
+    if (JSON.stringify(kept) === JSON.stringify(parseAllowances(row.grandfathered_json))) continue;
+    await d.global.run(
+      `UPDATE account_subscription SET grandfathered_json = ?, updated_at = ? WHERE id = ?`,
+      JSON.stringify(kept), at, row.id,
+    ).catch(() => undefined);
+    held++;
   }
   return held;
 }

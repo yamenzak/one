@@ -43,6 +43,8 @@ import { Edit } from "../src/icon.js";
 import { AskForIt, ConsentSheet, type Asked } from "../src/consent.js";
 import { Door, type DoorWire } from "../src/door.js";
 import { SetupScreen, type Place } from "../src/setup.js";
+import { MarketScreen, ShelfScreen, type Plan, type Sellable } from "../src/account/market.js";
+import { CreditsScreen, type Balance, type Movement, type Pack } from "../src/account/credits.js";
 import { ProveIt } from "../src/prove.js";
 import type { Ceremony } from "../src/passkey.js";
 import { SignInMethods } from "../src/account/signin.js";
@@ -421,6 +423,70 @@ const PLACES: readonly Place[] = [
   { id: "us", label: "United States", detail: "Virginia" },
 ];
 
+/*
+  ⚠️ ONE PRODUCT NOT OPEN TO THIS PERSON, because that row is the one a fixture
+  of three identical products never draws — and it is the ordinary state for
+  somebody who bought one thing.
+*/
+const SELLABLE: readonly Sellable[] = [
+  { id: "kova", name: "Kova", does: "Coaching, for a studio and the people it trains.", open: true },
+  { id: "scena", name: "Scena", does: "Screens, playing what you tell them, everywhere at once.", open: true },
+  { id: "tessa", name: "Tessa", does: "A clinic's own practice, run end to end.", open: false },
+];
+
+/*
+  ⚠️ THREE PLANS WITH DIFFERENT SHAPES OF INCLUSION — a count, a switch that is
+  off, and an unlimited. A fixture where every line is a number never draws the
+  em dash or the word, which are the two rows people actually squint at.
+*/
+const PLANS: readonly Plan[] = [
+  {
+    id: "solo", name: "Starter", price: { minor: 499, currency: "usd" }, period: "month", trialDays: 14,
+    includes: [
+      { key: "clients", label: "People you coach", value: 3, unlimited: false },
+      { key: "credits", label: "Monthly credits", value: 5_000, unlimited: false },
+      { key: "chat", label: "Messaging", value: false, unlimited: false },
+    ],
+  },
+  {
+    id: "pro", name: "Pro", price: { minor: 2900, currency: "usd" }, period: "month", trialDays: 14,
+    includes: [
+      { key: "clients", label: "People you coach", value: 40, unlimited: false },
+      { key: "credits", label: "Monthly credits", value: 60_000, unlimited: false },
+      { key: "chat", label: "Messaging", value: true, unlimited: false },
+    ],
+  },
+  {
+    id: "max", name: "Max", price: { minor: 9900, currency: "usd" }, period: "month", trialDays: 0,
+    includes: [
+      { key: "clients", label: "People you coach", value: -1, unlimited: true },
+      { key: "credits", label: "Monthly credits", value: 250_000, unlimited: false },
+      { key: "chat", label: "Messaging", value: true, unlimited: false },
+    ],
+  },
+];
+
+const BALANCE: Balance = {
+  total: 41_200, granted: 28_000, purchased: 13_200,
+  expiring: { at: "2026-09-01T00:00:00.000Z", amount: 28_000 },
+};
+
+const PACKS: readonly Pack[] = [
+  { id: "small", name: "Small", price: { minor: 900, currency: "usd" }, credits: 10_000 },
+  { id: "top", name: "Large", price: { minor: 3900, currency: "usd" }, credits: 50_000 },
+];
+
+/*
+  ⚠️ A LEDGER WITH SPENDS AND GRANTS MIXED, because a fixture of one kind never
+  shows the sign — which is the whole column a reader scans.
+*/
+const MOVEMENTS: readonly Movement[] = [
+  { kind: "granted", amount: -320, reason: "hold:draft-plan", productId: "kova", at: "2026-08-13T09:20:00.000Z" },
+  { kind: "granted", amount: -1_180, reason: "hold:snap-meal", productId: "kova", at: "2026-08-12T18:02:00.000Z" },
+  { kind: "granted", amount: 28_000, reason: "allowance:kova", productId: "kova", at: "2026-08-01T00:00:00.000Z" },
+  { kind: "purchased", amount: 50_000, reason: "pack:top", productId: "kova", at: "2026-07-19T11:41:00.000Z" },
+];
+
 /** Long enough to see the spinner and know it is a wait, not a stutter. */
 const ROUND_TRIP_MS = 900;
 
@@ -633,6 +699,32 @@ function Preview() {
         onBack={up}
         Heading={Heading}
       />
+    ) : at === "market" ? (
+      <MarketScreen products={SELLABLE} onGo={go} onBack={up} Heading={Heading} />
+    ) : at === "shelf" ? (
+      <ShelfScreen
+        product={SELLABLE.find((p) => p.id === where.product) ?? SELLABLE[0]!}
+        /* ⚠️ `#state=waiting` is the shelf mid-fetch, which is the state a
+           confident empty list would be indistinguishable from. */
+        plans={which === "waiting" ? null : PLANS}
+        trialAvailable={asked.get("trial") !== "used"}
+        /* ⚠️ `#pay=no` is a deployment with no provider — the case where every
+           button on a price list would refuse, and has to say so first. */
+        chargeable={asked.get("pay") !== "no"}
+        onStart={async () => { await new Promise((r) => setTimeout(r, ROUND_TRIP_MS)); return null; }}
+        onBack={up}
+        Heading={Heading}
+      />
+    ) : at === "credits" ? (
+      <CreditsScreen
+        balance={which === "waiting" ? null : BALANCE}
+        history={MOVEMENTS}
+        packs={PACKS}
+        chargeable={asked.get("pay") !== "no"}
+        onBuy={async () => { await new Promise((r) => setTimeout(r, ROUND_TRIP_MS)); return null; }}
+        onBack={up}
+        Heading={Heading}
+      />
     ) : at === "close" ? (
       <CloseAccountScreen
         /* ⚠️ `#state=waiting` IS THE UNANSWERED BLOCKING LIST, which on this
@@ -678,7 +770,9 @@ function Preview() {
             : asked.get("open") === "none" ? []
               : PRODUCTS
         }
-        onOpenProduct={() => undefined}
+        /* ⚠️ The balance the hub shows. `undefined` is a deployment with no
+           credits at all; `null` is one that has them and has not answered yet. */
+        balance={which === "waiting" ? null : { total: 41_200, granted: 28_000, purchased: 13_200, expiring: { at: "2026-09-01T00:00:00.000Z", amount: 28_000 } }}
         onOpenWorkspace={() => setOpen(false)}
         onClose={() => setOpen(false)}
       />

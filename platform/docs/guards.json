@@ -1838,8 +1838,8 @@
       "stage": "7",
       "status": "live",
       "impl": "kova/test/operating.solo.test.ts",
-      "proves": "changes whether an unpaid workspace is held to setup",
-      "fails": "a gate claiming the deployment can charge while the payment provider has no key — every workspace on a self-host stranded in setup over our own misconfiguration"
+      "proves": "refuses a workspace with nothing bought, and stands down where nothing can be bought",
+      "fails": "the parking state, which this used to assert and which no longer exists: a workspace is created against a subscription somebody already started, so the refusal moved from the first write to the creation itself. The half that still bites hardest is the stand-down — with no payment provider there is nothing to buy, so demanding a purchase would make the platform unusable over OUR missing configuration on every self-host and before the deploy guide's payment step"
     },
     {
       "id": "the-mode-picks-the-lane",
@@ -4171,6 +4171,69 @@
       "impl": "hello/test/provider.test.ts",
       "proves": "settles a workspace that lives in another region, with no region in the path",
       "fails": "a settlement written to the default region for a workspace that lives elsewhere — correct-looking in both places and taking effect in neither"
+    },
+    {
+      "id": "a-product-not-open-to-you-is-said-not-hidden",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "shows a product that is not open, rather than hiding it",
+      "fails": "a marketplace that is a different shape per person, so \"where is Tessa\" has no answer anybody can act on"
+    },
+    {
+      "id": "money-is-formatted-once",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "prints money from minor units, once",
+      "fails": "a price divided by a hundred at each render site — wrong in one place, and always the place nobody looks at, which on a storefront is the one that took the money"
+    },
+    {
+      "id": "a-row-goes-somewhere-or-carries-something",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "puts the price on the pack row, on a row that still goes somewhere",
+      "fails": "a shopping row with no price on it. The action slot makes a row unpressable, so a price put there is silently dropped AND the row stops working — which is how a pack row shipped with neither. The same test's sibling pins the trial pill on a plan row"
+    },
+    {
+      "id": "a-plan-carries-what-it-includes",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "keeps what a plan includes inside the plan",
+      "fails": "three plans of three entitlements rendered flat — nine rows repeating three labels, and a real catalogue is four plans of eight. The same test pins that a switch which is OFF is drawn rather than omitted, because a plan that silently leaves out what it does not include cannot be compared with one that does"
+    },
+    {
+      "id": "a-balance-says-what-expires",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "says what expires and when, beside what does not",
+      "fails": "one figure covering an allowance that lapses and a pack that does not — somebody watches the number fall on the first of the month with nothing having said it would, and the conversation that follows is about whether we took their credits"
+    },
+    {
+      "id": "a-ledger-string-never-reaches-a-screen",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "says what a movement was for in words",
+      "fails": "`hold:draft-plan` printed on the page — right to store, wrong to show, and it makes somebody's own spending read as a machine's notes about them"
+    },
+    {
+      "id": "nothing-chargeable-is-said-before-a-price-list",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "says when nothing can be charged yet",
+      "fails": "a price list whose every button refuses — somebody's decision spent before they are told it could not have been made"
     }
   ]
 }

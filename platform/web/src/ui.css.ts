@@ -589,6 +589,20 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 .item-detail { display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
   color: var(--ink-quiet); font-size: 14.5px; line-height: 1.35; }
 /*
+  ⚠️ A NUMBER ON THE RIGHT OF A ROW, AND IT IS TABULAR ON PURPOSE. Proportional
+  digits make a column of figures ragged — 41,200 above 1,113 above 900, each
+  ending somewhere different — which is exactly the column a reader is scanning
+  down. It is the one place in this interface where the type is not the reading
+  face's default, and the reason is that a balance is read as a quantity rather
+  than as words.
+
+  ⚠️ AND IT IS NOT A PILL. A pill says what STATE a row is in and takes its colour
+  from the tone scale; a value says how much, and colouring one would be inventing
+  a meaning for a number that already means itself.
+*/
+.value { color: var(--ink); font-size: 15px; font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1; white-space: nowrap; }
+/*
   ⚠️ ONE LINE WHERE SOMETHING SHARES THE ROW, AND THIS IS THE RULE THAT WAS
   WRITTEN AND NEVER ENFORCED. A destination row's second line may be as long as it
   needs — there is nothing beside it to push off a scan line. A row with a mark, a

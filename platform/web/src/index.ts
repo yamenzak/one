@@ -57,6 +57,8 @@ export * as Icon from "./icon.js";
 /* The account centre, and the consent sheet an app raises. */
 export { AccountCenter } from "./account/center.js";
 export { AccountHome, type AccountHomeProps } from "./account/home.js";
+export { MarketScreen, ShelfScreen, priceOf, type Sellable, type Plan, type Included } from "./account/market.js";
+export { CreditsScreen, CreditsRow, saidAs, type Balance, type Pack, type Movement } from "./account/credits.js";
 export { AccountDetails } from "./account/details.js";
 export { SignInMethods, type Device, type Passkey } from "./account/signin.js";
 export { PreferencesScreen, type Preferences } from "./account/preferences.js";

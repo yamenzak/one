@@ -29,6 +29,19 @@ export const ACCOUNT_SEGMENT = "account";
 
 export type Where =
   | { readonly at: "home" }
+  /*
+    ⚠️ THREE AREAS UNDER ONE ROOF, AND THEY ARE NOT THE SAME KIND OF THING. The
+    ACCOUNT CENTRE is who you are — profile, sign-in, preferences, the vault, the
+    legal record. The WORKSPACE HUB is what you belong to. The MARKETPLACE is what
+    you may start, and it is the only one of the three that takes money.
+
+    Kept as one flat list of settings pages, "new workspace" sat beside "change
+    your language" — a purchase and a preference wearing the same row.
+  */
+  | { readonly at: "market" }
+  /** One product's shelf: its plans, its trial, and the button that starts one. */
+  | { readonly at: "shelf"; readonly product: string }
+  | { readonly at: "credits" }
   | { readonly at: "details" }
   | { readonly at: "security" }
   | { readonly at: "preferences"; readonly part?: "appearance" | "reading" | "feedback" }
@@ -53,6 +66,8 @@ export function parseWhere(path: string): Where {
   if (one === "details") return { at: "details" };
   if (one === "security") return { at: "security" };
   if (one === "vault") return { at: "vault" };
+  if (one === "credits") return { at: "credits" };
+  if (one === "market") return two ? { at: "shelf", product: two } : { at: "market" };
   if (one === "export") return { at: "export" };
   if (one === "close") return { at: "close" };
   if (one === "preferences") {
@@ -83,6 +98,7 @@ export function pathOf(where: Where): string {
   const product = (id: string) => `legal/${id === "" ? ACCOUNT_SEGMENT : id}`;
   switch (where.at) {
     case "home": return "";
+    case "shelf": return `market/${where.product}`;
     case "preferences": return where.part ? `preferences/${where.part}` : "preferences";
     case "product": return product(where.product);
     case "receiving": return `${product(where.product)}/who`;
@@ -108,6 +124,7 @@ export const keyOf = (where: Where): string | null => pathOf(where) || null;
 export function upFrom(where: Where): Where {
   switch (where.at) {
     case "home": return { at: "home" };
+    case "shelf": return { at: "market" };
     case "preferences": return where.part ? { at: "preferences" } : { at: "home" };
     case "product": return { at: "legal" };
     case "receiving": return { at: "product", product: where.product };

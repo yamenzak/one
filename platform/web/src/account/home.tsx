@@ -17,14 +17,14 @@
  * — which is what makes the next screen an afternoon rather than a week.
  */
 
-import { useState, type CSSProperties, type ElementType, type ReactNode } from "react";
+import type { CSSProperties, ElementType, ReactNode } from "react";
 import { Mark } from "../mark.js";
 import { Lockup } from "../brand/mark.js";
 import { Add, Adjust, Guard, Heartbreak, Key, Onward, Save } from "../icon.js";
 import { Pill } from "../capsule.js";
 import { Blank, Card, Item, Waiting } from "../list.js";
-import { Choose } from "../choose.js";
 import type { Where } from "./routes.js";
+import { CreditsRow, type Balance } from "./credits.js";
 import { Screen, Section } from "../screen.js";
 
 /* ------------------------------------------------------------------ data --- */
@@ -114,7 +114,13 @@ export interface AccountHomeProps {
    * mean this worker writing a membership into Kova's regional store, which it has
    * no binding for and must never have. So this hands over rather than doing it.
    */
-  readonly onOpenProduct?: (product: Openable) => void;
+  /**
+   * ⚠️ THE BALANCE, AND `undefined` MEANS THIS DEPLOYMENT HAS NO CREDITS AT ALL —
+   * which is different from `null`, meaning it has some and they are still being
+   * fetched. A section that rendered a confident zero during a round trip is the
+   * same bug as one that renders an empty list as a fact.
+   */
+  readonly balance?: Balance | null;
   /**
    * ⚠️ LEAVING THE ACCOUNT CENTRE IS NOT A DESTINATION INSIDE IT. A workspace row
    * goes INTO that workspace — another product, at another address, outside this
@@ -137,28 +143,21 @@ const PRODUCT_NAME: Record<Product, string> = { kova: "Kova", scena: "Scena", te
 
 /**
  * ⚠️ IT SAYS WHAT IT MAKES, NOT WHAT IT OPENS. "New workspace" is the thing
- * somebody gets; "Create" is what the button does to the database. And where
- * there is more than one product it says so, because the next screen is a
- * question rather than a wizard.
+ * somebody gets; "Create" is what the button does to the database.
+ *
+ * ⚠️ AND IT GOES TO THE MARKETPLACE RATHER THAN STRAIGHT TO A SETUP DOOR. A
+ * workspace is created against a subscription somebody already started, so the
+ * step between here and the door is choosing a plan — this row used to open a
+ * picker of products and hand over, which skipped the one question that has to be
+ * answered before a workspace can exist at all.
  */
-const StartRow = ({ many, onGo }: { readonly many: boolean; readonly onGo: () => void }): ReactNode => (
-  <Item
-    icon={<Add />}
-    title="New workspace"
-    detail={many ? "Choose which product" : undefined}
-    onGo={onGo}
-  />
+const StartRow = ({ onGo }: { readonly onGo: () => void }): ReactNode => (
+  <Item icon={<Add />} title="New workspace" detail="Choose a plan" onGo={onGo} />
 );
 
 export function AccountHome({
-  person, workspaces, sharedCount = null, openable = [], onGo, onOpenWorkspace, onOpenProduct, onClose, Heading = "h1",
+  person, workspaces, sharedCount = null, openable = [], balance, onGo, onOpenWorkspace, onClose, Heading = "h1",
 }: AccountHomeProps): ReactNode {
-  /* ⚠️ ONE PRODUCT IS NOT A CHOICE. A picker with a single option is a question
-     with one answer, and the same argument the onboarding wizard makes about a
-     plan step nobody can fail. */
-  const [choosing, setChoosing] = useState(false);
-  const start = (p: Openable) => { setChoosing(false); onOpenProduct?.(p); };
-
   return (
     <Screen
       leave="dismiss"
@@ -235,31 +234,32 @@ export function AccountHome({
                 is where somebody looks — and it is the last row rather than a
                 control in the header, because most visits here are not about
                 starting anything. */}
-            {openable.length && onOpenProduct ? <StartRow many={openable.length > 1} onGo={() => (openable.length === 1 ? start(openable[0]!) : setChoosing(true))} /> : null}
+            {openable.length ? <StartRow onGo={() => onGo({ at: "market" })} /> : null}
           </Card>
         )}
         {/* ⚠️ AND IT IS OFFERED WITH NO WORKSPACES AT ALL, which is the state
             somebody arriving from the website is in: an empty list, an invitation
             that has not come, and the one thing they came here to do. */}
-        {workspaces?.length === 0 && openable.length && onOpenProduct ? (
+        {workspaces?.length === 0 && openable.length ? (
           <Card>
-            <StartRow many={openable.length > 1} onGo={() => (openable.length === 1 ? start(openable[0]!) : setChoosing(true))} />
+            <StartRow onGo={() => onGo({ at: "market" })} />
           </Card>
         ) : null}
       </Section>
 
-      {/* ⚠️ THE SAME PICKER EVERY OTHER CHOICE IN THIS SURFACE USES. A product is
-          a row with a name and a line about what it is for — which is exactly an
-          option, and inventing a second shape for it here would be a second thing
-          to keep in step with `Choose`. */}
-      <Choose
-        open={choosing}
-        title="What are you starting?"
-        options={openable.map((p) => ({ value: p.id, label: p.name, detail: p.does }))}
-        value=""
-        onPick={(id) => { const p = openable.find((o) => o.id === id); if (p) start(p); }}
-        onClose={() => setChoosing(false)}
-      />
+      {/*
+        ⚠️ CREDITS ARE THE ACCOUNT'S AND SO THEY ARE HERE, not inside a product.
+        Bought once and spent wherever somebody works, a balance shown only inside
+        one workspace is a number that looks like that workspace's — which is how
+        somebody comes to top up the wrong one.
+      */}
+      {balance !== undefined ? (
+        <Section name="Credits">
+          <Card>
+            <CreditsRow balance={balance} onGo={() => onGo({ at: "credits" })} />
+          </Card>
+        </Section>
+      ) : null}
 
       <Section name="Privacy">
         <Card>

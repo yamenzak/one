@@ -23,9 +23,13 @@ import { bindingsFor } from "@one/runtime";
 import worker from "../src/worker.js";
 import { post, SETUP, signIn } from "./session.js";
 
-/** ⚠️ The store directly, because only a payment provider's webhook sets this. */
-const db = () =>
-  bindingsFor({ db: sql() }, { DB: (env as Record<string, unknown>).DB }, { defaultRegion: "auto" })("auto" as ResolvedRegion).db;
+/**
+ * ⚠️ THE STORE DIRECTLY, because only a payment provider's webhook sets this —
+ * and it is the GLOBAL one, because the payer is an account and the subscription
+ * lives where accounts do.
+ */
+const directory = () =>
+  bindingsFor({ db: sql() }, { DB: (env as Record<string, unknown>).DIRECTORY }, { defaultRegion: "auto" })("auto" as ResolvedRegion).db;
 
 const SLUG = "bowland";
 const STUDIO = `https://${SLUG}.kova.4dl.app`;
@@ -156,11 +160,23 @@ describe("putting a workspace on a plan without a payment", () => {
   */
   it("stops a ladder that was already counting", async () => {
     const longAgo = new Date(Date.now() - 40 * 86_400_000).toISOString();
-    await db().run(
-      `INSERT INTO subscription (tenant_id, status, past_due_at, updated_at) VALUES (?, 'past_due', ?, ?)
-       ON CONFLICT(tenant_id) DO UPDATE SET status = 'past_due', past_due_at = excluded.past_due_at`,
-      tenantId, longAgo, longAgo,
+    /* ⚠️ THE ACCOUNT'S ROW, which is where the gate reads. Aged in the regional
+       store this would set a ladder nothing resolves against, and the test would
+       assert a healthy path is healthy. */
+    const had = await directory().first<{ id: string }>(
+      `SELECT id FROM account_subscription WHERE tenant_id = ?`, tenantId,
     );
+    if (had) {
+      await directory().run(
+        `UPDATE account_subscription SET status = 'past_due', past_due_at = ? WHERE id = ?`, longAgo, had.id,
+      );
+    } else {
+      await directory().run(
+        `INSERT INTO account_subscription (id, account_id, product_id, tenant_id, status, past_due_at, started_at, updated_at)
+         VALUES (?, '', 'kova', ?, 'past_due', ?, ?, ?)`,
+        `sub_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`, tenantId, longAgo, longAgo, longAgo,
+      );
+    }
     /*
       ⚠️ A WRITE, because reads are never gated at any rung — withholding
       somebody's own records over an invoice is not the same as withholding a
@@ -170,8 +186,8 @@ describe("putting a workspace on a plan without a payment", () => {
 
     expect((await operator("/api/admin.comp", { tenantId, planId: "studio", reason: "launch partner" })).status).toBe(200);
     expect((await coach("/api/movement.create", { name: "Back in service", pattern: "squat" })).status).toBe(200);
-    const left = await db().first<{ past_due_at: string | null }>(
-      `SELECT past_due_at FROM subscription WHERE tenant_id = ?`, tenantId,
+    const left = await directory().first<{ past_due_at: string | null }>(
+      `SELECT past_due_at FROM account_subscription WHERE tenant_id = ?`, tenantId,
     );
     expect(left!.past_due_at).toBeNull();
   });
@@ -381,19 +397,28 @@ describe("configuring the deployment", () => {
     setup could say "we can charge" while there was no key at all — and the
     failure is every workspace on a self-host stranded over OUR misconfiguration.
   */
-  it("changes whether an unpaid workspace is held to setup", async () => {
-    /* The studio is comped, so start from a workspace that never chose a plan. */
-    const fresh = "https://ilkley.kova.4dl.app";
+  /*
+    ⚠️ THIS USED TO ASSERT A PARKING STATE AND THERE IS NO LONGER ONE. A workspace
+    is created against a subscription somebody already started, so "a workspace
+    that never chose a plan" is not a state a chargeable deployment can reach —
+    the refusal moved from the first write to the creation itself.
+
+    ⚠️ AND THE STAND-DOWN IS THE HALF THAT MATTERS. With no payment provider there
+    is nothing to buy, so demanding a purchase would make the platform unusable
+    over OUR missing configuration rather than their non-payment — on every
+    self-host, and before the deploy guide's payment step.
+  */
+  it("refuses a workspace with nothing bought, and stands down where nothing can be bought", async () => {
     const founding = await signIn("ilkley@example.test", SETUP);
-    await post(SETUP, "/api/identity.workspace.create", { slug: "ilkley" }, founding);
-    const theirs = at(fresh)(await signIn("ilkley@example.test", fresh));
+    const refused = await post(SETUP, "/api/identity.workspace.create", { slug: "ilkley" }, founding);
+    expect(refused.res.status).toBe(402);
 
-    /* With a key configured, a workspace that never paid is held to setup. */
-    const held = await theirs("/api/movement.create", { name: "Nope", pattern: "squat" });
-    expect(held.status).toBe(402);
-
-    /* Take the key away, and the gate stands down — it was OUR configuration. */
     await operator("/api/admin.config.set", { key: "stripe.test.secret_key", value: "", scope: "app" });
+    const allowed = await post(SETUP, "/api/identity.workspace.create", { slug: "ilkley" }, founding);
+    expect(allowed.res.status).toBe(200);
+
+    const fresh = "https://ilkley.kova.4dl.app";
+    const theirs = at(fresh)(await signIn("ilkley@example.test", fresh));
     expect((await theirs("/api/movement.create", { name: "Fine", pattern: "squat" })).status).toBe(200);
   });
 

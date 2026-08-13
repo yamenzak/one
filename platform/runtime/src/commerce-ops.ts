@@ -20,7 +20,7 @@ import {
   packageLines, operation, packageContradictions, PUBLIC, refuseDiscount, runwayFor, s, standingOf,
 } from "@one/kernel";
 import {
-  applyPackage, applyPayment, choosePlan, claimCode, codesFor, grantsFor, issueCode, listPackages,
+  applyPackage, applyPayment, claimCode, codesFor, grantsFor, issueCode, listPackages,
   openPurchase, priorGrants, purchasesFor, readAccess, readLadder, readPackage, readPayments,
   readPurchase, savePayments, saveLadder, setOverrides, setRemainingDays, settlePurchase,
   credentialProblem, verifySecretOf,
@@ -31,7 +31,7 @@ import { attribute, claimByCustomer, claimEvent, listParked, park, rememberCusto
 import { OPERATE } from "./operator-ops.js";
 import { balance } from "./ledger.js";
 import { CREDITS } from "./generate.js";
-import { applyToSubscription, choosePlanFor, grantAllowance, grantCredits, rememberProviderRef, subscriptionById, subscriptionForTenant } from "./account-billing.js";
+import { applyToSubscription, choosePlanFor, grantAllowance, grantCredits, rememberProviderRef, subscriptionByProviderRef, subscriptionById, subscriptionForTenant } from "./account-billing.js";
 import { parseStripeEvent } from "./provider-stripe.js";
 import { previewOf, shelf } from "./market.js";
 
@@ -1204,9 +1204,27 @@ export function providerOperations<B extends BindingSpec>(app: AppSpec<B>): read
         routed by tenant alone, every first purchase on the platform would be
         parked as `no_tenant`, which is money taken and nothing granted.
       */
-      const named = event!.subscriptionRef
-        ? await subscriptionById(d.global, event!.subscriptionRef)
-        : null;
+      /*
+        ⚠️ AND THE PROVIDER'S OWN REFERENCE IS THE SECOND TRY, WHICH IS WHAT MAKES
+        A RENEWAL LAND. A checkout carries the metadata we wrote; the invoice a
+        month later carries the fields the PROVIDER thinks are interesting and
+        none of ours. Stamping the reference the first time an event places itself
+        is what lets the second one be claimed — without it the dead letter fills
+        with routine renewals, every one a subscription quietly lapsing.
+      */
+      /*
+        ⚠️ STATED METADATA STILL WINS, AND IT WINS FIRST. An event that names
+        another product must be parked here even when this worker could resolve it
+        by reference — a lookup that ran ahead of the check would let one product's
+        worker apply another's payment, which is the one attribution mistake that
+        is worse than parking. Written the other way round it passed every test
+        but the one that says so.
+      */
+      const mine = event!.appId === null || event!.appId === app.id;
+      const named = !mine ? null
+        : event!.subscriptionRef ? await subscriptionById(d.global, event!.subscriptionRef)
+          : event!.customerRef ? await subscriptionByProviderRef(d.global, event!.customerRef)
+            : null;
       if (named) {
         if (!(await claimEvent(d.global, event!.id, named.tenantId ?? named.id, event!.kind, at))) {
           return { outcome: "already_applied" };

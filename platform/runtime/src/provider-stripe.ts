@@ -70,8 +70,13 @@ export function parseStripeEvent(body: string, metadataPrefix: string): Provider
       taken with nothing granted, recoverable only by hand.
     */
     subscriptionRef: str(metadata.subscription) ?? str(metadata[`${metadataPrefix}_subscription`]),
-    /* ⚠️ Which pack, where the payment was for credits rather than for access. */
-    packId: str(metadata.pack) ?? str(metadata[`${metadataPrefix}_pack`]),
+    /*
+      ⚠️ Which credit pack, where the payment was for credits rather than for
+      access. Named in full on the wire: a provider's metadata is shared by every
+      app on one account, and `pack` alone is a word several of them could mean
+      something different by.
+    */
+    packId: str(metadata.credit_pack) ?? str(metadata[`${metadataPrefix}_credit_pack`]),
     customerRef: str(object.customer),
     paidMinor: num(object.amount_paid) || num(object.amount) || num(object.amount_total),
     refundedMinorTotal: num(object.amount_refunded),
