@@ -1078,6 +1078,14 @@ same guard asserts the seam: `JobCtx.standing` exists, and the runner actually
 resolves it per tenant. A declared field the runner never fills is worse than no
 field — every handler reads it as "nothing is wrong".
 
+⚠️ **And the identity half is structural in a stronger way: an app mounts
+nothing.** The route table is built from the operation registry, and
+`platformOperations`, `identityOperations` and `marketOperations` are always in
+it — so "an app that did not mount the shared surface", the failure
+`docs/PLATFORM-AUDIT.md` catalogued eight times in the old codebase, is not
+expressible. The same guard asserts it, because it is one `if` away from being a
+per-app decision again.
+
 ⚠️ **The exemption is a marker in the comment attached to the statement**, not a
 list at the top of a script. It reads the whole enclosing comment block rather
 than a fixed two lines, because the reasons this guard accepts are the ones that
@@ -1513,6 +1521,7 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `erasure-waits-for-the-last-rung` | erasing at the blocked rung — three weeks before the ladder says it may, while every screen said sixty days. Every rung before the last is reversible by paying | **live** |
 | `a-workspace-nobody-charged-is-never-erased` | reading an absent subscription as "unpaid forever", which deletes exactly the workspaces nobody ever charged — one made before this rail existed, or by an operator | **live** |
 | `a-closure-is-erased-on-its-own-date` | somebody who decided to leave waiting out the arrears ladder's sixty days for a decision they already made — or, worse, a second erasure branch for it, because two branches disagree eventually and the disagreement is about whether records still exist | **live** |
+| `the-identity-door-cannot-be-declined` | an app that can decline the identity door, which is an app that can grow its own — and in the old codebase three did, one of them mounting the send-guard AFTER the catch-all: a bypass that typechecks, passes every test and looks identical in a route list. Here nothing is mounted by an app at all, and this is one `if` away from being a per-app decision again | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

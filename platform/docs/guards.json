@@ -4315,6 +4315,15 @@
       "impl": "web/test/screens.test.tsx",
       "proves": "offers it once to somebody who already has a workspace",
       "fails": "two controls for one destination in two vocabularies — which also makes the section header that names the area read as decoration. The exception the same test pins: the empty list keeps it, because making somebody read a section header before they can act is making them read the page first"
+    },
+    {
+      "id": "the-identity-door-cannot-be-declined",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/owned.test.mjs",
+      "proves": "mounted: platform, identity and marketplace operations, for every app, unconditionally",
+      "fails": "an app that can decline the identity door, which is an app that can grow its own — and in the old codebase three did, one of them mounting the send-guard AFTER the catch-all: a bypass that typechecks, passes every test and looks identical in a route list. Here nothing is mounted by an app at all, and this is one `if` away from being a per-app decision again"
     }
   ]
 }

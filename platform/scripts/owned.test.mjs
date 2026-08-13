@@ -179,6 +179,29 @@ if (!/standing:\s*tenantId \?/.test(runner)) {
   ok("seam: the runner resolves it per tenant, and null for a platform-scoped job");
 }
 
+/*
+  ⚠️ AND THE PLATFORM'S OWN OPERATIONS ARE MOUNTED UNCONDITIONALLY, which is the
+  auth half of the same rule. The failure it prevents is the one this whole
+  repository is a reaction to: in the old codebase three apps each grew their own
+  identity door, and one mounted the send-guard AFTER the catch-all — a bypass
+  that typechecks, passes every test, and looks identical in a route list.
+
+  Here an app cannot forget, because it never mounts anything: the route table is
+  built from the registry and these three families are always in it. That is a
+  stronger property than any test of a particular app, and it is worth asserting
+  because it is one `if` away from being a per-app decision again.
+*/
+const registry = readFileSync(join(ROOT, "runtime", "src", "runtime.ts"), "utf8");
+const mounted = registry.match(/for \(const op of \[([^\]]*)\]\)/s)?.[1] ?? "";
+for (const family of ["platformOperations", "identityOperations", "marketOperations"]) {
+  if (!mounted.includes(`...${family}(app)`)) {
+    fail(`runtime/src/runtime.ts: \`${family}\` is not mounted for every app.\n` +
+         `       An app that can decline the identity door is an app that can grow its own —\n` +
+         `       which is how a send-guard came to sit after the catch-all, invisibly.`);
+  }
+}
+if (!bad) ok(`mounted: platform, identity and marketplace operations, for every app, unconditionally`);
+
 if (bad) {
   console.error(`\n${bad} ownership failure(s).`);
   process.exit(1);
