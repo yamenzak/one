@@ -8,7 +8,7 @@
 
 import { env } from "cloudflare:test";
 import { sql, type ResolvedRegion } from "@one/kernel";
-import { bindingsFor, CONFIG_SCHEMA, seedOne } from "@one/runtime";
+import { bindingsFor, CONFIG_SCHEMA, seedOne, SESSION_COOKIE } from "@one/runtime";
 import worker, { recorded } from "../src/worker.js";
 
 /* ⚠️ Whose configuration. The directory is bound with the same id into every
@@ -83,9 +83,16 @@ export const post = async (origin: string, path: string, body: unknown, cookie =
 export const accountIds = new Map<string, string>();
 
 /** Returns the cookie for that origin. Sessions are per origin, so it matters. */
-export async function signIn(email: string, origin: string): Promise<string> {
+/**
+ * ⚠️ `refusable` IS FOR ONE CASE AND IT IS NAMED RATHER THAN DEFAULTED. A door
+ * that has no workspace behind it REFUSES a sign-in, correctly, and a suite
+ * probing every door needs a cookie header to send it — so it asks for one
+ * knowing it may not get one. Everywhere else an absent cookie is a fault, and
+ * the difference has to be stated by the caller rather than guessed here.
+ */
+export async function signIn(email: string, origin: string, refusable = false): Promise<string> {
   await seedMail();
-  await post(origin, "/api/identity.code.request", { email });
+  const asked = await post(origin, "/api/identity.code.request", { email });
   /*
     ⚠️ READ OUT OF THE MESSAGE THAT WAS SENT, not out of a map the worker kept.
     The `recorded` provider is one a deployment CHOOSES, so this drives the same
@@ -96,6 +103,26 @@ export async function signIn(email: string, origin: string): Promise<string> {
   const { res, body } = await post(origin, "/api/identity.code.verify", { email, code });
   if (typeof body.accountId === "string") accountIds.set(email, body.accountId);
   const cookie = (res.headers.get("set-cookie") ?? "").split(";")[0]!;
+
+  /*
+    ⚠️ A SIGN-IN THAT DID NOT HAPPEN SAYS SO HERE, and this is not defensive
+    padding. Returning "" made every later request in the file anonymous, and
+    what a reader saw was an assertion three tests away — "expected false to be
+    true" about a list of sessions — with nothing anywhere naming the sign-in.
+    It cost most of an afternoon once.
+
+    ⚠️ THE OTP COOLDOWN IS THE USUAL CAUSE, so its status is in the message. A
+    second code for one address inside a minute is refused by design; a fixture
+    that asks for one and reads the previous message is asking the suite to
+    depend on whether a code had already been spent.
+  */
+  if (!cookie.startsWith(`${SESSION_COOKIE}=`)) {
+    if (refusable) return "";
+    throw new Error(
+      `sign-in did not happen for ${email} at ${origin}: ` +
+      `code.request ${asked.res.status}, code.verify ${res.status}, code ${code ?? "none recorded"}`,
+    );
+  }
 
   /*
     ⚠️ AND THEY AGREE TO WHAT THEY HAVE TO AGREE TO, because a real person does.

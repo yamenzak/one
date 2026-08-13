@@ -31,8 +31,30 @@ export default defineWorkersConfig({
       than the second of startup it costs, and because a screen that cannot be
       rendered beside the routes it calls is a screen nobody checks.
     */
-    // A serial root run absorbs Miniflare storage contention; one retry absorbs
-    // the rest. A genuine assertion failure still fails twice.
+    /*
+      ⚠️ ONE FILE AT A TIME, BECAUSE THE FILES SHARE ONE DATABASE. `isolatedStorage`
+      is false below on purpose — these tests describe a deployment's life — and
+      running them concurrently against one store is contention by construction
+      rather than by accident. It surfaced as a different test failing on each
+      run, none of them near the code that caused it, and about a third of runs:
+      a sign-in racing another file's, a workspace read before its neighbour's
+      write landed.
+
+      ⚠️ AND THE RETRY DOES NOT SAVE IT, which is what made this look like flake
+      rather than a fault. This package's fixtures use FIXED addresses and slugs,
+      so a retried file signs the same email in again inside the OTP cooldown and
+      gets no session at all — the second attempt fails for a different reason
+      than the first, and the reported error describes neither.
+
+      ⚠️ THIS ALONE DID NOT FIX IT, and the note is here so nobody trusts it to.
+      What actually did was moving the CONFIGURATION suite to the solo project:
+      it blanks the deployment's mail sender on purpose, and no amount of
+      ordering saves a neighbour that runs during that window. `signIn` throwing
+      instead of returning an empty cookie is what turned three weeks of
+      "something is flaky" into one line naming the door and the status.
+    */
+    fileParallelism: false,
+    // One retry absorbs what is left. A genuine assertion failure still fails twice.
     retry: 1,
     poolOptions: {
       workers: {

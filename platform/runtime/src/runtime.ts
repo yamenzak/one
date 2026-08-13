@@ -1496,6 +1496,13 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           /* ⚠️ Whose rows in a store every app binds by the same id. */
           appId: app.id,
           /*
+            ⚠️ EVERY PRODUCT, SO ONE CONSOLE CAN CONFIGURE THEM ALL. From the
+            deployment's own declaration rather than from a list an app keeps —
+            a second list is a second answer to "which products exist", and the
+            one that is wrong is the one the picker reads.
+          */
+          products: (opts.deployment?.products ?? []).map((p) => p.id),
+          /*
             ⚠️ THE SAME TABLE IN ANOTHER DATABASE, bound by the same id in every
             app. Null where a deployment binds none, which resolves to this app's
             own values and nothing else.

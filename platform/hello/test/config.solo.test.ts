@@ -10,7 +10,7 @@
  */
 
 import { env } from "cloudflare:test";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import worker, { recorded } from "../src/worker.js";
 import { post, SETUP, signIn } from "./session.js";
 
@@ -83,9 +83,76 @@ describe("configuration with no shared store", () => {
   it("is not reachable from inside a workspace", async () => {
     expect((await member("/api/admin.config")).status).toBe(403);
   });
+
+  /*
+    ⚠️ ONE CONSOLE, EVERY PRODUCT — which is what having ONE Stripe account and
+    ONE Google account behind three products actually needs. Three operator
+    doors meant three sign-ins and three places to paste one key, and the copy
+    that did not get re-pasted failed in a way nobody attributed to the rotation.
+
+    ⚠️ AND IT IS NOT THE THING `kernel/config.ts` REJECTS. That is a central
+    service PUSHING configuration into each product — a privileged write endpoint
+    in every app, authenticated by a machine token, accepting secret keys.
+    Nothing pushes here: the store is one database, the rows are keyed by app,
+    and each worker still reads only its own.
+  */
+  it("configures another product from the one door", async () => {
+    expect((await operator("/api/admin.config.set", {
+      key: "email.from", value: "Kova <noreply@4dl.app>", scope: "app", app: "kova",
+    })).status).toBe(200);
+
+    /* ⚠️ A read takes its input from the query, which is what makes it linkable. */
+    const theirs = (await operator("/api/admin.config?app=kova")).body;
+    expect(theirs.app).toBe("kova");
+    expect((theirs.keys as unknown as { key: string; value: unknown }[])
+      .find((k) => k.key === "email.from")?.value).toBe("Kova <noreply@4dl.app>");
+
+    /* ⚠️ AND THE SERVING PRODUCT'S OWN ROW IS UNTOUCHED, which is the whole
+       point of the column. Before it, these were one row. */
+    const mine = (await operator("/api/admin.config")).body;
+    expect(mine.app).toBe("hello");
+    expect((mine.keys as unknown as { key: string; value: unknown }[])
+      .find((k) => k.key === "email.from")?.value).not.toBe("Kova <noreply@4dl.app>");
+  });
+
+  /*
+    ⚠️ AN UNDECLARED PRODUCT IS REFUSED RATHER THAN WRITTEN, and the reason is the
+    same one an undeclared KEY is refused for: the store is keyed by app, so a
+    typo does not fail — it files a real Stripe key under a product that does not
+    exist, where nothing will ever read it and nothing will ever say so.
+  */
+  it("refuses a product this deployment does not have", async () => {
+    const out = await operator("/api/admin.config.set", {
+      key: "email.from", value: "x", scope: "app", app: "not-a-product",
+    });
+    expect(out.status).toBe(400);
+  });
+
+  /* ⚠️ The picker's own list, in the same answer — a console told separately is
+     one whose picker can offer an app the read then refuses. */
+  it("says which products there are to choose between", async () => {
+    expect((await operator("/api/admin.config")).body.products).toContain("kova");
+  });
 });
 
 /* ----------------------------------------------------------------- mail --- */
+
+/*
+  ⚠️ THIS FILE IS `solo` BECAUSE IT TURNS THE DEPLOYMENT'S MAIL OFF. Blanking
+  `email.from` proves the one thing the console has to be able to report — the
+  lane is not working, and here is why — and there is no way to prove it without
+  the lane actually not working. Storage is shared across this package's files,
+  so run beside them it takes every other file's sign-in down with it: a 503 on
+  the first attempt and the OTP cooldown on the retry, surfacing as a different
+  test failing in a different file on about a third of runs, with nothing naming
+  the cause.
+
+  ⚠️ THE `afterAll` BELOW IS STILL RIGHT AND IS NOT ENOUGH ON ITS OWN. It puts
+  the sender back whether or not the case passed, which is what stops a failure
+  here cascading — but it cannot close the window while the case is running, and
+  that window is what a neighbouring file falls into. Splitting on "does this
+  affect the whole deployment" is the same line the maintenance suite is on.
+*/
 
 /**
  * ⚠️ "AND PROVE IT WORKS" IS THE HALF USUALLY MISSING. A screen that accepts a
@@ -136,7 +203,22 @@ describe("proving the mail lane", () => {
     );
     expect(asked.status).toBe(503);
 
-    /* Put it back, or every later sign-in in this file has nowhere to come from. */
+  });
+
+  /*
+    ⚠️ PUT BACK WHETHER OR NOT THE TEST PASSED, and that is the whole reason this
+    is an `afterAll` rather than the last line of the case. Restoring inside the
+    body means a failure ANYWHERE above it leaves the deployment with no sender —
+    and storage is shared across this package's files, so the next file's sign-in
+    gets a 503 and the one after that gets the OTP cooldown on its retry. One
+    failing assertion became a different test failing in a different file, with
+    nothing naming the cause.
+
+    ⚠️ AND IT IS THE OPERATOR ROUTE RATHER THAN A DIRECT WRITE, because the
+    fixture that seeds this uses `seedOne` — which does nothing where a row
+    exists, correctly, so a blank row is not something a later sign-in repairs.
+  */
+  afterAll(async () => {
     await operator("/api/admin.config.set", { key: "email.from", value: "Hello <noreply@4dl.app>", scope: "app" });
   });
 

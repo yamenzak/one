@@ -1864,7 +1864,7 @@
       "group": "platform",
       "stage": "7",
       "status": "live",
-      "impl": "hello/test/config.test.ts",
+      "impl": "hello/test/config.solo.test.ts",
       "proves": "refuses a shared write, and says why",
       "fails": "reaching for a store that is not there, which throws into the same 503 a stated refusal produces — so the status alone cannot tell 'we told you' from 'it fell over'"
     },
@@ -1900,7 +1900,7 @@
       "group": "platform",
       "stage": "7",
       "status": "live",
-      "impl": "hello/test/config.test.ts",
+      "impl": "hello/test/config.solo.test.ts",
       "proves": "still resolves this app's own values",
       "fails": "a single-app deployment broken by a sharing mechanism it does not use"
     },
@@ -1936,7 +1936,7 @@
       "group": "platform",
       "stage": "7",
       "status": "live",
-      "impl": "hello/test/config.test.ts",
+      "impl": "hello/test/config.solo.test.ts",
       "proves": "reports what is missing rather than refusing the request",
       "fails": "telling somebody to check their inbox for a message that was never addressed to anybody"
     },

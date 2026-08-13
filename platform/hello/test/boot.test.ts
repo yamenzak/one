@@ -29,7 +29,10 @@ const members = new Map<string, string>();
 const memberAt = async (origin: string): Promise<string> => {
   const held = members.get(origin);
   if (held) return held;
-  const cookie = await signIn(`boot@example.test`, origin);
+  /* ⚠️ REFUSABLE, because this suite probes doors that have no workspace behind
+     them and a sign-in there is correctly refused — it wants a cookie header to
+     send, not a session. */
+  const cookie = await signIn(`boot@example.test`, origin, true);
   members.set(origin, cookie);
   return cookie;
 };

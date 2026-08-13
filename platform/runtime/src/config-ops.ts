@@ -29,6 +29,23 @@ export interface ConfigDeps {
   readonly own: SqlHandle;
   /** ⚠️ Whose rows in it. Never a default — see `readAll`. */
   readonly appId: string;
+  /**
+   * EVERY PRODUCT ON THIS DEPLOYMENT, so the console can be the deployment's
+   * rather than one product's.
+   *
+   * ⚠️ THIS IS WHAT REPLACES A CONSOLE PER APP. Running three products used to
+   * mean three operator doors, three sign-ins and three places to paste one
+   * Stripe key — and the key is one key, because there is one Stripe account
+   * behind every product. The store is shared and the rows are keyed by app, so
+   * one door can write them all; this list is what says which apps exist.
+   *
+   * ⚠️ AND IT IS NOT A PUSH. `kernel/config.ts` rejects a central service that
+   * pushes configuration into each product — a privileged write endpoint in
+   * every app, authenticated by a machine token, accepting secret keys. Nothing
+   * here pushes anything: it is one database, one human session, and each worker
+   * still reads only its own rows.
+   */
+  readonly products: readonly string[];
   /** ⚠️ Injected, so the one file that reaches the network is the one that sends. */
   readonly deliver: Deliver | null;
   /** ⚠️ Null where a deployment binds no shared store, which is most of them. */
@@ -40,13 +57,34 @@ export interface ConfigCarrier { readonly [CONFIG]: ConfigDeps }
 
 const deps = (ctx: unknown): ConfigDeps => (ctx as ConfigCarrier)[CONFIG];
 
+/**
+ * WHICH PRODUCT AN OPERATOR IS ACTING ON, CHECKED IN ONE PLACE.
+ *
+ * ⚠️ AN UNDECLARED APP IS REFUSED RATHER THAN WRITTEN. The store is keyed by
+ * app, so a typo does not fail — it files a real Stripe key under a product that
+ * does not exist, where nothing will ever read it and nothing will ever say so.
+ * That is the same failure an undeclared KEY has, one level up, and it is
+ * refused for the same reason.
+ *
+ * ⚠️ AND ABSENT IS THE APP SERVING THE REQUEST, so an app that has not been told
+ * about the console still configures itself. A default of "the first product"
+ * would make the answer depend on a list's order.
+ */
+const appOf = (d: ConfigDeps, ctx: { fail(code: string, meta?: Record<string, string | number | boolean>): never }, asked: string | undefined): string => {
+  if (asked === undefined || asked === d.appId) return d.appId;
+  if (!d.products.includes(asked)) {
+    ctx.fail("platform.invalid", { field: "app", reason: "not a product on this deployment" });
+  }
+  return asked;
+};
+
 export function configOperations<B extends BindingSpec>(app: AppSpec<B>): readonly AnyOperation[] {
   const read = operation({
     id: "admin.config",
     kind: "read",
     summary: "Every key this deployment reads, where its value comes from, and whether it is set.",
-    input: s.object({}),
-    output: s.object({ keys: s.json(), shared: s.bool() }),
+    input: s.object({ app: s.optional(s.text({ max: 60 })) }),
+    output: s.object({ app: s.text(), products: s.json(), keys: s.json(), shared: s.bool() }),
     permission: OPERATE,
     idempotency: { mode: "none" },
     /*
@@ -55,10 +93,16 @@ export function configOperations<B extends BindingSpec>(app: AppSpec<B>): readon
       and a model that can request it can be asked to put it somewhere.
     */
     tool: false,
-    async handler(ctx) {
+    async handler(ctx, input: { app?: string }) {
       const d = deps(ctx);
+      const app = appOf(d, ctx, input.app);
       return {
-        keys: lines(await readAll(d.own, d.appId), await readAll(d.shared, DEPLOYMENT_SCOPE), d.registry),
+        app,
+        /* ⚠️ WHICH PRODUCTS THERE ARE TO CHOOSE BETWEEN, in the same answer. A
+           console that had to be told separately is one whose picker can list an
+           app the read then refuses. */
+        products: d.products,
+        keys: lines(await readAll(d.own, app), await readAll(d.shared, DEPLOYMENT_SCOPE), d.registry),
         /* ⚠️ Whether there IS a shared store, so "shared" is not a lie on a self-host. */
         shared: d.shared !== null,
       };
@@ -74,8 +118,10 @@ export function configOperations<B extends BindingSpec>(app: AppSpec<B>): readon
       /* ⚠️ Empty is a legitimate value: it is how a key is turned off. */
       value: s.text({ max: 4_000 }),
       scope: s.enum(["app", "shared"]),
+      /* ⚠️ Which product's row. Absent is the one serving the request. */
+      app: s.optional(s.text({ max: 60 })),
     }),
-    output: s.object({ key: s.text(), scope: s.text() }),
+    output: s.object({ key: s.text(), scope: s.text(), app: s.text() }),
     permission: OPERATE,
     idempotency: { mode: "none" },
     /*
@@ -87,8 +133,9 @@ export function configOperations<B extends BindingSpec>(app: AppSpec<B>): readon
     outcome: { message: "Saved", tone: "success", invalidates: ["admin.config"] },
     fails: ["platform.invalid", "platform.unavailable"],
     tool: false,
-    async handler(ctx, input: { key: string; value: string; scope: "app" | "shared" }) {
+    async handler(ctx, input: { key: string; value: string; scope: "app" | "shared"; app?: string }) {
       const d = deps(ctx);
+      const app = appOf(d, ctx, input.app);
       const refused = refuseWrite(input.key, input.scope, d.registry);
       /*
         ⚠️ AN UNDECLARED KEY IS REFUSED RATHER THAN STORED. Stored, it is a row
@@ -106,10 +153,10 @@ export function configOperations<B extends BindingSpec>(app: AppSpec<B>): readon
 
       await writeOne(
         input.scope === "shared" ? d.shared! : d.own,
-        input.scope === "shared" ? DEPLOYMENT_SCOPE : d.appId,
+        input.scope === "shared" ? DEPLOYMENT_SCOPE : app,
         input.key, input.value, ctx.now() as Instant,
       );
-      return { key: input.key, scope: input.scope };
+      return { key: input.key, scope: input.scope, app };
     },
   });
 

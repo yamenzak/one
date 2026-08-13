@@ -101,7 +101,9 @@ describe("a collection is its own surface", () => {
     const theirs = await worker.fetch(
       new Request(`${other}/api/note.list`, { headers: { cookie: theirCookie } }), env as never,
     );
-    const rows = ((await theirs.json()) as { rows: { title: string }[] }).rows;
+    const payload = (await theirs.json()) as { rows?: { title: string }[] };
+    if (!payload.rows) throw new Error(`note.list ${theirs.status}: ${JSON.stringify(payload)}`);
+    const rows = payload.rows;
     expect(rows.some((r) => r.title === "ours alone")).toBe(false);
   });
 
