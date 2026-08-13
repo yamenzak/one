@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { Instant } from "@one/kernel";
-import { day, legalFrom, looksFrom, mineFrom, vaultFrom, type MineReply, type Reading, type VaultReply } from "../src/account/wire.js";
+import { day, legalFrom, looksFrom, mineFrom, vaultFrom, type MineReply, type Reading, type VaultReply } from "../src/hub/wire.js";
 
 const at = (iso: string) => iso as Instant;
 const read: Reading = { locale: "en-GB", zone: "UTC", now: at("2026-08-12T10:00:00.000Z") };

@@ -25,16 +25,16 @@
 import { useEffect, useState, type ElementType } from "react";
 import { createRoot } from "react-dom/client";
 import type { Problem } from "@one/kernel";
-import { AccountCenter } from "../src/account/center.js";
-import { AccountDetails } from "../src/account/details.js";
-import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
-import { PreferencesScreen, type Preferences } from "../src/account/preferences.js";
-import { KeptHere, meaning, VaultScreen, type Kept, type Looked, type Where as VaultWhere } from "../src/account/vault.js";
-import { LegalScreen, MustAcceptScreen, ProductScreen, ReceivingScreen, RecipientScreen, DocScreen, type Owed } from "../src/account/legal.js";
-import { ExportScreen, type Taken } from "../src/account/export.js";
-import { CloseAccountScreen } from "../src/account/close.js";
-import { keyOf, parseWhere, pathOf, upFrom, type Where } from "../src/account/routes.js";
-import type { Doc, Product } from "../src/account/wire.js";
+import { Hub } from "../src/hub/hub.js";
+import { AccountDetails } from "../src/hub/details.js";
+import { HubHome, type HubHomeProps } from "../src/hub/home.js";
+import { PreferencesScreen, type Preferences } from "../src/hub/preferences.js";
+import { KeptHere, meaning, VaultScreen, type Kept, type Looked, type Where as VaultWhere } from "../src/hub/vault.js";
+import { LegalScreen, MustAcceptScreen, ProductScreen, ReceivingScreen, RecipientScreen, DocScreen, type Owed } from "../src/hub/legal.js";
+import { ExportScreen, type Taken } from "../src/hub/export.js";
+import { CloseAccountScreen } from "../src/hub/close.js";
+import { keyOf, parseWhere, pathOf, upFrom, type Where } from "../src/hub/routes.js";
+import type { Doc, Product } from "../src/hub/wire.js";
 import { accountReceiving, transfersOf, type Held, type Receiving, type Subprocessor } from "@one/kernel";
 import { DEPLOYMENT } from "@one/deployment";
 import { ValueEditor, type EditableField } from "../src/editor.js";
@@ -43,11 +43,11 @@ import { Edit } from "../src/icon.js";
 import { AskForIt, ConsentSheet, type Asked } from "../src/consent.js";
 import { Door, type DoorWire } from "../src/door.js";
 import { SetupScreen, type Place } from "../src/setup.js";
-import { MarketScreen, ShelfScreen, type Plan, type Sellable } from "../src/account/market.js";
-import { CreditsScreen, type Balance, type Movement, type Pack } from "../src/account/credits.js";
+import { MarketScreen, ShelfScreen, type Plan, type Sellable } from "../src/hub/market.js";
+import { CreditsScreen, type Balance, type Movement, type Pack } from "../src/hub/credits.js";
 import { ProveIt } from "../src/prove.js";
 import type { Ceremony } from "../src/passkey.js";
-import { SignInMethods } from "../src/account/signin.js";
+import { SignInMethods } from "../src/hub/signin.js";
 import { Stack } from "../src/stack.js";
 import { configureFeedback, feel, FEEDBACK_DEFAULT } from "../src/feedback.js";
 
@@ -74,7 +74,7 @@ const FULL = {
     { tenantId: "t3", slug: "corniche", name: "Corniche Screens", product: "scena", role: "Owner", face: face("t3"), standing: { label: "Payment failed", urgent: true } },
     { tenantId: "t4", slug: "clinic", name: "Haddad Clinic", product: "tessa", role: "Member", face: face("t4"), standing: { label: "Trial · 6 days", urgent: false } },
   ],
-} satisfies Pick<AccountHomeProps, "person" | "workspaces">;
+} satisfies Pick<HubHomeProps, "person" | "workspaces">;
 
 /*
   ⚠️ THE STATES ARE REACHABLE, NOT DESCRIBED. Not-answered-yet and
@@ -87,7 +87,7 @@ const CASES = {
   none: { ...FULL, workspaces: [] },
   waiting: { ...FULL, workspaces: null },
   new: { person: { email: "b.okonkwo@gmail.com", avatarUrl: face("b.okonkwo@gmail.com") }, workspaces: [] },
-} satisfies Record<string, Pick<AccountHomeProps, "person" | "workspaces">>;
+} satisfies Record<string, Pick<HubHomeProps, "person" | "workspaces">>;
 
 /*
   ⚠️ THE FAILURES ARE REAL `Problem`s, not strings pretending. A per-field message
@@ -531,7 +531,7 @@ function Preview() {
      review of an inner screen began with three taps somebody had to be told. */
   /*
     ⚠️ A PATH, NOT A SCREEN NAME, AND IT IS THE REAL ONE. Every screen in the
-    account centre has an address now — `routes.ts` parses and prints them — so a
+    hub has an address now — `routes.ts` parses and prints them — so a
     review of an inner surface is a link rather than three taps somebody has to
     be told about, and the preview exercises the same parser the app will.
 
@@ -748,7 +748,7 @@ function Preview() {
         onBack={up}
       />
     ) : (
-      <AccountHome
+      <HubHome
         {...CASES[which] ?? CASES.four}
         /* ⚠️ COUNTED FROM THE VAULT FIXTURE RATHER THAN TYPED BESIDE IT, so the
            card and the screen it opens cannot disagree about how many things are
@@ -865,18 +865,18 @@ function Preview() {
             meets the vault without having gone looking for it. */}
         <AppFields onSave={save} onOpenVault={() => { go({ at: "vault" }); setOpen(true); }}
           onAsk={() => setAsking(true)} />
-        <button type="button" onClick={() => setOpen(true)}>Open the account centre</button>
+        <button type="button" onClick={() => setOpen(true)}>Open the hub</button>
       </div>
 
       {/* ⚠️ THE LEVEL IS THE CALLER'S, WHICH IS WHY THE STACK IS HERE AND NOT
           INSIDE THE PRESENTATION. Navigation is the router's state in the real
           app and this preview's state here; a presentation that owned it would
           be a presentation that had to be told about every screen. */}
-      <AccountCenter open={open} onClose={() => { setOpen(false); go({ at: "home" }); }}>
+      <Hub open={open} onClose={() => { setOpen(false); go({ at: "home" }); }}>
         {({ Heading }) => (
           <Stack at={keyOf(where)}>{screen({ Heading })}</Stack>
         )}
-      </AccountCenter>
+      </Hub>
 
       <ConsentSheet
         open={asking}

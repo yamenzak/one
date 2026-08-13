@@ -88,11 +88,11 @@ export const PLATFORM_GLOBAL: readonly SchemaModule[] = [
      meaningful beside the record of who that is. */
   CONSENT_SCHEMA,
   /* ⚠️ DECLARATIONS, NOT DATA, and global for the same reason the vault is: the
-     account centre answers for every product a person belongs to, and one app's
+     hub answers for every product a person belongs to, and one app's
      worker knows only its own manifest. */
   VAULT_SPEC_SCHEMA,
   /* ⚠️ AND THE SAME FOR WHAT EACH PRODUCT ASKS PEOPLE TO AGREE TO. `legal.list`
-     answers for the app serving the request, which on the account centre is
+     answers for the app serving the request, which on the hub is
      whichever one happens to be behind that door. */
   LEGAL_SPEC_SCHEMA,
   /*

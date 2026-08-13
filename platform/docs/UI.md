@@ -125,7 +125,7 @@ cannot be undone reads as a warning about that row.
 ### 2.3a Addresses
 
 **Every screen has one, and a screen without one cannot be linked to, refused to,
-or supported.** — The account centre was a route with four pieces of component
+or supported.** — The hub was a route with four pieces of component
 state inside it. So there was no link to somebody's own vault, a refusal that said
 "read this first" had nowhere to send anybody, support could not say "open this
 address", and the back button left the whole surface instead of going up one
@@ -478,7 +478,7 @@ against a narrow word space and the platform corrects it once, on the body. The
 font shorthand resets that correction, and every row, field and button in this
 product takes the page's font through it — so the correction reached paragraphs
 and nothing else. Measured: 1.28px on a paragraph, 0 on every row title and every
-row detail, which is most of the words in the account centre. It read as bad
+row detail, which is most of the words in the hub. It read as bad
 rendering rather than as a choice, which is what the original rule says about it.
 *Checked: `web/test/interface.test.tsx`.*
 
@@ -496,7 +496,7 @@ that own one, and a link out carries the mark and no referrer.*
 
 **One thing on a surface may be a place rather than a setting, and it is lit to
 say so.** — A list of rows says *these are all the same kind of thing*, which is
-exactly what an account centre's settings are and exactly what the vault is not:
+exactly what a hub's settings are and exactly what the vault is not:
 it is the one part of an account that keeps its meaning for somebody who has left
 every product. Making it a taller row would have said it was a bigger setting. It
 carries its own light, its own lockup and its whole surface as the target — and
@@ -668,7 +668,7 @@ thing is for.
 
 **Nobody is offered what they cannot do.** — Most people holding an account here
 are a customer of somebody else's workspace. A "New workspace" button on their
-account centre offers a thing they cannot do, and the refusal that says so
+hub offers a thing they cannot do, and the refusal that says so
 arrives long after they have decided the product is confusing. The control
 appears only for somebody a grant or an open front door lets in — and the control
 is not what makes it safe: `identity.workspace.create` refuses regardless, which
@@ -926,7 +926,7 @@ more, which is the honest state.
 | `a-sky-is-dimmed-by-a-factor` | a theme rule setting a sky's opacity outright. How much light arrives is a ground's headroom times a placement's ask; set as an opacity the theme wins on specificity, so a card that dims itself dims correctly under one theme and not at all under the other — valid CSS either way, and the broken half is the one whoever wrote it was not looking at | **live** |
 | `no-backtick-inside-a-sheet` | a backtick in a comment inside a CSS template literal — it closes the literal, and the compiler reports a missing , or ; hundreds of lines away in a line that has nothing wrong with it. Scans raw text, so it reports the cause on a file that no longer parses | **live** |
 | `vault-a-control-never-spends-a-rung-unasked` | a want with more than two rungs rendered as a switch. Somebody who chose "the assistant, no people" sees it reading ON, and turning it off and on again silently re-grants at the top of the ladder — nothing throws, the sentence underneath stays correct, and only the control is a lie about what it will do | **live** |
-| `vault-screen-writes-no-copy-of-its-own` | the account centre explaining a fact in its own words. Every reason, recommendation and hides-sentence is read out of a declaration, so an app that declares a thirteenth fact gets a thirteenth row without this screen being opened; the day it stops being true is the day the vault grows a branch per product | **live** |
+| `vault-screen-writes-no-copy-of-its-own` | the hub explaining a fact in its own words. Every reason, recommendation and hides-sentence is read out of a declaration, so an app that declares a thirteenth fact gets a thirteenth row without this screen being opened; the day it stops being true is the day the vault grows a branch per product | **live** |
 | `a-screen-may-not-invent-a-payload` | a screen written against `subprocessor: {name, purpose, region}` where the kernel declares `{id, name, role, receives, where, safeguard, terms}` — two fields nobody has ever sent. It typechecked, every test passed, and the screenshots looked right, because the FIXTURES were written to match the invention. `s.json()` is opaque at the boundary, so the kernel type the handler returns is the only place the shape is written down: name it, never describe it | **live** |
 | `an-old-acceptance-is-not-a-missing-one` | a boolean where four states are needed. "Accepted an earlier version" is what everybody sees the day terms change, and collapsing it into agreed-or-not misreports the record on precisely the day it matters | **live** |
 | `an-acceptance-is-matched-on-its-version` | "Accepted 2 March" shown against terms published in June — a screen quietly claiming somebody agreed to something they have never been shown | **live** |
@@ -948,7 +948,7 @@ more, which is the honest state.
 | `closing-waits-for-what-it-would-strand` | a working Close in front of somebody whose workspaces would be left with nobody who can manage them — `null` and `[]` read as the same answer, on the one screen where the difference is a workspace nobody can re-enter | **live** |
 | `an-export-says-what-is-missing` | an export that prints only what it managed to gather. It arrives, it is full of somebody's data, and nothing in it says what is not there — which is the omission that makes an export dangerous rather than merely incomplete | **live** |
 | `a-region-is-named-or-printed-as-itself` | a prettified guess at where somebody's data physically is, on the one screen that exists to answer exactly that. The two ids the kernel documents are named; a third has no name and is shown as the identifier it is | **live** |
-| `every-destination-has-an-address` | two screens printing to one path, so one of them is unreachable — and, before this, an account centre whose inner screens were component state: no link to a vault, no address for a refusal to send anybody to, and a back button that left the whole surface | **live** |
+| `every-destination-has-an-address` | two screens printing to one path, so one of them is unreachable — and, before this, a hub whose inner screens were component state: no link to a vault, no address for a refusal to send anybody to, and a back button that left the whole surface | **live** |
 | `a-route-parses-back-to-where-it-was` | a printer and a parser that do not invert each other — a surface that works until somebody reloads, and then opens somewhere else, once, with nothing in the console | **live** |
 | `a-declared-mark-is-drawn` | a mark named in a manifest that nothing draws. The fallback is total by design — an unknown name renders the company's initial — so a typo is a row that looks fine with the wrong thing in it, and the only way to notice is to have seen the right one | **live** |
 | `a-face-is-drawn-by-one-tile` | five avatar treatments, each defensible alone: a circle at 44 and another at 62, an 11-pixel radius beside a 14, two badge offsets and an icon well that was a sixth. Nothing fails — a screen with the wrong radius renders, passes and ships — and no amount of individually careful work fixes it while there are five places to be careful in | **live** |
@@ -956,7 +956,7 @@ more, which is the honest state.
 | `a-mark-derives-its-geometry` | a radius, a badge offset or a letter size written in pixels. It drifts the first time somebody adds a size, which is exactly what an 11-pixel radius on one 44-pixel tile and a 14 on another already were — a value somebody nearly got right rather than a decision | **live** |
 | `a-mark-is-sized-from-the-scale` | a screen setting the tile's size variable itself, which is a fourth size in a three-size scale — and it is invisible, because the sheet derives everything else from it and a wrong number still renders a perfectly proportioned mark | **live** |
 | `nothing-is-drawn-that-nobody-declares` | a committed brand path shipped to every browser for a company no manifest names. Not a defect a person sees — which is why it accumulates | **live** |
-| `a-link-out-is-never-a-bare-anchor` | browser blue, browser underline, no press and no motion, on a surface where every other control has a tone and a spring. An anchor is the one element that looks finished with no styling at all, which is why this was every link in the account centre | **live** |
+| `a-link-out-is-never-a-bare-anchor` | browser blue, browser underline, no press and no motion, on a surface where every other control has a tone and a spring. An anchor is the one element that looks finished with no styling at all, which is why this was every link in the hub | **live** |
 | `a-link-out-says-it-leaves` | an operative document's address rendered as more of this page, which is how somebody agrees to a summary believing they read the contract. The referrer matters for the same reason: a link out of a screen about somebody's data should not tell the destination which screen they were on | **live** |
 | `there-is-no-third-capsule` | a chip, a pill and a tag that are all a rounded rectangle with a grey ground and small text. That is what capsules everywhere is — not too many of them, but no rule about what one MEANS | **live** |
 | `a-pill-takes-the-tone-scale` | a colour chosen per row, which is how a column of capsules comes to look arbitrary. Four states named for what they mean is the rule that was missing | **live** |
@@ -965,7 +965,7 @@ more, which is the honest state.
 | `nobody-names-a-colour` | a colour typed at the point of use, which does not move when a theme does — and is invisible to whoever typed it, because they were looking at the theme it happens to be right in. Five hand-written whites on saturated grounds, a scrim and a drop shadow got in this way | **live** |
 | `there-is-one-focus-ring` | a focus ring written out per control — two pixels of accent, fourteen times, by hand. It is the same failure as fourteen durations: not a ring anybody chose, and the first person who wants a softer one has fourteen places to change | **live** |
 | `every-control-can-be-seen-when-focused` | a pressable thing with no focus indicator, which is a control somebody navigating by keyboard has lost — and which is invisible to everybody testing with a pointer, meaning everybody. The consent sheet's own picker was one | **live** |
-| `a-control-keeps-the-pages-word-space` | the font shorthand resetting the word space inside a control. The text face sets wide letters against a narrow word space and the platform corrects it once on the body; every row, field and button then silently undid the correction. Measured: 1.28px on a paragraph and 0 on every row title and detail, which is most of the words in the account centre | **live** |
+| `a-control-keeps-the-pages-word-space` | the font shorthand resetting the word space inside a control. The text face sets wide letters against a narrow word space and the platform corrects it once on the body; every row, field and button then silently undid the correction. Measured: 1.28px on a paragraph and 0 on every row title and detail, which is most of the words in the hub | **live** |
 | `a-link-out-tells-mail-from-a-page` | an address opened through the web treatment: a new tab that never arrives, under the outward mark whose entire value is that it is honest | **live** |
 | `there-is-one-label-style` | small tracked capitals — the device an interface reaches for when a label has to LOOK like something. This one already has a label: quiet ink, sentence case, smaller. Two had appeared, one of them in amber on the screen somebody is asked to read most carefully | **live** |
 | `a-door-is-not-an-oracle` | a sign-in screen that adds back what its endpoints refuse to say. Both operations behind it answer identically for an address with an account and one without — telling them apart is a membership oracle, which on a clinical product is a disclosure on its own — and a 'no account found' or a 'sign up' would hand that over from the screen instead | **live** |
@@ -980,8 +980,8 @@ more, which is the honest state.
 | `a-cooldown-is-the-servers-number` | a countdown the screen invented. The runtime decides when another code may be asked for and reports what is left; a local timer comes back before the endpoint will answer, which teaches people to press a button that fails | **live** |
 | `a-proof-is-raised-by-a-refusal` | a screen deciding for itself which actions need a recent proof — a second copy of a rule the operations declare, and the copy is the one that goes out of date the first time a fourth operation is added | **live** |
 | `a-proof-never-asks-who-you-are` | a form demanding the address the session already knows, standing between somebody and something they were in the middle of doing | **live** |
-| `the-product-can-be-left` | an account centre with no way to sign out. The row for the device in your hand carried no control and the comment beside it said leaving was the avatar menu's job — a menu this platform does not have — so on a shared computer there was no way out at all, on the one screen whose subject is where you are signed in | **live** |
-| `nobody-is-offered-what-they-cannot-open` | a New workspace button on the account centre of somebody who is a customer of a workspace rather than the owner of one. It offers a thing they cannot do, and the refusal that says so arrives long after they have decided the product is confusing | **live** |
+| `the-product-can-be-left` | a hub with no way to sign out. The row for the device in your hand carried no control and the comment beside it said leaving was the avatar menu's job — a menu this platform does not have — so on a shared computer there was no way out at all, on the one screen whose subject is where you are signed in | **live** |
+| `nobody-is-offered-what-they-cannot-open` | a New workspace button on the hub of somebody who is a customer of a workspace rather than the owner of one. It offers a thing they cannot do, and the refusal that says so arrives long after they have decided the product is confusing | **live** |
 | `a-workspace-can-actually-be-created` | the whole platform being behind having a workspace with no screen that makes one — `identity.workspace.create` was written, audited and tested and only a test harness ever called it. The narrower failure the same test pins: a business name sent through unchanged, so the first thing a new customer meets is a refusal for typing their own name correctly | **live** |
 | `a-permanent-choice-is-made-before-it-is-committed` | where a workspace's records live sitting under the control that creates it — a decision that can never be changed afterwards, which the ordinary path presses past without scrolling to | **live** |
 | `a-refusal-lands-on-what-caused-it` | every refusal sent to the same place. A taken address belongs under the address; not being let in is not something retyping fixes, and putting it there is an instruction to keep trying | **live** |
@@ -992,6 +992,9 @@ more, which is the honest state.
 | `a-balance-says-what-expires` | one figure covering an allowance that lapses and a pack that does not — somebody watches the number fall on the first of the month with nothing having said it would, and the conversation that follows is about whether we took their credits | **live** |
 | `a-ledger-string-never-reaches-a-screen` | `hold:draft-plan` printed on the page — right to store, wrong to show, and it makes somebody's own spending read as a machine's notes about them | **live** |
 | `nothing-chargeable-is-said-before-a-price-list` | a price list whose every button refuses — somebody's decision spent before they are told it could not have been made | **live** |
+| `the-hub-names-its-three-areas` | three questions flattened into one list of settings, where "new workspace" sits beside "change your language" — a purchase and a preference wearing the same row | **live** |
+| `an-empty-area-is-not-drawn` | a named section promising something that is not there — and most people holding an account here are a customer of somebody else's workspace | **live** |
+| `one-control-per-destination` | two controls for one destination in two vocabularies — which also makes the section header that names the area read as decoration. The exception the same test pins: the empty list keeps it, because making somebody read a section header before they can act is making them read the page first | **live** |
 <!-- /generated -->
 
 ## 5. What is not decided yet

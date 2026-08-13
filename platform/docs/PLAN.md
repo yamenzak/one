@@ -225,7 +225,7 @@ What is BUILT is a **destination**. A person's relationship with their own data
 does not end when they stop using a product — their facts, their grants, their
 credentials, the record of who read what — so there has to be an address for it
 that no app owns. `identity` is a door in `classifyHost`, it resolves no tenant,
-and it is where the account centre and the vault answer.
+and it is where the hub and the vault answer.
 
 Three consequences worth stating once:
 
@@ -297,7 +297,7 @@ whoever is already inside keep their foothold.
 
 **Answered 2026-08-13.** Provisioning a new customer was four manual steps and a
 person: somebody buys, somebody is told, somebody opens a console, somebody sends
-a link. The account centre is where that becomes self-serve, and the design turns
+a link. The hub is where that becomes self-serve, and the design turns
 on three facts that are easy to get wrong in the same direction.
 
 **A workspace is created at `setup.<product-root>` and nowhere else.** The account
@@ -305,9 +305,9 @@ centre is served by one worker; every other product is a different worker with i
 own regional bindings, its own schema and its own manifest. It cannot create a
 workspace in a product it cannot reach, and a cross-worker write for the one
 operation that mints a tenant would be the worst possible place to invent
-machine-to-machine trust. So the account centre's job is *who may create, where* —
+machine-to-machine trust. So the hub's job is *who may create, where* —
 and a hand-off. `setupDoorFor` derives the address from the product's own root, so
-the account centre and the product cannot disagree about the one thing that has to
+the hub and the product cannot disagree about the one thing that has to
 be right.
 
 **The grant is on an ADDRESS, not on an account, because of the sequence.**
@@ -326,12 +326,12 @@ site reading only the grant closes every free door; one reading only the
 declaration opens every sold one. Both look correct alone, so `mayCreateHere` is
 the single function and both call sites go through it: the API refusal
 (`platform.not_provisioned`, 403, naming the product) and `me.products`, which is
-what the account centre draws from.
+what the hub draws from.
 
 ⚠️ **The button is not what makes it safe.** `identity.workspace.create` refuses
-regardless; the row on the account centre is what stops somebody being *offered*
+regardless; the row on the hub is what stops somebody being *offered*
 it, which is a different job. Most people holding an account here are a customer of
-somebody else's workspace — a "New workspace" button on their account centre
+somebody else's workspace — a "New workspace" button on their hub
 offers a thing they cannot do, and the refusal that says so arrives long after they
 have decided the product is confusing.
 
@@ -713,7 +713,7 @@ Your list, answered. Where a row says **new**, no app has it today.
 
 | Subsystem | Design | Source today |
 |---|---|---|
-| **Identity** | Shared identity D1 bound into every worker; passkey RP raised to `4dl.app`; sessions stay per-app and per-region. No IdP, no redirect (§2.4). The account centre has its own DOOR at `id.4dl.app` — a destination, not an IdP (§2.4a). | `@4dl/auth`, per-app RP |
+| **Identity** | Shared identity D1 bound into every worker; passkey RP raised to `4dl.app`; sessions stay per-app and per-region. No IdP, no redirect (§2.4). The hub has its own DOOR at `id.4dl.app` — a destination, not an IdP (§2.4a). | `@4dl/auth`, per-app RP |
 | **The 4° Vault** | A person's sensitive facts held once, at the ACCOUNT, disclosed per app at a rung they chose and for as long as they chose. Readings computed inside it, granted separately from their inputs. [VAULT.md](VAULT.md). | **new** |
 | **Tenancy + doors** | Five doors kept — they are correct. Region added as a tenant property resolved at the host gate. | `@4dl/tenancy` |
 | **Regions (EU/global)** | §4.1 — the hardest item on the list | **new** |
@@ -1462,17 +1462,17 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-member-can-leave` | a workspace nobody but an administrator can get out of — `member.remove` wants `member:manage`, which somebody removing themselves does not have, and `exit.close` wants `workspace:close` and takes the workspace down for everybody, so a reader invited once was in for life | **live** |
 | `leaving-cannot-strand-a-workspace` | a workspace that is not closed but unreachable — records intact, bill running, and nobody left who can invite anybody into it. One rule (`wouldStrand`) asked by both doors, so it cannot hold on the administrator's and not on the account's | **live** |
 | `leaving-is-not-an-existence-oracle` | any signed-in account discovering which workspace ids are real, one guess at a time, from a door every account can reach | **live** |
-| `a-founder-is-in-their-own-workspace` | `invite` writes an address with no account behind it — right for an invitation, wrong for the founder, who is standing there. Every cross-workspace question is asked by account, so an unclaimed founding row makes somebody absent from their own account centre and lets closing their account strand a workspace nothing can see they are alone in | **live** |
+| `a-founder-is-in-their-own-workspace` | `invite` writes an address with no account behind it — right for an invitation, wrong for the founder, who is standing there. Every cross-workspace question is asked by account, so an unclaimed founding row makes somebody absent from their own hub and lets closing their account strand a workspace nothing can see they are alone in | **live** |
 | `closing-an-account-never-closes-a-workspace` | an account closure that takes colleagues offline with it — a workspace has people, records and a bill, and the person surprised by it pressed nothing. Refused and NAMED, so it is a decision the person can act on rather than an opaque no | **live** |
 | `closing-an-account-is-reversible` | a delete behind a confirmation dialog, which is a reflex rather than a decision. The way back is cancelling, not signing up again — that would be a different account | **live** |
 | `leaving-is-on-the-lane-that-always-survives` | naming these `me.*` — a write outside the `exit` lane is refused by the standing gate on a suspended workspace and by the consent gate for anybody who has not accepted a new document, so leaving would be withheld from exactly the two groups most likely to want it, and neither refusal mentions leaving | **live** |
 | `a-person-can-take-their-own-data` | the only export in the product being the WORKSPACE's — `exit.export` wants `workspace:close`, so an ordinary member may not ask for it, and what it returns is mostly not theirs | **live** |
 | `an-export-includes-who-read-the-vault` | an export missing the only part somebody cannot reconstruct. Their own facts they know; who looked at them, and when, exists nowhere else | **live** |
 | `an-export-is-nobody-elses-to-ask-for` | an export keyed by an id in the input, where the access check is a line somebody has to remember. Keyed by the session there is nothing to forget | **live** |
-| `no-membership-is-no-role` | calling every signed-in person an owner on a door with no workspace. The consent gate believed it: a Kova client opening the account centre was told they owed the Terms of service and the data processing agreement — both `mustAccept: ["owner"]` — and answered 451 on their own preferences until they agreed to a contract between the platform and a studio | **live** |
+| `no-membership-is-no-role` | calling every signed-in person an owner on a door with no workspace. The consent gate believed it: a Kova client opening the hub was told they owed the Terms of service and the data processing agreement — both `mustAccept: ["owner"]` — and answered 451 on their own preferences until they agreed to a contract between the platform and a studio | **live** |
 | `a-person-is-held-to-what-is-theirs` | 451 `platform.consent_required` on the account door over a document that was never theirs — an owner's terms asked of somebody who is in no workspace. What they do owe is the account's own, and accepting those is enough: the obligation is theirs, so the refusal is escapable | **live** |
 | `agreeing-survives-a-closed-gate` | a deadlock: `legal` was exempt from the CONSENT gate and not from the STANDING one. A workspace held read-only cannot write, accepting is a write, and the document is what stands between it and being able to act — so a studio that never chose a plan could not accept the terms that would let it choose one, and the refusal said nothing about documents | **live** |
-| `a-declaration-reaches-the-account-centre` | `publishVaultSpec` binding its parameters as an ARRAY where `run` takes them one at a time — D1 answered D1_TYPE_ERROR and a bare `catch {}` swallowed it, so `vault_specs` was empty for the life of the feature and the account centre showed nobody's vault. Every suite was green: the publish is total by design, the read falls back to an empty list, and an empty account centre looks exactly like one belonging to somebody who has shared nothing | **live** |
+| `a-declaration-reaches-the-account-centre` | `publishVaultSpec` binding its parameters as an ARRAY where `run` takes them one at a time — D1 answered D1_TYPE_ERROR and a bare `catch {}` swallowed it, so `vault_specs` was empty for the life of the feature and the hub showed nobody's vault. Every suite was green: the publish is total by design, the read falls back to an empty list, and an empty hub looks exactly like one belonging to somebody who has shared nothing | **live** |
 | `legal-answers-for-every-product` | `legal.list` answering for the app behind whichever door was used. A person is an owner in one studio, a client in another and a member of a third product, and they owe three different sets — so the one screen that exists to answer across products could not | **live** |
 | `legal-says-nothing-about-a-product-you-are-not-in` | every app on the deployment publishes here, so listing all of them tells somebody about products they have never used — and asks them to agree to the terms of one they do not | **live** |
 | `a-workspace-you-left-is-not-yours` | `mineIn` reading membership without `revoked_at IS NULL`. The row is revoked rather than deleted — deliberately, so who was in a workspace and when survives — so every reader has to say it means a PAST membership, or a workspace somebody left stays on their list for ever | **live** |
@@ -1492,7 +1492,7 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `the-provisioning-lane-refuses-without-its-key` | the one endpoint that can open every product on the deployment to any address somebody names, admitting everybody on a deployment where the key was never set — which is precisely the state a fresh deployment is in | **live** |
 | `a-second-purchase-does-not-revoke-the-first` | a grant written as a replacement, so the day somebody buys a second product is the day the first is revoked — silently, and noticed only when they try to open a workspace they already paid for | **live** |
 | `a-grant-can-be-taken-back-and-nothing-else-is` | a switch with no off — and the opposite failure, an endpoint a website can call that makes an existing workspace, its members and its records disappear. What is taken back is the ability to open a NEW one | **live** |
-| `the-account-centre-offers-only-what-was-granted` | an account centre listing every product on the deployment to everybody signed in, and the address to go to assembled by hand — the setup door is derived from the product's own root, so the account centre and the product cannot disagree about the one thing that has to be right | **live** |
+| `the-account-centre-offers-only-what-was-granted` | a hub listing every product on the deployment to everybody signed in, and the address to go to assembled by hand — the setup door is derived from the product's own root, so the hub and the product cannot disagree about the one thing that has to be right | **live** |
 | `one-address-rule-for-the-field-and-the-route` | a second regular expression in the screen that agrees today. `slugProblem` is in the kernel so the field and the route cannot drift — copied, the field says an address is fine and the only opinion that counts refuses it, which reaches somebody as a spinner and then a message about something they cannot see | **live** |
 | `the-name-a-workspace-was-given-survives` | the name written only to the directory's branding COPY, which is republished from the regional settings row on every branding write — so it survives until the first time anybody changes a logo or a colour and is then replaced by a copy of a row that never existed, with nothing reporting it | **live** |
 | `granted-credits-are-spent-before-purchased-ones` | charging purchased credits while granted ones expire beside them — money somebody paid for, taken in a way no screen shows and no error reports. The same test pins the second half: soonest-perishing first, or the earlier cohort lapses unused | **live** |

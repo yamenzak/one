@@ -15,8 +15,8 @@
  *
  * ⚠️ AND IT LIVES IN THE GLOBAL DIRECTORY, beside the accounts and the tenant
  * directory. Every product's worker reads it, no product's worker owns it, and a
- * grant given for one product is visible to the account centre served by
- * another — which is the entire point of the account centre being able to say
+ * grant given for one product is visible to the hub served by
+ * another — which is the entire point of the hub being able to say
  * what somebody may open.
  */
 

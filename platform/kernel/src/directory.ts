@@ -33,7 +33,7 @@ export interface DirectoryEntry {
   readonly region: RegionId;
   /**
    * ⚠️ WHICH PRODUCT SERVES IT — routing, like everything else in this store: the
-   * name of a bundle rather than a fact about anybody. The account centre answers
+   * name of a bundle rather than a fact about anybody. The hub answers
    * for every product a person belongs to, and without this a workspace cannot be
    * matched to the declaration of what that product wants to know.
    */
@@ -67,7 +67,7 @@ export interface DirectoryEntry {
 /*
   ⚠️ `appId` EARNED ITS PLACE AND THE ARGUMENT IS THE POINT OF THIS LIST. It is the
   name of a bundle, not a fact about anybody — routing, like the region beside it —
-  and without it the account centre cannot match a workspace to the declaration of
+  and without it the hub cannot match a workspace to the declaration of
   what its product wants to know, so the vault could group by nothing. Every future
   addition has to make an argument of that shape, in a diff, which is exactly what
   this list exists to force.

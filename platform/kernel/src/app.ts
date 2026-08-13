@@ -168,7 +168,7 @@ export interface TenancySpec {
    * ⚠️ `granted` IS A PRODUCT SOMEBODY IS LET INTO. The address has to hold a
    * provisioning grant — written by whoever sells the thing — and without one the
    * creation is REFUSED rather than merely unoffered. That distinction is the
-   * whole point: a button the account centre does not draw is not a control, it
+   * whole point: a button the hub does not draw is not a control, it
    * is a decoration, and the route is reachable by anybody who reads the tool
    * catalogue or the API document.
    *
@@ -373,14 +373,14 @@ export interface DeploymentSpec {
    *
    * ⚠️ AND THE WORKSPACE IS CREATED AT THE PRODUCT'S OWN SETUP DOOR, never here.
    * Creating one writes a membership into that product's regional store, which
-   * this worker has no binding for — so the account centre's job is to say who
+   * this worker has no binding for — so the hub's job is to say who
    * may create, where, and to hand over. `setup.<root>` is that address, and it
    * is derived from the root rather than stored, so the two cannot disagree.
    */
   readonly products?: readonly Product[];
 }
 
-/** One product on this deployment, as the account centre needs to know it. */
+/** One product on this deployment, as the hub needs to know it. */
 export interface Product {
   /** The app id, which is what a workspace's directory row records. */
   readonly id: string;
@@ -392,7 +392,7 @@ export interface Product {
   /**
    * ⚠️ WHETHER ANYBODY SIGNED IN MAY OPEN ONE HERE. It mirrors the product's own
    * `tenancy.creation`, and the duplication is unavoidable rather than sloppy:
-   * the account centre is served by one worker and cannot import another
+   * the hub is served by one worker and cannot import another
    * product's manifest, so this is the only place it can learn the answer.
    *
    * ⚠️ WHICH IS WHY EACH APP CHECKS ITS OWN ENTRY AGAINST ITS OWN MANIFEST. A
@@ -405,7 +405,7 @@ export interface Product {
 /**
  * WHERE A WORKSPACE IS CREATED FOR A PRODUCT.
  *
- * ⚠️ DERIVED, NOT DECLARED, so an account centre and a product cannot disagree
+ * ⚠️ DERIVED, NOT DECLARED, so an hub and a product cannot disagree
  * about the one address that has to be right — and `classifyHost` already reads
  * the same label. A second field holding "https://setup.kova.4dl.app" is a field
  * somebody edits when the root moves and forgets when it moves back.
@@ -515,7 +515,7 @@ export function legalProblems(docs: readonly LegalDoc[]): readonly { readonly id
       have to guess which one the author meant.
     */
     if (RESERVED_DOCUMENT_IDS.includes(d.id)) {
-      out.push({ id: d.id, why: `is a word the account centre's own addresses use, so its screen would be unreachable (reserved: ${RESERVED_DOCUMENT_IDS.join(", ")})` });
+      out.push({ id: d.id, why: `is a word the hub's own addresses use, so its screen would be unreachable (reserved: ${RESERVED_DOCUMENT_IDS.join(", ")})` });
     }
   }
   return out;
@@ -533,7 +533,7 @@ export const RESERVED_DOCUMENT_IDS: readonly string[] = ["who"];
 
 /**
  * ⚠️ AND THE SAME FOR AN APP ID, at the segment above. `account` is how the
- * account centre spells the deployment — whose own id is the empty string, which
+ * hub spells the deployment — whose own id is the empty string, which
  * no path can carry — so an app registered under that name would take over the
  * one address the platform's own documents live at.
  */

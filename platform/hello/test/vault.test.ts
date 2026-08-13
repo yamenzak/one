@@ -23,7 +23,7 @@ import { bindingsFor } from "@one/runtime";
 
 const SLUG = `vault${Math.random().toString(36).slice(2, 8)}`;
 const ORIGIN = `https://${SLUG}.hello.4dl.app`;
-/** ⚠️ The account centre's own door, under the PLATFORM root. */
+/** ⚠️ The hub's own door, under the PLATFORM root. */
 const ID = "https://id.4dl.app";
 
 const OWNER = `owner.${SLUG}@example.com`;
@@ -72,7 +72,7 @@ beforeAll(async () => {
 /* ------------------------------------------------------------ the person --- */
 
 describe("your own facts", () => {
-  it("answers on the account centre's door, with no workspace anywhere", async () => {
+  it("answers on the hub's door, with no workspace anywhere", async () => {
     /*
       ⚠️ THE WHOLE REASON THE DOOR EXISTS. Somebody reviewing what they have
       shared is the person most likely to have left every workspace they were
@@ -284,7 +284,7 @@ describe("taking your own data with you, which is not a workspace's export", () 
   /*
     ⚠️ `exit.export` IS THE WORKSPACE'S AND WANTS `workspace:close`. So the only
     export in the product was one an ordinary member may not ask for, about
-    records that are mostly not theirs — and the account centre's own "Download
+    records that are mostly not theirs — and the hub's own "Download
     your data" row had nothing behind it that the person reading it could reach.
   */
   it("carries every account-scoped table a module declares, with nothing hand-listed", async () => {
@@ -341,14 +341,14 @@ describe("taking your own data with you, which is not a workspace's export", () 
 
 /* ------------------------------------------------------- the declaration --- */
 
-describe("a product's declaration reaches the account centre", () => {
+describe("a product's declaration reaches the hub", () => {
   /*
     ⚠️ IT NEVER DID. `publishVaultSpec` passed its parameters as an ARRAY where
     `run` takes them one by one, D1 answered `D1_TYPE_ERROR`, and a bare
     `catch {}` swallowed it — so `vault_specs` was empty for the life of the
-    feature and the account centre showed nobody's vault at all. Every suite was
+    feature and the hub showed nobody's vault at all. Every suite was
     green: the publish is total by design, the read falls back to an empty list,
-    and an empty account centre looks exactly like an account centre for somebody
+    and an empty hub looks exactly like an hub for somebody
     who has shared nothing.
 
     ⚠️ SO THE ASSERTION IS ABOUT THE ROW, not about the screen. A test that asked

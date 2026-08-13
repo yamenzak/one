@@ -13,7 +13,7 @@
  * because each app's screen shows its own copy and agrees with itself.
  *
  * ⚠️ THE PRODUCT NOUNS BELOW ARE THE POINT, NOT AN OVERSIGHT. Each product gets
- * one sentence written in that product's own words, because the account centre
+ * one sentence written in that product's own words, because the hub
  * offers it to somebody who has never opened it and "a workspace" tells them
  * nothing. The exemptions are stated per NOUN rather than for the file, so a
  * noun no product here has earned still fails:
@@ -66,7 +66,7 @@ export const DEPLOYMENT: DeploymentSpec = {
     products could I open a workspace in" has no answer at all.
 
     ⚠️ `open` MIRRORS EACH APP'S OWN `tenancy.creation`, and each app checks its
-    own entry against its own manifest — the account centre cannot import another
+    own entry against its own manifest — the hub cannot import another
     product's declaration, so the two are stated twice and reconciled by a test on
     the one side that can see both.
   */
@@ -125,7 +125,7 @@ export const DEPLOYMENT: DeploymentSpec = {
       mustAccept: [ACCOUNT_HOLDER],
       body: [
         "This covers your 4° account itself, not any product you use it with. Each of those has its own terms and you accept them separately.",
-        "The account is yours. You can take everything it holds, close it, and be forgotten — from the account centre, without asking anybody.",
+        "The account is yours. You can take everything it holds, close it, and be forgotten — from the hub, without asking anybody.",
         "Closing your account does not close a workspace you own. Those belong to the people in them as well as to you, so we refuse rather than take them down on your behalf.",
       ].join("\n\n"),
     },
@@ -143,7 +143,7 @@ export const DEPLOYMENT: DeploymentSpec = {
       body: [
         "We hold what your account is made of: the address you sign in with, the passkeys you registered, where you are signed in, and how you have asked to be read to.",
         "We also hold your vault — the sensitive things you record about yourself. These are yours rather than any product's, which is why they survive leaving a workspace and closing a product. No product sees a vault fact unless you grant it, every grant is one you can withdraw, and every read is recorded where you can see who did it.",
-        "We do not sell any of it and we do not train anything on it. Where a product sends something to a model, that product names what it sends, on its own page in this account centre.",
+        "We do not sell any of it and we do not train anything on it. Where a product sends something to a model, that product names what it sends, on its own page in this hub.",
         "Ask us anything about this at legal@fourdegreelabs.com.",
       ].join("\n\n"),
     },

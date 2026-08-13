@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { keyOf, parseWhere, pathOf, upFrom, type Where } from "../src/account/routes.js";
+import { keyOf, parseWhere, pathOf, upFrom, type Where } from "../src/hub/routes.js";
 
 const EVERY: readonly Where[] = [
   { at: "home" },
@@ -35,7 +35,7 @@ const EVERY: readonly Where[] = [
   { at: "close" },
 ];
 
-describe("every screen in the account centre has an address", () => {
+describe("every screen in the hub has an address", () => {
   it("prints and parses back to the same place, for every one of them", () => {
     for (const where of EVERY) {
       expect(parseWhere(pathOf(where)), pathOf(where)).toEqual(where);

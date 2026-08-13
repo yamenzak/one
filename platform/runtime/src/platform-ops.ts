@@ -113,14 +113,14 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
    * WHAT THIS PERSON MAY OPEN, AND WHERE.
    *
    * ⚠️ ANSWERED FROM THE DEPLOYMENT'S OWN LIST OF PRODUCTS, not from what this
-   * worker happens to be. The account centre is served by one app and the answer
+   * worker happens to be. The hub is served by one app and the answer
    * is about all of them — which is exactly why the list is declared once, in a
    * module every worker imports, rather than assembled from whichever manifest is
    * in scope.
    *
    * ⚠️ AND A PRODUCT WITH AN OPEN FRONT DOOR IS ALWAYS IN THE ANSWER. Somebody
    * with no grant at all may still open a workspace in a self-serve product, and
-   * an account centre that only listed granted ones would hide the free one.
+   * an hub that only listed granted ones would hide the free one.
    */
   const mayOpen = operation({
     id: "me.products",
@@ -140,7 +140,7 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
       return {
         products: (provision.products ?? [])
           .filter((p) => p.open === true || grantOpens(held, p.id))
-          /* ⚠️ THE ADDRESS IS DERIVED, so the account centre and the product
+          /* ⚠️ THE ADDRESS IS DERIVED, so the hub and the product
              cannot disagree about the one thing that has to be right. */
           .map((p) => ({ id: p.id, name: p.name, does: p.does, setupAt: setupDoorFor(p) })),
       };
@@ -267,7 +267,7 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
       const name = (input.name ?? "").trim();
       /*
         ⚠️ THE GRANT IS CHECKED HERE, NOT IN THE SCREEN THAT OFFERS THE BUTTON. A
-        control the account centre does not draw is a decoration: this route is in
+        control the hub does not draw is a decoration: this route is in
         the API document, in the typed client and in every tool catalogue, and
         anybody signed in holds `workspace:create` on a tenantless door by
         construction. An app that sells its way in says so in its manifest, and
@@ -336,7 +336,7 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
         slug: input.slug,
         region,
         /* ⚠️ THE APP THAT MADE IT, recorded once and never inferred. It is what
-           lets the account centre match a workspace to the declaration of what
+           lets the hub match a workspace to the declaration of what
            its product wants to know — a workspace with no app is one the vault
            cannot speak for. */
         appId: app.id,
@@ -409,7 +409,7 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
           question is asked by ACCOUNT: which workspaces am I in, where am I the
           last administrator, what may I leave. Left unclaimed, somebody who made
           a workspace from the setup door and had not yet visited it was absent
-          from their own account centre, and closing their account would have
+          from their own hub, and closing their account would have
           stranded a workspace nothing could see they were alone in.
 
           ⚠️ IT STILL GOES THROUGH `claim`, whose `account_id IS NULL` predicate is

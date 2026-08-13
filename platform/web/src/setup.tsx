@@ -8,10 +8,10 @@
  * the same failure the door was written to close, one door along: the whole of
  * this platform is behind having a workspace, and there was no way to get one.
  *
- * ⚠️ IT IS ON THE PRODUCT'S OWN `setup.` HOST, NOT IN THE ACCOUNT CENTRE, and
- * that is a fact about workers rather than about navigation. The account centre
+ * ⚠️ IT IS ON THE PRODUCT'S OWN `setup.` HOST, NOT IN THE HUB, and
+ * that is a fact about workers rather than about navigation. The hub
  * is served by one worker; every product is a different one with its own regional
- * bindings and its own schema, and it cannot reach them. So the account centre
+ * bindings and its own schema, and it cannot reach them. So the hub
  * says who may open what and hands over; this screen is what they arrive at.
  *
  * ⚠️ AND THERE IS NO PLAN STEP HERE. Choosing what to pay is a write against a
@@ -99,7 +99,7 @@ export interface SetupProps {
   /**
    * ⚠️ WHERE IT MAY BE PUT, AND ONE IS THE ORDINARY CASE. A deployment with a
    * single region has nothing to ask, and a picker with one option is a question
-   * with one answer — the same rule the account centre's hand-off follows.
+   * with one answer — the same rule the hub's hand-off follows.
    */
   readonly places?: readonly Place[];
   readonly wire: SetupWire;

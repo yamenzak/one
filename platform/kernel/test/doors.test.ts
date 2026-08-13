@@ -31,7 +31,7 @@ const cfg: DoorConfig = {
 
 /* -------------------------------------------------------------- identity --- */
 
-describe("the account centre's door", () => {
+describe("the hub's door", () => {
   it("answers at id under the PLATFORM root, not under an app's", () => {
     expect(classifyHost("id.4dl.app", cfg).door).toBe("identity");
     /* ⚠️ `id.kova.4dl.app` is Kova's account screen wearing a platform name.
@@ -46,7 +46,7 @@ describe("the account centre's door", () => {
   /*
     ⚠️ THE PROPERTY THE WHOLE DOOR RESTS ON. A credential is offered at an origin
     whose relying party is a registrable-domain suffix of it — so one registered
-    under the platform root reaches the account centre with no second passkey and
+    under the platform root reaches the hub with no second passkey and
     no redirect anywhere. Get this wrong and the door needs its own sign-in.
   */
   it("asserts the platform as its relying party, so one passkey reaches it", () => {
@@ -56,7 +56,7 @@ describe("the account centre's door", () => {
   /*
     ⚠️ AND IT DOES NOT SHARE A SESSION WITH ANY PRODUCT. The credential is
     platform-wide and the session is not: widening this cookie would make an
-    injection in one product a session on every account centre.
+    injection in one product a session on every hub.
   */
   it("does not widen its cookie to a root it sits beside", () => {
     expect(cookieDomainFor(classifyHost("id.4dl.app", cfg))).toBeNull();
@@ -110,8 +110,8 @@ describe("another domain of ours", () => {
     expect(classifyHost("fourdegreelabs.com", cfg).door).toBe("unclaimed");
   });
 
-  /* ⚠️ The path has to survive, so a link into the account centre lands on the
-     account centre rather than on a home page. */
+  /* ⚠️ The path has to survive, so a link into the hub lands on the
+     hub rather than on a home page. */
   it("carries the label across, so a redirect lands where it was going", () => {
     expect(classifyHost("id.fourdegreelabs.com", cfg).alias?.canonical).toBe("id.4dl.app");
     expect(classifyHost("fourdegreelabs.com", cfg).alias?.canonical).toBe("4dl.app");

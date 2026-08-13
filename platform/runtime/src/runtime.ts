@@ -700,7 +700,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       const identity = identityStore(identityDb);
       /* ⚠️ THE DIRECTORY TRAVELS WITH THE STORE, because signing in indexes a
          session globally and reading one weighs it against that index. Without
-         it a session is invisible to the account centre and unrevokable from
+         it a session is invisible to the hub and unrevokable from
          there — which is exactly the session somebody would want to end. */
       const sessions = sessionStore(bind[opts.sessionsBinding] as SqlHandle, identityDb);
       const cookieId = readCookie(request.headers.get("cookie"), SESSION_COOKIE);
@@ -1100,7 +1100,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         ⚠️ NO MEMBERSHIP IS NO ROLE — IT IS NOT "OWNER". Falling back to owner for
         anybody signed in made every person on a door with no workspace an owner
         of nothing, and the consent gate believed it: a Kova client opening the
-        account centre was told they owed the Terms of service and the data
+        hub was told they owed the Terms of service and the data
         processing agreement — both `mustAccept: ["owner"]` — and was answered 451
         on `me.preferences.set` until they agreed to a contract between the
         platform and a studio. Measured, not reasoned about.
@@ -1600,7 +1600,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           deployment: opts.deployment ?? null,
           /* ⚠️ THE SAME WALK THE VAULT'S SURFACE USES, and deliberately the same
              one: both screens answer "everywhere I belong", and two derivations
-             of that is two answers to the question the account centre exists to
+             of that is two answers to the question the hub exists to
              ask. */
           workspaces: async () => {
             if (!session) return [];

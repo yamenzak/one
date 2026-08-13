@@ -12,7 +12,7 @@
  * "read my own weight" and "read anybody's weight".
  *
  * ⚠️ AND THE PERSON'S OWN OPERATIONS ARE MOUNTED ON A TENANTLESS LANE. The
- * account centre answers on the `identity` door, where there is no workspace and
+ * hub answers on the `identity` door, where there is no workspace and
  * no membership — which is the whole point of that door. An operation here that
  * needed a tenancy would be unreachable for somebody who has left every
  * workspace they were in, which is exactly the person most likely to be
@@ -85,7 +85,7 @@ export function vaultOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
     ⚠️ THE CATALOGUE IS THE PLATFORM'S REGISTRY NARROWED BY THIS APP'S ASK, and
     both halves matter. The registry alone would offer somebody a consent sheet
     full of facts this product has no use for — which trains people to grant
-    things nobody wanted. This app's ask alone would give the account centre
+    things nobody wanted. This app's ask alone would give the hub
     nothing to show for a fact the person holds and no current app wants.
   */
   const wants = new Map((app.vault?.wants ?? []).map((w) => [w.fact, w]));
@@ -339,7 +339,7 @@ export function vaultOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
       /*
         ⚠️ AN APP MAY BE NAMED HERE WHERE IT MAY NOT BE ON `share`, and the
         asymmetry is the right way round: naming another app can only ever take
-        access away. The account centre lists every app a person has shared with,
+        access away. The hub lists every app a person has shared with,
         so revoking has to reach the ones they are not currently inside.
       */
       await store(d).revoke(
@@ -498,7 +498,7 @@ export function vaultOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
 
   /*
     ⚠️ AN APP THAT ASKS FOR NOTHING GETS THE PERSON'S OWN SURFACE AND NOT THE
-    APP'S. The account centre is the platform's and answers on every product —
+    APP'S. The hub is the platform's and answers on every product —
     somebody has facts and grants whether or not the app in front of them wants
     any — while `subject.fact` and `vault.asked` are meaningless with no ask and
     would be a route that exists to refuse.

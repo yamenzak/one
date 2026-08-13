@@ -155,7 +155,7 @@ describe("what every app wants, where every app can see it", () => {
   /*
     ⚠️ THE VAULT IS ONE PERSON'S, SO IT CANNOT BE RENDERED FROM ONE APP'S MANIFEST.
     A worker knows its own wants and nothing about the product beside it — so the
-    account centre could only ever have shown the app it happened to be running
+    hub could only ever have shown the app it happened to be running
     inside, which is not the question it exists to answer. Every app publishes its
     declaration into the global store; whoever renders the vault reads all of them.
 
@@ -185,7 +185,7 @@ describe("what every app wants, where every app can see it", () => {
     expect(VAULT_SPEC_SCHEMA.ddl.join("\n")).not.toMatch(/account_id|user_id|tenant_id|email/);
   });
 
-  /* ⚠️ GLOBAL, LIKE THE VAULT ITSELF. Declared regionally, an account centre in
+  /* ⚠️ GLOBAL, LIKE THE VAULT ITSELF. Declared regionally, an hub in
      one region would answer for a subset of the products somebody uses and say
      nothing about the rest. */
   it("names no dependency that would put it in a region", () => {

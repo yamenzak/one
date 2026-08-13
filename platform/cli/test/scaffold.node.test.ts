@@ -47,7 +47,7 @@ describe("the app id", () => {
     /*
       ⚠️ AND EVERY NAME THE INTERFACE'S OWN ADDRESSES ALREADY USE. `RESERVED_APP_IDS`
       is the kernel's, because the reason is the kernel's: the deployment's own id
-      is the empty string, which no path can carry, so the account centre spells it
+      is the empty string, which no path can carry, so the hub spells it
       out — and an app registered under that name would take over the address the
       platform's own terms live at, on every link, with nothing failing. The
       scaffold enforces it; this is what keeps the two lists from drifting.

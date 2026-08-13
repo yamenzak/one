@@ -4,7 +4,7 @@
  * ⚠️ EVERY SCREEN HAS ONE, AND THAT IS NOT A CONVENIENCE. `center.tsx` has said
  * from the day it was written that this is a route rather than a popup — a person
  * can link to it, land on it and reload it — and then the screens INSIDE it were
- * four pieces of component state. So somebody could link to the account centre
+ * four pieces of component state. So somebody could link to the hub
  * and never to their own vault; a refusal that says "read this first" had nowhere
  * to send anybody; support could not say "open this address"; and the back button
  * left the whole surface instead of going up one level.

@@ -10,15 +10,15 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ACCOUNT_CSS } from "../src/account/account.css.js";
+import { HUB_CSS } from "../src/hub/hub.css.js";
 import { MARK_CSS } from "../src/brand/mark.css.js";
 import { UI_CSS } from "../src/ui.css.js";
 import { SKY_CSS } from "../src/sky.css.js";
 import { TYPE_CSS } from "../src/brand/type.css.js";
 import { MOTION_CSS } from "../src/motion.css.js";
-import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
+import { HubHome, type HubHomeProps } from "../src/hub/home.js";
 
-const props: AccountHomeProps = {
+const props: HubHomeProps = {
   person: { name: "Nadia Haddad", email: "nadia@example.com" },
   workspaces: [
     { tenantId: "t1", slug: "a", name: "A", product: "kova", role: "Owner" },
@@ -29,8 +29,8 @@ const props: AccountHomeProps = {
   onClose: () => undefined,
 };
 
-const markupFor = (over: Partial<AccountHomeProps> = {}) =>
-  renderToStaticMarkup(<AccountHome {...props} {...over} /> as never);
+const markupFor = (over: Partial<HubHomeProps> = {}) =>
+  renderToStaticMarkup(<HubHome {...props} {...over} /> as never);
 
 /*
   ⚠️ RENDERED **AND** READ, because rendering alone cannot see the whole app. A
@@ -73,7 +73,7 @@ const used = new Set(
 );
 
 /* Comments state the rules and would match them. Only declarations are read. */
-const rules = [UI_CSS, ACCOUNT_CSS, MARK_CSS, SKY_CSS, TYPE_CSS, MOTION_CSS].join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
+const rules = [UI_CSS, HUB_CSS, MARK_CSS, SKY_CSS, TYPE_CSS, MOTION_CSS].join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
 
 describe("the stylesheet and the markup are the same set of names", () => {
   /*

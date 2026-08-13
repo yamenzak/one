@@ -119,8 +119,8 @@ export const IDENTITY_SCHEMA: SchemaModule = {
  * answer: "where am I signed in", which spans apps and regions by definition.
  *
  * ⚠️ AND IT IS WHAT MAKES REVOCATION REACH ANOTHER PRODUCT. Signing a device out
- * from the account centre cannot delete a row in an app's regional store — the
- * account centre is not that app and may not be in that region. So it deletes
+ * from the hub cannot delete a row in an app's regional store — the
+ * hub is not that app and may not be in that region. So it deletes
  * the row HERE, and each app re-checks against this table on a bounded interval.
  * See `SESSION_RECHECK_MS` for the size of that bound and what it costs.
  */
@@ -144,7 +144,7 @@ export const SESSION_DIRECTORY_SCHEMA: SchemaModule = {
  * that comes true at the next sign-in, which is not what anybody means by it.
  *
  * Five minutes is the window. It is stated here rather than tuned in three
- * places, and the account centre says so where somebody signs a device out — a
+ * places, and the hub says so where somebody signs a device out — a
  * security control whose delay is a surprise is worse than one that is honest
  * about it.
  */
@@ -351,7 +351,7 @@ export function sessionStore(db: SqlHandle, directory?: SqlHandle): SessionStore
       /*
         ⚠️ AND IT IS INDEXED GLOBALLY, IN THE SAME BREATH. Not `.catch(() =>
         undefined)`: a directory write that failed silently would produce a
-        session this app honours and the account centre cannot see — invisible in
+        session this app honours and the hub cannot see — invisible in
         "where you are signed in" and unrevokable from there, which is exactly
         the session somebody would most want to end.
       */

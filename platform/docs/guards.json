@@ -3212,7 +3212,7 @@
     {
       "id": "vault-screen-writes-no-copy-of-its-own",
       "group": "interface",
-      "fails": "the account centre explaining a fact in its own words. Every reason, recommendation and hides-sentence is read out of a declaration, so an app that declares a thirteenth fact gets a thirteenth row without this screen being opened; the day it stops being true is the day the vault grows a branch per product",
+      "fails": "the hub explaining a fact in its own words. Every reason, recommendation and hides-sentence is read out of a declaration, so an app that declares a thirteenth fact gets a thirteenth row without this screen being opened; the day it stops being true is the day the vault grows a branch per product",
       "stage": "7",
       "status": "live",
       "impl": "web/test/screens.test.tsx",
@@ -3251,8 +3251,8 @@
       "stage": "6",
       "status": "live",
       "impl": "hello/test/membership.test.ts",
-      "proves": "lists it in the account centre before they have ever opened it",
-      "fails": "`invite` writes an address with no account behind it — right for an invitation, wrong for the founder, who is standing there. Every cross-workspace question is asked by account, so an unclaimed founding row makes somebody absent from their own account centre and lets closing their account strand a workspace nothing can see they are alone in"
+      "proves": "lists it in the hub before they have ever opened it",
+      "fails": "`invite` writes an address with no account behind it — right for an invitation, wrong for the founder, who is standing there. Every cross-workspace question is asked by account, so an unclaimed founding row makes somebody absent from their own hub and lets closing their account strand a workspace nothing can see they are alone in"
     },
     {
       "id": "closing-an-account-never-closes-a-workspace",
@@ -3378,7 +3378,7 @@
       "status": "live",
       "impl": "hello/test/account.test.ts",
       "proves": "asks an owner's documents of owners, and not of somebody in no workspace",
-      "fails": "calling every signed-in person an owner on a door with no workspace. The consent gate believed it: a Kova client opening the account centre was told they owed the Terms of service and the data processing agreement — both `mustAccept: [\"owner\"]` — and answered 451 on their own preferences until they agreed to a contract between the platform and a studio"
+      "fails": "calling every signed-in person an owner on a door with no workspace. The consent gate believed it: a Kova client opening the hub was told they owed the Terms of service and the data processing agreement — both `mustAccept: [\"owner\"]` — and answered 451 on their own preferences until they agreed to a contract between the platform and a studio"
     },
     {
       "id": "a-person-is-held-to-what-is-theirs",
@@ -3405,7 +3405,7 @@
       "status": "live",
       "impl": "hello/test/vault.test.ts",
       "proves": "is in the global store after boot, not merely attempted",
-      "fails": "`publishVaultSpec` binding its parameters as an ARRAY where `run` takes them one at a time — D1 answered D1_TYPE_ERROR and a bare `catch {}` swallowed it, so `vault_specs` was empty for the life of the feature and the account centre showed nobody's vault. Every suite was green: the publish is total by design, the read falls back to an empty list, and an empty account centre looks exactly like one belonging to somebody who has shared nothing"
+      "fails": "`publishVaultSpec` binding its parameters as an ARRAY where `run` takes them one at a time — D1 answered D1_TYPE_ERROR and a bare `catch {}` swallowed it, so `vault_specs` was empty for the life of the feature and the hub showed nobody's vault. Every suite was green: the publish is total by design, the read falls back to an empty list, and an empty hub looks exactly like one belonging to somebody who has shared nothing"
     },
     {
       "id": "legal-answers-for-every-product",
@@ -3630,7 +3630,7 @@
       "status": "live",
       "impl": "web/test/routes.test.ts",
       "proves": "gives every destination its own address",
-      "fails": "two screens printing to one path, so one of them is unreachable — and, before this, an account centre whose inner screens were component state: no link to a vault, no address for a refusal to send anybody to, and a back button that left the whole surface"
+      "fails": "two screens printing to one path, so one of them is unreachable — and, before this, a hub whose inner screens were component state: no link to a vault, no address for a refusal to send anybody to, and a back button that left the whole surface"
     },
     {
       "id": "a-route-parses-back-to-where-it-was",
@@ -3702,7 +3702,7 @@
       "status": "live",
       "impl": "web/test/interface.test.tsx",
       "proves": "writes a bare anchor nowhere",
-      "fails": "browser blue, browser underline, no press and no motion, on a surface where every other control has a tone and a spring. An anchor is the one element that looks finished with no styling at all, which is why this was every link in the account centre"
+      "fails": "browser blue, browser underline, no press and no motion, on a surface where every other control has a tone and a spring. An anchor is the one element that looks finished with no styling at all, which is why this was every link in the hub"
     },
     {
       "id": "a-link-out-says-it-leaves",
@@ -3783,7 +3783,7 @@
       "status": "live",
       "impl": "web/test/interface.test.tsx",
       "proves": "restates the word space wherever it takes the page's font",
-      "fails": "the font shorthand resetting the word space inside a control. The text face sets wide letters against a narrow word space and the platform corrects it once on the body; every row, field and button then silently undid the correction. Measured: 1.28px on a paragraph and 0 on every row title and detail, which is most of the words in the account centre"
+      "fails": "the font shorthand resetting the word space inside a control. The text face sets wide letters against a narrow word space and the platform corrects it once on the body; every row, field and button then silently undid the correction. Measured: 1.28px on a paragraph and 0 on every row title and detail, which is most of the words in the hub"
     },
     {
       "id": "a-link-out-tells-mail-from-a-page",
@@ -3954,7 +3954,7 @@
       "status": "live",
       "impl": "web/test/screens.test.tsx",
       "proves": "can be left, on this device and on every device",
-      "fails": "an account centre with no way to sign out. The row for the device in your hand carried no control and the comment beside it said leaving was the avatar menu's job — a menu this platform does not have — so on a shared computer there was no way out at all, on the one screen whose subject is where you are signed in"
+      "fails": "a hub with no way to sign out. The row for the device in your hand carried no control and the comment beside it said leaving was the avatar menu's job — a menu this platform does not have — so on a shared computer there was no way out at all, on the one screen whose subject is where you are signed in"
     },
     {
       "id": "a-product-is-opened-only-to-somebody-let-in",
@@ -4008,7 +4008,7 @@
       "status": "live",
       "impl": "hello/test/provisioning.test.ts",
       "proves": "offers a product to somebody who was let into it, and not to anybody else",
-      "fails": "an account centre listing every product on the deployment to everybody signed in, and the address to go to assembled by hand — the setup door is derived from the product's own root, so the account centre and the product cannot disagree about the one thing that has to be right"
+      "fails": "a hub listing every product on the deployment to everybody signed in, and the address to go to assembled by hand — the setup door is derived from the product's own root, so the hub and the product cannot disagree about the one thing that has to be right"
     },
     {
       "id": "nobody-is-offered-what-they-cannot-open",
@@ -4017,7 +4017,7 @@
       "status": "live",
       "impl": "web/test/screens.test.tsx",
       "proves": "offers nothing to somebody who may open nothing",
-      "fails": "a New workspace button on the account centre of somebody who is a customer of a workspace rather than the owner of one. It offers a thing they cannot do, and the refusal that says so arrives long after they have decided the product is confusing"
+      "fails": "a New workspace button on the hub of somebody who is a customer of a workspace rather than the owner of one. It offers a thing they cannot do, and the refusal that says so arrives long after they have decided the product is confusing"
     },
     {
       "id": "a-workspace-can-actually-be-created",
@@ -4288,6 +4288,33 @@
       "impl": "hello/test/jobs.solo.test.ts",
       "proves": "erases one the owner closed, on the date they were given",
       "fails": "somebody who decided to leave waiting out the arrears ladder's sixty days for a decision they already made — or, worse, a second erasure branch for it, because two branches disagree eventually and the disagreement is about whether records still exist"
+    },
+    {
+      "id": "the-hub-names-its-three-areas",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "names what you are, what you belong to and what you may start",
+      "fails": "three questions flattened into one list of settings, where \"new workspace\" sits beside \"change your language\" — a purchase and a preference wearing the same row"
+    },
+    {
+      "id": "an-empty-area-is-not-drawn",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "draws no marketplace at all for somebody with nothing to buy or open",
+      "fails": "a named section promising something that is not there — and most people holding an account here are a customer of somebody else's workspace"
+    },
+    {
+      "id": "one-control-per-destination",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "offers it once to somebody who already has a workspace",
+      "fails": "two controls for one destination in two vocabularies — which also makes the section header that names the area read as decoration. The exception the same test pins: the empty list keeps it, because making somebody read a section header before they can act is making them read the page first"
     }
   ]
 }

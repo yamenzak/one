@@ -53,7 +53,7 @@ export const VAULT_COLUMNS: Readonly<Record<string, readonly string[]>> = {
  *
  * ⚠️ THE VAULT IS ONE PERSON'S, SO IT CANNOT BE RENDERED FROM ONE APP'S MANIFEST.
  * A worker knows its own wants and nothing about the product next to it — so the
- * account centre, which exists precisely to answer "what does each place I belong
+ * hub, which exists precisely to answer "what does each place I belong
  * to know about me", could only ever have shown the app it happened to be running
  * inside. Each app publishes its declaration into the global store on boot, and
  * whoever renders the vault reads all of them.
@@ -122,7 +122,7 @@ export const VAULT_SCHEMA: SchemaModule = {
       ⚠️ WHY A GRANT CHANGED, APPEND-ONLY, AND SEPARATE FROM THE GRANT ITSELF.
       The grant table is current state — a revocation DELETES a row, which is
       what makes revocation total. Without this table the strongest thing the
-      account centre could say about a withdrawn grant is nothing at all, and
+      hub could say about a withdrawn grant is nothing at all, and
       "I never gave that" and "I gave it and took it back" are the two answers a
       person most wants to tell apart.
     */
@@ -231,7 +231,7 @@ export async function publishVaultSpec(
       another product — but a bare `catch {}` here swallowed a `D1_TYPE_ERROR`
       for as long as this has existed: the parameters were passed as an ARRAY
       where `run` takes them one by one, so every publish failed, `vault_specs`
-      stayed empty, and the account centre showed nobody's vault at all. Nothing
+      stayed empty, and the hub showed nobody's vault at all. Nothing
       anywhere said a word.
     */
     console.error("vault spec not published", app.id, why);
@@ -248,7 +248,7 @@ export async function publishedSpecs(
   return rows.flatMap((r) => {
     /* ⚠️ A ROW THAT WILL NOT PARSE IS DROPPED, not thrown on. It was written by
        another worker, possibly a version ahead — and one product's bad row must
-       not take the whole account centre down with it. */
+       not take the whole hub down with it. */
     try {
       return [{ appId: r.app_id, appName: r.app_name, spec: { wants: JSON.parse(r.wants) as VaultSpec["wants"] } }];
     } catch { return []; }

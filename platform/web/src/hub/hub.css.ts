@@ -8,7 +8,7 @@
  * its title is what moves those.
  */
 
-export const ACCOUNT_CSS = `
+export const HUB_CSS = `
 /* ⚠️ A SCREEN INSIDE THE PRESENTATION IS NAMED AT THE START OF THE LINE. The home
    is named by the brand — a lockup, on the axis of the page, recognised rather
    than read. Everything under it is named by what it is, and a heading that is

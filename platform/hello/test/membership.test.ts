@@ -176,7 +176,7 @@ describe("the person who makes a workspace is in it, by account and not just by 
     invitation and wrong for the founder — they are standing there. Every
     cross-workspace question is asked by ACCOUNT: which workspaces am I in, where
     am I the last administrator, what may I leave. So a founding row left
-    unclaimed made somebody absent from their own account centre until they
+    unclaimed made somebody absent from their own hub until they
     happened to visit the workspace, and made closing their account willing to
     strand a workspace nothing could see they were alone in.
 
@@ -185,7 +185,7 @@ describe("the person who makes a workspace is in it, by account and not just by 
     past — so the one path that does not go through a workspace was the one path
     with no test.
   */
-  it("lists it in the account centre before they have ever opened it", async () => {
+  it("lists it in the hub before they have ever opened it", async () => {
     const ID = "https://id.4dl.app";
     const founding = await signIn("founder@example.test", SETUP);
     const made = await post(SETUP, "/api/identity.workspace.create", { slug: "founded" }, founding);

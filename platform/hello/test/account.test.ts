@@ -111,7 +111,7 @@ describe("preferences", () => {
     a session shared across them is a blast radius. What travels is the ACCOUNT,
     and one platform-scoped passkey is what makes signing in there a tap.
   */
-  it("shows the same preferences on the account centre's own session", async () => {
+  it("shows the same preferences on the hub's own session", async () => {
     const mine = await signIn(WHO, ID);
     const r = await get(ID, "/api/me.preferences", mine);
     expect(r.status).toBe(200);
@@ -119,7 +119,7 @@ describe("preferences", () => {
     expect(r.body.locale).toBe("de");
   });
 
-  it("does not carry this product's session onto the account centre", async () => {
+  it("does not carry this product's session onto the hub", async () => {
     /* Not a limitation to work around. The cookie is scoped to the app root and
        `id.4dl.app` sits beside it, not under it. */
     expect((await get(ID, "/api/me.preferences", here)).body.units).toBe("");
@@ -152,7 +152,7 @@ describe("where you are signed in", () => {
     there is no workspace and no membership. Somebody reviewing this is the
     person most likely to have left every workspace they were in.
   */
-  it("lists every product's sessions from the account centre, with no workspace at all", async () => {
+  it("lists every product's sessions from the hub, with no workspace at all", async () => {
     const mine = await signIn(WHO, ID);
     const r = await get(ID, "/api/me.sessions", mine);
     expect(r.status).toBe(200);
@@ -316,7 +316,7 @@ describe("what every product you belong to asks of you", () => {
     expect(r.status).toBe(200);
     const apps = r.body.apps as unknown as { appId: string; roles: string[]; documents: unknown[] }[];
     /* ⚠️ Named from the registry, not from the door: this reached the account
-       centre without the account centre knowing which product it came from. */
+       centre without the hub knowing which product it came from. */
     expect(apps.map((a) => a.appId)).toContain("hello");
     expect(apps.find((a) => a.appId === "hello")!.roles).toEqual(["owner"]);
     expect(apps.find((a) => a.appId === "hello")!.documents.length).toBeGreaterThan(0);

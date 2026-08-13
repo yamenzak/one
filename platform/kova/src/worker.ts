@@ -104,13 +104,13 @@ const runtime = createRuntime(kova, {
   onBoot: {
     /* ⚠️ THE VAULT DECLARATION IS PUBLISHED WITH THE SCHEMA, because boot is the
        one moment this worker is certainly running its own current manifest. The
-       account centre reads every app's; a publication behind a deploy step is one
+       hub reads every app's; a publication behind a deploy step is one
        somebody forgets on the app that mattered. */
     global: async (directory) => {
       await applySchema(directory, GLOBAL_MODULES);
       await publishVaultSpec(directory, kova);
       /* ⚠️ AND WHAT THIS PRODUCT ASKS PEOPLE TO AGREE TO, for the same reason:
-         the account centre renders every app's, and a worker knows only its own. */
+         the hub renders every app's, and a worker knows only its own. */
       await publishLegalSpec(directory, kova, DEPLOYMENT);
     },
     region: (bind) => applySchema(bind.db, REGIONAL_MODULES).then(() => undefined),

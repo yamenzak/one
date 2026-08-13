@@ -24,7 +24,7 @@ export { MOTION_CSS } from "./motion.css.js";
 export { SKY_CSS, SKIES, type Sky } from "./sky.css.js";
 export { TYPE_CSS } from "./brand/type.css.js";
 export { MARK_CSS } from "./brand/mark.css.js";
-export { ACCOUNT_CSS } from "./account/account.css.js";
+export { HUB_CSS } from "./hub/hub.css.js";
 
 /* The way in. */
 export { Door, nextDoor, waitFrom, type DoorAt, type DoorProps, type DoorStep, type DoorWire } from "./door.js";
@@ -54,19 +54,19 @@ export { useCommit, type Commit } from "./commit.js";
 export { configureFeedback, feel, FEEDBACK_DEFAULT } from "./feedback.js";
 export * as Icon from "./icon.js";
 
-/* The account centre, and the consent sheet an app raises. */
-export { AccountCenter } from "./account/center.js";
-export { AccountHome, type AccountHomeProps } from "./account/home.js";
-export { MarketScreen, ShelfScreen, priceOf, type Sellable, type Plan, type Included } from "./account/market.js";
-export { CreditsScreen, CreditsRow, saidAs, type Balance, type Pack, type Movement } from "./account/credits.js";
-export { AccountDetails } from "./account/details.js";
-export { SignInMethods, type Device, type Passkey } from "./account/signin.js";
-export { PreferencesScreen, type Preferences } from "./account/preferences.js";
-export { VaultScreen, KeptHere, meaning, readAs } from "./account/vault.js";
+/* The hub — Account Center, Workspace Hub and Marketplace — and the consent sheet an app raises. */
+export { Hub } from "./hub/hub.js";
+export { HubHome, type HubHomeProps } from "./hub/home.js";
+export { MarketScreen, ShelfScreen, priceOf, type Sellable, type Plan, type Included } from "./hub/market.js";
+export { CreditsScreen, CreditsRow, saidAs, type Balance, type Pack, type Movement } from "./hub/credits.js";
+export { AccountDetails } from "./hub/details.js";
+export { SignInMethods, type Device, type Passkey } from "./hub/signin.js";
+export { PreferencesScreen, type Preferences } from "./hub/preferences.js";
+export { VaultScreen, KeptHere, meaning, readAs } from "./hub/vault.js";
 export {
   LegalScreen, ProductScreen, ReceivingScreen, RecipientScreen, DocScreen, MustAcceptScreen,
-} from "./account/legal.js";
-export { ExportScreen, type Taken } from "./account/export.js";
-export { CloseAccountScreen } from "./account/close.js";
-export { ACCOUNT_SEGMENT, keyOf, parseWhere, pathOf, upFrom, type Where } from "./account/routes.js";
+} from "./hub/legal.js";
+export { ExportScreen, type Taken } from "./hub/export.js";
+export { CloseAccountScreen } from "./hub/close.js";
+export { ACCOUNT_SEGMENT, keyOf, parseWhere, pathOf, upFrom, type Where } from "./hub/routes.js";
 export { ConsentSheet, ConsentBody, AskForIt, type Asked } from "./consent.js";

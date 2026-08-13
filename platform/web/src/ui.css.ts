@@ -9,7 +9,7 @@
  * and a form with no button row.
  *
  * ⚠️ WHAT IS NOT HERE IS AS DELIBERATE AS WHAT IS. A shape with one use stays in
- * the screen that uses it — see `account/account.css.ts`, which is four rules
+ * the screen that uses it — see `hub/hub.css.ts`, which is four rules
  * long. The moment a second screen wants one, it moves here, and the move is the
  * evidence.
  *
@@ -149,7 +149,7 @@ h2 { word-spacing: normal; }
    font shorthand on a control — which is every row, every field and every button
    in this product — silently undid the line above. Measured: 1.28px on a
    paragraph and 0 on every row title and every row detail, which is most of the
-   words in the account centre; it read as bad rendering rather than as a choice,
+   words in the hub; it read as bad rendering rather than as a choice,
    which is exactly what the rule above says about it. A rule of its own cannot fix
    it: this is a shorthand inside a more specific block, so the block has to be the
    place. The interface conformance suite fails on a font shorthand that does not

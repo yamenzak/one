@@ -72,7 +72,7 @@ export interface SignInMethodsProps {
   /**
    * ⚠️ LEAVING THE DEVICE YOU ARE HOLDING, WHICH NOTHING OFFERED. The row for
    * this device carried no control and the comment beside it said leaving was
-   * "the avatar menu's job" — a menu this platform's account centre does not
+   * "the avatar menu's job" — a menu this platform does not
    * have. So there was no way to sign out anywhere in the product, on the one
    * screen whose subject is where you are signed in.
    */

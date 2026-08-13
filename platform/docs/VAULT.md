@@ -262,14 +262,14 @@ rather than as a grant at the bottom rung, so there is one shape for "not shared
 — no row — and the log still records the decision.
 
 **`unshare` may name another app where `share` may not.** Naming one can only ever
-take access away, and the account centre has to reach apps somebody is not inside.
+take access away, and the hub has to reach apps somebody is not inside.
 
 ---
 
 ## 12. What the person sees, and why the screen is a renderer
 
 `web/src/consent.tsx` is the sheet an app raises; `web/src/account/vault.tsx` is
-the review screen on the account centre's own door.
+the review screen on the hub's own door.
 
 ⚠️ **The screen knows what a fact is for exactly nowhere.** Every name, every
 reason, every recommendation and every sentence about what a derivation cannot
@@ -279,7 +279,7 @@ thing, the fact registry for what the thing is. `wantedHere` in
 a `VaultSpec`, the person's grants and what they hold, and returns a `Wanted` per
 declared want with everything a screen needs and nothing it has to look up. An app
 that declares a thirteenth fact gets a thirteenth row, with its own explanation,
-without the account centre being opened.
+without the hub being opened.
 
 ⚠️ **It is organised by workspace, not by fact.** "Who knows my weight" is
 answered by a list of facts; "what does this studio know about me" is the question
@@ -358,7 +358,7 @@ sheet would simply ask for more.
 ⚠️ **It is a decision screen, not a permission prompt.** A permission prompt has
 two buttons and a sentence written to get past it; the only control afterwards is
 uninstalling. Here each row is a separate decision, each says what would be shown
-and what would be hidden, and every one can be moved again from the account centre
+and what would be hidden, and every one can be moved again from the hub
 without opening the app.
 
 ⚠️ **Nothing is pre-selected.** Not "recommended" as a default, not a switch

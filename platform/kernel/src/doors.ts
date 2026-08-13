@@ -193,7 +193,7 @@ const label = (hostname: string, root: string): string | null => {
 };
 
 /**
- * The label the account centre answers on, under the platform root.
+ * The label the hub answers on, under the platform root.
  *
  * ⚠️ A CONSTANT RATHER THAN A CONFIGURATION, because it is already reserved on
  * every product by `UNIVERSAL_RESERVED` — and the two would have to be kept in
@@ -276,7 +276,7 @@ export function classifyHost(hostnameRaw: string, cfg: DoorConfig): HostShape {
   if (l === null) {
     /*
       ⚠️ UNDER THE PLATFORM ROOT BUT NOT UNDER THIS APP'S — which is where the
-      account centre lives, and where every OTHER product's root lives too.
+      hub lives, and where every OTHER product's root lives too.
       Without this branch both fell through to the custom-domain lookup below,
       so `id.4dl.app` and `tessa.4dl.app` were resolved by asking which TENANT
       had claimed them. A hostname we own being answerable by somebody's claim is
@@ -397,7 +397,7 @@ export const TENANT_DOORS: readonly Door[] = ["tenant", "custom"];
  * workspace's screens a different address and orphan the cache on re-pairing.
  */
 /*
-  ⚠️ `identity` IS HERE, AND IT IS THE POINT OF THE DOOR. The account centre
+  ⚠️ `identity` IS HERE, AND IT IS THE POINT OF THE DOOR. The hub
   answers about a PERSON, and a person is not inside a workspace — so resolving a
   tenant to serve it would make the whole surface unreachable for exactly the
   people it is for: somebody who has left every workspace they were in, and

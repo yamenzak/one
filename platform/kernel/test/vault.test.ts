@@ -448,7 +448,7 @@ describe("a want, resolved for one person in one workspace", () => {
     sentence a screen shows about a want comes out of a declaration, so a screen
     that had to be edited for a new fact would be a screen that stopped reading
     them. What that costs, if it is ever lost, is not a layout bug: it is the
-    account centre growing a branch per product.
+    hub growing a branch per product.
   */
   const spec = { wants: [
     { fact: "body.height", need: "compute" as const, why: "To work out an energy target." },

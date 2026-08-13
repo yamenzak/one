@@ -136,9 +136,9 @@ describe("letting an address into a product", () => {
 
 /* ------------------------------------------------------------- the offer --- */
 
-describe("what the account centre may offer", () => {
+describe("what the hub may offer", () => {
   /*
-    ⚠️ THE ANSWER IS ABOUT EVERY PRODUCT, FROM ONE WORKER. The account centre is
+    ⚠️ THE ANSWER IS ABOUT EVERY PRODUCT, FROM ONE WORKER. The hub is
     served by one app and the question spans all of them, which is why the list is
     declared in the module every worker imports rather than assembled from
     whichever manifest happens to be in scope.
@@ -154,7 +154,7 @@ describe("what the account centre may offer", () => {
     expect(products.map((p) => p.id)).toEqual(["kova"]);
 
     /* ⚠️ AND IT CARRIES THE ADDRESS TO GO TO, derived from the product's root so
-       the account centre and the product cannot disagree about the one thing that
+       the hub and the product cannot disagree about the one thing that
        has to be right. A workspace is created at the setup door and nowhere else. */
     expect(products[0]!.setupAt).toBe("https://setup.kova.4dl.app");
 

@@ -106,7 +106,7 @@ export const CONSENT_SCHEMA: SchemaModule = {
  * EVERY APP'S LEGAL DECLARATION, IN THE GLOBAL STORE.
  *
  * ⚠️ A WORKER KNOWS ITS OWN MANIFEST AND NOTHING ABOUT THE PRODUCT BESIDE IT, so
- * the account centre — which answers for every workspace somebody belongs to —
+ * the hub — which answers for every workspace somebody belongs to —
  * could only ever show the documents of whichever app happened to serve the
  * request. That is the problem the vault had, and this is its answer:
  * declarations published on boot, read by whoever renders all of them.
@@ -171,7 +171,7 @@ export async function publishedLegal(
   return rows.flatMap((r) => {
     /* ⚠️ A ROW THAT WILL NOT PARSE IS DROPPED, not thrown on. It was written by
        another worker, possibly a version ahead, and one product's bad row must
-       not take the whole account centre down with it. */
+       not take the whole hub down with it. */
     try {
       /* ⚠️ THE DISCLOSURE IS ALLOWED TO BE ABSENT AND THE DOCUMENTS ARE NOT. A
          row written before the column existed has `{}`, and a screen that showed
@@ -189,7 +189,7 @@ export async function publishedLegal(
 /**
  * ⚠️ ONE ASSEMBLY, TWO CALLERS, AND THAT IS THE WHOLE REASON IT IS A FUNCTION.
  * `protection.list` answers it for the app serving the request; boot publishes it
- * so every OTHER product's account centre can show it. Written twice, the two
+ * so every OTHER product's hub can show it. Written twice, the two
  * would agree until the first feature that changed one — and the disagreement
  * would be between what a person is told inside a product and what they are told
  * about it from their account.
@@ -386,7 +386,7 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
    *
    * ⚠️ `legal.list` ANSWERS FOR ONE APP AND ONE ROLE — the app serving the
    * request, and whatever the caller is on the door they are standing at. That is
-   * right inside a product and useless on the account centre, which exists
+   * right inside a product and useless on the hub, which exists
    * precisely to answer across products: a person is an owner in one studio, a
    * client in another and a member of a third product entirely, and they owe
    * three different sets.

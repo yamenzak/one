@@ -33,7 +33,7 @@ export const DIRECTORY_SCHEMA: SchemaModule = {
   /*
     ⚠️ WHICH PRODUCT SERVES THIS WORKSPACE, and it is routing like everything else
     here — the name of a bundle, not a fact about anybody. It earns its place
-    because the account centre answers for every product a person belongs to, and
+    because the hub answers for every product a person belongs to, and
     without it a workspace cannot be matched to the declaration of what that
     product wants to know: the vault could group by nothing.
 

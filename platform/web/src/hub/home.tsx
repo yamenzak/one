@@ -1,7 +1,7 @@
 /**
  * THE ACCOUNT HOME — one person, everything they have, across every product.
  *
- * ⚠️ IT IS A MODAL ROUTE, NOT A TAB. The account centre is presented OVER
+ * ⚠️ IT IS A MODAL ROUTE, NOT A TAB. The hub is presented OVER
  * whichever app the person is in and rendered outside that app's shell — so there
  * is no navigation bar, no tabs and no product chrome on it, and the way out is a
  * CLOSE rather than a back.
@@ -69,7 +69,7 @@ export interface Openable {
   readonly setupAt: string;
 }
 
-export interface AccountHomeProps {
+export interface HubHomeProps {
   readonly person: Person;
   /** ⚠️ `null` is NOT ANSWERED YET. `[]` is answered, and empty. */
   readonly workspaces: readonly Workspace[] | null;
@@ -91,7 +91,7 @@ export interface AccountHomeProps {
    *
    * ⚠️ AN EMPTY LIST IS THE ORDINARY CASE AND IT DRAWS NOTHING. Most people with
    * an account here are somebody's client or somebody's colleague; a "New
-   * workspace" button on their account centre offers them a thing they cannot do
+   * workspace" button on their hub offers them a thing they cannot do
    * and would not want, and the refusal they would meet says so far too late.
    *
    * ⚠️ AND IT IS NOT WHAT MAKES THE CONTROL SAFE. `identity.workspace.create`
@@ -109,7 +109,7 @@ export interface AccountHomeProps {
   readonly onGo: (to: Where) => void;
   /**
    * ⚠️ IT LEAVES FOR THE PRODUCT'S OWN SETUP DOOR, which is the only place a
-   * workspace is created. The account centre is served by one worker and every
+   * workspace is created. The hub is served by one worker and every
    * other product is a different one — creating a Kova workspace from here would
    * mean this worker writing a membership into Kova's regional store, which it has
    * no binding for and must never have. So this hands over rather than doing it.
@@ -155,25 +155,31 @@ const StartRow = ({ onGo }: { readonly onGo: () => void }): ReactNode => (
   <Item icon={<Add />} title="New workspace" detail="Choose a plan" onGo={onGo} />
 );
 
-export function AccountHome({
+export function HubHome({
   person, workspaces, sharedCount = null, openable = [], balance, onGo, onOpenWorkspace, onClose, Heading = "h1",
-}: AccountHomeProps): ReactNode {
+}: HubHomeProps): ReactNode {
   return (
     <Screen
       leave="dismiss"
       onLeave={onClose}
-      /* ⚠️ NAMED HERE, NOT PASSED IN. The account centre is silk and it is not a
+      /* ⚠️ NAMED HERE, NOT PASSED IN. The hub is silk and it is not a
          choice a caller gets to make: the light is part of what this surface IS,
-         the same way the lockup is, and a prop would let one app's account centre
+         the same way the lockup is, and a prop would let one app's hub
          look like a different product's. */
       sky="silk"
       /* ⚠️ THE LOCKUP IS THE TITLE, MARK INCLUDED. This surface belongs to the
          account rather than to the product the person happens to be in, and the
-         mark beside the name is what says so — "Account Center" on its own is the
-         name of a settings page, which is exactly what this is not. */
-      title={<Heading className="page-title"><Lockup word="Account Center" /></Heading>}
+         mark beside the name is what says so — a bare word here is the name of a
+         settings page, which is exactly what this is not.
+
+         ⚠️ AND THE WORD IS `Hub` RATHER THAN ANY OF THE THREE THINGS UNDER IT.
+         It holds an Account Center, a Workspace Hub and a Marketplace, and
+         naming it after one of them makes the other two look like they wandered
+         in — which is how "new workspace" ended up beside "change your
+         language". */
+      title={<Heading className="page-title"><Lockup word="Hub" /></Heading>}
     >
-      <Section>
+      <Section name="Account Center">
         <Card>
           {/* ⚠️ THEIR OWN FACE, NOT A DRAWING OF A PERSON. Every other row on this
               card is named by a symbol because it is about a KIND of thing; this
@@ -203,7 +209,7 @@ export function AccountHome({
       */}
       <VaultCrown shared={sharedCount} onGo={() => onGo({ at: "vault" })} />
 
-      <Section name="Workspaces">
+      <Section name="Workspace Hub">
         {workspaces === null ? (
           <Waiting />
         ) : workspaces.length === 0 ? (
@@ -230,16 +236,22 @@ export function AccountHome({
                 onGo={() => onOpenWorkspace(w.tenantId)}
               />
             ))}
-            {/* ⚠️ THE WAY TO START ONE IS IN THE LIST OF THE ONES YOU HAVE, which
-                is where somebody looks — and it is the last row rather than a
-                control in the header, because most visits here are not about
-                starting anything. */}
-            {openable.length ? <StartRow onGo={() => onGo({ at: "market" })} /> : null}
+            {/*
+              ⚠️ NOTHING HERE, BECAUSE THE MARKETPLACE IS RIGHT BELOW. This
+              carried a "New workspace" row while the Marketplace section carried
+              "Start something new" — two controls, one destination, a screen
+              saying the same thing twice in two vocabularies. The named area
+              wins: a duplicate makes the section header decoration.
+            */}
           </Card>
         )}
-        {/* ⚠️ AND IT IS OFFERED WITH NO WORKSPACES AT ALL, which is the state
-            somebody arriving from the website is in: an empty list, an invitation
-            that has not come, and the one thing they came here to do. */}
+        {/*
+          ⚠️ AND IT IS OFFERED HERE WITH NO WORKSPACES AT ALL, which is the one
+          case where the duplicate is not one: an empty list, an invitation that
+          has not come, and the single thing somebody arriving from the website
+          came to do. Making them find a section header first is making them read
+          the page before they can act on it.
+        */}
         {workspaces?.length === 0 && openable.length ? (
           <Card>
             <StartRow onGo={() => onGo({ at: "market" })} />
@@ -253,10 +265,19 @@ export function AccountHome({
         one workspace is a number that looks like that workspace's — which is how
         somebody comes to top up the wrong one.
       */}
-      {balance !== undefined ? (
-        <Section name="Credits">
+      {/*
+        ⚠️ THE MARKETPLACE IS THE THIRD AREA AND IT IS NAMED, not implied by a
+        button in somebody else's list. Credits sit under it because they are
+        BOUGHT — grouped with the workspaces they are spent in, a balance reads
+        as one workspace's, which is how somebody comes to top up the wrong one.
+      */}
+      {openable.length || balance !== undefined ? (
+        <Section name="Marketplace">
           <Card>
-            <CreditsRow balance={balance} onGo={() => onGo({ at: "credits" })} />
+            {openable.length ? (
+              <Item icon={<Add />} title="Start something new" detail="Every product on one account" onGo={() => onGo({ at: "market" })} />
+            ) : null}
+            {balance !== undefined ? <CreditsRow balance={balance} onGo={() => onGo({ at: "credits" })} /> : null}
           </Card>
         </Section>
       ) : null}
@@ -287,7 +308,7 @@ export function AccountHome({
  * THE VAULT, AS A PLACE.
  *
  * ⚠️ IT CARRIES ITS OWN LIGHT AND ITS OWN LOCKUP, which is what makes it read as
- * somewhere rather than as a row that got bigger. The account centre's own name
+ * somewhere rather than as a row that got bigger. The hub's own name
  * is set the same way one screen up — mark and word as one object — so a second
  * lockup inside it says, in the only vocabulary the surface has, that this is a
  * thing of the same order and not a setting.

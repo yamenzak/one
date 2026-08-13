@@ -108,7 +108,7 @@ export const Others = draw(Share2, "others", 21);
    have, doing duty as emblems, in a column where every other tile is a company's
    own logo or a symbol that means what it draws. Nothing an icon set contains
    means "European Union"; a region is a label rather than a tile, and it is one
-   now — see `Region` in `account/legal.tsx`. Written down because the next person
+   now — see `Region` in `hub/legal.tsx`. Written down because the next person
    to want one will reach for the same two shapes. */
 
 /* Furniture — the parts of a row rather than a meaning in it. */

@@ -789,7 +789,7 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
    *
    * ⚠️ IT IS ON THE ACCOUNT'S DOOR, NOT THE WORKSPACE'S. Leaving somewhere you no
    * longer want to be must not require going there, and the list you are leaving
-   * from is the account centre's — a workspace whose standing has closed its own
+   * from is the hub's — a workspace whose standing has closed its own
    * origin is exactly one somebody wants out of.
    *
    * ⚠️ AND IT NAMES THE WORKSPACE IN THE INPUT, which is safe only because the
@@ -893,7 +893,7 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
    * EVERYTHING THIS PLATFORM HOLDS ABOUT ONE PERSON, IN ONE DOCUMENT.
    *
    * ⚠️ `exit.export` IS THE WORKSPACE'S, AND WANTS `workspace:close`. So the row
-   * on the account centre offering somebody their own data had nothing behind it
+   * on the hub offering somebody their own data had nothing behind it
    * that they could reach — the only export in the product was one an ordinary
    * member is not allowed to ask for, about records that are mostly not theirs.
    *

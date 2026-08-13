@@ -953,7 +953,7 @@ export function vaultActivities(spec: VaultSpec | undefined): readonly VaultActi
  * ⚠️ THIS EXISTS SO NO SCREEN EVER LEARNS WHAT A FACT IS. A vault built the
  * obvious way grows a branch per fact — a sentence for height, another for
  * weight, a special case for the one that is a series — and then every app that
- * declares a thirteenth fact needs the account centre edited. Everything below
+ * declares a thirteenth fact needs the hub edited. Everything below
  * is copied out of the manifest and the fact registry; the renderer's only job is
  * to lay it out.
  */

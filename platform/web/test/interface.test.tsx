@@ -2,7 +2,7 @@
  * THE DESIGN LANGUAGE, ENFORCED — the rules that no rendering test can see.
  *
  * ⚠️ THIS FILE EXISTS BECAUSE FIVE CAREFUL SCREENS ADDED UP TO AN INCOHERENT ONE.
- * Every avatar in the account centre was individually defensible and there were
+ * Every avatar in the hub was individually defensible and there were
  * five of them: a circle at 44 and another at 62, an 11-pixel radius beside a
  * 14-pixel one, two badge offsets, an icon well that was a sixth. Every link was a
  * bare anchor in browser blue on a surface where every control has a spring. Every
@@ -27,7 +27,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Away } from "../src/away.js";
 import { LOGOS } from "../src/brand/logos.js";
 import { UI_CSS } from "../src/ui.css.js";
-import { ACCOUNT_CSS } from "../src/account/account.css.js";
+import { HUB_CSS } from "../src/hub/hub.css.js";
 
 /** Every source file in this package, by the path it is reached at. */
 const sources = readdirSync("src", { recursive: true, encoding: "utf8" })
@@ -39,7 +39,7 @@ const code = sources.map(([f, src]) => [f, src.replace(/\/\*[\s\S]*?\*\//g, "").
 
 /** The shared vocabulary, and the one screen-local sheet beside it. */
 const sheets: readonly (readonly [string, string])[] = [
-  ["ui.css.ts", UI_CSS], ["account/account.css.ts", ACCOUNT_CSS],
+  ["ui.css.ts", UI_CSS], ["hub/hub.css.ts", HUB_CSS],
 ].map(([f, css]) => [f!, css!.replace(/\/\*[\s\S]*?\*\//g, "")] as const);
 const declarations = sheets[0]![1];
 
@@ -145,7 +145,7 @@ describe("a logo is the company's own, and only where one is declared", () => {
 describe("a link out is a component, and it says it leaves", () => {
   /*
     ⚠️ AN ANCHOR IS THE ONE ELEMENT THAT LOOKS FINISHED WITH NO STYLING AT ALL,
-    which is why every link in the account centre was browser blue with a browser
+    which is why every link in the hub was browser blue with a browser
     underline, no press and no motion, on a surface where every other control has
     a tone and a spring.
   */
@@ -311,7 +311,7 @@ describe("a control is set in the same words as the page", () => {
     corrects it once on the body — and every `font: inherit` on a button, a field
     or a row silently undid that correction inside a more specific block. Measured
     before the fix: 1.28px on a paragraph, 0 on every row title and every row
-    detail, which is most of the words in the account centre. Nothing renders
+    detail, which is most of the words in the hub. Nothing renders
     wrongly; it just reads as bad rendering, on every screen, forever.
   */
   it("restates the word space wherever it takes the page's font", () => {

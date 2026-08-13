@@ -17,15 +17,15 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { LegalDoc, Problem, Receiving } from "@one/kernel";
 
-import { AccountCenter, type AccountCenterProps } from "../src/account/center.js";
-import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
-import { MarketScreen, ShelfScreen, priceOf } from "../src/account/market.js";
-import { CreditsScreen, saidAs } from "../src/account/credits.js";
-import { AboutBody, KeptHere, meaning, readAs, VaultScreen, type Item, type Kept, type Looked, type Where } from "../src/account/vault.js";
+import { Hub, type HubProps } from "../src/hub/hub.js";
+import { HubHome, type HubHomeProps } from "../src/hub/home.js";
+import { MarketScreen, ShelfScreen, priceOf } from "../src/hub/market.js";
+import { CreditsScreen, saidAs } from "../src/hub/credits.js";
+import { AboutBody, KeptHere, meaning, readAs, VaultScreen, type Item, type Kept, type Looked, type Where } from "../src/hub/vault.js";
 import { AskForIt, ConsentBody, ConsentSheet, offered, type Asked } from "../src/consent.js";
-import { AccountDetails } from "../src/account/details.js";
-import { PreferencesScreen, type Preferences, type SetPreference } from "../src/account/preferences.js";
-import { SignInMethods, type Passkey } from "../src/account/signin.js";
+import { AccountDetails } from "../src/hub/details.js";
+import { PreferencesScreen, type Preferences, type SetPreference } from "../src/hub/preferences.js";
+import { SignInMethods, type Passkey } from "../src/hub/signin.js";
 import { Unset } from "../src/list.js";
 import { Chip } from "../src/capsule.js";
 import { Mark, DRAWN_LOGOS } from "../src/mark.js";
@@ -34,10 +34,10 @@ import { DEPLOYMENT } from "@one/deployment";
 import { SwitchRow } from "../src/switch.js";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ValueEditor, ValueEditorBody } from "../src/editor.js";
-import { counted, DocScreen, held, LegalScreen, MustAcceptScreen, paragraphs, ProductScreen, receives, ReceivingScreen, RecipientScreen, said, spoken, state } from "../src/account/legal.js";
-import { ExportScreen } from "../src/account/export.js";
-import { CloseAccountScreen } from "../src/account/close.js";
-import type { Doc, Product } from "../src/account/wire.js";
+import { counted, DocScreen, held, LegalScreen, MustAcceptScreen, paragraphs, ProductScreen, receives, ReceivingScreen, RecipientScreen, said, spoken, state } from "../src/hub/legal.js";
+import { ExportScreen } from "../src/hub/export.js";
+import { CloseAccountScreen } from "../src/hub/close.js";
+import type { Doc, Product } from "../src/hub/wire.js";
 import { configureFeedback, feedbackSettings, FEEDBACK_DEFAULT } from "../src/feedback.js";
 import { Device } from "../src/icon.js";
 
@@ -116,8 +116,8 @@ describe("starting something new", () => {
     { id: "kova", name: "Kova", does: "Coaching, for a studio.", setupAt: "https://setup.kova.4dl.app" },
     { id: "scena", name: "Scena", does: "Screens, everywhere at once.", setupAt: "https://setup.scena.4dl.app" },
   ];
-  const home = (over: Partial<AccountHomeProps> = {}) => html(
-    <AccountHome
+  const home = (over: Partial<HubHomeProps> = {}) => html(
+    <HubHome
       person={{ name: "Nadia", email: "n@example.test" }}
       workspaces={[]}
       onGo={() => undefined} onOpenWorkspace={() => undefined} onClose={() => undefined}
@@ -127,7 +127,7 @@ describe("starting something new", () => {
 
   /*
     ⚠️ MOST PEOPLE WITH AN ACCOUNT HERE ARE SOMEBODY'S CLIENT. A "New workspace"
-    button on their account centre offers them a thing they cannot do and would
+    button on their hub offers them a thing they cannot do and would
     not want — and the refusal they would meet says so long after they have
     decided the product is confusing.
   */
@@ -319,7 +319,7 @@ describe("sign-in methods", () => {
   /*
     ⚠️ THERE WAS NO WAY TO SIGN OUT ANYWHERE IN THE PRODUCT. The row for the
     device in your hand carried no control, and the comment beside it said leaving
-    was "the avatar menu's job" — a menu this account centre does not have. On a
+    was "the avatar menu's job" — a menu this hub does not have. On a
     shared computer that is not a missing affordance, it is a person who cannot
     leave.
 
@@ -387,7 +387,7 @@ describe("feedback", () => {
 
 /* --------------------------------------------------------- the presentation --- */
 
-describe("the account centre's presentation", () => {
+describe("the hub's presentation", () => {
   /*
     ⚠️ IT IS A ROUTE, NOT A POPUP, and `open` is therefore the router's state
     rather than the component's. Closed means the surface is absent — not hidden
@@ -395,12 +395,12 @@ describe("the account centre's presentation", () => {
     nobody is looking at.
   */
   it("renders nothing at all while it is closed", () => {
-    const props: AccountCenterProps = {
+    const props: HubProps = {
       open: false,
       onClose: () => undefined,
       children: () => "anything",
     };
-    expect(html(<AccountCenter {...props} />)).toBe("");
+    expect(html(<Hub {...props} />)).toBe("");
   });
 });
 
@@ -453,7 +453,7 @@ describe("your vault", () => {
     ⚠️ THE SCREEN IS A RENDERER, AND THIS IS THE CHECK THAT SAYS SO. Every
     sentence explaining a want comes out of the declaration — so a want whose
     `why` the app wrote appears verbatim, and the day this stops being true is the
-    day somebody has started writing product copy into the account centre.
+    day somebody has started writing product copy into the hub.
   */
   it("shows the app's own reason rather than one of its own", () => {
     const out = html(<AboutBody item={ITEM({
@@ -921,7 +921,7 @@ describe("consent and legal", () => {
       ⚠️ A DISCLOSURE PUSHED THE NEXT PRODUCT HALF A SCREEN DOWN. A product with
       four documents and a disclosure of its own is a PLACE, and unfolding one
       moved the list under whoever was reading it — so the hub is a list of
-      destinations, which is what every other hub in this account centre is.
+      destinations, which is what every other screen in this hub is.
     */
     const html = hub([
       { appId: "kova", appName: "Kova", roles: ["owner"], docs: [DOC({ outstanding: true })], receiving: null },
@@ -951,7 +951,7 @@ describe("consent and legal", () => {
   it("names the product each document belongs to", () => {
     /*
       ⚠️ A PERSON BELONGS TO SEVERAL AND EACH ASKS DIFFERENT THINGS. `legal.list`
-      answers for the app serving the request, which on the account centre is
+      answers for the app serving the request, which on the hub is
       whichever one happens to be behind that door — so an ungrouped list is a
       list that cannot say whose terms these are.
     */
@@ -1012,7 +1012,7 @@ describe("consent and legal", () => {
       { appId: "kova", appName: "Kova", roles: ["owner"], docs: [DOC({}, { id: "k" })], receiving: null },
     ]);
     /* ⚠️ THE LOCKUP, WHICH IS THE PLATFORM'S ONE DEVICE FOR "this belongs to the
-       account" — the same object that names the account centre and the vault. As
+       account" — the same object that names the hub and the vault. As
        words it is a fourth product with a longer name. */
     expect(html).toContain(`<span class="lockup-word">Account</span>`);
     expect(html).toContain(">Kova<");
@@ -1194,7 +1194,7 @@ describe("taking your data and closing the account", () => {
   });
 });
 
-describe("the rest of the account centre", () => {
+describe("the rest of the hub", () => {
   it("renders a declared document as text, never as markup", () => {
     /* ⚠️ A manifest is not an injection surface. */
     const html = renderToStaticMarkup(<>{paragraphs("<img src=x onerror=alert(1)>\n\nsecond")}</>);
@@ -1351,5 +1351,82 @@ describe("credits", () => {
     const out = credits({ packs: [{ id: "small", name: "Small", price: { minor: 900, currency: "usd" }, credits: 10_000 }] });
     expect(out).toContain("$9");
     expect(out).toMatch(/item-detail[^]*?\$9/);
+  });
+});
+
+/* ------------------------------------------------------------------- hub --- */
+
+describe("the hub's three areas", () => {
+  const hub = (over: Partial<HubHomeProps> = {}) => html(
+    <HubHome
+      person={{ name: "Nadia", email: "n@example.test" }}
+      workspaces={[]}
+      onGo={() => undefined} onOpenWorkspace={() => undefined} onClose={() => undefined}
+      {...over}
+    />,
+  );
+
+  /*
+    ⚠️ THREE AREAS, EACH NAMED, AND THE PAGE IS NAMED AFTER NONE OF THEM. What
+    you are, what you belong to and what you may start are three questions —
+    flattened into one list of settings, "new workspace" sat beside "change your
+    language", which is a purchase and a preference wearing the same row.
+  */
+  it("names what you are, what you belong to and what you may start", () => {
+    const out = hub({ openable: [{ id: "kova", name: "Kova", does: "Coaching.", setupAt: "https://setup.kova.4dl.app" }] });
+    expect(out).toContain("Account Center");
+    expect(out).toContain("Workspace Hub");
+    expect(out).toContain("Marketplace");
+  });
+
+  /*
+    ⚠️ AND THE MARKETPLACE IS ABSENT ENTIRELY FOR SOMEBODY WHO MAY OPEN NOTHING
+    AND HOLDS NO CREDITS. An empty area named on the page is a promise of
+    something there that is not — and most people holding an account here are a
+    customer of somebody else's workspace.
+  */
+  it("draws no marketplace at all for somebody with nothing to buy or open", () => {
+    expect(hub()).not.toContain("Marketplace");
+  });
+
+  /*
+    ⚠️ CREDITS ARE UNDER THE MARKETPLACE BECAUSE THEY ARE BOUGHT. Grouped with
+    the workspaces they are spent in, a balance reads as one workspace's — which
+    is how somebody comes to top up the wrong one.
+  */
+  it("keeps the balance with the things you buy, not with the things you are in", () => {
+    const out = hub({ balance: { total: 900, granted: 0, purchased: 900, expiring: null } });
+    expect(out.indexOf("Marketplace")).toBeLessThan(out.indexOf("Credits"));
+    expect(out.indexOf("Workspace Hub")).toBeLessThan(out.indexOf("Marketplace"));
+  });
+});
+
+/*
+  ⚠️ ONE CONTROL PER DESTINATION. The workspace list carried "New workspace"
+  while the Marketplace section carried "Start something new" — two controls,
+  one destination, the same thing said twice in two vocabularies. The named area
+  wins, except in the empty state, where making somebody read a section header
+  before they can act is making them read the page first.
+*/
+describe("starting one, said once", () => {
+  const hub = (over: Partial<HubHomeProps> = {}) => html(
+    <HubHome
+      person={{ name: "Nadia", email: "n@example.test" }}
+      workspaces={[{ tenantId: "t_1", slug: "haddad", name: "Haddad", product: "kova" as const, role: "owner" }]}
+      openable={[{ id: "kova", name: "Kova", does: "Coaching.", setupAt: "https://setup.kova.4dl.app" }]}
+      onGo={() => undefined} onOpenWorkspace={() => undefined} onClose={() => undefined}
+      {...over}
+    />,
+  );
+
+  it("offers it once to somebody who already has a workspace", () => {
+    const out = hub();
+    expect(out).not.toContain("New workspace");
+    expect(out).toContain("Start something new");
+  });
+
+  it("puts it in the empty list too, where there is nothing else on the screen", () => {
+    const out = hub({ workspaces: [] });
+    expect(out).toContain("New workspace");
   });
 });

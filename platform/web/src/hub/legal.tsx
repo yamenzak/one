@@ -14,7 +14,7 @@
  * documents and a disclosure of its own is a PLACE, and unfolding one pushed the
  * next product half a screen down — so a person in three of them was reading a
  * list that moved under them. The hub is now a list of destinations, which is what
- * every other hub in this account centre is.
+ * every other screen in this hub is.
  *
  * ⚠️ AND EACH ONE IS AN ADDRESS. `routes.ts` gives every screen here a path, so a
  * refusal that says "there is something to read first" can send somebody to the
@@ -53,7 +53,7 @@ export interface LegalScreenProps {
   /**
    * ⚠️ ONE ROW PER PRODUCT, because a person belongs to several and each asks
    * different things of them. `legal.list` answers for the app serving the
-   * request, which on the account centre is whichever one happens to be behind
+   * request, which on the hub is whichever one happens to be behind
    * that door — so this takes what every app PUBLISHED, resolved against the
    * roles this person actually holds in each.
    *

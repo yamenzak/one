@@ -16,7 +16,7 @@
  *
  * ⚠️ IT IS NOT THE ACCOUNT'S, AND IT WAS FILED THERE BY ACCIDENT OF BIRTH. It
  * names no account concept and imports none — a field, a save that resolves to a
- * `Problem` or to null, and a sheet. It was written for the account centre and
+ * `Problem` or to null, and a sheet. It was written for the hub and
  * lived in its folder for exactly that long.
  *
  * ⚠️ THE ACTION HOLDS ITS OWN STATE. A button that is submitted twice because it

@@ -7,7 +7,7 @@
  * only thing a person controls afterwards is uninstalling. Here each row is a
  * separate decision, each has a rung rather than a switch, each says what it
  * would show and what it would hide, and every one of them can be moved again
- * from the account centre without opening this app at all.
+ * from the hub without opening this app at all.
  *
  * ⚠️ NOTHING IS PRE-SELECTED. Not "recommended" as a default, not a switch
  * already on with a chance to turn it off. Every fact starts at `self` and the

@@ -21,7 +21,7 @@
 import type { ElementType, ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 
-export interface AccountCenterProps {
+export interface HubProps {
   readonly open: boolean;
   readonly onClose: () => void;
   /**
@@ -34,7 +34,7 @@ export interface AccountCenterProps {
   readonly children: (props: { readonly Heading: ElementType }) => ReactNode;
 }
 
-export function AccountCenter({ open, onClose, children }: AccountCenterProps): ReactNode {
+export function Hub({ open, onClose, children }: HubProps): ReactNode {
   return (
     <Dialog.Root open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
       <Dialog.Portal>
