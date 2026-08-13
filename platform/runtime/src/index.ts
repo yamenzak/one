@@ -41,6 +41,8 @@ export * from "./generate.js";
 export * from "./generate-ops.js";
 export * from "./operator-ops.js";
 export * from "./config.js";
+export * from "./app-spec.js";
+export * from "./membership-directory.js";
 export * from "./config-ops.js";
 export * from "./lookup.js";
 export * from "./settings.js";

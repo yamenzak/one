@@ -405,8 +405,12 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
       const owner = foundingRole(app);
       if (owner && founder?.email) {
         const store = await founder.sessionsIn(region);
+        /* ⚠️ The index goes with it, so the founder's own hub shows the
+           workspace they are standing in. */
+        const index = { db: directory, appId: app.id };
         await invite(
           store,
+          index,
           tenantId,
           { email: founder.email, role: owner, invitedBy: founder.userId as never },
           ctx.now() as Instant,
@@ -427,7 +431,7 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
           rather than by permission.
         */
         if (founder.userId) {
-          await claim(store, tenantId, founder.userId as UserId, founder.email, ctx.now() as Instant);
+          await claim(store, index, tenantId, founder.userId as UserId, founder.email, ctx.now() as Instant);
         }
       }
       return { tenantId, slug: input.slug, region };

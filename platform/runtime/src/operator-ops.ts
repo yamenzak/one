@@ -24,6 +24,7 @@ import { begin, end, historyFor } from "./impersonation.js";
 import { CREDITS } from "./generate.js";
 import { OPEN, readMaintenance, setMaintenance, type Maintenance } from "./maintenance.js";
 import { compSubscription, grantCredits, setAdjustments, subscriptionForTenant } from "./account-billing.js";
+import { declaredApps } from "./app-spec.js";
 
 /** ⚠️ Held by the operator role and by nothing a workspace can grant. */
 export const OPERATE = "platform:operate";
@@ -454,7 +455,7 @@ export function operatorOperations<B extends BindingSpec>(app: AppSpec<B>): read
     },
   });
 
-  return [tenants, comp, adjust, topup, readSwitch, setSwitch, impersonate, stopActing, sessions, ...catalogueOperations(app)] as unknown as readonly AnyOperation[];
+  return [tenants, comp, adjust, topup, readSwitch, setSwitch, impersonate, stopActing, sessions, ...catalogueOperations(app), ...deploymentOperations()] as unknown as readonly AnyOperation[];
 }
 
 /* -------------------------------------------------------------- the catalogue --- */
@@ -509,6 +510,47 @@ const parseAllowances = (text: string): Readonly<Record<string, Allowance>> => {
     return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, Allowance>) : {};
   } catch { return {}; }
 };
+
+/**
+ * EVERY PRODUCT ON THE DEPLOYMENT, WITH WHAT IT DECLARES AND WHAT IS OVERRIDDEN.
+ *
+ * ⚠️ THIS IS THE CONSOLE'S FRONT PAGE, and it is the operation that makes ONE
+ * console possible rather than one per product. The declarations are published
+ * at boot by each worker (`app-spec.ts`); the overrides are rows in the store
+ * they all share. Neither half is this worker's own manifest, which is the
+ * point: a console that could only describe the product serving it is a console
+ * per product with extra steps.
+ */
+function deploymentOperations(): readonly AnyOperation[] {
+  const apps = operation({
+    id: "admin.apps",
+    kind: "read",
+    summary: "Every product on this deployment, what it declares, and what has been changed.",
+    input: s.object({}),
+    output: s.object({ apps: s.json() }),
+    permission: OPERATE,
+    idempotency: { mode: "none" },
+    /* ⚠️ NOT A TOOL. It is the shape of every product's configuration surface in
+       one answer, which is reconnaissance. */
+    tool: false,
+    async handler(ctx) {
+      const d = deps(ctx);
+      const declared = await declaredApps(d.global);
+      const out = [];
+      for (const one of declared) {
+        /*
+          ⚠️ THE OVERRIDES COME FROM THE SAME PLACE THE GATE READS THEM, per app.
+          A console reading its own copy is a console that can disagree with what
+          a workspace is actually being sold.
+        */
+        const overrides = await planOverrides(d.global, one.appId);
+        out.push({ ...one, overrides, changed: Object.keys(overrides).length });
+      }
+      return { apps: out };
+    },
+  });
+  return [apps] as unknown as readonly AnyOperation[];
+}
 
 function catalogueOperations<B extends BindingSpec>(app: AppSpec<B>): readonly AnyOperation[] {
   const read = operation({

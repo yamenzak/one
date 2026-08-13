@@ -15,7 +15,7 @@
 import { DEPLOYMENT } from "@one/deployment";
 import { deriveSchema, PLATFORM_CONFIG } from "@one/kernel";
 import {
-  applySchema, createRuntime, publishLegalSpec, publishVaultSpec,
+  applySchema, createRuntime, publishApp,
   PLATFORM_GLOBAL, PLATFORM_REGIONAL, type RawEnv,
 } from "@one/runtime";
 import { alternatives, articles, assignments, bookings, checkins, clients, doses, entries, foods, goals, kova, labs, movements, portions, programmes, sets, supplements, swaps, workouts, fasts, photos, mealChoices, scans, releases
@@ -102,16 +102,22 @@ const runtime = createRuntime(kova, {
     supplies its own only where its audience genuinely is not its members.
   */
   onBoot: {
-    /* ⚠️ THE VAULT DECLARATION IS PUBLISHED WITH THE SCHEMA, because boot is the
-       one moment this worker is certainly running its own current manifest. The
-       hub reads every app's; a publication behind a deploy step is one
-       somebody forgets on the app that mattered. */
+    /*
+      ⚠️ WHAT THIS PRODUCT DECLARES, PUBLISHED WITH THE SCHEMA — because boot is
+      the one moment this worker is certainly running its own current manifest,
+      and a publication behind a deploy step is one somebody forgets on the app
+      that mattered.
+
+      ⚠️ AND IT IS ONE CALL FOR ALL OF IT. The vault's wants, the documents this
+      product asks people to agree to, its catalogue, its settings and the keys
+      it reads all go together — because three publishers is two too many to
+      remember, and each is INVISIBLE when it is missing: the vault shows
+      nobody's facts, the consent gate asks for nothing, the console shows a
+      product with no catalogue, and every suite stays green.
+    */
     global: async (directory) => {
       await applySchema(directory, GLOBAL_MODULES);
-      await publishVaultSpec(directory, kova);
-      /* ⚠️ AND WHAT THIS PRODUCT ASKS PEOPLE TO AGREE TO, for the same reason:
-         the hub renders every app's, and a worker knows only its own. */
-      await publishLegalSpec(directory, kova, DEPLOYMENT);
+      await publishApp(directory, kova, { deployment: DEPLOYMENT, config: PLATFORM_CONFIG });
     },
     region: (bind) => applySchema(bind.db, REGIONAL_MODULES).then(() => undefined),
   },

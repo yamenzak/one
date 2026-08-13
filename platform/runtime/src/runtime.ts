@@ -84,6 +84,7 @@ function deliverVia(env: RawEnv, binding: string | undefined): Deliver | null {
   };
 }
 import { PLATFORM_GLOBAL, SHARED_MODULES } from "./modules.js";
+import { belongings } from "./membership-directory.js";
 import { GUIDE, guideOperations, type GuideCarrier } from "./guide-ops.js";
 import { MILESTONES, milestoneOperations, type MilestoneCarrier } from "./milestone-ops.js";
 import { MILESTONE_EARNED, dayIn, earnerOf, recognise } from "./milestone.js";
@@ -807,7 +808,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             if (!here) continue;
             return {
               members: await membersOf(db, tenantId as TenantId),
-              revoke: (id, at) => revoke(db, tenantId as TenantId, id, at),
+              revoke: (id, at) => revoke(db, { db: directoryDb, appId: app.id }, tenantId as TenantId, id, at),
             };
           }
           return null;
@@ -952,7 +953,10 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           is still unclaimed.
         */
         if (!membership) {
-          membership = await claim(regionalDb, at.tenant.tenantId, session.accountId, session.snapshot.email, new Date().toISOString() as Instant);
+          membership = await claim(
+            regionalDb, { db: directoryDb, appId: app.id },
+            at.tenant.tenantId, session.accountId, session.snapshot.email, new Date().toISOString() as Instant,
+          );
         }
       }
 
@@ -1642,25 +1646,28 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           workspaces: async () => {
             if (!session) return [];
             /*
-              ⚠️ THIS PRODUCT'S WORKSPACES, BECAUSE THAT IS ALL THIS WORKER CAN
-              ANSWER FOR. `mineIn` reads THIS product's regional memberships, so
-              another product's rows can never match — scanning them spends the
-              200-row ceiling on rows that were never candidates, and somebody's
-              fourth workspace falls off a list that looks complete.
+              ⚠️ FROM THE CROSS-PRODUCT INDEX, WHICH IS THE ONLY THING THAT CAN
+              ANSWER THIS. Memberships are regional and per-app by design, so a
+              worker asking its own tables draws a list that looks complete and
+              is short by every other product somebody uses — and TWO screens
+              make this promise, so they could each look complete while
+              disagreeing with each other.
 
-              DEFER(one-161) stage:7 — the hub says "everywhere you belong,
-              across every product" and this can only answer for one. What it
-              needs is an account→workspace index in the GLOBAL store, written
-              when a membership is; memberships are regional by design and no
-              worker can read another product's region.
+              ⚠️ AND THE NAME STILL COMES FROM THE DIRECTORY, in one read for the
+              lot. The index holds routing rather than labels; copying a
+              workspace's name into it would be a copy that goes stale the first
+              time somebody renames one.
             */
-            const rows = await directoryDb.all<{ tenant_id: string; slug: string; app_id: string | null }>(
-              `SELECT tenant_id, slug, app_id FROM tenant_directory WHERE app_id = ? ORDER BY slug LIMIT 200`, app.id,
-            ).catch(() => []);
-            const mine = await platform.mineIn(rows.map((r) => r.tenant_id));
-            return rows
-              .filter((r) => mine.has(r.tenant_id) && r.app_id)
-              .map((r) => ({ appId: r.app_id!, tenantId: r.tenant_id, name: r.slug, role: mine.get(r.tenant_id)! }));
+            const mine = await belongings(directoryDb, session.accountId);
+            if (mine.length === 0) return [];
+            const named = new Map<string, string>();
+            for (const row of await directoryDb.all<{ tenant_id: string; slug: string }>(
+              `SELECT tenant_id, slug FROM tenant_directory WHERE tenant_id IN (${mine.map(() => "?").join(", ")})`,
+              ...mine.map((m) => m.tenantId),
+            ).catch(() => [])) named.set(row.tenant_id, row.slug);
+            return mine.map((m) => ({
+              appId: m.appId, tenantId: m.tenantId, name: named.get(m.tenantId) ?? m.tenantId, role: m.role,
+            }));
           },
         },
         /*
@@ -1696,25 +1703,28 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           workspaces: async () => {
             if (!session) return [];
             /*
-              ⚠️ THIS PRODUCT'S WORKSPACES, BECAUSE THAT IS ALL THIS WORKER CAN
-              ANSWER FOR. `mineIn` reads THIS product's regional memberships, so
-              another product's rows can never match — scanning them spends the
-              200-row ceiling on rows that were never candidates, and somebody's
-              fourth workspace falls off a list that looks complete.
+              ⚠️ FROM THE CROSS-PRODUCT INDEX, WHICH IS THE ONLY THING THAT CAN
+              ANSWER THIS. Memberships are regional and per-app by design, so a
+              worker asking its own tables draws a list that looks complete and
+              is short by every other product somebody uses — and TWO screens
+              make this promise, so they could each look complete while
+              disagreeing with each other.
 
-              DEFER(one-162) stage:7 — the same gap on the vault's own walk.
-              It groups a person's facts by the workspace that asked for them, so
-              it is short by every product this worker does not serve. Closed by
-              the same index one-161 needs, and listed separately because the two
-              screens would each look complete while disagreeing.
+              ⚠️ AND THE NAME STILL COMES FROM THE DIRECTORY, in one read for the
+              lot. The index holds routing rather than labels; copying a
+              workspace's name into it would be a copy that goes stale the first
+              time somebody renames one.
             */
-            const rows = await directoryDb.all<{ tenant_id: string; slug: string; app_id: string | null }>(
-              `SELECT tenant_id, slug, app_id FROM tenant_directory WHERE app_id = ? ORDER BY slug LIMIT 200`, app.id,
-            ).catch(() => []);
-            const mine = await platform.mineIn(rows.map((r) => r.tenant_id));
-            return rows
-              .filter((r) => mine.has(r.tenant_id) && r.app_id)
-              .map((r) => ({ appId: r.app_id!, tenantId: r.tenant_id, name: r.slug, role: mine.get(r.tenant_id)! }));
+            const mine = await belongings(directoryDb, session.accountId);
+            if (mine.length === 0) return [];
+            const named = new Map<string, string>();
+            for (const row of await directoryDb.all<{ tenant_id: string; slug: string }>(
+              `SELECT tenant_id, slug FROM tenant_directory WHERE tenant_id IN (${mine.map(() => "?").join(", ")})`,
+              ...mine.map((m) => m.tenantId),
+            ).catch(() => [])) named.set(row.tenant_id, row.slug);
+            return mine.map((m) => ({
+              appId: m.appId, tenantId: m.tenantId, name: named.get(m.tenantId) ?? m.tenantId, role: m.role,
+            }));
           },
         },
         [SETTINGS]: {
@@ -1777,6 +1787,8 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         },
         [MEMBERS]: {
           db: regionalDb,
+          /* ⚠️ The cross-product index — an INDEX and never a grant. */
+          index: { db: directoryDb, appId: app.id },
           tenantId: (at.tenant?.tenantId ?? "") as TenantId,
           userId: session?.accountId ?? null,
           permissions: caller.permissions,

@@ -26,6 +26,8 @@ import { GENERATION_SCHEMA } from "./generate.js";
 import { SETTINGS_SCHEMA } from "./settings.js";
 import { REPLAY_SCHEMA } from "./replay.js";
 import { CONSENT_SCHEMA, LEGAL_SPEC_SCHEMA, SUBJECT_CONSENT_SCHEMA } from "./reference-ops.js";
+import { APP_SPEC_SCHEMA } from "./app-spec.js";
+import { MEMBERSHIP_DIRECTORY_SCHEMA } from "./membership-directory.js";
 import { AUDIT_SCHEMA } from "./audit.js";
 import { LIMIT_SCHEMA } from "./limit.js";
 import { IMPERSONATION_SCHEMA } from "./impersonation.js";
@@ -91,6 +93,22 @@ export const PLATFORM_GLOBAL: readonly SchemaModule[] = [
      hub answers for every product a person belongs to, and one app's
      worker knows only its own manifest. */
   VAULT_SPEC_SCHEMA,
+  /*
+    ⚠️ AND WHAT EACH PRODUCT SELLS, CHARGES FOR AND LETS A WORKSPACE CHOOSE.
+    Global for the same reason as the two declarations around it: the console is
+    the deployment's rather than one product's, and a worker knows only its own
+    manifest. Without it a console can write another product's prices and cannot
+    show what that product shipped — so every edit looks like the first.
+  */
+  APP_SPEC_SCHEMA,
+  /*
+    ⚠️ AND WHERE EACH PERSON BELONGS, ACROSS PRODUCTS. Memberships are regional
+    and per-app by design, so the worker serving the hub could answer for its own
+    product and drew a list that looked complete. This is an INDEX and never a
+    grant — see its own header, which is the only thing standing between it and a
+    membership no workspace granted.
+  */
+  MEMBERSHIP_DIRECTORY_SCHEMA,
   /* ⚠️ AND THE SAME FOR WHAT EACH PRODUCT ASKS PEOPLE TO AGREE TO. `legal.list`
      answers for the app serving the request, which on the hub is
      whichever one happens to be behind that door. */

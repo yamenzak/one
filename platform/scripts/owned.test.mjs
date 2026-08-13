@@ -28,7 +28,7 @@
  * is the same discriminator every other guard here uses.
  */
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -201,6 +201,35 @@ for (const family of ["platformOperations", "identityOperations", "marketOperati
   }
 }
 if (!bad) ok(`mounted: platform, identity and marketplace operations, for every app, unconditionally`);
+
+/*
+  ⚠️ AND EVERY APP PUBLISHES WHAT IT DECLARES, at boot, or the console cannot
+  describe it.
+
+  The store is shared and its rows are keyed by app, so one operator door can
+  already WRITE every product's configuration and its prices. What it cannot do
+  is read what a product SHIPPED — the plans, the entitlement keys, the settings,
+  the sellable flags live in that worker's bundle — so an override with no
+  declaration beside it makes every edit look like the first.
+
+  ⚠️ AND A MISSING PUBLISH IS THE QUIETEST FAILURE IN THE SET. `publishApp`
+  swallows its own errors on purpose (boot must not throw over a console in
+  another product), an unpublished app is simply absent from `app_specs`, and an
+  absent row looks exactly like a product that declares nothing. Every suite
+  stays green. It has happened once already, to `vault_specs`, for the life of
+  that feature.
+*/
+for (const app of apps) {
+  const boot = join(ROOT, app, "src", "worker.ts");
+  const text = existsSync(boot) ? readFileSync(boot, "utf8") : "";
+  if (!/publishApp\(/.test(text)) {
+    fail(`${app}/src/worker.ts never calls \`publishApp\`.\n` +
+         `       Its vault wants, its legal documents, its catalogue and its settings are then\n` +
+         `       absent from the store every other product reads — and absent is indistinguishable\n` +
+         `       from "this product declares nothing". Nothing fails; the console is just empty.`);
+  }
+}
+if (!bad) ok(`published: ${apps.length} app(s) hand their declarations to the store the console reads`);
 
 if (bad) {
   console.error(`\n${bad} ownership failure(s).`);

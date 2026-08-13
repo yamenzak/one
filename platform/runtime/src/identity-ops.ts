@@ -22,6 +22,7 @@ import { b64u, verifyAssertion, verifyRegistration } from "./webauthn.js";
 import type { IdentityStore, SessionStore } from "./identity.js";
 import { type Membership, wouldStrand } from "./membership.js";
 import { sessionCookie, clearedCookie, SESSION_RECHECK_MS } from "./identity.js";
+import { belongings } from "./membership-directory.js";
 
 /** ⚠️ A symbol, so an app cannot reach the platform's stores by writing a name. */
 export const PLATFORM = Symbol.for("one.runtime.platform");
@@ -56,6 +57,13 @@ export interface PlatformDeps {
    * disagree with this one. `Map` answers `has`, so every caller that only asked
    * the first question still asks it the same way.
    */
+  /*
+    ⚠️ WHICH OF THESE WORKSPACES THIS PERSON IS IN, asked of THIS product's
+    regional memberships. It is what the strand check and the leave path need —
+    a real membership row, in the store that owns it. It is deliberately NOT
+    what "everywhere I belong" is derived from: that spans products, and this
+    cannot see one.
+  */
   mineIn(tenantIds: readonly string[]): Promise<ReadonlyMap<string, string>>;
   /**
    * ⚠️ ONE WORKSPACE'S MEMBERS, FOUND ONCE AND HANDED BACK STILL OPEN. Leaving
@@ -761,27 +769,29 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
       const d = deps(ctx);
       if (!d.session) return { workspaces: [] };
       /*
-        ⚠️ READ FROM MEMBERSHIP AND THE DIRECTORY, WHICH ARE IN DIFFERENT
-        STORES. Memberships are regional and the directory is global, so this
-        cannot be one join — and the honest order is directory-first, because the
-        directory is the thing that knows which region to ask.
+        ⚠️ FROM THE CROSS-PRODUCT INDEX, AND THAT IS WHAT MAKES THIS ANSWER TRUE.
+        Memberships are regional and per-app by design, so asking this worker's
+        own tables answered for this worker's own product — a list that looked
+        complete and was short by every other product somebody uses. There are
+        two screens making this promise and they now derive it once: one answer
+        to the question the hub exists to ask.
+
+        ⚠️ THE BRANDING STILL COMES FROM THE DIRECTORY, in one read. The index
+        holds routing rather than labels, and a copy of a workspace's name in it
+        would go stale the first time somebody renamed one.
       */
-      /*
-        ⚠️ THIS PRODUCT'S WORKSPACES, because `mineIn` reads THIS product's
-        regional memberships and can answer about nothing else. Scanning every
-        product's rows and filtering by a membership table that cannot match them
-        spends the 200-row ceiling on workspaces that were never candidates — so
-        with three products somebody's fourth workspace falls off a list that
-        looks complete.
-      */
-      const rows = await d.directory.all<{ slug: string; tenant_id: string; branding: string | null }>(
-        `SELECT slug, tenant_id, branding FROM tenant_directory WHERE app_id = ? ORDER BY slug LIMIT 200`, app.id,
+      const mine = await belongings(d.directory, d.session.accountId as UserId);
+      if (mine.length === 0) return { workspaces: [] };
+      const rows = await d.directory.all<{ slug: string; tenant_id: string; app_id: string; branding: string | null }>(
+        `SELECT slug, tenant_id, app_id, branding FROM tenant_directory WHERE tenant_id IN (${mine.map(() => "?").join(", ")})`,
+        ...mine.map((m) => m.tenantId),
       ).catch(() => []);
-      const mine = await d.mineIn(rows.map((r) => r.tenant_id));
+      const roles = new Map(mine.map((m) => [m.tenantId, m.role]));
       return {
-        workspaces: rows
-          .filter((r) => mine.has(r.tenant_id))
-          .map((r) => ({ slug: r.slug, tenantId: r.tenant_id, branding: parseBranding(r.branding) })),
+        workspaces: rows.map((r) => ({
+          slug: r.slug, tenantId: r.tenant_id, appId: r.app_id,
+          role: roles.get(r.tenant_id) ?? "", branding: parseBranding(r.branding),
+        })),
       };
     },
   });

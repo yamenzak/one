@@ -194,8 +194,53 @@ describe("the person who makes a workspace is in it, by account and not just by 
     const res = await worker.fetch(
       new Request(`${ID}/api/me.workspaces`, { headers: { cookie: mine } }), env as never,
     );
-    const listed = ((await res.json()) as { workspaces: { tenantId: string }[] }).workspaces;
+    const listed = ((await res.json()) as { workspaces: { tenantId: string; appId: string; role: string }[] }).workspaces;
     expect(listed.map((w) => w.tenantId)).toContain(made.body.tenantId as string);
+
+    /*
+      ⚠️ AND IT SAYS WHICH PRODUCT AND WHAT THEY ARE THERE, because the list spans
+      products now — it is read from the cross-product index rather than from this
+      worker's own regional memberships, which could only ever answer for one.
+      Without the product on the row, two workspaces at the same slug in different
+      products are indistinguishable on the one screen that shows both.
+    */
+    const found = listed.find((w) => w.tenantId === made.body.tenantId);
+    expect(found?.appId).toBe("hello");
+    expect(found?.role).not.toBe("");
+  });
+
+  /*
+    ⚠️ REMOVED FROM A WORKSPACE IS REMOVED FROM THE HUB, and it is a different
+    table from the one `member.remove` writes. The regional row is REVOKED rather
+    than deleted — "who was in this workspace and when" is where every
+    investigation starts — so a hub reading the index has to be told separately,
+    and a workspace left on somebody's list is one that refuses them at the door.
+  */
+  it("takes a workspace off the hub when somebody is removed from it", async () => {
+    const ID = "https://id.4dl.app";
+    const owner = await signIn("evictor@example.test", SETUP);
+    const made = await post(SETUP, "/api/identity.workspace.create", { slug: "evicting" }, owner);
+    const at = "https://evicting.hello.4dl.app";
+    const host = await signIn("evictor@example.test", at);
+
+    await post(at, "/api/member.invite", { email: "guest@example.test", role: "reader" }, host);
+    /* ⚠️ Signing in at the workspace is what CLAIMS the invitation; the hub is a
+       different origin and therefore a different session, which is the platform's
+       own rule rather than a fixture quirk. */
+    await signIn("guest@example.test", at);
+    const guest = await signIn("guest@example.test", ID);
+    const theirs = async () => {
+      const r = await worker.fetch(new Request(`${ID}/api/me.workspaces`, { headers: { cookie: guest } }), env as never);
+      return ((await r.json()) as { workspaces: { tenantId: string }[] }).workspaces.map((w) => w.tenantId);
+    };
+    expect(await theirs()).toContain(made.body.tenantId as string);
+
+    const roster = await worker.fetch(new Request(`${at}/api/member.list`, { headers: { cookie: host } }), env as never);
+    const them = ((await roster.json()) as { members: { id: string; email: string }[] }).members
+      .find((m) => m.email === "guest@example.test")!;
+    await post(at, "/api/member.remove", { id: them.id }, host);
+
+    expect(await theirs()).not.toContain(made.body.tenantId as string);
   });
 });
 

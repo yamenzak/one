@@ -20,13 +20,20 @@
 
 import type { AnyOperation, AppSpec, BindingSpec, Instant, SqlHandle, TenantId, UserId } from "@one/kernel";
 import { canGrant, operation, s, withinQuota } from "@one/kernel";
-import { invite, membersOf, permissionsOf, revoke, seatsUsed, setPermissions, wouldStrand } from "./membership.js";
+import { invite, membersOf, permissionsOf, revoke, seatsUsed, setPermissions, wouldStrand, type Indexing } from "./membership.js";
 
 /** ⚠️ A symbol, so an app cannot reach the store by writing a property name. */
 export const MEMBERS = Symbol.for("one.runtime.members");
 
 export interface MemberDeps {
   readonly db: SqlHandle;
+  /**
+   * ⚠️ WHERE THE CROSS-PRODUCT INDEX GOES. Memberships are regional and per-app;
+   * the hub answers "everywhere you belong" and can read only its own product's,
+   * so every write here is mirrored to the global store. It is an INDEX and
+   * never a grant — see `membership-directory.ts`.
+   */
+  readonly index: Indexing;
   readonly tenantId: TenantId;
   readonly userId: UserId | null;
   /**
@@ -144,7 +151,7 @@ export function membershipOperations<B extends BindingSpec>(app: AppSpec<B>): re
         }
       }
       const made = await invite(
-        d.db, d.tenantId,
+        d.db, d.index, d.tenantId,
         { email: input.email, role: input.role, subjectId: input.subjectId ?? null, invitedBy: d.userId },
         ctx.now(),
       );
@@ -177,7 +184,7 @@ export function membershipOperations<B extends BindingSpec>(app: AppSpec<B>): re
       if (wouldStrand(app.access.roles, members, input.id)) {
         ctx.fail("platform.conflict", { field: "id", reason: "last_administrator" });
       }
-      await revoke(d.db, d.tenantId, target!.id, ctx.now());
+      await revoke(d.db, d.index, d.tenantId, target!.id, ctx.now());
       return { removed: target!.id };
     },
   });

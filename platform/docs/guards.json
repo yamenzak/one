@@ -4450,6 +4450,33 @@
       "impl": "runtime/test/config.test.ts",
       "proves": "seeds only where there is nothing, and never over what somebody set",
       "fails": "a re-provision resetting a live deployment's configured mail sender back to whatever the automation shipped with. The same shape bit a test fixture first: seeding on every sign-in put a sender back after a case had deliberately blanked one, so the suite proving \"a code that could not be sent is not a code that was\" passed by having sent it"
+    },
+    {
+      "id": "every-app-publishes-what-it-declares",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/owned.test.mjs",
+      "proves": "hand their declarations to the store the console reads",
+      "fails": "a product absent from `app_specs`, which is indistinguishable from a product that declares nothing. The console can then write its prices and cannot show what it shipped, so every edit looks like the first — and `publishApp` swallows its own errors on purpose (boot must not throw over another product's console), so nothing anywhere says a word. It has happened once already, to `vault_specs`, for the life of that feature"
+    },
+    {
+      "id": "everywhere-you-belong-spans-products",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/membership-directory.test.ts",
+      "proves": "spans products, which is the whole reason it exists",
+      "fails": "a hub promising \"everywhere you belong, across every product\" and answering for one. Memberships are regional and per-app by design, so a worker asking its own tables draws a list that looks complete and is short by every other product somebody uses — and TWO screens make that promise, so they could each look complete while disagreeing with each other"
+    },
+    {
+      "id": "leaving-a-workspace-takes-it-off-the-hub",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/membership.test.ts",
+      "proves": "takes a workspace off the hub when somebody is removed from it",
+      "fails": "a workspace left on somebody's list that refuses them at the door. The regional row is REVOKED rather than deleted — \"who was in this workspace and when\" is where every investigation starts — so the index has to be told separately, and an index nobody deletes from is one that only ever grows"
     }
   ]
 }

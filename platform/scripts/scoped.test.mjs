@@ -156,11 +156,14 @@ for (const table of APP_KEYED) {
     for (const m of text.matchAll(new RegExp(`(SELECT|DELETE)[^\`]*?FROM ${table}\\b([^\`]*)`, "g"))) {
       const rest = m[2] ?? "";
       /*
-        ⚠️ A READ NARROWED TO ONE ROW BY ITS OWN KEY IS ALREADY SCOPED — a tenant
-        id and a hostname are unique across the deployment, so naming one answers
-        about exactly one workspace whichever product it belongs to.
+        ⚠️ A READ NARROWED BY ITS OWN KEY IS ALREADY SCOPED — a tenant id and a
+        hostname are unique across the deployment, so naming one answers about
+        exactly one workspace whichever product it belongs to. `IN` counts for
+        the same reason and had to be added: the hub resolves the names of the
+        workspaces the cross-product index just handed it, which is a list of
+        tenant ids and is exactly as narrow as one.
       */
-      if (/\bapp_id\b|\btenant_id = \?|\bhostname = \?|\bid = \?|\bevent_id = \?/.test(rest)) continue;
+      if (/\bapp_id\b|\btenant_id (=|IN) |\bhostname = \?|\bid = \?|\bevent_id = \?/.test(rest)) continue;
       if (excused(text, m.index ?? 0)) { exempt++; continue; }
       fail(
         `${path.slice(ROOT.length + 1)} reads ${table} without naming the app.\n` +

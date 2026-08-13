@@ -16,6 +16,21 @@
 
 import type { Instant, Membership as Resolvable, RoleRegistry, SchemaModule, SqlHandle, TenantId, UserId } from "@one/kernel";
 import { permissionsFor } from "@one/kernel";
+import { forgetBelonging, noteBelonging } from "./membership-directory.js";
+
+/**
+ * WHERE THE CROSS-PRODUCT INDEX LIVES, AND WHOSE IT IS.
+ *
+ * ⚠️ IT IS A REQUIRED PARAMETER RATHER THAN AN OPTION, and that is the whole
+ * design. A membership written without it is one the hub cannot see — a
+ * workspace missing from "everywhere you belong", silently, on the screen
+ * somebody opens right after being invited. Required, the compiler finds every
+ * writer; optional, the next one forgets and nothing says so.
+ */
+export interface Indexing {
+  readonly db: SqlHandle | null;
+  readonly appId: string;
+}
 
 /* ---------------------------------------------------------------- schema --- */
 
@@ -187,6 +202,7 @@ export async function seatsUsed(
  */
 export async function invite(
   db: SqlHandle,
+  index: Indexing,
   tenantId: TenantId,
   input: { readonly email: string; readonly role: string; readonly subjectId?: string | null; readonly invitedBy?: UserId | null },
   at: Instant,
@@ -209,7 +225,15 @@ export async function invite(
     newId(), tenantId, email, input.role, input.subjectId ?? null, input.invitedBy ?? null, at, at,
   );
   const row = await db.first<Row>(`SELECT ${COLUMNS} FROM membership WHERE tenant_id = ? AND email = ?`, tenantId, email);
-  return toMembership(row!);
+  const made = toMembership(row!);
+  /*
+    ⚠️ RE-INVITING SOMEBODY WHO WAS REMOVED PUTS THEM BACK ON THEIR OWN HUB. The
+    update above clears `revoked_at` on a row that may already carry an account,
+    and the index was deleted when they were removed — so without this they are
+    a member the workspace can see and their own list cannot.
+  */
+  if (made.accountId) await noteBelonging(index.db, made.accountId as UserId, tenantId, index.appId, made.role, at);
+  return made;
 }
 
 /**
@@ -225,7 +249,7 @@ export async function invite(
  * and null when the address has no invitation here.
  */
 export async function claim(
-  db: SqlHandle, tenantId: TenantId, accountId: UserId, email: string, at: Instant,
+  db: SqlHandle, index: Indexing, tenantId: TenantId, accountId: UserId, email: string, at: Instant,
 ): Promise<Membership | null> {
   const folded = foldEmail(email);
   await db.run(
@@ -237,7 +261,10 @@ export async function claim(
     `SELECT ${COLUMNS} FROM membership WHERE tenant_id = ? AND email = ? AND account_id = ? AND revoked_at IS NULL`,
     tenantId, folded, accountId,
   );
-  return row ? toMembership(row) : null;
+  if (!row) return null;
+  const mine = toMembership(row);
+  await noteBelonging(index.db, accountId, tenantId, index.appId, mine.role, at);
+  return mine;
 }
 
 /**
@@ -247,12 +274,18 @@ export async function claim(
  * "how did this record change" investigation starts from, and a deleted row
  * answers it with silence. The seat is freed either way.
  */
-export async function revoke(db: SqlHandle, tenantId: TenantId, id: string, at: Instant): Promise<boolean> {
-  const found = await db.first<{ id: string }>(
-    `SELECT id FROM membership WHERE tenant_id = ? AND id = ? AND revoked_at IS NULL`, tenantId, id,
+export async function revoke(
+  db: SqlHandle, index: Indexing, tenantId: TenantId, id: string, at: Instant,
+): Promise<boolean> {
+  const found = await db.first<{ id: string; account_id: string | null }>(
+    `SELECT id, account_id FROM membership WHERE tenant_id = ? AND id = ? AND revoked_at IS NULL`, tenantId, id,
   );
   if (!found) return false;
   await db.run(`UPDATE membership SET revoked_at = ?, updated_at = ? WHERE id = ?`, at, at, found.id);
+  /* ⚠️ DELETED FROM THE INDEX WHILE THE ROW IS ONLY REVOKED — see the index's own
+     header. A revoked membership left there is a workspace on somebody's hub that
+     refuses them at the door. */
+  if (found.account_id) await forgetBelonging(index.db, found.account_id as UserId, tenantId);
   return true;
 }
 
