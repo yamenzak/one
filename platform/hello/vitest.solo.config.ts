@@ -10,14 +10,14 @@ import base from "./vitest.config.js";
  * it, and the symptom is three unrelated tests reporting a 503 from endpoints
  * that have nothing to do with the one that closed the door.
  *
- * The CONFIGURATION suite is here for the same reason, and it took an afternoon
- * to attribute. It blanks the deployment's mail sender to prove the one thing an
- * operator console has to be able to report — the lane is not working, and here
- * is why — and there is no way to prove that without the lane actually not
- * working. Run beside its neighbours it took every other file's sign-in down
- * with it: a 503 on the first attempt and the OTP cooldown on the retry,
- * surfacing as a different test failing in a different file on about a third of
- * runs, none of them near the cause.
+ * ⚠️ THE MAIL SUITE WAS HERE AND THAT WAS NOT FAR ENOUGH — it is
+ * `vitest.mail.config.ts` now. It blanks the deployment's sender on purpose, and
+ * every file in THIS project signs in, which seeds the sender back on the way
+ * past. So the two arrangements failed in opposite directions from the same
+ * window: the mail suite passing by sending a code it exists to prove could not
+ * be sent, and a job suite whose fixture could not get a session reporting a
+ * workspace that was never erased. Both at about a third of runs, alternating,
+ * with nothing naming the cause.
  *
  * Splitting on "does this affect the whole deployment" rather than on subject
  * keeps the line predictable: anything global lives here.

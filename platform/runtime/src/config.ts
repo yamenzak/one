@@ -75,11 +75,31 @@ export async function readAll(db: SqlHandle | null, appId: string): Promise<Valu
  * upsert there would reset a live deployment's configured sender each time,
  * silently, back to whatever the automation shipped with.
  */
+/**
+ * ⚠️ EVERY WRITE TO THIS STORE MOVES A COUNTER, and it exists so a reader can
+ * hold a value without going back for it.
+ *
+ * What a deployment can deliver — whether mail is configured, whether push has
+ * keys — is asked on the notification path of every write that raises one, and
+ * it changes about once a quarter. Reading it per request is two queries against
+ * the global store for an answer that was the same yesterday; caching it without
+ * this is a console where an operator sets a key and the product goes on
+ * behaving as though they had not.
+ *
+ * A counter rather than a timestamp because the question is "has anything
+ * changed", not "how long ago" — and it is per PROCESS, so a second isolate
+ * still re-reads on its own first request.
+ */
+let written = 0;
+
+export const configGeneration = (): number => written;
+
 export async function seedOne(db: SqlHandle, appId: string, key: string, value: string, at: Instant): Promise<void> {
   await db.run(
     `INSERT INTO app_config (app_id, key, value, at) VALUES (?, ?, ?, ?) ON CONFLICT(app_id, key) DO NOTHING`,
     appId, key, value, at,
   );
+  written += 1;
 }
 
 export async function writeOne(db: SqlHandle, appId: string, key: string, value: string, at: Instant): Promise<void> {
@@ -88,6 +108,7 @@ export async function writeOne(db: SqlHandle, appId: string, key: string, value:
      ON CONFLICT(app_id, key) DO UPDATE SET value = excluded.value, at = excluded.at`,
     appId, key, value, at,
   );
+  written += 1;
 }
 
 /* -------------------------------------------------------------- the read --- */

@@ -235,6 +235,18 @@ export const MOTION_CSS = `
 .item:active [data-icon='others'] > :nth-child(1),
 .item:active [data-icon='others'] > :nth-child(3) { scale: 1.18; }
 
+/* ⚠️ A BELL RINGS BY ITS CLAPPER, AND THE BODY HANGS STILL. Swinging the whole
+   glyph is a bell being carried; what a notification does is sound. */
+.item:active [data-icon='bell'] > :nth-child(2) { translate: 0 0.9px; }
+
+/* A gift opens: the lid comes off the box. */
+.item:active [data-icon='gift'] > :nth-child(1) { translate: 0 -1.2px; }
+
+/* ⚠️ THE SMALL SPARKS MOVE AND THE BIG ONE DOES NOT, which is what makes it a
+   glint rather than a shape drifting off its own centre. */
+.item:active [data-icon='sparkle'] > :nth-child(2),
+.item:active [data-icon='sparkle'] > :nth-child(3) { scale: 1.3; }
+
 /* A plus turns towards being a cross, which is what adding then cancelling is. */
 .button:active [data-icon='add'] { rotate: 90deg; }
 

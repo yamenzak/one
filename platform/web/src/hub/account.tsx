@@ -22,7 +22,7 @@
 import type { ElementType, ReactNode } from "react";
 import { Crown, HUES } from "../crown.js";
 import { Mark } from "../mark.js";
-import { Adjust, Guard, Heartbreak, Key, Save } from "../icon.js";
+import { Adjust, Bell, Guard, Heartbreak, Key, Save } from "../icon.js";
 import { Card, Item } from "../list.js";
 import { Screen, Section, Title } from "../screen.js";
 import type { Person } from "./home.js";
@@ -32,13 +32,20 @@ export interface AccountProps {
   readonly person: Person;
   /** ⚠️ Null until known — a confident "Nothing shared" is worse than a wait. */
   readonly sharedCount?: number | null;
+  /**
+   * ⚠️ HOW MANY ARE UNREAD, AND ZERO IS NOT THE DEFAULT ANSWER. A row saying
+   * nothing is waiting while the count is still being fetched is the same wrong
+   * answer wearing a loading state's excuse — so absent means "not known yet"
+   * and the row says what it is instead of what it counts.
+   */
+  readonly unread?: number;
   readonly onGo: (to: Where) => void;
   readonly onBack: () => void;
   readonly Heading?: ElementType;
 }
 
 export function AccountScreen({
-  person, sharedCount = null, onGo, onBack, Heading = "h1",
+  person, sharedCount = null, unread = 0, onGo, onBack, Heading = "h1",
 }: AccountProps): ReactNode {
   return (
     <Screen leave="up" onLeave={onBack} name="Account Center" sky="silk"
@@ -58,6 +65,17 @@ export function AccountScreen({
           />
           <Item icon={<Key />} title="Sign-in methods" detail="Passkeys, codes and devices" onGo={() => onGo({ at: "security" })} />
           <Item icon={<Adjust />} title="Preferences" detail="Theme, language, units and feedback" onGo={() => onGo({ at: "preferences" })} />
+          {/*
+            ⚠️ THE INBOX IS THE ACCOUNT'S AND NOT A WORKSPACE'S. What a person
+            has been told follows them across every product they are in; filing
+            it under one workspace would mean visiting four places to find out
+            whether anybody had told you anything.
+          */}
+          <Item
+            icon={<Bell />} title="Notifications"
+            detail={unread ? `${unread} unread` : "Everything you have been told"}
+            onGo={() => onGo({ at: "inbox" })}
+          />
         </Card>
       </Section>
 

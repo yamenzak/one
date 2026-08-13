@@ -37,7 +37,7 @@ import { SETTINGS, settingsFor, settingsOperations, domainAdminOperations, type 
 import { readSettings, wordingFor } from "./settings.js";
 import { remember, replayed, replayKeyOf, REPLAY_HEADER } from "./replay.js";
 import { LOOKUP, type Fetcher, type LookupCarrier } from "./lookup.js";
-import { chargeableFrom, DEPLOYMENT_SCOPE, readAll, readCatalogue } from "./config.js";
+import { chargeableFrom, configGeneration, DEPLOYMENT_SCOPE, readAll, readCatalogue } from "./config.js";
 import { catalogueJob } from "./catalogue-sync.js";
 import { noteTokenUse, resolveToken, TOKEN_PREFIX } from "./api-token.js";
 import { TOKENS, tokenOperations, type TokenCarrier } from "./api-token-ops.js";
@@ -590,6 +590,24 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
    */
   const SWEEP_TENANTS = 500;
 
+  /**
+   * WHAT THIS DEPLOYMENT CAN DELIVER, HELD UNTIL SOMETHING IS WRITTEN.
+   *
+   * ⚠️ PER ISOLATE, LIKE `booted` BELOW, and for the same reason: it is an answer
+   * about the DEPLOYMENT rather than about a request. Reading it per request put
+   * two extra queries against the global store on the notification path of every
+   * write that raises one — measurably, on a path already writing to several
+   * tables.
+   */
+  let held: {
+    readonly generation: number;
+    readonly what: Promise<{
+      readonly values: Readonly<Record<string, string>>;
+      readonly keys: ReturnType<typeof keysFrom>;
+      readonly available: readonly Channel[];
+    }>;
+  } | null = null;
+
   const booted = new Map<string, Promise<void>>();
   const once = (key: string, run: () => Promise<void>) => {
     const existing = booted.get(key);
@@ -1015,43 +1033,73 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         the same is true of email on a deployment with no provider. The inbox is
         always available, because the inbox is a table in this database.
       */
-      const deliverySettings = { ...(await readAll(sharedConfigDb, DEPLOYMENT_SCOPE)), ...await readAll(directoryDb, app.id) };
-      const pushKeys = keysFrom(deliverySettings);
-      const available: readonly Channel[] = [
-        "inbox",
-        ...(chooseProvider(deliverySettings).ok ? ["email" as const] : []),
-        ...(pushKeys ? ["push" as const] : []),
-      ];
+      /*
+        ⚠️ HELD ACROSS REQUESTS AND DROPPED THE MOMENT ANYTHING IS WRITTEN.
 
-      const deliver = opts.send ?? (async (delivery: Delivery) => {
+        What a deployment can deliver — is mail configured, are there push keys —
+        is asked on the notification path of every write that raises one, and it
+        changes about once a quarter. Read per request it is two queries against
+        the GLOBAL store for an answer that was the same yesterday, on a path that
+        is already writing to several tables; `configGeneration` is what lets it
+        be held without becoming a console where an operator sets a key and the
+        product goes on behaving as though they had not.
+
+        ⚠️ AND IT IS PER PROCESS, so a second isolate reads it on its own first
+        request. Nothing here is shared between them and nothing needs to be.
+      */
+      const deliverable = () => {
+        const generation = configGeneration();
+        if (!held || held.generation !== generation) {
+          held = {
+            generation,
+            what: (async () => {
+              const values = { ...(await readAll(sharedConfigDb, DEPLOYMENT_SCOPE)), ...await readAll(directoryDb, app.id) };
+              const keys = keysFrom(values);
+              return {
+                values, keys,
+                available: [
+                  "inbox" as const,
+                  ...(chooseProvider(values).ok ? ["email" as const] : []),
+                  ...(keys ? ["push" as const] : []),
+                ] as readonly Channel[],
+              };
+            })(),
+          };
+        }
+        return held.what;
+      };
+
+      const deliver = opts.send ?? (async (note: Delivery) => {
         /*
           ⚠️ PUSH IS DELIVERED TO EVERY BROWSER THIS PERSON HAS, and the dead ones
           are pruned on the way past. A person signs in from a laptop, a phone and
           a second browser; sending to the newest only is a notification that
           arrives on whichever device they are not holding.
         */
-        if (delivery.channel === "push") {
-          if (!pushKeys || !at.tenant) return;
+        if (note.channel === "push") {
+          const { keys } = await deliverable();
+          if (!keys || !at.tenant) return;
           await pushToPerson(
-            regionalDb, pushKeys, at.tenant.tenantId, delivery.userId,
-            { title: delivery.title, ...(delivery.body ? { body: delivery.body } : {}), tag: delivery.type },
+            regionalDb, keys, at.tenant.tenantId, note.userId,
+            { title: note.title, ...(note.body ? { body: note.body } : {}), tag: note.type },
             Date.now(),
           ).catch(() => 0);
           return;
         }
-        if (delivery.channel !== "email") return;
+        if (note.channel !== "email") return;
         const who = await directoryDb.first<{ email: string }>(
-          `SELECT email FROM accounts WHERE id = ?`, delivery.userId,
+          `SELECT email FROM accounts WHERE id = ?`, note.userId,
         ).catch(() => null);
         /* ⚠️ No address is silence, not a throw. The inbox row is already
            written and it is the record; mail is the interruption. */
         if (!who?.email) return;
-        await send(deliverySettings, {
+        await send((await deliverable()).values, {
           to: who.email,
-          subject: delivery.title,
+          subject: note.title,
           /* ⚠️ A message with no body is its own title. An email whose whole
              content is a subject line reads as a truncated one. */
-          body: delivery.body ?? delivery.title,
+          body: note.body ?? note.title,
+          ...(note.html ? { html: note.html } : {}),
         }, opts.deliver ?? deliverVia(env, opts.sendEmailBinding),
           new Date().toISOString() as Instant).catch(() => undefined);
       });
@@ -1503,6 +1551,17 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
        * alternative — resolving it up front on every request — would read a
        * table on requests that raise nothing at all.
        */
+      /**
+       * ⚠️ EVERY READ IN HERE FAILS SOFT, AND THE LAST ONE DID NOT. This is
+       * awaited OUTSIDE the dispatch's own `catch` — so a rejection here does not
+       * degrade a notification, it fails the operation that raised it. A studio
+       * creating a workspace got a 500 because a config read lost a race with
+       * its neighbour, and what the caller saw was that the workspace had not
+       * been made, when it had.
+       *
+       * The block below says a failed dispatch never fails the operation. This is
+       * what makes that true of the whole path rather than of the last call in it.
+       */
       const theirVoice = async (tenantId: string) => {
         const [wording, policy, values] = await Promise.all([
           wordingFor(regionalDb, tenantId).catch(() => ({})),
@@ -1519,7 +1578,6 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           wording, policy,
           signature: String(values["mail.signature"] ?? ""),
           letter: { html: String(values["mail.letterhead"] ?? "") },
-          available,
         };
       };
 
@@ -1725,7 +1783,6 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
               audience: told.people, declaredRoles: told.declaredRoles,
               values: { reason },
               at: new Date().toISOString() as Instant,
-              available,
               send: deliver,
             }).catch(() => undefined);
           },
@@ -1781,8 +1838,12 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           permissions: caller.permissions,
           role: personRole,
           declaredRoles: new Set(Object.keys(app.access.roles)),
-          available,
-          pushKey: pushKeys?.publicKey ?? "",
+          /* ⚠️ A THUNK, so a request that never asks never reads the config —
+             see `deliverable`. */
+          deployment: async () => {
+            const { available, keys } = await deliverable();
+            return { available, pushKey: keys?.publicKey ?? "" };
+          },
         },
         [LOOKUP]: {
           services: app.services ?? {},

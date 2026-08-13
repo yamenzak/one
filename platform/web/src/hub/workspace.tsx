@@ -204,6 +204,13 @@ export function WorkspaceScreen({
             */}
             <Item title="People" detail="Who is in this workspace, and the roles it hands out"
               onGo={() => onGo({ at: "people", tenant: workspace.tenantId })} />
+            {/*
+              ⚠️ AND WHAT IT TELLS THEM, which is the workspace half of two
+              levels: this decides what the product may say on the workspace's
+              behalf and where, and each person then chooses within it.
+            */}
+            <Item title="Notifications" detail="What this product tells people here, and on which channels"
+              onGo={() => onGo({ at: "notices", tenant: workspace.tenantId })} />
             <Item title="AI" detail="Which model answers each thing this product asks, and what to mention first"
               onGo={() => onGo({ at: "ai", tenant: workspace.tenantId })} />
           </Card>

@@ -209,3 +209,46 @@ describe("every lane that leaves the process is disclosed", () => {
     expect([...sending].sort()).toEqual([...MAIL_LANES].sort());
   });
 });
+
+/* ------------------------------------------------------ a workspace's layout --- */
+
+/**
+ * ⚠️ THE PLATFORM'S OWN MAIL STAYS PLAIN AND A WORKSPACE'S MAY NOT. A sign-in
+ * code is one sentence and one number; a business writing to its own customers
+ * is sending something it wants to look like theirs.
+ */
+describe("the one message with two parts", () => {
+  const AT = "2026-08-14T09:00:00.000Z" as Instant;
+
+  it("stays a single plain part where there is no layout", () => {
+    const mime = mimeFor("Kova <noreply@4dl.app>", { to: "a@b.test", subject: "Hi", body: "There." }, AT);
+    expect(mime).toContain(`Content-Type: text/plain; charset="utf-8"`);
+    expect(mime).not.toContain("multipart");
+  });
+
+  /*
+    ⚠️ THE PLAIN PART COMES FIRST, and the order is the behaviour rather than
+    tidiness: a reader takes the LAST part it can render, so plain-then-html
+    shows the design to whoever can see it and the words to whoever cannot.
+    Reversed, some clients show the plain text to everybody and the layout is
+    never seen at all.
+  */
+  it("carries both parts, plain first, where a workspace has one", () => {
+    const mime = mimeFor(
+      "Kova <noreply@4dl.app>",
+      { to: "a@b.test", subject: "Hi", body: "There.", html: "<main>There.</main>" },
+      AT,
+    );
+    expect(mime).toContain("multipart/alternative");
+    expect(mime.indexOf("text/plain")).toBeLessThan(mime.indexOf("text/html"));
+  });
+
+  /* ⚠️ The closing boundary ends with two hyphens, and a message without one is
+     truncated by every parser that is strict about it. */
+  it("closes the boundary it opened", () => {
+    const mime = mimeFor("K <n@4dl.app>", { to: "a@b.test", subject: "Hi", body: "T", html: "<p>T</p>" }, AT);
+    const edge = /boundary="([^"]+)"/.exec(mime)![1]!;
+    expect(mime).toContain(`--${edge}--`);
+    expect((mime.match(new RegExp(`--${edge}`, "g")) ?? []).length).toBe(3);
+  });
+});

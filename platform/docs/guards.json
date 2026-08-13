@@ -1864,7 +1864,7 @@
       "group": "platform",
       "stage": "7",
       "status": "live",
-      "impl": "hello/test/config.solo.test.ts",
+      "impl": "hello/test/config.mail.test.ts",
       "proves": "refuses a shared write, and says why",
       "fails": "reaching for a store that is not there, which throws into the same 503 a stated refusal produces \u2014 so the status alone cannot tell 'we told you' from 'it fell over'"
     },
@@ -1900,7 +1900,7 @@
       "group": "platform",
       "stage": "7",
       "status": "live",
-      "impl": "hello/test/config.solo.test.ts",
+      "impl": "hello/test/config.mail.test.ts",
       "proves": "still resolves this app's own values",
       "fails": "a single-app deployment broken by a sharing mechanism it does not use"
     },
@@ -1936,7 +1936,7 @@
       "group": "platform",
       "stage": "7",
       "status": "live",
-      "impl": "hello/test/config.solo.test.ts",
+      "impl": "hello/test/config.mail.test.ts",
       "proves": "reports what is missing rather than refusing the request",
       "fails": "telling somebody to check their inbox for a message that was never addressed to anybody"
     },
@@ -5107,6 +5107,132 @@
       "impl": "runtime/test/push.test.ts",
       "proves": "sends to all of them and forgets the ones that answered gone",
       "fails": "a device list nobody prunes, where every send pays for every browser anybody ever signed in from"
+    },
+    {
+      "id": "the-inbox-has-a-surface",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "draws what it was told, having rendered none of the words itself",
+      "fails": "a notification reachable at an endpoint and nowhere a person would look \u2014 the failure this platform was started over"
+    },
+    {
+      "id": "an-unknown-notification-icon-still-draws",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "draws something for an icon it has never heard of",
+      "fails": "a blank where a glyph should be, on a row that then reads as broken"
+    },
+    {
+      "id": "no-switch-for-a-channel-that-cannot-deliver",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "offers no device switch on a deployment that cannot push",
+      "fails": "somebody turning on a switch that does nothing and no longer watching their inbox"
+    },
+    {
+      "id": "a-person-is-never-offered-the-category-that-blocks-the-product",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "asks about categories, and never about the one that blocks the product",
+      "fails": "the product silently ceasing to work for whoever switched off the notices that say it has"
+    },
+    {
+      "id": "a-workspace-turning-something-off-says-so",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "says when it was the workspace that turned something off",
+      "fails": "\"you turned this off\" shown to somebody who did not, with nothing to do about it"
+    },
+    {
+      "id": "the-policy-screen-names-no-notification",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "renders whatever the product declares, naming nothing itself",
+      "fails": "a hand-written list going out of date in the direction nobody notices"
+    },
+    {
+      "id": "the-roster-has-a-surface",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "names no role of its own, and draws the ones it was given",
+      "fails": "invite, remove and permissions reachable only by whoever can compose an HTTP request"
+    },
+    {
+      "id": "a-role-it-cannot-grant-is-shown-and-stood-down",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "shows a role it cannot hand out rather than hiding it",
+      "fails": "an administrator wondering why their list is shorter than the one a colleague describes"
+    },
+    {
+      "id": "a-role-id-is-derived-and-never-typed",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "makes a usable id out of whatever somebody calls a role",
+      "fails": "a role somebody made, assigned, and that grants nothing at all"
+    },
+    {
+      "id": "a-push-key-reaches-the-browser-as-bytes",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/push.test.ts",
+      "proves": "decodes the alphabet the key is written in",
+      "fails": "`InvalidCharacterError` out of `subscribe`, which reads as a broken browser rather than a wrong argument"
+    },
+    {
+      "id": "a-push-always-shows-something",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/push.test.ts",
+      "proves": "still notifies when the payload cannot be read",
+      "fails": "a silent push costing the site the notification permission it will not be granted twice"
+    },
+    {
+      "id": "a-device-label-is-not-a-fingerprint",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/push.test.ts",
+      "proves": "names the browser and the kind of device, and nothing else",
+      "fails": "a device fingerprint stored against a person's account to label a row they read once"
+    },
+    {
+      "id": "an-html-email-shows-the-layout-and-the-words",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/mail.test.ts",
+      "proves": "carries both parts, plain first, where a workspace has one",
+      "fails": "a reader taking the wrong part \u2014 the layout never seen, or the message arriving blank"
+    },
+    {
+      "id": "the-platforms-own-mail-stays-plain",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/mail.test.ts",
+      "proves": "stays a single plain part where there is no layout",
+      "fails": "a sign-in code sent as marketing-shaped HTML that renders differently in every client"
     }
   ]
 }

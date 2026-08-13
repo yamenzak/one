@@ -35,7 +35,8 @@
 
 import type { ReactNode } from "react";
 import {
-  ArrowLeft, ArrowLeftRight, Camera, Check, ChevronRight, Download, FileText, HeartCrack, Info, KeyRound, Languages, Lock,
+  ArrowLeft, ArrowLeftRight, Bell as Bell_, Camera, Check, ChevronRight, Download, FileText, Gift, HeartCrack, Info, KeyRound, Languages, Lock,
+  Sparkles,
   Wallet as Wallet_,
   ArrowUpRight, Mail, MonitorSmartphone, Pencil, Plus, Ruler, Share2, Shield, SlidersHorizontal, SunMoon,
   Vibrate, Volume2, X, type LucideIcon,
@@ -46,7 +47,8 @@ export type IconName =
   | "key" | "adjust" | "guard" | "save" | "heartbreak" | "letter" | "device" | "others"
   | "outward"
   | "edit" | "lens" | "onward" | "close" | "back" | "tick" | "add" | "swap" | "wallet"
-  | "light" | "tongue" | "measure" | "buzz" | "sound" | "locked" | "about" | "paper";
+  | "light" | "tongue" | "measure" | "buzz" | "sound" | "locked" | "about" | "paper"
+  | "bell" | "gift" | "sparkle";
 
 export interface IconProps {
   readonly size?: number;
@@ -140,6 +142,17 @@ export const About = draw(Info, "about", 19);
    neighbour. Sliders for a theme, an envelope for a language and a shield for a
    unit were all exactly that, and each of them means something else two screens
    away. */
+/*
+  ⚠️ THE THREE A NOTIFICATION IS DRAWN WITH, and they exist because the registry
+  demands an icon per type: a missing one renders as an anonymous bell, which is
+  indistinguishable from every other anonymous bell — so an inbox of them is a
+  list the reader has to open one at a time to triage. `Bell` is the fallback and
+  the bell in the corner, which is the one case where it means the thing itself.
+*/
+export const Bell = draw(Bell_, "bell", 21);
+export const Gifted = draw(Gift, "gift", 21);
+export const Sparkle = draw(Sparkles, "sparkle", 21);
+
 export const Light = draw(SunMoon, "light", 21);
 export const Tongue = draw(Languages, "tongue", 21);
 export const Measure = draw(Ruler, "measure", 21);
@@ -151,6 +164,9 @@ export const Sound = draw(Volume2, "sound", 21);
  * order the elements appear in, and the CSS addresses them by exactly that.
  */
 export const ICON_PARTS: Readonly<Record<IconName, readonly string[]>> = {
+  bell: ["path", "path"],
+  gift: ["path", "path", "path", "rect"],
+  sparkle: ["path", "path", "path", "circle"],
   key: ["path", "circle"],
   adjust: ["path", "path", "path", "path", "path", "path", "path", "path", "path"],
   guard: ["path"],

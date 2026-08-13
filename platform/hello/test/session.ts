@@ -50,23 +50,23 @@ const seedMail = async () => {
   const have = await readAll(db, APP);
   for (const [key, value] of Object.entries({ "email.provider": "recorded", "email.from": "Hello <noreply@4dl.app>" })) {
     /*
-      ⚠️ SEEDED WHERE ABSENT, AND REPAIRED WHERE BLANK — which is not the same as
-      an upsert, and the difference is the whole reason this comment is long.
+      ⚠️ SEEDED WHERE ABSENT AND NEVER OVER A ROW THAT EXISTS, INCLUDING A BLANK
+      ONE — and this has now been wrong in both directions, which is why the note
+      is long.
 
-      A plain upsert would put a sender back on top of one a test deliberately
-      blanked, and the suite proving "a code that could not be sent is not a code
-      that was" would pass by having sent it. A plain SEED cannot repair a blank
-      row at all, so one file's deliberate blank leaks into the next file's
-      sign-in as a 503 and into the one after that as the OTP cooldown — an
-      unrelated test failing in an unrelated file, on about a third of full runs,
-      none of them near the cause.
+      A blank row is a suite DELIBERATELY blanking the sender to prove the one
+      thing an operator console has to be able to report. Repairing it here put
+      the sender back underneath that suite from another file, mid-test: what it
+      then proved was that a code which could not be sent WAS sent, on about a
+      third of runs, which is the exact failure the lane exists to end.
 
-      ⚠️ REPAIRING HERE CANNOT DEFEAT THE SUITE THAT NEEDS THE BLANK, and that is
-      checkable rather than hoped: it asserts through `admin.email`, through
-      `admin.email.test` and through a raw `identity.code.request` — never
-      through `signIn`, which is the only caller of this.
+      ⚠️ AND THE LEAK THAT REPAIR WAS ADDED FOR IS THE OTHER SUITE'S TO CLOSE. A
+      deliberate blank is restored by the file that made it, immediately after
+      the assertion that needed it — not left lying for a neighbour's sign-in to
+      trip over. `restoreMail` is that call, and it is also an `afterAll`, so a
+      failure anywhere above it still puts the sender back.
     */
-    if ((have[key] ?? "") === "") await writeOne(db, APP, key, value, new Date().toISOString() as never);
+    if (!(key in have)) await writeOne(db, APP, key, value, new Date().toISOString() as never);
   }
 };
 

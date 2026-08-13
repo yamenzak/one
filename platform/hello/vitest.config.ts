@@ -24,7 +24,7 @@ export default defineWorkersConfig({
       turned it on.
     */
     /* ⚠️ The lock check needs a filesystem, so it lives in the node project. */
-    exclude: ["**/*.node.test.ts", "**/*.solo.test.ts", "**/node_modules/**"],
+    exclude: ["**/*.node.test.ts", "**/*.solo.test.ts", "**/*.mail.test.ts", "**/node_modules/**"],
     /*
       ⚠️ The screen suite is plain React rendered to a string — no worker, no
       Miniflare. It runs in the same project because one command is worth more
@@ -47,9 +47,11 @@ export default defineWorkersConfig({
       than the first, and the reported error describes neither.
 
       ⚠️ THIS ALONE DID NOT FIX IT, and the note is here so nobody trusts it to.
-      What actually did was moving the CONFIGURATION suite to the solo project:
-      it blanks the deployment's mail sender on purpose, and no amount of
-      ordering saves a neighbour that runs during that window. `signIn` throwing
+      What actually did was moving the suites that take something away from the
+      WHOLE deployment into runs of their own — maintenance and the jobs into
+      `vitest.solo.config.ts`, and the mail lane into `vitest.mail.config.ts`,
+      which is its own run because it has to be taken away from the solo suites
+      too: they sign in, and signing in seeds the sender back. `signIn` throwing
       instead of returning an empty cookie is what turned three weeks of
       "something is flaky" into one line naming the door and the status.
     */

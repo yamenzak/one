@@ -18,6 +18,8 @@ import {
 } from "../src/hub/console.js";
 import { AiScreen, refusalOf } from "../src/hub/ai.js";
 import { PeopleScreen, roleIdFrom, seatsSaid, subjectOfKey, verbOfKey, type PeopleProps } from "../src/hub/people.js";
+import { InboxScreen, NoticeChoices, categoryOf, iconFor, reachSaid } from "../src/hub/inbox.js";
+import { NoticePolicyScreen, allowingSaid } from "../src/hub/notices.js";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node as never);
 const nothing = async () => null;
@@ -678,5 +680,150 @@ describe("who is in a workspace, and what each of them may do", () => {
     expect(seatsSaid({ used: 2, allowed: 10 })).toBe("2 of 10 in use");
     expect(seatsSaid({ used: 2, allowed: true })).toBe("2 in use");
     expect(seatsSaid({ used: 2, allowed: -1 })).toBe("2 in use");
+  });
+});
+
+/* --------------------------------------------------- what a product tells you --- */
+
+/**
+ * ⚠️ A MECHANISM WITH NO SURFACE IS THE FAILURE THIS PLATFORM WAS STARTED OVER,
+ * and it had happened again: the algebra, the store, the dispatch and four
+ * operations were written and there was nowhere a person could look.
+ */
+describe("the inbox and what interrupts you", () => {
+  const NOTICES = [
+    { id: "n1", type: "plan.chosen", title: "You chose Pro", icon: "card", category: "billing", at: "2026-08-13T09:00:00.000Z", read: false, open: {} },
+    { id: "n2", type: "ghost.type", title: "Somebody did a thing", icon: "unheard-of", category: "activity", at: "2026-08-12T09:00:00.000Z", read: true, open: {} },
+  ];
+
+  const shown = (rows: typeof NOTICES | null, unread = 1) => html(
+    <InboxScreen rows={rows} unread={unread} onRead={async () => null}
+      onOpen={() => undefined} onGo={() => undefined} onBack={() => undefined} />,
+  );
+
+  it("draws what it was told, having rendered none of the words itself", () => {
+    expect(shown(NOTICES)).toContain("You chose Pro");
+  });
+
+  /* ⚠️ Unread is a MARK on the row rather than a different row — a list where
+     half the entries are styled differently is one the eye reads as two lists. */
+  it("marks the unread ones without splitting the list", () => {
+    const out = shown(NOTICES);
+    expect(out).toContain("New");
+    expect(out).toContain("1 unread");
+  });
+
+  /* ⚠️ "Mark all read" over an empty inbox is a control that reports success for
+     doing nothing. */
+  it("offers to clear it only where there is something to clear", () => {
+    expect(shown(NOTICES, 1)).toContain("Mark all read");
+    expect(shown(NOTICES, 0)).not.toContain("Mark all read");
+  });
+
+  it("tells still-loading from a product that has said nothing yet", () => {
+    expect(shown(null)).toContain("aria-busy");
+    expect(shown([])).toContain("Nothing yet");
+  });
+
+  /*
+    ⚠️ AN ICON NAME THIS PACKAGE DOES NOT DRAW FALLS BACK TO THE BELL. An app
+    names its own icons and this package draws a closed set, so the mapping has
+    to be total — a blank where a glyph should be is a row that reads as broken.
+  */
+  it("draws something for an icon it has never heard of", () => {
+    expect(iconFor("unheard-of")).toBe(iconFor("bell"));
+    expect(iconFor("card")).not.toBe(iconFor("bell"));
+    expect(shown(NOTICES)).toContain("data-icon=\"bell\"");
+  });
+
+  it("says a category in words rather than in its key", () => {
+    expect(categoryOf("billing")).toBe("Money");
+    expect(categoryOf("action")).toBe("Needs you");
+    /* ⚠️ An unknown one prints itself rather than vanishing. */
+    expect(categoryOf("weather")).toBe("weather");
+  });
+});
+
+describe("what a person chooses to be interrupted by", () => {
+  const REACHING = [
+    { type: "plan.chosen", category: "billing", icon: "card", title: "You chose {planId}", reaching: ["inbox", "email"], allowed: ["inbox", "email"] },
+    { type: "thing.happened", category: "activity", icon: "bell", title: "A thing happened", reaching: [], allowed: [] },
+  ];
+  const PREFS = { muted: ["activity"], email: true, push: false };
+
+  const shown = (channels: string[], onPush?: () => Promise<null>) => html(
+    <NoticeChoices prefs={PREFS} types={REACHING} channels={channels}
+      onSet={async () => null} {...(onPush ? { onPush } : {})} onBack={() => undefined} />,
+  );
+
+  /*
+    ⚠️ THE DEVICE SWITCH IS ABSENT WHERE THERE IS NOTHING TO SUBSCRIBE TO. A
+    deployment with no push keys gets no row — never a row that does nothing,
+    which is exactly what got this channel deleted from the platform once
+    already: somebody turns it on and stops watching their inbox.
+  */
+  it("offers no device switch on a deployment that cannot push", () => {
+    expect(shown(["inbox", "email", "push"], async () => null)).toContain("This device");
+    expect(shown(["inbox", "email"], async () => null)).not.toContain("This device");
+    expect(shown(["inbox", "email", "push"])).not.toContain("This device");
+  });
+
+  /*
+    ⚠️ CATEGORIES, NOT TYPES, and `action` is not among them. A per-type screen
+    is a list nobody maintains; and a switch for the category meaning "nothing
+    proceeds until you act" is a way to make the product silently stop working
+    for whoever pressed it.
+  */
+  it("asks about categories, and never about the one that blocks the product", () => {
+    const out = shown(["inbox", "email"]);
+    expect(out).toContain("Money");
+    expect(out).toContain("Activity");
+    expect(out).not.toContain("Needs you</");
+  });
+
+  /* ⚠️ "You turned this off" and "your workspace did" are different sentences,
+     and the row has to say which. */
+  it("says when it was the workspace that turned something off", () => {
+    expect(reachSaid(REACHING[1]!)).toContain("workspace");
+    expect(reachSaid(REACHING[0]!)).toBe("Here and by email");
+    expect(reachSaid({ ...REACHING[0]!, reaching: ["inbox"] })).toBe("Here only");
+  });
+});
+
+describe("what a workspace lets its product say", () => {
+  const POLICIES = [
+    { type: "plan.chosen", category: "billing", icon: "card", title: "You chose {planId}", roles: ["owner"], needs: "billing:manage", required: false, off: false, channels: null },
+    { type: "thing.happened", category: "activity", icon: "bell", title: "A thing happened", roles: ["owner"], needs: "note:read", required: false, off: true, channels: null },
+    { type: "document.owed", category: "action", icon: "shield", title: "Something is waiting", roles: ["owner"], needs: "guide:read", required: true, off: false, channels: null },
+  ];
+
+  const shown = (mayWrite = true) => html(
+    <NoticePolicyScreen rows={POLICIES} channels={["inbox", "email", "push"]}
+      onSet={async () => null} onClear={async () => null} mayWrite={mayWrite} onBack={() => undefined} />,
+  );
+
+  /* ⚠️ Nothing here names a notification: the list IS the product's registry, so
+     a type it adds appears and one it removes stops appearing. */
+  it("renders whatever the product declares, naming nothing itself", () => {
+    const out = shown();
+    for (const row of POLICIES) expect(out).toContain(row.title);
+  });
+
+  /* ⚠️ Only a row somebody MOVED is tagged. A badge on every line is texture. */
+  it("tags what this workspace changed and leaves the rest alone", () => {
+    const out = shown();
+    expect((out.match(/>Off</g) ?? []).length).toBe(1);
+  });
+
+  it("says where a row currently reaches, for somebody who may not change it", () => {
+    expect(shown(false)).toContain("Notifications and Email and Devices");
+    expect(allowingSaid(POLICIES[1]!, ["inbox", "email"])).toBe("Off");
+    expect(allowingSaid({ ...POLICIES[0]!, channels: ["inbox"] }, ["inbox", "email"])).toBe("Notifications only");
+  });
+
+  it("shows the whole list to somebody who may change none of it", () => {
+    const out = shown(false);
+    expect(out).toContain("You chose {planId}");
+    expect(out).toContain("Ask an administrator");
   });
 });

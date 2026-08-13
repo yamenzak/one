@@ -54,6 +54,8 @@ import {
 } from "../src/hub/console.js";
 import { AiScreen, type Action } from "../src/hub/ai.js";
 import { PeopleScreen, type Member, type Role } from "../src/hub/people.js";
+import { InboxScreen, NoticeChoices, type Notice, type Reaching } from "../src/hub/inbox.js";
+import { NoticePolicyScreen, type Policy as NoticePolicy } from "../src/hub/notices.js";
 import { SettingsScreen } from "../src/hub/settings.js";
 import type { Declaration } from "../src/hub/declared.js";
 import type { Plan } from "../src/hub/offer.js";
@@ -690,6 +692,37 @@ const ROLES: readonly Role[] = [
 
 const PERMISSIONS: readonly string[] = ["note:read", "note:write", "member:read", "member:manage", "file:read", "file:write"];
 
+/*
+  ⚠️ READ AND UNREAD BOTH, because "new" is a mark on a row rather than a
+  different row — a list where half the entries are styled differently is one the
+  eye reads as two lists.
+*/
+const NOTICES: readonly Notice[] = [
+  { id: "n1", type: "plan.chosen", title: "You chose Pro", icon: "card", category: "billing", at: "2026-08-13T09:00:00.000Z", read: false, open: {} },
+  { id: "n2", type: "package.granted", title: "30 days added", body: "Enjoy them, Sam.", icon: "gift", category: "billing", at: "2026-08-12T09:00:00.000Z", read: false, open: {} },
+  { id: "n3", type: "support.session", title: "Somebody from support was in your workspace", body: "Why: a billing question", icon: "shield", category: "service", at: "2026-08-11T09:00:00.000Z", read: true, open: {} },
+  /* ⚠️ An icon name this package does not draw — it falls back to the bell
+     rather than to a blank space where a glyph should be. */
+  { id: "n4", type: "thing.happened", title: "Somebody did a thing", icon: "unheard-of", category: "activity", at: "2026-08-10T09:00:00.000Z", read: true, open: { collection: "note" } },
+];
+
+const REACHING: readonly Reaching[] = [
+  { type: "plan.chosen", category: "billing", icon: "card", title: "You chose {planId}", reaching: ["inbox", "email"], allowed: ["inbox", "email", "push"] },
+  { type: "package.granted", category: "billing", icon: "gift", title: "{days} days added", reaching: ["inbox"], allowed: ["inbox"] },
+  /* ⚠️ Off at the WORKSPACE, which the row has to say — "you turned this off" and
+     "your workspace did" are different sentences. */
+  { type: "thing.happened", category: "activity", icon: "bell", title: "Somebody did a thing", reaching: [], allowed: [] },
+];
+
+const POLICIES: readonly NoticePolicy[] = [
+  { type: "plan.chosen", category: "billing", icon: "card", title: "You chose {planId}", roles: ["owner"], needs: "billing:manage", required: false, off: false, channels: null },
+  { type: "package.granted", category: "billing", icon: "gift", title: "{days} days added", roles: ["owner", "client"], needs: "commerce:read", required: false, off: false, channels: ["inbox"] },
+  { type: "thing.happened", category: "activity", icon: "bell", title: "Somebody did a thing", roles: ["owner"], needs: "note:read", required: false, off: true, channels: null },
+  /* ⚠️ The one nobody may switch off, and the screen says why rather than
+     drawing a control that refuses. */
+  { type: "document.owed", category: "action", icon: "shield", title: "Something is waiting for you", roles: ["owner"], needs: "guide:read", required: true, off: false, channels: null },
+];
+
 const CONSOLE_TENANTS: readonly Tenant[] = [
   { tenantId: "t1", appId: "kova", slug: "haddad", region: "eu", standing: "active", reason: "", plan: "Pro", status: "active", reachable: true },
   { tenantId: "t2", appId: "scena", slug: "haddad", region: "eu", standing: "active", reason: "", plan: "Free", status: "active", reachable: true },
@@ -1054,6 +1087,36 @@ function Preview() {
         /* ⚠️ `#write=no` is somebody who is not an administrator — the ordinary
            case, where the roster is shown whole and every control stands down. */
         mayManage={asked.get("write") !== "no"}
+        onBack={up} Heading={Heading}
+      />
+    ) : at === "notices" ? (
+      <NoticePolicyScreen
+        rows={which === "waiting" ? null : POLICIES}
+        channels={["inbox", "email", "push"]}
+        onSet={async () => null}
+        onClear={async () => null}
+        mayWrite={asked.get("write") !== "no"}
+        onBack={up} Heading={Heading}
+      />
+    ) : at === "inbox" ? (
+      <InboxScreen
+        rows={which === "waiting" ? null : which === "new" ? [] : NOTICES}
+        unread={which === "new" || which === "waiting" ? 0 : 2}
+        onRead={async () => null}
+        onOpen={() => undefined}
+        onGo={() => go({ at: "interruptions" })}
+        onBack={up} Heading={Heading}
+      />
+    ) : at === "interruptions" ? (
+      <NoticeChoices
+        prefs={which === "waiting" ? null : { muted: ["activity"], email: true, push: false }}
+        types={which === "waiting" ? null : which === "new" ? [] : REACHING}
+        /* ⚠️ `#state=nopush` is a deployment with no keys — the device switch is
+           ABSENT rather than present and inert, which is the whole reason the
+           channel was deleted from this platform the first time. */
+        channels={asked.get("state") === "nopush" ? ["inbox", "email"] : ["inbox", "email", "push"]}
+        onSet={async () => null}
+        onPush={async () => null}
         onBack={up} Heading={Heading}
       />
     ) : at === "tenants" ? (

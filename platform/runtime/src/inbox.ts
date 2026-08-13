@@ -250,9 +250,15 @@ export async function dispatch(input: {
   /** Its letterhead, for the messages it is allowed to phrase. */
   readonly letter?: Letter;
   /**
-   * ⚠️ WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER. A channel with nothing behind
-   * it must not be offered or used — see `channelsFor`. The inbox is always in
-   * it, because the inbox is this table.
+   * WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER, where the caller happens to know.
+   *
+   * ⚠️ ABSENT MEANS ALL OF THEM, AND THAT IS SAFE HERE RATHER THAN OPTIMISTIC.
+   * Answering it costs two reads of the GLOBAL store, and the dispatch path
+   * raises a notification on every write that declares one — so it is asked
+   * where somebody is being OFFERED a channel (the preferences screen, which is
+   * a read) and not where one is being used. A channel with nothing behind it is
+   * a no-op at delivery: `send` refuses without a provider, push returns without
+   * keys, and the inbox row — the record — is written either way.
    */
   readonly available?: readonly Channel[];
   send?(delivery: Delivery): Promise<void>;

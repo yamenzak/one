@@ -1174,6 +1174,18 @@ more, which is the honest state.
 | `a-model-shows-under-every-lane-it-serves` | a catalogue whose vision section looks empty while a vision model sits in it. One model serves several modalities — a Gemini text model is priced for pictures on the same row — which is why a model carries a LIST of lanes rather than one, and why one row per lane is not the alternative: the id is the provider path and there is only one of it | **live** |
 | `a-retirement-is-said-before-it-happens` | an operator learning about a retirement from a failing generation — one they had a month of warning about, on a screen that never showed it. The replacement is named because the provider names it | **live** |
 | `the-roster-has-a-screen` | a roster reachable by anybody who can compose an HTTP request and by nobody else. It also names no role or permission itself — both come from `role.list`, so one added to a product appears here and one removed stops appearing | **live** |
+| `the-inbox-has-a-surface` | a notification reachable at an endpoint and nowhere a person would look — the failure this platform was started over | **live** |
+| `an-unknown-notification-icon-still-draws` | a blank where a glyph should be, on a row that then reads as broken | **live** |
+| `no-switch-for-a-channel-that-cannot-deliver` | somebody turning on a switch that does nothing and no longer watching their inbox | **live** |
+| `a-person-is-never-offered-the-category-that-blocks-the-product` | the product silently ceasing to work for whoever switched off the notices that say it has | **live** |
+| `a-workspace-turning-something-off-says-so` | "you turned this off" shown to somebody who did not, with nothing to do about it | **live** |
+| `the-policy-screen-names-no-notification` | a hand-written list going out of date in the direction nobody notices | **live** |
+| `the-roster-has-a-surface` | invite, remove and permissions reachable only by whoever can compose an HTTP request | **live** |
+| `a-role-it-cannot-grant-is-shown-and-stood-down` | an administrator wondering why their list is shorter than the one a colleague describes | **live** |
+| `a-role-id-is-derived-and-never-typed` | a role somebody made, assigned, and that grants nothing at all | **live** |
+| `a-push-key-reaches-the-browser-as-bytes` | `InvalidCharacterError` out of `subscribe`, which reads as a broken browser rather than a wrong argument | **live** |
+| `a-push-always-shows-something` | a silent push costing the site the notification permission it will not be granted twice | **live** |
+| `a-device-label-is-not-a-fingerprint` | a device fingerprint stored against a person's account to label a row they read once | **live** |
 <!-- /generated -->
 
 ## 5. What is not decided yet

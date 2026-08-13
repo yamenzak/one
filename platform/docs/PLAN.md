@@ -1581,6 +1581,8 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-push-record-is-framed-as-the-encoding-demands` | a push service answering 201 while every browser silently drops the message | **live** |
 | `a-vapid-token-signs-the-service-and-expires` | a token no push service accepts, on a deployment where push works nowhere and nothing says why | **live** |
 | `a-dead-subscription-is-pruned-on-sight` | a device list nobody prunes, where every send pays for every browser anybody ever signed in from | **live** |
+| `an-html-email-shows-the-layout-and-the-words` | a reader taking the wrong part — the layout never seen, or the message arriving blank | **live** |
+| `the-platforms-own-mail-stays-plain` | a sign-in code sent as marketing-shaped HTML that renders differently in every client | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 
@@ -2086,6 +2088,52 @@ The roster itself had **no screen at all** before this: `member.invite`,
 compose an HTTP request and by nobody else. `people.tsx` is the surface, and it
 names no role and no permission of its own — both come from `role.list`, so one
 added to a product appears there and one removed stops appearing.
+
+### 7.11 Notifications are two levels, and a channel is a promise
+
+**Shipped 2026-08-14.** The algebra, the store, the dispatch and the wording
+overrides were all built. Four things were not, and each failed the same way as
+everything else in this section — present, correct, and reaching nobody.
+
+**The workspace had no say at all.** Only the person had a switch, so a studio
+could not decide what its product says on its behalf. It is two levels now and
+the workspace's is the CEILING: `notify_policy` per type, resolved before the
+person's own preferences. The other order cannot work — somebody cannot opt into
+a channel their workspace has turned off, because the switch would do nothing and
+say nothing. **Absent is the product's default, never "off"**, so a deployment
+that upgrades into the feature behaves exactly as it did the day before. And an
+`action` may be silenced by neither: it is the category meaning nothing proceeds
+until somebody acts, and the person who would press that switch is not the person
+the product then silently stops working for.
+
+⚠️ **THE AUDIENCE WAS MATCHED ON A ROLE NAME, WHICH CUSTOM ROLES BROKE THE HOUR
+THEY SHIPPED.** A role a workspace composes for itself is not in the manifest and
+never will be, so `def.roles.includes(role)` answers "no" for every one of them:
+somebody in a workspace for a month being told nothing while everything else
+works. Every type declares `needs` — a permission — and that is what the merged
+registry is matched on. Composition refuses a type whose key no role could hold,
+a declared role must still be listed (so the permission only ever widens to roles
+the manifest could not know about), and the resolution is `permissionsOf`, so a
+member whose key was revoked stops being told with no registry edit anywhere.
+
+**Push is back, with the three things it lacked when it was deleted.** It is RFC
+8291 and RFC 8292 on WebCrypto rather than `web-push` — the library is Node-shaped
+and this package carries one dependency on purpose, while what it does is two
+published algorithms a Worker already has. The payload is encrypted to the
+DEVICE, so the push service carries a sentence it cannot read; a 404 or 410
+prunes the row on sight; and **a deployment with no keys does not offer the
+channel**, which is the whole reason it was removed the first time.
+
+**And a workspace's letterhead wraps only what it may already phrase.** HTML for
+a business writing to its own customers, plain text for the platform writing to a
+workspace about its own arrears — a business that could wrap that in its own
+layout could bury it, and the people who would then not act on it are its staff.
+`refuseLetter` demands `{body}`: a layout without one sends the same empty page
+to every customer for ever and looks completely fine in the editor that saved it.
+
+The surfaces are `inbox.tsx` (the inbox, and what interrupts you) and
+`notices.tsx` (what the workspace allows). Neither names a notification: both
+lists are the product's own registry.
 
 ## 8. Stages
 

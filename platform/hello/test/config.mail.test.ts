@@ -218,6 +218,19 @@ describe("proving the mail lane", () => {
       that was never addressed to anybody is the failure this whole lane exists
       to end — it is what a `Map` did, silently, in every app here.
     */
+    /*
+      ⚠️ RE-BLANKED IMMEDIATELY BEFORE THE ONE ASSERTION THAT DEPENDS ON IT, and
+      that is not belt-and-braces. `signIn` seeds the mail lane and REPAIRS a
+      blank — it has to, or this file's deliberate blank leaks into the next
+      file's sign-in — and every file here shares one deployment. So any sign-in
+      that lands between the blank above and the request below puts the sender
+      back, and what this test then proves is that a code which could not be sent
+      WAS sent: the exact failure the lane exists to end, passing.
+
+      A precondition established three round trips before the assertion that
+      needs it is a precondition with a window in it.
+    */
+    await operator("/api/admin.config.set", { key: "email.from", value: "", scope: "app" });
     const asked = await worker.fetch(
       new Request(`${ORIGIN}/api/identity.code.request`, {
         method: "POST", headers: { "content-type": "application/json" },
@@ -226,6 +239,12 @@ describe("proving the mail lane", () => {
       env as never,
     );
     expect(asked.status).toBe(503);
+
+    /* ⚠️ PUT BACK HERE AND NOT ONLY IN `afterAll`. Every file in this project
+       shares one deployment, and a blank sender left lying between this line and
+       the end of the file is a neighbour's sign-in failing for a reason that has
+       nothing to do with what it was testing. */
+    await restoreMail();
 
   });
 

@@ -33,12 +33,16 @@ export interface InboxDeps {
   /** The roles the MANIFEST declares, so a workspace's own can be told apart. */
   readonly declaredRoles: ReadonlySet<string>;
   /**
-   * ⚠️ WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER. Push with no keys configured
-   * is not offered rather than offered and dropped.
+   * WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER, and the key a browser subscribes
+   * with. Push with no keys configured is not OFFERED rather than offered and
+   * dropped.
+   *
+   * ⚠️ A THUNK, because answering it is a config read. Two of those on every
+   * request — including every read of a list — to answer a question most
+   * requests never pose is the shape of a slow platform: invisible in any one
+   * handler and paid by all of them.
    */
-  readonly available: readonly Channel[];
-  /** The application server key a browser subscribes with. Empty means no push. */
-  readonly pushKey: string;
+  deployment(): Promise<{ readonly available: readonly Channel[]; readonly pushKey: string }>;
 }
 
 export interface InboxCarrier { readonly [INBOX]: InboxDeps }
@@ -99,9 +103,10 @@ export function inboxOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
     async handler(ctx) {
       const d = deps(ctx);
       if (!d.userId) return { muted: [], email: false, push: false, channels: [], types: [] };
-      const [prefs, policy] = await Promise.all([
+      const [prefs, policy, deployment] = await Promise.all([
         preferencesFor(d.db, d.tenantId, d.userId),
         policyFor(d.db, d.tenantId),
+        d.deployment(),
       ]);
       /*
         ⚠️ THE LIST IS DERIVED FROM WHAT THIS PERSON MAY READ AND WHAT THEIR
@@ -116,12 +121,12 @@ export function inboxOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
         .map(([type, def]) => ({
           type, category: def.category, icon: def.icon,
           title: saying(def, undefined).title,
-          reaching: channelsFor(def, prefs, policy[type] ?? {}, d.available),
+          reaching: channelsFor(def, prefs, policy[type] ?? {}, deployment.available),
           /* ⚠️ Said out loud, because a row with no switches has a reason and
              "your workspace turned this off" is not the same as "you did". */
-          allowed: policy[type]?.off ? [] : (policy[type]?.channels ?? CHANNELS).filter((c) => d.available.includes(c)),
+          allowed: policy[type]?.off ? [] : (policy[type]?.channels ?? CHANNELS).filter((c) => deployment.available.includes(c)),
         }));
-      return { ...prefs, channels: d.available, types };
+      return { ...prefs, channels: deployment.available, types };
     },
   });
 
@@ -173,7 +178,7 @@ export function inboxOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
     async handler(ctx) {
       /* ⚠️ Empty rather than a refusal: a deployment with no push configured is
          an ordinary deployment, and the screen's answer is to offer no switch. */
-      return { key: deps(ctx).pushKey };
+      return { key: (await deps(ctx).deployment()).pushKey };
     },
   });
 
@@ -298,7 +303,7 @@ function policyOperations<B extends BindingSpec>(app: AppSpec<B>): readonly AnyO
         off: book[type]?.off === true,
         channels: book[type]?.channels ?? null,
       }));
-      return { rows, channels: d.available };
+      return { rows, channels: (await d.deployment()).available };
     },
   });
 

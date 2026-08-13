@@ -29,6 +29,22 @@ export interface Message {
    * in every client and gets a message filed as marketing.
    */
   readonly body: string;
+  /**
+   * A WORKSPACE'S OWN LAYOUT, WHERE IT HAS ONE.
+   *
+   * ⚠️ AND ONLY EVER A WORKSPACE'S. Everything the PLATFORM sends is one sentence
+   * and one number — a sign-in code, a notice about somebody's own bill — and
+   * HTML buys neither of them anything while being the half of an email that
+   * renders differently in every client and gets a message filed as marketing.
+   * What this carries is a business writing to its own customers, wrapped in the
+   * design they chose.
+   *
+   * ⚠️ THE TEXT PART IS STILL REQUIRED. `body` is not optional and does not
+   * become optional here: a client that cannot render HTML, a screen reader, and
+   * a spam filter looking for a `text/plain` part are all ordinary, and an
+   * HTML-only email arrives blank for some readers with nothing saying so.
+   */
+  readonly html?: string;
 }
 
 /** Who a deployment sends as: `Kova <noreply@4dl.app>`, or a bare address. */
@@ -178,14 +194,17 @@ export async function send(values: Values, message: Message, deliver: Deliver | 
  * ⚠️ THE BINDING TAKES A RAW MIME MESSAGE, NOT AN OBJECT, and getting that wrong
  * is not a formatting problem — the send is rejected outright.
  *
- * Everything this platform sends is one sentence and one link, so this is
- * `text/plain` and nothing else: no multipart, no HTML alternative, no
- * attachments. That is the half of an email that renders differently in every
+ * ⚠️ EVERYTHING THE PLATFORM ITSELF SENDS IS `text/plain`, and that is a
+ * decision rather than a limitation: a sign-in code is one sentence and one
+ * number, and HTML is the half of an email that renders differently in every
  * client and gets a message filed as marketing.
+ *
+ * A WORKSPACE writing to its own customers is the one case with a second part —
+ * see `Message.html`. There are still no attachments.
  */
 export function mimeFor(from: string, message: Message, at: Instant): string {
   const domain = addressOf(from).email.split("@")[1] ?? "localhost";
-  return [
+  const head = [
     `From: ${from}`,
     `To: ${message.to}`,
     `Subject: ${encodeHeader(message.subject)}`,
@@ -194,10 +213,42 @@ export function mimeFor(from: string, message: Message, at: Instant): string {
     `Message-ID: <${crypto.randomUUID()}@${domain}>`,
     `Date: ${new Date(Date.parse(at)).toUTCString()}`,
     `MIME-Version: 1.0`,
+  ];
+  if (!message.html) {
+    return [
+      ...head,
+      `Content-Type: text/plain; charset="utf-8"`,
+      `Content-Transfer-Encoding: base64`,
+      ``,
+      base64Utf8(message.body),
+    ].join("\r\n");
+  }
+  /*
+    ⚠️ `multipart/alternative`, AND THE PLAIN PART COMES FIRST. The order is the
+    specification and it is also the behaviour: a reader takes the LAST part it
+    can render, so plain-then-html shows the design to whoever can see it and the
+    words to whoever cannot. Reversed, some clients show the plain text to
+    everybody and the layout is never seen.
+  */
+  const edge = `b${crypto.randomUUID().replace(/-/g, "")}`;
+  return [
+    ...head,
+    `Content-Type: multipart/alternative; boundary="${edge}"`,
+    ``,
+    `--${edge}`,
     `Content-Type: text/plain; charset="utf-8"`,
     `Content-Transfer-Encoding: base64`,
     ``,
     base64Utf8(message.body),
+    `--${edge}`,
+    `Content-Type: text/html; charset="utf-8"`,
+    `Content-Transfer-Encoding: base64`,
+    ``,
+    base64Utf8(message.html),
+    /* ⚠️ The closing boundary ends with two hyphens, and a message without one
+       is truncated by every parser that is strict about it. */
+    `--${edge}--`,
+    ``,
   ].join("\r\n");
 }
 

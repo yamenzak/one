@@ -53,6 +53,10 @@ export { Stack, directionOf, type Move } from "./stack.js";
 export { SwitchRow } from "./switch.js";
 export { ValueEditor, type EditableField } from "./editor.js";
 export { useCommit, type Commit } from "./commit.js";
+export {
+  PUSH_WORKER, askToPush, browserLabel, keyBytes, pushSupported, stopPushing,
+  type Answered as PushAnswered, type PushRefusal, type Subscribed,
+} from "./push.js";
 export { configureFeedback, feel, FEEDBACK_DEFAULT } from "./feedback.js";
 export * as Icon from "./icon.js";
 
@@ -79,6 +83,14 @@ export {
   PeopleScreen, REMOVE as REMOVE_MEMBER, roleIdFrom, seatsSaid, subjectOfKey, verbOfKey,
   type Member, type PeopleProps, type Role,
 } from "./hub/people.js";
+export {
+  InboxScreen, NoticeChoices, categoryOf, iconFor, reachSaid,
+  type ChoicesProps, type InboxProps, type Notice, type NoticePrefs, type Reaching,
+} from "./hub/inbox.js";
+export {
+  NoticePolicyScreen, CHANNEL_NAMES, allowingSaid,
+  type NoticePolicyProps, type Policy as NoticePolicy,
+} from "./hub/notices.js";
 export {
   ConsoleScreen, KeysScreen, CatalogueScreen, TenantsScreen, MaintenanceScreen, saidAs as keySaidAs,
   type CatalogueProps, type ConsoleProps, type Key, type KeysProps, type Product as ConsoleProduct,
