@@ -201,6 +201,8 @@ export function vaultOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
   const write = operation({
     id: "vault.record",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "`vault_grant_log` and `vault_disclosures` are the record, and they are the ones a person can read about themselves" },
     summary: "Record one of your own facts.",
     input: s.object({
       fact: s.text({ max: 60 }),
@@ -238,6 +240,8 @@ export function vaultOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
   const forget = operation({
     id: "vault.forget",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "`vault_grant_log` is the record" },
     summary: "Delete one of your own facts.",
     input: s.object({ fact: s.text({ max: 60 }), at: s.optional(s.text({ max: 10 })) }),
     output: s.object({ ok: s.bool() }),
@@ -259,6 +263,8 @@ export function vaultOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
   const share = operation({
     id: "vault.share",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "`vault_grant_log` is the record, with the reach and the expiry an audit row has nowhere to put" },
     summary: "Share one of your facts with an app, at a level you choose, for as long as you choose.",
     input: s.object({
       fact: s.text({ max: 60 }),
@@ -325,6 +331,8 @@ export function vaultOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
   const unshare = operation({
     id: "vault.unshare",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "`vault_grant_log` is the record" },
     summary: "Stop sharing one of your facts.",
     input: s.object({ fact: s.text({ max: 60 }), app: s.optional(s.text({ max: 60 })), workspace: s.optional(s.text({ max: 60 })) }),
     output: s.object({ ok: s.bool() }),

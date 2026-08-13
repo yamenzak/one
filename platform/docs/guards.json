@@ -4810,6 +4810,69 @@
       "impl": "web/test/declared.test.tsx",
       "proves": "says what is retiring and what it will be replaced by",
       "fails": "an operator learning about a retirement from a failing generation — one they had a month of warning about, on a screen that never showed it. The replacement is named because the provider names it"
+    },
+    {
+      "id": "every-write-is-recorded-by-default",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/surface.test.ts",
+      "proves": "records a write that declared nothing",
+      "fails": "an audit trail that is a thing people remember rather than a thing the platform does. `auditFor` returned null for any operation declaring nothing, so twenty of the platform's own writes were recorded NOWHERE while every suite stayed green — because a missing entry is indistinguishable from an action nobody took. Absent now derives one: the verb from the operation's own id, the subject from its row scope or its input's id"
+    },
+    {
+      "id": "an-audit-exemption-states-why",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/surface.test.ts",
+      "proves": "takes a stated exemption and nothing else",
+      "fails": "silence passing for a decision. A handful of writes genuinely keep their own record — the vault has a grant log, a sign-in has a session — and duplicating those into the audit is noise that makes the real entries harder to find. `{ why }` is the same shape `tool` uses, for the same reason: saying so out loud is cheap, being silently absent is what it replaced"
+    },
+    {
+      "id": "reads-are-not-recorded-unless-they-ask",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/surface.test.ts",
+      "proves": "leaves reads alone unless they ask",
+      "fails": "every list, every poll and every screen load becoming an entry — an audit nobody can read, which is the same silence as no audit with a much larger bill. A read that genuinely matters declares its own"
+    },
+    {
+      "id": "a-write-says-what-to-record-or-why-not",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/surface.test.mjs",
+      "proves": "every one saying what to record or why not",
+      "fails": "a derived entry taken as a licence to stop thinking. Coverage is automatic now, so this is not about coverage — it is about the two ways a derived entry is WORSE: `commerce.days` derives `verb: \"days\"`, which says nothing about access being extended, and an operation that keeps its own record elsewhere gets a duplicate nobody wants"
+    },
+    {
+      "id": "an-action-taken-by-a-model-is-told-apart",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/tools.test.ts",
+      "proves": "says when a model took the action rather than a person",
+      "fails": "an audit that cannot answer the first question anybody asks about an agent. The tool path is the SAME runner — `dispatch` calls `run(target, payload, \"tool\")` — so the gates, the row scope, the quota and the audit are identical, and the only difference is the one worth recording"
+    },
+    {
+      "id": "the-api-describes-itself",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/tools.test.ts",
+      "proves": "answers with a path for every route this caller may call",
+      "fails": "`openApiFor` written, unit-tested and served by NOTHING — every route, its method, its input and its declared failures derivable from the one registry, and no caller able to read any of it. A document that exists beside an API that is undocumented"
+    },
+    {
+      "id": "the-api-document-is-filtered-by-the-caller",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/tools.test.ts",
+      "proves": "describes less to a stranger than to a member",
+      "fails": "a document listing operations the reader's first call refuses, which is a support ticket rather than a reference. It is the same `check` over the same registry the router and the tool catalogue use, so there is no second list to keep in step"
     }
   ]
 }

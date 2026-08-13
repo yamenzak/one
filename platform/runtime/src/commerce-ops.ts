@@ -824,6 +824,8 @@ export function customerOperations<B extends BindingSpec>(app: AppSpec<B>): read
   const notified = operation({
     id: "webhook.customer",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "a provider's own event id is the record, and `provider_event` keeps it — an audit row would be a second copy of somebody else's ledger" },
     summary: "Receive the workspace's own provider saying a customer paid.",
     input: s.object({}),
     output: s.object({ outcome: s.text() }),
@@ -1161,6 +1163,8 @@ export function providerOperations<B extends BindingSpec>(app: AppSpec<B>): read
   const webhook = operation({
     id: "webhook.provider",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "a provider's own event id is the record, and `provider_event` keeps it — an audit row would be a second copy of somebody else's ledger" },
     summary: "Receive a payment provider's notification.",
     input: s.object({}),
     output: s.object({ outcome: s.text() }),

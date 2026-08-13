@@ -69,6 +69,8 @@ export function guideOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
   const dismiss = operation({
     id: "guide.hint.seen",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "somebody dismissed a hint. An entry per dismissal is volume that makes the real entries harder to find" },
     summary: "Stop showing one hint to this person.",
     input: s.object({ id: s.enum(guide.hints.map((h) => h.id)) }),
     output: s.object({ ok: s.bool() }),

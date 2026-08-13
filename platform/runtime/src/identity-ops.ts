@@ -144,6 +144,8 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
   const requestCode = operation({
     id: "identity.code.request",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "the sign-in code table IS the record, and it carries the address, the attempt and the outcome" },
     summary: "Send a one-time sign-in code to an email address.",
     input: s.object({ email: s.text({ max: 320 }) }),
     output: s.object({ sent: s.bool() }),
@@ -195,6 +197,8 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
   const verifyCode = operation({
     id: "identity.code.verify",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "the session is the record. A row saying somebody signed in, beside a session row saying the same, is one fact twice" },
     summary: "Exchange a one-time code for a session.",
     input: s.object({ email: s.text({ max: 320 }), code: s.text({ min: 6, max: 6 }) }),
     output: s.object({ accountId: s.text(), offerPasskey: s.bool() }),
@@ -250,6 +254,8 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
   const registerBegin = operation({
     id: "identity.passkey.register.begin",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "a ceremony half-completed is not an event. The credential row is the record of the one that finished" },
     summary: "Start adding a passkey to the signed-in account.",
     input: nothing(),
     output: s.object({ challenge: s.text(), relyingParty: s.text(), accountId: s.text(), exclude: s.array(s.text()) }),
@@ -283,6 +289,8 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
   const registerFinish = operation({
     id: "identity.passkey.register.finish",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "the credential row is the record, with its own created-at and its own name" },
     summary: "Finish adding a passkey.",
     input: s.object({
       challenge: s.text({ max: 200 }), attestationObject: s.text({ max: 8000 }),
@@ -330,6 +338,8 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
   const signInBegin = operation({
     id: "identity.passkey.begin",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "a challenge issued is not an act. The session is the record of the one that succeeded" },
     summary: "Start signing in with a passkey.",
     input: s.object({ email: s.text({ max: 320 }) }),
     output: s.object({ challenge: s.text(), relyingParty: s.text(), allow: s.array(s.text()) }),
@@ -358,6 +368,8 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
   const signInFinish = operation({
     id: "identity.passkey.finish",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "the session is the record" },
     summary: "Finish signing in with a passkey.",
     input: s.object({
       challenge: s.text({ max: 200 }), credentialId: s.text({ max: 500 }),
@@ -431,6 +443,8 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
   const signOut = operation({
     id: "identity.signout",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "the session's own end is the record, and it is the row somebody would actually read" },
     summary: "End this session.",
     input: s.object({ everywhere: s.optional(s.bool()) }),
     output: s.object({ ok: s.bool() }),
@@ -526,6 +540,8 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
   const setPreferences = operation({
     id: "me.preferences.set",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "somebody's own theme and language, changed by nobody but them. It is not an act on a workspace" },
     summary: "Change how you read things, and how the app answers.",
     input: s.object({
       units: s.optional(s.enum(["", "metric", "imperial"])),
@@ -639,6 +655,8 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
   const endSession = operation({
     id: "me.session.revoke",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "the session's own end is the record" },
     summary: "Sign out one device.",
     /*
       ⚠️ NO PROOF HERE, DELIBERATELY, AND IT IS THE RULE RATHER THAN AN OMISSION.
@@ -708,6 +726,8 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
   const keyRemove = operation({
     id: "me.passkey.remove",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "the credential's own removal is the record" },
     summary: "Remove a passkey.",
     /*
       ⚠️ REMOVING A CREDENTIAL IS THE FIRST THING SOMEBODY WITH A BORROWED

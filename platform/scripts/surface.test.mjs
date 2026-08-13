@@ -410,6 +410,51 @@ for (const field of declared) {
 }
 /* ⚠️ A literal, because a guard binds to the words rather than to the line —
    a template-literal title cannot anchor one, so it could be renamed away. */
+/* ------------------------------------------------- 12. AUDITED OR EXCUSED */
+
+/**
+ * ⚠️ EVERY WRITE LEAVES A RECORD, AND A DERIVED ONE IS NOT A LICENCE TO STOP
+ * THINKING.
+ *
+ * `auditFor` now derives an entry for a write that declares nothing — the verb
+ * from the id, the subject from the row scope — so coverage is automatic and
+ * this check is not about coverage. It is about the two ways a derived entry is
+ * WORSE than a written one: `commerce.days` derives `verb: "days"`, which says
+ * nothing about a grant of access being extended, and an operation that
+ * genuinely keeps its own record elsewhere gets a duplicate nobody wants.
+ *
+ * So a write says one of two things: what to record, or why not to. Both are one
+ * line, and the alternative is what this replaced — twenty of the platform's own
+ * writes recorded nowhere at all, with nothing failing, because a missing entry
+ * is indistinguishable from an action nobody took.
+ */
+{
+  const writes = [];
+  for (const path of files) {
+    const text = readFileSync(path, "utf8");
+    const marks = [...text.matchAll(/\n\s*id: [`"]([^`"]+)[`"],\n\s*kind: "(read|write)",/g)];
+    marks.forEach((m, i) => {
+      if (m[2] !== "write") return;
+      const seg = text.slice(m.index, marks[i + 1] ? marks[i + 1].index : m.index + 6000);
+      writes.push({ id: m[1], path, said: /\n\s*audit: /.test(seg) });
+    });
+  }
+  const quiet = writes.filter((w) => !w.said);
+  if (writes.length < 40) {
+    fail(`only ${writes.length} write(s) found, so this check proves nothing about the rest.`);
+  } else if (quiet.length) {
+    fail(
+      `${quiet.length} write(s) say nothing about being audited:\n` +
+      quiet.slice(0, 8).map((w) => `         ${w.id} (${rel(w.path)})`).join("\n") + "\n" +
+      `       An entry is DERIVED for these, so nothing is lost — but a derived verb is the\n` +
+      `       id's last segment, which says less than a person would. Write \`audit: (i) => …\`,\n` +
+      `       or \`audit: { why: "…" }\` where the operation genuinely keeps its own record.`,
+    );
+  } else {
+    ok(`audited: ${writes.length} write(s), every one saying what to record or why not`);
+  }
+}
+
 ok(`registries: every declaration is classified and reachable`
    + ` — ${declared.length} field(s), ${Object.keys(READ_BY_A_PERSON).length} read by an operation`);
 

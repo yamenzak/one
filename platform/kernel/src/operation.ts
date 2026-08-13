@@ -247,7 +247,26 @@ export interface OperationSpec<B extends BindingSpec, I, O, F extends string = s
    */
   readonly shape?: Readonly<Record<string, string>>;
 
-  readonly audit?: (input: I) => { readonly subject: string; readonly verb: string };
+  /**
+   * ⚠️ EVERY WRITE IS AUDITED BY DEFAULT, and this only says it BETTER.
+   *
+   * It used to be the whole of it: an operation that declared nothing was
+   * recorded nowhere, so "auditable" meant "audited where somebody remembered".
+   * Twenty of the platform's own writes had no entry, and nothing failed —
+   * because a missing audit row looks exactly like an action nobody took.
+   *
+   * Absent now derives one: the verb from the operation's own id, the subject
+   * from its row scope or its input's id. Declaring a function replaces that
+   * with something a person would rather read — `subject: clientId, verb:
+   * "assign"` says more than `client.assign` ever will.
+   *
+   * ⚠️ AND `{ why }` IS THE ONLY WAY OUT, in the same shape as `tool`. A handful
+   * of writes genuinely keep their own record — the vault has a grant log, a
+   * sign-in has a session — and duplicating those into the audit is noise that
+   * makes the real entries harder to find. Saying so out loud is cheap; being
+   * silently absent is what this replaced.
+   */
+  readonly audit?: ((input: I) => { readonly subject: string; readonly verb: string }) | { readonly why: string };
   readonly outcome?: Outcome;
   /** Events this raises. The ONLY notification and webhook dispatcher. */
   readonly emits?: readonly string[];

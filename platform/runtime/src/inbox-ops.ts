@@ -55,6 +55,8 @@ export function inboxOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
   const mark = operation({
     id: "inbox.read",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "marking one's own notification read. An entry per read is volume with no reader" },
     summary: "Mark one notification read, or all of them.",
     input: s.object({ id: s.optional(s.text({ max: 60 })) }),
     output: s.object({ ok: s.bool() }),
@@ -86,6 +88,8 @@ export function inboxOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
   const setPrefs = operation({
     id: "inbox.preferences.set",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "somebody's own notification choices, changed by nobody but them" },
     summary: "Choose which interruptions you want.",
     /*
       ⚠️ CATEGORIES, NOT TYPES. A per-type preference screen is a list nobody

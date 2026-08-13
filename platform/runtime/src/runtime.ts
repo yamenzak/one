@@ -440,6 +440,11 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     behalf and long before its handler runs.
   */
   const problems: ProblemCatalog = { ...app.problems, ...PLATFORM_PROBLEMS };
+  /* ⚠️ WHAT EACH DECLARED FAILURE ARRIVES AS, derived once from the same
+     catalogue the router answers from. A second table would be a document that
+     describes a status the API does not send. */
+  const problemStatus: Readonly<Record<string, number>> =
+    Object.fromEntries(Object.entries(problems).map(([code, p]) => [code, p.status]));
 
   const resolveConfig = {
     appRoot: app.tenancy.appRoot,
@@ -1912,6 +1917,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         [TOOLS]: {
           operations: [...byPath.values()],
           caller,
+          problemStatus,
           /*
             ⚠️ THE ACTOR BECOMES `tool`, WHICH IS VISIBLE AND NON-PRIVILEGING. An
             operation may know it is being driven by a model — worth recording,

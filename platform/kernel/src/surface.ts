@@ -282,10 +282,50 @@ export interface AuditEntry {
   readonly via: "http" | "tool";
 }
 
+/**
+ * ⚠️ THE VERB IS THE LAST SEGMENT OF THE ID, which is what an operation is
+ * already named after. `member.invite` invites; `commerce.package.save` saves.
+ * A derived verb is worse than a written one and infinitely better than none.
+ */
+export const verbOf = (id: string): string => id.split(".").pop() ?? id;
+
+/**
+ * ⚠️ AND THE SUBJECT IS WHAT THE OPERATION ALREADY SAYS IT ACTS ON. Row scope is
+ * declared for the runner to enforce, so its first value is the thing being
+ * acted upon; failing that, an `id` in the input. An entry with an empty subject
+ * is still an entry — it says the action happened, by whom and when, which is
+ * most of what an audit is for.
+ */
+export function subjectOf(op: AnyOperation, input: unknown): string {
+  const scoped = op.scope ? Object.values(op.scope(input as never))[0] : undefined;
+  if (typeof scoped === "string" && scoped) return scoped;
+  const id = (input as { id?: unknown } | null)?.id;
+  return typeof id === "string" ? id : "";
+}
+
+/**
+ * What to record.
+ *
+ * ⚠️ EVERY WRITE, WHETHER OR NOT ITS AUTHOR THOUGHT OF IT. This returned `null`
+ * for anything that declared nothing, which made an audit trail a thing people
+ * remembered rather than a thing the platform did — and twenty of the platform's
+ * own writes were recorded nowhere while every suite stayed green, because a
+ * missing entry is indistinguishable from an action nobody took.
+ *
+ * ⚠️ READS ARE NOT AUDITED UNLESS THEY ASK TO BE. Every list, every poll, every
+ * screen load would be an entry, and an audit nobody can read is the same
+ * silence with a much larger bill. A read that genuinely matters — somebody
+ * opening a record — declares its own.
+ */
 export function auditFor(op: AnyOperation, input: unknown, via: AuditEntry["via"]): AuditEntry | null {
-  if (!op.audit) return null;
-  const { subject, verb } = op.audit(input);
-  return { operationId: op.id, subject, verb, via };
+  /* ⚠️ A stated exemption, in the same shape as `tool: { why }`. */
+  if (op.audit && typeof op.audit !== "function") return null;
+  if (op.audit) {
+    const { subject, verb } = op.audit(input);
+    return { operationId: op.id, subject, verb, via };
+  }
+  if (op.kind !== "write") return null;
+  return { operationId: op.id, subject: subjectOf(op, input), verb: verbOf(op.id), via };
 }
 
 /* ---------------------------------------------------------------- openapi --- */

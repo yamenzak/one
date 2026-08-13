@@ -13,7 +13,7 @@
  */
 
 import type { AnyOperation, AppSpec, BindingSpec, Caller, Instant, RegionId, SqlHandle, TenantId, UserId } from "@one/kernel";
-import { check, nothing, operation, PUBLIC, s, slugProblem, toolNameFor, toolsFor } from "@one/kernel";
+import { check, nothing, openApiFor, operation, PUBLIC, s, slugProblem, toolNameFor, toolsFor } from "@one/kernel";
 import { placeTenant } from "./directory.js";
 import { writeSetting } from "./settings.js";
 import { claim, invite } from "./membership.js";
@@ -449,6 +449,12 @@ export const TOOLS = Symbol.for("one.runtime.tools");
 export interface ToolDeps {
   readonly operations: readonly AnyOperation[];
   readonly caller: Caller;
+  /**
+   * ⚠️ WHAT EACH DECLARED FAILURE ARRIVES AS. The API document is worth little
+   * without it — a path listing `plans.not_publishable` and nothing that says
+   * whether that is a 409 or a 503 stops exactly where a reader needs it.
+   */
+  readonly problemStatus: Readonly<Record<string, number>>;
   dispatch(op: AnyOperation, input: unknown): Promise<unknown>;
 }
 export interface ToolCarrier { readonly [TOOLS]: ToolDeps }
@@ -477,9 +483,52 @@ export function toolOperations(): readonly AnyOperation[] {
     },
   });
 
+  /**
+   * THE API, DESCRIBED BY ITSELF.
+   *
+   * ⚠️ `openApiFor` WAS WRITTEN, UNIT-TESTED AND SERVED BY NOTHING. Every route,
+   * its method, its input shape and its declared failures were derivable from
+   * the one registry and no caller could ever read them — which is a document
+   * that exists and an API that is undocumented, at the same time.
+   *
+   * ⚠️ AND IT IS FILTERED BY THE CALLER, exactly as the tool catalogue is.
+   * Publishing the whole surface would describe operations the reader's first
+   * call refuses, and an API document that lists what you may not do is a
+   * support ticket rather than a reference. One filter, one registry, three
+   * transports.
+   */
+  const describe = operation({
+    id: "api.describe",
+    kind: "read",
+    summary: "Every route this caller may call, its input and its declared failures.",
+    input: nothing(),
+    output: s.object({ paths: s.json(), problems: s.json() }),
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    /* ⚠️ Not a tool: a model has `tools.list`, which is the same registry in the
+       shape a model can actually call. Two catalogues to a model is two chances
+       to pick the wrong one. */
+    tool: false,
+    async handler(ctx) {
+      const t = (ctx as unknown as ToolCarrier)[TOOLS];
+      const mine = t.operations.filter((op) => check(op, t.caller).allowed);
+      return {
+        paths: openApiFor(mine, t.problemStatus),
+        /*
+          ⚠️ THE FAILURES TRAVEL WITH IT. A path that lists `plans.not_publishable`
+          and nothing that says what it means or what status it arrives as is a
+          document that stops exactly where somebody needs it.
+        */
+        problems: t.problemStatus,
+      };
+    },
+  });
+
   const call = operation({
     id: "tools.call",
     kind: "write",
+    /* ⚠️ Its own record, not this one — see `auditFor`. */
+    audit: { why: "the operation it dispatches records its own, marked as having come from a tool. Auditing the wrapper too would double every entry a model produces" },
     summary: "Run one of the operations this caller may drive.",
     input: s.object({ name: s.text({ max: 120 }), input: s.optional(s.json()) }),
     output: s.object({ result: s.json() }),
@@ -513,5 +562,5 @@ export function toolOperations(): readonly AnyOperation[] {
     },
   });
 
-  return [list, call] as unknown as readonly AnyOperation[];
+  return [list, describe, call] as unknown as readonly AnyOperation[];
 }

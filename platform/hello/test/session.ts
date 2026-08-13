@@ -8,7 +8,7 @@
 
 import { env } from "cloudflare:test";
 import { sql, type ResolvedRegion } from "@one/kernel";
-import { bindingsFor, CONFIG_SCHEMA, seedOne, SESSION_COOKIE, writeOne } from "@one/runtime";
+import { bindingsFor, CONFIG_SCHEMA, readAll, SESSION_COOKIE, writeOne } from "@one/runtime";
 import worker, { recorded } from "../src/worker.js";
 
 /* ⚠️ Whose configuration. The directory is bound with the same id into every
@@ -47,15 +47,26 @@ const seedMail = async () => {
      column, and what it produced was an `ON CONFLICT` that matched no key —
      three suites failing on the fixture rather than on anything they test. */
   await db.batch([...CONFIG_SCHEMA.ddl]);
+  const have = await readAll(db, APP);
   for (const [key, value] of Object.entries({ "email.provider": "recorded", "email.from": "Hello <noreply@4dl.app>" })) {
     /*
-      ⚠️ SEEDED, NEVER OVERWRITTEN, and the fixture depends on the distinction as
-      much as production does. This runs on every sign-in, so an upsert here puts
-      a sender back after a test has deliberately blanked one — and the suite
-      that proves "a code that could not be sent is not a code that was" passes
-      by having sent it.
+      ⚠️ SEEDED WHERE ABSENT, AND REPAIRED WHERE BLANK — which is not the same as
+      an upsert, and the difference is the whole reason this comment is long.
+
+      A plain upsert would put a sender back on top of one a test deliberately
+      blanked, and the suite proving "a code that could not be sent is not a code
+      that was" would pass by having sent it. A plain SEED cannot repair a blank
+      row at all, so one file's deliberate blank leaks into the next file's
+      sign-in as a 503 and into the one after that as the OTP cooldown — an
+      unrelated test failing in an unrelated file, on about a third of full runs,
+      none of them near the cause.
+
+      ⚠️ REPAIRING HERE CANNOT DEFEAT THE SUITE THAT NEEDS THE BLANK, and that is
+      checkable rather than hoped: it asserts through `admin.email`, through
+      `admin.email.test` and through a raw `identity.code.request` — never
+      through `signIn`, which is the only caller of this.
     */
-    await seedOne(db, APP, key, value, new Date().toISOString() as never);
+    if ((have[key] ?? "") === "") await writeOne(db, APP, key, value, new Date().toISOString() as never);
   }
 };
 

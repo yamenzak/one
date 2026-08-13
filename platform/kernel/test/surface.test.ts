@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  auditFor, check, laneOf, openApiFor, routeFor, shapeFor, toolNameFor, toolsFor, webhookEventsFor,
+  auditFor, check, laneOf, openApiFor, routeFor, shapeFor, subjectOf, toolNameFor, toolsFor, verbOf, webhookEventsFor,
   type AnyOperation, type Caller,
 } from "../src/surface.js";
 import { gateFor } from "../src/standing.js";
@@ -281,5 +281,74 @@ describe("lanes", () => {
   it("takes the standing lane from the id's first segment", () => {
     expect(laneOf(publishPlan as never)).toBe("training");
     expect(laneOf(applyPackageGrant as never)).toBe("commerce");
+  });
+});
+
+/* ------------------------------------------------------------ audited --- */
+
+describe("what is recorded", () => {
+  const write = (over: Record<string, unknown> = {}) => ({
+    id: "note.archive", kind: "write", summary: "Archive a note.",
+    permission: "note:write", idempotency: { mode: "none" },
+    ...over,
+  } as never);
+
+  /*
+    ⚠️ EVERY WRITE, WHETHER OR NOT ITS AUTHOR THOUGHT OF IT. This returned `null`
+    for anything declaring nothing, which made an audit trail a thing people
+    remembered rather than a thing the platform did — and twenty of the
+    platform's own writes were recorded nowhere while every suite stayed green,
+    because a missing entry is indistinguishable from an action nobody took.
+  */
+  it("records a write that declared nothing", () => {
+    expect(auditFor(write(), { id: "n_1" }, "http")).toEqual({
+      operationId: "note.archive", subject: "n_1", verb: "archive", via: "http",
+    });
+  });
+
+  /* ⚠️ A written one is better and wins. `subject: clientId, verb: "assign"`
+     says more than an id split on a dot ever will. */
+  it("prefers what the operation says about itself", () => {
+    const said = write({ audit: () => ({ subject: "c_9", verb: "assign" }) });
+    expect(auditFor(said, {}, "http")).toMatchObject({ subject: "c_9", verb: "assign" });
+  });
+
+  /*
+    ⚠️ AND `{ why }` IS THE ONLY WAY OUT, in the same shape as `tool`. A handful
+    of writes genuinely keep their own record; being silently absent is what
+    this replaced.
+  */
+  it("takes a stated exemption and nothing else", () => {
+    expect(auditFor(write({ audit: { why: "the session is the record" } }), {}, "http")).toBeNull();
+  });
+
+  /*
+    ⚠️ READS ARE NOT RECORDED UNLESS THEY ASK. Every list, every poll and every
+    screen load would be an entry, and an audit nobody can read is the same
+    silence with a much larger bill.
+  */
+  it("leaves reads alone unless they ask", () => {
+    expect(auditFor(write({ kind: "read" }), { id: "n_1" }, "http")).toBeNull();
+    const asked = write({ kind: "read", audit: () => ({ subject: "n_1", verb: "open" }) });
+    expect(auditFor(asked, {}, "http")).toMatchObject({ verb: "open" });
+  });
+
+  /* ⚠️ The subject comes from what the operation already says it acts on. */
+  it("takes the subject from row scope before the input", () => {
+    const scoped = write({ scope: () => ({ clientId: "c_2" }) });
+    expect(subjectOf(scoped, { id: "n_1" })).toBe("c_2");
+    expect(subjectOf(write(), { id: "n_1" })).toBe("n_1");
+    expect(subjectOf(write(), {})).toBe("");
+  });
+
+  it("takes the verb from the id the operation is already named after", () => {
+    expect(verbOf("commerce.package.save")).toBe("save");
+    expect(verbOf("solo")).toBe("solo");
+  });
+
+  /* ⚠️ And which transport, because an action taken BY a model is worth telling
+     apart from one a person took. */
+  it("says which transport it came in on", () => {
+    expect(auditFor(write(), {}, "tool")!.via).toBe("tool");
   });
 });
