@@ -248,6 +248,25 @@ not recognise falls through to the CUSTOM-DOMAIN lookup, which asks which tenant
 registered it — so a domain we own and did not declare is one a tenant's claim can
 be served at. `id.4dl.app` and every sibling product's root are `unclaimed` now.
 
+#### What exists in the browser, and what does not
+
+**Built 2026-08-13.** The four passkey operations and the two code operations had
+been complete, verified and rate-limited for three stages with **nothing calling
+them** — the only thing that had ever signed into this platform was a test
+harness. `@one/web` now carries the other half:
+
+- **`passkey.ts`** — the ceremony, with the browser injected rather than reached
+  for, so every outcome is exercisable without an authenticator. The encoder is
+  the kernel's, because both halves have to agree.
+- **`door.tsx`** — the screens and the pure transition function: an address, a
+  code, and an offer that is a suggestion rather than a step.
+- **`prove.tsx`** — what `platform.proof_required` turns into.
+
+⚠️ **What is still missing is an app that SERVES them.** The runtime answers
+JSON and nothing in `platform/` returns HTML, so `id.4dl.app` is a door the
+classifier knows, a set of screens, and no shell between them. That is the
+chrome half of stage 7 rather than a gap in the auth work.
+
 #### A session is not a proof forever
 
 **Answered 2026-08-13.** The realistic attack on an account here is not a stolen
