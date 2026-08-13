@@ -39,6 +39,8 @@ import { remember, replayed, replayKeyOf, REPLAY_HEADER } from "./replay.js";
 import { LOOKUP, type Fetcher, type LookupCarrier } from "./lookup.js";
 import { chargeableFrom, DEPLOYMENT_SCOPE, readAll, readCatalogue } from "./config.js";
 import { catalogueJob } from "./catalogue-sync.js";
+import { noteTokenUse, resolveToken, TOKEN_PREFIX } from "./api-token.js";
+import { TOKENS, tokenOperations, type TokenCarrier } from "./api-token-ops.js";
 
 /* ⚠️ NON-EMPTY WINS, NOT PRESENT WINS — `kernel/config.ts` states why, and a
    second reader that got it wrong would silently switch off a shared key for one
@@ -385,7 +387,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of [...platformOperations(app), ...identityOperations(app), ...marketOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...generationOperations(app), ...operatorOperations(app), ...configOperations(app), ...settingsOperations(app), ...domainAdminOperations(OPERATE), ...guideOperations(app), ...milestoneOperations(app), ...membershipOperations(app), ...referenceOperations(app), ...vaultOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app), ...marketOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...generationOperations(app), ...operatorOperations(app), ...configOperations(app), ...settingsOperations(app), ...domainAdminOperations(OPERATE), ...guideOperations(app), ...milestoneOperations(app), ...membershipOperations(app), ...referenceOperations(app), ...vaultOperations(app), ...tokenOperations(), ...toolOperations()]) byPath.set(routeFor(op).path, op);
 
   /*
     ⚠️ A COLLECTION'S OPERATIONS ARE DERIVED HERE, NOT BY THE APP. Leaving it to
@@ -745,6 +747,64 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           // An expired row is deleted rather than left to accumulate; a row for
           // another origin is left alone, because it is somebody else's session.
           else if (verdict.why === "expired") await sessions.revoke(found.id);
+        }
+      }
+
+      /*
+        ⚠️ A TOKEN IS A SESSION FOR A MACHINE, RESOLVED THE SAME WAY AND WORTH
+        LESS. It names an account and a workspace and carries no permissions at
+        all: everything below resolves the member's reach LIVE, exactly as a
+        browser session does, so a role somebody loses is a role their token
+        loses at the same moment. A scope list frozen at issue is the shape where
+        it is not.
+
+        ⚠️ THE COOKIE WINS WHERE BOTH ARE PRESENT. A browser that also carries a
+        bearer is somebody testing, and resolving the weaker credential would
+        silently downgrade what a person can do on their own screen.
+
+        ⚠️ AND IT NEVER PROVES ANYTHING RECENT. `proof: "recent"` exists against a
+        borrowed laptop with an open tab, and the answer is a code to an inbox — a
+        machine cannot give one, so closing an account or minting another token
+        stays something a person does in front of a screen. `tokenSession` leaves
+        `provenAt` null, and the gate reads that as not proven.
+      */
+      let viaToken: { readonly tenantId: string; readonly appId: string } | null = null;
+      const bearer = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+      if (!session && bearer.startsWith(TOKEN_PREFIX) && identityDb) {
+        const now = new Date().toISOString() as Instant;
+        const resolved = await resolveToken(identityDb, bearer, now);
+        /*
+          ⚠️ A CREDENTIAL THAT WAS PRESENTED AND DID NOT RESOLVE IS 401, AND THE
+          REQUEST STOPS HERE. Falling through to anonymous is the tempting
+          version and it is wrong twice over: the caller gets 403, which says
+          "you may not" to a client whose actual problem is "who you say you are
+          is not valid" — so it never re-authenticates — and a revoked or expired
+          token quietly becomes an anonymous caller with whatever the public
+          lanes allow, which is a credential that half works after being
+          destroyed.
+
+          ⚠️ AND THE THREE REASONS ARE ONE ANSWER. Telling an unknown token from
+          a revoked one, out loud, is an oracle for which strings were ever real.
+        */
+        if (!resolved.ok) {
+          return problemResponse({
+            code: "platform.unauthorized", status: 401,
+            title: "That credential is not valid", retryable: false,
+          }, ref);
+        }
+        if (resolved.ok) {
+          /* ⚠️ To the day, not the second — see `noteTokenUse`. */
+          await noteTokenUse(identityDb, resolved.row.id, now);
+          viaToken = { tenantId: resolved.row.tenantId, appId: resolved.row.appId };
+          session = {
+            id: `token:${resolved.row.id}`,
+            accountId: resolved.row.accountId,
+            appId: resolved.row.appId,
+            origin: url.origin,
+            snapshot: { email: "", name: "" },
+            provenAt: null,
+            expiresAt: (resolved.row.expiresAt ?? "9999-12-31T00:00:00.000Z") as Instant,
+          } as unknown as Session;
         }
       }
 
@@ -1507,7 +1567,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       };
       const audit: AuditEntry[] = [];
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & ConfigCarrier & SettingsCarrier & LookupCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier & ProvisionCarrier & MarketCarrier & ReferenceCarrier & VaultCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & ConfigCarrier & SettingsCarrier & LookupCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier & ProvisionCarrier & MarketCarrier & ReferenceCarrier & VaultCarrier & TokenCarrier = {
         [CONFIG]: {
           own: directoryDb,
           /* ⚠️ Whose rows in a store every app binds by the same id. */
@@ -1698,6 +1758,20 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           app-wide grant (`tenantId: null`) and a request from the account
           centre would resolve as two different scopes.
         */
+        /*
+          ⚠️ THE GLOBAL STORE, because a token is what RESOLVES a caller and is
+          therefore read before a region is known. It is also the reason issuing
+          lives on the hub: a credential belongs to a person, outlives any one
+          workspace they are in, and is the same kind of thing as a passkey.
+        */
+        [TOKENS]: {
+          global: directoryDb,
+          accountId: session?.accountId ?? "",
+          /* ⚠️ Which workspaces this person is ACTUALLY in, so a token cannot
+             name one they left or never joined — the resolver would honour it. */
+          belongings: async () =>
+            session ? (await belongings(directoryDb, session.accountId)).map((b) => ({ tenantId: b.tenantId, appId: b.appId })) : [],
+        },
         [VAULT]: {
           directory: directoryDb,
           session,

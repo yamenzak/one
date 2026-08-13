@@ -37,6 +37,7 @@ import { CONFIG_SCHEMA, MODEL_SCHEMA } from "./config.js";
 import { DIRECTORY_SCHEMA, DOMAIN_SCHEMA } from "./directory.js";
 import { VAULT_SCHEMA, VAULT_SPEC_SCHEMA } from "./vault.js";
 import { IDENTITY_SCHEMA } from "./identity.js";
+import { API_TOKEN_SCHEMA } from "./api-token.js";
 import { OTP_SCHEMA } from "./identity-ops.js";
 import { PROVISIONING_SCHEMA } from "./provisioning.js";
 import { ACCOUNT_BILLING_SCHEMA } from "./account-billing.js";
@@ -80,6 +81,9 @@ export const PLATFORM_GLOBAL: readonly SchemaModule[] = [
   DIRECTORY_SCHEMA,
   DOMAIN_SCHEMA,
   IDENTITY_SCHEMA,
+  /* ⚠️ A credential belonging to a PERSON, read before a region is known —
+     it is what resolves the caller in the first place. */
+  API_TOKEN_SCHEMA,
   /*
     ⚠️ GLOBAL, WHILE THE SESSION ITSELF STAYS REGIONAL. This is the index that
     answers "where am I signed in" — a question that spans apps and regions by

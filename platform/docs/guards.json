@@ -4873,6 +4873,60 @@
       "impl": "hello/test/tools.test.ts",
       "proves": "describes less to a stranger than to a member",
       "fails": "a document listing operations the reader's first call refuses, which is a support ticket rather than a reference. It is the same `check` over the same registry the router and the tool catalogue use, so there is no second list to keep in step"
+    },
+    {
+      "id": "a-token-is-the-persons-reach-not-a-copy-of-it",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/token.test.ts",
+      "proves": "drives the product as its owner",
+      "fails": "a scope list frozen at issue — the shape where somebody loses a role and their token keeps it, silently, until an audit finds a machine doing what its owner no longer may. A token stores no permissions at all: it names an account and a workspace, and every request resolves that member's reach live, exactly as a browser session does"
+    },
+    {
+      "id": "a-token-proves-nothing-recent",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/token.test.ts",
+      "proves": "cannot do what needs proving, including minting another token",
+      "fails": "the one way past the proof gate. `proof: \"recent\"` exists against a borrowed laptop with an open tab and the answer is a code to an inbox, which a machine cannot give — so closing an account, moving money and minting another credential stay things a person does in front of a screen. `provenAt` is null on a token session and the gate reads that as not proven"
+    },
+    {
+      "id": "a-token-names-a-workspace-its-owner-is-in",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/token.test.ts",
+      "proves": "refuses a workspace this person is not in",
+      "fails": "a credential naming a workspace somebody left, or never joined, which the resolver would happily honour. The tenant id is something a caller types"
+    },
+    {
+      "id": "a-secret-exists-once",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/token.test.ts",
+      "proves": "mints a secret exactly once, and never again",
+      "fails": "a console that can display a live credential, which leaks one through a screen share, a support session or any read of the database — and the whole reason a token exists rather than a password is that it can be destroyed without disturbing the person. The store holds a hash; the list carries the last four characters so two tokens can be told apart"
+    },
+    {
+      "id": "a-revoked-token-stops-immediately",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/token.test.ts",
+      "proves": "stops working the moment it is revoked",
+      "fails": "a credential that half works after being destroyed. A presented token that does not resolve refuses the request 401 rather than falling through to anonymous — which is wrong twice over: 403 tells a client \"you may not\" when its actual problem is \"who you say you are is not valid\", so it never re-authenticates; and a revoked token quietly becomes an anonymous caller with whatever the public lanes allow"
+    },
+    {
+      "id": "a-tokens-refusals-are-one-answer",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/token.test.ts",
+      "proves": "refuses a string that was never a token",
+      "fails": "an oracle for which strings were ever real. Unknown, revoked and expired are three reasons in the log and one answer to the caller"
     }
   ]
 }
