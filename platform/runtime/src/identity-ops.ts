@@ -630,6 +630,13 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     id: "me.session.revoke",
     kind: "write",
     summary: "Sign out one device.",
+    /*
+      ⚠️ NO PROOF HERE, DELIBERATELY, AND IT IS THE RULE RATHER THAN AN OMISSION.
+      Signing another device out is what somebody does the moment they think they
+      have been compromised — and a step-up in front of a DEFENSIVE action helps
+      whoever is already inside keep their foothold. The same argument covers
+      leaving a workspace and turning a grant off.
+    */
     input: s.object({ id: s.text({ max: 128 }) }),
     output: s.object({ ok: s.bool(), within: s.number() }),
     permission: PUBLIC,
@@ -692,6 +699,15 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     id: "me.passkey.remove",
     kind: "write",
     summary: "Remove a passkey.",
+    /*
+      ⚠️ REMOVING A CREDENTIAL IS THE FIRST THING SOMEBODY WITH A BORROWED
+      SESSION DOES, because it is how they stop the real owner getting back in
+      before the takeover is finished. A permission check passes for them — the
+      cookie is genuine — so the only thing between an open tab and a locked-out
+      person is asking them to prove it is them, which on their own device is one
+      tap.
+    */
+    proof: "recent",
     input: s.object({ id: s.text({ max: 255 }) }),
     output: s.object({ ok: s.bool() }),
     permission: PUBLIC,
@@ -892,6 +908,15 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     id: "exit.account.export",
     kind: "read",
     summary: "Everything your account holds about you, in one document.",
+    /*
+      ⚠️ A READ, AND IT STILL ASKS. This is the one read in the platform that
+      hands over EVERYTHING at once — the vault, the addresses, the record of who
+      looked at what — which makes it the single most valuable thing a borrowed
+      session can be pointed at. The rule that reads are never gated is about
+      withholding somebody's own records from THEM; this is about handing them to
+      whoever is holding the laptop.
+    */
+    proof: "recent",
     input: nothing(),
     output: s.object({ at: s.instant(), tables: s.json(), dropped: s.json(), account: s.json(), workspaces: s.json() }),
     permission: PUBLIC,
@@ -915,6 +940,10 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     id: "exit.account.close",
     kind: "write",
     summary: "Close your account. Reversible for seven days.",
+    /* ⚠️ THE MOST DESTRUCTIVE THING THIS PLATFORM CAN BE ASKED TO DO. Seven days
+       of grace is what makes it survivable; a recent proof is what stops it
+       being started by somebody who simply found the tab open. */
+    proof: "recent",
     input: s.object({ reason: s.optional(s.text({ max: 500 })) }),
     output: s.object({ closesAt: s.instant() }),
     permission: PUBLIC,

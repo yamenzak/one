@@ -166,6 +166,23 @@ export const PLATFORM_PROBLEMS = declareProblems({
     may hold none, and telling them the person has recorded nothing is itself a
     disclosure nobody made.
   */
+  /*
+    ⚠️ ITS OWN CODE, AND IT IS THE ONE REFUSAL THAT IS NOT ABOUT PERMISSION AT
+    ALL. The caller is allowed to do this and the session is genuine; what is
+    missing is a RECENT proof that the person holding it is the person it was
+    issued to. A borrowed laptop with an open tab is the realistic threat, and
+    against it a permission check is worth nothing — it passes.
+
+    ⚠️ 401, WHICH IS THE ONLY STATUS THAT MEANS "PROVE IT AGAIN". 403 says the
+    answer will not change, and a client that reads it that way will not offer
+    the one thing that resolves this.
+  */
+  "platform.proof_required": {
+    status: 401,
+    title: "Confirm it is you",
+    detail: () => "Sign in again to continue. It takes one tap with a passkey.",
+    retryable: false,
+  },
   "platform.not_shared": {
     status: 409,
     title: "That is not shared with you",

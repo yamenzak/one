@@ -221,6 +221,44 @@ describe("closing your ACCOUNT, which is not closing a workspace", () => {
     expect((await account(mine)("/api/exit.account.status")).body.closesAt).toBeUndefined();
   });
 
+  /*
+    ⚠️ A SESSION IS NOT A PROOF FOREVER, AND THIS IS WHAT MAKES THAT TRUE. The
+    realistic attack on an account is not a stolen password — there is none — it
+    is a borrowed laptop with an open tab. Against that, every check the platform
+    has PASSES: the cookie is genuine, the permission is held, the workspace is in
+    good standing. Closing an account, removing a credential and exporting
+    everything are the three things such a person would do, so each asks for a
+    proof no more than ten minutes old.
+
+    ⚠️ THE ROW IS BACK-DATED RATHER THAN THE CLOCK MOVED, because the age of the
+    session IS the mechanism — there is no second timestamp to fake, which is the
+    property that makes it impossible for a proof to be recorded when none was
+    given.
+  */
+  it("asks somebody to prove it is them before the account can be closed", async () => {
+    const stale = await signIn("stale@example.test", ID);
+    const id = stale.split("=")[1]!;
+    const long = new Date(Date.now() - 60 * 60_000).toISOString();
+    /* ⚠️ THE ACCOUNT DOOR RESOLVES NO WORKSPACE, so its session is written in the
+       DIRECTORY's region rather than in a tenant's — which is the same reason the
+       door exists at all: a person's account is not any product's. */
+    for (const binding of ["DB", "DB_EU"]) {
+      await handle(binding).run(`UPDATE sessions SET created_at = ? WHERE id = ?`, long, id);
+    }
+
+    const out = await account(stale)("/api/exit.account.close", {});
+    expect(out.status).toBe(401);
+    expect(out.body.code).toBe("platform.proof_required");
+
+    /* ⚠️ AND THE WHOLE EXPORT WITH IT — the one read that hands over everything
+       at once, which is what a borrowed session is worth pointing at. */
+    expect((await account(stale)("/api/exit.account.export")).status).toBe(401);
+
+    /* ⚠️ WHILE SIGNING A DEVICE OUT IS STILL ALLOWED. A step-up in front of a
+       defensive action helps whoever is already inside keep their foothold. */
+    expect((await account(stale)("/api/me.sessions")).status).toBe(200);
+  });
+
   it("closes with seven days to change your mind, and gives them back", async () => {
     /* ⚠️ A workspace with a second administrator, so leaving strands nobody. */
     const founder = await signIn("shared@example.test", SETUP);

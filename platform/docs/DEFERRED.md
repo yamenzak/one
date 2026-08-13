@@ -21,4 +21,4 @@ kind: index
 - `one-187` — `mail:no_sender` on the identity door under a full  
   <sub>hello/test/account.test.ts:28</sub>
 - `one-189` — an operator is called `owner` on their own  
-  <sub>runtime/src/runtime.ts:1065</sub>
+  <sub>runtime/src/runtime.ts:1076</sub>

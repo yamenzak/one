@@ -63,6 +63,40 @@ describe("the gates, in order", () => {
     if (!v.allowed) expect(v.refusal).toBe("standing");
   });
 
+  /*
+    ⚠️ A PROOF IS NOT A PERMISSION, AND THE ORDER SAYS SO. Somebody who may not do
+    a thing at all is told that, rather than sent to prove who they are for an
+    answer that will not change; somebody who MAY do it meets the proof before any
+    question about the workspace, because those are about the workspace and this is
+    about them.
+
+    ⚠️ AND THE THREAT IT ANSWERS PASSES EVERY OTHER CHECK. A borrowed laptop with
+    an open tab holds a genuine cookie, a real permission and a workspace in good
+    standing — so this is the only gate in the file that can refuse it.
+  */
+  it("asks for a recent proof where one is declared, after the permission", () => {
+    const risky = { ...(publishPlan as never as AnyOperation), proof: "recent" as const };
+    const stale = check(risky, full);
+    expect(stale.allowed).toBe(false);
+    if (!stale.allowed) expect(stale.refusal).toBe("proof");
+    expect(check(risky, caller({ ...full, provenRecently: true })).allowed).toBe(true);
+
+    /* ⚠️ AND SOMEBODY WHO MAY NOT DO IT AT ALL HEARS THAT INSTEAD. */
+    const wrong = check(risky, caller({ ...full, permissions: new Set(), provenRecently: true }));
+    if (!wrong.allowed) expect(wrong.refusal).toBe("permission");
+  });
+
+  /*
+    ⚠️ ABSENT IS "NOT PROVEN", NEVER "NOT ASKED". A caller with no session — a
+    webhook, a machine, a device — has proved nothing, and defaulting the other way
+    would make every un-sessioned lane the one way past this gate.
+  */
+  it("treats a caller who cannot have proved anything as unproven", () => {
+    const risky = { ...(publishPlan as never as AnyOperation), proof: "recent" as const };
+    const v = check(risky, caller({ ...full }));
+    expect(v.allowed).toBe(false);
+  });
+
   it("never gates a READ on standing, at any rung", () => {
     for (const standing of ["read_only", "blocked", "closing"] as const) {
       const c = caller({ ...full, gate: gateFor({ standing, reason: "arrears" }) });

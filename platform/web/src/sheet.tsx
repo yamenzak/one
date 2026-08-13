@@ -69,11 +69,21 @@ export function Sheet({ open, onClose, dismissible, label, children }: SheetProp
           onPointerDownOutside={(e) => { if (!dismissible) e.preventDefault(); }}
           onEscapeKeyDown={(e) => { if (!dismissible) e.preventDefault(); }}
           onOpenAutoFocus={(e) => {
-            /* ⚠️ ON THE SURFACE, NOT ON ITS FIRST CONTROL — otherwise a sheet whose
-               first control is the way out opens with a ring round it and reads
-               "Close" before it reads its own title. A field inside asks for focus
-               itself, which is a different decision made by whoever put it there. */
-            if (!dismissible) { e.preventDefault(); (e.currentTarget as HTMLElement | null)?.focus(); }
+            /*
+              ⚠️ ON THE SURFACE, NOT ON ITS FIRST CONTROL — always, and it used to
+              be only for the sheets that cannot be dismissed. A sheet whose first
+              control is the way out opened with a ring round "Close" and read that
+              before its own title; a sheet whose first control is an ACTION opened
+              with the action focused, which is a sheet where the reflex press that
+              summoned it can fire the thing it was asking about. The proof sheet
+              is the second kind, and the confirm is the second kind with teeth.
+
+              ⚠️ A FIELD INSIDE STILL TAKES FOCUS, because it asks for it itself on
+              mount — a decision made by whoever put it there rather than by the
+              surface, which is the distinction this line is drawing.
+            */
+            e.preventDefault();
+            (e.currentTarget as HTMLElement | null)?.focus();
           }}
         >
           {dismissible ? (

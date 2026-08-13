@@ -3901,6 +3901,51 @@
       "impl": "hello/test/identity.test.ts",
       "proves": "issues a challenge with no address, so a discoverable passkey can answer",
       "fails": "a sign-in operation that demands a non-empty address. The door arms the address field before anybody types, so the request would 400 before the ceremony started, the suggestion would never appear, and nothing anywhere would fail"
+    },
+    {
+      "id": "a-proof-is-not-a-permission",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/surface.test.ts",
+      "proves": "asks for a recent proof where one is declared, after the permission",
+      "fails": "a destructive operation gated by permission alone. The realistic threat to an account is a borrowed laptop with an open tab, and against it every other check passes — the cookie is genuine, the permission is held, the workspace is in good standing"
+    },
+    {
+      "id": "an-unproven-caller-is-not-an-unasked-one",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/surface.test.ts",
+      "proves": "treats a caller who cannot have proved anything as unproven",
+      "fails": "a caller with no session defaulting to proven — which would make every un-sessioned lane the one way past this gate"
+    },
+    {
+      "id": "closing-an-account-asks-who-you-are",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/exit.test.ts",
+      "proves": "asks somebody to prove it is them before the account can be closed",
+      "fails": "the three things a borrowed session is worth pointing at — closing the account, removing a credential and exporting everything — reachable from an open tab with no further proof. The same test pins the other direction: signing a device out is DEFENSIVE, and a step-up in front of it helps whoever is already inside keep their foothold"
+    },
+    {
+      "id": "a-proof-is-raised-by-a-refusal",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/door.test.tsx",
+      "proves": "knows the one refusal a proof resolves",
+      "fails": "a screen deciding for itself which actions need a recent proof — a second copy of a rule the operations declare, and the copy is the one that goes out of date the first time a fourth operation is added"
+    },
+    {
+      "id": "a-proof-never-asks-who-you-are",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/door.test.tsx",
+      "proves": "shows the address rather than asking for it",
+      "fails": "a form demanding the address the session already knows, standing between somebody and something they were in the middle of doing"
     }
   ]
 }

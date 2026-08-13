@@ -19,7 +19,7 @@ import type {
 } from "@one/kernel";
 import {
   ACCOUNT_HOLDER, ALWAYS_ALLOWED, CONSENT_EXEMPT_LANES, accountCascade, assertComposable, auditFor, check, consentGate, cookieDomainFor, gateFor, laneOf, weekStarting, PLATFORM_PROBLEMS, SEATS_ENTITLEMENT, STORAGE_ENTITLEMENT, SUPPORT_SESSION,
-  catalogueOf, detailFor, floorPlan, fromQuery, PUBLIC, relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
+  catalogueOf, detailFor, floorPlan, fromQuery, provenRecently, PUBLIC, relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
 } from "@one/kernel";
 import { bindingsFor, globalSql, secretFor, type RawEnv } from "./env.js";
 import { applySchema } from "./schema.js";
@@ -1035,7 +1035,18 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       const customerFlags = app.access.customerRail && subjectId && at.tenant
         ? await customerFlagsFor(regionalDb, at.tenant.tenantId, subjectId, app.access.customerFlags, entitlements, new Date().toISOString() as Instant)
         : undefined;
-      const caller: Caller = { permissions, customerFlags, entitlements, gate };
+      /*
+        ⚠️ PROVEN IS THE SESSION'S OWN AGE, AND NOTHING ELSE RECORDS IT. A session
+        exists because somebody completed a ceremony, so "recently proven" and
+        "recently created" are one fact — and re-proving mints a new session,
+        which resets it. A second timestamp would be a copy that can disagree,
+        including in the direction that says somebody proved themselves when they
+        did not.
+      */
+      const caller: Caller = {
+        permissions, customerFlags, entitlements, gate,
+        provenRecently: session ? provenRecently(session, new Date().toISOString() as Instant) : false,
+      };
 
       /*
         ⚠️ THE MEMBERSHIP KNOWS IT, so nothing has to guess. `roleOf` derives one
@@ -1871,9 +1882,23 @@ export class DeclaredFailure extends Error {
   }
 }
 
+/*
+  ⚠️ A REFUSAL IS ANSWERED IN THE WORDS OF THE THING THAT REFUSED IT. Standing is
+  about the workspace, proof is about the person holding the cookie, and
+  permission is about the role — three different problems with three different
+  ways out, and one 403 for all of them is copy that is wrong for two.
+*/
 const refusalProblem = (refusal: string): Omit<Problem, "ref"> =>
   refusal === "standing"
     ? { code: "platform.read_only", status: 402, title: "This workspace is read-only", retryable: false }
-    : { code: "platform.forbidden", status: 403, title: "You don't have access to this", retryable: false };
+    : refusal === "proof"
+      /* ⚠️ 401, NOT 403, BECAUSE THE ANSWER CHANGES. A client reading 403 has no
+         reason to offer the one thing that resolves this, which is proving it is
+         you again — and on a passkey that is a single tap. */
+      ? {
+          code: "platform.proof_required", status: 401, title: "Confirm it is you",
+          detail: "Sign in again to continue. It takes one tap with a passkey.", retryable: false,
+        }
+      : { code: "platform.forbidden", status: 403, title: "You don't have access to this", retryable: false };
 
 

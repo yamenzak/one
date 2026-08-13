@@ -42,6 +42,7 @@ import { Card, Entry } from "../src/list.js";
 import { Edit } from "../src/icon.js";
 import { AskForIt, ConsentSheet, type Asked } from "../src/consent.js";
 import { Door, type DoorWire } from "../src/door.js";
+import { ProveIt } from "../src/prove.js";
 import type { Ceremony } from "../src/passkey.js";
 import { SignInMethods } from "../src/account/signin.js";
 import { Stack } from "../src/stack.js";
@@ -641,7 +642,15 @@ function Preview() {
       />
     );
 
-  if (doorAs) {
+  /*
+    ⚠️ THE SHEET A REFUSAL RAISES, WHICH NOTHING ELSE IN THIS PREVIEW COULD REACH.
+    It is opened by `platform.proof_required` coming back from a write, and a
+    preview with no server has no way to produce one — so it is a mode.
+    `#prove=1`, and `#prove=passkey` for a device that has one.
+  */
+  const proveAs = asked.get("prove");
+
+  if (doorAs || proveAs) {
     /*
       ⚠️ A WIRE THAT REFUSES AS OFTEN AS IT AGREES. A door reviewed against a
       wire that always says yes is a door whose cooldown, whose wrong code and
@@ -663,14 +672,24 @@ function Preview() {
     };
     /* ⚠️ A BROWSER THAT CANNOT, BY DEFAULT. Most people arriving at a door have
        no passkey, and a preview that assumes one is a preview of the rarer half. */
-    const ceremony: Ceremony = {
-      available: async () => doorAs === "passkey",
+    const browser: Ceremony = {
+      available: async () => doorAs === "passkey" || proveAs === "passkey",
       autofill: async () => false,
       create: async () => null,
       get: async () => null,
     };
-    return (
-      <Door name="Kova" wire={wire} ceremony={ceremony} onIn={() => undefined} />
+    return proveAs ? (
+      <ProveIt
+        open
+        email="nadia@haddadstrength.com"
+        toDo="closing your account"
+        wire={wire}
+        ceremony={browser}
+        onProven={() => undefined}
+        onClose={() => undefined}
+      />
+    ) : (
+      <Door name="Kova" wire={wire} ceremony={browser} onIn={() => undefined} />
     );
   }
 

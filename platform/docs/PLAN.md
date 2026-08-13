@@ -248,6 +248,32 @@ not recognise falls through to the CUSTOM-DOMAIN lookup, which asks which tenant
 registered it — so a domain we own and did not declare is one a tenant's claim can
 be served at. `id.4dl.app` and every sibling product's root are `unclaimed` now.
 
+#### A session is not a proof forever
+
+**Answered 2026-08-13.** The realistic attack on an account here is not a stolen
+password — there is none — and not a phished code, which expires in ten minutes.
+It is a borrowed laptop with an open tab. Against that, every check the platform
+has PASSES: the cookie is genuine, the permission is held, the workspace is in
+good standing.
+
+So an operation may declare `proof: "recent"`, and the gate refuses it with
+`platform.proof_required` (401, because the answer changes) unless the session is
+younger than ten minutes. Three carry it — closing an account, removing a
+credential, exporting everything — which are the three things somebody who found
+a tab open would do.
+
+⚠️ **The proof is the session's own age, and there is no second timestamp.** A
+session exists because a ceremony was completed, so "recently proven" and
+"recently created" are one fact; re-proving mints a new session, which resets it.
+A step-up table or a `stepped_up_at` column would be a copy of something already
+recorded — and a copy can disagree, including in the direction that says somebody
+proved themselves when they did not.
+
+⚠️ **And it is never put on a defensive action.** Signing another device out,
+revoking a session, turning a grant off: those are what somebody does the moment
+they think they have been compromised, and friction in front of them helps
+whoever is already inside keep their foothold.
+
 #### The migration is additive
 
 A credential bound to `<app>.4dl.app` keeps working on that app. New
@@ -1281,6 +1307,9 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `the-account-is-not-a-product` | the deployment listed as one more product somebody signed up for. It exists before any product and outlives all of them, so an empty `appId` is how the runtime says which row this is — and a reader who cannot tell reads the terms of the thing every product is reached through as optional | **live** |
 | `the-account-terms-gate-covers-the-account` | a consent gate reading the app's documents and not the deployment's — every product's terms enforced and none of the platform's. The account's are owed for HAVING an account and are asked of a role no app declares, which is the one set an app's declaration structurally cannot reach | **live** |
 | `a-discoverable-passkey-needs-no-address` | a sign-in operation that demands a non-empty address. The door arms the address field before anybody types, so the request would 400 before the ceremony started, the suggestion would never appear, and nothing anywhere would fail | **live** |
+| `a-proof-is-not-a-permission` | a destructive operation gated by permission alone. The realistic threat to an account is a borrowed laptop with an open tab, and against it every other check passes — the cookie is genuine, the permission is held, the workspace is in good standing | **live** |
+| `an-unproven-caller-is-not-an-unasked-one` | a caller with no session defaulting to proven — which would make every un-sessioned lane the one way past this gate | **live** |
+| `closing-an-account-asks-who-you-are` | the three things a borrowed session is worth pointing at — closing the account, removing a credential and exporting everything — reachable from an open tab with no further proof. The same test pins the other direction: signing a device out is DEFENSIVE, and a step-up in front of it helps whoever is already inside keep their foothold | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

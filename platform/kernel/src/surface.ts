@@ -73,9 +73,21 @@ export interface Caller {
   /** What the tenant's own CUSTOMER bought from them. Absent where an app has no such rail. */
   readonly customerFlags?: ReadonlySet<string>;
   readonly gate: StandingGate;
+  /**
+   * ⚠️ WHETHER THIS CALLER PROVED THEMSELVES RECENTLY, for the operations that
+   * ask. It is a fact about the SESSION rather than about the role, which is why
+   * it is a separate field and not a permission: the realistic threat to an
+   * account is a borrowed laptop with an open tab, and against that a permission
+   * check passes.
+   *
+   * ⚠️ ABSENT MEANS "NOT PROVEN", NEVER "NOT ASKED". A caller with no session —
+   * a webhook, a machine — has proved nothing, and defaulting the other way would
+   * make every un-sessioned lane the one way past this gate.
+   */
+  readonly provenRecently?: boolean;
 }
 
-export type Refusal = "standing" | "permission" | "entitlement" | "customer_flag" | "quota";
+export type Refusal = "standing" | "permission" | "entitlement" | "customer_flag" | "quota" | "proof";
 
 export type Verdict =
   | {
@@ -118,6 +130,19 @@ export type Verdict =
 export function check(op: AnyOperation, caller: Caller): Verdict {
   if (!permits(caller.gate, laneOf(op), op.kind === "write")) return { allowed: false, refusal: "standing" };
   if (op.permission !== PUBLIC && !caller.permissions.has(op.permission)) return { allowed: false, refusal: "permission" };
+  /*
+    ⚠️ AFTER THE PERMISSION AND BEFORE EVERYTHING ELSE. Somebody who may not do a
+    thing at all should be told that, rather than sent to prove who they are for
+    an answer that will not change — and somebody who MAY do it should meet this
+    before a quota or an entitlement, because those are questions about the
+    workspace and this is a question about them.
+
+    ⚠️ IT ALSO FILTERS THE TOOL CATALOGUE, which is the reason it lives in the
+    pure gate rather than in the runner. A model holding a stale session is not
+    offered "close the account" at all — an offer whose first call fails is worse
+    than a capability that was never advertised.
+  */
+  if (op.proof === "recent" && !caller.provenRecently) return { allowed: false, refusal: "proof" };
   if (op.entitlement && !grants(caller.entitlements[op.entitlement] ?? false)) return { allowed: false, refusal: "entitlement" };
   /*
     ⚠️ THE CUSTOMER RAIL WITHHOLDS FROM CUSTOMERS AND SAYS NOTHING ABOUT ANYBODY

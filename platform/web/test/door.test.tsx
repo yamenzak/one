@@ -18,6 +18,7 @@ import type { Problem } from "@one/kernel";
 import { b64u } from "@one/kernel";
 import { Door, nextDoor, waitFrom, type DoorAt, type DoorWire } from "../src/door.js";
 import { outcomeOf, registerPasskey, signInWithPasskey, type Ceremony } from "../src/passkey.js";
+import { needsProof, ProveItBody } from "../src/prove.js";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node as never);
 
@@ -269,5 +270,49 @@ describe("what the door says", () => {
     const out = open();
     expect(out).not.toContain('type="password"');
     expect(out).not.toMatch(/password/i);
+  });
+});
+
+/* ------------------------------------------------------------------ proof --- */
+
+describe("proving it is you, again", () => {
+  const REFUSAL: Problem = {
+    code: "platform.proof_required", status: 401, retryable: false, ref: "r", title: "Confirm it is you",
+  } as unknown as Problem;
+
+  /*
+    ⚠️ THE SHEET IS RAISED BY A REFUSAL, NEVER GUESSED AT. Which operations ask
+    for a recent proof is declared on the operations themselves; a screen deciding
+    for itself would be a second copy of that rule, and the copy is the one that
+    goes out of date the first time a fourth operation is added.
+  */
+  it("knows the one refusal a proof resolves", () => {
+    expect(needsProof(REFUSAL)).toBe(true);
+    expect(needsProof({ ...REFUSAL, code: "platform.forbidden" } as unknown as Problem)).toBe(false);
+    expect(needsProof(null)).toBe(false);
+  });
+
+  const asked = (over: Partial<DoorWire> = {}) => html(
+    <ProveItBody
+      email="nadia@example.test" toDo="closing your account"
+      wire={{ ...WIRE, ...over }} onProven={() => undefined} ceremony={willing()}
+    />,
+  );
+
+  /*
+    ⚠️ IT NEVER ASKS WHO THEY ARE. This person is signed in and the session knows
+    the address; a field demanding it back is a form standing between somebody and
+    something they were in the middle of doing.
+  */
+  it("shows the address rather than asking for it", () => {
+    const out = asked();
+    expect(out).not.toMatch(/Email address/);
+    expect(out).toContain("closing your account");
+  });
+
+  /* ⚠️ AND IT SAYS WHAT IT IS FOR. "Confirm it is you" with no object is a
+     product being suspicious of somebody for no stated reason. */
+  it("names the thing it is asking about", () => {
+    expect(asked()).toMatch(/Before closing your account/);
   });
 });

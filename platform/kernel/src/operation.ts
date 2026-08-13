@@ -192,6 +192,25 @@ export interface OperationSpec<B extends BindingSpec, I, O, F extends string = s
 
   /** RBAC. Checked before the handler, for every transport. */
   readonly permission: string;
+  /**
+   * ⚠️ THIS ONE NEEDS A RECENT PROOF, NOT JUST A SESSION — and the two guard
+   * against different things. A permission answers "may this ROLE do it"; a
+   * proof answers "is the person holding this cookie the person it was issued
+   * to". Against the realistic threat — a borrowed laptop with an open tab — the
+   * permission check is worth nothing, because it passes.
+   *
+   * ⚠️ DECLARED ON THE OPERATION, SO IT CANNOT BE FORGOTTEN AT ONE CALL SITE.
+   * Enforced by the runtime before the handler, exactly like the permission, for
+   * every transport — which is what stops a second caller reaching a destructive
+   * operation through a path where somebody remembered to ask and one where
+   * nobody did.
+   *
+   * ⚠️ AND IT IS NEVER PUT ON A DEFENSIVE ACTION. Signing another device out,
+   * revoking a session, removing a grant — those are what somebody does when
+   * they think they have been compromised, and a step-up in front of them helps
+   * whoever is already inside keep their foothold.
+   */
+  readonly proof?: "recent";
   /** What the TENANT bought from us. */
   readonly entitlement?: string;
   /** What the tenant's own CUSTOMER bought from them, where an app has that rail. */

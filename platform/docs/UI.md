@@ -906,6 +906,8 @@ more, which is the honest state.
 | `a-passkey-sign-in-needs-no-address` | an allow list where an empty one belongs. Empty means any credential for this relying party, which is what lets a discoverable passkey open the door before anybody types — a populated list turns the passkey lane into something that begins by asking for the thing a passkey exists to avoid typing | **live** |
 | `the-passkey-offer-is-the-servers-answer` | a screen deciding for itself whether to suggest a credential. It knows neither what this person holds nor which relying party this door prompts for, so it nags somebody who already has one, on every sign-in, forever | **live** |
 | `a-cooldown-is-the-servers-number` | a countdown the screen invented. The runtime decides when another code may be asked for and reports what is left; a local timer comes back before the endpoint will answer, which teaches people to press a button that fails | **live** |
+| `a-proof-is-raised-by-a-refusal` | a screen deciding for itself which actions need a recent proof — a second copy of a rule the operations declare, and the copy is the one that goes out of date the first time a fourth operation is added | **live** |
+| `a-proof-never-asks-who-you-are` | a form demanding the address the session already knows, standing between somebody and something they were in the middle of doing | **live** |
 <!-- /generated -->
 
 ## 5. What is not decided yet

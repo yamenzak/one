@@ -56,6 +56,34 @@ export interface Session {
   readonly snapshot: AccountSnapshot;
 }
 
+/**
+ * HOW LONG A PROOF OF POSSESSION STAYS FRESH.
+ *
+ * ⚠️ TEN MINUTES, AND THE NUMBER IS A TRADE RATHER THAN A CONVENTION. Long
+ * enough that reading a screen, thinking, and deciding does not expire it —
+ * closing an account is not a thing anybody should be rushed through — and short
+ * enough that a session left open on a borrowed machine is not a standing licence
+ * to use it. It is the same ten minutes an emailed code is good for, which is not
+ * a coincidence: both are answers to "was this person here just now".
+ */
+export const PROOF_FRESH_MS = 10 * 60_000;
+
+/**
+ * WHETHER A SESSION WAS PROVEN RECENTLY ENOUGH FOR SOMETHING SERIOUS.
+ *
+ * ⚠️ THE PROOF IS THE SESSION'S OWN AGE, AND THAT IS THE WHOLE MECHANISM. A
+ * session exists because somebody completed a ceremony — a passkey assertion or
+ * an emailed code — so "recently proven" and "recently created" are the same
+ * fact. Re-proving mints a new session, which resets it.
+ *
+ * ⚠️ WHICH IS WHY THERE IS NO SECOND TIMESTAMP AND NO STEP-UP TABLE. Both would
+ * be a copy of something already recorded, and a copy is a thing that can
+ * disagree — including in the direction that says somebody proved themselves when
+ * they did not.
+ */
+export const provenRecently = (session: Pick<Session, "createdAt">, now: Instant): boolean =>
+  Date.parse(now) - Date.parse(session.createdAt) < PROOF_FRESH_MS;
+
 export type SessionVerdict =
   | { readonly ok: true; readonly session: Session; readonly stale: boolean }
   | { readonly ok: false; readonly why: "expired" | "wrong_origin" | "wrong_app" };
