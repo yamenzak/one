@@ -79,7 +79,14 @@ export const DIRECTORY_FIELDS = ["tenantId", "slug", "region", "appId", "standin
  * store can be a KV, a D1 or a fake in a test without any of them appearing here.
  */
 export interface Directory {
-  bySlug(slug: string): Promise<DirectoryEntry | null>;
+  /**
+   * ⚠️ THE APP IS PART OF THE QUESTION, because a slug is unique per product
+   * rather than per deployment — this store is bound with the same id into every
+   * worker, so `haddad.kova` and `haddad.scena` are two workspaces belonging to
+   * two businesses. Asked by slug alone it answered with whichever was written
+   * first, and the answer decides which database a request is served from.
+   */
+  bySlug(appId: string, slug: string): Promise<DirectoryEntry | null>;
   byDomain(hostname: string): Promise<DirectoryEntry | null>;
 }
 

@@ -28,8 +28,15 @@ export const JOB_SCHEMA: SchemaModule = {
     */
     /* ⚠️ `idle` is separate from `skipped`: one is an error signal and the other
        is "nothing to do", and the runner reads them differently. */
-    `CREATE TABLE IF NOT EXISTS job_run (id TEXT PRIMARY KEY, job TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT, done INTEGER NOT NULL DEFAULT 0, skipped INTEGER NOT NULL DEFAULT 0, idle INTEGER NOT NULL DEFAULT 0, more INTEGER NOT NULL DEFAULT 0, failed INTEGER NOT NULL DEFAULT 0, detail TEXT);`,
-    `CREATE INDEX IF NOT EXISTS idx_job_run_recent ON job_run(job, started_at);`,
+    /*
+      ⚠️ THE APP IS IN THE ROW AND IN THE INDEX, because this is the global store
+      and the global store is bound with the same id into every worker. Without
+      it "has `sweep` run today" was answered by whichever product swept first,
+      so every other product's sweep silently skipped — a scheduled job that
+      never runs and never fails, which is the quietest way for work to stop.
+    */
+    `CREATE TABLE IF NOT EXISTS job_run (id TEXT PRIMARY KEY, app_id TEXT NOT NULL DEFAULT '', job TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT, done INTEGER NOT NULL DEFAULT 0, skipped INTEGER NOT NULL DEFAULT 0, idle INTEGER NOT NULL DEFAULT 0, more INTEGER NOT NULL DEFAULT 0, failed INTEGER NOT NULL DEFAULT 0, detail TEXT);`,
+    `CREATE INDEX IF NOT EXISTS idx_job_run_recent ON job_run(app_id, job, started_at);`,
   ],
   /* ⚠️ For a database that already has the table. The runner tolerates a
      duplicate-column failure here and nowhere else, which is what makes adding
@@ -47,10 +54,10 @@ export const JOB_SCHEMA: SchemaModule = {
  * and the work is never done. Reading the last SUCCESS means a broken job keeps
  * trying at its own cadence, which is what somebody debugging it needs.
  */
-export async function lastSuccess(db: SqlHandle, jobId: string): Promise<Instant | null> {
+export async function lastSuccess(db: SqlHandle, appId: string, jobId: string): Promise<Instant | null> {
   const row = await db.first<{ started_at: string }>(
-    `SELECT started_at FROM job_run WHERE job = ? AND failed = 0 ORDER BY started_at DESC LIMIT 1`,
-    jobId,
+    `SELECT started_at FROM job_run WHERE app_id = ? AND job = ? AND failed = 0 ORDER BY started_at DESC LIMIT 1`,
+    appId, jobId,
   ).catch(() => null);
   return (row?.started_at ?? null) as Instant | null;
 }
@@ -70,6 +77,13 @@ export interface RunReport {
 
 export interface RunDeps<B> {
   readonly global: SqlHandle;
+  /**
+   * ⚠️ WHOSE SCHEDULE THIS IS. The run table is in the store every worker binds
+   * by the same id, so without the app "has this job run today" was answered by
+   * whichever product ran first — and every other product's sweep skipped,
+   * silently, reporting neither a run nor a failure.
+   */
+  readonly appId: string;
   /** Tenants to sweep, per region, already bounded by the caller. */
   tenants(region: RegionId): Promise<readonly { readonly tenantId: TenantId; readonly region: RegionId }[]>;
   regions: readonly RegionId[];
@@ -105,7 +119,7 @@ export async function runDue<B>(
 
   for (const spec of jobs) {
     const startedAt = deps.now();
-    if (!isDue(spec, await lastSuccess(deps.global, spec.id), startedAt)) {
+    if (!isDue(spec, await lastSuccess(deps.global, deps.appId, spec.id), startedAt)) {
       reports.push({ job: spec.id, ran: false, done: 0, skipped: 0, idle: 0, more: false, failed: false });
       continue;
     }
@@ -164,7 +178,7 @@ export async function runDue<B>(
       detail = detail ?? "every tenant skipped";
     }
 
-    await record(deps.global, spec.id, startedAt, deps.now(), { done, skipped, idle, more, failed, detail });
+    await record(deps.global, deps.appId, spec.id, startedAt, deps.now(), { done, skipped, idle, more, failed, detail });
     reports.push({ job: spec.id, ran: true, done, skipped, idle, more, failed, ...(detail ? { detail } : {}) });
   }
 
@@ -194,14 +208,15 @@ const describe = (e: unknown): string => (e instanceof Error ? e.name : "unknown
 
 async function record(
   db: SqlHandle,
+  appId: string,
   jobId: string,
   startedAt: Instant,
   finishedAt: Instant,
   out: { done: number; skipped: number; idle: number; more: boolean; failed: boolean; detail?: string },
 ): Promise<void> {
   await db.run(
-    `INSERT INTO job_run (id, job, started_at, finished_at, done, skipped, idle, more, failed, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    crypto.randomUUID(), jobId, startedAt, finishedAt, out.done, out.skipped, out.idle, out.more ? 1 : 0, out.failed ? 1 : 0, out.detail ?? null,
+    `INSERT INTO job_run (id, app_id, job, started_at, finished_at, done, skipped, idle, more, failed, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    crypto.randomUUID(), appId, jobId, startedAt, finishedAt, out.done, out.skipped, out.idle, out.more ? 1 : 0, out.failed ? 1 : 0, out.detail ?? null,
   ).catch(() => undefined);
 }
 
@@ -226,11 +241,11 @@ export interface JobHistory {
  * with an extra table — the same argument as the payment dead letter, and the
  * same conclusion: it is not optional and it is behind an operator permission.
  */
-export async function jobHistory(db: SqlHandle, limit: number): Promise<readonly JobHistory[]> {
+export async function jobHistory(db: SqlHandle, appId: string, limit: number): Promise<readonly JobHistory[]> {
   const rows = await db.all<{
     job: string; started_at: string; finished_at: string | null;
     done: number; skipped: number; idle: number; more: number; failed: number; detail: string | null;
-  }>(`SELECT job, started_at, finished_at, done, skipped, idle, more, failed, detail FROM job_run ORDER BY started_at DESC LIMIT ?`, limit)
+  }>(`SELECT job, started_at, finished_at, done, skipped, idle, more, failed, detail FROM job_run WHERE app_id = ? ORDER BY started_at DESC LIMIT ?`, appId, limit)
     .catch(() => []);
   return rows.map((r) => ({
     job: r.job, startedAt: r.started_at, finishedAt: r.finished_at,

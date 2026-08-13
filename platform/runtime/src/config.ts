@@ -24,27 +24,66 @@ import { redactConfig, resolveConfig, writableToShared } from "@one/kernel";
  * ⚠️ ONE TABLE, IN BOTH STORES, WITH THE SAME SHAPE. The shared store is another
  * database with this table in it — not a different schema, because the two are
  * read by one resolver and a second shape would be a second reader.
+ *
+ * ⚠️ AND THE APP IS PART OF THE KEY, which it was not. "This app's own store" is
+ * the directory, and the directory is bound with the same id into every worker —
+ * so every product's `email.from` was one row, and `email.from` is declared
+ * `shared: false` precisely because it is per-app. The two-layer resolution the
+ * whole module is about collapsed: the local layer WAS the shared layer, and
+ * every product silently agreed about keys they were each meant to own.
+ *
+ * In the SHARED store the app id is the empty string, because a shared key
+ * belongs to the deployment rather than to a product. That is a value rather
+ * than a second table, so one resolver still reads both — see the header.
  */
 export const CONFIG_SCHEMA: SchemaModule = {
   id: "config",
-  ddl: [`CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL, at TEXT NOT NULL);`],
+  ddl: [`CREATE TABLE IF NOT EXISTS app_config (app_id TEXT NOT NULL DEFAULT '', key TEXT NOT NULL, value TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (app_id, key));`],
 };
+
+/** ⚠️ What the SHARED store's rows are filed under: the deployment, not a product. */
+export const DEPLOYMENT_SCOPE = "";
 
 export type Values = Readonly<Record<string, string>>;
 
-export async function readAll(db: SqlHandle | null): Promise<Values> {
+/**
+ * ⚠️ THE APP IS A PARAMETER RATHER THAN A DEFAULT, and that is deliberate. A
+ * default would be one call site away from reading the deployment's rows and
+ * calling them a product's — which is the defect this signature exists to make
+ * unwritable. The shared store is read with `DEPLOYMENT_SCOPE`.
+ */
+export async function readAll(db: SqlHandle | null, appId: string): Promise<Values> {
   if (!db) return {};
-  const rows = await db.all<{ key: string; value: string }>(`SELECT key, value FROM app_config`).catch(() => []);
+  const rows = await db.all<{ key: string; value: string }>(
+    `SELECT key, value FROM app_config WHERE app_id = ?`, appId,
+  ).catch(() => []);
   const out: Record<string, string> = {};
   for (const row of rows) out[row.key] = row.value;
   return out;
 }
 
-export async function writeOne(db: SqlHandle, key: string, value: string, at: Instant): Promise<void> {
+/**
+ * SEED A VALUE ONLY WHERE THERE IS NONE.
+ *
+ * ⚠️ IT IS NOT `writeOne` WITH A DIFFERENT NAME, and the difference is what a
+ * deployment's first day depends on. Provisioning seeds a mail sender so the
+ * bootstrap deadlock can be broken — reaching the console needs a session, which
+ * needs a code, which needs mail — and it runs again on every re-provision. An
+ * upsert there would reset a live deployment's configured sender each time,
+ * silently, back to whatever the automation shipped with.
+ */
+export async function seedOne(db: SqlHandle, appId: string, key: string, value: string, at: Instant): Promise<void> {
   await db.run(
-    `INSERT INTO app_config (key, value, at) VALUES (?, ?, ?)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value, at = excluded.at`,
-    key, value, at,
+    `INSERT INTO app_config (app_id, key, value, at) VALUES (?, ?, ?, ?) ON CONFLICT(app_id, key) DO NOTHING`,
+    appId, key, value, at,
+  );
+}
+
+export async function writeOne(db: SqlHandle, appId: string, key: string, value: string, at: Instant): Promise<void> {
+  await db.run(
+    `INSERT INTO app_config (app_id, key, value, at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(app_id, key) DO UPDATE SET value = excluded.value, at = excluded.at`,
+    appId, key, value, at,
   );
 }
 

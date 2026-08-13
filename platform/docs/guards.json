@@ -4405,6 +4405,51 @@
       "impl": "web/test/routes.test.ts",
       "proves": "goes up one level rather than out",
       "fails": "somebody who opened their passkeys from the account centre being dropped two levels by one press — the back button doing something other than undoing what they did"
+    },
+    {
+      "id": "a-global-table-says-whose-each-row-is",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/scoped.test.mjs",
+      "proves": "keyed by whose they are",
+      "fails": "a table in the store every worker binds by the same id, keyed by neither an app nor an account nor a workspace — so its rows belong to whichever product wrote them first. Four were: a slug UNIQUE across the deployment (the second product cannot create a workspace at a name the first used), `app_config` (a key declared per-app shared by every app), `plan_override` (repricing one product's plan reprices another's) and `job_run` (one product's sweep suppresses every other's). All four typechecked and passed every suite, because nothing under platform/ deploys and each suite binds a store of its own"
+    },
+    {
+      "id": "a-scoped-column-is-a-column-something-filters-on",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/scoped.test.mjs",
+      "proves": "every query against an app-keyed table names the app",
+      "fails": "the fix wearing the defect's clothes — `app_id` on the table and `SELECT * FROM plan_override` over it. It is the likelier of the two to ship, because the column is visible in review and the query is somewhere else. The one deliberate exception, the operator's list of every workspace on the deployment, says so on the line above itself"
+    },
+    {
+      "id": "two-products-keep-their-configuration-apart",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/config.test.ts",
+      "proves": "keeps two products' values apart in the one store they share",
+      "fails": "one `email.from` for every product on the deployment — a key declared `shared: false` PRECISELY because it is per-app, held in a store every worker binds by the same id. The two-layer resolution the whole module is about collapsed: the local layer WAS the shared layer"
+    },
+    {
+      "id": "two-products-keep-their-schedules-apart",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/jobs.test.ts",
+      "proves": "keeps two products' schedules apart in the one store they share",
+      "fails": "\"has `sweep` run today\" answered by whichever product swept first, so every other product's sweep skips — reporting neither a run nor a failure, which is the quietest way for work to stop"
+    },
+    {
+      "id": "seeding-never-overwrites-what-an-operator-set",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/config.test.ts",
+      "proves": "seeds only where there is nothing, and never over what somebody set",
+      "fails": "a re-provision resetting a live deployment's configured mail sender back to whatever the automation shipped with. The same shape bit a test fixture first: seeding on every sign-in put a sender back after a case had deliberately blanked one, so the suite proving \"a code that could not be sent is not a code that was\" passed by having sent it"
     }
   ]
 }

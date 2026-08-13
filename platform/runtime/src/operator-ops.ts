@@ -63,12 +63,12 @@ export interface OperatorCarrier { readonly [OPERATOR]: OperatorDeps }
 
 const deps = (ctx: unknown): OperatorDeps => (ctx as OperatorCarrier)[OPERATOR];
 
-interface Row { tenant_id: string; slug: string; region: string; standing: string; standing_reason: string }
+interface Row { tenant_id: string; app_id: string; slug: string; region: string; standing: string; standing_reason: string }
 
 /** Where a workspace lives, or nothing. */
 async function placeOf(global: SqlHandle, tenantId: string): Promise<Row | null> {
   return global.first<Row>(
-    `SELECT tenant_id, slug, region, standing, standing_reason FROM tenant_directory WHERE tenant_id = ?`, tenantId,
+    `SELECT tenant_id, app_id, slug, region, standing, standing_reason FROM tenant_directory WHERE tenant_id = ?`, tenantId,
   ).catch(() => null);
 }
 
@@ -95,7 +95,14 @@ export function operatorOperations<B extends BindingSpec>(app: AppSpec<B>): read
       const d = deps(ctx);
       const limit = Math.min(input.limit ?? 50, 200);
       const rows = await d.global.all<Row>(
-        `SELECT tenant_id, slug, region, standing, standing_reason FROM tenant_directory
+        /*
+          ⚠️ scope-exempt: this is the OPERATOR's list, and the console is the
+          deployment's rather than one product's — every workspace on it, whoever
+          serves them. `app_id` is selected so a row says which product it
+          belongs to; two workspaces may share a slug across products, and a list
+          that did not say so would show what reads as a duplicate.
+        */
+        `SELECT tenant_id, app_id, slug, region, standing, standing_reason FROM tenant_directory
          ${input.search ? "WHERE slug LIKE ?" : ""} ORDER BY slug LIMIT ?`,
         ...(input.search ? [`%${input.search}%`] : []), limit,
       ).catch(() => []);
@@ -115,7 +122,7 @@ export function operatorOperations<B extends BindingSpec>(app: AppSpec<B>): read
            operator screen that disagrees with the gate is worse than none. */
         const sub = await subscriptionForTenant(d.global, row.tenant_id).catch(() => null);
         out.push({
-          tenantId: row.tenant_id, slug: row.slug, region: row.region,
+          tenantId: row.tenant_id, appId: row.app_id, slug: row.slug, region: row.region,
           standing: row.standing, reason: row.standing_reason,
           plan: sub?.planId ?? null, status: sub?.status ?? null,
           /* ⚠️ Reported, so a region that will not open is visible rather than blank. */
@@ -463,7 +470,14 @@ export function operatorOperations<B extends BindingSpec>(app: AppSpec<B>): read
 export const CATALOGUE_SCHEMA: SchemaModule = {
   id: "plan_overrides",
   ddl: [
-    `CREATE TABLE IF NOT EXISTS plan_override (plan_id TEXT PRIMARY KEY, price_minor INTEGER, price_currency TEXT, trial_days INTEGER, entitlements_json TEXT NOT NULL DEFAULT '{}', at TEXT NOT NULL, by TEXT NOT NULL);`,
+    /*
+      ⚠️ THE APP IS PART OF THE KEY, and it was not. This is the global store,
+      which is bound with the same id into every worker — so one operator editing
+      the price of a plan called `pro` edited it for every product that named a
+      plan `pro`, and the second product's price changed with nobody having
+      opened its console.
+    */
+    `CREATE TABLE IF NOT EXISTS plan_override (app_id TEXT NOT NULL DEFAULT '', plan_id TEXT NOT NULL, price_minor INTEGER, price_currency TEXT, trial_days INTEGER, entitlements_json TEXT NOT NULL DEFAULT '{}', at TEXT NOT NULL, by TEXT NOT NULL, PRIMARY KEY (app_id, plan_id));`,
   ],
 };
 
@@ -472,8 +486,9 @@ interface OverrideRow {
   trial_days: number | null; entitlements_json: string;
 }
 
-export async function planOverrides(db: SqlHandle): Promise<PlanOverrides> {
-  const rows = await db.all<OverrideRow>(`SELECT * FROM plan_override`).catch(() => []);
+/** ⚠️ The app is a parameter, never a default — see the DDL above. */
+export async function planOverrides(db: SqlHandle, appId: string): Promise<PlanOverrides> {
+  const rows = await db.all<OverrideRow>(`SELECT * FROM plan_override WHERE app_id = ?`, appId).catch(() => []);
   const out: Record<string, PlanOverride> = {};
   for (const r of rows) {
     out[r.plan_id] = {
@@ -512,7 +527,7 @@ function catalogueOperations<B extends BindingSpec>(app: AppSpec<B>): readonly A
     idempotency: { mode: "none" },
     async handler(ctx) {
       const d = deps(ctx);
-      const overrides = await planOverrides(d.global);
+      const overrides = await planOverrides(d.global, app.id);
       return {
         declared: app.access.plans,
         overrides,
@@ -554,15 +569,17 @@ function catalogueOperations<B extends BindingSpec>(app: AppSpec<B>): readonly A
       const refused = refuseCatalogueEdit(app.access.plans, app.access.entitlements, input.planId, edit);
       if (refused) ctx.fail("platform.invalid", { field: "planId", reason: refused });
 
-      const before = catalogueOf(app.access.plans, await planOverrides(d.global));
+      const before = catalogueOf(app.access.plans, await planOverrides(d.global, app.id));
 
-      const current = await d.global.first<OverrideRow>(`SELECT * FROM plan_override WHERE plan_id = ?`, input.planId).catch(() => null);
+      const current = await d.global.first<OverrideRow>(
+        `SELECT * FROM plan_override WHERE app_id = ? AND plan_id = ?`, app.id, input.planId,
+      ).catch(() => null);
       await d.global.run(
-        `INSERT INTO plan_override (plan_id, price_minor, price_currency, trial_days, entitlements_json, at, by)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(plan_id) DO UPDATE SET price_minor = excluded.price_minor, price_currency = excluded.price_currency,
+        `INSERT INTO plan_override (app_id, plan_id, price_minor, price_currency, trial_days, entitlements_json, at, by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(app_id, plan_id) DO UPDATE SET price_minor = excluded.price_minor, price_currency = excluded.price_currency,
            trial_days = excluded.trial_days, entitlements_json = excluded.entitlements_json, at = excluded.at, by = excluded.by`,
-        input.planId,
+        app.id, input.planId,
         input.price ? input.price.minor : current?.price_minor ?? null,
         input.price ? input.price.currency : current?.price_currency ?? null,
         input.trialDays === undefined ? current?.trial_days ?? null : input.trialDays,
@@ -570,7 +587,7 @@ function catalogueOperations<B extends BindingSpec>(app: AppSpec<B>): readonly A
         ctx.now(), d.actorId,
       );
 
-      const after = catalogueOf(app.access.plans, await planOverrides(d.global));
+      const after = catalogueOf(app.access.plans, await planOverrides(d.global, app.id));
       const wasPlan = before.find((p) => p.id === input.planId);
       const nowPlan = after.find((p) => p.id === input.planId);
 

@@ -73,6 +73,13 @@ export function refuses(state: Maintenance, lane: string, mutates: boolean, isOp
  */
 export const PLATFORM_STATE_SCHEMA = {
   id: "platform_state",
+  /*
+    ⚠️ deployment-wide: the maintenance switch closes EVERY door because an
+    operator said so, which is one decision about one deployment rather than
+    something each product answers separately. Keying it per app would buy the
+    ability to take one product down and cost the property the switch exists
+    for — one row, read once per request, that cannot half-apply.
+  */
   ddl: [`CREATE TABLE IF NOT EXISTS platform_state (key TEXT PRIMARY KEY, value TEXT NOT NULL, at TEXT NOT NULL);`],
 };
 

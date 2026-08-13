@@ -11,7 +11,7 @@
 
 import type { AnyOperation, AppSpec, BindingSpec, ConfigRegistry, Instant, SqlHandle } from "@one/kernel";
 import { modelFor, operation, s } from "@one/kernel";
-import { lines, readAll, readRates, refuseRate, refuseWrite, writeOne, writeRate } from "./config.js";
+import { DEPLOYMENT_SCOPE, lines, readAll, readRates, refuseRate, refuseWrite, writeOne, writeRate } from "./config.js";
 import { chooseProvider, send, type Deliver } from "./mail.js";
 import { OPERATE } from "./operator-ops.js";
 
@@ -19,8 +19,16 @@ import { OPERATE } from "./operator-ops.js";
 export const CONFIG = Symbol.for("one.runtime.config");
 
 export interface ConfigDeps {
-  /** This app's own store. Always present. */
+  /**
+   * This app's own store. Always present.
+   *
+   * ⚠️ IT IS THE SAME PHYSICAL DATABASE AS EVERY OTHER APP'S, and `appId` below
+   * is what makes "own" true. Bound with the same id into every worker, this
+   * store held one `app_config` row per key for the whole deployment.
+   */
   readonly own: SqlHandle;
+  /** ⚠️ Whose rows in it. Never a default — see `readAll`. */
+  readonly appId: string;
   /** ⚠️ Injected, so the one file that reaches the network is the one that sends. */
   readonly deliver: Deliver | null;
   /** ⚠️ Null where a deployment binds no shared store, which is most of them. */
@@ -50,7 +58,7 @@ export function configOperations<B extends BindingSpec>(app: AppSpec<B>): readon
     async handler(ctx) {
       const d = deps(ctx);
       return {
-        keys: lines(await readAll(d.own), await readAll(d.shared), d.registry),
+        keys: lines(await readAll(d.own, d.appId), await readAll(d.shared, DEPLOYMENT_SCOPE), d.registry),
         /* ⚠️ Whether there IS a shared store, so "shared" is not a lie on a self-host. */
         shared: d.shared !== null,
       };
@@ -96,7 +104,11 @@ export function configOperations<B extends BindingSpec>(app: AppSpec<B>): readon
         ctx.fail("platform.unavailable", { reason: "this deployment binds no shared configuration store" });
       }
 
-      await writeOne(input.scope === "shared" ? d.shared! : d.own, input.key, input.value, ctx.now() as Instant);
+      await writeOne(
+        input.scope === "shared" ? d.shared! : d.own,
+        input.scope === "shared" ? DEPLOYMENT_SCOPE : d.appId,
+        input.key, input.value, ctx.now() as Instant,
+      );
       return { key: input.key, scope: input.scope };
     },
   });
@@ -218,7 +230,7 @@ export function configOperations<B extends BindingSpec>(app: AppSpec<B>): readon
     tool: false,
     async handler(ctx, input: { to: string }) {
       const d = deps(ctx);
-      const values = { ...(await readAll(d.shared)), ...nonEmpty(await readAll(d.own)) };
+      const values = { ...(await readAll(d.shared, DEPLOYMENT_SCOPE)), ...nonEmpty(await readAll(d.own, d.appId)) };
       const out = await send(values, {
         to: input.to,
         subject: "Test message",
@@ -247,7 +259,7 @@ export function configOperations<B extends BindingSpec>(app: AppSpec<B>): readon
     idempotency: { mode: "none" },
     async handler(ctx) {
       const d = deps(ctx);
-      const values = { ...(await readAll(d.shared)), ...nonEmpty(await readAll(d.own)) };
+      const values = { ...(await readAll(d.shared, DEPLOYMENT_SCOPE)), ...nonEmpty(await readAll(d.own, d.appId)) };
       const chosen = chooseProvider(values);
       return chosen.ok
         ? { ready: true, provider: chosen.provider, from: chosen.from }

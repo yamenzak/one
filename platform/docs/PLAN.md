@@ -1522,6 +1522,11 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-workspace-nobody-charged-is-never-erased` | reading an absent subscription as "unpaid forever", which deletes exactly the workspaces nobody ever charged — one made before this rail existed, or by an operator | **live** |
 | `a-closure-is-erased-on-its-own-date` | somebody who decided to leave waiting out the arrears ladder's sixty days for a decision they already made — or, worse, a second erasure branch for it, because two branches disagree eventually and the disagreement is about whether records still exist | **live** |
 | `the-identity-door-cannot-be-declined` | an app that can decline the identity door, which is an app that can grow its own — and in the old codebase three did, one of them mounting the send-guard AFTER the catch-all: a bypass that typechecks, passes every test and looks identical in a route list. Here nothing is mounted by an app at all, and this is one `if` away from being a per-app decision again | **live** |
+| `a-global-table-says-whose-each-row-is` | a table in the store every worker binds by the same id, keyed by neither an app nor an account nor a workspace — so its rows belong to whichever product wrote them first. Four were: a slug UNIQUE across the deployment (the second product cannot create a workspace at a name the first used), `app_config` (a key declared per-app shared by every app), `plan_override` (repricing one product's plan reprices another's) and `job_run` (one product's sweep suppresses every other's). All four typechecked and passed every suite, because nothing under platform/ deploys and each suite binds a store of its own | **live** |
+| `a-scoped-column-is-a-column-something-filters-on` | the fix wearing the defect's clothes — `app_id` on the table and `SELECT * FROM plan_override` over it. It is the likelier of the two to ship, because the column is visible in review and the query is somewhere else. The one deliberate exception, the operator's list of every workspace on the deployment, says so on the line above itself | **live** |
+| `two-products-keep-their-configuration-apart` | one `email.from` for every product on the deployment — a key declared `shared: false` PRECISELY because it is per-app, held in a store every worker binds by the same id. The two-layer resolution the whole module is about collapsed: the local layer WAS the shared layer | **live** |
+| `two-products-keep-their-schedules-apart` | "has `sweep` run today" answered by whichever product swept first, so every other product's sweep skips — reporting neither a run nor a failure, which is the quietest way for work to stop | **live** |
+| `seeding-never-overwrites-what-an-operator-set` | a re-provision resetting a live deployment's configured mail sender back to whatever the automation shipped with. The same shape bit a test fixture first: seeding on every sign-in put a sender back after a case had deliberately blanked one, so the suite proving "a code that could not be sent is not a code that was" passed by having sent it | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 
@@ -1644,6 +1649,70 @@ and everything that made it safe generalises:
 ⚠️ **Do not migrate a tenant and a schema in the same step.** Reconcile the data
 in place first while `apps/api` still serves it; move the traffic second. Two
 reversible steps beat one that is not.
+
+---
+
+### 7.5 ⚠️ The app is a column — a defect the console cannot be built over
+
+**Found 2026-08-13, while designing the console below.** `DIRECTORY` is one
+physical D1 **bound with the same id into every worker** (§2.4 — that is the
+whole reason an account, its credits and its subscriptions span products). Four
+tables in `PLATFORM_GLOBAL` are keyed as though it were per-app, and they are
+not:
+
+| table | key today | what happens |
+|---|---|---|
+| `tenant_directory` | `slug` UNIQUE | **a second product cannot have a workspace at a slug the first one used.** `haddad.kova.4dl.app` and `haddad.scena.4dl.app` are different workspaces; the second `INSERT` fails |
+| `app_config` | `key` | "this app's own store" is every app's store, so `email.from` — declared `shared: false` precisely because it is per-app — is one row for all of them, and the two-layer resolution collapses |
+| `plan_override` | `plan_id` | one operator repricing Kova's `pro` reprices every product that named a plan `pro` |
+| `job_run` | indexed on `job` | "has `sweep` run today" is answered by whichever product swept first, so the others silently skip |
+
+Every one is invisible today because nothing under `platform/` deploys and each
+suite binds a store of its own. All four appear the day a second app ships.
+
+**`platform_state` is the judgement call rather than the bug.** Maintenance is
+deployment-wide *by design* — one switch, every door — so one row is correct.
+What it costs is the ability to take one product down, which is a feature nobody
+has asked for; it stays shared, and the guard below records the decision instead
+of the omission.
+
+**And this is what makes the console possible.** With the app as a column there
+is one store, one door and one human session in front of every product's
+configuration — which is *not* the "central service that PUSHES configuration
+into each product" §3 rejects. There is no push, no machine token and no
+privileged write endpoint in any app. Each worker still reads only its own rows.
+
+### 7.6 One console, and where the line falls
+
+**The console is the DEPLOYMENT's, not the app's.** `admin.<app>` gave every
+product its own operator door, so running three products meant three consoles,
+three sign-ins and three places to paste one Stripe key. It is one door on the
+hub's worker now, and the app is a parameter.
+
+The line is not taste, and it is enforceable: **the console writes the GLOBAL
+store; anything REGIONAL stays on the app's own door.** Global is every table
+above plus account billing, provisioning and the directory — which is the whole
+of configuration, the catalogue, the ceilings and the money. Regional is a
+workspace's own records, and the one operator act that touches them is
+impersonation: it mints a session in that workspace's region, which the hub's
+worker has no binding for.
+
+### 7.7 Self-discovery, which is already declared
+
+Nothing below is a new mechanism. Each is a declaration the manifest already
+carries and no screen renders — §8's stage 4 row has said so since it was
+written.
+
+| declared | renders as |
+|---|---|
+| `SettingsSpec` (`kernel/settings.ts`) | a workspace's settings, one control per `SettingKind`, defaults and permissions included |
+| `ConfigRegistry` (`kernel/config.ts`) | the deployment's configuration, per app and shared, with a secret write-only |
+| `app.access.plans` + `entitlements` | the catalogue: price, trial, ceilings, and what an edit is allowed to move |
+| the customer rail's sellable flags | what a workspace may sell its own customers, and what a package includes |
+
+<!-- DEFER(one-160) stage:7 — impersonation from the console. It mints a session
+     in the target workspace's region, so the hub's worker needs a regional handle
+     it does not bind. Until then it is the app door's own act. -->
 
 ---
 

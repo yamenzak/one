@@ -28,6 +28,8 @@ export interface DataDeps {
   readonly db: SqlHandle;
   /** The global store, where a job's run record lives. */
   readonly global: SqlHandle;
+  /** ⚠️ Whose runs. The global store is one database for every product. */
+  readonly appId: string;
   /**
    * ⚠️ NULL ONLY WHERE A DEPLOYMENT GENUINELY HAS NO OBJECT STORE. Erasure
    * refuses rather than proceeding when there are files it cannot reach, so a
@@ -222,7 +224,7 @@ export function dataOperations<B extends BindingSpec>(_app: AppSpec<B>): readonl
     idempotency: { mode: "none" },
     async handler(ctx, input: { limit?: number }) {
       const d = deps(ctx);
-      return { runs: await jobHistory(d.global, Math.min(input.limit ?? 25, 100)) };
+      return { runs: await jobHistory(d.global, d.appId, Math.min(input.limit ?? 25, 100)) };
     },
   });
 

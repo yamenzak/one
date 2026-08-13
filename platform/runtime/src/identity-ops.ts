@@ -766,8 +766,16 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
         cannot be one join — and the honest order is directory-first, because the
         directory is the thing that knows which region to ask.
       */
+      /*
+        ⚠️ THIS PRODUCT'S WORKSPACES, because `mineIn` reads THIS product's
+        regional memberships and can answer about nothing else. Scanning every
+        product's rows and filtering by a membership table that cannot match them
+        spends the 200-row ceiling on workspaces that were never candidates — so
+        with three products somebody's fourth workspace falls off a list that
+        looks complete.
+      */
       const rows = await d.directory.all<{ slug: string; tenant_id: string; branding: string | null }>(
-        `SELECT slug, tenant_id, branding FROM tenant_directory ORDER BY slug LIMIT 200`,
+        `SELECT slug, tenant_id, branding FROM tenant_directory WHERE app_id = ? ORDER BY slug LIMIT 200`, app.id,
       ).catch(() => []);
       const mine = await d.mineIn(rows.map((r) => r.tenant_id));
       return {

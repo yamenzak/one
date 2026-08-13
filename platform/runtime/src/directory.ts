@@ -27,28 +27,32 @@ export const DIRECTORY_SCHEMA: SchemaModule = {
       branding rides along and a cold sign-in shows the right name rather than
       flashing the product's own and correcting itself.
     */
-    `CREATE TABLE IF NOT EXISTS tenant_directory (tenant_id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, region TEXT NOT NULL, standing TEXT NOT NULL, standing_reason TEXT NOT NULL, standing_next_at TEXT, domains TEXT NOT NULL DEFAULT '[]', branding TEXT NOT NULL DEFAULT '{}');`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_directory_slug ON tenant_directory(slug);`,
+    /*
+      ⚠️ A SLUG IS UNIQUE PER PRODUCT, NOT PER DEPLOYMENT, and it was the second
+      for as long as this store was one app's. It is bound with the same id into
+      every worker, so `haddad.kova` and `haddad.scena` — two different
+      workspaces belonging to two different businesses — were one row, and the
+      second could not be created at all. There is nothing clever about the fix;
+      what is worth keeping is that a UNIQUE spanning every product is invisible
+      until the day a second product ships, and then it is a signup that fails.
+    */
+    `CREATE TABLE IF NOT EXISTS tenant_directory (tenant_id TEXT PRIMARY KEY, app_id TEXT NOT NULL DEFAULT '', slug TEXT NOT NULL, region TEXT NOT NULL, standing TEXT NOT NULL, standing_reason TEXT NOT NULL, standing_next_at TEXT, domains TEXT NOT NULL DEFAULT '[]', branding TEXT NOT NULL DEFAULT '{}');`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_directory_app_slug ON tenant_directory(app_id, slug);`,
   ],
   /*
-    ⚠️ WHICH PRODUCT SERVES THIS WORKSPACE, and it is routing like everything else
-    here — the name of a bundle, not a fact about anybody. It earns its place
-    because the hub answers for every product a person belongs to, and
-    without it a workspace cannot be matched to the declaration of what that
-    product wants to know: the vault could group by nothing.
+    ⚠️ `app_id` IS IN THE CREATE RATHER THAN AN ALTER, AND THAT IS ONLY SAFE
+    BECAUSE NOTHING HERE HAS EVER RUN. `platform/` is absent from `apps.json`, so
+    no database of this shape exists anywhere — and writing a migration for one
+    that does not exist is writing untested code for a path nobody takes. The
+    day this deploys, that stops being true and the rule reverts: a column added
+    to a CREATE is a column that exists on a fresh deployment and on nothing
+    else, and every read of it is fine in every test and an error in production.
 
-    ⚠️ IT IS AN ALTER, NOT A LINE IN THE CREATE, because a database that already
-    exists never re-runs the create — so a column added there is a column that
-    exists on a fresh deployment and on nothing else, and every read of it is
-    fine in every test and an error in production.
-
-    ⚠️ AND IT DEFAULTS TO EMPTY RATHER THAN TO A PRODUCT. A row written before
-    this column existed belongs to whichever app wrote it, and guessing would
-    attribute somebody's workspace to the wrong one — an empty string is a
-    workspace the vault leaves out until its app writes the row again, which is
-    the safe direction on a screen about disclosure.
+    ⚠️ AND IT DEFAULTS TO EMPTY RATHER THAN TO A PRODUCT. Guessing would attribute
+    somebody's workspace to the wrong one; an empty string is a workspace whose
+    app has not written its row yet, which is the safe direction on a screen
+    about disclosure.
   */
-  alters: [`ALTER TABLE tenant_directory ADD COLUMN app_id TEXT NOT NULL DEFAULT '';`],
 };
 
 /**
@@ -96,8 +100,8 @@ const COLUMNS = DIRECTORY_COLUMNS.join(", ");
 
 export function sqlDirectory(db: SqlHandle): Directory {
   return {
-    async bySlug(slug) {
-      const r = await db.first<Row>(`SELECT ${COLUMNS} FROM tenant_directory WHERE slug = ?`, slug);
+    async bySlug(appId, slug) {
+      const r = await db.first<Row>(`SELECT ${COLUMNS} FROM tenant_directory WHERE app_id = ? AND slug = ?`, appId, slug);
       return r ? toEntry(r) : null;
     },
     async byDomain(hostname) {

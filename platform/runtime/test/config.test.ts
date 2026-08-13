@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { chargeableFrom, lines, readAll, refuseWrite, writeOne } from "../src/config.js";
+import { chargeableFrom, DEPLOYMENT_SCOPE, lines, readAll, refuseWrite, seedOne, writeOne } from "../src/config.js";
 import type { ConfigRegistry, Instant, SqlHandle } from "@one/kernel";
 
 const AT = "2026-01-10T00:00:00.000Z" as Instant;
@@ -19,14 +19,31 @@ const registry: ConfigRegistry = {
   "email.from": { shared: false, secret: false, why: "the display name is per-product" },
 };
 
+/*
+  ⚠️ THE FAKE IS SCOPED BECAUSE THE REAL TABLE IS, and a fake that ignored the app
+  would let a reader that ignored it pass — which is precisely how this store came
+  to hold one `email.from` for every product on the deployment. `seed` is keyed
+  `<app>/<key>`, so a fixture cannot express a row belonging to nobody.
+*/
 const store = (seed: Record<string, string> = {}) => {
-  const rows = { ...seed };
+  const rows = new Map<string, string>(Object.entries(seed));
+  const at = (appId: string, key: string) => `${appId}/${key}`;
   return {
     rows,
     handle: {
-      async all<T>() { return Object.entries(rows).map(([key, value]) => ({ key, value })) as T[]; },
+      async all<T>(_sql: string, appId: string) {
+        return [...rows]
+          .filter(([k]) => k.startsWith(`${appId}/`))
+          .map(([k, value]) => ({ key: k.slice(appId.length + 1), value })) as T[];
+      },
       async first<T>() { return null as T | null; },
-      async run(_sql: string, key: string, value: string) { rows[key] = value; },
+      async run(sql: string, appId: string, key: string, value: string) {
+        /* ⚠️ The fake honours DO NOTHING, because that is the whole difference
+           between seeding and writing and a fake that ignored it would prove
+           nothing. */
+        if (sql.includes("DO NOTHING") && rows.has(at(appId, key))) return;
+        rows.set(at(appId, key), value);
+      },
     } as unknown as SqlHandle,
   };
 };
@@ -36,8 +53,8 @@ const store = (seed: Record<string, string> = {}) => {
 describe("reading and writing", () => {
   it("reads what was written", async () => {
     const s = store();
-    await writeOne(s.handle, "stripe.mode", "live", AT);
-    expect(await readAll(s.handle)).toEqual({ "stripe.mode": "live" });
+    await writeOne(s.handle, "kova", "stripe.mode", "live", AT);
+    expect(await readAll(s.handle, "kova")).toEqual({ "stripe.mode": "live" });
   });
 
   /*
@@ -46,12 +63,55 @@ describe("reading and writing", () => {
     self-host and every test run are.
   */
   it("treats an unbound store as empty rather than throwing", async () => {
-    expect(await readAll(null)).toEqual({});
+    expect(await readAll(null, "kova")).toEqual({});
+  });
+
+  /*
+    ⚠️ TWO PRODUCTS, ONE DATABASE, AND THE KEY THAT PROVES IT. This store is the
+    directory, and the directory is bound with the same id into every worker — so
+    `app_config` keyed by the key alone made every product's `email.from` one
+    row. `email.from` is declared `shared: false` PRECISELY because it is
+    per-app, which is the shape of the whole defect: a declaration promising
+    something the storage could not keep, with nothing anywhere disagreeing.
+  */
+  it("keeps two products' values apart in the one store they share", async () => {
+    const s = store();
+    await writeOne(s.handle, "kova", "email.from", "Kova", AT);
+    await writeOne(s.handle, "scena", "email.from", "Scena", AT);
+    expect(await readAll(s.handle, "kova")).toEqual({ "email.from": "Kova" });
+    expect(await readAll(s.handle, "scena")).toEqual({ "email.from": "Scena" });
+  });
+
+  /*
+    ⚠️ AND THE SHARED STORE'S ROWS BELONG TO THE DEPLOYMENT, not to whichever
+    product happened to write them. `DEPLOYMENT_SCOPE` is a value rather than a
+    second table, so one resolver still reads both layers.
+  */
+  it("files a shared key under the deployment rather than under a product", async () => {
+    const s = store();
+    await writeOne(s.handle, DEPLOYMENT_SCOPE, "stripe.secret", "sk_x", AT);
+    expect(await readAll(s.handle, DEPLOYMENT_SCOPE)).toEqual({ "stripe.secret": "sk_x" });
+    expect(await readAll(s.handle, "kova")).toEqual({});
+  });
+
+  /*
+    ⚠️ SEEDING IS NOT WRITING, and the difference is a live deployment's mail
+    sender. Provisioning seeds one so the bootstrap deadlock can be broken —
+    reaching the console needs a session, which needs a code, which needs mail —
+    and it runs again on every re-provision. An upsert there resets what an
+    operator configured, silently, back to whatever the automation shipped with.
+  */
+  it("seeds only where there is nothing, and never over what somebody set", async () => {
+    const s = store();
+    await seedOne(s.handle, "kova", "email.from", "Kova", AT);
+    await writeOne(s.handle, "kova", "email.from", "Haddad Strength", AT);
+    await seedOne(s.handle, "kova", "email.from", "Kova", AT);
+    expect(await readAll(s.handle, "kova")).toEqual({ "email.from": "Haddad Strength" });
   });
 
   it("survives a database with no table yet", async () => {
     const broken = { async all() { throw new Error("no such table"); } } as unknown as SqlHandle;
-    expect(await readAll(broken)).toEqual({});
+    expect(await readAll(broken, "kova")).toEqual({});
   });
 });
 

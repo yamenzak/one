@@ -18,21 +18,26 @@ function global_() {
   const runs: Record<string, unknown>[] = [];
   return {
     runs,
+    /*
+      ⚠️ THE FAKE FILTERS ON THE APP BECAUSE THE REAL TABLE DOES, and a fake that
+      did not would let a reader that ignored it pass — which is exactly how one
+      product's sweep came to suppress every other product's.
+    */
     db: {
       async first<T>(sql: string, ...p: readonly unknown[]) {
         if (!sql.includes("job_run")) return null;
-        const found = [...runs].reverse().find((r) => r.job === p[0] && r.failed === 0);
+        const found = [...runs].reverse().find((r) => r.app_id === p[0] && r.job === p[1] && r.failed === 0);
         return (found ? { started_at: found.started_at } : null) as T | null;
       },
       async all<T>(sql: string, ...p: readonly unknown[]) {
         if (sql.includes("tenant_directory")) return [] as T[];
-        return [...runs].reverse().slice(0, Number(p[0] ?? 100)) as T[];
+        return [...runs].reverse().filter((r) => r.app_id === p[0]).slice(0, Number(p[1] ?? 100)) as T[];
       },
       async run(sql: string, ...p: readonly unknown[]) {
         if (sql.startsWith("INSERT INTO job_run")) {
           runs.push({
-            id: p[0], job: p[1], started_at: p[2], finished_at: p[3],
-            done: p[4], skipped: p[5], idle: p[6], more: p[7], failed: p[8], detail: p[9],
+            id: p[0], app_id: p[1], job: p[2], started_at: p[3], finished_at: p[4],
+            done: p[5], skipped: p[6], idle: p[7], more: p[8], failed: p[9], detail: p[10],
           });
         }
       },
@@ -40,8 +45,9 @@ function global_() {
   };
 }
 
-const deps = (g: ReturnType<typeof global_>, tenants: string[], now: string) => ({
+const deps = (g: ReturnType<typeof global_>, tenants: string[], now: string, appId = "hello") => ({
   global: g.db,
+  appId,
   regions: ["auto"] as RegionId[],
   now: () => AT(now),
   bindingsFor: () => ({}),
@@ -89,7 +95,7 @@ describe("running what is due", () => {
 
   it("skips a job that is not due, and says it did not run", async () => {
     const g = global_();
-    g.runs.push({ job: "sweep", started_at: "2026-01-10T00:00:00.000Z", failed: 0 });
+    g.runs.push({ app_id: "hello", job: "sweep", started_at: "2026-01-10T00:00:00.000Z", failed: 0 });
     const out = await runDue([sweeping()], deps(g, ["t1"], "2026-01-10T01:00:00.000Z"));
     expect(out[0]).toMatchObject({ ran: false, done: 0 });
     expect(g.runs.length, "a run that did not happen is not a run").toBe(1);
@@ -182,7 +188,23 @@ describe("what the scheduler has been doing", () => {
     const g = global_();
     await runDue([sweeping({ id: "a", scope: "platform" })], deps(g, [], "2026-01-10T00:00:00.000Z"));
     await runDue([sweeping({ id: "b", scope: "platform" })], deps(g, [], "2026-01-10T00:00:00.000Z"));
-    expect((await jobHistory(g.db, 10)).map((h) => h.job)).toEqual(["b", "a"]);
+    expect((await jobHistory(g.db, "hello", 10)).map((h) => h.job)).toEqual(["b", "a"]);
+  });
+
+  /*
+    ⚠️ TWO PRODUCTS, ONE SCHEDULE TABLE. The global store is bound with the same
+    id into every worker, so "has `sweep` run today" was answered by whichever
+    product swept first — and every other product's sweep skipped, reporting
+    neither a run nor a failure. A job that never runs and never fails is the
+    quietest way for work to stop.
+  */
+  it("keeps two products' schedules apart in the one store they share", async () => {
+    const g = global_();
+    await runDue([sweeping({ scope: "platform" })], deps(g, [], "2026-01-10T00:00:00.000Z", "kova"));
+    const scena = await runDue([sweeping({ scope: "platform" })], deps(g, [], "2026-01-10T01:00:00.000Z", "scena"));
+    expect(scena[0], "the second product's sweep must not be suppressed by the first's").toMatchObject({ ran: true });
+    expect((await jobHistory(g.db, "kova", 10))).toHaveLength(1);
+    expect((await jobHistory(g.db, "scena", 10))).toHaveLength(1);
   });
 
   it("keeps its record in the global store, where the schedule is decided", () => {

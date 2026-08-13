@@ -35,6 +35,13 @@ export type Resolution = { readonly ok: true; readonly at: Resolved } | { readon
 export interface ResolveConfig extends DoorConfig {
   /** Where a tenantless request reads from. Routing data only. */
   readonly directoryRegion: RegionId;
+  /**
+   * ⚠️ WHICH PRODUCT IS SERVING THIS REQUEST, and it is here because the
+   * directory is shared. A slug is unique per product, so resolving one without
+   * naming the product answers with whichever workspace was created first — and
+   * what that answer decides is which database the request is served from.
+   */
+  readonly appId: string;
 }
 
 /**
@@ -80,7 +87,7 @@ export async function resolveRequest(hostname: string, cfg: ResolveConfig, direc
     };
   }
 
-  const entry = host.door === "custom" ? await directory.byDomain(host.hostname) : await directory.bySlug(host.slug ?? "");
+  const entry = host.door === "custom" ? await directory.byDomain(host.hostname) : await directory.bySlug(cfg.appId, host.slug ?? "");
   if (!entry) {
     return { ok: false, problem: { code: "platform.not_found", status: 404, title: "Not found", retryable: false } };
   }

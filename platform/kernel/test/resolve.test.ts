@@ -22,6 +22,7 @@ const cfg: ResolveConfig = {
   platformRoot: "4dl.app",
   reserved: ["kova", "coach"],
   doors: ["root", "setup", "admin", "tenant", "custom"],
+  appId: "hello",
   directoryRegion: "eu",
 };
 
@@ -36,8 +37,14 @@ const entry = (over: Partial<DirectoryEntry> = {}): DirectoryEntry => ({
   ...over,
 });
 
+/*
+  ⚠️ THE STUB MATCHES ON THE APP AS WELL AS THE SLUG, because the real one does —
+  the directory is bound with the same id into every worker, so `haddad.kova` and
+  `haddad.scena` are two workspaces belonging to two businesses. A stub that
+  ignored the app would let a resolver that ignored it pass.
+*/
 const dir = (e: DirectoryEntry | null): Directory => ({
-  bySlug: async (s) => (e && e.slug === s ? e : null),
+  bySlug: async (appId, s) => (e && e.appId === appId && e.slug === s ? e : null),
   byDomain: async (h) => (e && e.domains.includes(h) ? e : null),
 });
 

@@ -8,8 +8,12 @@
 
 import { env } from "cloudflare:test";
 import { sql, type ResolvedRegion } from "@one/kernel";
-import { bindingsFor } from "@one/runtime";
+import { bindingsFor, CONFIG_SCHEMA, seedOne } from "@one/runtime";
 import worker, { recorded } from "../src/worker.js";
+
+/* ⚠️ Whose configuration. The directory is bound with the same id into every
+   worker, so a row with no app on it is every product's row. */
+const APP = "hello";
 
 /**
  * ⚠️ THE DEPLOYMENT HAS TO CHOOSE A MAIL PROVIDER BEFORE IT CAN SEND ANYTHING,
@@ -38,12 +42,20 @@ import worker, { recorded } from "../src/worker.js";
 */
 const seedMail = async () => {
   const db = bindingsFor({ db: sql() }, { DB: (env as Record<string, unknown>).DIRECTORY }, { defaultRegion: "auto" })("auto" as ResolvedRegion).db;
-  await db.batch([`CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL, at TEXT NOT NULL);`]);
-  for (const [key, value] of [["email.provider", "recorded"], ["email.from", "Hello <noreply@4dl.app>"]]) {
-    await db.run(
-      `INSERT INTO app_config (key, value, at) VALUES (?, ?, ?) ON CONFLICT(key) DO NOTHING`,
-      key, value, new Date().toISOString(),
-    );
+  /* ⚠️ THE MODULE'S OWN DDL, NEVER A COPY OF IT. A fixture that retyped this
+     `CREATE TABLE` kept a stale shape alive after the real one gained the app
+     column, and what it produced was an `ON CONFLICT` that matched no key —
+     three suites failing on the fixture rather than on anything they test. */
+  await db.batch([...CONFIG_SCHEMA.ddl]);
+  for (const [key, value] of Object.entries({ "email.provider": "recorded", "email.from": "Hello <noreply@4dl.app>" })) {
+    /*
+      ⚠️ SEEDED, NEVER OVERWRITTEN, and the fixture depends on the distinction as
+      much as production does. This runs on every sign-in, so an upsert here puts
+      a sender back after a test has deliberately blanked one — and the suite
+      that proves "a code that could not be sent is not a code that was" passes
+      by having sent it.
+    */
+    await seedOne(db, APP, key, value, new Date().toISOString() as never);
   }
 };
 

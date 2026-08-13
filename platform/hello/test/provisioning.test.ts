@@ -17,7 +17,7 @@ import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import worker from "../src/worker.js";
 import { signIn } from "./session.js";
-import { bindingsFor } from "@one/runtime";
+import { bindingsFor, writeOne } from "@one/runtime";
 import { sql, type ResolvedRegion } from "@one/kernel";
 
 const ID = "https://id.4dl.app";
@@ -51,11 +51,11 @@ beforeAll(async () => {
      in it — which fails as "no such table", one layer away from anything the
      test is about. */
   await worker.fetch(new Request(`${ID}/api/me.products`), env as never);
-  await directory().run(
-    `INSERT INTO app_config (key, value, at) VALUES (?, ?, ?)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-    "provisioning.key", KEY, new Date().toISOString(),
-  );
+  /* ⚠️ The real writer, so a fixture cannot hold a stale table shape alive —
+     which is what a retyped INSERT here did the day `app_config` gained its app
+     column, failing three suites on the fixture rather than on anything they
+     test. */
+  await writeOne(directory(), "hello", "provisioning.key", KEY, new Date().toISOString() as never);
 });
 
 describe("letting an address into a product", () => {
@@ -220,7 +220,7 @@ describe("naming a workspace while creating it", () => {
     expect(wrote.status).toBe(200);
 
     const row = await directory().first<{ branding: string }>(
-      `SELECT branding FROM tenant_directory WHERE slug = ?`, NAMED,
+      `SELECT branding FROM tenant_directory WHERE app_id = ? AND slug = ?`, "hello", NAMED,
     );
     expect(JSON.parse(row?.branding ?? "{}")["brand.name"]).toBe("Haddad Strength");
   });

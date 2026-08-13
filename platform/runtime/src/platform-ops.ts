@@ -327,7 +327,16 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
       */
       if (!app.tenancy.regions.includes(region)) ctx.fail("platform.invalid", { field: "region", reason: "not available" });
 
-      const taken = await directory.first<{ slug: string }>(`SELECT slug FROM tenant_directory WHERE slug = ?`, input.slug);
+      /*
+        ⚠️ TAKEN IN THIS PRODUCT, NOT ON THE DEPLOYMENT. The directory is bound
+        with the same id into every worker, so asked without the app this refused
+        `haddad` to a clinic because a gym three products away had it — a signup
+        turned away over a name in a business the person has never heard of, with
+        the message "that address is taken" and nothing they could do about it.
+      */
+      const taken = await directory.first<{ slug: string }>(
+        `SELECT slug FROM tenant_directory WHERE app_id = ? AND slug = ?`, app.id, input.slug,
+      );
       if (taken) ctx.fail("platform.conflict", { field: "slug", reason: "that address is taken" });
 
       const tenantId = `t_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}` as TenantId;

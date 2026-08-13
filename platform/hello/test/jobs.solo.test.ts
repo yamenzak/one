@@ -32,6 +32,7 @@ beforeAll(async () => {
 
 const deps = (now: string) => ({
   global: handle("DIRECTORY"),
+  appId: "hello",
   regions: ["auto"] as RegionId[],
   now: () => now as Instant,
   bindingsFor: () => ({ db: handle("DB") }),
@@ -54,11 +55,11 @@ describe("the clock, in SQL", () => {
   it("reads past a failed run to the last one that worked", async () => {
     const g = handle("DIRECTORY");
     await runDue([sweeping("clock", async () => ({ done: 1, more: false }))], deps("2026-01-01T00:00:00.000Z"));
-    expect(await lastSuccess(g, "clock")).toBe("2026-01-01T00:00:00.000Z");
+    expect(await lastSuccess(g, "hello", "clock")).toBe("2026-01-01T00:00:00.000Z");
 
     await runDue([sweeping("clock", async () => { throw new Error("no"); })], deps("2026-01-09T00:00:00.000Z"));
     expect(
-      await lastSuccess(g, "clock"),
+      await lastSuccess(g, "hello", "clock"),
       "a failure must not advance the clock, or a broken job never retries",
     ).toBe("2026-01-01T00:00:00.000Z");
   });
@@ -72,7 +73,7 @@ describe("the clock, in SQL", () => {
   it("keeps one job's clock to itself", async () => {
     const g = handle("DIRECTORY");
     await runDue([sweeping("other", async () => ({ done: 1, more: false }))], deps("2026-02-01T00:00:00.000Z"));
-    expect(await lastSuccess(g, "clock")).not.toBe("2026-02-01T00:00:00.000Z");
+    expect(await lastSuccess(g, "hello", "clock")).not.toBe("2026-02-01T00:00:00.000Z");
   });
 });
 
@@ -91,7 +92,7 @@ describe("the app's own sweep", () => {
   });
 
   it("is readable by an operator afterwards", async () => {
-    const history = await jobHistory(handle("DIRECTORY"), 50);
+    const history = await jobHistory(handle("DIRECTORY"), "hello", 50);
     expect(history.some((h) => h.job === "notes.tidy")).toBe(true);
   });
 

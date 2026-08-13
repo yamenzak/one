@@ -37,7 +37,13 @@ import { SETTINGS, settingsFor, settingsOperations, domainAdminOperations, type 
 import { readSettings, wordingFor } from "./settings.js";
 import { remember, replayed, replayKeyOf, REPLAY_HEADER } from "./replay.js";
 import { LOOKUP, type Fetcher, type LookupCarrier } from "./lookup.js";
-import { chargeableFrom, readAll, readRates } from "./config.js";
+import { chargeableFrom, DEPLOYMENT_SCOPE, readAll, readRates } from "./config.js";
+
+/* ⚠️ NON-EMPTY WINS, NOT PRESENT WINS — `kernel/config.ts` states why, and a
+   second reader that got it wrong would silently switch off a shared key for one
+   product the first time somebody saved a blank field. */
+const nonEmptyOf = (v: Readonly<Record<string, string>>): Record<string, string> =>
+  Object.fromEntries(Object.entries(v).filter(([, x]) => x !== ""));
 import { send, type Deliver } from "./mail.js";
 
 /**
@@ -445,6 +451,8 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     */
     doors: app.tenancy.doors.map((d) => (d === "slug" ? "tenant" : d)),
     directoryRegion: app.identity.directoryRegion,
+    /* ⚠️ The directory is shared, so a slug is only unique inside a product. */
+    appId: app.id,
   };
   const regional = (env: RawEnv) => bindingsFor(app.bindings, env, { defaultRegion: app.tenancy.defaultRegion });
 
@@ -582,6 +590,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         keeping: keptBy(app.collections),
       }))], {
         global: directoryDb,
+        appId: app.id,
         regions: app.tenancy.regions,
         now: () => new Date().toISOString() as Instant,
         bindingsFor: (region) => regional(env)(region as ResolvedRegion),
@@ -596,13 +605,21 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           return standingOf(
             sub ?? { planId: null, status: "none", trialEndsAt: null, pastDueAt: null, closingAt: null },
             new Date().toISOString() as Instant,
-            chargeableFrom(await readAll(directoryDb).catch(() => ({}))),
+            chargeableFrom(await readAll(directoryDb, app.id).catch(() => ({}))),
           );
         },
         tenants: async (region) => {
           const rows = await directoryDb.all<{ tenant_id: string }>(
-            `SELECT tenant_id FROM tenant_directory WHERE region = ? ORDER BY tenant_id LIMIT ?`,
-            region, SWEEP_TENANTS,
+            /*
+              ⚠️ THIS PRODUCT'S WORKSPACES ONLY. The sweep runs this app's jobs
+              against this app's regional store, so another product's workspace
+              resolves to nothing there and is counted as SKIPPED — and a run
+              where everything skipped and nothing was done is reported as a
+              failure. A correct sweep failing because a second product exists is
+              the whole of it.
+            */
+            `SELECT tenant_id FROM tenant_directory WHERE app_id = ? AND region = ? ORDER BY tenant_id LIMIT ?`,
+            app.id, region, SWEEP_TENANTS,
           ).catch(() => []);
           return rows.map((r) => ({ tenantId: r.tenant_id as TenantId, region }));
         },
@@ -865,7 +882,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           telling somebody to check their inbox for neither is the failure.
         */
         deliverCode: opts.deliverCode ?? (async (email, code) => {
-          const values = { ...(await readAll(sharedConfigDb)), ...await readAll(directoryDb) };
+          const values = { ...(await readAll(sharedConfigDb, DEPLOYMENT_SCOPE)), ...await readAll(directoryDb, app.id) };
           const out = await send(values, {
             to: email,
             subject: `${app.name}: your sign-in code`,
@@ -897,7 +914,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         /* ⚠️ No address is silence, not a throw. The inbox row is already
            written and it is the record; mail is the interruption. */
         if (!who?.email) return;
-        const values = { ...(await readAll(sharedConfigDb)), ...await readAll(directoryDb) };
+        const values = { ...(await readAll(sharedConfigDb, DEPLOYMENT_SCOPE)), ...await readAll(directoryDb, app.id) };
         await send(values, {
           to: who.email,
           subject: delivery.title,
@@ -1019,7 +1036,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         failure is not a 500, it is every workspace on a self-host stranded in
         setup over OUR misconfiguration.
       */
-      const chargeable = chargeableFrom(await readAll(directoryDb));
+      const chargeable = chargeableFrom(await readAll(directoryDb, app.id));
       /*
         ⚠️ THE CATALOGUE AS IT IS ACTUALLY SOLD, NOT AS IT WAS DECLARED. An
         operator's edit that the gate never reads is a price list screen with no
@@ -1028,7 +1045,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         paid for it would change nothing and the only symptom is a refusal they
         were told would not happen.
       */
-      const selling = catalogueOf(app.access.plans, await planOverrides(directoryDb));
+      const selling = catalogueOf(app.access.plans, await planOverrides(directoryDb, app.id));
       /*
         ⚠️ THE SUBSCRIPTION IS THE ACCOUNT'S AND IT IS READ FROM THE GLOBAL STORE.
         The payer is an account, so the row lives where accounts do — and it has
@@ -1476,6 +1493,8 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & ConfigCarrier & SettingsCarrier & LookupCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier & ProvisionCarrier & MarketCarrier & ReferenceCarrier & VaultCarrier = {
         [CONFIG]: {
           own: directoryDb,
+          /* ⚠️ Whose rows in a store every app binds by the same id. */
+          appId: app.id,
           /*
             ⚠️ THE SAME TABLE IN ANOTHER DATABASE, bound by the same id in every
             app. Null where a deployment binds none, which resolves to this app's
@@ -1568,7 +1587,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             others.
           */
           chosen: () => choicesOf(regionalDb, at.tenant?.tenantId ?? ""),
-          disabled: async () => disabledFrom((await readAll(directoryDb))["ai.models.disabled"]),
+          disabled: async () => disabledFrom((await readAll(directoryDb, app.id))["ai.models.disabled"]),
           /*
             ⚠️ NULL WHERE NOTHING IS BOUND. `generate` refuses on it; nothing
             anywhere substitutes an answer.
@@ -1582,7 +1601,18 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           services: app.services ?? {},
           /* ⚠️ Read lazily: only a request that actually looks something up pays
              for the query. */
-          values: () => readAll(sharedConfigDb ?? directoryDb),
+          /*
+            ⚠️ BOTH LAYERS, THIS APP'S WINNING — the same rule every other reader
+            follows. It read ONE store, whichever existed, so a deployment with a
+            shared store never saw a product's own value and one without never
+            saw a shared one. That was survivable while the local layer was the
+            shared layer by accident; with the app as a column it would be a
+            service configured per product and resolved as the deployment's.
+          */
+          values: async () => ({
+            ...(await readAll(sharedConfigDb, DEPLOYMENT_SCOPE)),
+            ...nonEmptyOf(await readAll(directoryDb, app.id)),
+          }),
           /*
             ⚠️ THE NETWORK, INJECTED — the same shape as the mail lane. Nothing
             in a suite can reach a real service by accident, and the path is
@@ -1604,8 +1634,21 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
              ask. */
           workspaces: async () => {
             if (!session) return [];
+            /*
+              ⚠️ THIS PRODUCT'S WORKSPACES, BECAUSE THAT IS ALL THIS WORKER CAN
+              ANSWER FOR. `mineIn` reads THIS product's regional memberships, so
+              another product's rows can never match — scanning them spends the
+              200-row ceiling on rows that were never candidates, and somebody's
+              fourth workspace falls off a list that looks complete.
+
+              DEFER(one-161) stage:7 — the hub says "everywhere you belong,
+              across every product" and this can only answer for one. What it
+              needs is an account→workspace index in the GLOBAL store, written
+              when a membership is; memberships are regional by design and no
+              worker can read another product's region.
+            */
             const rows = await directoryDb.all<{ tenant_id: string; slug: string; app_id: string | null }>(
-              `SELECT tenant_id, slug, app_id FROM tenant_directory ORDER BY slug LIMIT 200`,
+              `SELECT tenant_id, slug, app_id FROM tenant_directory WHERE app_id = ? ORDER BY slug LIMIT 200`, app.id,
             ).catch(() => []);
             const mine = await platform.mineIn(rows.map((r) => r.tenant_id));
             return rows
@@ -1645,8 +1688,21 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           */
           workspaces: async () => {
             if (!session) return [];
+            /*
+              ⚠️ THIS PRODUCT'S WORKSPACES, BECAUSE THAT IS ALL THIS WORKER CAN
+              ANSWER FOR. `mineIn` reads THIS product's regional memberships, so
+              another product's rows can never match — scanning them spends the
+              200-row ceiling on rows that were never candidates, and somebody's
+              fourth workspace falls off a list that looks complete.
+
+              DEFER(one-162) stage:7 — the same gap on the vault's own walk.
+              It groups a person's facts by the workspace that asked for them, so
+              it is short by every product this worker does not serve. Closed by
+              the same index one-161 needs, and listed separately because the two
+              screens would each look complete while disagreeing.
+            */
             const rows = await directoryDb.all<{ tenant_id: string; slug: string; app_id: string | null }>(
-              `SELECT tenant_id, slug, app_id FROM tenant_directory ORDER BY slug LIMIT 200`,
+              `SELECT tenant_id, slug, app_id FROM tenant_directory WHERE app_id = ? ORDER BY slug LIMIT 200`, app.id,
             ).catch(() => []);
             const mine = await platform.mineIn(rows.map((r) => r.tenant_id));
             return rows
@@ -1733,6 +1789,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         [DATA]: {
           db: regionalDb,
           global: directoryDb,
+          appId: app.id,
           tenantId: at.tenant?.tenantId ?? "",
           modules: opts.regionalModules ?? [],
           keeping: keptBy(app.collections),
@@ -1764,7 +1821,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         */
         [PROVISION]: {
           store: provisioningStore(directoryDb),
-          key: String((await readAll(directoryDb).catch(() => ({} as Record<string, string>)))["provisioning.key"] ?? ""),
+          key: String((await readAll(directoryDb, app.id).catch(() => ({} as Record<string, string>)))["provisioning.key"] ?? ""),
           presented: (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "") || null,
           products: opts.deployment?.products ?? [],
         },
@@ -1781,7 +1838,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           selling,
           declared: app.access.entitlements as never,
           chargeable,
-          portalUrl: (await readAll(directoryDb))["billing.portal_url"] ?? null,
+          portalUrl: (await readAll(directoryDb, app.id))["billing.portal_url"] ?? null,
         },
         [COMMERCE]: {
           db: regionalDb,
@@ -1795,7 +1852,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           selling,
           /* ⚠️ Read from config, so turning billing on is a setting rather than
              a deploy — and absent is reported rather than linked to. */
-          portalUrl: (await readAll(directoryDb))["billing.portal_url"] ?? null,
+          portalUrl: (await readAll(directoryDb, app.id))["billing.portal_url"] ?? null,
           entitlements: caller.entitlements,
           global: directoryDb,
           /*
