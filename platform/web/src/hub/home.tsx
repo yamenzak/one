@@ -60,6 +60,14 @@ export interface HubHomeProps {
   readonly openable?: readonly { readonly id: string }[];
   /** ⚠️ `undefined` is a deployment with no credits; `null` is "not yet known". */
   readonly balance?: Balance | null;
+  /**
+   * ⚠️ WHETHER THIS PERSON RUNS THE DEPLOYMENT, and it draws a FOURTH crown.
+   * Almost nobody holds this, which is exactly why it is a crown rather than a
+   * row: an area that appears for one person in ten thousand must not make the
+   * screen look different to everybody else, and three areas plus an absent one
+   * is the same screen.
+   */
+  readonly operator?: boolean;
   readonly onGo: (to: Where) => void;
   readonly onClose: () => void;
   readonly Heading?: ElementType;
@@ -90,7 +98,7 @@ const marketFoot = (openable: number, balance: Balance | null | undefined): Reac
 };
 
 export function HubHome({
-  person, workspaces, sharedCount = null, openable = [], balance, onGo, onClose, Heading = "h1",
+  person, workspaces, sharedCount = null, openable = [], balance, operator = false, onGo, onClose, Heading = "h1",
 }: HubHomeProps): ReactNode {
   const market = openable.length > 0 || balance !== undefined;
 
@@ -141,6 +149,20 @@ export function HubHome({
             said="Start something new, and top up the credits every product spends."
             foot={marketFoot(openable.length, balance)}
             onGo={() => onGo({ at: "market" })}
+          />
+        ) : null}
+        {/*
+          ⚠️ THE CONSOLE IS ABSENT FOR EVERYBODY WHO IS NOT AN OPERATOR, and the
+          server decides — this is what stops it being OFFERED, never what stops
+          it being reached. Every operation behind it carries `platform:operate`,
+          which is held by nothing a workspace can grant.
+        */}
+        {operator ? (
+          <Crown
+            word="Console"
+            hue={HUES.console}
+            said="Every product on this deployment, what each one sells, and the keys they all share."
+            onGo={() => onGo({ at: "console" })}
           />
         ) : null}
       </Section>

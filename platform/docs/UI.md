@@ -810,6 +810,64 @@ as a state it is a row that says "you have paid for this, making the workspace i
 the last step".
 *Checked: `web/test/screens.test.tsx`.*
 
+### 2.7d Screens nobody writes
+
+**A settings screen is the declaration, rendered.** — `SettingsSpec` already
+carries the label, the kind, the range, the choices and the help line, and the
+read already sends it beside the values. A form written beside that goes out of
+date in the direction nobody notices: a setting added to the manifest and not to
+the form has a default nobody can change on a screen that looks complete; one
+removed and left on the form writes a key no consumer reads. Neither fails.
+*Checked: `web/test/declared.test.tsx`.*
+
+**One control per KIND, and an unknown kind draws nothing.** — A switch is the
+only inline control, because in a switch the choice IS the action; everything
+else is a value somebody types or picks, and a card of inline inputs is a form
+rather than a settings screen. A future kind rendered as a text box is a colour
+somebody types a word into — refused by the store, so what they see is a field
+that will not save. Absent is honest; wrong is not.
+
+**A row says what it is set to, whether or not you may change it.** — A settings
+screen whose rows are only names is a menu, and a menu between somebody and
+eleven settings is a tax. What a workspace has chosen is also not a secret from
+the people it applies to, so a narrower setting is shown and stood down rather
+than hidden.
+
+**A fallback is not a choice.** — Printing a declared default as though somebody
+had typed it makes an untouched workspace look configured. "We have not decided"
+and "we decided this" are the difference the screen exists to show.
+
+**Group by the prefix the key already has.** — `brand.*` is one card, `lapse.*`
+another. Derived, so a new group is a key name rather than a second registry to
+keep in step.
+
+### 2.7e An operator console
+
+**It is the deployment's, not one product's.** — There is one payment account,
+one mail lane and one bot check behind every product, so a console per product is
+three sign-ins and three places to paste one key — and the copy nobody re-pastes
+fails in a way nobody attributes to the rotation. What makes it possible is that
+every per-product row is keyed by the product; what makes it honest is that each
+product publishes what it declares, so the console can show what shipped beside
+what was changed.
+
+**A secret is set, and never shown.** — A console that can display a provider's
+key leaks one through a screen share, a support session or any read
+vulnerability. What an operator needs is whether it is configured. Say
+"write-only" ONCE for the screen: repeated per row it makes the secrets the
+tallest, loudest things on a list whose subject is which keys are set.
+
+**Say where a value came from.** — "It is set" and "it is set HERE" have
+different fixes. Typing a local value over one resolving from the shared store
+pins that product to a copy which will not follow the next rotation, and nothing
+else on the screen would say so.
+
+**Mark what was moved, and only what was moved.** — An edited price, a
+grandfathered ceiling, an adjusted one. A badge on every row is texture; a badge
+on the two that differ is the answer to "why does this workspace have more than
+the plan says", which is the question support is actually asked.
+*Checked: `web/test/declared.test.tsx`.*
+
 ### 2.8 Failure
 
 **A failure is a `Problem`, never a string.** — The platform already refuses to
@@ -1078,6 +1136,14 @@ more, which is the honest state.
 | `a-shelf-is-a-grid-and-a-holding-is-a-row` | a product set as a row — a column of mostly empty space where the eye reads every label to find one it recognises — or a subscription set as a tile, which drops the price, the standing and the renewal date that are the reason somebody opened the screen | **live** |
 | `an-inert-tile-is-not-a-disabled-button` | a product hidden from somebody it is not open to, so the grid is a different shape per person and "where is the other one" has no answer anybody can act on — or shown as a disabled button, which announces it as a control they cannot use rather than as a thing on a shelf | **live** |
 | `up-is-the-area-not-the-hub` | somebody who opened their passkeys from the account centre being dropped two levels by one press — the back button doing something other than undoing what they did | **live** |
+| `a-settings-screen-is-the-declaration` | a form written beside a declaration, which goes out of date in the direction nobody notices — a setting added to a manifest and not to the form is one with a default nobody can change, on a screen that looks complete; one removed and left on the form writes a key no consumer reads. Neither fails, and both are one edit somebody forgot | **live** |
+| `an-unknown-kind-draws-nothing` | a future setting kind rendered as a text box — a colour somebody types a word into, a number that accepts "soon". The store refuses it, correctly, so what a person sees is a field that will not save and no explanation available anywhere. Absent is honest; wrong is not | **live** |
+| `a-setting-shows-what-it-is-set-to` | a settings screen whose rows are only names, which is a menu — and a menu between somebody and eleven settings is a tax. The same test pins the narrower case: a setting most people may not write is still SHOWN, because what a workspace has chosen is not a secret from the people it applies to | **live** |
+| `a-fallback-is-not-a-choice` | an untouched workspace that looks configured — "we have not decided" and "we decided this" printed identically, on the screen where the difference is the whole question | **live** |
+| `a-moved-ceiling-says-who-moved-it` | a workspace shown its plan's numbers rather than the walk's, which disagrees with the gate for exactly the workspaces somebody has helped — the ones most likely to be looking. A badge on every row instead is texture; the two that differ are the answer to the question support is actually asked | **live** |
+| `a-secret-is-set-and-never-shown` | a console that can display a payment provider's key, leaked through a screen share, a support session or any read vulnerability. The same test pins the rule being stated ONCE for the screen: repeated per row it made the secrets the tallest, loudest things on a list whose subject is which keys are set | **live** |
+| `a-console-says-where-a-value-came-from` | "it is set" and "it is set HERE" printed the same, which have different fixes: typing a local value over one that resolves from the shared store pins that product to a copy which will not follow the next rotation, and nothing else on the screen would say so | **live** |
+| `an-edited-price-is-told-from-a-shipped-one` | every price looking like the one the product was built with, so an operator cannot tell their own change from the app's default. It is also the whole reason each product publishes its declaration: without the shipped catalogue beside the overrides there is nothing to compare | **live** |
 <!-- /generated -->
 
 ## 5. What is not decided yet

@@ -68,6 +68,16 @@ export * as Icon from "./icon.js";
 export { Hub } from "./hub/hub.js";
 export { HubHome, type HubHomeProps, type Person } from "./hub/home.js";
 export { AccountScreen, type AccountProps } from "./hub/account.js";
+export {
+  DeclaredSettings, groupsOf, shownAs,
+  type Declaration, type Declared, type DeclaredProps, type Values,
+} from "./hub/declared.js";
+export { SettingsScreen, type SettingsProps } from "./hub/settings.js";
+export { WorkspaceScreen, amountOf, type Resolved, type WorkspaceProps } from "./hub/workspace.js";
+export {
+  ConsoleScreen, KeysScreen, CatalogueScreen, saidAs as keySaidAs,
+  type CatalogueProps, type ConsoleProps, type Key, type KeysProps, type Product as ConsoleProduct,
+} from "./hub/console.js";
 export { WorkspacesScreen, type Workspace, type WorkspacesProps, type Product as WorkspaceProduct } from "./hub/workspaces.js";
 export { MarketScreen, ShelfScreen, type Sellable } from "./hub/market.js";
 export { PlanScreen, standsAs, type Holding, type PlanProps } from "./hub/plan.js";

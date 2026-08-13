@@ -52,6 +52,20 @@ export type Where =
    */
   | { readonly at: "plan"; readonly subscription: string }
   | { readonly at: "credits" }
+  /*
+    ⚠️ THE OPERATOR CONSOLE IS THE DEPLOYMENT'S, and every question in it starts
+    with "which product" — so the product is in the address rather than in a
+    picker's state. It is also what makes a console screen linkable, which is
+    what support asks for first.
+  */
+  | { readonly at: "console" }
+  | { readonly at: "product-config"; readonly product: string }
+  | { readonly at: "catalogue"; readonly product: string }
+  | { readonly at: "shared-config" }
+  | { readonly at: "tenants" }
+  | { readonly at: "maintenance" }
+  /** One workspace's own settings, rendered from what its product declares. */
+  | { readonly at: "workspace"; readonly tenant: string }
   | { readonly at: "details" }
   | { readonly at: "security" }
   | { readonly at: "preferences"; readonly part?: "appearance" | "reading" | "feedback" }
@@ -81,6 +95,16 @@ export function parseWhere(path: string): Where {
   if (one === "credits") return { at: "credits" };
   if (one === "market") return two ? { at: "shelf", product: two } : { at: "market" };
   if (one === "plan") return two ? { at: "plan", subscription: two } : { at: "market" };
+  if (one === "workspace") return two ? { at: "workspace", tenant: two } : { at: "workspaces" };
+  if (one === "console") {
+    if (!two) return { at: "console" };
+    if (two === "shared") return { at: "shared-config" };
+    if (two === "workspaces") return { at: "tenants" };
+    if (two === "maintenance") return { at: "maintenance" };
+    /* ⚠️ `console/<product>` is its configuration and `console/<product>/plans`
+       its catalogue — the two questions an operator has about one product. */
+    return three === "plans" ? { at: "catalogue", product: two } : { at: "product-config", product: two };
+  }
   if (one === "export") return { at: "export" };
   if (one === "close") return { at: "close" };
   if (one === "preferences") {
@@ -113,6 +137,12 @@ export function pathOf(where: Where): string {
     case "home": return "";
     case "shelf": return `market/${where.product}`;
     case "plan": return `plan/${where.subscription}`;
+    case "workspace": return `workspace/${where.tenant}`;
+    case "product-config": return `console/${where.product}`;
+    case "catalogue": return `console/${where.product}/plans`;
+    case "shared-config": return "console/shared";
+    case "tenants": return "console/workspaces";
+    case "maintenance": return "console/maintenance";
     case "preferences": return where.part ? `preferences/${where.part}` : "preferences";
     case "product": return product(where.product);
     case "receiving": return `${product(where.product)}/who`;
@@ -139,6 +169,12 @@ export function upFrom(where: Where): Where {
   switch (where.at) {
     case "home": return { at: "home" };
     case "shelf": case "plan": return { at: "market" };
+    case "workspace": return { at: "workspaces" };
+    /* ⚠️ Everything in the console goes up to the console, and the catalogue goes
+       up to the product whose catalogue it is — one press, one level. */
+    case "product-config": case "shared-config": case "tenants": case "maintenance":
+      return { at: "console" };
+    case "catalogue": return { at: "product-config", product: where.product };
     /*
       ⚠️ THE THREE AREAS GO UP TO THE HUB, and everything inside one goes up to
       its area rather than to the hub. Sent straight home, somebody who opened

@@ -7,6 +7,13 @@
  * "Payment failed" — and those are facts somebody scans for. A grid of marks
  * would hide the one thing that makes this list worth opening.
  *
+ * ⚠️ A ROW OPENS THE WORKSPACE'S OWN SCREEN RATHER THAN THE WORKSPACE. For as
+ * long as it left for another origin, the one place somebody could see all their
+ * workspaces was the one place they could do nothing about any of them — and
+ * "what does this one actually include" had no screen at all, in a product whose
+ * whole billing model is ceilings. Opening the product is still one press, from
+ * there, where it is a decision rather than the only thing the row does.
+ *
  * ⚠️ AND STARTING ONE IS NOT HERE. That is the Marketplace, one level up: a
  * workspace is created against a subscription somebody buys, so the control
  * belongs where the buying is. This screen carried a "New workspace" row while
@@ -43,6 +50,7 @@ export interface WorkspacesProps {
   readonly workspaces: readonly Workspace[] | null;
   /** Where somebody with none is sent, when there is anything for them to start. */
   readonly onStart?: () => void;
+  /** ⚠️ Its own screen in the hub, not the product — see the header. */
   readonly onOpen: (tenantId: string) => void;
   readonly onBack: () => void;
   readonly email: string;

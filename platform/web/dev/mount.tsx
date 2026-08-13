@@ -47,6 +47,10 @@ import { Door, type DoorWire } from "../src/door.js";
 import { SetupScreen, type Place } from "../src/setup.js";
 import { MarketScreen, ShelfScreen, type Sellable } from "../src/hub/market.js";
 import { PlanScreen, type Holding } from "../src/hub/plan.js";
+import { WorkspaceScreen, type Resolved } from "../src/hub/workspace.js";
+import { ConsoleScreen, KeysScreen, CatalogueScreen, type Key as ConfigKey } from "../src/hub/console.js";
+import { SettingsScreen } from "../src/hub/settings.js";
+import type { Declaration } from "../src/hub/declared.js";
 import type { Plan } from "../src/hub/offer.js";
 import { CreditsScreen, type Balance, type Movement, type Pack } from "../src/hub/credits.js";
 import { ProveIt } from "../src/prove.js";
@@ -537,6 +541,55 @@ const HOLDINGS: readonly Holding[] = [
   },
 ];
 
+/*
+  ⚠️ A DECLARATION WITH ONE OF EVERY KIND, because the renderer's whole job is to
+  turn kinds into controls — a fixture of six text fields would be a picture of
+  one branch. The keys carry their real prefixes, so the grouping is exercised
+  rather than described.
+*/
+const DECLARED: Declaration = {
+  "brand.name": { label: "What this workspace is called", kind: "text", fallback: "", help: "Shown on the sign-in screen and in the messages you send." },
+  "brand.accent": { label: "Accent colour", kind: "colour", fallback: "" },
+  "mail.signature": { label: "How your messages sign off", kind: "text", fallback: "" },
+  "lapse.after": { label: "Days before access lapses", kind: "number", fallback: 14, min: 0, max: 365 },
+  "lapse.then": { label: "And then", kind: "enum", fallback: "read_only", values: ["read_only", "blocked", "archive"] },
+  "lapse.notify": { label: "Tell them first", kind: "bool", fallback: true },
+};
+
+const CHOSEN = { "brand.name": "Haddad Strength", "lapse.after": 30, "lapse.then": "archive" };
+
+/*
+  ⚠️ ONE CEILING PER SOURCE, because `source` is the only reason this screen is
+  worth opening — a fixture where everything came from the plan never draws the
+  two rows that answer "why does this workspace have more than the plan says".
+*/
+const INCLUDED: readonly Resolved[] = [
+  { key: "clients", label: "People you coach", value: 40, unlimited: false, source: "plan" },
+  { key: "seats", label: "Colleagues", value: 5, unlimited: false, plan: 3, source: "grandfathered" },
+  { key: "storage", label: "Storage", value: -1, unlimited: true, source: "adjusted" },
+];
+
+/*
+  ⚠️ EVERY SOURCE AND A SECRET, because those are the four rows that render
+  differently and the ones an operator reads the screen for.
+*/
+const CONFIG_KEYS: readonly ConfigKey[] = [
+  { key: "stripe.mode", value: "test", secret: false, shared: true, source: "shared" },
+  { key: "stripe.live.secret_key", value: true, secret: true, shared: true, source: "shared" },
+  { key: "email.from", value: "Kova <noreply@4dl.app>", secret: false, shared: false, source: "app" },
+  { key: "google.gemini_key", value: false, secret: true, shared: true, source: "unset" },
+];
+
+const CONSOLE_PRODUCTS = [
+  { appId: "kova", appName: "Kova", manifestVersion: "0.21.0", changed: 0 },
+  { appId: "scena", appName: "Scena", manifestVersion: "0.4.0", changed: 2 },
+  { appId: "tessa", appName: "Tessa", manifestVersion: "0.9.0", changed: 0 },
+];
+
+/* ⚠️ An app id is a routing token; a person reads a name. One helper rather than
+   a lookup table, so a fourth product needs no edit here. */
+const titledId = (id: string): string => id.replace(/^./, (c) => c.toUpperCase());
+
 /** Long enough to see the spinner and know it is a wait, not a stutter. */
 const ROUND_TRIP_MS = 900;
 
@@ -810,6 +863,47 @@ function Preview() {
       address, so a review of "what you belong to" is not a review of the hub
       with everything else on it.
     */
+    ) : at === "workspace" ? (
+      <WorkspaceScreen
+        workspace={{
+          tenantId: where.tenant, name: "Haddad Strength", product: "kova", productName: "Kova",
+          role: "Owner", at: "https://haddad.kova.4dl.app", face: face("t1"),
+        }}
+        included={which === "waiting" ? null : INCLUDED}
+        plan={{ name: "Pro", said: "$29 a month" }}
+        declared={DECLARED}
+        values={which === "waiting" ? null : CHOSEN}
+        onSet={save}
+        /* ⚠️ `#write=no` is somebody in a workspace who is not its owner — the
+           ordinary case, and the one where every control stands down. */
+        {...(asked.get("write") === "no" ? { mayWrite: () => false } : {})}
+        onGo={go} onBack={up} Heading={Heading}
+      />
+    ) : at === "console" ? (
+      <ConsoleScreen
+        products={which === "waiting" ? null : which === "new" ? [] : CONSOLE_PRODUCTS}
+        onGo={go} onBack={up} Heading={Heading}
+      />
+    ) : at === "product-config" ? (
+      <KeysScreen
+        product={{ id: where.product, name: titledId(where.product) }}
+        keys={which === "waiting" ? null : CONFIG_KEYS}
+        hasShared={asked.get("shared") !== "no"}
+        onEdit={() => undefined} onBack={up} Heading={Heading}
+      />
+    ) : at === "shared-config" ? (
+      <KeysScreen
+        product={null}
+        keys={which === "waiting" ? null : CONFIG_KEYS.filter((k) => k.shared)}
+        hasShared={asked.get("shared") !== "no"}
+        onEdit={() => undefined} onBack={up} Heading={Heading}
+      />
+    ) : at === "catalogue" ? (
+      <CatalogueScreen
+        product={{ id: where.product, name: titledId(where.product) }}
+        plans={which === "waiting" ? null : PLANS.map((p, i) => ({ ...p, ...(i === 1 ? { edited: true } : {}) }))}
+        onEdit={() => undefined} onBack={up} Heading={Heading}
+      />
     ) : at === "account" ? (
       <AccountScreen
         person={(CASES[which] ?? CASES.four).person}
@@ -826,10 +920,9 @@ function Preview() {
       <WorkspacesScreen
         workspaces={(CASES[which] ?? CASES.four).workspaces}
         email={(CASES[which] ?? CASES.four).person.email}
-        /* ⚠️ A WORKSPACE ROW LEAVES THIS SURFACE, which is why it is not a route
-           in the preview either. In the product it is a full navigation to
-           another origin. */
-        onOpen={() => undefined}
+        /* ⚠️ A ROW OPENS THE WORKSPACE'S OWN SCREEN, which is a route in this
+           surface now. Leaving for the product is one press from there. */
+        onOpen={(tenantId) => go({ at: "workspace", tenant: tenantId })}
         onStart={asked.get("open") === "none" ? undefined : () => go({ at: "market" })}
         Heading={Heading}
         onBack={up}
@@ -862,6 +955,9 @@ function Preview() {
         /* ⚠️ WHAT THE WEBSITE ENABLES, AS THE ACCOUNT CENTRE SEES IT. `#open=one`
            for a single product (no picker at all) and `#open=` for somebody who
            may open nothing, which is what most people with an account are. */
+        /* ⚠️ `#operator=1` DRAWS THE FOURTH CROWN. Almost nobody holds this, which
+           is why it is worth being able to look at both versions of the screen. */
+        operator={asked.get("operator") === "1"}
         openable={
           asked.get("open") === "one" ? PRODUCTS.slice(0, 1)
             : asked.get("open") === "none" ? []
@@ -990,7 +1086,8 @@ function Preview() {
             /* ⚠️ THE THREE AREAS COME FIRST AND THE HUB IS "", because that is
                the order somebody walks them. A dial that listed only the leaves
                would make the split invisible in the one place it is reviewed. */
-            options={["", "account", "workspaces", "market", "market/kova", "plan/sub_2", "credits",
+            options={["", "account", "workspaces", "workspace/t1", "market", "market/kova", "plan/sub_2", "credits",
+              "console", "console/kova", "console/kova/plans", "console/shared",
               "details", "security", "preferences", "vault", "legal", "export", "close"] as const}
             onPick={(path) => go(parseWhere(path))}
           />

@@ -4477,6 +4477,78 @@
       "impl": "hello/test/membership.test.ts",
       "proves": "takes a workspace off the hub when somebody is removed from it",
       "fails": "a workspace left on somebody's list that refuses them at the door. The regional row is REVOKED rather than deleted — \"who was in this workspace and when\" is where every investigation starts — so the index has to be told separately, and an index nobody deletes from is one that only ever grows"
+    },
+    {
+      "id": "a-settings-screen-is-the-declaration",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "renders one control per declared setting and invents none",
+      "fails": "a form written beside a declaration, which goes out of date in the direction nobody notices — a setting added to a manifest and not to the form is one with a default nobody can change, on a screen that looks complete; one removed and left on the form writes a key no consumer reads. Neither fails, and both are one edit somebody forgot"
+    },
+    {
+      "id": "an-unknown-kind-draws-nothing",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "draws nothing for a kind it does not know",
+      "fails": "a future setting kind rendered as a text box — a colour somebody types a word into, a number that accepts \"soon\". The store refuses it, correctly, so what a person sees is a field that will not save and no explanation available anywhere. Absent is honest; wrong is not"
+    },
+    {
+      "id": "a-setting-shows-what-it-is-set-to",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "stands a control down without hiding what it is set to",
+      "fails": "a settings screen whose rows are only names, which is a menu — and a menu between somebody and eleven settings is a tax. The same test pins the narrower case: a setting most people may not write is still SHOWN, because what a workspace has chosen is not a secret from the people it applies to"
+    },
+    {
+      "id": "a-fallback-is-not-a-choice",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "says nothing is set rather than printing the fallback",
+      "fails": "an untouched workspace that looks configured — \"we have not decided\" and \"we decided this\" printed identically, on the screen where the difference is the whole question"
+    },
+    {
+      "id": "a-moved-ceiling-says-who-moved-it",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "says which ceilings were moved, and by what",
+      "fails": "a workspace shown its plan's numbers rather than the walk's, which disagrees with the gate for exactly the workspaces somebody has helped — the ones most likely to be looking. A badge on every row instead is texture; the two that differ are the answer to the question support is actually asked"
+    },
+    {
+      "id": "a-secret-is-set-and-never-shown",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "says a secret is set and never what it is",
+      "fails": "a console that can display a payment provider's key, leaked through a screen share, a support session or any read vulnerability. The same test pins the rule being stated ONCE for the screen: repeated per row it made the secrets the tallest, loudest things on a list whose subject is which keys are set"
+    },
+    {
+      "id": "a-console-says-where-a-value-came-from",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "says where each value came from",
+      "fails": "\"it is set\" and \"it is set HERE\" printed the same, which have different fixes: typing a local value over one that resolves from the shared store pins that product to a copy which will not follow the next rotation, and nothing else on the screen would say so"
+    },
+    {
+      "id": "an-edited-price-is-told-from-a-shipped-one",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "tells an edited price from the one the product shipped",
+      "fails": "every price looking like the one the product was built with, so an operator cannot tell their own change from the app's default. It is also the whole reason each product publishes its declaration: without the shipped catalogue beside the overrides there is nothing to compare"
     }
   ]
 }

@@ -36,7 +36,15 @@ import { Spinner, Tick } from "./icon.js";
 import { Sheet } from "./sheet.js";
 
 /** What a value is, which is all the sheet needs to draw the right control. */
-export type FieldKind = "text" | "email";
+/**
+ * ⚠️ THE KIND IS WHAT THE KEYBOARD AND THE VALIDATION COME FROM, and it grew
+ * because settings are declared rather than written: `SettingsSpec` says a value
+ * is a number or a colour, and an editor that could only offer a text box made
+ * every declared kind land in the same control. A number typed on a letter
+ * keyboard and a colour typed as a word are both refused by the store — correctly
+ * — and what somebody sees is a field that will not save.
+ */
+export type FieldKind = "text" | "email" | "number" | "colour";
 
 export interface EditableField {
   /** ⚠️ THE KEY A `Problem`'s `fields` IS KEYED BY. Same name, or a per-field
@@ -248,10 +256,14 @@ export function ValueEditorBody({ field, onSave = async () => null, onClose = ()
       <Field
         label={field.label}
         name={field.name}
-        type={field.kind === "email" ? "email" : "text"}
-        inputMode={field.kind === "email" ? "email" : undefined}
-        autoComplete={field.kind === "email" ? "email" : "name"}
-        autoCapitalize={field.kind === "email" ? "none" : "words"}
+        type={field.kind === "email" ? "email" : field.kind === "colour" ? "color" : "text"}
+        /* ⚠️ `inputMode` RATHER THAN `type="number"`, which brings spinners, a
+           locale-dependent decimal separator and a value that reads as "" the
+           moment somebody types a minus sign. What a number actually needs is
+           the right keyboard. */
+        inputMode={field.kind === "email" ? "email" : field.kind === "number" ? "decimal" : undefined}
+        autoComplete={field.kind === "email" ? "email" : field.kind === "text" ? "name" : "off"}
+        autoCapitalize={field.kind === "text" ? "words" : "none"}
         spellCheck={false}
         maxLength={field.maxLength}
         placeholder={field.placeholder}

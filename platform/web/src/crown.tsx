@@ -97,4 +97,16 @@ export const HUES = {
    * violet and a teal. At 20 both sources stay warm.
    */
   market: 20,
+  /**
+   * What you RUN, for the one person in ten thousand who runs it. Green because
+   * it is the only area that is not about them at all — every other crown is
+   * somebody's own account, workspaces or purchases, and this one is the
+   * machinery under all three.
+   *
+   * ⚠️ AND IT IS THE FURTHEST FROM THE OTHER THREE that is still a colour rather
+   * than a warning. 152 sits 44° from the workspaces teal and 132° from the
+   * marketplace orange; red and amber were both available and both already mean
+   * something on every other surface here.
+   */
+  console: 152,
 } as const;
