@@ -383,17 +383,17 @@ describe("the switch that closes every door", () => {
 
 describe("the deployment's model catalogue", () => {
   const MODELS = [
-    { id: "llama", provider: "workers-ai", lane: "text", enabled: true, markup: 1.4, thinking: false,
+    { id: "llama", provider: "workers-ai", lanes: ["text"], enabled: true, markup: 1.4, thinking: false,
       cost: { input: 1, output: 2, perOutput: null }, price: { input: 1.4, output: 2.8, perOutput: null }, problems: [] },
-    { id: "pro", provider: "gemini", lane: "text", enabled: false, markup: 1.25, thinking: true,
+    { id: "pro", provider: "gemini", lanes: ["text"], enabled: false, markup: 1.25, thinking: true,
       cost: { input: 4, output: 16, perOutput: null }, price: { input: 5, output: 20, perOutput: null }, problems: [] },
-    { id: "free", provider: "gemini", lane: "image", enabled: true, markup: 1, thinking: false,
+    { id: "free", provider: "gemini", lanes: ["image"], enabled: true, markup: 1, thinking: false,
       cost: { input: 1, output: 4, perOutput: 600 }, price: { input: 1, output: 4, perOutput: 600 },
       problems: ["has a markup of zero or less, which sells every call at or below cost"] },
   ];
   const LANES = ["text", "vision", "image", "speech", "transcribe", "video"];
 
-  const shown = (models: typeof MODELS | null, over: { hasShared?: boolean } = {}) => html(
+  const shown = (models: typeof MODELS | null, over: { hasShared?: boolean; onSync?: () => Promise<null> } = {}) => html(
     <ModelsScreen models={models} lanes={LANES} onEdit={() => undefined}
       onEnabled={async () => null} onBack={() => undefined} {...over} />,
   );
@@ -449,6 +449,41 @@ describe("the deployment's model catalogue", () => {
 
   it("says when there is nowhere to keep a catalogue", () => {
     expect(shown([], { hasShared: false })).toContain("binds no shared configuration store");
+  });
+
+  /*
+    ⚠️ A MODEL APPEARS UNDER EVERY LANE IT SERVES, because it does. A Gemini text
+    model is priced for pictures on the same row, so showing it under one heading
+    only would leave a catalogue whose vision section looks empty while a vision
+    model is sitting in it.
+  */
+  it("shows a model under every lane it serves", () => {
+    const both = [{ ...MODELS[0]!, lanes: ["text", "vision"] }];
+    const out = shown(both);
+    expect(out).toContain("Words in, words out");
+    expect(out).toContain("A picture in, words out");
+    expect([...out.matchAll(/llama/g)].length).toBeGreaterThanOrEqual(2);
+  });
+
+  /*
+    ⚠️ A RETIREMENT IS SAID BEFORE IT HAPPENS. One an operator learns about from
+    a failing generation is one they had a month of warning about, on a screen
+    that never showed it — and the replacement is named, because the provider
+    names it in the page itself.
+  */
+  it("says what is retiring and what it will be replaced by", () => {
+    const going = [{ ...MODELS[0]!, retiresAt: "2026-06-01", replacedBy: "llama-next" }];
+    expect(shown(going)).toContain("Retires 2026-06-01 → llama-next");
+  });
+
+  /*
+    ⚠️ AND READING THE PRICE LISTS IS A BUTTON AS WELL AS A DAILY JOB, but only
+    where the deployment can actually reach them. A control that fails when
+    pressed is worse than one that is not offered.
+  */
+  it("offers a read of the price lists only where one is possible", () => {
+    expect(shown(MODELS, { onSync: async () => null })).toContain("Read the price lists");
+    expect(shown(MODELS)).not.toContain("Read the price lists");
   });
 });
 

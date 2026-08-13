@@ -4720,6 +4720,96 @@
       "impl": "web/test/declared.test.tsx",
       "proves": "shows a row that would be unmetered, and says why",
       "fails": "an operator seeing a model they added simply not appear, with nothing anywhere saying why — and the fault being hidden is the one that decides whether every call to that model is free"
+    },
+    {
+      "id": "the-price-lists-are-read-not-typed",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/catalogue-doc.test.ts",
+      "proves": "reads the whole catalogue rather than a handful of it",
+      "fails": "a catalogue typed by hand, which is wrong by the end of the quarter — and being wrong here is a transfer rather than a bug, because the reserve is the ceiling on revenue and every unit an out-of-date rate fails to count is one the platform pays for and nobody is billed. The fixtures are the real pages, committed whole: a parser proved against an invented fixture is proved against its author's idea of the page, and every shape that actually breaks it is what an invented fixture leaves out"
+    },
+    {
+      "id": "a-shutdown-date-and-its-replacement-are-read-from-the-page",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/catalogue-doc.test.ts",
+      "proves": "reads what to move to, resolved to a model id",
+      "fails": "a workspace pinned to a model that has been shut down, discovering it as a provider error on a morning nobody was watching. Google's page carries both the date and the target — \"migrate to Gemini 2.5 Flash Image\" — so the close alternative is a fact to read rather than a judgement made under time pressure. It is resolved from the LINK TEXT and never from the anchor, because the anchor is imprecise in the page itself: Imagen's notice links to `#gemini-2.5-flash`, a text model that cannot draw"
+    },
+    {
+      "id": "the-paid-price-is-never-the-free-tier",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/catalogue-doc.test.ts",
+      "proves": "reads the paid price and never the free tier",
+      "fails": "the single most expensive way this parser could be wrong. \"Free of charge\" read as zero is an unmetered model: the reserve holds nothing, the settle charges nothing, the balance never moves, and the provider invoices as usual"
+    },
+    {
+      "id": "a-sync-never-touches-the-markup-or-the-switch",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/catalogue-doc.test.ts",
+      "proves": "never touches the markup or whether a model is in service",
+      "fails": "a document that grew a row overnight deciding what a deployment charges and which companies it sends data to. A sync corrects what a PROVIDER charges; the markup and the switch are the operator's, and a new row arrives disabled and unpriced — visible, refused by `modelProblems`, and unusable until somebody decides"
+    },
+    {
+      "id": "a-bad-parse-changes-nothing",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/catalogue-sync.test.ts",
+      "proves": "changes nothing when a page yields far too little",
+      "fails": "one bad morning at a provider's CDN becoming a deployment where every AI action refuses, having thrown away the catalogue that was correct yesterday. \"Parsed something\" is not \"parsed the page\": a document that changed shape rarely yields zero rows, it yields three from whichever table still matches, and applying that drops the rest — reading on every screen as a provider that retired most of its range"
+    },
+    {
+      "id": "one-page-down-does-not-hold-the-other-back",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/catalogue-sync.test.ts",
+      "proves": "applies one provider when the other cannot be reached",
+      "fails": "an all-or-nothing apply, where the flakier of the two documents decides how often either is ever corrected. And a failure says WHY: a report that only counted successes is how a rate goes six months out of date behind a green screen"
+    },
+    {
+      "id": "a-retired-model-is-taken-out-of-service-without-a-migration",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/catalogue-sync.test.ts",
+      "proves": "takes it out of service on the date the provider gave",
+      "fails": "every call to a shut-down model failing, for every workspace pinned to it, reported as a provider error. Nothing is deleted — the row carries the rate every past generation was settled against and the replacement — and no workspace is migrated: `chooseModel` prefers a retired pick's named replacement at read time, so there is no walk over every region rewriting rows and therefore no half-completed run that leaves some workspaces behind. Retiring runs BEFORE the fetch and needs no network, so a docs site having a bad morning cannot leave a dead model in service for a day"
+    },
+    {
+      "id": "a-retired-pick-goes-to-its-named-replacement",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/model-choice.test.ts",
+      "proves": "moves a retired pick to the model the provider named",
+      "fails": "a workspace whose model was retired falling to whichever model happens to be cheapest — which would answer a clinical read with a small model on the day a provider retired a big one. The provider names the replacement in its own page, so honouring it is reading a fact rather than making a judgement, and `source` says `replaced` so the screen can say what happened"
+    },
+    {
+      "id": "a-model-shows-under-every-lane-it-serves",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "shows a model under every lane it serves",
+      "fails": "a catalogue whose vision section looks empty while a vision model sits in it. One model serves several modalities — a Gemini text model is priced for pictures on the same row — which is why a model carries a LIST of lanes rather than one, and why one row per lane is not the alternative: the id is the provider path and there is only one of it"
+    },
+    {
+      "id": "a-retirement-is-said-before-it-happens",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "says what is retiring and what it will be replaced by",
+      "fails": "an operator learning about a retirement from a failing generation — one they had a month of warning about, on a screen that never showed it. The replacement is named because the provider names it"
     }
   ]
 }

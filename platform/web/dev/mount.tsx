@@ -608,20 +608,29 @@ const CONSOLE_PRODUCTS = [
 */
 const MODELS: readonly Model[] = [
   {
-    id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", provider: "workers-ai", lane: "text", enabled: true,
+    id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", provider: "workers-ai", lanes: ["text"], enabled: true,
     markup: 1.4, thinking: false,
     cost: { input: 1, output: 2, perOutput: null }, price: { input: 1.4, output: 2.8, perOutput: null }, problems: [],
   },
   {
-    id: "gemini-2.5-pro", provider: "gemini", lane: "text", enabled: true, markup: 1.25, thinking: true,
+    id: "gemini-2.5-pro", provider: "gemini", lanes: ["text"], enabled: true, markup: 1.25, thinking: true,
     cost: { input: 4, output: 16, perOutput: null }, price: { input: 5, output: 20, perOutput: null }, problems: [],
   },
   {
-    id: "gemini-2.5-flash", provider: "gemini", lane: "vision", enabled: false, markup: 1.4, thinking: false,
+    /* ⚠️ Two lanes on one row, which is the ordinary case for a Gemini model
+       and the reason a model carries a list rather than one. */
+    id: "gemini-2.5-flash", provider: "gemini", lanes: ["text", "vision"], enabled: false, markup: 1.4, thinking: false,
     cost: { input: 1, output: 4, perOutput: null }, price: { input: 1.4, output: 5.6, perOutput: null }, problems: [],
   },
   {
-    id: "gemini-2.5-flash-image", provider: "gemini", lane: "image", enabled: true, markup: 1, thinking: false,
+    /* ⚠️ And one the provider has dated, with the model it names to move to. */
+    id: "gemini-2.0-flash", provider: "gemini", lanes: ["text", "vision"], enabled: true, markup: 1.4, thinking: false,
+    retiresAt: "2026-06-01", replacedBy: "gemini-2.5-flash",
+    cost: { input: 1, output: 4, perOutput: null }, price: { input: 1.4, output: 5.6, perOutput: null }, problems: [],
+  },
+  {
+    id: "gemini-2.5-flash-image", provider: "gemini", lanes: ["image"], enabled: true, markup: 1, thinking: false,
+    retiresAt: "2026-08-17", replacedBy: "gemini-3.1-flash-image",
     cost: { input: 1, output: 4, perOutput: 600 }, price: { input: 1, output: 4, perOutput: 600 },
     problems: ["has a markup of zero or less, which sells every call at or below cost"],
   },
@@ -994,6 +1003,7 @@ function Preview() {
         hasShared={asked.get("shared") !== "no"}
         onEdit={() => undefined}
         onEnabled={async () => null}
+        onSync={async () => null}
         onBack={up} Heading={Heading}
       />
     ) : at === "ai" ? (

@@ -38,6 +38,7 @@ import { readSettings, wordingFor } from "./settings.js";
 import { remember, replayed, replayKeyOf, REPLAY_HEADER } from "./replay.js";
 import { LOOKUP, type Fetcher, type LookupCarrier } from "./lookup.js";
 import { chargeableFrom, DEPLOYMENT_SCOPE, readAll, readCatalogue } from "./config.js";
+import { catalogueJob } from "./catalogue-sync.js";
 
 /* ⚠️ NON-EMPTY WINS, NOT PRESENT WINS — `kernel/config.ts` states why, and a
    second reader that got it wrong would silently switch off a shared key for one
@@ -584,7 +585,14 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         of them: `CollectionSpec.retention` is a declaration every app makes and
         nothing read, so a limit written in a manifest deleted nothing.
       */
-      return runDue([...(app.jobs ?? []), retentionJob(app.collections), auditJob(app.governance.auditRetentionDays), limitJob(), arrearsJob(() => ({
+      return runDue([...(app.jobs ?? []), retentionJob(app.collections), auditJob(app.governance.auditRetentionDays), limitJob(),
+        /* ⚠️ The price lists, daily. Retiring a shut-down model needs no network at
+           all — the dates are already in the rows — so it runs even where the
+           documents cannot be reached. */
+        catalogueJob(
+          opts.sharedConfigBinding ? globalSql(env, opts.sharedConfigBinding) : null,
+          async (url: string) => (opts.lookup ?? ((u, i) => fetch(u, i as RequestInit)))(url, { method: "GET", headers: {} }),
+        ), arrearsJob(() => ({
         global: directoryDb,
         objectsFor: (region) => (regional(env)(region as ResolvedRegion)[opts.objectsBinding ?? "media"] as ObjectHandle | undefined) ?? null,
         modules: opts.regionalModules ?? [],
@@ -1519,6 +1527,13 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             accident, and the send path is exercised rather than stubbed out.
           */
           deliver: opts.deliver ?? deliverVia(env, opts.sendEmailBinding),
+          /*
+            ⚠️ THE SAME FETCHER THE LOOKUP LANE USES, so the one place this
+            runtime reaches the network stays one place. Null on a deployment
+            with no outbound access — the sync refuses and says so rather than
+            reporting a success that read nothing.
+          */
+          fetch: async (url: string) => (opts.lookup ?? ((u, i) => fetch(u, i as RequestInit)))(url, { method: "GET", headers: {} }),
         },
         [OPERATOR]: {
           global: directoryDb,

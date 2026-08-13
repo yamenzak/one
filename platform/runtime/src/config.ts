@@ -181,7 +181,7 @@ export const MODEL_SCHEMA: SchemaModule = {
   global: "deployment",
   id: "ai_model",
   ddl: [
-    `CREATE TABLE IF NOT EXISTS ai_model (id TEXT PRIMARY KEY, provider TEXT NOT NULL, lane TEXT NOT NULL DEFAULT 'text', rate_input REAL NOT NULL, rate_output REAL NOT NULL, per_output REAL, attachment_units REAL, markup REAL NOT NULL DEFAULT 1, thinking INTEGER, enabled INTEGER NOT NULL DEFAULT 1, at TEXT NOT NULL);`,
+    `CREATE TABLE IF NOT EXISTS ai_model (id TEXT PRIMARY KEY, provider TEXT NOT NULL, lanes TEXT NOT NULL DEFAULT 'text', rate_input REAL NOT NULL, rate_output REAL NOT NULL, per_output REAL, attachment_units REAL, markup REAL NOT NULL DEFAULT 1, thinking INTEGER, enabled INTEGER NOT NULL DEFAULT 1, retires_at TEXT, replaced_by TEXT, at TEXT NOT NULL);`,
   ],
 };
 
@@ -196,17 +196,20 @@ export const MODEL_SCHEMA: SchemaModule = {
 export async function readCatalogue(db: SqlHandle | null): Promise<Catalogue> {
   if (!db) return [];
   const rows = await db.all<{
-    id: string; provider: string; lane: string; rate_input: number; rate_output: number;
-    per_output: number | null; attachment_units: number | null; markup: number; thinking: number | null; enabled: number;
+    id: string; provider: string; lanes: string; rate_input: number; rate_output: number;
+    per_output: number | null; attachment_units: number | null; markup: number; thinking: number | null;
+    enabled: number; retires_at: string | null; replaced_by: string | null;
   }>(
-    /* unbounded-read: a deployment's model catalogue, typed in by an operator —
-       tens of rows, and there is no per-workspace growth behind it. */
-    `SELECT id, provider, lane, rate_input, rate_output, per_output, attachment_units, markup, thinking, enabled FROM ai_model ORDER BY lane, id`,
+    /* unbounded-read: a deployment's model catalogue — tens of rows, synced from
+       two price lists, and there is no per-workspace growth behind it. */
+    `SELECT id, provider, lanes, rate_input, rate_output, per_output, attachment_units, markup, thinking, enabled, retires_at, replaced_by FROM ai_model ORDER BY lanes, id`,
   ).catch(() => []);
   return rows.map((r) => ({
     id: r.id,
     provider: r.provider,
-    lane: r.lane as ModelSpec["lane"],
+    /* ⚠️ A LIST, because one model serves several modalities — a Gemini text
+       model is priced for pictures on the same row. */
+    lanes: r.lanes.split(",").map((l) => l.trim()).filter(Boolean) as ModelSpec["lanes"],
     rate: { input: r.rate_input, output: r.rate_output },
     ...(r.per_output === null ? {} : { perOutput: r.per_output }),
     ...(r.attachment_units === null ? {} : { attachmentUnits: r.attachment_units }),
@@ -214,6 +217,8 @@ export async function readCatalogue(db: SqlHandle | null): Promise<Catalogue> {
     /* ⚠️ Null is "not a reasoning model", which is also what absent means. */
     ...(r.thinking === null ? {} : { thinking: r.thinking === 1 }),
     enabled: r.enabled === 1,
+    ...(r.retires_at === null ? {} : { retiresAt: r.retires_at }),
+    ...(r.replaced_by === null ? {} : { replacedBy: r.replaced_by }),
   }));
 }
 
@@ -233,15 +238,17 @@ export function refuseModel(m: ModelSpec): readonly string[] {
 
 export async function writeModel(db: SqlHandle, m: ModelSpec, at: Instant): Promise<void> {
   await db.run(
-    `INSERT INTO ai_model (id, provider, lane, rate_input, rate_output, per_output, attachment_units, markup, thinking, enabled, at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET provider = excluded.provider, lane = excluded.lane,
+    `INSERT INTO ai_model (id, provider, lanes, rate_input, rate_output, per_output, attachment_units, markup, thinking, enabled, retires_at, replaced_by, at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET provider = excluded.provider, lanes = excluded.lanes,
        rate_input = excluded.rate_input, rate_output = excluded.rate_output,
        per_output = excluded.per_output, attachment_units = excluded.attachment_units,
-       markup = excluded.markup, thinking = excluded.thinking, enabled = excluded.enabled, at = excluded.at`,
-    m.id, m.provider, m.lane, m.rate.input, m.rate.output,
+       markup = excluded.markup, thinking = excluded.thinking, enabled = excluded.enabled,
+       retires_at = excluded.retires_at, replaced_by = excluded.replaced_by, at = excluded.at`,
+    m.id, m.provider, m.lanes.join(","), m.rate.input, m.rate.output,
     m.perOutput ?? null, m.attachmentUnits ?? null, m.markup,
-    m.thinking === undefined ? null : m.thinking ? 1 : 0, m.enabled ? 1 : 0, at,
+    m.thinking === undefined ? null : m.thinking ? 1 : 0, m.enabled ? 1 : 0,
+    m.retiresAt ?? null, m.replacedBy ?? null, at,
   );
 }
 

@@ -453,8 +453,12 @@ export function MaintenanceScreen({ mode, message, onSet, onBack, Heading = "h1"
 export interface Model {
   readonly id: string;
   readonly provider: string;
-  readonly lane: string;
+  readonly lanes: readonly string[];
   readonly enabled: boolean;
+  /** ⚠️ When the provider switches it off, where the provider has said so. */
+  readonly retiresAt?: string;
+  /** ⚠️ And what it names to move to. Read from the page, not decided here. */
+  readonly replacedBy?: string;
   readonly markup: number;
   readonly thinking: boolean;
   readonly cost: { readonly input: number; readonly output: number; readonly perOutput: number | null };
@@ -469,6 +473,8 @@ export interface ModelsProps {
   readonly lanes: readonly string[];
   readonly onEdit: (id: string | null) => void;
   readonly onEnabled: (id: string, enabled: boolean) => Promise<Problem | null>;
+  /** ⚠️ Read both price lists now. Absent where a deployment cannot reach them. */
+  readonly onSync?: () => Promise<Problem | null>;
   readonly onBack: () => void;
   readonly Heading?: ElementType;
   /** ⚠️ False on a deployment that binds no shared store — said, never hidden. */
@@ -513,10 +519,14 @@ export const marginOf = (markup: number): string => `${Math.round((markup - 1) *
  * every call to it is free.
  */
 export function ModelsScreen({
-  models, lanes, onEdit, onEnabled, onBack, Heading = "h1", hasShared = true,
+  models, lanes, onEdit, onEnabled, onSync, onBack, Heading = "h1", hasShared = true,
 }: ModelsProps): ReactNode {
+  /* ⚠️ A MODEL APPEARS UNDER EVERY LANE IT SERVES, because it does. A Gemini
+     text model is priced for pictures on the same row, and showing it under one
+     heading would put a vision model in a catalogue where the vision section
+     looks empty. */
   const byLane = lanes
-    .map((lane) => [lane, (models ?? []).filter((m) => m.lane === lane)] as const)
+    .map((lane) => [lane, (models ?? []).filter((m) => m.lanes.includes(lane))] as const)
     .filter(([, rows]) => rows.length > 0);
 
   return (
@@ -528,6 +538,15 @@ export function ModelsScreen({
         <Section>
           <Card>
             <Item title="Add a model" detail="A provider path, what it costs, and what it is sold for" onGo={() => onEdit(null)} />
+            {/*
+              ⚠️ READING THE PRICE LISTS IS A BUTTON AS WELL AS A DAILY JOB. A
+              sync that only ran on a schedule is one an operator cannot use at
+              the moment they need it — the morning a provider announces a
+              shutdown, or straight after adding the key that makes a lane usable.
+            */}
+            {onSync ? (
+              <Item title="Read the price lists" detail="Cloudflare and Google, as they publish them" onGo={() => void onSync()} />
+            ) : null}
           </Card>
         </Section>
       ) : null}
@@ -568,6 +587,18 @@ export function ModelsScreen({
                       a catalogue is checking exactly this.
                     */}
                     {m.enabled && !m.problems.length ? ` · ${marginOf(m.markup)} margin` : ""}
+                    {/*
+                      ⚠️ A RETIREMENT IS SAID BEFORE IT HAPPENS, not after. One an
+                      operator learns about from a failing generation is one they
+                      had a month of warning about on a screen that never showed
+                      it — and the replacement is named, because the provider
+                      names it.
+                    */}
+                    {m.retiresAt ? (
+                      <Pill tone="warn">
+                        {m.replacedBy ? `Retires ${m.retiresAt} → ${m.replacedBy}` : `Retires ${m.retiresAt}`}
+                      </Pill>
+                    ) : null}
                     {m.problems.length ? <Pill tone="alarm">{m.problems[0]}</Pill> : null}
                   </>
                 }

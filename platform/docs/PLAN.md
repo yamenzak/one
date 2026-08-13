@@ -1541,6 +1541,14 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `an-action-may-ask-for-the-capable-model` | a clinical reading answered by whichever model happened to be cheapest. Naming a model was how a product used to say this, and losing it with the catalogue was a real regression rather than a simplification — a misread lab figure is a number a coach acts on. `prefer: "capable"` means dearest in the lane, and price is the only capability signal a catalogue actually carries | **live** |
 | `a-catalogue-row-that-cannot-be-metered-is-refused` | a row that succeeds and is unmetered, for every product behind the store at once. A rate of zero makes the reserve zero, the settle zero and the balance never move while the provider invoices as usual; a markup of zero sells every call at cost; and an attaching lane with no attachment price is the expensive one because it SUCCEEDS — the reserve is computed from the words alone and the platform pays for every picture, scaling with use | **live** |
 | `one-writer-for-both-halves-of-a-choice` | a workspace's model quietly cleared by saving its wording. The two share a row, so two `INSERT … ON CONFLICT` statements each naming their own column is the shape where the second one's column defaults overwrite the first — and what it produces is a setting that saved successfully and reverted | **live** |
+| `the-price-lists-are-read-not-typed` | a catalogue typed by hand, which is wrong by the end of the quarter — and being wrong here is a transfer rather than a bug, because the reserve is the ceiling on revenue and every unit an out-of-date rate fails to count is one the platform pays for and nobody is billed. The fixtures are the real pages, committed whole: a parser proved against an invented fixture is proved against its author's idea of the page, and every shape that actually breaks it is what an invented fixture leaves out | **live** |
+| `a-shutdown-date-and-its-replacement-are-read-from-the-page` | a workspace pinned to a model that has been shut down, discovering it as a provider error on a morning nobody was watching. Google's page carries both the date and the target — "migrate to Gemini 2.5 Flash Image" — so the close alternative is a fact to read rather than a judgement made under time pressure. It is resolved from the LINK TEXT and never from the anchor, because the anchor is imprecise in the page itself: Imagen's notice links to `#gemini-2.5-flash`, a text model that cannot draw | **live** |
+| `the-paid-price-is-never-the-free-tier` | the single most expensive way this parser could be wrong. "Free of charge" read as zero is an unmetered model: the reserve holds nothing, the settle charges nothing, the balance never moves, and the provider invoices as usual | **live** |
+| `a-sync-never-touches-the-markup-or-the-switch` | a document that grew a row overnight deciding what a deployment charges and which companies it sends data to. A sync corrects what a PROVIDER charges; the markup and the switch are the operator's, and a new row arrives disabled and unpriced — visible, refused by `modelProblems`, and unusable until somebody decides | **live** |
+| `a-bad-parse-changes-nothing` | one bad morning at a provider's CDN becoming a deployment where every AI action refuses, having thrown away the catalogue that was correct yesterday. "Parsed something" is not "parsed the page": a document that changed shape rarely yields zero rows, it yields three from whichever table still matches, and applying that drops the rest — reading on every screen as a provider that retired most of its range | **live** |
+| `one-page-down-does-not-hold-the-other-back` | an all-or-nothing apply, where the flakier of the two documents decides how often either is ever corrected. And a failure says WHY: a report that only counted successes is how a rate goes six months out of date behind a green screen | **live** |
+| `a-retired-model-is-taken-out-of-service-without-a-migration` | every call to a shut-down model failing, for every workspace pinned to it, reported as a provider error. Nothing is deleted — the row carries the rate every past generation was settled against and the replacement — and no workspace is migrated: `chooseModel` prefers a retired pick's named replacement at read time, so there is no walk over every region rewriting rows and therefore no half-completed run that leaves some workspaces behind. Retiring runs BEFORE the fetch and needs no network, so a docs site having a bad morning cannot leave a dead model in service for a day | **live** |
+| `a-retired-pick-goes-to-its-named-replacement` | a workspace whose model was retired falling to whichever model happens to be cheapest — which would answer a clinical read with a small model on the day a provider retired a big one. The provider names the replacement in its own page, so honouring it is reading a fact rather than making a judgement, and `source` says `replaced` so the screen can say what happened | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 
@@ -1903,6 +1911,59 @@ call, growing with however much somebody typed into a settings box once.
 The surfaces are `ModelsScreen` (the operator's, on the hub's console beside the
 shared keys) and `AiScreen` (the workspace's, which names no action and no model
 — both come from the server, so a screen cannot offer what a save refuses).
+
+### 7.9 The price lists read themselves
+
+**Shipped 2026-08-14.** The catalogue was operator-typed and nothing kept it
+true. Two documents are read instead — Cloudflare's
+`workers-ai/platform/pricing/index.md` and Google's
+`gemini-api/docs/pricing` — daily, and on a button.
+
+⚠️ **THE RATES ARE THE HALF THAT COSTS MONEY WHEN THEY ROT.** The reserve is the
+ceiling on revenue, so every unit an out-of-date rate fails to count is one the
+platform pays for and nobody is billed — silently, on every call. A catalogue
+typed by hand is wrong by the end of the quarter and nothing anywhere says so.
+
+⚠️ **AND THE RETIREMENT IS THE HALF WITH A DEADLINE.** Google's page carries the
+shut-down date AND the model to move to — *"migrate to Gemini 2.5 Flash Image"* —
+so the close alternative is a fact to read rather than a judgement somebody makes
+under time pressure. Past the date every call to the model fails, for every
+workspace pinned to it, on a morning nobody was watching.
+
+**Four rules, and each is a failure this design refuses to have:**
+
+| | |
+|---|---|
+| **A bad parse changes nothing** | "Parsed something" is not "parsed the page". A document that changed shape yields three rows from whichever table still matches — applying that drops the rest and reads as a provider that retired its range. `FLOOR` is the floor per provider |
+| **One page down does not hold the other back** | An all-or-nothing apply lets the flakier document decide how often either is corrected. And a failure says WHY: a report counting only successes is how a rate goes six months stale behind a green screen |
+| **A new row arrives switched off and unpriced** | Offering a model the moment a document grew one is the platform choosing a sub-processor on a workspace's behalf overnight. `markup` and `enabled` are never touched by a sync |
+| **Nothing is deleted and nobody is migrated** | A retired row keeps the rate every past generation was settled against and the replacement it names. `chooseModel` prefers that replacement at READ time, so there is no walk over every region rewriting rows — and no half-completed run leaving workspaces behind |
+
+⚠️ **RETIRING RUNS BEFORE THE FETCH AND NEEDS NO NETWORK.** The dates are already
+in the rows, so a deployment that cannot reach a docs site still takes a
+shut-down model out of service — rather than leaving a dead model running for a
+day because somebody else's CDN had a bad morning.
+
+⚠️ **AND THE REPLACEMENT IS RESOLVED FROM THE LINK TEXT, NEVER THE ANCHOR.** The
+anchor is written by hand and is wrong in the page itself: Imagen's notice says
+"migrate to Gemini 2.5 Flash Image" and links to `#gemini-2.5-flash`, which is a
+different model, in a different lane, that cannot draw.
+
+**The fixtures are the pages themselves**, fetched and committed whole. A parser
+proved against an invented fixture is proved against its author's idea of the
+page; every shape that actually breaks it is what the invented one leaves out.
+They will go stale, and that is the point — refreshing one is how a provider's
+change is seen as a diff in a review rather than as a sync that quietly parsed
+nothing at three in the morning.
+
+⚠️ **What Cloudflare's page does NOT carry is any retirement notice at all**, so
+a model disappearing from it is the only signal there is — and absence is
+deliberately not treated as a retirement, because a page that failed to render
+half its tables would otherwise retire half the catalogue. Its image and audio
+rows are also priced by tile, by step and by the minute, none of which is "one
+thing produced", so they import at zero: visible, in their lane, refused by
+`modelProblems`, and priced by hand in ten seconds. Inventing a conversion would
+be a number nobody could check deciding a bill.
 
 ## 8. Stages
 

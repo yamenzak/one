@@ -30,7 +30,7 @@ const ai: AiSpec = {
   kernel, where the multiplication happens.
 */
 const CATALOGUE: Catalogue = [
-  { id: "gemini-2.5-flash", provider: "google", lane: "text", rate: { input: 1, output: 2 }, markup: 1, enabled: true },
+  { id: "gemini-2.5-flash", provider: "google", lanes: ["text"], rate: { input: 1, output: 2 }, markup: 1, enabled: true },
 ];
 
 /* -------------------------------------------------------------- fixtures --- */
@@ -421,8 +421,8 @@ describe("a picture and the feature that did or did not ask for one", () => {
     },
   };
   const seeing: Catalogue = [
-    { id: "sees", provider: "p", lane: "vision", rate: { input: 1, output: 2 }, attachmentUnits: 1_000, markup: 1, enabled: true },
-    { id: "reads", provider: "p", lane: "text", rate: { input: 1, output: 2 }, markup: 1, enabled: true },
+    { id: "sees", provider: "p", lanes: ["vision"], rate: { input: 1, output: 2 }, attachmentUnits: 1_000, markup: 1, enabled: true },
+    { id: "reads", provider: "p", lanes: ["text"], rate: { input: 1, output: 2 }, markup: 1, enabled: true },
   ];
   const picture = { bytes: new Uint8Array([1, 2, 3]).buffer, contentType: "image/jpeg" };
 

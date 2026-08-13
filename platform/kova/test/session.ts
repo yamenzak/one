@@ -81,11 +81,11 @@ const seedModels = async () => {
   await db.batch([...MODEL_SCHEMA.ddl]);
   const at = new Date().toISOString() as never;
   for (const m of [
-    { id: "gemini-2.5-flash", provider: "gemini", lane: "text" as const, rate: { input: 1, output: 4 }, markup: 1, enabled: true },
-    { id: "gemini-2.5-pro", provider: "gemini", lane: "text" as const, rate: { input: 4, output: 16 }, thinking: true, markup: 1, enabled: true },
-    { id: "gemini-2.5-flash-vision", provider: "gemini", lane: "vision" as const, rate: { input: 1, output: 4 }, attachmentUnits: 1_100, markup: 1, enabled: true },
-    { id: "gemini-2.5-pro-vision", provider: "gemini", lane: "vision" as const, rate: { input: 4, output: 16 }, thinking: true, attachmentUnits: 1_100, markup: 1, enabled: true },
-    { id: "gemini-2.5-flash-image", provider: "gemini", lane: "image" as const, rate: { input: 1, output: 4 }, perOutput: 600, markup: 1, enabled: true },
+    { id: "gemini-2.5-flash", provider: "gemini", lanes: ["text"] as const, rate: { input: 1, output: 4 }, markup: 1, enabled: true },
+    { id: "gemini-2.5-pro", provider: "gemini", lanes: ["text"] as const, rate: { input: 4, output: 16 }, thinking: true, markup: 1, enabled: true },
+    { id: "gemini-2.5-flash-vision", provider: "gemini", lanes: ["vision"] as const, rate: { input: 1, output: 4 }, attachmentUnits: 1_100, markup: 1, enabled: true },
+    { id: "gemini-2.5-pro-vision", provider: "gemini", lanes: ["vision"] as const, rate: { input: 4, output: 16 }, thinking: true, attachmentUnits: 1_100, markup: 1, enabled: true },
+    { id: "gemini-2.5-flash-image", provider: "gemini", lanes: ["image"] as const, rate: { input: 1, output: 4 }, perOutput: 600, markup: 1, enabled: true },
   ]) {
     await writeModel(db, m, at);
   }

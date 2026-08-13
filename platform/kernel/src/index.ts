@@ -42,6 +42,7 @@ export * from "./job.js";
 export * from "./guide.js";
 export * from "./milestone.js";
 export * from "./generation.js";
+export * from "./catalogue-doc.js";
 export * from "./moment.js";
 export * from "./market.js";
 export * from "./subscription.js";

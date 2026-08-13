@@ -173,7 +173,16 @@ describe("a workspace is created, and only the platform may create it", () => {
     */
     const slug = `second${Math.random().toString(36).slice(2, 7)}`;
     expect((await call(setup, { method: "POST", as: "member", body: JSON.stringify({ slug }) })).status).toBe(200);
-  });
+  /*
+    ⚠️ A REAL TIMEOUT RATHER THAN VITEST'S DEFAULT FIVE SECONDS, which is a
+    number nobody measured. Creating a workspace applies a whole region's schema
+    on first touch, which makes this the most expensive single call in the suite —
+    and under a full run, sharing Miniflare storage with every other file, it
+    crosses five seconds often enough to fail twice through the retry. What that
+    produces is a red run with no assertion in it, on a test that passes on its
+    own, which is the least useful failure there is.
+  */
+  }, 20_000);
 });
 
 /* ---------------------------------------------------------------- tenant --- */

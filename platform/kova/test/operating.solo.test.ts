@@ -508,7 +508,7 @@ describe("what a model costs", () => {
   */
   it("takes a new model and offers it to the actions in its lane", async () => {
     expect((await operator("/api/admin.models.set", {
-      id: "brand-new-model", provider: "gemini", lane: "text", input: 1, output: 3, markup: 1.5,
+      id: "brand-new-model", provider: "gemini", lanes: ["text"], input: 1, output: 3, markup: 1.5,
     })).status).toBe(200);
 
     const actions = (await coach("/api/ai.models.list")).body.actions as unknown as
@@ -523,7 +523,7 @@ describe("what a model costs", () => {
   */
   it("shows what a model costs beside what it is sold for", async () => {
     await operator("/api/admin.models.set", {
-      id: "marked-up", provider: "gemini", lane: "text", input: 2, output: 10, markup: 1.5,
+      id: "marked-up", provider: "gemini", lanes: ["text"], input: 2, output: 10, markup: 1.5,
     });
     const models = (await operator("/api/admin.models")).body.models as unknown as
       { id: string; cost: { input: number }; price: { input: number; output: number }; markup: number }[];
@@ -540,7 +540,7 @@ describe("what a model costs", () => {
   */
   it("refuses a rate of zero", async () => {
     const out = await operator("/api/admin.models.set", {
-      id: "gemini-2.5-flash", provider: "gemini", lane: "text", input: 0, output: 8, markup: 1.4,
+      id: "gemini-2.5-flash", provider: "gemini", lanes: ["text"], input: 0, output: 8, markup: 1.4,
     });
     expect(out.status).toBe(400);
   });
@@ -551,7 +551,7 @@ describe("what a model costs", () => {
   */
   it("refuses a markup that sells at or below cost", async () => {
     expect((await operator("/api/admin.models.set", {
-      id: "gemini-2.5-flash", provider: "gemini", lane: "text", input: 1, output: 4, markup: 0,
+      id: "gemini-2.5-flash", provider: "gemini", lanes: ["text"], input: 1, output: 4, markup: 0,
     })).status).toBe(400);
   });
 
@@ -562,7 +562,7 @@ describe("what a model costs", () => {
   */
   it("refuses a vision model that prices no picture", async () => {
     expect((await operator("/api/admin.models.set", {
-      id: "blind", provider: "gemini", lane: "vision", input: 1, output: 4, markup: 1.4,
+      id: "blind", provider: "gemini", lanes: ["vision"], input: 1, output: 4, markup: 1.4,
     })).status).toBe(400);
   });
 
@@ -573,7 +573,7 @@ describe("what a model costs", () => {
   */
   it("takes a model out of service without losing it", async () => {
     await operator("/api/admin.models.set", {
-      id: "retiring", provider: "gemini", lane: "text", input: 1, output: 4, markup: 1.4,
+      id: "retiring", provider: "gemini", lanes: ["text"], input: 1, output: 4, markup: 1.4,
     });
     expect((await operator("/api/admin.models.enabled", { id: "retiring", enabled: false })).status).toBe(200);
 
@@ -592,7 +592,7 @@ describe("what a model costs", () => {
   it("is not reachable from inside a studio", async () => {
     expect((await coach("/api/admin.models")).status).toBe(403);
     expect((await coach("/api/admin.models.set", {
-      id: "gemini-2.5-flash", provider: "gemini", lane: "text", input: 1, output: 1, markup: 1.4,
+      id: "gemini-2.5-flash", provider: "gemini", lanes: ["text"], input: 1, output: 1, markup: 1.4,
     })).status).toBe(403);
   });
 });

@@ -15,14 +15,14 @@ import {
   type AiSpec, type Catalogue, type ModelSpec,
 } from "../src/generation.js";
 
-const model = (over: Partial<ModelSpec> & Pick<ModelSpec, "id" | "lane">): ModelSpec => ({
+const model = (over: Partial<ModelSpec> & Pick<ModelSpec, "id" | "lanes">): ModelSpec => ({
   provider: "gemini", rate: { input: 1, output: 4 }, markup: 1, enabled: true, ...over,
 });
 
-const TEXT = priced(model({ id: "m", lane: "text", rate: { input: 1, output: 4 } }));
-const THINKS = priced(model({ id: "m", lane: "text", rate: { input: 1, output: 4 }, thinking: true }));
-const SEES = priced(model({ id: "v", lane: "vision", rate: { input: 1, output: 4 }, attachmentUnits: 1_100 }));
-const DRAWS = priced(model({ id: "d", lane: "image", perOutput: 600 }));
+const TEXT = priced(model({ id: "m", lanes: ["text"], rate: { input: 1, output: 4 } }));
+const THINKS = priced(model({ id: "m", lanes: ["text"], rate: { input: 1, output: 4 }, thinking: true }));
+const SEES = priced(model({ id: "v", lanes: ["vision"], rate: { input: 1, output: 4 }, attachmentUnits: 1_100 }));
+const DRAWS = priced(model({ id: "d", lanes: ["image"], perOutput: 600 }));
 
 const app = (actions: AiSpec["actions"]): AiSpec => ({ actions });
 
@@ -68,7 +68,7 @@ describe("a picture, which is nowhere in the text", () => {
     cheapest-looking row runs the largest invoice.
   */
   it("adds the picture's units to the reserve", () => {
-    const blind = priced(model({ id: "v", lane: "vision", rate: { input: 1, output: 4 }, attachmentUnits: 0 }));
+    const blind = priced(model({ id: "v", lanes: ["vision"], rate: { input: 1, output: 4 }, attachmentUnits: 0 }));
     expect(planAction(READ, "read", "what is this", SEES)!.reserve)
       .toBe(planAction(READ, "read", "what is this", blind)!.reserve + 1_100);
   });
@@ -80,12 +80,12 @@ describe("a picture, which is nowhere in the text", () => {
   });
 
   it("refuses a catalogue row that is given attachments and prices none", () => {
-    expect(modelProblems(model({ id: "v", lane: "vision" })))
+    expect(modelProblems(model({ id: "v", lanes: ["vision"] })))
       .toEqual([expect.stringContaining("prices none")]);
   });
 
   it("says nothing about the same price on a lane that does not attach", () => {
-    expect(modelProblems(model({ id: "m", lane: "text" }))).toEqual([]);
+    expect(modelProblems(model({ id: "m", lanes: ["text"] }))).toEqual([]);
   });
 });
 
@@ -113,7 +113,7 @@ describe("a lane that produces things", () => {
   });
 
   it("refuses a catalogue row that produces things and prices none of them", () => {
-    expect(modelProblems(model({ id: "d", lane: "image" })))
+    expect(modelProblems(model({ id: "d", lanes: ["image"] })))
       .toEqual([expect.stringContaining("prices none of them")]);
   });
 
@@ -183,7 +183,7 @@ describe("what an app's own declaration can get wrong", () => {
 /* --------------------------------------------------- what a catalogue can --- */
 
 describe("what a catalogue row can get wrong", () => {
-  const ok: Catalogue = [model({ id: "m", lane: "text" }), model({ id: "d", lane: "image", perOutput: 600 })];
+  const ok: Catalogue = [model({ id: "m", lanes: ["text"] }), model({ id: "d", lanes: ["image"], perOutput: 600 })];
 
   it("accepts a catalogue that can be metered", () => {
     expect(catalogueProblems(ok)).toEqual([]);
@@ -195,9 +195,9 @@ describe("what a catalogue row can get wrong", () => {
     the cheapest row in the catalogue right up to the end of the month.
   */
   it("refuses a rate of nothing, on either side", () => {
-    expect(modelProblems(model({ id: "m", lane: "text", rate: { input: 0, output: 4 } })))
+    expect(modelProblems(model({ id: "m", lanes: ["text"], rate: { input: 0, output: 4 } })))
       .toEqual([expect.stringContaining("unmetered")]);
-    expect(modelProblems(model({ id: "m", lane: "text", rate: { input: 1, output: 0 } })))
+    expect(modelProblems(model({ id: "m", lanes: ["text"], rate: { input: 1, output: 0 } })))
       .toEqual([expect.stringContaining("unmetered")]);
   });
 
@@ -207,17 +207,17 @@ describe("what a catalogue row can get wrong", () => {
     it is the likeliest to be typed, because zero is what an empty box means.
   */
   it("refuses a markup that sells at or below cost", () => {
-    expect(modelProblems(model({ id: "m", lane: "text", markup: 0 })))
+    expect(modelProblems(model({ id: "m", lanes: ["text"], markup: 0 })))
       .toEqual([expect.stringContaining("at or below cost")]);
   });
 
   it("refuses the same model twice, because which rate applies depends on order", () => {
-    expect(catalogueProblems([...ok, model({ id: "m", lane: "text" })]))
+    expect(catalogueProblems([...ok, model({ id: "m", lanes: ["text"] })]))
       .toEqual([{ id: "m", why: expect.stringContaining("twice") }]);
   });
 
   it("refuses a lane it cannot price", () => {
-    expect(modelProblems(model({ id: "m", lane: "hologram" as never })))
+    expect(modelProblems(model({ id: "m", lanes: ["hologram"] as never })))
       .toContainEqual(expect.stringContaining("not one the meter can price"));
   });
 });

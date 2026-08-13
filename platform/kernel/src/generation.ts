@@ -72,8 +72,14 @@ export interface ModelSpec {
   readonly id: string;
   /** Which lane runs it — the Workers AI binding, the Gemini key, whatever comes next. */
   readonly provider: string;
-  /** ⚠️ What it does. The meter reads this to decide which arithmetic applies. */
-  readonly lane: Lane;
+  /**
+   * ⚠️ WHAT IT CAN DO, AND IT IS A LIST. One model serves several modalities —
+   * a Gemini text model is priced for "text / image / video / audio" on the same
+   * row — so a single lane per model cannot describe the catalogue that actually
+   * exists. One row per lane is not the alternative: the id is the provider path
+   * and there is only one of it.
+   */
+  readonly lanes: readonly Lane[];
   /**
    * ⚠️ WHAT THE PROVIDER CHARGES, in credits per unit, input and output
    * separately — because every provider prices them differently and a single
@@ -129,6 +135,26 @@ export interface ModelSpec {
    * its rate and its history.
    */
   readonly enabled: boolean;
+  /**
+   * ⚠️ WHEN THE PROVIDER SWITCHES IT OFF, where the provider has said so.
+   *
+   * A retirement is the one catalogue fact with a deadline attached, and the
+   * failure it causes is not a degraded feature: every call to a shut-down model
+   * fails, for every workspace pinned to it, on a date nobody was watching.
+   */
+  readonly retiresAt?: string;
+  /**
+   * ⚠️ AND WHAT TO USE INSTEAD, because the provider names one. Google's own
+   * pricing page carries the target in the deprecation notice — "migrate to
+   * Gemini 2.5 Flash Image" — so the close alternative is a fact to read rather
+   * than a judgement to make.
+   *
+   * ⚠️ IT IS HONOURED AT READ TIME AND NEVER BY A MIGRATION. `chooseModel`
+   * prefers it when a workspace's own pick is no longer eligible, so nothing has
+   * to walk every region rewriting rows — and a workspace that has not been
+   * moved cannot be left pointing at something that stopped answering.
+   */
+  readonly replacedBy?: string;
 }
 
 export type Catalogue = readonly ModelSpec[];
@@ -358,16 +384,20 @@ export function catalogueProblems(catalogue: Catalogue): readonly AiProblem[] {
  */
 export function modelProblems(m: ModelSpec): readonly string[] {
   const out: string[] = [];
-  if (!LANES.includes(m.lane)) out.push(`is in lane "${m.lane}", which is not one the meter can price`);
+  if (m.lanes.length === 0) out.push("is in no lane, so no action can ever reach it");
+  for (const lane of m.lanes) {
+    if (!LANES.includes(lane)) out.push(`is in lane "${lane}", which is not one the meter can price`);
+  }
   /*
     ⚠️ A ZERO RATE IS NOT "FREE", IT IS UNMETERED. The reserve is zero, the
     settle is zero, the balance never moves and the provider still invoices — so
     the model looks like the cheapest one in the catalogue right up to the end of
     the month.
   */
-  if (produces(m.lane)) {
-    if (!((m.perOutput ?? 0) > 0)) out.push("produces things and prices none of them, so every one is unmetered");
-  } else if (!(m.rate.input > 0) || !(m.rate.output > 0)) {
+  if (m.lanes.some(produces) && !((m.perOutput ?? 0) > 0)) {
+    out.push("produces things and prices none of them, so every one is unmetered");
+  }
+  if (m.lanes.some((l) => !produces(l)) && (!(m.rate.input > 0) || !(m.rate.output > 0))) {
     out.push("prices a unit at zero or less, so every call to it is unmetered");
   }
   /*
@@ -377,7 +407,7 @@ export function modelProblems(m: ModelSpec): readonly string[] {
     picture. It scales with use, so the cheapest-looking row runs the largest
     invoice.
   */
-  if (attaches(m.lane) && !((m.attachmentUnits ?? 0) > 0)) {
+  if (m.lanes.some(attaches) && !((m.attachmentUnits ?? 0) > 0)) {
     out.push("is given attachments and prices none, so every picture or recording on it is unmetered");
   }
   if (!(m.markup > 0)) out.push("has a markup of zero or less, which sells every call at or below cost");
@@ -402,7 +432,7 @@ export function modelProblems(m: ModelSpec): readonly string[] {
  * them. An action that says `prefer: "capable"` inverts that for itself and
  * nothing else; see `ActionSpec`.
  */
-export type ModelSource = "catalogue" | "workspace";
+export type ModelSource = "catalogue" | "workspace" | "replaced";
 
 export type ModelChoice =
   | { readonly ok: true; readonly model: Priced; readonly source: ModelSource }
@@ -414,8 +444,8 @@ export type ModelChoice =
    */
   | { readonly ok: false; readonly why: "unknown_action" | "none_in_lane" | "none_permitted" };
 
-/** ⚠️ Whether a model can do what an action asks — one comparison, no inference. */
-export const modelSuits = (model: ModelSpec, action: ActionSpec): boolean => model.lane === action.lane;
+/** ⚠️ Whether a model can do what an action asks — one lookup, no inference. */
+export const modelSuits = (model: ModelSpec, action: ActionSpec): boolean => model.lanes.includes(action.lane);
 
 export interface Eligibility {
   readonly ai: AiSpec;
@@ -481,6 +511,21 @@ export function chooseModel(input: Eligibility & { readonly chosen?: string | nu
   if (input.chosen) {
     const picked = eligible.find((m) => m.id === input.chosen);
     if (picked) return { ok: true, model: picked, source: "workspace" };
+    /*
+      ⚠️ A RETIRED PICK GOES TO ITS NAMED REPLACEMENT, NOT TO THE CHEAPEST. The
+      provider names one — "migrate to Gemini 2.5 Flash Image" is in the pricing
+      page itself — so honouring it is reading a fact rather than making a
+      judgement. Falling to the cheapest instead would answer a clinical read
+      with a small model on the day a provider retired a big one.
+
+      ⚠️ AND IT IS DONE HERE RATHER THAN BY A MIGRATION. Nothing has to walk
+      every region rewriting rows, so no workspace can be left behind by a job
+      that half ran — and `source` says `replaced`, so the screen can say what
+      happened rather than showing a model nobody chose.
+    */
+    const instead = input.catalogue.find((m) => m.id === input.chosen)?.replacedBy;
+    const swap = instead ? eligible.find((m) => m.id === instead) : undefined;
+    if (swap) return { ok: true, model: swap, source: "replaced" };
   }
   const cheapest = eligible[0];
   if (cheapest) return { ok: true, model: cheapest, source: "catalogue" };

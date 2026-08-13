@@ -18,18 +18,18 @@ import {
   type AiSpec, type Catalogue, type ModelSpec,
 } from "../src/generation.js";
 
-const model = (over: Partial<ModelSpec> & Pick<ModelSpec, "id" | "lane">): ModelSpec => ({
+const model = (over: Partial<ModelSpec> & Pick<ModelSpec, "id" | "lanes">): ModelSpec => ({
   provider: "gemini", rate: { input: 1, output: 4 }, markup: 1, enabled: true, ...over,
 });
 
 const CATALOGUE: Catalogue = [
   /* Text on both lanes, so a workspace has a real choice to make. */
-  model({ id: "gemini-2.5-flash", lane: "text", rate: { input: 1, output: 4 } }),
-  model({ id: "@cf/meta/llama", lane: "text", provider: "workers-ai", rate: { input: 1, output: 2 } }),
+  model({ id: "gemini-2.5-flash", lanes: ["text"], rate: { input: 1, output: 4 } }),
+  model({ id: "@cf/meta/llama", lanes: ["text"], provider: "workers-ai", rate: { input: 1, output: 2 } }),
   /* Vision is its own lane, and a model in it prices what it is given. */
-  model({ id: "gemini-2.5-pro", lane: "vision", rate: { input: 4, output: 16 }, thinking: true, attachmentUnits: 1_100 }),
+  model({ id: "gemini-2.5-pro", lanes: ["vision"], rate: { input: 4, output: 16 }, thinking: true, attachmentUnits: 1_100 }),
   /* Drawing is a third shape again — priced per picture, no meaningful output. */
-  model({ id: "gemini-flash-image", lane: "image", perOutput: 600 }),
+  model({ id: "gemini-flash-image", lanes: ["image"], perOutput: 600 }),
 ];
 
 const APP: AiSpec = {
@@ -104,7 +104,7 @@ describe("what a workspace is offered", () => {
     and offering it would sell a generation the platform pays for in full.
   */
   it("never offers a row that would be unmetered", () => {
-    const broken = [...CATALOGUE, model({ id: "free-lunch", lane: "text", rate: { input: 0, output: 0 } })];
+    const broken = [...CATALOGUE, model({ id: "free-lunch", lanes: ["text"], rate: { input: 0, output: 0 } })];
     expect(modelsFor(where("draft", { catalogue: broken })).map((m) => m.id)).not.toContain("free-lunch");
   });
 
@@ -162,6 +162,37 @@ describe("who decided", () => {
       .toEqual({ ok: false, why: "none_permitted" });
   });
 
+  /*
+    ⚠️ A RETIRED PICK GOES TO THE MODEL THE PROVIDER NAMED, not to the cheapest.
+    The page carries the target — "migrate to Gemini 2.5 Flash Image" — so
+    honouring it is reading a fact rather than making a judgement; falling to the
+    cheapest instead would answer a clinical read with a small model on the day a
+    provider retired a big one.
+
+    ⚠️ AND IT HAPPENS AT READ TIME rather than by a migration, so nothing has to
+    walk every region rewriting rows and no workspace can be left behind by a job
+    that half ran.
+  */
+  it("moves a retired pick to the model the provider named", () => {
+    const after = CATALOGUE.map((m) =>
+      m.id === "gemini-2.5-flash"
+        ? { ...m, enabled: false, retiresAt: "2026-06-01", replacedBy: "@cf/meta/llama" }
+        : m);
+    const out = chooseModel({ ...where("draft", { catalogue: after }), chosen: "gemini-2.5-flash" });
+    expect(out).toMatchObject({ ok: true, source: "replaced" });
+    expect(out.ok && out.model.id).toBe("@cf/meta/llama");
+  });
+
+  /* ⚠️ And a replacement that is not itself eligible is not a replacement. The
+     fall-back to the cheapest is what stops a chain of retirements stranding a
+     workspace on something that is also gone. */
+  it("falls to the cheapest when the named replacement is gone too", () => {
+    const after = CATALOGUE.map((m) =>
+      m.id === "gemini-2.5-flash" ? { ...m, enabled: false, replacedBy: "long-gone" } : m);
+    const out = chooseModel({ ...where("draft", { catalogue: after }), chosen: "gemini-2.5-flash" });
+    expect(out).toMatchObject({ ok: true, source: "catalogue" });
+  });
+
   it("names an action it does not have rather than guessing one", () => {
     expect(chooseModel(where("nope"))).toEqual({ ok: false, why: "unknown_action" });
   });
@@ -175,12 +206,12 @@ describe("the markup, which is what the platform is paid", () => {
     green suite, which is why the type carries it rather than a convention.
   */
   it("turns cost into price", () => {
-    const sold = priced(model({ id: "x", lane: "text", rate: { input: 2, output: 10 }, markup: 1.5 }));
+    const sold = priced(model({ id: "x", lanes: ["text"], rate: { input: 2, output: 10 }, markup: 1.5 }));
     expect(sold.rate).toEqual({ input: 3, output: 15 });
   });
 
   it("marks a per-output price up the same way", () => {
-    const sold = priced(model({ id: "x", lane: "image", perOutput: 600, markup: 2 }));
+    const sold = priced(model({ id: "x", lanes: ["image"], perOutput: 600, markup: 2 }));
     expect(sold.perOutput).toBe(1_200);
   });
 
@@ -191,7 +222,7 @@ describe("the markup, which is what the platform is paid", () => {
     nothing.
   */
   it("is not applied twice", () => {
-    const once = priced(model({ id: "x", lane: "text", rate: { input: 2, output: 10 }, markup: 1.5 }));
+    const once = priced(model({ id: "x", lanes: ["text"], rate: { input: 2, output: 10 }, markup: 1.5 }));
     expect(priced(once).rate).toEqual(once.rate);
     expect(once.markup).toBe(1);
   });

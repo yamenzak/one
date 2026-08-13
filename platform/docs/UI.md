@@ -1152,6 +1152,8 @@ more, which is the honest state.
 | `an-unknown-maintenance-rung-is-never-open` | a CLOSED deployment reported as open, on the one screen whose entire job is saying which it is. The mode arrives off the wire, so a deployment ahead of this bundle can send a word the list does not carry — and falling back to the first rung is the one wrong answer that matters here | **live** |
 | `the-ai-settings-screen-discovers-its-own-actions` | a hand-written list of a product's AI actions, which goes out of date in the direction nobody notices: an action added and not listed is one nobody can configure, on a screen that looks complete. It names no models either — what a workspace may pick is decided by four server-side layers, so a screen offering a list of its own would offer what the save refuses | **live** |
 | `an-unmetered-model-is-shown-and-flagged` | an operator seeing a model they added simply not appear, with nothing anywhere saying why — and the fault being hidden is the one that decides whether every call to that model is free | **live** |
+| `a-model-shows-under-every-lane-it-serves` | a catalogue whose vision section looks empty while a vision model sits in it. One model serves several modalities — a Gemini text model is priced for pictures on the same row — which is why a model carries a LIST of lanes rather than one, and why one row per lane is not the alternative: the id is the provider path and there is only one of it | **live** |
+| `a-retirement-is-said-before-it-happens` | an operator learning about a retirement from a failing generation — one they had a month of warning about, on a screen that never showed it. The replacement is named because the provider names it | **live** |
 <!-- /generated -->
 
 ## 5. What is not decided yet

@@ -99,7 +99,7 @@ describe("configuration with no shared store", () => {
   /* ⚠️ And a write with nowhere to write it is refused, not swallowed. */
   it("refuses to publish a model when there is no shared store to publish it to", async () => {
     const out = await operator("/api/admin.models.set", {
-      id: "m", provider: "p", lane: "text", input: 1, output: 2, markup: 1.5,
+      id: "m", provider: "p", lanes: ["text"], input: 1, output: 2, markup: 1.5,
     });
     expect(out.status).toBe(503);
   });

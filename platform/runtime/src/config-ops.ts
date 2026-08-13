@@ -12,6 +12,7 @@
 import type { AnyOperation, AppSpec, BindingSpec, ConfigRegistry, Instant, ModelSpec, SqlHandle } from "@one/kernel";
 import { LANES, modelProblems, operation, priced, s } from "@one/kernel";
 import { DEPLOYMENT_SCOPE, lines, readAll, readCatalogue, refuseModel, refuseWrite, setModelEnabled, writeModel, writeOne } from "./config.js";
+import { syncCatalogue, type Fetch } from "./catalogue-sync.js";
 import { chooseProvider, send, type Deliver } from "./mail.js";
 import { OPERATE } from "./operator-ops.js";
 
@@ -50,6 +51,12 @@ export interface ConfigDeps {
   readonly deliver: Deliver | null;
   /** ⚠️ Null where a deployment binds no shared store, which is most of them. */
   readonly shared: SqlHandle | null;
+  /**
+   * ⚠️ INJECTED, so the file that reaches the network is not this one. Null on a
+   * deployment with no outbound access — the sync refuses and says so, rather
+   * than reporting a success that read nothing.
+   */
+  readonly fetch: Fetch | null;
   readonly registry: ConfigRegistry;
 }
 
@@ -197,7 +204,9 @@ export function configOperations<B extends BindingSpec>(app: AppSpec<B>): readon
           models: rows.map((m) => {
             const sold = priced(m);
             return {
-              id: m.id, provider: m.provider, lane: m.lane, enabled: m.enabled,
+              id: m.id, provider: m.provider, lanes: m.lanes, enabled: m.enabled,
+              ...(m.retiresAt ? { retiresAt: m.retiresAt } : {}),
+              ...(m.replacedBy ? { replacedBy: m.replacedBy } : {}),
               markup: m.markup, thinking: m.thinking ?? false,
               cost: { input: m.rate.input, output: m.rate.output, perOutput: m.perOutput ?? null, attachmentUnits: m.attachmentUnits ?? null },
               price: { input: sold.rate.input, output: sold.rate.output, perOutput: sold.perOutput ?? null },
@@ -218,7 +227,7 @@ export function configOperations<B extends BindingSpec>(app: AppSpec<B>): readon
       input: s.object({
         id: s.text({ min: 1, max: 200 }),
         provider: s.text({ min: 1, max: 60 }),
-        lane: s.text({ min: 1, max: 20 }),
+        lanes: s.array(s.text({ min: 1, max: 20 }), { max: 6 }),
         input: s.number({ min: 0 }),
         output: s.number({ min: 0 }),
         perOutput: s.optional(s.number({ min: 0 })),
@@ -234,14 +243,14 @@ export function configOperations<B extends BindingSpec>(app: AppSpec<B>): readon
       fails: ["platform.invalid", "platform.unavailable"],
       tool: false,
       async handler(ctx, input: {
-        id: string; provider: string; lane: string; input: number; output: number;
+        id: string; provider: string; lanes: string[]; input: number; output: number;
         perOutput?: number; attachmentUnits?: number; markup: number; thinking?: boolean;
       }) {
         const d = deps(ctx);
         if (!d.shared) ctx.fail("platform.unavailable", { reason: "this deployment binds no shared configuration store" });
 
         const model: ModelSpec = {
-          id: input.id, provider: input.provider, lane: input.lane as ModelSpec["lane"],
+          id: input.id, provider: input.provider, lanes: input.lanes as ModelSpec["lanes"],
           rate: { input: input.input, output: input.output },
           ...(input.perOutput === undefined ? {} : { perOutput: input.perOutput }),
           ...(input.attachmentUnits === undefined ? {} : { attachmentUnits: input.attachmentUnits }),
@@ -262,6 +271,38 @@ export function configOperations<B extends BindingSpec>(app: AppSpec<B>): readon
 
         await writeModel(d.shared!, model, ctx.now() as Instant);
         return { id: input.id };
+      },
+    }),
+    /*
+      ⚠️ THE PRICE LISTS, READ ON DEMAND AS WELL AS DAILY. A sync that only ran
+      on a schedule is one an operator cannot use at the moment they need it —
+      the morning a provider announces a shutdown, or straight after adding the
+      key that makes a lane usable at all.
+    */
+    operation({
+      id: "admin.models.sync",
+      kind: "write",
+      summary: "Read both providers' price lists and apply what they say.",
+      input: s.object({}),
+      output: s.object({ providers: s.json() }),
+      permission: OPERATE,
+      idempotency: { mode: "none" },
+      audit: () => ({ subject: "catalogue", verb: "sync" }),
+      outcome: { message: "Read", tone: "success", invalidates: ["admin.models"] },
+      fails: ["platform.unavailable"],
+      tool: false,
+      async handler(ctx) {
+        const d = deps(ctx);
+        if (!d.shared) ctx.fail("platform.unavailable", { reason: "this deployment binds no shared configuration store" });
+        if (!d.fetch) ctx.fail("platform.unavailable", { reason: "this deployment cannot reach the price lists" });
+        const report = await syncCatalogue(d.shared!, d.fetch!, ctx.now() as Instant);
+        /*
+          ⚠️ THE REPORT IS THE ANSWER, INCLUDING THE FAILURES. A sync that
+          reported success while one page was unreachable is exactly how a rate
+          goes six months out of date behind a green screen — and every unit an
+          out-of-date rate fails to count is one the platform pays for.
+        */
+        return { providers: report.providers };
       },
     }),
     operation({
