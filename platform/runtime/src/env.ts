@@ -17,7 +17,7 @@
 
 import type {
   ActorHandle, BindingSpec, CacheHandle, CacheNamespace, Handle, InferenceHandle,
-  ObjectHandle, QueueHandle, RegionId, ResolvedBindings, ResolvedRegion, SqlHandle, Store,
+  GlobalSql, ObjectHandle, QueueHandle, RegionId, ResolvedBindings, ResolvedRegion, SqlHandle, Store,
 } from "@one/kernel";
 
 /* ------------------------------------------------------------- the shapes --- */
@@ -169,9 +169,15 @@ export function bindingsFor<B extends BindingSpec>(
  * that here rather than in the pipeline keeps the count of files that index an
  * environment at one, which is the entire value of a chokepoint.
  */
-export function globalSql(env: RawEnv, binding: string): SqlHandle | null {
+export function globalSql(env: RawEnv, binding: string): GlobalSql | null {
   const raw = env[binding];
-  return raw ? sqlHandle(raw as RawSql) : null;
+  /*
+    ⚠️ THE ONE PLACE A GLOBAL HANDLE IS MINTED, and the cast is what makes it so.
+    `GlobalSql` is a `SqlHandle` the type system can tell apart, so a function
+    that must never receive the shared store can say so — see the type's own
+    header for the swap it exists to refuse.
+  */
+  return raw ? (sqlHandle(raw as RawSql) as GlobalSql) : null;
 }
 
 function wrap(store: Store, raw: unknown, region: RegionId, cfg: RegionalConfig): Handle<Store> {

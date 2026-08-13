@@ -1530,6 +1530,9 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `every-app-publishes-what-it-declares` | a product absent from `app_specs`, which is indistinguishable from a product that declares nothing. The console can then write its prices and cannot show what it shipped, so every edit looks like the first — and `publishApp` swallows its own errors on purpose (boot must not throw over another product's console), so nothing anywhere says a word. It has happened once already, to `vault_specs`, for the life of that feature | **live** |
 | `everywhere-you-belong-spans-products` | a hub promising "everywhere you belong, across every product" and answering for one. Memberships are regional and per-app by design, so a worker asking its own tables draws a list that looks complete and is short by every other product somebody uses — and TWO screens make that promise, so they could each look complete while disagreeing with each other | **live** |
 | `leaving-a-workspace-takes-it-off-the-hub` | a workspace left on somebody's list that refuses them at the door. The regional row is REVOKED rather than deleted — "who was in this workspace and when" is where every investigation starts — so the index has to be told separately, and an index nobody deletes from is one that only ever grows | **live** |
+| `the-shared-store-is-not-a-regional-one` | the two handles being swapped, which compiles and runs. They have the same shape, opposite meanings, and are wired one after the other from two variables in one scope. The global store has no `tenant_settings`, so the reader's own `catch` answers with nothing: every workspace shows its declared fallbacks, every save reports success and vanishes, and the result is indistinguishable from a workspace nobody has configured — which is what a new one looks like. The constraint is negative on purpose, because there is one producer of the global handle and one per binding per region of the others | **live** |
+| `one-table-one-store` | a table name declared on both sides reading as a duplicate when it is a silent divergence. Every statement is `CREATE TABLE IF NOT EXISTS`, so whichever runner reaches it first decides the shape and the loser's columns never exist — no error, no warning, and the first symptom is a query naming a column that is simply not there. It has happened one store over, and it took every route touching the database down rather than degrading a feature | **live** |
+| `what-a-workspace-chose-stays-in-its-region` | a workspace's settings moved into the store every worker binds by the same id. Four reasons, none visible from a table's shape: RESIDENCY — its settings are its records, and they live where its records live; ACROSS — the global store is bound into every product's worker, and unlike the vault there is no grant algebra in front of these rows; HOT PATH — branding and wording are read per request by the app to draw its own sign-in screen; ERASURE — `scoped` declares these tables regionally and the purge cascade is derived from it, so a table that changed store without the cascade following is a deleted workspace that keeps its configuration while the sweep reports success. Where something is genuinely needed before a region is known the answer is to publish a COPY and keep the regional row authoritative, as `publishBranding` does — never the reverse | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 
@@ -1699,6 +1702,46 @@ of configuration, the catalogue, the ceilings and the money. Regional is a
 workspace's own records, and the one operator act that touches them is
 impersonation: it mints a session in that workspace's region, which the hub's
 worker has no binding for.
+
+**Which store a new thing belongs in, as a question rather than a list:**
+
+> Does the **app** need it to serve a request, or does a **person** need it to
+> understand their account?
+
+The first is regional. The second is global. A workspace's plan, ceilings,
+standing, slug, domains and every configuration key are what it IS — global, and
+that is why one console can answer for every product. A workspace's settings are
+what it CHOSE — regional, and four things break if they move:
+
+| | |
+|---|---|
+| **Residency** | a workspace's records live in its region, and its settings are its records: its name, its logo, its sign-off, its policy |
+| **Across products** | the global store is bound with the same id into EVERY worker. The vault is global too, but a grant algebra stands in front of it; settings have none, and building one to make a settings row safe to co-locate is more work than not moving it |
+| **The hot path** | branding and wording are read per request by the app itself, to draw its own sign-in screen. Regional, that read is local |
+| **Erasure** | `scoped` declares these tables regionally and the purge cascade is DERIVED from those declarations. A table that changed store without the cascade following is a deleted workspace that keeps its configuration, with the sweep reporting success |
+
+⚠️ **Where something is genuinely needed on both sides, PUBLISH A COPY and keep
+the regional row authoritative.** `tenant_directory.branding` is that case and
+the only one: the sign-in screen wears a workspace's name and colour and renders
+before there is a tenancy whose regional store could be read, so `publishBranding`
+refreshes the directory copy on every settings write. Never the reverse — a
+global row that a regional reader falls back to is a second source, and the two
+disagree for exactly the workspaces somebody has just changed.
+
+`what-a-workspace-chose-stays-in-its-region` and `one-table-one-store` enforce
+the placement; `the-shared-store-is-not-a-regional-one` moves the handle mix-up
+to the compiler, because the two are wired one line apart and swapping them
+compiles, runs, and answers every settings read with the declared fallbacks.
+
+**And reaching across is not the alternative.** Both federation shapes cost
+something already argued for here: a credentialed fetch from the hub's origin to
+a product's needs the session cookie widened past the app root, which §7.6's own
+sentence — *an account shared across products is a feature, a session shared
+across them is a blast radius* — exists to refuse; and the hub's worker calling
+each product is §3's rejected central pusher with the arrow reversed, a
+privileged endpoint in every product behind a machine token. So the hub says
+where a workspace is managed and leaves for it, and the destination is the SAME
+screen, because `WorkspaceScreen` and `declared.tsx` are the shared package's.
 
 ### 7.7 Self-discovery, which is already declared
 

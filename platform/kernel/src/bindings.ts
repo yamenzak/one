@@ -193,6 +193,44 @@ export interface SqlHandle {
   batch(statements: readonly string[]): Promise<void>;
 }
 
+/* ------------------------------------------------------- which store it is --- */
+
+declare const STORE: unique symbol;
+
+/**
+ * THE ONE STORE EVERY WORKER SHARES, AS A TYPE.
+ *
+ * ⚠️ A GLOBAL HANDLE AND A REGIONAL ONE HAVE THE SAME SHAPE AND OPPOSITE
+ * MEANINGS, and they are held side by side in the same scope — `directoryDb` and
+ * `regionalDb`, one line apart, both `SqlHandle`. Swapping them compiles, runs,
+ * and answers: the global store has no `tenant_settings`, so a read against it
+ * falls into the reader's own `catch` and returns NOTHING. Every workspace shows
+ * its declared fallbacks, every save reports success and vanishes, and the
+ * screen that results is exactly what a workspace nobody has configured looks
+ * like. There is no error anywhere.
+ *
+ * ⚠️ SO THE STORE IS IN THE TYPE, on the same argument this file already makes
+ * about regions: a query cannot hit the wrong continent because a handle arrives
+ * pointed at one, and it should not be able to hit the wrong STORE for the same
+ * reason. Only `globalSql` mints one of these, so a function that demands it
+ * cannot be handed anything else.
+ */
+export type GlobalSql = SqlHandle & { readonly [STORE]: "global" };
+
+/**
+ * A handle that is NOT the global one.
+ *
+ * ⚠️ THE CONSTRAINT IS NEGATIVE, AND THAT IS THE CHEAP DIRECTION. There is
+ * exactly ONE producer of a global handle and many producers of regional ones —
+ * every binding an app declares, in every region, plus every test fake. Branding
+ * the many would be a cast at each and a `RegionalSql` in every fixture, all to
+ * express what "not that one" already says.
+ *
+ * A plain `SqlHandle` satisfies it, which is the point: nothing existing has to
+ * change, and the single handle that must never arrive here is refused by name.
+ */
+export type RegionalSql = SqlHandle & { readonly [STORE]?: never };
+
 export interface ObjectHandle {
   /** Returns the ledger key. ⚠️ There is no write that skips the ledger. */
   put(key: string, body: ArrayBuffer | ReadableStream, contentType: string): Promise<string>;

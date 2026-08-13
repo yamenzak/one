@@ -19,7 +19,7 @@ import { defineApp } from "../src/app.js";
 import { nothing, s } from "../src/validate.js";
 import { kova } from "./proof.app.js";
 import type { DirectoryEntry } from "../src/directory.js";
-import type { CacheStore } from "../src/bindings.js";
+import type { CacheStore, GlobalSql, RegionalSql, SqlHandle } from "../src/bindings.js";
 import { collection, field } from "../src/collection.js";
 import { operation } from "../src/operation.js";
 
@@ -186,3 +186,30 @@ defineApp({ ...kova, operations: [inventsAFailure], problems: {} });
 // on an operation's behalf, long before its handler runs.
 const failsWithAPlatformCode = { ...inventsAFailure, fails: ["platform.conflict"] as const };
 defineApp({ ...kova, operations: [failsWithAPlatformCode], problems: {} });
+
+/* ----------------------------------------------------------------- store --- */
+
+// ⚠️ THE GLOBAL STORE MAY NOT BE HANDED TO SOMETHING THAT WANTS A REGIONAL ONE.
+//
+// The two have the same shape and opposite meanings, and they are wired one
+// after the other from two variables in one scope. Swapped, it compiles and it
+// runs: the global store has no `tenant_settings`, so the reader's own `catch`
+// answers with nothing, every workspace shows its declared fallbacks and every
+// save reports success and vanishes. That is indistinguishable from a workspace
+// nobody has configured, which is what a new one looks like.
+declare const theSharedStore: GlobalSql;
+declare const someStore: SqlHandle;
+
+// @ts-expect-error — the store every worker shares is not one workspace's own
+export const wrongStore: RegionalSql = theSharedStore;
+
+// The other direction is refused for the mirror reason: publishing a copy into
+// the directory is the one write that MUST reach the shared store, and a
+// regional handle there would write a row the sign-in screen never reads.
+// @ts-expect-error — only `globalSql` mints the shared store's handle
+export const wrongDirectory: GlobalSql = someStore;
+
+// ⚠️ AND AN ORDINARY HANDLE IS STILL ORDINARY. The constraint is negative on
+// purpose — there is one producer of the global handle and one per binding per
+// region of the others — so nothing that exists today has to be re-typed.
+export const plainIsFine: RegionalSql = someStore;

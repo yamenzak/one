@@ -13,7 +13,7 @@
  */
 
 import type {
-  NotificationRegistry, SchemaModule, SettingsSpec, SqlHandle, Wording, WordingBook, WordingRefusal,
+  GlobalSql, NotificationRegistry, RegionalSql, SchemaModule, SettingsSpec, Wording, WordingBook, WordingRefusal,
 } from "@one/kernel";
 import { refuseSetting, refuseWording, settingsOf, type SettingRefusal } from "@one/kernel";
 
@@ -35,7 +35,7 @@ export const SETTINGS_SCHEMA: SchemaModule = {
 };
 
 /** Every stored value for one workspace, raw. Undeclared keys are dropped. */
-export async function storedSettings(db: SqlHandle, tenantId: string): Promise<Readonly<Record<string, string>>> {
+export async function storedSettings(db: RegionalSql, tenantId: string): Promise<Readonly<Record<string, string>>> {
   const rows = await db.all<{ key: string; value: string }>(
     `SELECT key, value FROM tenant_settings WHERE tenant_id = ?`, tenantId,
   ).catch(() => []);
@@ -53,7 +53,7 @@ export async function storedSettings(db: SqlHandle, tenantId: string): Promise<R
  * the screen that shows it.
  */
 export async function readSettings(
-  db: SqlHandle,
+  db: RegionalSql,
   spec: SettingsSpec,
   tenantId: string,
 ): Promise<Readonly<Record<string, string | number | boolean>>> {
@@ -69,7 +69,7 @@ export async function readSettings(
  * catch would be a caller that catches everything.
  */
 export async function writeSetting(
-  db: SqlHandle,
+  db: RegionalSql,
   spec: SettingsSpec,
   tenantId: string,
   key: string,
@@ -105,7 +105,7 @@ export async function writeSetting(
 export const BRANDING_KEYS = ["brand.name", "brand.mark", "brand.accent"] as const;
 
 export async function publishBranding(
-  directory: SqlHandle,
+  directory: GlobalSql,
   tenantId: string,
   branding: Readonly<Record<string, string>>,
 ): Promise<void> {
@@ -125,7 +125,7 @@ export async function publishBranding(
  * people is one dispatch; a lookup per person per type would be a workspace's
  * whole copy read eleven times to send eleven copies of one sentence.
  */
-export async function wordingFor(db: SqlHandle, tenantId: string): Promise<WordingBook> {
+export async function wordingFor(db: RegionalSql, tenantId: string): Promise<WordingBook> {
   const rows = await db.all<{ type: string; title: string; body: string }>(
     `SELECT type, title, body FROM tenant_wording WHERE tenant_id = ?`, tenantId,
   ).catch(() => []);
@@ -142,7 +142,7 @@ export async function wordingFor(db: SqlHandle, tenantId: string): Promise<Wordi
  * reached for that this notification does not carry, a box left empty.
  */
 export async function setWording(
-  db: SqlHandle,
+  db: RegionalSql,
   registry: NotificationRegistry,
   tenantId: string,
   type: string,
@@ -165,5 +165,5 @@ export async function setWording(
  * day somebody makes a blank mean something, a workspace that pressed Reset
  * three months ago would start sending it.
  */
-export const clearWording = (db: SqlHandle, tenantId: string, type: string): Promise<void> =>
+export const clearWording = (db: RegionalSql, tenantId: string, type: string): Promise<void> =>
   db.run(`DELETE FROM tenant_wording WHERE tenant_id = ? AND type = ?`, tenantId, type);

@@ -176,6 +176,85 @@ for (const table of APP_KEYED) {
 }
 if (!bad) ok(`readers: every query against an app-keyed table names the app`);
 
+/* ------------------------------------------------ one table, one store --- */
+
+/**
+ * ⚠️ A TABLE NAME DECLARED ON BOTH SIDES IS A SILENT DIVERGENCE, not a
+ * duplicate. Every statement is `CREATE TABLE IF NOT EXISTS`, so whichever
+ * runner reaches it first wins and the loser's columns never exist — no error,
+ * no warning, and the first symptom is a query naming a column that is simply
+ * not there. It has happened, one store over, and it took every route touching
+ * the database down with it rather than degrading a feature.
+ */
+const regionalBlock = modulesSrc.slice(
+  modulesSrc.indexOf("export const PLATFORM_REGIONAL"),
+  modulesSrc.indexOf("export const PLATFORM_GLOBAL"),
+);
+const regionalNames = [...regionalBlock.matchAll(/^\s*([A-Z][A-Z0-9_]*_SCHEMA)/gm)].map((m) => m[1]);
+
+if (regionalNames.length < 10) {
+  fail(`only ${regionalNames.length} module(s) read out of PLATFORM_REGIONAL — the parser has stopped matching, which reads as a pass`);
+}
+
+const tablesOf = (name) => {
+  const decl = declarationOf(name);
+  return decl ? [...decl.matchAll(CREATE)].map((m) => m[1]) : [];
+};
+
+const globalTables = new Map();
+for (const name of globalNames) for (const t of tablesOf(name)) globalTables.set(t, name);
+
+for (const name of regionalNames) {
+  if (globalNames.includes(name)) {
+    fail(`${name} is composed into BOTH stores. A module runs once per store it is listed in, so its version marker is written twice and its DDL is applied against two databases that then disagree about what it holds`);
+  }
+  for (const table of tablesOf(name)) {
+    const also = globalTables.get(table);
+    if (!also) continue;
+    fail(
+      `${table} is declared by ${name} (regional) AND ${also} (global).\n` +
+      `       Both are CREATE TABLE IF NOT EXISTS, so whichever store's runner reaches it first decides\n` +
+      `       the shape and the other's columns silently never exist. Give it one home, or give the\n` +
+      `       second one its own name.`,
+    );
+  }
+}
+if (!bad) ok(`homes: ${globalTables.size} global and ${regionalNames.flatMap(tablesOf).length} regional table(s), no name in both`);
+
+/**
+ * ⚠️ WHAT A WORKSPACE CHOSE STAYS IN ITS REGION, and this is the one placement
+ * worth pinning by name rather than deriving. Everything else here is a
+ * structural question the parser can answer; this is a decision, and the reasons
+ * it was taken are not visible from a table's shape:
+ *
+ *   RESIDENCY   a workspace's records live in its region, and its settings are
+ *               its records — its name, its logo, its sign-off, its policy
+ *   ACROSS      the global store is bound with the same id into EVERY worker.
+ *               The vault is global too, but a grant algebra stands in front of
+ *               it; settings have none, and building one to make a settings row
+ *               safe to co-locate is more work than leaving it where it is
+ *   HOT PATH    branding and wording are read per request by the app to draw its
+ *               own sign-in screen. Regional, that read is local
+ *   ERASURE     `scoped` declares these tables regionally and the purge cascade
+ *               is DERIVED from it. A table that changed store without the
+ *               cascade following is a deleted workspace that keeps its
+ *               configuration, with the sweep reporting success
+ *
+ * The escape hatch, where something is genuinely needed before a region is
+ * known, is to PUBLISH A COPY and keep the regional row authoritative — which is
+ * what `publishBranding` does for the three keys the sign-in screen wears. Never
+ * the reverse.
+ */
+const WORKSPACE_RECORDS = ["SETTINGS_SCHEMA"];
+for (const name of WORKSPACE_RECORDS) {
+  if (globalNames.includes(name)) {
+    fail(`${name} holds what a workspace CHOSE and is composed into the global store. Read this guard's own comment before moving it — the four reasons are residency, cross-product reach, the hot path and the erasure cascade`);
+  } else if (!regionalNames.includes(name)) {
+    fail(`${name} holds what a workspace CHOSE and is in neither store — either it was renamed, in which case rename it here too, or it is no longer composed at all and every settings read now answers with declared fallbacks and nothing else`);
+  }
+}
+if (!bad) ok(`placement: what a workspace chose is stored in its own region`);
+
 if (bad) {
   console.error(`\n${bad} scope failure(s).`);
   process.exit(1);

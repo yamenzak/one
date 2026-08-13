@@ -4603,6 +4603,33 @@
       "impl": "web/test/declared.test.tsx",
       "proves": "never reports a mode it does not know as open",
       "fails": "a CLOSED deployment reported as open, on the one screen whose entire job is saying which it is. The mode arrives off the wire, so a deployment ahead of this bundle can send a word the list does not carry — and falling back to the first rung is the one wrong answer that matters here"
+    },
+    {
+      "id": "the-shared-store-is-not-a-regional-one",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/negative.ts",
+      "proves": "the store every worker shares is not one workspace's own",
+      "fails": "the two handles being swapped, which compiles and runs. They have the same shape, opposite meanings, and are wired one after the other from two variables in one scope. The global store has no `tenant_settings`, so the reader's own `catch` answers with nothing: every workspace shows its declared fallbacks, every save reports success and vanishes, and the result is indistinguishable from a workspace nobody has configured — which is what a new one looks like. The constraint is negative on purpose, because there is one producer of the global handle and one per binding per region of the others"
+    },
+    {
+      "id": "one-table-one-store",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/scoped.test.mjs",
+      "proves": "no name in both",
+      "fails": "a table name declared on both sides reading as a duplicate when it is a silent divergence. Every statement is `CREATE TABLE IF NOT EXISTS`, so whichever runner reaches it first decides the shape and the loser's columns never exist — no error, no warning, and the first symptom is a query naming a column that is simply not there. It has happened one store over, and it took every route touching the database down rather than degrading a feature"
+    },
+    {
+      "id": "what-a-workspace-chose-stays-in-its-region",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/scoped.test.mjs",
+      "proves": "what a workspace chose is stored in its own region",
+      "fails": "a workspace's settings moved into the store every worker binds by the same id. Four reasons, none visible from a table's shape: RESIDENCY — its settings are its records, and they live where its records live; ACROSS — the global store is bound into every product's worker, and unlike the vault there is no grant algebra in front of these rows; HOT PATH — branding and wording are read per request by the app to draw its own sign-in screen; ERASURE — `scoped` declares these tables regionally and the purge cascade is derived from it, so a table that changed store without the cascade following is a deleted workspace that keeps its configuration while the sweep reports success. Where something is genuinely needed before a region is known the answer is to publish a COPY and keep the regional row authoritative, as `publishBranding` does — never the reverse"
     }
   ]
 }

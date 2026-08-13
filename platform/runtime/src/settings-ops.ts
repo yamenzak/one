@@ -8,7 +8,7 @@
  * setting produces all three from one place.
  */
 
-import type { AnyOperation, AppSpec, BindingSpec, SettingsSpec, SqlHandle } from "@one/kernel";
+import type { AnyOperation, AppSpec, BindingSpec, GlobalSql, RegionalSql, SettingsSpec } from "@one/kernel";
 import { BRANDING, SENDING, operation, s } from "@one/kernel";
 import { BRANDING_KEYS, publishBranding, readSettings, storedSettings, writeSetting } from "./settings.js";
 
@@ -16,9 +16,17 @@ import { BRANDING_KEYS, publishBranding, readSettings, storedSettings, writeSett
 export const SETTINGS = Symbol.for("one.runtime.settings");
 
 export interface SettingsDeps {
-  readonly db: SqlHandle;
+  /*
+    ⚠️ THE TWO HANDLES ARE TYPED APART, AND THIS IS THE LINE WHERE IT MATTERS.
+    They are wired one after the other from two variables in one scope, and
+    swapped they would compile and run: the global store has no `tenant_settings`,
+    so the reader's own `catch` returns nothing, every workspace shows its
+    declared fallbacks, and every save reports success and vanishes. `RegionalSql`
+    and `GlobalSql` are what refuse it — see `kernel/bindings.ts`.
+  */
+  readonly db: RegionalSql;
   /** ⚠️ Where the branding copy and the domain claims live. */
-  readonly directory: SqlHandle;
+  readonly directory: GlobalSql;
   readonly tenantId: string;
   /*
     ⚠️ THERE IS NO `isOperator` HERE, AND THERE WAS ONE. It was declared, it was
