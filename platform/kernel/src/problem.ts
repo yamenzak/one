@@ -183,6 +183,19 @@ export const PLATFORM_PROBLEMS = declareProblems({
     detail: () => "Sign in again to continue. It takes one tap with a passkey.",
     retryable: false,
   },
+  /*
+    ⚠️ ITS OWN CODE, AND IT IS NOT A 403. "You are not allowed here" is about a
+    role somebody holds; this is about a product they have not been let into yet,
+    which is a thing that CHANGES the moment somebody buys it. The way out is not
+    an administrator, it is the front of the website — so the code says so and the
+    detail names the product rather than the permission.
+  */
+  "platform.not_provisioned": {
+    status: 403,
+    title: "This product is not open to you yet",
+    detail: (m) => `Ask for access to ${m.product} and it will be enabled on this address.`,
+    retryable: false,
+  },
   "platform.not_shared": {
     status: 409,
     title: "That is not shared with you",

@@ -12,6 +12,14 @@
  * day it is written and drifted by the second edit, with the drift invisible
  * because each app's screen shows its own copy and agrees with itself.
  *
+ * ⚠️ THE PRODUCT NOUNS BELOW ARE THE POINT, NOT AN OVERSIGHT. Each product gets
+ * one sentence written in that product's own words, because the account centre
+ * offers it to somebody who has never opened it and "a workspace" tells them
+ * nothing. The exemptions are stated per NOUN rather than for the file, so a
+ * noun no product here has earned still fails:
+ * vocabulary-exempt-file(coach): what one of this deployment's products is.
+ * vocabulary-exempt-file(studio): who that product is sold to.
+ *
  * ⚠️ AND IT IS WHY THE ACCOUNT HAS TERMS AT ALL. Every other document in this
  * repository belongs to a product and is asked of a role inside one. An account
  * exists before any product and outlives all of them: the vault holds facts that
@@ -51,6 +59,37 @@ export const DEPLOYMENT: DeploymentSpec = {
     because a product genuinely may reach somewhere the platform does not, and
     may receive more categories through it than the platform does.
   */
+  /*
+    ⚠️ EVERY PRODUCT, AND THE ACCOUNT CENTRE IS WHY THE LIST EXISTS. It is served
+    by one worker; every other product is a different one, and the only things
+    they share are this module and the global directory. Without this, "which
+    products could I open a workspace in" has no answer at all.
+
+    ⚠️ `open` MIRRORS EACH APP'S OWN `tenancy.creation`, and each app checks its
+    own entry against its own manifest — the account centre cannot import another
+    product's declaration, so the two are stated twice and reconciled by a test on
+    the one side that can see both.
+  */
+  products: [
+    {
+      id: "kova",
+      name: "Kova",
+      does: "Coaching, for a studio and the people it trains.",
+      root: "kova.4dl.app",
+    },
+    {
+      id: "tessa",
+      name: "Tessa",
+      does: "A clinic's own practice, run end to end.",
+      root: "tessa.4dl.app",
+    },
+    {
+      id: "scena",
+      name: "Scena",
+      does: "Screens, playing what you tell them, everywhere at once.",
+      root: "scena.4dl.app",
+    },
+  ],
   subprocessors: [
     {
       id: "cloudflare",

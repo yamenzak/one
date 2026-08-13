@@ -293,6 +293,58 @@ revoking a session, turning a grant off: those are what somebody does the moment
 they think they have been compromised, and friction in front of them helps
 whoever is already inside keep their foothold.
 
+#### Being let into a product, and where a workspace is actually created
+
+**Answered 2026-08-13.** Provisioning a new customer was four manual steps and a
+person: somebody buys, somebody is told, somebody opens a console, somebody sends
+a link. The account centre is where that becomes self-serve, and the design turns
+on three facts that are easy to get wrong in the same direction.
+
+**A workspace is created at `setup.<product-root>` and nowhere else.** The account
+centre is served by one worker; every other product is a different worker with its
+own regional bindings, its own schema and its own manifest. It cannot create a
+workspace in a product it cannot reach, and a cross-worker write for the one
+operation that mints a tenant would be the worst possible place to invent
+machine-to-machine trust. So the account centre's job is *who may create, where* —
+and a hand-off. `setupDoorFor` derives the address from the product's own root, so
+the account centre and the product cannot disagree about the one thing that has to
+be right.
+
+**The grant is on an ADDRESS, not on an account, because of the sequence.**
+Somebody types their email on `fourdegreelabs.com`, is told they will be let in,
+and signs in afterwards — often days later, on another device. A flag needing an
+account to attach to could not be set at the moment it is bought, so it would have
+to be remembered somewhere else until an account appeared: this table with an
+extra step and a race. It is the same mechanism an invitation to a workspace
+already uses, which is why nothing new had to be invented for the case where the
+person does not exist yet.
+
+**And the two halves are one question, asked once.** `tenancy.creation` is the
+product's own declaration — `open` means a free front door admits anybody signed
+in, `granted` means it is sold — and the grant is what a purchase writes. A call
+site reading only the grant closes every free door; one reading only the
+declaration opens every sold one. Both look correct alone, so `mayCreateHere` is
+the single function and both call sites go through it: the API refusal
+(`platform.not_provisioned`, 403, naming the product) and `me.products`, which is
+what the account centre draws from.
+
+⚠️ **The button is not what makes it safe.** `identity.workspace.create` refuses
+regardless; the row on the account centre is what stops somebody being *offered*
+it, which is a different job. Most people holding an account here are a customer of
+somebody else's workspace — a "New workspace" button on their account centre
+offers a thing they cannot do, and the refusal that says so arrives long after they
+have decided the product is confusing.
+
+⚠️ **The machine lane is one endpoint and its key is the whole door.**
+`platform.provisioning.grant` / `.revoke` take a bearer key from config — rotated
+by a person in a console, not by a deploy — compared in constant time, and a
+deployment that never set one refuses everybody. A missing secret that admitted
+everybody would be the worst available default for the one endpoint that can open
+every product on the deployment to any address the caller names. A grant MERGES
+(a second purchase must not revoke the first) and a revoke takes back only the
+ability to open a NEW workspace: an endpoint a website can call must never be able
+to make somebody's existing workspace disappear.
+
 #### The migration is additive
 
 A credential bound to `<app>.4dl.app` keeps working on that app. New
@@ -1329,6 +1381,12 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-proof-is-not-a-permission` | a destructive operation gated by permission alone. The realistic threat to an account is a borrowed laptop with an open tab, and against it every other check passes — the cookie is genuine, the permission is held, the workspace is in good standing | **live** |
 | `an-unproven-caller-is-not-an-unasked-one` | a caller with no session defaulting to proven — which would make every un-sessioned lane the one way past this gate | **live** |
 | `closing-an-account-asks-who-you-are` | the three things a borrowed session is worth pointing at — closing the account, removing a credential and exporting everything — reachable from an open tab with no further proof. The same test pins the other direction: signing a device out is DEFENSIVE, and a step-up in front of it helps whoever is already inside keep their foothold | **live** |
+| `a-product-is-opened-only-to-somebody-let-in` | one of the two halves of this question answered alone. A call site reading only the grant closes every free front door; one reading only the app's declaration opens every sold one — and both look correct in isolation, which is why the pair is one function | **live** |
+| `a-grant-to-everything-is-understood-once` | the wildcard compared as an ordinary name at a second call site — the day it is, every operator grant silently stops opening anything, and the person holding it is told to buy what they were given | **live** |
+| `the-provisioning-lane-refuses-without-its-key` | the one endpoint that can open every product on the deployment to any address somebody names, admitting everybody on a deployment where the key was never set — which is precisely the state a fresh deployment is in | **live** |
+| `a-second-purchase-does-not-revoke-the-first` | a grant written as a replacement, so the day somebody buys a second product is the day the first is revoked — silently, and noticed only when they try to open a workspace they already paid for | **live** |
+| `a-grant-can-be-taken-back-and-nothing-else-is` | a switch with no off — and the opposite failure, an endpoint a website can call that makes an existing workspace, its members and its records disappear. What is taken back is the ability to open a NEW one | **live** |
+| `the-account-centre-offers-only-what-was-granted` | an account centre listing every product on the deployment to everybody signed in, and the address to go to assembled by hand — the setup door is derived from the product's own root, so the account centre and the product cannot disagree about the one thing that has to be right | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

@@ -398,6 +398,18 @@ const VAULT_ASKS: readonly Asked[] = [
   },
 ];
 
+/*
+  ⚠️ WHAT SOMEBODY WAS LET INTO, WHICH IS A GRANT RATHER THAN A LIST OF PRODUCTS.
+  The real answer comes from `me.products`, which crosses the grant on their
+  address with the products this deployment declares — so a fixture of three is a
+  person the website has enabled for everything.
+*/
+const PRODUCTS = [
+  { id: "kova", name: "Kova", does: "Coaching, for a studio and the people it trains.", setupAt: "https://setup.kova.4dl.app" },
+  { id: "scena", name: "Scena", does: "Screens, playing what you tell them, everywhere at once.", setupAt: "https://setup.scena.4dl.app" },
+  { id: "tessa", name: "Tessa", does: "A clinic's own practice, run end to end.", setupAt: "https://setup.tessa.4dl.app" },
+];
+
 /** Long enough to see the spinner and know it is a wait, not a stutter. */
 const ROUND_TRIP_MS = 900;
 
@@ -639,6 +651,15 @@ function Preview() {
         onGo={go}
         /* ⚠️ A WORKSPACE ROW LEAVES THIS SURFACE, which is why it is not a route
            in it. In the product it is a full navigation to another origin. */
+        /* ⚠️ WHAT THE WEBSITE ENABLES, AS THE ACCOUNT CENTRE SEES IT. `#open=one`
+           for a single product (no picker at all) and `#open=` for somebody who
+           may open nothing, which is what most people with an account are. */
+        openable={
+          asked.get("open") === "one" ? PRODUCTS.slice(0, 1)
+            : asked.get("open") === "none" ? []
+              : PRODUCTS
+        }
+        onOpenProduct={() => undefined}
         onOpenWorkspace={() => setOpen(false)}
         onClose={() => setOpen(false)}
       />

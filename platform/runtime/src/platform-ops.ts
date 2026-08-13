@@ -16,6 +16,8 @@ import type { AnyOperation, AppSpec, BindingSpec, Caller, Instant, RegionId, Sql
 import { check, nothing, operation, PUBLIC, s, toolNameFor, toolsFor, UNIVERSAL_RESERVED } from "@one/kernel";
 import { placeTenant } from "./directory.js";
 import { claim, invite } from "./membership.js";
+import { EVERY_PRODUCT, grantOpens, mayCreateHere, setupDoorFor, type Product } from "@one/kernel";
+import { sameSecret, type ProvisioningStore } from "./provisioning.js";
 
 /**
  * ⚠️ A SYMBOL, so an app cannot reach it by writing the property name.
@@ -59,6 +61,35 @@ export interface FounderDeps {
 
 export interface FounderCarrier { readonly [FOUNDER]: FounderDeps }
 
+/**
+ * WHO MAY BE LET INTO THIS PRODUCT, AND WHO MAY SAY SO.
+ *
+ * ⚠️ A SYMBOL FOR THE SAME REASON THE DIRECTORY IS ONE. Reading a grant is a
+ * platform question; WRITING one is a machine lane with a shared secret behind
+ * it, and neither belongs on the contract an app's handlers code against.
+ */
+export const PROVISION = Symbol.for("one.runtime.provision");
+
+export interface ProvisionDeps {
+  readonly store: ProvisioningStore;
+  /**
+   * ⚠️ THE KEY THE COMPANY'S OWN WEBSITE PRESENTS, from the shared config store.
+   * Absent — the ordinary state of a fresh deployment — means the lane is CLOSED
+   * rather than open: a missing secret that admitted everybody would be the worst
+   * possible default for the one endpoint that opens products to addresses.
+   */
+  readonly key: string;
+  /** What the caller presented, if anything. Never logged. */
+  readonly presented: string | null;
+  /**
+   * ⚠️ EVERY PRODUCT ON THIS DEPLOYMENT, from the module every worker imports.
+   * Absent is a self-host with one product and nothing to choose between.
+   */
+  readonly products: readonly Product[];
+}
+
+export interface ProvisionCarrier { readonly [PROVISION]: ProvisionDeps }
+
 /** `hello`, `my-gym`, `north-clinic` — a DNS label, and never a door. */
 export function slugProblem(slug: string, reserved: readonly string[]): string | null {
   if (!/^[a-z0-9]([a-z0-9-]{1,30}[a-z0-9])?$/.test(slug)) return "not a valid address";
@@ -88,6 +119,120 @@ export function foundingRole<B extends BindingSpec>(app: AppSpec<B>): string | n
 }
 
 export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): readonly AnyOperation[] {
+  /**
+   * WHAT THIS PERSON MAY OPEN, AND WHERE.
+   *
+   * ⚠️ ANSWERED FROM THE DEPLOYMENT'S OWN LIST OF PRODUCTS, not from what this
+   * worker happens to be. The account centre is served by one app and the answer
+   * is about all of them — which is exactly why the list is declared once, in a
+   * module every worker imports, rather than assembled from whichever manifest is
+   * in scope.
+   *
+   * ⚠️ AND A PRODUCT WITH AN OPEN FRONT DOOR IS ALWAYS IN THE ANSWER. Somebody
+   * with no grant at all may still open a workspace in a self-serve product, and
+   * an account centre that only listed granted ones would hide the free one.
+   */
+  const mayOpen = operation({
+    id: "me.products",
+    kind: "read",
+    summary: "The products you can open a workspace in.",
+    input: nothing(),
+    output: s.object({ products: s.json() }),
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    /* ⚠️ Not a tool: it is a shopping list keyed to one person's entitlements. */
+    tool: false,
+    async handler(ctx) {
+      const founder = (ctx as unknown as FounderCarrier)[FOUNDER];
+      const provision = (ctx as unknown as ProvisionCarrier)[PROVISION];
+      if (!founder?.email) return { products: [] };
+      const held = await provision.store.read(founder.email);
+      return {
+        products: (provision.products ?? [])
+          .filter((p) => p.open === true || grantOpens(held, p.id))
+          /* ⚠️ THE ADDRESS IS DERIVED, so the account centre and the product
+             cannot disagree about the one thing that has to be right. */
+          .map((p) => ({ id: p.id, name: p.name, does: p.does, setupAt: setupDoorFor(p) })),
+      };
+    },
+  });
+
+  /**
+   * LETTING SOMEBODY IN — the one machine lane on this deployment.
+   *
+   * ⚠️ IT IS CALLED BY OUR OWN WEBSITE AND BY NOTHING ELSE. Somebody types their
+   * address on the company's site, and the product they bought is opened for that
+   * address here — before they have an account, which is the ordinary case and
+   * the reason the grant is written against an address.
+   *
+   * ⚠️ AUTHENTICATED BY A SHARED SECRET, IN CONSTANT TIME, AND CLOSED WHEN THERE
+   * IS NONE. A missing key admitting everybody is the worst available default for
+   * the one endpoint that opens products to arbitrary addresses — so absent means
+   * refused, which is also the state of every fresh deployment.
+   *
+   * ⚠️ AND IT SAYS NOTHING BACK. Not whether the address has an account, not
+   * whether it already held a grant: an endpoint somebody can call with a stolen
+   * key should not also be an oracle about who our customers are.
+   */
+  const provisionGrant = operation({
+    id: "platform.provisioning.grant",
+    kind: "write",
+    summary: "Let an address open a workspace in one or more products.",
+    input: s.object({
+      email: s.text({ min: 3, max: 320 }),
+      /* ⚠️ Named products, or the wildcard. Absent is every product this
+         deployment sells, which is what a single-product site will send. */
+      apps: s.optional(s.array(s.text({ max: 40 }))),
+    }),
+    output: s.object({ granted: s.bool() }),
+    permission: PUBLIC,
+    /* ⚠️ Natural on the address: the same purchase retried is one grant. */
+    idempotency: { mode: "natural", key: "email" },
+    audit: (i: { email: string }) => ({ subject: i.email, verb: "provision" }),
+    fails: ["platform.forbidden", "platform.invalid"],
+    /* ⚠️ A model that can provision can provision anybody. */
+    tool: false,
+    async handler(ctx, input: { email: string; apps?: readonly string[] }) {
+      const provision = (ctx as unknown as ProvisionCarrier)[PROVISION];
+      if (!provision.presented || !sameSecret(provision.presented, provision.key)) {
+        ctx.fail("platform.forbidden", { reason: "not a provisioning caller" });
+      }
+      const email = input.email.trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) ctx.fail("platform.invalid", { field: "email" });
+      const apps = input.apps?.length ? input.apps : [EVERY_PRODUCT];
+      await provision.store.grant(email, apps, "website", ctx.now() as Instant);
+      return { granted: true as const };
+    },
+  });
+
+  /** ⚠️ A switch with no off is not a switch — a refund is the ordinary case. */
+  const provisionRevoke = operation({
+    id: "platform.provisioning.revoke",
+    kind: "write",
+    summary: "Stop an address opening new workspaces in one or more products.",
+    input: s.object({ email: s.text({ min: 3, max: 320 }), apps: s.optional(s.array(s.text({ max: 40 }))) }),
+    output: s.object({ revoked: s.bool() }),
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    audit: (i: { email: string }) => ({ subject: i.email, verb: "unprovision" }),
+    fails: ["platform.forbidden"],
+    tool: false,
+    async handler(ctx, input: { email: string; apps?: readonly string[] }) {
+      const provision = (ctx as unknown as ProvisionCarrier)[PROVISION];
+      if (!provision.presented || !sameSecret(provision.presented, provision.key)) {
+        ctx.fail("platform.forbidden", { reason: "not a provisioning caller" });
+      }
+      /*
+        ⚠️ IT TAKES AWAY THE ABILITY TO OPEN A NEW ONE AND NOTHING ELSE. Workspaces
+        that exist keep existing, with their members, their records and their bill:
+        a refund is not a reason for somebody else's studio to disappear, and an
+        endpoint a website can call must never be able to make that happen.
+      */
+      await provision.store.revoke(input.email, input.apps?.length ? input.apps : null);
+      return { revoked: true as const };
+    },
+  });
+
   const createWorkspace = operation({
     /*
       ⚠️ ON THE `identity` LANE, which survives every rung of the standing
@@ -111,7 +256,7 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
     */
     outcome: { message: "Workspace created", tone: "success", moment: "welcome", invalidates: ["workspaces"] },
     emits: ["workspace.created"],
-    fails: ["platform.invalid", "platform.conflict"],
+    fails: ["platform.invalid", "platform.conflict", "platform.not_provisioned"],
     /*
       ⚠️ NOT REACHABLE BY A TOOL. An assistant that can mint tenants can mint
       them in a loop, and every one is a real address somebody else can no longer
@@ -121,6 +266,24 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
     tool: false,
     async handler(ctx, input: { slug: string; region?: string }) {
       const directory = (ctx as unknown as DirectoryCarrier)[DIRECTORY];
+      /*
+        ⚠️ THE GRANT IS CHECKED HERE, NOT IN THE SCREEN THAT OFFERS THE BUTTON. A
+        control the account centre does not draw is a decoration: this route is in
+        the API document, in the typed client and in every tool catalogue, and
+        anybody signed in holds `workspace:create` on a tenantless door by
+        construction. An app that sells its way in says so in its manifest, and
+        this is the line that makes the saying true.
+
+        ⚠️ AND IT IS ON THE ADDRESS THE SESSION PROVES, never on one in the body.
+        A grant looked up by an input field is a grant anybody can borrow by
+        typing somebody else's address.
+      */
+      if (app.tenancy.creation === "granted") {
+        const founder = (ctx as unknown as FounderCarrier)[FOUNDER];
+        const provision = (ctx as unknown as ProvisionCarrier)[PROVISION];
+        const held = founder?.email ? await provision.store.read(founder.email) : null;
+        if (!mayCreateHere(app.tenancy.creation, held, app.id)) ctx.fail("platform.not_provisioned", { product: app.name });
+      }
       const bad = slugProblem(input.slug, app.tenancy.reservedSlugs);
       if (bad) ctx.fail("platform.invalid", { field: "slug", reason: bad });
 
@@ -198,7 +361,7 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
     },
   });
 
-  return [createWorkspace as unknown as AnyOperation];
+  return [createWorkspace, mayOpen, provisionGrant, provisionRevoke] as unknown as readonly AnyOperation[];
 }
 
 /* ------------------------------------------------------------------ tools --- */

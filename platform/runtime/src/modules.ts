@@ -36,6 +36,7 @@ import { DIRECTORY_SCHEMA, DOMAIN_SCHEMA } from "./directory.js";
 import { VAULT_SCHEMA, VAULT_SPEC_SCHEMA } from "./vault.js";
 import { IDENTITY_SCHEMA } from "./identity.js";
 import { OTP_SCHEMA } from "./identity-ops.js";
+import { PROVISIONING_SCHEMA } from "./provisioning.js";
 import { PROVIDER_SCHEMA } from "./provider.js";
 import { PLATFORM_STATE_SCHEMA } from "./maintenance.js";
 import { JOB_SCHEMA } from "./jobs.js";
@@ -105,6 +106,13 @@ export const PLATFORM_GLOBAL: readonly SchemaModule[] = [
      record of the support sessions that happened inside it. */
   IMPERSONATION_SCHEMA,
   OTP_SCHEMA as SchemaModule,
+  /*
+    ⚠️ GLOBAL, BECAUSE A GRANT IS ABOUT A PERSON AND A PRODUCT — and the account
+    centre that reads it is served by a different worker from the one that has to
+    honour it. A per-app copy would be one product's answer to a question about
+    all of them.
+  */
+  PROVISIONING_SCHEMA as SchemaModule,
   PROVIDER_SCHEMA,
   PLATFORM_STATE_SCHEMA,
   JOB_SCHEMA,

@@ -17,12 +17,13 @@
  * — which is what makes the next screen an afternoon rather than a week.
  */
 
-import type { CSSProperties, ElementType, ReactNode } from "react";
+import { useState, type CSSProperties, type ElementType, type ReactNode } from "react";
 import { Mark } from "../mark.js";
 import { Lockup } from "../brand/mark.js";
-import { Adjust, Guard, Heartbreak, Key, Onward, Save } from "../icon.js";
+import { Add, Adjust, Guard, Heartbreak, Key, Onward, Save } from "../icon.js";
 import { Pill } from "../capsule.js";
 import { Blank, Card, Item, Waiting } from "../list.js";
+import { Choose } from "../choose.js";
 import type { Where } from "./routes.js";
 import { Screen, Section } from "../screen.js";
 
@@ -58,6 +59,16 @@ export interface Workspace {
   readonly standing?: { readonly label: string; readonly urgent: boolean };
 }
 
+/** One product somebody may start something in, from `me.products`. */
+export interface Openable {
+  readonly id: string;
+  readonly name: string;
+  /** One line: what somebody would open a workspace here to do. */
+  readonly does: string;
+  /** ⚠️ Derived by the runtime from the product's root — never composed here. */
+  readonly setupAt: string;
+}
+
 export interface AccountHomeProps {
   readonly person: Person;
   /** ⚠️ `null` is NOT ANSWERED YET. `[]` is answered, and empty. */
@@ -76,6 +87,19 @@ export interface AccountHomeProps {
    */
   readonly sharedCount?: number | null;
   /**
+   * PRODUCTS THIS PERSON MAY OPEN A WORKSPACE IN — `me.products`.
+   *
+   * ⚠️ AN EMPTY LIST IS THE ORDINARY CASE AND IT DRAWS NOTHING. Most people with
+   * an account here are somebody's client or somebody's colleague; a "New
+   * workspace" button on their account centre offers them a thing they cannot do
+   * and would not want, and the refusal they would meet says so far too late.
+   *
+   * ⚠️ AND IT IS NOT WHAT MAKES THE CONTROL SAFE. `identity.workspace.create`
+   * refuses an address with no grant on a product that is sold — a button the
+   * screen does not draw is a decoration, and the route is in the API document.
+   */
+  readonly openable?: readonly Openable[];
+  /**
    * ⚠️ A DESTINATION, NOT A NAME. It was a string — `"account.profile"` — matched
    * by whoever mounted the surface, so a row could name a screen nobody had built
    * and the only symptom was a press that did nothing. Every row here now hands
@@ -83,6 +107,14 @@ export interface AccountHomeProps {
    * destination a type error rather than a dead control.
    */
   readonly onGo: (to: Where) => void;
+  /**
+   * ⚠️ IT LEAVES FOR THE PRODUCT'S OWN SETUP DOOR, which is the only place a
+   * workspace is created. The account centre is served by one worker and every
+   * other product is a different one — creating a Kova workspace from here would
+   * mean this worker writing a membership into Kova's regional store, which it has
+   * no binding for and must never have. So this hands over rather than doing it.
+   */
+  readonly onOpenProduct?: (product: Openable) => void;
   /**
    * ⚠️ LEAVING THE ACCOUNT CENTRE IS NOT A DESTINATION INSIDE IT. A workspace row
    * goes INTO that workspace — another product, at another address, outside this
@@ -103,7 +135,30 @@ export interface AccountHomeProps {
 
 const PRODUCT_NAME: Record<Product, string> = { kova: "Kova", scena: "Scena", tessa: "Tessa" };
 
-export function AccountHome({ person, workspaces, sharedCount = null, onGo, onOpenWorkspace, onClose, Heading = "h1" }: AccountHomeProps): ReactNode {
+/**
+ * ⚠️ IT SAYS WHAT IT MAKES, NOT WHAT IT OPENS. "New workspace" is the thing
+ * somebody gets; "Create" is what the button does to the database. And where
+ * there is more than one product it says so, because the next screen is a
+ * question rather than a wizard.
+ */
+const StartRow = ({ many, onGo }: { readonly many: boolean; readonly onGo: () => void }): ReactNode => (
+  <Item
+    icon={<Add />}
+    title="New workspace"
+    detail={many ? "Choose which product" : undefined}
+    onGo={onGo}
+  />
+);
+
+export function AccountHome({
+  person, workspaces, sharedCount = null, openable = [], onGo, onOpenWorkspace, onOpenProduct, onClose, Heading = "h1",
+}: AccountHomeProps): ReactNode {
+  /* ⚠️ ONE PRODUCT IS NOT A CHOICE. A picker with a single option is a question
+     with one answer, and the same argument the onboarding wizard makes about a
+     plan step nobody can fail. */
+  const [choosing, setChoosing] = useState(false);
+  const start = (p: Openable) => { setChoosing(false); onOpenProduct?.(p); };
+
   return (
     <Screen
       leave="dismiss"
@@ -176,9 +231,35 @@ export function AccountHome({ person, workspaces, sharedCount = null, onGo, onOp
                 onGo={() => onOpenWorkspace(w.tenantId)}
               />
             ))}
+            {/* ⚠️ THE WAY TO START ONE IS IN THE LIST OF THE ONES YOU HAVE, which
+                is where somebody looks — and it is the last row rather than a
+                control in the header, because most visits here are not about
+                starting anything. */}
+            {openable.length && onOpenProduct ? <StartRow many={openable.length > 1} onGo={() => (openable.length === 1 ? start(openable[0]!) : setChoosing(true))} /> : null}
           </Card>
         )}
+        {/* ⚠️ AND IT IS OFFERED WITH NO WORKSPACES AT ALL, which is the state
+            somebody arriving from the website is in: an empty list, an invitation
+            that has not come, and the one thing they came here to do. */}
+        {workspaces?.length === 0 && openable.length && onOpenProduct ? (
+          <Card>
+            <StartRow many={openable.length > 1} onGo={() => (openable.length === 1 ? start(openable[0]!) : setChoosing(true))} />
+          </Card>
+        ) : null}
       </Section>
+
+      {/* ⚠️ THE SAME PICKER EVERY OTHER CHOICE IN THIS SURFACE USES. A product is
+          a row with a name and a line about what it is for — which is exactly an
+          option, and inventing a second shape for it here would be a second thing
+          to keep in step with `Choose`. */}
+      <Choose
+        open={choosing}
+        title="What are you starting?"
+        options={openable.map((p) => ({ value: p.id, label: p.name, detail: p.does }))}
+        value=""
+        onPick={(id) => { const p = openable.find((o) => o.id === id); if (p) start(p); }}
+        onClose={() => setChoosing(false)}
+      />
 
       <Section name="Privacy">
         <Card>

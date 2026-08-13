@@ -3955,6 +3955,69 @@
       "impl": "web/test/screens.test.tsx",
       "proves": "can be left, on this device and on every device",
       "fails": "an account centre with no way to sign out. The row for the device in your hand carried no control and the comment beside it said leaving was the avatar menu's job — a menu this platform does not have — so on a shared computer there was no way out at all, on the one screen whose subject is where you are signed in"
+    },
+    {
+      "id": "a-product-is-opened-only-to-somebody-let-in",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/identity.test.ts",
+      "proves": "keeps a sold product shut until somebody is let in",
+      "fails": "one of the two halves of this question answered alone. A call site reading only the grant closes every free front door; one reading only the app's declaration opens every sold one — and both look correct in isolation, which is why the pair is one function"
+    },
+    {
+      "id": "a-grant-to-everything-is-understood-once",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/identity.test.ts",
+      "proves": "understands a grant to everything",
+      "fails": "the wildcard compared as an ordinary name at a second call site — the day it is, every operator grant silently stops opening anything, and the person holding it is told to buy what they were given"
+    },
+    {
+      "id": "the-provisioning-lane-refuses-without-its-key",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/provisioning.test.ts",
+      "proves": "refuses a caller with no key and one with the wrong key",
+      "fails": "the one endpoint that can open every product on the deployment to any address somebody names, admitting everybody on a deployment where the key was never set — which is precisely the state a fresh deployment is in"
+    },
+    {
+      "id": "a-second-purchase-does-not-revoke-the-first",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/provisioning.test.ts",
+      "proves": "adds a second product without taking the first away",
+      "fails": "a grant written as a replacement, so the day somebody buys a second product is the day the first is revoked — silently, and noticed only when they try to open a workspace they already paid for"
+    },
+    {
+      "id": "a-grant-can-be-taken-back-and-nothing-else-is",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/provisioning.test.ts",
+      "proves": "takes a grant back without touching what was already created",
+      "fails": "a switch with no off — and the opposite failure, an endpoint a website can call that makes an existing workspace, its members and its records disappear. What is taken back is the ability to open a NEW one"
+    },
+    {
+      "id": "the-account-centre-offers-only-what-was-granted",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/provisioning.test.ts",
+      "proves": "offers a product to somebody who was let into it, and not to anybody else",
+      "fails": "an account centre listing every product on the deployment to everybody signed in, and the address to go to assembled by hand — the setup door is derived from the product's own root, so the account centre and the product cannot disagree about the one thing that has to be right"
+    },
+    {
+      "id": "nobody-is-offered-what-they-cannot-open",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "offers nothing to somebody who may open nothing",
+      "fails": "a New workspace button on the account centre of somebody who is a customer of a workspace rather than the owner of one. It offers a thing they cannot do, and the refusal that says so arrives long after they have decided the product is confusing"
     }
   ]
 }

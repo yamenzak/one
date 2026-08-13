@@ -125,3 +125,62 @@ export function shouldOfferRootCredential(all: readonly Credential[], rpId: stri
   return all.length > 0 && usable.every((c) => c.relyingParty !== platformRoot);
 }
 
+/* ------------------------------------------------------- provisioning --- */
+
+/**
+ * WHO MAY OPEN A WORKSPACE, AND WHERE.
+ *
+ * ⚠️ IT IS GRANTED TO AN ADDRESS, NOT TO AN ACCOUNT, and that is the whole
+ * reason it is a record of its own. The real sequence is somebody typing their
+ * address on a marketing site and signing in AFTERWARDS — so a grant that needed
+ * an account to attach to would be a grant that cannot be given at the moment it
+ * is bought. It is claimed by whoever proves that address, which is the same
+ * mechanism an invitation to a workspace already uses.
+ *
+ * ⚠️ AND `apps` IS A LIST RATHER THAN A BOOLEAN, because a deployment sells more
+ * than one thing. Somebody who paid for one product is not thereby entitled to
+ * open workspaces in the others, and a boolean cannot say which — so the first
+ * time a second product exists, a boolean has to be replaced by this, on live
+ * data, with every existing grant meaning something ambiguous.
+ */
+export interface Provisioning {
+  readonly email: string;
+  /** ⚠️ `["*"]` is every product. Written by an operator, never by a purchase. */
+  readonly apps: readonly string[];
+  readonly grantedAt: Instant;
+  /** Who granted it — a machine name or an operator's address. Audit, not display. */
+  readonly by: string;
+}
+
+/** ⚠️ Every product, or the ones named. Nothing else means anything. */
+export const EVERY_PRODUCT = "*";
+
+/**
+ * Whether a grant opens a particular product.
+ *
+ * ⚠️ PURE, AND IT IS THE ONE PLACE THE WILDCARD IS UNDERSTOOD. Written at each
+ * call site, the day somebody checks `apps.includes(id)` without it is the day a
+ * wildcard grant silently stops opening anything.
+ */
+export const grantOpens = (grant: Provisioning | null, appId: string): boolean =>
+  grant !== null && (grant.apps.includes(EVERY_PRODUCT) || grant.apps.includes(appId));
+
+/**
+ * Whether this person may open a workspace in this product.
+ *
+ * ⚠️ THE WHOLE RULE, IN ONE PLACE, BECAUSE IT HAS TWO HALVES THAT LOOK ALIKE. A
+ * product with an open front door admits anybody signed in — that is what a free
+ * tier IS — and one that is sold admits the addresses somebody was paid for. A
+ * call site that checked only the grant would close the open product; one that
+ * checked only the declaration would open the sold one.
+ *
+ * ⚠️ AND `undefined` IS `open`, which is what every app did before the field
+ * existed. A default of `granted` would close every existing front door on the
+ * day this was added, silently, to everybody.
+ */
+export const mayCreateHere = (
+  creation: "open" | "granted" | undefined,
+  grant: Provisioning | null,
+  appId: string,
+): boolean => creation !== "granted" || grantOpens(grant, appId);
+

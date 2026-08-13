@@ -8,8 +8,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  ACCOUNT_FIELDS, credentialsFor, offerableAt, shouldOfferRootCredential,
-  type Account, type Credential,
+  ACCOUNT_FIELDS, credentialsFor, EVERY_PRODUCT, grantOpens, mayCreateHere, offerableAt, shouldOfferRootCredential,
+  type Account, type Credential, type Provisioning,
 } from "../src/identity.js";
 import { snapshotOf, validateSession, type Session } from "../src/session.js";
 import { canAssignRole, canGrant, holds, permissionsFor, type Membership, type RoleRegistry } from "../src/membership.js";
@@ -236,5 +236,41 @@ describe("nobody may grant what they do not hold", () => {
     expect(canAssignRole(coach, "assistant", roles)).toBe(true);
     expect(canAssignRole(coach, "owner", roles)).toBe(false);
     expect(canAssignRole(owner, "owner", roles)).toBe(true);
+  });
+});
+
+/* --------------------------------------------------------- provisioning --- */
+
+describe("who may open a workspace", () => {
+  const grant = (apps: readonly string[]): Provisioning =>
+    ({ email: "n@example.test", apps, grantedAt: "2026-01-01T00:00:00.000Z" as Instant, by: "website" });
+
+  /*
+    ⚠️ AN OPEN FRONT DOOR IS NOT A GRANT, AND THE TWO LOOK ALIKE. A product with a
+    free tier admits anybody signed in — that is what a free tier IS — and one
+    that is sold admits the addresses somebody was paid for. A call site checking
+    only the grant closes the first; one checking only the declaration opens the
+    second.
+  */
+  it("lets anybody into a product whose door is open", () => {
+    expect(mayCreateHere("open", null, "kova")).toBe(true);
+    /* ⚠️ AND `undefined` IS OPEN, which is what every app did before the field
+       existed — a default of granted would have closed every front door in the
+       platform on the day it was added. */
+    expect(mayCreateHere(undefined, null, "kova")).toBe(true);
+  });
+
+  it("keeps a sold product shut until somebody is let in", () => {
+    expect(mayCreateHere("granted", null, "kova")).toBe(false);
+    expect(mayCreateHere("granted", grant(["scena"]), "kova")).toBe(false);
+    expect(mayCreateHere("granted", grant(["kova"]), "kova")).toBe(true);
+  });
+
+  /* ⚠️ THE WILDCARD IS UNDERSTOOD IN ONE PLACE. Written at each call site, the
+     day somebody compares the list without it is the day every wildcard grant
+     silently stops opening anything. */
+  it("understands a grant to everything", () => {
+    expect(grantOpens(grant([EVERY_PRODUCT]), "anything-at-all")).toBe(true);
+    expect(grantOpens(null, "kova")).toBe(false);
   });
 });

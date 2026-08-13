@@ -159,6 +159,24 @@ export interface TenancySpec {
   readonly defaultRegion: RegionId;
   /** Labels a tenant may not take — other doors, mail autoconfig, ACME, money words. */
   readonly reservedSlugs: readonly string[];
+  /**
+   * WHO MAY OPEN A WORKSPACE HERE.
+   *
+   * ⚠️ `open` IS A SELF-SERVE PRODUCT: anybody who can sign in can create one,
+   * which is what `access.personal` already says and what a free tier means.
+   *
+   * ⚠️ `granted` IS A PRODUCT SOMEBODY IS LET INTO. The address has to hold a
+   * provisioning grant — written by whoever sells the thing — and without one the
+   * creation is REFUSED rather than merely unoffered. That distinction is the
+   * whole point: a button the account centre does not draw is not a control, it
+   * is a decoration, and the route is reachable by anybody who reads the tool
+   * catalogue or the API document.
+   *
+   * ⚠️ AND THE DEFAULT IS `open`, BECAUSE THAT IS WHAT AN APP WITHOUT AN OPINION
+   * ALREADY DID. A default of `granted` would silently close every existing
+   * product's front door on the day this field was added.
+   */
+  readonly creation?: "open" | "granted";
 }
 
 /* -------------------------------------------------------------- defaults --- */
@@ -343,7 +361,56 @@ export interface DeploymentSpec {
    * reach somewhere the platform does not.
    */
   readonly subprocessors: readonly Subprocessor[];
+  /**
+   * EVERY PRODUCT ON THIS DEPLOYMENT, DECLARED ONCE.
+   *
+   * ⚠️ THE ACCOUNT CENTRE CANNOT ASK AN APP WHAT ELSE EXISTS. It is served by one
+   * worker and every other product is a different one; the only thing they share
+   * is this module and the global directory. Without a list here, "which products
+   * could I open a workspace in" has no answer at all — which is why the account
+   * centre could show somebody the workspaces they are in and nothing about the
+   * ones they could start.
+   *
+   * ⚠️ AND THE WORKSPACE IS CREATED AT THE PRODUCT'S OWN SETUP DOOR, never here.
+   * Creating one writes a membership into that product's regional store, which
+   * this worker has no binding for — so the account centre's job is to say who
+   * may create, where, and to hand over. `setup.<root>` is that address, and it
+   * is derived from the root rather than stored, so the two cannot disagree.
+   */
+  readonly products?: readonly Product[];
 }
+
+/** One product on this deployment, as the account centre needs to know it. */
+export interface Product {
+  /** The app id, which is what a workspace's directory row records. */
+  readonly id: string;
+  readonly name: string;
+  /** One line: what somebody would open a workspace here to do. */
+  readonly does: string;
+  /** The host its doors hang off — the same value as its own `tenancy.appRoot`. */
+  readonly root: string;
+  /**
+   * ⚠️ WHETHER ANYBODY SIGNED IN MAY OPEN ONE HERE. It mirrors the product's own
+   * `tenancy.creation`, and the duplication is unavoidable rather than sloppy:
+   * the account centre is served by one worker and cannot import another
+   * product's manifest, so this is the only place it can learn the answer.
+   *
+   * ⚠️ WHICH IS WHY EACH APP CHECKS ITS OWN ENTRY AGAINST ITS OWN MANIFEST. A
+   * disagreement here offers somebody a door that then refuses them, or hides one
+   * that would have opened — and the app is the only side that can see both.
+   */
+  readonly open?: boolean;
+}
+
+/**
+ * WHERE A WORKSPACE IS CREATED FOR A PRODUCT.
+ *
+ * ⚠️ DERIVED, NOT DECLARED, so an account centre and a product cannot disagree
+ * about the one address that has to be right — and `classifyHost` already reads
+ * the same label. A second field holding "https://setup.kova.4dl.app" is a field
+ * somebody edits when the root moves and forgets when it moves back.
+ */
+export const setupDoorFor = (product: Product): string => `https://setup.${product.root}`;
 
 /**
  * THE ACCOUNT'S OWN DISCLOSURE, AS A PROJECTION OF THE DECLARATION ABOVE.

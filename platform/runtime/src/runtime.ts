@@ -90,8 +90,9 @@ import { claim, memberOf, membersOf, permissionsOf, revoke, seatsUsed, subjectFo
 import { MEMBERS, membershipOperations, type MemberCarrier } from "./membership-ops.js";
 import { sqlDirectory } from "./directory.js";
 import { collectionOperations } from "./collection-ops.js";
-import { DIRECTORY, FOUNDER, TOOLS, foundingRole, platformOperations, toolOperations, type DirectoryCarrier, type FounderCarrier, type ToolCarrier } from "./platform-ops.js";
+import { DIRECTORY, FOUNDER, PROVISION, TOOLS, foundingRole, platformOperations, toolOperations, type DirectoryCarrier, type FounderCarrier, type ProvisionCarrier, type ToolCarrier } from "./platform-ops.js";
 import { identityOperations, PLATFORM, type PlatformCarrier, type PlatformDeps } from "./identity-ops.js";
+import { provisioningStore } from "./provisioning.js";
 import { identityStore, readCookie, SESSION_COOKIE, sessionStore } from "./identity.js";
 import { REFERENCE, referenceOperations, type ReferenceCarrier } from "./reference-ops.js";
 import { VAULT, vaultOperations, type VaultCarrier } from "./vault-ops.js";
@@ -1436,7 +1437,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       };
       const audit: AuditEntry[] = [];
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & ConfigCarrier & SettingsCarrier & LookupCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier & ReferenceCarrier & VaultCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & ConfigCarrier & SettingsCarrier & LookupCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier & ProvisionCarrier & ReferenceCarrier & VaultCarrier = {
         [CONFIG]: {
           own: directoryDb,
           /*
@@ -1699,6 +1700,23 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           },
           email: session?.snapshot.email ?? null,
           userId: session?.accountId ?? null,
+        },
+        /*
+          ⚠️ THE KEY IS READ FROM CONFIG PER REQUEST AND NEVER FROM AN ENVIRONMENT
+          VARIABLE, for the same reason every other credential here is: it is
+          rotated by a person in a console rather than by a deploy, and one held in
+          `vars` is one that differs per app the day somebody redeploys three of
+          them. Absent is the CLOSED state — see the operation.
+
+          ⚠️ AND THE HEADER IS READ, NOT THE BODY. A secret in a JSON field is a
+          secret in every request log that records bodies; an Authorization header
+          is the one place infrastructure already knows not to print.
+        */
+        [PROVISION]: {
+          store: provisioningStore(directoryDb),
+          key: String((await readAll(directoryDb).catch(() => ({} as Record<string, string>)))["provisioning.key"] ?? ""),
+          presented: (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "") || null,
+          products: opts.deployment?.products ?? [],
         },
         [COMMERCE]: {
           db: regionalDb,

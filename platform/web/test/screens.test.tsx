@@ -18,6 +18,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { LegalDoc, Problem, Receiving } from "@one/kernel";
 
 import { AccountCenter, type AccountCenterProps } from "../src/account/center.js";
+import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
 import { AboutBody, KeptHere, meaning, readAs, VaultScreen, type Item, type Kept, type Looked, type Where } from "../src/account/vault.js";
 import { AskForIt, ConsentBody, ConsentSheet, offered, type Asked } from "../src/consent.js";
 import { AccountDetails } from "../src/account/details.js";
@@ -103,6 +104,59 @@ describe("a switch row", () => {
 
   it("is a label, so the whole row is the target rather than the switch alone", () => {
     expect(html(<SwitchRow title="Sound" on onChange={nothing} />)).toMatch(/^<label/);
+  });
+});
+
+/* ----------------------------------------------------------- provisioning --- */
+
+describe("starting something new", () => {
+  const OPENABLE = [
+    { id: "kova", name: "Kova", does: "Coaching, for a studio.", setupAt: "https://setup.kova.4dl.app" },
+    { id: "scena", name: "Scena", does: "Screens, everywhere at once.", setupAt: "https://setup.scena.4dl.app" },
+  ];
+  const home = (over: Partial<AccountHomeProps> = {}) => html(
+    <AccountHome
+      person={{ name: "Nadia", email: "n@example.test" }}
+      workspaces={[]}
+      onGo={() => undefined} onOpenWorkspace={() => undefined} onClose={() => undefined}
+      {...over}
+    />,
+  );
+
+  /*
+    ⚠️ MOST PEOPLE WITH AN ACCOUNT HERE ARE SOMEBODY'S CLIENT. A "New workspace"
+    button on their account centre offers them a thing they cannot do and would
+    not want — and the refusal they would meet says so long after they have
+    decided the product is confusing.
+  */
+  it("offers nothing to somebody who may open nothing", () => {
+    expect(home()).not.toContain("New workspace");
+  });
+
+  it("offers it to somebody who may, with no workspaces at all", () => {
+    const out = home({ openable: OPENABLE, onOpenProduct: () => undefined });
+    expect(out).toContain("New workspace");
+    /* ⚠️ AND SAYS THE NEXT SCREEN IS A QUESTION, because there is more than one
+       product. With a single one it goes straight there — a picker with one
+       option is a question with one answer. */
+    expect(out).toContain("Choose which product");
+  });
+
+  it("says nothing about choosing when there is one product", () => {
+    const out = home({ openable: [OPENABLE[0]!], onOpenProduct: () => undefined });
+    expect(out).toContain("New workspace");
+    expect(out).not.toContain("Choose which product");
+  });
+
+  /*
+    ⚠️ AND THE CONTROL IS NOT WHAT MAKES IT SAFE. `identity.workspace.create`
+    refuses an address with no grant on a product that is sold; this row is what
+    stops somebody being offered it, which is a different job. A screen that was
+    the only control would be a decoration in front of a route in the API
+    document — see `hello/test/provisioning.test.ts` for the half that refuses.
+  */
+  it("draws nothing when nobody can be handed over to", () => {
+    expect(home({ openable: OPENABLE })).not.toContain("New workspace");
   });
 });
 
