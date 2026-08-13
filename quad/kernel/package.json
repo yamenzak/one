@@ -1,0 +1,19 @@
+{
+  "name": "@quad/kernel",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Quad's contract layer: entities, declarations and the rules over them. Pure — no I/O, no bindings, no React. See docs/PLAN.md §2.4.",
+  "exports": { ".": "./src/index.ts" },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
