@@ -78,6 +78,8 @@ const deps = (ctx: unknown): ReferenceDeps => (ctx as ReferenceCarrier)[REFERENC
 /* ---------------------------------------------------------------- schema --- */
 
 export const CONSENT_SCHEMA: SchemaModule = {
+  /** ⚠️ Global: a consent belongs to the person, not to the workspace that happened to ask. */
+  global: "account",
   id: "consent",
   after: ["identity"],
   ddl: [
@@ -117,6 +119,8 @@ export const CONSENT_SCHEMA: SchemaModule = {
  * correctly refuses.
  */
 export const LEGAL_SPEC_SCHEMA: SchemaModule = {
+  /** ⚠️ Global: what each product asks people to agree to, readable from the door serving the hub. */
+  global: "declaration",
   id: "legal_specs",
   ddl: [
     `CREATE TABLE IF NOT EXISTS legal_specs (app_id TEXT PRIMARY KEY, app_name TEXT NOT NULL, documents TEXT NOT NULL);`,

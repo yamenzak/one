@@ -129,6 +129,8 @@ async function hashCode(email: string, code: string): Promise<string> {
 }
 
 export const OTP_SCHEMA = {
+  /** ⚠️ Global: a sign-in code is issued before there is a session, and therefore before there is a region. */
+  global: "account" as const,
   id: "identity_codes",
   after: ["identity"],
   ddl: [

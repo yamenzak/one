@@ -33,6 +33,8 @@ import type { Instant, SchemaModule, SqlHandle } from "@one/kernel";
  * routing data and only routing data.
  */
 export const PROVIDER_SCHEMA: SchemaModule = {
+  /** ⚠️ Global: one webhook settles whichever worker it arrives at, so the event id must be unique deployment-wide. */
+  global: "money",
   id: "provider",
   ddl: [
     `CREATE TABLE IF NOT EXISTS provider_customer (customer_ref TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, app_id TEXT NOT NULL, at TEXT NOT NULL);`,

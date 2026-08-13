@@ -30,6 +30,8 @@ import {
 /* --------------------------------------------------------------- storage --- */
 
 export const ACCOUNT_BILLING_SCHEMA: SchemaModule = {
+  /** ⚠️ Global: the payer is an account. A regional table could answer for three of somebody's four workspaces. */
+  global: "money",
   id: "account_billing",
   after: ["identity"],
   ddl: [

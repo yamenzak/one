@@ -33,6 +33,8 @@ import { publishLegalSpec } from "./reference-ops.js";
  * boot read the wall clock, which the injected-clock guard correctly refuses.
  */
 export const APP_SPEC_SCHEMA: SchemaModule = {
+  /** ⚠️ Global: one console shows what each product SHIPPED beside what an operator changed. */
+  global: "declaration",
   id: "app_specs",
   ddl: [
     `CREATE TABLE IF NOT EXISTS app_specs (app_id TEXT PRIMARY KEY, app_name TEXT NOT NULL, manifest_version TEXT NOT NULL, declared TEXT NOT NULL);`,

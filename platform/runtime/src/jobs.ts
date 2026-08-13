@@ -19,6 +19,8 @@ import {
 } from "@one/kernel";
 
 export const JOB_SCHEMA: SchemaModule = {
+  /** ⚠️ Global: when a sweep last ran is the deployment's own housekeeping, per product. */
+  global: "deployment",
   id: "jobs",
   ddl: [
     /*

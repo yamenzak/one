@@ -30,6 +30,8 @@ import type { Instant, SchemaModule, SqlHandle, TenantId, UserId } from "@one/ke
  * without a second read per row.
  */
 export const MEMBERSHIP_DIRECTORY_SCHEMA: SchemaModule = {
+  /** ⚠️ Global: everywhere a person belongs, across products. An INDEX and never a grant — see this file's header. */
+  global: "account",
   id: "membership_directory",
   ddl: [
     `CREATE TABLE IF NOT EXISTS membership_directory (account_id TEXT NOT NULL, tenant_id TEXT NOT NULL, app_id TEXT NOT NULL, role TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (account_id, tenant_id));`,

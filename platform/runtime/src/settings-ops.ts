@@ -149,6 +149,8 @@ export function settingsOperations<B extends BindingSpec>(app: AppSpec<B>): read
  * do not own, which makes the whole ceremony decorative.
  */
 export const DOMAIN_CLAIM_SCHEMA = {
+  /** ⚠️ Global: a claim is looked up by hostname, before a region — the same reason as the domain table itself. */
+  global: "routing" as const,
   id: "directory_domain_claims",
   after: ["directory"],
   ddl: [

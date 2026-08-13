@@ -72,6 +72,8 @@ export function refuses(state: Maintenance, lane: string, mutates: boolean, isOp
  * set when a region is exactly what is broken.
  */
 export const PLATFORM_STATE_SCHEMA = {
+  /** ⚠️ Global: one switch, every door — a maintenance mode that half-applied would be worse than none. */
+  global: "deployment" as const,
   id: "platform_state",
   /*
     ⚠️ deployment-wide: the maintenance switch closes EVERY door because an

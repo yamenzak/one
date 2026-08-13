@@ -469,6 +469,8 @@ export function operatorOperations<B extends BindingSpec>(app: AppSpec<B>): read
  * business actually makes, and the gap is filled by discounts nobody records.
  */
 export const CATALOGUE_SCHEMA: SchemaModule = {
+  /** ⚠️ Global: a price is the deployment's and a region is a workspace's. */
+  global: "money",
   id: "plan_overrides",
   ddl: [
     /*

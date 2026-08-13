@@ -17,6 +17,8 @@ import type { Directory, DirectoryEntry, Instant, RegionId, SchemaModule, SqlHan
 export const DIRECTORY_COLUMNS = ["tenant_id", "slug", "region", "standing", "standing_reason", "standing_next_at", "domains", "branding", "app_id"] as const;
 
 export const DIRECTORY_SCHEMA: SchemaModule = {
+  /** ⚠️ Global: the row that ANSWERS which region a workspace is in, so nothing regional could hold it. */
+  global: "routing",
   id: "directory",
   ddl: [
     /*
@@ -61,6 +63,8 @@ export const DIRECTORY_SCHEMA: SchemaModule = {
  * stays because a tenant's own view of "my domains" should be one read.
  */
 export const DOMAIN_SCHEMA: SchemaModule = {
+  /** ⚠️ Global: a hostname is resolved to a workspace before any region is known. */
+  global: "routing",
   id: "directory_domains",
   after: ["directory"],
   ddl: [`CREATE TABLE IF NOT EXISTS tenant_domains (hostname TEXT PRIMARY KEY, tenant_id TEXT NOT NULL);`],

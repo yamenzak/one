@@ -78,6 +78,8 @@ export const VAULT_COLUMNS: Readonly<Record<string, readonly string[]>> = {
 export const VAULT_SPEC_COLUMNS = ["app_id", "app_name", "wants"] as const;
 
 export const VAULT_SPEC_SCHEMA: SchemaModule = {
+  /** ⚠️ Global: the hub answers for every product a person uses, and one worker knows only its own manifest. */
+  global: "declaration",
   id: "vault_specs",
   ddl: [
     `CREATE TABLE IF NOT EXISTS vault_specs (app_id TEXT PRIMARY KEY, app_name TEXT NOT NULL, wants TEXT NOT NULL);`,
@@ -86,6 +88,8 @@ export const VAULT_SPEC_SCHEMA: SchemaModule = {
 
 
 export const VAULT_SCHEMA: SchemaModule = {
+  /** ⚠️ Global: a vault fact outlives every app they use and every workspace they leave. */
+  global: "account",
   id: "vault",
   after: ["identity"],
   ddl: [

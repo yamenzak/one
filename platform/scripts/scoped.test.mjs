@@ -245,6 +245,40 @@ if (!bad) ok(`homes: ${globalTables.size} global and ${regionalNames.flatMap(tab
  * what `publishBranding` does for the three keys the sign-in screen wears. Never
  * the reverse.
  */
+/**
+ * ⚠️ AND EVERY MODULE IN THE SHARED STORE SAYS WHICH OF FIVE REASONS PUT IT
+ * THERE. The check below this one names `SETTINGS_SCHEMA`, which pins the
+ * decision that has actually been taken and catches nothing about the NEXT
+ * settings-shaped table somebody adds. There is no way to derive the difference
+ * from a table's shape — `membership_directory` is tenant-scoped and correctly
+ * global — so the question is asked of the author instead.
+ *
+ * ⚠️ IT WORKS BECAUSE THE VOCABULARY IS CLOSED. A required free-text reason
+ * would have been a required sentence, and a sentence can be written about
+ * anything; whoever was moving the wrong table would have written a true one.
+ * Five words, none of which means "a workspace's own records", so a table that
+ * belongs in a region has nothing to say here. `GlobalReason` in
+ * `kernel/schema.ts` is the list and the compiler refuses a sixth word.
+ */
+const reasonOf = (name) => (declarationOf(name) ?? "").match(/^\s*global: "([a-z]+)"/m)?.[1] ?? null;
+
+for (const name of globalNames) {
+  if (!reasonOf(name)) {
+    fail(
+      `${name} is composed into the store every worker binds by the same id and does not say why.\n` +
+      `       Declare \`global:\` on the module — routing, account, money, declaration or deployment.\n` +
+      `       If none of the five is true of it, it is one workspace's own records and belongs in\n` +
+      `       that workspace's region.`,
+    );
+  }
+}
+for (const name of regionalNames) {
+  if (reasonOf(name)) {
+    fail(`${name} declares \`global:\` and is composed into a REGIONAL store. The field is the reason a module is in the shared one; on a regional module it is a claim nothing acts on, and the next person reading it will believe it`);
+  }
+}
+if (!bad) ok(`reasons: every global module names which of the five put it there`);
+
 const WORKSPACE_RECORDS = ["SETTINGS_SCHEMA"];
 for (const name of WORKSPACE_RECORDS) {
   if (globalNames.includes(name)) {

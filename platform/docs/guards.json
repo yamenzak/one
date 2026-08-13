@@ -4623,6 +4623,15 @@
       "fails": "a table name declared on both sides reading as a duplicate when it is a silent divergence. Every statement is `CREATE TABLE IF NOT EXISTS`, so whichever runner reaches it first decides the shape and the loser's columns never exist — no error, no warning, and the first symptom is a query naming a column that is simply not there. It has happened one store over, and it took every route touching the database down rather than degrading a feature"
     },
     {
+      "id": "a-global-module-says-which-of-five-reasons-put-it-there",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/scoped.test.mjs",
+      "proves": "every global module names which of the five put it there",
+      "fails": "the NEXT settings-shaped table added to the store every worker shares. Naming one module catches the decision already taken and nothing about the next one, and the difference cannot be derived from a table's shape — `membership_directory` is tenant-scoped and correctly global. So the question is asked of the author instead, and it works because the vocabulary is CLOSED: a required free-text reason is a required sentence, and a sentence can be written about anything, so whoever was moving the wrong table would have written a true one. Five words — routing, account, money, declaration, deployment — none of which means \"a workspace's own records\", so a table that belongs in a region has nothing to say. `GlobalReason` refuses a sixth at compile time"
+    },
+    {
       "id": "what-a-workspace-chose-stays-in-its-region",
       "group": "platform",
       "stage": "7",

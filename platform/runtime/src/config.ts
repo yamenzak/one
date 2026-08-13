@@ -37,6 +37,8 @@ import { redactConfig, resolveConfig, writableToShared } from "@one/kernel";
  * than a second table, so one resolver still reads both — see the header.
  */
 export const CONFIG_SCHEMA: SchemaModule = {
+  /** ⚠️ Global: one Stripe account, one mail sender, one Turnstile widget behind every product. */
+  global: "deployment",
   id: "config",
   ddl: [`CREATE TABLE IF NOT EXISTS app_config (app_id TEXT NOT NULL DEFAULT '', key TEXT NOT NULL, value TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (app_id, key));`],
 };
@@ -174,6 +176,8 @@ export function chargeableFrom(values: Values): boolean {
  * them would be a platform every product had to be edited into.
  */
 export const MODEL_SCHEMA: SchemaModule = {
+  /** ⚠️ Global: what a model costs is the same behind every product, so a rate is one row rather than a deploy per app. */
+  global: "deployment",
   id: "ai_model",
   ddl: [
     `CREATE TABLE IF NOT EXISTS ai_model (id TEXT PRIMARY KEY, provider TEXT NOT NULL, rate_input REAL NOT NULL, rate_output REAL NOT NULL, thinking INTEGER, at TEXT NOT NULL);`,

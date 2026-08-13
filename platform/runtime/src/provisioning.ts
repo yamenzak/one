@@ -24,6 +24,8 @@ import type { Instant, Provisioning, SqlHandle } from "@one/kernel";
 import { EVERY_PRODUCT } from "@one/kernel";
 
 export const PROVISIONING_SCHEMA = {
+  /** ⚠️ Global: a grant is about a person and a product, and the hub that reads it is a different worker from the one that honours it. */
+  global: "account" as const,
   id: "provisioning",
   after: ["identity"],
   ddl: [

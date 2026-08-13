@@ -1532,6 +1532,7 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `leaving-a-workspace-takes-it-off-the-hub` | a workspace left on somebody's list that refuses them at the door. The regional row is REVOKED rather than deleted — "who was in this workspace and when" is where every investigation starts — so the index has to be told separately, and an index nobody deletes from is one that only ever grows | **live** |
 | `the-shared-store-is-not-a-regional-one` | the two handles being swapped, which compiles and runs. They have the same shape, opposite meanings, and are wired one after the other from two variables in one scope. The global store has no `tenant_settings`, so the reader's own `catch` answers with nothing: every workspace shows its declared fallbacks, every save reports success and vanishes, and the result is indistinguishable from a workspace nobody has configured — which is what a new one looks like. The constraint is negative on purpose, because there is one producer of the global handle and one per binding per region of the others | **live** |
 | `one-table-one-store` | a table name declared on both sides reading as a duplicate when it is a silent divergence. Every statement is `CREATE TABLE IF NOT EXISTS`, so whichever runner reaches it first decides the shape and the loser's columns never exist — no error, no warning, and the first symptom is a query naming a column that is simply not there. It has happened one store over, and it took every route touching the database down rather than degrading a feature | **live** |
+| `a-global-module-says-which-of-five-reasons-put-it-there` | the NEXT settings-shaped table added to the store every worker shares. Naming one module catches the decision already taken and nothing about the next one, and the difference cannot be derived from a table's shape — `membership_directory` is tenant-scoped and correctly global. So the question is asked of the author instead, and it works because the vocabulary is CLOSED: a required free-text reason is a required sentence, and a sentence can be written about anything, so whoever was moving the wrong table would have written a true one. Five words — routing, account, money, declaration, deployment — none of which means "a workspace's own records", so a table that belongs in a region has nothing to say. `GlobalReason` refuses a sixth at compile time | **live** |
 | `what-a-workspace-chose-stays-in-its-region` | a workspace's settings moved into the store every worker binds by the same id. Four reasons, none visible from a table's shape: RESIDENCY — its settings are its records, and they live where its records live; ACROSS — the global store is bound into every product's worker, and unlike the vault there is no grant algebra in front of these rows; HOT PATH — branding and wording are read per request by the app to draw its own sign-in screen; ERASURE — `scoped` declares these tables regionally and the purge cascade is derived from it, so a table that changed store without the cascade following is a deleted workspace that keeps its configuration while the sweep reports success. Where something is genuinely needed before a region is known the answer is to publish a COPY and keep the regional row authoritative, as `publishBranding` does — never the reverse | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
@@ -1728,6 +1729,28 @@ refreshes the directory copy on every settings write. Never the reverse — a
 global row that a regional reader falls back to is a second source, and the two
 disagree for exactly the workspaces somebody has just changed.
 
+⚠️ **AND EVERY MODULE IN THE SHARED STORE DECLARES WHICH OF FIVE REASONS PUT IT
+THERE** — `global:` on the `SchemaModule`, refused on a regional one:
+
+| word | means |
+|---|---|
+| `routing` | read BEFORE a region is known, so nothing regional could answer it |
+| `account` | about a PERSON, so it outlives every workspace they leave |
+| `money` | one balance and one card across products; one webhook settles it |
+| `declaration` | what a product SHIPPED, published so one console reads every product's. Never data |
+| `deployment` | one row for the whole deployment — maintenance, configuration, the operator record |
+
+**The vocabulary being closed is the entire mechanism.** Naming one module in a
+guard pins the decision already taken and catches nothing about the next
+settings-shaped table, and the difference cannot be derived from a table's shape:
+`membership_directory` is tenant-scoped and correctly global. A required
+free-text reason would have been no better — a sentence can be written about
+anything, so whoever was moving the wrong table would have written a true one.
+There is no word here for "a workspace's own records", because that answer means
+regional; a table that belongs in a region has nothing it can say. Nobody has to
+recognise the mistake, only find a word for it.
+
+`a-global-module-says-which-of-five-reasons-put-it-there`,
 `what-a-workspace-chose-stays-in-its-region` and `one-table-one-store` enforce
 the placement; `the-shared-store-is-not-a-regional-one` moves the handle mix-up
 to the compiler, because the two are wired one line apart and swapping them

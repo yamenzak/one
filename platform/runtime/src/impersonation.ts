@@ -24,6 +24,8 @@
 import type { Instant, SchemaModule, SqlHandle } from "@one/kernel";
 
 export const IMPERSONATION_SCHEMA: SchemaModule = {
+  /** ⚠️ Global: the record of what operators did here, which a workspace closing must not delete. */
+  global: "deployment",
   id: "impersonation",
   after: ["identity"],
   ddl: [

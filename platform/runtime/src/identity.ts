@@ -19,6 +19,8 @@ import { b64u } from "./webauthn.js";
 /* ---------------------------------------------------------------- schema --- */
 
 export const IDENTITY_SCHEMA: SchemaModule = {
+  /** ⚠️ Global: one person, one credential, every product — the whole reason a passkey works on a second app's origin. */
+  global: "account",
   id: "identity",
   ddl: [
     `CREATE TABLE IF NOT EXISTS accounts (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, email_verified INTEGER NOT NULL DEFAULT 0, name TEXT, avatar_url TEXT, locale TEXT NOT NULL DEFAULT 'en', created_at TEXT NOT NULL, profile_version INTEGER NOT NULL DEFAULT 1);`,
@@ -125,6 +127,8 @@ export const IDENTITY_SCHEMA: SchemaModule = {
  * See `SESSION_RECHECK_MS` for the size of that bound and what it costs.
  */
 export const SESSION_DIRECTORY_SCHEMA: SchemaModule = {
+  /** ⚠️ Global: where somebody is signed in spans apps and regions by definition; the sessions themselves stay regional. */
+  global: "account",
   id: "session_directory",
   after: ["identity"],
   ddl: [
