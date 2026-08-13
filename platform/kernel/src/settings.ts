@@ -114,6 +114,22 @@ export const SENDING: SettingsSpec = {
     fallback: "",
     help: "Added to the end of emails this workspace sends. Empty means no sign-off.",
   },
+  /**
+   * ⚠️ THE LETTERHEAD, AND IT WRAPS RATHER THAN REPLACES. `{body}` is where the
+   * message goes, and `refuseLetter` demands it — a layout without one sends the
+   * same empty page to every customer for ever, and looks completely fine in the
+   * editor that saved it.
+   *
+   * ⚠️ AND IT REACHES ONLY WHAT A WORKSPACE MAY ALREADY PHRASE. The platform
+   * writing to a workspace about its own arrears stays plain, because a business
+   * that could wrap that in its own layout could bury it.
+   */
+  "mail.letterhead": {
+    label: "Your email layout",
+    kind: "text",
+    fallback: "",
+    help: "HTML wrapped round the messages you send. Use {title}, {body} and {signature}. Empty sends plain text.",
+  },
 };
 
 /* ------------------------------------------------------------- validation --- */

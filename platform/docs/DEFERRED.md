@@ -11,9 +11,9 @@ kind: index
 ## Stage 7 — Kova migration
 
 - `one-160` — impersonation from the console. It mints a session  
-  <sub>docs/PLAN.md:1848</sub>
+  <sub>docs/PLAN.md:1861</sub>
 - `one-172` — the operator door admits any signed-in  
-  <sub>runtime/src/runtime.ts:1093</sub>
+  <sub>runtime/src/runtime.ts:1149</sub>
 - `one-182` — a `person` seal with a real key. The type exists,  
   <sub>docs/VAULT.md:441</sub>
 - `one-183` — a fact belongs to an ACCOUNT, so somebody a  
@@ -23,4 +23,4 @@ kind: index
 - `one-187` — `mail:no_sender` on the identity door under a full  
   <sub>hello/test/account.test.ts:28</sub>
 - `one-189` — an operator is called `owner` on their own  
-  <sub>runtime/src/runtime.ts:1221</sub>
+  <sub>runtime/src/runtime.ts:1277</sub>

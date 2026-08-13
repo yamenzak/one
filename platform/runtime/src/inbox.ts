@@ -15,9 +15,10 @@
  */
 
 import {
-  DEFAULT_PREFERENCES, channelsFor, destinationFor, render, saying, signOff,
-  type Category, type Channel, type Instant, type NotificationRegistry,
-  type Preferences, type SchemaModule, type SqlHandle, type WordingBook,
+  DEFAULT_PREFERENCES, channelsFor, destinationFor, inAudience, letterFor, refusePolicy, render, saying,
+  type Category, type Channel, type Instant, type Letter, type NotificationRegistry, type Policy,
+  type PolicyBook, type PolicyRefusal, type Preferences, type SchemaModule, type SqlHandle,
+  type WordingBook, type Written,
 } from "@one/kernel";
 
 export const INBOX_SCHEMA: SchemaModule = {
@@ -31,8 +32,15 @@ export const INBOX_SCHEMA: SchemaModule = {
     */
     `CREATE INDEX IF NOT EXISTS idx_inbox_unread ON inbox(tenant_id, user_id, read_at, at);`,
     `CREATE TABLE IF NOT EXISTS inbox_prefs (tenant_id TEXT NOT NULL, user_id TEXT NOT NULL, muted_json TEXT NOT NULL DEFAULT '[]', email INTEGER NOT NULL DEFAULT 1, push INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (tenant_id, user_id));`,
+    /*
+      ⚠️ THE WORKSPACE'S OWN CEILING, AND ITS ABSENCE IS THE PRODUCT'S DEFAULT.
+      A row per type only where somebody has decided something — so a deployment
+      that upgrades into this feature behaves exactly as it did the day before,
+      which a table of rows written eagerly at seed time could not promise.
+    */
+    `CREATE TABLE IF NOT EXISTS notify_policy (tenant_id TEXT NOT NULL, type TEXT NOT NULL, off INTEGER NOT NULL DEFAULT 0, channels_json TEXT, at TEXT NOT NULL, PRIMARY KEY (tenant_id, type));`,
   ],
-  scoped: { tenantColumn: "tenant_id", tenantTables: ["inbox", "inbox_prefs"] },
+  scoped: { tenantColumn: "tenant_id", tenantTables: ["inbox", "inbox_prefs", "notify_policy"] },
 };
 
 /* -------------------------------------------------------------- the read --- */
@@ -61,21 +69,67 @@ const parse = <T>(text: string, fallback: T): T => {
 };
 
 export async function preferencesFor(db: SqlHandle, tenantId: string, userId: string): Promise<Preferences> {
-  const row = await db.first<{ muted_json: string; email: number }>(
-    `SELECT muted_json, email FROM inbox_prefs WHERE tenant_id = ? AND user_id = ?`,
+  const row = await db.first<{ muted_json: string; email: number; push: number }>(
+    `SELECT muted_json, email, push FROM inbox_prefs WHERE tenant_id = ? AND user_id = ?`,
     tenantId, userId,
   );
   if (!row) return DEFAULT_PREFERENCES;
-  return { muted: parse<Category[]>(row.muted_json, []), email: row.email === 1 };
+  return { muted: parse<Category[]>(row.muted_json, []), email: row.email === 1, push: row.push === 1 };
 }
 
 export async function setPreferences(db: SqlHandle, tenantId: string, userId: string, prefs: Preferences): Promise<void> {
   await db.run(
-    `INSERT INTO inbox_prefs (tenant_id, user_id, muted_json, email) VALUES (?, ?, ?, ?)
-     ON CONFLICT(tenant_id, user_id) DO UPDATE SET muted_json = excluded.muted_json, email = excluded.email`,
-    tenantId, userId, JSON.stringify(prefs.muted), prefs.email ? 1 : 0,
+    `INSERT INTO inbox_prefs (tenant_id, user_id, muted_json, email, push) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(tenant_id, user_id) DO UPDATE SET muted_json = excluded.muted_json, email = excluded.email, push = excluded.push`,
+    tenantId, userId, JSON.stringify(prefs.muted), prefs.email ? 1 : 0, prefs.push ? 1 : 0,
   );
 }
+
+/* --------------------------------------------------- what a workspace says --- */
+
+/**
+ * ⚠️ READ WHOLE, ONCE, RATHER THAN PER TYPE. A dispatch asks about one type but
+ * a screen asks about all of them, and a workspace has a handful of rows at
+ * most — so one read serves both and there is no per-type query on a path that
+ * already reads the roster.
+ */
+export async function policyFor(db: SqlHandle, tenantId: string): Promise<PolicyBook> {
+  const rows = await db.all<{ type: string; off: number; channels_json: string | null }>(
+    /* unbounded-read: one row per notification type this workspace has decided about. */
+    `SELECT type, off, channels_json FROM notify_policy WHERE tenant_id = ?`, tenantId,
+  ).catch(() => []);
+  const out: Record<string, Policy> = {};
+  for (const r of rows) {
+    out[r.type] = {
+      ...(r.off === 1 ? { off: true } : {}),
+      ...(r.channels_json ? { channels: parse<Channel[]>(r.channels_json, []) } : {}),
+    };
+  }
+  return out;
+}
+
+/**
+ * ⚠️ REFUSED HERE AND NOT AT THE ROUTE, so every caller meets the same rule. The
+ * one that matters is `action_off`: a workspace that could switch off the
+ * category meaning "nothing proceeds until somebody does something" is one where
+ * the product silently stops working for people who did not press the switch.
+ */
+export async function setPolicy(
+  db: SqlHandle, registry: NotificationRegistry, tenantId: string, type: string, policy: Policy, at: Instant,
+): Promise<PolicyRefusal | null> {
+  const refused = refusePolicy(registry, type, policy);
+  if (refused) return refused;
+  await db.run(
+    `INSERT INTO notify_policy (tenant_id, type, off, channels_json, at) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(tenant_id, type) DO UPDATE SET off = excluded.off, channels_json = excluded.channels_json, at = excluded.at`,
+    tenantId, type, policy.off ? 1 : 0,
+    policy.channels ? JSON.stringify(policy.channels) : null, at,
+  );
+  return null;
+}
+
+export const clearPolicy = (db: SqlHandle, tenantId: string, type: string): Promise<void> =>
+  db.run(`DELETE FROM notify_policy WHERE tenant_id = ? AND type = ?`, tenantId, type);
 
 /**
  * ⚠️ RENDERED ON READ, FROM THE REGISTRY — never stored as text.
@@ -148,6 +202,12 @@ export interface Delivery {
   readonly type: string;
   readonly title: string;
   readonly body?: string;
+  /**
+   * ⚠️ THE WORKSPACE'S OWN LAYOUT, WHERE IT HAS ONE AND MAY HAVE ONE. Absent
+   * means the plain text above is the whole message — which is what the platform
+   * writing to a workspace about its own bill always is.
+   */
+  readonly html?: string;
 }
 
 /**
@@ -167,27 +227,48 @@ export async function dispatch(input: {
   readonly registry: NotificationRegistry;
   readonly tenantId: string;
   readonly type: string;
-  readonly audience: readonly { readonly userId: string; readonly role: string }[];
+  /**
+   * ⚠️ EACH PERSON'S PERMISSIONS TRAVEL WITH THEM, because that is the test a
+   * workspace's OWN role can pass. Matching a role name answers "no" for every
+   * role a workspace composed for itself — silently, which is how somebody comes
+   * to be in a workspace for a month being told nothing at all.
+   */
+  readonly audience: readonly {
+    readonly userId: string; readonly role: string; readonly permissions: ReadonlySet<string>;
+  }[];
+  /** The roles the MANIFEST declares, so a workspace's own can be told apart. */
+  readonly declaredRoles: ReadonlySet<string>;
   readonly values: Readonly<Record<string, string | number>>;
   readonly rowId?: string;
   readonly at: Instant;
   /** What this workspace says instead, per type. Absent means the platform's words. */
   readonly wording?: WordingBook;
+  /** What it allows, per type. Absent means the product's own defaults. */
+  readonly policy?: PolicyBook;
   /** How this workspace signs off. Email only — see `signOff`. */
   readonly signature?: string;
+  /** Its letterhead, for the messages it is allowed to phrase. */
+  readonly letter?: Letter;
+  /**
+   * ⚠️ WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER. A channel with nothing behind
+   * it must not be offered or used — see `channelsFor`. The inbox is always in
+   * it, because the inbox is this table.
+   */
+  readonly available?: readonly Channel[];
   send?(delivery: Delivery): Promise<void>;
 }): Promise<readonly Delivery[]> {
   const def = input.registry[input.type];
   if (!def) return [];
 
   const out: Delivery[] = [];
+  const policy = input.policy?.[input.type] ?? {};
   for (const person of input.audience) {
-    if (!def.roles.includes(person.role)) continue;
+    if (!inAudience(def, person, input.declaredRoles)) continue;
     const prefs = await preferencesFor(input.db, input.tenantId, person.userId);
     const said = saying(def, input.wording?.[input.type]);
     const title = render(said.title, input.values);
 
-    for (const channel of channelsFor(def, prefs)) {
+    for (const channel of channelsFor(def, prefs, policy, input.available)) {
       if (channel === "inbox") {
         await input.db.run(
           `INSERT INTO inbox (id, tenant_id, user_id, type, values_json, row_id, at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -202,8 +283,30 @@ export async function dispatch(input: {
         own branding does not need to be told whose workspace it is.
       */
       const written = said.body ? render(said.body, input.values) : undefined;
-      const body = channel === "email" ? signOff(written, input.signature ?? "") : written;
-      const delivery: Delivery = { channel, userId: person.userId, type: input.type, title, ...(body ? { body } : {}) };
+      if (channel === "push") {
+        /*
+          ⚠️ NO LETTERHEAD AND NO SIGN-OFF ON A PUSH. It is a title and a line on
+          a lock screen, with a hard length limit set by somebody else's push
+          service — a signature there is the half of the message that survives.
+        */
+        out.push({ channel, userId: person.userId, type: input.type, title, ...(written ? { body: written } : {}) });
+        if (input.send) await input.send(out[out.length - 1]!).catch(() => undefined);
+        continue;
+      }
+      /*
+        ⚠️ THE LETTERHEAD REACHES EXACTLY THE TYPES THE WORDING DOES. A workspace
+        that could wrap the platform's own arrears notice in its own layout could
+        bury it, and the people who would then not act on it are its staff.
+      */
+      const mail: Written = letterFor(
+        { title, ...(written ? { body: written } : {}) },
+        input.signature ?? "",
+        def.theirs ? input.letter ?? {} : {},
+      );
+      const delivery: Delivery = {
+        channel, userId: person.userId, type: input.type, title: mail.subject,
+        body: mail.text, ...(mail.html ? { html: mail.html } : {}),
+      };
       /*
         ⚠️ A FAILED INTERRUPTION IS NOT A FAILED NOTIFICATION. The inbox row is
         already written; a mail provider being down must not roll back the

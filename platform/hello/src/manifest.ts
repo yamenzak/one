@@ -352,25 +352,28 @@ export const hello = defineApp({
       category: "service", tone: "success", icon: "sparkle",
       title: "{slug} is ready",
       link: { to: "inbox" },
-      roles: ["owner"],
+      /* ⚠️ Whoever pays for it is who is told it exists. */
+      roles: ["owner"], needs: "billing:manage",
     },
     "plan.chosen": {
       category: "billing", tone: "info", icon: "card",
       title: "You chose {planId}",
       link: { to: "inbox" },
-      roles: ["owner"],
+      roles: ["owner"], needs: "billing:manage",
     },
     "package.granted": {
       category: "billing", tone: "success", icon: "gift",
       title: "{days} days added",
       link: { to: "inbox" },
-      roles: ["owner"],
+      roles: ["owner"], needs: "billing:manage",
     },
     "support.session": {
       category: "service", tone: "warning", icon: "shield",
       title: "Somebody from support was in your workspace",
       body: "Why: {reason}",
-      link: { to: "inbox" }, roles: ["owner"],
+      /* ⚠️ Somebody from outside acted inside: told to whoever can see who is in
+         it, which is the question this raises. */
+      link: { to: "inbox" }, roles: ["owner"], needs: "member:read",
     },
     /*
       ⚠️ THE ONE TYPE EVERY MILESTONE IS ANNOUNCED WITH, and the platform names
@@ -382,7 +385,8 @@ export const hello = defineApp({
       category: "activity", tone: "success", icon: "sparkle",
       title: "{title}",
       link: { to: "inbox" },
-      roles: ["owner", "reader"],
+      /* ⚠️ Your own achievement, so the key is the one everybody signed in has. */
+      roles: ["owner", "reader"], needs: "inbox:read",
     },
   },
   /*

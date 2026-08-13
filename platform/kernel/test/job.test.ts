@@ -56,16 +56,16 @@ describe("when a job is due", () => {
 const base = {
   id: "test",
   access: {
-    permissions: [], roles: {}, plans: [], entitlements: {},
+    permissions: ["inbox:read", "note:read"], roles: {}, plans: [], entitlements: {},
     customerRail: false as const, customerFlags: {}, seats: { counts: [] }, personal: [],
   },
   collections: [],
   /* ⚠️ The three the platform raises: an app that declares none announces none. */
   notifications: {
-    "workspace.created": { category: "service", tone: "success", icon: "sparkle", title: "ready", link: { to: "inbox" }, roles: ["owner"] },
-    "plan.chosen": { category: "billing", tone: "info", icon: "card", title: "chosen", link: { to: "inbox" }, roles: ["owner"] },
-    "package.granted": { category: "billing", tone: "success", icon: "gift", title: "granted", link: { to: "inbox" }, roles: ["owner"] },
-    "support.session": { category: "service", tone: "warning", icon: "shield", title: "Somebody from support was in your workspace", body: "Why: {reason}", link: { to: "inbox" }, roles: ["owner"] },
+    "workspace.created": { category: "service", tone: "success", icon: "sparkle", title: "ready", link: { to: "inbox" }, roles: ["owner"], needs: "inbox:read" },
+    "plan.chosen": { category: "billing", tone: "info", icon: "card", title: "chosen", link: { to: "inbox" }, roles: ["owner"], needs: "inbox:read" },
+    "package.granted": { category: "billing", tone: "success", icon: "gift", title: "granted", link: { to: "inbox" }, roles: ["owner"], needs: "inbox:read" },
+    "support.session": { category: "service", tone: "warning", icon: "shield", title: "Somebody from support was in your workspace", body: "Why: {reason}", link: { to: "inbox" }, roles: ["owner"], needs: "inbox:read" },
   } as NotificationRegistry,
   help: {}, filePurposes: {},
   governance: {
@@ -113,7 +113,7 @@ describe("what a manifest may not say about a job", () => {
 
     const told: NotificationDef = {
       category: "service", tone: "info", icon: "clock",
-      title: "Swept", link: { to: "inbox" }, roles: ["owner"],
+      title: "Swept", link: { to: "inbox" }, roles: ["owner"], needs: "note:read",
     };
     expect(() => assertComposable({ ...base, notifications: { ...base.notifications, swept: told }, jobs: [sweeping({ emits: ["swept"] })] })).not.toThrow();
   });

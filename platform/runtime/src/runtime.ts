@@ -14,7 +14,7 @@
  */
 
 import type {
-  Actor, AnyOperation, AppSpec, AuditEntry, BindingSpec, Caller, Ctx, Instant, Problem,
+  Actor, AnyOperation, AppSpec, AuditEntry, BindingSpec, Caller, Channel, Ctx, Instant, Problem,
   ConfigRegistry, DeploymentSpec, InferenceHandle, ObjectHandle, ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, SchemaModule, Session, SqlHandle, StandingState, TenantId,
 } from "@one/kernel";
 import {
@@ -48,7 +48,7 @@ import { registryWith, rolesOf } from "./tenant-role.js";
    product the first time somebody saved a blank field. */
 const nonEmptyOf = (v: Readonly<Record<string, string>>): Record<string, string> =>
   Object.fromEntries(Object.entries(v).filter(([, x]) => x !== ""));
-import { send, type Deliver } from "./mail.js";
+import { chooseProvider, send, type Deliver } from "./mail.js";
 
 /**
  * THE ONE PLACE THAT KNOWS ABOUT `cloudflare:email`.
@@ -96,7 +96,8 @@ import { OUTCOME_HEADER, outcomeHeader, type Raised } from "./outcome.js";
 import { fetchMedia, usedBytes } from "./files.js";
 import { readMaintenance, refuses } from "./maintenance.js";
 import { runDue, type RunReport } from "./jobs.js";
-import { dispatch, interpolatable, type Delivery } from "./inbox.js";
+import { dispatch, interpolatable, policyFor, type Delivery } from "./inbox.js";
+import { keysFrom, pushToPerson } from "./push.js";
 import { customerFlagsFor, PARKED } from "./commerce.js";
 import { subscriptionForTenant } from "./account-billing.js";
 import { claim, memberOf, membersOf, permissionsOf, revoke, seatsUsed, subjectFor, wouldStrand } from "./membership.js";
@@ -471,13 +472,39 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     the checklist alike. Two would drift, and the way they drift is that a
     notification reaches somebody the checklist says is not there.
   */
+  /**
+   * ⚠️ EVERY PERSON'S PERMISSIONS COME BACK WITH THEM, resolved against the
+   * MERGED registry — the app's roles plus the ones this workspace composed for
+   * itself. Matching a role NAME is what a notification used to do, and it
+   * answers "no" for every custom role: somebody in a workspace's own Front Desk
+   * role is told nothing at all, silently, while everything else works.
+   *
+   * ⚠️ AND IT IS `permissionsOf`, SO A NARROWED MEMBER IS NARROWED HERE TOO. A
+   * colleague whose `checkin:write` was taken away stops being told about
+   * check-ins, without anybody editing a notification registry — which is the
+   * whole of what "it derives from the permissions they hold" has to mean.
+   */
   const audienceOf = async (tenantId: TenantId, db: SqlHandle) => {
-    if (opts.audienceFor) return opts.audienceFor(tenantId, db);
+    const declaredRoles = new Set(Object.keys(app.access.roles));
+    const roles = registryWith(app.access.roles, await rolesOf(db, tenantId).catch(() => []));
+    if (opts.audienceFor) {
+      const said = await opts.audienceFor(tenantId, db);
+      return {
+        declaredRoles,
+        people: said.map((p) => ({ ...p, permissions: new Set(roles[p.role] ?? []) })),
+      };
+    }
     const members = await membersOf(db, tenantId);
-    return members
-      .filter((m) => m.accountId !== null)
-      .map((m) => ({ userId: m.accountId as string, role: m.role }));
+    return {
+      declaredRoles,
+      people: members
+        .filter((m) => m.accountId !== null)
+        .map((m) => ({ userId: m.accountId as string, role: m.role, permissions: permissionsOf(roles, m) })),
+    };
   };
+
+  /** ⚠️ Nobody, in the shape the dispatch wants — so a failed read is not a crash. */
+  const NOBODY = { declaredRoles: new Set<string>(), people: [] as readonly { userId: string; role: string; permissions: ReadonlySet<string> }[] };
 
   /*
     ⚠️ A CEILING NOBODY CAN COUNT IS NOT A CEILING, and this is where that stops
@@ -981,7 +1008,37 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
        * carries who it is for; letting it carry where to send would make every
        * raise site a place somebody can be mailed from.
        */
+      /*
+        ⚠️ WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER, READ ONCE. A channel with
+        nothing behind it must never be offered: the switch that silently does
+        nothing is why push was deleted from this platform the first time, and
+        the same is true of email on a deployment with no provider. The inbox is
+        always available, because the inbox is a table in this database.
+      */
+      const deliverySettings = { ...(await readAll(sharedConfigDb, DEPLOYMENT_SCOPE)), ...await readAll(directoryDb, app.id) };
+      const pushKeys = keysFrom(deliverySettings);
+      const available: readonly Channel[] = [
+        "inbox",
+        ...(chooseProvider(deliverySettings).ok ? ["email" as const] : []),
+        ...(pushKeys ? ["push" as const] : []),
+      ];
+
       const deliver = opts.send ?? (async (delivery: Delivery) => {
+        /*
+          ⚠️ PUSH IS DELIVERED TO EVERY BROWSER THIS PERSON HAS, and the dead ones
+          are pruned on the way past. A person signs in from a laptop, a phone and
+          a second browser; sending to the newest only is a notification that
+          arrives on whichever device they are not holding.
+        */
+        if (delivery.channel === "push") {
+          if (!pushKeys || !at.tenant) return;
+          await pushToPerson(
+            regionalDb, pushKeys, at.tenant.tenantId, delivery.userId,
+            { title: delivery.title, ...(delivery.body ? { body: delivery.body } : {}), tag: delivery.type },
+            Date.now(),
+          ).catch(() => 0);
+          return;
+        }
         if (delivery.channel !== "email") return;
         const who = await directoryDb.first<{ email: string }>(
           `SELECT email FROM accounts WHERE id = ?`, delivery.userId,
@@ -989,8 +1046,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         /* ⚠️ No address is silence, not a throw. The inbox row is already
            written and it is the record; mail is the interruption. */
         if (!who?.email) return;
-        const values = { ...(await readAll(sharedConfigDb, DEPLOYMENT_SCOPE)), ...await readAll(directoryDb, app.id) };
-        await send(values, {
+        await send(deliverySettings, {
           to: who.email,
           subject: delivery.title,
           /* ⚠️ A message with no body is its own title. An email whose whole
@@ -1448,12 +1504,23 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
        * table on requests that raise nothing at all.
        */
       const theirVoice = async (tenantId: string) => {
-        const [wording, values] = await Promise.all([
+        const [wording, policy, values] = await Promise.all([
           wordingFor(regionalDb, tenantId).catch(() => ({})),
+          policyFor(regionalDb, tenantId).catch(() => ({})),
           readSettings(regionalDb, settingsFor(app), tenantId)
             .catch(() => ({} as Readonly<Record<string, string | number | boolean>>)),
         ]);
-        return { wording, signature: String(values["mail.signature"] ?? "") };
+        /*
+          ⚠️ THE LETTERHEAD IS A SETTING LIKE ANY OTHER, and it is read here with
+          the sign-off it wraps. Two reads would be two chances for a screen to
+          save one and a dispatch to send the other.
+        */
+        return {
+          wording, policy,
+          signature: String(values["mail.signature"] ?? ""),
+          letter: { html: String(values["mail.letterhead"] ?? "") },
+          available,
+        };
       };
 
       const run = async (target: AnyOperation, payload: unknown, via: AuditEntry["via"]) => {
@@ -1503,7 +1570,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           successful change as an error and invite a retry that duplicates it.
         */
         if (target.emits?.length && at.tenant) {
-          const audience = await audienceOf(at.tenant.tenantId as TenantId, regionalDb).catch(() => []);
+          const audience = await audienceOf(at.tenant.tenantId as TenantId, regionalDb).catch(() => NOBODY);
           /*
             ⚠️ READ ONCE FOR THE WHOLE DISPATCH, not once per person. A workspace
             writing to eleven people is one sentence eleven times, and a lookup
@@ -1513,7 +1580,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           for (const type of target.emits) {
             await dispatch({
               db: regionalDb, registry: app.notifications, tenantId: at.tenant.tenantId,
-              type, audience,
+              type, audience: audience.people, declaredRoles: audience.declaredRoles,
               values: interpolatable(payload, result),
               at: new Date().toISOString() as Instant,
               ...voice,
@@ -1556,7 +1623,11 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
               await dispatch({
                 db: regionalDb, registry: app.notifications, tenantId: at.tenant.tenantId,
                 type: MILESTONE_EARNED,
-                audience: [{ userId: earner, role: personRole }],
+                /* ⚠️ One person, their own achievement — and still resolved
+                   against the merged registry, or a workspace's own role earns
+                   nothing it is ever told about. */
+                audience: [{ userId: earner, role: personRole, permissions: caller.permissions }],
+                declaredRoles: new Set(Object.keys(app.access.roles)),
                 values: { milestone: id, title: (app.milestones ?? {})[id]!.title },
                 at: new Date().toISOString() as Instant,
                 ...voice,
@@ -1647,12 +1718,14 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             const bound = regional(env)(place.region as ResolvedRegion);
             if (opts.onBoot) await once(place.region, () => opts.onBoot!.region(bound, place.region as RegionId));
             const there = bound.db as SqlHandle;
+            const told = await audienceOf(tenantId as TenantId, there).catch(() => NOBODY);
             await dispatch({
               db: there, registry: app.notifications, tenantId,
               type: SUPPORT_SESSION,
-              audience: await audienceOf(tenantId as TenantId, there).catch(() => []),
+              audience: told.people, declaredRoles: told.declaredRoles,
               values: { reason },
               at: new Date().toISOString() as Instant,
+              available,
               send: deliver,
             }).catch(() => undefined);
           },
@@ -1698,7 +1771,19 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           tenantId: at.tenant?.tenantId ?? "",
           actorId: actor.userId ?? "system",
         },
-        [INBOX]: { db: regionalDb, tenantId: at.tenant?.tenantId ?? "", userId: session?.accountId ?? null },
+        [INBOX]: {
+          db: regionalDb, tenantId: at.tenant?.tenantId ?? "", userId: session?.accountId ?? null,
+          /*
+            ⚠️ THE CALLER'S OWN REACH, so what they can be TOLD is derived from
+            what they may DO. A preferences screen listing every type a product
+            has is one where most rows do nothing for most people.
+          */
+          permissions: caller.permissions,
+          role: personRole,
+          declaredRoles: new Set(Object.keys(app.access.roles)),
+          available,
+          pushKey: pushKeys?.publicKey ?? "",
+        },
         [LOOKUP]: {
           services: app.services ?? {},
           /* ⚠️ Read lazily: only a request that actually looks something up pays
@@ -1872,7 +1957,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             file_stored: ((await regionalDb.first<{ n: number }>(
               `SELECT COUNT(*) AS n FROM media WHERE tenant_id = ?`, at.tenant?.tenantId ?? "",
             ).catch(() => null))?.n ?? 0) > 0,
-            colleague_invited: (await audienceOf((at.tenant?.tenantId ?? "") as TenantId, regionalDb).catch(() => [])).length > 1,
+            colleague_invited: (await audienceOf((at.tenant?.tenantId ?? "") as TenantId, regionalDb).catch(() => NOBODY)).people.length > 1,
             /*
               ⚠️ THE DEPLOYMENT'S, NOT A WORKSPACE'S. Read from the same flag the
               standing gate reads, so "we cannot take money" is one fact with one

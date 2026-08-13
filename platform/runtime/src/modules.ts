@@ -19,6 +19,7 @@ import { ACTIVITY_SCHEMA } from "./collection-ops.js";
 import { LEDGER_SCHEMA } from "./ledger.js";
 import { COMMERCE_SCHEMA } from "./commerce.js";
 import { INBOX_SCHEMA } from "./inbox.js";
+import { PUSH_SCHEMA } from "./push.js";
 import { MEDIA_SCHEMA } from "./files.js";
 import { GUIDE_SCHEMA } from "./guide.js";
 import { MILESTONE_SCHEMA } from "./milestone.js";
@@ -57,6 +58,8 @@ export const PLATFORM_REGIONAL: readonly SchemaModule[] = [
   LEDGER_SCHEMA,
   COMMERCE_SCHEMA,
   INBOX_SCHEMA,
+  /* ⚠️ After the inbox, which is what it delivers. */
+  PUSH_SCHEMA,
   MEDIA_SCHEMA,
   GUIDE_SCHEMA,
   MILESTONE_SCHEMA,

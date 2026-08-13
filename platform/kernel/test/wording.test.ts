@@ -18,14 +18,14 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  MAX_WORDING, refuseWording, render, saying, signOff, tokensIn,
+  MAX_LETTER, MAX_WORDING, letterFor, refuseLetter, refuseWording, render, saying, signOff, tokensIn,
   type NotificationDef, type NotificationRegistry,
 } from "../src/notify.js";
 
 const def = (over: Partial<NotificationDef> = {}): NotificationDef => ({
   category: "activity", tone: "info", icon: "check",
   title: "{days} days added", body: "Enjoy them, {name}.",
-  link: { to: "inbox" }, roles: ["client"], ...over,
+  link: { to: "inbox" }, roles: ["client"], needs: "commerce:read", ...over,
 });
 
 const REGISTRY: NotificationRegistry = {
@@ -157,5 +157,68 @@ describe("how a workspace signs off", () => {
   it("changes nothing where there is no sign-off", () => {
     expect(signOff("See you Tuesday.", "   ")).toBe("See you Tuesday.");
     expect(signOff(undefined, "")).toBeUndefined();
+  });
+});
+
+/* ----------------------------------------------------------- the letterhead --- */
+
+/**
+ * ⚠️ A WRAPPER, NEVER THE MESSAGE. The title and the body are still rendered
+ * from the registry with the dispatch's own values, so a letterhead cannot say
+ * anything the notification did not — it decides how it looks, not what it says.
+ * A template that WAS the message would be a second copy of every sentence,
+ * drifting from the one the inbox shows.
+ */
+describe("a workspace's own letterhead", () => {
+  const said = { title: "12 days added", body: "Enjoy them, Sam." };
+
+  it("wraps the message it was given and invents none of it", () => {
+    const out = letterFor(said, "— Anna", { html: "<main>{title}<p>{body}</p><i>{signature}</i></main>" });
+    expect(out.html).toBe("<main>12 days added<p>Enjoy them, Sam.</p><i>— Anna</i></main>");
+    expect(out.subject).toBe("12 days added");
+  });
+
+  /*
+    ⚠️ THE TEXT PART IS ALWAYS BUILT, EVEN WHERE THERE IS HTML. A client that
+    cannot render it, a screen reader, a spam filter reading a text/plain part
+    that is not there — all three are ordinary, and an HTML-only email arrives
+    blank for some readers with nothing on our side saying so.
+  */
+  it("always writes the plain half too", () => {
+    const out = letterFor(said, "— Anna", { html: "<main>{body}</main>" });
+    expect(out.text).toBe("Enjoy them, Sam.\n\n— Anna");
+  });
+
+  it("sends plain text where a workspace has no layout", () => {
+    expect(letterFor(said, "— Anna").html).toBeUndefined();
+    expect(letterFor(said, "— Anna", { html: "   " }).html).toBeUndefined();
+  });
+
+  /*
+    ⚠️ A LAYOUT WITH NO `{body}` SENDS THE SAME EMPTY PAGE TO EVERY CUSTOMER FOR
+    EVER, and it looks completely fine in the editor that saved it — which is why
+    it is refused at the keyboard of the person who can fix it.
+  */
+  it("refuses a layout the message would not appear in", () => {
+    expect(refuseLetter({ html: "<main>{title}</main>" })).toBe("no_body");
+    expect(refuseLetter({ html: "<main>{body}</main>" })).toBe(null);
+    expect(refuseLetter({})).toBe(null);
+  });
+
+  /* ⚠️ And an unknown token renders as its own literal text in a customer's
+     inbox, because `render` leaves one in place rather than printing undefined. */
+  it("refuses a token no dispatch will ever carry", () => {
+    expect(refuseLetter({ html: "<main>{body}{amount}</main>" })).toBe("unknown_token");
+  });
+
+  it("refuses a newsletter wearing a letterhead's name", () => {
+    expect(refuseLetter({ html: `<main>{body}${"x".repeat(MAX_LETTER)}</main>` })).toBe("too_long");
+  });
+
+  /* ⚠️ The layout's own sign-off wins where it has one, so a workspace can put
+     it inside the design rather than under it. */
+  it("prefers the letterhead's own sign-off to the plain one", () => {
+    expect(letterFor(said, "— Anna", { html: "<i>{signature}</i>{body}", signature: "— The team" }).html)
+      .toContain("— The team");
   });
 });

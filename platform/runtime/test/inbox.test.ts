@@ -46,16 +46,27 @@ function store(): SqlHandle & { rows: Record<string, unknown>[] } {
 const registry: NotificationRegistry = {
   "thing.happened": {
     category: "activity", tone: "info", icon: "bell",
-    title: "{who} did a thing", link: { to: "inbox" }, roles: ["owner"],
+    title: "{who} did a thing", link: { to: "inbox" }, roles: ["owner"], needs: "thing:read",
   },
   "money.moved": {
     category: "billing", tone: "success", icon: "card",
-    title: "{amount} arrived", link: { to: "inbox" }, roles: ["owner", "finance"],
+    title: "{amount} arrived", link: { to: "inbox" }, roles: ["owner", "finance"], needs: "money:read",
   },
 };
 
 const AT = "2026-01-10T00:00:00.000Z" as Instant;
-const everyone = [{ userId: "u_owner", role: "owner" }, { userId: "u_guest", role: "guest" }, { userId: "u_finance", role: "finance" }];
+/*
+  ⚠️ EVERY PERSON CARRIES WHAT THEY MAY DO, because that is the test a role a
+  workspace composed for itself can pass — matching a role NAME answers "no" for
+  every one of them.
+*/
+const ALL = new Set(["thing:read", "money:read"]);
+const DECLARED = new Set(["owner", "guest", "finance"]);
+const everyone = [
+  { userId: "u_owner", role: "owner", permissions: ALL },
+  { userId: "u_guest", role: "guest", permissions: ALL },
+  { userId: "u_finance", role: "finance", permissions: ALL },
+];
 
 /* ------------------------------------------------------------- audience --- */
 
@@ -67,19 +78,19 @@ describe("who is told", () => {
   */
   it("tells only the roles the type is for", async () => {
     const db = store();
-    const sent = await dispatch({ db, registry, tenantId: "t", type: "thing.happened", audience: everyone, values: { who: "Sam" }, at: AT });
+    const sent = await dispatch({ db, registry, tenantId: "t", type: "thing.happened", audience: everyone, declaredRoles: DECLARED, values: { who: "Sam" }, at: AT });
     expect(sent.filter((d) => d.channel === "inbox").map((d) => d.userId)).toEqual(["u_owner"]);
   });
 
   it("tells every role a type names, and no others", async () => {
     const db = store();
-    const sent = await dispatch({ db, registry, tenantId: "t", type: "money.moved", audience: everyone, values: { amount: "€9" }, at: AT });
+    const sent = await dispatch({ db, registry, tenantId: "t", type: "money.moved", audience: everyone, declaredRoles: DECLARED, values: { amount: "€9" }, at: AT });
     expect(sent.filter((d) => d.channel === "inbox").map((d) => d.userId).sort()).toEqual(["u_finance", "u_owner"]);
   });
 
   it("does nothing at all for a type the registry does not have", async () => {
     const db = store();
-    expect(await dispatch({ db, registry, tenantId: "t", type: "ghost", audience: everyone, values: {}, at: AT })).toEqual([]);
+    expect(await dispatch({ db, registry, tenantId: "t", type: "ghost", audience: everyone, declaredRoles: DECLARED, values: {}, at: AT })).toEqual([]);
     expect(db.rows).toEqual([]);
   });
 });
@@ -89,8 +100,8 @@ describe("who is told", () => {
 describe("the interruption and the record are different things", () => {
   it("writes the row and skips the interruption for a muted category", async () => {
     const db = store();
-    await setPreferences(db, "t", "u_owner", { muted: ["billing"], email: true });
-    const sent = await dispatch({ db, registry, tenantId: "t", type: "money.moved", audience: [{ userId: "u_owner", role: "owner" }], values: { amount: "€9" }, at: AT });
+    await setPreferences(db, "t", "u_owner", { muted: ["billing"], email: true, push: false });
+    const sent = await dispatch({ db, registry, tenantId: "t", type: "money.moved", audience: [{ userId: "u_owner", role: "owner", permissions: ALL }], declaredRoles: DECLARED, values: { amount: "€9" }, at: AT });
     expect(sent.map((d) => d.channel)).toEqual(["inbox"]);
     expect(db.rows.length).toBe(1);
   });
@@ -104,11 +115,111 @@ describe("the interruption and the record are different things", () => {
     const db = store();
     const sent = await dispatch({
       db, registry, tenantId: "t", type: "thing.happened",
-      audience: [{ userId: "u_owner", role: "owner" }], values: { who: "Sam" }, at: AT,
+      audience: [{ userId: "u_owner", role: "owner", permissions: ALL }], declaredRoles: DECLARED, values: { who: "Sam" }, at: AT,
       send: async () => { throw new Error("mail is down"); },
     });
     expect(sent.map((d) => d.channel)).toEqual(["inbox", "email"]);
     expect(db.rows.length).toBe(1);
+  });
+
+  /* ------------------------------------------------ the workspace's ceiling --- */
+
+  /*
+    ⚠️ TWO LEVELS, AND THE WORKSPACE'S IS THE CEILING. A studio deciding its
+    clients are not emailed about something is a decision about its own business,
+    and the person then chooses within what is left. Absent means the product's
+    own default, so a deployment that upgrades into this behaves exactly as it
+    did the day before.
+  */
+  it("keeps the record for a type the workspace put on the inbox only", async () => {
+    const db = store();
+    const sent = await dispatch({
+      db, registry, tenantId: "t", type: "thing.happened",
+      audience: [{ userId: "u_owner", role: "owner", permissions: ALL }], declaredRoles: DECLARED,
+      values: { who: "Sam" }, at: AT, policy: { "thing.happened": { channels: ["inbox"] } },
+    });
+    expect(sent.map((d) => d.channel)).toEqual(["inbox"]);
+    expect(db.rows.length).toBe(1);
+  });
+
+  it("writes nothing at all for a type the workspace switched off", async () => {
+    const db = store();
+    const sent = await dispatch({
+      db, registry, tenantId: "t", type: "thing.happened",
+      audience: [{ userId: "u_owner", role: "owner", permissions: ALL }], declaredRoles: DECLARED,
+      values: { who: "Sam" }, at: AT, policy: { "thing.happened": { off: true } },
+    });
+    expect(sent).toEqual([]);
+    expect(db.rows).toEqual([]);
+  });
+
+  /* ⚠️ And a channel this deployment cannot deliver is never used — the switch
+     that silently does nothing is why push was deleted from here once already. */
+  it("does not reach for a channel nothing behind it delivers", async () => {
+    const db = store();
+    await setPreferences(db, "t", "u_owner", { muted: [], email: true, push: true });
+    const sent = await dispatch({
+      db, registry, tenantId: "t", type: "thing.happened",
+      audience: [{ userId: "u_owner", role: "owner", permissions: ALL }], declaredRoles: DECLARED,
+      values: { who: "Sam" }, at: AT, available: ["inbox", "email"],
+    });
+    expect(sent.map((d) => d.channel)).toEqual(["inbox", "email"]);
+  });
+
+  /* ---------------------------------------------------- a role we never named --- */
+
+  /*
+    ⚠️ A ROLE A WORKSPACE COMPOSED FOR ITSELF IS NOT IN THE MANIFEST, so matching
+    the name answers "no" for every one of them — somebody in a workspace for a
+    month being told nothing while everything else works.
+  */
+  it("tells a role the product never heard of, by what it may read", async () => {
+    const db = store();
+    const sent = await dispatch({
+      db, registry, tenantId: "t", type: "thing.happened",
+      audience: [{ userId: "u_desk", role: "front-desk", permissions: ALL }], declaredRoles: DECLARED,
+      values: { who: "Sam" }, at: AT,
+    });
+    expect(sent.filter((d) => d.channel === "inbox").map((d) => d.userId)).toEqual(["u_desk"]);
+  });
+
+  it("tells one nothing where the permission was taken away", async () => {
+    const db = store();
+    const sent = await dispatch({
+      db, registry, tenantId: "t", type: "thing.happened",
+      audience: [{ userId: "u_desk", role: "front-desk", permissions: new Set(["money:read"]) }],
+      declaredRoles: DECLARED, values: { who: "Sam" }, at: AT,
+    });
+    expect(sent).toEqual([]);
+  });
+
+  /* ----------------------------------------------------------- letterhead --- */
+
+  /*
+    ⚠️ THE LETTERHEAD REACHES EXACTLY THE TYPES THE WORDING DOES. A workspace that
+    could wrap the platform's own arrears notice in its own layout could bury it,
+    and the people who would then not act on it are its staff.
+  */
+  it("wraps what a workspace may phrase, and nothing else", async () => {
+    const db = store();
+    const seen: Delivery[] = [];
+    const theirs: NotificationRegistry = {
+      "thing.happened": { ...registry["thing.happened"]!, theirs: true },
+      "money.moved": registry["money.moved"]!,
+    };
+    const letter = { html: "<main>{body}</main>" };
+    for (const type of ["thing.happened", "money.moved"]) {
+      await dispatch({
+        db, registry: theirs, tenantId: "t", type,
+        audience: [{ userId: "u_owner", role: "owner", permissions: ALL }], declaredRoles: DECLARED,
+        values: { who: "Sam", amount: "€9" }, at: AT, letter,
+        send: async (d) => { seen.push(d); },
+      });
+    }
+    const mail = seen.filter((d) => d.channel === "email");
+    expect(mail.find((d) => d.type === "thing.happened")?.html).toBe("<main>Sam did a thing</main>");
+    /* ⚠️ Ours about their bill: plain, always. */
+    expect(mail.find((d) => d.type === "money.moved")?.html).toBeUndefined();
   });
 
   it("hands the sender the rendered copy rather than the template", async () => {
@@ -116,7 +227,7 @@ describe("the interruption and the record are different things", () => {
     const seen: Delivery[] = [];
     await dispatch({
       db, registry, tenantId: "t", type: "thing.happened",
-      audience: [{ userId: "u_owner", role: "owner" }], values: { who: "Sam" }, at: AT,
+      audience: [{ userId: "u_owner", role: "owner", permissions: ALL }], declaredRoles: DECLARED, values: { who: "Sam" }, at: AT,
       send: async (d) => { seen.push(d); },
     });
     expect(seen.map((d) => d.title)).toEqual(["Sam did a thing"]);
@@ -151,7 +262,7 @@ describe("what a notification's copy may say", () => {
 describe("reading", () => {
   it("renders from the registry and skips a row whose type is gone", async () => {
     const db = store();
-    await dispatch({ db, registry, tenantId: "t", type: "thing.happened", audience: [{ userId: "u_owner", role: "owner" }], values: { who: "Sam" }, at: AT });
+    await dispatch({ db, registry, tenantId: "t", type: "thing.happened", audience: [{ userId: "u_owner", role: "owner", permissions: ALL }], declaredRoles: DECLARED, values: { who: "Sam" }, at: AT });
     db.rows.push({ id: "x", tenant_id: "t", user_id: "u_owner", type: "retired.type", values_json: "{}", row_id: null, read_at: null, at: AT });
 
     const out = await listInbox(db, registry, "t", "u_owner", 50);
@@ -159,6 +270,6 @@ describe("reading", () => {
   });
 
   it("declares its tables so erasure can find them", () => {
-    expect(INBOX_SCHEMA.scoped?.tenantTables).toEqual(["inbox", "inbox_prefs"]);
+    expect(INBOX_SCHEMA.scoped?.tenantTables).toEqual(["inbox", "inbox_prefs", "notify_policy"]);
   });
 });

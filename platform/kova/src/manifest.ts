@@ -3807,11 +3807,13 @@ export const kova = defineApp({
   notifications: {
     "workspace.created": {
       category: "service", tone: "success", icon: "sparkle",
-      title: "{slug} is ready", link: { to: "inbox" }, roles: ["owner"],
+      title: "{slug} is ready", link: { to: "inbox" },
+      /* ⚠️ Whoever pays for the studio is who is told it exists. */
+      roles: ["owner"], needs: "billing:manage",
     },
     "plan.chosen": {
       category: "billing", tone: "info", icon: "card",
-      title: "You chose {planId}", link: { to: "inbox" }, roles: ["owner"],
+      title: "You chose {planId}", link: { to: "inbox" }, roles: ["owner"], needs: "billing:manage",
     },
     /*
       ⚠️ THE THREE `theirs` ENTRIES BELOW ARE THE STUDIO WRITING TO ITS OWN
@@ -3822,13 +3824,18 @@ export const kova = defineApp({
     */
     "package.granted": {
       category: "billing", tone: "success", icon: "gift", theirs: true,
-      title: "{days} days added", link: { to: "inbox" }, roles: ["owner", "client"],
+      title: "{days} days added", link: { to: "inbox" },
+      /* ⚠️ The studio reads it as commerce and the client reads it as their own
+         access, and `commerce:read` is the key both of them hold. */
+      roles: ["owner", "client"], needs: "commerce:read",
     },
     "support.session": {
       category: "service", tone: "warning", icon: "shield",
       title: "Somebody from support was in your workspace",
       body: "Why: {reason}",
-      link: { to: "inbox" }, roles: ["owner"],
+      /* ⚠️ Somebody from outside acted inside: told to whoever can see who is in
+         the studio, which is the question this raises. */
+      link: { to: "inbox" }, roles: ["owner"], needs: "member:read",
     },
     /* ⚠️ The one that matters: a person is told what they are meant to do. */
     "programme.published": {
@@ -3836,32 +3843,38 @@ export const kova = defineApp({
       title: "You have a new programme",
       body: "Your coach has published what you are doing next. Open it when you are ready.",
       link: { to: "collection", collection: "programme" },
-      roles: ["client"],
+      /* ⚠️ The key that opens what this points at — so a studio role composed
+         later to look after clients is told too, without editing this file. */
+      roles: ["client"], needs: "programme:read",
     },
     "workout.completed": {
       category: "activity", tone: "info", icon: "check",
       title: "A workout was finished",
       link: { to: "collection", collection: "workout" },
-      roles: ["owner", "trainer"],
+      /* ⚠️ `workout:write` rather than `:read` — a client holds the read and this
+         is about supervising, which is the distinction `roles` draws for the
+         declared roles and this draws for a studio's own. */
+      roles: ["owner", "trainer"], needs: "workout:write",
     },
     /* ⚠️ Raised by the document's own transition, not by an operation beside it. */
     "checkin.filed": {
       category: "activity", tone: "info", icon: "check",
       title: "A check-in came in",
       link: { to: "collection", collection: "checkin" },
-      roles: ["owner", "trainer"],
+      roles: ["owner", "trainer"], needs: "checkin:write",
     },
     "checkin.answered": {
       category: "activity", tone: "success", icon: "check", theirs: true,
       title: "Your coach replied",
       body: "There is an answer waiting on your last check-in.",
       link: { to: "collection", collection: "checkin" },
-      roles: ["client"],
+      roles: ["client"], needs: "checkin:read",
     },
     "milestone.earned": {
       category: "activity", tone: "success", icon: "sparkle",
       title: "{title}", link: { to: "inbox" },
-      roles: ["owner", "trainer", "client"],
+      /* ⚠️ Your own achievement, so the key is the one everybody signed in has. */
+      roles: ["owner", "trainer", "client"], needs: "inbox:read",
     },
   },
 

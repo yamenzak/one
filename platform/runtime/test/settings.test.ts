@@ -219,7 +219,7 @@ describe("the keys every app gets", () => {
     dispatch, so it cannot be an app's to name.
   */
   it("are present whether an app declares any settings or not", () => {
-    expect(Object.keys(settingsFor({}))).toEqual(["brand.name", "brand.mark", "brand.accent", "mail.signature"]);
+    expect(Object.keys(settingsFor({}))).toEqual(["brand.name", "brand.mark", "brand.accent", "mail.signature", "mail.letterhead"]);
   });
 
   it("come before the app's own, so they render first", () => {

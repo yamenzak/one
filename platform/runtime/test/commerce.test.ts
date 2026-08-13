@@ -105,10 +105,10 @@ const app = (over: Partial<AppSpec<typeof bindings>>): AppSpec<typeof bindings> 
      with a workspace creation, a plan choice, a grant and a support session
      that all announce nothing. */
   notifications: {
-    "workspace.created": { category: "service", tone: "success", icon: "sparkle", title: "{slug} is ready", link: { to: "inbox" }, roles: ["owner"] },
-    "plan.chosen": { category: "billing", tone: "info", icon: "card", title: "You chose {planId}", link: { to: "inbox" }, roles: ["owner"] },
-    "package.granted": { category: "billing", tone: "success", icon: "gift", title: "{days} days added", link: { to: "inbox" }, roles: ["owner"] },
-    "support.session": { category: "service", tone: "warning", icon: "shield", title: "Somebody from support was in your workspace", body: "Why: {reason}", link: { to: "inbox" }, roles: ["owner"] },
+    "workspace.created": { category: "service", tone: "success", icon: "sparkle", title: "{slug} is ready", link: { to: "inbox" }, roles: ["owner"], needs: "member:read" },
+    "plan.chosen": { category: "billing", tone: "info", icon: "card", title: "You chose {planId}", link: { to: "inbox" }, roles: ["owner"], needs: "member:read" },
+    "package.granted": { category: "billing", tone: "success", icon: "gift", title: "{days} days added", link: { to: "inbox" }, roles: ["owner"], needs: "member:read" },
+    "support.session": { category: "service", tone: "warning", icon: "shield", title: "Somebody from support was in your workspace", body: "Why: {reason}", link: { to: "inbox" }, roles: ["owner"], needs: "member:read" },
   },
   help: {},
   filePurposes: {},

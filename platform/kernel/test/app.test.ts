@@ -243,7 +243,9 @@ describe("the row a collection implies", () => {
 const base = {
     id: "test",
     access: {
-      permissions: [], roles: {}, plans: [] as PlanSpec[],
+      /* ⚠️ Every notification names a permission it needs, so the smallest
+         composable app declares one. */
+      permissions: ["inbox:read", "note:read"], roles: {}, plans: [] as PlanSpec[],
       entitlements: {} as Record<string, EntitlementDef>,
       customerRail: false as AccessSpec["customerRail"], customerFlags: {} as Record<string, FlagDef>,
       seats: { counts: [] },
@@ -276,10 +278,10 @@ const base = {
     choice and a grant that announce nothing at all.
   */
   notifications: {
-    "workspace.created": { category: "service", tone: "success", icon: "sparkle", title: "ready", link: { to: "inbox" }, roles: ["owner"] },
-    "plan.chosen": { category: "billing", tone: "info", icon: "card", title: "chosen", link: { to: "inbox" }, roles: ["owner"] },
-    "package.granted": { category: "billing", tone: "success", icon: "gift", title: "granted", link: { to: "inbox" }, roles: ["owner"] },
-    "support.session": { category: "service", tone: "warning", icon: "shield", title: "Somebody from support was in your workspace", body: "Why: {reason}", link: { to: "inbox" }, roles: ["owner"] },
+    "workspace.created": { category: "service", tone: "success", icon: "sparkle", title: "ready", link: { to: "inbox" }, roles: ["owner"], needs: "inbox:read" },
+    "plan.chosen": { category: "billing", tone: "info", icon: "card", title: "chosen", link: { to: "inbox" }, roles: ["owner"], needs: "inbox:read" },
+    "package.granted": { category: "billing", tone: "success", icon: "gift", title: "granted", link: { to: "inbox" }, roles: ["owner"], needs: "inbox:read" },
+    "support.session": { category: "service", tone: "warning", icon: "shield", title: "Somebody from support was in your workspace", body: "Why: {reason}", link: { to: "inbox" }, roles: ["owner"], needs: "inbox:read" },
   } as Record<string, NotificationDef>,
   help: {} as HelpRegistry,
   filePurposes: {},
@@ -312,7 +314,7 @@ describe("who can get into a workspace at all", () => {
       ...base,
       access: {
         ...base.access,
-        permissions: ["workspace:create", "member:manage"],
+        permissions: ["workspace:create", "member:manage", "inbox:read", "note:read"],
         personal: ["workspace:create"],
         roles: { owner: ["member:manage"] },
       },
@@ -459,7 +461,7 @@ describe("a document's own transitions raise events, and they are checked too", 
       ...filing("report.filed"),
       notifications: {
         ...base.notifications,
-        "report.filed": { category: "activity", tone: "info", icon: "check", title: "Filed", link: { to: "inbox" }, roles: ["owner"] },
+        "report.filed": { category: "activity", tone: "info", icon: "check", title: "Filed", link: { to: "inbox" }, roles: ["owner"], needs: "inbox:read" },
       },
     } as never)).not.toThrow();
   });
@@ -576,7 +578,7 @@ describe("punctuation is refused by the whole manifest", () => {
 describe("a milestone is refused by the whole manifest or by nothing", () => {
   const announced = {
     ...base.notifications,
-    "milestone.earned": { category: "activity", tone: "success", icon: "sparkle", title: "{title}", link: { to: "inbox" }, roles: ["owner"] },
+    "milestone.earned": { category: "activity", tone: "success", icon: "sparkle", title: "{title}", link: { to: "inbox" }, roles: ["owner"], needs: "inbox:read" },
   } as Record<string, NotificationDef>;
 
   /*
@@ -636,7 +638,7 @@ describe("the platform's own events need copy, and the app is where copy lives",
 describe("what an app can tell somebody", () => {
   const told: NotificationDef = {
     category: "activity", tone: "info", icon: "bell",
-    title: "{who} did a thing", link: { to: "inbox" }, roles: ["owner"],
+    title: "{who} did a thing", link: { to: "inbox" }, roles: ["owner"], needs: "note:read",
   };
 
   it("refuses an operation raising an event no notification declares", () => {

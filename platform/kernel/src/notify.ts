@@ -74,8 +74,30 @@ export interface NotificationDef {
   /**
    * Who this is FOR. A notification with no audience is one that reaches
    * everybody or nobody, and both have shipped.
+   *
+   * ⚠️ THESE ARE THE PRODUCT'S OWN ROLES, AND A WORKSPACE HAS OTHERS. A role a
+   * workspace composed for itself is a bundle of permissions with a name the
+   * manifest has never heard of, so a name match alone answers "no" for every
+   * one of them — a Front Desk who is told nothing, in a product where
+   * everything else works. `needs` is what the merged registry is matched on.
    */
   readonly roles: readonly string[];
+  /**
+   * THE PERMISSION THAT MAKES THIS RELEVANT TO SOMEBODY.
+   *
+   * ⚠️ REQUIRED, AND IT IS WHAT MAKES A CUSTOM ROLE WORK WITHOUT ANY APP
+   * DECLARING ONE. A workspace's own role cannot appear in `roles` — the
+   * manifest was written before the role existed — so this is the test that CAN
+   * be asked of it: whoever may read the thing this notification is about is
+   * told about it. A declared role must ALSO be listed in `roles`, so this can
+   * only ever narrow the audience the product intended, never widen it.
+   *
+   * ⚠️ AND IT IS THE KEY A PERSON'S OWN SWITCHES ARE DERIVED FROM. Somebody who
+   * cannot read a check-in has no business being offered a switch for "a
+   * check-in was filed" — a preferences screen listing every type a product has
+   * is one where most rows do nothing for most people.
+   */
+  readonly needs: string;
   /**
    * ⚠️ WHETHER A WORKSPACE MAY PUT THIS IN ITS OWN WORDS — off unless declared.
    *
@@ -123,49 +145,141 @@ export const SUPPORT_SESSION = "support.session";
 /* ---------------------------------------------------------- the channels --- */
 
 /**
- * ⚠️ NO `push`, AND ITS REMOVAL IS THE POINT.
- *
- * It was here — a third channel, a preference somebody could switch on, a branch
- * in `channelsFor` that returned it — and nothing anywhere delivered one. There
- * is no service worker in this platform, no subscription store and no device to
- * receive anything, so what shipped was a switch in a settings screen that
- * silently did nothing, which is worse than an absent feature: somebody turns it
- * on and stops watching their inbox.
- *
- * It comes back with the offline work that gives it something to reach — see
- * PLAN.md §4 — and not before. A channel is a promise about delivery.
+ * ⚠️ A CHANNEL IS A PROMISE ABOUT DELIVERY, and `push` was removed once for
+ * breaking it: it was a preference somebody could switch on with nothing behind
+ * it — no service worker, no subscription store, no device — which is worse than
+ * an absent feature, because somebody turns it on and stops watching their
+ * inbox. It is back with all three, and `deliverable` is what keeps the promise:
+ * a deployment that has not configured push does not OFFER push.
  */
-export type Channel = "inbox" | "email";
+export type Channel = "inbox" | "email" | "push";
+
+export const CHANNELS: readonly Channel[] = ["inbox", "email", "push"];
 
 /**
- * ⚠️ THE INBOX IS NEVER OPTIONAL, and that is the whole shape of this function.
+ * ⚠️ THE INBOX IS NEVER OPTIONAL, and that is the whole shape of this file.
  *
- * Email and push can be declined, silently fail, be filtered, or arrive at an
- * address somebody has left. The inbox is the record — so a preference removes
- * the INTERRUPTION and never the information, and "I never got that" has an
- * answer that does not depend on a mail provider.
+ * Email and push can be declined, silently fail, be filtered, arrive at an
+ * address somebody has left or at a browser they have uninstalled. The inbox is
+ * the RECORD — so a preference removes the INTERRUPTION and never the
+ * information, and "I never got that" has an answer that does not depend on a
+ * mail provider or a push service.
  */
 export interface Preferences {
   /** Per category, the interruptions this person wants. The inbox is not listed. */
   readonly muted: readonly Category[];
   readonly email: boolean;
+  readonly push: boolean;
 }
 
-export const DEFAULT_PREFERENCES: Preferences = { muted: [], email: true };
+/**
+ * ⚠️ PUSH IS OFF BY DEFAULT AND EMAIL IS ON, because they are not the same kind
+ * of consent. An address was given to us; a device notification is a permission
+ * a browser asks for at a moment somebody chose, and defaulting it on would
+ * describe a subscription nobody has made.
+ */
+export const DEFAULT_PREFERENCES: Preferences = { muted: [], email: true, push: false };
+
+/* ------------------------------------------------------ what a tenant says --- */
 
 /**
- * Where one notification goes for one person.
+ * WHAT A WORKSPACE ALLOWS FOR ONE TYPE.
  *
- * ⚠️ AN `action` IS NEVER MUTED. It is the category that says nothing proceeds
- * until somebody does something — a plan that lapses, a document waiting to be
- * signed, a workspace about to be erased. Letting it be switched off makes the
- * product silently stop working for whoever switched it off, and they will not
- * connect the two.
+ * ⚠️ TWO LEVELS, AND THE TENANT'S IS THE CEILING. A workspace decides what its
+ * product says on its behalf and how loudly — a studio that does not want its
+ * clients emailed about every published programme is making a decision about its
+ * own business — and a person then chooses WITHIN that. The other order does not
+ * work: a person cannot be asked to opt into a channel their workspace has
+ * turned off, because the switch would do nothing and say nothing.
+ *
+ * ⚠️ ABSENT MEANS THE PRODUCT'S OWN DEFAULT, NOT "OFF". A workspace that has
+ * never opened the screen must behave exactly as it did before the screen
+ * existed, or shipping this feature silences every deployment that upgrades.
  */
-export function channelsFor(def: NotificationDef, prefs: Preferences): readonly Channel[] {
+export interface Policy {
+  /** ⚠️ Off entirely — not even the inbox row. See `refusePolicy`. */
+  readonly off?: boolean;
+  /** The channels this workspace permits. Absent is all of them. */
+  readonly channels?: readonly Channel[];
+}
+
+export type PolicyBook = Readonly<Record<string, Policy>>;
+
+export type PolicyRefusal = "unknown_type" | "action_off" | "unknown_channel";
+
+/**
+ * Whether a workspace may store this policy for this type.
+ *
+ * ⚠️ AN `action` MAY NOT BE TURNED OFF BY ANYBODY — not by the person receiving
+ * it and not by the workspace sending it. It is the category that means nothing
+ * proceeds until somebody does something: a plan that lapsed, a document waiting
+ * to be signed, a workspace about to be erased. A workspace that could switch
+ * those off would be one where the product silently stops working and nobody in
+ * it is told why — and the person who switched it off is not the person it
+ * stops working for.
+ */
+export function refusePolicy(
+  registry: NotificationRegistry, type: string, policy: Policy,
+): PolicyRefusal | null {
+  const def = registry[type];
+  if (!def) return "unknown_type";
+  if (def.category === "action" && policy.off) return "action_off";
+  for (const c of policy.channels ?? []) if (!CHANNELS.includes(c)) return "unknown_channel";
+  return null;
+}
+
+/* --------------------------------------------------------- who gets what --- */
+
+/**
+ * Whether one person is in this notification's audience.
+ *
+ * ⚠️ THE PERMISSION IS THE TEST A CUSTOM ROLE CAN PASS. A role the workspace
+ * composed for itself is not in the manifest and never will be, so matching the
+ * NAME answers "no" for every one of them — silently, which is how somebody
+ * comes to be in a workspace for a month being told nothing.
+ *
+ * ⚠️ AND A DECLARED ROLE STILL HAS TO BE LISTED. `roles` is the product saying
+ * who a message is FOR — "a check-in was filed" is for whoever supervises, not
+ * for the client who filed it, even though both may read it — and a permission
+ * cannot express that. So the permission WIDENS to roles the manifest could not
+ * know about and never widens the ones it does.
+ */
+export function inAudience(
+  def: NotificationDef,
+  person: { readonly role: string; readonly permissions: ReadonlySet<string> },
+  declaredRoles: ReadonlySet<string>,
+): boolean {
+  if (!person.permissions.has(def.needs)) return false;
+  return declaredRoles.has(person.role) ? def.roles.includes(person.role) : true;
+}
+
+/**
+ * Where one notification goes for one person, after both levels have spoken.
+ *
+ * ⚠️ AN `action` IS NEVER MUTED, on either level. Same argument as `refusePolicy`
+ * — the person who switches it off is not the person the product then silently
+ * stops working for.
+ *
+ * ⚠️ AND `available` IS WHAT KEEPS A CHANNEL'S PROMISE. A deployment with no
+ * push keys and a deployment with no mail provider must not put a message on a
+ * channel that will drop it: the inbox row is still written, so the information
+ * survives and only the interruption is missing.
+ */
+export function channelsFor(
+  def: NotificationDef,
+  prefs: Preferences,
+  policy: Policy = {},
+  available: readonly Channel[] = CHANNELS,
+): readonly Channel[] {
+  if (policy.off) return [];
   const out: Channel[] = ["inbox"];
   const muted = def.category !== "action" && prefs.muted.includes(def.category);
-  if (!muted && prefs.email) out.push("email");
+  if (muted) return out;
+
+  const allowed = (c: Channel) =>
+    (policy.channels ?? CHANNELS).includes(c) && available.includes(c);
+  if (prefs.email && allowed("email")) out.push("email");
+  if (prefs.push && allowed("push")) out.push("push");
   return out;
 }
 
@@ -208,6 +322,20 @@ export function destinationFor(def: NotificationDef, rowId?: string): { readonly
  * same failure the destination type exists to prevent — a notification that
  * renders and goes nowhere.
  */
+/**
+ * ⚠️ AND EVERY `needs` MUST BE A PERMISSION THE MANIFEST DECLARES.
+ *
+ * A key nobody declares is held by nobody, so the type reaches nobody — for
+ * ever, silently, with the notification appearing in every catalogue and every
+ * generated document. It is the same failure `danglingLinks` refuses one field
+ * along, and the same shape as an undeclared permission on a custom role:
+ * plausible, inert, and invisible until somebody asks why they were never told.
+ */
+export function unknownNeeds(registry: NotificationRegistry, permissions: readonly string[]): readonly string[] {
+  const declared = new Set(permissions);
+  return Object.entries(registry).filter(([, def]) => !declared.has(def.needs)).map(([id]) => id);
+}
+
 export function danglingLinks(registry: NotificationRegistry, collections: readonly CollectionSpec[]): readonly string[] {
   const known = new Set(collections.map((c) => c.id));
   return Object.entries(registry)
@@ -316,4 +444,94 @@ export function signOff(body: string | undefined, signature: string): string | u
   const signed = signature.trim();
   if (signed === "") return body;
   return body ? `${body}\n\n${signed}` : signed;
+}
+
+/* ------------------------------------------------------- their letterhead --- */
+
+/**
+ * A WORKSPACE'S OWN LETTERHEAD, WRAPPED ROUND WHAT LEAVES THE PRODUCT.
+ *
+ * ⚠️ THE PLATFORM'S OWN MAIL STAYS PLAIN, AND THAT IS NOT THE SAME DECISION. A
+ * sign-in code is one sentence and one number; HTML buys it nothing and is the
+ * half of an email that renders differently in every client and gets a message
+ * filed as marketing. A workspace writing to its own customers is a business
+ * with a logo and a sign-off, sending something it wants to look like theirs —
+ * different sender, different reader, different message.
+ *
+ * ⚠️ SO IT REACHES EXACTLY THE TYPES `theirs` ALREADY GOVERNS. A workspace that
+ * could wrap the platform's own arrears notice in its own layout could bury it,
+ * and the people who would then not act on it are its staff.
+ *
+ * ⚠️ AND IT IS A WRAPPER, NEVER THE MESSAGE. The title and the body are still
+ * rendered from the registry with the dispatch's own values, so a letterhead
+ * cannot say anything the notification did not — it decides how it looks, not
+ * what it says. A template that WAS the message would be a second copy of every
+ * sentence, drifting from the one the inbox shows.
+ */
+export interface Letter {
+  /**
+   * ⚠️ `{title}`, `{body}` AND `{signature}`, AND NOTHING ELSE. Any other token
+   * renders as its own literal text in a customer's inbox — `render` leaves an
+   * unknown one in place on purpose, which makes this the moment to refuse it:
+   * at the keyboard of the person who can fix it.
+   */
+  readonly html?: string;
+  readonly signature?: string;
+}
+
+export const LETTER_TOKENS: readonly string[] = ["title", "body", "signature"];
+
+/**
+ * ⚠️ ROOM FOR A REAL LAYOUT, AND A CEILING ANYWAY. Inlined CSS and a logo as a
+ * data URI is a few kilobytes; past this it is not a letterhead, it is a
+ * newsletter, and it is being stored in a column every notification read pays to
+ * fetch.
+ */
+export const MAX_LETTER = 20_000;
+
+export type LetterRefusal = "unknown_token" | "too_long" | "no_body";
+
+/**
+ * Whether these words may be a workspace's letterhead.
+ *
+ * ⚠️ A LAYOUT WITH NO `{body}` IS ONE THAT SENDS THE SAME EMPTY PAGE TO EVERY
+ * CUSTOMER FOREVER, and it looks completely fine in the editor — which is
+ * exactly why it is refused here rather than discovered from a support ticket.
+ */
+export function refuseLetter(letter: Letter): LetterRefusal | null {
+  const html = (letter.html ?? "").trim();
+  if (html === "") return null;
+  if (html.length > MAX_LETTER) return "too_long";
+  const tokens = tokensIn(html);
+  if (!tokens.includes("body")) return "no_body";
+  for (const t of tokens) if (!LETTER_TOKENS.includes(t)) return "unknown_token";
+  return null;
+}
+
+/**
+ * ⚠️ THE TEXT PART IS ALWAYS BUILT, EVEN WHERE THERE IS HTML. A client that
+ * cannot render it, a screen reader, a spam filter reading a text/plain part
+ * that is not there — all three are ordinary, and an HTML-only email is one that
+ * arrives blank for some readers with nothing on our side saying so.
+ */
+export interface Written {
+  readonly subject: string;
+  readonly text: string;
+  readonly html?: string;
+}
+
+export function letterFor(
+  said: { readonly title: string; readonly body?: string },
+  signature: string,
+  letter: Letter = {},
+): Written {
+  const signed = (letter.signature ?? signature).trim();
+  const text = signOff(said.body, signed) ?? said.title;
+  const layout = (letter.html ?? "").trim();
+  if (layout === "") return { subject: said.title, text };
+  return {
+    subject: said.title,
+    text,
+    html: render(layout, { title: said.title, body: said.body ?? said.title, signature: signed }),
+  };
 }

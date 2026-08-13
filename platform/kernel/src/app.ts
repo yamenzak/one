@@ -36,7 +36,7 @@ import { shadowProblems, vaultActivities, wantProblems } from "./vault.js";
 import type { NotificationRegistry } from "./notify.js";
 import type { Release, Retired } from "./release.js";
 import { releaseProblems } from "./release.js";
-import { PLATFORM_EVENTS, danglingLinks } from "./notify.js";
+import { PLATFORM_EVENTS, danglingLinks, unknownNeeds } from "./notify.js";
 import type { CreditPack, EntitlementDef, PlanSpec } from "./entitlement.js";
 import { packProblems, parkingAboveFloor } from "./entitlement.js";
 import type { Currency, Locale, RegionId, TimeZone, UnitSystem } from "./primitives.js";
@@ -1095,6 +1095,20 @@ export function assertComposable(spec: {
   const dangling = danglingLinks(spec.notifications, spec.collections);
   if (dangling.length) {
     throw new Error(`${spec.id}: notification(s) ${dangling.join(", ")} link to a collection this app does not declare.`);
+  }
+
+  /*
+    ⚠️ A NOTIFICATION WHOSE `needs` NOBODY DECLARES REACHES NOBODY, for ever, and
+    appears in every catalogue and every generated document while doing it. It is
+    the audience test a workspace's own roles are matched on, so an undeclared key
+    is not a narrower audience — it is an empty one.
+  */
+  const unreachable = unknownNeeds(spec.notifications, spec.access.permissions);
+  if (unreachable.length) {
+    throw new Error(
+      `${spec.id}: notification(s) ${unreachable.join(", ")} need a permission this app does not declare — ` +
+        `nobody can hold it, so nobody is ever told.`,
+    );
   }
 
   /*

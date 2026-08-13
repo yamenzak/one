@@ -1568,6 +1568,19 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-held-role-is-refused-rather-than-deleted` | every member on a deleted role resolving to no permissions at all — signed in, in the workspace, able to do nothing, with nothing on any screen saying why. Moving them automatically is worse: a permission change nobody asked for, applied to people who are not in the room | **live** |
 | `a-re-role-cannot-strand-a-workspace` | a workspace nobody can administer, reached through the door nobody re-checked. `wouldStrand` guarded removal and leaving; moving the last administrator into a role that cannot manage members is the same outcome and the quieter of the three, because everybody is still in the room | **live** |
 | `a-re-role-is-bounded-by-where-they-are-going` | a workspace's own administrator role being the one role its administrator can never hold. The strand check asked whether the person MANAGES rather than whether the role they are moving INTO does, so promoting the last owner into a custom role carrying the same keys was refused as stranding | **live** |
+| `a-notification-reaches-a-role-the-product-never-named` | a role a workspace composed for itself is told nothing at all, silently, while everything else works | **live** |
+| `a-permission-is-never-widened-by-a-notification` | "a check-in was filed" reaching the client who filed it, because they hold the key too | **live** |
+| `a-notification-nobody-can-hold-the-key-to` | a type that reaches nobody for ever, from a registry that looks complete | **live** |
+| `a-workspace-may-narrow-what-it-sends-and-not-silence-an-action` | a workspace switching off the notices that say nothing proceeds until somebody acts | **live** |
+| `a-workspace-that-decided-nothing-changes-nothing` | shipping a policy screen silences every deployment that upgrades into it | **live** |
+| `a-letterhead-wraps-and-never-replaces` | the same empty page sent to every customer for ever, from an editor where it looked fine | **live** |
+| `only-what-a-workspace-may-phrase-may-it-wrap` | a business burying its own arrears notice inside its own layout, for staff who then do not act | **live** |
+| `an-html-email-still-carries-its-plain-half` | an email that arrives blank for a screen reader and for any client that cannot render it | **live** |
+| `a-push-payload-is-encrypted-to-the-device` | "your card was declined" legible to whoever operates the push queue | **live** |
+| `a-push-nonce-is-never-reused` | an AES-GCM nonce reused across two sends, which turns an encrypted channel into a readable one | **live** |
+| `a-push-record-is-framed-as-the-encoding-demands` | a push service answering 201 while every browser silently drops the message | **live** |
+| `a-vapid-token-signs-the-service-and-expires` | a token no push service accepts, on a deployment where push works nowhere and nothing says why | **live** |
+| `a-dead-subscription-is-pruned-on-sight` | a device list nobody prunes, where every send pays for every browser anybody ever signed in from | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 
