@@ -1733,7 +1733,6 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
              region is known, so they live beside the directory. */
           directory: directoryDb,
           tenantId: at.tenant?.tenantId ?? "",
-          isOperator: actor.kind === "operator",
         },
         [FILES]: {
           db: regionalDb,
@@ -1813,7 +1812,6 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           modules: opts.regionalModules ?? [],
           keeping: keptBy(app.collections),
           auditRetentionDays: app.governance.auditRetentionDays,
-          isOperator: at.door === "admin",
           /* ⚠️ The same store the uploads went to, so erasure reaches the bytes. */
           objects: (bind[opts.objectsBinding ?? "media"] as ObjectHandle | undefined) ?? null,
         },

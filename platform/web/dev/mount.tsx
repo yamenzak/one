@@ -48,7 +48,10 @@ import { SetupScreen, type Place } from "../src/setup.js";
 import { MarketScreen, ShelfScreen, type Sellable } from "../src/hub/market.js";
 import { PlanScreen, type Holding } from "../src/hub/plan.js";
 import { WorkspaceScreen, type Resolved } from "../src/hub/workspace.js";
-import { ConsoleScreen, KeysScreen, CatalogueScreen, type Key as ConfigKey } from "../src/hub/console.js";
+import {
+  ConsoleScreen, KeysScreen, CatalogueScreen, TenantsScreen, MaintenanceScreen, MODES,
+  type Key as ConfigKey, type Tenant,
+} from "../src/hub/console.js";
 import { SettingsScreen } from "../src/hub/settings.js";
 import type { Declaration } from "../src/hub/declared.js";
 import type { Plan } from "../src/hub/offer.js";
@@ -586,6 +589,23 @@ const CONSOLE_PRODUCTS = [
   { appId: "tessa", appName: "Tessa", manifestVersion: "0.9.0", changed: 0 },
 ];
 
+/*
+  ⚠️ TWO WORKSPACES AT THE SAME SLUG UNDER TWO PRODUCTS, because that is now
+  legal and the row has to survive it. A fixture where every slug was unique
+  would draw a list that looks right and says nothing about the case the screen
+  exists to handle.
+
+  ⚠️ AND ONE IN A REGION THAT WILL NOT ANSWER, which is the other row that
+  renders differently — a workspace with no plan on it, for a reason that is ours
+  rather than theirs.
+*/
+const CONSOLE_TENANTS: readonly Tenant[] = [
+  { tenantId: "t1", appId: "kova", slug: "haddad", region: "eu", standing: "active", reason: "", plan: "Pro", status: "active", reachable: true },
+  { tenantId: "t2", appId: "scena", slug: "haddad", region: "eu", standing: "active", reason: "", plan: "Free", status: "active", reachable: true },
+  { tenantId: "t3", appId: "kova", slug: "northline", region: "us", standing: "read_only", reason: "past_due", plan: "Solo", status: "past_due", reachable: true },
+  { tenantId: "t4", appId: "tessa", slug: "brightwater", region: "ap", standing: "active", reason: "", plan: null, status: null, reachable: false },
+];
+
 /* ⚠️ An app id is a routing token; a person reads a name. One helper rather than
    a lookup table, so a fourth product needs no edit here. */
 const titledId = (id: string): string => id.replace(/^./, (c) => c.toUpperCase());
@@ -907,6 +927,22 @@ function Preview() {
         product={{ id: where.product, name: titledId(where.product) }}
         plans={which === "waiting" ? null : PLANS.map((p, i) => ({ ...p, ...(i === 1 ? { edited: true } : {}) }))}
         onEdit={() => undefined} onBack={up} Heading={Heading}
+      />
+    ) : at === "tenants" ? (
+      <TenantsScreen
+        tenants={which === "waiting" ? null : which === "new" ? [] : CONSOLE_TENANTS}
+        onOpen={(tenantId) => go({ at: "workspace", tenant: tenantId })}
+        onSearch={() => undefined}
+        onBack={up} Heading={Heading}
+      />
+    ) : at === "maintenance" ? (
+      <MaintenanceScreen
+        /* ⚠️ `#state=` picks the rung, because the screen the whole control is
+           for is the CLOSED one and it is the one nobody sees by accident. */
+        mode={MODES.find((m) => m.value === asked.get("state"))?.value ?? "off"}
+        message="We are back within the hour."
+        onSet={async () => null}
+        onBack={up} Heading={Heading}
       />
     ) : at === "account" ? (
       <AccountScreen

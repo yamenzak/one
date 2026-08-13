@@ -7,11 +7,28 @@
  * and then opens somewhere else, once, with nothing in the console.
  */
 
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { keyOf, parseWhere, pathOf, upFrom, type Where } from "../src/hub/routes.js";
 
+/*
+  ⚠️ EVERY MEMBER OF THE UNION, AND THE LAST TEST IN THIS FILE CHECKS THAT. A
+  destination missing from this list is a destination nothing here holds to a
+  round trip or to a screen — which is the same silence the guard below exists to
+  break, one level up.
+*/
 const EVERY: readonly Where[] = [
   { at: "home" },
+  { at: "account" },
+  { at: "workspaces" },
+  { at: "workspace", tenant: "t1" },
+  { at: "plan", subscription: "sub_1" },
+  { at: "console" },
+  { at: "product-config", product: "kova" },
+  { at: "catalogue", product: "kova" },
+  { at: "shared-config" },
+  { at: "tenants" },
+  { at: "maintenance" },
   { at: "details" },
   { at: "security" },
   { at: "preferences" },
@@ -113,16 +130,54 @@ describe("every screen in the hub has an address", () => {
   });
 
   /*
-    ⚠️ EVERY DESTINATION RESOLVES TO A SCREEN, AND THE COMPILER IS MOST OF IT NOW.
-    The account home's rows handed back strings — `"account.profile"` — matched by
-    whoever mounted the surface, so a row could name a screen nobody had built and
-    the only symptom was a press that did nothing. What a test still has to say is
-    that the union has not grown a member with no address: a `Where` that prints
-    to the same path as another one is two screens at one URL, and one of them is
-    unreachable.
+    ⚠️ A `Where` THAT PRINTS TO ANOTHER ONE'S PATH IS TWO SCREENS AT ONE URL, and
+    one of them is unreachable — from a link, from a reload, from support saying
+    "open this address". The parser can only ever answer with one of them.
   */
   it("gives every destination its own address", () => {
     const printed = EVERY.map(pathOf);
     expect(new Set(printed).size, printed.join(" ")).toBe(EVERY.length);
+  });
+
+  /*
+    ⚠️ EVERY DESTINATION RESOLVES TO A SCREEN, AND THE COMPILER DOES NONE OF IT.
+    This test used to say the compiler was "most of it now" and it was not: the
+    surface renders from a chain of `at === "…"` ternaries ending in the hub's
+    home, so a destination nobody built does not fail to compile, does not throw
+    and does not render blank — it silently opens the HOME. A row that goes
+    somewhere unexpected is the hardest kind of wrong to notice, because the
+    screen it lands on is a real one.
+
+    It happened, immediately: the operator console shipped rows linking to
+    Workspaces and to Maintenance while neither screen existed, and pressing
+    either one went home. Everything was green.
+
+    ⚠️ SO THE UNION IS READ FROM ITS OWN SOURCE, not typed out here. A list of
+    names in a test is a list somebody has to remember to add to — which is the
+    same forgotten edit, moved.
+  */
+  const source = (file: string) => readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+
+  const DECLARED: readonly string[] = [
+    ...new Set(
+      [...source("src/hub/routes.ts").matchAll(/readonly at:\s*"([a-z-]+)"/g)].map((m) => m[1]!),
+    ),
+  ];
+
+  it("holds every member of the union to a round trip", () => {
+    expect(DECLARED.length).toBeGreaterThan(20);
+    expect([...DECLARED].sort()).toEqual([...new Set(EVERY.map((w) => w.at))].sort());
+  });
+
+  it("renders a screen for every one of them", () => {
+    const mount = source("dev/mount.tsx");
+    /*
+      ⚠️ THE HOME IS THE FALLBACK AND SO HAS NO BRANCH — deliberately, because
+      an address nobody can read has to land somewhere. It is the ONLY exemption,
+      and it is named rather than inferred: a second destination quietly sharing
+      the fallback is exactly the fault above.
+    */
+    const missing = DECLARED.filter((at) => at !== "home" && !mount.includes(`at === "${at}"`));
+    expect(missing, `no screen renders: ${missing.join(", ")}`).toEqual([]);
   });
 });

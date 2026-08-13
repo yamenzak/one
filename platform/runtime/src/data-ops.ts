@@ -46,10 +46,8 @@ export interface DataDeps {
    * decision about a collection and a schema module knows only about tables.
    */
   readonly keeping: readonly Keeping[];
-  /** ⚠️ How long the audit is kept. Declared by every app, read by nothing. */
+  /** ⚠️ How long the audit is kept — reported here, swept by `auditJob`. */
   readonly auditRetentionDays: number;
-  /** Whether this caller may act for the whole deployment rather than one workspace. */
-  readonly isOperator: boolean;
 }
 
 export interface DataCarrier { readonly [DATA]: DataDeps }

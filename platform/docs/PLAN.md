@@ -1717,9 +1717,22 @@ written.
 every product reads — one call, because three publishers is two too many to
 remember and each is invisible when missing. `admin.apps` is the console's front
 page; `declared.tsx` turns any declaration into controls; `SettingsScreen`,
-`WorkspaceScreen`, `ConsoleScreen`, `KeysScreen` and `CatalogueScreen` are the
-surfaces. Stage 4's row above said "the settings and admin surfaces exist as
-operations and are not rendered" for as long as that was true; it is not now.
+`WorkspaceScreen`, `ConsoleScreen`, `KeysScreen`, `CatalogueScreen`,
+`TenantsScreen` and `MaintenanceScreen` are the surfaces. Stage 4's row above
+said "the settings and admin surfaces exist as operations and are not rendered"
+for as long as that was true; it is not now.
+
+⚠️ **THE LAST TWO WERE LINKED BEFORE THEY EXISTED, AND NOTHING SAID SO.** The
+console shipped rows to Workspaces and to Maintenance while neither screen was
+built, and pressing either went to the hub's HOME — because the surface renders
+from a chain of `at === "…"` ternaries ending in that home, so a destination
+nobody built does not fail to compile, does not throw and does not render blank.
+A row that lands on a real screen is the hardest kind of wrong to see.
+`every-destination-has-a-screen-that-renders-it` reads the `Where` union out of
+its own source and checks each member against the mount, and
+`every-destination-is-held-to-a-round-trip` does the same for the address table —
+both derived, because a list of names in a test is the same forgotten edit moved
+one file over.
 
 ⚠️ **One boundary is NOT closed and must not be closed the same way.** A
 workspace's settings and its resolved ceilings are REGIONAL and per-product —

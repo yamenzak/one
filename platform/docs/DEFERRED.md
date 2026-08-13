@@ -11,7 +11,7 @@ kind: index
 ## Stage 7 — Kova migration
 
 - `one-160` — impersonation from the console. It mints a session  
-  <sub>docs/PLAN.md:1734</sub>
+  <sub>docs/PLAN.md:1747</sub>
 - `one-172` — the operator door admits any signed-in  
   <sub>runtime/src/runtime.ts:1006</sub>
 - `one-182` — a `person` seal with a real key. The type exists,  

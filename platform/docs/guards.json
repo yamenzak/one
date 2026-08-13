@@ -4558,6 +4558,51 @@
       "impl": "web/test/declared.test.tsx",
       "proves": "says where a workspace is managed rather than showing it as empty",
       "fails": "an empty \"What it includes\" card, which is indistinguishable from a plan that includes nothing — a sentence about somebody's bill invented by a screen that simply could not reach the answer. Settings and ceilings are regional and per-product by design, and unlike memberships they must not be crossed by copying: a workspace's settings are its data, and publishing them into the store every product reads would put one business's configuration where another product's worker can read it"
+    },
+    {
+      "id": "every-destination-has-a-screen-that-renders-it",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/routes.test.ts",
+      "proves": "renders a screen for every one of them",
+      "fails": "a destination nobody built silently opening the HOME. The surface renders from a chain of `at === \"…\"` ternaries ending in the hub's home, so a route with no branch does not fail to compile, does not throw and does not render blank — and a row that goes somewhere unexpected is the hardest kind of wrong to notice, because the screen it lands on is a real one. It happened immediately: the operator console shipped rows linking to Workspaces and to Maintenance while neither screen existed"
+    },
+    {
+      "id": "every-destination-is-held-to-a-round-trip",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/routes.test.ts",
+      "proves": "holds every member of the union to a round trip",
+      "fails": "a destination missing from the list nothing holds to a round trip or to a screen. The union is read from its own source rather than typed out in the test, because a list of names in a test is a list somebody has to remember to add to — which is the same forgotten edit, moved"
+    },
+    {
+      "id": "two-workspaces-may-share-a-slug",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "says the product on every row, because two may share a name",
+      "fails": "a list showing what reads as a duplicate. A slug is unique per PRODUCT rather than per deployment — the whole point of the app column added to the directory — so an operator acting on \"the haddad one\" has a one-in-two chance of the right business"
+    },
+    {
+      "id": "a-region-that-is-down-is-not-a-workspace-on-nothing",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "tells a region that is down from a workspace on no plan",
+      "fails": "a row with no plan on it, produced by a region that would not answer, reading as a workspace that is on no plan. The plan and the standing are read from each workspace's own region one at a time, and those two states want opposite responses from whoever is looking"
+    },
+    {
+      "id": "an-unknown-maintenance-rung-is-never-open",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/declared.test.tsx",
+      "proves": "never reports a mode it does not know as open",
+      "fails": "a CLOSED deployment reported as open, on the one screen whose entire job is saying which it is. The mode arrives off the wire, so a deployment ahead of this bundle can send a word the list does not carry — and falling back to the first rung is the one wrong answer that matters here"
     }
   ]
 }

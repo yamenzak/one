@@ -75,8 +75,10 @@ export {
 export { SettingsScreen, type SettingsProps } from "./hub/settings.js";
 export { WorkspaceScreen, amountOf, type Resolved, type WorkspaceProps } from "./hub/workspace.js";
 export {
-  ConsoleScreen, KeysScreen, CatalogueScreen, saidAs as keySaidAs,
+  ConsoleScreen, KeysScreen, CatalogueScreen, TenantsScreen, MaintenanceScreen, saidAs as keySaidAs,
   type CatalogueProps, type ConsoleProps, type Key, type KeysProps, type Product as ConsoleProduct,
+  type Plan as CataloguePlan, type MaintenanceProps, type Mode as MaintenanceMode,
+  type Tenant, type TenantsProps,
 } from "./hub/console.js";
 export { WorkspacesScreen, type Workspace, type WorkspacesProps, type Product as WorkspaceProduct } from "./hub/workspaces.js";
 export { MarketScreen, ShelfScreen, type Sellable } from "./hub/market.js";

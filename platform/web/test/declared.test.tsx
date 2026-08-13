@@ -13,7 +13,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { DeclaredSettings, groupsOf, shownAs, type Declaration } from "../src/hub/declared.js";
 import { SettingsScreen } from "../src/hub/settings.js";
 import { WorkspaceScreen, amountOf, type Resolved } from "../src/hub/workspace.js";
-import { ConsoleScreen, KeysScreen, CatalogueScreen, saidAs } from "../src/hub/console.js";
+import {
+  ConsoleScreen, KeysScreen, CatalogueScreen, TenantsScreen, MaintenanceScreen, saidAs,
+} from "../src/hub/console.js";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node as never);
 const nothing = async () => null;
@@ -295,5 +297,83 @@ describe("the operator console", () => {
     expect(out).toContain("$4.99");
     expect(out).toContain("14 days free");
     expect([...out.matchAll(/Edited/g)]).toHaveLength(1);
+  });
+});
+
+/* ---------------------------------------------------- workspaces + closed --- */
+
+describe("every workspace on the deployment", () => {
+  const TENANTS = [
+    { tenantId: "t1", appId: "kova", slug: "haddad", region: "eu", standing: "active", reason: "", plan: "Pro", status: "active", reachable: true },
+    { tenantId: "t2", appId: "scena", slug: "haddad", region: "eu", standing: "active", reason: "", plan: "Free", status: "active", reachable: true },
+    { tenantId: "t3", appId: "tessa", slug: "brightwater", region: "ap", standing: "active", reason: "", plan: null, status: null, reachable: false },
+  ];
+
+  const list = (tenants: typeof TENANTS | null) => html(
+    <TenantsScreen tenants={tenants} onOpen={() => undefined} onSearch={() => undefined} onBack={() => undefined} />,
+  );
+
+  /*
+    ⚠️ TWO WORKSPACES MAY SHARE A SLUG, because a slug is unique per PRODUCT — the
+    whole point of the column that was added to the directory. A row that named
+    only the slug would show what reads as a duplicate, and an operator acting on
+    "the haddad one" would have a one-in-two chance of the right business.
+  */
+  it("says the product on every row, because two may share a name", () => {
+    const out = list(TENANTS);
+    expect([...out.matchAll(/haddad/g)].length).toBeGreaterThanOrEqual(2);
+    expect(out).toContain("kova");
+    expect(out).toContain("scena");
+  });
+
+  /*
+    ⚠️ A REGION THAT WILL NOT ANSWER IS SAID, not left to read as "no plan". The
+    plan is fetched from the workspace's own region, so a region that is down and
+    a workspace on nothing produce the same blank — and they want opposite
+    responses from whoever is looking.
+  */
+  it("tells a region that is down from a workspace on no plan", () => {
+    const out = list(TENANTS);
+    expect(out).toContain("ap unreachable");
+    expect(out).toContain("no plan");
+  });
+
+  /* ⚠️ Nothing found is a search that matched nothing, never a deployment with
+     no workspaces — the screen carries a search box above it. */
+  it("tells still-loading from nothing-matched", () => {
+    expect(list(null)).toContain("aria-busy");
+    expect(list([])).toContain("No workspace matches");
+  });
+});
+
+describe("the switch that closes every door", () => {
+  const shown = (mode: "off" | "readonly" | "full") => html(
+    <MaintenanceScreen mode={mode} message="Back within the hour." onSet={async () => null} onBack={() => undefined} />,
+  );
+
+  /*
+    ⚠️ THE RUNG IS DESCRIBED BY WHAT IT DOES, not by its name. "readonly" is a
+    word from a database column; whether people lose what they were in the middle
+    of is the decision an operator is actually making.
+  */
+  it("says what each rung does rather than what it is called", () => {
+    expect(shown("readonly")).toContain("nobody is signed out");
+    /* ⚠️ Matched short of the apostrophe, which `renderToStaticMarkup` escapes. */
+    expect(shown("full")).toContain("every session but an operator");
+  });
+
+  /*
+    ⚠️ A MODE THIS BUNDLE DOES NOT KNOW IS SHOWN AS ITSELF. Falling back to the
+    first rung would report a CLOSED deployment as open, on the one screen whose
+    entire job is saying which it is.
+  */
+  it("never reports a mode it does not know as open", () => {
+    const out = html(
+      <MaintenanceScreen
+        mode={"draining" as never} message="" onSet={async () => null} onBack={() => undefined}
+      />,
+    );
+    expect(out).toContain("draining");
+    expect(out).not.toContain("Everything works");
   });
 });

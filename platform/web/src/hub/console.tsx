@@ -18,10 +18,12 @@
  * Scena's — which is correct behaviour and reads as a bug, every time.
  */
 
-import type { ElementType, ReactNode } from "react";
+import { useState, type ElementType, type ReactNode } from "react";
 import type { Problem } from "@one/kernel";
 import { Pill } from "../capsule.js";
-import { Blank, Card, Item, Unset, Waiting } from "../list.js";
+import { Blank, Card, Entry, Item, Unset, Waiting } from "../list.js";
+import { Choose } from "../choose.js";
+import { Field } from "../field.js";
 import { Mark } from "../mark.js";
 import { Screen, Section, Title } from "../screen.js";
 import { Tiles } from "../tiles.js";
@@ -266,6 +268,172 @@ export function CatalogueScreen({ product, plans, onEdit, onBack, Heading = "h1"
           </Card>
         )}
       </Section>
+    </Screen>
+  );
+}
+
+/* ------------------------------------------------------------- workspaces --- */
+
+/** One workspace on the deployment, as `admin.tenants` answers. */
+export interface Tenant {
+  readonly tenantId: string;
+  readonly appId: string;
+  readonly slug: string;
+  readonly region: string;
+  readonly standing: string;
+  readonly reason: string;
+  readonly plan: string | null;
+  readonly status: string | null;
+  /** ⚠️ Whether the region would open. Reported, so a broken one is not blank. */
+  readonly reachable: boolean;
+}
+
+export interface TenantsProps {
+  readonly tenants: readonly Tenant[] | null;
+  readonly onOpen: (tenantId: string) => void;
+  readonly onSearch: (text: string) => void;
+  readonly onBack: () => void;
+  readonly Heading?: ElementType;
+}
+
+/**
+ * EVERY WORKSPACE ON THE DEPLOYMENT, WHOEVER SERVES IT.
+ *
+ * ⚠️ IT SAYS WHICH PRODUCT ON EVERY ROW, and that is not decoration. A slug is
+ * unique per PRODUCT rather than per deployment, so two businesses may both be
+ * `haddad` — and a list that did not say so would show what reads as a duplicate
+ * and let an operator act on the wrong one.
+ *
+ * ⚠️ AND A REGION THAT WILL NOT OPEN IS SAID, not left blank. The plan and the
+ * standing are read from the workspace's own region one at a time; a region that
+ * is down produces a row with no plan on it, which is indistinguishable from a
+ * workspace on no plan — and those two want opposite responses.
+ */
+export function TenantsScreen({ tenants, onOpen, onSearch, onBack, Heading = "h1" }: TenantsProps): ReactNode {
+  return (
+    <Screen leave="up" onLeave={onBack} name="Workspaces" sky="silk"
+      title={<Title as={Heading}>Workspaces</Title>}
+      lede="Every workspace on this deployment, whichever product serves it."
+    >
+      <Section>
+        <Field label="Find one" value="" onValue={onSearch} clearable />
+      </Section>
+      <Section>
+        {tenants === null ? <Waiting rows={5} /> : tenants.length === 0 ? (
+          <Blank title="No workspace matches">Nothing on this deployment goes by that.</Blank>
+        ) : (
+          <Card>
+            {tenants.map((t) => (
+              <Item
+                key={t.tenantId}
+                mark={<Mark kind="workspace" name={t.slug} product={t.appId} />}
+                title={t.slug}
+                /*
+                  ⚠️ THE PRODUCT, THE PLAN AND WHAT IS WRONG, in that order — which
+                  is the order an operator scanning this list needs them. The
+                  region is absent on purpose: it matters when something is broken,
+                  and then it is on the row that says so.
+                */
+                detail={
+                  <>
+                    {t.appId} · {t.plan ?? "no plan"}
+                    {t.standing !== "active" ? <Pill tone="warn">{t.reason}</Pill> : null}
+                    {!t.reachable ? <Pill tone="alarm">{t.region} unreachable</Pill> : null}
+                  </>
+                }
+                onGo={() => onOpen(t.tenantId)}
+              />
+            ))}
+          </Card>
+        )}
+      </Section>
+    </Screen>
+  );
+}
+
+/* ------------------------------------------------------------ maintenance --- */
+
+export type Mode = "off" | "readonly" | "full";
+
+export interface MaintenanceProps {
+  readonly mode: Mode;
+  readonly message: string;
+  readonly onSet: (mode: Mode, message: string) => Promise<Problem | null>;
+  readonly onBack: () => void;
+  readonly Heading?: ElementType;
+}
+
+/*
+  ⚠️ WHAT EACH RUNG ACTUALLY DOES, in the words of somebody who would meet it.
+  "readonly" is a mode name; "writes are refused and nobody is signed out" is
+  what an operator is deciding between, and the difference is whether people lose
+  what they were in the middle of.
+*/
+export const MODES: readonly { readonly value: Mode; readonly label: string; readonly detail: string }[] = [
+  { value: "off", label: "Open", detail: "Everything works" },
+  { value: "readonly", label: "Read-only", detail: "Writes are refused, reads are served, nobody is signed out" },
+  { value: "full", label: "Closed", detail: "The product is withheld, sign-in is disabled, every session but an operator's ends" },
+];
+
+/**
+ * THE ONE SWITCH THAT CLOSES EVERY DOOR.
+ *
+ * ⚠️ IT IS DEPLOYMENT-WIDE AND SAYS SO, because it is the one control here that
+ * is not about a product. `platform_state` holds one row for the whole
+ * deployment — deliberately, so the switch cannot half-apply — which also means
+ * there is no way to take one product down and leave the others up.
+ *
+ * ⚠️ AND CLOSING REQUIRES A MESSAGE. A deployment that has vanished with nothing
+ * on the screen is one whose customers conclude it is gone; the server refuses a
+ * close with no message, and so does this.
+ */
+export function MaintenanceScreen({ mode, message, onSet, onBack, Heading = "h1" }: MaintenanceProps): ReactNode {
+  const [choosing, setChoosing] = useState(false);
+  const [said, setSaid] = useState(message);
+  /* ⚠️ A RUNG THIS SCREEN DOES NOT KNOW IS SHOWN AS ITSELF, never as the first
+     one. The mode arrives off the wire, so a deployment ahead of this bundle can
+     send a word that is not in the list — and defaulting to "Open" would report a
+     closed deployment as open, which is the one wrong answer that matters here. */
+  const now = MODES.find((m) => m.value === mode) ?? { value: mode, label: mode, detail: "" };
+
+  return (
+    <Screen leave="up" onLeave={onBack} name="Maintenance" sky="silk"
+      title={<Title as={Heading}>Maintenance</Title>}
+      lede="One switch, every product on this deployment."
+    >
+      <Section>
+        <Card>
+          <Item title="Right now" detail={now.detail} action={<Pill tone={mode === "off" ? "ok" : "warn"}>{now.label}</Pill>} />
+        </Card>
+      </Section>
+
+      <Section name="What people are told">
+        <Card>
+          <Entry label="Message" affordance={null}>
+            <Field
+              label="Message"
+              value={said}
+              onValue={setSaid}
+              under="Shown on every door while it is closed. Required to close."
+            />
+          </Entry>
+        </Card>
+      </Section>
+
+      <Section>
+        <Card>
+          <Item title="Change it" detail={`Currently ${now.label.toLowerCase()}`} onGo={() => setChoosing(true)} />
+        </Card>
+      </Section>
+
+      <Choose
+        open={choosing}
+        title="Maintenance"
+        options={MODES.map((m) => ({ value: m.value, label: m.label, detail: m.detail }))}
+        value={mode}
+        onPick={(next) => onSet(next, said)}
+        onClose={() => setChoosing(false)}
+      />
     </Screen>
   );
 }

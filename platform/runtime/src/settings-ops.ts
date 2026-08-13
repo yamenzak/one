@@ -20,8 +20,19 @@ export interface SettingsDeps {
   /** ⚠️ Where the branding copy and the domain claims live. */
   readonly directory: SqlHandle;
   readonly tenantId: string;
-  /** Whether this caller acts for the deployment rather than one workspace. */
-  readonly isOperator: boolean;
+  /*
+    ⚠️ THERE IS NO `isOperator` HERE, AND THERE WAS ONE. It was declared, it was
+    set on every request, and nothing read it — so what it amounted to was a
+    speculative way for an operator to write a setting whose own permission they
+    do not hold, switched off, with no test and no caller.
+
+    Deleting it rather than wiring it is the decision. An operator configures a
+    PRODUCT — its keys, its catalogue, its ceilings, all of which are the
+    deployment's and live in the global store. A workspace's own settings are the
+    workspace's, and the deliberate way for an operator to touch them is
+    impersonation: time-boxed, announced and audited. A quiet bypass on the write
+    path is the same power with none of those three.
+  */
 }
 
 export interface SettingsCarrier { readonly [SETTINGS]: SettingsDeps }
