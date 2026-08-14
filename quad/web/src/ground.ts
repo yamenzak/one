@@ -51,15 +51,18 @@ export const GROUND = {
      */
     raised: 0.865,
     /**
-     * ⚠️ THE FILL OF A CONTROL, AND IT HAS TO CLEAR THE RAISED TIER TOO. The
-     * library's `--default` is the ground of every secondary button — including
-     * the pill behind the nav's current destination, which sits ON the island.
-     * Left at its shipped value it landed 0.033 from the raised tier this file
-     * had just moved, so the one thing telling somebody where they are was
-     * invisible in dark. A palette is a set of RELATIONSHIPS; changing one tier
-     * without the things that sit on it is how a fix becomes a different bug.
+     * ⚠️ THE FILL OF A CONTROL, AND IT HAS TO CLEAR EVERYTHING A CONTROL SITS
+     * ON — which is three grounds, not two. The library's `--default` is the
+     * fill of every secondary and tertiary button: on a CARD (surface, 1.0), on
+     * the ISLAND (raised, 0.865), and — the one this value forgot — directly on
+     * the PAGE (background, 0.915), which is where a hero's quick actions live.
+     * At 0.94 it cleared the first two and sat 0.025 from the page, so four
+     * chips on the light ground read as smudges: WHERE a control sits decided
+     * whether it was visible. The window that clears all three by the 0.04
+     * floor is [0.955, 0.96]; this is its middle. A palette is a set of
+     * RELATIONSHIPS, and this tier has three of them.
      */
-    control: 0.94,
+    control: 0.9575,
   },
   dark: {
     background: 0.12,
@@ -89,6 +92,19 @@ export const TINT = { light: 5, dark: 8 } as const;
 
 /** The page's own ground carries more of it: it is the thing being belonged TO. */
 export const GROUND_TINT = { light: 9, dark: 6 } as const;
+
+/**
+ * ⚠️ A CONTROL IS NEVER GREYER THAN THE GROUND UNDER IT, and in light it was —
+ * which is the other half of why the hero's chips looked DIRTY rather than
+ * merely faint. The page carries 9% of the brand and the control carried 5%, so
+ * a chip on the ground was both nearly the same VALUE and visibly less
+ * SATURATED: a grey wash over a coloured field, which the eye reads as grime,
+ * not as a surface. Matching the richest ground it can sit on makes a chip
+ * "the same material, lighter" — the reading every other tier already has.
+ * Dark stays at the surface share: tint on a near-black control is swallowed,
+ * and the ground there carries less than the surfaces do, not more.
+ */
+export const CONTROL_TINT = { light: 9, dark: 8 } as const;
 
 const grey = (l: number) => `oklch(${l} 0 0)`;
 
@@ -131,7 +147,7 @@ function tier(mode: "light" | "dark"): string {
     /* ⚠️ A FIELD IS A SURFACE TOO. Left alone it stays pure white on a tinted
        card, which is the one place the old palette's dustiness would survive. */
     `--field-background: ${tinted(g.surface, t)};`,
-    `--default: ${tinted(g.control, t)};`,
+    `--default: ${tinted(g.control, CONTROL_TINT[mode])};`,
     /* ⚠️ NO EDGES. Both are ways of saying "separate", and a design needs one. */
     `--surface-shadow: none;`,
     `--overlay-shadow: none;`,

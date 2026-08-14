@@ -103,6 +103,20 @@ const HUE: Readonly<Record<Tone, string>> = {
 const mix = (hue: string, pct: number) =>
   `color-mix(in oklab, ${hue} calc(var(--sky, 1) * ${pct}%), transparent)`;
 
+/**
+ * ⚠️ MICRO-TEXTURE IS A DARK-THEME MATERIAL, AND IN LIGHT IT IS DIRT. The
+ * threads and dot fields below are marks of the brand laid over the ground —
+ * on a near-black screen a darker-than-nothing mark reads as SHEEN, light
+ * catching a fibre. On a light screen the same mark is DARKER than the paper,
+ * and a field of fine dark marks on light paper has a name: grime. It is not a
+ * strength problem — `--sky` already halves light mode and the hatching still
+ * read as a dirty wash behind the hero — it is a sign problem, and no
+ * multiplier fixes a sign. So texture layers carry a second knob that light
+ * turns OFF: the folds, poles and sweeps remain, the fibres do not.
+ */
+const thread = (hue: string, pct: number) =>
+  `color-mix(in oklab, ${hue} calc(var(--sky, 1) * var(--thread, 1) * ${pct}%), transparent)`;
+
 /** A soft pole of light: where, how wide, how strong. */
 const pole = (hue: string, pct: number, x: string, y: string, w: string, h: string) =>
   `radial-gradient(${w} ${h} at ${x} ${y}, ${mix(hue, pct)} 0%, transparent 72%)`;
@@ -219,14 +233,14 @@ function layers(what: Ambience, hue: string): readonly string[] {
     */
     case "dots":
       return [
-        `radial-gradient(${mix(hue, 22)} 0.5px, transparent 0.5px)`,
+        `radial-gradient(${thread(hue, 22)} 0.5px, transparent 0.5px)`,
         pole(hue, 14, "50%", "-10%", "120%", "70%"),
       ];
 
     /* Fine diagonal threading over a wash — cloth, not stripes. */
     case "weave":
       return [
-        `repeating-linear-gradient(45deg, ${mix(hue, 6)} 0 1px, transparent 1px 9px)`,
+        `repeating-linear-gradient(45deg, ${thread(hue, 6)} 0 1px, transparent 1px 9px)`,
         pole(hue, 18, "30%", "-10%", "110%", "70%"),
         pole(hue, 10, "90%", "40%", "70%", "60%"),
       ];
@@ -239,7 +253,7 @@ function layers(what: Ambience, hue: string): readonly string[] {
     */
     case "drape":
       return [
-        `repeating-linear-gradient(38deg, ${mix(hue, 5)} 0 1px, transparent 1px 7px)`,
+        `repeating-linear-gradient(38deg, ${thread(hue, 5)} 0 1px, transparent 1px 7px)`,
         /* ⚠️ EVERY ANGULAR STOP IS A RAMP, NEVER A JUMP. A conic gradient going
            straight from a tint to `transparent` draws a SEAM — a hard diagonal
            line across the screen that reads as a graphic, not as cloth. Cloth
@@ -343,7 +357,7 @@ export function ambienceStylesheet(): string {
     `[data-sky] { position: relative; isolation: isolate; --sky: 1; }`,
     /* ⚠️ SEE `mix` — one multiplier per theme, not forty hand-tuned numbers.
        Both selector forms, because the stamp may be on the host or an ancestor. */
-    `[data-theme="light"] [data-sky], [data-theme="light"][data-sky] { --sky: 0.55; }`,
+    `[data-theme="light"] [data-sky], [data-theme="light"][data-sky] { --sky: 0.55; --thread: 0; }`,
     `[data-sky]:not([data-sky="plain"])::before,`,
     `[data-sky]:not([data-sky="plain"])::after {`,
     `  content: ""; position: absolute; top: 0; left: 0; right: 0;`,

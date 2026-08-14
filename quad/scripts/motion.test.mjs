@@ -215,6 +215,36 @@ if (!grain) {
   ok(`grain: the dither is noise, with no pitch to see`);
 }
 
+/**
+ * ⚠️ MICRO-TEXTURE DIES IN LIGHT, AND IT IS A SIGN PROBLEM RATHER THAN A
+ * STRENGTH ONE. The ambience threads and dot fields are marks of the brand over
+ * the ground: darker-than-nothing on a near-black screen, which reads as sheen,
+ * and darker-than-the-paper on a light one, which reads as grime — a hero over
+ * hatching that a person described, accurately, as dusty and dirty. `--sky`
+ * already halves light mode and it still showed, because no multiplier fixes a
+ * sign. So every sub-pixel pattern layer must run through `thread()`, which
+ * carries the knob light turns off — and a new ambience whose fibres bypass it
+ * is this exact complaint shipping again.
+ */
+const fibres = [...AMBIENCE.matchAll(/repeating-linear-gradient\([^,]+,\s*\$\{(\w+)\(/g),
+  ...AMBIENCE.matchAll(/radial-gradient\(\$\{(\w+)\([^)]*\)\}\s*0?\.\d+px/g)];
+const loose_ = fibres.filter(([, fn]) => fn !== "thread");
+if (!fibres.length) {
+  fail(`ambience.ts: no texture layers found — if the fibres are gone, drop this check on purpose.`);
+} else if (loose_.length) {
+  for (const [whole, fn] of loose_) {
+    fail(`ambience.ts: a texture layer bypasses \`thread()\` — \`${whole.slice(0, 60)}…\` uses \`${fn}()\`.
+` +
+         `       Fine dark marks on light paper are grime; the knob light turns off is
+` +
+         `       \`--thread\`, and only \`thread()\` carries it.`);
+  }
+} else if (!/--thread: 0/.test(AMBIENCE)) {
+  fail(`ambience.ts: nothing sets \`--thread: 0\` in light, so every fibre still shows there.`);
+} else {
+  ok(`threads: ${fibres.length} texture layer(s), every fibre dies in light`);
+}
+
 console.log(bad
   ? `\nmotion: ${bad} finding(s) — a product with no motion and no typography of its own.`
   : `\nmotion: one set of curves, one set of roles, and reduced motion answered.`);

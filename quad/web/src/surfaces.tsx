@@ -403,7 +403,16 @@ export function QuickActions({ actions }: {
                colour belongs to the ground, never to the thing on it.
                `tertiary` is the same fill with no foreground override. */
             variant="tertiary"
-            data-glass="true"
+            /* ⚠️ NO GLASS, AND ITS PRESENCE HERE WAS A RULE BROKEN TWICE OVER.
+               Glass is for CHROME — the crown, the island — things content
+               passes UNDER, which is what the blur exists to keep legible.
+               These chips scroll WITH the page: nothing ever moves behind
+               them, so the blur bought nothing and the translucent fill cost
+               plenty — 76% of a grey tier laid over the light ambience is a
+               desaturated wash on a coloured ground, which the eye reads as
+               grime rather than as a surface. An in-flow control is OPAQUE,
+               from the tier ladder, where its visibility is guarded
+               arithmetic rather than whatever the gradient behind it does. */
             aria-label={a.label}
             onPress={a.onDo}
           >{a.icon}</Button>

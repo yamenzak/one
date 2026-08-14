@@ -148,20 +148,19 @@ for (const mode of ["light", "dark"]) {
     fail(`ground.ts: cannot read ${unread.join(", ") || "MIN_DELTA"} for ${mode} — the guard is blind.`);
     continue;
   }
-  /* ⚠️ EVERY PAIR, NOT A LADDER. The first version of this checked
-     background→surface→raised in order, which quietly assumed `raised` is the
-     brightest — true in dark and false in light, where the ladder ends at white
-     and a floating surface has to go the other way. An ordered check would have
-     forced the island BETWEEN the page and a card, which is the one value it
-     must not have. What matters is that no two tiers are confusable. */
-  /* ⚠️ `control` IS IN HERE BECAUSE IT SITS ON THE OTHERS. It is the fill of a
-     secondary button — on a card, and on the island — so it has to clear both.
-     Leaving it out is how moving the raised tier made the nav's current-position
-     pill land 0.033 away from the island under it and disappear. */
-  for (const [a, b] of [
-    ["background", "surface"], ["background", "raised"], ["surface", "raised"],
-    ["surface", "control"], ["raised", "control"],
-  ]) {
+  /*
+    ⚠️ EVERY PAIR, GENERATED — because the last version SAID "every pair" and
+    then wrote five of the six by hand. The one it left out, background→control,
+    is exactly the one that shipped: a hero's quick actions sit directly on the
+    page, the control tier was 0.025 from it in light, and four chips on the
+    ground read as smudges while the guard reported the palette sound. A pair
+    list is a claim about where things sit, and where things sit is decided by
+    screens this file never sees — so no pair is exempt, and an exemption
+    somebody genuinely needs gets argued in here as code.
+  */
+  const names = Object.keys(t);
+  const pairs = names.flatMap((a, i) => names.slice(i + 1).map((b) => [a, b]));
+  for (const [a, b] of pairs) {
     const delta = Math.abs(t[b] - t[a]);
     if (delta < floor) {
       gaps++;
@@ -171,7 +170,37 @@ for (const mode of ["light", "dark"]) {
     }
   }
 }
-if (!gaps) ok(`tiers: every surface clears the next by ${floor} in both themes`);
+if (!gaps) ok(`tiers: every pair of surfaces clears ${floor} in both themes`);
+
+/**
+ * ⚠️ A CONTROL IS NEVER GREYER THAN THE GROUND UNDER IT. Value separation is
+ * only half of visibility on a TINTED ground: a chip that is less saturated
+ * than the field it sits on reads as a grey wash over colour — grime, not a
+ * surface — however correct its lightness is. The control tier must carry at
+ * least the richest ground's share of the brand, per theme.
+ */
+const share = (name) => {
+  const m = new RegExp(`export const ${name} = \\{ light: (\\d+), dark: (\\d+) \\}`).exec(GROUND_SRC);
+  return m ? { light: Number(m[1]), dark: Number(m[2]) } : null;
+};
+const groundShare = share("GROUND_TINT");
+const controlShare = share("CONTROL_TINT");
+if (!groundShare || !controlShare) {
+  fail(`ground.ts: cannot read GROUND_TINT/CONTROL_TINT — the parity guard is blind.`);
+} else {
+  let dirty = 0;
+  for (const mode of ["light", "dark"]) {
+    if (controlShare[mode] < groundShare[mode]) {
+      dirty++;
+      fail(`ground.ts: ${mode} control carries ${controlShare[mode]}% of the brand against the ground's ${groundShare[mode]}%.
+` +
+           `       A chip greyer than the coloured field it sits on reads as grime, not a
+` +
+           `       surface — the dusty look, whatever its lightness is.`);
+    }
+  }
+  if (!dirty) ok(`kin: the control tier is never greyer than the ground it sits on`);
+}
 
 /**
  * ⚠️ AND THE TOKENS ARE ACTUALLY SET TO NONE. The ban above covers what WE

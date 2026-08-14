@@ -309,6 +309,24 @@
       "proves": "mono:"
     },
     {
+      "id": "a-control-clears-every-ground-it-sits-on",
+      "protects": "D7",
+      "stage": "5",
+      "status": "live",
+      "fails": "four quick-action chips 0.025 from the light page reading as smudges, while a hand-picked pair list reported the palette sound",
+      "impl": "scripts/ground.test.mjs",
+      "proves": "kin:"
+    },
+    {
+      "id": "micro-texture-dies-in-light",
+      "protects": "D7",
+      "stage": "5",
+      "status": "live",
+      "fails": "fine dark fibres over light paper behind a hero \u2014 which a person described, accurately, as dusty and dirty",
+      "impl": "scripts/motion.test.mjs",
+      "proves": "threads:"
+    },
+    {
       "id": "no-service-call-is-made-over-fetch",
       "protects": "D3",
       "stage": "7",
