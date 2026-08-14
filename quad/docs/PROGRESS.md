@@ -21,8 +21,8 @@ reader can trust this table instead of re-reading the code.
 | 4 | Identity + tenancy | shipped |
 | 5 | Surface — HeroUI shell, nav, sky, rendered settings | shipped |
 | 6 | Money — plans, entitlements, credits, jobs | shipped |
-| 7 | Services — ai and notify over RPC | building |
-| 8 | Vault + legal | not started |
+| 7 | Services — ai and notify over RPC | shipped |
+| 8 | Vault + legal | building |
 | 9 | Kova on Quad | not started |
 
 ## What is built
@@ -141,7 +141,22 @@ refuse — it reads as built and passes every test.
 - `web/money.tsx` — the bill, the wallet with its per-product breakdown, and the
   job console.
 
-The guard registry, its eleven checks, and the standards that bind them.
+**Services — the work that leaves the request path.**
+
+- `services.ts` — the contract is an INTERFACE both sides import, which is the
+  whole reason the seam is RPC rather than `fetch`: a method renamed on one side
+  fails to compile on the other. Generation is reserve → run → settle, with the
+  reserve computed from the same text that is sent, and a failure releases the
+  hold. The mock lane is gated on the environment structurally, because no test
+  can check it — the suites run where mocking is correct.
+- `inbox.ts` — the inbox, the two-level policy and the dispatch. The row is
+  filed for everybody in the audience whatever the policy narrowed away: email
+  and push are interruptions a person may refuse, the inbox is the record.
+- `web/inbox.tsx` · `web/ai.tsx` — the bell, the inbox, and the screen that
+  shows which model answers which lane. A previous platform had the schema, the
+  Durable Object, the routes and sixteen dispatch sites with nowhere to look.
+
+The guard registry, its twelve checks, and the standards that bind them.
 
 ## Decisions, and how well each is defended
 
@@ -150,7 +165,7 @@ The guard registry, its eleven checks, and the standards that bind them.
 |---|---|---|
 | D1 | The tenant is primary; an app is a capability switched on for it | 3 |
 | D2 | The name is Quad; packages are `@quad/*` | 2 |
-| D3 | One worker on the request path; heavy work splits over RPC service bindings | 1 |
+| D3 | One worker on the request path; heavy work splits over RPC service bindings | 2 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 3 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
@@ -158,8 +173,8 @@ The guard registry, its eleven checks, and the standards that bind them.
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 2 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 2 |
-| D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 3 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 27 |
+| D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 4 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 30 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -192,6 +207,7 @@ the library decides FOR us.
 | `no-handler-raises-its-own-cross-cutting-concern` | D12 | a concern an app can forget, forgotten invisibly — no error, no failing test, a capability that silently does not apply |
 | `no-cross-tenant-query-fans-out-over-shards` | D5 | an operator console that gets slower with every shard, until the sweep it runs times out |
 | `composition-is-lazy` | D4 | cold start growing with the catalogue, until the catalogue that was meant to grow cannot |
+| `no-service-call-is-made-over-fetch` | D3 | a wrong payload becoming a production error where it had been a compile error |
 | `a-declaration-is-a-literal-a-script-can-walk` | D8 | a declaration that has to be executed before it can be read, so every generated surface stops being derivable |
 | `a-library-decides-it-does-not-rule` | D9 | one of our own rules living inside somebody else's package, re-learned from their release notes |
 | `a-notification-nobody-can-receive-is-refused` | D12 | a message switched on in the policy screen that never arrives, so people stop trusting the ones that do |
@@ -221,8 +237,12 @@ the library decides FOR us.
 | `arrears-take-writes-and-never-reads` | D12 | a business locked out of its own records over an unpaid invoice, which is holding their data hostage |
 | `a-signup-in-progress-is-never-read-as-arrears` | D12 | a brand-new workspace held read-only over an invoice that never existed, in its first minute |
 | `grandfathering-and-an-adjustment-are-separate-columns` | D12 | give this workspace ten seats becoming a one-way door whose only reverse discards what they were originally sold |
+| `a-fabricating-lane-is-development-only` | D3 | invented output served as fact in production, billed for, with every suite green because the suites run where mocking is correct |
+| `a-failed-generation-gives-the-credits-back` | D12 | a customer whose balance shrank for a call that returned nothing, with the hold never released |
+| `the-inbox-is-written-whatever-the-policy-says` | D12 | somebody who muted email having no record at all of what happened while they were not looking |
+| `a-notification-audience-is-a-permission` | D12 | a workspace that made its own role silently receiving nothing, with every dispatch reporting success against an empty audience |
+| `one-persons-inbox-is-one-persons` | D11 | a workspace filter without the account, which is everybody reading everybody else's notifications |
 | `a-vault-fact-is-never-stored-by-an-app` *(owed)* | D11 | an app writing the vault's own tables directly, so a fact exists with no grant, no consent record and no way to shred it |
-| `no-service-call-is-made-over-fetch` *(owed)* | D3 | a wrong payload becoming a production error where it had been a compile error |
 <!-- /generated -->
 
 ## Commands

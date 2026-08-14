@@ -18,3 +18,5 @@ export * from "./shell.js";
 export * from "./console.js";
 export * from "./guide.js";
 export * from "./money.js";
+export * from "./inbox.js";
+export * from "./ai.js";

@@ -17,8 +17,9 @@
  */
 
 import type { Allowance, AppSpec, TenantId } from "@quad/kernel";
-import { withinQuota } from "@quad/kernel";
+import { PUBLIC, withinQuota } from "@quad/kernel";
 import { noteInvitation } from "./directory.js";
+import { inboxOf, markSeen, policyOf, preferenceOf, setPolicy, setPreference, unseenCount } from "./inbox.js";
 import { invite, membersOf, remove, rolesFor, setRole } from "./membership.js";
 import type { Ctx, Resolved } from "./compose.js";
 import type { Db } from "./sql.js";
@@ -117,6 +118,61 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         return { id: String(input.id) };
       }),
 
+    /* ------------------------------------------------------------ inbox --- */
+
+    /*
+      ⚠️ THE INBOX IS THE PLATFORM'S AND EVERY APP HAS IT. An app that had to
+      declare "list my notifications" would be an app that could ship without
+      one — which is precisely what a previous platform did, for three stages,
+      with the schema, the routes and sixteen dispatch sites already in place.
+
+      ⚠️ AND `PUBLIC` IS RIGHT HERE: this is a question about the caller, and a
+      workspace permission on "what was I told" would be a role check on
+      somebody's own record.
+    */
+    "inbox.list": op("inbox.list", "read", PUBLIC as unknown as string, "What you were told.",
+      async (ctx) => ({
+        items: ctx.accountId ? await inboxOf(ctx.db, ctx.tenantId as TenantId, ctx.accountId) : [],
+        unseen: ctx.accountId ? await unseenCount(ctx.db, ctx.tenantId as TenantId, ctx.accountId) : 0,
+      })),
+
+    "inbox.seen": op("inbox.seen", "write", PUBLIC as unknown as string, "Mark as read.",
+      async (ctx, input) => {
+        if (!ctx.accountId) return ctx.fail("platform.unauthorized");
+        await markSeen(ctx.db, ctx.tenantId as TenantId, ctx.accountId,
+          input.id ? String(input.id) : null, ctx.now);
+        return { seen: true };
+      }),
+
+    /* ⚠️ Two levels, two operations, two authorities. A person narrowing their
+       own notifications and a workspace setting the ceiling are not the same
+       write, and sharing one would let either overwrite the other. */
+    "inbox.preference": op("inbox.preference", "write", PUBLIC as unknown as string,
+      "Choose how you are told.",
+      async (ctx, input) => {
+        if (!ctx.accountId) return ctx.fail("platform.unauthorized");
+        await setPreference(ctx.db, ctx.tenantId as TenantId, ctx.accountId,
+          String(input.type ?? ""), asChannels(input.channels));
+        return { saved: true };
+      }),
+
+    "inbox.policy": op("inbox.policy", "write", "tenant:manage",
+      "Choose what this workspace may be told about.",
+      async (ctx, input) => {
+        await setPolicy(ctx.db, ctx.tenantId as TenantId,
+          String(input.type ?? ""), asChannels(input.channels));
+        return { saved: true };
+      }),
+
+    "inbox.settings": op("inbox.settings", "read", PUBLIC as unknown as string,
+      "The two levels of the notification policy.",
+      async (ctx) => ({
+        policy: await policyOf(ctx.db, ctx.tenantId as TenantId),
+        preference: ctx.accountId
+          ? await preferenceOf(ctx.db, ctx.tenantId as TenantId, ctx.accountId)
+          : {},
+      })),
+
     "member.remove": op("member.remove", "write", "member:manage", "Remove somebody.",
       async (ctx, input) => {
         const merged = await rolesFor(ctx.db, ctx.tenantId as TenantId, roles());
@@ -131,3 +187,9 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       }),
   };
 }
+
+/** ⚠️ A channel list from a request is untrusted; the kernel's policy rules
+    refuse anything the type does not offer, and this only keeps the shape. */
+const asChannels = (given: unknown): readonly ("inbox" | "email" | "push")[] =>
+  (Array.isArray(given) ? given : [])
+    .filter((c): c is "inbox" | "email" | "push" => c === "inbox" || c === "email" || c === "push");

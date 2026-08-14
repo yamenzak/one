@@ -193,8 +193,10 @@
       "id": "no-service-call-is-made-over-fetch",
       "protects": "D3",
       "stage": "7",
-      "status": "owed",
-      "fails": "a wrong payload becoming a production error where it had been a compile error"
+      "status": "live",
+      "fails": "a wrong payload becoming a production error where it had been a compile error",
+      "impl": "scripts/services.test.mjs",
+      "proves": "rpc:"
     },
     {
       "id": "a-declaration-is-a-literal-a-script-can-walk",
@@ -456,6 +458,51 @@
       "impl": "apps/hello/test/money.test.ts",
       "proves": "holds a workspace at what it was sold",
       "fails": "give this workspace ten seats becoming a one-way door whose only reverse discards what they were originally sold"
+    },
+    {
+      "id": "a-fabricating-lane-is-development-only",
+      "protects": "D3",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/services.test.mjs",
+      "proves": "mock:",
+      "fails": "invented output served as fact in production, billed for, with every suite green because the suites run where mocking is correct"
+    },
+    {
+      "id": "a-failed-generation-gives-the-credits-back",
+      "protects": "D12",
+      "stage": "7",
+      "status": "live",
+      "impl": "apps/hello/test/services.test.ts",
+      "proves": "gives the credits back when the provider fails",
+      "fails": "a customer whose balance shrank for a call that returned nothing, with the hold never released"
+    },
+    {
+      "id": "the-inbox-is-written-whatever-the-policy-says",
+      "protects": "D12",
+      "stage": "7",
+      "status": "live",
+      "impl": "apps/hello/test/services.test.ts",
+      "proves": "still files the row when every interruption is switched off",
+      "fails": "somebody who muted email having no record at all of what happened while they were not looking"
+    },
+    {
+      "id": "a-notification-audience-is-a-permission",
+      "protects": "D12",
+      "stage": "7",
+      "status": "live",
+      "impl": "apps/hello/test/services.test.ts",
+      "proves": "reaches everybody who holds the key",
+      "fails": "a workspace that made its own role silently receiving nothing, with every dispatch reporting success against an empty audience"
+    },
+    {
+      "id": "one-persons-inbox-is-one-persons",
+      "protects": "D11",
+      "stage": "7",
+      "status": "live",
+      "impl": "apps/hello/test/services.test.ts",
+      "proves": "never shows one person another person's inbox",
+      "fails": "a workspace filter without the account, which is everybody reading everybody else's notifications"
     }
   ]
 }

@@ -14,6 +14,8 @@ export * from "./billing.js";
 export * from "./credits.js";
 export * from "./jobs.js";
 export * from "./locate.js";
+export * from "./inbox.js";
+export * from "./services.js";
 export * from "./records.js";
 export * from "./handles.js";
 export * from "./compose.js";

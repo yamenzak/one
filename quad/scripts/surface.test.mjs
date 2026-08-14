@@ -57,7 +57,7 @@ const SURFACES = {
     make and a screen that does not exist yet — which is exactly the state this
     guard exists to keep visible rather than let anybody forget.
   */
-  lanes: { owed: "7" },
+  lanes: { file: "web/src/ai.tsx", renders: "export function AiLanes" },
   vault: { owed: "8" },
   purposes: { owed: "8" },
   documents: { owed: "8" },
