@@ -20,7 +20,10 @@
  */
 
 import type { AccessSpec } from "./access.js";
-import { foundingRole, undeclared, unholdable } from "./access.js";
+import {
+  PLATFORM_PERMISSIONS, PLATFORM_PERSONAL, PLATFORM_ROLES, claimsPlatform, foundingAppRole,
+  undeclared, unholdable,
+} from "./access.js";
 import type { Lane } from "./ai.js";
 import type { WhitelabelDef } from "./brand.js";
 import type { CollectionSpec } from "./collection.js";
@@ -164,7 +167,9 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
   const out: Refusal[] = [];
   const at = (of: string, why: string) => out.push({ of, why });
 
-  const permissions = spec.access.permissions;
+  /* ⚠️ Surfaces may NAME platform keys ("the money screen needs billing:read")
+     even though the app may not DECLARE them — see `claimsPlatform`. */
+  const permissions = [...spec.access.permissions, ...PLATFORM_PERMISSIONS, ...PLATFORM_PERSONAL];
   const routes = spec.screens.map((s) => s.route);
   const events = eventsOf(spec);
 
@@ -193,22 +198,35 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
   /* --- what nobody can reach --------------------------------------------- */
 
   for (const key of unholdable(spec.access)) {
-    at("permission", `"${key}" is declared and no role or personal set holds it`);
+    at("permission", `"${key}" is declared and no app role holds it`);
   }
   for (const key of undeclared(spec.access)) {
     at("permission", `a role holds "${key}", which is not a declared permission`);
   }
-  for (const why of unreachable(spec.operations, spec.access.roles, spec.access.personal)) {
+  /* ⚠️ An app claiming a platform key would let a product update quietly mint
+     workspace managers (D15). The fix is deletion, so it is its own refusal. */
+  for (const key of claimsPlatform(spec.access)) {
+    at("permission", `"${key}" is the platform's — an app may name it on a surface, never declare or bundle it`);
+  }
+  for (const why of unreachable(spec.operations,
+    { ...PLATFORM_ROLES, ...spec.access.roles }, PLATFORM_PERSONAL)) {
     at("operation", why);
   }
 
   /*
-    ⚠️ SOMEBODY MUST BE ABLE TO ADMINISTER A NEW TENANT. With no role that can
-    manage members there is no founding membership: every request answers 403,
-    and the tenant row, the tables and the session are all perfectly correct.
+    ⚠️ SOMEBODY MUST BE ABLE TO USE A NEW TENANT'S APP. The platform makes the
+    creator an `owner` (workspace authority is the platform's); this is the APP
+    role they found in, and an app with no roles at all has no founding state.
   */
-  if (!foundingRole(spec.access.roles)) {
-    at("access", "no role can manage members, so a new tenant would have nobody who can run it");
+  if (!foundingAppRole(spec.access)) {
+    at("access", "no app roles are declared, so a new workspace's creator would be nobody in it");
+  }
+  if (spec.access.founding && !spec.access.roles[spec.access.founding]) {
+    at("access", `founding role "${spec.access.founding}" is not a declared role`);
+  }
+  for (const role of spec.access.seats.counts) {
+    if (!(role in PLATFORM_ROLES)) at("access", `seats count "${role}", which is not a platform role`);
+    if (role === "customer") at("access", "customers never cost a seat — they are the product, not the staff");
   }
 
   /* --- what is sold and not kept ----------------------------------------- */

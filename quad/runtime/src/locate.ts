@@ -14,7 +14,7 @@
  */
 
 import type { AppSpec, Door, Instant, TenantId } from "@quad/kernel";
-import { tableFor } from "@quad/kernel";
+import { seatsUsed, tableFor } from "@quad/kernel";
 import { heldBy } from "./billing.js";
 import { balanceOf } from "./credits.js";
 import { tenantBySlug, type TenantRow } from "./directory.js";
@@ -100,7 +100,7 @@ async function prime(
     const seats = app.access.seats;
     if (seats?.entitlement) {
       const members = await membersOf(db, tenantId);
-      into.set(seats.entitlement, members.filter((m) => seats.counts.includes(m.role)).length);
+      into.set(seats.entitlement, seatsUsed(members, seats.counts));
     }
   }
 }

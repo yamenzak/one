@@ -40,11 +40,14 @@ const app = (over: Partial<AppSpec> = {}): AppSpec => ({
   id: "probe",
   name: "Probe",
   mark: "◆",
+  /* ⚠️ The app's OWN keys only (D15): workspace authority — members, settings,
+     the bill — is the platform's, and an app that declared those keys would be
+     one whose roles could mint managers. */
   access: {
-    permissions: ["note:read", "note:write", "member:read", "member:manage", "tenant:create"],
-    roles: { owner: ["note:read", "note:write", "member:read", "member:manage"] },
-    personal: ["tenant:create"],
-    seats: { counts: ["owner"], entitlement: "seats" },
+    permissions: ["note:read", "note:write"],
+    roles: { editor: ["note:read", "note:write"], reader: ["note:read"] },
+    founding: "editor",
+    seats: { counts: ["owner", "manager", "staff"], entitlement: "seats" },
   },
   entitlements: {
     seats: { label: "Seats", withheld: "quota" },
@@ -95,18 +98,55 @@ describe("what nobody could ever reach", () => {
     included — and the 403 is indistinguishable from one somebody forgot to
     grant. It reads exactly like a feature nobody uses.
   */
-  it("refuses a permission no role and no personal set can hold", () => {
+  it("refuses a permission no app role holds", () => {
     const broken = app({ access: { ...app().access, permissions: [...app().access.permissions, "ghost:read"] } });
-    expect(whyOf(broken)).toContain("no role or personal set holds it");
+    expect(whyOf(broken)).toContain("no app role holds it");
   });
 
   /* ⚠️ And the mirror: a role holding a key nothing declares grants nothing, and
      looks from both sides like access somebody has. */
   it("refuses a role that holds a key nothing declares", () => {
     const broken = app({
-      access: { ...app().access, roles: { owner: [...app().access.roles.owner!, "ghost:write"] } },
+      access: { ...app().access, roles: { ...app().access.roles, editor: ["note:read", "ghost:write"] } },
     });
     expect(whyOf(broken)).toContain("not a declared permission");
+  });
+
+  /*
+    ⚠️ AN APP CLAIMING A PLATFORM KEY WOULD LET A PRODUCT UPDATE QUIETLY MINT
+    WORKSPACE MANAGERS (D15). Naming one on a screen is legal — "the money
+    screen needs billing:read" — declaring or bundling it is not.
+  */
+  it("refuses an app that declares or bundles a platform key", () => {
+    const declared = app({
+      access: { ...app().access, permissions: [...app().access.permissions, "member:manage"] },
+    });
+    expect(whyOf(declared)).toContain("the platform's");
+    const bundled = app({
+      access: { ...app().access, roles: { ...app().access.roles, editor: ["note:read", "note:write", "member:manage"] } },
+    });
+    expect(whyOf(bundled)).toContain("the platform's");
+  });
+
+  /* ...and a screen may NAME one, because the surface is where a platform
+     permission is legitimately asked about. */
+  it("accepts a screen that names a platform key", () => {
+    const ok = app({
+      screens: [...app().screens,
+        { id: "people", route: "/people", label: "People", permission: "member:read" as const }],
+    });
+    expect(refuseApp(ok)).toEqual([]);
+  });
+
+  it("refuses a founding role that is not declared, and seat counts that are not platform roles", () => {
+    const ghost = app({ access: { ...app().access, founding: "ghost" } });
+    expect(whyOf(ghost)).toContain('founding role "ghost"');
+    const seats = app({ access: { ...app().access, seats: { counts: ["editor"], entitlement: "seats" } } });
+    expect(whyOf(seats)).toContain("not a platform role");
+    /* ⚠️ Customers are the product, not the staff — a seat ceiling on them gates
+       the workspace on the people it exists to serve. */
+    const customers = app({ access: { ...app().access, seats: { counts: ["customer"], entitlement: "seats" } } });
+    expect(whyOf(customers)).toContain("never cost a seat");
   });
 
   it("refuses an operation whose permission nothing holds", () => {
@@ -117,16 +157,17 @@ describe("what nobody could ever reach", () => {
   });
 
   /*
-    ⚠️ SOMEBODY MUST BE ABLE TO ADMINISTER A NEW TENANT. With no role that can
-    manage members there is no founding membership — every request 403s while the
-    tenant row, the tables and the session are all perfectly correct.
+    ⚠️ SOMEBODY MUST BE ABLE TO USE A NEW TENANT'S APP. The platform makes the
+    creator an `owner` — running the workspace is its authority — but with no
+    app roles at all there is nothing for them to BE in the product: every app
+    request 403s while the tenant row, the tables and the session are all
+    perfectly correct.
   */
-  it("refuses an app where no role can run a workspace", () => {
+  it("refuses an app with no roles for a founder to hold", () => {
     const broken = app({
       access: {
-        permissions: ["note:read", "tenant:create"],
-        roles: { reader: ["note:read"] },
-        personal: ["tenant:create"],
+        permissions: [],
+        roles: {},
         seats: { counts: [], entitlement: "seats" },
       },
       collections: [note],
@@ -135,7 +176,7 @@ describe("what nobody could ever reach", () => {
       plans: [{ id: "free", name: "Free", said: "", price: 0, currency: "EUR", order: 0, parking: true, includes: {} }],
       screens: [],
     });
-    expect(whyOf(broken)).toContain("nobody who can run it");
+    expect(whyOf(broken)).toContain("nobody in it");
   });
 
   /* ⚠️ PUBLIC means "the session decides" and is not a hole — it is how the

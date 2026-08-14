@@ -19,7 +19,7 @@
  */
 
 import type { AccountId, TenantId, VaultBook } from "@quad/kernel";
-import { newId, refuseRead, type Consent, type Grant } from "@quad/kernel";
+import { newId, refuseRead, type Consent, type VaultGrant } from "@quad/kernel";
 import type { SchemaModule } from "./schema.js";
 import type { Db } from "./sql.js";
 
@@ -207,7 +207,7 @@ export async function consent(
 
 export async function grantsOf(
   db: Db, subject: AccountId, grantee: string,
-): Promise<readonly Grant[]> {
+): Promise<readonly VaultGrant[]> {
   const rows = await db.prepare(
     `SELECT * FROM vault_grant WHERE subject_id = ? AND grantee = ?`).bind(subject, grantee).all();
   return rows.results.map((r) => ({

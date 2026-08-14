@@ -161,6 +161,9 @@ export interface Dispatch {
 export async function audienceFor(
   db: Db,
   book: NotificationBook,
+  /** ⚠️ The app the notification belongs to — the audience is what each member
+      may do IN THAT APP (D15), or a role in one product would ring bells in all. */
+  appId: string,
   roles: RoleRegistry,
   dispatch: Dispatch,
   available: readonly Channel[],
@@ -175,7 +178,7 @@ export async function audienceFor(
   for (const member of members) {
     if (!member.accountId) continue;
     if (dispatch.except && member.accountId === dispatch.except) continue;
-    if (!inAudience(def, permissionsFor(member, roles))) continue;
+    if (!inAudience(def, permissionsFor(member, appId, roles))) continue;
 
     const preference = await preferenceOf(db, dispatch.tenantId, member.accountId);
     out.push({

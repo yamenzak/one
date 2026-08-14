@@ -20,8 +20,8 @@ import type { AppSpec } from "@quad/kernel";
 import {
   AUDIT_SCHEMA, BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA,
   JOBS_SCHEMA, MEMBERSHIP_SCHEMA, REPLAY_SCHEMA, VAULT_SCHEMA,
-  accountOfToken, applySchema, appsOfTenant, bearerFrom, locator, memberFor, permissionsOf,
-  personalOps, rolesFor, schemaFor, serve, sessionIdFrom, shardFor, whoIs,
+  NOBODY, accountOfToken, applySchema, appsOfTenant, bearerFrom, locator, memberFor,
+  permissionsResolver, personalOps, schemaFor, serve, sessionIdFrom, shardFor, whoIs,
   type Db, type TenantRow,
 } from "@quad/runtime";
 import { hello } from "@quad/hello";
@@ -181,20 +181,17 @@ const handler = (env: Env) => {
         : await whoIs(directory, sessionIdFrom(request), now);
 
       const accountId = viaToken ?? viaSession;
-      if (!accountId) {
-        return { caller: { signedIn: false, permissions: new Set(), provenAt: null }, accountId: null };
-      }
-      const app = APPS[located.apps[0] ?? ""]?.();
+      if (!accountId) return NOBODY;
       const member = await memberFor(located.db, located.tenantId as never, accountId);
-      const roles = await rolesFor(located.db, located.tenantId as never, app?.access.roles ?? {});
       return {
         accountId,
         email,
-        caller: {
-          signedIn: true,
-          permissions: permissionsOf(member, roles),
-          provenAt: session?.provenAt ?? null,
-        },
+        signedIn: true,
+        provenAt: session?.provenAt ?? null,
+        /* ⚠️ Per app (D15) — the flat set this replaced was resolved against
+           `located.apps[0]`, so a role in the second product granted nothing. */
+        permissionsIn: permissionsResolver(located.db, located.tenantId as never, member,
+          (appId) => APPS[appId]?.().access.roles ?? null, now),
       };
     },
   });

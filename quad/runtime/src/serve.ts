@@ -37,16 +37,28 @@ import type { Db } from "./sql.js";
  * does, a deployment that answered as somebody would be one whose gates are
  * decoration — so the default is nobody, and the caller with no session is
  * refused by the permission gate exactly as they should be.
+ *
+ * ⚠️ PERMISSIONS ARE A FUNCTION OF WHICH APP IS ASKING (D15). A flat set here
+ * was the multi-app bug: it was resolved against ONE app's registry — whichever
+ * happened to be first on the tenant's list — so a role in the second product
+ * granted nothing, silently, on every request. The gate resolves the set for
+ * the app the operation belongs to; `null` is the platform's own context.
  */
 export interface Who {
-  readonly caller: Caller;
   readonly accountId: string | null;
   readonly email?: string | null;
+  readonly signedIn: boolean;
+  readonly provenAt: string | null;
+  readonly permissionsIn: (appId: string | null) => Promise<ReadonlySet<string>>;
 }
 
+const NONE: ReadonlySet<string> = new Set();
+
 export const NOBODY: Who = {
-  caller: { signedIn: false, permissions: new Set(), provenAt: null },
   accountId: null,
+  signedIn: false,
+  provenAt: null,
+  permissionsIn: async () => NONE,
 };
 
 export interface Wiring {
@@ -216,9 +228,17 @@ export async function performOperation(
 
   /* --- the gates, in the kernel's order ----------------------------------- */
 
+  /* ⚠️ Resolved for the app THIS operation belongs to (D15) — the flat set the
+     caller used to carry was whichever app was first on the tenant's list. */
+  const caller: Caller = {
+    signedIn: who.signedIn,
+    permissions: await who.permissionsIn(composed.app.id),
+    provenAt: who.provenAt,
+  };
+
   const refused = check({
     op: op.spec,
-    caller: who.caller,
+    caller,
     standing: located.standing ?? IN_GOOD_STANDING,
     entitlements: located.entitlements ?? [],
     flags: located.flags ?? {},
@@ -243,7 +263,9 @@ export async function performOperation(
     accountId: who.accountId,
     now,
     directory: wiring.directory,
-    permissions: who.caller.permissions,
+    permissions: caller.permissions,
+    permissionsIn: who.permissionsIn,
+    declaredRoles: (appId) => wiring.apps[appId]?.().access.roles ?? null,
     email: who.email ?? null,
     allowance: (key: string) =>
       (located.entitlements ?? []).find((e) => e.key === key)?.value ?? false,

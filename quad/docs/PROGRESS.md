@@ -26,6 +26,7 @@ reader can trust this table instead of re-reading the code.
 | 9 | Kova on Quad | shipped |
 | 10 | One — the deployment and the Hub | shipped |
 | 11 | The agent surface — every operation an MCP tool, derived | shipped |
+| 12 | Multi-app access — a platform role for the workspace, a role per app inside it | shipped |
 
 ## What is NOT built, and where to pick it up
 
@@ -340,6 +341,37 @@ the replay, the seven gates and the audit apply to agents identically.
   stop meaning callable, and the roster's granting operations cannot quietly
   become tools again.
 
+**Multi-app access — one membership, two authorities (D15).** A row carries a
+PLATFORM role (`owner` / `manager` / `staff` / `customer` — identical keys in
+every product, the workspace's constitutional offices) and a role PER ENABLED
+APP in that app's own vocabulary, `founding` naming the one a creator gets.
+`permissionsFor(member, appId)` is the ONE resolver — platform role ∪ app role
+∪ live grants, MINUS revoked — and a grant may carry `until`, which is the
+whole lapse mechanism the package rail stands on (D16, stage 13).
+
+- **The gate resolves the caller's keys for the app the operation belongs to.**
+  The seam this replaced resolved against `located.apps[0]` — whichever product
+  happened to be first — so a role in the second product granted nothing,
+  silently, with every single-app suite green. `permissionsResolver` (runtime)
+  is the per-request memo every deployment hands to `Who`.
+- **Every assignment is bounded per authority.** The inviter's platform keys
+  bound the platform role; their keys IN EACH APP bound that app's role —
+  `beyondGranter` asks both at the invitation and the removal, and
+  `member.role` splits the two writes (`platformRole` | `app` + `role`), each
+  against its own authority. A manager cannot mint an owner; staff cannot
+  invite at all.
+- **An app may NAME a platform key on a surface and may never DECLARE one** —
+  `claimsPlatform` refuses the manifest at boot, so a product update cannot
+  quietly mint workspace managers. Custom roles compose ONE app's declared
+  keys; seats count platform roles and `customer` never costs one.
+- **The audience is per-app**: `audienceFor` resolves each member in the app
+  that raised the event, so a role in one product does not ring bells about
+  another's.
+- `scripts/access.test.mjs` holds the three structural promises
+  (mutation-verified, five mutations tried); `kernel/test/access.test.ts` is
+  the resolver's own suite — multi-app resolution, grant expiry, revocation
+  last, the bounds, stranding, seats.
+
 **`@quad/one-hub` — the page a person opens.** The signpost, sign-in with an
 emailed code, the workspace list, and the wizard that makes one — HeroUI v3 as it
 ships, themed through tokens, nothing restyled.
@@ -378,6 +410,8 @@ The guard registry, its checks, and the standards that bind them.
 | D12 | Every cross-cutting concern is a field on a declaration, never a call site | 39 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 0 |
+| D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 3 |
+| D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 0 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -495,6 +529,9 @@ the library decides FOR us.
 | `an-opted-out-operation-is-invisible-on-the-agent-door` | D13 | a tool hidden from the list and still callable — or a distinct refusal that confirms the name to the model that was refused it |
 | `the-tool-catalogue-means-callable` | D13 | an agent shown every tool including the refusals, taught to try them, with an audit row per call that was never going to run |
 | `the-rosters-granting-operations-are-not-tools` | D13 | a model that can invite somebody to a workspace from a sentence in a document it was asked to summarise |
+| `the-gate-resolves-keys-for-the-operations-own-app` | D15 | a role in the second product grants nothing, silently, for everybody — every suite green because every suite has one app |
+| `every-assignment-is-bounded-per-authority` | D15 | anybody who can edit access escalates in two steps: grant yourself the role you lack through the authority nobody bounds, then use it |
+| `a-notifications-audience-is-per-app` | D15 | a role in one product rings bells about another product's events for people who cannot even open it |
 <!-- /generated -->
 
 ## Commands

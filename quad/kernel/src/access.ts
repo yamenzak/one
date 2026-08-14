@@ -1,56 +1,150 @@
 /**
  * WHAT SOMEBODY MAY DO, AND WHO MAY GIVE IT TO THEM.
  *
+ * ⚠️ TWO KINDS OF AUTHORITY ON ONE MEMBERSHIP, AND THE SPLIT IS THE MULTI-APP
+ * MODEL (D15). A PLATFORM role says what somebody may do to the WORKSPACE —
+ * manage members, settings, the bill — in keys identical across every product.
+ * An APP role says what they may do INSIDE one product, in that product's own
+ * vocabulary, held per enabled app. A single flat role cannot be both: "trainer"
+ * names Kova keys and names nothing in the next app, and the failure is silent
+ * 403s in the second product for everybody. Per-app MEMBERSHIPS are the other
+ * wrong answer — two rosters, two invitations, two seats for one person, the
+ * seam D1 exists to close.
+ *
  * ⚠️ NOBODY MAY GRANT WHAT THEY DO NOT HOLD. Without that one rule, anybody who
  * can edit access escalates in two steps: give yourself the key you lack, then
- * use it. It is cheap to check, it belongs beside the resolution rather than in
- * whichever screen happens to call it, and its absence is invisible until
- * somebody notices they have been an owner for a month.
+ * use it. It is asked of platform roles and of each app's roles separately,
+ * because bounding one and not the other is the same escalation with a shorter
+ * first step.
  *
  * ⚠️ AND A ROLE IS A NAME FOR A BUNDLE, NEVER A COPY OF ONE. Storing the
  * permission SET on a membership row is the shape that rots: a key added to a
  * role reaches nobody who joined before it, and one removed keeps working for
- * everybody who did. Neither failure is visible from the role name, which is the
- * only thing anybody ever looks at.
+ * everybody who did.
+ *
+ * ⚠️ A GRANT MAY CARRY A CLOCK, AND AN EXPIRED GRANT IS NOT HELD. This is the
+ * seam the package rail stands on (D16): a purchase applies keys with an
+ * `until`, and the ONE resolver below is where they stop counting — not N
+ * checks in N apps. Bare keys (no clock) remain what they were: a person's
+ * deliberate exception.
  *
  * Layer 2. Imports primitives.
  */
 
 import type { AccountId, TenantId } from "./primitives.js";
 
+/* -------------------------------------------------------- platform authority --- */
+
+/**
+ * ⚠️ THE PLATFORM'S OWN KEYS, IDENTICAL IN EVERY PRODUCT. An app may NAME them
+ * on its operations and screens — "the money screen needs `billing:read`" — but
+ * may never declare them as its own or put them in its role bundles: they are
+ * granted by the platform role alone, so "who runs this workspace" means one
+ * thing however many products it holds.
+ *
+ * ⚠️ `billing:*`, NOT `money:*`. A product about money (invoices a studio
+ * raises) legitimately owns a `money` vocabulary; the workspace's bill WITH US
+ * is a different fact, and sharing a prefix would make one screen's key
+ * accidentally open the other's.
+ */
+export const PLATFORM_PERMISSIONS = [
+  "member:read", "member:manage", "tenant:manage", "billing:read", "billing:manage",
+] as const;
+
+/**
+ * ⚠️ FOUR PLATFORM ROLES AND NO REGISTRY TO EDIT. These are the workspace's
+ * constitutional offices, the same in every product — which is what lets the
+ * People screen, the seat count and the stranding rule exist once. An app's
+ * creativity lives in its OWN roles; a workspace's lives in custom app roles.
+ *
+ *   owner     everything, including the bill.
+ *   manager   runs the roster and the settings; sees the bill, cannot change it.
+ *   staff     is on the team. App roles say what they do all day.
+ *   customer  is IN the workspace — a client, a buyer — with no workspace
+ *             authority at all. Costs no seat, ever.
+ */
+export const PLATFORM_ROLES: RoleRegistry = {
+  owner: ["member:read", "member:manage", "tenant:manage", "billing:read", "billing:manage"],
+  manager: ["member:read", "member:manage", "tenant:manage", "billing:read"],
+  staff: ["member:read"],
+  customer: [],
+};
+
+/** ⚠️ What somebody holds before they belong to anything — see `personal.ts`. */
+export const PLATFORM_PERSONAL: readonly string[] = ["tenant:create"];
+
 export type RoleRegistry = Readonly<Record<string, readonly string[]>>;
+
+/* -------------------------------------------------------------- membership --- */
+
+/**
+ * ⚠️ A GRANT IS A KEY WITH A PROVENANCE. `app` scopes it (absent = platform),
+ * `until` is the clock (absent = a person's standing exception), `source` says
+ * where it came from — `"pkg:strength"` is what lets a package's grants be
+ * found, extended and removed as one thing.
+ */
+export interface Grant {
+  readonly key: string;
+  readonly app?: string;
+  /** ISO instant. At or past it, the grant is not held. */
+  readonly until?: string;
+  readonly source?: string;
+}
 
 export interface Membership {
   readonly accountId: AccountId;
   readonly tenantId: TenantId;
-  readonly role: string;
-  /** Extra keys beyond the role. Bounded — see `canGrant`. */
-  readonly grants?: readonly string[];
-  /** Withheld from the role. Applied last, so it always wins. */
+  /** One of `PLATFORM_ROLES`' keys. */
+  readonly platformRole: string;
+  /** appId → that app's role name. Absent app = not a user of it. */
+  readonly appRoles: Readonly<Record<string, string>>;
+  readonly grants?: readonly Grant[];
+  /** Withheld keys. Applied last, so it always wins. */
   readonly revoked?: readonly string[];
 }
 
 /**
- * A membership resolved to what it can do.
+ * What one person may do, in one app's context.
  *
- * ⚠️ REVOCATION IS LAST, AND THE ORDER IS THE POINT. A revocation exists to take
- * something away from somebody who would otherwise have it, so anything applied
- * after it could hand it back. "Their role, except this one thing" has to be
- * expressible, and it is only expressible if nothing follows it.
+ * ⚠️ ONE RESOLVER, AND EVERY READER USES IT — the gate, the audience test, the
+ * settings screens, the tool catalogue, the navigation. Two implementations of
+ * "what can this person do" is how a screen comes to promise what a route
+ * refuses.
+ *
+ * ⚠️ THE ORDER: platform role ∪ app role ∪ live grants, MINUS revoked — and
+ * revocation is last because "their role, except this one thing" is only
+ * expressible if nothing follows it. An expired grant contributes nothing: that
+ * single comparison is the whole lapse mechanism every app inherits (D16).
  */
-export function permissionsFor(m: Membership | null, roles: RoleRegistry): ReadonlySet<string> {
+export function permissionsFor(
+  m: Membership | null,
+  appId: string | null,
+  appRoles: RoleRegistry = {},
+  now?: string,
+): ReadonlySet<string> {
   if (!m) return new Set();
-  const out = new Set<string>(roles[m.role] ?? []);
-  for (const p of m.grants ?? []) out.add(p);
+  const out = new Set<string>(PLATFORM_ROLES[m.platformRole] ?? []);
+  if (appId !== null) {
+    const named = m.appRoles[appId];
+    for (const p of (named ? appRoles[named] : undefined) ?? []) out.add(p);
+  }
+  for (const g of m.grants ?? []) {
+    if (g.app !== undefined && g.app !== appId) continue;
+    if (g.until !== undefined && now !== undefined && g.until <= now) continue;
+    out.add(g.key);
+  }
   for (const p of m.revoked ?? []) out.delete(p);
   return out;
 }
 
+/* -------------------------------------------------------------- the bounds --- */
+
 /**
  * ⚠️ A ROLE IS GRANTABLE ONLY WHEN THE GRANTER HOLDS EVERY KEY IT CARRIES, so
- * "assign a role" cannot be a back door around "grant a permission". Both doors
- * ask this — the invitation and the re-role — because bounding one and not the
- * other is the same escalation with a shorter first step.
+ * "assign a role" cannot be a back door around "grant a permission". Asked at
+ * the invitation and at the re-role, per authority: platform roles against the
+ * granter's platform keys, each app's role against the granter's keys IN THAT
+ * APP.
  */
 export const canGrant = (granter: ReadonlySet<string>, keys: readonly string[]): boolean =>
   keys.every((k) => granter.has(k));
@@ -60,8 +154,15 @@ export const canAssign = (granter: ReadonlySet<string>, role: string, roles: Rol
 
 /* ------------------------------------------------------------ custom roles --- */
 
+/**
+ * ⚠️ A CUSTOM ROLE COMPOSES ONE APP'S KEYS. The platform's four offices are not
+ * composable — a fifth kind of "who runs this place" is a governance question,
+ * not a bundle — and a role spanning two apps would be a name that means
+ * something different depending on which product is looking at it.
+ */
 export interface CustomRole {
   readonly id: string;
+  readonly app: string;
   readonly name: string;
   readonly permissions: readonly string[];
 }
@@ -69,18 +170,14 @@ export interface CustomRole {
 /**
  * ⚠️ A ROLE ID IS A SLUG BECAUSE IT IS A KEY IN A MERGED REGISTRY. One with a
  * space or a dot in it is a key nobody can type into a `roles: [...]` and a row
- * that resolves to nothing — a role somebody made, assigned, and that grants
- * nothing at all.
+ * that resolves to nothing.
  */
 export const roleIdOk = (id: string): boolean => /^[a-z][a-z0-9-]{1,38}$/.test(id);
 
 /**
- * The registry a caller is resolved against.
- *
  * ⚠️ THE APP'S OWN ROLES WIN, AND THE ORDER IS THE SECURITY PROPERTY. Spread the
- * other way a workspace could define `owner`, and every owner in it would hold
- * whatever that workspace said — the takeover the id check refuses at the door,
- * and this is the second lock on it, in the one place a mistake is exploited.
+ * other way a workspace could redefine a declared role, and everybody holding it
+ * would hold whatever that workspace said.
  */
 export const registryWith = (declared: RoleRegistry, custom: readonly CustomRole[]): RoleRegistry => ({
   ...Object.fromEntries(custom.map((r) => [r.id, r.permissions])),
@@ -90,10 +187,10 @@ export const registryWith = (declared: RoleRegistry, custom: readonly CustomRole
 export type RoleRefusal = "id" | "declared" | "undeclared_permission" | "beyond_you";
 
 /**
- * ⚠️ EACH REFUSAL IS A DIFFERENT THING TO DO NEXT, which is why they are not one
- * code. A bad id is a typo; a declared name is a role that already exists; an
- * undeclared key is one that would grant nothing; and `beyond_you` is the
- * escalation. Collapsed into "invalid", the last one reads as a bug in the form.
+ * ⚠️ EACH REFUSAL IS A DIFFERENT THING TO DO NEXT. A bad id is a typo; a
+ * declared name is a role that already exists; an undeclared key is one that
+ * would grant nothing; `beyond_you` is the escalation. Collapsed into
+ * "invalid", the last one reads as a bug in the form.
  */
 export function refuseRole(
   role: CustomRole, declared: RoleRegistry, known: ReadonlySet<string>, author: ReadonlySet<string>,
@@ -111,19 +208,15 @@ export function refuseRole(
  * WHETHER REMOVING SOMEBODY WOULD LEAVE NOBODY IN CHARGE.
  *
  * ⚠️ A WORKSPACE WITH NOBODY WHO CAN MANAGE MEMBERS IS NOT CLOSED, IT IS
- * UNREACHABLE. Its records are intact, its bill keeps running, and there is
- * nobody left who can invite anybody back in. Closing is a different action with
- * a confirmation and an export attached; this is the accident that looks like it
- * and cannot be undone from inside.
- *
- * ⚠️ AND IT ASKS THE MERGED REGISTRY WHICH ROLES COUNT rather than naming an
- * owner. A workspace whose administrators sit in a role it composed itself is
- * the ordinary case, and a hardcoded name fails open — every removal allowed.
+ * UNREACHABLE. Its records are intact, its bill keeps running, and nobody left
+ * inside can invite anybody back in. Asked of the PLATFORM authority alone,
+ * because running the workspace is the platform's question — an app role
+ * cannot confer it and a custom role cannot compose it.
  */
 export function wouldStrand(
-  roles: RoleRegistry, members: readonly Membership[], accountId: AccountId, key = "member:manage",
+  members: readonly Membership[], accountId: AccountId, key = "member:manage",
 ): boolean {
-  const manages = (m: Membership) => permissionsFor(m, roles).has(key);
+  const manages = (m: Membership) => permissionsFor(m, null).has(key);
   const target = members.find((m) => m.accountId === accountId);
   if (!target || !manages(target)) return false;
   return members.filter(manages).length === 1;
@@ -132,7 +225,12 @@ export function wouldStrand(
 /* -------------------------------------------------------------- the seats --- */
 
 export interface SeatSpec {
-  /** Which roles cost a seat. A role outside this list is free. */
+  /**
+   * ⚠️ WHICH PLATFORM ROLES COST A SEAT. Platform roles, because a seat is a
+   * workspace fact — a person is on the team or they are not, however many
+   * products the team uses. `customer` may never be listed: customers are the
+   * product, not the staff.
+   */
   readonly counts: readonly string[];
   /** The entitlement key the count is checked against. */
   readonly entitlement: string;
@@ -141,54 +239,62 @@ export interface SeatSpec {
 /**
  * ⚠️ AN INVITATION OCCUPIES A SEAT BEFORE IT IS ANSWERED. Counting only accepted
  * members lets anybody past the ceiling by inviting twenty people and waiting —
- * and the overage then arrives days later, all at once, as a bill rather than as
- * a refusal, which is the wrong end of the product to discover a limit from.
+ * and the overage then arrives days later as a bill rather than as a refusal.
  */
 export const seatsUsed = (members: readonly Membership[], counts: readonly string[]): number =>
-  members.filter((m) => counts.includes(m.role)).length;
+  members.filter((m) => counts.includes(m.platformRole)).length;
+
+/* -------------------------------------------------------------- the spec --- */
 
 export interface AccessSpec {
+  /** The app's OWN keys. Naming a platform key here is refused — see below. */
   readonly permissions: readonly string[];
   readonly roles: RoleRegistry;
   /**
-   * ⚠️ WHAT SOMEBODY HOLDS BEFORE THEY BELONG TO ANYTHING. Required, and usually
-   * one key: somebody has to be able to make their first tenant while outside
-   * every tenant, and a role cannot express that because a role is held inside
-   * one. Leaving it to a resolver is what produces "give a signed-in person the
-   * owner role", which is an authorization bypass on every other door.
+   * The app role a workspace's creator gets. Absent, the first declared role —
+   * stated so a manifest's role order is visibly load-bearing.
    */
-  readonly personal: readonly string[];
+  readonly founding?: string;
   readonly seats: SeatSpec;
 }
 
+/** The app role a new workspace's creator holds in this app. */
+export const foundingAppRole = (access: AccessSpec): string | null =>
+  access.founding ?? Object.keys(access.roles)[0] ?? null;
+
 /**
- * ⚠️ A PERMISSION NO ROLE AND NO PERSONAL SET HOLDS IS DECLARED AND UNHOLDABLE.
- * Every operation naming it refuses every caller, for ever, and the 403 is
- * indistinguishable from one somebody forgot to grant.
+ * ⚠️ AN APP CLAIMING A PLATFORM KEY WOULD LET ITS ROLES GRANT WORKSPACE
+ * AUTHORITY — a product update quietly minting managers. Named as its own
+ * refusal because the fix (delete the line) is different from an undeclared
+ * key's (declare it).
+ */
+export const claimsPlatform = (access: AccessSpec): readonly string[] => {
+  const platform = new Set<string>([...PLATFORM_PERMISSIONS, ...PLATFORM_PERSONAL]);
+  return [
+    ...access.permissions.filter((p) => platform.has(p)),
+    ...[...new Set(Object.values(access.roles).flat())].filter((p) => platform.has(p)),
+  ];
+};
+
+/**
+ * ⚠️ A PERMISSION NO ROLE HOLDS IS DECLARED AND UNHOLDABLE. Every operation
+ * naming it refuses every caller, for ever, and the 403 is indistinguishable
+ * from one somebody forgot to grant. Grants can hand out any declared key, so
+ * this is a warning about roles, not a wall — but an app whose key is ONLY
+ * reachable by grant should know it said so.
  */
 export const unholdable = (access: AccessSpec): readonly string[] => {
-  const held = new Set([...Object.values(access.roles).flat(), ...access.personal]);
+  const held = new Set(Object.values(access.roles).flat());
   return access.permissions.filter((p) => !held.has(p));
 };
 
 /**
- * ⚠️ AND A ROLE OR PERSONAL SET NAMING AN UNDECLARED KEY GRANTS NOTHING. It
- * looks like access somebody has and behaves like access they do not, which is
- * the hardest kind of permission bug to see from either side.
+ * ⚠️ A ROLE NAMING AN UNDECLARED KEY GRANTS NOTHING. It looks like access
+ * somebody has and behaves like access they do not — the hardest permission bug
+ * to see from either side. Platform keys are known everywhere and app keys must
+ * be the app's own.
  */
 export const undeclared = (access: AccessSpec): readonly string[] => {
-  const known = new Set(access.permissions);
-  return [...new Set([...Object.values(access.roles).flat(), ...access.personal])]
-    .filter((p) => !known.has(p));
+  const known = new Set([...access.permissions, ...PLATFORM_PERMISSIONS, ...PLATFORM_PERSONAL]);
+  return [...new Set(Object.values(access.roles).flat())].filter((p) => !known.has(p));
 };
-
-/**
- * ⚠️ SOMEBODY MUST BE ABLE TO ADMINISTER A NEW TENANT. The platform makes the
- * creator a member in whichever role can manage members — chosen by capability
- * rather than by name, so an app whose administrators are called something else
- * still works. With no such role there is no founding membership: every request
- * answers 403, and the tenant row, the tables and the session are all perfectly
- * correct.
- */
-export const foundingRole = (roles: RoleRegistry, key = "member:manage"): string | null =>
-  Object.entries(roles).find(([, keys]) => keys.includes(key))?.[0] ?? null;

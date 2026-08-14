@@ -244,30 +244,34 @@ export const KOVA: AppSpec = defineApp({
     permissions: [
       "client:read", "client:write", "plan:read", "plan:write", "log:read", "log:write",
       "meal:read", "meal:write", "body:read", "body:write", "money:read", "money:write",
-      "member:read", "member:manage", "tenant:manage", "tenant:create",
     ],
+    /*
+      ⚠️ APP ROLES ONLY (D15). Who runs the studio — members, settings, the
+      bill — is the platform role's question; these say what somebody does all
+      day INSIDE Kova. The founder is an `owner` at the platform level and a
+      `trainer` here.
+    */
     roles: {
-      owner: [
-        "client:read", "client:write", "plan:read", "plan:write", "log:read", "log:write",
-        "meal:read", "meal:write", "body:read", "body:write", "money:read", "money:write",
-        "member:read", "member:manage", "tenant:manage",
-      ],
+      /* ⚠️ The trainer holds EVERY key the client role carries — an inviter may
+         only grant a role key by key, so a coach missing one client key could
+         not add a client at all. */
       trainer: [
         "client:read", "client:write", "plan:read", "plan:write", "log:read", "log:write",
-        "meal:read", "meal:write", "body:read", "member:read",
+        "meal:read", "meal:write", "body:read", "body:write", "money:read", "money:write",
       ],
-      assistant: ["client:read", "plan:read", "log:read", "member:read"],
+      assistant: ["client:read", "plan:read", "log:read"],
       /*
-        ⚠️ A CLIENT IS A MEMBER WITH A NARROW ROLE, and they hold the WRITE keys
-        for their own logbook and none of the read keys for anybody else's. The
-        platform gives them their own records by construction (subject scope);
-        this role is what lets them add to them.
+        ⚠️ A CLIENT IS A MEMBER WITH A NARROW APP ROLE (platform role
+        `customer` — no workspace authority, no seat). They hold the WRITE keys
+        for their own logbook and none of the read keys for anybody else's:
+        subject scope gives them their own records by construction, and this
+        role is what lets them add to them.
       */
       client: ["log:read", "log:write", "meal:read", "meal:write", "body:read", "body:write", "plan:read"],
     },
-    personal: ["tenant:create"],
-    /* ⚠️ A client costs no seat: they are the product, not the staff. */
-    seats: { counts: ["owner", "trainer", "assistant"], entitlement: "seats" },
+    founding: "trainer",
+    /* ⚠️ Platform staff cost seats; a client is the product, not the staff. */
+    seats: { counts: ["owner", "manager", "staff"], entitlement: "seats" },
   },
 
   entitlements: {

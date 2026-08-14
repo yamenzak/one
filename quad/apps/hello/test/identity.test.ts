@@ -16,9 +16,9 @@
 import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
-  AUDIT_SCHEMA, CODE_TRIES, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, MEMBERSHIP_SCHEMA, REPLAY_SCHEMA,
-  addShard, applySchema, memberFor, membersOf, noteShardApp, permissionsOf, personalOps, rolesFor,
-  schemaFor, serve, sessionIdFrom, tenantBySlug, whoIs, type Db,
+  AUDIT_SCHEMA, CODE_TRIES, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, MEMBERSHIP_SCHEMA, NOBODY,
+  REPLAY_SCHEMA, addShard, applySchema, memberFor, membersOf, noteShardApp, permissionsResolver,
+  personalOps, schemaFor, serve, sessionIdFrom, tenantBySlug, whoIs, type Db,
 } from "@quad/runtime";
 import { HELLO, hello } from "../src/index.js";
 
@@ -59,24 +59,21 @@ const app = () => serve({
   },
   /*
     ⚠️ WHO IS ASKING IS RESOLVED FROM THE SESSION AND THE WORKSPACE'S OWN
-    ROSTER — never from anything the request said about itself. The role is read
-    in the tenant's shard and merged with whatever roles the workspace made for
-    itself, so a custom role works everywhere a declared one does.
+    ROSTER — never from anything the request said about itself. Permissions are
+    a function of which app asks (D15): the platform role answers everywhere,
+    the app role only in its app, and a custom role works wherever a declared
+    one does.
   */
   identify: async (request, located) => {
     const { session, email, accountId } = await whoIs(directory(), sessionIdFrom(request), new Date());
-    if (!session || !accountId) {
-      return { caller: { signedIn: false, permissions: new Set(), provenAt: null }, accountId: null };
-    }
+    if (!session || !accountId) return NOBODY;
     const member = await memberFor(located.db, located.tenantId as never, accountId);
-    const roles = await rolesFor(located.db, located.tenantId as never, HELLO.access.roles);
     return {
       accountId, email,
-      caller: {
-        signedIn: true,
-        permissions: permissionsOf(member, roles),
-        provenAt: session.provenAt,
-      },
+      signedIn: true,
+      provenAt: session.provenAt,
+      permissionsIn: permissionsResolver(located.db, located.tenantId as never, member,
+        (appId) => (appId === "hello" ? HELLO.access.roles : null)),
     };
   },
 });
@@ -228,7 +225,11 @@ describe("making a workspace", () => {
 
     const members = await membersOf(shard(), tenant!.id);
     expect(members).toHaveLength(1);
-    expect(members[0]!.role).toBe("owner");
+    /* ⚠️ Two authorities on one row (D15): the platform makes every founder an
+       `owner` — running the workspace is its to give — and the app's `founding`
+       declaration says what they are INSIDE the product. */
+    expect(members[0]!.platformRole).toBe("owner");
+    expect(members[0]!.appRoles).toEqual({ hello: "writer" });
     /* ⚠️ Accepted the moment it is made — the founder is already signed in as
        themselves, and a pending invitation waiting at their own address is not
        a state anybody should have to resolve. */
@@ -303,7 +304,7 @@ describe("inviting a colleague", () => {
   it("invites an address, and they claim it by signing in as it", async () => {
     const { cookie, tenant } = await found();
     const made = await post("northwind", "/api/member.invite",
-      { email: "alex@example.com", role: "writer" }, cookie);
+      { email: "alex@example.com", platformRole: "staff", appRoles: { hello: "writer" } }, cookie);
     expect(made.status).toBe(200);
 
     /* ⚠️ Claimed by signing in as the address it was sent to — the only way. */
@@ -327,34 +328,54 @@ describe("inviting a colleague", () => {
   */
   it("refuses an invitation into a role beyond the inviter", async () => {
     const { cookie, tenant } = await found();
-    await post("northwind", "/api/member.invite", { email: "alex@example.com", role: "writer" }, cookie);
+    await post("northwind", "/api/member.invite",
+      { email: "alex@example.com", platformRole: "staff", appRoles: { hello: "writer" } }, cookie);
     const theirs = await signIn("alex@example.com");
 
-    /* A writer may not invite an owner: they do not hold `member:manage` at all,
-       so the gate refuses before the rule is even reached. */
+    /* Staff may not invite at all: they do not hold `member:manage`, so the
+       gate refuses before the rule is even reached. */
     expect((await post("northwind", "/api/member.invite",
-      { email: "mallory@example.com", role: "owner" }, theirs)).status).toBe(403);
+      { email: "mallory@example.com", platformRole: "owner" }, theirs)).status).toBe(403);
 
-    /* And the rule itself, from somebody who CAN invite but not into that role:
-       a workspace role that manages members without holding everything owner
-       does. */
-    await shard().prepare(
-      `INSERT INTO custom_role (id, tenant_id, name, permissions_json, at) VALUES (?, ?, ?, ?, ?)`)
-      .bind("helper", tenant.id, "Helper",
-        JSON.stringify(["note:read", "member:read", "member:manage"]), new Date().toISOString()).run();
-    await post("northwind", "/api/member.role",
-      { id: (await membersOf(shard(), tenant.id)).find((m) => m.email === "alex@example.com")!.id,
-        role: "helper" }, cookie);
+    /* Make them a manager — somebody who CAN invite, but not into every role. */
+    const alexId = (await membersOf(shard(), tenant.id)).find((m) => m.email === "alex@example.com")!.id;
+    await post("northwind", "/api/member.role", { id: alexId, platformRole: "manager" }, cookie);
 
     /* ⚠️ THE SAME SESSION, AND IT NOW CARRIES THE NEW ROLE. Permissions are
        resolved from the roster on every request rather than stamped into the
        session at sign-in — otherwise a role taken away keeps working until
-       somebody signs out, which is precisely when it matters that it does not. */
+       somebody signs out, which is precisely when it matters that it does not.
+       A manager still may not mint an owner: they cannot grant `billing:manage`. */
     expect((await post("northwind", "/api/member.invite",
-      { email: "mallory@example.com", role: "owner" }, theirs)).status).toBe(403);
-    /* ...and into a role they do hold everything of, it works. */
+      { email: "mallory@example.com", platformRole: "owner" }, theirs)).status).toBe(403);
+    /* ...and into roles they hold every key of — platform AND app — it works. */
     expect((await post("northwind", "/api/member.invite",
-      { email: "mallory@example.com", role: "helper" }, theirs)).status).toBe(200);
+      { email: "mallory@example.com", platformRole: "staff", appRoles: { hello: "reader" } },
+      theirs)).status).toBe(200);
+  });
+
+  /*
+    ⚠️ A CUSTOM ROLE WORKS EVERYWHERE A DECLARED ONE DOES — it joins the app's
+    registry at resolution, so nothing downstream knows it exists. And it is
+    ONE APP'S: the platform's offices are not composable.
+  */
+  it("assigns a workspace's own role, and it resolves like a declared one", async () => {
+    const { cookie, tenant } = await found();
+    await post("northwind", "/api/member.invite",
+      { email: "alex@example.com", platformRole: "staff", appRoles: { hello: "writer" } }, cookie);
+    const theirs = await signIn("alex@example.com");
+    await shard().prepare(
+      `INSERT INTO custom_role (id, tenant_id, app, name, permissions_json, at) VALUES (?, ?, ?, ?, ?, ?)`)
+      .bind("helper", tenant.id, "hello", "Helper",
+        JSON.stringify(["note:read"]), new Date().toISOString()).run();
+
+    const alexId = (await membersOf(shard(), tenant.id)).find((m) => m.email === "alex@example.com")!.id;
+    expect((await post("northwind", "/api/member.role",
+      { id: alexId, app: "hello", role: "helper" }, cookie)).status).toBe(200);
+
+    /* The narrower role applies on the very next request: reads stay, writes stop. */
+    expect((await post("northwind", "/api/note.create", { title: "Nope" }, theirs)).status).toBe(403);
+    expect((await get("northwind", "/api/note.list", theirs)).status).toBe(200);
   });
 
   /*
@@ -362,26 +383,32 @@ describe("inviting a colleague", () => {
     members lets anybody past the ceiling by inviting twenty people and waiting,
     and the overage arrives later as a bill rather than as a refusal.
   */
-  it("counts an unanswered invitation against the seats", async () => {
+  it("counts an unanswered invitation against the seats — and customers never", async () => {
     SEATS = 2;
     try {
       const { cookie } = await found();
       expect((await post("northwind", "/api/member.invite",
-        { email: "a@example.com", role: "writer" }, cookie)).status).toBe(200);
+        { email: "a@example.com", platformRole: "staff", appRoles: { hello: "writer" } },
+        cookie)).status).toBe(200);
       const out = await post("northwind", "/api/member.invite",
-        { email: "b@example.com", role: "writer" }, cookie);
+        { email: "b@example.com", platformRole: "staff" }, cookie);
       expect(out.status).toBe(402);
       /* ⚠️ Both numbers, because they ARE the sentence. */
       const body = await out.json() as { problem: { title: string } };
       expect(body.problem.title).toContain("2");
       expect(body.problem.title).not.toContain("undefined");
+      /* ⚠️ A customer is the product, not the staff: full seats must never stop
+         a workspace adding the people it exists to serve. */
+      expect((await post("northwind", "/api/member.invite",
+        { email: "c@example.com", platformRole: "customer", appRoles: { hello: "reader" } },
+        cookie)).status).toBe(200);
     } finally { SEATS = 10; }
   });
 
   it("refuses to invite somebody who is already here", async () => {
     const { cookie } = await found();
     expect((await post("northwind", "/api/member.invite",
-      { email: "sam@example.com", role: "writer" }, cookie)).status).toBe(409);
+      { email: "sam@example.com", platformRole: "staff" }, cookie)).status).toBe(409);
   });
 
   /*
@@ -390,16 +417,17 @@ describe("inviting a colleague", () => {
   */
   it("promotes somebody, but only within what the promoter holds", async () => {
     const { cookie, tenant } = await found();
-    await post("northwind", "/api/member.invite", { email: "alex@example.com", role: "writer" }, cookie);
+    await post("northwind", "/api/member.invite",
+      { email: "alex@example.com", platformRole: "staff", appRoles: { hello: "writer" } }, cookie);
     const theirs = await signIn("alex@example.com");
     const them = (await membersOf(shard(), tenant.id)).find((m) => m.email === "alex@example.com")!;
 
-    /* A writer cannot promote themselves — the same escalation with a shorter
+    /* Staff cannot promote themselves — the same escalation with a shorter
        first step, which is why both doors ask. */
-    expect((await post("northwind", "/api/member.role", { id: them.id, role: "owner" }, theirs)).status)
-      .toBe(403);
-    expect((await post("northwind", "/api/member.role", { id: them.id, role: "owner" }, cookie)).status)
-      .toBe(200);
+    expect((await post("northwind", "/api/member.role",
+      { id: them.id, platformRole: "owner" }, theirs)).status).toBe(403);
+    expect((await post("northwind", "/api/member.role",
+      { id: them.id, platformRole: "owner" }, cookie)).status).toBe(200);
   });
 });
 
@@ -424,7 +452,8 @@ describe("leaving", () => {
     await post("setup", "/api/me.tenant.create",
       { slug: "northwind", name: "Northwind", country: "DE" }, mine);
     const tenant = (await tenantBySlug(directory(), "northwind"))!;
-    await post("northwind", "/api/member.invite", { email: "alex@example.com", role: "writer" }, mine);
+    await post("northwind", "/api/member.invite",
+      { email: "alex@example.com", platformRole: "staff", appRoles: { hello: "writer" } }, mine);
     const theirs = await signIn("alex@example.com");
 
     expect((await post("setup", "/api/me.leave", { slug: "northwind" }, theirs)).status).toBe(200);

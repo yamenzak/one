@@ -14,7 +14,7 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { eventsOf, primaryOf, type Channel } from "@quad/kernel";
+import { PLATFORM_ROLES, eventsOf, primaryOf, type Channel } from "@quad/kernel";
 import {
   FlagConsole, Guide, NotificationPolicy, Settings, Shelf, Shell, settingsShown, policyShown,
 } from "@quad/web";
@@ -22,8 +22,9 @@ import { HELLO } from "../src/index.js";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node);
 
-/** Everything the owner of a `hello` workspace can do. */
-const OWNER = new Set(HELLO.access.roles.owner ?? []);
+/** Everything a founder holds: the platform's `owner` office ∪ the app's
+    founding role (D15) — resolved exactly as `permissionsFor` would. */
+const OWNER = new Set([...(PLATFORM_ROLES.owner ?? []), ...(HELLO.access.roles.writer ?? [])]);
 const EVERY: readonly Channel[] = ["inbox", "email", "push"];
 
 describe("everything hello declares reaches a screen", () => {

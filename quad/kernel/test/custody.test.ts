@@ -12,7 +12,7 @@
 import { describe, expect, it } from "vitest";
 import {
   refuseRead, refuseVault, discloseVault, consented, live, strayFacts,
-  type Consent, type Grant,
+  type Consent, type VaultGrant,
 } from "../src/vault.js";
 import { refuseLegal, missingDocuments, ropa, outstanding, type Acceptance } from "../src/legal.js";
 import { settle, estimate, plan, charged, refusePacks, unbounded, THINKING_HEADROOM } from "../src/credit.js";
@@ -37,7 +37,7 @@ const purposes = {
     holdings: ["sensitive" as const], retention: null, required: true },
 };
 
-const grant = (over: Partial<Grant> = {}): Grant => ({
+const grant = (over: Partial<VaultGrant> = {}): VaultGrant => ({
   subject: ME, to: "mem_1", purpose: "coaching", fields: ["client.conditions"],
   until: LATER, grantedAt: NOW, ...over,
 });

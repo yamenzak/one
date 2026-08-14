@@ -74,7 +74,7 @@ export interface Consent {
   readonly withdrawnAt: Instant | null;
 }
 
-export interface Grant {
+export interface VaultGrant {
   readonly subject: AccountId;
   /** Who may read. A membership, an app, a service — resolved before it gets here. */
   readonly to: string;
@@ -94,7 +94,7 @@ export const consented = (c: Consent | undefined, now: Instant): boolean =>
  * at this two years after they stopped working here" impossible rather than
  * unlikely.
  */
-export const live = (g: Grant, now: Instant): boolean =>
+export const live = (g: VaultGrant, now: Instant): boolean =>
   !g.revokedAt && g.until > now;
 
 export type ReadRefusal =
@@ -113,7 +113,7 @@ export function refuseRead(
   book: VaultBook,
   ask: { readonly field: string; readonly purpose: string; readonly to: string; readonly now: Instant },
   consents: readonly Consent[],
-  grants: readonly Grant[],
+  grants: readonly VaultGrant[],
 ): ReadRefusal | null {
   const def = book[ask.field];
   if (!def) return "unknown_field";

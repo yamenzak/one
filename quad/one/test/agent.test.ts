@@ -12,10 +12,12 @@
 import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import { residencyFor } from "@quad/kernel";
+import { PLATFORM_ROLES } from "@quad/kernel";
 import {
-  addShard, createTenant, found, noteBelonging, noteShardApp, startSession, upsertAccount,
+  addShard, createTenant, found, invite, noteBelonging, noteShardApp, startSession, upsertAccount,
   type Db,
 } from "@quad/runtime";
+import { HELLO } from "@quad/hello";
 import worker from "../src/index.js";
 
 const asDev = { ...env, ROOT: "localhost", ENVIRONMENT: "development", AUTH_SECRET: "test" };
@@ -50,12 +52,20 @@ beforeAll(async () => {
   tenantId = made.tenant.id;
 
   const owner = await upsertAccount(directory(), "amara@example.com", null);
-  await found(shard(), made.tenant.id, owner, "amara@example.com", "owner");
+  await found(shard(), made.tenant.id, owner, "amara@example.com", { hello: "writer" });
   await noteBelonging(directory(), owner, made.tenant.id);
   ownerCookie = `quad_session=${(await startSession(directory(), owner)).id}`;
 
+  /* ⚠️ A customer with a read-only app role (D15): no workspace authority, so
+     the platform's writes and roster stay out of their catalogue. */
   const reader = await upsertAccount(directory(), "sam@example.com", null);
-  await found(shard(), made.tenant.id, reader, "sam@example.com", "reader");
+  await invite(shard(), made.tenant.id,
+    { email: "sam@example.com", platformRole: "customer", appRoles: { hello: "reader" } },
+    { platform: new Set(PLATFORM_ROLES.owner), inApp: async () => new Set(HELLO.access.permissions) },
+    async () => HELLO.access.roles, { counts: ["owner", "manager", "staff"], allowed: -1 });
+  await shard().prepare(
+    `UPDATE membership SET account_id = ?, accepted_at = ? WHERE tenant_id = ? AND email = ?`)
+    .bind(reader, new Date().toISOString(), made.tenant.id, "sam@example.com").run();
   await noteBelonging(directory(), reader, made.tenant.id);
   readerCookie = `quad_session=${(await startSession(directory(), reader)).id}`;
 });
@@ -156,7 +166,7 @@ describe("what a call does", () => {
     to call — so `member.invite` and `no.such.thing` are the same sentence.
   */
   it("does not admit an opted-out operation exists", async () => {
-    const refused = await callTool("member.invite", { email: "x@example.com", role: "writer" }, ownerCookie);
+    const refused = await callTool("member.invite", { email: "x@example.com", platformRole: "staff" }, ownerCookie);
     const absent = await callTool("no.such.thing", {}, ownerCookie);
     expect(refused.error?.code).toBe(-32602);
     expect(refused.error?.message).toBe("no such tool: member.invite");

@@ -11,10 +11,11 @@
 
 import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { Caller } from "@quad/kernel";
+import { PLATFORM_ROLES } from "@quad/kernel";
 import {
-  AUDIT_SCHEMA, DIRECTORY_SCHEMA, REPLAY_SCHEMA, addShard, applySchema, compose, createTenant,
-  forget, noteShardApp, schemaFor, serve, surfaceOfComposed, type Db, type Located, type Who,
+  AUDIT_SCHEMA, DIRECTORY_SCHEMA, NOBODY, REPLAY_SCHEMA, addShard, applySchema, compose,
+  createTenant, forget, noteShardApp, schemaFor, serve, surfaceOfComposed,
+  type Db, type Located, type Who,
 } from "@quad/runtime";
 import { HELLO, hello } from "../src/index.js";
 
@@ -38,16 +39,21 @@ const ROOTS = { root: "quad.test" };
 let tenantId = "";
 
 /** ⚠️ Who is asking is a seam identity fills at stage 4 — see `Who`. */
-let who: Who = { caller: { signedIn: false, permissions: new Set(), provenAt: null }, accountId: null };
+let who: Who = NOBODY;
 
-const asOwner = (over: Partial<Caller> = {}): Who => ({
+/** A signed-in caller whose keys are the same in every app's context. */
+const whoWith = (permissions: ReadonlySet<string>): Who => ({
+  accountId: "acc_x", signedIn: true, provenAt: null,
+  permissionsIn: async () => permissions,
+});
+
+/* A founder: the platform's `owner` office plus the app's founding role (D15). */
+const asOwner = (): Who => ({
   accountId: "acc_owner",
-  caller: {
-    signedIn: true,
-    permissions: new Set(HELLO.access.roles.owner ?? []),
-    provenAt: new Date().toISOString(),
-    ...over,
-  },
+  signedIn: true,
+  provenAt: new Date().toISOString(),
+  permissionsIn: async () =>
+    new Set([...(PLATFORM_ROLES.owner ?? []), ...(HELLO.access.roles.writer ?? [])]),
 });
 
 let standing: Located["standing"];
@@ -178,7 +184,7 @@ describe("the gates, applied to every operation", () => {
     the fact that `hello/src/index.ts` has no gate call in it is the assertion.
   */
   it("refuses a caller who does not hold the key, without the handler running", async () => {
-    who = { accountId: "acc_x", caller: { signedIn: true, permissions: new Set(["note:read"]), provenAt: null } };
+    who = whoWith(new Set(["note:read"]));
     const out = await post("/api/note.create", { title: "Nope" });
     expect(out.status).toBe(403);
     const rows = await shard().prepare(`SELECT COUNT(*) n FROM note`).first<{ n: number }>();
@@ -186,7 +192,7 @@ describe("the gates, applied to every operation", () => {
   });
 
   it("asks somebody signed out to sign in", async () => {
-    who = { accountId: null, caller: { signedIn: false, permissions: new Set(), provenAt: null } };
+    who = NOBODY;
     expect((await call("/api/note.list")).status).toBe(401);
   });
 
@@ -317,7 +323,7 @@ describe("what was recorded", () => {
   /* ⚠️ AND A REFUSAL TOO. An audit of only the successes answers "did anybody
      try" with silence, which is the question actually asked after an incident. */
   it("records an attempt that was refused", async () => {
-    who = { accountId: "acc_x", caller: { signedIn: true, permissions: new Set(["note:read"]), provenAt: null } };
+    who = whoWith(new Set(["note:read"]));
     await post("/api/note.create", { title: "Refused" });
     const row = await shard().prepare(`SELECT ok, problem FROM audit`).first<
       { ok: number; problem: string }>();

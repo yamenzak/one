@@ -18,7 +18,7 @@
  */
 
 import type { AccountId, AppSpec, Door, TenantId } from "@quad/kernel";
-import { RESERVED_SLUGS, foundingRole, residencyFor, slugOk } from "@quad/kernel";
+import { RESERVED_SLUGS, foundingAppRole, residencyFor, slugOk, wouldStrand } from "@quad/kernel";
 import {
   appsOfTenant, createTenant, forgetInvitation, invitationsFor, noteBelonging, tenantsOf,
   upsertAccount, type TenantRow,
@@ -191,10 +191,10 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
 
         const app = ctx.app(deps.appId);
         if (!app) return ctx.fail("platform.unavailable");
-        /* ⚠️ The founding role is chosen by CAPABILITY, not by the name
-           "owner" — an app whose administrators are called something else still
-           gets a workspace somebody can run. */
-        const role = foundingRole(app.access.roles);
+        /* ⚠️ Workspace authority is the PLATFORM'S to give — `found` makes the
+           creator an `owner` regardless of any app. What the app declares is
+           the role they hold INSIDE it (D15). */
+        const role = foundingAppRole(app.access);
         if (!role) return ctx.fail("platform.unavailable");
 
         const made = await createTenant(ctx.directory, {
@@ -205,7 +205,7 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
 
         const accountId = ctx.session!.accountId;
         await found(ctx.shardOf(made.tenant), made.tenant.id, accountId,
-          ctx.email ?? "", role, ctx.now);
+          ctx.email ?? "", { [deps.appId]: role }, ctx.now);
         await noteBelonging(ctx.directory, accountId, made.tenant.id, ctx.now);
         return { slug: made.tenant.slug, id: made.tenant.id };
       },
@@ -230,12 +230,11 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
           ⚠️ LEAVING IS ALWAYS ALLOWED, EXCEPT WHERE IT WOULD STRAND THE
           WORKSPACE. The last person who can manage members walking out does not
           close it — it makes it unreachable, with the bill still running and
-          nobody able to invite anybody back in.
+          nobody able to invite anybody back in. Asked of the PLATFORM authority,
+          through the kernel's one rule — a second local copy of "who can run
+          this place" is how the two answers drift.
         */
-        const app = ctx.app(deps.appId);
-        const roles = app?.access.roles ?? {};
-        const managers = members.filter((m) => roles[m.role]?.includes("member:manage"));
-        if (managers.length === 1 && managers[0]?.id === mine.id) return ctx.fail("platform.conflict");
+        if (wouldStrand(members, ctx.session!.accountId)) return ctx.fail("platform.conflict");
 
         await db.prepare(`UPDATE membership SET removed_at = ? WHERE id = ?`)
           .bind(ctx.now.toISOString(), mine.id).run();

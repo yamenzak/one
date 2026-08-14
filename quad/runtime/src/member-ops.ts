@@ -16,11 +16,11 @@
  * context is passed only to them.
  */
 
-import type { Allowance, AppSpec, TenantId } from "@quad/kernel";
-import { PUBLIC, withinQuota } from "@quad/kernel";
+import type { Allowance, AppSpec, RoleRegistry, TenantId } from "@quad/kernel";
+import { PUBLIC, seatsUsed, withinQuota } from "@quad/kernel";
 import { noteInvitation } from "./directory.js";
 import { inboxOf, markSeen, policyOf, preferenceOf, setPolicy, setPreference, unseenCount } from "./inbox.js";
-import { invite, membersOf, remove, rolesFor, setRole } from "./membership.js";
+import { invite, membersOf, remove, rolesFor, setAppRole, setPlatformRole } from "./membership.js";
 import type { Ctx, Resolved } from "./compose.js";
 import type { Db } from "./sql.js";
 
@@ -32,6 +32,20 @@ import type { Db } from "./sql.js";
 export interface PlatformCtx extends Ctx {
   readonly directory: Db;
   readonly permissions: ReadonlySet<string>;
+  /**
+   * ⚠️ THE CALLER'S KEYS IN ANOTHER CONTEXT (D15). `permissions` is this
+   * operation's own app; assigning a role in app B from app A's roster screen
+   * has to be bounded by what the assigner holds IN B, and only the deployment
+   * can resolve that.
+   */
+  readonly permissionsIn: (appId: string | null) => Promise<ReadonlySet<string>>;
+  /**
+   * ⚠️ ANOTHER APP'S DECLARED ROLES, RESOLVED BY THE DEPLOYMENT. One invitation
+   * may assign roles in several products (that is the point of one roster), and
+   * validating app B's role needs app B's registry — which only the deployment
+   * holds. `null` for an app this deployment does not serve.
+   */
+  readonly declaredRoles: (appId: string) => RoleRegistry | null;
   readonly email: string | null;
   readonly allowance: (key: string) => Allowance;
 }
@@ -47,7 +61,29 @@ const asPlatform = (ctx: Ctx): PlatformCtx => ctx as PlatformCtx;
  */
 export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
   const seats = app.access.seats;
-  const roles = () => app.access.roles;
+
+  /*
+    ⚠️ THE TWO HALVES OF EVERY BOUNDED ASSIGNMENT (D15). The granter's keys are
+    resolved PER AUTHORITY — their platform keys for the platform role, their
+    keys IN EACH APP for that app's role — and each app's role is validated
+    against that app's own registry, custom roles included. This app's registry
+    comes from its manifest; any other's comes from the deployment.
+  */
+  /* ⚠️ The platform keys are resolved in NO app's context — `ctx.permissions`
+     is this operation's own app and carries that app's role keys too. */
+  const granter = async (ctx: PlatformCtx) => ({
+    platform: await ctx.permissionsIn(null),
+    inApp: (appId: string) => ctx.permissionsIn(appId),
+  });
+  const registryFor = (ctx: PlatformCtx) => async (appId: string): Promise<RoleRegistry> =>
+    rolesFor(ctx.db, ctx.tenantId as TenantId, appId,
+      (appId === app.id ? app.access.roles : ctx.declaredRoles(appId)) ?? {});
+
+  const asAppRoles = (given: unknown): Readonly<Record<string, string>> =>
+    given !== null && typeof given === "object" && !Array.isArray(given)
+      ? Object.fromEntries(Object.entries(given as Record<string, unknown>)
+        .filter((pair): pair is [string, string] => typeof pair[1] === "string"))
+      : {};
 
   const op = (
     id: string, kind: "read" | "write", permission: string, summary: string,
@@ -76,28 +112,29 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
     "member.list": op("member.list", "read", "member:read", "Everybody in this workspace.",
       async (ctx) => ({
         items: (await membersOf(ctx.db, ctx.tenantId as TenantId)).map((m) => ({
-          id: m.id, email: m.email, role: m.role, accepted: m.acceptedAt !== null,
+          id: m.id, email: m.email, platformRole: m.platformRole, appRoles: m.appRoles,
+          accepted: m.acceptedAt !== null,
         })),
       })),
 
     "member.invite": op("member.invite", "write", "member:manage", "Invite somebody by email.",
       async (ctx, input) => {
         const email = String(input.email ?? "").trim().toLowerCase();
-        const role = String(input.role ?? "");
+        const platformRole = String(input.platformRole ?? "");
+        const appRoles = asAppRoles(input.appRoles);
         const allowed = ctx.allowance(seats.entitlement);
         /* ⚠️ Reported as a ceiling with its numbers, because "you have used all
            of yours" without them renders "your plan includes undefined". */
-        const used = (await membersOf(ctx.db, ctx.tenantId as TenantId))
-          .filter((m) => seats.counts.includes(m.role)).length;
-        /* ⚠️ Only for a role that costs a seat — see `invite`. A workspace whose
-           customers are members would otherwise be unable to add one. */
-        if (seats.counts.includes(role) && !withinQuota(allowed, used)) {
+        const used = seatsUsed(await membersOf(ctx.db, ctx.tenantId as TenantId), seats.counts);
+        /* ⚠️ Only for a PLATFORM role that costs a seat — see `invite`. A
+           workspace's customers are members too, and refusing one because the
+           staff seats are full would gate the product on the payroll. */
+        if (seats.counts.includes(platformRole) && !withinQuota(allowed, used)) {
           return ctx.fail("platform.quota_reached", { limit: String(allowed), used });
         }
 
-        const merged = await rolesFor(ctx.db, ctx.tenantId as TenantId, roles());
-        const made = await invite(ctx.db, ctx.tenantId as TenantId, { email, role },
-          { permissions: ctx.permissions }, merged,
+        const made = await invite(ctx.db, ctx.tenantId as TenantId,
+          { email, platformRole, appRoles }, await granter(ctx), registryFor(ctx),
           { counts: seats.counts, allowed: typeof allowed === "number" ? allowed : -1 }, ctx.now);
 
         if (made === "beyond_you") return ctx.fail("platform.forbidden");
@@ -109,23 +146,46 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
            signs in, belongs to nothing, and the only way to find their
            invitation is to search every shard for it (D5). */
         await noteInvitation(ctx.directory, email, ctx.tenantId as TenantId, ctx.now);
-        return { id: made.id, email: made.email, role: made.role };
+        return { id: made.id, email: made.email, platformRole: made.platformRole, appRoles: made.appRoles };
       },
       /* ⚠️ The kernel's own canonical opt-out, made real: a model that can
          invite somebody from a sentence in a document is a model that can be
          asked to. */
       { why: "It grants access, so a model must not be able to call it from a sentence." }),
 
+    /*
+      ⚠️ ONE OPERATION, TWO AUTHORITIES, AND THE INPUT SAYS WHICH. `platformRole`
+      changes what somebody may do to the WORKSPACE; `app` + `role` changes what
+      they may do in ONE product (`role: null` takes them out of it). Each is
+      bounded against ITS OWN authority — the caller's platform keys for one,
+      their keys in that app for the other — because bounding one with the
+      other's keys is the escalation D15 exists to close.
+    */
     "member.role": op("member.role", "write", "member:manage", "Change somebody's role.",
       async (ctx, input) => {
-        const merged = await rolesFor(ctx.db, ctx.tenantId as TenantId, roles());
-        const out = await setRole(ctx.db, ctx.tenantId as TenantId, String(input.id ?? ""),
-          String(input.role ?? ""), { permissions: ctx.permissions }, merged);
+        const memberId = String(input.id ?? "");
+
+        if (typeof input.platformRole === "string") {
+          const out = await setPlatformRole(ctx.db, ctx.tenantId as TenantId, memberId,
+            input.platformRole, await ctx.permissionsIn(null));
+          if (out === "beyond_you") return ctx.fail("platform.forbidden");
+          if (out === "no_such_member") return ctx.fail("platform.not_found");
+          if (out === "no_such_role") return ctx.fail("platform.invalid");
+          if (out === "would_strand") return ctx.fail("platform.conflict");
+          return { id: memberId };
+        }
+
+        const appId = String(input.app ?? "");
+        if (!appId) return ctx.fail("platform.invalid");
+        const role = input.role === null ? null : String(input.role ?? "");
+        if (role === "") return ctx.fail("platform.invalid");
+        const out = await setAppRole(ctx.db, ctx.tenantId as TenantId, memberId, appId, role,
+          await ctx.permissionsIn(appId), await registryFor(ctx)(appId));
         if (out === "beyond_you") return ctx.fail("platform.forbidden");
         if (out === "no_such_member") return ctx.fail("platform.not_found");
         if (out === "no_such_role") return ctx.fail("platform.invalid");
         if (out === "would_strand") return ctx.fail("platform.conflict");
-        return { id: String(input.id) };
+        return { id: memberId };
       },
       { why: "It changes what somebody may do, which only a person weighs." }),
 
@@ -186,9 +246,8 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
 
     "member.remove": op("member.remove", "write", "member:manage", "Remove somebody.",
       async (ctx, input) => {
-        const merged = await rolesFor(ctx.db, ctx.tenantId as TenantId, roles());
         const out = await remove(ctx.db, ctx.tenantId as TenantId, String(input.id ?? ""),
-          { permissions: ctx.permissions }, merged, ctx.now);
+          await granter(ctx), registryFor(ctx), ctx.now);
         if (out === "beyond_you") return ctx.fail("platform.forbidden");
         if (out === "no_such_member") return ctx.fail("platform.not_found");
         /* ⚠️ Removing the last person who can run the place does not close it —

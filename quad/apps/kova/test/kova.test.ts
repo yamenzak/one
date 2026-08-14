@@ -19,8 +19,8 @@ import { primaryOf, refuseApp } from "@quad/kernel";
 import {
   AUDIT_SCHEMA, BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA,
   MEMBERSHIP_SCHEMA, REPLAY_SCHEMA, VAULT_SCHEMA,
-  addShard, applySchema, compose, forget, locator, memberFor, noteShardApp, openAccount,
-  permissionsOf, personalOps, rolesFor, schemaFor, serve, sessionIdFrom, subscribe, surfaceOfComposed,
+  NOBODY, addShard, applySchema, compose, forget, locator, memberFor, noteShardApp, openAccount,
+  permissionsResolver, personalOps, schemaFor, serve, sessionIdFrom, subscribe, surfaceOfComposed,
   tenantBySlug, whoIs, type Db,
 } from "@quad/runtime";
 import { KOVA, kova } from "../src/index.js";
@@ -54,14 +54,12 @@ const app = () => serve({
   }),
   identify: async (request, located) => {
     const { session, email, accountId } = await whoIs(directory(), sessionIdFrom(request), new Date());
-    if (!session || !accountId) {
-      return { caller: { signedIn: false, permissions: new Set(), provenAt: null }, accountId: null };
-    }
+    if (!session || !accountId) return NOBODY;
     const member = await memberFor(located.db, located.tenantId as never, accountId);
-    const roles = await rolesFor(located.db, located.tenantId as never, KOVA.access.roles);
     return {
-      accountId, email,
-      caller: { signedIn: true, permissions: permissionsOf(member, roles), provenAt: session.provenAt },
+      accountId, email, signedIn: true, provenAt: session.provenAt,
+      permissionsIn: permissionsResolver(located.db, located.tenantId as never, member,
+        (appId) => (appId === "kova" ? KOVA.access.roles : null)),
     };
   },
 });
@@ -180,7 +178,7 @@ describe("a coach's first day", () => {
   it("lets a client log a set, and the coach see it", async () => {
     const { coach, slug } = await studio();
     expect((await post(slug, "/api/member.invite",
-      { email: "alex@example.com", role: "client" }, coach)).status).toBe(200);
+      { email: "alex@example.com", platformRole: "customer", appRoles: { kova: "client" } }, coach)).status).toBe(200);
 
     const client = await signIn("alex@example.com");
     const logged = await post(slug, "/api/workout-log.create",
@@ -209,7 +207,7 @@ describe("a coach's first day", () => {
      platform rather than from anything Kova wrote. */
   it("does not let a client read the studio's roster or its clients", async () => {
     const { coach, slug } = await studio();
-    await post(slug, "/api/member.invite", { email: "alex@example.com", role: "client" }, coach);
+    await post(slug, "/api/member.invite", { email: "alex@example.com", platformRole: "customer", appRoles: { kova: "client" } }, coach);
     const client = await signIn("alex@example.com");
 
     expect((await get(slug, "/api/client.list", client)).status).toBe(403);
@@ -267,11 +265,11 @@ describe("what a studio has paid for", () => {
     const { coach, slug } = await studio("solo");
     /* Solo sells one seat, and the founder is holding it. */
     const staff = await post(slug, "/api/member.invite",
-      { email: "second@example.com", role: "trainer" }, coach);
+      { email: "second@example.com", platformRole: "staff", appRoles: { kova: "trainer" } }, coach);
     expect(staff.status).toBe(402);
 
     const asClient = await post(slug, "/api/member.invite",
-      { email: "alex@example.com", role: "client" }, coach);
+      { email: "alex@example.com", platformRole: "customer", appRoles: { kova: "client" } }, coach);
     expect(asClient.status).toBe(200);
   });
 });

@@ -83,16 +83,20 @@ export const HELLO: AppSpec = defineApp({
   mark: "◇",
 
   access: {
-    permissions: ["note:read", "note:write", "member:read", "member:manage", "tenant:manage", "tenant:create"],
+    permissions: ["note:read", "note:write"],
+    /*
+      ⚠️ APP ROLES ONLY (D15). Workspace authority — the roster, the settings,
+      the bill — is the platform's four offices, and an app naming those keys
+      in a bundle is refused at composition.
+    */
     roles: {
-      owner: ["note:read", "note:write", "member:read", "member:manage", "tenant:manage"],
-      writer: ["note:read", "note:write", "member:read"],
+      writer: ["note:read", "note:write"],
       reader: ["note:read"],
     },
-    /* ⚠️ Somebody has to be able to make their first workspace from outside
-       every workspace, and a role cannot express that. */
-    personal: ["tenant:create"],
-    seats: { counts: ["owner", "writer"], entitlement: "seats" },
+    founding: "writer",
+    /* ⚠️ Seats count PLATFORM staff — a person is on the team or they are not,
+       however many products the team uses. */
+    seats: { counts: ["owner", "manager", "staff"], entitlement: "seats" },
   },
 
   entitlements: {

@@ -93,7 +93,7 @@ export async function answerMcp(
       return rpcResult(rpc.id, {});
 
     case "tools/list":
-      return rpcResult(rpc.id, { tools: listTools(wiring, located, who) });
+      return rpcResult(rpc.id, { tools: await listTools(wiring, located, who) });
 
     case "tools/call":
       return callTool(wiring, located, who, rpc, now);
@@ -123,14 +123,17 @@ async function readRpc(request: Request): Promise<RpcRequest | null> {
  * of tools the permission gate will refuse teaches an agent to try them, and
  * every attempt is an audit row for a call that was never going to run.
  */
-function listTools(wiring: Wiring, located: Located, who: Who): readonly McpTool[] {
+async function listTools(wiring: Wiring, located: Located, who: Who): Promise<readonly McpTool[]> {
   const out: McpTool[] = [];
   const seen = new Set<string>();
   for (const composed of composedApps(wiring, located)) {
+    /* ⚠️ Per app (D15): the same caller may reach different tools in different
+       products, and one flat set would list the union — tools the gate refuses. */
+    const permissions = await who.permissionsIn(composed.app.id);
     for (const resolved of composed.byId.values()) {
       if (seen.has(resolved.id)) continue;
       seen.add(resolved.id);
-      if (!maySee(resolved, who)) continue;
+      if (!maySee(resolved, who, permissions)) continue;
       const tool = toolFor(resolved.spec);
       if (tool) out.push(tool);
     }
@@ -138,10 +141,10 @@ function listTools(wiring: Wiring, located: Located, who: Who): readonly McpTool
   return out.sort((a, b) => (a.name < b.name ? -1 : 1));
 }
 
-const maySee = (resolved: Resolved, who: Who): boolean =>
+const maySee = (resolved: Resolved, who: Who, permissions: ReadonlySet<string>): boolean =>
   resolved.permission === PUBLIC
-    ? who.caller.signedIn
-    : who.caller.permissions.has(resolved.permission as string);
+    ? who.signedIn
+    : permissions.has(resolved.permission as string);
 
 const composedApps = (wiring: Wiring, located: Located): readonly Composed[] =>
   located.apps

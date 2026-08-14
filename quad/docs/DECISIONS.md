@@ -252,3 +252,57 @@ stays ours; it is a product fact no gateway can know.
 **Therefore never:** a direct `fetch` to a provider's API from the AI lane; a
 model price parsed from a pricing page where the gateway can report the cost of
 the actual call; the reserve-and-settle arithmetic delegated to the gateway.
+
+---
+
+## D15 — One membership, two authorities: a platform role for the workspace, a role per app inside it
+
+A membership row carries one PLATFORM role — `owner`, `manager`, `staff`,
+`customer`, identical keys in every product, not editable, never an app's to
+declare — and one APP role per enabled app, in that app's own vocabulary,
+`founding` naming the one a workspace's creator gets. `permissionsFor(member,
+appId)` is the one resolver every reader uses — the gate resolves the set for
+the app the operation belongs to, the audience test for the app that raised the
+event, the tool catalogue per app it lists. Every assignment is bounded per
+authority: the granter's platform keys bound the platform role, their keys IN
+EACH APP bound that app's role. Custom roles compose ONE app's declared keys;
+the platform's offices are not composable, and an app that declares or bundles
+a platform key does not boot. Decided 2026-08-14, with the tenant centre
+(CENTER.md) as the driving surface.
+
+**Why.** A single flat role cannot serve two products: "trainer" names Kova
+keys and names nothing in the next app, and the failure is silent 403s in the
+second product for everybody — the deployment's identity seam was resolving
+roles against `located.apps[0]`, which is exactly that bug. Per-app
+MEMBERSHIPS are the other wrong answer: two rosters, two invitations, two
+seats for one person. And bounding only one authority is a two-step
+escalation with a shorter first step — a previous platform shipped the
+bounding function with no caller at all.
+
+**Therefore never:** a flat permission set on a caller; a role registry
+resolved against whichever app is first; an app declaring `member:*`,
+`tenant:*` or `billing:*` as its own; a seat ceiling counted on app roles or
+charged to a `customer`; a stranding check asked of anything but the platform
+authority; a second implementation of "what can this person do".
+
+---
+
+## D16 — A package is a role with a clock: timed grants on the membership, resolved by the same resolver
+
+What a tenant sells its own customers is expressed as GRANTS on the buyer's
+membership row — `{ key, app?, until?, source }` — applied by a purchase,
+extended by a renewal (never stacked), and dropped by the one resolver the
+moment `until` passes. `source` ties a package's grants together so they can be
+found, extended and removed as one thing. Bare grants (no clock) remain a
+person's deliberate exception. Decided 2026-08-14; the package rail itself is
+stage 13.
+
+**Why.** The alternative is double feature-flagging — package flags resolved
+beside role permissions, two systems answering "may they?" that drift until a
+screen promises what a route refuses. A grant that expires in the resolver
+needs no sweep, no lapse flag and no per-app enforcement: an expired grant is
+simply not held, everywhere, at the next request.
+
+**Therefore never:** a second capability system beside the resolver; a lapse
+implemented as a job that edits roles; a renewal that stacks time onto an
+unexpired grant twice; a package that grants a key its app never declared.

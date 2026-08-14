@@ -10,7 +10,7 @@
 
 import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { Channel, ModelRow, TenantId } from "@quad/kernel";
+import { PLATFORM_ROLES, type Channel, type ModelRow, type TenantId } from "@quad/kernel";
 import {
   BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA, MEMBERSHIP_SCHEMA,
   addShard, applySchema, audienceFor, balanceOf, createTenant, credit, fileNote, found, inboxOf,
@@ -54,10 +54,11 @@ beforeEach(async () => {
 });
 
 const roster = async () => {
-  await found(shard(), tenantId, "acc_owner" as never, "sam@example.com", "owner");
-  await invite(shard(), tenantId, { email: "alex@example.com", role: "reader" },
-    { permissions: new Set(HELLO.access.roles.owner ?? []) }, HELLO.access.roles,
-    { counts: [], allowed: -1 });
+  await found(shard(), tenantId, "acc_owner" as never, "sam@example.com", { hello: "writer" });
+  await invite(shard(), tenantId,
+    { email: "alex@example.com", platformRole: "customer", appRoles: { hello: "reader" } },
+    { platform: new Set(PLATFORM_ROLES.owner), inApp: async () => new Set(HELLO.access.roles.writer ?? []) },
+    async () => HELLO.access.roles, { counts: ["owner", "manager", "staff"], allowed: -1 });
   /* The invited person has signed in, so they have an account. */
   await shard().prepare(`UPDATE membership SET account_id = 'acc_alex', accepted_at = ? WHERE email = ?`)
     .bind(new Date().toISOString(), "alex@example.com").run();
@@ -78,7 +79,7 @@ describe("being told something", () => {
   */
   it("reaches everybody who holds the key, and files a row for each", async () => {
     await roster();
-    const told = await audienceFor(shard(), HELLO.notifications ?? {}, HELLO.access.roles,
+    const told = await audienceFor(shard(), HELLO.notifications ?? {}, "hello", HELLO.access.roles,
       { ...dispatch, tenantId }, EVERY);
     expect(told.map((t) => t.email).sort()).toEqual(["alex@example.com", "sam@example.com"]);
 
@@ -95,7 +96,7 @@ describe("being told something", () => {
      inbox is noise, and enough of it teaches people to stop opening the bell. */
   it("does not tell somebody about what they just did", async () => {
     await roster();
-    const told = await audienceFor(shard(), HELLO.notifications ?? {}, HELLO.access.roles,
+    const told = await audienceFor(shard(), HELLO.notifications ?? {}, "hello", HELLO.access.roles,
       { ...dispatch, tenantId, except: "acc_alex" }, EVERY);
     expect(told.map((t) => t.accountId)).toEqual(["acc_owner"]);
   });
@@ -108,7 +109,7 @@ describe("being told something", () => {
   it("still files the row when every interruption is switched off", async () => {
     await roster();
     await setPreference(shard(), tenantId, "acc_alex", "note.published", []);
-    const told = await audienceFor(shard(), HELLO.notifications ?? {}, HELLO.access.roles,
+    const told = await audienceFor(shard(), HELLO.notifications ?? {}, "hello", HELLO.access.roles,
       { ...dispatch, tenantId }, EVERY);
     const alex = told.find((t) => t.accountId === "acc_alex");
     expect(alex?.channels).toEqual(["inbox"]);
@@ -122,7 +123,7 @@ describe("being told something", () => {
     await roster();
     await setPolicy(shard(), tenantId, "note.published", ["inbox"]);
     await setPreference(shard(), tenantId, "acc_alex", "note.published", ["inbox", "email", "push"]);
-    const told = await audienceFor(shard(), HELLO.notifications ?? {}, HELLO.access.roles,
+    const told = await audienceFor(shard(), HELLO.notifications ?? {}, "hello", HELLO.access.roles,
       { ...dispatch, tenantId }, EVERY);
     expect(told.find((t) => t.accountId === "acc_alex")?.channels).toEqual(["inbox"]);
   });
@@ -131,7 +132,7 @@ describe("being told something", () => {
      into a swallowed catch looks delivered. */
   it("offers only what the deployment can actually deliver", async () => {
     await roster();
-    const told = await audienceFor(shard(), HELLO.notifications ?? {}, HELLO.access.roles,
+    const told = await audienceFor(shard(), HELLO.notifications ?? {}, "hello", HELLO.access.roles,
       { ...dispatch, tenantId }, ["inbox", "email"]);
     expect(told[0]!.channels).not.toContain("push");
 
@@ -142,7 +143,7 @@ describe("being told something", () => {
 
   it("marks one as read, and then all of them", async () => {
     await roster();
-    const told = await audienceFor(shard(), HELLO.notifications ?? {}, HELLO.access.roles,
+    const told = await audienceFor(shard(), HELLO.notifications ?? {}, "hello", HELLO.access.roles,
       { ...dispatch, tenantId }, EVERY);
     await fileNote(shard(), HELLO.notifications ?? {}, { ...dispatch, tenantId }, told);
     await fileNote(shard(), HELLO.notifications ?? {}, { ...dispatch, tenantId }, told);
@@ -159,7 +160,7 @@ describe("being told something", () => {
      account is somebody reading everybody's notifications. */
   it("never shows one person another person's inbox", async () => {
     await roster();
-    const told = await audienceFor(shard(), HELLO.notifications ?? {}, HELLO.access.roles,
+    const told = await audienceFor(shard(), HELLO.notifications ?? {}, "hello", HELLO.access.roles,
       { ...dispatch, tenantId, except: "acc_alex" }, EVERY);
     await fileNote(shard(), HELLO.notifications ?? {}, { ...dispatch, tenantId }, told);
     expect(await inboxOf(shard(), tenantId, "acc_alex")).toHaveLength(0);

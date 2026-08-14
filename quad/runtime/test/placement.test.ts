@@ -59,10 +59,9 @@ const stub = operation({
 const app = (id: string, collections = [note]): AppSpec => ({
   id, name: id, mark: "◆",
   access: {
-    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "member:manage", "tenant:create"],
-    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "member:manage"] },
-    personal: ["tenant:create"],
-    seats: { counts: ["owner"], entitlement: "seats" },
+    permissions: ["note:read", "note:write", "receipt:read", "receipt:write"],
+    roles: { editor: ["note:read", "note:write", "receipt:read", "receipt:write"] },
+    seats: { counts: ["owner", "manager", "staff"], entitlement: "seats" },
   },
   entitlements: { seats: { label: "Seats", withheld: "quota" } },
   plans: [{ id: "free", name: "Free", said: "", price: 0, currency: "EUR", order: 0, parking: true,
