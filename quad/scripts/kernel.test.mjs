@@ -75,8 +75,16 @@ ok(`purity: ${kernelFiles} kernel file(s), none reach for a binding`);
  * WebAuthn's own field names` — because a wire protocol's field names appear a
  * dozen times in the file implementing it, and a dozen line exemptions teach
  * everybody that exemptions are routine.
+ *
+ * ⚠️ `screen` IS DELIBERATELY ABSENT, AND THE ABSENCE IS THE INTERESTING PART. A
+ * UI framework's shared layers have to be able to name the thing they render —
+ * that is framework vocabulary, not product knowledge. The collision is real
+ * (one of our products calls a television a screen) and it is that product's to
+ * resolve: a physical panel is a `display` in its manifest. Putting the word on
+ * this list instead would have meant either 120 exemptions or a framework that
+ * cannot say what a page is.
  */
-const NOUNS = /\b(client|clients|workout|workouts|meal|meals|coach|coaches|trainer|trainers|studio|studios|screen|screens|slide|slides|playlist|playlists)\b/gi;
+const NOUNS = /\b(client|clients|workout|workouts|meal|meals|coach|coaches|trainer|trainers|studio|studios|slide|slides|playlist|playlists)\b/gi;
 const exemptions = (src) =>
   new Set([...src.matchAll(/vocabulary-exempt-file\(([a-z]+)\):\s*\S/g)].map((m) => m[1]));
 

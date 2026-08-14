@@ -92,6 +92,21 @@ ok(`invoked: every live guard is reached by a command CI runs`);
 
 const owed = guards.filter((g) => g.status === "owed");
 for (const g of owed) if (!g.stage) fail(`${g.id}: owed against no stage, so nothing will ever force it`);
+
+/*
+  ⚠️ AND A SHIPPED STAGE MAY OWE NOTHING. Without this the stage table is a mood:
+  a stage gets marked shipped, its outstanding guards keep their entry, and the
+  word stops meaning that the thing is actually defended. `PROGRESS.md` is read
+  rather than a second list kept here, because two lists disagree.
+*/
+const progress = readFileSync(join(QUAD, "docs/PROGRESS.md"), "utf8");
+const shipped = new Set([...progress.matchAll(/^\|\s*(\d+)\s*\|[^|]*\|\s*shipped\s*\|/gm)].map((m) => m[1]));
+for (const g of owed) {
+  if (shipped.has(String(g.stage))) {
+    fail(`${g.id}: owed against stage ${g.stage}, which PROGRESS.md calls shipped.\n` +
+         `       Either the guard is due now, or "shipped" has stopped meaning defended.`);
+  }
+}
 const byStage = {};
 for (const g of owed) byStage[g.stage] = (byStage[g.stage] ?? 0) + 1;
 ok(`owed: ${owed.length} guard(s) outstanding — ${Object.entries(byStage).map(([s, n]) => `stage ${s}: ${n}`).join(", ") || "none"}`);

@@ -14,9 +14,9 @@ reader can trust this table instead of re-reading the code.
 
 | # | Stage | Status |
 |---|---|---|
-| 0 | Ground — workspace, docs, guard registry, standards | building |
-| 1 | Kernel — entities, declarations, gate algebra, problems | building |
-| 2 | Directory + placement | not started |
+| 0 | Ground — workspace, docs, guard registry, standards | shipped |
+| 1 | Kernel — entities, declarations, gate algebra, problems | shipped |
+| 2 | Directory + placement | building |
 | 3 | Runtime — manifest → live worker | not started |
 | 4 | Identity + tenancy | not started |
 | 5 | Surface — HeroUI shell, nav, sky, rendered settings | not started |
@@ -27,9 +27,31 @@ reader can trust this table instead of re-reading the code.
 
 ## What is built
 
-- `@quad/kernel` — `tenancy.ts`: accounts, tenants, enablement, placement, and
-  the rule that refuses a tenant on a shard that cannot hold it.
-- The guard registry, its three checks, and the standards that bind them.
+**`@quad/kernel` — the whole declaration surface, and it is pure.** Twenty-one
+files, no I/O, no bindings, no React; every rule in it is provable with no
+fixture at all.
+
+- `tenancy.ts` — accounts, tenants, enablement, placement, standing, and the
+  rule that refuses a tenant on a shard that cannot hold it.
+- `field.ts` · `collection.ts` · `operation.ts` — what a value is, what a thing
+  an app keeps is, and the one declaration that carries every cross-cutting
+  concern (D12).
+- `access.ts` · `gate.ts` — permissions, custom roles, and the seven gates in
+  the order that decides which sentence somebody is shown first.
+- `entitlement.ts` · `credit.ts` — the plan → grandfathered → adjusted → clamped
+  walk, and the reserve that is a ceiling on revenue rather than an estimate.
+- `notify.ts` · `setting.ts` · `flag.ts` — the two-level notification policy
+  addressed by permission, the three settings screens, and the kill switch a
+  tenant cannot beat.
+- `vault.ts` · `legal.ts` — consent as the ceiling and a grant as the specific,
+  and a processing record derived rather than written.
+- `job.ts` · `brand.ts` · `guide.ts` · `ai.ts` — work nobody watches, a theme
+  that cannot be made unreadable, a checklist derived from events, and one lane
+  whatever a provider calls it.
+- `manifest.ts` — the composition. Everything above, cross-checked in one pass,
+  and a manifest that does not compose refuses to boot.
+
+The guard registry, its four checks, and the standards that bind them.
 
 ## Decisions, and how well each is defended
 
@@ -43,17 +65,19 @@ reader can trust this table instead of re-reading the code.
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 3 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
 | D7 | HeroUI v3 is the component layer, and its components are not restyled | 1 |
-| D8 | Declarations are typed object literals; not decorators, not a custom format | 0 |
-| D9 | Libraries encode decisions; we write invariants | 0 |
+| D8 | Declarations are typed object literals; not decorators, not a custom format | 1 |
+| D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 1 |
-| D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 1 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 9 |
+| D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 2 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 12 |
 <!-- /generated -->
 
-⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE.** D8 and D9 are undefended today —
-both are about how code is written rather than what it does, which is exactly the
-kind that erodes without a check. Their guards are owed at the stage that first
-makes them checkable.
+⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
+has at least one. D8 and D9 were the two that did not, both being about how code
+is written rather than what it does — `scripts/declarations.test.mjs` is what
+closed them: no decorators, a builder that returns its literal untouched, no
+classes in the kernel, and a kernel dependency list where each entry states what
+the library decides FOR us.
 
 ## Every guard, live and owed
 
@@ -71,12 +95,18 @@ makes them checkable.
 | `the-kernel-touches-nothing` | D12 | a contract layer that needs a binding to test, so the rules stop being provable and start being fixtures |
 | `the-shared-layers-carry-no-product-vocabulary` | D12 | a shared module that knows what a client is, which has stopped being shared |
 | `the-framework-name-is-reserved-inside-the-framework` | D2 | `quad` meaning four different things inside the thing called Quad |
+| `no-more-than-five-primary-destinations` | D10 | a bottom bar that stopped being tappable and became a menu |
+| `a-declaration-is-a-literal-a-script-can-walk` | D8 | a declaration that has to be executed before it can be read, so every generated surface stops being derivable |
+| `a-library-decides-it-does-not-rule` | D9 | one of our own rules living inside somebody else's package, re-learned from their release notes |
+| `a-notification-nobody-can-receive-is-refused` | D12 | a message switched on in the policy screen that never arrives, so people stop trusting the ones that do |
+| `a-switch-nothing-is-behind-is-refused` | D12 | somebody turning on a control that does nothing, and no longer watching for the problem it promised to solve |
+| `everything-sold-is-withheld-somewhere` | D12 | money taken for a capability every customer already has, failing in the generous direction so nobody reports it |
+| `a-sensitive-fact-is-never-an-ordinary-column` | D11 | somebody's health record in a product table, outside consent, outside the grant log and outside crypto-shredding |
 | `no-heroui-component-is-restyled` *(owed)* | D7 | consistency that is maintained by care rather than enforced, which lasts until the first hurried screen |
-| `no-more-than-five-primary-destinations` *(owed)* | D10 | a bottom bar that stopped being tappable and became a menu |
 | `every-declaration-reaches-a-surface` *(owed)* | D12 | a mechanism built, tested and wired with nowhere a person can look — every suite green |
 | `every-surface-control-changes-behaviour` *(owed)* | D12 | a switch somebody turns on that does nothing, so they stop watching the thing it promised |
 | `no-handler-raises-its-own-cross-cutting-concern` *(owed)* | D12 | a concern an app can forget, forgotten invisibly — no error, no failing test, a capability that silently does not apply |
-| `a-vault-fact-is-never-stored-by-an-app` *(owed)* | D11 | somebody's health record in a product table, outside consent, outside the grant log and outside crypto-shredding |
+| `a-vault-fact-is-never-stored-by-an-app` *(owed)* | D11 | an app writing the vault's own tables directly, so a fact exists with no grant, no consent record and no way to shred it |
 | `no-cross-tenant-query-fans-out-over-shards` *(owed)* | D5 | an operator console that gets slower with every shard, until the sweep it runs times out |
 | `composition-is-lazy` *(owed)* | D4 | cold start growing with the catalogue, until the catalogue that was meant to grow cannot |
 | `no-service-call-is-made-over-fetch` *(owed)* | D3 | a wrong payload becoming a production error where it had been a compile error |

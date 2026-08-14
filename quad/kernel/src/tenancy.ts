@@ -11,28 +11,10 @@
  * lets a product hammering the store and a quiet one share a shard, and what
  * lets a tenant be moved off a hot one without changing anything about it.
  *
- * Layer 1. Imports nothing.
+ * Layer 2. Imports primitives.
  */
 
-/* ------------------------------------------------------------- primitives --- */
-
-declare const ID: unique symbol;
-
-/**
- * ⚠️ BRANDED, SO ONE KIND OF ID CANNOT BE PASSED WHERE ANOTHER IS WANTED. Every
- * id here is a string at runtime and they are all the same shape, so without
- * this the compiler is happy to hand a tenant's id to something asking for an
- * account's — which reads correctly, runs, and returns somebody else's records.
- */
-export type Id<K extends string> = string & { readonly [ID]: K };
-
-export type AccountId = Id<"account">;
-export type TenantId = Id<"tenant">;
-/** An app's id is written by hand in its manifest, so it is a plain slug. */
-export type AppId = string;
-
-/** ISO-8601, always UTC, always with milliseconds. */
-export type Instant = string & { readonly [ID]: "instant" };
+import type { AccountId, AppId, Instant, TenantId } from "./primitives.js";
 
 /* -------------------------------------------------------------- placement --- */
 
@@ -182,3 +164,27 @@ export function placeOn(
  */
 export const appsOf = (rows: readonly Enablement[]): readonly AppId[] =>
   [...new Set(rows.map((r) => r.appId))];
+
+/* ------------------------------------------------------------- standing --- */
+
+/**
+ * WHERE A TENANT STANDS WITH US.
+ *
+ * ⚠️ TWO SEPARATE FACTS, AND CONFLATING THEM IS THE BUG. `writable` is the rung
+ * a tenant in arrears sits on — they read everything they have and change
+ * nothing. `serving` is further down: we have stopped providing the product, so
+ * every ceiling clamps to nothing. A single boolean forces one to imply the
+ * other, and then the first missed invoice either takes away too little or
+ * withholds a business's own records.
+ *
+ * ⚠️ AND `reason` IS RENDERED, so it is a sentence rather than a code. Somebody
+ * meeting this needs to know what to do about it, and "read_only" is not that.
+ */
+export interface Standing {
+  readonly writable: boolean;
+  readonly serving: boolean;
+  readonly reason: string;
+}
+
+/** ⚠️ The ordinary case, named, so nothing has to spell it out to mean "fine". */
+export const IN_GOOD_STANDING: Standing = { writable: true, serving: true, reason: "" };

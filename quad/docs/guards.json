@@ -129,9 +129,11 @@
     {
       "id": "no-more-than-five-primary-destinations",
       "protects": "D10",
-      "stage": "5",
-      "status": "owed",
-      "fails": "a bottom bar that stopped being tappable and became a menu"
+      "stage": "1",
+      "status": "live",
+      "fails": "a bottom bar that stopped being tappable and became a menu",
+      "impl": "kernel/test/manifest.test.ts",
+      "proves": "the ceiling is 5"
     },
     {
       "id": "every-declaration-reaches-a-surface",
@@ -159,7 +161,7 @@
       "protects": "D11",
       "stage": "8",
       "status": "owed",
-      "fails": "somebody's health record in a product table, outside consent, outside the grant log and outside crypto-shredding"
+      "fails": "an app writing the vault's own tables directly, so a fact exists with no grant, no consent record and no way to shred it"
     },
     {
       "id": "no-cross-tenant-query-fans-out-over-shards",
@@ -181,6 +183,60 @@
       "stage": "7",
       "status": "owed",
       "fails": "a wrong payload becoming a production error where it had been a compile error"
+    },
+    {
+      "id": "a-declaration-is-a-literal-a-script-can-walk",
+      "protects": "D8",
+      "stage": "1",
+      "status": "live",
+      "impl": "scripts/declarations.test.mjs",
+      "proves": "builders:",
+      "fails": "a declaration that has to be executed before it can be read, so every generated surface stops being derivable"
+    },
+    {
+      "id": "a-library-decides-it-does-not-rule",
+      "protects": "D9",
+      "stage": "1",
+      "status": "live",
+      "impl": "scripts/declarations.test.mjs",
+      "proves": "libraries:",
+      "fails": "one of our own rules living inside somebody else's package, re-learned from their release notes"
+    },
+    {
+      "id": "a-notification-nobody-can-receive-is-refused",
+      "protects": "D12",
+      "stage": "1",
+      "status": "live",
+      "impl": "kernel/test/manifest.test.ts",
+      "proves": "audience is always empty",
+      "fails": "a message switched on in the policy screen that never arrives, so people stop trusting the ones that do"
+    },
+    {
+      "id": "a-switch-nothing-is-behind-is-refused",
+      "protects": "D12",
+      "stage": "1",
+      "status": "live",
+      "impl": "kernel/test/manifest.test.ts",
+      "proves": "switching it changes nothing",
+      "fails": "somebody turning on a control that does nothing, and no longer watching for the problem it promised to solve"
+    },
+    {
+      "id": "everything-sold-is-withheld-somewhere",
+      "protects": "D12",
+      "stage": "1",
+      "status": "live",
+      "impl": "kernel/test/manifest.test.ts",
+      "proves": "nothing withholds it",
+      "fails": "money taken for a capability every customer already has, failing in the generous direction so nobody reports it"
+    },
+    {
+      "id": "a-sensitive-fact-is-never-an-ordinary-column",
+      "protects": "D11",
+      "stage": "1",
+      "status": "live",
+      "impl": "kernel/test/custody.test.ts",
+      "proves": "sensitive_outside_vault",
+      "fails": "somebody's health record in a product table, outside consent, outside the grant log and outside crypto-shredding"
     }
   ]
 }

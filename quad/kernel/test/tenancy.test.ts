@@ -8,10 +8,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-  appsOf, enabled, placeOn, refusePlacement,
-  type AppId, type Enablement, type Instant, type Shard, type TenantId,
-} from "../src/tenancy.js";
+import { appsOf, enabled, placeOn, refusePlacement, type Enablement, type Shard } from "../src/tenancy.js";
+import type { AppId, Instant, TenantId } from "../src/primitives.js";
 
 const AT = "2026-08-14T00:00:00.000Z" as Instant;
 
