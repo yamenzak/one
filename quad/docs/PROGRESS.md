@@ -211,6 +211,10 @@ refuse — it reads as built and passes every test.
   `Center`. A container that picks its own gap is a layout nobody designed: the
   Hub had twenty-three of them at four different values, each defensible, with
   nobody able to point at which was wrong.
+- **The twelve ambiences are governed by [AMBIENCE.md](AMBIENCE.md)** — which
+  of them a screen reaches for, at which of the three levels (app signature,
+  screen kind, one lifted band), the colour and texture rules, and why `plain`
+  is the default rather than a failure to choose.
 - **The interface is monochrome and the data is not**, which is the palette's
   whole shape. `--accent` — what the library paints every control, switch and
   selected row with — is a VALUE at zero chroma, so the one coloured thing on a
