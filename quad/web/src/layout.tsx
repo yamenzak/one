@@ -28,7 +28,7 @@ import { Avatar, Button, Card, Separator } from "@heroui/react";
 import type { Ambience } from "./ambience.js";
 import { TYPE } from "./type.js";
 import {
-  BAND_PAD, CROWN, CROWN_SIZE, FACE, GUTTER, HERO_PAD, ICON, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
+  BAND_PAD, CROWN, CROWN_SIZE, FACE, GUTTER, HEAD_GAP, HERO_PAD, ICON, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
   type Space, type Width,
 } from "./metrics.js";
 import { MOTION } from "./motion.js";
@@ -231,6 +231,36 @@ export function Title(
   );
 }
 
+/**
+ * A HEADING AND THE THING IT HEADS, WHICH IS ONE BLOCK RATHER THAN TWO.
+ *
+ * ⚠️ A HEADING BELONGS TO WHAT IS UNDER IT, AND A BARE `SectionTitle` CANNOT
+ * KNOW THAT. Dropped into a stack beside its content it is just the previous
+ * sibling, so it takes the stack's gap — 24px on a `roomy` one — and a heading
+ * floating 24px above its own tiles reads as an orphan, equidistant from the
+ * block it names and the block before it. `Group` has always paired a label with
+ * its card at `HEAD_GAP`; everything that is not a card had no way to say the
+ * same thing, which is why the specimens did it wrong every time.
+ */
+export function Section(
+  { label, under, children }: {
+    readonly label: string;
+    readonly under?: string;
+    readonly children?: React.ReactNode;
+  },
+) {
+  return (
+    <section className={`flex flex-col ${HEAD_GAP}`}>
+      <div className="flex flex-col gap-1">
+        <h2 className={TYPE.section}>{label}</h2>
+        {under ? <p className={TYPE.note}>{under}</p> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** ⚠️ For a heading with nothing structurally under it. Prefer `Section`. */
 export function SectionTitle({ children }: { readonly children: React.ReactNode }) {
   return <h2 className={TYPE.section}>{children}</h2>;
 }

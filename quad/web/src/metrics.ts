@@ -56,8 +56,18 @@ export const ROW = {
  * each set its own makes the text column ragged down the whole list, which is
  * the single most visible sign of a hand-built list. A box means every label
  * starts at the same x, whatever is in it.
+ *
+ * ⚠️ AND IT IS A 40px CHIP, NOT A 24px SLOT. A bare glyph beside two lines of
+ * text has no weight — the row reads as text with a decoration, and a card of
+ * them reads as a paragraph with bullets. Every product whose lists have
+ * presence puts the mark in a filled circle at the height of the text block it
+ * sits beside. It also settles a question that had two answers: at 40px a glyph
+ * lead and a FACE are the same width, so a separator has one inset instead of
+ * two, and the class of bug where a list of people was ruled at the glyph inset
+ * cannot occur.
  */
-export const LEAD = "flex size-6 shrink-0 items-center justify-center" as const;
+export const LEAD =
+  "flex size-10 shrink-0 items-center justify-center rounded-full" as const;
 
 /**
  * ⚠️ THE ICON SIZE IS LOCKED HERE AND NOWHERE ELSE. Every glyph in the product
@@ -65,7 +75,7 @@ export const LEAD = "flex size-6 shrink-0 items-center justify-center" as const;
  * obviously missing while the icons were text characters at whatever size the
  * font gave them.
  */
-export const ICON = { row: 20, crown: 20, quick: 22, nav: 22, face: 28 } as const;
+export const ICON = { row: 20, crown: 20, quick: 22, nav: 22, face: 28, tile: 26 } as const;
 
 /**
  * ⚠️ A FACE IS 40px, AND THE CROWN LOOKED EMPTY UNTIL IT WAS. A 24px avatar in a
@@ -75,14 +85,18 @@ export const ICON = { row: 20, crown: 20, quick: 22, nav: 22, face: 28 } as cons
 export const FACE = "size-10" as const;
 
 /**
- * ⚠️ WHERE A SEPARATOR STARTS, AND THERE ARE TWO ANSWERS BECAUSE THERE ARE TWO
- * LEADS. A rule that runs under the lead cuts the icon column in half and makes
- * a list read as a table; one that starts where the labels start is what makes
- * the leads read as a single column. So the inset is lead + gap — 24 + 12 for a
- * glyph, 40 + 12 for a face — and a list of people using the glyph inset is
- * exactly the ragged edge this file exists to prevent.
+ * ⚠️ WHERE A SEPARATOR STARTS. A rule that runs under the lead cuts the icon
+ * column in half and makes a list read as a table; one that starts where the
+ * labels start is what makes the leads read as a single column.
+ *
+ * ⚠️ `lead` AND `face` ARE THE SAME NUMBER NOW, AND THAT IS THE POINT RATHER
+ * THAN AN OVERSIGHT. They were 36 and 52 while a glyph sat in a 24px slot beside
+ * a 40px avatar, which is what made a list of people ruled at the glyph inset a
+ * mistake anybody could make. A glyph chip is 40px too, so there is one column
+ * and one inset; the names stay because a caller reading `face` should not have
+ * to know they coincide, and the day a lead changes size only one of them moves.
  */
-export const INSET = { lead: "ml-9", face: "ml-13", none: "" } as const;
+export const INSET = { lead: "ml-13", face: "ml-13", none: "" } as const;
 
 export type Inset = keyof typeof INSET;
 

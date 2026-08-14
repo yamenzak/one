@@ -16,7 +16,7 @@
 import { useState } from "react";
 import { AppCrown, Balance, Band, CopyRow, Figure, Group, Grid, Island, Money, NavRow, ActionRow,
   ToggleRow, FieldRow, NoteRow, OfferRow, PersonRow, AmountRow, QuickActions, SeeAll,
-  StepRow, TileGrid, Nothing, Row, SectionTitle, Stack, StickyAction, Title,
+  StepRow, TileGrid, Nothing, Row, Section, Stack, StickyAction, Title,
   TYPE, type Ambience } from "@quad/web";
 import { Button } from "@heroui/react";
 import { Sheet } from "../ui.js";
@@ -40,38 +40,40 @@ export function Gallery() {
 
       {/* -------------------------------------------------------- balance --- */}
       <section className="flex flex-col gap-3">
-        <SectionTitle>The one number</SectionTitle>
-        <Balance
-          eyebrow="Personal · EUR"
-          figure={<Money amount={105170} />}
-          identifier="DE29 1001 0178 4770 4207 58"
-          under={
-            <QuickActions
-              actions={[
-                { id: "add", label: "Add money", icon: glyph(<Plus />), onDo: nothing },
-                { id: "move", label: "Move", icon: glyph(<ArrowLeftRight />), onDo: nothing },
-                { id: "details", label: "Details", icon: glyph(<FileText />), onDo: nothing },
-                { id: "more", label: "More", icon: glyph(<Ellipsis />), onDo: nothing },
-              ]}
-            />
-          }
-        />
+        <Section label="The one number">
+          <Balance
+            eyebrow="Personal · EUR"
+            figure={<Money amount={105170} />}
+            identifier="DE29 1001 0178 4770 4207 58"
+            under={
+              <QuickActions
+                actions={[
+                  { id: "add", label: "Add money", icon: glyph(<Plus />), onDo: nothing },
+                  { id: "move", label: "Move", icon: glyph(<ArrowLeftRight />), onDo: nothing },
+                  { id: "details", label: "Details", icon: glyph(<FileText />), onDo: nothing },
+                  { id: "more", label: "More", icon: glyph(<Ellipsis />), onDo: nothing },
+                ]}
+              />
+            }
+          />
+        </Section>
       </section>
 
       {/* ------------------------------------------------------- ambience --- */}
       <section className="flex flex-col gap-3">
-        <SectionTitle>Ambience</SectionTitle>
-        <Grid min="9rem">
-          {SKIES.map((sky) => (
-            <div
-              key={sky}
-              data-sky={sky}
-              className="flex h-24 items-end overflow-hidden rounded-2xl p-3"
-            >
-              <span className={TYPE.note}>{sky}</span>
-            </div>
-          ))}
-        </Grid>
+        <Section label="Ambience">
+          <Grid min="9rem">
+            {SKIES.map((sky) => (
+              <div
+                key={sky}
+                data-sky={sky}
+                className="flex h-24 items-end overflow-hidden rounded-2xl p-3"
+              >
+                <span className={TYPE.note}>{sky}</span>
+              </div>
+            ))}
+          </Grid>
+        </Section>
       </section>
 
       {/* ----------------------------------------------------------- rows --- */}
@@ -159,14 +161,15 @@ export function Gallery() {
 
       {/* ------------------------------------------------------- clusters --- */}
       <section className="flex flex-col gap-3">
-        <SectionTitle>Shortcuts</SectionTitle>
-        <QuickActions
-          actions={[
-            { id: "fraud", label: "Report fraud", icon: glyph(<TriangleAlert />), onDo: nothing },
-            { id: "card", label: "Lost card", icon: glyph(<CreditCard />), onDo: nothing },
-            { id: "device", label: "Lost device", icon: glyph(<Smartphone />), onDo: nothing },
-          ]}
-        />
+        <Section label="Shortcuts">
+          <QuickActions
+            actions={[
+              { id: "fraud", label: "Report fraud", icon: glyph(<TriangleAlert />), onDo: nothing },
+              { id: "card", label: "Lost card", icon: glyph(<CreditCard />), onDo: nothing },
+              { id: "device", label: "Lost device", icon: glyph(<Smartphone />), onDo: nothing },
+            ]}
+          />
+        </Section>
         <TileGrid
           tiles={[
             { id: "a", label: "Miles", icon: glyph(<Plane />), onOpen: nothing },
@@ -179,8 +182,9 @@ export function Gallery() {
 
       {/* --------------------------------------------------------- states --- */}
       <section className="flex flex-col gap-3">
-        <SectionTitle>Nothing here</SectionTitle>
-        <Nothing says="No active challenges yet" />
+        <Section label="Nothing here">
+          <Nothing says="No active challenges yet" />
+        </Section>
         <Nothing
           says="You are not in any workspace yet"
           offer={{ label: "Start a workspace", onDo: nothing }}
@@ -189,10 +193,11 @@ export function Gallery() {
 
       {/* --------------------------------------------------------- crown --- */}
       <section className="flex flex-col gap-3">
-        <SectionTitle>The crown</SectionTitle>
-        <p className={TYPE.note}>
-          The face and search never move; the last two slots belong to the destination
-        </p>
+        <Section label="The crown">
+          <p className={TYPE.note}>
+            The face and search never move; the last two slots belong to the destination
+          </p>
+        </Section>
         {([
           ["Home", "▦", "▭"],
           ["Invest", "▦", "◍"],
@@ -216,10 +221,11 @@ export function Gallery() {
 
       {/* ----------------------------------------------------------- nav --- */}
       <section className="flex flex-col gap-3">
-        <SectionTitle>Getting around</SectionTitle>
-        <p className={TYPE.note}>
-          Four here, five at most, and the labels go while you scroll
-        </p>
+        <Section label="Getting around">
+          <p className={TYPE.note}>
+            Four here, five at most, and the labels go while you scroll
+          </p>
+        </Section>
         <Island
           here="/"
           onGo={nothing}
@@ -234,10 +240,11 @@ export function Gallery() {
 
       {/* --------------------------------------------------------- sticky --- */}
       <section className="flex flex-col gap-3">
-        <SectionTitle>The one action</SectionTitle>
-        <p className={TYPE.note}>
-          A screen has an island or a pinned action, never both — they occupy one place
-        </p>
+        <Section label="The one action">
+          <p className={TYPE.note}>
+            A screen has an island or a pinned action, never both — they occupy one place
+          </p>
+        </Section>
         <StickyAction>
           <Button variant="primary" className="w-full" onPress={nothing}>Invite friends</Button>
         </StickyAction>
@@ -245,12 +252,13 @@ export function Gallery() {
 
       {/* ---------------------------------------------------------- sheet --- */}
       <section className="flex flex-col gap-3">
-        <SectionTitle>Sheet</SectionTitle>
-        <Band bleed="flush">
-          <Sheet title="Sign in to One" lead="We will email you a code — no password to lose">
-            <Row><span className={TYPE.note}>A centred sheet is for a screen somebody arrives at</span></Row>
-          </Sheet>
-        </Band>
+        <Section label="Sheet">
+          <Band bleed="flush">
+            <Sheet title="Sign in to One" lead="We will email you a code — no password to lose">
+              <Row><span className={TYPE.note}>A centred sheet is for a screen somebody arrives at</span></Row>
+            </Sheet>
+          </Band>
+        </Section>
       </section>
     </Stack>
   );

@@ -18,7 +18,7 @@ import { useState } from "react";
 import {
   ActionRow, AmountRow, AppCrown, Balance, Band, CopyRow, Crown, Figure, Grid, Group,
   Island, Money, NavRow, Nothing, NoteRow, OfferRow, Page, PersonRow, Prose,
-  QuickActions, Row, SeeAll, SectionTitle, Stack, StepRow, StickyAction,
+  QuickActions, Row, SeeAll, Section, Stack, StepRow, StickyAction,
   TileGrid, Title, ToggleRow, FieldRow, TYPE,
 } from "@quad/web";
 import { Button } from "@heroui/react";
@@ -257,7 +257,7 @@ function Start() {
         <Stack space="roomy">
           <Title under="Nothing has been recorded on this ward today">Morning round</Title>
 
-          <Grid min="10rem">
+          <Grid min="6rem">
             <Figure value="0" of="Seen" />
             <Figure value="14" of="On the ward" />
             <Figure value="3" of="Awaiting bloods" />
@@ -268,15 +268,16 @@ function Start() {
             offer={{ label: "Start the round", onDo: nothing }}
           />
 
-          <SectionTitle>Get set up</SectionTitle>
-          <TileGrid
-            tiles={[
-              { id: "beds", label: "Beds", icon: glyph(<CreditCard />), onOpen: nothing },
-              { id: "staff", label: "Staff", icon: glyph(<CircleUser />), onOpen: nothing },
-              { id: "rounds", label: "Rounds", icon: glyph(<Clock />), onOpen: nothing },
-              { id: "alerts", label: "Alerts", icon: glyph(<TriangleAlert />), onOpen: nothing },
-            ]}
-          />
+          <Section label="Get set up">
+            <TileGrid
+              tiles={[
+                { id: "beds", label: "Beds", icon: glyph(<CreditCard />), onOpen: nothing },
+                { id: "staff", label: "Staff", icon: glyph(<CircleUser />), onOpen: nothing },
+                { id: "rounds", label: "Rounds", icon: glyph(<Clock />), onOpen: nothing },
+                { id: "alerts", label: "Alerts", icon: glyph(<TriangleAlert />), onOpen: nothing },
+              ]}
+            />
+          </Section>
 
           <Group label="While you are here">
             <OfferRow

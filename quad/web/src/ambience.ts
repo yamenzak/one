@@ -374,6 +374,14 @@ export function ambienceStylesheet(): string {
     `[data-glass="true"]:hover {`,
     `  background-color: color-mix(in oklab, var(--foreground) 18%, transparent) !important;`,
     `}`,
+    /*
+      ⚠️ THE CHIP A ROW'S MARK SITS IN. It is here rather than on the component
+      for the same reason the dot is: a component that named a colour would be
+      one a workspace's branding never reaches (D7). `foreground` at seven
+      percent is a fill that works on a card in either theme without knowing
+      which theme it is in.
+    */
+    `[data-chip="true"] { background-color: color-mix(in oklab, var(--foreground) 7%, transparent); }`,
     /* ⚠️ THE UNREAD DOT, COLOURED BY ITS TONE RATHER THAN BY A LITERAL. It is
        here rather than in a component because a component that named a colour
        would be one a workspace's branding never reaches (D7). */

@@ -138,7 +138,16 @@ const Lead = ({ icon }: { readonly icon?: React.ReactNode }) =>
        draws at whatever the default is — and a list with two icon sizes in it is
        the thing that reads as unfinished. Fixing it here means a caller cannot
        get it wrong. */
-    ? <span aria-hidden="true" className={LEAD} style={{ ["--icon" as string]: `${ICON.row}px` }}>{icon}</span>
+    ? (
+      <span
+        aria-hidden="true"
+        data-chip="true"
+        className={LEAD}
+        style={{ ["--icon" as string]: `${ICON.row}px` }}
+      >
+        {icon}
+      </span>
+    )
     : null;
 
 /**
@@ -401,11 +410,24 @@ export function TileGrid({ tiles }: {
           key={t.id}
           /* ⚠️ `tertiary` — the glyph is never brand-coloured. See QuickActions. */
           variant="tertiary"
-          className={`flex-col h-24 ${SPACE.tight}`}
+          /* ⚠️ `w-full` OR THE CELL IS EQUAL AND THE TILE IS NOT. `.button` is
+             `w-fit`, so a grid of equal 1fr columns held tiles sized to their
+             own labels — "Beds", "Staff" and "Rounds" came out 162, 156 and 198
+             wide, in a grid that had already made room for three identical
+             ones. A row of tiles at three widths is the same fault as a crown of
+             lozenges: the container was right and nothing filled it. */
+          className={`w-full flex-col h-28 ${SPACE.tight}`}
           onPress={t.onOpen}
         >
-          <span aria-hidden="true">{t.icon}</span>
-          <span className={TYPE.note}>{t.label}</span>
+          {/* ⚠️ THE MARK CARRIES THE TILE. A 16px glyph in a 96px square is a
+              tile that is mostly empty, and a grid of them reads as placeholder
+              art. `.button` sizes its own svgs, so the size is set on the box. */}
+          <span aria-hidden="true" style={{ ["--icon" as string]: `${ICON.tile}px` }}>
+            {t.icon}
+          </span>
+          {/* ⚠️ `label`, NOT `note`. A tile's word IS the tile — muting it makes
+              a grid of grey words under marks nobody can name. */}
+          <span className={TYPE.label}>{t.label}</span>
         </Button>
       ))}
     </div>
