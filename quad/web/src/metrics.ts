@@ -124,7 +124,7 @@ export const CROWN_SIZE = "lg" as const;
  * labels and 40 without — a bar with sixteen pixels of nothing around a row of
  * pills. Four is what a pill needs to not touch the edge it sits in.
  */
-export const ISLAND_PAD = "p-1" as const;
+export const ISLAND_PAD = "p-2" as const;
 
 /**
  * ⚠️ AND THE ITEM INSIDE IT HAS A HEIGHT, OR ITS CONTENT TOUCHES THE EDGES. With
@@ -135,6 +135,15 @@ export const ISLAND_PAD = "p-1" as const;
  * puts the air on both sides without anybody choosing two numbers.
  */
 export const ISLAND_ITEM = "min-h-11" as const;
+
+/**
+ * ⚠️ AND THE ISLAND'S OWN INSET IS WHAT KEEPS THE ACTIVE PILL OFF THE RIM. At
+ * four pixels the filled pill behind the current destination ran to within a
+ * hair of the island's edge — two rounded rectangles nested with nothing
+ * between them, which reads as a rendering artefact rather than as a control
+ * inside a bar. Eight is where the pill sits IN the island rather than against
+ * it.
+ */
 
 /* ------------------------------------------------------------------ stacks --- */
 

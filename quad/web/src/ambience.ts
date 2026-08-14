@@ -359,17 +359,42 @@ export function ambienceStylesheet(): string {
       it is on. This is also why a control here is never tinted with the accent:
       see the icon rule below.
 
-      ⚠️ GLASS IS FOR CHROME OVER THE GROUND, NEVER OVER A CARD. `[data-sky]`
-      sets `isolation: isolate` so the ground can sit at `z-index: -1`, and an
-      isolated stacking context is where `backdrop-filter` stops sampling — so a
-      glass control over a card gets the fill without the blur, and whatever is
-      under it reads straight through. The nav island learnt this the obvious
-      way. Over a card, use a surface.
+      ⚠️ GLASS IS FOR CHROME THAT DOES NOT SCROLL, WHICH IS THE ONLY LINE THAT
+      MATTERS. The cost is real — the backdrop is read back and blurred, per
+      frame, per layer — so a scrolling list of translucent cards is a phone
+      with a weak GPU working hard for nothing. Four fixed chips and one bar are
+      not that.
+
+      ⚠️ A NOTE HERE ONCE CLAIMED THE BLUR CANNOT SAMPLE THROUGH `[data-sky]`'s
+      `isolation: isolate`. Measured, it samples through it perfectly well; what
+      was wrong was the FILL — at twelve percent over a card there is nothing
+      for a blur to separate, so it looked flat and the flatness was diagnosed
+      as the blur being absent. A wrong cause in a comment is worse than no
+      comment, because the next person builds on it.
     */
     `[data-glass="true"] {`,
-    `  background-color: color-mix(in oklab, var(--foreground) 12%, transparent) !important;`,
+    `  background-color: color-mix(in oklab, var(--foreground) 14%, transparent) !important;`,
     `  backdrop-filter: blur(20px) saturate(1.4);`,
     `  -webkit-backdrop-filter: blur(20px) saturate(1.4);`,
+    `}`,
+    /*
+      ⚠️ THE BAR IS A VEIL OF THE RAISED TIER, NOT A WASH OF THE FOREGROUND, and
+      the difference is what makes it translucent rather than merely see-through.
+      A foreground tint at any strength a person can see past is one you can
+      READ past — the row under the nav came through it and collided with the
+      labels, two sets of words in the same place, which is the fault this
+      component has now had twice.
+
+      ⚠️ AND IT CANNOT BE A VEIL OF `--background` EITHER, which is the obvious
+      choice and the one that fails in the interesting place: over the page's own
+      ground it would BE the ground, so the bar would vanish exactly where there
+      is no card behind it. `--surface-tertiary` is the tier the palette
+      guarantees clears both the page and a card, so a veil of it is separable
+      wherever it lands — and eight percent of whatever is behind still comes
+      through, blurred, which is the whole effect.
+    */
+    `[data-island="true"][data-glass="true"] {`,
+    `  background-color: color-mix(in oklab, var(--surface-tertiary) 96%, transparent) !important;`,
     `}`,
     `[data-glass="true"]:hover {`,
     `  background-color: color-mix(in oklab, var(--foreground) 18%, transparent) !important;`,

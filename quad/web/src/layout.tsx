@@ -414,16 +414,22 @@ export function Island({ items, here, onGo }: {
           `Switch` does — so `flex items-center` alone left four destinations in a
           vertical column down the middle of the screen. A library component's
           own direction is not the one you assume. */}
-      {/* ⚠️ THE ISLAND IS THE ONE PIECE OF CHROME THAT IS NOT GLASS, and the
-          reason is where it sits. Every other floating control here is over the
-          GROUND, where a translucent fill is depth; the island is over CARDS,
-          where it is a hole — the row underneath read straight through the nav,
-          two sets of words in the same place. `tertiary` is the library's most
-          prominent surface and it keeps the shadow, which is what separates a
-          floating thing from the thing it floats over. */}
+      {/* ⚠️ GLASS, AND THE COST IS ACCEPTABLE HERE FOR A REASON THAT IS ABOUT
+          THIS ELEMENT RATHER THAN ABOUT THE TECHNIQUE. `backdrop-filter` is
+          expensive because it reads back everything behind the element and
+          blurs it, per frame — which is ruinous across a scrolling list of
+          cards and unremarkable for ONE fixed bar and four crown chips. The
+          rule is not "no blur"; it is "blur what does not scroll".
+
+          ⚠️ AN EARLIER NOTE HERE CLAIMED THE BLUR COULD NOT WORK THROUGH
+          `[data-sky]`'s `isolation: isolate`. That was wrong — measured, the
+          backdrop samples through it fine. What was actually wrong was the
+          fill: at twelve percent over a card there was nothing for the blur to
+          separate, so it read as flat and got diagnosed as absent. */}
       <Card
-        variant="tertiary"
+        variant="transparent"
         data-island="true"
+        data-glass="true"
         className={`w-full ${WIDTH.read} flex-row items-center gap-1 ${ISLAND_PAD}`}
       >
         {items.slice(0, PRIMARY_MAX).map((item) => {
