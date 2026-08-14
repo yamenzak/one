@@ -265,7 +265,8 @@ export async function performOperation(
     directory: wiring.directory,
     permissions: caller.permissions,
     permissionsIn: who.permissionsIn,
-    declaredRoles: (appId) => wiring.apps[appId]?.().access.roles ?? null,
+    appOf: (appId) => wiring.apps[appId]?.() ?? null,
+    enabledApps: located.apps,
     email: who.email ?? null,
     allowance: (key: string) =>
       (located.entitlements ?? []).find((e) => e.key === key)?.value ?? false,

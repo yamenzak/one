@@ -306,3 +306,29 @@ simply not held, everywhere, at the next request.
 **Therefore never:** a second capability system beside the resolver; a lapse
 implemented as a job that edits roles; a renewal that stacks time onto an
 unexpired grant twice; a package that grants a key its app never declared.
+
+---
+
+## D17 — The tenant centre is one bundle for every product, and declarations reach the page as data
+
+A workspace's own address opens the centre: five fixed areas (Home, People,
+Money, Settings, Data & Trust) and every enabled product's declared screens
+inside the same shell, under `/<app>/…`, with the switcher in the crown. The
+page holds no manifest — `centre.view` sends the declarative slices (screens,
+settings, notification types, documents, processors, the caller's resolved
+permissions per app) and the page draws exactly what the gate would allow.
+A product's own screen content is registered through `mountScreen`, keyed by
+app and declared route; an unregistered screen renders an honest notice.
+Decided 2026-08-14, with stage 14.
+
+**Why.** A bundle per product is the previous platform's four SPAs wearing one
+URL — every shared surface fixed N times, every divergence invisible. And a
+page that imported a manifest would ship every product's declarations to every
+tenant, grow with the catalogue, and hold a second copy of what the deployment
+already knows. Data over the wire keeps one bundle honest: the same
+`permissionsFor` sets gate the route and shape the page.
+
+**Therefore never:** an app-specific SPA; a page importing `@quad/<app>`; a
+people, billing, settings, consent or notification screen inside a product; a
+screen drawn in an app's frame except through `mountScreen`; a centre area
+rendered for somebody whose platform keys cannot open it.

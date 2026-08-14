@@ -123,6 +123,7 @@ describe("what the manifest produced", () => {
   */
   it("derives every route from the declarations alone", () => {
     expect(surfaceOfComposed(compose(HELLO)).map((r) => `${r.method} ${r.path}`)).toEqual([
+      "GET /api/centre.view",
       "GET /api/inbox.list",
       "POST /api/inbox.policy",
       "POST /api/inbox.preference",
@@ -132,6 +133,7 @@ describe("what the manifest produced", () => {
       "GET /api/member.list",
       "POST /api/member.remove",
       "POST /api/member.role",
+      "GET /api/money.view",
       "POST /api/note.create",
       "POST /api/note.delete",
       "GET /api/note.list",
@@ -144,6 +146,8 @@ describe("what the manifest produced", () => {
       "GET /api/package.held",
       "GET /api/package.list",
       "POST /api/package.revoke",
+      "GET /api/setting.read",
+      "POST /api/setting.write",
     ]);
   });
 

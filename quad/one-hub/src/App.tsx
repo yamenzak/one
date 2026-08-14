@@ -19,6 +19,7 @@ import { SPECIMEN_IDS, Specimen, type SpecimenId } from "./screens/Specimens.js"
 
 import { useSession } from "./session.js";
 import type { Face } from "./door.js";
+import { Centre } from "./centre/Centre.js";
 import { Elsewhere } from "./screens/Elsewhere.js";
 import { NewWorkspace } from "./screens/NewWorkspace.js";
 import { SignIn } from "./screens/SignIn.js";
@@ -28,7 +29,7 @@ import { Workspaces } from "./screens/Workspaces.js";
 /** What the Hub shows, as a name — the thing the guard and the tests read. */
 export type Screen =
   | "waiting" | "stuck" | "signpost" | "sign-in" | "workspaces" | "new-workspace"
-  | "elsewhere" | "gallery";
+  | "centre" | "elsewhere" | "gallery";
 
 /**
  * ⚠️ EVERY COMBINATION IS ANSWERED, INCLUDING THE ONES THAT SHOULD NOT HAPPEN.
@@ -48,14 +49,16 @@ export function pickScreen(
   if (face === null) return "waiting";
   if (face === "signpost") return "signpost";
   if (face === "elsewhere") return "elsewhere";
-  /* Both remaining doors need somebody. */
+  /* Every remaining door needs somebody. */
   if (signedIn === null) return "waiting";
   if (!signedIn) return "sign-in";
+  if (face === "centre") return "centre";
   return face === "create" ? "new-workspace" : "workspaces";
 }
 
 const LEAD: Readonly<Record<string, string>> = {
   create: "Sign in first — a workspace belongs to somebody.",
+  centre: "Sign in to open this workspace.",
   hub: "We will email you a code. There is no password to remember or lose.",
 };
 
@@ -80,6 +83,10 @@ export function App() {
      centred sheet with no chrome. Using one for both makes the sign-in look like
      a settings page — which is how a product comes to feel like a form. */
   const settled = screen === "workspaces" || screen === "gallery";
+
+  /* ⚠️ The centre brings its OWN shell — crown, nav, areas — so it replaces the
+     Hub's frame exactly as a specimen does, rather than sitting inside it. */
+  if (screen === "centre") return <><NoticeHost /><Centre /></>;
 
   /* ⚠️ A specimen brings its OWN page, crown and ambience — that is the whole
      claim being tested — so it replaces the Hub's frame rather than sitting

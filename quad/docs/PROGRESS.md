@@ -28,6 +28,7 @@ reader can trust this table instead of re-reading the code.
 | 11 | The agent surface — every operation an MCP tool, derived | shipped |
 | 12 | Multi-app access — a platform role for the workspace, a role per app inside it | shipped |
 | 13 | The package rail — a priced bundle of timed grants, one ledger, one clock | shipped |
+| 14 | The tenant centre — the shell with the router: five areas + app screens inside | shipped |
 
 ## What is NOT built, and where to pick it up
 
@@ -403,6 +404,40 @@ sweep.
   `apps/hello/test/packages.test.ts` drives the rail through the real doors on
   a movable clock — grant, grace, lapse, renewal, once-per, revoke, archive.
 
+**The tenant centre — a workspace's own address opens it (D17).** The first
+Quad surface with a real router, and it is still a pure parse: five areas —
+Home, People, Money, Settings, Data & Trust — then every enabled product's
+declared screens inside the same shell under `/<app>/…`, the switcher in the
+crown, the designed Island as the phone nav in every context.
+
+- **The page holds no manifest.** `centre.view` sends the declarative slices —
+  screens, settings, notification types, documents, processors, role names,
+  sellable keys — plus the caller's resolved permission set PER APP, so the
+  page draws exactly what the gate would allow, from the same resolver.
+- **People is the stage-12/13 payoff**: one roster with the platform office
+  and the per-app roles on each row, bounded invitations and re-roles, the
+  package composer beside the role controls (same gesture, plus a price and a
+  clock), holdings with their ladder state, grant/extend/revoke.
+- **Money is the one-bill promise drawn**: lines per product from the same
+  rows a charge would collect, the credit balance, each product's shelf with
+  the current plan marked — and plan changes say honestly that they arrive
+  with the payment rail.
+- **Settings renders both authorities**: each product's tenant rows (saved
+  with the declaration's own `needs`) and the person's own, plus the
+  notification ceiling and the personal narrowing — all generated, no app
+  wrote a screen. Data & Trust renders the manifests' documents and
+  sub-processors and points account-wide actions at the account door.
+- **Cross-app platform ops name their target**: `package.*` and `setting.*`
+  take an `app` input, because the route resolves whichever app is first on
+  the tenant's list — bound to the composition, the second product would be
+  unreachable for ever (guarded, mutation-verified).
+- **`mountScreen` is the app-screen seam**: a product's screen content
+  registers by app id and declared route; unregistered screens render an
+  honest notice instead of a blank page. Boot declares the deployment's own
+  shard idempotently, so a fresh `wrangler dev` can create a workspace.
+- Verified in a real browser against the real worker on the real host
+  topology — every area photographed at phone width, light and dark.
+
 **`@quad/one-hub` — the page a person opens.** The signpost, sign-in with an
 emailed code, the workspace list, and the wizard that makes one — HeroUI v3 as it
 ships, themed through tokens, nothing restyled.
@@ -436,13 +471,14 @@ The guard registry, its checks, and the standards that bind them.
 | D7 | HeroUI v3 is the component layer, and its components are not restyled | 25 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 2 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
-| D10 | Five primary destinations, maximum | 4 |
+| D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 10 |
 | D12 | Every cross-cutting concern is a field on a declaration, never a call site | 39 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 0 |
-| D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 3 |
+| D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
 | D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 4 |
+| D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 0 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -567,6 +603,9 @@ the library decides FOR us.
 | `a-package-grant-always-carries-its-clock` | D16 | a purchase that sells access for ever, because a bare grant is a standing exception and the resolver is correct to honour it |
 | `a-renewal-extends-and-never-stacks` | D16 | two overlapping windows for one purchase, and which one the resolver reads decides what somebody paid for |
 | `the-rails-granting-operations-are-not-tools` | D16 | a model composes or applies what a payment buys from a sentence in a document |
+| `every-centre-stop-has-a-branch` | D10 | a path the parser can produce renders a blank page, which is the same picture as a page that failed to load |
+| `an-unreachable-area-resolves-away-before-it-renders` | D15 | a customer opens People and every call on the screen is a 403 dressed as a broken page |
+| `a-cross-app-operation-names-its-target` | D15 | the second product's packages and settings are unreachable for ever, because the route resolves whichever app is first on the tenant's list |
 <!-- /generated -->
 
 ## Commands

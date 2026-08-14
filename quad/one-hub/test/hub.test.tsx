@@ -40,7 +40,7 @@ describe("which screen the Hub is", () => {
       for (const signedIn of [true, false, null]) {
         const screen = pickScreen(faceFor(kind), signedIn, false);
         expect(screen, `${kind} / signedIn=${signedIn}`).not.toBe(undefined);
-        expect(["waiting", "stuck", "signpost", "sign-in", "workspaces", "new-workspace", "elsewhere"])
+        expect(["waiting", "stuck", "signpost", "sign-in", "workspaces", "new-workspace", "centre", "elsewhere"])
           .toContain(screen satisfies Screen);
       }
     }
@@ -55,9 +55,13 @@ describe("which screen the Hub is", () => {
     expect(pickScreen(null, true, false)).toBe("waiting");
   });
 
-  it("asks for a sign-in on both doors that need one", () => {
+  it("asks for a sign-in on every door that needs one", () => {
     expect(pickScreen("hub", false, false)).toBe("sign-in");
     expect(pickScreen("create", false, false)).toBe("sign-in");
+    /* ⚠️ A workspace's own address included: the centre is behind a session. */
+    expect(pickScreen("centre", false, false)).toBe("sign-in");
+    expect(pickScreen("centre", true, false)).toBe("centre");
+    expect(pickScreen("centre", null, false)).toBe("waiting");
   });
 
   it("shows workspaces on the account door and the wizard on the setup door", () => {

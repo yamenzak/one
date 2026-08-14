@@ -101,6 +101,27 @@ if (!/permissionsFor\(member,\s*appId/.test(inbox)) {
   ok(`audience: told about an app's events by what you may do in that app`);
 }
 
+/* --------------------------------------------------------------- target --- */
+
+/**
+ * ⚠️ A CROSS-APP PLATFORM OPERATION NAMES ITS TARGET APP IN THE INPUT. Every
+ * composition carries the same op ids, and the route resolves whichever app is
+ * FIRST on the tenant's list — an op bound to its composing app answers for
+ * that app for ever, so the second product's packages and settings are simply
+ * unreachable, with every single-app suite green.
+ */
+const rails = ["runtime/src/packages.ts", "runtime/src/settings.ts"]
+  .map((f) => [f, strip(readFileSync(join(QUAD, f), "utf8"))]);
+const untargeted = rails.filter(([, src]) =>
+  !/const targetOf/.test(src) || !/ctx\.enabledApps\.includes\(named\)/.test(src));
+if (untargeted.length) {
+  fail(`${untargeted.map(([f]) => f).join(", ")}: the platform ops no longer resolve a\n` +
+       `       target app from the input — they answer for whichever app is first on\n` +
+       `       the tenant's list, and only that one, for ever.`);
+} else {
+  ok(`target: packages and settings answer for the app the input names`);
+}
+
 /* ------------------------------------------------------------------ end --- */
 
 console.log(`\naccess: two authorities on one membership, resolved per app.`);

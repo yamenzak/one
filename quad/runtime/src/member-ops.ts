@@ -40,12 +40,14 @@ export interface PlatformCtx extends Ctx {
    */
   readonly permissionsIn: (appId: string | null) => Promise<ReadonlySet<string>>;
   /**
-   * ⚠️ ANOTHER APP'S DECLARED ROLES, RESOLVED BY THE DEPLOYMENT. One invitation
-   * may assign roles in several products (that is the point of one roster), and
-   * validating app B's role needs app B's registry — which only the deployment
-   * holds. `null` for an app this deployment does not serve.
+   * ⚠️ ANOTHER APP'S MANIFEST, RESOLVED BY THE DEPLOYMENT. One invitation may
+   * assign roles in several products (that is the point of one roster), and the
+   * Money area answers for every enabled product at once — both need what only
+   * the deployment holds. `null` for an app it does not serve.
    */
-  readonly declaredRoles: (appId: string) => RoleRegistry | null;
+  readonly appOf: (appId: string) => AppSpec | null;
+  /** Which products this workspace has switched on. */
+  readonly enabledApps: readonly string[];
   readonly email: string | null;
   readonly allowance: (key: string) => Allowance;
 }
@@ -77,7 +79,7 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
   });
   const registryFor = (ctx: PlatformCtx) => async (appId: string): Promise<RoleRegistry> =>
     rolesFor(ctx.db, ctx.tenantId as TenantId, appId,
-      (appId === app.id ? app.access.roles : ctx.declaredRoles(appId)) ?? {});
+      (appId === app.id ? app.access.roles : ctx.appOf(appId)?.access.roles) ?? {});
 
   const asAppRoles = (given: unknown): Readonly<Record<string, string>> =>
     given !== null && typeof given === "object" && !Array.isArray(given)

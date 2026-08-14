@@ -27,6 +27,9 @@ import type { Db } from "./sql.js";
 import { list, patch, put, readOne } from "./records.js";
 import { memberOps } from "./member-ops.js";
 import { packageOps } from "./packages.js";
+import { settingOps } from "./settings.js";
+import { moneyOps } from "./money-ops.js";
+import { centreOps } from "./centre-ops.js";
 
 /* ------------------------------------------------------------------ shape --- */
 
@@ -186,6 +189,9 @@ export function compose(app: AppSpec): Composed {
      redeclare. */
   for (const [id, resolved] of Object.entries(memberOps(app))) byId.set(id, resolved);
   for (const [id, resolved] of Object.entries(packageOps(app))) byId.set(id, resolved);
+  for (const [id, resolved] of Object.entries(settingOps(app))) byId.set(id, resolved);
+  for (const [id, resolved] of Object.entries(moneyOps(app))) byId.set(id, resolved);
+  for (const [id, resolved] of Object.entries(centreOps(app))) byId.set(id, resolved);
 
   for (const spec of app.operations) {
     byId.set(spec.id, {

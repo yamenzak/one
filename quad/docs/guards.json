@@ -1009,6 +1009,33 @@
       "impl": "scripts/package.test.mjs",
       "proves": "optout:",
       "fails": "a model composes or applies what a payment buys from a sentence in a document"
+    },
+    {
+      "id": "every-centre-stop-has-a-branch",
+      "protects": "D10",
+      "stage": "14",
+      "status": "live",
+      "impl": "one-hub/test/centre.test.ts",
+      "proves": "every stop has a branch",
+      "fails": "a path the parser can produce renders a blank page, which is the same picture as a page that failed to load"
+    },
+    {
+      "id": "an-unreachable-area-resolves-away-before-it-renders",
+      "protects": "D15",
+      "stage": "14",
+      "status": "live",
+      "impl": "one-hub/test/centre.test.ts",
+      "proves": "sends a customer home",
+      "fails": "a customer opens People and every call on the screen is a 403 dressed as a broken page"
+    },
+    {
+      "id": "a-cross-app-operation-names-its-target",
+      "protects": "D15",
+      "stage": "14",
+      "status": "live",
+      "impl": "scripts/access.test.mjs",
+      "proves": "target:",
+      "fails": "the second product's packages and settings are unreachable for ever, because the route resolves whichever app is first on the tenant's list"
     }
   ]
 }

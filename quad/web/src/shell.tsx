@@ -23,8 +23,34 @@
 import type { ScreenSpec, Tone } from "@quad/kernel";
 import { PRIMARY_MAX, primaryOf } from "@quad/kernel";
 import { Avatar, Button, Chip, Separator, Tooltip } from "@heroui/react";
+import {
+  Banknote, Bell, Calendar, Circle, ClipboardList, Cog, Coins, FileText, House,
+  Inbox as InboxGlyph, NotebookPen, Package, Shield, Sun, Users,
+} from "lucide-react";
+import { Island } from "./layout.js";
 import { skyCss, type Sky } from "./theme.js";
 import { GUTTER, NAV_SPACE, PAD, ROW, SPACE } from "./metrics.js";
+
+/**
+ * ⚠️ AN ICON IS A NAME IN A MANIFEST AND A GLYPH HERE. The manifest stays pure
+ * data — no React in a declaration — and the mapping lives once, so a new
+ * screen names a glyph instead of importing one. A name nobody mapped renders
+ * the neutral mark rather than nothing: an empty slot in a nav reads as a
+ * broken button.
+ */
+const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
+  home: <House />, house: <House />, sun: <Sun />,
+  people: <Users />, users: <Users />,
+  money: <Coins />, coins: <Coins />, bank: <Banknote />,
+  settings: <Cog />, cog: <Cog />,
+  trust: <Shield />, shield: <Shield />,
+  inbox: <InboxGlyph />, bell: <Bell />,
+  note: <NotebookPen />, file: <FileText />, list: <ClipboardList />,
+  calendar: <Calendar />, package: <Package />,
+};
+
+export const glyphOf = (name?: string): React.ReactNode =>
+  (name && GLYPHS[name]) ?? <Circle />;
 
 /**
  * ⚠️ THE DATA IN THE CROWN, NOT THE CROWN ITSELF. `Crown` is the component in
@@ -144,22 +170,18 @@ export function Shell(props: ShellProps) {
         <main className={`flex-1 min-w-0 ${PAD} ${NAV_SPACE} md:${PAD}`}>{children}</main>
       </div>
 
-      {/* -------------------------------------------------------- the island --- */}
-      <nav
-        className={`md:hidden fixed inset-x-0 bottom-0 flex justify-around gap-1 ${PAD}`}
-        aria-label="Sections"
-      >
-        {primary.map((s) => (
-          <Button
-            key={s.id}
-            variant={s.route === here ? "primary" : "ghost"}
-            aria-current={s.route === here ? "page" : undefined}
-            onPress={() => onGo(s.route)}
-          >
-            {s.label}
-          </Button>
-        ))}
-      </nav>
+      {/* ⚠️ THE ISLAND, not a welded bar — glass, one travelling pill, labels
+          that fold while somebody scrolls. The same component every specimen
+          uses, so the phone nav cannot drift from the design. */}
+      <div className="md:hidden">
+        <Island
+          here={here}
+          onGo={onGo}
+          items={primary.map((s) => ({
+            id: s.id, label: s.label, route: s.route, icon: glyphOf(s.icon ?? s.id),
+          }))}
+        />
+      </div>
     </div>
   );
 }

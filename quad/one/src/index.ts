@@ -19,8 +19,8 @@
 import type { AppSpec } from "@quad/kernel";
 import {
   AUDIT_SCHEMA, BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA,
-  JOBS_SCHEMA, MEMBERSHIP_SCHEMA, PACKAGE_SCHEMA, REPLAY_SCHEMA, VAULT_SCHEMA,
-  NOBODY, accountOfToken, applySchema, appsOfTenant, bearerFrom, locator, memberFor,
+  JOBS_SCHEMA, MEMBERSHIP_SCHEMA, PACKAGE_SCHEMA, REPLAY_SCHEMA, SETTING_SCHEMA, VAULT_SCHEMA,
+  NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, locator, memberFor, noteShardApp,
   permissionsResolver, personalOps, schemaFor, serve, sessionIdFrom, shardFor, whoIs,
   type Db, type TenantRow,
 } from "@quad/runtime";
@@ -44,7 +44,7 @@ const APPS: Readonly<Record<string, () => AppSpec>> = { hello, kova };
  * silently never does.
  */
 const DIRECTORY_MODULES = [DIRECTORY_SCHEMA, IDENTITY_SCHEMA, BILLING_SCHEMA, JOBS_SCHEMA];
-const SHARD_MODULES = [MEMBERSHIP_SCHEMA, PACKAGE_SCHEMA, AUDIT_SCHEMA, REPLAY_SCHEMA, INBOX_SCHEMA, VAULT_SCHEMA];
+const SHARD_MODULES = [MEMBERSHIP_SCHEMA, PACKAGE_SCHEMA, SETTING_SCHEMA, AUDIT_SCHEMA, REPLAY_SCHEMA, INBOX_SCHEMA, VAULT_SCHEMA];
 
 export interface Env {
   readonly DIRECTORY: D1Database;
@@ -99,12 +99,22 @@ const missingConfig = (env: Env): readonly string[] =>
 
 const boot = (env: Env): Promise<void> => {
   booted ??= (async () => {
-    await applySchema(env.DIRECTORY as unknown as Db, DIRECTORY_MODULES);
+    const directory = env.DIRECTORY as unknown as Db;
+    await applySchema(directory, DIRECTORY_MODULES);
     /* Every app this deployment serves, on the one shard it has today. */
     await applySchema(env.SHARD_EU_1 as unknown as Db, [
       ...Object.values(APPS).map((make) => schemaFor(make())),
       ...SHARD_MODULES,
     ]);
+    /*
+      ⚠️ THE SHARD THIS DEPLOYMENT BINDS IS DECLARED AT BOOT, IDEMPOTENTLY. The
+      directory places every new workspace on a registered shard — with no row,
+      creating one answers "nowhere to put it" on a deployment whose database
+      is RIGHT THERE, bound and migrated. Both writes are upserts, so a
+      thousand cold starts write what one did.
+    */
+    await addShard(directory, "eu-1", "eu", 10_000);
+    for (const id of Object.keys(APPS)) await noteShardApp(directory, "eu-1", id as never);
   })();
   return booted;
 };

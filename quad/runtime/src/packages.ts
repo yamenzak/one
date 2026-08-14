@@ -181,6 +181,19 @@ async function writePackageGrants(
  * grant path, in the platform's surface exactly like the roster's.
  */
 export function packageOps(app: AppSpec): Readonly<Record<string, Resolved>> {
+  /*
+    ⚠️ THE TARGET APP IS AN INPUT, NOT THE COMPOSITION. Every app's composition
+    carries these operations under the same ids, and the HTTP route resolves
+    whichever app happens to be FIRST on the tenant's list — so an op bound to
+    its composing app could never answer for the second product. `app` in the
+    input names the product; absent, the composing app stands.
+  */
+  const targetOf = (ctx: PlatformCtx, input: Record<string, unknown>): AppSpec | null => {
+    const named = input.app === undefined ? app.id : String(input.app);
+    if (!ctx.enabledApps.includes(named)) return null;
+    return named === app.id ? app : ctx.appOf(named);
+  };
+
   const op = (
     id: string, kind: "read" | "write", permission: string, summary: string,
     run: (ctx: PlatformCtx, input: Record<string, unknown>) => Promise<unknown>,
@@ -204,16 +217,22 @@ export function packageOps(app: AppSpec): Readonly<Record<string, Resolved>> {
 
   return {
     "package.list": op("package.list", "read", "member:read", "What this workspace sells.",
-      async (ctx) => ({
-        items: (await packagesOf(ctx.db, ctx.tenantId as TenantId, app.id))
-          .filter((p) => !p.archivedAt),
-      })),
+      async (ctx, input) => {
+        const target = targetOf(ctx, input);
+        if (!target) return ctx.fail("platform.not_found");
+        return {
+          items: (await packagesOf(ctx.db, ctx.tenantId as TenantId, target.id))
+            .filter((p) => !p.archivedAt),
+        };
+      }),
 
     "package.create": op("package.create", "write", "tenant:manage", "Compose a package.",
       async (ctx, input) => {
+        const target = targetOf(ctx, input);
+        if (!target) return ctx.fail("platform.not_found");
         const def: PackageDef = {
           id: String(input.id ?? "").trim().toLowerCase(),
-          app: app.id,
+          app: target.id,
           name: String(input.name ?? "").trim(),
           priceCents: Number(input.priceCents ?? NaN),
           currency: String(input.currency ?? "EUR"),
@@ -232,12 +251,12 @@ export function packageOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           may not bundle keys they do not themselves hold in this app — the
           role composer's rule, or buying from yourself is an escalation.
         */
-        const refused = refusePackage(def, sellableKeys(app), await ctx.permissionsIn(app.id));
+        const refused = refusePackage(def, sellableKeys(target), await ctx.permissionsIn(target.id));
         if (refused === "beyond_you") return ctx.fail("platform.forbidden");
         if (refused === "undeliverable") return ctx.fail("platform.invalid", { detail: "undeliverable" });
         if (refused) return ctx.fail("platform.invalid", { detail: refused });
 
-        const seen = await packageOf(ctx.db, ctx.tenantId as TenantId, app.id, def.id);
+        const seen = await packageOf(ctx.db, ctx.tenantId as TenantId, target.id, def.id);
         if (seen) return ctx.fail("platform.conflict");
 
         await ctx.db.prepare(
@@ -254,22 +273,26 @@ export function packageOps(app: AppSpec): Readonly<Record<string, Resolved>> {
        purchase already made is a promise already priced. */
     "package.archive": op("package.archive", "write", "tenant:manage", "Stop selling a package.",
       async (ctx, input) => {
+        const target = targetOf(ctx, input);
+        if (!target) return ctx.fail("platform.not_found");
         const id = String(input.id ?? "");
-        const seen = await packageOf(ctx.db, ctx.tenantId as TenantId, app.id, id);
+        const seen = await packageOf(ctx.db, ctx.tenantId as TenantId, target.id, id);
         if (!seen) return ctx.fail("platform.not_found");
         await ctx.db.prepare(
           `UPDATE package SET archived_at = ? WHERE tenant_id = ? AND app = ? AND id = ?`)
-          .bind(ctx.now.toISOString(), ctx.tenantId, app.id, id).run();
+          .bind(ctx.now.toISOString(), ctx.tenantId, target.id, id).run();
         return { id };
       }),
 
     "package.held": op("package.held", "read", "member:read", "What somebody holds.",
       async (ctx, input) => {
+        const target = targetOf(ctx, input);
+        if (!target) return ctx.fail("platform.not_found");
         const memberId = String(input.member ?? "");
         const member = (await membersOf(ctx.db, ctx.tenantId as TenantId))
           .find((m) => m.id === memberId);
         if (!member) return ctx.fail("platform.not_found");
-        const all = await packagesOf(ctx.db, ctx.tenantId as TenantId, app.id);
+        const all = await packagesOf(ctx.db, ctx.tenantId as TenantId, target.id);
         const held = await Promise.all(all.map(async (pkg) => ({
           ...(await holdingOf(ctx.db, ctx.tenantId as TenantId, memberId, pkg, ctx.now)),
           name: pkg.name,
@@ -285,17 +308,19 @@ export function packageOps(app: AppSpec): Readonly<Record<string, Resolved>> {
     */
     "package.grant": op("package.grant", "write", "member:manage", "Grant or extend a package.",
       async (ctx, input) => {
+        const target = targetOf(ctx, input);
+        if (!target) return ctx.fail("platform.not_found");
         const memberId = String(input.member ?? "");
         const packageId = String(input.package ?? "");
         /* ⚠️ The staff lane is still bounded: nobody applies grants they could
-           not hand out key by key in this app. */
-        const pkg = await packageOf(ctx.db, ctx.tenantId as TenantId, app.id, packageId);
+           not hand out key by key in the package's own app. */
+        const pkg = await packageOf(ctx.db, ctx.tenantId as TenantId, target.id, packageId);
         if (!pkg) return ctx.fail("platform.not_found");
-        const mine = await ctx.permissionsIn(app.id);
+        const mine = await ctx.permissionsIn(target.id);
         if (pkg.grants.some((k) => !mine.has(k))) return ctx.fail("platform.forbidden");
 
         const out = await applyPackage(ctx.db, ctx.tenantId as TenantId, memberId, packageId,
-          app.id, `staff:${ctx.accountId ?? "unknown"}`, ctx.now);
+          target.id, `staff:${ctx.accountId ?? "unknown"}`, ctx.now);
         if (out === "no_such_package" || out === "no_such_member") return ctx.fail("platform.not_found");
         if (out === "archived") return ctx.fail("platform.invalid");
         if (out === "once") return ctx.fail("platform.conflict");
