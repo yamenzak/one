@@ -50,11 +50,22 @@ export const GROUND = {
      * dropping shadows is supposed to make impossible.
      */
     raised: 0.865,
+    /**
+     * ⚠️ THE FILL OF A CONTROL, AND IT HAS TO CLEAR THE RAISED TIER TOO. The
+     * library's `--default` is the ground of every secondary button — including
+     * the pill behind the nav's current destination, which sits ON the island.
+     * Left at its shipped value it landed 0.033 from the raised tier this file
+     * had just moved, so the one thing telling somebody where they are was
+     * invisible in dark. A palette is a set of RELATIONSHIPS; changing one tier
+     * without the things that sit on it is how a fix becomes a different bug.
+     */
+    control: 0.94,
   },
   dark: {
     background: 0.12,
     surface: 0.21,
     raised: 0.28,
+    control: 0.36,
   },
 } as const;
 
@@ -107,6 +118,7 @@ function tier(mode: "light" | "dark"): string {
     /* ⚠️ A FIELD IS A SURFACE TOO. Left alone it stays pure white on a tinted
        card, which is the one place the old palette's dustiness would survive. */
     `--field-background: ${tinted(g.surface, t)};`,
+    `--default: ${tinted(g.control, t)};`,
     /* ⚠️ NO EDGES. Both are ways of saying "separate", and a design needs one. */
     `--surface-shadow: none;`,
     `--overlay-shadow: none;`,

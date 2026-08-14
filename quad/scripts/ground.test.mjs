@@ -115,7 +115,10 @@ const tiers = (mode) => {
     const m = new RegExp(`${k}: ([\\d.]+)`).exec(block);
     return m ? Number(m[1]) : null;
   };
-  return { background: read("background"), surface: read("surface"), raised: read("raised") };
+  return {
+    background: read("background"), surface: read("surface"),
+    raised: read("raised"), control: read("control"),
+  };
 };
 
 let gaps = 0;
@@ -133,7 +136,14 @@ for (const mode of ["light", "dark"]) {
      and a floating surface has to go the other way. An ordered check would have
      forced the island BETWEEN the page and a card, which is the one value it
      must not have. What matters is that no two tiers are confusable. */
-  for (const [a, b] of [["background", "surface"], ["background", "raised"], ["surface", "raised"]]) {
+  /* ⚠️ `control` IS IN HERE BECAUSE IT SITS ON THE OTHERS. It is the fill of a
+     secondary button — on a card, and on the island — so it has to clear both.
+     Leaving it out is how moving the raised tier made the nav's current-position
+     pill land 0.033 away from the island under it and disappear. */
+  for (const [a, b] of [
+    ["background", "surface"], ["background", "raised"], ["surface", "raised"],
+    ["surface", "control"], ["raised", "control"],
+  ]) {
     const delta = Math.abs(t[b] - t[a]);
     if (delta < floor) {
       gaps++;

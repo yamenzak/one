@@ -381,6 +381,8 @@ export function ambienceStylesheet(): string {
       percent is a fill that works on a card in either theme without knowing
       which theme it is in.
     */
+    /* ⚠️ WHERE YOU ARE IS THE ONE LABEL YOU CAN READ — see `Island`. */
+    `[data-here="true"] { color: var(--foreground); }`,
     `[data-chip="true"] { background-color: color-mix(in oklab, var(--foreground) 7%, transparent); }`,
     /* ⚠️ THE UNREAD DOT, COLOURED BY ITS TONE RATHER THAN BY A LITERAL. It is
        here rather than in a component because a component that named a colour

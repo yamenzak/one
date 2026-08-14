@@ -336,6 +336,56 @@ for (const file of FILES) {
 }
 if (!lozenge) ok(`shapes: every icon-only control asks the library to be one`);
 
+/**
+ * ⚠️ A ROW OF EQUALS IS EQUAL, AND `.button` IS `w-fit`, SO IT NEVER IS BY
+ * DEFAULT. This is the same fault three times over and each one shipped: the
+ * crown came out four shapes at three widths, the tiles came out 162/156/198 in
+ * a grid of identical columns, and the nav came out 69/46/48/60 with the active
+ * pill inheriting whichever width its own label happened to make. Every time,
+ * the container was right and nothing filled it; every time it read as cheap
+ * without being nameable.
+ *
+ * ⚠️ SO THE CHECK IS ON THE GROUPS, BY NAME, because "these siblings are peers"
+ * is a fact about the design rather than anything in the markup. A fourth group
+ * is a line here, added on purpose, by whoever builds it.
+ *
+ * ⚠️ AND `grow` ALONE IS NOT ENOUGH — `basis-0` is the half people leave off.
+ * With `grow` and the default `basis-auto`, flex hands out the LEFTOVER space
+ * after each item's own content, so a longer label still ends up wider. The
+ * widths converge, which is worse than obviously wrong: it looks nearly right.
+ */
+const EQUALS = [
+  ["web/src/layout.tsx", "Island", /grow basis-0/],
+  ["web/src/surfaces.tsx", "TileGrid", /w-full flex-col/],
+];
+let uneven = 0;
+for (const [file, group, needs] of EQUALS) {
+  const src = readFileSync(join(QUAD, file), "utf8");
+  /* ⚠️ SPLIT ON THE DECLARATIONS, not a lazy match to the first `\n}`. Both of
+     these components destructure a multi-line inline type, whose `}) {` sits at
+     column zero — so the naive block stopped at the PARAMETER LIST and reported
+     a finding against a body it had never read. Every guard in this repo that
+     matched a function body has had this bug once. */
+  /* ⚠️ AND THE COMMENTS COME OUT FIRST. The prose explaining why `basis-0` is
+     required contains the string `basis-0`, so the check matched its own
+     rationale and passed a body that no longer had it — a guard made green by
+     the paragraph justifying the guard. */
+  const block = src
+    .split(/\nexport /)
+    .filter((b) => b.startsWith(`function ${group}`))
+    .map((b) => [null, b.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "")])[0];
+  if (!block) {
+    uneven++;
+    fail(`${file}: no \`${group}\` to check — if it moved, move this line with it.`);
+  } else if (!needs.test(block[1])) {
+    uneven++;
+    fail(`${file}: \`${group}\` lets its items size to their own content (D7).\n` +
+         `       \`.button\` is \`w-fit\`, so a row of peers comes out a row of different\n` +
+         `       widths — and \`grow\` without \`basis-0\` only narrows the difference.`);
+  }
+}
+if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
+
 console.log(bad
   ? `\nheroui: ${bad} finding(s) — a screen branding will not reach.`
   : `\nheroui: components as they ship, themed through tokens.`);

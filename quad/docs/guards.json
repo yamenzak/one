@@ -30,6 +30,15 @@
       "fails": "a crown of four controls at three different widths, because a button with only a glyph in it still lays out w-fit px-4"
     },
     {
+      "id": "a-row-of-equals-shares-its-width",
+      "protects": "D7",
+      "stage": "5",
+      "status": "live",
+      "impl": "scripts/heroui.test.mjs",
+      "proves": "peers:",
+      "fails": "a nav of four destinations at four widths, with the current one inheriting whichever width its own label happened to make"
+    },
+    {
       "id": "the-type-scale-has-a-top",
       "protects": "D7",
       "stage": "5",

@@ -28,7 +28,7 @@ import { Avatar, Button, Card, Separator } from "@heroui/react";
 import type { Ambience } from "./ambience.js";
 import { TYPE } from "./type.js";
 import {
-  BAND_PAD, CROWN, CROWN_SIZE, FACE, GUTTER, HEAD_GAP, HERO_PAD, ICON, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
+  BAND_PAD, CROWN, CROWN_SIZE, FACE, GUTTER, HEAD_GAP, HERO_PAD, ICON, ISLAND_PAD, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
   type Space, type Width,
 } from "./metrics.js";
 import { MOTION } from "./motion.js";
@@ -393,7 +393,11 @@ export function Island({ items, here, onGo }: {
   return (
     <nav
       aria-label="Sections"
-      className={`sticky bottom-0 z-10 flex justify-center ${PAD} ${SAFE_BOTTOM}`}
+      /* ⚠️ THE ISLAND SPANS THE COLUMN, IT DOES NOT SHRINK TO ITS WORDS. At
+         `w-fit` it came out 76% of the screen against a reference at 89%, with
+         a card visible either side of it — which reads as a bar that did not
+         finish loading rather than as a thing floating over the page. */
+      className={`sticky bottom-0 z-10 flex justify-center ${GUTTER} ${PAD} ${SAFE_BOTTOM}`}
     >
       {/* ⚠️ AN ISLAND NEEDS ITS OWN GROUND, AND IT DID NOT HAVE ONE. Four ghost
           buttons over a transparent box are four buttons with the page showing
@@ -420,7 +424,7 @@ export function Island({ items, here, onGo }: {
       <Card
         variant="tertiary"
         data-island="true"
-        className="flex flex-row items-center gap-1"
+        className={`w-full ${WIDTH.read} flex-row items-center gap-1 ${ISLAND_PAD}`}
       >
         {items.slice(0, PRIMARY_MAX).map((item) => {
           const at = item.route === here;
@@ -432,16 +436,44 @@ export function Island({ items, here, onGo }: {
                  tell two of ours apart; a shape does not. */
               variant={at ? "secondary" : "ghost"}
               aria-current={at ? "page" : undefined}
-              className="flex-col gap-1"
+              /* ⚠️ `grow basis-0` — EQUAL SHARES, NOT CONTENT WIDTHS. `.button`
+                 is `w-fit`, so "Round" came out 69px beside "Ward" at 46: four
+                 destinations at four widths, and the active pill inheriting
+                 whichever one its own label happened to make. A nav is a row of
+                 equals or it is a row of links. `basis-0` is the half people
+                 leave off — with `grow` alone the shares are the leftovers
+                 AFTER each item's own text, so the widths still differ. */
+              className={`grow basis-0 flex-col gap-1 ${ROW.free}`}
               onPress={() => onGo(item.route)}
             >
-              <span aria-hidden="true" className="relative flex items-center">
+              <span
+                aria-hidden="true"
+                className="relative flex items-center"
+                /* ⚠️ `.button` SIZES ITS OWN SVGS to `size-5 sm:size-4`, so every
+                   nav glyph drew at 16–20px under a 14px label — the one place
+                   in the product where the word outweighed the mark. */
+                style={{ ["--icon" as string]: `${ICON.nav}px` }}
+              >
                 {item.icon}
                 {item.unread
                   ? <span aria-hidden="true" className="absolute -top-1 -right-2"><Dot /></span>
                   : null}
               </span>
-              <span className={dense ? "sr-only" : TYPE.note}>{item.label}</span>
+              {/* ⚠️ THE PLACE YOU ARE IS THE ONE YOU CAN READ. Every label took
+                  the muted note role, so the only signal for "here" was the
+                  pill behind it — which is a shape, at the bottom of the screen,
+                  under a thumb. Full contrast on the current one is the cheapest
+                  possible way to say it, and it is the half that survives being
+                  looked at from an angle in sunlight. */}
+              {/* ⚠️ AN ATTRIBUTE, NOT A SECOND COLOUR CLASS. `text-foreground`
+                  beside `text-muted` is a tie on specificity, so which one wins
+                  is whichever Tailwind emitted last — the label stayed muted and
+                  looked like a class that had simply not been applied. The
+                  stylesheet is injected after everything, so an attribute rule
+                  resolves the tie in one direction, always. */}
+              <span data-here={at ? "true" : undefined} className={dense ? "sr-only" : TYPE.note}>
+                {item.label}
+              </span>
             </Button>
           );
         })}

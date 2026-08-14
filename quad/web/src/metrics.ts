@@ -75,7 +75,7 @@ export const LEAD =
  * obviously missing while the icons were text characters at whatever size the
  * font gave them.
  */
-export const ICON = { row: 20, crown: 20, quick: 22, nav: 22, face: 28, tile: 26 } as const;
+export const ICON = { row: 20, crown: 20, quick: 22, nav: 24, face: 28, tile: 26 } as const;
 
 /**
  * ⚠️ A FACE IS 40px, AND THE CROWN LOOKED EMPTY UNTIL IT WAS. A 24px avatar in a
@@ -117,6 +117,14 @@ export const CROWN = "min-h-16" as const;
  * were not asking for it.
  */
 export const CROWN_SIZE = "lg" as const;
+
+/**
+ * ⚠️ THE ISLAND HOLDS ITS ITEMS AT ARM'S LENGTH AND NOTHING MORE. `Card` is
+ * `p-4`, so the nav came out 63px tall against a reference that is 54 with its
+ * labels and 40 without — a bar with sixteen pixels of nothing around a row of
+ * pills. Four is what a pill needs to not touch the edge it sits in.
+ */
+export const ISLAND_PAD = "p-1" as const;
 
 /* ------------------------------------------------------------------ stacks --- */
 
