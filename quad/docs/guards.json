@@ -910,6 +910,42 @@
       "impl": "scripts/ground.test.mjs",
       "proves": "painted:",
       "fails": "a palette that is entirely correct and reaches nothing, because the page is the user agent canvas and a light card comes out darker than it"
+    },
+    {
+      "id": "the-agent-door-ends-in-the-one-operation-path",
+      "protects": "D13",
+      "stage": "11",
+      "status": "live",
+      "impl": "scripts/agent.test.mjs",
+      "proves": "path:",
+      "fails": "a gate that silently does not apply to agents, because the MCP door ran the handler itself and the first forgotten concern is invisible"
+    },
+    {
+      "id": "an-opted-out-operation-is-invisible-on-the-agent-door",
+      "protects": "D13",
+      "stage": "11",
+      "status": "live",
+      "impl": "scripts/agent.test.mjs",
+      "proves": "optout:",
+      "fails": "a tool hidden from the list and still callable \u2014 or a distinct refusal that confirms the name to the model that was refused it"
+    },
+    {
+      "id": "the-tool-catalogue-means-callable",
+      "protects": "D13",
+      "stage": "11",
+      "status": "live",
+      "impl": "scripts/agent.test.mjs",
+      "proves": "listed:",
+      "fails": "an agent shown every tool including the refusals, taught to try them, with an audit row per call that was never going to run"
+    },
+    {
+      "id": "the-rosters-granting-operations-are-not-tools",
+      "protects": "D13",
+      "stage": "11",
+      "status": "live",
+      "impl": "scripts/agent.test.mjs",
+      "proves": "granting:",
+      "fails": "a model that can invite somebody to a workspace from a sentence in a document it was asked to summarise"
     }
   ]
 }

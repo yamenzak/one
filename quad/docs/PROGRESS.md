@@ -25,6 +25,7 @@ reader can trust this table instead of re-reading the code.
 | 8 | Vault + legal | shipped |
 | 9 | Kova on Quad | shipped |
 | 10 | One — the deployment and the Hub | shipped |
+| 11 | The agent surface — every operation an MCP tool, derived | shipped |
 
 ## What is NOT built, and where to pick it up
 
@@ -305,6 +306,37 @@ never reproduces. Everything else in the file is a value handed to `serve`.
 - ⚠️ **The D1 ids in `wrangler.jsonc` are placeholders on purpose.** A deploy
   with them in place binds databases that do not exist.
 
+**The agent surface — `/mcp` on the tenant's own address, derived (D13).**
+Stateless MCP: no session handshake, no Durable Object, plain JSON-RPC on the
+door the workspace already answers. The catalogue is a projection — `toolFor`
+over the composed operations, `tool: { why }` the stated opt-out — and a tool
+call enters `performOperation`, the same function the HTTP route ends in, so
+the replay, the seven gates and the audit apply to agents identically.
+
+- **Listed means callable by this caller** — the navigation's own rule. The
+  owner's catalogue and a reader's differ; nobody is shown a tool the
+  permission gate would refuse.
+- **An opt-out is invisible, not refused.** `member.invite`, `member.role` and
+  `member.remove` carry the kernel's canonical opt-out now (granting access is
+  not a thing a model does from a sentence), and calling one answers exactly as
+  a tool that never existed.
+- **Two identity lanes.** A browser agent arrives with the member's own session
+  cookie (same origin — which is all WebMCP's bridge needs); a server agent
+  arrives with a bearer token minted at the account centre: shown once, stored
+  hashed, ninety-day expiry, revocable this instant because it is a row.
+  `me.token.create/list/revoke` answer on the account door only. What a token
+  may do in a workspace is the roster answering per request, so a revoked role
+  is a revoked token power on the very next call — and a token never satisfies
+  the `recent` proof gate, by design.
+- **Remote-client OAuth (pre-registered clients, CIMD) is deliberately not
+  built** — no client table waits for a flow nothing implements; see D13 for
+  the two lanes that exist instead.
+- `scripts/agent.test.mjs` holds the four promises structurally, and every
+  check is mutation-verified: the door cannot stop ending in the one operation
+  path, an opt-out cannot become listable or callable, the catalogue cannot
+  stop meaning callable, and the roster's granting operations cannot quietly
+  become tools again.
+
 **`@quad/one-hub` — the page a person opens.** The signpost, sign-in with an
 emailed code, the workspace list, and the wizard that makes one — HeroUI v3 as it
 ships, themed through tokens, nothing restyled.
@@ -341,6 +373,8 @@ The guard registry, its checks, and the standards that bind them.
 | D10 | Five primary destinations, maximum | 4 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 10 |
 | D12 | Every cross-cutting concern is a field on a declaration, never a call site | 39 |
+| D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
+| D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 0 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -454,6 +488,10 @@ the library decides FOR us.
 | `every-surface-tier-is-findable-without-an-edge` | D7 | cards that vanish in one theme when shadows are dropped, looking like a rendering fault rather than a decision |
 | `the-library-draws-no-edges-of-its-own` | D7 | a ban kept in our files while the components draw their own, so the rule reads as held and is not |
 | `the-page-ground-is-ours` | D7 | a palette that is entirely correct and reaches nothing, because the page is the user agent canvas and a light card comes out darker than it |
+| `the-agent-door-ends-in-the-one-operation-path` | D13 | a gate that silently does not apply to agents, because the MCP door ran the handler itself and the first forgotten concern is invisible |
+| `an-opted-out-operation-is-invisible-on-the-agent-door` | D13 | a tool hidden from the list and still callable — or a distinct refusal that confirms the name to the model that was refused it |
+| `the-tool-catalogue-means-callable` | D13 | an agent shown every tool including the refusals, taught to try them, with an audit row per call that was never going to run |
+| `the-rosters-granting-operations-are-not-tools` | D13 | a model that can invite somebody to a workspace from a sentence in a document it was asked to summarise |
 <!-- /generated -->
 
 ## Commands

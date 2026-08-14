@@ -21,7 +21,8 @@
 
 import type { AppSpec, Caller, Door, Problem, Resolved as _Resolved, Roots, Standing } from "@quad/kernel";
 import { IN_GOOD_STANDING, PLATFORM_PROBLEMS, check, doorFor, newId, problem } from "@quad/kernel";
-import { compose, type Composed } from "./compose.js";
+import { compose, type Composed, type Resolved as ResolvedOp } from "./compose.js";
+import { answerMcp } from "./mcp.js";
 import type { PlatformCtx } from "./member-ops.js";
 import { keyFor, record, remember, seen, entryFor } from "./audit.js";
 import { clearCookie, sessionIdFrom, setCookie, type Session } from "./identity.js";
@@ -115,6 +116,15 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
     if (url.pathname === "/health") {
       return json({ ok: true, door: door.kind, root: wiring.roots.root });
     }
+    /*
+      ⚠️ THE AGENT DOOR, AND IT IS THE SAME BUILDING (D13). `/mcp` answers on a
+      tenant's own address with the tenant's own tools — a projection of the
+      operations the caller could already reach over `/api/*`, entered through
+      `performOperation` below so every gate, the replay and the audit apply
+      identically. A separate agent deployment would be a second copy of all of
+      them.
+    */
+    if (url.pathname === "/mcp") return answerMcp(wiring, request, door, now);
     if (!url.pathname.startsWith("/api/")) return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
 
     const id = url.pathname.slice("/api/".length);
@@ -155,81 +165,114 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
 
     const who = (await wiring.identify?.(request, located)) ?? NOBODY;
 
-    /* --- a replay is answered before anything is spent -------------------- */
-
-    const given = request.headers.get("idempotency-key");
-    const mode = op.spec.idempotency.mode;
-    const replayKey = mode === "key" && given
-      ? keyFor(located.tenantId, op.id, given)
-      : mode === "natural" && typeof input[op.spec.idempotency.key] === "string"
-        ? keyFor(located.tenantId, op.id, String(input[op.spec.idempotency.key]))
-        : null;
-
-    if (replayKey) {
-      const already = await seen(located.db, located.tenantId, replayKey);
-      if (already !== null) return json(already, 200, { "idempotent-replay": "true" });
-    }
-
-    /* --- the gates, in the kernel's order --------------------------------- */
-
-    const refused = check({
-      op: op.spec,
-      caller: who.caller,
-      standing: located.standing ?? IN_GOOD_STANDING,
-      entitlements: located.entitlements ?? [],
-      flags: located.flags ?? {},
-      used: located.used ?? (() => 0),
-      ledger: { balance: located.balance ?? 0 },
-      now: now.toISOString(),
-      catalog,
-    });
-    if (refused) {
-      await recordOutcome(located, who, op, input, { ok: false, problem: refused.problem.code }, now);
-      return asProblem(refused.problem);
-    }
-
-    /* --- the handler ------------------------------------------------------ */
-
-    /* ⚠️ THE PLATFORM'S OWN OPERATIONS SEE MORE THAN A HANDLER DOES — the
-       directory, the caller's keys, the allowances — and an app handler is
-       typed against `Ctx`, which carries none of it. See `member-ops.ts`. */
-    const ctx: PlatformCtx = {
-      db: located.db,
-      tenantId: located.tenantId,
-      accountId: who.accountId,
-      now,
-      directory: wiring.directory,
-      permissions: who.caller.permissions,
-      email: who.email ?? null,
-      allowance: (key: string) =>
-        (located.entitlements ?? []).find((e) => e.key === key)?.value ?? false,
-      fail: (code, values) => { throw new Refused(problem(catalog, code, values)); },
-    };
-
-    try {
-      const answer = await op.run(ctx, input);
-      if (replayKey) await remember(located.db, located.tenantId, op.id, replayKey, answer, now);
-      await recordOutcome(located, who, op, input, {
-        ok: true, id: (answer as { id?: string } | null)?.id,
-      }, now);
-      return json(answer ?? {});
-    } catch (thrown) {
-      if (thrown instanceof Refused) {
-        await recordOutcome(located, who, op, input, { ok: false, problem: thrown.problem.code }, now);
-        return asProblem(thrown.problem);
-      }
-      /*
-        ⚠️ AN UNEXPECTED THROW BECOMES A REFERENCE, NOT A STACK TRACE. The
-        reference is in the log beside the cause and is the one thing a person is
-        asked to quote — without it every report starts with "it said something
-        went wrong".
-      */
-      const ref = newId("err", now);
-      console.error(`${ref} ${op.id}`, thrown);
-      await recordOutcome(located, who, op, input, { ok: false, problem: "platform.unavailable" }, now);
-      return asProblem(problem(catalog, "platform.unavailable", { ref }, { ref }));
+    const outcome = await performOperation(
+      wiring, located, who, { composed, op }, input,
+      request.headers.get("idempotency-key"), now,
+    );
+    switch (outcome.kind) {
+      case "replay": return json(outcome.answer, 200, { "idempotent-replay": "true" });
+      case "ok": return json(outcome.answer ?? {});
+      case "refused": return asProblem(outcome.problem);
     }
   };
+}
+
+/* -------------------------------------------------------------- the path --- */
+
+export type Performed =
+  | { readonly kind: "replay"; readonly answer: unknown }
+  | { readonly kind: "ok"; readonly answer: unknown }
+  | { readonly kind: "refused"; readonly problem: Problem };
+
+/**
+ * ⚠️ THE ONE OPERATION PATH, WHATEVER DOOR THE CALL CAME THROUGH (D12). The
+ * HTTP route and the agent door both end here — replay, the seven gates in the
+ * kernel's order, the handler, the audit entry for successes and refusals
+ * alike. A second copy for "the MCP ones" would be a second place every
+ * cross-cutting concern has to be remembered, which is the exact shape this
+ * framework exists to refuse.
+ */
+export async function performOperation(
+  wiring: Wiring, located: Located, who: Who,
+  found: { readonly composed: Composed; readonly op: ResolvedOp },
+  input: Record<string, unknown>, given: string | null, now: Date,
+): Promise<Performed> {
+  const { composed, op } = found;
+  const catalog = composed.catalog;
+
+  /* --- a replay is answered before anything is spent ---------------------- */
+
+  const mode = op.spec.idempotency.mode;
+  const replayKey = mode === "key" && given
+    ? keyFor(located.tenantId, op.id, given)
+    : mode === "natural" && typeof input[op.spec.idempotency.key] === "string"
+      ? keyFor(located.tenantId, op.id, String(input[op.spec.idempotency.key]))
+      : null;
+
+  if (replayKey) {
+    const already = await seen(located.db, located.tenantId, replayKey);
+    if (already !== null) return { kind: "replay", answer: already };
+  }
+
+  /* --- the gates, in the kernel's order ----------------------------------- */
+
+  const refused = check({
+    op: op.spec,
+    caller: who.caller,
+    standing: located.standing ?? IN_GOOD_STANDING,
+    entitlements: located.entitlements ?? [],
+    flags: located.flags ?? {},
+    used: located.used ?? (() => 0),
+    ledger: { balance: located.balance ?? 0 },
+    now: now.toISOString(),
+    catalog,
+  });
+  if (refused) {
+    await recordOutcome(located, who, op, input, { ok: false, problem: refused.problem.code }, now);
+    return { kind: "refused", problem: refused.problem };
+  }
+
+  /* --- the handler -------------------------------------------------------- */
+
+  /* ⚠️ THE PLATFORM'S OWN OPERATIONS SEE MORE THAN A HANDLER DOES — the
+     directory, the caller's keys, the allowances — and an app handler is
+     typed against `Ctx`, which carries none of it. See `member-ops.ts`. */
+  const ctx: PlatformCtx = {
+    db: located.db,
+    tenantId: located.tenantId,
+    accountId: who.accountId,
+    now,
+    directory: wiring.directory,
+    permissions: who.caller.permissions,
+    email: who.email ?? null,
+    allowance: (key: string) =>
+      (located.entitlements ?? []).find((e) => e.key === key)?.value ?? false,
+    fail: (code, values) => { throw new Refused(problem(catalog, code, values)); },
+  };
+
+  try {
+    const answer = await op.run(ctx, input);
+    if (replayKey) await remember(located.db, located.tenantId, op.id, replayKey, answer, now);
+    await recordOutcome(located, who, op, input, {
+      ok: true, id: (answer as { id?: string } | null)?.id,
+    }, now);
+    return { kind: "ok", answer };
+  } catch (thrown) {
+    if (thrown instanceof Refused) {
+      await recordOutcome(located, who, op, input, { ok: false, problem: thrown.problem.code }, now);
+      return { kind: "refused", problem: thrown.problem };
+    }
+    /*
+      ⚠️ AN UNEXPECTED THROW BECOMES A REFERENCE, NOT A STACK TRACE. The
+      reference is in the log beside the cause and is the one thing a person is
+      asked to quote — without it every report starts with "it said something
+      went wrong".
+    */
+    const ref = newId("err", now);
+    console.error(`${ref} ${op.id}`, thrown);
+    await recordOutcome(located, who, op, input, { ok: false, problem: "platform.unavailable" }, now);
+    return { kind: "refused", problem: problem(catalog, "platform.unavailable", { ref }, { ref }) };
+  }
 }
 
 type _Op = Composed["byId"] extends ReadonlyMap<string, infer V> ? V : never;

@@ -20,8 +20,9 @@ import type { AppSpec } from "@quad/kernel";
 import {
   AUDIT_SCHEMA, BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA,
   JOBS_SCHEMA, MEMBERSHIP_SCHEMA, REPLAY_SCHEMA, VAULT_SCHEMA,
-  applySchema, appsOfTenant, locator, memberFor, permissionsOf, personalOps, rolesFor,
-  schemaFor, serve, sessionIdFrom, shardFor, whoIs, type Db, type TenantRow,
+  accountOfToken, applySchema, appsOfTenant, bearerFrom, locator, memberFor, permissionsOf,
+  personalOps, rolesFor, schemaFor, serve, sessionIdFrom, shardFor, whoIs,
+  type Db, type TenantRow,
 } from "@quad/runtime";
 import { hello } from "@quad/hello";
 import { kova } from "@quad/kova";
@@ -163,8 +164,24 @@ const handler = (env: Env) => {
       — which is exactly when it matters that it does.
     */
     identify: async (request, located) => {
-      const { session, email, accountId } = await whoIs(directory, sessionIdFrom(request), new Date());
-      if (!session || !accountId) {
+      /*
+        ⚠️ TWO WAYS TO SAY WHO YOU ARE, ONE ANSWER TO WHAT YOU MAY DO. A person
+        arrives with a session cookie; an agent arrives with a bearer token the
+        account minted at the account centre. Both resolve to an ACCOUNT, and
+        everything after — the membership, the roles, the permissions — is the
+        workspace's own roster answering per request, identically. A token
+        never carries `provenAt`: anything a machine can hold must not satisfy
+        the `recent` proof gate, which exists against exactly that.
+      */
+      const now = new Date();
+      const bearer = bearerFrom(request);
+      const viaToken = bearer ? await accountOfToken(directory, bearer, env.AUTH_SECRET, now) : null;
+      const { session, email, accountId: viaSession } = viaToken
+        ? { session: null, email: null, accountId: null }
+        : await whoIs(directory, sessionIdFrom(request), now);
+
+      const accountId = viaToken ?? viaSession;
+      if (!accountId) {
         return { caller: { signedIn: false, permissions: new Set(), provenAt: null }, accountId: null };
       }
       const app = APPS[located.apps[0] ?? ""]?.();
@@ -176,7 +193,7 @@ const handler = (env: Env) => {
         caller: {
           signedIn: true,
           permissions: permissionsOf(member, roles),
-          provenAt: session.provenAt,
+          provenAt: session?.provenAt ?? null,
         },
       };
     },
@@ -227,7 +244,7 @@ export default {
       than a 404 from here — and `/api/*` is the one prefix that is ours, which
       is why every operation answers under it and nothing else does.
     */
-    if (url.pathname.startsWith("/api/") || url.pathname === "/health") {
+    if (url.pathname.startsWith("/api/") || url.pathname === "/health" || url.pathname === "/mcp") {
       return handler(env)(request);
     }
     return env.ASSETS.fetch(request);

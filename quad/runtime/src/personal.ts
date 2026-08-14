@@ -24,7 +24,8 @@ import {
   upsertAccount, type TenantRow,
 } from "./directory.js";
 import {
-  endSession, forgetCode, issueCode, readSession, spendCode, startSession, type Session,
+  endSession, forgetCode, issueCode, mintToken, readSession, revokeToken, spendCode,
+  startSession, tokensOf, type Session,
 } from "./identity.js";
 import { claimInvitations, found, membersOf } from "./membership.js";
 import type { Db } from "./sql.js";
@@ -241,6 +242,42 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
         await ctx.directory.prepare(`DELETE FROM belongs WHERE account_id = ? AND tenant_id = ?`)
           .bind(ctx.session!.accountId, tenant.id).run();
         return { left: slug };
+      },
+    },
+
+    /* ------------------------------------------------------------- tokens --- */
+
+    /*
+      ⚠️ A TOKEN IS MINTED AT THE ACCOUNT CENTRE AND NOWHERE ELSE. It is an
+      account credential — what it may do in a workspace is that workspace's
+      roster answering per request — so the place that mints it is the door
+      about who you are, not any one workspace's. Shown once; stored as a hash;
+      dead in ninety days unless re-minted; revocable this instant because it is
+      a row (see `identity.ts`).
+    */
+    "me.token.create": {
+      kind: "write", needs: "session", doors: ["account"],
+      async run(ctx, input): Promise<unknown> {
+        const label = String(input.label ?? "").trim();
+        if (!label || label.length > 80) return ctx.fail("platform.invalid");
+        return mintToken(ctx.directory, ctx.session!.accountId, label, deps.secret, ctx.now);
+      },
+    },
+
+    "me.token.list": {
+      kind: "read", needs: "session", doors: ["account"],
+      async run(ctx): Promise<unknown> {
+        return { items: await tokensOf(ctx.directory, ctx.session!.accountId) };
+      },
+    },
+
+    "me.token.revoke": {
+      kind: "write", needs: "session", doors: ["account"],
+      async run(ctx, input): Promise<unknown> {
+        const done = await revokeToken(
+          ctx.directory, ctx.session!.accountId, String(input.id ?? ""), ctx.now);
+        if (!done) return ctx.fail("platform.not_found");
+        return { id: String(input.id) };
       },
     },
   };

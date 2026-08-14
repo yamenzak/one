@@ -200,3 +200,55 @@ that silently does not apply.
 
 **Therefore never:** a handler that raises its own notification, writes its own
 audit entry, checks its own entitlement, or meters its own credits.
+
+---
+
+## D13 — The agent surface is derived: every operation is an MCP tool unless it says why not
+
+`/mcp` answers on a tenant's own address, stateless, and its catalogue is a
+projection of the operations the caller could already reach over `/api/*` —
+`tool: { why }` is the stated opt-out, and an opted-out operation is neither
+listed nor callable there, answering exactly as a tool that never existed.
+A tool call enters `performOperation`, the same path the HTTP door ends in, so
+the replay, all seven gates and the audit apply to agents identically. Decided
+2026-08-14, after MCP dropped its session handshake and became a stateless
+protocol a manifest can serve without a Durable Object.
+
+**Why.** A hand-registered tool list drifts three ways at once: a renamed
+operation keeps its old tool, a new operation ships without one, and an
+operation that opted out for a stated reason is re-added by somebody who cannot
+see the reason. And an agent path with its own gate wiring is a second place a
+concern can be forgotten — invisibly, for agents only, with every suite green
+(D12). Deriving both from the declaration makes all five states unreachable.
+
+**Therefore never:** a tool registered by hand; an MCP handler that runs an
+operation or applies a gate itself rather than through `performOperation`; a
+distinct refusal for an opted-out tool (it confirms the name); a tool listed
+that the caller's permissions cannot call; an agent identity resolved anywhere
+but the deployment's own `identify` seam. Remote-client OAuth (pre-registered
+clients, CIMD) is deliberately absent until a real client needs it — the lanes
+are the session cookie (a browser agent acting as the signed-in member) and a
+bearer token minted at the account centre, shown once, stored hashed, expiring
+in ninety days, revocable now because it is a row.
+
+---
+
+## D14 — Provider AI calls go through the unified AI binding and its gateway, never direct fetch
+
+When One's AI lane is wired to real providers, every call — Workers AI, Gemini,
+any third party — goes through the platform `AI` binding with a gateway
+(`env.AI.run(model, params, { gateway: { id } })`). Decided 2026-08-14, when
+Cloudflare unified Workers AI and AI Gateway behind one binding with per-request
+logging, token counts and cost attribution.
+
+**Why.** The COST half of metering — what we pay a provider — previously came
+from parsing public pricing pages, a mechanism that has already priced a model
+wrong once (flash-tier rates bound to a Pro model, a reserve that under-counted
+and a platform that ate the difference silently on every call). The gateway
+reports actual token counts and cost per request from the same place the call
+was made. The REVENUE half — the reserve as a ceiling, markup, tenant credits —
+stays ours; it is a product fact no gateway can know.
+
+**Therefore never:** a direct `fetch` to a provider's API from the AI lane; a
+model price parsed from a pricing page where the gateway can report the cost of
+the actual call; the reserve-and-settle arithmetic delegated to the gateway.

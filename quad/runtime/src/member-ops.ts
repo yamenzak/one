@@ -52,6 +52,9 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
   const op = (
     id: string, kind: "read" | "write", permission: string, summary: string,
     run: (ctx: PlatformCtx, input: Record<string, unknown>) => Promise<unknown>,
+    /* ⚠️ The agent-door policy, spec-shaped: absent means "a tool", `{ why }`
+       is the stated opt-out — see `tool` on `OperationSpec`. */
+    tool?: { readonly why: string },
   ): Resolved => ({
     id, kind,
     method: kind === "read" ? "GET" : "POST",
@@ -62,6 +65,7 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       input: {}, output: {},
       permission,
       idempotency: { mode: "none" },
+      ...(tool ? { tool } : {}),
       ...(kind === "write" ? { emits: [`${id}d`] } : {}),
       async handler() { return {} as never; },
     } as Resolved["spec"],
@@ -106,7 +110,11 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
            invitation is to search every shard for it (D5). */
         await noteInvitation(ctx.directory, email, ctx.tenantId as TenantId, ctx.now);
         return { id: made.id, email: made.email, role: made.role };
-      }),
+      },
+      /* ⚠️ The kernel's own canonical opt-out, made real: a model that can
+         invite somebody from a sentence in a document is a model that can be
+         asked to. */
+      { why: "It grants access, so a model must not be able to call it from a sentence." }),
 
     "member.role": op("member.role", "write", "member:manage", "Change somebody's role.",
       async (ctx, input) => {
@@ -118,7 +126,8 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         if (out === "no_such_role") return ctx.fail("platform.invalid");
         if (out === "would_strand") return ctx.fail("platform.conflict");
         return { id: String(input.id) };
-      }),
+      },
+      { why: "It changes what somebody may do, which only a person weighs." }),
 
     /* ------------------------------------------------------------ inbox --- */
 
@@ -186,7 +195,8 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
            it makes it unreachable, with the bill still running. */
         if (out === "would_strand") return ctx.fail("platform.conflict");
         return { id: String(input.id) };
-      }),
+      },
+      { why: "It takes access away, which only a person weighs." }),
   };
 }
 

@@ -41,6 +41,13 @@ export const IDENTITY_SCHEMA: SchemaModule = {
        nothing writes, behind a capability nothing implements, is the exact
        shape this framework exists to refuse — it reads as built, it passes
        every test, and the first person to look for passkeys finds a schema. */
+    /* ⚠️ A TOKEN IS AN ACCOUNT'S, NEVER A WORKSPACE'S. What it may do in any
+       workspace is the account's membership there, resolved per request — so
+       revoking a role revokes it for the token on the very next call, and a
+       token found in a leak grants nothing its owner could not already do. */
+    `CREATE TABLE IF NOT EXISTS api_token (id TEXT PRIMARY KEY, account_id TEXT NOT NULL, label TEXT NOT NULL, hash TEXT NOT NULL, at TEXT NOT NULL, expires_at TEXT NOT NULL, last_used_at TEXT, revoked_at TEXT);`,
+    `CREATE INDEX IF NOT EXISTS ix_api_token_hash ON api_token (hash);`,
+    `CREATE INDEX IF NOT EXISTS ix_api_token_account ON api_token (account_id);`,
   ],
 };
 
@@ -226,6 +233,105 @@ export const clearCookie = (root: string): string => {
   return [`${SESSION_COOKIE}=`, "Path=/", "HttpOnly", "SameSite=Lax", "Secure", "Max-Age=0",
     ...(domain ? [`Domain=${domain}`] : [])].join("; ");
 };
+
+/* ----------------------------------------------------------------- tokens --- */
+
+/**
+ * ⚠️ A TOKEN IS FOR A MACHINE, AND EVERYTHING ABOUT IT SAYS SO. It is shown
+ * once and stored as a hash — a copy of the database holds nothing usable. It
+ * expires in ninety days rather than never, because a long-lived key broadly
+ * scoped is the shape every post-incident review finds at the bottom. And it
+ * can never satisfy the `recent` proof gate: anything a machine can hold must
+ * not stand in for a person in front of a screen, which is that gate's whole
+ * reason to exist.
+ */
+export const TOKEN_LIFE_MS = 90 * 24 * 60 * 60 * 1000;
+const TOKEN_PREFIX = "qtk_";
+
+export interface MintedToken {
+  readonly id: string;
+  /** ⚠️ Returned once, to be copied. It is never stored and never read back. */
+  readonly token: string;
+  readonly expiresAt: string;
+}
+
+export interface TokenRow {
+  readonly id: string;
+  readonly label: string;
+  readonly at: string;
+  readonly expiresAt: string;
+  readonly lastUsedAt: string | null;
+  readonly revoked: boolean;
+}
+
+export async function mintToken(
+  db: Db, accountId: AccountId, label: string, secret: string, now = new Date(),
+): Promise<MintedToken> {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  const token = TOKEN_PREFIX + [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const id = `tok_${crypto.randomUUID()}`;
+  const expiresAt = new Date(now.getTime() + TOKEN_LIFE_MS).toISOString();
+  await db.prepare(
+    `INSERT INTO api_token (id, account_id, label, hash, at, expires_at, last_used_at, revoked_at)
+     VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)`)
+    .bind(id, accountId, label, await hash(token, secret), now.toISOString(), expiresAt).run();
+  return { id, token, expiresAt };
+}
+
+export async function tokensOf(db: Db, accountId: AccountId): Promise<readonly TokenRow[]> {
+  const rows = await db.prepare(
+    `SELECT id, label, at, expires_at, last_used_at, revoked_at FROM api_token
+     WHERE account_id = ? ORDER BY at DESC`).bind(accountId).all<{
+      id: string; label: string; at: string; expires_at: string;
+      last_used_at: string | null; revoked_at: string | null;
+    }>();
+  return (rows.results ?? []).map((r) => ({
+    id: r.id, label: r.label, at: r.at, expiresAt: r.expires_at,
+    lastUsedAt: r.last_used_at, revoked: r.revoked_at !== null,
+  }));
+}
+
+/** ⚠️ Only the owner's — a token id is not a capability to revoke it. */
+export async function revokeToken(
+  db: Db, accountId: AccountId, id: string, now = new Date(),
+): Promise<boolean> {
+  const out = await db.prepare(
+    `UPDATE api_token SET revoked_at = ? WHERE id = ? AND account_id = ? AND revoked_at IS NULL`)
+    .bind(now.toISOString(), id, accountId).run();
+  return (out.meta?.changes ?? 0) > 0;
+}
+
+/**
+ * The account behind a presented token, or nothing.
+ *
+ * ⚠️ EXPIRY AND REVOCATION ARE CHECKED HERE, ON EVERY USE — a token is a row,
+ * not a claim, for the same reason a session is: revoking one has to mean it
+ * stops working now, not when it expires.
+ */
+export async function accountOfToken(
+  db: Db, presented: string, secret: string, now = new Date(),
+): Promise<AccountId | null> {
+  if (!presented.startsWith(TOKEN_PREFIX)) return null;
+  const row = await db.prepare(
+    `SELECT id, account_id, expires_at, revoked_at FROM api_token WHERE hash = ?`)
+    .bind(await hash(presented, secret))
+    .first<{ id: string; account_id: string; expires_at: string; revoked_at: string | null }>();
+  if (!row) return null;
+  if (row.revoked_at !== null) return null;
+  if (Date.parse(row.expires_at) <= now.getTime()) return null;
+  await db.prepare(`UPDATE api_token SET last_used_at = ? WHERE id = ?`)
+    .bind(now.toISOString(), row.id).run();
+  return row.account_id as AccountId;
+}
+
+/** The bearer token on a request, if one was presented. */
+export function bearerFrom(request: Request): string | null {
+  const given = request.headers.get("authorization");
+  if (!given) return null;
+  const [scheme, ...rest] = given.trim().split(/\s+/);
+  if (scheme?.toLowerCase() !== "bearer") return null;
+  return rest.join("") || null;
+}
 
 export function sessionIdFrom(request: Request): string | null {
   const jar = request.headers.get("cookie");
