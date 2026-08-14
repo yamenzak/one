@@ -137,6 +137,68 @@ for (const file of SOURCES) {
 }
 if (!sizes) ok(`type: no screen picks its own size or weight`);
 
+/**
+ * ⚠️ THE SCALE HAS A TOP, AND FOR A WHILE IT DID NOT. `title` and `figure` were
+ * both `text-2xl`, so the number a whole screen was built around rendered at
+ * exactly the size of the heading above it, and every hero read as a slightly
+ * larger caption. Nothing was broken and nothing looked wrong in isolation —
+ * which is the failure mode this whole file exists for.
+ *
+ * ⚠️ SO THE STEPS ARE CHECKED AS AN ORDER, not as values. What size `display`
+ * should be is a design decision that will change; that it must be larger than
+ * a title, which must be larger than a section, which must be larger than body
+ * text, is the property that makes it a scale at all.
+ */
+const TYPE_SRC = readFileSync(join(QUAD, "web/src/type.ts"), "utf8");
+const STEP = { xs: 12, sm: 14, base: 16, lg: 18, xl: 20, "2xl": 24, "3xl": 30, "4xl": 36, "5xl": 48 };
+const sizeOf = (role) => {
+  const decl = new RegExp(`\\b${role}: "([^"]*)"`).exec(TYPE_SRC);
+  if (!decl) return null;
+  const rem = /text-\[([\d.]+)rem\]/.exec(decl[1]);
+  if (rem) return Number(rem[1]) * 16;
+  const named = /\btext-((?:[0-9]?xl)|xs|sm|base|lg)\b/.exec(decl[1]);
+  return named ? STEP[named[1]] ?? null : null;
+};
+const LADDER = ["display", "title", "section", "body", "note"];
+const steps = LADDER.map((r) => [r, sizeOf(r)]);
+const missing = steps.filter(([, px]) => px === null).map(([r]) => r);
+if (missing.length) {
+  fail(`type.ts: cannot read a size for ${missing.join(", ")} — the scale guard is blind.`);
+} else {
+  const wrong = steps.slice(1).filter(([, px], i) => px >= steps[i][1]);
+  if (wrong.length) {
+    fail(`type.ts: the scale does not descend — ${steps.map(([r, px]) => `${r} ${px}px`).join(" · ")}.\n` +
+         `       A role that is not larger than the one under it is a scale with no top,\n` +
+         `       and a hero that renders at the size of its own heading.`);
+  } else {
+    ok(`scale: ${steps.map(([r, px]) => `${r} ${px}`).join(" > ")}`);
+  }
+}
+
+/**
+ * ⚠️ DITHER IS NOISE, AND A REPEATING GRADIENT IS THE OPPOSITE OF NOISE. The
+ * grain layer shipped as two dot fields at 3px and 5px, described in its own
+ * comment as invisible, and it was plainly a grid on any light ground — two
+ * pitches that close beat into a lattice, which is the exact fault the layer
+ * exists to hide. It survived review because it was only ever looked at
+ * whole-page, in dark, at one-to-one.
+ *
+ * ⚠️ SO THE CHECK IS STRUCTURAL: whatever paints the grain must be real noise.
+ * "Is this visible" is not a question a script can ask, but "is this periodic"
+ * is the same question with an answer.
+ */
+const AMBIENCE = readFileSync(join(QUAD, "web/src/ambience.ts"), "utf8");
+const grain = /const GRAIN = ([\s\S]*?);\n/.exec(AMBIENCE);
+if (!grain) {
+  fail(`ambience.ts: no \`GRAIN\` to check — if the layer is gone, drop this guard on purpose.`);
+} else if (!/feTurbulence/.test(AMBIENCE) || /repeating-|radial-gradient/.test(grain[1])) {
+  fail(`ambience.ts: the grain is periodic, so it is a pattern rather than dither.\n` +
+       `       A repeating gradient has a pitch, and two pitches beat into a visible\n` +
+       `       lattice on any light ground. Use \`feTurbulence\` — every pixel independent.`);
+} else {
+  ok(`grain: the dither is noise, with no pitch to see`);
+}
+
 console.log(bad
   ? `\nmotion: ${bad} finding(s) — a product with no motion and no typography of its own.`
   : `\nmotion: one set of curves, one set of roles, and reduced motion answered.`);

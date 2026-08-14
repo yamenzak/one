@@ -21,6 +21,24 @@
   ],
   "guards": [
     {
+      "id": "the-type-scale-has-a-top",
+      "protects": "D7",
+      "stage": "5",
+      "status": "live",
+      "impl": "scripts/motion.test.mjs",
+      "proves": "scale:",
+      "fails": "a hero that renders at the size of the heading above it, because two roles resolved to the same size and neither looked wrong alone"
+    },
+    {
+      "id": "the-grain-is-noise-not-a-pattern",
+      "protects": "D7",
+      "stage": "5",
+      "status": "live",
+      "impl": "scripts/motion.test.mjs",
+      "proves": "grain:",
+      "fails": "a visible lattice across every light screen, drawn by the layer whose whole job is to be invisible"
+    },
+    {
       "id": "a-tenant-is-never-placed-where-its-schema-is-missing",
       "protects": "D5",
       "stage": "1",

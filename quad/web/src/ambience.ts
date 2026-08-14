@@ -119,18 +119,41 @@ const DEPTH =
   + "color-mix(in oklab, var(--background) calc(var(--sky, 1) * 45%), transparent) 100%)";
 
 /**
- * ⚠️ GRAIN IS NOT TEXTURE FOR ITS OWN SAKE — IT IS DITHER. A wash this large is
- * smooth enough to band into visible steps on an ordinary display, and the bands
- * are what make a CSS ground look like a CSS ground. Two offset dot fields at
- * three percent break the steps up and are invisible on their own.
+ * ⚠️ GRAIN IS DITHER, AND DITHER MUST BE NOISE. A wash this large bands into
+ * visible steps on an ordinary display, and breaking the steps up needs
+ * randomness — which a repeating gradient is the precise opposite of.
+ *
+ * ⚠️ THE FIRST VERSION OF THIS WAS TWO DOT FIELDS AT 3px AND 5px, AND IT WAS
+ * VISIBLE AS A GRID. It was described here as "invisible on their own" and
+ * shipped; on a near-white ground, dots of the foreground colour at three
+ * percent are plainly there, and two pitches that close beat against each other
+ * into a lattice — the exact fault the old `dots` ambience had, reintroduced by
+ * the layer meant to hide it. It survived because it was only ever looked at
+ * whole-page, in dark.
+ *
+ * ⚠️ SO IT IS `feTurbulence`, WHICH IS ACTUAL NOISE. Every pixel is independent,
+ * so there is no pitch to beat against anything and nothing to see at any zoom.
+ * `saturate 0` because the filter's raw output is coloured; `stitchTiles`
+ * because without it the tile edges are a seam — a grid again, one repeat wider.
  */
-const GRAIN = [
-  `radial-gradient(color-mix(in oklab, var(--foreground) 3%, transparent) 0.5px, transparent 0.5px)`,
-  `radial-gradient(color-mix(in oklab, var(--foreground) 2%, transparent) 0.5px, transparent 0.5px)`,
-].join(", ");
+const NOISE = [
+  "%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E",
+  "%3Cfilter id='n'%3E",
+  "%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E",
+  "%3CfeColorMatrix type='saturate' values='0'/%3E",
+  "%3C/filter%3E",
+  "%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E",
+  "%3C/svg%3E",
+].join("");
 
-const GRAIN_SIZE = "3px 3px, 5px 5px";
-const GRAIN_POS = "0 0, 2px 3px";
+const GRAIN = `url("data:image/svg+xml,${NOISE}")`;
+
+/**
+ * ⚠️ AND IT IS APPLIED BY OPACITY AND A BLEND, NOT BY A COLOUR. Noise painted as
+ * a colour is a texture; noise blended at two percent is a rounding error in the
+ * gradient underneath it, which is all dither ever needs to be.
+ */
+const GRAIN_OPACITY = "calc(var(--sky, 1) * 0.035)";
 
 /**
  * ⚠️ THE MASK IS WHY IT READS AS DEPTH RATHER THAN AS A PANEL. Without it every
@@ -318,8 +341,9 @@ export function ambienceStylesheet(): string {
     /* ⚠️ The dither, unmasked — see the note above this function. */
     `[data-sky]:not([data-sky="plain"])::after {`,
     `  background-image: ${GRAIN};`,
-    `  background-size: ${GRAIN_SIZE};`,
-    `  background-position: ${GRAIN_POS};`,
+    `  background-repeat: repeat;`,
+    `  opacity: ${GRAIN_OPACITY};`,
+    `  mix-blend-mode: overlay;`,
     `}`,
     ...rules,
     /* ⚠️ A bleeding ambience must reach the edge even inside a padded column. */

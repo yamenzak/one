@@ -455,17 +455,24 @@ export function Nothing({ says, offer }: {
  * is neutral — never red, which is for something being wrong. A product that
  * paints every outgoing payment red tells somebody their groceries were a fault.
  */
-export function Money({ amount, currency = "€", size = "figure", tone = "neutral" }: {
+export function Money({ amount, currency = "€", size = "display", tone = "neutral" }: {
   /** ⚠️ Minor units, as an integer. A float here is a rounding error later. */
   readonly amount: number;
   readonly currency?: string;
-  readonly size?: "figure" | "label";
+  /**
+   * ⚠️ `display` IS THE DEFAULT BECAUSE THAT IS WHERE MONEY GOES. Every call site
+   * in the product puts this in a hero, and defaulting to the row size meant the
+   * number a whole screen was built around rendered at the same 24px as the
+   * heading above it. A default that is wrong at every call site is not a
+   * default, it is a step everybody has to remember.
+   */
+  readonly size?: "display" | "figure" | "label";
   readonly tone?: Tone;
 }) {
   const sign = amount < 0 ? "−" : tone === "success" ? "+" : "";
   const whole = Math.floor(Math.abs(amount) / 100).toLocaleString();
   const part = String(Math.abs(amount) % 100).padStart(2, "0");
-  const big = size === "figure" ? TYPE.figure : TYPE.label;
+  const big = size === "display" ? TYPE.display : size === "figure" ? TYPE.figure : TYPE.label;
 
   return (
     <span className={`${big} tabular-nums`} data-tone={tone}>
