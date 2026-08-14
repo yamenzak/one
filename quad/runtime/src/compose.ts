@@ -21,9 +21,10 @@
 import type {
   AnyOperation, AppSpec, CollectionSpec, CrudVerb, Gate, Permission, ProblemCatalog,
 } from "@quad/kernel";
-import { PLATFORM_PROBLEMS, eventFor, operationsFor, permissionFor, routeFor } from "@quad/kernel";
+import { PLATFORM_PROBLEMS, eraseBy, eventFor, operationsFor, permissionFor, routeFor } from "@quad/kernel";
+import { tableFor } from "@quad/kernel";
 import type { Db } from "./sql.js";
-import { erase, list, put, readOne } from "./records.js";
+import { list, put, readOne } from "./records.js";
 import { memberOps } from "./member-ops.js";
 
 /* ------------------------------------------------------------------ shape --- */
@@ -71,6 +72,17 @@ export interface Composed {
  * entry — reads one shape. The moment generated operations carried less, every
  * one of those would need a branch, and a branch is where a concern goes missing.
  */
+/**
+ * ⚠️ A SUBJECT-SCOPED COLLECTION IS THE CALLER'S OWN RECORDS, AND THAT IS THE
+ * WHOLE ANSWER. The generated verbs filter by whoever is asking, so a person's
+ * own logbook is theirs by construction rather than by a handler remembering to
+ * add a `WHERE`. Seeing SOMEBODY ELSE'S is a different question with a different
+ * permission, and it is an operation the app declares — which is right: the
+ * platform can say "yours", but only a product knows who else may look.
+ */
+const scopeOf = (spec: CollectionSpec, ctx: Ctx): string =>
+  eraseBy(spec)?.of === "subject" ? (ctx.accountId ?? "") : ctx.tenantId;
+
 function crudFor(spec: CollectionSpec, verb: CrudVerb): Resolved {
   const id = `${spec.id}.${verb}`;
   const kind = verb === "list" || verb === "read" ? "read" as const : "write" as const;
@@ -92,27 +104,32 @@ function crudFor(spec: CollectionSpec, verb: CrudVerb): Resolved {
   } as AnyOperation;
 
   const run = async (ctx: Ctx, input: Record<string, unknown>): Promise<unknown> => {
+    const scope = scopeOf(spec, ctx);
     switch (verb) {
-      case "list": return { items: await list(ctx.db, spec, ctx.tenantId) };
+      case "list": return { items: await list(ctx.db, spec, scope) };
       case "read": {
-        const row = await readOne(ctx.db, spec, ctx.tenantId, String(input.id ?? ""));
+        const row = await readOne(ctx.db, spec, scope, String(input.id ?? ""));
         if (!row) ctx.fail("platform.not_found");
         return row;
       }
       case "create": {
-        const done = await put(ctx.db, spec, ctx.tenantId, input, ctx.accountId, ctx.now);
+        const done = await put(ctx.db, spec, scope, input, ctx.accountId, ctx.now);
         if ("why" in done) ctx.fail("platform.invalid", { detail: done.detail });
         return done;
       }
       case "update": {
-        const row = await readOne(ctx.db, spec, ctx.tenantId, String(input.id ?? ""));
+        const row = await readOne(ctx.db, spec, scope, String(input.id ?? ""));
         if (!row) ctx.fail("platform.not_found");
         return { id: String(input.id) };
       }
       case "delete": {
-        const row = await readOne(ctx.db, spec, ctx.tenantId, String(input.id ?? ""));
+        /* ⚠️ Read first, in the caller's own scope: a delete that trusted the id
+           alone would remove somebody else's record on a guessed id. */
+        const row = await readOne(ctx.db, spec, scope, String(input.id ?? ""));
         if (!row) ctx.fail("platform.not_found");
-        await erase(ctx.db, [spec], "tenant", ctx.tenantId);
+        await ctx.db.prepare(
+          `DELETE FROM ${tableFor(spec)} WHERE id = ? AND ${eraseBy(spec)?.column ?? "id"} = ?`)
+          .bind(String(input.id), scope).run();
         return { id: String(input.id) };
       }
     }

@@ -85,7 +85,9 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
            of yours" without them renders "your plan includes undefined". */
         const used = (await membersOf(ctx.db, ctx.tenantId as TenantId))
           .filter((m) => seats.counts.includes(m.role)).length;
-        if (!withinQuota(allowed, used)) {
+        /* ⚠️ Only for a role that costs a seat — see `invite`. A workspace whose
+           customers are members would otherwise be unable to add one. */
+        if (seats.counts.includes(role) && !withinQuota(allowed, used)) {
           return ctx.fail("platform.quota_reached", { limit: String(allowed), used });
         }
 

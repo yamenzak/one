@@ -1,0 +1,31 @@
+{
+  "name": "@quad/kova",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Kova on Quad \u2014 a personal-training platform as a manifest and nothing else. The proof that a real product needs no infrastructure of its own.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@quad/kernel": "workspace:*",
+    "@quad/runtime": "workspace:*",
+    "@quad/web": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.8.55",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.0"
+  }
+}

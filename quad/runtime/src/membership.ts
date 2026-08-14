@@ -110,8 +110,20 @@ export async function invite(
   const members = await membersOf(db, tenantId);
   if (members.some((m) => m.email === input.email)) return "already_here";
 
-  /* ⚠️ Counted including the invitations nobody has answered yet. */
-  if (seats.allowed >= 0 && seatsUsed(members, seats.counts) >= seats.allowed) return "no_seats";
+  /*
+    ⚠️ THE CEILING IS ABOUT THE ROLE BEING INVITED, NOT ABOUT THE INVITATION. A
+    role that costs no seat — a customer of the business rather than its staff —
+    must not be refused because the staff seats are full, or a studio on the
+    smallest plan can never add the people it exists to serve.
+
+    ⚠️ AND IT COUNTS THE INVITATIONS NOBODY HAS ANSWERED YET, because counting
+    only accepted members lets anybody past the ceiling by inviting twenty people
+    and waiting.
+  */
+  const costsASeat = seats.counts.includes(input.role);
+  if (costsASeat && seats.allowed >= 0 && seatsUsed(members, seats.counts) >= seats.allowed) {
+    return "no_seats";
+  }
 
   const id = newId("mem", now);
   await db.prepare(

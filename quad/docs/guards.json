@@ -550,6 +550,33 @@
       "impl": "apps/hello/test/vault.test.ts",
       "proves": "refuses to reopen somebody who was erased",
       "fails": "a fresh salt after a shredding, making everything written afterwards a second collection nobody agreed to"
+    },
+    {
+      "id": "a-real-product-needs-no-infrastructure-of-its-own",
+      "protects": "D12",
+      "stage": "9",
+      "status": "live",
+      "impl": "apps/kova/test/kova.test.ts",
+      "proves": "derives its whole surface, including what it never declared",
+      "fails": "a product that has to write its own router, schema, gates and audit, which is a product that can leave one of them out"
+    },
+    {
+      "id": "a-persons-own-records-are-theirs-by-construction",
+      "protects": "D11",
+      "stage": "9",
+      "status": "live",
+      "impl": "apps/kova/test/kova.test.ts",
+      "proves": "lets a client log a set, and the coach see it",
+      "fails": "somebody's logbook readable by anybody in the workspace, because a handler forgot a WHERE"
+    },
+    {
+      "id": "a-seat-ceiling-only-counts-roles-that-cost-a-seat",
+      "protects": "D12",
+      "stage": "9",
+      "status": "live",
+      "impl": "apps/kova/test/kova.test.ts",
+      "proves": "counts staff against the seats and clients against the clients",
+      "fails": "a studio on the smallest plan unable to add the customers it exists to serve, refused for staff seats it was not asking for"
     }
   ]
 }

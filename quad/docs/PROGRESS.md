@@ -23,7 +23,7 @@ reader can trust this table instead of re-reading the code.
 | 6 | Money — plans, entitlements, credits, jobs | shipped |
 | 7 | Services — ai and notify over RPC | shipped |
 | 8 | Vault + legal | shipped |
-| 9 | Kova on Quad | building |
+| 9 | Kova on Quad | shipped |
 
 ## What is built
 
@@ -170,6 +170,14 @@ refuse — it reads as built and passes every test.
   erasure (which says plainly what it cannot undo), the derived processing
   record, the documents and the sub-processors with their countries.
 
+**`@quad/kova` — the first real product, as a manifest.** Six collections, three
+handlers, and no infrastructure of its own: no router, no schema, no migration,
+no gate call, no audit call, no settings screen, no billing code, no erasure
+cascade. Thirty-eight routes derived, the roster and the inbox among them
+without Kova declaring either. A client's conditions and weight are vault-backed,
+because a health fact in a product table is outside consent, outside the grant
+log and outside crypto-shredding.
+
 The guard registry, its thirteen checks, and the standards that bind them.
 
 ## Decisions, and how well each is defended
@@ -187,8 +195,8 @@ The guard registry, its thirteen checks, and the standards that bind them.
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 2 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 2 |
-| D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 9 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 30 |
+| D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 10 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 32 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -262,6 +270,9 @@ the library decides FOR us.
 | `consent-is-the-ceiling-and-a-grant-is-the-specific` | D11 | an operator-written grant standing in for the subject's own agreement, which is a lawful-basis failure wearing an access-control shape |
 | `every-look-is-recorded-including-the-refused-ones` | D11 | the question "did anybody try to look at this" answered with silence, which is the question actually asked after something goes wrong |
 | `erasure-is-not-a-pause` | D11 | a fresh salt after a shredding, making everything written afterwards a second collection nobody agreed to |
+| `a-real-product-needs-no-infrastructure-of-its-own` | D12 | a product that has to write its own router, schema, gates and audit, which is a product that can leave one of them out |
+| `a-persons-own-records-are-theirs-by-construction` | D11 | somebody's logbook readable by anybody in the workspace, because a handler forgot a WHERE |
+| `a-seat-ceiling-only-counts-roles-that-cost-a-seat` | D12 | a studio on the smallest plan unable to add the customers it exists to serve, refused for staff seats it was not asking for |
 <!-- /generated -->
 
 ## Commands
