@@ -67,21 +67,44 @@ run and a dead product.
 every sign-in code in flight. It is a WORKER secret rather than a repository
 one, because a repository secret is readable by every workflow run in the repo.
 
-### Two dashboard steps, and only two
+### Three dashboard steps, in this order
 
-| What | Where |
-|---|---|
-| `A`/`AAAA` (or a proxied `CNAME`) for `one.4dl.app` and `*.one.4dl.app` | zone `4dl.app` → DNS |
-| Worker routes `one.4dl.app/*` and `*.one.4dl.app/*` → script `one` | zone `4dl.app` → Workers Routes |
+**1. The certificate, and it must come first.** Universal SSL covers `4dl.app`
+and `*.4dl.app` — **one level only** — so it does not cover `id.one.4dl.app`.
+TLS is terminated *before* the worker runs, so a missing certificate fails the
+handshake and nothing in the logs, the health check or the deploy output says a
+word about it: every door but the apex is simply unreachable behind a green
+deploy.
+
+The `4dl.app` zone **already has an Advanced Certificate** (ordered for
+`*.kova.4dl.app`, DEPLOY.md §11 step A). One certificate carries the wildcards
+for every product on the zone, so this is two hosts added to it rather than a
+second $10/month:
+
+> SSL/TLS → Edge Certificates → the existing advanced certificate → add
+> **`one.4dl.app`** and **`*.one.4dl.app`**.
+
+Wait for **Active**. `curl -sI https://anything.one.4dl.app/health` completing
+the handshake is the check — any HTTP status is fine, a certificate error is not.
+
+**2. DNS.** Zone `4dl.app` → DNS → Add record, both **proxied** (orange cloud):
+
+| Type | Name | Target |
+|---|---|---|
+| `AAAA` | `one` | `100::` |
+| `AAAA` | `*.one` | `100::` |
+
+`100::` is the IPv6 discard prefix — the standard originless target for a
+hostname served entirely by a Worker. Nothing is ever sent to that address; the
+record exists so the name resolves through Cloudflare and the route can fire.
+
+**3. The two Worker routes.** Zone `4dl.app` → Workers Routes, both pointing at
+the script `one`: `one.4dl.app/*` and `*.one.4dl.app/*`.
 
 ⚠️ **No `routes` in `wrangler.jsonc`, deliberately.** Declaring them makes
 `wrangler dev` rewrite the incoming Host to the route's hostname, which collapses
-every door onto one — and the doors ARE the tenancy.
-
-⚠️ **Universal SSL covers `4dl.app` and `*.4dl.app` — one level only.** A
-certificate for `*.one.4dl.app` is a second-level wildcard, which needs Advanced
-Certificate Manager or Cloudflare for SaaS. Without it every door but the apex
-fails its TLS handshake, and the browser blames the network.
+every door onto one — and the doors ARE the tenancy. Wrangler never removes
+routes it does not declare, so once these exist every deploy keeps them.
 
 ### Why this cannot disturb Kova
 
