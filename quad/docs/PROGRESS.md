@@ -36,13 +36,22 @@ catalogue of is a thing that looks complete because nothing is red.
 
 Honestly outstanding, in the order it will bite:
 
-1. **Nothing is deployed to Cloudflare.** `quad/one` is a real worker with a real
-   `wrangler.jsonc`, and `quad/one-hub` is the page it serves — both boot, and
-   the worker's own suite drives every door through Miniflare on the real
-   `*.localhost` topology. What is missing is the account: the D1 ids in that
-   config are placeholders, so a `wrangler deploy` would bind databases that do
-   not exist and answer every request 500. Provisioning and a CI job are the next
-   act.
+1. **Nothing is deployed to Cloudflare — but the workflow that would is built.**
+   `.github/workflows/quad.yml` gates, provisions and deploys One; the only thing
+   left is a run. The D1 ids in `quad/one/wrangler.jsonc` are placeholders, and
+   the deploy SKIPS on them rather than shipping a worker bound to nothing —
+   Actions → **Quad** → Run workflow with `provision` ticked is what creates the
+   databases, writes their ids back and mints `AUTH_SECRET`.
+   - ⚠️ **Two dashboard steps it cannot do**: the DNS records for
+     `one.4dl.app` / `*.one.4dl.app`, and the two Worker routes. `wrangler.jsonc`
+     declares no `routes` deliberately — declaring them makes `wrangler dev`
+     rewrite the incoming Host, which collapses every door onto one.
+   - ⚠️ **The isolation from the live product is a guard, not a habit.**
+     `quad/scripts/inert.test.mjs` fails if One is registered in `apps.json` (the
+     file all three legacy workflows derive their app list from), if its worker
+     or database name collides with a live one, or if `ROOT` overlaps a route a
+     paying tenant answers on. All five of those mutations were tried; all five
+     fail the guard.
 2. **Passkeys.** Sign-in is an emailed code. There is deliberately no credential
    table waiting for a ceremony — see the note under identity below.
 3. **A workspace's own screens are components, not an application.** The Hub is
@@ -266,16 +275,16 @@ The guard registry, its checks, and the standards that bind them.
 |---|---|---|
 | D1 | The tenant is primary; an app is a capability switched on for it | 3 |
 | D2 | The name is Quad; packages are `@quad/*` | 2 |
-| D3 | One worker on the request path; heavy work splits over RPC service bindings | 4 |
+| D3 | One worker on the request path; heavy work splits over RPC service bindings | 6 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
-| D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 3 |
+| D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 4 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
 | D7 | HeroUI v3 is the component layer, and its components are not restyled | 3 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 2 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 3 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 10 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 34 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 35 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -357,6 +366,10 @@ the library decides FOR us.
 | `every-screen-the-picker-names-is-drawn` | D10 | a blank page, which is the same picture as a page that failed to load — so somebody reloads for a minute and then gives up |
 | `a-code-that-could-not-be-sent-holds-no-cooldown` | D12 | somebody locked out for a minute waiting on a code that was never delivered, told they are asking too often |
 | `the-deployment-answers-on-every-door-it-serves` | D3 | a deploy reporting green while the isolate throws in its first middleware — the page still loads, because static assets never reach the worker |
+| `quad-is-off-the-production-deploy-path` | D3 | the framework shipping to the account a paying tenant is served from, selected by a workflow that derives its app list from a file somebody tidily added it to |
+| `one-shares-no-name-with-a-live-product` | D5 | one product reading another's rows, or a deploy replacing a live worker — a worker name is account-wide and provisioning finds a database by name |
+| `ones-wildcard-never-covers-a-live-tenants-address` | D3 | route precedence rather than intent deciding who answers a paying customer's own subdomain |
+| `a-deployment-that-cannot-sign-refuses-to-serve` | D12 | every sign-in code signed with a constant anybody reading the repository already has, on a deployment where nothing looks wrong |
 <!-- /generated -->
 
 ## Commands

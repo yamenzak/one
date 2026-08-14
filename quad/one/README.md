@@ -52,18 +52,47 @@ something.
   port 80 and 404s, which reads as "the door is broken" rather than "the link
   is".
 
-## Before it can be deployed
+## Shipping it
 
-⚠️ **The D1 ids in `wrangler.jsonc` are placeholders.** A deploy with them in
-place binds databases that do not exist and answers every request 500. Creating
-them, writing the real ids in, and a CI job that ships this are the next act —
-see [../docs/PROGRESS.md](../docs/PROGRESS.md).
+**Actions → "Quad" → Run workflow, with `provision` ticked.** That creates the
+D1 databases One binds, writes their real ids into `wrangler.jsonc` and commits
+them, mints `AUTH_SECRET` as a worker secret if there is none, deploys, and then
+probes two doors to check it actually came up.
 
-⚠️ **`ENVIRONMENT` must stay `production` in `wrangler.jsonc`.** That block is
-the DEPLOYED config; `wrangler dev` overrides it. The development lane puts
-sign-in codes in retained logs and turns on the fabricating AI lane.
+Until that has run, the deploy step **skips**: `wrangler` accepts a placeholder
+id without complaint and the worker comes up bound to nothing, which is a green
+run and a dead product.
+
+⚠️ **`AUTH_SECRET` is minted once and never re-put.** Rewriting it invalidates
+every sign-in code in flight. It is a WORKER secret rather than a repository
+one, because a repository secret is readable by every workflow run in the repo.
+
+### Two dashboard steps, and only two
+
+| What | Where |
+|---|---|
+| `A`/`AAAA` (or a proxied `CNAME`) for `one.4dl.app` and `*.one.4dl.app` | zone `4dl.app` → DNS |
+| Worker routes `one.4dl.app/*` and `*.one.4dl.app/*` → script `one` | zone `4dl.app` → Workers Routes |
 
 ⚠️ **No `routes` in `wrangler.jsonc`, deliberately.** Declaring them makes
 `wrangler dev` rewrite the incoming Host to the route's hostname, which collapses
-every door onto one — and the doors ARE the tenancy. The production routes are a
-dashboard step.
+every door onto one — and the doors ARE the tenancy.
+
+⚠️ **Universal SSL covers `4dl.app` and `*.4dl.app` — one level only.** A
+certificate for `*.one.4dl.app` is a second-level wildcard, which needs Advanced
+Certificate Manager or Cloudflare for SaaS. Without it every door but the apex
+fails its TLS handshake, and the browser blames the network.
+
+### Why this cannot disturb Kova
+
+`ROOT` is `one.4dl.app`, not the apex. Kova's production routes are
+`kova.4dl.app/*` and `*.kova.4dl.app/*`, and One serves `*.${ROOT}` — so putting
+One at `4dl.app` would place its wildcard over every live tenant's address, with
+route precedence rather than intent deciding who answers. The worker name, both
+database names and the root are all checked against the live registry by
+`quad/scripts/inert.test.mjs`, which runs before anything is created.
+
+⚠️ **`ENVIRONMENT` must stay `production` in `wrangler.jsonc`.** That block is
+the DEPLOYED config; `.dev.vars` overrides it locally. The development lane puts
+sign-in codes in retained logs and turns on the lane that fabricates AI output
+and bills for it.

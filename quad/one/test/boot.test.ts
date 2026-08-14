@@ -68,6 +68,26 @@ describe("the worker on its own", () => {
   });
 
   /*
+    ⚠️ AND IT REFUSES TO SERVE WITHOUT THE THINGS IT CANNOT SAFELY GUESS. With
+    no signing secret every sign-in code is signed with `undefined` — a constant,
+    and one anybody reading this repository already has, so the codes are
+    forgeable and nothing looks wrong anywhere. With no `ROOT` every hostname
+    classifies as no door at all. Neither is a degraded feature.
+
+    ⚠️ It is checked at BOOT rather than at the sign-in route, so `/health` says
+    it too — a probe that reports healthy on a deployment which cannot sign
+    anybody in is the reverse of a probe.
+  */
+  it("refuses to serve at all when it cannot sign anything", async () => {
+    for (const absent of ["AUTH_SECRET", "ROOT"]) {
+      const crippled = { ...asDev, [absent]: "" };
+      const res = await worker.fetch(
+        new Request("http://localhost:8080/health"), crippled as never);
+      expect(res.status, absent).toBe(503);
+    }
+  });
+
+  /*
     ⚠️ THE SCHEMA IS APPLIED BY THE WORKER, ONCE, BEFORE THE FIRST REQUEST IS
     ANSWERED. Firing it rather than awaiting it answers "no such table" to
     whoever happens to be first after a deploy — a fault that appears once and

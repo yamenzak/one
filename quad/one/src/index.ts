@@ -72,6 +72,30 @@ export interface Env {
  */
 let booted: Promise<void> | null = null;
 
+/**
+ * ⚠️ A DEPLOYMENT WITH NO SIGNING SECRET MUST NOT SERVE. Without it every
+ * sign-in code is signed with `undefined` — which is a constant, and a constant
+ * anybody reading this repository already has, so the codes are forgeable and
+ * nothing anywhere looks wrong. Refusing is loud; the alternative is an
+ * authentication system that appears to work.
+ *
+ * ⚠️ AND IT IS CHECKED AT BOOT RATHER THAN AT THE SIGN-IN ROUTE. A check on the
+ * route leaves `/health` answering 200 on a deployment that cannot safely sign
+ * anybody in, which is the reverse of what a probe is for.
+ */
+const REQUIRED: readonly (keyof Env & string)[] = ["ROOT", "AUTH_SECRET"];
+
+/**
+ * ⚠️ CHECKED ON EVERY REQUEST, NOT ONCE — and the cost of that is two string
+ * reads, against an invariant whose absence is forgeable sign-in codes. Folded
+ * into the memoised boot below it becomes order-dependent: whichever
+ * configuration reached the isolate first decides for every request after it,
+ * and the check is then something that has already happened rather than
+ * something that is true.
+ */
+const missingConfig = (env: Env): readonly string[] =>
+  REQUIRED.filter((key) => !String(env[key] ?? "").trim());
+
 const boot = (env: Env): Promise<void> => {
   booted ??= (async () => {
     await applySchema(env.DIRECTORY as unknown as Db, DIRECTORY_MODULES);
@@ -161,9 +185,40 @@ const handler = (env: Env) => {
 
 /* ------------------------------------------------------------------ fetch --- */
 
+/** ⚠️ The reason goes to the log, where the operator is. The request gets a
+    status a probe can act on and nothing about our configuration. */
+const unavailable = (): Response =>
+  new Response(
+    JSON.stringify({ problem: { code: "platform.unavailable", title: "One is not configured" } }),
+    { status: 503, headers: { "content-type": "application/json; charset=utf-8" } },
+  );
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    await boot(env);
+    /*
+      ⚠️ A DEPLOYMENT THAT CANNOT START SAYS SO ON EVERY PATH, `/health`
+      INCLUDED. Letting the throw escape answers 500 with no body — which is
+      what a previous platform did for a day behind a green deploy workflow,
+      while the page still loaded because static assets never reach the worker.
+      The reason goes to the log, where the operator is; the request gets a
+      status a probe can act on.
+    */
+    const unconfigured = missingConfig(env);
+    if (unconfigured.length) {
+      console.error(
+        `[boot] One cannot serve: ${unconfigured.join(", ")} is not set. ` +
+        `In development copy quad/one/.dev.vars.example to .dev.vars; in a ` +
+        `deployment ROOT is a var and AUTH_SECRET is a worker secret.`,
+      );
+      return unavailable();
+    }
+
+    try {
+      await boot(env);
+    } catch (why) {
+      console.error("[boot]", why);
+      return unavailable();
+    }
 
     const url = new URL(request.url);
     /*

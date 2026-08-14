@@ -11,17 +11,25 @@
   // collapsed Host is a development environment where none of this works and
   // nothing says why. The production routes are a dashboard step.
 
+  // ⚠️ THIS BLOCK IS THE DEPLOYED CONFIG. Local overrides go in `.dev.vars`
+  // (copy `.dev.vars.example`), which wrangler reads in preference to this — so
+  // a value here is what a real request sees, and nothing else.
   "vars": {
-    // ⚠️ `ROOT` is what `doorFor` measures every hostname against. Locally it is
-    // `localhost`, because browsers resolve `*.localhost` to loopback and
-    // Miniflare preserves the Host exactly as the edge does — so
-    // `setup.localhost:8080` IS the setup door, with no flag pretending.
-    "ROOT": "localhost",
+    // ⚠️ `ROOT` IS WHAT `doorFor` MEASURES EVERY HOSTNAME AGAINST, so a wrong
+    // one is not a misconfiguration — it is a deployment where every door is
+    // `none` and every request 404s. It read `localhost` here for exactly as
+    // long as this file was never deployed.
+    //
+    // ⚠️ AND IT IS DELIBERATELY NOT `4dl.app`. Kova's production routes are
+    // `kova.4dl.app/*` and `*.kova.4dl.app/*`; putting One at the apex would
+    // make `*.4dl.app/*` One's, and One's wildcard would then match a live
+    // tenant's address. One label of its own keeps the two disjoint, which is
+    // the whole isolation while Kova has not migrated.
+    "ROOT": "one.4dl.app",
 
-    // ⚠️ NEVER SET TO `development` IN A DEPLOYED CONFIG. This block is the
-    // deployed one: in production the development lane would put sign-in codes
-    // in retained logs and let the AI mock fabricate output that is billed for.
-    // `wrangler dev` overrides it below.
+    // ⚠️ NEVER `development` HERE. The development lane puts sign-in codes in
+    // retained logs and turns on the lane that fabricates AI output and bills
+    // for it. `.dev.vars` is what turns it on locally.
     "ENVIRONMENT": "production"
   },
 

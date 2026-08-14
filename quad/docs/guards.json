@@ -622,6 +622,42 @@
       "impl": "one/test/boot.test.ts",
       "proves": "answers /health on every door",
       "fails": "a deploy reporting green while the isolate throws in its first middleware — the page still loads, because static assets never reach the worker"
+    },
+    {
+      "id": "quad-is-off-the-production-deploy-path",
+      "protects": "D3",
+      "stage": "10",
+      "status": "live",
+      "impl": "scripts/inert.test.mjs",
+      "proves": "registry: apps.json names nothing under quad/",
+      "fails": "the framework shipping to the account a paying tenant is served from, selected by a workflow that derives its app list from a file somebody tidily added it to"
+    },
+    {
+      "id": "one-shares-no-name-with-a-live-product",
+      "protects": "D5",
+      "stage": "10",
+      "status": "live",
+      "impl": "scripts/inert.test.mjs",
+      "proves": "collide with none of",
+      "fails": "one product reading another's rows, or a deploy replacing a live worker — a worker name is account-wide and provisioning finds a database by name"
+    },
+    {
+      "id": "ones-wildcard-never-covers-a-live-tenants-address",
+      "protects": "D3",
+      "stage": "10",
+      "status": "live",
+      "impl": "scripts/inert.test.mjs",
+      "proves": "overlaps none of",
+      "fails": "route precedence rather than intent deciding who answers a paying customer's own subdomain"
+    },
+    {
+      "id": "a-deployment-that-cannot-sign-refuses-to-serve",
+      "protects": "D12",
+      "stage": "10",
+      "status": "live",
+      "impl": "one/test/boot.test.ts",
+      "proves": "refuses to serve at all when it cannot sign anything",
+      "fails": "every sign-in code signed with a constant anybody reading the repository already has, on a deployment where nothing looks wrong"
     }
   ]
 }
