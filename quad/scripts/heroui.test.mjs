@@ -155,6 +155,22 @@ const layoutOnly = (cls) => {
 };
 
 /**
+ * ⚠️ ONE COMPONENT WHERE THE SHAPE IS THE DATA, AND IT IS `Skeleton`. Radius is
+ * appearance on everything the library draws, because the library knows what a
+ * card or a button should look like. It does not know what is COMING — and a
+ * placeholder's entire job is to be the geometry of the thing it stands in for,
+ * so a stand-in for an avatar is a circle, one for a line of text is a pill, and
+ * one for a chart is a rounded panel. Refusing the radius would leave every
+ * skeleton a sharp-cornered rectangle, which is a placeholder that does not
+ * match its content — the exact fault the shaped skeletons exist to avoid.
+ *
+ * ⚠️ AND IT IS RADIUS ONLY. A `Skeleton` given a colour, a border or a shadow is
+ * the ordinary breach, and still is.
+ */
+const SHAPE_IS_DATA = new Set(["Skeleton"]);
+const shapeOk = (tag, cls) => SHAPE_IS_DATA.has(tag.split(".")[0]) && /^rounded(-|$)/.test(bare(cls));
+
+/**
  * ⚠️ HEROUI COMPONENTS ARE FOUND BY WHAT WAS IMPORTED, not by a hardcoded list.
  * A list would silently stop covering the component added next week — which is
  * exactly the one somebody is in a hurry about.
@@ -188,7 +204,7 @@ for (const file of FILES) {
     const cls = attrs.match(/className=(?:"([^"]*)"|\{`([^`]*)`\})/);
     if (cls) {
       for (const one of (cls[1] ?? cls[2] ?? "").split(/\s+/).filter(Boolean)) {
-        if (!layoutOnly(one)) {
+        if (!layoutOnly(one) && !shapeOk(tag, one)) {
           restyled++;
           fail(`${rel(file)}: <${tag} className="… ${one} …"> restyles a component (D7).\n` +
                `       Theme it through tokens, or place it with a layout utility.`);

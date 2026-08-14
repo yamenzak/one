@@ -180,6 +180,16 @@ export const ISLAND_ITEM = "py-2" as const;
  * arguable.
  */
 export const SPACE = {
+  /**
+   * ⚠️ 4px, AND IT IS THE PAIR RATHER THAN THE GROUP. A label and the one line
+   * under it are ONE thing said twice; at `tight` they read as two, and every
+   * row in the product is built out of exactly that pair. It was missing from
+   * the first version of this scale, so eleven components wrote `gap-1` by hand
+   * — all of them agreeing, which is the good outcome of a bad situation and is
+   * why nothing looked wrong. A step nobody can name is a step that drifts the
+   * first time somebody has a reason.
+   */
+  hair: "gap-1",
   tight: "gap-2",
   snug: "gap-3",
   roomy: "gap-6",

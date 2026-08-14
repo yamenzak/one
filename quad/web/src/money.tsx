@@ -106,7 +106,7 @@ export function Wallet({ balance, held, spentByApp, appName, packs, onBuy }: Wal
             {spent > 0 ? (
               <div className={`flex flex-col ${SPACE.tight}`}>
                 {spentByApp.map((s) => (
-                  <div key={s.appId ?? "platform"} className="flex flex-col gap-1">
+                  <div key={s.appId ?? "platform"} className={`flex flex-col ${SPACE.hair}`}>
                     <div className={`flex justify-between ${SPACE.snug}`}>
                       <span>{s.appId ? appName(s.appId) : "The platform"}</span>
                       <span>{s.credits}</span>

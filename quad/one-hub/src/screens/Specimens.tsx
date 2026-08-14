@@ -18,7 +18,9 @@ import { useState } from "react";
 import {
   ActionRow, AmountRow, AppCrown, Balance, Band, CopyRow, Crown, Figure, Grid, Group,
   Island, Money, NavRow, Nothing, NoteRow, OfferRow, Page, PersonRow, Prose,
-  QuickActions, Row, SeeAll, Section, Spacer, Stack, StepRow, StickyAction,
+  QuickActions, Row, SeeAll, Section, Spacer, Stack, StepRow, StickyAction, Cluster, Rail,
+  Await, Trouble, Working, RowsWaiting, ChartWaiting, FigureWaiting, TilesWaiting, TextWaiting,
+  waiting, ready, trouble, type Loaded,
   TileGrid, Title, ToggleRow, FieldRow, PageCrown, TYPE,
 } from "@quad/web";
 import {
@@ -26,6 +28,7 @@ import {
   LineChart, Meter, Ring, Rings, StackedChart, Stat, StatRow,
 } from "@quad/web";
 import { Button } from "@heroui/react";
+import { PLATFORM_PROBLEMS, problem } from "@quad/kernel";
 import { ChartColumn, Check, CircleUser, Clock, CreditCard, Ellipsis, EyeOff, FileText, Globe, House, KeyRound, Landmark, LogIn, Mail, MessagesSquare, Package, PiggyBank, Plus, ReceiptText, Trash2, TriangleAlert } from "lucide-react";
 
 const nothing = () => {};
@@ -164,6 +167,94 @@ function Settings() {
             <FieldRow label="Where records are kept" value="European Union" />
             <ActionRow icon={glyph(<Trash2 />)} label="Close this workspace" tone="danger" onDo={nothing} />
           </Group>
+        </Stack>
+      </Band>
+    </Page>
+  );
+}
+
+/* --------------------------------------------------------------- the states --- */
+
+/**
+ * ⚠️ THE FOUR OUTCOMES, SIDE BY SIDE, WHICH IS THE ONLY WAY ANYBODY EVER SEES
+ * THREE OF THEM. In development a request is instant and it succeeds, so
+ * waiting, nothing and trouble are exactly the states that ship unlooked-at —
+ * this specimen renders all four at once and cycles a real one, so a change to
+ * any of them is visible the moment it is made rather than the first time
+ * somebody's network drops.
+ */
+function States() {
+  const [cycle, setCycle] = useState<0 | 1 | 2 | 3>(0);
+  const rows = ["Priya Raman", "Tom Okafor", "Lena Fischer"];
+  const live: Loaded<readonly string[]> =
+    cycle === 0 ? waiting()
+      : cycle === 1 ? ready([])
+        : cycle === 2 ? trouble(problem(PLATFORM_PROBLEMS, "platform.unavailable", {}, { ref: "req_8f21c04" }))
+          : ready(rows);
+
+  return (
+    <Page sky="veil">
+      <PageCrown title="States" back={nothing} />
+      <Band width="work">
+        <Stack space="roomy">
+          <Section label="One surface, cycled" under="The same component through all four">
+            <Stack space="snug">
+              <Cluster>
+                {(["Waiting", "Nothing", "Trouble", "Ready"] as const).map((w, i) => (
+                  <Button
+                    key={w}
+                    size="sm"
+                    variant={cycle === i ? "primary" : "tertiary"}
+                    onPress={() => setCycle(i as 0 | 1 | 2 | 3)}
+                  >
+                    {w}
+                  </Button>
+                ))}
+              </Cluster>
+              <Await
+                of={live}
+                waiting={<RowsWaiting rows={3} />}
+                nothing={<Nothing says="No one on the stands yet" under="Bikes you check in will show up here" offer={{ label: "Check one in", onDo: nothing }} />}
+                again={nothing}
+                then={(names) => (
+                  <Group>
+                    {names.map((n) => (
+                      <PersonRow key={n} name={n} under="Ribble CGR · brake bleed" when="Today" onOpen={nothing} />
+                    ))}
+                  </Group>
+                )}
+              />
+            </Stack>
+          </Section>
+
+          <Section label="Every skeleton" under="Each is the geometry of the thing it stands in for">
+            <Stack space="roomy">
+              <Group label="Rows"><RowsWaiting rows={2} /></Group>
+              <ChartPanel label="A chart"><ChartWaiting /></ChartPanel>
+              <ChartPanel label="A figure"><FigureWaiting /></ChartPanel>
+              <ChartPanel label="Tiles"><TilesWaiting /></ChartPanel>
+              <ChartPanel label="Prose"><TextWaiting /></ChartPanel>
+            </Stack>
+          </Section>
+
+          <Section label="Every refusal" under="The tone comes from the problem, never from the screen">
+            <Stack space="snug">
+              {(["platform.unavailable", "platform.forbidden", "platform.quota_reached"] as const).map((code) => (
+                <Trouble key={code} problem={problem(PLATFORM_PROBLEMS, code, {}, { ref: "req_8f21c04" })} again={nothing} />
+              ))}
+              <Working says="Saving" />
+            </Stack>
+          </Section>
+
+          <Section label="A rail" under="Sideways, snapping, and it shows the next one">
+            <Rail>
+              {rows.map((n) => (
+                <ChartPanel key={n} label={n} under="Ribble CGR">
+                  <FigureWaiting />
+                </ChartPanel>
+              ))}
+            </Rail>
+          </Section>
         </Stack>
       </Band>
     </Page>
@@ -546,6 +637,7 @@ function Report() {
 export const SPECIMENS = {
   workshop: Workshop,
   settings: Settings,
+  states: States,
   inner: Inner,
   detail: Detail,
   flow: Flow,

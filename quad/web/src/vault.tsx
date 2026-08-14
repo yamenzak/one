@@ -35,7 +35,7 @@ export function ConsentSheet({ shown, given, onChange }: ConsentProps) {
           </Card.Header>
           <Card.Content>
             <div className={`flex flex-col ${SPACE.snug}`}>
-              <ul className="flex flex-col gap-1">
+              <ul className={`flex flex-col ${SPACE.hair}`}>
                 {fields.map((f) => <li key={f.id}>{f.label}</li>)}
               </ul>
               <Separator />

@@ -133,7 +133,7 @@ export function Shelf({ plans, entitlements, current, onChoose }: ShelfProps) {
                 ? <Chip color="success" variant="soft"><Chip.Label>{plan.trialDays} days free</Chip.Label></Chip>
                 : null}
               <Separator />
-              <dl className="flex flex-col gap-1">
+              <dl className={`flex flex-col ${SPACE.hair}`}>
                 {keys.map(([key, def]) => (
                   <div key={key} className={`flex justify-between ${SPACE.snug}`}>
                     <dt>{def.label}</dt>

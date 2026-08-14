@@ -16,7 +16,7 @@
 import { useState } from "react";
 import { AppCrown, Balance, Band, CopyRow, Figure, Group, Grid, Island, Money, NavRow, ActionRow,
   ToggleRow, FieldRow, NoteRow, OfferRow, PersonRow, AmountRow, QuickActions, SeeAll,
-  StepRow, TileGrid, Nothing, Row, Section, Stack, StickyAction, Title,
+  StepRow, TileGrid, Nothing, Row, Section, Stack, StickyAction, Title, Cluster, SPACE,
   TYPE, type Ambience } from "@quad/web";
 import { Button } from "@heroui/react";
 import { Sheet } from "../ui.js";
@@ -39,7 +39,7 @@ export function Gallery() {
       <Title under="Every piece a screen is assembled from">The vocabulary</Title>
 
       {/* -------------------------------------------------------- balance --- */}
-      <section className="flex flex-col gap-3">
+      <section className={`flex flex-col ${SPACE.snug}`}>
         <Section label="The one number">
           <Balance
             eyebrow="Personal · EUR"
@@ -60,7 +60,7 @@ export function Gallery() {
       </section>
 
       {/* ------------------------------------------------------- ambience --- */}
-      <section className="flex flex-col gap-3">
+      <section className={`flex flex-col ${SPACE.snug}`}>
         <Section label="Ambience">
           <Grid min="9rem">
             {SKIES.map((sky) => (
@@ -152,15 +152,15 @@ export function Gallery() {
 
       {/* -------------------------------------------------------- figures --- */}
       <Group label="Figures">
-        <div className="flex flex-wrap gap-10 py-2">
+        <Cluster space="airy">
           <Figure value="€7,172" of="Total wealth" />
           <Figure value="3,677" of="Points" />
           <Figure value="12" of="Workspaces" />
-        </div>
+        </Cluster>
       </Group>
 
       {/* ------------------------------------------------------- clusters --- */}
-      <section className="flex flex-col gap-3">
+      <section className={`flex flex-col ${SPACE.snug}`}>
         <Section label="Shortcuts">
           <QuickActions
             actions={[
@@ -181,7 +181,7 @@ export function Gallery() {
       </section>
 
       {/* --------------------------------------------------------- states --- */}
-      <section className="flex flex-col gap-3">
+      <section className={`flex flex-col ${SPACE.snug}`}>
         <Section label="Nothing here">
           <Nothing says="No active challenges yet" />
         </Section>
@@ -192,7 +192,7 @@ export function Gallery() {
       </section>
 
       {/* --------------------------------------------------------- crown --- */}
-      <section className="flex flex-col gap-3">
+      <section className={`flex flex-col ${SPACE.snug}`}>
         <Section label="The crown">
           <p className={TYPE.note}>
             The face and search never move; the last two slots belong to the destination
@@ -220,7 +220,7 @@ export function Gallery() {
       </section>
 
       {/* ----------------------------------------------------------- nav --- */}
-      <section className="flex flex-col gap-3">
+      <section className={`flex flex-col ${SPACE.snug}`}>
         <Section label="Getting around">
           <p className={TYPE.note}>
             Four here, five at most, and the labels go while you scroll
@@ -239,7 +239,7 @@ export function Gallery() {
       </section>
 
       {/* --------------------------------------------------------- sticky --- */}
-      <section className="flex flex-col gap-3">
+      <section className={`flex flex-col ${SPACE.snug}`}>
         <Section label="The one action">
           <p className={TYPE.note}>
             A screen has an island or a pinned action, never both — they occupy one place
@@ -251,7 +251,7 @@ export function Gallery() {
       </section>
 
       {/* ---------------------------------------------------------- sheet --- */}
-      <section className="flex flex-col gap-3">
+      <section className={`flex flex-col ${SPACE.snug}`}>
         <Section label="Sheet">
           <Band bleed="flush">
             <Sheet title="Sign in to One" lead="We will email you a code — no password to lose">

@@ -21,6 +21,7 @@
  * reason and can reach for one; what every product needs is that a drawer, a
  * toast and a page all decelerate the same way.
  */
+import type * as React from "react";
 
 /**
  * The six curves HeroUI defines, by what they are FOR rather than by their
@@ -97,3 +98,61 @@ export const MOTION = {
 } as const;
 
 export type Intent = keyof typeof MOTION;
+
+/* ---------------------------------------------------------------- arrival --- */
+
+/**
+ * THE THREE KINDS OF MOTION THERE ARE, AND THERE IS NO FOURTH.
+ *
+ * ⚠️ A PRODUCT WITH A DOZEN ANIMATION TECHNIQUES HAS NO MOTION DESIGN, IT HAS A
+ * JUNGLE. Every moving thing in this system is one of exactly three, and which
+ * one it is falls out of what is happening rather than out of taste:
+ *
+ *   IT ARRIVED ... `ARRIVE` — something that was not in the tree now is. A
+ *                  transition cannot express this: there is no prior state to
+ *                  transition FROM, so it needs a keyframe.
+ *   IT CHANGED ... a transition on a `MOTION` token. The element was already
+ *                  there and one of its properties moved.
+ *   IT IS WAITING  `Skeleton`, `Spinner`, `ProgressBar` — the library's own,
+ *                  which animate themselves and stand down by themselves.
+ *
+ * ⚠️ AND THE ARRIVAL KEYFRAME IS THE LIBRARY'S, NOT OURS. HeroUI defines
+ * `@keyframes enter` globally and drives it entirely through `--tw-enter-*`
+ * custom properties — it is what every popover, dropdown and modal it ships
+ * animates on. Naming it here means our own content arrives the same way the
+ * library's does, rather than one step out of phase with it, which is the exact
+ * fault this file's header is about. The only thing declared below is WHICH
+ * properties move.
+ *
+ * ⚠️ THE OPT-OUTS ARE BOTH PRESENT AND BOTH REQUIRED. HeroUI switches its own
+ * components off for `prefers-reduced-motion` and for a `data-reduce-motion`
+ * ancestor; a rule of ours that answered only the first would keep moving for
+ * somebody who turned it off inside the app, which is the half that is actually
+ * reachable from a settings screen.
+ */
+export const ARRIVE = { "data-arrive": "true" } as const;
+
+/**
+ * ⚠️ A STAGGER, AND IT IS CAPPED. A list where every row arrives at once reads
+ * as a flash; one where the delay grows without limit makes the twentieth row
+ * take a second and a half, which reads as a slow page rather than as a
+ * considered one. Six steps is where the eye stops counting.
+ */
+export const arriveAt = (index: number): React.CSSProperties =>
+  ({ ["--tw-animation-delay" as string]: `${Math.min(index, 5) * 40}ms` });
+
+/**
+ * ⚠️ INJECTED BESIDE THE REST OF THE SHARED CHROME, and it has to BE injected —
+ * `CHART_MOTION` was imported by the Hub's entry point and left out of the join,
+ * so the chart reveal never ran once, in any build, with everything green.
+ */
+export const ARRIVE_MOTION = [
+  `[data-arrive="true"] {`,
+  `  animation: enter var(--default-transition-duration) var(--ease-out-quart)`,
+  `    var(--tw-animation-delay, 0s) both;`,
+  `  --tw-enter-opacity: 0;`,
+  `  --tw-enter-translate-y: 0.5rem;`,
+  `}`,
+  `@media (prefers-reduced-motion: reduce) { [data-arrive="true"] { animation: none; } }`,
+  `[data-reduce-motion="true"] [data-arrive="true"] { animation: none; }`,
+].join("\n");

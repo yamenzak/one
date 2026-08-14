@@ -1,0 +1,305 @@
+/**
+ * THE FOUR THINGS A SURFACE CAN BE, DECIDED ONCE.
+ *
+ * ⚠️ EVERY SCREEN THAT FETCHES HAS FOUR OUTCOMES AND MOST SHIP TWO. Waiting,
+ * nothing, a refusal, and the content — and the two that get skipped are the two
+ * nobody sees while building, because in development the request is instant and
+ * it succeeds. What ships is a screen that renders its empty state during the
+ * round trip and its empty state again when the request fails, so "you have no
+ * clients" is what a coach is told when the network dropped.
+ *
+ * ⚠️ SO THE DECISION IS A COMPONENT, NOT A CONVENTION. `Await` is the one place
+ * the four-way choice is made; a caller that reaches for a ternary on `loading`
+ * has re-implemented three of the four cases and got one of them wrong. This is
+ * the same argument as `metrics.ts` and it has the same enforcement.
+ *
+ * ⚠️ AND `[]` IS NOT "NOT YET", WHICH IS THE FAILURE THIS SHAPE MAKES
+ * UNREPRESENTABLE. A state seeded with an empty array and rendered as fact is a
+ * wrong answer wearing a loading state's excuse — a badge confidently reading 0,
+ * "you're all caught up" over an inbox still loading, a `catch(() => setItems([]))`
+ * that turns a FAILED load into "no media yet". `Loaded<T>` has no value to seed
+ * it with: the only way to construct one is to say which of the three it is.
+ */
+
+import * as React from "react";
+import { Alert, Button, EmptyState, Skeleton, Spinner } from "@heroui/react";
+import type { Problem } from "@quad/kernel";
+import { TYPE } from "./type.js";
+import { PAD, ROW, SPACE } from "./metrics.js";
+import { ARRIVE } from "./motion.js";
+import { Group } from "./surfaces.js";
+
+/* ----------------------------------------------------------------- loaded --- */
+
+/**
+ * ⚠️ THREE CASES AND NO DEFAULT. `undefined` meaning "still loading" is the
+ * shape this replaces, and it fails in the one place it matters: a request that
+ * legitimately resolved to nothing is indistinguishable from one that has not
+ * come back.
+ */
+export type Loaded<T> =
+  | { readonly status: "waiting" }
+  | { readonly status: "trouble"; readonly problem: Problem }
+  | { readonly status: "ready"; readonly data: T };
+
+export const waiting = <T,>(): Loaded<T> => ({ status: "waiting" });
+export const trouble = <T,>(problem: Problem): Loaded<T> => ({ status: "trouble", problem });
+export const ready = <T,>(data: T): Loaded<T> => ({ status: "ready", data });
+
+/* ------------------------------------------------------------------ await --- */
+
+export interface AwaitProps<T> {
+  readonly of: Loaded<T>;
+  /**
+   * ⚠️ SHAPED LIKE WHAT IS COMING, NOT A SPINNER. See `skeleton.tsx` — a
+   * placeholder with the wrong geometry is a layout that jumps, which is worse
+   * than one that was briefly blank.
+   */
+  readonly waiting: React.ReactNode;
+  /** What is true when the answer is legitimately nothing. */
+  readonly nothing?: React.ReactNode;
+  /**
+   * ⚠️ EMPTINESS IS THE CALLER'S TO DEFINE FOR ANYTHING THAT IS NOT A LIST. An
+   * array of length zero is the case that is always empty and it is handled;
+   * a `{ items: [], total: 0 }` is not something this can guess about.
+   */
+  readonly isNothing?: (data: T) => boolean;
+  readonly then: (data: T) => React.ReactNode;
+  /** ⚠️ Offered only where the problem says trying again could work. */
+  readonly again?: () => void;
+}
+
+/**
+ * THE FOUR-WAY DECISION, AND IT IS THE ONLY ONE.
+ *
+ * ⚠️ THE ORDER IS NOT ARBITRARY. Trouble outranks emptiness, because a failed
+ * request has no data and `[]` is what a naive reading of it produces; waiting
+ * outranks both, because during the round trip neither of the others is known
+ * yet. Getting this order wrong is how a screen comes to say "nothing here" for
+ * a second on every single load.
+ */
+export function Await<T>({ of, waiting: skeleton, nothing, isNothing, then, again }: AwaitProps<T>) {
+  if (of.status === "waiting") return <>{skeleton}</>;
+  if (of.status === "trouble") return <Trouble problem={of.problem} again={again} />;
+
+  const empty = isNothing
+    ? isNothing(of.data)
+    : Array.isArray(of.data) && of.data.length === 0;
+  if (empty && nothing) return <>{nothing}</>;
+
+  return <>{then(of.data)}</>;
+}
+
+/* ---------------------------------------------------------------- trouble --- */
+
+/**
+ * A REFUSAL, IN THE WORDS THE PLATFORM ALREADY WROTE.
+ *
+ * ⚠️ EVERY FIELD ON THIS COMES FROM THE `Problem`, WHICH IS THE POINT. The
+ * kernel decided what a refusal says, whether trying again could plausibly work
+ * and what tone it carries; a screen that re-words it is a screen where the same
+ * failure reads differently depending on where you hit it. There is no `message`
+ * prop and there must not be one.
+ *
+ * ⚠️ `again` IS OFFERED ONLY WHERE `retryable` SAYS SO. A retry button on a
+ * `forbidden` is a person hammering a door that will never open, and it teaches
+ * them that our buttons do not mean anything.
+ *
+ * ⚠️ AND THE REFERENCE IS SHOWN WHEREVER THERE IS ONE. It is in the log beside
+ * the cause, so support finds in seconds what is otherwise a conversation that
+ * starts "it said something went wrong".
+ */
+export function Trouble({ problem, again }: {
+  readonly problem: Problem;
+  readonly again?: () => void;
+}) {
+  return (
+    <Alert {...ARRIVE} status={statusOf(problem.tone)}>
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>{problem.title}</Alert.Title>
+        {problem.detail ? <Alert.Description>{problem.detail}</Alert.Description> : null}
+        {/* ⚠️ ONLY WHERE THE SENTENCE DOES NOT ALREADY CARRY IT. Several
+            problems interpolate `{ref}` into their own detail, and printing it
+            again underneath is the reference twice with nothing between them —
+            which reads as a rendering fault rather than as thoroughness. */}
+        {problem.ref && !problem.detail?.includes(problem.ref) ? (
+          <Alert.Description>
+            <span className="tabular-nums">{problem.ref}</span>
+          </Alert.Description>
+        ) : null}
+      </Alert.Content>
+      {again && problem.retryable ? (
+        <Button size="sm" variant="tertiary" onPress={again}>Try again</Button>
+      ) : null}
+    </Alert>
+  );
+}
+
+/**
+ * ⚠️ THE KERNEL'S FIVE TONES AND THE LIBRARY'S FIVE STATUSES ARE NOT THE SAME
+ * FIVE, and the mapping is here rather than at every call site. Both have
+ * success, warning and danger; the kernel's `info` is the library's `accent` and
+ * its `neutral` is `default`. Passing a tone straight through compiles for four
+ * of them and silently paints an informational refusal in the default grey,
+ * which is the reading a person acts on least.
+ */
+type Status = "default" | "accent" | "danger" | "success" | "warning";
+const STATUS: Readonly<Record<Problem["tone"], Status>> = {
+  neutral: "default",
+  info: "accent",
+  success: "success",
+  warning: "warning",
+  danger: "danger",
+};
+const statusOf = (tone: Problem["tone"]): Status => STATUS[tone] ?? "default";
+
+/* ---------------------------------------------------------------- nothing --- */
+
+/**
+ * WHAT IS TRUE WHEN THERE IS NOTHING HERE.
+ *
+ * ⚠️ AN EMPTY STATE IS A BEGINNING, NOT A REPORT. "0 results" is the query's
+ * answer; "Nothing here yet" is a person's, and it says the same thing while
+ * adding that this is where something goes. The tone rules enforce the
+ * difference — see `kernel/src/tone.ts`'s `empty` voice.
+ *
+ * ⚠️ AND IT CARRIES THE ACTION THAT WOULD END IT, where there is one. An empty
+ * state with no way out of it is a dead end with good manners.
+ */
+export function Nothing({ says, under, offer }: {
+  readonly says: string;
+  readonly under?: string;
+  readonly offer?: { readonly label: string; readonly onDo: () => void };
+}) {
+  return (
+    <EmptyState {...ARRIVE} className={`flex flex-col items-center ${SPACE.snug} ${PAD}`}>
+      <p className={TYPE.label}>{says}</p>
+      {under ? <p className={`${TYPE.note} text-center text-balance`}>{under}</p> : null}
+      {/* ⚠️ A VARIANT, NEVER A COLOUR. Naming one here would be this file
+          deciding what an accent looks like, which is the library's answer and
+          not ours (D7). */}
+      {offer ? <Button variant="primary" onPress={offer.onDo}>{offer.label}</Button> : null}
+    </EmptyState>
+  );
+}
+
+/* ---------------------------------------------------------------- waiting --- */
+
+/**
+ * ⚠️ A SPINNER IS FOR AN ACTION, A SKELETON IS FOR A SURFACE, AND SWAPPING THEM
+ * IS THE MISTAKE. A spinner says "something is happening and I cannot tell you
+ * how far"; on a page that is about to fill with rows it says nothing and then
+ * the layout jumps. A skeleton says where the rows will be. Use this inside a
+ * button or beside a control, and `skeleton.tsx` for everything else.
+ */
+export function Working({ says }: { readonly says?: string }) {
+  return (
+    <span className={`flex items-center ${SPACE.tight}`} role="status">
+      <Spinner size="sm" />
+      {says ? <span className={TYPE.note}>{says}</span> : null}
+    </span>
+  );
+}
+
+/* -------------------------------------------------------------- skeletons --- */
+
+/**
+ * THE PLACEHOLDER IS THE GEOMETRY OF WHAT IS COMING.
+ *
+ * ⚠️ A GREY BOX OF THE WRONG SIZE IS WORSE THAN A BLANK. The entire value of a
+ * skeleton is that nothing moves when the content lands — get the height wrong
+ * and you have added a jump that would not have happened, plus a flicker. So
+ * there is one skeleton per real shape in this vocabulary, each built from the
+ * SAME metrics as the component it stands in for, and a component whose box
+ * changes changes its skeleton in the same commit.
+ *
+ * ⚠️ AND THE SHIMMER IS `Skeleton`'S OWN. The library animates it and switches
+ * it off under both reduced-motion settings; a hand-rolled pulse would be a
+ * fourth kind of motion in a system that has three.
+ */
+
+/** ⚠️ `ROW.tap` — the same 64px a real row is, so a list does not resize. */
+export function RowsWaiting({ rows = 3, lead = true }: {
+  readonly rows?: number;
+  readonly lead?: boolean;
+}) {
+  return (
+    <Group>
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className={`flex items-center ${ROW.gap} ${ROW.tap} ${ROW.pad}`}>
+          {lead ? <Skeleton className="size-10 shrink-0 rounded-full" /> : null}
+          <div className={`flex min-w-0 grow flex-col ${SPACE.tight}`}>
+            <Skeleton className="h-4 w-2/5 rounded-full" />
+            <Skeleton className="h-3 w-3/5 rounded-full" />
+          </div>
+        </div>
+      ))}
+    </Group>
+  );
+}
+
+/** ⚠️ A number and its label, at `TYPE.display`'s height rather than a guess. */
+export function FigureWaiting({ count = 1 }: { readonly count?: number }) {
+  return (
+    <div className={`flex flex-col ${SPACE.tight}`}>
+      {Array.from({ length: count }, (_, i) => (
+        <React.Fragment key={i}>
+          <Skeleton className="h-3 w-24 rounded-full" />
+          <Skeleton className="h-10 w-40 rounded-full" />
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * ⚠️ THE CHART'S OWN ASPECT, NOT A SQUARE. Every frame in `chart/` is 320×120,
+ * so this is that ratio — a placeholder at any other shape is a card that
+ * changes height the moment real data lands.
+ */
+export function ChartWaiting() {
+  return (
+    <div className={`flex w-full flex-col ${SPACE.snug}`}>
+      <Skeleton className="aspect-[320/120] w-full rounded-2xl" />
+      <div className={`flex ${SPACE.snug}`}>
+        <Skeleton className="h-3 w-20 rounded-full" />
+        <Skeleton className="h-3 w-20 rounded-full" />
+      </div>
+    </div>
+  );
+}
+
+/** ⚠️ `h-28`, which is what `TileGrid` draws. */
+export function TilesWaiting({ tiles = 4 }: { readonly tiles?: number }) {
+  return (
+    <div
+      className={`grid ${SPACE.snug}`}
+      style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(8rem, 100%), 1fr))" }}
+    >
+      {Array.from({ length: tiles }, (_, i) => (
+        <Skeleton key={i} className="h-28 w-full rounded-2xl" />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * ⚠️ THE LAST LINE IS SHORT, WHICH IS THE WHOLE TELL. A paragraph placeholder
+ * of equal-length bars reads as a table; real prose ends mid-line, and copying
+ * that is the difference between a skeleton somebody believes and one that looks
+ * like a loading bug.
+ */
+export function TextWaiting({ lines = 3 }: { readonly lines?: number }) {
+  return (
+    <div className={`flex flex-col ${SPACE.tight}`}>
+      {/* ⚠️ THE LAST LINE IS A SEPARATE ELEMENT RATHER THAN A TERNARY, which
+          also makes the rule structural instead of a condition somebody has to
+          read. */}
+      {Array.from({ length: Math.max(0, lines - 1) }, (_, i) => (
+        <Skeleton key={i} className="h-4 w-full rounded-full" />
+      ))}
+      {lines > 0 ? <Skeleton className="h-4 w-[55%] rounded-full" /> : null}
+    </div>
+  );
+}

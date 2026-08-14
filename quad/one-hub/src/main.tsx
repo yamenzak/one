@@ -1,7 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  CHART_MOTION, FACE_CSS, GROUND_CSS, SKY_MOTION, ambienceStylesheet, applyAppearance,
+  ARRIVE_MOTION, CHART_MOTION, FACE_CSS, GROUND_CSS, SKY_MOTION, ambienceStylesheet,
+  applyAppearance,
 } from "@quad/web";
 import "./styles.css";
 import { App } from "./App.js";
@@ -27,8 +28,17 @@ import { SessionProvider } from "./session.js";
  */
 applyAppearance();
 
+/*
+  ⚠️ EVERY BLOCK THE SHARED LAYER EXPORTS, AND THE LIST IS THE BUG. `CHART_MOTION`
+  was imported here and left out of the join, so the chart reveal never ran once,
+  in any build — an unused import that nothing flags, because a stylesheet that
+  is missing does not throw, it simply does not animate. `scripts/motion.test.mjs`
+  asserts the set now.
+*/
 const sky = document.createElement("style");
-sky.textContent = [FACE_CSS, GROUND_CSS, ambienceStylesheet(), SKY_MOTION].join("\n");
+sky.textContent = [
+  FACE_CSS, GROUND_CSS, ambienceStylesheet(), SKY_MOTION, ARRIVE_MOTION, CHART_MOTION,
+].join("\n");
 document.head.append(sky);
 
 const root = document.getElementById("root");

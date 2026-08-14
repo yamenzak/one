@@ -144,11 +144,21 @@ export function problem(
   */
   const def = catalog[code] ?? { ...PLATFORM_PROBLEMS["platform.unavailable"]!, };
   const known = code in catalog;
+  /*
+    ⚠️ THE REFERENCE IS A VALUE THE SENTENCE CAN USE, and it was not. `unavailable`
+    has always read "Quote {ref} if you tell us about it" and the ref arrived in
+    `extra` rather than in `values`, so the token was never substituted — the one
+    problem a person is most likely to see told them to quote a literal brace.
+    It did not print `undefined`, which is why nothing ever failed over it: `say`
+    leaves an unknown token visible on purpose, and that correct behaviour is
+    exactly what made this survive.
+  */
+  const said = extra.ref ? { ...values, ref: extra.ref } : values;
   return {
     code: known ? code : "platform.unavailable",
     status: def.status,
-    title: say(def.title, values),
-    ...(def.detail ? { detail: say(def.detail, values) } : {}),
+    title: say(def.title, said),
+    ...(def.detail ? { detail: say(def.detail, said) } : {}),
     retryable: def.retryable,
     tone: def.tone,
     ...(extra.fields ? { fields: extra.fields } : {}),

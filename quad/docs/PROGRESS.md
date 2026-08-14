@@ -197,6 +197,25 @@ refuse — it reads as built and passes every test.
   has scrolled away. **The glass is on the CONTROLS, never on the bar**: a
   full-width frosted strip has a boundary where the blur stops, which is a border
   by another name, and it is the thing the no-edges pass exists to remove.
+- `state.tsx` — **the four outcomes, decided once**. Every surface that fetches
+  can be waiting, empty, refused or full, and most products ship two of those
+  because in development the request is instant and it succeeds. `Loaded<T>` has
+  no value to seed it with, so `[]` cannot masquerade as "not yet"; `Await` makes
+  the four-way choice in one place, in the one order that is right (trouble
+  outranks emptiness, waiting outranks both); `Trouble` renders a kernel
+  `Problem` and offers a retry only where `retryable` says one could work; and
+  the placeholders are SHAPED — a row skeleton is `ROW.tap` tall, a chart
+  skeleton is 320×120, because a placeholder of the wrong size adds a jump that
+  would not otherwise have happened.
+- `layout.tsx`'s frames — `Stack`, `Row`, `Grid`, `Columns`, `Rail`, `Cluster`,
+  `Center`. A container that picks its own gap is a layout nobody designed: the
+  Hub had twenty-three of them at four different values, each defensible, with
+  nobody able to point at which was wrong.
+- **Three kinds of motion and no fourth**, in `motion.ts`. A thing that ARRIVES
+  uses HeroUI's own `enter` keyframe (`ARRIVE`), one that CHANGES uses a
+  transition on a `MOTION` token, one that WAITS uses the library's `Skeleton` or
+  `Spinner`. The block arrives, never its rows — twelve rows each on their own
+  delay is the effect everybody builds once and nobody enjoys twice.
 
 **Money — one workspace, several products, one bill.**
 
@@ -302,7 +321,7 @@ The guard registry, its checks, and the standards that bind them.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 5 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 16 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 22 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 2 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 4 |
@@ -347,6 +366,12 @@ the library decides FOR us.
 | `no-cross-tenant-query-fans-out-over-shards` | D5 | an operator console that gets slower with every shard, until the sweep it runs times out |
 | `composition-is-lazy` | D4 | cold start growing with the catalogue, until the catalogue that was meant to grow cannot |
 | `every-test-gets-its-own-world` | D12 | a suite that is wrong half the time and green every time, with the next real intermittent failure absorbed by the same line |
+| `every-surface-has-four-outcomes` | D7 | a screen that says "you have nothing" while it is still loading, and says it again when the request failed |
+| `a-collection-never-starts-as-a-fact` | D7 | a confident zero on the first paint — a badge, an all-caught-up, a no-media-yet — every one of them a wrong answer wearing a loading state's excuse |
+| `a-skeleton-is-the-shape-of-its-content` | D7 | a layout that jumps the moment data lands, which is worse than one that was briefly blank |
+| `three-kinds-of-motion-and-no-fourth` | D7 | a product with a dozen animation techniques and therefore no motion design, accreted one defensible animation at a time |
+| `a-shared-stylesheet-reaches-the-document` | D7 | an effect that is exported, imported, and never injected — so it has never once run, and looks exactly like a design decision |
+| `no-container-picks-its-own-rhythm` | D7 | twenty screens at gap-2, gap-3, gap-4 and gap-10, each defensible, with nobody able to point at which one is wrong |
 | `no-service-call-is-made-over-fetch` | D3 | a wrong payload becoming a production error where it had been a compile error |
 | `a-declaration-is-a-literal-a-script-can-walk` | D8 | a declaration that has to be executed before it can be read, so every generated surface stops being derivable |
 | `a-library-decides-it-does-not-rule` | D9 | one of our own rules living inside somebody else's package, re-learned from their release notes |

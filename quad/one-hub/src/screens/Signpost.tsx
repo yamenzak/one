@@ -9,6 +9,7 @@
 
 import { Button } from "@heroui/react";
 import { accountUrl, setupUrl, type Where } from "../door.js";
+import { Cluster } from "@quad/web";
 import { Sheet } from "../ui.js";
 
 export function Signpost({ where }: { readonly where: Where }) {
@@ -17,14 +18,14 @@ export function Signpost({ where }: { readonly where: Where }) {
       title="One"
       lead="Every product on one account — sign in, or start a workspace"
     >
-      <div className="flex flex-wrap gap-2">
+      <Cluster>
         <Button variant="primary" onPress={() => { location.assign(accountUrl(where, location)); }}>
           Sign in
         </Button>
         <Button variant="secondary" onPress={() => { location.assign(setupUrl(where, location)); }}>
           Start a workspace
         </Button>
-      </div>
+      </Cluster>
     </Sheet>
   );
 }

@@ -25,7 +25,8 @@ import { EEA, slugOk } from "@quad/kernel";
 import { api } from "../api.js";
 import { byName } from "../countries.js";
 import { accountUrl, tenantUrl, type Where } from "../door.js";
-import { Refusal, Sheet } from "../ui.js";
+import { Cluster, SPACE, Trouble } from "@quad/web";
+import { Sheet } from "../ui.js";
 
 /** ⚠️ From the name, but only until somebody types their own — a slug that
     silently follows the name is a slug that changes under an edit. */
@@ -62,9 +63,9 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
       title="Start a workspace"
       lead="A workspace is a business — invite everybody else once it exists"
     >
-      {problem ? <Refusal problem={problem} /> : null}
+      {problem ? <Trouble problem={problem} /> : null}
 
-      <Form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); void create(); }}>
+      <Form className={`flex flex-col ${SPACE.snug}`} onSubmit={(e) => { e.preventDefault(); void create(); }}>
         <TextField isRequired fullWidth name="name" value={name} onChange={setName} isDisabled={busy}>
           <Label>What is it called?</Label>
           <Input autoFocus placeholder="Northwind Fitness" />
@@ -119,7 +120,7 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
           </ComboBox.Popover>
         </ComboBox>
 
-        <div className="flex flex-wrap gap-2">
+        <Cluster>
           <Button
             type="submit"
             variant="primary"
@@ -135,7 +136,7 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
           >
             Back to your workspaces
           </Button>
-        </div>
+        </Cluster>
       </Form>
     </Sheet>
   );

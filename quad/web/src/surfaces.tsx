@@ -30,6 +30,7 @@ import type { Tone } from "@quad/kernel";
 import { TYPE } from "./type.js";
 import { CARD_ROWS, CROWN_SIZE, FACE, HEAD_GAP, ICON, INSET, LEAD, PAD, ROW, SPACE } from "./metrics.js";
 import type { Inset } from "./metrics.js";
+import { ARRIVE, arriveAt } from "./motion.js";
 
 /* ------------------------------------------------------------------ group --- */
 
@@ -38,14 +39,34 @@ export interface GroupProps {
   readonly label?: string;
   /** One line under the label, for a group whose consequence is not obvious. */
   readonly under?: string;
+  /**
+   * ⚠️ ITS PLACE IN A SEQUENCE OF BLOCKS, WHICH IS THE ONLY STAGGER THERE IS.
+   * Pass the index within a screen's sections and they arrive in reading order;
+   * leave it off and the block arrives on its own. Capped at six steps — see
+   * `arriveAt`.
+   */
+  readonly at?: number;
   readonly children?: React.ReactNode;
 }
 
-export function Group({ label, under, children }: GroupProps) {
+/**
+ * ⚠️ THE BLOCK ARRIVES, NOT ITS ROWS, AND THIS IS THE WHOLE ANTI-JUNGLE RULE.
+ * Twelve rows each easing in on their own delay is the effect everybody builds
+ * once and nobody enjoys twice: the list takes half a second to become readable
+ * and the eye is dragged down it rather than allowed to scan. A card is ONE
+ * thing arriving, its rows are its contents, and a screen of four cards reads as
+ * four beats. `arriveAt` is offered for exactly that — a stagger BETWEEN blocks,
+ * capped, never within one.
+ */
+export function Group({ label, under, at, children }: GroupProps) {
   return (
-    <section className={`flex flex-col ${HEAD_GAP}`}>
+    <section
+      {...ARRIVE}
+      style={at === undefined ? undefined : arriveAt(at)}
+      className={`flex flex-col ${HEAD_GAP}`}
+    >
       {label ? (
-        <div className="flex flex-col gap-1">
+        <div className={`flex flex-col ${SPACE.hair}`}>
           <h2 className={TYPE.section}>{label}</h2>
           {under ? <p className={TYPE.note}>{under}</p> : null}
         </div>
@@ -127,7 +148,7 @@ interface RowBase {
  * not enough: the block itself has to align its own lines.
  */
 const Body = ({ label, under }: { readonly label: string; readonly under?: string }) => (
-  <span className="flex min-w-0 grow flex-col items-start gap-1 text-left">
+  <span className={`flex min-w-0 grow flex-col items-start text-left ${SPACE.hair}`}>
     <span className={TYPE.label}>{label}</span>
     {under ? <span className={TYPE.note}>{under}</span> : null}
   </span>
@@ -255,7 +276,7 @@ export function FieldRow({ label, value, onEdit }: {
 }) {
   return (
     <div className={`flex items-center ${ROW.gap} ${ROW.pad} ${ROW.still}`}>
-      <span className="flex min-w-0 grow flex-col items-start gap-1 text-left">
+      <span className={`flex min-w-0 grow flex-col items-start text-left ${SPACE.hair}`}>
         <span className={TYPE.note}>{label}</span>
         <span className={TYPE.body}>{value}</span>
       </span>
@@ -437,35 +458,13 @@ export function TileGrid({ tiles }: {
   );
 }
 
-/**
- * WHAT A SCREEN SAYS WHEN THERE IS NOTHING ON IT.
- *
- * ⚠️ AN EMPTY STATE IS A FACT PLUS A WAY OUT, and the fact is stated in the
- * person's terms rather than the system's — "No workspaces yet", never "0
- * results". `yet` is doing real work: it says this is a beginning rather than a
- * failure.
- *
- * ⚠️ AND IT IS NEVER SHOWN WHILE WE ARE STILL LOOKING. A loading state wearing
- * an empty state's clothes is the most common wrong answer a product gives.
- */
-export function Nothing({ says, offer }: {
-  readonly says: string;
-  readonly offer?: { readonly label: string; readonly onDo: () => void };
-}) {
-  return (
-    <Card>
-      <Card.Header><Card.Title>{says}</Card.Title></Card.Header>
-      {offer ? (
-        <Card.Content>
-          {/* ⚠️ `Button` takes a VARIANT, not a colour. Passing a tone here
-              would be this file deciding what an accent looks like, which is
-              the library's answer and not ours (D7). */}
-          <Button variant="primary" onPress={offer.onDo}>{offer.label}</Button>
-        </Card.Content>
-      ) : null}
-    </Card>
-  );
-}
+/*
+  ⚠️ `Nothing` MOVED TO `state.tsx`, and the move is the argument. It lived here
+  beside the surfaces, on a `Card`, with its own note saying it must never be
+  shown while we are still looking — a rule a component cannot keep about
+  itself, because whoever renders it decides when. It is one of four outcomes
+  now, and `Await` is what chooses between them.
+*/
 
 /* ------------------------------------------------------------------ money --- */
 
@@ -529,7 +528,7 @@ export function CopyRow({ label, value, onCopy }: {
 }) {
   return (
     <div className={`flex items-center ${ROW.gap} ${ROW.pad} ${ROW.still}`}>
-      <span className="flex min-w-0 grow flex-col items-start gap-1 text-left">
+      <span className={`flex min-w-0 grow flex-col items-start text-left ${SPACE.hair}`}>
         <span className={TYPE.note}>{label}</span>
         <span className={`${TYPE.body} break-words`}>{value}</span>
       </span>

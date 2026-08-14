@@ -170,6 +170,98 @@ export function Grid(
   );
 }
 
+/**
+ * TWO COLUMNS THAT BECOME ONE, AND THE ORDER IS THE DESIGN.
+ *
+ * ⚠️ AN ASIDE THAT WRAPS BELOW IS NOT A DECISION ANYBODY MAKES DELIBERATELY. A
+ * `flex-wrap` two-up drops its second column when it runs out of room, at a
+ * width that depends on the content, so the same screen is two columns on one
+ * phone and one on another. Naming the breakpoint once means every split page
+ * in every app turns at the same place.
+ *
+ * ⚠️ AND THE ASIDE COMES SECOND IN THE DOM WHATEVER SIDE IT IS DRAWN ON. On one
+ * column it stacks under the main content, which is the reading order somebody
+ * with a screen reader gets — putting a filter panel before the results because
+ * it is drawn on the left is how a page becomes unusable without being wrong.
+ */
+export function Columns({ aside, side = "end", space = "roomy", children }: {
+  readonly aside: React.ReactNode;
+  /** Which side it is DRAWN on. The reading order does not change. */
+  readonly side?: "start" | "end";
+  readonly space?: Space;
+  readonly children: React.ReactNode;
+}) {
+  return (
+    <div className={`flex flex-col md:flex-row ${SPACE[space]}`}>
+      <div className="min-w-0 grow">{children}</div>
+      <aside className={`w-full shrink-0 md:w-72 ${side === "start" ? "md:order-first" : ""}`}>
+        {aside}
+      </aside>
+    </div>
+  );
+}
+
+/**
+ * A ROW THAT SCROLLS SIDEWAYS AND SNAPS — the carousel, and it is a layout
+ * rather than a component because what goes in it is anything.
+ *
+ * ⚠️ A HORIZONTAL LIST WITHOUT SNAP IS A LIST THAT STOPS HALFWAY THROUGH A CARD,
+ * every time, and nothing tells a person whether that is the edge of the content
+ * or the edge of the screen. Snap is what makes the gesture land somewhere.
+ *
+ * ⚠️ IT BLEEDS PAST THE GUTTER AND PADS ITSELF BACK. A rail inset to the reading
+ * column has a hard stop at both edges, which reads as a cropped screenshot; one
+ * that reaches the edge and carries its own padding shows the next card peeking,
+ * which is the only affordance saying there is more.
+ *
+ * ⚠️ AND THE SCROLLBAR IS THE LIBRARY'S `scrollbar-none`, not a hand-rolled
+ * `::-webkit-scrollbar` — HeroUI ships the utility and it covers Firefox too.
+ */
+export function Rail({ space = "snug", children }: {
+  readonly space?: Space;
+  readonly children: React.ReactNode;
+}) {
+  return (
+    <div className={`-mx-4 flex snap-x snap-mandatory overflow-x-auto scrollbar-none px-4 md:-mx-6 md:px-6 ${SPACE[space]}`}>
+      {React.Children.map(children, (child) => (
+        <div className="w-[85%] shrink-0 snap-start sm:w-72">{child}</div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * ⚠️ A WRAPPING ROW OF SMALL THINGS, WHICH IS NOT THE SAME AS `Row`. `Row` puts
+ * a few peers on one line and expects them to fit; a cluster is filter chips, or
+ * tags, or a legend — an unknown number of unequal items that will wrap, and
+ * whose gap has to be the same in both directions or the wrapped lines sit
+ * closer together than the items in them.
+ */
+export function Cluster({ space = "tight", children }: {
+  readonly space?: Space;
+  readonly children?: React.ReactNode;
+}) {
+  return <div className={`flex flex-wrap items-center ${SPACE[space]}`}>{children}</div>;
+}
+
+/**
+ * ⚠️ CENTRED IN BOTH DIRECTIONS, FOR THE SCREENS THAT ARE ONE THING. A sign-in,
+ * a confirmation, a blocked notice: a column that is vertically centred in what
+ * is left of the page. Hand-built, this is where `h-screen` gets used and the
+ * last control ends up under a phone's address bar — `min-h-0 grow` on a flex
+ * child does it without naming a viewport at all.
+ */
+export function Center({ space = "roomy", children }: {
+  readonly space?: Space;
+  readonly children?: React.ReactNode;
+}) {
+  return (
+    <div className={`flex min-h-0 grow flex-col items-center justify-center ${SPACE[space]} ${BAND_PAD}`}>
+      {children}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ crown --- */
 
 export interface CrownProps {
@@ -393,7 +485,7 @@ export function Title(
   { children, under }: { readonly children: React.ReactNode; readonly under?: string },
 ) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className={`flex flex-col ${SPACE.hair}`}>
       <h1 className={TYPE.title}>{children}</h1>
       {under ? <p className={TYPE.note}>{under}</p> : null}
     </div>
@@ -420,7 +512,7 @@ export function Section(
 ) {
   return (
     <section className={`flex flex-col ${HEAD_GAP}`}>
-      <div className="flex flex-col gap-1">
+      <div className={`flex flex-col ${SPACE.hair}`}>
         <h2 className={TYPE.section}>{label}</h2>
         {under ? <p className={TYPE.note}>{under}</p> : null}
       </div>
@@ -448,7 +540,7 @@ export function Figure(
   { value, of }: { readonly value: React.ReactNode; readonly of: string },
 ) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className={`flex flex-col ${SPACE.hair}`}>
       <span className={TYPE.figure}>{value}</span>
       <span className={TYPE.note}>{of}</span>
     </div>

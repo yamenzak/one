@@ -13,10 +13,10 @@
  * page, which is the same picture as a page that failed to load.
  */
 
-import { Band, Crown, Page, Spacer, TYPE } from "@quad/web";
+import { Band, Crown, Page, Spacer, Trouble, Working, TYPE } from "@quad/web";
 import { Gallery } from "./screens/Gallery.js";
 import { SPECIMEN_IDS, Specimen, type SpecimenId } from "./screens/Specimens.js";
-import { Waiting, Refusal } from "./ui.js";
+
 import { useSession } from "./session.js";
 import type { Face } from "./door.js";
 import { Elsewhere } from "./screens/Elsewhere.js";
@@ -104,8 +104,8 @@ export function App() {
             ? "py-8"
             : "min-h-[68dvh] flex flex-col items-center justify-center gap-6 py-8"}
         >
-          {screen === "waiting" ? <Waiting what="Getting your workspaces" /> : null}
-          {screen === "stuck" && stuck ? <Refusal problem={stuck} /> : null}
+          {screen === "waiting" ? <Working says="Getting your workspaces" /> : null}
+          {screen === "stuck" && stuck ? <Trouble problem={stuck} /> : null}
           {screen === "signpost" && where ? <Signpost where={where} /> : null}
           {screen === "sign-in" ? <SignIn lead={LEAD[face ?? ""] ?? LEAD.hub!} /> : null}
           {screen === "workspaces" && where ? <Workspaces where={where} /> : null}

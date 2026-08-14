@@ -14,7 +14,8 @@ import { Button, Form, InputOTP, Label, REGEXP_ONLY_DIGITS, TextField, Input } f
 import type { Problem } from "@quad/kernel";
 import { CODE_DIGITS } from "@quad/kernel";
 import { useSession } from "../session.js";
-import { Refusal, Sheet } from "../ui.js";
+import { Cluster, SPACE, Trouble } from "@quad/web";
+import { Sheet } from "../ui.js";
 
 export function SignIn({ lead }: { readonly lead: string }) {
   const { askForCode, enter } = useSession();
@@ -50,15 +51,15 @@ export function SignIn({ lead }: { readonly lead: string }) {
 
   return (
     <Sheet title="Sign in to One" lead={lead}>
-      {problem ? <Refusal problem={problem} /> : null}
+      {problem ? <Trouble problem={problem} /> : null}
 
       {sent
         ? (
           <Form
-            className="flex flex-col gap-4"
+            className={`flex flex-col ${SPACE.snug}`}
             onSubmit={(e) => { e.preventDefault(); void finish(); }}
           >
-            <div className="flex flex-col gap-2">
+            <div className={`flex flex-col ${SPACE.tight}`}>
               <Label>The code we sent to {email}</Label>
               <InputOTP
                 autoFocus
@@ -83,7 +84,7 @@ export function SignIn({ lead }: { readonly lead: string }) {
               </InputOTP>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <Cluster>
               <Button
                 type="submit"
                 variant="primary"
@@ -97,12 +98,12 @@ export function SignIn({ lead }: { readonly lead: string }) {
               <Button variant="ghost" isDisabled={busy} onPress={() => { setSent(false); setCode(""); }}>
                 Use a different address
               </Button>
-            </div>
+            </Cluster>
           </Form>
         )
         : (
           <Form
-            className="flex flex-col gap-4"
+            className={`flex flex-col ${SPACE.snug}`}
             onSubmit={(e) => { e.preventDefault(); void send(); }}
           >
             <TextField

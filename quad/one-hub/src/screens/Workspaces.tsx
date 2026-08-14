@@ -15,12 +15,12 @@
 
 import { useState } from "react";
 import { Button, Card, Separator } from "@heroui/react";
-import { Row, Stack, TYPE, Title } from "@quad/web";
+import { Cluster, Row, SPACE, Stack, TYPE, Title, Trouble } from "@quad/web";
 import type { Problem } from "@quad/kernel";
 import { api } from "../api.js";
 import { setupUrl, tenantUrl, type Where } from "../door.js";
 import { useSession } from "../session.js";
-import { Refusal } from "../ui.js";
+
 
 export function Workspaces({ where }: { readonly where: Where }) {
   const { me, refresh, leave } = useSession();
@@ -40,13 +40,13 @@ export function Workspaces({ where }: { readonly where: Where }) {
 
   return (
     <Stack space="roomy">
-      <header className="flex flex-wrap items-baseline gap-3">
+      <header className={`flex flex-wrap items-baseline ${SPACE.snug}`}>
         <Title>Your workspaces</Title>
         <span className={`${TYPE.note} ml-auto`}>{me.email}</span>
         <Button variant="ghost" onPress={() => { void leave(); }}>Sign out</Button>
       </header>
 
-      {problem ? <Refusal problem={problem} /> : null}
+      {problem ? <Trouble problem={problem} /> : null}
 
       {me.tenants.length === 0
         ? (
@@ -70,7 +70,7 @@ export function Workspaces({ where }: { readonly where: Where }) {
           </Card>
         )
         : (
-          <div className="flex flex-col gap-3">
+          <div className={`flex flex-col ${SPACE.snug}`}>
             {me.tenants.map((t) => (
               <Card key={t.slug}>
                 <Card.Header>
@@ -78,7 +78,7 @@ export function Workspaces({ where }: { readonly where: Where }) {
                   <Card.Description>{t.slug}.{where.root}</Card.Description>
                 </Card.Header>
                 <Card.Content>
-                  <div className="flex flex-wrap gap-2">
+                  <Cluster>
                     <Button
                       variant="primary"
                       onPress={() => { location.assign(tenantUrl(t.slug, where, location)); }}
@@ -92,7 +92,7 @@ export function Workspaces({ where }: { readonly where: Where }) {
                     >
                       Leave
                     </Button>
-                  </div>
+                  </Cluster>
                 </Card.Content>
               </Card>
             ))}

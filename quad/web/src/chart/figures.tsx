@@ -14,6 +14,7 @@
 import * as React from "react";
 import { TYPE } from "../type.js";
 import { PAD, SPACE } from "../metrics.js";
+import { ARRIVE, arriveAt } from "../motion.js";
 import { Sparkline } from "./charts.js";
 import { type Point, compact } from "./scale.js";
 
@@ -189,17 +190,22 @@ export function Meter({ label, value, limit, unit = "", suffix = "" }: {
  * had, and a chart is the most likely thing to repeat it because it arrives with
  * a viewBox and looks like it should own its own margins.
  */
-export function ChartPanel({ label, under, aside, children }: {
+export function ChartPanel({ label, under, aside, at, children }: {
   readonly label: string;
   readonly under?: string;
   /** A range picker, a filter — one row, above the plot. */
   readonly aside?: React.ReactNode;
+  /** ⚠️ Its place in a sequence of blocks — see `Group.at`. */
+  readonly at?: number;
   readonly children: React.ReactNode;
 }) {
   return (
-    <section className={`flex flex-col ${SPACE.snug} ${PAD}`}>
+    /* ⚠️ THE PANEL ARRIVES AND THE MARKS DRAW. Two animations on one card would
+       be a jungle in miniature; they are sequenced instead — the panel eases in
+       on the library's `enter`, and `data-draw` reveals the marks inside it. */
+    <section {...ARRIVE} style={at === undefined ? undefined : arriveAt(at)} className={`flex flex-col ${SPACE.snug} ${PAD}`}>
       <div className={`flex items-start justify-between ${SPACE.snug}`}>
-        <div className="flex min-w-0 flex-col gap-1">
+        <div className={`flex min-w-0 flex-col ${SPACE.hair}`}>
           <h3 className={TYPE.label}>{label}</h3>
           {under ? <p className={TYPE.note}>{under}</p> : null}
         </div>
