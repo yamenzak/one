@@ -117,6 +117,44 @@ const mix = (hue: string, pct: number) =>
 const thread = (hue: string, pct: number) =>
   `color-mix(in oklab, ${hue} calc(var(--sky, 1) * var(--thread, 1) * ${pct}%), transparent)`;
 
+/**
+ * ⚠️ THE FIELD IS WHAT MAKES AN AMBIENCE OWN THE SCREEN, and its absence is what
+ * made every one of them shy. The shapes — poles, folds, sweeps — were painted
+ * straight onto the page's ground, so an ambience was a decoration ON a screen
+ * rather than the world the screen happens in; the reference product runs its
+ * colour the full height and lets the content land on it, and the difference
+ * between the two is the difference between a themed page and a place.
+ *
+ * ⚠️ AND LIGHT KEEPS ITS SATURATION, WHICH `--sky` ALONE CANNOT DO. Scaling a
+ * hue toward TRANSPARENT makes light mode paler — a wash — when what a light
+ * ambience should be is the same colour at a higher VALUE: lilac, not faded
+ * violet. So the field mixes toward `--lumen`, which is transparent in dark
+ * (colour over near-black = glow) and paper in light (colour into white =
+ * a saturated pastel field). The value lightens; the hue stays committed.
+ */
+const field = (hue: string, weight: number) => [
+  `linear-gradient(180deg,`,
+  `color-mix(in oklab, ${hue} calc(var(--field, 1) * ${Math.round(62 * weight)}%), var(--lumen, transparent)) 0%,`,
+  `color-mix(in oklab, ${hue} calc(var(--field, 1) * ${Math.round(34 * weight)}%), var(--lumen, transparent)) 52%,`,
+  `transparent 96%)`,
+].join(" ");
+
+/**
+ * ⚠️ THE FIELD'S WEIGHT IS PER AMBIENCE, BECAUSE ONE STRENGTH DROWNED ELEVEN
+ * IDENTITIES. At full strength under every ambience the twelve read as twelve
+ * flat colour fields — drape's fold, veil's sweep and aurora's poles were
+ * inside the field's own value range and disappeared into it. The reference
+ * product has two kinds of world, not one: colour-led screens that ARE a field,
+ * and graphic-led screens whose drama needs darkness around it. So the
+ * field-led ambiences (calm, lift, tide) run at full and the shape-led ones
+ * give their graphic room — the more distinctive the shape, the more air it
+ * gets. `spotlight` is lowest because staging IS darkness.
+ */
+const FIELD_WEIGHT: Readonly<Record<Exclude<Ambience, "plain">, number>> = {
+  calm: 1, focus: 0.85, lift: 1, mesh: 0.8, dots: 0.7, weave: 0.7,
+  drape: 0.75, aurora: 0.6, veil: 0.65, tide: 1, spotlight: 0.5,
+};
+
 /** A soft pole of light: where, how wide, how strong. */
 const pole = (hue: string, pct: number, x: string, y: string, w: string, h: string) =>
   `radial-gradient(${w} ${h} at ${x} ${y}, ${mix(hue, pct)} 0%, transparent 72%)`;
@@ -182,9 +220,17 @@ const GRAIN_OPACITY = "calc(var(--sky, 1) * 0.035)";
  * early fade wastes the ambience on the part of the screen the crown is already
  * covering.
  */
+/**
+ * ⚠️ THE RAMP STARTS LATE AND LANDS LATE. It used to start dropping at 45% and
+ * be half gone by 72%, which is precisely why every ambience read as SHY — the
+ * world died at mid-screen and the lower half of every page was bare ground
+ * with a decorated hat on it. The ambience now holds to past the fold and puts
+ * its whole fade into the last stretch, so content lands ON the world rather
+ * than after it.
+ */
 export const FADE = (() => {
-  const ramp = "linear-gradient(180deg, black 0%, black 45%, "
-    + "color-mix(in oklab, black 55%, transparent) 72%, transparent 100%)";
+  const ramp = "linear-gradient(180deg, black 0%, black 62%, "
+    + "color-mix(in oklab, black 60%, transparent) 84%, transparent 100%)";
   return `mask-image: ${ramp}; -webkit-mask-image: ${ramp}`;
 })();
 
@@ -321,7 +367,10 @@ function layers(what: Ambience, hue: string): readonly string[] {
 export function ambienceCss(what: Ambience, tone: Tone = "neutral"): string {
   const forms = layers(what, HUE[tone]);
   if (!forms.length) return "";
-  return `background-image: ${[DEPTH, ...forms].join(", ")}`;
+  /* ⚠️ The field is LAST, which is bottom-most: the shapes are lights ON the
+     world, and the field is the world. */
+  const weight = FIELD_WEIGHT[what as Exclude<Ambience, "plain">];
+  return `background-image: ${[DEPTH, ...forms, field(HUE[tone], weight)].join(", ")}`;
 }
 
 /**
@@ -345,8 +394,11 @@ const GLASS = "blur(11px) saturate(1.4) contrast(1.2) brightness(0.92)";
 export function ambienceStylesheet(): string {
   const rules = AMBIENCES.filter((a) => a !== "plain").map((a) => {
     const css = ambienceCss(a);
+    /* ⚠️ EXPLICIT PER LAYER, because `background-size` CYCLES a short list
+       across the layers — with the field appended, "22px, auto" would tile the
+       field itself at 22px and the whole world becomes confetti. */
     const sized = a === "dots"
-      ? "; background-size: 22px 22px, auto"
+      ? "; background-size: auto, 22px 22px, auto, auto"
       : "";
     return `[data-sky="${a}"]::before { ${css}${sized}; ${FADE}; }`;
   });
@@ -357,7 +409,13 @@ export function ambienceStylesheet(): string {
     `[data-sky] { position: relative; isolation: isolate; --sky: 1; }`,
     /* ⚠️ SEE `mix` — one multiplier per theme, not forty hand-tuned numbers.
        Both selector forms, because the stamp may be on the host or an ancestor. */
-    `[data-theme="light"] [data-sky], [data-theme="light"][data-sky] { --sky: 0.55; --thread: 0; }`,
+    `[data-theme="light"] [data-sky], [data-theme="light"][data-sky] {`,
+    /* ⚠️ `--lumen` is what keeps light COMMITTED — see `field`. The shapes stay
+       at just over half strength; the field mixes into paper at a strength of
+       its own, because a saturated pastel is a choice and a faded wash is a
+       default. */
+    `  --sky: 0.55; --thread: 0; --lumen: oklch(0.985 0 0); --field: 0.62;`,
+    `}`,
     `[data-sky]:not([data-sky="plain"])::before,`,
     `[data-sky]:not([data-sky="plain"])::after {`,
     `  content: ""; position: absolute; top: 0; left: 0; right: 0;`,

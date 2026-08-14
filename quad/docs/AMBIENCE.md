@@ -9,15 +9,32 @@ judgment the implementation cannot make for you.
 
 ## The system in one paragraph
 
-An ambience is a NAMED SHAPE (`drape`, `tide`, `aurora`…) drawn from four knobs
+An ambience is a NAMED SHAPE (`drape`, `tide`, `aurora`…) drawn from five knobs
 it never chooses itself: the HUE comes from the tone (`neutral`/`info` → the
 workspace's `--brand`, `success`/`warning`/`danger` → the status tokens), the
 STRENGTH from `--sky` (1 in dark, 0.55 in light), the FIBRES from `--thread`
 (1 in dark, 0 in light — micro-texture reads as sheen on near-black and as
-grime on paper, which is a sign problem no multiplier fixes), and the dither
+grime on paper, which is a sign problem no multiplier fixes), the FIELD from
+`--field` (the full-height colour the shapes are lights on), and the dither
 from the grain layer. A screen names a shape and a tone; it never names a
 colour, a gradient or an opacity. That is why one brand change re-paints every
 screen of every app and nothing else edits.
+
+**The world owns the screen.** Under every ambience runs a full-height FIELD of
+the same hue — the shapes (poles, folds, sweeps) are lights ON that world, not
+decorations on the page's bare ground. Two consequences worth knowing:
+
+- **Light keeps its saturation.** The field mixes toward paper (`--lumen`), not
+  toward transparent — so light mode is the same colour at a higher VALUE
+  (lilac, not faded violet). The value lightens; the hue stays committed. A
+  light ambience that looks like a stain got this backwards.
+- **The field's weight is per ambience** (`FIELD_WEIGHT` in `ambience.ts`),
+  because one strength drowned eleven identities: at full field, drape's fold
+  and veil's sweep sat inside the field's own value range and vanished. The
+  field-led ambiences (`calm`, `lift`, `tide`) run at full; the shape-led ones
+  give their graphic darkness to stand against, `spotlight` most of all —
+  staging IS darkness. Tuning a weight is a design change to that ambience's
+  identity, not a knob a screen may touch.
 
 **The interface on top is monochrome.** The ambience is where colour lives —
 the ONE place a workspace's hue reaches at full strength — and the controls
@@ -84,6 +101,15 @@ Rules of thumb that outrank the table:
   eventually stops believing.
 - **The brand default is the platform blue** until a workspace chooses;
   un-branded must look designed, not unfinished.
+- **A context may one day carry its own hue — as a registered token, never a
+  hex.** The reference product gives each account its own world (violet
+  personal, blue groceries, green online), and that is a real pattern: the
+  colour tells you WHERE you are before a word is read. If an app wants it,
+  the road is the tone channel — the app registers named tones that resolve to
+  tokens, exactly as Kova's eleven accents do — so the screen still says
+  `tone="groceries"` and never `#4477ff`. Nothing today needs this; it is
+  written down so the first app that does builds it the right way instead of
+  the obvious way.
 - **Data ignores all of it.** Chart hues are the platform's (`--data`, the
   categorical eight, the diverging poles) whatever the ambience does — a brand
   may recolour the world, never a reading.
