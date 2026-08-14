@@ -26,6 +26,7 @@ import { tableFor } from "@quad/kernel";
 import type { Db } from "./sql.js";
 import { list, patch, put, readOne } from "./records.js";
 import { memberOps } from "./member-ops.js";
+import { packageOps } from "./packages.js";
 
 /* ------------------------------------------------------------------ shape --- */
 
@@ -180,8 +181,11 @@ export function compose(app: AppSpec): Composed {
   }
   /* ⚠️ THE ROSTER IS THE PLATFORM'S AND EVERY APP HAS IT (see `member-ops.ts`).
      Added before the app's own, so an app cannot shadow "invite a colleague"
-     with something that skips the two doors bounding it. */
+     with something that skips the two doors bounding it. The package rail
+     (D16) rides the same rule: what a purchase grants is not an app's to
+     redeclare. */
   for (const [id, resolved] of Object.entries(memberOps(app))) byId.set(id, resolved);
+  for (const [id, resolved] of Object.entries(packageOps(app))) byId.set(id, resolved);
 
   for (const spec of app.operations) {
     byId.set(spec.id, {

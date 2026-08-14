@@ -138,6 +138,12 @@ describe("what the manifest produced", () => {
       "POST /api/note.publish",
       "GET /api/note.read",
       "POST /api/note.update",
+      "POST /api/package.archive",
+      "POST /api/package.create",
+      "POST /api/package.grant",
+      "GET /api/package.held",
+      "GET /api/package.list",
+      "POST /api/package.revoke",
     ]);
   });
 

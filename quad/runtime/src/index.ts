@@ -23,6 +23,7 @@ export * from "./compose.js";
 export * from "./audit.js";
 export * from "./identity.js";
 export * from "./membership.js";
+export * from "./packages.js";
 export * from "./member-ops.js";
 export * from "./personal.js";
 export * from "./serve.js";

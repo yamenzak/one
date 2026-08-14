@@ -973,6 +973,42 @@
       "impl": "scripts/access.test.mjs",
       "proves": "audience:",
       "fails": "a role in one product rings bells about another product's events for people who cannot even open it"
+    },
+    {
+      "id": "a-package-cannot-sell-what-cannot-be-delivered",
+      "protects": "D16",
+      "stage": "13",
+      "status": "live",
+      "impl": "scripts/package.test.mjs",
+      "proves": "sellable:",
+      "fails": "money taken for a key nothing reads, discovered at the customer's first 403 weeks after the editor said saved"
+    },
+    {
+      "id": "a-package-grant-always-carries-its-clock",
+      "protects": "D16",
+      "stage": "13",
+      "status": "live",
+      "impl": "scripts/package.test.mjs",
+      "proves": "clock:",
+      "fails": "a purchase that sells access for ever, because a bare grant is a standing exception and the resolver is correct to honour it"
+    },
+    {
+      "id": "a-renewal-extends-and-never-stacks",
+      "protects": "D16",
+      "stage": "13",
+      "status": "live",
+      "impl": "scripts/package.test.mjs",
+      "proves": "queue:",
+      "fails": "two overlapping windows for one purchase, and which one the resolver reads decides what somebody paid for"
+    },
+    {
+      "id": "the-rails-granting-operations-are-not-tools",
+      "protects": "D16",
+      "stage": "13",
+      "status": "live",
+      "impl": "scripts/package.test.mjs",
+      "proves": "optout:",
+      "fails": "a model composes or applies what a payment buys from a sentence in a document"
     }
   ]
 }

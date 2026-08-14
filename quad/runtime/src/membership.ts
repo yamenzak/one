@@ -311,7 +311,9 @@ export function permissionsResolver(
   tenantId: TenantId,
   member: MemberRow | null,
   declared: (appId: string) => RoleRegistry | null,
-  now?: Date,
+  /* ⚠️ Defaulted, never optional in effect: without a clock every timed grant
+     counts for ever, which is a package that never lapses (D16). */
+  now: Date = new Date(),
 ): (appId: string | null) => Promise<ReadonlySet<string>> {
   const asked = new Map<string | null, Promise<ReadonlySet<string>>>();
   return (appId) => {

@@ -27,6 +27,7 @@ reader can trust this table instead of re-reading the code.
 | 10 | One — the deployment and the Hub | shipped |
 | 11 | The agent surface — every operation an MCP tool, derived | shipped |
 | 12 | Multi-app access — a platform role for the workspace, a role per app inside it | shipped |
+| 13 | The package rail — a priced bundle of timed grants, one ledger, one clock | shipped |
 
 ## What is NOT built, and where to pick it up
 
@@ -372,6 +373,36 @@ whole lapse mechanism the package rail stands on (D16, stage 13).
   the resolver's own suite — multi-app resolution, grant expiry, revocation
   last, the bounds, stranding, seats.
 
+**The package rail — what a workspace sells its own customers (D16).** A
+package is a priced bundle of TIMED grants composed like a custom role — one
+app's keys, a price, a period, a grace, an optional retention — and a purchase
+applies it to the buyer's membership with a clock. The ordinary permission
+gate opens and closes; there is no second resolver, no client-flag system, no
+sweep.
+
+- **One path for every confirmation.** A webhook, a staff grant and a manual
+  confirmation all land on `applyPackage`, so a comped month and a paid month
+  are the same mechanism. The `purchase` table is the append-only ledger, and
+  it is what answers `oncePer` — the live grant row cannot, because a repeat
+  purchase folds into it.
+- **The ladder is derived, not swept.** `active` → `grace` → `lapsed` is
+  `packageState` over the ledger's latest window; the membership's grant clock
+  is expiry PLUS grace, so the resolver keeps its one comparison and never
+  learns the ladder. A lapsed customer keeps their membership, their base role
+  and their own records — nothing is shredded and nobody is signed out.
+- **A renewal extends and never stacks** (`extendedUntil` queues; the grant
+  write replaces by `source`), and **the destructive floor is the platform's**:
+  no retention under `PACKAGE_FLOOR_DAYS`, counted from lapse.
+- **Composition is where selling nothing is refused**: `refusePackage` against
+  `sellableKeys` — a key nothing reads, one only reachable behind an
+  entitlement no plan sells, or a platform office, refused in the editor
+  rather than at the customer's first 403. And the author must hold every key
+  they bundle, or buying from yourself is an escalation.
+- `scripts/package.test.mjs` holds four structural promises (eight mutations
+  tried, eight caught); `kernel/test/package.test.ts` proves the arithmetic;
+  `apps/hello/test/packages.test.ts` drives the rail through the real doors on
+  a movable clock — grant, grace, lapse, renewal, once-per, revoke, archive.
+
 **`@quad/one-hub` — the page a person opens.** The signpost, sign-in with an
 emailed code, the workspace list, and the wizard that makes one — HeroUI v3 as it
 ships, themed through tokens, nothing restyled.
@@ -411,7 +442,7 @@ The guard registry, its checks, and the standards that bind them.
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 0 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 3 |
-| D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 0 |
+| D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 4 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -532,6 +563,10 @@ the library decides FOR us.
 | `the-gate-resolves-keys-for-the-operations-own-app` | D15 | a role in the second product grants nothing, silently, for everybody — every suite green because every suite has one app |
 | `every-assignment-is-bounded-per-authority` | D15 | anybody who can edit access escalates in two steps: grant yourself the role you lack through the authority nobody bounds, then use it |
 | `a-notifications-audience-is-per-app` | D15 | a role in one product rings bells about another product's events for people who cannot even open it |
+| `a-package-cannot-sell-what-cannot-be-delivered` | D16 | money taken for a key nothing reads, discovered at the customer's first 403 weeks after the editor said saved |
+| `a-package-grant-always-carries-its-clock` | D16 | a purchase that sells access for ever, because a bare grant is a standing exception and the resolver is correct to honour it |
+| `a-renewal-extends-and-never-stacks` | D16 | two overlapping windows for one purchase, and which one the resolver reads decides what somebody paid for |
+| `the-rails-granting-operations-are-not-tools` | D16 | a model composes or applies what a payment buys from a sentence in a document |
 <!-- /generated -->
 
 ## Commands

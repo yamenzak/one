@@ -19,7 +19,7 @@
 import type { AppSpec } from "@quad/kernel";
 import {
   AUDIT_SCHEMA, BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA,
-  JOBS_SCHEMA, MEMBERSHIP_SCHEMA, REPLAY_SCHEMA, VAULT_SCHEMA,
+  JOBS_SCHEMA, MEMBERSHIP_SCHEMA, PACKAGE_SCHEMA, REPLAY_SCHEMA, VAULT_SCHEMA,
   NOBODY, accountOfToken, applySchema, appsOfTenant, bearerFrom, locator, memberFor,
   permissionsResolver, personalOps, schemaFor, serve, sessionIdFrom, shardFor, whoIs,
   type Db, type TenantRow,
@@ -44,7 +44,7 @@ const APPS: Readonly<Record<string, () => AppSpec>> = { hello, kova };
  * silently never does.
  */
 const DIRECTORY_MODULES = [DIRECTORY_SCHEMA, IDENTITY_SCHEMA, BILLING_SCHEMA, JOBS_SCHEMA];
-const SHARD_MODULES = [MEMBERSHIP_SCHEMA, AUDIT_SCHEMA, REPLAY_SCHEMA, INBOX_SCHEMA, VAULT_SCHEMA];
+const SHARD_MODULES = [MEMBERSHIP_SCHEMA, PACKAGE_SCHEMA, AUDIT_SCHEMA, REPLAY_SCHEMA, INBOX_SCHEMA, VAULT_SCHEMA];
 
 export interface Env {
   readonly DIRECTORY: D1Database;
