@@ -157,6 +157,26 @@ export function checkerForAll(fields: Fields): v.GenericSchema {
   return v.object(shape as never);
 }
 
+/**
+ * Whether a set of values is acceptable, and what to say if not.
+ *
+ * ⚠️ THE LAYER ABOVE NEVER MEETS THE LIBRARY. `checkerForAll` returns a Valibot
+ * schema, which would make every caller import Valibot to use it — and a
+ * validation library reaching one layer further out every time somebody needs a
+ * check is how a dependency becomes structural. This is the whole surface: give
+ * it a declaration and some values, get back an answer.
+ */
+export type Checked =
+  | { readonly ok: true; readonly values: Record<string, unknown> }
+  | { readonly ok: false; readonly why: string };
+
+export function checkAll(fields: Fields, values: unknown): Checked {
+  const out = v.safeParse(checkerForAll(fields), values);
+  return out.success
+    ? { ok: true, values: out.output as Record<string, unknown> }
+    : { ok: false, why: out.issues.map((i: { message: string }) => i.message).join("; ") };
+}
+
 /* --------------------------------------------------------------- the rules --- */
 
 export type FieldRefusal =

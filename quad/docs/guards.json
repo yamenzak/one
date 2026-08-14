@@ -167,8 +167,10 @@
       "id": "no-cross-tenant-query-fans-out-over-shards",
       "protects": "D5",
       "stage": "2",
-      "status": "owed",
-      "fails": "an operator console that gets slower with every shard, until the sweep it runs times out"
+      "status": "live",
+      "fails": "an operator console that gets slower with every shard, until the sweep it runs times out",
+      "impl": "scripts/shards.test.mjs",
+      "proves": "halves:"
     },
     {
       "id": "composition-is-lazy",
@@ -237,6 +239,33 @@
       "impl": "kernel/test/custody.test.ts",
       "proves": "sensitive_outside_vault",
       "fails": "somebody's health record in a product table, outside consent, outside the grant log and outside crypto-shredding"
+    },
+    {
+      "id": "erasure-follows-a-column-a-declaration-named",
+      "protects": "D12",
+      "stage": "2",
+      "status": "live",
+      "impl": "runtime/test/placement.test.ts",
+      "proves": "the column erasure follows",
+      "fails": "a deletion request that reports success and leaves the rows, because the sweep had nothing to follow"
+    },
+    {
+      "id": "a-schema-runner-never-migrates-destructively",
+      "protects": "D12",
+      "stage": "2",
+      "status": "live",
+      "impl": "runtime/test/placement.test.ts",
+      "proves": "refuses a statement that would fail quietly",
+      "fails": "a DROP running itself on every shard at 3am because somebody edited a declaration"
+    },
+    {
+      "id": "an-identifier-that-is-not-a-name-never-reaches-a-statement",
+      "protects": "D8",
+      "stage": "2",
+      "status": "live",
+      "impl": "runtime/test/placement.test.ts",
+      "proves": "is not a name",
+      "fails": "a generated schema built from something a request supplied, which is the injection this whole design forecloses"
     }
   ]
 }

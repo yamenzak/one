@@ -16,8 +16,8 @@ reader can trust this table instead of re-reading the code.
 |---|---|---|
 | 0 | Ground — workspace, docs, guard registry, standards | shipped |
 | 1 | Kernel — entities, declarations, gate algebra, problems | shipped |
-| 2 | Directory + placement | building |
-| 3 | Runtime — manifest → live worker | not started |
+| 2 | Directory + placement | shipped |
+| 3 | Runtime — manifest → live worker | building |
 | 4 | Identity + tenancy | not started |
 | 5 | Surface — HeroUI shell, nav, sky, rendered settings | not started |
 | 6 | Money — plans, entitlements, credits | not started |
@@ -51,7 +51,23 @@ fixture at all.
 - `manifest.ts` — the composition. Everything above, cross-checked in one pass,
   and a manifest that does not compose refuses to boot.
 
-The guard registry, its four checks, and the standards that bind them.
+**`@quad/runtime` — the directory, the shards, and a schema nobody versions.**
+The only code that touches a binding.
+
+- `directory.ts` — one global D1: accounts, tenants, enablement, the membership
+  INDEX (never a grant), shards and what each has applied. Creating a tenant
+  provisions nothing: a row and a placement.
+- `schema.ts` — the schema is DERIVED from the collections and stamped with a
+  hash of itself, so nobody bumps a version and forgets. A field added to a
+  collection is found by asking `pragma_table_info` and added on the next boot,
+  on a database whose history nobody knows.
+- `records.ts` — writes built from the declaration with values bound, the scope
+  column written by the platform rather than the caller, and an erasure cascade
+  walked from `scope` instead of a hand-written list.
+- `sql.ts` · `handles.ts` — the one place an identifier is interpolated, and the
+  shard id → binding derivation that throws rather than improvising.
+
+The guard registry, its six checks, and the standards that bind them.
 
 ## Decisions, and how well each is defended
 
@@ -65,11 +81,11 @@ The guard registry, its four checks, and the standards that bind them.
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 3 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
 | D7 | HeroUI v3 is the component layer, and its components are not restyled | 1 |
-| D8 | Declarations are typed object literals; not decorators, not a custom format | 1 |
+| D8 | Declarations are typed object literals; not decorators, not a custom format | 2 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 1 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 2 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 12 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 14 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -96,18 +112,21 @@ the library decides FOR us.
 | `the-shared-layers-carry-no-product-vocabulary` | D12 | a shared module that knows what a client is, which has stopped being shared |
 | `the-framework-name-is-reserved-inside-the-framework` | D2 | `quad` meaning four different things inside the thing called Quad |
 | `no-more-than-five-primary-destinations` | D10 | a bottom bar that stopped being tappable and became a menu |
+| `no-cross-tenant-query-fans-out-over-shards` | D5 | an operator console that gets slower with every shard, until the sweep it runs times out |
 | `a-declaration-is-a-literal-a-script-can-walk` | D8 | a declaration that has to be executed before it can be read, so every generated surface stops being derivable |
 | `a-library-decides-it-does-not-rule` | D9 | one of our own rules living inside somebody else's package, re-learned from their release notes |
 | `a-notification-nobody-can-receive-is-refused` | D12 | a message switched on in the policy screen that never arrives, so people stop trusting the ones that do |
 | `a-switch-nothing-is-behind-is-refused` | D12 | somebody turning on a control that does nothing, and no longer watching for the problem it promised to solve |
 | `everything-sold-is-withheld-somewhere` | D12 | money taken for a capability every customer already has, failing in the generous direction so nobody reports it |
 | `a-sensitive-fact-is-never-an-ordinary-column` | D11 | somebody's health record in a product table, outside consent, outside the grant log and outside crypto-shredding |
+| `erasure-follows-a-column-a-declaration-named` | D12 | a deletion request that reports success and leaves the rows, because the sweep had nothing to follow |
+| `a-schema-runner-never-migrates-destructively` | D12 | a DROP running itself on every shard at 3am because somebody edited a declaration |
+| `an-identifier-that-is-not-a-name-never-reaches-a-statement` | D8 | a generated schema built from something a request supplied, which is the injection this whole design forecloses |
 | `no-heroui-component-is-restyled` *(owed)* | D7 | consistency that is maintained by care rather than enforced, which lasts until the first hurried screen |
 | `every-declaration-reaches-a-surface` *(owed)* | D12 | a mechanism built, tested and wired with nowhere a person can look — every suite green |
 | `every-surface-control-changes-behaviour` *(owed)* | D12 | a switch somebody turns on that does nothing, so they stop watching the thing it promised |
 | `no-handler-raises-its-own-cross-cutting-concern` *(owed)* | D12 | a concern an app can forget, forgotten invisibly — no error, no failing test, a capability that silently does not apply |
 | `a-vault-fact-is-never-stored-by-an-app` *(owed)* | D11 | an app writing the vault's own tables directly, so a fact exists with no grant, no consent record and no way to shred it |
-| `no-cross-tenant-query-fans-out-over-shards` *(owed)* | D5 | an operator console that gets slower with every shard, until the sweep it runs times out |
 | `composition-is-lazy` *(owed)* | D4 | cold start growing with the catalogue, until the catalogue that was meant to grow cannot |
 | `no-service-call-is-made-over-fetch` *(owed)* | D3 | a wrong payload becoming a production error where it had been a compile error |
 <!-- /generated -->

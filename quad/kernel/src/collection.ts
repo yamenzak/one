@@ -113,7 +113,18 @@ export const eraseBy = (spec: CollectionSpec): { readonly column: string; readon
 
 export type CollectionRefusal =
   | "field_invalid" | "global_holds_data" | "kept_without_reason"
-  | "subject_column_missing" | "quota_without_ceiling" | "no_operations_at_all";
+  | "subject_column_missing" | "quota_without_ceiling" | "no_operations_at_all"
+  | "not_a_name";
+
+/**
+ * ⚠️ AN ID AND A FIELD NAME BECOME A TABLE AND A COLUMN, AND AN IDENTIFIER
+ * CANNOT BE BOUND. Values go in as parameters; names are interpolated into DDL
+ * because SQL has no other way to say them — so the safety has to be that a name
+ * which is not a name never reaches the statement builder at all. This is the
+ * check that makes the generated schema safe to generate.
+ */
+export const NAME = /^[a-z][a-z0-9-]*$/;
+export const FIELD_NAME = /^[a-z][a-zA-Z0-9_]*$/;
 
 export interface CollectionProblem {
   readonly collection: string;
@@ -135,6 +146,11 @@ export function refuseCollection(spec: CollectionSpec): readonly CollectionProbl
 
   for (const bad of refuseFields(spec.fields)) {
     at("field_invalid", `${bad.field}: ${bad.why}`);
+  }
+
+  if (!NAME.test(spec.id)) at("not_a_name", `"${spec.id}" cannot be a table name`);
+  for (const name of Object.keys(spec.fields)) {
+    if (!FIELD_NAME.test(name)) at("not_a_name", `"${name}" cannot be a column name`);
   }
 
   if (spec.scope.of === "global" && holdingsIn(spec.fields).length > 0) {

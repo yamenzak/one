@@ -22,7 +22,7 @@
     "one:gate": "node platform/scripts/sheets.mjs platform/web/src && node platform/scripts/docs.test.mjs && node platform/scripts/guards.test.mjs && node platform/scripts/kernel.test.mjs && node platform/scripts/bindings.test.mjs && node platform/scripts/surface.test.mjs && node platform/scripts/handlers.test.mjs && node platform/scripts/owned.test.mjs && node platform/scripts/scoped.test.mjs && node platform/scripts/budget.test.mjs && node platform/scripts/capabilities.test.mjs && node platform/scripts/wire.test.mjs",
     "quad:test": "turbo run test --filter='./quad/*' --filter='./quad/apps/*'",
     "quad:typecheck": "turbo run typecheck --filter='./quad/*' --filter='./quad/apps/*'",
-    "quad:gate": "node quad/scripts/docs.test.mjs && node quad/scripts/guards.test.mjs && node quad/scripts/kernel.test.mjs && node quad/scripts/declarations.test.mjs"
+    "quad:gate": "node quad/scripts/docs.test.mjs && node quad/scripts/guards.test.mjs && node quad/scripts/kernel.test.mjs && node quad/scripts/declarations.test.mjs && node quad/scripts/shards.test.mjs"
   },
   "devDependencies": {
     "turbo": "^2.5.9",

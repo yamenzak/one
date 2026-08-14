@@ -1371,6 +1371,22 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)(tsx@4.23.9)
 
+  quad/runtime:
+    dependencies:
+      '@quad/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+    devDependencies:
+      '@cloudflare/vitest-pool-workers':
+        specifier: 0.8.55
+        version: 0.8.55(@cloudflare/workers-types@4.20260702.1)(@vitest/runner@3.2.7)(@vitest/snapshot@3.2.7)(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)(tsx@4.23.9))
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)(tsx@4.23.9)
+
 packages:
 
   '@apideck/better-ajv-errors@0.3.7':

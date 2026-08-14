@@ -52,6 +52,17 @@ export function newId<K extends string>(prefix: K, at: Date = new Date()): Id<K>
   return `${prefix}_${stamp}${noise}` as Id<K>;
 }
 
+/**
+ * ⚠️ THE PREFIX IS THE WIRE FORM AND THE BRAND IS THE CONCEPT, and they are
+ * deliberately not the same string. An id is read by people — in a log, a URL, a
+ * support conversation — so it is short; the type is read by the compiler, so it
+ * is the whole word. Tying them together would make every id in the product four
+ * characters longer to serve a compiler that does not care.
+ */
+export const newAccountId = (at?: Date): AccountId => newId("acc", at) as string as AccountId;
+export const newTenantId = (at?: Date): TenantId => newId("ten", at) as string as TenantId;
+export const newSessionId = (at?: Date): SessionId => newId("ses", at) as string as SessionId;
+
 /* ------------------------------------------------------------------ tone --- */
 
 /**

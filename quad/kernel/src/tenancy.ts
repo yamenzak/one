@@ -46,6 +46,35 @@ export interface Placement {
  */
 export type Residency = "eu" | "global";
 
+/**
+ * The EEA, plus the two that behave like it for this purpose.
+ *
+ * ⚠️ THIS IS A LIST OF COUNTRIES, NOT A LIST OF PEOPLE. See `Tenant.country` —
+ * the question is where the business is, which they declare and we can act on,
+ * rather than anybody's nationality, which is unverifiable and which asking for
+ * would itself be collecting a special category.
+ */
+export const EEA: readonly string[] = [
+  "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU",
+  "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES",
+  "SE", "IS", "LI", "NO", "CH", "GB",
+];
+
+/**
+ * ⚠️ WHERE A NEW TENANT'S RECORDS SHOULD LIVE, AND `global` IS NOT "ANYWHERE" —
+ * it is the deployment's default region, named honestly rather than promised as
+ * something narrower. Offering a residency we cannot keep end to end (storage,
+ * backups, logs, every sub-processor) is a promise broken by a rebalance nobody
+ * connected to it.
+ *
+ * ⚠️ AND THIS IS A DEFAULT, NOT A CEILING. A business outside the EEA that wants
+ * EU residency may have it — the rule below is what happens when nobody chose,
+ * and it errs towards the stricter regime because that is the direction whose
+ * mistake is recoverable.
+ */
+export const residencyFor = (country: string): Residency =>
+  EEA.includes(country.toUpperCase()) ? "eu" : "global";
+
 /* --------------------------------------------------------------- entities --- */
 
 /** A person. One identity across every product (D1). */
