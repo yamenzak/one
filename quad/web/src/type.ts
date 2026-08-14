@@ -38,6 +38,13 @@ export const TYPE = {
    * the ripple rather than on the values.
    */
   figure: "text-2xl font-semibold tabular-nums tracking-tight",
+  /**
+   * ⚠️ THE FRACTIONAL PART OF AN AMOUNT, RELATIVE TO ITS WHOLE. `€1,051.70` at
+   * one size is a number; with a smaller `.70` it is a sum of money, because the
+   * eye lands on the part that matters. `em` rather than a fixed size, so the
+   * ratio holds wherever the figure is used — a fixed one would be right once.
+   */
+  minor: "text-[0.62em]",
 } as const;
 
 export type Role = keyof typeof TYPE;

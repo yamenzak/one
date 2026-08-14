@@ -58,7 +58,8 @@ const SOURCES = [
  */
 const VOICE = {
   title: "title",
-  label: "title",
+  /* ⚠️ A row label, not a screen title — see the `name` voice. */
+  label: "name",
   summary: "under",
   under: "under",
   lead: "under",

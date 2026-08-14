@@ -14,9 +14,11 @@
  */
 
 import { useState } from "react";
-import { Band, Figure, Group, Grid, NavRow, ActionRow, ToggleRow, FieldRow, PersonRow,
-  AmountRow, QuickActions, TileGrid, Nothing, RowRule, Row, SectionTitle, Stack, Title,
+import { Balance, Band, CopyRow, Figure, Group, Grid, Island, Money, NavRow, ActionRow,
+  ToggleRow, FieldRow, NoteRow, OfferRow, PersonRow, AmountRow, QuickActions, SeeAll,
+  StepRow, TileGrid, Nothing, RowRule, Row, SectionTitle, Stack, StickyAction, Title,
   TYPE, type Ambience } from "@quad/web";
+import { Button } from "@heroui/react";
 import { Sheet } from "../ui.js";
 
 const nothing = () => {};
@@ -34,6 +36,26 @@ export function Gallery() {
   return (
     <Stack space="airy">
       <Title under="Every piece a screen is assembled from">The vocabulary</Title>
+
+      {/* -------------------------------------------------------- balance --- */}
+      <section className="flex flex-col gap-3">
+        <SectionTitle>The one number</SectionTitle>
+        <Balance
+          eyebrow="Personal · EUR"
+          figure={<Money amount={105170} />}
+          identifier="DE29 1001 0178 4770 4207 58"
+          under={
+            <QuickActions
+              actions={[
+                { id: "add", label: "Add money", icon: glyph("+"), onDo: nothing },
+                { id: "move", label: "Move", icon: glyph("⇄"), onDo: nothing },
+                { id: "details", label: "Details", icon: glyph("▤"), onDo: nothing },
+                { id: "more", label: "More", icon: glyph("…"), onDo: nothing },
+              ]}
+            />
+          }
+        />
+      </section>
 
       {/* ------------------------------------------------------- ambience --- */}
       <section className="flex flex-col gap-3">
@@ -92,6 +114,53 @@ export function Gallery() {
         <ActionRow icon={glyph("✕")} label="Close this workspace" tone="danger" onDo={nothing} />
       </Group>
 
+      {/* --------------------------------------------------- copy + notes --- */}
+      <Group label="For local and international transfers">
+        <CopyRow label="Beneficiary" value="Yamen Zakhour" onCopy={nothing} />
+        <RowRule />
+        <CopyRow label="IBAN" value="DE29 1001 0178 4770 4207 58" onCopy={nothing} />
+        <RowRule />
+        <CopyRow label="BIC / SWIFT code" value="REVODEB2" onCopy={nothing} />
+        <RowRule />
+        <NoteRow icon={glyph("⌂")}>
+          Eligible deposits are protected up to a value of €100,000, or more in exceptions.
+        </NoteRow>
+        <NoteRow icon={glyph("◷")}>
+          Local transfers can be instant or take up to two working days, depending on the sending bank.
+        </NoteRow>
+      </Group>
+
+      {/* -------------------------------------------------- offers + steps --- */}
+      <Group label="Discover more">
+        <OfferRow
+          icon={glyph("◍")}
+          label="International transfer"
+          under="Fast, secure and low cost"
+          offer={{ label: "Send", onDo: nothing }}
+        />
+        <RowRule />
+        <OfferRow
+          icon={glyph("&")}
+          label="Joint account"
+          under="Manage money together"
+          offer={{ label: "Open", onDo: nothing }}
+        />
+      </Group>
+
+      <Group label="Before 25 August, your friends">
+        <StepRow icon={glyph("⚭")} label="Sign up with your link" under="And verify their identity" />
+        <StepRow icon={glyph("◎")} label="Add money to their account" under="By card or bank transfer" />
+        <StepRow icon={glyph("▤")} label="Order a physical card" under="And add it to a wallet" />
+      </Group>
+
+      {/* ------------------------------------------------------ truncated --- */}
+      <Group label="Upcoming payments">
+        <AmountRow icon={glyph("◫")} label="REWE Pay" under="Recurring" amount="−€3.08" />
+        <RowRule />
+        <AmountRow icon={glyph("◫")} label="Db Vertrieb GmbH" under="Monthly, next on 17 August" amount="−€63.00" />
+        <SeeAll onOpen={nothing} />
+      </Group>
+
       {/* -------------------------------------------------------- figures --- */}
       <Group label="Figures">
         <div className="flex flex-wrap gap-10 py-2">
@@ -129,6 +198,24 @@ export function Gallery() {
           says="You are not in any workspace yet"
           offer={{ label: "Start a workspace", onDo: nothing }}
         />
+      </section>
+
+      {/* ----------------------------------------------------------- nav --- */}
+      <section className="flex flex-col gap-3">
+        <SectionTitle>Getting around</SectionTitle>
+        <Island
+          here="/"
+          onGo={nothing}
+          items={[
+            { id: "home", label: "Home", icon: glyph("⌂"), route: "/" },
+            { id: "work", label: "Work", icon: glyph("▤"), route: "/work" },
+            { id: "pay", label: "Pay", icon: glyph("⇄"), route: "/pay" },
+            { id: "you", label: "You", icon: glyph("◉"), route: "/you" },
+          ]}
+        />
+        <StickyAction>
+          <Button variant="primary" className="w-full" onPress={nothing}>Invite friends</Button>
+        </StickyAction>
       </section>
 
       {/* ---------------------------------------------------------- sheet --- */}

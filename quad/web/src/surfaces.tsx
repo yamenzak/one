@@ -274,9 +274,12 @@ export function QuickActions({ actions }: {
   }[];
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-center gap-6 py-2">
+    /* ⚠️ Four must FIT a phone. At 80px wide with a 24px gap they came to 392px
+       against 390 available, so the fourth wrapped to its own line — which reads
+       as a mistake rather than as a row. */
+    <div className="flex flex-wrap items-start justify-center gap-3 py-2">
       {actions.slice(0, 4).map((a) => (
-        <div key={a.id} className="flex w-20 flex-col items-center gap-2">
+        <div key={a.id} className="flex w-16 flex-col items-center gap-2">
           <Button variant="secondary" aria-label={a.label} onPress={a.onDo}>{a.icon}</Button>
           <span className={`${TYPE.note} text-center`}>{a.label}</span>
         </div>
@@ -343,5 +346,147 @@ export function Nothing({ says, offer }: {
         </Card.Content>
       ) : null}
     </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ money --- */
+
+/**
+ * AN AMOUNT, WITH ITS FRACTION SET SMALLER THAN ITS WHOLE.
+ *
+ * ⚠️ THIS IS THE ONE TYPOGRAPHIC DEVICE THAT MAKES A BALANCE READ AS A BALANCE.
+ * `€1,051.70` at one size is a number; `€1,051` with a smaller `.70` is a sum of
+ * money, because the eye lands on the part that matters and treats the rest as
+ * precision. Every product that handles money well does this, and it is
+ * invisible until you put the two side by side.
+ *
+ * ⚠️ AND IT IS `tabular-nums` WHEREVER IT APPEARS, so a column of amounts lines
+ * up on the decimal. Proportional digits make a list ripple, and the reader ends
+ * up comparing the ripple rather than the values.
+ *
+ * ⚠️ THE SIGN IS A TONE, NOT A COLOUR. Money coming in is `success`, going out
+ * is neutral — never red, which is for something being wrong. A product that
+ * paints every outgoing payment red tells somebody their groceries were a fault.
+ */
+export function Money({ amount, currency = "€", size = "figure", tone = "neutral" }: {
+  /** ⚠️ Minor units, as an integer. A float here is a rounding error later. */
+  readonly amount: number;
+  readonly currency?: string;
+  readonly size?: "figure" | "label";
+  readonly tone?: Tone;
+}) {
+  const sign = amount < 0 ? "−" : tone === "success" ? "+" : "";
+  const whole = Math.floor(Math.abs(amount) / 100).toLocaleString();
+  const part = String(Math.abs(amount) % 100).padStart(2, "0");
+  const big = size === "figure" ? TYPE.figure : TYPE.label;
+
+  return (
+    <span className={`${big} tabular-nums`} data-tone={tone}>
+      {sign}{currency}{whole}
+      <span className={TYPE.minor}>.{part}</span>
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------- more rows --- */
+
+/**
+ * A VALUE SOMEBODY CAME TO COPY.
+ *
+ * ⚠️ AN IBAN IS NOT READ, IT IS TAKEN. Rendering one as ordinary text makes
+ * somebody select twenty characters on a phone, and they will get it wrong. The
+ * value is the control.
+ */
+export function CopyRow({ label, value, onCopy }: {
+  readonly label: string;
+  readonly value: string;
+  readonly onCopy: (value: string) => void;
+}) {
+  return (
+    <div className="flex items-start gap-3 py-3">
+      <div className="flex flex-col gap-1 min-w-0">
+        <span className={TYPE.note}>{label}</span>
+        <span className={`${TYPE.body} break-words`}>{value}</span>
+      </div>
+      <span className="ml-auto shrink-0">
+        <Button variant="ghost" aria-label={`Copy ${label.toLowerCase()}`} onPress={() => onCopy(value)}>
+          Copy
+        </Button>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * SOMETHING TRUE THAT IS NOT A CONTROL.
+ *
+ * ⚠️ THIS IS THE ONE PLACE PROSE BELONGS, AND IT TAKES ITS FULL STOPS. A
+ * deposit-protection notice is two sentences and reads as sentences; a caption
+ * under a label is not, and takes none. The distinction is what `tone.ts`
+ * enforces, and having a component for each is what stops somebody splitting the
+ * difference.
+ */
+export function NoteRow({ icon, children }: {
+  readonly icon?: React.ReactNode;
+  readonly children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3 py-3">
+      <Lead icon={icon} />
+      <p className={TYPE.body}>{children}</p>
+    </div>
+  );
+}
+
+/**
+ * SOMETHING ON OFFER, WITH THE WAY IN BESIDE IT.
+ *
+ * ⚠️ A TRAILING BUTTON RATHER THAN A CHEVRON, AND THE DIFFERENCE IS A PROMISE. A
+ * chevron says "there is more to read"; a button says "this starts now". Using
+ * one for the other is how somebody ends up in a flow they were browsing.
+ */
+export function OfferRow({ icon, label, under, offer }: RowBase & {
+  readonly offer: { readonly label: string; readonly onDo: () => void };
+}) {
+  return (
+    <div className="flex items-center gap-3 py-2">
+      <Lead icon={icon} />
+      <Body label={label} under={under} />
+      <span className="ml-auto shrink-0">
+        <Button variant="secondary" onPress={offer.onDo}>{offer.label}</Button>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * ONE OF THE THINGS THAT HAS TO HAPPEN.
+ *
+ * ⚠️ NO CHEVRON AND NO CONTROL: a step is a statement, and making it look
+ * pressable invites somebody to press it and find nothing. What makes it a list
+ * rather than prose is that each item is one thing, with its own qualifier
+ * underneath.
+ */
+export function StepRow({ icon, label, under }: RowBase) {
+  return (
+    <div className="flex items-start gap-3 py-3">
+      <Lead icon={icon} />
+      <Body label={label} under={under} />
+    </div>
+  );
+}
+
+/**
+ * ⚠️ THE WAY OUT OF A TRUNCATED LIST, AT THE BOTTOM OF THE CARD THAT TRUNCATED
+ * IT. Anywhere else and it is a link to somewhere; here it is the answer to the
+ * question the list just raised.
+ */
+export function SeeAll({ label = "See all", onOpen }: {
+  readonly label?: string; readonly onOpen: () => void;
+}) {
+  return (
+    <div className="flex justify-center pt-1">
+      <Button variant="ghost" onPress={onOpen}>{label}</Button>
+    </div>
   );
 }

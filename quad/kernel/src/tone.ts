@@ -19,6 +19,13 @@
 export type Voice =
   /** What a screen or a thing IS. A noun phrase. "Privacy", "Your workspaces". */
   | "title"
+  /**
+   * ⚠️ WHAT A ROW IS, WHICH IS NOT WHAT A SCREEN IS. "Add money to their
+   * account" is a good row label and a bad screen title, and holding both to
+   * four words would force one of them to be worse. A row has its neighbours for
+   * context; a title has to survive alone in a back button.
+   */
+  | "name"
   /** One line under a label. Says the consequence, not the mechanism. */
   | "under"
   /** What a control DOES, on the control. Verb first. "Send me a code". */
@@ -83,11 +90,22 @@ export function refuseCopy(voice: Voice, text: string): readonly CopyRefusal[] {
     out.push({ rule: "shouting", why: "an exclamation mark is the product congratulating itself" });
   }
 
-  if (/\b(?:[A-Z]{4,})\b/.test(trimmed.replace(/\b(?:AI|API|PDF|URL|SMS|VAT|EU|UK|US)\b/g, ""))) {
-    out.push({ rule: "shouting", why: "capitals for emphasis read as raised voice" });
-  }
+  /*
+    ⚠️ THERE IS NO RULE AGAINST CAPITALS, AND THAT IS A DECISION RATHER THAN AN
+    OMISSION. One was written and removed the same hour: real product copy is
+    full of brands, acronyms, bank codes and IBANs — REWE, REVODEB2, SEPA — and
+    the check flagged every one. The fault it targeted (SHOUTING for emphasis) is
+    rare and obvious in review; the false positives were constant. A guard people
+    waive is worse than no guard, because it teaches everybody that a red line
+    from this file is probably nothing.
+  */
 
   switch (voice) {
+    case "name":
+      if (n > 6) out.push({ rule: "length", why: `${n} words; a row label is six or fewer` });
+      if (/[.:]$/.test(trimmed)) out.push({ rule: "punctuation", why: "a row label is not a sentence" });
+      break;
+
     case "title":
       /* ⚠️ A title is what you are looking at, and it has to survive being read
          in a back button, a tab and a breadcrumb. */

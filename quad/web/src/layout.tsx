@@ -19,7 +19,8 @@
  */
 
 import type { Tone } from "@quad/kernel";
-import { Separator } from "@heroui/react";
+import { PRIMARY_MAX } from "@quad/kernel";
+import { Button, Separator } from "@heroui/react";
 import type { Sky } from "./theme.js";
 import { TYPE } from "./type.js";
 
@@ -243,3 +244,97 @@ export function Figure(
 
 /** Pushes what follows it to the bottom of a flex column. */
 export const Spacer = () => <div className="flex-1" />;
+
+/* ---------------------------------------------------------------- balance --- */
+
+/**
+ * THE ONE NUMBER A SCREEN IS ABOUT.
+ *
+ * ⚠️ EYEBROW, FIGURE, IDENTIFIER — in that order, and the order is the reading.
+ * The eyebrow says which of several this is ("Personal · EUR"), the figure is
+ * what somebody came for, and the identifier is the thing they would copy or
+ * quote. A layout that leads with the identifier makes them hunt for the number.
+ *
+ * ⚠️ AND IT IS CENTRED, WHICH IS THE ONE PLACE IN THIS SYSTEM THAT IS. Centred
+ * text is hard to scan, which is exactly right for a block nobody scans — they
+ * look at it. Everything else stays left-aligned.
+ */
+export function Balance({ eyebrow, figure, identifier, under }: {
+  readonly eyebrow?: string;
+  readonly figure: React.ReactNode;
+  readonly identifier?: React.ReactNode;
+  readonly under?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-2 py-8 text-center">
+      {eyebrow ? <span className={TYPE.note}>{eyebrow}</span> : null}
+      <div className="flex items-baseline justify-center">{figure}</div>
+      {identifier ? (
+        <span className={`${TYPE.note} flex items-center gap-2`}>{identifier}</span>
+      ) : null}
+      {under}
+    </div>
+  );
+}
+
+/**
+ * THE ACTION A WHOLE SCREEN EXISTS FOR, PINNED WHERE A THUMB IS.
+ *
+ * ⚠️ A LONG SCREEN WITH ITS ONLY CONTROL AT THE BOTTOM IS A SCREEN PEOPLE DO NOT
+ * FINISH. Pinning it means the decision is always one reach away, and the
+ * content scrolls behind it rather than under it.
+ *
+ * ⚠️ `pb-[env(safe-area-inset-bottom)]` IS NOT OPTIONAL. Without it the control
+ * sits under the home indicator on every modern phone — reachable, but with the
+ * gesture bar over it, which reads as a layout somebody did not test.
+ */
+export function StickyAction({ children }: { readonly children: React.ReactNode }) {
+  return (
+    <div className="sticky bottom-0 z-10 flex w-full justify-center p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="w-full max-w-md">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * THE FLOATING NAV — five destinations maximum (D10).
+ *
+ * ⚠️ AN ISLAND RATHER THAN A BAR, and it is not decoration: a bar welded to the
+ * bottom edge cuts the page in two, while an island floats over content that
+ * visibly continues beneath it, so the page reads as longer than the screen.
+ *
+ * ⚠️ AND THE KERNEL REFUSES A SIXTH ITEM. Past five a bottom bar stops being
+ * tappable and becomes a menu — so this slices as well, because a deployment
+ * rendering a manifest it did not compose must not draw one either.
+ */
+export function Island({ items, here, onGo }: {
+  readonly items: readonly {
+    readonly id: string; readonly label: string;
+    readonly icon: React.ReactNode; readonly route: string;
+    readonly unread?: number;
+  }[];
+  readonly here: string;
+  readonly onGo: (route: string) => void;
+}) {
+  return (
+    <nav
+      aria-label="Sections"
+      className="sticky bottom-0 z-10 flex justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+    >
+      <div className="flex items-center gap-1">
+        {items.slice(0, PRIMARY_MAX).map((item) => (
+          <Button
+            key={item.id}
+            variant={item.route === here ? "secondary" : "ghost"}
+            aria-current={item.route === here ? "page" : undefined}
+            className="flex-col gap-1"
+            onPress={() => onGo(item.route)}
+          >
+            <span aria-hidden="true">{item.icon}</span>
+            <span className={TYPE.note}>{item.label}</span>
+          </Button>
+        ))}
+      </div>
+    </nav>
+  );
+}
