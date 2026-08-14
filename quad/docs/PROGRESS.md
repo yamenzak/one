@@ -25,6 +25,39 @@ reader can trust this table instead of re-reading the code.
 | 8 | Vault + legal | shipped |
 | 9 | Kova on Quad | shipped |
 
+## What is NOT built, and where to pick it up
+
+⚠️ **EVERY STAGE IN [PLAN.md](PLAN.md) §7 IS SHIPPED, WHICH IS NOT THE SAME AS
+FINISHED.** The framework holds together end to end and refuses the whole class
+of faults it was built to refuse; what it has not yet met is a browser, a
+deployment or a customer. Naming that here is the point of the document — the
+failure this framework is a catalogue of is a thing that looks complete because
+nothing is red.
+
+Honestly outstanding, in the order it will bite:
+
+1. **Nothing is deployed.** There is no `wrangler.jsonc`, no worker entry, no
+   binding for a real D1, and no CI job that ships this. Every suite runs against
+   Miniflare, which is the real runtime — but a deployment is a separate act, and
+   "provisioning becomes a feature flag" is a claim about tenants, not about the
+   first worker.
+2. **Passkeys.** Sign-in is an emailed code. There is deliberately no credential
+   table waiting for a ceremony — see the note under identity below.
+3. **The screens are components, not an application.** `@quad/web` renders every
+   declared surface, and `apps/hello` and `apps/kova` prove it against their real
+   manifests — but nothing assembles them into a page a person can open, because
+   that needs a router and the shell is deliberately router-free.
+4. **The service workers are contracts, not deployments.** `AiService` and
+   `NotifyService` are the typed seam, and the runtime implements both — but they
+   are called in-process today. Splitting them into bound workers is a
+   `wrangler.jsonc` change and no code change, which is the property the seam was
+   built for.
+5. **Payment.** The bill is assembled and the ladder walks; nothing takes a card.
+   That is a provider integration, and it is deliberately the last thing.
+6. **The template.** A second app is copied from `apps/kova` today. A real
+   `apps/_template` with the conformance tests that catch a bad copy is the
+   cheapest thing on this list and the one that decides whether app #3 diverges.
+
 ## What is built
 
 **`@quad/kernel` — the whole declaration surface, and it is pure.** Twenty-one
