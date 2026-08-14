@@ -187,7 +187,16 @@ refuse — it reads as built and passes every test.
   measured for the same reason and are deliberately NOT `--success`/`--danger`.
   `charts.tsx` draws; `figures.tsx` is the number a screen exists for, the delta
   beside it, and a meter. There is no pie and no second y-axis, and the API has
-  nowhere to put either.
+  nowhere to put either. `circles.tsx` is the round half, and it splits the jobs
+  rather than offering the pie back: `Ring` for one ratio against a limit,
+  `Rings` for up to three that do not sum, `DonutChart` for composition where the
+  whole is the subject — five slices then `Other` — and `CompositionBar`, which
+  answers the donut's question more accurately and is the one to reach for first.
+- `layout.tsx`'s `PageCrown` — an inner page's header, where the page's name is
+  the biggest thing on it at rest and comes back small beside the way out once it
+  has scrolled away. **The glass is on the CONTROLS, never on the bar**: a
+  full-width frosted strip has a boundary where the blur stops, which is a border
+  by another name, and it is the thing the no-edges pass exists to remove.
 
 **Money — one workspace, several products, one bill.**
 

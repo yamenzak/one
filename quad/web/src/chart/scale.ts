@@ -202,6 +202,67 @@ export function barPathX(x: number, y: number, w: number, h: number, r = 4): str
     + `L${x + w} ${y + h - k} Q${x + w} ${y + h} ${x + w - k} ${y + h} L${x} ${y + h} Z`;
 }
 
+/* --------------------------------------------------------------------- arcs --- */
+
+/**
+ * ⚠️ TWELVE O'CLOCK IS ZERO AND CLOCKWISE IS FORWARD. SVG's own angles start at
+ * three o'clock and run the other way, so every circular chart that does its own
+ * trigonometry starts a quarter turn out and mirrored — which does not look like
+ * a bug, it looks like a design decision somebody made badly. It is corrected
+ * once, here.
+ */
+export const polar = (cx: number, cy: number, r: number, turn: number): Placed => {
+  const a = (turn - 0.25) * Math.PI * 2;
+  return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+};
+
+/**
+ * An arc as a stroked path, `from` and `to` in TURNS (0…1).
+ *
+ * ⚠️ A FULL CIRCLE CANNOT BE DRAWN AS ONE ARC, and this is the bug every hand-
+ * rolled donut has. `A` interpolates between two points; when they are the same
+ * point the renderer draws NOTHING, so a segment at 100% — the single most
+ * likely value in any "one category is everything" dataset — vanishes entirely
+ * and the chart reads as empty. The gap below is what keeps two distinct points.
+ */
+export function arcPath(
+  cx: number, cy: number, r: number, from: number, to: number,
+): string {
+  const span = Math.min(Math.max(to - from, 0), 0.9999);
+  if (span <= 0) return "";
+  const a = polar(cx, cy, r, from);
+  const b = polar(cx, cy, r, from + span);
+  return `M${a.x} ${a.y} A${r} ${r} 0 ${span > 0.5 ? 1 : 0} 1 ${b.x} ${b.y}`;
+}
+
+/**
+ * Values → arcs around the circle, each starting where the last ended.
+ *
+ * ⚠️ THE GAP IS TAKEN OUT OF EVERY SEGMENT, NOT ADDED BETWEEN THEM. Adding
+ * pushes the total past a full turn, so the last slice overlaps the first and
+ * the biggest category eats the smallest — silently, and only when the data
+ * happens to be ordered that way. Taking it out keeps the sum exact.
+ *
+ * ⚠️ AND A SEGMENT NEVER SHRINKS BELOW THE GAP. A 0.2% slice with a 0.01-turn
+ * gap either side would come out negative and disappear, which is the same lie
+ * as rounding it to zero; it is drawn at the minimum instead, and the number
+ * beside it is what carries the magnitude.
+ */
+export function arcs(values: readonly number[], gap = 0.006): readonly Segment[] {
+  const total = values.reduce((a, v) => a + Math.max(0, v), 0);
+  if (total <= 0) return values.map(() => ({ from: 0, to: 0 }));
+  const shown = values.filter((v) => v > 0).length;
+  const room = Math.max(0, 1 - gap * (shown > 1 ? shown : 0));
+  let at = 0;
+  return values.map((v) => {
+    if (v <= 0) return { from: at, to: at };
+    const span = Math.max((Math.max(0, v) / total) * room, gap);
+    const seg = { from: at, to: at + span };
+    at = seg.to + (shown > 1 ? gap : 0);
+    return seg;
+  });
+}
+
 /* ------------------------------------------------------------------- stack --- */
 
 /** One stacked segment: where it starts and ends along the value axis. */

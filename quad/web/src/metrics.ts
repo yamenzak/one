@@ -119,6 +119,26 @@ export const CROWN = "min-h-16" as const;
 export const CROWN_SIZE = "lg" as const;
 
 /**
+ * ⚠️ A PIECE OF CROWN CHROME THAT IS NOT A CONTROL, AT THE SAME SIZE AS THE ONES
+ * THAT ARE. The collapsed page title is the only thing in this shape today: it
+ * needs a ground to stay readable over a card scrolling past it, and the ONE
+ * ground the crown is allowed is the one its buttons already wear. Matching
+ * `lg`'s box by hand is the cost of not being a `Button` — and it must not be
+ * one, because a heading somebody can press is a heading that goes nowhere.
+ */
+export const CROWN_CHIP = "flex h-11 items-center rounded-full px-4" as const;
+
+/**
+ * ⚠️ AIR UNDER A PAGE TITLE, AND ONLY UNDER IT. A screen's name and the first
+ * section heading below it are both left-aligned words at similar weight, so
+ * with only a stack gap between them the eye reads them as one list — and on a
+ * page whose title also carries a scope row, three rows of words arrive with
+ * nothing saying which belongs to which. Padding at the TOP would fight the
+ * crown, which already sets it.
+ */
+export const TITLE_PAD = "pb-6" as const;
+
+/**
  * ⚠️ THE ISLAND HOLDS ITS ITEMS AT ARM'S LENGTH AND NOTHING MORE. `Card` is
  * `p-4`, so the nav came out 63px tall against a reference that is 54 with its
  * labels and 40 without — a bar with sixteen pixels of nothing around a row of

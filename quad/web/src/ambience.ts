@@ -401,29 +401,31 @@ export function ambienceStylesheet(): string {
       a bright ground reading as a wash. Four terms rather than one is the
       difference between glass and a frosted panel.
     */
-    `[data-glass="true"] {`,
-    `  background-color: color-mix(in oklab, var(--foreground) 10%, transparent) !important;`,
-    `  backdrop-filter: ${GLASS};`,
-    `  -webkit-backdrop-filter: ${GLASS};`,
-    `}`,
     /*
-      ⚠️ THE BAR IS A VEIL OF THE RAISED TIER, NOT A WASH OF THE FOREGROUND, and
+      ⚠️ GLASS IS A VEIL OF THE RAISED TIER, NOT A WASH OF THE FOREGROUND, and
       the difference is what makes it translucent rather than merely see-through.
       A foreground tint at any strength a person can see past is one you can
       READ past — the row under the nav came through it and collided with the
-      labels, two sets of words in the same place, which is the fault this
-      component has now had twice.
+      labels, two sets of words in the same place.
+
+      ⚠️ AND THIS WAS THE ISLAND'S RULE ALONE, WHICH IS WHY THE CROWN HAD THE
+      SAME BUG A SECOND TIME. The base was a ten-percent foreground wash and only
+      the nav overrode it, so when the crown's chips became the only glass on the
+      screen a quick-action label read straight through the search field at full
+      size. There is one fill now: the value that was already proved.
 
       ⚠️ AND IT CANNOT BE A VEIL OF `--background` EITHER, which is the obvious
       choice and the one that fails in the interesting place: over the page's own
-      ground it would BE the ground, so the bar would vanish exactly where there
+      ground it would BE the ground, so a chip would vanish exactly where there
       is no card behind it. `--surface-tertiary` is the tier the palette
       guarantees clears both the page and a card, so a veil of it is separable
-      wherever it lands — and eight percent of whatever is behind still comes
+      wherever it lands — and a quarter of whatever is behind still comes
       through, blurred, which is the whole effect.
     */
-    `[data-island="true"][data-glass="true"] {`,
+    `[data-glass="true"] {`,
     `  background-color: color-mix(in oklab, var(--surface-tertiary) 76%, transparent) !important;`,
+    `  backdrop-filter: ${GLASS};`,
+    `  -webkit-backdrop-filter: ${GLASS};`,
     `}`,
     /*
       ⚠️ THE PILL THAT MARKS WHERE YOU ARE, AS A RULE RATHER THAN A CLASS. It is
@@ -448,7 +450,7 @@ export function ambienceStylesheet(): string {
     `}`,
     `@media (prefers-reduced-motion: reduce) { [data-pill="true"] { transition: none !important; } }`,
     `[data-glass="true"]:hover {`,
-    `  background-color: color-mix(in oklab, var(--foreground) 18%, transparent) !important;`,
+    `  background-color: color-mix(in oklab, var(--surface-tertiary) 92%, transparent) !important;`,
     `}`,
     /*
       ⚠️ THE CHIP A ROW'S MARK SITS IN. It is here rather than on the component

@@ -10,7 +10,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  areaPath, band, compact, extent, linePath, norm, place, stack, stackSpan, ticks,
+  arcPath, arcs, areaPath, band, compact, extent, linePath, norm, place, polar, stack,
+  stackSpan, ticks,
 } from "./scale.js";
 
 describe("the domain", () => {
@@ -137,6 +138,55 @@ describe("formatting", () => {
 
   it("drops a trailing zero decimal, which carries nothing", () => {
     expect(compact(25_000)).toBe("25K");
+  });
+});
+
+describe("arcs", () => {
+  it("starts at twelve o'clock and runs clockwise", () => {
+    /* SVG's own angles start at three and run the other way; a circular chart
+       that forgets is a quarter turn out and mirrored, which reads as a design
+       decision rather than as a bug. */
+    const top = polar(50, 50, 40, 0);
+    expect(top.x).toBeCloseTo(50);
+    expect(top.y).toBeCloseTo(10);
+    const quarter = polar(50, 50, 40, 0.25);
+    expect(quarter.x).toBeCloseTo(90);
+    expect(quarter.y).toBeCloseTo(50);
+  });
+
+  it("draws something for a segment that is the whole circle", () => {
+    /* ⚠️ An `A` between two identical points renders NOTHING, so a category
+       holding 100% — the likeliest single value in any composition — vanished
+       and the chart read as empty. */
+    expect(arcPath(50, 50, 40, 0, 1)).not.toBe("");
+    expect(arcPath(50, 50, 40, 0, 1)).toContain("A40 40");
+  });
+
+  it("emits nothing for a segment of no size", () => {
+    expect(arcPath(50, 50, 40, 0.3, 0.3)).toBe("");
+  });
+
+  it("takes the gap OUT of the segments rather than adding it between", () => {
+    /* Adding pushes the total past a full turn, so the last slice laps the first
+       and the biggest category eats the smallest — silently, and only for some
+       orderings of the same data. */
+    const out = arcs([1, 1, 1, 1]);
+    expect(out[3]!.to).toBeLessThanOrEqual(1);
+    expect(out[0]!.from).toBe(0);
+  });
+
+  it("leaves no gap at all around a lone segment", () => {
+    expect(arcs([5])).toEqual([{ from: 0, to: 1 }]);
+  });
+
+  it("keeps a tiny slice visible instead of rounding it away", () => {
+    const [big, tiny] = arcs([1000, 1]);
+    expect(tiny!.to - tiny!.from).toBeGreaterThan(0);
+    expect(big!.to - big!.from).toBeGreaterThan(tiny!.to - tiny!.from);
+  });
+
+  it("survives a set that sums to nothing", () => {
+    expect(arcs([0, 0])).toEqual([{ from: 0, to: 0 }, { from: 0, to: 0 }]);
   });
 });
 

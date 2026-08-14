@@ -18,12 +18,12 @@ import { useState } from "react";
 import {
   ActionRow, AmountRow, AppCrown, Balance, Band, CopyRow, Crown, Figure, Grid, Group,
   Island, Money, NavRow, Nothing, NoteRow, OfferRow, Page, PersonRow, Prose,
-  QuickActions, Row, SeeAll, Section, Stack, StepRow, StickyAction,
-  TileGrid, Title, ToggleRow, FieldRow, TYPE,
+  QuickActions, Row, SeeAll, Section, Spacer, Stack, StepRow, StickyAction,
+  TileGrid, Title, ToggleRow, FieldRow, PageCrown, TYPE,
 } from "@quad/web";
 import {
-  ChartPanel, ColumnChart, DivergingChart, HeatmapChart, Hero, LineChart, Meter,
-  StackedChart, Stat, StatRow,
+  ChartPanel, ColumnChart, CompositionBar, DivergingChart, DonutChart, HeatmapChart, Hero,
+  LineChart, Meter, Ring, Rings, StackedChart, Stat, StatRow,
 } from "@quad/web";
 import { Button } from "@heroui/react";
 import { ChartColumn, Check, CircleUser, Clock, CreditCard, Ellipsis, EyeOff, FileText, Globe, House, KeyRound, Landmark, LogIn, Mail, MessagesSquare, Package, PiggyBank, Plus, ReceiptText, Trash2, TriangleAlert } from "lucide-react";
@@ -163,6 +163,80 @@ function Settings() {
             <FieldRow label="Address" value="ironworks.t.4dl.app" onEdit={nothing} />
             <FieldRow label="Where records are kept" value="European Union" />
             <ActionRow icon={glyph(<Trash2 />)} label="Close this workspace" tone="danger" onDo={nothing} />
+          </Group>
+        </Stack>
+      </Band>
+    </Page>
+  );
+}
+
+/* ----------------------------------------------------------- an inner page --- */
+
+/**
+ * ⚠️ THE SPECIMEN THAT ONLY MEANS ANYTHING IN MOTION. Everything else in this
+ * file is judged from a screenshot; this one is about what the header DOES when
+ * somebody scrolls — the page's name starts as the biggest thing on it and comes
+ * back small beside the way out. A still frame of it looks like an ordinary
+ * screen with a title, which is exactly the point: the chrome is only there when
+ * it is needed and the rest of the time it is the page.
+ */
+function Inner() {
+  const days = Array.from({ length: 31 }, (_, i) => i);
+
+  return (
+    <Page sky="drape">
+      <PageCrown
+        title="Analytics"
+        back={nothing}
+        actions={[{ id: "range", label: "Date range", icon: glyph(<Clock />), onDo: nothing }]}
+        under={
+          <Row>
+            <Button size="sm" variant="ghost" data-glass="true" onPress={nothing}>Personal</Button>
+            <Spacer />
+            <Button size="sm" variant="ghost" onPress={nothing}>This month</Button>
+          </Row>
+        }
+      />
+      <Band width="work">
+        <Stack space="roomy">
+          <Group label="Where it went">
+            <ChartPanel label="Spent" under="Against the same days last month">
+              <LineChart
+                describes="Spend by day this month against last month"
+                series={[
+                  {
+                    id: "now", label: "This month", subject: true,
+                    points: days.map((d) => ({ x: d, y: Math.round(120 + d * 21 + Math.sin(d / 3) * 60) })),
+                  },
+                  {
+                    id: "was", label: "Last month",
+                    points: days.map((d) => ({ x: d, y: Math.round(160 + d * 17) })),
+                  },
+                ]}
+              />
+            </ChartPanel>
+          </Group>
+
+          <Group label="Overview">
+            <ChartPanel label="Total assets" under="£7,166 across three accounts">
+              <CompositionBar
+                describes="Total assets by account type"
+                unit="£"
+                data={[
+                  { label: "Savings & Funds", value: 5_940 },
+                  { label: "Cash", value: 1_226 },
+                ]}
+              />
+            </ChartPanel>
+          </Group>
+
+          <Group label="Recent">
+            <AmountRow icon={glyph(<Landmark />)} label="EDEKA" under="12 Aug, 19:32" amount="−£5.98" />
+            <AmountRow icon={glyph(<CreditCard />)} label="Personal → Groceries" under="12 Aug, 12:11" amount="+£100.00" tone="success" />
+            <AmountRow icon={glyph(<ReceiptText />)} label="Monthly plan" under="10 Aug, 09:00" amount="−£8.99" />
+            <AmountRow icon={glyph(<Landmark />)} label="Shell" under="9 Aug, 17:44" amount="−£62.10" />
+            <AmountRow icon={glyph(<Package />)} label="Parts order 8871" under="9 Aug, 11:02" amount="−£214.00" />
+            <AmountRow icon={glyph(<Landmark />)} label="Deposit" under="8 Aug, 08:30" amount="+£1,400.00" tone="success" />
           </Group>
         </Stack>
       </Band>
@@ -410,10 +484,56 @@ function Report() {
             <ChartPanel label="This month's allowances">
               <Stack space="snug">
                 <Meter label="Parts budget" value={4200} limit={5000} unit="£" />
-                <Meter label="Bay hours" value={281} limit={300} />
-                <Meter label="Storage" value={12} limit={50} unit="GB" />
+                <Meter label="Bay hours" value={281} limit={300} suffix="h" />
+                <Meter label="Storage" value={12} limit={50} suffix="GB" />
               </Stack>
             </ChartPanel>
+          </Group>
+
+          {/* ⚠️ THE COMPOSITION BAR SITS ABOVE THE DONUT ON PURPOSE. The two
+              answer the same question and this one answers it better, so the
+              specimen reads in the order the vocabulary wants to be reached for. */}
+          <Group label="What the money is">
+            <ChartPanel label="Where it sits" under="Across every account">
+              <CompositionBar
+                describes="Balance by account type"
+                unit="£"
+                data={[
+                  { label: "Operating", value: 42_800 },
+                  { label: "Reserve", value: 18_200 },
+                  { label: "Tax set aside", value: 9_400 },
+                ]}
+              />
+            </ChartPanel>
+          </Group>
+
+          <Group label="The same, round">
+            <Grid min="14rem">
+              <ChartPanel label="Spend by category">
+                <DonutChart
+                  describes="Spend by category this month"
+                  unit="£"
+                  data={[
+                    { label: "Parts", value: 5_400 }, { label: "Wages", value: 4_100 },
+                    { label: "Rent", value: 1_800 }, { label: "Fuel", value: 900 },
+                    { label: "Insurance", value: 480 }, { label: "Software", value: 234 },
+                  ]}
+                />
+              </ChartPanel>
+              <ChartPanel label="Bay utilisation">
+                <Ring label="Bay 2" value={281} limit={300} suffix="h" />
+              </ChartPanel>
+              <ChartPanel label="Three targets">
+                <Rings
+                  describes="Progress against this month's three targets"
+                  items={[
+                    { id: "rev", label: "Revenue", value: 12_914, limit: 15_000 },
+                    { id: "jobs", label: "Jobs", value: 128, limit: 140 },
+                    { id: "nps", label: "Reviews", value: 41, limit: 60 },
+                  ]}
+                />
+              </ChartPanel>
+            </Grid>
           </Group>
         </Stack>
       </Band>
@@ -426,6 +546,7 @@ function Report() {
 export const SPECIMENS = {
   workshop: Workshop,
   settings: Settings,
+  inner: Inner,
   detail: Detail,
   flow: Flow,
   start: Start,

@@ -139,11 +139,20 @@ export function Hero({ eyebrow, value, unit = "", delta, upIsGood = true }: {
  * ⚠️ AND THE FILL CARRIES SEVERITY. A meter that is the same colour at 40% and
  * at 99% is a meter that never told anybody anything.
  */
-export function Meter({ label, value, limit, unit = "" }: {
+export function Meter({ label, value, limit, unit = "", suffix = "" }: {
   readonly label: string;
   readonly value: number;
   readonly limit: number;
+  /** ⚠️ What goes BEFORE the number, which is a currency and nothing else. */
   readonly unit?: string;
+  /**
+   * ⚠️ AND WHAT GOES AFTER, WHICH IS EVERY OTHER UNIT THERE IS. One prop could
+   * not carry both, and the one that existed was a prefix — so a meter given
+   * `unit="GB"` read "GB12 of GB50". A component cannot tell a currency symbol
+   * from a unit of measure by looking at the string, and guessing produces the
+   * same fault in the other direction.
+   */
+  readonly suffix?: string;
 }) {
   const share = limit > 0 ? Math.max(0, Math.min(1, value / limit)) : 0;
   const tone = share >= 0.9 ? "danger" : share >= 0.75 ? "warning" : "accent";
@@ -152,7 +161,7 @@ export function Meter({ label, value, limit, unit = "" }: {
       <span className={`flex items-baseline justify-between ${SPACE.tight}`}>
         <span className={TYPE.label}>{label}</span>
         <span className={`${TYPE.note} tabular-nums`}>
-          {unit}{compact(value)} of {unit}{compact(limit)}
+          {unit}{compact(value)}{suffix} of {unit}{compact(limit)}{suffix}
         </span>
       </span>
       <span

@@ -28,8 +28,9 @@ import { Avatar, Button, Card, Separator } from "@heroui/react";
 import type { Ambience } from "./ambience.js";
 import { TYPE } from "./type.js";
 import {
-  BAND_PAD, CROWN, CROWN_SIZE, FACE, GUTTER, HEAD_GAP, HERO_PAD, ICON, ISLAND_ITEM, ISLAND_PAD,
-  SAFE_TOP, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
+  BAND_PAD, CROWN, CROWN_CHIP, CROWN_SIZE, FACE, GUTTER, HEAD_GAP, HERO_PAD, ICON, ISLAND_ITEM,
+  ISLAND_PAD,
+  SAFE_TOP, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, TITLE_PAD, WIDTH,
   type Space, type Width,
 } from "./metrics.js";
 import { MOTION } from "./motion.js";
@@ -204,7 +205,8 @@ export function Crown(
   { mark, name, under, aside, bleed = "hold", width = "read" }: CrownProps,
 ) {
   return (
-    <header className={`sticky top-0 z-10 w-full ${SAFE_TOP}`} data-glass="true">
+    /* ⚠️ THE BAR ITSELF IS NOT GLASS — see `AppCrown` for the whole argument. */
+    <header className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
       <Band bleed={bleed} width={width}>
         <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
           {mark ? <span aria-hidden="true" className="flex items-center">{mark}</span> : null}
@@ -218,6 +220,167 @@ export function Crown(
     </header>
   );
 }
+
+/* ------------------------------------------------------------- page crown --- */
+
+/**
+ * THE HEADER AN INNER PAGE HAS: a way back, the page's name, and the name
+ * COLLAPSES.
+ *
+ * ⚠️ A PAGE'S NAME IS BOTH THE BIGGEST THING ON IT AND SOMETHING YOU STILL NEED
+ * FOUR SCREENS DOWN, and one element cannot be both. At rest the title is a
+ * display-weight heading under the back control, where it is the first thing
+ * read; once it has scrolled away it comes back small, beside the back control,
+ * where it costs one line and answers "what am I in" without anybody scrolling
+ * up to ask. A header that pins the LARGE title instead spends a fifth of a
+ * phone on a word; one that pins nothing leaves somebody four cards deep with a
+ * back arrow to nowhere named.
+ *
+ * ⚠️ THE HANDOVER IS SEQUENCED, NOT A CROSS-FADE. `MOTION.exit` is shorter than
+ * `MOTION.enter` by design, so the large title is gone before the compact one
+ * arrives and the two are never both legible in the same frame — which is what
+ * reading two sizes of the same word at once looks like, and it is the tell that
+ * separates this from a naive opacity swap.
+ *
+ * ⚠️ AND THERE IS NO BAR. No plate, no hairline, no frosted strip: the back
+ * control and the actions are glass CHIPS on the page's own ground, and the
+ * ground under a crown is already a step lighter than the page because the
+ * ambience is built that way. That is the whole separation, and it is why
+ * `edges:` can stay green.
+ */
+export function PageCrown({ title, back, backLabel = "Back", actions = [], under }: {
+  readonly title: string;
+  readonly back: () => void;
+  readonly backLabel?: string;
+  readonly actions?: readonly Slot[];
+  /**
+   * ⚠️ THE ROW THAT SCROLLS AWAY WITH THE TITLE — a scope picker, a date range.
+   * It belongs to the heading rather than to the content, and pinning it would
+   * put two rows of chrome over every page.
+   */
+  readonly under?: React.ReactNode;
+}) {
+  const past = useScrolledPast();
+
+  return (
+    <>
+      <header className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
+        <Band bleed="edge" width="work">
+          <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
+            <Button
+              isIconOnly
+              size={CROWN_SIZE}
+              variant="ghost"
+              data-glass="true"
+              aria-label={backLabel}
+              onPress={back}
+            >
+              <Back />
+            </Button>
+
+            {/*
+              ⚠️ `aria-hidden`, BECAUSE THE `h1` BELOW IS THE PAGE'S NAME. Two
+              elements carrying the same words is two headings to a screen
+              reader and a duplicate to anybody navigating by them — the compact
+              copy is a visual reminder, and it says so.
+
+              ⚠️ AND IT CARRIES ITS OWN GROUND, WHICH IS THE PRICE OF HAVING NO
+              BAR. With the header transparent, a card scrolling past arrives
+              directly behind these words — the first build drew "Analytics"
+              across a chart's own grid lines and its subject series, two sets of
+              ink in the same place. A plate behind the whole row would fix it
+              and is the thing being removed; a chip behind the TITLE fixes it
+              and is the same element the back control and the actions already
+              are. Chrome that needs a background is a chip, not a bar.
+            */}
+            <span
+              aria-hidden="true"
+              data-glass="true"
+              data-capsule="true"
+              className={`min-w-0 truncate ${TYPE.label} ${CROWN_CHIP}`}
+              style={{
+                opacity: past ? 1 : 0,
+                transform: past ? "none" : "translateY(0.375rem)",
+                transition: past ? MOTION.enter : MOTION.exit,
+              }}
+            >
+              {title}
+            </span>
+
+            <Spacer />
+
+            {actions.map((a) => (
+              <Button
+                key={a.id}
+                isIconOnly
+                size={CROWN_SIZE}
+                variant="tertiary"
+                data-glass="true"
+                aria-label={a.label}
+                onPress={a.onDo}
+              >
+                {a.icon}
+              </Button>
+            ))}
+          </div>
+        </Band>
+      </header>
+
+      {/* ⚠️ THE PADDING IS BELOW THE HEADING, NOT AROUND IT. The crown above
+          already sets the top; `BAND_PAD` here would double it and push the
+          title down the screen. What was missing is air UNDER the block — the
+          first build ran the scope row straight into the first section heading,
+          two rows of words at the same left edge with nothing saying which
+          belongs to which. */}
+      <Band bleed="edge" width="work">
+        <div className={`flex flex-col ${HEAD_GAP} ${TITLE_PAD}`}>
+          <h1
+            className={TYPE.display}
+            style={{
+              opacity: past ? 0 : 1,
+              transition: past ? MOTION.exit : MOTION.enter,
+            }}
+          >
+            {title}
+          </h1>
+          {under}
+        </div>
+      </Band>
+    </>
+  );
+}
+
+/**
+ * ⚠️ ONE THRESHOLD, NOT A SCROLL-LINKED FRACTION. Driving the swap off a
+ * continuous offset means a state update per frame and a title that is half
+ * faded for as long as somebody's finger is still — which reads as a rendering
+ * fault rather than as a transition. A boolean crossed once, animated by CSS, is
+ * the same effect with none of that.
+ *
+ * ⚠️ THE HYSTERESIS IS THE POINT. Coming back UP has a lower threshold than
+ * going down, so a page resting exactly on the boundary cannot oscillate — which
+ * a single value does, visibly, on any list whose last item is near the fold.
+ */
+function useScrolledPast(down = 56, up = 32): boolean {
+  const [past, setPast] = React.useState(false);
+
+  React.useEffect(() => {
+    const onScroll = () => setPast((was) => (was ? scrollY > up : scrollY > down));
+    onScroll();
+    addEventListener("scroll", onScroll, { passive: true });
+    return () => removeEventListener("scroll", onScroll);
+  }, [down, up]);
+
+  return past;
+}
+
+/** ⚠️ Drawn here for the same reason `Lens` is — no icon library in this layer. */
+const Back = () => (
+  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M19 12H5" strokeLinecap="round" />
+    <path d="m12 19-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 
 /* ------------------------------------------------------------------ heads --- */
 
@@ -611,20 +774,21 @@ export function AppCrown(
 ) {
   return (
     /*
-      ⚠️ PINNED AND GLASS, LIKE THE NAV AND FOR THE SAME REASON. A crown that
-      scrolls away takes the account, the search and the screen's two actions
-      with it, and every one of them is something somebody reaches for in the
-      middle of reading. Content passing UNDER a plate is also what tells them
-      the page continues above — a crown that simply leaves says nothing.
+      ⚠️ PINNED, AND THE BAR ITSELF IS NOT A SURFACE. A crown that scrolls away
+      takes the account, the search and the screen's two actions with it, and
+      every one of them is something somebody reaches for in the middle of
+      reading — so it stays. What it must not do is become a PLATE.
 
-      ⚠️ AND IT IS THE OTHER HALF OF "BLUR WHAT DOES NOT SCROLL". Two fixed
-      plates per screen is the whole budget; it buys the two pieces of chrome
-      that are always there.
+      ⚠️ THE GLASS IS ON THE CONTROLS, NEVER ON THE BAR, and this shipped the
+      wrong way round once. A full-width frosted strip is the thing the whole
+      no-edges pass exists to remove: it draws a horizontal band across the top
+      of every screen, with a visible boundary where the blur stops, which is a
+      border by another name. Blurring each chip instead gives the same
+      legibility over moving content and leaves the page one surface — the
+      reference product does exactly this, and it is why its header reads as
+      controls floating on the page rather than as a toolbar bolted to it.
     */
-    <header
-      className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}
-      data-glass="true"
-    >
+    <header className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
       <Band bleed="edge" width="work">
         <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
           {/* ⚠️ `isIconOnly`, AND IT IS THE WHOLE REASON THIS ROW READS AS A ROW.

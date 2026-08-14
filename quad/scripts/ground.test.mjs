@@ -91,6 +91,24 @@ for (const file of FILES) {
       }
     }
   }
+
+  /*
+    ⚠️ AND THE SAME PROPERTY IN A STYLE OBJECT, WHICH THIS DID NOT SEE. A
+    utility class is how an edge is USUALLY drawn and it is not how an edge is
+    drawn in an SVG-adjacent component — a composition bar reached for
+    `borderInlineStart: "2px solid …"` in an inline style and passed a guard
+    whose whole subject it was. Every narrow check gets around eventually; the
+    fix is to ask the question about the property rather than about the syntax.
+  */
+  for (const [, prop] of src.matchAll(/\b(border[A-Za-z]*|boxShadow|outline[A-Za-z]*)\s*:/g)) {
+    /* ⚠️ Turning one OFF is the point of this file's rule, so it is allowed. */
+    const after = src.slice(src.indexOf(`${prop}:`)).slice(0, 80);
+    if (/:\s*(?:"none"|"0"|0\b|undefined|"transparent")/.test(after)) continue;
+    edges++;
+    fail(`${name}: draws an edge in a style object — \`${prop}\` (D7).\n` +
+         `       Same rule, different syntax. Separate two fills with a GAP that lets the\n` +
+         `       ground through, the way the stacked marks already do.`);
+  }
 }
 if (!edges) ok(`edges: ${FILES.length} file(s), none draws a border or a shadow`);
 
