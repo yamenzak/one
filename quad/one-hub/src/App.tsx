@@ -13,7 +13,7 @@
  * page, which is the same picture as a page that failed to load.
  */
 
-import { Band, Crown, Page, Spacer, Trouble, Working, TYPE } from "@quad/web";
+import { Band, Crown, NoticeHost, Page, Spacer, Trouble, Working, TYPE } from "@quad/web";
 import { Gallery } from "./screens/Gallery.js";
 import { SPECIMEN_IDS, Specimen, type SpecimenId } from "./screens/Specimens.js";
 
@@ -84,13 +84,17 @@ export function App() {
   /* ⚠️ A specimen brings its OWN page, crown and ambience — that is the whole
      claim being tested — so it replaces the Hub's frame rather than sitting
      inside it. */
-  if (specimen) return <Specimen id={specimen as SpecimenId} />;
+  /* ⚠️ `NoticeHost` mounts ONCE, beside whichever frame renders — two hosts
+     would show every notice twice, which reads as a fault in the thing being
+     announced. */
+  if (specimen) return <><NoticeHost /><Specimen id={specimen as SpecimenId} /></>;
 
   return (
     /* ⚠️ The ambience is an attribute on the frame, read by a stylesheet rule
        built from theme tokens — never an inline style, which would beat every
        token and stop a workspace's branding reaching any screen. */
     <Page sky="calm">
+      <NoticeHost />
       <Crown
         name="One"
         under={where?.root}

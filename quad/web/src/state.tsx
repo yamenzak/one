@@ -294,6 +294,43 @@ export function TilesWaiting({ tiles = 4 }: { readonly tiles?: number }) {
   );
 }
 
+/** ⚠️ The geometry `Listing` draws: a header line, then cell bars per column. */
+export function TableWaiting({ cols = 4, rows = 5 }: {
+  readonly cols?: number;
+  readonly rows?: number;
+}) {
+  return (
+    <div className={`flex flex-col ${SPACE.snug}`} role="status" aria-label="Loading table">
+      <div className={`flex ${SPACE.roomy}`}>
+        {Array.from({ length: cols }, (_, i) => (
+          <Skeleton key={i} className="h-4 grow rounded-full" />
+        ))}
+      </div>
+      {Array.from({ length: rows }, (_, r) => (
+        <div key={r} className={`flex items-center ${SPACE.roomy} h-11`}>
+          {Array.from({ length: cols }, (_, i) => (
+            <Skeleton key={i} className="h-4 grow rounded-full" />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** ⚠️ A label bar over a control-height box — what every `forms.tsx` control is. */
+export function FormWaiting({ fields = 3 }: { readonly fields?: number }) {
+  return (
+    <div className={`flex flex-col ${SPACE.roomy}`} role="status" aria-label="Loading form">
+      {Array.from({ length: fields }, (_, i) => (
+        <div key={i} className={`flex flex-col ${SPACE.tight}`}>
+          <Skeleton className="h-4 w-28 rounded-full" />
+          <Skeleton className="h-10 w-full rounded-xl" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /**
  * ⚠️ THE LAST LINE IS SHORT, WHICH IS THE WHOLE TELL. A paragraph placeholder
  * of equal-length bars reads as a table; real prose ends mid-line, and copying

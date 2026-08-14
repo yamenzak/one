@@ -27,6 +27,10 @@ import {
   ChartPanel, ColumnChart, CompositionBar, DivergingChart, DonutChart, HeatmapChart, Hero,
   LineChart, Meter, Ring, Rings, StackedChart, Stat, StatRow,
 } from "@quad/web";
+import {
+  Agree, Confirm, Crumbs, DateInput, Listing, Menu, MoneyInput, OneOf, PageTabs, Picks,
+  SearchInput, Segmented, Steps, TextInput, Timeline, Tray, notice, type Col,
+} from "@quad/web";
 import { Button } from "@heroui/react";
 import { PLATFORM_PROBLEMS, problem } from "@quad/kernel";
 import { ChartColumn, Check, CircleUser, Clock, CreditCard, Ellipsis, EyeOff, FileText, Globe, House, KeyRound, Landmark, LogIn, Mail, MessagesSquare, Package, PiggyBank, Plus, ReceiptText, Trash2, TriangleAlert } from "lucide-react";
@@ -632,6 +636,187 @@ function Report() {
   );
 }
 
+/* ------------------------------------------------------------ a backoffice --- */
+
+interface Livery {
+  readonly id: string;
+  readonly horse: string;
+  readonly owner: string;
+  readonly due: string;
+  readonly days: number;
+  readonly amount: number;
+}
+
+const LIVERIES: readonly Livery[] = [
+  { id: "L-118", horse: "Biscuit", owner: "Priya Raman", due: "12 Aug", days: 2, amount: 42000 },
+  { id: "L-117", horse: "Comet", owner: "Tom Okafor", due: "11 Aug", days: 3, amount: 38500 },
+  { id: "L-116", horse: "Nutmeg", owner: "Lena Fischer", due: "8 Aug", days: 6, amount: 51000 },
+  { id: "L-115", horse: "Atlas", owner: "Amir Al Tarsha", due: "7 Aug", days: 7, amount: 42000 },
+  { id: "L-114", horse: "Willow", owner: "Jonas Weber", due: "4 Aug", days: 10, amount: 61200 },
+  { id: "L-113", horse: "Pepper", owner: "Sofia Marino", due: "1 Aug", days: 13, amount: 38500 },
+];
+
+const stableEuros = (minor: number) =>
+  `€${(minor / 100).toLocaleString("en", { minimumFractionDigits: 2 })}`;
+
+/**
+ * A stables' billing desk — the DATA-SHAPED layout: crumbs over a title, a
+ * filter row, a sortable listing, and the second tier behind a menu. The kind
+ * of screen an operator lives in, which is why it stays `plain`.
+ */
+function Backoffice() {
+  const [view, setView] = useState("open");
+  const [q, setQ] = useState("");
+
+  const cols: readonly Col<Livery>[] = [
+    { id: "horse", label: "Horse", cell: (r) => r.horse, by: (a, b) => a.horse.localeCompare(b.horse) },
+    { id: "owner", label: "Owner", cell: (r) => r.owner, by: (a, b) => a.owner.localeCompare(b.owner) },
+    { id: "due", label: "Due", cell: (r) => r.due },
+    { id: "days", label: "Days over", numeric: true, cell: (r) => r.days, by: (a, b) => a.days - b.days },
+    { id: "amount", label: "Amount", numeric: true, cell: (r) => stableEuros(r.amount), by: (a, b) => a.amount - b.amount },
+  ];
+
+  const shown = LIVERIES.filter((r) =>
+    q === "" || `${r.horse} ${r.owner}`.toLowerCase().includes(q.toLowerCase()));
+
+  return (
+    <Page>
+      <PageCrown
+        title="Billing"
+        back={nothing}
+        actions={[{
+          id: "new", label: "New invoice", icon: glyph(<Plus />), onDo: nothing,
+        }]}
+      />
+      <Band width="work">
+        <Stack space="roomy">
+          <Crumbs trail={[
+            { label: "Aldergate Stables", onGo: nothing },
+            { label: "Money", onGo: nothing },
+            { label: "Billing" },
+          ]} />
+
+          <Cluster space="tight">
+            <Segmented label="Which invoices" value={view} onChange={setView} options={[
+              { id: "open", label: "Open" }, { id: "paid", label: "Paid" }, { id: "all", label: "All" },
+            ]} />
+            <SearchInput label="Search invoices" value={q} onChange={setQ} placeholder="Horse or owner" />
+            <Menu
+              trigger={<Button variant="tertiary">More…</Button>}
+              items={[
+                { id: "export", label: "Export month", onDo: nothing },
+                { id: "remind", label: "Send reminders", onDo: nothing },
+                { id: "void", label: "Void selected", tone: "danger", onDo: nothing },
+              ]}
+            />
+          </Cluster>
+
+          <Listing
+            label="Open liveries"
+            of={ready(shown)}
+            cols={cols}
+            rowKey={(r) => r.id}
+            onOpen={nothing}
+            pageSize={5}
+            says={{ nothing: "Nothing matches", under: "Try the owner's name" }}
+          />
+
+          <Group label="Longest overdue">
+            <AmountRow icon={glyph(<Landmark />)} label="Pepper · Sofia Marino" under="13 days over" amount="€385.00" onOpen={nothing} />
+            <AmountRow icon={glyph(<Landmark />)} label="Willow · Jonas Weber" under="10 days over" amount="€612.00" onOpen={nothing} />
+          </Group>
+
+          <Cluster space="tight">
+            <Tray
+              trigger={<Button variant="secondary">Record a payment</Button>}
+              title="Record a payment"
+              actions={<Button variant="primary" className="w-full" onPress={() => notice.ok("Payment recorded")}>Record</Button>}
+            >
+              <Stack space="roomy">
+                <MoneyInput label="Amount" value={385} onChange={nothing} currency="EUR" />
+                <DateInput label="Received on" onChange={nothing} />
+              </Stack>
+            </Tray>
+            <Confirm
+              trigger={<Button variant="tertiary">Void an invoice</Button>}
+              title="Void invoice L-113?"
+              act={{ label: "Void invoice", onDo: () => notice.warn("Invoice voided") }}
+            >
+              <span className={TYPE.body}>The livery stays; the charge is written off and audited.</span>
+            </Confirm>
+          </Cluster>
+        </Stack>
+      </Band>
+    </Page>
+  );
+}
+
+/* --------------------------------------------------------------- an enroll --- */
+
+/**
+ * A wizard mid-flight — `Steps` above, one question per group, the whole form
+ * vocabulary doing its ordinary work, and the one action pinned. `focus`
+ * because the screen IS one task.
+ */
+function Enroll() {
+  const [name, setName] = useState("");
+  const [level, setLevel] = useState<string | null>(null);
+  /* ⚠️ A CHOSEN-nothing is a fact a form may legitimately start from — but the
+     specimen preselects, both to show the state and to keep the seeded-`[]`
+     shape out of a file people copy from. */
+  const [days, setDays] = useState<readonly string[]>(["tue", "thu"]);
+  const [rate, setRate] = useState<number | undefined>(60);
+  const [ok, setOk] = useState<boolean | undefined>(false);
+
+  return (
+    <Page sky="focus">
+      <PageCrown title="New client" back={nothing} />
+      <Band>
+        <Stack space="roomy">
+          <Steps
+            at="detail"
+            steps={[
+              { id: "who", label: "Who" },
+              { id: "detail", label: "Training" },
+              { id: "plan", label: "Package" },
+              { id: "done", label: "Confirm" },
+            ]}
+          />
+
+          <TextInput label="Their name" value={name} onChange={setName} help="How the coach will see them" />
+
+          <OneOf label="Where are they starting from?" value={level} onChange={setLevel} options={[
+            { id: "new", label: "New to training", help: "First structured programme" },
+            { id: "keen", label: "Trains already", help: "Knows the movements" },
+            { id: "sharp", label: "Competitive", help: "Programming toward a meet" },
+          ]} />
+
+          <Picks label="Days they can train" value={days} onChange={setDays} options={[
+            { id: "mon", label: "Monday" }, { id: "tue", label: "Tuesday" },
+            { id: "wed", label: "Wednesday" }, { id: "thu", label: "Thursday" },
+            { id: "fri", label: "Friday" }, { id: "sat", label: "Saturday" },
+          ]} />
+
+          <MoneyInput label="Session rate" value={rate} onChange={setRate} currency="EUR" min={0}
+            help="What this client pays per session" />
+
+          <DateInput label="First session" onChange={nothing} />
+
+          <Agree label="Send them an invite email now" value={ok} onChange={setOk} />
+
+          <Timeline moments={[
+            { id: "a", when: "After you confirm", label: "They get an email", under: "A code, no password" },
+            { id: "b", when: "First sign-in", label: "They finish their own intake", under: "Injuries, preferences, schedule" },
+          ]} />
+        </Stack>
+      </Band>
+      <StickyAction>
+        <Button variant="primary" className="w-full" onPress={nothing}>Continue to package</Button>
+      </StickyAction>
+    </Page>
+  );
+}
+
 /* ------------------------------------------------------------------ picker --- */
 
 export const SPECIMENS = {
@@ -643,6 +828,8 @@ export const SPECIMENS = {
   flow: Flow,
   start: Start,
   report: Report,
+  backoffice: Backoffice,
+  enroll: Enroll,
 } as const;
 
 export type SpecimenId = keyof typeof SPECIMENS;
