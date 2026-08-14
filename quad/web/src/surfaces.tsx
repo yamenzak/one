@@ -28,7 +28,7 @@ import * as React from "react";
 import { Avatar, Button, Card, Chip, Label, Separator, Switch } from "@heroui/react";
 import type { Tone } from "@quad/kernel";
 import { TYPE } from "./type.js";
-import { FACE, HEAD_GAP, ICON, INSET, LEAD, PAD, ROW, SPACE } from "./metrics.js";
+import { CROWN_SIZE, FACE, HEAD_GAP, ICON, INSET, LEAD, PAD, ROW, SPACE } from "./metrics.js";
 import type { Inset } from "./metrics.js";
 
 /* ------------------------------------------------------------------ group --- */
@@ -354,6 +354,12 @@ export function QuickActions({ actions }: {
       {actions.slice(0, 4).map((a) => (
         <div key={a.id} className={`flex w-16 flex-col items-center ${SPACE.tight}`}>
           <Button
+            /* ⚠️ `isIconOnly` MAKES IT A CIRCLE. Without it a `Button` is
+               `w-fit px-4`, so a 22px glyph comes out in a 54×44 lozenge — four
+               of them in a row read as four buttons somebody forgot to finish,
+               against the row of equal circles this is modelled on. */
+            isIconOnly
+            size={CROWN_SIZE}
             /* ⚠️ `tertiary`, NOT `secondary`, AND THE DIFFERENCE IS THE WHOLE
                ICON PROBLEM. `.button--secondary` sets
                `--button-fg: var(--accent-soft-foreground)` — so every glyph in

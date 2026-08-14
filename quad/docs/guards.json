@@ -21,6 +21,15 @@
   ],
   "guards": [
     {
+      "id": "an-icon-control-is-a-circle",
+      "protects": "D7",
+      "stage": "5",
+      "status": "live",
+      "impl": "scripts/heroui.test.mjs",
+      "proves": "shapes:",
+      "fails": "a crown of four controls at three different widths, because a button with only a glyph in it still lays out w-fit px-4"
+    },
+    {
       "id": "the-type-scale-has-a-top",
       "protects": "D7",
       "stage": "5",

@@ -21,14 +21,14 @@
 import * as React from "react";
 import type { Tone } from "@quad/kernel";
 import { PRIMARY_MAX } from "@quad/kernel";
-import { Button, Card, Separator } from "@heroui/react";
+import { Avatar, Button, Card, Separator } from "@heroui/react";
 /* ⚠️ `Ambience`, not `theme.ts`'s older four-value `Sky`. The two drifted the
    moment patterns were added, and a `Page` that could not be given `dots` was a
    vocabulary with a piece nothing could reach. */
 import type { Ambience } from "./ambience.js";
 import { TYPE } from "./type.js";
 import {
-  BAND_PAD, CROWN, FACE, GUTTER, HERO_PAD, ICON, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
+  BAND_PAD, CROWN, CROWN_SIZE, FACE, GUTTER, HERO_PAD, ICON, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
   type Space, type Width,
 } from "./metrics.js";
 import { MOTION } from "./motion.js";
@@ -465,7 +465,14 @@ const Dot = () => <span className="flex size-2" data-tone="danger" data-dot="tru
  * conversation.
  */
 export interface AppCrownProps {
-  readonly face: React.ReactNode;
+  /**
+   * ⚠️ A PERSON, NOT A NODE. This took `React.ReactNode` and every caller in the
+   * tree passed a LINE GLYPH — so the account slot, the one place a product puts
+   * somebody's face, rendered an outline of a generic head. An arbitrary node is
+   * more generality than the slot has any use for, and it is exactly the freedom
+   * that let a placeholder become the design.
+   */
+  readonly who: { readonly name: string; readonly src?: string };
   readonly onOpenAccount: () => void;
   readonly onSearch: () => void;
   readonly searchLabel?: string;
@@ -482,39 +489,77 @@ export interface Slot {
 }
 
 export function AppCrown(
-  { face, onOpenAccount, onSearch, searchLabel = "Search", actions = [], unread }: AppCrownProps,
+  { who, onOpenAccount, onSearch, searchLabel = "Search", actions = [], unread }: AppCrownProps,
 ) {
   return (
     <header className="w-full">
       <Band bleed="edge" width="work">
         <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
-          <Button variant="ghost" data-glass="true" aria-label="Your account" onPress={onOpenAccount}>
-            {/* ⚠️ A REAL 40px FACE — see `FACE`. A 24px glyph in a 64px bar is
-                what made every crown look top-light and unfinished. */}
-            <span
-              className={`relative flex ${FACE} items-center justify-center`}
-              /* ⚠️ THE FACE SETS ITS OWN GLYPH SIZE, because `.button` sizes every
-                 svg inside it to `size-5 sm:size-4` — so the 40px slot held a
-                 16px mark and the crown still read as top-light after the slot
-                 was fixed. */
-              style={{ ["--icon" as string]: `${ICON.face}px` }}
-            >
-              {face}
+          {/* ⚠️ `isIconOnly`, AND IT IS THE WHOLE REASON THIS ROW READS AS A ROW.
+              Without it every control here is `w-fit px-4` — a 20px glyph in a
+              52×44 lozenge — so a crown built from an avatar, a field and two
+              actions came out as four different shapes at three different
+              widths. The library ships the modifier; we were not asking for it,
+              and the result was the single clearest tell that this was a copy of
+              a design rather than one. */}
+          <Button
+            isIconOnly
+            size={CROWN_SIZE}
+            variant="ghost"
+            data-glass="true"
+            aria-label="Your account"
+            onPress={onOpenAccount}
+          >
+            <span className="relative flex size-full items-center justify-center">
+              {/* ⚠️ THE LIBRARY'S `Avatar`, WHICH ALREADY KNOWS WHAT A MISSING
+                  FACE LOOKS LIKE: an initial on the theme's own tint, not an
+                  outline of a stranger. */}
+              <Avatar className="size-full">
+                {who.src ? <Avatar.Image src={who.src} alt="" /> : null}
+                <Avatar.Fallback>{who.name.slice(0, 1).toUpperCase()}</Avatar.Fallback>
+              </Avatar>
               {unread
-                ? <span aria-hidden="true" className="absolute -top-1 -right-1"><Dot /></span>
+                ? <span aria-hidden="true" className="absolute -top-0.5 -right-0.5"><Dot /></span>
                 : null}
             </span>
           </Button>
 
           {/* ⚠️ SEARCH IS A BUTTON HERE, NOT A FIELD. A live input in the crown
               is a keyboard on every screen the moment a thumb brushes it; the
-              real search is a surface of its own. */}
-          <Button variant="tertiary" data-glass="true" className="grow justify-start" onPress={onSearch}>
-            {searchLabel}
+              real search is a surface of its own.
+
+              ⚠️ AND IT CARRIES THE GLASS, WHICH IT DID NOT. A field with no
+              affordance in it is a label — every product that puts search in the
+              crown draws the lens, because that is what makes a row of words
+              read as somewhere to type. Ours said "Search jobs" and looked like
+              a heading. */}
+          <Button
+            size={CROWN_SIZE}
+            variant="tertiary"
+            data-glass="true"
+            className={`grow justify-start ${SPACE.tight}`}
+            onPress={onSearch}
+          >
+            <Lens />
+            {/* ⚠️ `text-muted` AND NOT `TYPE.note`, WHICH IS THE SIZE TOO. A
+                placeholder is secondary in COLOUR at the control's own size; the
+                note role is 14px, so the words inside a 44px field came out a
+                step smaller than the field, which is the compressed look this
+                whole pass is about. Muted is a token; the size stays the
+                button's. */}
+            <span className="text-muted">{searchLabel}</span>
           </Button>
 
           {actions.map((a) => (
-            <Button key={a.id} variant="tertiary" data-glass="true" aria-label={a.label} onPress={a.onDo}>
+            <Button
+              key={a.id}
+              isIconOnly
+              size={CROWN_SIZE}
+              variant="tertiary"
+              data-glass="true"
+              aria-label={a.label}
+              onPress={a.onDo}
+            >
               {a.icon}
             </Button>
           ))}
@@ -523,3 +568,17 @@ export function AppCrown(
     </header>
   );
 }
+
+/**
+ * ⚠️ THE ONE GLYPH THE SHARED LAYER DRAWS ITSELF, and it is drawn rather than
+ * imported for a reason that is not taste: `@quad/web` takes no icon library as
+ * a dependency, because the app choosing one is the app\'s decision and a shared
+ * package that picks for it is a shared package every app has to fight. A lens
+ * is eleven characters of path data and it is the only mark this layer needs.
+ */
+const Lens = () => (
+  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.5-3.5" strokeLinecap="round" />
+  </svg>
+);

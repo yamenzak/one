@@ -201,7 +201,7 @@ export function Gallery() {
         ] as const).map(([where, one, two]) => (
           <AppCrown
             key={where}
-            face={glyph(<CircleUser />)}
+            who={{ name: "Amara Osei" }}
             unread={where === "Home"}
             onOpenAccount={nothing}
             onSearch={nothing}

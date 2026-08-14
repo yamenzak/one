@@ -89,6 +89,21 @@ export type Inset = keyof typeof INSET;
 /** ⚠️ One crown, one height. Two of them at different heights is two products. */
 export const CROWN = "min-h-16" as const;
 
+/**
+ * ⚠️ EVERY CONTROL IN THE CROWN IS THE SAME SIZE, AND THAT SIZE IS `lg`. Measured
+ * against a product that reads well, the top row is a 40px band of equal
+ * elements — avatar, field, actions — at around 17px type. The library's default
+ * `md` is 40px tall but only 14px type, which is what made ours read as a
+ * miniature of the same idea; `lg` is 44/16 and errs on the confident side.
+ *
+ * ⚠️ AND `isIconOnly` IS NOT OPTIONAL ON AN ICON CONTROL. Without it a `Button`
+ * is `w-fit px-4`, so a 20px glyph comes out in a 52×44 LOZENGE — the single
+ * clearest reason our crown looked like a cheap copy of one made of circles.
+ * The library ships the modifier (`.button--icon-only` is `w-11 p-0`); we simply
+ * were not asking for it.
+ */
+export const CROWN_SIZE = "lg" as const;
+
 /* ------------------------------------------------------------------ stacks --- */
 
 /**

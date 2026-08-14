@@ -306,6 +306,36 @@ for (const file of FILES) {
 }
 if (!tinted) ok(`glyphs: no icon control is tinted with the brand`);
 
+/**
+ * ⚠️ AN ICON CONTROL IS A CIRCLE, AND WITHOUT `isIconOnly` IT IS A LOZENGE.
+ * `.button` is `w-fit px-4`, so a 20px glyph in a 44px-tall button comes out
+ * 52×44 — and a crown built from an avatar, a field and two actions came out as
+ * four different shapes at three different widths. Set against a product whose
+ * top row is four equal circles, that one omission is most of what read as
+ * cheap: not the colours, not the spacing, the SHAPES.
+ *
+ * ⚠️ IT IS FINDABLE BECAUSE THE ACCESSIBLE NAME GIVES IT AWAY. A control with an
+ * `aria-label` and no words in it is, by construction, a control whose only
+ * content is a glyph — which is the same condition `isIconOnly` describes. The
+ * library ships the modifier; the only way to get this wrong is not to ask.
+ */
+let lozenge = 0;
+for (const file of FILES) {
+  const src = readFileSync(file, "utf8");
+  for (const m of src.matchAll(/<Button\b([^>]*)>([\s\S]*?)<\/Button>/g)) {
+    const [, attrs, body] = m;
+    if (!/aria-label=/.test(attrs) || /isIconOnly/.test(attrs)) continue;
+    /* Words between the tags — a label, not a glyph expression or an element. */
+    const words = body.replace(/\{[^}]*\}|<[^>]*>|\/\*[\s\S]*?\*\//g, "").trim();
+    if (words) continue;
+    lozenge++;
+    fail(`${rel(file)}: an icon-only <Button> without \`isIconOnly\` (D7).\n` +
+         `       It renders \`w-fit px-4\` — a glyph in a lozenge, not a circle, and a row\n` +
+         `       of them is a row of different widths. The library ships the modifier.`);
+  }
+}
+if (!lozenge) ok(`shapes: every icon-only control asks the library to be one`);
+
 console.log(bad
   ? `\nheroui: ${bad} finding(s) — a screen branding will not reach.`
   : `\nheroui: components as they ship, themed through tokens.`);

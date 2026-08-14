@@ -44,7 +44,7 @@ function Workshop() {
         ]} />}
     >
       <AppCrown
-        face={glyph(<CircleUser />)}
+        who={{ name: "Amara Osei" }}
         unread
         onOpenAccount={nothing}
         onSearch={nothing}
@@ -244,7 +244,7 @@ function Start() {
         ]} />}
     >
       <AppCrown
-        face={glyph(<CircleUser />)}
+        who={{ name: "Amara Osei" }}
         onOpenAccount={nothing}
         onSearch={nothing}
         searchLabel="Search the ward"
