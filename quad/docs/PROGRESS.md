@@ -174,6 +174,20 @@ refuse — it reads as built and passes every test.
   every background with nothing else edited.
 - `field.tsx` — a declared field becomes a control, and a stored secret is never
   rendered back.
+- `chart/` — nine chart forms, five figures, and the arithmetic under them, as
+  inline SVG with no library. `scale.ts` decides (a domain that includes zero for
+  a length and excludes it for a slope, nice ticks, a mark capped at 24px, a
+  stack that keeps each sign on its own side) and is TESTED, because a bar at the
+  correct pixel for the wrong number looks exactly like one at the correct pixel
+  for the right number. `palette.ts` splits the four colour jobs and settles the
+  one that matters: **identity is the platform's and magnitude is the brand's** —
+  the eight categorical hues are fixed, ordered, never cycled and validated to
+  stay separable under protanopia and deuteranopia, so a workspace cannot recolour
+  a chart into one a colourblind reader cannot use. The diverging poles are
+  measured for the same reason and are deliberately NOT `--success`/`--danger`.
+  `charts.tsx` draws; `figures.tsx` is the number a screen exists for, the delta
+  beside it, and a meter. There is no pie and no second y-axis, and the API has
+  nowhere to put either.
 
 **Money — one workspace, several products, one bill.**
 
@@ -377,7 +391,7 @@ the library decides FOR us.
 | `ones-wildcard-never-covers-a-live-tenants-address` | D3 | route precedence rather than intent deciding who answers a paying customer's own subdomain |
 | `a-deployment-that-cannot-sign-refuses-to-serve` | D12 | every sign-in code signed with a constant anybody reading the repository already has, on a deployment where nothing looks wrong |
 | `no-screen-writes-its-own-easing-or-duration` | D7 | a product where a drawer, a toast and a card each decelerate differently — nothing broken, nothing nameable, and it reads as cheap |
-| `motion-answers-to-the-reduced-motion-setting` | D7 | a background that keeps moving for somebody who asked it to stop, which for some people is a symptom rather than a preference |
+| `motion-answers-to-the-reduced-motion-setting` | D7 | an animation that keeps running for somebody who asked it to stop, which for some people is a symptom rather than a preference |
 | `typography-is-a-role-not-a-size` | D7 | thirty screens each choosing a defensible heading size, and a product with no typographic system at all |
 | `every-collection-records-who-and-when` | D12 | a record nobody can attribute, discovered at the moment somebody needs to know who changed it |
 | `the-generated-edit-actually-writes` | D12 | an edit that passes the gate, writes an audit entry saying it happened, answers 200 — and changes nothing |

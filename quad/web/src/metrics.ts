@@ -176,6 +176,19 @@ export type Space = keyof typeof SPACE;
  */
 export const PAD = "p-4" as const;
 
+/**
+ * ⚠️ A CARD FULL OF ROWS PADS SIDEWAYS ONLY, BECAUSE THE ROWS PAD THEMSELVES.
+ * `.card` is `p-4` and every row is `py-3`, so the first row sat 28px below the
+ * card's top edge and the last 28 above the bottom — a card of three rows with
+ * a row and a half of air stacked at each end. It reads as a component that has
+ * been given room twice, which is what it is.
+ *
+ * ⚠️ HORIZONTAL PADDING STAYS, because nothing else supplies it: the rows are
+ * flush by design (see `ROW.flush`) so that a separator can line up with the
+ * labels rather than with the card.
+ */
+export const CARD_ROWS = "px-4 py-0" as const;
+
 /** Between a section's heading and the card under it. */
 export const HEAD_GAP = "gap-2" as const;
 
@@ -214,6 +227,13 @@ export const ACTION_SPACE = "pb-24" as const;
  * gesture bar over it, which reads as a layout nobody tested.
  */
 export const SAFE_BOTTOM = "pb-[max(0.75rem,env(safe-area-inset-bottom))]" as const;
+
+/**
+ * ⚠️ AND THE TOP, WHICH MATTERS THE MOMENT THE CROWN STICKS. A bar pinned to the
+ * top of a phone sits under the status bar and the notch; the crown got away
+ * with it while it scrolled off, and stops the moment it does not.
+ */
+export const SAFE_TOP = "pt-[env(safe-area-inset-top)]" as const;
 
 /* ------------------------------------------------------------------ widths --- */
 

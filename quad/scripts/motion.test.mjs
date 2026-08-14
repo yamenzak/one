@@ -87,21 +87,37 @@ if (!curves) ok(`curves: no screen writes its own easing or duration`);
 /* ------------------------------------------------------------- the keyframes --- */
 
 /**
- * ⚠️ A `@keyframes` IS THE ONE THING THAT ESCAPES THE LIBRARY'S REDUCED-MOTION
- * RULES ENTIRELY. A transition can be switched off by setting
- * `transition-property: none`; a running animation carries on.
+ * ⚠️ THE RULE IS "EVERY MOTION ANSWERS TO THE SETTING", AND A BAN ON KEYFRAMES
+ * WAS A PROXY FOR IT. The proxy was right for a year and then a chart needed a
+ * reveal — a thing with no prior state, which a transition cannot express
+ * without a mount effect and a forced reflow. Refusing it would have meant
+ * either no animated charts or a JS tween, and a tween is the one form of motion
+ * that genuinely cannot be switched off. The narrow check is the one that gets
+ * waived; this one asks the real question instead.
+ *
+ * ⚠️ SO A KEYFRAME IS LEGAL WHEN THE SAME FILE SWITCHES IT OFF BOTH WAYS: the
+ * media query for the OS setting, and the `data-reduce-motion` ancestor for the
+ * in-app one. Either alone leaves half the people who asked still watching it.
  */
+const offBoth = (src, name) =>
+  /prefers-reduced-motion:\s*reduce/.test(src)
+  && /data-reduce-motion="true"/.test(src)
+  && new RegExp(`animation:[^;]*${name}`).test(src);
+
 let frames = 0;
 for (const file of SOURCES) {
   const src = strip(readFileSync(file, "utf8"));
   for (const [, name] of src.matchAll(/@keyframes\s+([\w-]+)/g)) {
+    if (offBoth(src, name)) continue;
     frames++;
-    fail(`${rel(file)}: declares @keyframes ${name}.\n` +
+    fail(`${rel(file)}: declares @keyframes ${name} and does not switch it off.\n` +
+         `       A keyframe is legal only where the SAME file turns it off for both\n` +
+         `       \`prefers-reduced-motion\` and a \`data-reduce-motion\` ancestor.\n` +
          `       It sits outside HeroUI's reduced-motion handling, so it keeps moving\n` +
          `       for somebody who asked it to stop. Use a transition on a token.`);
   }
 }
-if (!frames) ok(`keyframes: none hand-rolled, so every motion answers to the setting`);
+if (!frames) ok(`keyframes: every one is switched off both ways`);
 
 /* ------------------------------------------------------------------- roles --- */
 

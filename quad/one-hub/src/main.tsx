@@ -1,6 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { FACE_CSS, GROUND_CSS, SKY_MOTION, ambienceStylesheet, applyAppearance } from "@quad/web";
+import {
+  CHART_MOTION, FACE_CSS, GROUND_CSS, SKY_MOTION, ambienceStylesheet, applyAppearance,
+} from "@quad/web";
 import "./styles.css";
 import { App } from "./App.js";
 import { SessionProvider } from "./session.js";

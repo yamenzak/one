@@ -1,0 +1,202 @@
+/**
+ * WHEN THE FORM IS A NUMBER RATHER THAN A CHART.
+ *
+ * ⚠️ THE MOST COMMON CHART MISTAKE IS DRAWING ONE AT ALL. A single current value
+ * is a stat tile, not a one-bar bar chart. A handful of headline numbers is a row
+ * of tiles, not a grouped bar chart. A ratio against a limit is a meter, not a
+ * pie of two slices. Each of those substitutions costs the reader a decode step
+ * to learn something they could have read.
+ *
+ * ⚠️ SO THESE COME FIRST IN THE VOCABULARY, and a chart is what you reach for
+ * when the shape of the change is the point rather than the number.
+ */
+
+import * as React from "react";
+import { TYPE } from "../type.js";
+import { PAD, SPACE } from "../metrics.js";
+import { Sparkline } from "./charts.js";
+import { type Point, compact } from "./scale.js";
+
+/* ------------------------------------------------------------------ delta --- */
+
+/**
+ * ⚠️ A DELTA'S COLOUR IS DIRECTION × WHETHER UP IS GOOD, WHICH IS TWO FACTS AND
+ * NOT ONE. Spend went up is red; revenue went up is green; churn went down is
+ * green. A component that paints every rise green is one that congratulates
+ * somebody on their costs, and it is the single most common way a dashboard is
+ * confidently wrong.
+ *
+ * ⚠️ AND IT CARRIES AN ARROW AS WELL AS A COLOUR. Status by hue alone fails the
+ * readers this whole palette is chosen to protect.
+ */
+export function Delta({ value, of, upIsGood = true, unit = "" }: {
+  readonly value: number;
+  /** ⚠️ Named, always: "vs last month" — a delta against nothing is a number. */
+  readonly of: string;
+  readonly upIsGood?: boolean;
+  readonly unit?: string;
+}) {
+  if (!value) return <span className={TYPE.note}>No change {of}</span>;
+  const up = value > 0;
+  const good = up === upIsGood;
+  return (
+    <span
+      className={`inline-flex items-center ${SPACE.tight} ${TYPE.note}`}
+      data-tone={good ? "success" : "danger"}
+      style={{ color: good ? "var(--success)" : "var(--danger)" }}
+    >
+      <span aria-hidden="true">{up ? "▲" : "▼"}</span>
+      {unit}{compact(Math.abs(value))}
+      <span className="text-muted">{of}</span>
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------- stat --- */
+
+/**
+ * A LABEL, A VALUE, AN OPTIONAL DELTA AND AN OPTIONAL TWELVE-POINT TREND.
+ *
+ * ⚠️ THE VALUE USES PROPORTIONAL FIGURES, NOT TABULAR ONES. `tabular-nums` gives
+ * every digit a zero's width, which is exactly right in a column and visibly
+ * loose at display size — a standalone `121` set in tabular figures has a gap
+ * either side of the ones. Tabular is for things that must align vertically.
+ */
+export function Stat({ label, value, unit = "", delta, trend, upIsGood = true }: {
+  readonly label: string;
+  readonly value: number | string;
+  readonly unit?: string;
+  readonly delta?: { readonly value: number; readonly of: string };
+  readonly trend?: readonly Point[];
+  readonly upIsGood?: boolean;
+}) {
+  return (
+    <div className={`flex flex-col ${SPACE.tight}`}>
+      <span className={TYPE.note}>{label}</span>
+      <span className={`flex items-baseline ${SPACE.tight}`}>
+        <span className={TYPE.figure} style={{ fontVariantNumeric: "proportional-nums" }}>
+          {unit}{typeof value === "number" ? compact(value) : value}
+        </span>
+        {delta ? <Delta value={delta.value} of={delta.of} upIsGood={upIsGood} unit={unit} /> : null}
+      </span>
+      {trend ? <Sparkline points={trend} /> : null}
+    </div>
+  );
+}
+
+/**
+ * ⚠️ A ROW OF TILES, AND IT WRAPS RATHER THAN SCROLLS. A KPI row that scrolls
+ * sideways hides the number somebody came for on a phone, and nothing tells them
+ * it is there.
+ */
+export function StatRow({ children }: { readonly children: React.ReactNode }) {
+  return (
+    <div
+      className={`grid ${SPACE.roomy}`}
+      style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(8rem, 45%), 1fr))" }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------- hero --- */
+
+/**
+ * ⚠️ EXACTLY ONE PER VIEW, AND IT IS THE NUMBER THE SCREEN EXISTS FOR. Two heroes
+ * is no hero — the eye has to choose, and whichever it picks was not the
+ * decision anybody designed. It takes `display` from the type scale, which is
+ * where the ≥ 48px rule already lives.
+ */
+export function Hero({ eyebrow, value, unit = "", delta, upIsGood = true }: {
+  readonly eyebrow?: string;
+  readonly value: number | string;
+  readonly unit?: string;
+  readonly delta?: { readonly value: number; readonly of: string };
+  readonly upIsGood?: boolean;
+}) {
+  return (
+    <div className={`flex flex-col items-center ${SPACE.tight} text-center`}>
+      {eyebrow ? <span className={TYPE.note}>{eyebrow}</span> : null}
+      <span className={TYPE.display}>
+        {unit}{typeof value === "number" ? compact(value) : value}
+      </span>
+      {delta ? <Delta value={delta.value} of={delta.of} upIsGood={upIsGood} unit={unit} /> : null}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ meter --- */
+
+/**
+ * A RATIO AGAINST A LIMIT — storage used, budget spent, seats taken.
+ *
+ * ⚠️ THE TRACK IS A LIGHTER STEP OF THE FILL'S OWN RAMP, NOT A GREY. Blue on
+ * blue means the state reads across the whole bar rather than only where the
+ * fill has got to, which is what lets somebody see "nearly full" without
+ * measuring it against the end.
+ *
+ * ⚠️ AND THE FILL CARRIES SEVERITY. A meter that is the same colour at 40% and
+ * at 99% is a meter that never told anybody anything.
+ */
+export function Meter({ label, value, limit, unit = "" }: {
+  readonly label: string;
+  readonly value: number;
+  readonly limit: number;
+  readonly unit?: string;
+}) {
+  const share = limit > 0 ? Math.max(0, Math.min(1, value / limit)) : 0;
+  const tone = share >= 0.9 ? "danger" : share >= 0.75 ? "warning" : "accent";
+  return (
+    <div className={`flex w-full flex-col ${SPACE.tight}`}>
+      <span className={`flex items-baseline justify-between ${SPACE.tight}`}>
+        <span className={TYPE.label}>{label}</span>
+        <span className={`${TYPE.note} tabular-nums`}>
+          {unit}{compact(value)} of {unit}{compact(limit)}
+        </span>
+      </span>
+      <span
+        role="meter"
+        aria-valuenow={value} aria-valuemin={0} aria-valuemax={limit} aria-label={label}
+        className="flex h-2 w-full overflow-hidden rounded-full"
+        style={{ background: `color-mix(in oklab, var(--${tone}) 18%, var(--surface))` }}
+      >
+        <span
+          data-draw="true"
+          className="flex h-full rounded-full"
+          style={{ width: `${share * 100}%`, background: `var(--${tone})` }}
+        />
+      </span>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ panel --- */
+
+/**
+ * ⚠️ A CHART GOES IN A CARD LIKE ANYTHING ELSE, and this is that card with its
+ * heading. It exists so a chart never carries its own padding — the double
+ * padding a card and a component both supply is the same fault the row shapes
+ * had, and a chart is the most likely thing to repeat it because it arrives with
+ * a viewBox and looks like it should own its own margins.
+ */
+export function ChartPanel({ label, under, aside, children }: {
+  readonly label: string;
+  readonly under?: string;
+  /** A range picker, a filter — one row, above the plot. */
+  readonly aside?: React.ReactNode;
+  readonly children: React.ReactNode;
+}) {
+  return (
+    <section className={`flex flex-col ${SPACE.snug} ${PAD}`}>
+      <div className={`flex items-start justify-between ${SPACE.snug}`}>
+        <div className="flex min-w-0 flex-col gap-1">
+          <h3 className={TYPE.label}>{label}</h3>
+          {under ? <p className={TYPE.note}>{under}</p> : null}
+        </div>
+        {aside ? <div className="shrink-0">{aside}</div> : null}
+      </div>
+      {children}
+    </section>
+  );
+}

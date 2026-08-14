@@ -728,8 +728,8 @@
       "stage": "10",
       "status": "live",
       "impl": "scripts/motion.test.mjs",
-      "proves": "keyframes: none hand-rolled, so every motion answers to the setting",
-      "fails": "a background that keeps moving for somebody who asked it to stop, which for some people is a symptom rather than a preference"
+      "proves": "keyframes: every one is switched off both ways",
+      "fails": "an animation that keeps running for somebody who asked it to stop, which for some people is a symptom rather than a preference"
     },
     {
       "id": "typography-is-a-role-not-a-size",

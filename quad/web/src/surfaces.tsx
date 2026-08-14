@@ -28,7 +28,7 @@ import * as React from "react";
 import { Avatar, Button, Card, Chip, Label, Separator, Switch } from "@heroui/react";
 import type { Tone } from "@quad/kernel";
 import { TYPE } from "./type.js";
-import { CROWN_SIZE, FACE, HEAD_GAP, ICON, INSET, LEAD, PAD, ROW, SPACE } from "./metrics.js";
+import { CARD_ROWS, CROWN_SIZE, FACE, HEAD_GAP, ICON, INSET, LEAD, PAD, ROW, SPACE } from "./metrics.js";
 import type { Inset } from "./metrics.js";
 
 /* ------------------------------------------------------------------ group --- */
@@ -50,8 +50,11 @@ export function Group({ label, under, children }: GroupProps) {
           {under ? <p className={TYPE.note}>{under}</p> : null}
         </div>
       ) : null}
-      <Card>
-        <Card.Content>
+      <Card className={CARD_ROWS}>
+        {/* ⚠️ `gap-0` — `.card__content` ships `gap-1`, so four pixels sat
+            between every row ON TOP of the separator that already says where
+            one ends. A rule with air either side of it is a rule you notice. */}
+        <Card.Content className="gap-0">
           <div className="flex flex-col">{ruled(children)}</div>
         </Card.Content>
       </Card>

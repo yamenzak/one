@@ -64,6 +64,8 @@ const VOICE = {
   under: "under",
   lead: "under",
   description: "under",
+  /* ⚠️ A chart's accessible name — read aloud, never rendered. A description. */
+  describes: "under",
   says: "empty",
 };
 
@@ -87,8 +89,8 @@ for (const file of SOURCES) {
 
   /* `label: "…"` in a declaration, and `label="…"` on a component. */
   const written = [
-    ...src.matchAll(/\b(title|label|summary|under|lead|description|says)\s*:\s*"([^"\\]{2,})"/g),
-    ...src.matchAll(/\b(title|label|summary|under|lead|description|says)\s*=\s*"([^"\\]{2,})"/g),
+    ...src.matchAll(/\b(title|label|summary|under|lead|description|describes|says)\s*:\s*"([^"\\]{2,})"/g),
+    ...src.matchAll(/\b(title|label|summary|under|lead|description|describes|says)\s*=\s*"([^"\\]{2,})"/g),
   ];
 
   for (const [, prop, text] of written) {

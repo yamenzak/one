@@ -21,6 +21,10 @@ import {
   QuickActions, Row, SeeAll, Section, Stack, StepRow, StickyAction,
   TileGrid, Title, ToggleRow, FieldRow, TYPE,
 } from "@quad/web";
+import {
+  ChartPanel, ColumnChart, DivergingChart, HeatmapChart, Hero, LineChart, Meter,
+  StackedChart, Stat, StatRow,
+} from "@quad/web";
 import { Button } from "@heroui/react";
 import { ChartColumn, Check, CircleUser, Clock, CreditCard, Ellipsis, EyeOff, FileText, Globe, House, KeyRound, Landmark, LogIn, Mail, MessagesSquare, Package, PiggyBank, Plus, ReceiptText, Trash2, TriangleAlert } from "lucide-react";
 
@@ -114,12 +118,17 @@ function Settings() {
 
   return (
     <Page sky="veil">
-      <Crown name="Ironworks Studio" under="Settings" width="read" />
+      <Crown name="Ironworks Studio" width="read" />
       <Band>
         <Stack space="roomy">
-          <Title under="What this workspace does without being asked">Automatic</Title>
+          {/* ⚠️ ONE TITLE, AND IT IS THE SCREEN. This had the crown saying
+              "Settings" and the title saying "Automatic", which is two headers
+              for one screen and neither of them its name — so the eye read the
+              first card's heading as the page and everything after it as
+              unrelated. The sections are `Group` labels, all of them. */}
+          <Title>Settings</Title>
 
-          <Group>
+          <Group label="Automatic" under="What this workspace does without being asked">
             <ToggleRow
               icon={glyph(<EyeOff />)}
               label="Quiet hours"
@@ -293,6 +302,125 @@ function Start() {
   );
 }
 
+/* --------------------------------------------------------------- a report --- */
+
+/**
+ * ⚠️ A SCREEN MADE ENTIRELY OF THE CHART VOCABULARY, and it is the specimen that
+ * matters most: a catalogue proves each form draws, while only a whole report
+ * shows whether a stat tile, a hero, a meter and four charts can share one page
+ * without any of them needing a measurement.
+ */
+function Report() {
+  const days = Array.from({ length: 30 }, (_, i) => i);
+  const spend = days.map((d) => ({
+    x: d,
+    /* A run with a gap in it, because a real series has one. */
+    y: d === 17 ? null : Math.round(180 + d * 14 + Math.sin(d / 2.4) * 90),
+  }));
+  const forecast = days.map((d) => ({ x: d, y: d < 14 ? null : Math.round(340 + d * 15) }));
+
+  return (
+    <Page sky="tide">
+      <AppCrown
+        who={{ name: "Amara Osei" }}
+        onOpenAccount={nothing}
+        onSearch={nothing}
+        searchLabel="Search reports"
+        actions={[
+          { id: "range", label: "Date range", icon: glyph(<Clock />), onDo: nothing },
+          { id: "export", label: "Export", icon: glyph(<FileText />), onDo: nothing },
+        ]}
+      />
+      <Band width="work">
+        <Stack space="roomy">
+          <Hero eyebrow="Spent this month" value={12914} unit="£" delta={{ value: 2140, of: "vs last" }} upIsGood={false} />
+
+          <StatRow>
+            <Stat label="Jobs booked" value={128} delta={{ value: 12, of: "vs last" }} trend={spend.slice(0, 12)} />
+            <Stat label="Average job" value={101} unit="£" delta={{ value: -4, of: "vs last" }} />
+            <Stat label="Awaiting parts" value={7} delta={{ value: 0, of: "vs last" }} />
+          </StatRow>
+
+          <Group label="Where it went">
+            <ChartPanel label="Spend by day" under="This month against the forecast">
+              <LineChart
+                describes="Spend by day, this month against the forecast"
+                series={[
+                  { id: "actual", label: "Actual", points: spend, subject: true },
+                  { id: "forecast", label: "Forecast", points: forecast },
+                ]}
+              />
+            </ChartPanel>
+          </Group>
+
+          <Group label="By bay">
+            <ChartPanel label="Hours logged" under="Bay 2 is the one to look at">
+              <ColumnChart
+                describes="Hours logged by bay"
+                subject={1}
+                data={[
+                  { label: "Bay 1", value: 62 }, { label: "Bay 2", value: 104 },
+                  { label: "Bay 3", value: 71 }, { label: "Bay 4", value: 44 },
+                ]}
+              />
+            </ChartPanel>
+          </Group>
+
+          <Group label="Against last month">
+            <ChartPanel label="Change by category">
+              <DivergingChart
+                describes="Change by category against last month"
+                data={[
+                  { label: "Parts", value: 340 }, { label: "Labour", value: -120 },
+                  { label: "Tyres", value: 90 }, { label: "Fluids", value: -40 },
+                ]}
+              />
+            </ChartPanel>
+          </Group>
+
+          <Group label="What it is made of">
+            <ChartPanel label="Revenue by line" under="Four weeks">
+              <StackedChart
+                describes="Revenue by line over four weeks"
+                groups={["W1", "W2", "W3", "W4"]}
+                series={[
+                  { id: "parts", label: "Parts", values: [12, 15, 11, 18] },
+                  { id: "labour", label: "Labour", values: [22, 20, 26, 24] },
+                  { id: "other", label: "Other", values: [4, 6, 5, 7] },
+                ]}
+              />
+            </ChartPanel>
+          </Group>
+
+          <Group label="Busiest hours">
+            <ChartPanel label="Jobs by day and hour">
+              <HeatmapChart
+                describes="Jobs by day and hour"
+                rows={["Mon", "Tue", "Wed", "Thu", "Fri"]}
+                columns={["8", "10", "12", "14", "16", "18"]}
+                values={[
+                  [1, 4, 6, 5, 3, 1], [2, 5, 7, 6, 4, 2], [1, 3, 8, 7, 5, 1],
+                  [3, 6, 9, 8, 4, 2], [2, 4, 5, null, 2, 1],
+                ]}
+              />
+            </ChartPanel>
+          </Group>
+
+          <Group label="Where you stand">
+            <ChartPanel label="This month's allowances">
+              <Stack space="snug">
+                <Meter label="Parts budget" value={4200} limit={5000} unit="£" />
+                <Meter label="Bay hours" value={281} limit={300} />
+                <Meter label="Storage" value={12} limit={50} unit="GB" />
+              </Stack>
+            </ChartPanel>
+          </Group>
+        </Stack>
+      </Band>
+    </Page>
+  );
+}
+
 /* ------------------------------------------------------------------ picker --- */
 
 export const SPECIMENS = {
@@ -301,6 +429,7 @@ export const SPECIMENS = {
   detail: Detail,
   flow: Flow,
   start: Start,
+  report: Report,
 } as const;
 
 export type SpecimenId = keyof typeof SPECIMENS;

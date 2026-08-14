@@ -28,7 +28,8 @@ import { Avatar, Button, Card, Separator } from "@heroui/react";
 import type { Ambience } from "./ambience.js";
 import { TYPE } from "./type.js";
 import {
-  BAND_PAD, CROWN, CROWN_SIZE, FACE, GUTTER, HEAD_GAP, HERO_PAD, ICON, ISLAND_ITEM, ISLAND_PAD, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
+  BAND_PAD, CROWN, CROWN_SIZE, FACE, GUTTER, HEAD_GAP, HERO_PAD, ICON, ISLAND_ITEM, ISLAND_PAD,
+  SAFE_TOP, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
   type Space, type Width,
 } from "./metrics.js";
 import { MOTION } from "./motion.js";
@@ -203,7 +204,7 @@ export function Crown(
   { mark, name, under, aside, bleed = "hold", width = "read" }: CrownProps,
 ) {
   return (
-    <header className="w-full">
+    <header className={`sticky top-0 z-10 w-full ${SAFE_TOP}`} data-glass="true">
       <Band bleed={bleed} width={width}>
         <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
           {mark ? <span aria-hidden="true" className="flex items-center">{mark}</span> : null}
@@ -609,7 +610,21 @@ export function AppCrown(
   { who, onOpenAccount, onSearch, searchLabel = "Search", actions = [], unread }: AppCrownProps,
 ) {
   return (
-    <header className="w-full">
+    /*
+      ⚠️ PINNED AND GLASS, LIKE THE NAV AND FOR THE SAME REASON. A crown that
+      scrolls away takes the account, the search and the screen's two actions
+      with it, and every one of them is something somebody reaches for in the
+      middle of reading. Content passing UNDER a plate is also what tells them
+      the page continues above — a crown that simply leaves says nothing.
+
+      ⚠️ AND IT IS THE OTHER HALF OF "BLUR WHAT DOES NOT SCROLL". Two fixed
+      plates per screen is the whole budget; it buys the two pieces of chrome
+      that are always there.
+    */
+    <header
+      className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}
+      data-glass="true"
+    >
       <Band bleed="edge" width="work">
         <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
           {/* ⚠️ `isIconOnly`, AND IT IS THE WHOLE REASON THIS ROW READS AS A ROW.
