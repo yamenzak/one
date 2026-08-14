@@ -14,17 +14,20 @@ export default defineWorkersConfig({
   test: {
     /* ⚠️ The screen suite is its own project — see vitest.screens.config.ts. */
     /*
-      ⚠️ ONE FILE AT A TIME AND NO ISOLATION. These suites describe a
-      deployment's life — shards registered, tenants placed, schema applied — and
-      running them concurrently against one store is contention by construction.
-      It surfaces as a different test failing on each run, none of them near the
-      code that caused it.
+      ⚠️ ONE FILE AT A TIME, AND EVERY TEST GETS ITS OWN WORLD. These suites
+      describe a deployment's life — shards registered, tenants placed, schema
+      applied — so they write the same names into the same databases. Sharing one
+      store makes each of them a test of whichever ran first, and it surfaces as a
+      different test failing on each run, none near the code that caused it.
+
+      ⚠️ AND THERE IS NO `retry`, DELIBERATELY. A retry is what a shared store has
+      instead of isolation: it turns a suite that is wrong some of the time into a
+      suite that is green, and absorbs the next real intermittent failure with it.
     */
     fileParallelism: false,
-    retry: 1,
     poolOptions: {
       workers: {
-        isolatedStorage: false,
+        isolatedStorage: true,
         miniflare: {
           compatibilityDate: "2025-07-12",
           compatibilityFlags: ["nodejs_compat"],

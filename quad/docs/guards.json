@@ -237,6 +237,15 @@
       "proves": "lazy:"
     },
     {
+      "id": "every-test-gets-its-own-world",
+      "protects": "D12",
+      "stage": "3",
+      "status": "live",
+      "fails": "a suite that is wrong half the time and green every time, with the next real intermittent failure absorbed by the same line",
+      "impl": "scripts/apps.test.mjs",
+      "proves": "suites:"
+    },
+    {
       "id": "no-service-call-is-made-over-fetch",
       "protects": "D3",
       "stage": "7",

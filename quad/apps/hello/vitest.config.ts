@@ -15,17 +15,33 @@ export default defineWorkersConfig({
     /* ⚠️ The screen suite is its own project — see vitest.screens.config.ts. */
     exclude: ["**/*.screens.test.tsx", "**/node_modules/**"],
     /*
-      ⚠️ ONE FILE AT A TIME AND NO ISOLATION. These suites describe a
-      deployment's life — shards registered, tenants placed, schema applied — and
-      running them concurrently against one store is contention by construction.
-      It surfaces as a different test failing on each run, none of them near the
-      code that caused it.
+      ⚠️ ONE FILE AT A TIME, AND EVERY TEST GETS ITS OWN WORLD. These suites
+      describe a deployment's life — shards registered, tenants placed, schema
+      applied — so they write the same names into the same three databases:
+      `northwind` is created by nine tests and one wallet is spent by a dozen.
+      A shared store makes each of those a test of whichever ran first.
+
+      ⚠️ AND THE FAULT IS ALWAYS SOMEWHERE ELSE. It surfaces as a different test
+      failing on each run, none near the code that caused it, at a rate low
+      enough that a re-run looks like a fix — `expected 200 to be 409` because a
+      slug a previous test took had gone, `expected 'not_enough'` because a
+      wallet a previous test drained had not. Measured here at roughly one run in
+      two with retries off; nothing at all with the stack on.
+
+      ⚠️ SO THERE IS NO `retry`, DELIBERATELY. A retry is what this config had
+      instead of isolation, and it turns a suite that is wrong half the time into
+      a suite that is green — which is strictly worse than red, because the next
+      real intermittent failure is absorbed by the same line and nobody sees it.
     */
     fileParallelism: false,
-    retry: 1,
     poolOptions: {
       workers: {
-        isolatedStorage: false,
+        /*
+          ⚠️ PER-TEST STORAGE STACK. `beforeAll` seeding survives (the stack pops
+          back to it, not past it), and each test's writes are discarded — which
+          is the property every assertion in this package already assumed.
+        */
+        isolatedStorage: true,
         miniflare: {
           compatibilityDate: "2025-07-12",
           compatibilityFlags: ["nodejs_compat"],

@@ -134,6 +134,53 @@ for (const dir of ["runtime/src", "web/src", ...appDirs.map((a) => `apps/${a}/sr
 }
 if (!eager) ok(`lazy: nothing composes an app at startup`);
 
+/* ------------------------------------------------------------------ suites --- */
+
+/**
+ * ⚠️ A SUITE THAT RETRIES IS A SUITE THAT IS WRONG SOME OF THE TIME AND GREEN ALL
+ * OF IT. Every Workers-pool suite here writes the same fixture names into the
+ * same databases — `northwind` is created by nine tests, one wallet is spent by a
+ * dozen — so without a per-test storage stack each of those is a test of whichever
+ * ran first. Measured on `@quad/hello`: roughly one run in two failed with
+ * retries off, and the failure was never near the code that caused it.
+ *
+ * ⚠️ AND `retry` IS THE FIX SOMEBODY REACHES FOR, because it works: it turns the
+ * red run green in one line, leaves the shared store in place, and absorbs the
+ * next real intermittent failure along with this one. That is the whole reason
+ * this is a script rather than a note — the wrong fix is a one-line edit made by
+ * somebody in a hurry, and it looks exactly like a fix.
+ */
+const CONFIGS = [];
+const findConfigs = (dir) => {
+  const at = join(QUAD, dir);
+  if (!existsSync(at)) return;
+  for (const e of readdirSync(at, { withFileTypes: true })) {
+    if (e.isFile() && /^vitest\..*config\.[cm]?ts$/.test(e.name)) CONFIGS.push(join(at, e.name));
+  }
+};
+for (const dir of ["one", "one-hub", "runtime", "web", "kernel", ...appDirs.map((a) => `apps/${a}`)]) {
+  findConfigs(dir);
+}
+
+let suites = 0;
+for (const file of CONFIGS) {
+  const code = stripComments(readFileSync(file, "utf8"));
+  if (/\bretry\s*:/.test(code)) {
+    suites++;
+    fail(`${rel(file)}: sets \`retry\`.\n` +
+         `       A retry is what a suite has instead of isolation. Give every test its\n` +
+         `       own world (\`isolatedStorage: true\`) and let a genuine failure be red.`);
+  }
+  /* ⚠️ Only a suite that HAS a store can share one — a pure package has none. */
+  if (/isolatedStorage\s*:\s*false/.test(code)) {
+    suites++;
+    fail(`${rel(file)}: turns the per-test storage stack OFF.\n` +
+         `       Every test then reads whatever the last one left, and the assertion that\n` +
+         `       fails is somewhere else entirely.`);
+  }
+}
+if (!suites) ok(`suites: ${CONFIGS.length} vitest config(s), each giving every test its own world`);
+
 console.log(bad
   ? `\napps: ${bad} finding(s) — an app doing what the platform is for.`
   : `\napps: manifests declare, the platform does, and composition waits for a request.`);

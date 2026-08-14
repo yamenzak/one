@@ -11,11 +11,16 @@ import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
  */
 export default defineWorkersConfig({
   test: {
+    /*
+      ⚠️ ONE FILE AT A TIME, AND EVERY TEST GETS ITS OWN WORLD — and no `retry`,
+      which is what a shared store has instead of isolation. A retry turns a suite
+      that is wrong some of the time into a suite that is green, and absorbs the
+      next real intermittent failure with it.
+    */
     fileParallelism: false,
-    retry: 1,
     poolOptions: {
       workers: {
-        isolatedStorage: false,
+        isolatedStorage: true,
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
           compatibilityDate: "2025-07-12",
