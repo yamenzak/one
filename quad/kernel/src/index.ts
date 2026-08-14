@@ -19,6 +19,7 @@ export * from "./operation.js";
 export * from "./access.js";
 export * from "./entitlement.js";
 export * from "./gate.js";
+export * from "./dunning.js";
 export * from "./tenancy.js";
 
 export * from "./notify.js";

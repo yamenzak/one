@@ -21,7 +21,12 @@ import { HELLO, hello } from "../src/index.js";
 const directory = () => env.DIRECTORY as unknown as Db;
 const shard = () => env.SHARD_EU_1 as unknown as Db;
 
-/* ⚠️ NOT `acme`, WHICH IS RESERVED — it is the certificate-issuance protocol's
+/* ⚠️ ONE SLUG PER TEST FILE. The pool gives each file its own isolate and ONE
+   database, so two files that both call their workspace the same thing race on
+   a unique index — which surfaces as a 503 in whichever file lost, nowhere near
+   the code that caused it.
+
+   ⚠️ AND NOT `acme`, WHICH IS RESERVED — it is the certificate-issuance protocol's
    own label, and a workspace holding it would answer on the path a certificate
    authority validates against. The obvious example company name is the one that
    cannot be used, which is exactly why the reserved list is checked rather than
@@ -54,7 +59,7 @@ const app = () => serve({
   apps: { hello },
   directory: directory(),
   locate: async (door) =>
-    door.kind === "tenant" && door.slug === "northwind"
+    door.kind === "tenant" && door.slug === "westwind"
       ? {
         tenantId, db: shard(), apps: ["hello"],
         ...(standing ? { standing } : {}),
@@ -65,7 +70,7 @@ const app = () => serve({
 });
 
 const call = (path: string, init: RequestInit = {}) =>
-  app()(new Request(`https://northwind.quad.test${path}`, init));
+  app()(new Request(`https://westwind.quad.test${path}`, init));
 
 const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
   call(path, { method: "POST", body: JSON.stringify(body), headers });
@@ -82,7 +87,7 @@ beforeEach(async () => {
   for (const t of ["note", "audit", "replay"]) await shard().exec(`DELETE FROM ${t};`);
   await directory().exec(`DELETE FROM tenant;`);
   const made = await createTenant(directory(), {
-    slug: "northwind", name: "Northwind", country: "DE", where: "eu", apps: ["hello"],
+    slug: "westwind", name: "Westwind", country: "DE", where: "eu", apps: ["hello"],
   });
   if (typeof made === "string") throw new Error(made);
   tenantId = made.tenant.id;

@@ -402,6 +402,60 @@
       "impl": "web/test/surface.test.tsx",
       "proves": "is a handful of variables and nothing else",
       "fails": "a workspace able to break its own customers' screens on our infrastructure, and to make a page look like something it is not"
+    },
+    {
+      "id": "one-workspace-with-two-products-pays-one-bill",
+      "protects": "D1",
+      "stage": "6",
+      "status": "live",
+      "impl": "apps/hello/test/money.test.ts",
+      "proves": "holds a plan in each and pays one bill",
+      "fails": "a customer of two products becoming two customers - two cards, two renewal dates, two companies as far as they can tell"
+    },
+    {
+      "id": "a-reserve-is-a-ceiling-on-revenue",
+      "protects": "D12",
+      "stage": "6",
+      "status": "live",
+      "impl": "apps/hello/test/money.test.ts",
+      "proves": "never charges more than was held",
+      "fails": "every unit an estimate fails to anticipate charged to a customer instead of absorbed, or absorbed silently on every call"
+    },
+    {
+      "id": "a-hold-is-taken-in-the-statement-that-checks-it",
+      "protects": "D12",
+      "stage": "6",
+      "status": "live",
+      "impl": "apps/hello/test/money.test.ts",
+      "proves": "refuses a second hold that the balance cannot cover",
+      "fails": "two concurrent calls both passing the same balance check, and a balance that went negative long after the calls that did it"
+    },
+    {
+      "id": "arrears-take-writes-and-never-reads",
+      "protects": "D12",
+      "stage": "6",
+      "status": "live",
+      "impl": "apps/hello/test/money.test.ts",
+      "proves": "stops writes after a week and still serves every read",
+      "fails": "a business locked out of its own records over an unpaid invoice, which is holding their data hostage"
+    },
+    {
+      "id": "a-signup-in-progress-is-never-read-as-arrears",
+      "protects": "D12",
+      "stage": "6",
+      "status": "live",
+      "impl": "apps/hello/test/money.test.ts",
+      "proves": "never reads a signup in progress as arrears",
+      "fails": "a brand-new workspace held read-only over an invoice that never existed, in its first minute"
+    },
+    {
+      "id": "grandfathering-and-an-adjustment-are-separate-columns",
+      "protects": "D12",
+      "stage": "6",
+      "status": "live",
+      "impl": "apps/hello/test/money.test.ts",
+      "proves": "holds a workspace at what it was sold",
+      "fails": "give this workspace ten seats becoming a one-way door whose only reverse discards what they were originally sold"
     }
   ]
 }

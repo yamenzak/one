@@ -48,14 +48,15 @@ const SURFACES = {
   milestones: { file: "web/src/guide.tsx", renders: "export function Milestones" },
   help: { file: "web/src/guide.tsx", renders: "export function Help" },
 
+  packs: { file: "web/src/money.tsx", renders: "export function Wallet" },
+  meters: { file: "web/src/money.tsx", renders: "export function Wallet" },
+  jobs: { file: "web/src/money.tsx", renders: "export function Jobs" },
+
   /*
     ⚠️ OWED, WITH A STAGE. Each of these is a declaration an app can already
     make and a screen that does not exist yet — which is exactly the state this
     guard exists to keep visible rather than let anybody forget.
   */
-  packs: { owed: "6" },
-  meters: { owed: "6" },
-  jobs: { owed: "6" },
   lanes: { owed: "7" },
   vault: { owed: "8" },
   purposes: { owed: "8" },

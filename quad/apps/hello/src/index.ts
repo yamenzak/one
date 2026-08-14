@@ -177,6 +177,35 @@ export const HELLO: AppSpec = defineApp({
   },
 
   whitelabel: { surfaces: ["shell", "email"], entitlement: "publishing" },
+
+  /* ⚠️ A pack has a real price. Credits for nothing is always a catalogue
+     mistake rather than a promotion — a promotion is a discount on a price,
+     which stays a price. */
+  packs: [
+    { id: "small", name: "1,000 credits", credits: 1000, price: 900, currency: "EUR", order: 0 },
+    { id: "large", name: "5,000 credits", credits: 5000, price: 3900, currency: "EUR", order: 1 },
+  ],
+
+  /* ⚠️ The ceiling the reserve is computed from — never "whatever it returns".
+     A meter with no ceiling reserves nothing and settles at whatever arrived. */
+  meters: {
+    "note.draft": { id: "note.draft", label: "Draft a note", lane: "text", maxOutput: 800 },
+  },
+  lanes: ["text"],
+
+  jobs: {
+    tidy: {
+      id: "tidy", label: "Tidy old drafts",
+      why: "Removes drafts nobody has touched, so the list stays worth reading.",
+      schedule: "0 3 * * *", scope: "per-tenant",
+      onFail: { then: "park" },
+      rerunnable: true,
+      /* ⚠️ A floor, because a retention misread as zero shreds on the first run
+         — correctly, at speed, reporting success. */
+      destroys: { floorDays: 30 },
+      budgetSeconds: 20,
+    },
+  },
 });
 
 /* ⚠️ A THUNK, BECAUSE COMPOSITION IS LAZY (D4). Exporting the composed surface

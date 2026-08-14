@@ -20,8 +20,8 @@ reader can trust this table instead of re-reading the code.
 | 3 | Runtime — manifest → live worker | shipped |
 | 4 | Identity + tenancy | shipped |
 | 5 | Surface — HeroUI shell, nav, sky, rendered settings | shipped |
-| 6 | Money — plans, entitlements, credits | building |
-| 7 | Services — ai and notify over RPC | not started |
+| 6 | Money — plans, entitlements, credits, jobs | shipped |
+| 7 | Services — ai and notify over RPC | building |
 | 8 | Vault + legal | not started |
 | 9 | Kova on Quad | not started |
 
@@ -121,6 +121,26 @@ refuse — it reads as built and passes every test.
 - `field.tsx` — a declared field becomes a control, and a stored secret is never
   rendered back.
 
+**Money — one workspace, several products, one bill.**
+
+- `billing.ts` — a subscription is per PRODUCT and the account is per BUSINESS.
+  The plan a workspace is on is a fact about a product; the card, the balance
+  and the invoice are facts about the business, and conflating them is what
+  makes the second product a second bill. Grandfathering and an operator's
+  adjustment are separate columns because they want opposite rules.
+- `credits.ts` — one wallet, whatever product spends from it, with the ledger
+  carrying which one did. The hold is taken in the statement that checks it, so
+  two concurrent calls cannot both pass the same balance check.
+- `jobs.ts` — every run recorded, successes and failures alike, and the console
+  reads the LAST run: a job that is scheduled tells you nothing, a job whose
+  last run was three days ago has stopped.
+- `dunning.ts` (kernel) — the ladder, anchored on one timestamp and derived on
+  every read. Arrears take writes, never reads, and never the ability to leave.
+- `locate.ts` — one function turns a door into everything a request needs, so a
+  deployment cannot wire a gate to read something else.
+- `web/money.tsx` — the bill, the wallet with its per-product breakdown, and the
+  job console.
+
 The guard registry, its eleven checks, and the standards that bind them.
 
 ## Decisions, and how well each is defended
@@ -128,7 +148,7 @@ The guard registry, its eleven checks, and the standards that bind them.
 <!-- generated: node scripts/inventory.mjs decisions -->
 | # | Decision | Guarded by |
 |---|---|---|
-| D1 | The tenant is primary; an app is a capability switched on for it | 2 |
+| D1 | The tenant is primary; an app is a capability switched on for it | 3 |
 | D2 | The name is Quad; packages are `@quad/*` | 2 |
 | D3 | One worker on the request path; heavy work splits over RPC service bindings | 1 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
@@ -139,7 +159,7 @@ The guard registry, its eleven checks, and the standards that bind them.
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 2 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 3 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 22 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 27 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -195,6 +215,12 @@ the library decides FOR us.
 | `a-stored-secret-is-never-rendered-back` | D11 | a live credential handed to every script in the page and to whatever the browser saved |
 | `a-destination-nobody-can-reach-is-never-drawn` | D10 | a nav item that leads to a 403, which the person cannot tell from something simply broken |
 | `branding-is-tokens-and-never-a-stylesheet` | D7 | a workspace able to break its own customers' screens on our infrastructure, and to make a page look like something it is not |
+| `one-workspace-with-two-products-pays-one-bill` | D1 | a customer of two products becoming two customers - two cards, two renewal dates, two companies as far as they can tell |
+| `a-reserve-is-a-ceiling-on-revenue` | D12 | every unit an estimate fails to anticipate charged to a customer instead of absorbed, or absorbed silently on every call |
+| `a-hold-is-taken-in-the-statement-that-checks-it` | D12 | two concurrent calls both passing the same balance check, and a balance that went negative long after the calls that did it |
+| `arrears-take-writes-and-never-reads` | D12 | a business locked out of its own records over an unpaid invoice, which is holding their data hostage |
+| `a-signup-in-progress-is-never-read-as-arrears` | D12 | a brand-new workspace held read-only over an invoice that never existed, in its first minute |
+| `grandfathering-and-an-adjustment-are-separate-columns` | D12 | give this workspace ten seats becoming a one-way door whose only reverse discards what they were originally sold |
 | `a-vault-fact-is-never-stored-by-an-app` *(owed)* | D11 | an app writing the vault's own tables directly, so a fact exists with no grant, no consent record and no way to shred it |
 | `no-service-call-is-made-over-fetch` *(owed)* | D3 | a wrong payload becoming a production error where it had been a compile error |
 <!-- /generated -->
