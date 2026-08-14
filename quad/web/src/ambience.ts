@@ -646,6 +646,9 @@ export function ambienceCss(what: Ambience, tone: Tone = "neutral"): string {
  */
 const GLASS = "blur(11px) saturate(1.4) contrast(1.2) brightness(0.92)";
 
+/** ⚠️ Light's own stack — it LIFTS. See the milk-vs-smoke note at the rules. */
+const GLASS_LIGHT = "blur(14px) saturate(1.5) contrast(1.04) brightness(1.05)";
+
 /**
  * ⚠️ EXPLICIT PER LAYER, because `background-size`/`-repeat`/`-position` CYCLE
  * a short list across the layers — with the field appended, "22px, auto" would
@@ -806,6 +809,40 @@ export function ambienceStylesheet(): string {
     `[data-glass="true"]:hover {`,
     `  background-color: color-mix(in oklab, var(--surface-tertiary) 92%, transparent) !important;`,
     `}`,
+    /*
+      ⚠️ DARK GLASS IS SMOKE, LIGHT GLASS IS MILK — one recipe cannot be both.
+      The dark stack darkens what passes under it (brightness 0.92), which over
+      a glowing field reads as depth. The same darkening over PAPER is a grey
+      film — the exact "dusty" reading, produced by the chrome itself — and the
+      grey tertiary veil doubles it. So light gets its own recipe: a veil of
+      the SURFACE tier (white-leaning, so the bar reads as material rather
+      than as shadow), and a filter that LIFTS — brightness above one — while
+      the saturation boost keeps the world's colour alive through it.
+    */
+    `[data-theme="light"] [data-glass="true"], [data-theme="light"][data-glass="true"] {`,
+    `  background-color: color-mix(in oklab, var(--surface) 68%, transparent) !important;`,
+    `  backdrop-filter: ${GLASS_LIGHT};`,
+    `  -webkit-backdrop-filter: ${GLASS_LIGHT};`,
+    `}`,
+    `[data-theme="light"] [data-glass="true"]:hover, [data-theme="light"][data-glass="true"]:hover {`,
+    `  background-color: color-mix(in oklab, var(--surface) 88%, transparent) !important;`,
+    `}`,
+    `[data-theme="light"] [data-pill="true"], [data-theme="light"][data-pill="true"] {`,
+    `  background-color: color-mix(in oklab, var(--surface) 85%, transparent);`,
+    `  backdrop-filter: brightness(1.04) saturate(1.2);`,
+    `  -webkit-backdrop-filter: brightness(1.04) saturate(1.2);`,
+    `}`,
+    /*
+      ⚠️ A TILE IS A CARD YOU PRESS, NOT AN OVERSIZED CHIP. The control tier is
+      tuned for chip-sized things between surfaces; spread across a 7rem square
+      it reads as a grey slab — off-white beside true-white cards in light, a
+      pale brick over the world in dark. So a tile takes the SURFACE tier, the
+      same material as the cards it sits beside, through the button's own
+      background hooks rather than a repaint — hover intact, tier arithmetic
+      intact, and the rule lives here because a component that named a colour
+      would be one a workspace's branding never reaches (D7).
+    */
+    `[data-tile="true"] { --button-bg: var(--surface); --button-bg-hover: var(--surface-tertiary); }`,
     /*
       ⚠️ THE CHIP A ROW'S MARK SITS IN. It is here rather than on the component
       for the same reason the dot is: a component that named a colour would be

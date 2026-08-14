@@ -211,12 +211,23 @@ export function ActionRow({ icon, label, under, onDo, tone = "neutral" }: RowBas
   readonly onDo: () => void; readonly tone?: Tone;
 }) {
   return (
+    /*
+      ⚠️ DANGER IS A VOICE, NOT A FILL. The filled `danger` variant is for the
+      confirming button INSIDE a `Confirm` — the one place a person is already
+      reading carefully. As a row in a list it was a full-bleed red slab jammed
+      against the card's own corners, which reads as an alarm going off on a
+      settings page. A destructive row is the ordinary row shape with the words
+      in the danger tone — the grammar every settings screen anybody trusts
+      already uses — and the two-step it opens is where the red button lives.
+    */
     <Button
-      variant={tone === "danger" ? "danger" : "ghost"}
+      variant="ghost"
       className={`w-full justify-start ${ROW.free} ${ROW.flush} ${ROW.tap}`}
       onPress={onDo}
     >
-      <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
+      <span
+        className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}${tone === "danger" ? " text-danger" : ""}`}
+      >
         <Lead icon={icon} />
         <Body label={label} under={under} />
       </span>
@@ -444,6 +455,10 @@ export function TileGrid({ tiles }: {
           key={t.id}
           /* ⚠️ `tertiary` — the glyph is never brand-coloured. See QuickActions. */
           variant="tertiary"
+          /* ⚠️ AND THE FILL IS THE SURFACE TIER, NOT THE CONTROL TIER — a tile
+             is a card you press. The rule lives in `ambience.ts` beside the
+             chip and the pill, for the same D7 reason. */
+          data-tile="true"
           /* ⚠️ `w-full` OR THE CELL IS EQUAL AND THE TILE IS NOT. `.button` is
              `w-fit`, so a grid of equal 1fr columns held tiles sized to their
              own labels — "Beds", "Staff" and "Rounds" came out 162, 156 and 198
