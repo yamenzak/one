@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  arcPath, arcs, areaPath, band, compact, extent, linePath, norm, place, polar, stack,
+  arcPath, arcs, areaPath, band, compact, compactLike, extent, linePath, norm, place, polar, stack,
   stackSpan, ticks,
 } from "./scale.js";
 
@@ -138,6 +138,21 @@ describe("formatting", () => {
 
   it("drops a trailing zero decimal, which carries nothing", () => {
     expect(compact(25_000)).toBe("25K");
+  });
+
+  it("keeps one notation all the way to a destination, for a number being counted", () => {
+    /* ⚠️ A count to 12,914 through plain `compact` runs 2,292 → 9,554 → 12.7K,
+       changing NOTATION a third of the way up — which the eye reads as a glitch
+       rather than as a scale. */
+    const toward = compactLike(12_914);
+    expect(toward(2_292)).toBe("2.3K");
+    expect(toward(9_554)).toBe("9.6K");
+    expect(toward(12_914)).toBe("12.9K");
+  });
+
+  it("leaves a small destination on the ordinary rules", () => {
+    expect(compactLike(842)(300)).toBe("300");
+    expect(compactLike(842)(842)).toBe("842");
   });
 });
 

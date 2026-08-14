@@ -116,7 +116,19 @@ export function Trouble({ problem, again }: {
   return (
     <Alert {...ARRIVE} status={statusOf(problem.tone)}>
       <Alert.Indicator />
-      <Alert.Content>
+      {/*
+        ⚠️ THE ACTION GOES UNDER THE SENTENCE, NOT BESIDE IT. `.alert` is a ROW
+        and `.alert__content` is the only child that grows, so a button as a
+        third sibling takes its width out of the text — which turned a
+        seven-word title into two cramped lines with a control wedged against
+        them. A refusal is read first and acted on second, and the layout has to
+        agree with that order.
+
+        ⚠️ AND THE CONTENT COLUMN NEEDS A GAP. `.alert__content` ships none, so
+        the title, the sentence and the control sat flush against each other in
+        a component whose whole job is to be read under pressure.
+      */}
+      <Alert.Content className={SPACE.tight}>
         <Alert.Title>{problem.title}</Alert.Title>
         {problem.detail ? <Alert.Description>{problem.detail}</Alert.Description> : null}
         {/* ⚠️ ONLY WHERE THE SENTENCE DOES NOT ALREADY CARRY IT. Several
@@ -124,14 +136,12 @@ export function Trouble({ problem, again }: {
             again underneath is the reference twice with nothing between them —
             which reads as a rendering fault rather than as thoroughness. */}
         {problem.ref && !problem.detail?.includes(problem.ref) ? (
-          <Alert.Description>
-            <span className="tabular-nums">{problem.ref}</span>
-          </Alert.Description>
+          <Alert.Description><span className={TYPE.code}>{problem.ref}</span></Alert.Description>
+        ) : null}
+        {again && problem.retryable ? (
+          <Button size="sm" variant="tertiary" onPress={again}>Try again</Button>
         ) : null}
       </Alert.Content>
-      {again && problem.retryable ? (
-        <Button size="sm" variant="tertiary" onPress={again}>Try again</Button>
-      ) : null}
     </Alert>
   );
 }

@@ -65,7 +65,7 @@ function Workshop() {
         <Stack space="roomy">
           <Balance
             eyebrow="Today · Bay 2"
-            figure={<Money amount={148000} currency="£" />}
+            figure={<Money amount={148000} currency="£" count />}
             identifier="9 jobs booked, 3 waiting on parts"
             under={
               <QuickActions

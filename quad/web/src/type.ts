@@ -62,6 +62,23 @@ export const TYPE = {
    * ratio holds wherever the figure is used — a fixed one would be right once.
    */
   minor: "text-[0.58em] font-semibold",
+  /**
+   * ⚠️ AN IDENTIFIER, AND IT IS THE ONLY THING IN THIS SYSTEM THAT IS MONO.
+   * `req_8f21c04`, an IBAN, a seal number, an API key: strings nobody reads as
+   * words, that get copied, quoted down a phone and compared character by
+   * character. That is the one job a monospaced face is actually better at,
+   * because it is the one place `0`/`O` and `1`/`l`/`I` have to be told apart —
+   * and `CopyRow` was rendering exactly these in the body face.
+   *
+   * ⚠️ AND NUMBERS ARE DELIBERATELY NOT MONO, WHICH IS THE COMMON MISTAKE. The
+   * problem a monospaced face solves for a column of figures is alignment, and
+   * `tabular-nums` already solves it — on the brand face, at the brand's own
+   * proportions. Setting money in mono buys the same alignment and pays for it
+   * with the wrong connotation: a balance starts reading as terminal output, a
+   * price as a config value. Every product that handles money well sets it in
+   * its own sans with tabular figures, which is what `display` and `figure` do.
+   */
+  code: "font-mono text-sm tracking-tight",
 } as const;
 
 export type Role = keyof typeof TYPE;
@@ -115,8 +132,25 @@ export const FACE_STACK = [
  * which is slower and, on long pages, occasionally wrong. The browser default is
  * already kerned.
  */
+/**
+ * ⚠️ THE MONO STACK IS THE SYSTEM'S, NOT A SECOND SELF-HOSTED FILE. It is used
+ * by one role, for identifiers, at small sizes — so what it has to be is
+ * fixed-width and unambiguous, and every platform already ships a face that is
+ * both. Shipping a second variable font for a reference code would be a font
+ * file per app for a string most people never see.
+ */
+export const MONO_STACK = [
+  "ui-monospace",
+  "SFMono-Regular",
+  '"SF Mono"',
+  "Menlo",
+  "Consolas",
+  '"Liberation Mono"',
+  "monospace",
+].join(", ");
+
 export const FACE_CSS = [
-  `:root { --font-sans: ${FACE_STACK}; }`,
+  `:root { --font-sans: ${FACE_STACK}; --font-mono: ${MONO_STACK}; }`,
   `html, body { font-family: var(--font-sans); }`,
   /* ⚠️ A number is read, not spelled — every figure in the product is lining by
      default, so a column of them cannot sit at different heights. */

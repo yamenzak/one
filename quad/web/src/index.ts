@@ -14,6 +14,7 @@ export * from "./theme.js";
 export * from "./ambience.js";
 export * from "./surfaces.js";
 export * from "./state.js";
+export * from "./tally.js";
 export * from "./appearance.js";
 export * from "./motion.js";
 export * from "./type.js";

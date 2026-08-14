@@ -300,6 +300,23 @@ export function stackSpan(rows: readonly (readonly number[])[]): Span {
  * with the row below. Getting this backwards makes a dashboard either unreadable
  * or unusable, and which one you want depends on the mark, not on the value.
  */
+/**
+ * ⚠️ THE SAME FORMAT ALL THE WAY UP, FOR A NUMBER THAT IS BEING COUNTED. `compact`
+ * chooses its unit from the value in front of it, which is right for a static
+ * figure and visibly wrong for a moving one: a count to 12,914 runs `2,292` →
+ * `9,554` → `12.7K`, changing NOTATION a third of the way through. The eye reads
+ * that as a glitch rather than as a scale. Given the value it is heading for,
+ * every step is written the way the destination will be.
+ */
+export const compactLike = (destination: number) => (v: number): string => {
+  const scale = Math.abs(destination);
+  if (scale < 1e4) return compact(v);
+  const [at, suffix] = scale >= 1e9 ? [1e9, "B"] : scale >= 1e6 ? [1e6, "M"] : [1e3, "K"] as const;
+  const n = v / at;
+  const shown = Math.abs(n) < 100 ? n.toFixed(1).replace(/\.0$/, "") : String(Math.round(n));
+  return `${shown}${suffix}`;
+};
+
 export function compact(v: number): string {
   const abs = Math.abs(v);
   /*

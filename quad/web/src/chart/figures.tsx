@@ -15,8 +15,9 @@ import * as React from "react";
 import { TYPE } from "../type.js";
 import { PAD, SPACE } from "../metrics.js";
 import { ARRIVE, arriveAt } from "../motion.js";
+import { Tally } from "../tally.js";
 import { Sparkline } from "./charts.js";
-import { type Point, compact } from "./scale.js";
+import { type Point, compact, compactLike } from "./scale.js";
 
 /* ------------------------------------------------------------------ delta --- */
 
@@ -109,18 +110,28 @@ export function StatRow({ children }: { readonly children: React.ReactNode }) {
  * decision anybody designed. It takes `display` from the type scale, which is
  * where the ≥ 48px rule already lives.
  */
-export function Hero({ eyebrow, value, unit = "", delta, upIsGood = true }: {
+export function Hero({ eyebrow, value, unit = "", delta, upIsGood = true, count = true }: {
   readonly eyebrow?: string;
   readonly value: number | string;
   readonly unit?: string;
   readonly delta?: { readonly value: number; readonly of: string };
   readonly upIsGood?: boolean;
+  /**
+   * ⚠️ ON BY DEFAULT HERE AND NOWHERE ELSE. A hero is BY DEFINITION the one
+   * number a screen is about, which is the whole rule for when a count earns its
+   * place — see `tally.tsx`. Turn it off for a value that is not really a
+   * quantity: a version, a year, an account number that happens to be digits.
+   */
+  readonly count?: boolean;
 }) {
   return (
     <div className={`flex flex-col items-center ${SPACE.tight} text-center`}>
       {eyebrow ? <span className={TYPE.note}>{eyebrow}</span> : null}
       <span className={TYPE.display}>
-        {unit}{typeof value === "number" ? compact(value) : value}
+        {unit}
+        {typeof value === "number"
+          ? <Tally value={value} format={compactLike(value)} count={count} />
+          : value}
       </span>
       {delta ? <Delta value={delta.value} of={delta.of} upIsGood={upIsGood} unit={unit} /> : null}
     </div>

@@ -31,6 +31,7 @@ import { TYPE } from "./type.js";
 import { CARD_ROWS, CROWN_SIZE, FACE, HEAD_GAP, ICON, INSET, LEAD, PAD, ROW, SPACE } from "./metrics.js";
 import type { Inset } from "./metrics.js";
 import { ARRIVE, arriveAt } from "./motion.js";
+import { Tally } from "./tally.js";
 
 /* ------------------------------------------------------------------ group --- */
 
@@ -485,7 +486,7 @@ export function TileGrid({ tiles }: {
  * is neutral — never red, which is for something being wrong. A product that
  * paints every outgoing payment red tells somebody their groceries were a fault.
  */
-export function Money({ amount, currency = "€", size = "display", tone = "neutral" }: {
+export function Money({ amount, currency = "€", size = "display", tone = "neutral", count = false }: {
   /** ⚠️ Minor units, as an integer. A float here is a rounding error later. */
   readonly amount: number;
   readonly currency?: string;
@@ -498,15 +499,30 @@ export function Money({ amount, currency = "€", size = "display", tone = "neut
    */
   readonly size?: "display" | "figure" | "label";
   readonly tone?: Tone;
+  /**
+   * ⚠️ OFF UNLESS ASKED, EVEN THOUGH THIS DEFAULTS TO `display`. An amount in a
+   * hero is the one number a screen is about and should count; the same
+   * component renders every row in a transaction list, and twelve of those
+   * counting at once is the noise `tally.tsx` exists to refuse. The size cannot
+   * decide it either — a `display` amount inside a card is still not the screen.
+   */
+  readonly count?: boolean;
 }) {
   const sign = amount < 0 ? "−" : tone === "success" ? "+" : "";
-  const whole = Math.floor(Math.abs(amount) / 100).toLocaleString();
   const part = String(Math.abs(amount) % 100).padStart(2, "0");
   const big = size === "display" ? TYPE.display : size === "figure" ? TYPE.figure : TYPE.label;
 
   return (
     <span className={`${big} tabular-nums`} data-tone={tone}>
-      {sign}{currency}{whole}
+      {sign}{currency}
+      {/* ⚠️ THE WHOLE UNITS COUNT AND THE FRACTION DOES NOT. Cents ticking
+          through 99 values is a slot machine; the pounds are what somebody is
+          reading and the pence are precision that should simply be there. */}
+      <Tally
+        value={Math.floor(Math.abs(amount) / 100)}
+        format={(n) => n.toLocaleString()}
+        count={count}
+      />
       <span className={TYPE.minor}>.{part}</span>
     </span>
   );
@@ -530,7 +546,11 @@ export function CopyRow({ label, value, onCopy }: {
     <div className={`flex items-center ${ROW.gap} ${ROW.pad} ${ROW.still}`}>
       <span className={`flex min-w-0 grow flex-col items-start text-left ${SPACE.hair}`}>
         <span className={TYPE.note}>{label}</span>
-        <span className={`${TYPE.body} break-words`}>{value}</span>
+        {/* ⚠️ MONO, BECAUSE THIS IS AN IDENTIFIER RATHER THAN A WORD. A seal
+            number or an IBAN is copied, quoted down a phone and compared
+            character by character, which is the one job a fixed-width face is
+            genuinely better at — see `TYPE.code`. */}
+        <span className={`${TYPE.code} break-all`}>{value}</span>
       </span>
       <span className="shrink-0">
         <Button variant="ghost" aria-label={`Copy ${label.toLowerCase()}`} onPress={() => onCopy(value)}>
