@@ -24,6 +24,7 @@
  * when the library changes its mind about a shadow (D7).
  */
 
+import * as React from "react";
 import { Avatar, Button, Card, Chip, Label, Separator, Switch } from "@heroui/react";
 import type { Tone } from "@quad/kernel";
 import { TYPE } from "./type.js";
@@ -51,10 +52,7 @@ export function Group({ label, under, children }: GroupProps) {
       ) : null}
       <Card>
         <Card.Content>
-          {/* ⚠️ `divide` rather than a border per row: a row does not know
-              whether it is the last one, and a trailing rule inside a rounded
-              card is the classic tell of a hand-built list. */}
-          <div className="flex flex-col">{children}</div>
+          <div className="flex flex-col">{ruled(children)}</div>
         </Card.Content>
       </Card>
     </section>
@@ -62,14 +60,48 @@ export function Group({ label, under, children }: GroupProps) {
 }
 
 /**
- * ⚠️ BETWEEN ROWS, NEVER AFTER THE LAST. `Group` cannot know which is last, so
- * the caller interleaves — which is also what lets one card hold two runs.
+ * ⚠️ BETWEEN ROWS, NEVER AFTER THE LAST — and `Group` draws it, not the caller.
  *
- * ⚠️ AND IT IS INSET TO THE TEXT COLUMN — see `INSET`. Which inset depends on
- * what the rows above and below LEAD with, so a run of people takes `face` and a
- * run of glyph rows takes `lead`. Getting it wrong is not subtle once anybody
- * looks: the rule stops 16px short of the labels it is meant to line up with.
+ * ⚠️ THE INSET DEPENDS ON WHAT THE ROWS LEAD WITH, WHICH IS WHY ASKING THE
+ * CALLER WAS THE WRONG DESIGN. A rule should start where the labels start: 36px
+ * after a glyph, 52px after a face, and flush against a row with no lead at all.
+ * Every one of those three was wrong somewhere in the specimens the first time
+ * anybody looked at a render — a list of people ruled at the glyph inset, and a
+ * card of copyable fields ruled 36px in from labels that were flush. Nobody
+ * writing a screen should have to know that, and `Group` already has the one
+ * thing needed to work it out: the rows themselves.
+ *
+ * ⚠️ AND A ROW DECLARES ITS OWN LEAD AS A PROPERTY, NOT BY ITS NAME. The obvious
+ * version of this reads `component.name` and matches it against a list — which
+ * works in development and silently stops working in the build, because the
+ * minifier renames every function it can see. Every rule in the product would
+ * quietly fall back to the glyph inset in production and nowhere else, which is
+ * the worst shape a defect can have. A property is a string literal; nothing
+ * renames it.
  */
+interface Ruled { lead?: Inset }
+
+/**
+ * ⚠️ AND IT ONLY INTERLEAVES WHEN THE CALLER SUPPLIED NONE. One card holding two
+ * separate runs is a real shape — a list and then a total, say — and the way to
+ * express it is a rule the caller places by hand. Detecting that and standing
+ * down keeps both possible without a second component.
+ */
+function ruled(children: React.ReactNode): React.ReactNode {
+  const rows = React.Children.toArray(children).filter(Boolean);
+  if (rows.some((r) => React.isValidElement(r) && r.type === RowRule)) return rows;
+
+  const insetOf = (node: React.ReactNode): Inset =>
+    (React.isValidElement(node) ? (node.type as Ruled).lead : undefined) ?? "lead";
+
+  return rows.flatMap((row, i) => (i === 0
+    ? [row]
+    /* ⚠️ The rule belongs to the row BELOW it — that is the one whose label it
+       has to line up with, and the one somebody's eye travels to next. */
+    : [<RowRule key={`rule-${i}`} inset={insetOf(row)} />, row]));
+}
+
+/** ⚠️ Exported for the two-runs-in-one-card case above; screens rarely need it. */
 export const RowRule = ({ inset = "lead" }: { readonly inset?: Inset } = {}) => (
   <div className={INSET[inset]}><Separator /></div>
 );
@@ -321,7 +353,20 @@ export function QuickActions({ actions }: {
     <div className={`flex flex-wrap items-start justify-center ${SPACE.snug}`}>
       {actions.slice(0, 4).map((a) => (
         <div key={a.id} className={`flex w-16 flex-col items-center ${SPACE.tight}`}>
-          <Button variant="secondary" aria-label={a.label} onPress={a.onDo}>{a.icon}</Button>
+          <Button
+            /* ⚠️ `tertiary`, NOT `secondary`, AND THE DIFFERENCE IS THE WHOLE
+               ICON PROBLEM. `.button--secondary` sets
+               `--button-fg: var(--accent-soft-foreground)` — so every glyph in
+               the product was tinted by the brand, and a tinted glyph is one
+               that stops reading the moment the ground behind it moves. A mark
+               that is timeless is a NEUTRAL mark on a translucent ground; the
+               colour belongs to the ground, never to the thing on it.
+               `tertiary` is the same fill with no foreground override. */
+            variant="tertiary"
+            data-glass="true"
+            aria-label={a.label}
+            onPress={a.onDo}
+          >{a.icon}</Button>
           <span className={`${TYPE.note} text-center`}>{a.label}</span>
         </div>
       ))}
@@ -348,7 +393,8 @@ export function TileGrid({ tiles }: {
       {tiles.map((t) => (
         <Button
           key={t.id}
-          variant="secondary"
+          /* ⚠️ `tertiary` — the glyph is never brand-coloured. See QuickActions. */
+          variant="tertiary"
           className={`flex-col h-24 ${SPACE.tight}`}
           onPress={t.onOpen}
         >
@@ -531,3 +577,14 @@ export function SeeAll({ label = "See all", onOpen }: {
     </div>
   );
 }
+
+/* ------------------------------------------------------------- the leads --- */
+
+/**
+ * ⚠️ WHAT EACH ROW LEADS WITH, DECLARED ONCE, BESIDE THE ROWS THEMSELVES. A row
+ * that says nothing leads with a glyph, which is the common case — so adding a
+ * row type is only a decision here when it is one of the other two.
+ */
+(PersonRow as Ruled).lead = "face";
+(FieldRow as Ruled).lead = "none";
+(CopyRow as Ruled).lead = "none";

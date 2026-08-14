@@ -16,7 +16,7 @@
 import { useState } from "react";
 import { AppCrown, Balance, Band, CopyRow, Figure, Group, Grid, Island, Money, NavRow, ActionRow,
   ToggleRow, FieldRow, NoteRow, OfferRow, PersonRow, AmountRow, QuickActions, SeeAll,
-  StepRow, TileGrid, Nothing, RowRule, Row, SectionTitle, Stack, StickyAction, Title,
+  StepRow, TileGrid, Nothing, Row, SectionTitle, Stack, StickyAction, Title,
   TYPE, type Ambience } from "@quad/web";
 import { Button } from "@heroui/react";
 import { Sheet } from "../ui.js";
@@ -77,7 +77,6 @@ export function Gallery() {
       {/* ----------------------------------------------------------- rows --- */}
       <Group label="Rows" under="Seven shapes cover every list in the product">
         <NavRow icon={glyph(<ChevronRight />)} label="Goes somewhere" onOpen={nothing} />
-        <RowRule />
         <NavRow
           icon={glyph(<ChevronRight />)}
           label="Goes somewhere, explained"
@@ -85,7 +84,6 @@ export function Gallery() {
           aside={<span className={TYPE.note}>3</span>}
           onOpen={nothing}
         />
-        <RowRule />
         <ToggleRow
           icon={glyph(<EyeOff />)}
           label="Hide balances"
@@ -93,7 +91,6 @@ export function Gallery() {
           value={hide}
           onChange={setHide}
         />
-        <RowRule />
         <ToggleRow
           icon={glyph(<MessagesSquare />)}
           label="Messaging with friends"
@@ -101,28 +98,19 @@ export function Gallery() {
           value={flip}
           onChange={setFlip}
         />
-        <RowRule />
         <FieldRow label="Residential address" value="Woldegker Str. 8A, 13059, Berlin" onEdit={nothing} />
-        <RowRule />
         <FieldRow label="Tax residency" value="Germany" />
-        <RowRule inset="face" />
         <PersonRow name="Amir Al Tarsha" under="Sent you €2.69" when="Yesterday" unread={5} onOpen={nothing} />
-        <RowRule inset="face" />
         <AmountRow icon={glyph(<PiggyBank />)} label="Savings" under="Two accounts" amount="€6,003" onOpen={nothing} />
-        <RowRule />
         <AmountRow icon={glyph(<Coins />)} label="Cash" amount="€1,169" />
-        <RowRule />
         <ActionRow icon={glyph(<Trash2 />)} label="Close this workspace" tone="danger" onDo={nothing} />
       </Group>
 
       {/* --------------------------------------------------- copy + notes --- */}
       <Group label="For local and international transfers">
         <CopyRow label="Beneficiary" value="Yamen Zakhour" onCopy={nothing} />
-        <RowRule />
         <CopyRow label="IBAN" value="DE29 1001 0178 4770 4207 58" onCopy={nothing} />
-        <RowRule />
         <CopyRow label="BIC / SWIFT code" value="REVODEB2" onCopy={nothing} />
-        <RowRule />
         <NoteRow icon={glyph(<House />)}>
           Eligible deposits are protected up to a value of €100,000, or more in exceptions.
         </NoteRow>
@@ -139,7 +127,6 @@ export function Gallery() {
           under="Fast, secure and low cost"
           offer={{ label: "Send", onDo: nothing }}
         />
-        <RowRule />
         <OfferRow
           icon={glyph(<Users />)}
           label="Joint account"
@@ -157,7 +144,6 @@ export function Gallery() {
       {/* ------------------------------------------------------ truncated --- */}
       <Group label="Upcoming payments">
         <AmountRow icon={glyph(<Landmark />)} label="REWE Pay" under="Recurring" amount="−€3.08" />
-        <RowRule />
         <AmountRow icon={glyph(<Landmark />)} label="Db Vertrieb GmbH" under="Monthly, next on 17 August" amount="−€63.00" />
         <SeeAll onOpen={nothing} />
       </Group>

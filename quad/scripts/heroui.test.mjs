@@ -269,6 +269,43 @@ for (const file of FILES) {
 }
 if (!loose) ok(`anchored: every positioned component sits inside the wrapper it positions against`);
 
+/**
+ * ⚠️ A GLYPH IS NEVER BRAND-COLOURED, AND ONE LIBRARY VARIANT MAKES IT ONE.
+ * `.button--secondary` sets `--button-fg: var(--accent-soft-foreground)` — so an
+ * icon button written the obvious way came out tinted, and every quick action,
+ * every crown control and every tile in the product was drawn in the brand
+ * colour. That looks deliberate right up until the ground behind it changes, at
+ * which point a tinted mark is one that stops reading: a workspace whose accent
+ * is close to its own ambience loses its icons entirely.
+ *
+ * ⚠️ THE RULE IS THAT COLOUR BELONGS TO THE GROUND AND NEVER TO THE THING ON IT.
+ * A neutral mark on a translucent fill survives olive, violet, white and
+ * concrete alike, which is exactly why the products that do this well look
+ * timeless and ours looked like a theme. `tertiary` is the same fill with no
+ * foreground override; `ghost` is no fill at all.
+ */
+let tinted = 0;
+for (const file of FILES) {
+  const src = readFileSync(file, "utf8");
+  /*
+    ⚠️ THE WHOLE ELEMENT, NOT ITS FIRST CHILD. The first version of this matched
+    `<Button …>{x.icon}` and so passed `TileGrid`, whose glyph is one `<span>`
+    deeper and whose tiles were the most obviously tinted thing on the screen. A
+    check that only sees the shape it was written against reports green about
+    the case it was written to find.
+  */
+  for (const m of src.matchAll(/<Button\b([^>]*)>([\s\S]*?)<\/Button>/g)) {
+    if (!/\.icon\}/.test(m[2])) continue;
+    if (/variant=["']secondary["']/.test(m[1])) {
+      tinted++;
+      fail(`${rel(file)}: an icon <Button variant="secondary"> is drawn in the accent (D7).\n` +
+           `       \`.button--secondary\` sets --button-fg to accent-soft-foreground. Use\n` +
+           `       \`tertiary\` (same fill, no tint) or \`ghost\` — colour is the ground's.`);
+    }
+  }
+}
+if (!tinted) ok(`glyphs: no icon control is tinted with the brand`);
+
 console.log(bad
   ? `\nheroui: ${bad} finding(s) — a screen branding will not reach.`
   : `\nheroui: components as they ship, themed through tokens.`);

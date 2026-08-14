@@ -375,7 +375,18 @@ export function Island({ items, here, onGo }: {
           `Switch` does — so `flex items-center` alone left four destinations in a
           vertical column down the middle of the screen. A library component's
           own direction is not the one you assume. */}
-      <Card variant="tertiary" data-island="true" className="flex flex-row items-center gap-1">
+      {/* ⚠️ THE ISLAND IS THE ONE PIECE OF CHROME THAT IS NOT GLASS, and the
+          reason is where it sits. Every other floating control here is over the
+          GROUND, where a translucent fill is depth; the island is over CARDS,
+          where it is a hole — the row underneath read straight through the nav,
+          two sets of words in the same place. `tertiary` is the library's most
+          prominent surface and it keeps the shadow, which is what separates a
+          floating thing from the thing it floats over. */}
+      <Card
+        variant="tertiary"
+        data-island="true"
+        className="flex flex-row items-center gap-1"
+      >
         {items.slice(0, PRIMARY_MAX).map((item) => {
           const at = item.route === here;
           return (
@@ -477,7 +488,7 @@ export function AppCrown(
     <header className="w-full">
       <Band bleed="edge" width="work">
         <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
-          <Button variant="ghost" aria-label="Your account" onPress={onOpenAccount}>
+          <Button variant="ghost" data-glass="true" aria-label="Your account" onPress={onOpenAccount}>
             {/* ⚠️ A REAL 40px FACE — see `FACE`. A 24px glyph in a 64px bar is
                 what made every crown look top-light and unfinished. */}
             <span
@@ -498,12 +509,12 @@ export function AppCrown(
           {/* ⚠️ SEARCH IS A BUTTON HERE, NOT A FIELD. A live input in the crown
               is a keyboard on every screen the moment a thumb brushes it; the
               real search is a surface of its own. */}
-          <Button variant="secondary" className="grow justify-start" onPress={onSearch}>
+          <Button variant="tertiary" data-glass="true" className="grow justify-start" onPress={onSearch}>
             {searchLabel}
           </Button>
 
           {actions.map((a) => (
-            <Button key={a.id} variant="secondary" aria-label={a.label} onPress={a.onDo}>
+            <Button key={a.id} variant="tertiary" data-glass="true" aria-label={a.label} onPress={a.onDo}>
               {a.icon}
             </Button>
           ))}

@@ -142,6 +142,36 @@ if (unfree.length) {
 }
 
 /**
+ * ⚠️ A ROW WITHOUT A GLYPH DECLARES SO, OR ITS SEPARATOR STARTS IN MIDAIR.
+ * `Group` derives each rule's inset from the row below it and defaults to the
+ * glyph column, which is right for most rows and wrong for exactly two kinds:
+ * one that leads with a face (52px, not 36) and one that leads with nothing at
+ * all (flush). Both shipped wrong — a list of people ruled at the glyph inset,
+ * and a card of copyable fields ruled 36px in from labels that were flush
+ * against the card.
+ *
+ * ⚠️ SO A ROW THAT RENDERS NO `<Lead>` MUST BE IN THE DECLARATION BLOCK. It is a
+ * property rather than a name because the minifier renames functions — see
+ * `surfaces.tsx` — and it is checked here because the default is silent: a new
+ * row type gets the glyph inset and nobody finds out until somebody looks at a
+ * render.
+ */
+const declared = new Set(
+  [...surfaces.matchAll(/\((\w+) as Ruled\)\.lead\s*=/g)].map((m) => m[1]),
+);
+const leadless = blocks
+  .map((b) => [/^function (\w*Row)/.exec(b)[1], b])
+  .filter(([name, body]) => !/<Lead\b/.test(body) && !declared.has(name))
+  .map(([name]) => name);
+if (leadless.length) {
+  fail(`surfaces.tsx: ${leadless.join(", ")} renders no <Lead> and declares no \`lead\`.\n` +
+       `       Group will rule it at the glyph inset, so its separator starts 36px in\n` +
+       `       from labels that are flush. Add \`(${leadless[0]} as Ruled).lead = "none"\`.`);
+} else {
+  ok(`insets: every row either leads with a glyph or says what it leads with`);
+}
+
+/**
  * ⚠️ AND THE PAGE RESERVES ROOM FOR ITS NAV. A sticky island floats over what
  * precedes it, so without this the last card of every screen is cropped under
  * the nav — which is what shipped, on both specimens, until somebody looked at a

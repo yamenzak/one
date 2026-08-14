@@ -18,7 +18,7 @@ import { useState } from "react";
 import {
   ActionRow, AmountRow, AppCrown, Balance, Band, CopyRow, Crown, Figure, Grid, Group,
   Island, Money, NavRow, Nothing, NoteRow, OfferRow, Page, PersonRow, Prose,
-  QuickActions, Row, RowRule, SeeAll, SectionTitle, Stack, StepRow, StickyAction,
+  QuickActions, Row, SeeAll, SectionTitle, Stack, StepRow, StickyAction,
   TileGrid, Title, ToggleRow, FieldRow, TYPE,
 } from "@quad/web";
 import { Button } from "@heroui/react";
@@ -34,7 +34,7 @@ const glyph = (icon: React.ReactNode) => icon;
 function Workshop() {
   return (
     <Page
-      sky="weave"
+      sky="drape"
       nav={<Island here="/" onGo={nothing}
         items={[
           { id: "today", label: "Today", icon: glyph(<House />), route: "/" },
@@ -74,16 +74,13 @@ function Workshop() {
 
           <Group label="On the stands">
             <PersonRow name="Priya Raman" under="Ribble CGR · brake bleed" when="In 40m" unread={2} onOpen={nothing} />
-            <RowRule inset="face" />
             <PersonRow name="Tom Okafor" under="Brompton · full service" when="Today" onOpen={nothing} />
-            <RowRule inset="face" />
             <PersonRow name="Lena Fischer" under="Waiting on a rear mech" when="Thu" onOpen={nothing} />
             <SeeAll onOpen={nothing} />
           </Group>
 
           <Group label="Waiting to be paid">
             <AmountRow icon={glyph(<Landmark />)} label="Invoice 2043" under="Sent Monday" amount="£240.00" onOpen={nothing} />
-            <RowRule />
             <AmountRow icon={glyph(<Landmark />)} label="Invoice 2041" under="Overdue by 6 days" amount="£85.00" onOpen={nothing} />
           </Group>
 
@@ -94,7 +91,6 @@ function Workshop() {
               under="Let people book a slot themselves"
               offer={{ label: "Turn on", onDo: nothing }}
             />
-            <RowRule />
             <OfferRow
               icon={glyph(<ChartColumn />)}
               label="Parts supplier"
@@ -117,7 +113,7 @@ function Settings() {
   const [digest, setDigest] = useState(true);
 
   return (
-    <Page sky="dots">
+    <Page sky="veil">
       <Crown name="Ironworks Studio" under="Settings" width="read" />
       <Band>
         <Stack space="roomy">
@@ -131,7 +127,6 @@ function Settings() {
               value={quiet}
               onChange={setQuiet}
             />
-            <RowRule />
             <ToggleRow
               icon={glyph(<MessagesSquare />)}
               label="Weekly digest"
@@ -139,7 +134,6 @@ function Settings() {
               value={digest}
               onChange={setDigest}
             />
-            <RowRule />
             <ToggleRow
               icon={glyph(<Globe />)}
               label="Share anonymous usage"
@@ -151,19 +145,14 @@ function Settings() {
 
           <Group label="People" under="Who can do what in here">
             <NavRow icon={glyph(<CircleUser />)} label="Members" aside={<span className={TYPE.note}>12</span>} onOpen={nothing} />
-            <RowRule />
             <NavRow icon={glyph(<KeyRound />)} label="Roles" under="Three custom roles" onOpen={nothing} />
-            <RowRule />
             <NavRow icon={glyph(<Mail />)} label="Invitations" aside={<span className={TYPE.note}>2</span>} onOpen={nothing} />
           </Group>
 
           <Group label="This workspace">
             <FieldRow label="Name" value="Ironworks Studio" onEdit={nothing} />
-            <RowRule />
             <FieldRow label="Address" value="ironworks.t.4dl.app" onEdit={nothing} />
-            <RowRule />
             <FieldRow label="Where records are kept" value="European Union" />
-            <RowRule />
             <ActionRow icon={glyph(<Trash2 />)} label="Close this workspace" tone="danger" onDo={nothing} />
           </Group>
         </Stack>
@@ -185,11 +174,8 @@ function Detail() {
 
           <Group label="For the depot">
             <CopyRow label="Vehicle" value="MAN TGX 26.510 · BX24 WKD" onCopy={nothing} />
-            <RowRule />
             <CopyRow label="Seal number" value="EU-4471-8890-2213" onCopy={nothing} />
-            <RowRule />
             <CopyRow label="Route reference" value="RTE-2026-0814-NW" onCopy={nothing} />
-            <RowRule />
             <NoteRow icon={glyph(<Clock />)}>
               Seals are checked at both ends. If one is broken on arrival, photograph it before
               opening and the load is treated as disputed.
@@ -201,9 +187,7 @@ function Detail() {
 
           <Group label="On the trailer">
             <AmountRow icon={glyph(<ChartColumn />)} label="Pallets" amount="18" />
-            <RowRule />
             <AmountRow icon={glyph(<PiggyBank />)} label="Weight" amount="21.4 t" />
-            <RowRule />
             <AmountRow icon={glyph(<EyeOff />)} label="Temperature" under="Held since 04:10" amount="2 °C" tone="success" />
           </Group>
         </Stack>
@@ -217,7 +201,7 @@ function Detail() {
 /** Steps, and one unmistakable action. */
 function Flow() {
   return (
-    <Page sky="mesh">
+    <Page sky="aurora">
       <Crown name="Greenhouse" under="New grower" width="read" ruled={false} />
       <Band>
         <Stack space="roomy">
@@ -250,7 +234,7 @@ function Flow() {
 function Start() {
   return (
     <Page
-      sky="calm"
+      sky="tide"
       nav={<Island here="/" onGo={nothing}
         items={[
           { id: "round", label: "Round", icon: glyph(<House />), route: "/" },

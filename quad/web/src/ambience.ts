@@ -1,56 +1,83 @@
 /**
- * WHAT SITS BEHIND A SCREEN — gradients, patterns and texture, all derived from
- * the accent.
+ * WHAT SITS BEHIND A SCREEN — the ground, its light, its material and its grain.
  *
- * ⚠️ NAMED, NEVER A COLOUR (D7). Each ambience is a SHAPE; the hue comes from
- * whatever the workspace's accent is at the time. A screen that named a colour
- * would stop matching the moment somebody changed their brand, and nobody would
- * connect the two.
+ * ⚠️ NAMED, NEVER A COLOUR (D7). Each ambience is a SHAPE OF LIGHT; the hue comes
+ * from whatever the workspace's accent is at the time. A screen that named a
+ * colour would stop matching the moment somebody changed their brand, and nobody
+ * would connect the two.
  *
- * ⚠️ A PATTERN IS BARELY THERE, AND THE FIRST VERSION OF THIS FILE GOT THAT
- * WRONG. `dots` and `weave` shipped at a strength where the repeat was plainly
- * visible across a whole screen — which does not read as texture, it reads as a
- * moiré or a rendering fault, and it was the single thing that made the product
- * look counterfeit. A texture is felt, never seen. The tints below are a third of
- * what they were, the repeat is finer, and both stop well before the fold.
+ * ⚠️ AN AMBIENCE IS FOUR LAYERS, NOT ONE GRADIENT, AND THAT IS THE WHOLE
+ * DIFFERENCE. The first version of this file put one radial wash behind a screen
+ * and called it ambience; against a product that does this well it read as a
+ * light leak — flat, banded, obviously a CSS gradient. A ground that reads as
+ * MATERIAL has:
  *
- * ⚠️ THEY ARE STILL CSS RATHER THAN IMAGES, for the reason that has not changed:
- * a PNG is bytes on every cold load and a FIXED colour, so it cannot follow a
- * tenant's accent.
+ *   1. a WASH — the deep base, so the screen has a colour rather than a tint
+ *   2. FORMS — two to four soft poles of light at different values, which is what
+ *      gives it somewhere to travel and stops it reading as a single blur
+ *   3. DEPTH — a vignette pulling the corners down, which is most of why a
+ *      photographic backdrop looks lit rather than filled
+ *   4. GRAIN — a barely-there fine texture. This one is not decoration: a large
+ *      smooth gradient BANDS on an 8-bit display, and the banding is the single
+ *      clearest tell of a cheap background. A little noise dithers it away.
  *
- * ⚠️ THE BLEED IS THE OTHER HALF. An ambience that stops at the crown's lower
- * edge draws a line across the page; one that fades has depth. `FADE` is the
- * mask that does it, and it is why the pattern is on its own layer rather than
- * on the element's background.
+ * ⚠️ ONE HUE, MANY VALUES. Every ambience below is built from the accent alone
+ * (or the tone's token), varied by strength and spread, with light and shadow
+ * doing the rest. Reaching for a second colour is what turns a branded surface
+ * into somebody's idea of a nice gradient, and it cannot follow a tenant's brand.
+ * `aurora` is the one exception and it declares its companion in writing.
+ *
+ * ⚠️ THEY ARE CSS RATHER THAN IMAGES, and that is not a compromise. A PNG is
+ * bytes on every cold load and a FIXED colour, so it cannot follow a tenant's
+ * accent — which is the entire point of the system. What CSS costs is that the
+ * shapes have to be composed rather than photographed, which is what the four
+ * layers above are for.
+ *
+ * ⚠️ AND IT REACHES A WHOLE VIEWPORT, NOT A BAND. Ambience belongs to the top of
+ * a screen and should be gone by the time somebody has scrolled one screen —
+ * which means a height of `100vh` and a long fade, not a strip behind the crown.
+ * A `60vh` version of this file put the ramp above the fold and made every
+ * patterned screen end in a visible horizontal edge.
  */
 
 import type { Tone } from "@quad/kernel";
 
 /**
- * ⚠️ SEVEN, AND `plain` IS THE DEFAULT ON PURPOSE. Ambience everywhere is
- * ambience nowhere: the reason the patterned screens in a good product land is
- * that most screens are flat.
+ * ⚠️ TWELVE, AND `plain` IS STILL THE DEFAULT. Ambience everywhere is ambience
+ * nowhere: the reason the rich screens in a good product land is that most
+ * screens are flat. What earns a ground is a screen somebody ARRIVES at — a
+ * balance, a home, a result — never a form and never a list.
  *
- *   plain   nothing. Most screens.
- *   calm    one wide, slow wash. Where somebody arrives.
- *   focus   a tight vignette pulling the eye to the middle. One task.
- *   lift    a rising gradient. Something that just went well.
- *   mesh    two offset washes. A landing surface with room to breathe.
- *   dots    a fading dot field. Reads as "this area is technical" — security,
- *           devices, diagnostics.
- *   weave   fine diagonal threading. Reads as material and premium — a plan, a
- *           balance, anything about worth.
+ *   plain      nothing. Most screens.
+ *   calm       one wide, slow wash. Where somebody arrives.
+ *   focus      a tight pool of light in the middle. One task.
+ *   lift       light rising from below. Something that just went well.
+ *   mesh       two offset poles. A landing surface with room to breathe.
+ *   dots       a fading measure. Reads as technical — devices, diagnostics.
+ *   weave      fine diagonal threading. Reads as woven cloth.
+ *   drape      a fold of heavy fabric, lit from one side. The most material of
+ *              them: worth, a plan, anything premium.
+ *   aurora     several poles at different values with one companion hue. Alive
+ *              and generous — a celebration, a milestone, a reward.
+ *   veil       one broad diagonal sweep of light. Clean and directional; good
+ *              under a single large figure.
+ *   tide       two deep bands meeting on a soft horizon. Calm, wide, patient.
+ *   spotlight  a hard light source with a long falloff and a heavy corner. The
+ *              most staged — a single object, a single decision.
  */
-export type Ambience = "plain" | "calm" | "focus" | "lift" | "mesh" | "dots" | "weave";
+export type Ambience =
+  | "plain" | "calm" | "focus" | "lift" | "mesh" | "dots"
+  | "weave" | "drape" | "aurora" | "veil" | "tide" | "spotlight";
 
 export const AMBIENCES: readonly Ambience[] = [
-  "plain", "calm", "focus", "lift", "mesh", "dots", "weave",
+  "plain", "calm", "focus", "lift", "mesh", "dots",
+  "weave", "drape", "aurora", "veil", "tide", "spotlight",
 ];
 
 /**
  * ⚠️ TONE SELECTS THE TOKEN, AMBIENCE SELECTS THE SHAPE. Keeping them apart is
  * what lets a warning-toned screen be calm and a success-toned one lift, without
- * anybody drawing thirty-five combinations by hand.
+ * anybody drawing sixty combinations by hand.
  */
 const HUE: Readonly<Record<Tone, string>> = {
   neutral: "var(--accent)",
@@ -60,106 +87,269 @@ const HUE: Readonly<Record<Tone, string>> = {
   danger: "var(--danger)",
 };
 
+/**
+ * ⚠️ EVERY STRENGTH IS SCALED BY `--sky`, AND THAT IS HOW LIGHT MODE SURVIVES.
+ * The same mix that reads as a lit ground on a dark screen reads as a stain on a
+ * white one — the eye judges a tint against the paper, not in the abstract. One
+ * multiplier set per theme is the whole fix; the alternative is two hand-tuned
+ * numbers per layer per ambience, which is forty numbers nobody will keep true.
+ */
 const mix = (hue: string, pct: number) =>
-  `color-mix(in oklab, ${hue} ${pct}%, transparent)`;
+  `color-mix(in oklab, ${hue} calc(var(--sky, 1) * ${pct}%), transparent)`;
+
+/** A soft pole of light: where, how wide, how strong. */
+const pole = (hue: string, pct: number, x: string, y: string, w: string, h: string) =>
+  `radial-gradient(${w} ${h} at ${x} ${y}, ${mix(hue, pct)} 0%, transparent 72%)`;
+
+/**
+ * ⚠️ THE VIGNETTE IS THE LAYER PEOPLE LEAVE OUT, AND IT IS THE ONE THAT MAKES A
+ * GROUND LOOK LIT. Without it the corners are exactly as bright as the middle,
+ * which never happens to a real surface and reads as "filled" rather than
+ * "photographed". It pulls DOWN toward the page's own ground rather than to
+ * black, so it works in both themes and under any brand.
+ *
+ * ⚠️ AND IT STARTS LATE, BECAUSE A VIGNETTE THAT STARTS EARLY IS NOT A VIGNETTE
+ * — it is a wash over the whole ground, and the first version of it was exactly
+ * that: opaque from 40% outward, which is most of a phone. It flattened every
+ * pole underneath it and made `aurora` — four poles at four values — read as a
+ * faint smudge. Frame the light; do not paint over it.
+ */
+const DEPTH =
+  "radial-gradient(135% 115% at 50% 22%, transparent 62%, "
+  + "color-mix(in oklab, var(--background) calc(var(--sky, 1) * 45%), transparent) 100%)";
+
+/**
+ * ⚠️ GRAIN IS NOT TEXTURE FOR ITS OWN SAKE — IT IS DITHER. A wash this large is
+ * smooth enough to band into visible steps on an ordinary display, and the bands
+ * are what make a CSS ground look like a CSS ground. Two offset dot fields at
+ * three percent break the steps up and are invisible on their own.
+ */
+const GRAIN = [
+  `radial-gradient(color-mix(in oklab, var(--foreground) 3%, transparent) 0.5px, transparent 0.5px)`,
+  `radial-gradient(color-mix(in oklab, var(--foreground) 2%, transparent) 0.5px, transparent 0.5px)`,
+].join(", ");
+
+const GRAIN_SIZE = "3px 3px, 5px 5px";
+const GRAIN_POS = "0 0, 2px 3px";
 
 /**
  * ⚠️ THE MASK IS WHY IT READS AS DEPTH RATHER THAN AS A PANEL. Without it every
- * patterned header ends in a hard horizontal edge, which is the single thing
- * that makes an ambient background look like a mistake.
+ * ground ends in a hard horizontal edge, which is the single thing that makes an
+ * ambient background look like a mistake. The ramp is long and starts late: an
+ * early fade wastes the ambience on the part of the screen the crown is already
+ * covering.
  */
-export const FADE =
-  "mask-image: linear-gradient(180deg, black 0%, black 30%, transparent 100%); " +
-  "-webkit-mask-image: linear-gradient(180deg, black 0%, black 30%, transparent 100%)";
+export const FADE = (() => {
+  const ramp = "linear-gradient(180deg, black 0%, black 45%, "
+    + "color-mix(in oklab, black 55%, transparent) 72%, transparent 100%)";
+  return `mask-image: ${ramp}; -webkit-mask-image: ${ramp}`;
+})();
 
 /**
- * ⚠️ THE LAYER IS A BAND AT THE TOP, NOT THE WHOLE PAGE, AND THIS IS THE BUG THE
- * FADE HAD. Masked over `inset: 0` on a page taller than the screen, the ramp to
- * transparent lands somewhere past the fold — so the pattern stayed at full
- * strength for the entire visible screen and only faded on a page shorter than
- * the viewport, which is never. Ambience belongs to the top of a screen, where
- * the crown is; a height in `vh` is what makes the fade a thing anybody sees.
+ * ⚠️ ONE VIEWPORT, NOT A BAND — see the header. A ground that stops behind the
+ * crown draws a line across the page; one that lasts a screen and fades has
+ * depth, and is gone by the time anybody has scrolled past it.
  */
-export const REACH = "60vh";
+export const REACH = "100vh";
 
-/** The background layer for one ambience, as CSS declarations. */
-export function ambienceCss(what: Ambience, tone: Tone = "neutral"): string {
-  const hue = HUE[tone];
+/** The layers of one ambience, innermost last, as `background-image` entries. */
+function layers(what: Ambience, hue: string): readonly string[] {
   switch (what) {
     case "plain":
-      return "";
+      return [];
 
     case "calm":
-      return `background-image: radial-gradient(120% 90% at 50% -30%, ${mix(hue, 14)} 0%, transparent 65%)`;
+      return [
+        pole(hue, 20, "50%", "-20%", "130%", "80%"),
+        pole(hue, 10, "80%", "10%", "70%", "50%"),
+      ];
 
     case "focus":
-      return `background-image: radial-gradient(70% 60% at 50% 25%, ${mix(hue, 10)} 0%, transparent 72%)`;
+      return [
+        pole(hue, 16, "50%", "22%", "70%", "55%"),
+        pole(hue, 7, "50%", "0%", "120%", "40%"),
+      ];
 
     case "lift":
-      return `background-image: linear-gradient(180deg, ${mix(hue, 12)} 0%, transparent 70%)`;
+      return [
+        `linear-gradient(0deg, ${mix(hue, 22)} 0%, ${mix(hue, 6)} 40%, transparent 75%)`,
+        pole(hue, 12, "50%", "95%", "110%", "60%"),
+      ];
 
-    /* Two offset washes rather than one, so the eye has somewhere to travel. */
     case "mesh":
-      return "background-image: " + [
-        `radial-gradient(80% 70% at 10% -10%, ${mix(hue, 16)} 0%, transparent 62%)`,
-        `radial-gradient(70% 60% at 95% 5%, ${mix(hue, 9)} 0%, transparent 64%)`,
-      ].join(", ");
+      return [
+        pole(hue, 22, "8%", "-8%", "85%", "70%"),
+        pole(hue, 14, "96%", "6%", "75%", "60%"),
+        pole(hue, 8, "50%", "45%", "90%", "60%"),
+      ];
 
     /*
-      ⚠️ A DOT FIELD FROM TWO GRADIENTS, NOT AN IMAGE. `background-size` sets the
-      density and the accent tints it, so the same declaration is a fine mesh on
-      a phone and a coarse one on a wall display without a second asset.
+      ⚠️ A MEASURE, NOT A DOT FIELD. The point of this one is that it says
+      "technical" — so the dots sit on a wash rather than on nothing, which is
+      what stopped the old version reading as a rendering fault.
     */
     case "dots":
       return [
-        /* ⚠️ 18% and 22px, from 55% and 14px. At the old values the grid was a
-           thing you looked AT rather than a surface the screen sat on. */
-        `background-image: radial-gradient(${mix(hue, 18)} 0.5px, transparent 0.5px)`,
-        `background-size: 22px 22px`,
-        `background-position: 0 0`,
-      ].join("; ");
+        `radial-gradient(${mix(hue, 22)} 0.5px, transparent 0.5px)`,
+        pole(hue, 14, "50%", "-10%", "120%", "70%"),
+      ];
 
-    /* Fine diagonal threading. Two passes at opposing angles reads as woven
-       rather than as stripes. */
+    /* Fine diagonal threading over a wash — cloth, not stripes. */
     case "weave":
       return [
-        "background-image: " + [
-          /* ⚠️ One pass, not two crossed ones — the crosshatch read as moiré. */
-          `repeating-linear-gradient(45deg, ${mix(hue, 5)} 0 1px, transparent 1px 9px)`,
-        ].join(", "),
-      ].join("; ");
+        `repeating-linear-gradient(45deg, ${mix(hue, 6)} 0 1px, transparent 1px 9px)`,
+        pole(hue, 18, "30%", "-10%", "110%", "70%"),
+        pole(hue, 10, "90%", "40%", "70%", "60%"),
+      ];
+
+    /*
+      ⚠️ THE FOLD IS A CONIC GRADIENT, AND NOTHING ELSE PRODUCES IT. A fold is a
+      surface turning away from a light source — the brightness sweeps around a
+      point rather than along a line, which is exactly what a conic sweep is and
+      exactly what no combination of linear gradients can fake.
+    */
+    case "drape":
+      return [
+        `repeating-linear-gradient(38deg, ${mix(hue, 5)} 0 1px, transparent 1px 7px)`,
+        /* ⚠️ EVERY ANGULAR STOP IS A RAMP, NEVER A JUMP. A conic gradient going
+           straight from a tint to `transparent` draws a SEAM — a hard diagonal
+           line across the screen that reads as a graphic, not as cloth. Cloth
+           has no edges; a fold is a continuous change of angle, so every stop
+           below has a neighbour a long way off rather than a stop beside it. */
+        `conic-gradient(from 190deg at 22% -14%, `
+          + `${mix(hue, 24)} 0deg, ${mix(hue, 13)} 48deg, ${mix(hue, 4)} 96deg, `
+          + `${mix(hue, 15)} 168deg, ${mix(hue, 5)} 232deg, ${mix(hue, 20)} 306deg, `
+          + `${mix(hue, 24)} 360deg)`,
+        pole(hue, 20, "70%", "12%", "90%", "70%"),
+      ];
+
+    /*
+      ⚠️ THE ONE AMBIENCE WITH A SECOND HUE, AND IT IS DECLARED RATHER THAN
+      INVENTED. `--success` is the companion because it is the token furthest
+      from the accent that every theme is guaranteed to define — so the pairing
+      still follows a tenant's brand instead of freezing one screen on ours.
+    */
+    case "aurora":
+      return [
+        pole("var(--success)", 18, "18%", "8%", "70%", "55%"),
+        pole(hue, 26, "78%", "-6%", "80%", "60%"),
+        pole(hue, 14, "45%", "38%", "70%", "50%"),
+        pole("var(--success)", 9, "88%", "45%", "60%", "45%"),
+      ];
+
+    /* One broad sweep, and a counter-sweep so the dark half is not flat. */
+    case "veil":
+      return [
+        `linear-gradient(112deg, ${mix(hue, 30)} 0%, ${mix(hue, 12)} 34%, transparent 58%)`,
+        `linear-gradient(292deg, ${mix(hue, 14)} 0%, transparent 45%)`,
+        pole(hue, 10, "20%", "20%", "80%", "60%"),
+      ];
+
+    /* Two deep bands meeting on a soft horizon. */
+    case "tide":
+      return [
+        `linear-gradient(180deg, ${mix(hue, 26)} 0%, ${mix(hue, 8)} 45%, transparent 70%)`,
+        pole(hue, 16, "15%", "35%", "90%", "45%"),
+        pole(hue, 12, "85%", "8%", "70%", "40%"),
+      ];
+
+    /*
+      ⚠️ A LIGHT SOURCE AND A SHADOW, WHICH IS WHY THE CORNER IS HEAVY. Staging
+      is direction: everything else here is lit from everywhere, and this one is
+      lit from somewhere.
+    */
+    case "spotlight":
+      return [
+        pole(hue, 34, "72%", "-4%", "70%", "55%"),
+        pole(hue, 12, "60%", "20%", "120%", "80%"),
+        `linear-gradient(200deg, transparent 40%, `
+          + `color-mix(in oklab, var(--background) calc(var(--sky, 1) * 45%), transparent) 100%)`,
+      ];
   }
 }
 
 /**
- * ⚠️ EVERY AMBIENCE, AS ONE STYLESHEET, WITH THE FADE AND THE MOTION ATTACHED.
+ * The background layer for one ambience, as CSS declarations.
+ *
+ * ⚠️ DEPTH GOES ON TOP OF THE FORMS AND UNDER NOTHING ELSE — first in the list,
+ * because `background-image` paints its first entry last. Putting the vignette
+ * under the poles lets them light the corners it exists to darken.
+ */
+export function ambienceCss(what: Ambience, tone: Tone = "neutral"): string {
+  const forms = layers(what, HUE[tone]);
+  if (!forms.length) return "";
+  return `background-image: ${[DEPTH, ...forms].join(", ")}`;
+}
+
+/**
+ * ⚠️ EVERY AMBIENCE, AS ONE STYLESHEET, WITH THE FADE AND THE GRAIN ATTACHED.
  * Built once and injected, because the gradients are derived from the accent at
  * runtime — a workspace's brand has to reach the background of every screen
  * without any screen knowing that branding exists.
  *
- * The layer is a `::before` rather than the element's own background so the
- * mask can fade it without fading the content on top of it.
+ * ⚠️ TWO PSEUDO-ELEMENTS, AND THEY ARE NOT INTERCHANGEABLE. `::before` carries
+ * the ground and is MASKED, so it fades. `::after` carries the grain and is NOT,
+ * because dither that fades out stops dithering exactly where the gradient is
+ * shallowest and banding is most visible.
  */
 export function ambienceStylesheet(): string {
   const rules = AMBIENCES.filter((a) => a !== "plain").map((a) => {
     const css = ambienceCss(a);
-    return `[data-sky="${a}"]::before { ${css}; ${FADE}; }`;
+    const sized = a === "dots"
+      ? "; background-size: 22px 22px, auto"
+      : "";
+    return `[data-sky="${a}"]::before { ${css}${sized}; ${FADE}; }`;
   });
 
   return [
     /* ⚠️ `-1` and `isolation` on the host, or the layer paints over the content
        of any ancestor that happens to create a stacking context. */
-    `[data-sky] { position: relative; isolation: isolate; }`,
-    `[data-sky]:not([data-sky="plain"])::before {`,
-    /* ⚠️ `bottom: auto` and a height — see `REACH`. `inset: 0` is what made the
-       fade invisible on every page longer than a screen. */
+    `[data-sky] { position: relative; isolation: isolate; --sky: 1; }`,
+    /* ⚠️ SEE `mix` — one multiplier per theme, not forty hand-tuned numbers.
+       Both selector forms, because the stamp may be on the host or an ancestor. */
+    `[data-theme="light"] [data-sky], [data-theme="light"][data-sky] { --sky: 0.55; }`,
+    `[data-sky]:not([data-sky="plain"])::before,`,
+    `[data-sky]:not([data-sky="plain"])::after {`,
     `  content: ""; position: absolute; top: 0; left: 0; right: 0;`,
     `  height: ${REACH}; bottom: auto; z-index: -1;`,
-    `  pointer-events: none; background-repeat: repeat;`,
+    `  pointer-events: none;`,
+    `}`,
+    `[data-sky]:not([data-sky="plain"])::before { background-repeat: repeat; }`,
+    /* ⚠️ The dither, unmasked — see the note above this function. */
+    `[data-sky]:not([data-sky="plain"])::after {`,
+    `  background-image: ${GRAIN};`,
+    `  background-size: ${GRAIN_SIZE};`,
+    `  background-position: ${GRAIN_POS};`,
     `}`,
     ...rules,
     /* ⚠️ A bleeding ambience must reach the edge even inside a padded column. */
-    `[data-bleed="edge"]::before { left: 50%; right: auto; width: 100vw; transform: translateX(-50%); }`,
+    `[data-bleed="edge"]::before, [data-bleed="edge"]::after {`,
+    `  left: 50%; right: auto; width: 100vw; transform: translateX(-50%);`,
+    `}`,
+    /*
+      ⚠️ CHROME OVER AN AMBIENCE IS GLASS, NOT PAINT. A solid pill over a lit
+      ground is a hole punched in it — the ground is the thing that makes the
+      screen, and every opaque control sitting on it takes a piece away. A
+      translucent fill of the FOREGROUND token blurs whatever is behind it, so
+      the same rule works on olive, on violet and on white without knowing which
+      it is on. This is also why a control here is never tinted with the accent:
+      see the icon rule below.
+
+      ⚠️ GLASS IS FOR CHROME OVER THE GROUND, NEVER OVER A CARD. `[data-sky]`
+      sets `isolation: isolate` so the ground can sit at `z-index: -1`, and an
+      isolated stacking context is where `backdrop-filter` stops sampling — so a
+      glass control over a card gets the fill without the blur, and whatever is
+      under it reads straight through. The nav island learnt this the obvious
+      way. Over a card, use a surface.
+    */
+    `[data-glass="true"] {`,
+    `  background-color: color-mix(in oklab, var(--foreground) 12%, transparent) !important;`,
+    `  backdrop-filter: blur(20px) saturate(1.4);`,
+    `  -webkit-backdrop-filter: blur(20px) saturate(1.4);`,
+    `}`,
+    `[data-glass="true"]:hover {`,
+    `  background-color: color-mix(in oklab, var(--foreground) 18%, transparent) !important;`,
+    `}`,
     /* ⚠️ THE UNREAD DOT, COLOURED BY ITS TONE RATHER THAN BY A LITERAL. It is
        here rather than in a component because a component that named a colour
        would be one a workspace's branding never reaches (D7). */
