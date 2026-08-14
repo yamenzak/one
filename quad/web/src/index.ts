@@ -20,3 +20,5 @@ export * from "./guide.js";
 export * from "./money.js";
 export * from "./inbox.js";
 export * from "./ai.js";
+export * from "./vault.js";
+export * from "./legal.js";

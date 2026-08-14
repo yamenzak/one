@@ -52,16 +52,17 @@ const SURFACES = {
   meters: { file: "web/src/money.tsx", renders: "export function Wallet" },
   jobs: { file: "web/src/money.tsx", renders: "export function Jobs" },
 
-  /*
-    ⚠️ OWED, WITH A STAGE. Each of these is a declaration an app can already
-    make and a screen that does not exist yet — which is exactly the state this
-    guard exists to keep visible rather than let anybody forget.
-  */
   lanes: { file: "web/src/ai.tsx", renders: "export function AiLanes" },
-  vault: { owed: "8" },
-  purposes: { owed: "8" },
-  documents: { owed: "8" },
-  processors: { owed: "8" },
+  vault: { file: "web/src/vault.tsx", renders: "export function MyData" },
+  purposes: { file: "web/src/vault.tsx", renders: "export function ConsentSheet" },
+  documents: { file: "web/src/legal.tsx", renders: "export function Documents" },
+  processors: { file: "web/src/legal.tsx", renders: "export function SubProcessors" },
+
+  /*
+    ⚠️ NOTHING IS OWED TODAY, and the shape stays here on purpose: `{ owed: "N" }`
+    is how the next declaration kind is added honestly — visible, against a stage,
+    rather than quietly unrendered.
+  */
 
   /* Not a surface: an app's own refusal wording is rendered wherever the
      refusal is, which is every screen. */

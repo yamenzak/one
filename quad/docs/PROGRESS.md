@@ -22,8 +22,8 @@ reader can trust this table instead of re-reading the code.
 | 5 | Surface — HeroUI shell, nav, sky, rendered settings | shipped |
 | 6 | Money — plans, entitlements, credits, jobs | shipped |
 | 7 | Services — ai and notify over RPC | shipped |
-| 8 | Vault + legal | building |
-| 9 | Kova on Quad | not started |
+| 8 | Vault + legal | shipped |
+| 9 | Kova on Quad | building |
 
 ## What is built
 
@@ -156,7 +156,21 @@ refuse — it reads as built and passes every test.
   shows which model answers which lane. A previous platform had the schema, the
   Durable Object, the routes and sixteen dispatch sites with nowhere to look.
 
-The guard registry, its twelve checks, and the standards that bind them.
+**The vault, and the record.**
+
+- `runtime/vault.ts` — encrypted rows keyed by a per-subject salt, so erasure is
+  ONE write and what it destroys is the only thing that could turn the
+  ciphertext back into facts — here and in any backup that already left. Every
+  look is recorded, refusals included, with no opt-out anywhere: "who looked at
+  my health record, and when" is the question the design exists to answer.
+- Consent is the ceiling and a grant is the specific; withdrawing is a timestamp
+  rather than a deleted row, because the row is the evidence that the reads
+  before it were lawful. A grant expires.
+- `web/vault.tsx` · `web/legal.tsx` — the consent sheet, who looked, export and
+  erasure (which says plainly what it cannot undo), the derived processing
+  record, the documents and the sub-processors with their countries.
+
+The guard registry, its thirteen checks, and the standards that bind them.
 
 ## Decisions, and how well each is defended
 
@@ -173,7 +187,7 @@ The guard registry, its twelve checks, and the standards that bind them.
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 2 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 2 |
-| D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 4 |
+| D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 9 |
 | D12 | Every cross-cutting concern is a field on a declaration, never a call site | 30 |
 <!-- /generated -->
 
@@ -205,6 +219,7 @@ the library decides FOR us.
 | `every-declaration-reaches-a-surface` | D12 | a mechanism built, tested and wired with nowhere a person can look — every suite green |
 | `every-surface-control-changes-behaviour` | D12 | a switch somebody turns on that does nothing, so they stop watching the thing it promised |
 | `no-handler-raises-its-own-cross-cutting-concern` | D12 | a concern an app can forget, forgotten invisibly — no error, no failing test, a capability that silently does not apply |
+| `a-vault-fact-is-never-stored-by-an-app` | D11 | an app writing the vault's own tables directly, so a fact exists with no grant, no consent record and no way to shred it |
 | `no-cross-tenant-query-fans-out-over-shards` | D5 | an operator console that gets slower with every shard, until the sweep it runs times out |
 | `composition-is-lazy` | D4 | cold start growing with the catalogue, until the catalogue that was meant to grow cannot |
 | `no-service-call-is-made-over-fetch` | D3 | a wrong payload becoming a production error where it had been a compile error |
@@ -242,7 +257,11 @@ the library decides FOR us.
 | `the-inbox-is-written-whatever-the-policy-says` | D12 | somebody who muted email having no record at all of what happened while they were not looking |
 | `a-notification-audience-is-a-permission` | D12 | a workspace that made its own role silently receiving nothing, with every dispatch reporting success against an empty audience |
 | `one-persons-inbox-is-one-persons` | D11 | a workspace filter without the account, which is everybody reading everybody else's notifications |
-| `a-vault-fact-is-never-stored-by-an-app` *(owed)* | D11 | an app writing the vault's own tables directly, so a fact exists with no grant, no consent record and no way to shred it |
+| `no-app-carries-its-own-encryption` | D11 | a field that looks safer than a plain column and survives an erasure - key not shredded, reads unrecorded, export unaware it exists |
+| `erasing-destroys-the-key-not-just-the-rows` | D11 | telling somebody they were forgotten while a readable copy sits in a backup that already left the building |
+| `consent-is-the-ceiling-and-a-grant-is-the-specific` | D11 | an operator-written grant standing in for the subject's own agreement, which is a lawful-basis failure wearing an access-control shape |
+| `every-look-is-recorded-including-the-refused-ones` | D11 | the question "did anybody try to look at this" answered with silence, which is the question actually asked after something goes wrong |
+| `erasure-is-not-a-pause` | D11 | a fresh salt after a shredding, making everything written afterwards a second collection nobody agreed to |
 <!-- /generated -->
 
 ## Commands
