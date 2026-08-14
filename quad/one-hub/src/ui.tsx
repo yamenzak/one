@@ -10,6 +10,7 @@
 
 import { Alert, Card, Spinner } from "@heroui/react";
 import type { Problem, Tone } from "@quad/kernel";
+import { TYPE } from "@quad/web";
 
 /**
  * ⚠️ OUR TONE, THEIR STATUS NAME — the same bridge `colorFor` is for `Chip`. A
@@ -52,7 +53,7 @@ export function Waiting({ what }: { readonly what: string }) {
   return (
     <div className="flex items-center justify-center gap-3 py-12" role="status">
       <Spinner size="sm" />
-      <span>{what}</span>
+      <span className={TYPE.note}>{what}</span>
     </div>
   );
 }

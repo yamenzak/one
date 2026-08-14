@@ -25,7 +25,11 @@
     // make `*.4dl.app/*` One's, and One's wildcard would then match a live
     // tenant's address. One label of its own keeps the two disjoint, which is
     // the whole isolation while Kova has not migrated.
-    "ROOT": "one.4dl.app",
+    //
+    // `t` for tenant: every door is one label under it, so a workspace is
+    // `<slug>.t.4dl.app` — shorter to say, shorter to type, and shorter on the
+    // wire in every request a screen or a phone makes.
+    "ROOT": "t.4dl.app",
 
     // ⚠️ NEVER `development` HERE. The development lane puts sign-in codes in
     // retained logs and turns on the lane that fabricates AI output and bills

@@ -13,6 +13,7 @@
  * page, which is the same picture as a page that failed to load.
  */
 
+import { Band, Crown, Page, Spacer, TYPE } from "@quad/web";
 import { Waiting, Refusal } from "./ui.js";
 import { useSession } from "./session.js";
 import type { Face } from "./door.js";
@@ -52,18 +53,40 @@ export function App() {
   const { where, face, me, stuck } = useSession();
   const screen = pickScreen(face, me === null ? null : me !== "nobody", stuck !== null);
 
+  /* ⚠️ A SCREEN SOMEBODY WORKS IN AND A SCREEN SOMEBODY ARRIVES AT ARE NOT THE
+     SAME LAYOUT. The first is a column under a ruled crown; the second is a
+     centred sheet with no chrome. Using one for both makes the sign-in look like
+     a settings page — which is how a product comes to feel like a form. */
+  const settled = screen === "workspaces";
+
   return (
-    /* ⚠️ The ambience is an attribute on the frame, read by a stylesheet rule —
-       never an inline style, which would beat every token and stop a workspace's
-       branding reaching the background of every screen. */
-    <div className="min-h-dvh flex flex-col items-center justify-center gap-6 p-4" data-sky="calm">
-      {screen === "waiting" ? <Waiting what="Getting your workspaces" /> : null}
-      {screen === "stuck" && stuck ? <Refusal problem={stuck} /> : null}
-      {screen === "signpost" && where ? <Signpost where={where} /> : null}
-      {screen === "sign-in" ? <SignIn lead={LEAD[face ?? ""] ?? LEAD.hub!} /> : null}
-      {screen === "workspaces" && where ? <Workspaces where={where} /> : null}
-      {screen === "new-workspace" && where ? <NewWorkspace where={where} /> : null}
-      {screen === "elsewhere" && where ? <Elsewhere where={where} kind={where.kind} /> : null}
-    </div>
+    /* ⚠️ The ambience is an attribute on the frame, read by a stylesheet rule
+       built from theme tokens — never an inline style, which would beat every
+       token and stop a workspace's branding reaching any screen. */
+    <Page sky="calm">
+      <Crown
+        name="One"
+        under={where?.root}
+        width={settled ? "work" : "read"}
+        ruled={settled}
+        aside={me && me !== "nobody" ? <span className={TYPE.note}>{me.email}</span> : null}
+      />
+      <Band width={settled ? "work" : "read"}>
+        <div
+          className={settled
+            ? "py-8"
+            : "min-h-[68dvh] flex flex-col items-center justify-center gap-6 py-8"}
+        >
+          {screen === "waiting" ? <Waiting what="Getting your workspaces" /> : null}
+          {screen === "stuck" && stuck ? <Refusal problem={stuck} /> : null}
+          {screen === "signpost" && where ? <Signpost where={where} /> : null}
+          {screen === "sign-in" ? <SignIn lead={LEAD[face ?? ""] ?? LEAD.hub!} /> : null}
+          {screen === "workspaces" && where ? <Workspaces where={where} /> : null}
+          {screen === "new-workspace" && where ? <NewWorkspace where={where} /> : null}
+          {screen === "elsewhere" && where ? <Elsewhere where={where} kind={where.kind} /> : null}
+        </div>
+      </Band>
+      <Spacer />
+    </Page>
   );
 }

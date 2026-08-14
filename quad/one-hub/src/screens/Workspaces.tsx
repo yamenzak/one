@@ -15,6 +15,7 @@
 
 import { useState } from "react";
 import { Button, Card, Separator } from "@heroui/react";
+import { Row, Stack, TYPE, Title } from "@quad/web";
 import type { Problem } from "@quad/kernel";
 import { api } from "../api.js";
 import { setupUrl, tenantUrl, type Where } from "../door.js";
@@ -38,10 +39,10 @@ export function Workspaces({ where }: { readonly where: Where }) {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <Stack space="roomy">
       <header className="flex flex-wrap items-baseline gap-3">
-        <h1>Your workspaces</h1>
-        <span className="ml-auto">{me.email}</span>
+        <Title>Your workspaces</Title>
+        <span className={`${TYPE.note} ml-auto`}>{me.email}</span>
         <Button variant="ghost" onPress={() => { void leave(); }}>Sign out</Button>
       </header>
 
@@ -97,13 +98,13 @@ export function Workspaces({ where }: { readonly where: Where }) {
             ))}
 
             <Separator />
-            <div className="flex">
+            <Row>
               <Button variant="secondary" onPress={() => { location.assign(setupUrl(where, location)); }}>
                 Start another workspace
               </Button>
-            </div>
+            </Row>
           </div>
         )}
-    </div>
+    </Stack>
   );
 }

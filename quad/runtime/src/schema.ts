@@ -65,9 +65,24 @@ export function statementsFor(spec: CollectionSpec): readonly string[] {
     ...Object.entries(spec.fields)
       .filter(([field]) => field !== scope?.column)
       .map(([field, f]) => `${column(field)} ${storeFor(f.kind)}${f.required ? " NOT NULL" : ""}`),
-    /* ⚠️ ISO text, always — see `sql.ts`. A sweep compares these. */
+    /*
+      ⚠️ THE FOUR PROVENANCE COLUMNS, ON EVERY COLLECTION, WITHOUT ANY APP
+      DECLARING THEM. When it was made and by whom, when it was last changed and
+      by whom. An app that had to declare these is an app that could ship without
+      them — and the first time anybody wants to know is after something went
+      wrong, which is exactly when it is too late to start recording.
+
+      ⚠️ `edited_at` IS NULL UNTIL SOMETHING IS EDITED, deliberately. Defaulting
+      it to the creation time makes "never touched since it was made" and "edited
+      the instant it was made" the same row, and the first question anybody asks
+      of a suspicious record is which of those it is.
+
+      ⚠️ ISO text, always — see `sql.ts`. A sweep compares these as strings.
+    */
     `at TEXT NOT NULL`,
     `by TEXT`,
+    `edited_at TEXT`,
+    `edited_by TEXT`,
   ];
 
   const out = [`CREATE TABLE IF NOT EXISTS ${name} (${cols.join(", ")});`];
@@ -80,7 +95,12 @@ export function statementsFor(spec: CollectionSpec): readonly string[] {
 /** Every column a collection declares, as the reconciler expects them. */
 export const columnsFor = (spec: CollectionSpec): Readonly<Record<string, string>> => {
   const scope = eraseBy(spec);
-  const out: Record<string, string> = { id: "TEXT", at: "TEXT", by: "TEXT" };
+  /* ⚠️ The reconciler adds what a live table is missing, by asking
+     `pragma_table_info` — so the two provenance columns appear on a database
+     that predates them, on its next boot, with nothing migrated by hand. */
+  const out: Record<string, string> = {
+    id: "TEXT", at: "TEXT", by: "TEXT", edited_at: "TEXT", edited_by: "TEXT",
+  };
   if (scope) out[column(scope.column)] = "TEXT";
   for (const [field, f] of Object.entries(spec.fields)) out[column(field)] = storeFor(f.kind);
   return out;

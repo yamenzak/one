@@ -15,14 +15,22 @@
  */
 
 import type { CollectionSpec } from "@quad/kernel";
-import { checkAll, eraseBy, newId } from "@quad/kernel";
+import { checkAll, checkSome, eraseBy, newId } from "@quad/kernel";
 import { column, table, type Db } from "./sql.js";
 
 export interface Written {
   readonly id: string;
 }
 
-export type WriteRefusal = { readonly why: "invalid"; readonly detail: string };
+/**
+ * ⚠️ `not_found` IS A REFUSAL, NOT AN ABSENCE OF ONE. An update whose statement
+ * matched no row did not find the caller's record — either it does not exist or
+ * it is not theirs, and both must answer the same way, because distinguishing
+ * them tells somebody which ids belong to other people.
+ */
+export type WriteRefusal =
+  | { readonly why: "invalid"; readonly detail: string }
+  | { readonly why: "not_found"; readonly detail?: string };
 
 /**
  * ⚠️ VALIDATED AT THE ONE PLACE THAT VALIDATES. The declaration is a literal a
@@ -54,6 +62,64 @@ export async function put(
   await db.prepare(
     `INSERT INTO ${table(spec.id)} (${columns.map(column).join(", ")})
      VALUES (${columns.map(() => "?").join(", ")})`).bind(...bound).run();
+  return { id };
+}
+
+/**
+ * CHANGE A RECORD, IN THE CALLER'S OWN SCOPE.
+ *
+ * ⚠️ THIS EXISTED AS A READ AND A `return { id }`. The generated `update`
+ * operation passed the gate, wrote an audit entry saying the change had
+ * happened, answered 200 with the id — and changed nothing. Every collection in
+ * every app, and every suite green, because the tests asserted the route
+ * existed. That is the exact shape this framework is a catalogue of.
+ *
+ * ⚠️ SCOPED IN THE `WHERE`, NOT CHECKED BEFOREHAND. A read-then-write leaves a
+ * window where the scope was true when it was checked and false when it was
+ * used; putting it in the statement means the row is either theirs or not
+ * updated.
+ *
+ * ⚠️ AND THE SCOPE COLUMN ITSELF IS NEVER WRITABLE. Letting an edit set it is
+ * letting somebody move their record into another workspace, which is both a
+ * leak and a row erasure can no longer reach.
+ */
+export async function patch(
+  db: Db,
+  spec: CollectionSpec,
+  scope: string,
+  id: string,
+  values: Record<string, unknown>,
+  by: string | null = null,
+  now = new Date(),
+): Promise<Written | WriteRefusal> {
+  const erase = eraseBy(spec);
+  const { id: _ignored, ...rest } = values;
+  const offered = erase ? { ...rest, [erase.column]: undefined } : rest;
+  const wanted = Object.fromEntries(
+    Object.entries(offered).filter(([, value]) => value !== undefined));
+
+  const checked = checkSome(spec.fields, wanted);
+  if (!checked.ok) return { why: "invalid", detail: checked.why };
+
+  const names = Object.keys(checked.values);
+  /* ⚠️ An edit that changes nothing still stamps the provenance: somebody
+     reviewed this record and left it as it was, which is a fact worth keeping —
+     and answering "nothing to do" would make a no-op indistinguishable from a
+     refusal. */
+  const sets = [...names.map((n) => `${column(n)} = ?`), `edited_at = ?`, `edited_by = ?`];
+  const bound = [
+    ...names.map((n) => normalise(checked.values[n])),
+    now.toISOString(), by, id, ...(erase ? [scope] : []),
+  ];
+
+  const done = await db.prepare(
+    `UPDATE ${table(spec.id)} SET ${sets.join(", ")}
+     WHERE id = ?${erase ? ` AND ${column(erase.column)} = ?` : ""}`).bind(...bound).run();
+
+  /* ⚠️ Reported, not assumed. A statement that matched no row is a record that
+     is not the caller's, and answering 200 to it says an edit landed on
+     somebody else's data. */
+  if (!done.meta?.changes) return { why: "not_found" };
   return { id };
 }
 

@@ -658,6 +658,60 @@
       "impl": "one/test/boot.test.ts",
       "proves": "refuses to serve at all when it cannot sign anything",
       "fails": "every sign-in code signed with a constant anybody reading the repository already has, on a deployment where nothing looks wrong"
+    },
+    {
+      "id": "no-screen-writes-its-own-easing-or-duration",
+      "protects": "D7",
+      "stage": "10",
+      "status": "live",
+      "impl": "scripts/motion.test.mjs",
+      "proves": "curves: no screen writes its own easing or duration",
+      "fails": "a product where a drawer, a toast and a card each decelerate differently — nothing broken, nothing nameable, and it reads as cheap"
+    },
+    {
+      "id": "motion-answers-to-the-reduced-motion-setting",
+      "protects": "D7",
+      "stage": "10",
+      "status": "live",
+      "impl": "scripts/motion.test.mjs",
+      "proves": "keyframes: none hand-rolled, so every motion answers to the setting",
+      "fails": "a background that keeps moving for somebody who asked it to stop, which for some people is a symptom rather than a preference"
+    },
+    {
+      "id": "typography-is-a-role-not-a-size",
+      "protects": "D7",
+      "stage": "10",
+      "status": "live",
+      "impl": "scripts/motion.test.mjs",
+      "proves": "type: no screen picks its own size or weight",
+      "fails": "thirty screens each choosing a defensible heading size, and a product with no typographic system at all"
+    },
+    {
+      "id": "every-collection-records-who-and-when",
+      "protects": "D12",
+      "stage": "10",
+      "status": "live",
+      "impl": "scripts/provenance.test.mjs",
+      "proves": "columns: every collection gets",
+      "fails": "a record nobody can attribute, discovered at the moment somebody needs to know who changed it"
+    },
+    {
+      "id": "the-generated-edit-actually-writes",
+      "protects": "D12",
+      "stage": "10",
+      "status": "live",
+      "impl": "scripts/provenance.test.mjs",
+      "proves": "update: the generated edit goes through",
+      "fails": "an edit that passes the gate, writes an audit entry saying it happened, answers 200 — and changes nothing"
+    },
+    {
+      "id": "an-edit-cannot-land-on-somebody-elses-record",
+      "protects": "D5",
+      "stage": "10",
+      "status": "live",
+      "impl": "apps/hello/test/serve.test.ts",
+      "proves": "cannot reach a record that is not the caller's",
+      "fails": "a guessed id from another workspace answering 200 as though the change landed"
     }
   ]
 }

@@ -53,16 +53,28 @@ export interface Live {
   readonly columns: readonly string[];
 }
 
+/**
+ * ⚠️ `run()` REPORTS HOW MANY ROWS IT TOUCHED, AND THAT IS NOT A DETAIL. An
+ * UPDATE scoped in its own `WHERE` is the only safe way to write somebody's row
+ * — but it is also silent when the row was not theirs, so the count is the
+ * difference between "changed" and "matched nothing and said 200". It is
+ * optional because a driver may not report it; a caller that needs it must treat
+ * an absent count as "did not happen".
+ */
+export interface Ran {
+  readonly meta?: { readonly changes?: number };
+}
+
 export interface Db {
   prepare(query: string): {
     bind(...values: unknown[]): {
       all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
       first<T = Record<string, unknown>>(): Promise<T | null>;
-      run(): Promise<unknown>;
+      run(): Promise<Ran>;
     };
     all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
     first<T = Record<string, unknown>>(): Promise<T | null>;
-    run(): Promise<unknown>;
+    run(): Promise<Ran>;
   };
   exec(query: string): Promise<unknown>;
 }

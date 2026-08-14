@@ -332,3 +332,114 @@ describe("what was recorded", () => {
     expect(rows?.n).toBe(0);
   });
 });
+
+/* ------------------------------------------------------- changing a record --- */
+
+/**
+ * ⚠️ THE GENERATED `update` WAS A READ AND A `return { id }`. It passed the gate,
+ * wrote an audit entry saying the change had happened, answered 200 with the id,
+ * and changed nothing — in every collection of every app, with every suite
+ * green, because the only thing asserted about it was that the route existed.
+ *
+ * ⚠️ SO WHAT IS ASSERTED HERE IS THE ROW, NEVER THE RESPONSE. A test that reads
+ * back what the API returned is a test the original defect passes.
+ */
+describe("changing a record", () => {
+  const rowOf = (id: string) =>
+    shard().prepare(`SELECT * FROM note WHERE id = ?`).bind(id).first<Record<string, unknown>>();
+
+  const makeNote = async (): Promise<string> => {
+    const out = await post("/api/note.create", { title: "First", body: "Original", pinned: false });
+    return (await out.json() as { id: string }).id;
+  };
+
+  it("actually writes the new value", async () => {
+    const id = await makeNote();
+    expect((await post("/api/note.update", { id, title: "Second" })).status).toBe(200);
+    expect((await rowOf(id))?.title).toBe("Second");
+  });
+
+  /* ⚠️ ABSENT IS UNTOUCHED, NEVER NULLED. Treating a missing field as "set to
+     nothing" turns every edit into a silent erasure of everything the form did
+     not happen to carry. */
+  it("leaves alone what the caller did not send", async () => {
+    const id = await makeNote();
+    await post("/api/note.update", { id, title: "Second" });
+    expect((await rowOf(id))?.body).toBe("Original");
+  });
+
+  /* ⚠️ An edit is not a smaller create: demanding every required field would
+     make renaming a note mean resending its body. */
+  it("does not demand the fields it is not changing", async () => {
+    const id = await makeNote();
+    expect((await post("/api/note.update", { id, pinned: true })).status).toBe(200);
+    expect((await rowOf(id))?.pinned).toBe(1);
+  });
+
+  /* ⚠️ Refused rather than ignored — a caller who misspells a field otherwise
+     gets a 200 and no change, which is the original bug with a typo in it. */
+  it("refuses a field nobody declared", async () => {
+    const id = await makeNote();
+    expect((await post("/api/note.update", { id, ttile: "typo" })).status).toBe(400);
+  });
+
+  it("still applies the declaration's rules to what it is given", async () => {
+    const id = await makeNote();
+    expect((await post("/api/note.update", { id, title: "x".repeat(500) })).status).toBe(400);
+    expect((await rowOf(id))?.title).toBe("First");
+  });
+
+  /* ⚠️ The scope is in the statement's own WHERE, so a guessed id from another
+     workspace matches no row — and the answer must be the same one a missing
+     record gets, or the refusal itself tells somebody which ids are real. */
+  it("cannot reach a record that is not the caller's", async () => {
+    const id = await makeNote();
+    await shard().prepare(`UPDATE note SET tenant_id = ? WHERE id = ?`)
+      .bind("ten_somebody_else", id).run();
+    expect((await post("/api/note.update", { id, title: "Taken" })).status).toBe(404);
+    expect((await rowOf(id))?.title).toBe("First");
+  });
+
+  /* -------------------------------------------------------- provenance --- */
+
+  /**
+   * ⚠️ FOUR COLUMNS ON EVERY COLLECTION, DECLARED BY NO APP. An app that had to
+   * ask for these is an app that could ship without them, and the first time
+   * anybody wants them is after something went wrong.
+   */
+  it("records who made it and when, without the app declaring anything", async () => {
+    const id = await makeNote();
+    const row = await rowOf(id);
+    expect(row?.by).toBe("acc_owner");
+    expect(String(row?.at)).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  /* ⚠️ NULL until something is edited, deliberately: defaulting it to the
+     creation time makes "never touched" and "edited the instant it was made" the
+     same row, which is the first question anybody asks of a suspicious record. */
+  it("leaves the edit stamp empty until there is an edit", async () => {
+    const row = await rowOf(await makeNote());
+    expect(row?.edited_at).toBeNull();
+    expect(row?.edited_by).toBeNull();
+  });
+
+  it("records who changed it and when", async () => {
+    const id = await makeNote();
+    who = asOwner();
+    await post("/api/note.update", { id, title: "Second" });
+    const row = await rowOf(id);
+    expect(row?.edited_by).toBe("acc_owner");
+    expect(String(row?.edited_at)).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    /* ⚠️ And the creation stamp survives the edit. An `at` that moves is a
+       creation time nobody has. */
+    expect(row?.at).toBeTruthy();
+  });
+
+  /* ⚠️ Reviewing a record and leaving it as it was IS a fact worth keeping, and
+     answering "nothing to do" would make a no-op look like a refusal. */
+  it("stamps a review that changed nothing", async () => {
+    const id = await makeNote();
+    await post("/api/note.update", { id, title: "First" });
+    expect((await rowOf(id))?.edited_at).toBeTruthy();
+  });
+});

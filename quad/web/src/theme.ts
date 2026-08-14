@@ -16,6 +16,7 @@
 
 import type { Theme, Tone } from "@quad/kernel";
 import { contrast, luminance } from "@quad/kernel";
+import { MOTION } from "./motion.js";
 
 /* ------------------------------------------------------------------ tokens --- */
 
@@ -139,11 +140,19 @@ export function skyCss(sky: Sky, tone: Tone = "neutral"): string {
  * somebody cannot use.
  */
 export const SKY_MOTION = `
-@media (prefers-reduced-motion: no-preference) {
-  [data-sky]:not([data-sky="plain"])::before { animation: quad-drift 24s ease-in-out infinite alternate; }
-}
-@keyframes quad-drift { from { transform: translate3d(0, 0, 0) scale(1); }
-  to { transform: translate3d(0, -2%, 0) scale(1.04); } }`;
+[data-sky] { background-repeat: no-repeat; background-size: 140% 140%; }
+[data-sky]:not([data-sky="plain"]) { transition: ${MOTION.drift}; background-position: 50% 0%; }
+[data-sky]:not([data-sky="plain"]):hover { background-position: 50% 6%; }
+
+/* ⚠️ BOTH SWITCHES, BECAUSE THE LIBRARY HONOURS BOTH. A page that respected only
+   the media query would keep drifting for somebody who turned motion off inside
+   the product, and one that respected only the attribute would ignore the
+   setting on their device. */
+[data-sky][data-reduce-motion="true"],
+[data-reduce-motion="true"] [data-sky] { transition-property: none; }
+@media (prefers-reduced-motion: reduce) {
+  [data-sky] { transition-property: none; }
+}`;
 
 /**
  * ⚠️ OUR TONE, THEIR COLOUR NAME. A declaration says what HAPPENED — five tones,

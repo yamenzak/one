@@ -25,7 +25,13 @@ import { PRIMARY_MAX, primaryOf } from "@quad/kernel";
 import { Avatar, Button, Chip, Separator, Tooltip } from "@heroui/react";
 import { skyCss, type Sky } from "./theme.js";
 
-export interface Crown {
+/**
+ * ⚠️ THE DATA IN THE CROWN, NOT THE CROWN ITSELF. `Crown` is the component in
+ * `layout.tsx`; this is what the Shell needs to draw one. Sharing the name made
+ * `@quad/web` export two different things under it, and the ambiguity is the
+ * kind a bundler resolves silently in whichever order it happened to read.
+ */
+export interface CrownInfo {
   readonly appName: string;
   readonly appMark: string;
   readonly tenantName: string;
@@ -41,7 +47,7 @@ export interface ShellProps {
   readonly held: ReadonlySet<string>;
   /** Our own switches. A screen behind an unset one is not drawn. */
   readonly flags?: Readonly<Record<string, boolean>>;
-  readonly crown: Crown;
+  readonly crown: CrownInfo;
   readonly onGo: (route: string) => void;
   readonly onSwitchApp?: (appId: string) => void;
   readonly onOpenInbox?: () => void;

@@ -24,7 +24,7 @@ import type {
 import { PLATFORM_PROBLEMS, eraseBy, eventFor, operationsFor, permissionFor, routeFor } from "@quad/kernel";
 import { tableFor } from "@quad/kernel";
 import type { Db } from "./sql.js";
-import { list, put, readOne } from "./records.js";
+import { list, patch, put, readOne } from "./records.js";
 import { memberOps } from "./member-ops.js";
 
 /* ------------------------------------------------------------------ shape --- */
@@ -114,13 +114,21 @@ function crudFor(spec: CollectionSpec, verb: CrudVerb): Resolved {
       }
       case "create": {
         const done = await put(ctx.db, spec, scope, input, ctx.accountId, ctx.now);
-        if ("why" in done) ctx.fail("platform.invalid", { detail: done.detail });
+        if ("why" in done) ctx.fail("platform.invalid", { detail: done.detail ?? "" });
         return done;
       }
       case "update": {
-        const row = await readOne(ctx.db, spec, scope, String(input.id ?? ""));
-        if (!row) ctx.fail("platform.not_found");
-        return { id: String(input.id) };
+        /* ⚠️ ONE STATEMENT, SCOPED IN ITS OWN `WHERE` — see `patch`. A read to
+           check ownership followed by a write leaves a window between them, and
+           this operation used to be the read WITHOUT the write: it answered 200
+           with the id and changed nothing. */
+        const done = await patch(ctx.db, spec, scope, String(input.id ?? ""),
+          input, ctx.accountId, ctx.now);
+        if ("why" in done) {
+          if (done.why === "not_found") return ctx.fail("platform.not_found");
+          return ctx.fail("platform.invalid", { detail: done.detail ?? "" });
+        }
+        return done;
       }
       case "delete": {
         /* ⚠️ Read first, in the caller's own scope: a delete that trusted the id

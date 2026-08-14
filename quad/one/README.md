@@ -70,7 +70,7 @@ one, because a repository secret is readable by every workflow run in the repo.
 ### Three dashboard steps, in this order
 
 **1. The certificate, and it must come first.** Universal SSL covers `4dl.app`
-and `*.4dl.app` — **one level only** — so it does not cover `id.one.4dl.app`.
+and `*.4dl.app` — **one level only** — so it does not cover `id.t.4dl.app`.
 TLS is terminated *before* the worker runs, so a missing certificate fails the
 handshake and nothing in the logs, the health check or the deploy output says a
 word about it: every door but the apex is simply unreachable behind a green
@@ -82,24 +82,24 @@ for every product on the zone, so this is two hosts added to it rather than a
 second $10/month:
 
 > SSL/TLS → Edge Certificates → the existing advanced certificate → add
-> **`one.4dl.app`** and **`*.one.4dl.app`**.
+> **`t.4dl.app`** and **`*.t.4dl.app`**.
 
-Wait for **Active**. `curl -sI https://anything.one.4dl.app/health` completing
+Wait for **Active**. `curl -sI https://anything.t.4dl.app/health` completing
 the handshake is the check — any HTTP status is fine, a certificate error is not.
 
 **2. DNS.** Zone `4dl.app` → DNS → Add record, both **proxied** (orange cloud):
 
 | Type | Name | Target |
 |---|---|---|
-| `AAAA` | `one` | `100::` |
-| `AAAA` | `*.one` | `100::` |
+| `AAAA` | `t` | `100::` |
+| `AAAA` | `*.t` | `100::` |
 
 `100::` is the IPv6 discard prefix — the standard originless target for a
 hostname served entirely by a Worker. Nothing is ever sent to that address; the
 record exists so the name resolves through Cloudflare and the route can fire.
 
 **3. The two Worker routes.** Zone `4dl.app` → Workers Routes, both pointing at
-the script `one`: `one.4dl.app/*` and `*.one.4dl.app/*`.
+the script `one`: `t.4dl.app/*` and `*.t.4dl.app/*`.
 
 ⚠️ **No `routes` in `wrangler.jsonc`, deliberately.** Declaring them makes
 `wrangler dev` rewrite the incoming Host to the route's hostname, which collapses
@@ -108,7 +108,7 @@ routes it does not declare, so once these exist every deploy keeps them.
 
 ### Why this cannot disturb Kova
 
-`ROOT` is `one.4dl.app`, not the apex. Kova's production routes are
+`ROOT` is `t.4dl.app`, not the apex. Kova's production routes are
 `kova.4dl.app/*` and `*.kova.4dl.app/*`, and One serves `*.${ROOT}` — so putting
 One at `4dl.app` would place its wildcard over every live tenant's address, with
 route precedence rather than intent deciding who answers. The worker name, both

@@ -11,6 +11,10 @@
  */
 
 export * from "./theme.js";
+export * from "./appearance.js";
+export * from "./motion.js";
+export * from "./type.js";
+export * from "./layout.js";
 export * from "./field.js";
 export * from "./settings.js";
 export * from "./policy.js";

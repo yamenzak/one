@@ -177,6 +177,43 @@ export function checkAll(fields: Fields, values: unknown): Checked {
     : { ok: false, why: out.issues.map((i: { message: string }) => i.message).join("; ") };
 }
 
+/**
+ * The same rules, applied only to the fields somebody actually sent.
+ *
+ * ⚠️ AN EDIT IS NOT A SMALLER CREATE. `checkAll` demands every required field,
+ * which is right when a record is being made and wrong when one is being
+ * changed: renaming a note would have to resend its body, and a client editing
+ * one field of a profile would have to resend a value they were never shown.
+ *
+ * ⚠️ AND AN ABSENT FIELD IS UNTOUCHED, NEVER NULLED. The difference is the whole
+ * contract of a partial write — treating absence as "set to nothing" turns every
+ * edit into a silent erasure of everything the form did not carry.
+ *
+ * ⚠️ A FIELD NOBODY DECLARED IS REFUSED RATHER THAN IGNORED. Dropping it quietly
+ * means a caller who misspells a name gets a 200 and no change, which is the
+ * hardest kind of bug to see from the outside.
+ */
+export function checkSome(fields: Fields, values: unknown): Checked {
+  if (values === null || typeof values !== "object" || Array.isArray(values)) {
+    return { ok: false, why: "expected an object" };
+  }
+  const given = values as Record<string, unknown>;
+  const unknownNames = Object.keys(given).filter((name) => !(name in fields));
+  if (unknownNames.length) {
+    return { ok: false, why: `no such field: ${unknownNames.join(", ")}` };
+  }
+
+  const shape: Record<string, v.GenericSchema> = {};
+  for (const name of Object.keys(given)) {
+    const spec = fields[name];
+    if (spec) shape[name] = checkerFor(spec);
+  }
+  const out = v.safeParse(v.object(shape as never), given);
+  return out.success
+    ? { ok: true, values: out.output as Record<string, unknown> }
+    : { ok: false, why: out.issues.map((i: { message: string }) => i.message).join("; ") };
+}
+
 /* --------------------------------------------------------------- the rules --- */
 
 export type FieldRefusal =
