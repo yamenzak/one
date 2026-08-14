@@ -315,6 +315,51 @@
       "impl": "apps/hello/test/serve.test.ts",
       "proves": "records an attempt that was refused",
       "fails": "an incident review asking who tried and finding silence, because only the successes were recorded"
+    },
+    {
+      "id": "nobody-may-grant-a-role-they-could-not-grant-key-by-key",
+      "protects": "D12",
+      "stage": "4",
+      "status": "live",
+      "impl": "apps/hello/test/identity.test.ts",
+      "proves": "role beyond the inviter",
+      "fails": "a two-step escalation: invite a second address of your own as an owner, then sign in as it"
+    },
+    {
+      "id": "an-invitation-is-claimed-by-address-and-nothing-else",
+      "protects": "D12",
+      "stage": "4",
+      "status": "live",
+      "impl": "apps/hello/test/identity.test.ts",
+      "proves": "they claim it by signing in as it",
+      "fails": "anybody holding an account id adding themselves to a workspace they were never invited to"
+    },
+    {
+      "id": "permissions-are-resolved-on-every-request",
+      "protects": "D12",
+      "stage": "4",
+      "status": "live",
+      "impl": "apps/hello/test/identity.test.ts",
+      "proves": "resolved from the roster on every request",
+      "fails": "a role taken away that keeps working until the person signs out, which is exactly when it matters that it does not"
+    },
+    {
+      "id": "a-workspace-is-created-in-one-place",
+      "protects": "D1",
+      "stage": "4",
+      "status": "live",
+      "impl": "apps/hello/test/identity.test.ts",
+      "proves": "cannot be started from inside somebody else's workspace",
+      "fails": "somebody who followed a colleague's link being invited to start a second workspace on that workspace's own branded page"
+    },
+    {
+      "id": "a-code-cannot-be-guessed-or-used-to-flood-an-inbox",
+      "protects": "D12",
+      "stage": "4",
+      "status": "live",
+      "impl": "apps/hello/test/identity.test.ts",
+      "proves": "stops accepting guesses",
+      "fails": "a six-digit password with unlimited attempts, and a sign-in endpoint anybody can use to mail somebody a hundred times"
     }
   ]
 }

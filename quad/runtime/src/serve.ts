@@ -21,8 +21,12 @@
 
 import type { AppSpec, Caller, Door, Problem, Resolved as _Resolved, Roots, Standing } from "@quad/kernel";
 import { IN_GOOD_STANDING, PLATFORM_PROBLEMS, check, doorFor, newId, problem } from "@quad/kernel";
-import { compose, type Composed, type Ctx } from "./compose.js";
+import { compose, type Composed } from "./compose.js";
+import type { PlatformCtx } from "./member-ops.js";
 import { keyFor, record, remember, seen, entryFor } from "./audit.js";
+import { clearCookie, sessionIdFrom, setCookie, type Session } from "./identity.js";
+import { whoIs, type PersonalBook, type PersonalCtx } from "./personal.js";
+import type { TenantRow } from "./directory.js";
 import type { Db } from "./sql.js";
 
 /* ------------------------------------------------------------------ seams --- */
@@ -36,6 +40,7 @@ import type { Db } from "./sql.js";
 export interface Who {
   readonly caller: Caller;
   readonly accountId: string | null;
+  readonly email?: string | null;
 }
 
 export const NOBODY: Who = {
@@ -52,6 +57,13 @@ export interface Wiring {
   readonly locate: (door: Door) => Promise<Located | null>;
   readonly identify?: (request: Request, located: Located) => Promise<Who>;
   readonly now?: () => Date;
+  /**
+   * ⚠️ THE OPERATIONS ABOUT YOURSELF, WHICH RESOLVE NO WORKSPACE. Somebody has
+   * to be able to sign in and make their first workspace while they belong to
+   * nothing, and no role can express that — see `personal.ts`.
+   */
+  readonly personal?: PersonalBook;
+  readonly shardOf?: (tenant: TenantRow) => Db;
 }
 
 export interface Located {
@@ -95,6 +107,15 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
     if (!url.pathname.startsWith("/api/")) return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
 
     const id = url.pathname.slice("/api/".length);
+
+    /*
+      ⚠️ THE PERSONAL LANE IS ANSWERED BEFORE A WORKSPACE IS RESOLVED, and it has
+      to be: the caller is outside every workspace at the moment they need it.
+      It is also outside the standing gate — leaving must never be something an
+      unpaid invoice can prevent.
+    */
+    const own = wiring.personal?.[id];
+    if (own) return answerPersonal(wiring, own, id, request, url, door, now);
     if (door.kind !== "tenant") return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
 
     const located = await wiring.locate(door);
@@ -158,13 +179,20 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
 
     /* --- the handler ------------------------------------------------------ */
 
-    class Refusal extends Error { constructor(readonly problem: Problem) { super(problem.code); } }
-    const ctx: Ctx = {
+    /* ⚠️ THE PLATFORM'S OWN OPERATIONS SEE MORE THAN A HANDLER DOES — the
+       directory, the caller's keys, the allowances — and an app handler is
+       typed against `Ctx`, which carries none of it. See `member-ops.ts`. */
+    const ctx: PlatformCtx = {
       db: located.db,
       tenantId: located.tenantId,
       accountId: who.accountId,
       now,
-      fail: (code, values) => { throw new Refusal(problem(catalog, code, values)); },
+      directory: wiring.directory,
+      permissions: who.caller.permissions,
+      email: who.email ?? null,
+      allowance: (key: string) =>
+        (located.entitlements ?? []).find((e) => e.key === key)?.value ?? false,
+      fail: (code, values) => { throw new Refused(problem(catalog, code, values)); },
     };
 
     try {
@@ -175,7 +203,7 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
       }, now);
       return json(answer ?? {});
     } catch (thrown) {
-      if (thrown instanceof Refusal) {
+      if (thrown instanceof Refused) {
         await recordOutcome(located, who, op, input, { ok: false, problem: thrown.problem.code }, now);
         return asProblem(thrown.problem);
       }
@@ -194,6 +222,58 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
 }
 
 type _Op = Composed["byId"] extends ReadonlyMap<string, infer V> ? V : never;
+
+/* ---------------------------------------------------------------- personal --- */
+
+class Refused extends Error {
+  constructor(readonly problem: Problem) { super(problem.code); }
+}
+
+async function answerPersonal(
+  wiring: Wiring, op: PersonalBook[string], id: string,
+  request: Request, url: URL, door: Door, now: Date,
+): Promise<Response> {
+  const catalog = PLATFORM_PROBLEMS;
+  const no = (code: string, values?: Record<string, string | number>) =>
+    asProblem(problem(catalog, code, values));
+
+  if (request.method !== (op.kind === "read" ? "GET" : "POST")) return no("platform.not_found");
+  if (op.doors && !op.doors.includes(door.kind)) return no("platform.not_found");
+
+  const input = await readInput(request, url);
+  if (input === null) return no("platform.invalid");
+
+  const { session, email } = await whoIs(wiring.directory, sessionIdFrom(request), now);
+  if (op.needs === "session" && !session) return no("platform.unauthorized");
+
+  let cookie: string | null = null;
+  const ctx: PersonalCtx = {
+    directory: wiring.directory,
+    session, email, door, now,
+    shardOf: (tenant) => {
+      if (!wiring.shardOf) throw new Error("this deployment resolves no shards");
+      return wiring.shardOf(tenant);
+    },
+    app: (appId) => wiring.apps[appId]?.() ?? null,
+    /* ⚠️ THE RUNTIME WRITES THE COOKIE, NOT THE HANDLER. Its flags — HttpOnly,
+       SameSite, Secure, the domain — are a security decision, and one handler
+       setting them slightly differently is one door with a weaker session. */
+    issue: (next: Session | null) => {
+      cookie = next ? setCookie(next.id, wiring.roots.root) : clearCookie(wiring.roots.root);
+    },
+    fail: (code, values) => { throw new Refused(problem(catalog, code, values)); },
+  };
+
+  try {
+    const answer = await op.run(ctx, input);
+    return json(answer ?? {}, 200, cookie ? { "set-cookie": cookie } : {});
+  } catch (thrown) {
+    if (thrown instanceof Refused) return asProblem(thrown.problem);
+    const ref = newId("err", now);
+    console.error(`${ref} ${id}`, thrown);
+    return asProblem(problem(catalog, "platform.unavailable", { ref }, { ref }));
+  }
+}
 
 const recordOutcome = async (
   located: Located, who: Who, op: _Op, input: Record<string, unknown>,

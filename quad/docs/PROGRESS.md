@@ -18,8 +18,8 @@ reader can trust this table instead of re-reading the code.
 | 1 | Kernel — entities, declarations, gate algebra, problems | shipped |
 | 2 | Directory + placement | shipped |
 | 3 | Runtime — manifest → live worker | shipped |
-| 4 | Identity + tenancy | building |
-| 5 | Surface — HeroUI shell, nav, sky, rendered settings | not started |
+| 4 | Identity + tenancy | shipped |
+| 5 | Surface — HeroUI shell, nav, sky, rendered settings | building |
 | 6 | Money — plans, entitlements, credits | not started |
 | 7 | Services — ai and notify over RPC | not started |
 | 8 | Vault + legal | not started |
@@ -86,6 +86,25 @@ nothing else: no router, no schema, no migration, no gate call, no audit call.
 It declares every cross-cutting concern on purpose, because the next app is
 copied from it and anything absent here is absent everywhere.
 
+- `identity.ts` — email codes and sessions. A session is a ROW, not a signed
+  claim, because a signed token cannot be revoked before it expires and "sign
+  out everywhere" has to mean something. A code is stored as a hash, spent
+  whether the guess was right or wrong, and rate-limited per address.
+- `membership.ts` · `member-ops.ts` — the roster lives in the tenant's own
+  shard and the directory only indexes it. Every app gets `member.list`,
+  `member.invite`, `member.role` and `member.remove` without declaring them,
+  because the two doors that bound an invitation must be bounded once rather
+  than per product.
+- `personal.ts` — the operations about yourself, which resolve no workspace:
+  sign in, sign out, who am I, make a workspace, leave one. Deliberately outside
+  the standing gate, because leaving must never be something an unpaid invoice
+  can prevent.
+
+⚠️ **PASSKEYS ARE NOT BUILT.** Sign-in is an emailed code. There is deliberately
+no `credential` table waiting for one: a table nothing writes, behind a
+capability nothing implements, is the exact shape this framework exists to
+refuse — it reads as built and passes every test.
+
 The guard registry, its eight checks, and the standards that bind them.
 
 ## Decisions, and how well each is defended
@@ -93,7 +112,7 @@ The guard registry, its eight checks, and the standards that bind them.
 <!-- generated: node scripts/inventory.mjs decisions -->
 | # | Decision | Guarded by |
 |---|---|---|
-| D1 | The tenant is primary; an app is a capability switched on for it | 1 |
+| D1 | The tenant is primary; an app is a capability switched on for it | 2 |
 | D2 | The name is Quad; packages are `@quad/*` | 2 |
 | D3 | One worker on the request path; heavy work splits over RPC service bindings | 1 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
@@ -104,7 +123,7 @@ The guard registry, its eight checks, and the standards that bind them.
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 1 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 2 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 18 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 22 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -148,6 +167,11 @@ the library decides FOR us.
 | `every-gate-is-applied-by-the-runtime-not-the-app` | D12 | a handler that runs for somebody who was never allowed to call it, because one call site forgot the check |
 | `a-replay-spends-nothing` | D12 | a phone that retried in a basement getting a second charge, a second notification and two of what it made once |
 | `a-write-is-recorded-whether-it-succeeded-or-was-refused` | D12 | an incident review asking who tried and finding silence, because only the successes were recorded |
+| `nobody-may-grant-a-role-they-could-not-grant-key-by-key` | D12 | a two-step escalation: invite a second address of your own as an owner, then sign in as it |
+| `an-invitation-is-claimed-by-address-and-nothing-else` | D12 | anybody holding an account id adding themselves to a workspace they were never invited to |
+| `permissions-are-resolved-on-every-request` | D12 | a role taken away that keeps working until the person signs out, which is exactly when it matters that it does not |
+| `a-workspace-is-created-in-one-place` | D1 | somebody who followed a colleague's link being invited to start a second workspace on that workspace's own branded page |
+| `a-code-cannot-be-guessed-or-used-to-flood-an-inbox` | D12 | a six-digit password with unlimited attempts, and a sign-in endpoint anybody can use to mail somebody a hundred times |
 | `no-heroui-component-is-restyled` *(owed)* | D7 | consistency that is maintained by care rather than enforced, which lasts until the first hurried screen |
 | `every-declaration-reaches-a-surface` *(owed)* | D12 | a mechanism built, tested and wired with nowhere a person can look — every suite green |
 | `every-surface-control-changes-behaviour` *(owed)* | D12 | a switch somebody turns on that does nothing, so they stop watching the thing it promised |

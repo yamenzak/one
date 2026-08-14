@@ -103,9 +103,18 @@ describe("what the manifest produced", () => {
   /*
     ⚠️ NOTHING IS REGISTERED. One collection produced five operations and their
     routes; the declared one is beside them and indistinguishable downstream.
+
+    ⚠️ AND THE ROSTER IS THERE WITHOUT THE APP DECLARING IT. Every workspace has
+    people in it, so every app has these — and because they are the platform's,
+    the two doors that bound an invitation are bounded once rather than per
+    product.
   */
   it("derives every route from the declarations alone", () => {
     expect(surfaceOfComposed(compose(HELLO)).map((r) => `${r.method} ${r.path}`)).toEqual([
+      "POST /api/member.invite",
+      "GET /api/member.list",
+      "POST /api/member.remove",
+      "POST /api/member.role",
       "POST /api/note.create",
       "POST /api/note.delete",
       "GET /api/note.list",

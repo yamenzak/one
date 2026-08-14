@@ -24,10 +24,19 @@ import type {
 import { PLATFORM_PROBLEMS, eventFor, operationsFor, permissionFor, routeFor } from "@quad/kernel";
 import type { Db } from "./sql.js";
 import { erase, list, put, readOne } from "./records.js";
+import { memberOps } from "./member-ops.js";
 
 /* ------------------------------------------------------------------ shape --- */
 
-/** What a handler is given. ⚠️ No binding, no env, no request — see `serve.ts`. */
+/**
+ * What a handler is given.
+ *
+ * ⚠️ NO BINDING, NO ENV, NO REQUEST, AND NOT THE DIRECTORY. Its own tenant's
+ * database, who is asking, the time, and a way to refuse. Anything more would
+ * let an app reach around the platform, and the platform's guarantees would
+ * become things apps opt into. `PlatformCtx` is the widened one, and only the
+ * platform's own operations are handed it.
+ */
 export interface Ctx {
   readonly db: Db;
   readonly tenantId: string;
@@ -144,6 +153,11 @@ export function compose(app: AppSpec): Composed {
       byId.set(opId, crudFor(spec, verb));
     }
   }
+  /* ⚠️ THE ROSTER IS THE PLATFORM'S AND EVERY APP HAS IT (see `member-ops.ts`).
+     Added before the app's own, so an app cannot shadow "invite a colleague"
+     with something that skips the two doors bounding it. */
+  for (const [id, resolved] of Object.entries(memberOps(app))) byId.set(id, resolved);
+
   for (const spec of app.operations) {
     byId.set(spec.id, {
       id: spec.id,

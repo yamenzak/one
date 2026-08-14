@@ -35,6 +35,11 @@ export const DIRECTORY_SCHEMA: SchemaModule = {
     /* ⚠️ An index, never a grant — see the header. */
     `CREATE TABLE IF NOT EXISTS belongs (account_id TEXT NOT NULL, tenant_id TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (account_id, tenant_id));`,
     `CREATE INDEX IF NOT EXISTS ix_belongs_tenant ON belongs (tenant_id);`,
+    /* ⚠️ AN INVITATION IS A CROSS-TENANT QUESTION, SO IT IS INDEXED HERE (D5).
+       "Which workspaces invited this address" is asked once, at sign-in, by
+       somebody who belongs to nothing yet — and the only other way to answer it
+       is to search every shard for a row that is usually not there. */
+    `CREATE TABLE IF NOT EXISTS invited (email TEXT NOT NULL, tenant_id TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (email, tenant_id));`,
   ],
 };
 
@@ -299,4 +304,30 @@ export async function mayMove(
   const shard = (await shards(db)).find((s) => s.id === toShard);
   if (!shard) return "no_such_shard";
   return refusePlacement(shard, { where: tenant.residency, apps: await appsOfTenant(db, tenantId) });
+}
+
+/* ----------------------------------------------------------- invitations --- */
+
+export async function noteInvitation(
+  db: Db, email: string, tenantId: TenantId, now = new Date(),
+): Promise<void> {
+  await db.prepare(`INSERT INTO invited (email, tenant_id, at) VALUES (?, ?, ?)
+    ON CONFLICT(email, tenant_id) DO NOTHING`).bind(email, tenantId, now.toISOString()).run();
+}
+
+/** ⚠️ One query for somebody who belongs to nothing yet — see the schema note. */
+export async function invitationsFor(db: Db, email: string): Promise<readonly TenantRow[]> {
+  const rows = await db.prepare(`
+    SELECT t.* FROM tenant t JOIN invited i ON i.tenant_id = t.id
+    WHERE i.email = ? AND t.closed_at IS NULL`).bind(email).all();
+  return rows.results.map(asTenant);
+}
+
+/**
+ * ⚠️ FORGOTTEN ONCE IT IS CLAIMED, because an invitation index that outlives the
+ * invitation is a list of addresses with no purpose — and it would re-claim on
+ * every later sign-in, quietly undoing a removal.
+ */
+export async function forgetInvitation(db: Db, email: string, tenantId: TenantId): Promise<void> {
+  await db.prepare(`DELETE FROM invited WHERE email = ? AND tenant_id = ?`).bind(email, tenantId).run();
 }
