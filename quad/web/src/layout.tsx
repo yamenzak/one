@@ -27,7 +27,14 @@ import { Button, Separator } from "@heroui/react";
    vocabulary with a piece nothing could reach. */
 import type { Ambience } from "./ambience.js";
 import { TYPE } from "./type.js";
+import {
+  BAND_PAD, GUTTER, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
+  type Space, type Width,
+} from "./metrics.js";
 import { MOTION } from "./motion.js";
+
+export type { Space, Width };
+export { SPACE, WIDTH };
 
 /* ------------------------------------------------------------------ bleed --- */
 
@@ -46,12 +53,7 @@ export type Bleed = "hold" | "edge" | "flush";
 /** ⚠️ Two widths, not five. A scale nobody can hold in their head is a scale
     people opt out of. `read` is prose and forms; `work` is anything with
     columns in it. */
-export type Width = "read" | "work";
 
-const WIDTH: Readonly<Record<Width, string>> = {
-  read: "max-w-2xl",
-  work: "max-w-6xl",
-};
 
 /* ------------------------------------------------------------------- page --- */
 
@@ -59,6 +61,15 @@ export interface PageProps {
   /** ⚠️ Named, never a colour — see the header. */
   readonly sky?: Ambience;
   readonly tone?: Tone;
+  /**
+   * ⚠️ THE NAV IS THE PAGE'S, NOT THE CONTENT'S, AND THIS IS WHY. A sticky island
+   * floats over whatever precedes it, so the last card on a screen is cropped
+   * under it — which is what both specimens did the first time anybody looked.
+   * The island cannot fix that itself: by the time it lays out, the content above
+   * has already been sized. Handing it to the page is what lets the page reserve
+   * the room.
+   */
+  readonly nav?: React.ReactNode;
   readonly children?: React.ReactNode;
 }
 
@@ -70,10 +81,11 @@ export interface PageProps {
  * is a page whose last control sits under the address bar until you scroll,
  * which reads as a broken layout rather than as a unit bug.
  */
-export function Page({ sky = "plain", tone = "neutral", children }: PageProps) {
+export function Page({ sky = "plain", tone = "neutral", nav, children }: PageProps) {
   return (
     <div className="min-h-dvh flex flex-col" data-sky={sky} data-tone={tone}>
-      {children}
+      <div className={`flex grow flex-col ${nav ? NAV_SPACE : ""}`}>{children}</div>
+      {nav}
     </div>
   );
 }
@@ -101,8 +113,8 @@ export function Band({ bleed = "hold", width = "read", sky, tone, children }: Ba
   const inner = bleed === "flush"
     ? "w-full"
     : bleed === "edge"
-      ? "w-full px-4 md:px-6"
-      : `w-full ${WIDTH[width]} mx-auto px-4 md:px-6`;
+      ? `w-full ${GUTTER}`
+      : `w-full ${WIDTH[width]} mx-auto ${GUTTER}`;
 
   return (
     <section
@@ -123,9 +135,6 @@ export function Band({ bleed = "hold", width = "read", sky, tone, children }: Ba
  * gap at the bottom of its container that nobody asked for. A gap does none of
  * those, and it is why every layout here is flex or grid.
  */
-export const SPACE = { tight: "gap-2", snug: "gap-3", roomy: "gap-6", airy: "gap-10" } as const;
-export type Space = keyof typeof SPACE;
-
 export function Stack(
   { space = "snug", children }: { readonly space?: Space; readonly children?: React.ReactNode },
 ) {
@@ -190,13 +199,13 @@ export function Crown(
   return (
     <header className="w-full">
       <Band bleed={bleed} width={width}>
-        <div className="flex items-center gap-3 py-3">
+        <div className={`flex items-center ${SPACE.snug} ${BAND_PAD}`}>
           {mark ? <span aria-hidden="true" className="flex items-center">{mark}</span> : null}
           <div className="flex flex-col min-w-0">
             <strong className={TYPE.label}>{name}</strong>
             {under ? <span className={TYPE.note}>{under}</span> : null}
           </div>
-          {aside ? <div className="ml-auto flex items-center gap-2">{aside}</div> : null}
+          {aside ? <div className={`ml-auto flex items-center ${SPACE.tight}`}>{aside}</div> : null}
         </div>
       </Band>
       {ruled ? <Separator /> : null}
@@ -271,11 +280,11 @@ export function Balance({ eyebrow, figure, identifier, under }: {
   readonly under?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-2 py-8 text-center">
+    <div className={`flex flex-col items-center ${SPACE.tight} ${BAND_PAD} text-center`}>
       {eyebrow ? <span className={TYPE.note}>{eyebrow}</span> : null}
       <div className="flex items-baseline justify-center">{figure}</div>
       {identifier ? (
-        <span className={`${TYPE.note} flex items-center gap-2`}>{identifier}</span>
+        <span className={`${TYPE.note} flex items-center ${SPACE.tight}`}>{identifier}</span>
       ) : null}
       {under}
     </div>
@@ -301,7 +310,7 @@ export function Balance({ eyebrow, figure, identifier, under }: {
  */
 export function StickyAction({ children }: { readonly children: React.ReactNode }) {
   return (
-    <div className="sticky bottom-0 z-10 flex w-full justify-center p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <div className={`sticky bottom-0 z-10 flex w-full justify-center ${PAD} ${SAFE_BOTTOM}`}>
       <div className="w-full max-w-md">{children}</div>
     </div>
   );
@@ -343,7 +352,7 @@ export function Island({ items, here, onGo }: {
   return (
     <nav
       aria-label="Sections"
-      className="sticky bottom-0 z-10 flex justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+      className={`sticky bottom-0 z-10 flex justify-center ${PAD} ${SAFE_BOTTOM}`}
     >
       <div className="flex items-center gap-1" style={{ transition: MOTION.travel }}>
         {items.slice(0, PRIMARY_MAX).map((item) => {
@@ -446,7 +455,7 @@ export function AppCrown(
   return (
     <header className="w-full">
       <Band bleed="edge" width="work">
-        <div className="flex items-center gap-3 py-3">
+        <div className={`flex items-center ${SPACE.snug} ${BAND_PAD}`}>
           <Button variant="ghost" aria-label="Your account" onPress={onOpenAccount}>
             <span className="relative flex items-center">
               {face}

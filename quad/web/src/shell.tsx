@@ -24,6 +24,7 @@ import type { ScreenSpec, Tone } from "@quad/kernel";
 import { PRIMARY_MAX, primaryOf } from "@quad/kernel";
 import { Avatar, Button, Chip, Separator, Tooltip } from "@heroui/react";
 import { skyCss, type Sky } from "./theme.js";
+import { GUTTER, NAV_SPACE, PAD, ROW, SPACE } from "./metrics.js";
 
 /**
  * ⚠️ THE DATA IN THE CROWN, NOT THE CROWN ITSELF. `Crown` is the component in
@@ -79,14 +80,14 @@ export function Shell(props: ShellProps) {
       style={{ ...skyStyle(at?.sky as Sky | undefined, at?.tone) }}
     >
       {/* ------------------------------------------------------------ crown --- */}
-      <header className="flex items-center gap-3 px-4 py-3">
+      <header className={`flex items-center ${SPACE.snug} ${GUTTER} ${ROW.pad}`}>
         <span aria-hidden="true">{crown.appMark}</span>
         <div className="flex flex-col">
           <strong>{crown.tenantName}</strong>
           <small>{crown.appName}</small>
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className={`ml-auto flex items-center ${SPACE.tight}`}>
           {(crown.apps ?? []).length > 1 && onSwitchApp
             ? (crown.apps ?? []).map((other) => (
               <Tooltip key={other.id}>
@@ -118,7 +119,7 @@ export function Shell(props: ShellProps) {
       <div className="flex flex-1 min-h-0">
         {/* ⚠️ The same five, plus room for more. A desktop sidebar that showed a
             different set would make the two layouts two products. */}
-        <nav className="hidden md:flex flex-col gap-1 w-56 shrink-0 p-3" aria-label="Sections">
+        <nav className={`hidden md:flex flex-col gap-1 w-56 shrink-0 ${PAD}`} aria-label="Sections">
           {primary.map((s) => (
             <Button
               key={s.id}
@@ -140,12 +141,12 @@ export function Shell(props: ShellProps) {
           ))}
         </nav>
 
-        <main className="flex-1 min-w-0 p-4 pb-24 md:pb-4">{children}</main>
+        <main className={`flex-1 min-w-0 ${PAD} ${NAV_SPACE} md:${PAD}`}>{children}</main>
       </div>
 
       {/* -------------------------------------------------------- the island --- */}
       <nav
-        className="md:hidden fixed inset-x-0 bottom-0 flex justify-around gap-1 p-2"
+        className={`md:hidden fixed inset-x-0 bottom-0 flex justify-around gap-1 ${PAD}`}
         aria-label="Sections"
       >
         {primary.map((s) => (

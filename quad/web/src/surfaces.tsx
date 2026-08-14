@@ -27,6 +27,7 @@
 import { Avatar, Badge, Button, Card, Label, Separator, Switch } from "@heroui/react";
 import type { Tone } from "@quad/kernel";
 import { TYPE } from "./type.js";
+import { HEAD_GAP, LEAD, PAD, ROW, SPACE } from "./metrics.js";
 
 /* ------------------------------------------------------------------ group --- */
 
@@ -40,9 +41,9 @@ export interface GroupProps {
 
 export function Group({ label, under, children }: GroupProps) {
   return (
-    <section className="flex flex-col gap-2">
+    <section className={`flex flex-col ${HEAD_GAP}`}>
       {label ? (
-        <div className="flex flex-col gap-1 px-1">
+        <div className="flex flex-col gap-1">
           <h2 className={TYPE.section}>{label}</h2>
           {under ? <p className={TYPE.note}>{under}</p> : null}
         </div>
@@ -73,15 +74,23 @@ interface RowBase {
   readonly under?: string;
 }
 
+/**
+ * ⚠️ `items-start text-left` IS THE FIX FOR THE RAGGED COLUMN. HeroUI's `Button`
+ * centres its children, so a two-line row rendered its label centred over its
+ * description — every list in the product had a soft, wandering left edge, and
+ * it read as amateur without being nameable. `justify-start` on the button is
+ * not enough: the block itself has to align its own lines.
+ */
 const Body = ({ label, under }: { readonly label: string; readonly under?: string }) => (
-  <div className="flex flex-col gap-0.5 min-w-0">
+  <span className="flex min-w-0 grow flex-col items-start gap-1 text-left">
     <span className={TYPE.label}>{label}</span>
     {under ? <span className={TYPE.note}>{under}</span> : null}
-  </div>
+  </span>
 );
 
+/** ⚠️ A FIXED BOX, so every label in a list starts at the same x — see `LEAD`. */
 const Lead = ({ icon }: { readonly icon?: React.ReactNode }) =>
-  icon ? <span aria-hidden="true" className="flex shrink-0 items-center">{icon}</span> : null;
+  icon ? <span aria-hidden="true" className={LEAD}>{icon}</span> : null;
 
 /**
  * ⚠️ A ROW THAT GOES SOMEWHERE IS A BUTTON, NOT A DIV WITH AN onClick. The
@@ -100,10 +109,10 @@ export interface NavRowProps extends RowBase {
 export function NavRow({ icon, label, under, aside, onOpen, isDisabled }: NavRowProps) {
   return (
     <Button variant="ghost" className="w-full justify-start" isDisabled={isDisabled} onPress={onOpen}>
-      <span className="flex w-full items-center gap-3 py-1">
+      <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
         <Lead icon={icon} />
         <Body label={label} under={under} />
-        <span className="ml-auto flex items-center gap-2">
+        <span className={`flex shrink-0 items-center ${SPACE.tight}`}>
           {aside}
           {/* ⚠️ The chevron is the promise that something is behind this. A row
               without one that navigates is a row people do not press. */}
@@ -124,7 +133,7 @@ export function ActionRow({ icon, label, under, onDo, tone = "neutral" }: RowBas
       className="w-full justify-start"
       onPress={onDo}
     >
-      <span className="flex w-full items-center gap-3 py-1">
+      <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
         <Lead icon={icon} />
         <Body label={label} under={under} />
       </span>
@@ -146,19 +155,19 @@ export function ToggleRow({ icon, label, under, value, onChange, isDisabled }: R
     /* ⚠️ THE BREATHING ROOM IS ON OUR WRAPPER, NOT ON THE SWITCH. Padding is a
        component's own density; setting it here would be restyling the library,
        and the restyle guard is right to refuse it. */
-    <div className="flex w-full py-2">
+    <div className={`flex w-full ${ROW.pad} ${ROW.tap} items-center`}>
     <Switch
       /* ⚠️ `justify-between` IS THE WHOLE FIX. Without it the content takes the
          full width and the control wraps to a second line — which reads as a
          broken row rather than as a switch. That is what it looked like the
          first time it was RENDERED rather than described. */
-      className="w-full flex-row justify-between items-center gap-3"
+      className={`w-full flex-row justify-between items-center ${ROW.gap}`}
       isSelected={value}
       isDisabled={isDisabled}
       onChange={onChange}
     >
       <Switch.Content className="grow">
-        <span className="flex items-center gap-3">
+        <span className={`flex items-center ${ROW.gap}`}>
           <Lead icon={icon} />
           <Label><Body label={label} under={under} /></Label>
         </span>
@@ -184,13 +193,13 @@ export function FieldRow({ label, value, onEdit }: {
   readonly onEdit?: () => void;
 }) {
   return (
-    <div className="flex items-start gap-3 py-3">
-      <div className="flex flex-col gap-1 min-w-0">
+    <div className={`flex items-center ${ROW.gap} ${ROW.pad} ${ROW.still}`}>
+      <span className="flex min-w-0 grow flex-col items-start gap-1 text-left">
         <span className={TYPE.note}>{label}</span>
         <span className={TYPE.body}>{value}</span>
-      </div>
+      </span>
       {onEdit ? (
-        <span className="ml-auto">
+        <span className="shrink-0">
           <Button variant="ghost" aria-label={`Change ${label.toLowerCase()}`} onPress={onEdit}>
             Change
           </Button>
@@ -216,13 +225,13 @@ export function PersonRow({ name, under, when, unread, face, onOpen }: {
 }) {
   return (
     <Button variant="ghost" className="w-full justify-start" onPress={onOpen}>
-      <span className="flex w-full items-center gap-3 py-1">
+      <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
         <Avatar className="shrink-0">
           {face ? <Avatar.Image src={face} alt="" /> : null}
           <Avatar.Fallback>{name.slice(0, 1).toUpperCase()}</Avatar.Fallback>
         </Avatar>
         <Body label={name} under={under} />
-        <span className="ml-auto flex flex-col items-end gap-1">
+        <span className="flex shrink-0 flex-col items-end gap-1">
           {when ? <span className={TYPE.note}>{when}</span> : null}
           {unread ? (
             <Badge color="accent"><Badge.Label>{unread}</Badge.Label></Badge>
@@ -246,10 +255,10 @@ export function AmountRow({ icon, label, under, amount, tone = "neutral", onOpen
   readonly onOpen?: () => void;
 }) {
   const inner = (
-    <span className="flex w-full items-center gap-3 py-1">
+    <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
       <Lead icon={icon} />
       <Body label={label} under={under} />
-      <span className={`ml-auto ${TYPE.label} tabular-nums`} data-tone={tone}>{amount}</span>
+      <span className={`shrink-0 ${TYPE.label} tabular-nums`} data-tone={tone}>{amount}</span>
       {onOpen ? <span aria-hidden="true" className={TYPE.note}>›</span> : null}
     </span>
   );
@@ -277,9 +286,9 @@ export function QuickActions({ actions }: {
     /* ⚠️ Four must FIT a phone. At 80px wide with a 24px gap they came to 392px
        against 390 available, so the fourth wrapped to its own line — which reads
        as a mistake rather than as a row. */
-    <div className="flex flex-wrap items-start justify-center gap-3 py-2">
+    <div className={`flex flex-wrap items-start justify-center ${SPACE.snug} ${ROW.pad}`}>
       {actions.slice(0, 4).map((a) => (
-        <div key={a.id} className="flex w-16 flex-col items-center gap-2">
+        <div key={a.id} className={`flex w-16 flex-col items-center ${SPACE.tight}`}>
           <Button variant="secondary" aria-label={a.label} onPress={a.onDo}>{a.icon}</Button>
           <span className={`${TYPE.note} text-center`}>{a.label}</span>
         </div>
@@ -301,14 +310,14 @@ export function TileGrid({ tiles }: {
 }) {
   return (
     <div
-      className="grid gap-3"
+      className={`grid ${SPACE.snug}`}
       style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(6rem, 45%), 1fr))" }}
     >
       {tiles.map((t) => (
         <Button
           key={t.id}
           variant="secondary"
-          className="flex-col h-24 gap-2"
+          className={`flex-col h-24 ${SPACE.tight}`}
           onPress={t.onOpen}
         >
           <span aria-hidden="true">{t.icon}</span>
@@ -403,12 +412,12 @@ export function CopyRow({ label, value, onCopy }: {
   readonly onCopy: (value: string) => void;
 }) {
   return (
-    <div className="flex items-start gap-3 py-3">
-      <div className="flex flex-col gap-1 min-w-0">
+    <div className={`flex items-center ${ROW.gap} ${ROW.pad} ${ROW.still}`}>
+      <span className="flex min-w-0 grow flex-col items-start gap-1 text-left">
         <span className={TYPE.note}>{label}</span>
         <span className={`${TYPE.body} break-words`}>{value}</span>
-      </div>
-      <span className="ml-auto shrink-0">
+      </span>
+      <span className="shrink-0">
         <Button variant="ghost" aria-label={`Copy ${label.toLowerCase()}`} onPress={() => onCopy(value)}>
           Copy
         </Button>
@@ -431,7 +440,7 @@ export function NoteRow({ icon, children }: {
   readonly children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-3 py-3">
+    <div className={`flex items-start ${ROW.gap} ${ROW.pad}`}>
       <Lead icon={icon} />
       <p className={TYPE.body}>{children}</p>
     </div>
@@ -449,10 +458,10 @@ export function OfferRow({ icon, label, under, offer }: RowBase & {
   readonly offer: { readonly label: string; readonly onDo: () => void };
 }) {
   return (
-    <div className="flex items-center gap-3 py-2">
+    <div className={`flex items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
       <Lead icon={icon} />
       <Body label={label} under={under} />
-      <span className="ml-auto shrink-0">
+      <span className="shrink-0">
         <Button variant="secondary" onPress={offer.onDo}>{offer.label}</Button>
       </span>
     </div>
@@ -469,7 +478,7 @@ export function OfferRow({ icon, label, under, offer }: RowBase & {
  */
 export function StepRow({ icon, label, under }: RowBase) {
   return (
-    <div className="flex items-start gap-3 py-3">
+    <div className={`flex items-start ${ROW.gap} ${ROW.pad} ${ROW.still}`}>
       <Lead icon={icon} />
       <Body label={label} under={under} />
     </div>
@@ -485,7 +494,7 @@ export function SeeAll({ label = "See all", onOpen }: {
   readonly label?: string; readonly onOpen: () => void;
 }) {
   return (
-    <div className="flex justify-center pt-1">
+    <div className="flex justify-center">
       <Button variant="ghost" onPress={onOpen}>{label}</Button>
     </div>
   );

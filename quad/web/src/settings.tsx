@@ -20,6 +20,7 @@ import type { SettingBook, SettingDef, Level } from "@quad/kernel";
 import { disclose, groupsOn, settingsOn } from "@quad/kernel";
 import { Card, Chip, Separator } from "@heroui/react";
 import { Field } from "./field.js";
+import { SPACE } from "./metrics.js";
 
 export interface SettingsProps {
   readonly book: SettingBook;
@@ -45,7 +46,7 @@ export function Settings({ book, level, stored, held, includes, onChange }: Sett
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className={`flex flex-col ${SPACE.roomy}`}>
       {groups.map((group) => {
         const rows = mine.filter((s) => s.group === group);
         if (!rows.length) return null;
@@ -53,12 +54,12 @@ export function Settings({ book, level, stored, held, includes, onChange }: Sett
           <Card key={group}>
             <Card.Header><Card.Title>{group}</Card.Title></Card.Header>
             <Card.Content>
-              <div className="flex flex-col gap-5">
+              <div className={`flex flex-col ${SPACE.roomy}`}>
                 {rows.map((def, i) => {
                   const locked = !!def.entitlement && includes ? !includes(def.entitlement) : false;
                   const shown = disclose(def, stored);
                   return (
-                    <div key={def.id} className="flex flex-col gap-2">
+                    <div key={def.id} className={`flex flex-col ${SPACE.tight}`}>
                       {i > 0 ? <Separator /> : null}
                       <Field
                         name={def.id}

@@ -21,6 +21,7 @@
 import type { Lane, ModelRow } from "@quad/kernel";
 import { defaultIn, inLane } from "@quad/kernel";
 import { Card, Chip, Switch, Label } from "@heroui/react";
+import { SPACE } from "./metrics.js";
 
 export interface LanesProps {
   /** What the app asked for. */
@@ -31,7 +32,7 @@ export interface LanesProps {
 
 export function AiLanes({ lanes, models, onEnable }: LanesProps) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col ${SPACE.snug}`}>
       {lanes.map((lane) => {
         const rows = inLane(models, lane);
         const chosen = defaultIn(models, lane);
@@ -45,7 +46,7 @@ export function AiLanes({ lanes, models, onEnable }: LanesProps) {
               </Card.Description>
             </Card.Header>
             <Card.Content>
-              <div className="flex flex-col gap-3">
+              <div className={`flex flex-col ${SPACE.snug}`}>
                 {/* ⚠️ Said plainly, because every call into it refuses for ever. */}
                 {!chosen
                   ? (
@@ -56,7 +57,7 @@ export function AiLanes({ lanes, models, onEnable }: LanesProps) {
                   : null}
 
                 {rows.map((model) => (
-                  <div key={model.id} className="flex items-center justify-between gap-4">
+                  <div key={model.id} className={`flex items-center justify-between ${SPACE.snug}`}>
                     <div className="flex flex-col">
                       <strong>{model.label}</strong>
                       {/* ⚠️ The id IS the provider path, so what is shown is what
@@ -64,7 +65,7 @@ export function AiLanes({ lanes, models, onEnable }: LanesProps) {
                           catalogue comes to disagree with itself. */}
                       <small>{model.id}</small>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className={`flex items-center ${SPACE.snug}`}>
                       <Chip color="default" variant="soft">
                         <Chip.Label>in {model.input} / out {model.output} per 1k</Chip.Label>
                       </Chip>

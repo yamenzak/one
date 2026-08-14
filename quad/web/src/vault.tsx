@@ -15,6 +15,7 @@
 
 import type { Disclosure } from "@quad/kernel";
 import { Button, Card, Chip, Separator, Switch, Label } from "@heroui/react";
+import { SPACE } from "./metrics.js";
 
 export interface ConsentProps {
   readonly shown: readonly Disclosure[];
@@ -24,7 +25,7 @@ export interface ConsentProps {
 
 export function ConsentSheet({ shown, given, onChange }: ConsentProps) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col ${SPACE.snug}`}>
       {shown.map(({ purpose, fields, required }) => (
         <Card key={purpose.id}>
           <Card.Header>
@@ -33,12 +34,12 @@ export function ConsentSheet({ shown, given, onChange }: ConsentProps) {
             <Card.Description>{purpose.why}</Card.Description>
           </Card.Header>
           <Card.Content>
-            <div className="flex flex-col gap-3">
+            <div className={`flex flex-col ${SPACE.snug}`}>
               <ul className="flex flex-col gap-1">
                 {fields.map((f) => <li key={f.id}>{f.label}</li>)}
               </ul>
               <Separator />
-              <div className="flex flex-wrap items-center gap-3">
+              <div className={`flex flex-wrap items-center ${SPACE.snug}`}>
                 <Switch
                   isSelected={required || given[purpose.id] === true}
                   isDisabled={required}
@@ -91,7 +92,7 @@ export function WhoLooked({ looks }: { readonly looks: readonly Look[] }) {
     );
   }
   return (
-    <div className="flex flex-col gap-2">
+    <div className={`flex flex-col ${SPACE.tight}`}>
       {looks.map((look, i) => (
         <Card key={`${look.at}-${i}`}>
           <Card.Header>
@@ -129,7 +130,7 @@ export function MyData({ onExport, onErase, erased }: MineProps) {
         <Card.Description>Take a copy, or have it destroyed.</Card.Description>
       </Card.Header>
       <Card.Content>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className={`flex flex-wrap items-center ${SPACE.snug}`}>
           <Button variant="secondary" onPress={onExport}>Download everything</Button>
           <Button variant="danger" isDisabled={erased} onPress={onErase}>Erase everything</Button>
           {/*

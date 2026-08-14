@@ -18,6 +18,7 @@
 import type { Channel, NotificationBook, NotificationDef, Policy, Preference } from "@quad/kernel";
 import { INTERRUPTS, channelsFor, inAudience } from "@quad/kernel";
 import { Card, Chip, Label, Switch } from "@heroui/react";
+import { SPACE } from "./metrics.js";
 
 export interface PolicyProps {
   readonly book: NotificationBook;
@@ -41,7 +42,7 @@ export function NotificationPolicy(
   const mine = Object.values(book).filter((def) => inAudience(def, held));
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col ${SPACE.snug}`}>
       {mine.map((def) => {
         const on = channelsFor(def, policy, preference, available);
         const ceiling = level === "person" ? (policy[def.id] ?? def.channels) : def.channels;
@@ -54,7 +55,7 @@ export function NotificationPolicy(
               <Card.Description>{def.summary}</Card.Description>
             </Card.Header>
             <Card.Content>
-              <div className="flex flex-wrap items-center gap-4">
+              <div className={`flex flex-wrap items-center ${SPACE.snug}`}>
                 {def.channels.filter((c) => c !== "inbox").map((channel) => {
                   const offered = available.includes(channel) && ceiling.includes(channel);
                   return (

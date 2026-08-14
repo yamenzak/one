@@ -15,6 +15,7 @@
 import type { Allowance, EntitlementDef, FlagBook, FlagDef, PlanSpec } from "@quad/kernel";
 import { UNLIMITED, overdue, resolve, settableBy } from "@quad/kernel";
 import { Button, Card, Chip, Label, Separator, Switch } from "@heroui/react";
+import { SPACE } from "./metrics.js";
 
 /* ------------------------------------------------------------------ flags --- */
 
@@ -34,7 +35,7 @@ export function FlagConsole(props: FlagConsoleProps) {
   const late = new Set(overdue(book, today as never));
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col ${SPACE.snug}`}>
       {Object.values(book).map((def: FlagDef) => {
         const switches = {
           deployment: deployment[def.id],
@@ -51,7 +52,7 @@ export function FlagConsole(props: FlagConsoleProps) {
               <Card.Description>{def.why}</Card.Description>
             </Card.Header>
             <Card.Content>
-              <div className="flex flex-wrap items-center gap-3">
+              <div className={`flex flex-wrap items-center ${SPACE.snug}`}>
                 <Switch isSelected={on} isDisabled={!mine} onChange={(next) => onSet(def.id, next)}>
                   <Switch.Control><Switch.Thumb /></Switch.Control>
                   <Switch.Content><Label>{on ? "On" : "Off"}</Label></Switch.Content>
@@ -118,7 +119,7 @@ export function Shelf({ plans, entitlements, current, onChoose }: ShelfProps) {
   const keys = Object.entries(entitlements).filter(([, def]) => !def.reserved);
 
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    <div className={`grid ${SPACE.snug} md:grid-cols-3`}>
       {shown.map((plan) => (
         <Card key={plan.id}>
           <Card.Header>
@@ -126,7 +127,7 @@ export function Shelf({ plans, entitlements, current, onChoose }: ShelfProps) {
             <Card.Description>{plan.said}</Card.Description>
           </Card.Header>
           <Card.Content>
-            <div className="flex flex-col gap-2">
+            <div className={`flex flex-col ${SPACE.tight}`}>
               <strong>{money(plan.price, plan.currency)}</strong>
               {plan.trialDays
                 ? <Chip color="success" variant="soft"><Chip.Label>{plan.trialDays} days free</Chip.Label></Chip>
@@ -134,7 +135,7 @@ export function Shelf({ plans, entitlements, current, onChoose }: ShelfProps) {
               <Separator />
               <dl className="flex flex-col gap-1">
                 {keys.map(([key, def]) => (
-                  <div key={key} className="flex justify-between gap-4">
+                  <div key={key} className={`flex justify-between ${SPACE.snug}`}>
                     <dt>{def.label}</dt>
                     <dd>{saying(plan.includes[key] ?? false)}</dd>
                   </div>

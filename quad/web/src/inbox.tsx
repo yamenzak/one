@@ -19,6 +19,7 @@
 import { Button, Card, Chip, Separator } from "@heroui/react";
 import { colorFor } from "./theme.js";
 import type { Tone } from "@quad/kernel";
+import { SPACE } from "./metrics.js";
 
 export interface Note {
   readonly id: string;
@@ -85,7 +86,7 @@ export function Inbox({ notes, failed, onOpen, onSeenAll }: InboxProps) {
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className={`flex flex-col ${SPACE.tight}`}>
       <div className="flex justify-end">
         <Button variant="ghost" onPress={onSeenAll}>Mark all as read</Button>
       </div>
@@ -96,7 +97,7 @@ export function Inbox({ notes, failed, onOpen, onSeenAll }: InboxProps) {
             <Card.Description>{note.at.slice(0, 16).replace("T", " ")}</Card.Description>
           </Card.Header>
           <Card.Content>
-            <div className="flex items-center gap-3">
+            <div className={`flex items-center ${SPACE.snug}`}>
               {!note.seen
                 ? (
                   <Chip color={colorFor(note.tone as Tone)} variant="soft">

@@ -13,10 +13,11 @@
 
 import type { DocumentDef, RopaEntry, SubProcessorBook } from "@quad/kernel";
 import { Button, Card, Chip, Separator, Table } from "@heroui/react";
+import { SPACE } from "./metrics.js";
 
 export function Ropa({ rows }: { readonly rows: readonly RopaEntry[] }) {
   return (
-    <div className="flex flex-col gap-3">
+    <div className={`flex flex-col ${SPACE.snug}`}>
       {rows.map((row) => (
         <Card key={row.of}>
           <Card.Header>
@@ -24,8 +25,8 @@ export function Ropa({ rows }: { readonly rows: readonly RopaEntry[] }) {
             <Card.Description>{row.why}</Card.Description>
           </Card.Header>
           <Card.Content>
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap gap-2">
+            <div className={`flex flex-col ${SPACE.tight}`}>
+              <div className={`flex flex-wrap ${SPACE.tight}`}>
                 {row.holdings.map((h) => (
                   <Chip key={h} color={h === "sensitive" ? "warning" : "default"} variant="soft">
                     <Chip.Label>{h}</Chip.Label>
@@ -59,7 +60,7 @@ export interface DocumentsProps {
 export function Documents({ documents, outstanding, onAccept }: DocumentsProps) {
   const owed = new Set(outstanding.map((d) => d.id));
   return (
-    <div className="flex flex-col gap-3">
+    <div className={`flex flex-col ${SPACE.snug}`}>
       {documents.map((doc) => (
         <Card key={doc.id}>
           <Card.Header>
@@ -69,7 +70,7 @@ export function Documents({ documents, outstanding, onAccept }: DocumentsProps) 
             <Card.Description>Version of {doc.version}</Card.Description>
           </Card.Header>
           <Card.Content>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className={`flex flex-wrap items-center ${SPACE.snug}`}>
               {owed.has(doc.id)
                 ? <Button variant="primary" onPress={() => onAccept(doc.id)}>Read and accept</Button>
                 : <Chip color="success" variant="soft"><Chip.Label>Accepted</Chip.Label></Chip>}

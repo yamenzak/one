@@ -85,10 +85,20 @@ const LAYOUT = [
   /^(aspect|columns)-/,
 ];
 
+/**
+ * ⚠️ AN INTERPOLATION NAMING A METRIC IS ALLOWED, AND ANYTHING ELSE IS NOT. Once
+ * the spacing moved into `metrics.ts`, every placement read `${ROW.pad}` — which
+ * this could neither verify nor sensibly refuse. Resolving the names it knows is
+ * the honest middle: a metric is layout by construction (its own guard says so),
+ * and an interpolation of anything else is a value this check cannot see, which
+ * is exactly what it must not wave through.
+ */
+const METRICS = /^\$\{(?:ROW|SPACE|WIDTH)\.\w+\}$|^\$\{(?:LEAD|HEAD_GAP|GUTTER|BAND_PAD|NAV_SPACE|ACTION_SPACE|SAFE_BOTTOM)\}$/;
+
 /** ⚠️ A responsive or state prefix does not change what the utility IS. */
 const bare = (cls) => cls.replace(/^(?:[a-z0-9]+:)+/, "").replace(/^[!-]/, "");
 
-const layoutOnly = (cls) => LAYOUT.some((re) => re.test(bare(cls)));
+const layoutOnly = (cls) => METRICS.test(cls) || LAYOUT.some((re) => re.test(bare(cls)));
 
 /**
  * ⚠️ HEROUI COMPONENTS ARE FOUND BY WHAT WAS IMPORTED, not by a hardcoded list.

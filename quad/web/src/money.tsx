@@ -14,6 +14,7 @@
 import type { JobBook, PackDef } from "@quad/kernel";
 import { Button, Card, Chip, Meter, ProgressBar, Separator } from "@heroui/react";
 import { money } from "./console.js";
+import { SPACE } from "./metrics.js";
 
 /* ------------------------------------------------------------------- bill --- */
 
@@ -33,17 +34,17 @@ export function Bill({ lines, total, currency, appName, mixed }: BillProps) {
         <Card.Description>One invoice, one line per product.</Card.Description>
       </Card.Header>
       <Card.Content>
-        <div className="flex flex-col gap-2">
+        <div className={`flex flex-col ${SPACE.tight}`}>
           {lines.length === 0
             ? <span>Nothing yet — every product here is on a free plan.</span>
             : lines.map((line) => (
-              <div key={line.appId} className="flex justify-between gap-4">
+              <div key={line.appId} className={`flex justify-between ${SPACE.snug}`}>
                 <span>{appName(line.appId)} · {line.planId}</span>
                 <span>{money(line.price, line.currency)}</span>
               </div>
             ))}
           <Separator />
-          <div className="flex justify-between gap-4">
+          <div className={`flex justify-between ${SPACE.snug}`}>
             <strong>Total</strong>
             <strong>{money(total, currency)}</strong>
           </div>
@@ -81,14 +82,14 @@ export function Wallet({ balance, held, spentByApp, appName, packs, onBuy }: Wal
   const spent = spentByApp.reduce((n, s) => n + s.credits, 0);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col ${SPACE.snug}`}>
       <Card>
         <Card.Header>
           <Card.Title>Credits</Card.Title>
           <Card.Description>{spendable} to spend</Card.Description>
         </Card.Header>
         <Card.Content>
-          <div className="flex flex-col gap-3">
+          <div className={`flex flex-col ${SPACE.snug}`}>
             {/*
               ⚠️ HELD IS SHOWN SEPARATELY, because a balance that silently
               excludes it is a number that disagrees with what the person can
@@ -103,10 +104,10 @@ export function Wallet({ balance, held, spentByApp, appName, packs, onBuy }: Wal
               : null}
 
             {spent > 0 ? (
-              <div className="flex flex-col gap-2">
+              <div className={`flex flex-col ${SPACE.tight}`}>
                 {spentByApp.map((s) => (
                   <div key={s.appId ?? "platform"} className="flex flex-col gap-1">
-                    <div className="flex justify-between gap-4">
+                    <div className={`flex justify-between ${SPACE.snug}`}>
                       <span>{s.appId ? appName(s.appId) : "The platform"}</span>
                       <span>{s.credits}</span>
                     </div>
@@ -121,7 +122,7 @@ export function Wallet({ balance, held, spentByApp, appName, packs, onBuy }: Wal
         </Card.Content>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className={`grid ${SPACE.snug} md:grid-cols-3`}>
         {[...packs].sort((a, b) => a.order - b.order).map((pack) => (
           <Card key={pack.id}>
             <Card.Header>
@@ -169,7 +170,7 @@ export interface JobsProps {
  */
 export function Jobs({ book, runs, missedMs, now }: JobsProps) {
   return (
-    <div className="flex flex-col gap-3">
+    <div className={`flex flex-col ${SPACE.snug}`}>
       {Object.values(book).map((job) => {
         const last = runs.filter((r) => r.jobId === job.id)
           .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))[0];
@@ -183,7 +184,7 @@ export function Jobs({ book, runs, missedMs, now }: JobsProps) {
               <Card.Description>{job.why}</Card.Description>
             </Card.Header>
             <Card.Content>
-              <div className="flex flex-wrap items-center gap-3">
+              <div className={`flex flex-wrap items-center ${SPACE.snug}`}>
                 {/* ⚠️ "Has not run" is the headline, because it is the failure
                     that produces no error anywhere. */}
                 {quiet

@@ -15,6 +15,7 @@ import type { GuideBook, HelpBook, MilestoneBook } from "@quad/kernel";
 import { progressOf, reached, remaining } from "@quad/kernel";
 import { Button, Card, Chip, ProgressBar } from "@heroui/react";
 import { colorFor } from "./theme.js";
+import { SPACE } from "./metrics.js";
 
 export interface GuideProps {
   readonly book: GuideBook;
@@ -38,12 +39,12 @@ export function Guide({ book, events, held, onGo }: GuideProps) {
         <Card.Description>{done.done.length} of {done.total} done</Card.Description>
       </Card.Header>
       <Card.Content>
-        <div className="flex flex-col gap-4">
+        <div className={`flex flex-col ${SPACE.snug}`}>
           <ProgressBar value={done.done.length} maxValue={Math.max(1, done.total)}>
             <ProgressBar.Track><ProgressBar.Fill /></ProgressBar.Track>
           </ProgressBar>
           {left.map((step) => (
-            <div key={step.id} className="flex items-center justify-between gap-4">
+            <div key={step.id} className={`flex items-center justify-between ${SPACE.snug}`}>
               <div className="flex flex-col">
                 <strong>{step.label}</strong>
                 <small>{step.why}</small>
@@ -70,7 +71,7 @@ export function Milestones({ book, counts, already }: MilestonesProps) {
   const now = reached(book, counts, already);
   if (!now.length) return null;
   return (
-    <div className="flex flex-col gap-2">
+    <div className={`flex flex-col ${SPACE.tight}`}>
       {now.map((m) => (
         <Chip key={m.id} color={colorFor(m.tone)} variant="soft">
           <Chip.Label>{m.said}</Chip.Label>
@@ -96,7 +97,7 @@ export function Help({ book, screen }: HelpProps) {
   const mine = Object.values(book).filter((h) => h.screen === screen);
   if (!mine.length) return null;
   return (
-    <div className="flex flex-col gap-3">
+    <div className={`flex flex-col ${SPACE.snug}`}>
       {mine.map((h) => (
         <Card key={h.id}>
           <Card.Header><Card.Title>{h.title}</Card.Title></Card.Header>

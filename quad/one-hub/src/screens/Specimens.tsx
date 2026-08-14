@@ -31,7 +31,16 @@ const glyph = (mark: string) => <span aria-hidden="true">{mark}</span>;
 /** A bike workshop's day. Balance hero doing duty as a workload figure. */
 function Workshop() {
   return (
-    <Page sky="weave">
+    <Page
+      sky="weave"
+      nav={<Island here="/" onGo={nothing}
+        items={[
+          { id: "today", label: "Today", icon: glyph("⌂"), route: "/" },
+          { id: "jobs", label: "Jobs", icon: glyph("▤"), route: "/jobs", unread: true },
+          { id: "parts", label: "Parts", icon: glyph("⬡"), route: "/parts" },
+          { id: "people", label: "People", icon: glyph("◉"), route: "/people" },
+        ]} />}
+    >
       <AppCrown
         face={glyph("◉")}
         unread
@@ -93,16 +102,6 @@ function Workshop() {
           </Group>
         </Stack>
       </Band>
-      <Island
-        here="/"
-        onGo={nothing}
-        items={[
-          { id: "today", label: "Today", icon: glyph("⌂"), route: "/" },
-          { id: "jobs", label: "Jobs", icon: glyph("▤"), route: "/jobs", unread: true },
-          { id: "parts", label: "Parts", icon: glyph("⬡"), route: "/parts" },
-          { id: "people", label: "People", icon: glyph("◉"), route: "/people" },
-        ]}
-      />
     </Page>
   );
 }
@@ -248,7 +247,16 @@ function Flow() {
 /** A first run, and a dashboard that has nothing in it yet. */
 function Start() {
   return (
-    <Page sky="calm">
+    <Page
+      sky="calm"
+      nav={<Island here="/" onGo={nothing}
+        items={[
+          { id: "round", label: "Round", icon: glyph("⌂"), route: "/" },
+          { id: "ward", label: "Ward", icon: glyph("▭"), route: "/ward" },
+          { id: "notes", label: "Notes", icon: glyph("▤"), route: "/notes", unread: true },
+          { id: "team", label: "Team", icon: glyph("◉"), route: "/team" },
+        ]} />}
+    >
       <AppCrown
         face={glyph("◉")}
         onOpenAccount={nothing}
@@ -294,16 +302,6 @@ function Start() {
           </Group>
         </Stack>
       </Band>
-      <Island
-        here="/"
-        onGo={nothing}
-        items={[
-          { id: "round", label: "Round", icon: glyph("⌂"), route: "/" },
-          { id: "ward", label: "Ward", icon: glyph("▭"), route: "/ward" },
-          { id: "notes", label: "Notes", icon: glyph("▤"), route: "/notes", unread: true },
-          { id: "team", label: "Team", icon: glyph("◉"), route: "/team" },
-        ]}
-      />
     </Page>
   );
 }
