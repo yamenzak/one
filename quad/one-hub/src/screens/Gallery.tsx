@@ -14,7 +14,7 @@
  */
 
 import { useState } from "react";
-import { Balance, Band, CopyRow, Figure, Group, Grid, Island, Money, NavRow, ActionRow,
+import { AppCrown, Balance, Band, CopyRow, Figure, Group, Grid, Island, Money, NavRow, ActionRow,
   ToggleRow, FieldRow, NoteRow, OfferRow, PersonRow, AmountRow, QuickActions, SeeAll,
   StepRow, TileGrid, Nothing, RowRule, Row, SectionTitle, Stack, StickyAction, Title,
   TYPE, type Ambience } from "@quad/web";
@@ -200,19 +200,57 @@ export function Gallery() {
         />
       </section>
 
+      {/* --------------------------------------------------------- crown --- */}
+      <section className="flex flex-col gap-3">
+        <SectionTitle>The crown</SectionTitle>
+        <p className={TYPE.note}>
+          The face and search never move; the last two slots belong to the destination
+        </p>
+        {([
+          ["Home", "▦", "▭"],
+          ["Invest", "▦", "◍"],
+          ["Payments", "▤", "+"],
+          ["Points", "✦", "▭"],
+        ] as const).map(([where, one, two]) => (
+          <AppCrown
+            key={where}
+            face={glyph("◉")}
+            unread={where === "Home"}
+            onOpenAccount={nothing}
+            onSearch={nothing}
+            searchLabel={`Search ${where.toLowerCase()}`}
+            actions={[
+              { id: "a", label: "First", icon: glyph(one), onDo: nothing },
+              { id: "b", label: "Second", icon: glyph(two), onDo: nothing },
+            ]}
+          />
+        ))}
+      </section>
+
       {/* ----------------------------------------------------------- nav --- */}
       <section className="flex flex-col gap-3">
         <SectionTitle>Getting around</SectionTitle>
+        <p className={TYPE.note}>
+          Four here, five at most, and the labels go while you scroll
+        </p>
         <Island
           here="/"
           onGo={nothing}
           items={[
             { id: "home", label: "Home", icon: glyph("⌂"), route: "/" },
             { id: "work", label: "Work", icon: glyph("▤"), route: "/work" },
-            { id: "pay", label: "Pay", icon: glyph("⇄"), route: "/pay" },
+            { id: "pay", label: "Pay", icon: glyph("⇄"), route: "/pay", unread: true },
             { id: "you", label: "You", icon: glyph("◉"), route: "/you" },
           ]}
         />
+      </section>
+
+      {/* --------------------------------------------------------- sticky --- */}
+      <section className="flex flex-col gap-3">
+        <SectionTitle>The one action</SectionTitle>
+        <p className={TYPE.note}>
+          A screen has an island or a pinned action, never both — they occupy one place
+        </p>
         <StickyAction>
           <Button variant="primary" className="w-full" onPress={nothing}>Invite friends</Button>
         </StickyAction>

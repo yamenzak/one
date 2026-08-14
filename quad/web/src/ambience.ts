@@ -140,5 +140,10 @@ export function ambienceStylesheet(): string {
     ...rules,
     /* ⚠️ A bleeding ambience must reach the edge even inside a padded column. */
     `[data-bleed="edge"]::before { left: 50%; right: auto; width: 100vw; transform: translateX(-50%); }`,
+    /* ⚠️ THE UNREAD DOT, COLOURED BY ITS TONE RATHER THAN BY A LITERAL. It is
+       here rather than in a component because a component that named a colour
+       would be one a workspace's branding never reaches (D7). */
+    `[data-dot="true"] { border-radius: 9999px; background: var(--danger); }`,
+    `[data-dot="true"][data-tone="accent"] { background: var(--accent); }`,
   ].join("\n");
 }

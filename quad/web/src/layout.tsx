@@ -18,11 +18,13 @@
  * exists. An inline style would beat every token and freeze one page on ours.
  */
 
+import * as React from "react";
 import type { Tone } from "@quad/kernel";
 import { PRIMARY_MAX } from "@quad/kernel";
 import { Button, Separator } from "@heroui/react";
 import type { Sky } from "./theme.js";
 import { TYPE } from "./type.js";
+import { MOTION } from "./motion.js";
 
 /* ------------------------------------------------------------------ bleed --- */
 
@@ -287,6 +289,12 @@ export function Balance({ eyebrow, figure, identifier, under }: {
  * ⚠️ `pb-[env(safe-area-inset-bottom)]` IS NOT OPTIONAL. Without it the control
  * sits under the home indicator on every modern phone — reachable, but with the
  * gesture bar over it, which reads as a layout somebody did not test.
+ *
+ * ⚠️ A SCREEN HAS THIS OR AN `Island`, NEVER BOTH. They pin to the same place and
+ * overlap — which the catalogue page demonstrated the first time it rendered
+ * them together, with the button sitting across the nav. It is also the right
+ * rule for a different reason: a screen with one unmistakable action is not a
+ * screen somebody should be navigating away from mid-decision.
  */
 export function StickyAction({ children }: { readonly children: React.ReactNode }) {
   return (
@@ -297,44 +305,168 @@ export function StickyAction({ children }: { readonly children: React.ReactNode 
 }
 
 /**
- * THE FLOATING NAV — five destinations maximum (D10).
+ * THE FLOATING NAV — five destinations maximum (D10), and it collapses.
  *
  * ⚠️ AN ISLAND RATHER THAN A BAR, and it is not decoration: a bar welded to the
  * bottom edge cuts the page in two, while an island floats over content that
  * visibly continues beneath it, so the page reads as longer than the screen.
  *
- * ⚠️ AND THE KERNEL REFUSES A SIXTH ITEM. Past five a bottom bar stops being
- * tappable and becomes a menu — so this slices as well, because a deployment
+ * ⚠️ IT SHEDS ITS LABELS WHILE SOMEBODY IS SCROLLING, and gets them back when
+ * they stop. Reading and navigating are different moments: during the first the
+ * nav is in the way, during the second it is the point. Shrinking rather than
+ * hiding is what keeps it from feeling like the product took something away.
+ *
+ * ⚠️ AND THE LABEL GOES TO `sr-only`, NEVER TO `hidden`. A collapsed nav that
+ * removed its labels from the accessibility tree would be four unnamed buttons
+ * to anybody using a screen reader — the one group for whom the icon carries
+ * nothing at all.
+ *
+ * ⚠️ THE KERNEL REFUSES A SIXTH ITEM, and this slices too: a deployment
  * rendering a manifest it did not compose must not draw one either.
  */
 export function Island({ items, here, onGo }: {
   readonly items: readonly {
     readonly id: string; readonly label: string;
     readonly icon: React.ReactNode; readonly route: string;
-    readonly unread?: number;
+    /** ⚠️ A dot, never a count. At this size a number is unreadable, and what
+        the nav owes is "something happened here", not how much. */
+    readonly unread?: boolean;
   }[];
   readonly here: string;
   readonly onGo: (route: string) => void;
 }) {
+  const dense = useScrolling();
+
   return (
     <nav
       aria-label="Sections"
       className="sticky bottom-0 z-10 flex justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
     >
-      <div className="flex items-center gap-1">
-        {items.slice(0, PRIMARY_MAX).map((item) => (
-          <Button
-            key={item.id}
-            variant={item.route === here ? "secondary" : "ghost"}
-            aria-current={item.route === here ? "page" : undefined}
-            className="flex-col gap-1"
-            onPress={() => onGo(item.route)}
-          >
-            <span aria-hidden="true">{item.icon}</span>
-            <span className={TYPE.note}>{item.label}</span>
-          </Button>
-        ))}
+      <div className="flex items-center gap-1" style={{ transition: MOTION.travel }}>
+        {items.slice(0, PRIMARY_MAX).map((item) => {
+          const at = item.route === here;
+          return (
+            <Button
+              key={item.id}
+              /* ⚠️ THE ACTIVE ONE IS A FILLED PILL, not a coloured icon. Colour
+                 alone fails for the eight percent of men who cannot reliably
+                 tell two of ours apart; a shape does not. */
+              variant={at ? "secondary" : "ghost"}
+              aria-current={at ? "page" : undefined}
+              className="flex-col gap-1"
+              onPress={() => onGo(item.route)}
+            >
+              <span aria-hidden="true" className="relative flex items-center">
+                {item.icon}
+                {item.unread
+                  ? <span aria-hidden="true" className="absolute -top-1 -right-2"><Dot /></span>
+                  : null}
+              </span>
+              <span className={dense ? "sr-only" : TYPE.note}>{item.label}</span>
+            </Button>
+          );
+        })}
       </div>
     </nav>
+  );
+}
+
+/**
+ * ⚠️ "IS SOMEBODY SCROLLING RIGHT NOW", not "how far down are they". A threshold
+ * on scroll position makes the nav collapse at an arbitrary place and stay
+ * collapsed while somebody reads, which is exactly backwards.
+ *
+ * ⚠️ AND IT STANDS DOWN ENTIRELY FOR REDUCED MOTION. A control that changes size
+ * under the thumb is motion, whatever it is called.
+ */
+function useScrolling(quietMs = 220): boolean {
+  const [moving, setMoving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof matchMedia === "function"
+      && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    let timer: ReturnType<typeof setTimeout>;
+    const onScroll = () => {
+      setMoving(true);
+      clearTimeout(timer);
+      timer = setTimeout(() => setMoving(false), quietMs);
+    };
+    addEventListener("scroll", onScroll, { passive: true });
+    return () => { removeEventListener("scroll", onScroll); clearTimeout(timer); };
+  }, [quietMs]);
+
+  return moving;
+}
+
+/** ⚠️ Its own element so the tone token colours it — see `Tone`. */
+const Dot = () => <span className="flex size-2" data-tone="danger" data-dot="true" />;
+
+/* ------------------------------------------------------------- app crown --- */
+
+/**
+ * THE CROWN EVERY DESTINATION SHARES, WITH TWO SLOTS THAT ARE THE DESTINATION'S.
+ *
+ * ⚠️ THE FRAME IS FIXED AND ONLY THE LAST TWO CHANGE. Somebody's face on the
+ * left and search in the middle are in the same place on every screen, so
+ * neither is ever re-learned; the two trailing slots carry what THIS
+ * destination's two most common actions are. A crown that changed wholesale per
+ * screen would make the top of the app a thing you read rather than a thing you
+ * use — and one that was identical everywhere would put the same two actions in
+ * front of somebody four times, three of them wrong.
+ *
+ * ⚠️ EXACTLY TWO, AND THE TYPE SAYS SO. A third fits on a wide phone and falls
+ * off a narrow one, which is a layout that is correct on the device it was built
+ * on. A destination with three candidates has to choose, which is the useful
+ * conversation.
+ */
+export interface AppCrownProps {
+  readonly face: React.ReactNode;
+  readonly onOpenAccount: () => void;
+  readonly onSearch: () => void;
+  readonly searchLabel?: string;
+  /** ⚠️ A tuple, not an array — the ceiling is the type rather than a slice. */
+  readonly actions?: readonly [] | readonly [Slot] | readonly [Slot, Slot];
+  readonly unread?: boolean;
+}
+
+export interface Slot {
+  readonly id: string;
+  readonly label: string;
+  readonly icon: React.ReactNode;
+  readonly onDo: () => void;
+}
+
+export function AppCrown(
+  { face, onOpenAccount, onSearch, searchLabel = "Search", actions = [], unread }: AppCrownProps,
+) {
+  return (
+    <header className="w-full">
+      <Band bleed="edge" width="work">
+        <div className="flex items-center gap-3 py-3">
+          <Button variant="ghost" aria-label="Your account" onPress={onOpenAccount}>
+            <span className="relative flex items-center">
+              {face}
+              {unread
+                ? <span aria-hidden="true" className="absolute -top-1 -right-1"><Dot /></span>
+                : null}
+            </span>
+          </Button>
+
+          {/* ⚠️ SEARCH IS A BUTTON HERE, NOT A FIELD. A live input in the crown
+              is a keyboard on every screen the moment a thumb brushes it; the
+              real search is a surface of its own. */}
+          <Button variant="secondary" className="grow justify-start" onPress={onSearch}>
+            {searchLabel}
+          </Button>
+
+          {actions.map((a) => (
+            <Button key={a.id} variant="secondary" aria-label={a.label} onPress={a.onDo}>
+              {a.icon}
+            </Button>
+          ))}
+        </div>
+      </Band>
+    </header>
   );
 }
