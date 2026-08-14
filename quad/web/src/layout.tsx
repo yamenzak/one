@@ -415,8 +415,24 @@ export function Island({ items, here, onGo }: {
         variant="transparent"
         data-island="true"
         data-glass="true"
-        className={`relative w-full ${WIDTH.read} flex-row items-center overflow-hidden ${ISLAND_PAD}`}
+        className={`w-full ${WIDTH.read} flex-row items-center ${ISLAND_PAD}`}
       >
+        {/*
+          ⚠️ A TRACK INSIDE THE BAR'S PADDING, AND IT IS NOT A WRAPPER FOR ITS
+          OWN SAKE. The pill is absolutely positioned, and a percentage width on
+          an absolute box resolves against its containing block's PADDING box —
+          so with the pill parented to the bar, insetting the bar moved its edge
+          and not the pill's. A track is the box the pill's percentages are
+          honestly about, and the bar's four pixels then surround it.
+
+          ⚠️ AND `gap-0` IS LOAD-BEARING. `.card` ships `gap-3`, which nothing
+          here had overridden — so four items shared the width MINUS 36px of
+          gaps while the pill stepped by a clean quarter of the whole. The two
+          agree at the first destination and drift right by four pixels at every
+          one after it, which is exactly what it looked like. Arithmetic that
+          assumes a partition has to be given a partition.
+        */}
+        <div className="relative flex w-full flex-row items-center gap-0">
         {/*
           ⚠️ ONE PILL THAT TRAVELS, NOT FOUR BACKGROUNDS SWITCHING ON AND OFF.
           A per-item fill can only appear and disappear; a single element can
@@ -500,6 +516,7 @@ export function Island({ items, here, onGo }: {
             </Button>
           );
         })}
+        </div>
       </Card>
     </nav>
   );

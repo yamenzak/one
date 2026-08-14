@@ -124,7 +124,7 @@ export const CROWN_SIZE = "lg" as const;
  * labels and 40 without — a bar with sixteen pixels of nothing around a row of
  * pills. Four is what a pill needs to not touch the edge it sits in.
  */
-export const ISLAND_PAD = "p-0" as const;
+export const ISLAND_PAD = "p-1" as const;
 
 /**
  * ⚠️ AND THE ITEM INSIDE IT HAS A HEIGHT, OR ITS CONTENT TOUCHES THE EDGES. With
@@ -137,13 +137,15 @@ export const ISLAND_PAD = "p-0" as const;
 export const ISLAND_ITEM = "py-2" as const;
 
 /**
- * ⚠️ AND THE ISLAND HAS NO INSET AT ALL NOW, BECAUSE THE PILL IS THE FULL
- * HEIGHT OF IT. An inset made the pill smaller than the thing it marks; a pill
- * that fills the bar is bigger, easier to hit, and — the reason it had to change
- * — it is one element sliding between four equal columns rather than four
- * backgrounds switching on and off, which is the only way it can travel.
+ * ⚠️ FOUR PIXELS, AND THE PILL IS INSET BY IT WITHOUT KNOWING IT IS. The pill is
+ * absolutely positioned, and a percentage width on an absolute box resolves
+ * against the containing block's PADDING box — so inset the bar and the pill
+ * still starts at the padding edge. It sits inside a TRACK instead: a plain box
+ * inside the padding, which the pill spans exactly and the bar's four pixels
+ * surround. That is what keeps it off the rim while the arithmetic below stays
+ * whole numbers.
  *
- * ⚠️ SO THE AIR IS ON THE ITEM INSTEAD, which also makes the bar's height a
+ * ⚠️ THE REST OF THE AIR IS ON THE ITEM, which makes the bar's height a
  * consequence of its content rather than a number: 8 + icon + gap + label + 8
  * when the labels are out, and 8 + icon + 8 when they are folded away. The bar
  * collapses because the label does, not because anything measured it.

@@ -315,6 +315,13 @@ export function ambienceCss(what: Ambience, tone: Tone = "neutral"): string {
  * because dither that fades out stops dithering exactly where the gradient is
  * shallowest and banding is most visible.
  */
+/**
+ * ⚠️ THE GLASS RECIPE, IN ONE PLACE AND IN THIS ORDER. Filters compose in the
+ * order written: blurring first and correcting after is what recovers colour and
+ * form; correcting first and blurring after averages the correction away.
+ */
+const GLASS = "blur(11px) saturate(1.4) contrast(1.2) brightness(0.92)";
+
 export function ambienceStylesheet(): string {
   const rules = AMBIENCES.filter((a) => a !== "plain").map((a) => {
     const css = ambienceCss(a);
@@ -387,10 +394,17 @@ export function ambienceStylesheet(): string {
       a different route. Pushing saturation back up is what keeps the glass the
       colour of what is behind it.
     */
+    /*
+      ⚠️ ONE FILTER STACK, WRITTEN ONCE. Blur is only the first term: saturation
+      puts back what averaging toward grey takes out, contrast keeps the shapes
+      behind from going flat, and a slight darkening is what stops a plate over
+      a bright ground reading as a wash. Four terms rather than one is the
+      difference between glass and a frosted panel.
+    */
     `[data-glass="true"] {`,
     `  background-color: color-mix(in oklab, var(--foreground) 10%, transparent) !important;`,
-    `  backdrop-filter: blur(28px) saturate(1.8);`,
-    `  -webkit-backdrop-filter: blur(28px) saturate(1.8);`,
+    `  backdrop-filter: ${GLASS};`,
+    `  -webkit-backdrop-filter: ${GLASS};`,
     `}`,
     /*
       ⚠️ THE BAR IS A VEIL OF THE RAISED TIER, NOT A WASH OF THE FOREGROUND, and
@@ -410,8 +424,6 @@ export function ambienceStylesheet(): string {
     */
     `[data-island="true"][data-glass="true"] {`,
     `  background-color: color-mix(in oklab, var(--surface-tertiary) 76%, transparent) !important;`,
-    `  backdrop-filter: blur(36px) saturate(1.8);`,
-    `  -webkit-backdrop-filter: blur(36px) saturate(1.8);`,
     `}`,
     /*
       ⚠️ THE PILL THAT MARKS WHERE YOU ARE, AS A RULE RATHER THAN A CLASS. It is
@@ -420,7 +432,20 @@ export function ambienceStylesheet(): string {
       tier, which the palette guarantees clears both the raised tier under it
       and the surfaces around it.
     */
-    `[data-pill="true"] { background-color: var(--default); border-radius: 9999px; }`,
+    /*
+      ⚠️ THE PILL IS GLASS ON GLASS, which is the only way it reads as sitting ON
+      the bar rather than being cut out of it. Its backdrop is the bar's already
+      filtered plate, so it needs no blur of its own — a second blur of an
+      already blurred thing costs a full readback and changes almost nothing.
+      What it needs is to be BRIGHTER and a touch more saturated than what it
+      covers, which is what a raised piece of glass does to the light through it.
+    */
+    `[data-pill="true"] {`,
+    `  background-color: color-mix(in oklab, var(--default) 72%, transparent);`,
+    `  border-radius: 9999px;`,
+    `  backdrop-filter: brightness(1.14) saturate(1.25);`,
+    `  -webkit-backdrop-filter: brightness(1.14) saturate(1.25);`,
+    `}`,
     `@media (prefers-reduced-motion: reduce) { [data-pill="true"] { transition: none !important; } }`,
     `[data-glass="true"]:hover {`,
     `  background-color: color-mix(in oklab, var(--foreground) 18%, transparent) !important;`,
