@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { findBoundaryViolations, formatViolations, violationKeys } from "@4dl/core/boundary";
 
-const ALLOW: readonly string[] = [
-  /* ⚠️ Not our vocabulary: `google-ai-studio` is the AI Gateway's own route
-     segment for the Gemini provider — a vendor URL, not a tenant. */
-  "src/generate.ts:studio",
-];
+const ALLOW: readonly string[] = [];
 const dir = new URL("..", import.meta.url).pathname;
 
 describe("package boundary", () => {

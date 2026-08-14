@@ -134,17 +134,6 @@ export const SHARED_CONFIG_KEYS: readonly string[] = [
    * lives.
    */
   "ai.markup",
-  /**
-   * One AI Gateway in front of every provider call, platform-wide. The value
-   * is the gateway URL from the Cloudflare dashboard
-   * (https://gateway.ai.cloudflare.com/v1/<account>/<gateway>). Set, every
-   * Gemini call re-bases onto the gateway's google-ai-studio route and the
-   * Workers AI binding names the gateway — per-request logs, token counts and
-   * cost attribution with no auth or payload change. Unset, calls go direct
-   * and nothing differs; that is what makes this a config decision rather
-   * than a migration. See `geminiBaseFrom` in @4dl/ai.
-   */
-  "ai.gateway_base",
   // One Turnstile widget, hostname-scoped across the whole apex.
   "turnstile.secret",
   "turnstile.hostnames",
