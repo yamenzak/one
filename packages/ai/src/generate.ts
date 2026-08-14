@@ -897,6 +897,35 @@ export function geminiBilledTokens(u: GeminiUsage | undefined): { inputTokens?: 
  *  TYPE names; enum/items/properties preserved). Lets one enum schema drive both
  *  Workers AI json_schema and Gemini responseSchema so the model is constrained
  *  to the allowed vocab, not just "some JSON". */
+/* ----------------------------------------------------------------- gateway --- */
+
+/**
+ * Where provider calls go: direct, or through the platform's AI Gateway.
+ *
+ * `ai.gateway_base` (shared config) is the gateway URL from the Cloudflare
+ * dashboard — https://gateway.ai.cloudflare.com/v1/<account>/<gateway>. Set,
+ * every Gemini call re-bases onto the gateway's google-ai-studio route and the
+ * Workers AI binding names the gateway, so every call gets per-request logs,
+ * token counts and cost attribution. Unset, calls go direct and NOTHING
+ * differs: the path after the base, the query-string auth and the response
+ * shape are identical on both routes, which is what makes this a config
+ * decision rather than a migration. The reserve→settle arithmetic is
+ * unaffected either way — the gateway reports what we PAY, never what a
+ * tenant is charged.
+ */
+const GEMINI_DIRECT = "https://generativelanguage.googleapis.com/v1beta";
+
+export const geminiBaseFrom = (gatewayBase: string | undefined): string => {
+  const base = (gatewayBase ?? "").trim().replace(/\/+$/, "");
+  return base ? `${base}/google-ai-studio/v1beta` : GEMINI_DIRECT;
+};
+
+/** The gateway's NAME, for the Workers AI binding — the URL's last segment. */
+export const gatewayIdFrom = (gatewayBase: string | undefined): string | undefined => {
+  const base = (gatewayBase ?? "").trim().replace(/\/+$/, "");
+  return base ? base.split("/").pop() || undefined : undefined;
+};
+
 function toGeminiSchema(s: unknown): unknown {
   if (!s || typeof s !== "object") return s;
   const out: Record<string, unknown> = {};
@@ -915,6 +944,7 @@ async function runGemini(
   key: string,
   modelId: string,
   input: GenerateInput,
+  base: string = GEMINI_DIRECT,
 ): Promise<{ output: string; usage: Usage }> {
   const parts: Record<string, unknown>[] = [{ text: input.prompt }];
   if (input.image) parts.push({ inline_data: { mime_type: input.image.mimeType, data: input.image.data } });
@@ -926,7 +956,7 @@ async function runGemini(
     if (input.jsonSchema) generationConfig.responseSchema = toGeminiSchema(input.jsonSchema);
   }
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`,
+    `${base}/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`,
     {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -1178,7 +1208,7 @@ export async function generate(env: AiBindings, input: GenerateInput): Promise<G
       // finishReason, so wrapping the whole call is what makes "empty model
       // response" retryable — it is the single most common transient failure.
       const g = await withRetry(
-        () => withTimeout(runGemini(geminiKey!, model.id, runInput)),
+        () => withTimeout(runGemini(geminiKey!, model.id, runInput, geminiBaseFrom(cfg["ai.gateway_base"]))),
         (n, why) => { retries.push(`${n}:${why.slice(0, 60)}`); },
       );
       output = g.output;
@@ -1203,7 +1233,8 @@ export async function generate(env: AiBindings, input: GenerateInput): Promise<G
       // settled rejection forever.
       const attempt = async () => {
         const result = await withTimeout(
-          env.AI!.run(model.id as Parameters<Ai["run"]>[0], args as Parameters<Ai["run"]>[1]) as Promise<WorkersAiResult>,
+          env.AI!.run(model.id as Parameters<Ai["run"]>[0], args as Parameters<Ai["run"]>[1],
+            gatewayIdFrom(cfg["ai.gateway_base"]) ? { gateway: { id: gatewayIdFrom(cfg["ai.gateway_base"])! } } : undefined) as Promise<WorkersAiResult>,
         );
         const text = readWorkersAiOutput(result);
         // Checked in here, not after, so an empty body is a RETRYABLE failure
@@ -1263,13 +1294,13 @@ const b64ToBytes = (b64: string): Uint8Array => { const bin = atob(b64); const a
 
 interface GeminiImageResponse { candidates?: { content?: { parts?: { inlineData?: { mimeType?: string; data?: string } }[] } }[]; usageMetadata?: { promptTokenCount?: number } }
 
-async function runGeminiImage(key: string, modelId: string, prompt: string, reference?: { data: string; mimeType: string }): Promise<{ bytes: Uint8Array; mimeType: string; inputTokens: number }> {
+async function runGeminiImage(key: string, modelId: string, prompt: string, reference?: { data: string; mimeType: string }, base: string = GEMINI_DIRECT): Promise<{ bytes: Uint8Array; mimeType: string; inputTokens: number }> {
   const parts: Record<string, unknown>[] = [{ text: prompt }];
   // Image-to-image: seed with a reference so the output keeps its character,
   // style and camera angle (used for a coherent exercise start→end pair).
   if (reference) parts.push({ inline_data: { mime_type: reference.mimeType, data: reference.data } });
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`,
+    `${base}/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`,
     { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { responseModalities: ["IMAGE"] } }) },
   );
   if (!res.ok) throw new Error(`HTTP ${res.status} ${(await res.text().catch(() => "")).slice(0, 300)}`);
@@ -1340,7 +1371,7 @@ export async function generateImage(env: AiBindings, input: GenerateImageInput):
   let bytes: Uint8Array, mimeType: string, usage: Usage, mocked = false;
   try {
     if (useMock) { bytes = b64ToBytes(MOCK_PNG_B64); mimeType = "image/png"; usage = estUsage; mocked = true; }
-    else { const r = await withTimeout(runGeminiImage(geminiKey!, model.id, prompt, input.reference)); bytes = r.bytes; mimeType = r.mimeType; usage = { inputTokens: r.inputTokens, images: 1 }; }
+    else { const r = await withTimeout(runGeminiImage(geminiKey!, model.id, prompt, input.reference, geminiBaseFrom(cfg["ai.gateway_base"]))); bytes = r.bytes; mimeType = r.mimeType; usage = { inputTokens: r.inputTokens, images: 1 }; }
   } catch (err) {
     await dobj.release(hold.hold);
     const detail = `${model.id}: ${err instanceof Error ? err.message : String(err)}`;
@@ -1407,9 +1438,9 @@ interface GeminiTtsResponse {
   usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
 }
 
-async function runGeminiTts(key: string, modelId: string, text: string, voice: string): Promise<{ pcm: Uint8Array; sampleRate: number; inputTokens?: number; outputTokens?: number }> {
+async function runGeminiTts(key: string, modelId: string, text: string, voice: string, base: string = GEMINI_DIRECT): Promise<{ pcm: Uint8Array; sampleRate: number; inputTokens?: number; outputTokens?: number }> {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`,
+    `${base}/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`,
     {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -1470,7 +1501,7 @@ export async function generateSpeech(env: AiBindings, input: { tenantId: string;
   try {
     if (useMock) { bytes = silentWav(); usage = estUsage; mocked = true; }
     else {
-      const r = await withTimeout(runGeminiTts(geminiKey!, modelId, input.text, input.voice ?? DEFAULT_TTS_VOICE));
+      const r = await withTimeout(runGeminiTts(geminiKey!, modelId, input.text, input.voice ?? DEFAULT_TTS_VOICE, geminiBaseFrom(cfg["ai.gateway_base"])));
       bytes = pcmToWav(r.pcm, r.sampleRate);
       usage = billedUsage(r, estUsage, "", { ...(model ?? ({} as AiModelRow)), id: modelId, provider: "google" });
     }
