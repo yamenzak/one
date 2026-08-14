@@ -16,6 +16,7 @@ export * from "./surfaces.js";
 export * from "./appearance.js";
 export * from "./motion.js";
 export * from "./type.js";
+export * from "./ground.js";
 export * from "./layout.js";
 export * from "./field.js";
 export * from "./settings.js";

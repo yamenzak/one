@@ -766,6 +766,42 @@
       "impl": "scripts/tone.test.mjs",
       "proves": "fire on the copy they exist to catch",
       "fails": "a green run that means nothing, because the checker's own rules stopped matching anything"
+    },
+    {
+      "id": "nothing-draws-a-border-or-a-shadow",
+      "protects": "D7",
+      "stage": "5",
+      "status": "live",
+      "impl": "scripts/ground.test.mjs",
+      "proves": "edges:",
+      "fails": "a hairline here and a soft shadow there, read as two different kinds of thing when they are the same claim twice"
+    },
+    {
+      "id": "every-surface-tier-is-findable-without-an-edge",
+      "protects": "D7",
+      "stage": "5",
+      "status": "live",
+      "impl": "scripts/ground.test.mjs",
+      "proves": "tiers:",
+      "fails": "cards that vanish in one theme when shadows are dropped, looking like a rendering fault rather than a decision"
+    },
+    {
+      "id": "the-library-draws-no-edges-of-its-own",
+      "protects": "D7",
+      "stage": "5",
+      "status": "live",
+      "impl": "scripts/ground.test.mjs",
+      "proves": "tokens:",
+      "fails": "a ban kept in our files while the components draw their own, so the rule reads as held and is not"
+    },
+    {
+      "id": "the-page-ground-is-ours",
+      "protects": "D7",
+      "stage": "5",
+      "status": "live",
+      "impl": "scripts/ground.test.mjs",
+      "proves": "painted:",
+      "fails": "a palette that is entirely correct and reaches nothing, because the page is the user agent canvas and a light card comes out darker than it"
     }
   ]
 }

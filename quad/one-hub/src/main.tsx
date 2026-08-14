@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { FACE_CSS, SKY_MOTION, ambienceStylesheet, applyAppearance } from "@quad/web";
+import { FACE_CSS, GROUND_CSS, SKY_MOTION, ambienceStylesheet, applyAppearance } from "@quad/web";
 import "./styles.css";
 import { App } from "./App.js";
 import { SessionProvider } from "./session.js";
@@ -26,7 +26,7 @@ import { SessionProvider } from "./session.js";
 applyAppearance();
 
 const sky = document.createElement("style");
-sky.textContent = [FACE_CSS, ambienceStylesheet(), SKY_MOTION].join("\n");
+sky.textContent = [FACE_CSS, GROUND_CSS, ambienceStylesheet(), SKY_MOTION].join("\n");
 document.head.append(sky);
 
 const root = document.getElementById("root");

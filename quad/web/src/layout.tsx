@@ -180,8 +180,14 @@ export interface CrownProps {
   readonly aside?: React.ReactNode;
   readonly bleed?: Bleed;
   readonly width?: Width;
-  /** ⚠️ A rule under the crown is right on a working screen and wrong on a
-      landing one, where it cuts the page in half for no reason. */
+  /**
+   * ⚠️ GONE, AND KEPT AS A NO-OP SO THE CALLERS THAT PASS IT STILL COMPILE.
+   * With borders and shadows banned everywhere else, this hairline became the
+   * ONE edge left in the product — which is the inconsistency the ban exists to
+   * remove, arriving from the last place anybody would look. A crown separates
+   * because it is at the top and because the ground under it is designed; a line
+   * under it is the old way of saying so.
+   */
   readonly ruled?: boolean;
 }
 
@@ -194,7 +200,7 @@ export interface CrownProps {
  * spends a scarce slot on something every screen already has.
  */
 export function Crown(
-  { mark, name, under, aside, bleed = "hold", width = "read", ruled = true }: CrownProps,
+  { mark, name, under, aside, bleed = "hold", width = "read" }: CrownProps,
 ) {
   return (
     <header className="w-full">
@@ -208,7 +214,6 @@ export function Crown(
           {aside ? <div className={`flex shrink-0 items-center ${SPACE.tight}`}>{aside}</div> : null}
         </div>
       </Band>
-      {ruled ? <Separator /> : null}
     </header>
   );
 }

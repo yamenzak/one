@@ -23,7 +23,7 @@
     "quad:dev": "turbo run dev --filter='./quad/*'",
     "quad:test": "turbo run test --filter='./quad/*' --filter='./quad/apps/*'",
     "quad:typecheck": "turbo run typecheck --filter='./quad/*' --filter='./quad/apps/*'",
-    "quad:gate": "node quad/scripts/inert.test.mjs && node quad/scripts/docs.test.mjs && node quad/scripts/guards.test.mjs && node quad/scripts/kernel.test.mjs && node quad/scripts/declarations.test.mjs && node quad/scripts/shards.test.mjs && node quad/scripts/apps.test.mjs && node quad/scripts/heroui.test.mjs && node quad/scripts/motion.test.mjs && node --experimental-strip-types quad/scripts/tone.test.mjs && node quad/scripts/provenance.test.mjs && node quad/scripts/surface.test.mjs && node quad/scripts/hub.test.mjs && node quad/scripts/services.test.mjs && node quad/scripts/vault.test.mjs"
+    "quad:gate": "node quad/scripts/inert.test.mjs && node quad/scripts/docs.test.mjs && node quad/scripts/guards.test.mjs && node quad/scripts/kernel.test.mjs && node quad/scripts/declarations.test.mjs && node quad/scripts/shards.test.mjs && node quad/scripts/apps.test.mjs && node quad/scripts/heroui.test.mjs && node quad/scripts/ground.test.mjs && node quad/scripts/motion.test.mjs && node --experimental-strip-types quad/scripts/tone.test.mjs && node quad/scripts/provenance.test.mjs && node quad/scripts/surface.test.mjs && node quad/scripts/hub.test.mjs && node quad/scripts/services.test.mjs && node quad/scripts/vault.test.mjs"
   },
   "devDependencies": {
     "turbo": "^2.5.9",
