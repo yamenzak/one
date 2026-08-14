@@ -55,7 +55,10 @@ Honestly outstanding, in the order it will bite:
      fail the guard.
 2. **Passkeys.** Sign-in is an emailed code. There is deliberately no credential
    table waiting for a ceremony — see the note under identity below.
-3. **A workspace's own screens are components, not an application.** The Hub is
+3. **A workspace's own screens are components, not an application.**
+   ⚠️ **[CENTER.md](CENTER.md) is the plan for this** — the tenant centre, the
+   multi-app access model, the package rail and the operator console; stages
+   12–16. The Hub is
    real: the signpost, the sign-in, the workspace list and the wizard are screens
    a person opens (`quad/one-hub`). What no page assembles yet is the surface
    BEHIND a workspace's door — `@quad/web` renders every declared screen and both
