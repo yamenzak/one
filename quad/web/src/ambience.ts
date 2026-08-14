@@ -372,10 +372,25 @@ export function ambienceStylesheet(): string {
       as the blur being absent. A wrong cause in a comment is worse than no
       comment, because the next person builds on it.
     */
+    /*
+      ⚠️ A LONG BLUR AND A LIGHT FILL, IN THAT ORDER OF IMPORTANCE. What makes
+      glass read as glass is that the world behind it is RECOGNISABLE and
+      unreadable at the same time — colour and movement survive, detail does
+      not. That is a property of the blur radius, not of the opacity: a short
+      blur under a heavy fill is a frosted panel, which is a different and older
+      material. Twenty-eight pixels is past the point where 16px text stops
+      resolving into words, so the fill can stay light.
+
+      ⚠️ AND THE SATURATION BOOST IS NOT A FLOURISH. Blurring averages colours
+      toward grey, so a plate over a coloured ground comes out duller than the
+      ground it is made of — which is exactly the "dusty" reading, arrived at by
+      a different route. Pushing saturation back up is what keeps the glass the
+      colour of what is behind it.
+    */
     `[data-glass="true"] {`,
-    `  background-color: color-mix(in oklab, var(--foreground) 14%, transparent) !important;`,
-    `  backdrop-filter: blur(20px) saturate(1.4);`,
-    `  -webkit-backdrop-filter: blur(20px) saturate(1.4);`,
+    `  background-color: color-mix(in oklab, var(--foreground) 10%, transparent) !important;`,
+    `  backdrop-filter: blur(28px) saturate(1.8);`,
+    `  -webkit-backdrop-filter: blur(28px) saturate(1.8);`,
     `}`,
     /*
       ⚠️ THE BAR IS A VEIL OF THE RAISED TIER, NOT A WASH OF THE FOREGROUND, and
@@ -394,8 +409,19 @@ export function ambienceStylesheet(): string {
       through, blurred, which is the whole effect.
     */
     `[data-island="true"][data-glass="true"] {`,
-    `  background-color: color-mix(in oklab, var(--surface-tertiary) 96%, transparent) !important;`,
+    `  background-color: color-mix(in oklab, var(--surface-tertiary) 76%, transparent) !important;`,
+    `  backdrop-filter: blur(36px) saturate(1.8);`,
+    `  -webkit-backdrop-filter: blur(36px) saturate(1.8);`,
     `}`,
+    /*
+      ⚠️ THE PILL THAT MARKS WHERE YOU ARE, AS A RULE RATHER THAN A CLASS. It is
+      one element that TRAVELS between four equal columns — see `Island` — so it
+      needs a fill and a radius and nothing else. `--default` is the control
+      tier, which the palette guarantees clears both the raised tier under it
+      and the surfaces around it.
+    */
+    `[data-pill="true"] { background-color: var(--default); border-radius: 9999px; }`,
+    `@media (prefers-reduced-motion: reduce) { [data-pill="true"] { transition: none !important; } }`,
     `[data-glass="true"]:hover {`,
     `  background-color: color-mix(in oklab, var(--foreground) 18%, transparent) !important;`,
     `}`,

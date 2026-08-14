@@ -388,7 +388,9 @@ export function Island({ items, here, onGo }: {
   readonly here: string;
   readonly onGo: (route: string) => void;
 }) {
-  const dense = useScrolling();
+  const folded = useScrollingDown();
+  const shown = items.slice(0, PRIMARY_MAX);
+  const at = shown.findIndex((i) => i.route === here);
 
   return (
     <nav
@@ -399,65 +401,59 @@ export function Island({ items, here, onGo }: {
          finish loading rather than as a thing floating over the page. */
       className={`sticky bottom-0 z-10 flex justify-center ${GUTTER} ${PAD} ${SAFE_BOTTOM}`}
     >
-      {/* ⚠️ AN ISLAND NEEDS ITS OWN GROUND, AND IT DID NOT HAVE ONE. Four ghost
-          buttons over a transparent box are four buttons with the page showing
-          BETWEEN them — the specimen rendered "Booking" from the card underneath
-          straight through the nav's own "Booking" label, which reads as a
-          rendering fault rather than as a layout choice. `Card` is the library's
-          answer to "a raised surface with a ground and a radius", so this stays
-          themed rather than painted. */}
-      {/* ⚠️ THE TRANSITION IS AN ATTRIBUTE, NOT A `style`. An inline style beats
-          every token, so a component carrying one stops answering to branding —
-          the restyle guard refuses it, correctly, and the stylesheet is where
-          this rule belongs anyway. */}
-      {/* ⚠️ `flex-row` EXPLICITLY. `Card` stacks its children by default — as
-          `Switch` does — so `flex items-center` alone left four destinations in a
-          vertical column down the middle of the screen. A library component's
-          own direction is not the one you assume. */}
       {/* ⚠️ GLASS, AND THE COST IS ACCEPTABLE HERE FOR A REASON THAT IS ABOUT
-          THIS ELEMENT RATHER THAN ABOUT THE TECHNIQUE. `backdrop-filter` is
-          expensive because it reads back everything behind the element and
-          blurs it, per frame — which is ruinous across a scrolling list of
-          cards and unremarkable for ONE fixed bar and four crown chips. The
-          rule is not "no blur"; it is "blur what does not scroll".
+          THIS ELEMENT RATHER THAN ABOUT THE TECHNIQUE. `backdrop-filter` reads
+          back everything behind the element and blurs it, per frame — ruinous
+          across a scrolling list of cards, unremarkable for ONE fixed bar and
+          four crown chips. The rule is not "no blur"; it is "blur what does not
+          scroll".
 
           ⚠️ AN EARLIER NOTE HERE CLAIMED THE BLUR COULD NOT WORK THROUGH
           `[data-sky]`'s `isolation: isolate`. That was wrong — measured, the
-          backdrop samples through it fine. What was actually wrong was the
-          fill: at twelve percent over a card there was nothing for the blur to
-          separate, so it read as flat and got diagnosed as absent. */}
+          backdrop samples through it fine. What was wrong was the fill. */}
       <Card
         variant="transparent"
         data-island="true"
         data-glass="true"
-        className={`w-full ${WIDTH.read} flex-row items-center gap-1 ${ISLAND_PAD}`}
+        className={`relative w-full ${WIDTH.read} flex-row items-center overflow-hidden ${ISLAND_PAD}`}
       >
-        {items.slice(0, PRIMARY_MAX).map((item) => {
-          const at = item.route === here;
+        {/*
+          ⚠️ ONE PILL THAT TRAVELS, NOT FOUR BACKGROUNDS SWITCHING ON AND OFF.
+          A per-item fill can only appear and disappear; a single element can
+          MOVE, and moving is what tells somebody the two destinations are on
+          one shelf rather than two unrelated screens. It is also why the items
+          had to be equal width first — with equal columns the pill's place is
+          arithmetic (`index × 100%` of one column) and needs no measuring, no
+          ref, and no resize observer that can be one frame behind.
+        */}
+        {at >= 0 ? (
+          <span
+            aria-hidden="true"
+            data-pill="true"
+            className="absolute inset-y-0 left-0"
+            style={{
+              width: `${100 / shown.length}%`,
+              transform: `translateX(${at * 100}%)`,
+              transition: MOTION.travel,
+            }}
+          />
+        ) : null}
+
+        {shown.map((item) => {
+          const isHere = item.route === here;
           return (
             <Button
               key={item.id}
-              /* ⚠️ THE ACTIVE ONE IS A FILLED PILL, not a coloured icon. Colour
-                 alone fails for the eight percent of men who cannot reliably
-                 tell two of ours apart; a shape does not. */
-              /* ⚠️ `tertiary`, NOT `secondary`, FOR THE SAME REASON EVERY OTHER
-                 ICON CONTROL IS: `.button--secondary` sets
-                 `--button-fg: var(--accent-soft-foreground)`, so the CURRENT
-                 destination's glyph was the one brand-coloured mark left in the
-                 product. The reference marks "here" with a brighter NEUTRAL, not
-                 a hue — which is also what our own rule says, and what survives a
-                 workspace whose accent is close to its own chrome. The pill and
-                 the full-contrast label carry it. */
-              variant={at ? "tertiary" : "ghost"}
-              aria-current={at ? "page" : undefined}
-              /* ⚠️ `grow basis-0` — EQUAL SHARES, NOT CONTENT WIDTHS. `.button`
-                 is `w-fit`, so "Round" came out 69px beside "Ward" at 46: four
-                 destinations at four widths, and the active pill inheriting
-                 whichever one its own label happened to make. A nav is a row of
-                 equals or it is a row of links. `basis-0` is the half people
-                 leave off — with `grow` alone the shares are the leftovers
-                 AFTER each item's own text, so the widths still differ. */
-              className={`grow basis-0 flex-col justify-center gap-1 ${ROW.free} ${ISLAND_ITEM}`}
+              /* ⚠️ ALWAYS `ghost`. The filled state is the pill behind it now,
+                 so a variant that paints its own would be a second marker
+                 appearing where the first one is trying to arrive. */
+              variant="ghost"
+              aria-current={isHere ? "page" : undefined}
+              /* ⚠️ `relative` PUTS THE ITEM ABOVE THE PILL. A positioned element
+                 paints over a static one whatever the DOM order, so without it
+                 the sliding pill covers the four labels it is meant to sit
+                 under. */
+              className={`relative grow basis-0 flex-col justify-center gap-1 ${ROW.free} ${ISLAND_ITEM}`}
               onPress={() => onGo(item.route)}
             >
               <span
@@ -473,29 +469,33 @@ export function Island({ items, here, onGo }: {
                   ? <span aria-hidden="true" className="absolute -top-1 -right-2"><Dot /></span>
                   : null}
               </span>
-              {/* ⚠️ THE PLACE YOU ARE IS THE ONE YOU CAN READ. Every label took
-                  the muted note role, so the only signal for "here" was the
-                  pill behind it — which is a shape, at the bottom of the screen,
-                  under a thumb. Full contrast on the current one is the cheapest
-                  possible way to say it, and it is the half that survives being
-                  looked at from an angle in sunlight. */}
-              {/* ⚠️ AN ATTRIBUTE, NOT A SECOND COLOUR CLASS. `text-foreground`
-                  beside `text-muted` is a tie on specificity, so which one wins
-                  is whichever Tailwind emitted last — the label stayed muted and
-                  looked like a class that had simply not been applied. The
-                  stylesheet is injected after everything, so an attribute rule
-                  resolves the tie in one direction, always. */}
-              {/* ⚠️ `leading-none` — THE GAP WAS MOSTLY THE LINE BOX. `gap-1` is
-                  four pixels and the icon sat fourteen from its label, because a
-                  14px label in a 20px line box carries three pixels of leading
-                  above and below that no gap utility can see. Measured against
-                  the reference the space was two and a half times too big, which
-                  is why the nav read as loose while everything in it was right. */}
+              {/*
+                ⚠️ THE LABEL FOLDS, IT IS NOT REMOVED. `sr-only` is a switch: the
+                bar jumps from one height to another and the content under it
+                jumps with it. Animating the label's own box means the BAR's
+                height is the animation, which is the whole effect asked for.
+
+                ⚠️ AND IT STAYS IN THE ACCESSIBILITY TREE while folded, which
+                `sr-only` also managed and `display: none` would not. A collapsed
+                nav that dropped its labels would be four unnamed buttons to
+                anybody using a screen reader — the one group for whom the icon
+                carries nothing at all.
+              */}
               <span
-                data-here={at ? "true" : undefined}
-                className={dense ? "sr-only" : `${TYPE.note} leading-none`}
+                className="flex overflow-hidden"
+                style={{
+                  maxHeight: folded ? 0 : "1rem",
+                  opacity: folded ? 0 : 1,
+                  transform: folded ? "translateY(-0.25rem)" : "none",
+                  transition: MOTION.reveal,
+                }}
               >
-                {item.label}
+                <span
+                  data-here={isHere ? "true" : undefined}
+                  className={`${TYPE.note} leading-none`}
+                >
+                  {item.label}
+                </span>
               </span>
             </Button>
           );
@@ -506,31 +506,41 @@ export function Island({ items, here, onGo }: {
 }
 
 /**
- * ⚠️ "IS SOMEBODY SCROLLING RIGHT NOW", not "how far down are they". A threshold
- * on scroll position makes the nav collapse at an arbitrary place and stay
- * collapsed while somebody reads, which is exactly backwards.
+ * ⚠️ WHICH WAY SOMEBODY IS GOING, NOT WHETHER THEY ARE MOVING. The first version
+ * of this collapsed the nav while ANY scrolling was happening and restored it
+ * when it stopped — so the labels flickered back on every pause, and reading
+ * halfway down a page meant watching the bar breathe. Direction is the signal
+ * people actually give: going DOWN is reading, and the nav is in the way; coming
+ * back UP is looking for it.
  *
- * ⚠️ AND IT STANDS DOWN ENTIRELY FOR REDUCED MOTION. A control that changes size
- * under the thumb is motion, whatever it is called.
+ * ⚠️ AND IT UNFOLDS AT THE TOP WHATEVER THE DIRECTION. Arriving at the head of a
+ * page with the labels still folded from the last scroll is a nav that remembers
+ * something the person does not.
+ *
+ * ⚠️ THE THRESHOLD IS NOT DECORATION. Without it a one-pixel jitter — a rubber
+ * band, a focus scroll, a fixed element resizing — flips the direction, and the
+ * bar folds and unfolds on its own while nobody touches anything.
  */
-function useScrolling(quietMs = 220): boolean {
-  const [moving, setMoving] = React.useState(false);
+function useScrollingDown(threshold = 6, top = 24): boolean {
+  const [down, setDown] = React.useState(false);
 
   React.useEffect(() => {
     if (typeof matchMedia === "function"
       && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-    let timer: ReturnType<typeof setTimeout>;
+    let last = window.scrollY;
     const onScroll = () => {
-      setMoving(true);
-      clearTimeout(timer);
-      timer = setTimeout(() => setMoving(false), quietMs);
+      const y = window.scrollY;
+      if (y <= top) { setDown(false); last = y; return; }
+      if (Math.abs(y - last) < threshold) return;
+      setDown(y > last);
+      last = y;
     };
     addEventListener("scroll", onScroll, { passive: true });
-    return () => { removeEventListener("scroll", onScroll); clearTimeout(timer); };
-  }, [quietMs]);
+    return () => removeEventListener("scroll", onScroll);
+  }, [threshold, top]);
 
-  return moving;
+  return down;
 }
 
 /** ⚠️ Its own element so the tone token colours it — see `Tone`. */

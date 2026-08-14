@@ -39,6 +39,15 @@
       "fails": "a nav of four destinations at four widths, with the current one inheriting whichever width its own label happened to make"
     },
     {
+      "id": "the-nav-marks-here-by-moving",
+      "protects": "D10",
+      "stage": "5",
+      "status": "live",
+      "impl": "scripts/heroui.test.mjs",
+      "proves": "travel:",
+      "fails": "a marker that appears where the sliding one is still arriving, because a filled per-item variant can only switch on and off where one element can travel"
+    },
+    {
       "id": "the-type-scale-has-a-top",
       "protects": "D7",
       "stage": "5",

@@ -124,7 +124,7 @@ export const CROWN_SIZE = "lg" as const;
  * labels and 40 without — a bar with sixteen pixels of nothing around a row of
  * pills. Four is what a pill needs to not touch the edge it sits in.
  */
-export const ISLAND_PAD = "p-2" as const;
+export const ISLAND_PAD = "p-0" as const;
 
 /**
  * ⚠️ AND THE ITEM INSIDE IT HAS A HEIGHT, OR ITS CONTENT TOUCHES THE EDGES. With
@@ -134,15 +134,19 @@ export const ISLAND_PAD = "p-2" as const;
  * sat on the rim. A minimum height and a centred column is the fix, because it
  * puts the air on both sides without anybody choosing two numbers.
  */
-export const ISLAND_ITEM = "min-h-11" as const;
+export const ISLAND_ITEM = "py-2" as const;
 
 /**
- * ⚠️ AND THE ISLAND'S OWN INSET IS WHAT KEEPS THE ACTIVE PILL OFF THE RIM. At
- * four pixels the filled pill behind the current destination ran to within a
- * hair of the island's edge — two rounded rectangles nested with nothing
- * between them, which reads as a rendering artefact rather than as a control
- * inside a bar. Eight is where the pill sits IN the island rather than against
- * it.
+ * ⚠️ AND THE ISLAND HAS NO INSET AT ALL NOW, BECAUSE THE PILL IS THE FULL
+ * HEIGHT OF IT. An inset made the pill smaller than the thing it marks; a pill
+ * that fills the bar is bigger, easier to hit, and — the reason it had to change
+ * — it is one element sliding between four equal columns rather than four
+ * backgrounds switching on and off, which is the only way it can travel.
+ *
+ * ⚠️ SO THE AIR IS ON THE ITEM INSTEAD, which also makes the bar's height a
+ * consequence of its content rather than a number: 8 + icon + gap + label + 8
+ * when the labels are out, and 8 + icon + 8 when they are folded away. The bar
+ * collapses because the label does, not because anything measured it.
  */
 
 /* ------------------------------------------------------------------ stacks --- */

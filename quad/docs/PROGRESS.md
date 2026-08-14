@@ -282,7 +282,7 @@ The guard registry, its checks, and the standards that bind them.
 | D7 | HeroUI v3 is the component layer, and its components are not restyled | 16 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 2 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
-| D10 | Five primary destinations, maximum | 3 |
+| D10 | Five primary destinations, maximum | 4 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 10 |
 | D12 | Every cross-cutting concern is a field on a declaration, never a call site | 38 |
 <!-- /generated -->
@@ -301,6 +301,7 @@ the library decides FOR us.
 |---|---|---|
 | `an-icon-control-is-a-circle` | D7 | a crown of four controls at three different widths, because a button with only a glyph in it still lays out w-fit px-4 |
 | `a-row-of-equals-shares-its-width` | D7 | a nav of four destinations at four widths, with the current one inheriting whichever width its own label happened to make |
+| `the-nav-marks-here-by-moving` | D10 | a marker that appears where the sliding one is still arriving, because a filled per-item variant can only switch on and off where one element can travel |
 | `the-type-scale-has-a-top` | D7 | a hero that renders at the size of the heading above it, because two roles resolved to the same size and neither looked wrong alone |
 | `the-grain-is-noise-not-a-pattern` | D7 | a visible lattice across every light screen, drawn by the layer whose whole job is to be invisible |
 | `a-tenant-is-never-placed-where-its-schema-is-missing` | D5 | every request for one customer answering "no such table", after a move that reported success |

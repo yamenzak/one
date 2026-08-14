@@ -87,6 +87,13 @@ export const MOTION = {
   press: transition("transform, background-color, border-color", "instant", "settle"),
   travel: transition("transform", "moderate", "travel"),
   drift: transition("background-position", "ambient", "steady"),
+  /**
+   * ⚠️ A SIXTH, AND THE REASON IS THAT NOTHING ELSE ANIMATES A THING'S SIZE.
+   * Every intent above moves or fades something whose box does not change; a
+   * label folding out of a nav changes the height of the bar it is in, and the
+   * things around it have to move with it rather than jump when it lands.
+   */
+  reveal: transition("max-height, opacity, transform", "moderate", "travel"),
 } as const;
 
 export type Intent = keyof typeof MOTION;

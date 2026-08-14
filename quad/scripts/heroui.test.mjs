@@ -400,6 +400,35 @@ for (const [file, group, needs] of EQUALS) {
 }
 if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
 
+/**
+ * ⚠️ THE NAV'S CURRENT PLACE IS ONE ELEMENT THAT MOVES, NOT FOUR THAT SWITCH.
+ * The obvious build is a filled variant on whichever item is active, and it is
+ * strictly worse in a way nobody notices until the two are side by side: a
+ * background can only appear and disappear, while a single element can TRAVEL,
+ * and travelling is what says the two destinations are on one shelf rather than
+ * being two unrelated screens. It is also the reason the items had to be equal
+ * width first — with equal columns the pill's place is arithmetic rather than
+ * something measured, so it can never be a frame behind.
+ *
+ * ⚠️ AND THE ITEMS MUST STAY UNFILLED, or the marker appears where the sliding
+ * one is still arriving. That is the shape a "simplification" would take, so it
+ * is the shape this checks: one pill, and no per-item variant that paints.
+ */
+{
+  const island = readFileSync(join(QUAD, "web/src/layout.tsx"), "utf8")
+    .split(/\nexport /).filter((b) => b.startsWith("function Island"))[0] ?? "";
+  const body = island.replace(/\/\*[\s\S]*?\*\//g, "");
+  const pills = [...body.matchAll(/data-pill=/g)].length;
+  const switched = /variant=\{[^}]*\?/.test(body);
+  if (pills !== 1 || switched) {
+    fail(`web/src/layout.tsx: the nav marks "here" by switching, not by moving (D7).\n` +
+         `       ${pills} pill(s) found${switched ? ", and an item paints its own variant" : ""}.\n` +
+         `       One element that travels; the items stay ghost.`);
+  } else {
+    ok(`travel: the nav's current place is one pill that moves`);
+  }
+}
+
 console.log(bad
   ? `\nheroui: ${bad} finding(s) — a screen branding will not reach.`
   : `\nheroui: components as they ship, themed through tokens.`);
