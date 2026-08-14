@@ -296,7 +296,21 @@ for (const file of FILES) {
   */
   for (const m of src.matchAll(/<Button\b([^>]*)>([\s\S]*?)<\/Button>/g)) {
     if (!/\.icon\}/.test(m[2])) continue;
-    if (/variant=["']secondary["']/.test(m[1])) {
+    /*
+      ⚠️ THE WORD ANYWHERE IN THE ATTRIBUTE, NOT JUST AS THE WHOLE VALUE. This
+      matched `variant="secondary"` and so could not see
+      `variant={at ? "secondary" : "ghost"}` — which is how the nav's CURRENT
+      destination stayed the one brand-tinted glyph in the product, with the
+      guard green, for as long as nobody put the two navs side by side. A rule
+      that only recognises the simplest way to write the thing it forbids is a
+      rule that teaches people the other way.
+    */
+    /* ⚠️ COMMENTS OUT FIRST, AND MATCH THE PROP RATHER THAN THE WORD. The prose
+       explaining why this must not be `secondary` contains the word `secondary`,
+       so a bare search reads its own rationale — and it happened to pass only
+       because the comment quotes it in backticks rather than in quotes, which is
+       not a property anybody should be relying on. */
+    if (/variant=[^\n]*secondary/.test(m[1].replace(/\/\*[\s\S]*?\*\//g, ""))) {
       tinted++;
       fail(`${rel(file)}: an icon <Button variant="secondary"> is drawn in the accent (D7).\n` +
            `       \`.button--secondary\` sets --button-fg to accent-soft-foreground. Use\n` +

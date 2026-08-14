@@ -126,6 +126,16 @@ export const CROWN_SIZE = "lg" as const;
  */
 export const ISLAND_PAD = "p-1" as const;
 
+/**
+ * ⚠️ AND THE ITEM INSIDE IT HAS A HEIGHT, OR ITS CONTENT TOUCHES THE EDGES. With
+ * the library's fixed height released the button became exactly as tall as an
+ * icon plus a label, so a nav measured against a reference had 0.12 of its
+ * height as padding below the words where the reference has 0.22 — the labels
+ * sat on the rim. A minimum height and a centred column is the fix, because it
+ * puts the air on both sides without anybody choosing two numbers.
+ */
+export const ISLAND_ITEM = "min-h-11" as const;
+
 /* ------------------------------------------------------------------ stacks --- */
 
 /**

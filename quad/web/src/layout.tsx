@@ -28,7 +28,7 @@ import { Avatar, Button, Card, Separator } from "@heroui/react";
 import type { Ambience } from "./ambience.js";
 import { TYPE } from "./type.js";
 import {
-  BAND_PAD, CROWN, CROWN_SIZE, FACE, GUTTER, HEAD_GAP, HERO_PAD, ICON, ISLAND_PAD, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
+  BAND_PAD, CROWN, CROWN_SIZE, FACE, GUTTER, HEAD_GAP, HERO_PAD, ICON, ISLAND_ITEM, ISLAND_PAD, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
   type Space, type Width,
 } from "./metrics.js";
 import { MOTION } from "./motion.js";
@@ -434,7 +434,15 @@ export function Island({ items, here, onGo }: {
               /* ⚠️ THE ACTIVE ONE IS A FILLED PILL, not a coloured icon. Colour
                  alone fails for the eight percent of men who cannot reliably
                  tell two of ours apart; a shape does not. */
-              variant={at ? "secondary" : "ghost"}
+              /* ⚠️ `tertiary`, NOT `secondary`, FOR THE SAME REASON EVERY OTHER
+                 ICON CONTROL IS: `.button--secondary` sets
+                 `--button-fg: var(--accent-soft-foreground)`, so the CURRENT
+                 destination's glyph was the one brand-coloured mark left in the
+                 product. The reference marks "here" with a brighter NEUTRAL, not
+                 a hue — which is also what our own rule says, and what survives a
+                 workspace whose accent is close to its own chrome. The pill and
+                 the full-contrast label carry it. */
+              variant={at ? "tertiary" : "ghost"}
               aria-current={at ? "page" : undefined}
               /* ⚠️ `grow basis-0` — EQUAL SHARES, NOT CONTENT WIDTHS. `.button`
                  is `w-fit`, so "Round" came out 69px beside "Ward" at 46: four
@@ -443,7 +451,7 @@ export function Island({ items, here, onGo }: {
                  equals or it is a row of links. `basis-0` is the half people
                  leave off — with `grow` alone the shares are the leftovers
                  AFTER each item's own text, so the widths still differ. */
-              className={`grow basis-0 flex-col gap-1 ${ROW.free}`}
+              className={`grow basis-0 flex-col justify-center gap-1 ${ROW.free} ${ISLAND_ITEM}`}
               onPress={() => onGo(item.route)}
             >
               <span
@@ -471,7 +479,16 @@ export function Island({ items, here, onGo }: {
                   looked like a class that had simply not been applied. The
                   stylesheet is injected after everything, so an attribute rule
                   resolves the tie in one direction, always. */}
-              <span data-here={at ? "true" : undefined} className={dense ? "sr-only" : TYPE.note}>
+              {/* ⚠️ `leading-none` — THE GAP WAS MOSTLY THE LINE BOX. `gap-1` is
+                  four pixels and the icon sat fourteen from its label, because a
+                  14px label in a 20px line box carries three pixels of leading
+                  above and below that no gap utility can see. Measured against
+                  the reference the space was two and a half times too big, which
+                  is why the nav read as loose while everything in it was right. */}
+              <span
+                data-here={at ? "true" : undefined}
+                className={dense ? "sr-only" : `${TYPE.note} leading-none`}
+              >
                 {item.label}
               </span>
             </Button>
