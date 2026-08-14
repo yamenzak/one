@@ -19,8 +19,8 @@ reader can trust this table instead of re-reading the code.
 | 2 | Directory + placement | shipped |
 | 3 | Runtime — manifest → live worker | shipped |
 | 4 | Identity + tenancy | shipped |
-| 5 | Surface — HeroUI shell, nav, sky, rendered settings | building |
-| 6 | Money — plans, entitlements, credits | not started |
+| 5 | Surface — HeroUI shell, nav, sky, rendered settings | shipped |
+| 6 | Money — plans, entitlements, credits | building |
 | 7 | Services — ai and notify over RPC | not started |
 | 8 | Vault + legal | not started |
 | 9 | Kova on Quad | not started |
@@ -105,7 +105,23 @@ no `credential` table waiting for one: a table nothing writes, behind a
 capability nothing implements, is the exact shape this framework exists to
 refuse — it reads as built and passes every test.
 
-The guard registry, its eight checks, and the standards that bind them.
+**`@quad/web` — the screens nobody writes.** HeroUI v3, router-free.
+
+- `shell.tsx` — the crown, a desktop sidebar and a bottom island of at most five
+  (D10). A destination somebody cannot reach is not drawn: a nav item leading to
+  a 403 is a promise the product does not keep.
+- `settings.tsx` · `policy.tsx` · `console.tsx` · `guide.tsx` — the three
+  settings screens, the two-level notification policy, the flag console, the
+  plan shelf, the onboarding checklist and help. Every one rendered from the
+  declarations; no app writes a screen.
+- `theme.ts` — a workspace's branding is a handful of CSS variables in HeroUI's
+  own names, and the ambience behind every page derives from those same tokens.
+  A page declares a sky by NAME, never by colour, so a brand change reaches
+  every background with nothing else edited.
+- `field.tsx` — a declared field becomes a control, and a stored secret is never
+  rendered back.
+
+The guard registry, its eleven checks, and the standards that bind them.
 
 ## Decisions, and how well each is defended
 
@@ -118,11 +134,11 @@ The guard registry, its eight checks, and the standards that bind them.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 3 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 1 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 3 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 2 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
-| D10 | Five primary destinations, maximum | 1 |
-| D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 2 |
+| D10 | Five primary destinations, maximum | 2 |
+| D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 3 |
 | D12 | Every cross-cutting concern is a field on a declaration, never a call site | 22 |
 <!-- /generated -->
 
@@ -149,7 +165,10 @@ the library decides FOR us.
 | `the-kernel-touches-nothing` | D12 | a contract layer that needs a binding to test, so the rules stop being provable and start being fixtures |
 | `the-shared-layers-carry-no-product-vocabulary` | D12 | a shared module that knows what a client is, which has stopped being shared |
 | `the-framework-name-is-reserved-inside-the-framework` | D2 | `quad` meaning four different things inside the thing called Quad |
+| `no-heroui-component-is-restyled` | D7 | consistency that is maintained by care rather than enforced, which lasts until the first hurried screen |
 | `no-more-than-five-primary-destinations` | D10 | a bottom bar that stopped being tappable and became a menu |
+| `every-declaration-reaches-a-surface` | D12 | a mechanism built, tested and wired with nowhere a person can look — every suite green |
+| `every-surface-control-changes-behaviour` | D12 | a switch somebody turns on that does nothing, so they stop watching the thing it promised |
 | `no-handler-raises-its-own-cross-cutting-concern` | D12 | a concern an app can forget, forgotten invisibly — no error, no failing test, a capability that silently does not apply |
 | `no-cross-tenant-query-fans-out-over-shards` | D5 | an operator console that gets slower with every shard, until the sweep it runs times out |
 | `composition-is-lazy` | D4 | cold start growing with the catalogue, until the catalogue that was meant to grow cannot |
@@ -172,9 +191,10 @@ the library decides FOR us.
 | `permissions-are-resolved-on-every-request` | D12 | a role taken away that keeps working until the person signs out, which is exactly when it matters that it does not |
 | `a-workspace-is-created-in-one-place` | D1 | somebody who followed a colleague's link being invited to start a second workspace on that workspace's own branded page |
 | `a-code-cannot-be-guessed-or-used-to-flood-an-inbox` | D12 | a six-digit password with unlimited attempts, and a sign-in endpoint anybody can use to mail somebody a hundred times |
-| `no-heroui-component-is-restyled` *(owed)* | D7 | consistency that is maintained by care rather than enforced, which lasts until the first hurried screen |
-| `every-declaration-reaches-a-surface` *(owed)* | D12 | a mechanism built, tested and wired with nowhere a person can look — every suite green |
-| `every-surface-control-changes-behaviour` *(owed)* | D12 | a switch somebody turns on that does nothing, so they stop watching the thing it promised |
+| `nothing-hand-rolls-a-control-the-library-ships` | D7 | a control missing the focus ring, the pressed state and the keyboard behaviour, which looks fine and so survives review |
+| `a-stored-secret-is-never-rendered-back` | D11 | a live credential handed to every script in the page and to whatever the browser saved |
+| `a-destination-nobody-can-reach-is-never-drawn` | D10 | a nav item that leads to a 403, which the person cannot tell from something simply broken |
+| `branding-is-tokens-and-never-a-stylesheet` | D7 | a workspace able to break its own customers' screens on our infrastructure, and to make a page look like something it is not |
 | `a-vault-fact-is-never-stored-by-an-app` *(owed)* | D11 | an app writing the vault's own tables directly, so a fact exists with no grant, no consent record and no way to shred it |
 | `no-service-call-is-made-over-fetch` *(owed)* | D3 | a wrong payload becoming a production error where it had been a compile error |
 <!-- /generated -->

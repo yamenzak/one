@@ -12,6 +12,8 @@ import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
  */
 export default defineWorkersConfig({
   test: {
+    /* ⚠️ The screen suite is its own project — see vitest.screens.config.ts. */
+    exclude: ["**/*.screens.test.tsx", "**/node_modules/**"],
     /*
       ⚠️ ONE FILE AT A TIME AND NO ISOLATION. These suites describe a
       deployment's life — shards registered, tenants placed, schema applied — and

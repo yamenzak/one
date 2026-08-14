@@ -50,9 +50,14 @@ const everySource = () => PACKAGES.flatMap(sourcesIn);
  * the shape the decorator chose to keep. Every guard here WALKS the
  * declarations, and a guard cannot walk something that has to be executed first.
  */
+/* ⚠️ TEMPLATE LITERALS ARE STRIPPED FIRST, because CSS lives in them and `@media`
+   is not a decorator. A guard whose first finding is its own false positive is a
+   guard whose next real finding gets waived. */
+const stripTemplates = (s) => s.replace(/`(?:[^`\\]|\\.)*`/gs, "``");
+
 let decorated = 0;
 for (const file of everySource()) {
-  const code = stripComments(readFileSync(file, "utf8"));
+  const code = stripTemplates(stripComments(readFileSync(file, "utf8")));
   for (const m of code.matchAll(/^[ \t]*@[A-Za-z_$][\w$]*\s*[({\n]/gm)) {
     decorated++;
     fail(`${rel(file)}: a decorator (${m[0].trim()}) — declarations are literals (D8).\n` +

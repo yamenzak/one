@@ -123,8 +123,10 @@
       "id": "no-heroui-component-is-restyled",
       "protects": "D7",
       "stage": "5",
-      "status": "owed",
-      "fails": "consistency that is maintained by care rather than enforced, which lasts until the first hurried screen"
+      "status": "live",
+      "fails": "consistency that is maintained by care rather than enforced, which lasts until the first hurried screen",
+      "impl": "scripts/heroui.test.mjs",
+      "proves": "restyle:"
     },
     {
       "id": "no-more-than-five-primary-destinations",
@@ -139,15 +141,19 @@
       "id": "every-declaration-reaches-a-surface",
       "protects": "D12",
       "stage": "5",
-      "status": "owed",
-      "fails": "a mechanism built, tested and wired with nowhere a person can look — every suite green"
+      "status": "live",
+      "fails": "a mechanism built, tested and wired with nowhere a person can look — every suite green",
+      "impl": "scripts/surface.test.mjs",
+      "proves": "surfaced:"
     },
     {
       "id": "every-surface-control-changes-behaviour",
       "protects": "D12",
       "stage": "5",
-      "status": "owed",
-      "fails": "a switch somebody turns on that does nothing, so they stop watching the thing it promised"
+      "status": "live",
+      "fails": "a switch somebody turns on that does nothing, so they stop watching the thing it promised",
+      "impl": "apps/hello/test/reference.screens.test.tsx",
+      "proves": "the screens show nothing the manifest does not declare"
     },
     {
       "id": "no-handler-raises-its-own-cross-cutting-concern",
@@ -360,6 +366,42 @@
       "impl": "apps/hello/test/identity.test.ts",
       "proves": "stops accepting guesses",
       "fails": "a six-digit password with unlimited attempts, and a sign-in endpoint anybody can use to mail somebody a hundred times"
+    },
+    {
+      "id": "nothing-hand-rolls-a-control-the-library-ships",
+      "protects": "D7",
+      "stage": "5",
+      "status": "live",
+      "impl": "scripts/heroui.test.mjs",
+      "proves": "library:",
+      "fails": "a control missing the focus ring, the pressed state and the keyboard behaviour, which looks fine and so survives review"
+    },
+    {
+      "id": "a-stored-secret-is-never-rendered-back",
+      "protects": "D11",
+      "stage": "5",
+      "status": "live",
+      "impl": "web/test/surface.test.tsx",
+      "proves": "never puts a stored secret into the page",
+      "fails": "a live credential handed to every script in the page and to whatever the browser saved"
+    },
+    {
+      "id": "a-destination-nobody-can-reach-is-never-drawn",
+      "protects": "D10",
+      "stage": "5",
+      "status": "live",
+      "impl": "web/test/surface.test.tsx",
+      "proves": "draws only what this person can reach",
+      "fails": "a nav item that leads to a 403, which the person cannot tell from something simply broken"
+    },
+    {
+      "id": "branding-is-tokens-and-never-a-stylesheet",
+      "protects": "D7",
+      "stage": "5",
+      "status": "live",
+      "impl": "web/test/surface.test.tsx",
+      "proves": "is a handful of variables and nothing else",
+      "fails": "a workspace able to break its own customers' screens on our infrastructure, and to make a page look like something it is not"
     }
   ]
 }
