@@ -2,7 +2,7 @@
  * WHAT SITS BEHIND A SCREEN — the ground, its light, its material and its grain.
  *
  * ⚠️ NAMED, NEVER A COLOUR (D7). Each ambience is a SHAPE OF LIGHT; the hue comes
- * from whatever the workspace's accent is at the time. A screen that named a
+ * from whatever the workspace's BRAND is at the time. A screen that named a
  * colour would stop matching the moment somebody changed their brand, and nobody
  * would connect the two.
  *
@@ -80,8 +80,14 @@ export const AMBIENCES: readonly Ambience[] = [
  * anybody drawing sixty combinations by hand.
  */
 const HUE: Readonly<Record<Tone, string>> = {
-  neutral: "var(--accent)",
-  info: "var(--accent)",
+  /*
+    ⚠️ `--brand`, WHICH IS WHERE A WORKSPACE'S COLOUR LIVES NOW. The interface is
+    monochrome and the ground it sits on is not — so the ambience is the ONE
+    place a tenant's hue reaches at full strength, and it is the right one: it is
+    the thing being belonged to rather than a control being pressed.
+  */
+  neutral: "var(--brand)",
+  info: "var(--brand)",
   success: "var(--success)",
   warning: "var(--warning)",
   danger: "var(--danger)",

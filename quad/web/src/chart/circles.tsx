@@ -97,7 +97,7 @@ export function Ring({ label, value, limit, unit = "", suffix = "", severity = t
      the attribute remaps the accent — it does not, so a ring at 94% drew in the
      brand blue and the severity it had correctly computed reached nothing. The
      rest of the system names the token (`Meter` does), and so does this. */
-  const tone = severity && t >= 0.95 ? "danger" : severity && t >= 0.8 ? "warning" : "accent";
+  const tone = severity && t >= 0.95 ? "danger" : severity && t >= 0.8 ? "warning" : "data";
   const r = MID - THICK / 2;
   const reads = `${unit}${compact(value)}${suffix} of ${unit}${compact(limit)}${suffix}`;
   const name = describes ?? `${label}: ${reads}`;

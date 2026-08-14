@@ -167,7 +167,9 @@ export function Meter({ label, value, limit, unit = "", suffix = "" }: {
   readonly suffix?: string;
 }) {
   const share = limit > 0 ? Math.max(0, Math.min(1, value / limit)) : 0;
-  const tone = share >= 0.9 ? "danger" : share >= 0.75 ? "warning" : "accent";
+  /* ⚠️ `data`, NOT `accent` — a meter fill MEASURES, and the accent is
+     monochrome now. See `DATA` in `palette.ts`. */
+  const tone = share >= 0.9 ? "danger" : share >= 0.75 ? "warning" : "data";
   return (
     <div className={`flex w-full flex-col ${SPACE.tight}`}>
       <span className={`flex items-baseline justify-between ${SPACE.tight}`}>

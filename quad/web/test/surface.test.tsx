@@ -325,7 +325,7 @@ describe("a workspace's branding", () => {
   */
   it("is a handful of variables and nothing else", () => {
     const css = brandCss({ accent: "#2563eb", ground: "#ffffff", ink: "#111111", radius: "lg" });
-    expect(css).toContain("--accent: #2563eb");
+    expect(css).toContain("--brand: #2563eb");
     expect(css).toContain("--background: #ffffff");
     expect(css).toContain("--radius: 0.875rem");
     /* ⚠️ Nothing but a :root block — anything wider is a stylesheet they control. */
@@ -333,11 +333,20 @@ describe("a workspace's branding", () => {
     expect(css).not.toContain("class");
   });
 
-  /* ⚠️ The text that sits on the accent is derived: asking somebody for it is
-     asking a question most people answer wrongly, and wrong is unreadable. */
-  it("works out the text colour that sits on their accent", () => {
-    expect(brandCss({ accent: "#111111" })).toContain("--accent-foreground: var(--snow)");
-    expect(brandCss({ accent: "#fefefe" })).toContain("--accent-foreground: var(--eclipse)");
+  /*
+    ⚠️ A WORKSPACE CANNOT WRITE THE ACCENT, AND THAT IS THE MONOCHROME DECISION
+    ENFORCED AT THE ONE PLACE THEY COULD. `--accent` is what the library paints
+    every control with; their colour is `--brand`, which is the ground those
+    controls sit on. The moment a tenant can set the accent the interface is
+    coloured again, by somebody who has read none of this.
+  */
+  it("never lets a workspace write the accent", () => {
+    const css = brandCss({ accent: "#2563eb" });
+    expect(css).toContain("--brand:");
+    expect(css).not.toContain("--accent:");
+    /* ⚠️ And there is no foreground to derive any more — the pair is fixed in
+       `ground.ts`, so it cannot be got wrong by anybody's choice. */
+    expect(css).not.toContain("--accent-foreground");
   });
 
   /* ⚠️ Both themes, or the dark one inherits a light brand — which they will
@@ -357,7 +366,7 @@ describe("a workspace's branding", () => {
      change reaches the background of every screen with nothing else edited. */
   it("derives the ambience from tokens rather than from a colour", () => {
     expect(skyCss("plain")).toBe("");
-    expect(skyCss("calm", "neutral")).toContain("var(--accent)");
+    expect(skyCss("calm", "neutral")).toContain("var(--brand)");
     expect(skyCss("lift", "success")).toContain("var(--success)");
     expect(skyCss("calm")).not.toMatch(/#[0-9a-f]{6}/i);
   });

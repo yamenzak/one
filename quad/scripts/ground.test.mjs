@@ -204,7 +204,97 @@ if (/html \{ background-color: var\(--background\)/.test(GROUND_SRC)) {
        `       out darker than the page in light, which is the whole dusty look.`);
 }
 
+/* ------------------------------------------------------------------ mono --- */
+
+/**
+ * THE INTERFACE IS MONOCHROME AND THE DATA IS COLOURED (D7).
+ *
+ * ⚠️ WHILE THE ACCENT WAS A HUE IT WAS ALSO EVERYTHING — the primary button, the
+ * link, the nav pill, the switch, the sequential ramp. Present on every screen,
+ * meaning nothing, and requiring a SECOND colour before anything could stand
+ * out. At zero chroma the one coloured thing on a screen is, by construction,
+ * the thing that matters.
+ *
+ * ⚠️ AND IT IS CHECKED RATHER THAN INTENDED, because the way this comes back is
+ * not somebody arguing against it. It is one screen that needs "a bit more life"
+ * and a two-character edit to a token, which nothing else in the tree would
+ * notice.
+ */
+const chromaOf = (decl) => {
+  const m = /oklch\(\s*[\d.]+\s+([\d.]+)/.exec(decl);
+  return m ? Number(m[1]) : null;
+};
+
+let mono = 0;
+const accents = [...GROUND_SRC.matchAll(/`--accent(?:-foreground)?: \$\{grey\(([^)]*)\)\};`/g)];
+if (accents.length < 2) {
+  mono++;
+  fail(`ground.ts: \`--accent\` is not built from \`grey()\` in both themes.\n` +
+       `       It is what the library paints every control with, so a hue there is a\n` +
+       `       coloured interface — and then nothing on a screen can stand out by being\n` +
+       `       the only coloured thing, which is the whole design.`);
+}
+for (const [, decl] of GROUND_SRC.matchAll(/`--(?:accent|default|surface[\w-]*|background): ([^`]*)`/g)) {
+  const c = chromaOf(decl);
+  if (c !== null && c > 0 && !/var\(--brand\)/.test(decl)) {
+    mono++;
+    fail(`ground.ts: a control token carries chroma — \`${decl.slice(0, 50)}\`.\n` +
+         `       A tint mixed FROM \`--brand\` is the ground and is fine; a hue written here\n` +
+         `       is an interface that is coloured on purpose.`);
+  }
+}
+
+/**
+ * ⚠️ FOCUS IS THE ONE THING THAT MUST NOT FOLLOW, and it is the half that gets
+ * forgotten because it is the library's default rather than anything we wrote:
+ * HeroUI ships `--focus: var(--accent)`. Left alone, going monochrome makes the
+ * focus ring monochrome too — on an interface that is otherwise all values,
+ * which is exactly where it is least findable. Somebody navigating by keyboard
+ * loses the only thing telling them where they are.
+ */
+if (!/`--focus: \$\{FOCUS\};`/.test(GROUND_SRC)) {
+  mono++;
+  fail(`ground.ts: \`--focus\` is not pinned, so it inherits the accent.\n` +
+       `       A monochrome focus ring on a monochrome interface is the one somebody\n` +
+       `       navigating by keyboard cannot find.`);
+} else if ((chromaOf(/export const FOCUS = "([^"]*)"/.exec(GROUND_SRC)?.[1] ?? "") ?? 0) <= 0.05) {
+  mono++;
+  fail(`ground.ts: \`FOCUS\` has no chroma to speak of — it has to be a HUE.`);
+}
+
+/**
+ * ⚠️ AND A WORKSPACE SETS `--brand`, NEVER `--accent`. The moment a tenant can
+ * write the accent the interface is coloured again, by somebody who has not read
+ * any of this — and it is a one-word change in a file about branding, which is
+ * the last place anybody would look for it.
+ */
+const THEME_SRC = readFileSync(join(QUAD, "web/src/theme.ts"), "utf8")
+  .replace(/\/\*[\s\S]*?\*\//g, "");
+if (/put\(TOKENS\.accent/.test(THEME_SRC) || /accent: "--accent"/.test(THEME_SRC)) {
+  mono++;
+  fail(`web/src/theme.ts: a workspace can still write \`--accent\`.\n` +
+       `       Their colour is \`--brand\` — the ground, the surfaces and the ambience.\n` +
+       `       The accent is the interface, and the interface is ours and monochrome.`);
+}
+
+/**
+ * ⚠️ AND NO CHART MARK READS THE ACCENT, because a mark that MEASURES would then
+ * be grey — and grey already means de-emphasis on a plot here. "More of it" and
+ * "not the subject" would be the same language, on the same chart.
+ */
+for (const file of FILES.filter((f) => rel(f).startsWith("web/src/chart/"))) {
+  const src = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  if (/var\(--accent\)/.test(src)) {
+    mono++;
+    fail(`${rel(file)}: a chart mark reads \`--accent\`, which is monochrome now.\n` +
+         `       Data uses \`DATA\` (\`--data\`) — the interface is mono, the data is coloured,\n` +
+         `       and the data's colours are the platform's.`);
+  }
+}
+
+if (!mono) ok(`mono: the interface is values, the data is hues, and focus is neither`);
+
 console.log(bad
   ? `\nground: ${bad} finding(s) — an edge, or a boundary that needs one.`
-  : `\nground: no borders, no shadows, and surfaces that carry themselves.`);
+  : `\nground: no borders, no shadows, one monochrome interface, one coloured data.`);
 process.exit(bad ? 1 : 0);

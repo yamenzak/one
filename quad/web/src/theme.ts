@@ -26,7 +26,20 @@ import { MOTION } from "./motion.js";
  * token that maps to nothing changes nothing — visibly, on somebody's brand.
  */
 const TOKENS = {
-  accent: "--accent",
+  /*
+    ⚠️ A WORKSPACE'S COLOUR IS `--brand`, NOT `--accent`, AND THAT IS THE WHOLE
+    SPLIT. `--accent` is what the library paints controls with and it is
+    MONOCHROME now — see `ground.ts`. A brand lands on the ground those controls
+    sit on: the page, the surfaces, the ambience. The tenant still recognises
+    their product; the interface stays a set of values, so the only colour on a
+    screen is one that means something.
+
+    ⚠️ AND IT REMOVES A WHOLE CLASS OF FAILURE. While a tenant chose the accent,
+    every primary button in the product was a colour we had never seen, so
+    contrast on the one control people press was a thing we clamped and hoped
+    for. A ground tint at five percent cannot be unreadable.
+  */
+  brand: "--brand",
   ground: "--background",
   ink: "--foreground",
   radius: "--radius",
@@ -50,23 +63,19 @@ export function brandCss(theme: Theme): string {
   const lines: string[] = [];
   const put = (name: string, value: string) => lines.push(`  ${name}: ${value};`);
 
-  if (theme.accent) put(TOKENS.accent, theme.accent);
+  if (theme.accent) put(TOKENS.brand, theme.accent);
   if (theme.ground) put(TOKENS.ground, theme.ground);
   if (theme.ink) put(TOKENS.ink, theme.ink);
   if (theme.radius) put(TOKENS.radius, RADIUS[theme.radius]);
   if (theme.font) put(TOKENS.font, theme.font);
 
   /*
-    ⚠️ THE FOREGROUND ON THE ACCENT IS DERIVED, NOT ASKED FOR. A workspace picks
-    one colour; asking them for the text colour that sits on it is asking a
-    question most people answer wrongly, and the wrong answer is a button
-    nobody can read.
+    ⚠️ THERE IS NO `--accent-foreground` TO DERIVE ANY MORE, and its absence is
+    the point. It existed because a workspace's colour was the fill of every
+    primary button, so the text on it had to be computed from a hue nobody had
+    seen. The accent is monochrome and ours now; the pair is fixed in
+    `ground.ts` and cannot be got wrong by anybody's choice.
   */
-  if (theme.accent) {
-    const l = luminance(theme.accent);
-    if (l !== null) put("--accent-foreground", l > 0.55 ? "var(--eclipse)" : "var(--snow)");
-  }
-
   return lines.length ? `:root {\n${lines.join("\n")}\n}` : "";
 }
 
@@ -89,7 +98,7 @@ export function brandCssFor(light: Theme, dark?: Theme): string {
  * WHAT SITS BEHIND A SCREEN.
  *
  * ⚠️ A NAME, NOT A COLOUR (see the header). Each of these is a shape and a
- * motion; the colour comes from whatever the accent is at the time.
+ * motion; the colour comes from whatever the brand is at the time.
  *
  *   plain  nothing. The default, and most screens should stay here — ambience
  *          everywhere is ambience nowhere.
@@ -107,8 +116,9 @@ export const SKIES: readonly Sky[] = ["plain", "calm", "focus", "lift"];
  * eight combinations having to be drawn by hand.
  */
 const TONE_TOKEN: Readonly<Record<Tone, string>> = {
-  neutral: "var(--accent)",
-  info: "var(--accent)",
+  /* ⚠️ The ambience is where a brand lives now — see `TOKENS.brand`. */
+  neutral: "var(--brand)",
+  info: "var(--brand)",
   success: "var(--success)",
   warning: "var(--warning)",
   danger: "var(--danger)",

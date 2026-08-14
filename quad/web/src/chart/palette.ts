@@ -67,12 +67,31 @@ export function assign(count: number, dark: boolean): readonly string[] {
  * against, and the order is visible in the colour. Reach for identity only when
  * the series ARE the subject.
  *
- * ⚠️ AND IT IS BUILT FROM THE ACCENT, so a workspace's brand reaches every chart
- * that measures rather than names. The mix is against the surface rather than
- * against white, so the light end stays on the page's own ground in both themes.
+ * ⚠️ IT IS A FIXED HUE, NOT `--accent`, AND THAT CHANGED WHEN THE INTERFACE WENT
+ * MONOCHROME. A ramp built from the accent became a ramp of GREYS the moment the
+ * accent stopped being a colour — and grey already means something on a chart
+ * here: `QUIET` is de-emphasis. "More of it" and "not the subject" would have
+ * been the same language, on the same plot, with nothing saying which was meant.
+ *
+ * ⚠️ SO THE RULE IS NOW ONE SENTENCE, WHICH IS CLEANER THAN WHAT IT REPLACES:
+ * the interface is monochrome and the DATA is coloured, and every colour the
+ * data uses is the platform's. Categorical was already ours, and validated for
+ * colour vision; this is the same argument arriving at the same answer, and it
+ * removes the last place a workspace could recolour a reading.
+ *
+ * ⚠️ THE MIX IS AGAINST THE SURFACE rather than against white, so the light end
+ * sits on the page's own ground in both themes.
  */
+/**
+ * ⚠️ A TOKEN, SO ONE HUE SERVES BOTH THEMES AND EVERY MARK THAT MEASURES. It is
+ * defined in `ground.ts` beside the tiers it has to sit on, because a data hue
+ * that clears a light surface and disappears on a dark one is a hue chosen
+ * without its ground.
+ */
+export const DATA = "var(--data)";
+
 export const magnitude = (t: number): string =>
-  `color-mix(in oklab, var(--accent) ${Math.round(12 + Math.max(0, Math.min(1, t)) * 88)}%, var(--surface))`;
+  `color-mix(in oklab, ${DATA} ${Math.round(12 + Math.max(0, Math.min(1, t)) * 88)}%, var(--surface))`;
 
 /**
  * ⚠️ TWO POLES AND A NEUTRAL MIDDLE — never a hue in the centre. A rainbow
@@ -127,10 +146,10 @@ export const QUIET = "color-mix(in oklab, var(--foreground) 26%, transparent)";
 export const SEPARATOR = "var(--surface)";
 
 /**
- * ⚠️ ONE SERIES IN THE ACCENT AND THE REST IN GREY IS THE MOST UNDERUSED FORM
+ * ⚠️ ONE SERIES IN COLOUR AND THE REST IN GREY IS THE MOST UNDERUSED FORM
  * THERE IS. When the story is "this one moved", identity colour buries it among
  * seven equals; emphasis says it in the first glance. Offered here so it is as
  * easy to reach for as the categorical default.
  */
 export const emphasis = (isSubject: boolean): string =>
-  (isSubject ? "var(--accent)" : QUIET);
+  (isSubject ? DATA : QUIET);

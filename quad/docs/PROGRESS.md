@@ -211,6 +211,16 @@ refuse — it reads as built and passes every test.
   `Center`. A container that picks its own gap is a layout nobody designed: the
   Hub had twenty-three of them at four different values, each defensible, with
   nobody able to point at which was wrong.
+- **The interface is monochrome and the data is not**, which is the palette's
+  whole shape. `--accent` — what the library paints every control, switch and
+  selected row with — is a VALUE at zero chroma, so the one coloured thing on a
+  screen is by construction the thing that matters. A workspace's colour is
+  `--brand`: the page, the surfaces and the ambience those controls sit on. Two
+  things are pinned against it and both are the half people forget: `--focus`,
+  because HeroUI defines it as the accent and a monochrome focus ring on a
+  monochrome interface is where it is least findable; and `--data`, because a
+  chart mark that measures would otherwise be grey, and grey already means
+  de-emphasis on a plot.
 - **Three kinds of motion and no fourth**, in `motion.ts`. A thing that ARRIVES
   uses HeroUI's own `enter` keyframe (`ARRIVE`), one that CHANGES uses a
   transition on a `MOTION` token, one that WAITS uses the library's `Skeleton` or
@@ -321,7 +331,7 @@ The guard registry, its checks, and the standards that bind them.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 5 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 22 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 23 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 2 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 4 |
@@ -372,6 +382,7 @@ the library decides FOR us.
 | `three-kinds-of-motion-and-no-fourth` | D7 | a product with a dozen animation techniques and therefore no motion design, accreted one defensible animation at a time |
 | `a-shared-stylesheet-reaches-the-document` | D7 | an effect that is exported, imported, and never injected — so it has never once run, and looks exactly like a design decision |
 | `no-container-picks-its-own-rhythm` | D7 | twenty screens at gap-2, gap-3, gap-4 and gap-10, each defensible, with nobody able to point at which one is wrong |
+| `the-interface-is-monochrome-and-the-data-is-not` | D7 | an accent that is the button, the link, the nav pill and the ramp all at once — present on every screen, meaning nothing, and needing a second colour before anything can stand out |
 | `no-service-call-is-made-over-fetch` | D3 | a wrong payload becoming a production error where it had been a compile error |
 | `a-declaration-is-a-literal-a-script-can-walk` | D8 | a declaration that has to be executed before it can be read, so every generated surface stops being derivable |
 | `a-library-decides-it-does-not-rule` | D9 | one of our own rules living inside somebody else's package, re-learned from their release notes |

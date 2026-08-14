@@ -26,7 +26,7 @@ import { TYPE } from "../type.js";
 import { SPACE } from "../metrics.js";
 import { MOTION } from "../motion.js";
 import {
-  AXIS, GRID, QUIET, SEPARATOR, assign, emphasis, magnitude, polarity, pole, seriesColour,
+  AXIS, DATA, GRID, QUIET, SEPARATOR, assign, emphasis, magnitude, polarity, pole, seriesColour,
 } from "./palette.js";
 import {
   type Point, type Span, areaPath, band, barPath, barPathX, compact, extent, grouped,
@@ -248,11 +248,11 @@ export function AreaChart({ describes, series, zero = true }: {
       {/* ⚠️ A WASH AT TEN PERCENT, NEVER A SATURATED BLOCK. The fill says "this
           is the same series"; the line says where the value is. A solid area
           makes the line invisible and the axis unreadable behind it. */}
-      <path {...draw} d={areaPath(placed, base)} fill="var(--accent)" fillOpacity={0.1} stroke="none" />
+      <path {...draw} d={areaPath(placed, base)} fill={DATA} fillOpacity={0.1} stroke="none" />
       <path
         {...draw}
         d={linePath(placed)}
-        fill="none" stroke="var(--accent)"
+        fill="none" stroke={DATA}
         strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
       />
     </Frame>
@@ -477,7 +477,7 @@ export function DumbbellChart({ describes, data }: {
                 stroke={QUIET} strokeWidth={2} strokeLinecap="round"
               />
               <circle cx={at(d.from)} cy={mid} r={4} fill={QUIET} stroke={SEPARATOR} strokeWidth={2} />
-              <circle cx={at(d.to)} cy={mid} r={4} fill="var(--accent)" stroke={SEPARATOR} strokeWidth={2} />
+              <circle cx={at(d.to)} cy={mid} r={4} fill={DATA} stroke={SEPARATOR} strokeWidth={2} />
             </g>
           );
         })}
@@ -618,7 +618,7 @@ export function Sparkline({ points, tone = "accent" }: {
   const y = extent(points.map((p) => p.y), false);
   const x = extent(points.map((p) => p.x), false);
   const placed = place(points, x, y, 72, 20);
-  const colour = tone === "quiet" ? QUIET : "var(--accent)";
+  const colour = tone === "quiet" ? QUIET : DATA;
   const last = [...placed].reverse().find(Boolean);
 
   return (

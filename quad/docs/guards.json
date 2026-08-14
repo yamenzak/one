@@ -300,6 +300,15 @@
       "proves": "frames:"
     },
     {
+      "id": "the-interface-is-monochrome-and-the-data-is-not",
+      "protects": "D7",
+      "stage": "5",
+      "status": "live",
+      "fails": "an accent that is the button, the link, the nav pill and the ramp all at once \u2014 present on every screen, meaning nothing, and needing a second colour before anything can stand out",
+      "impl": "scripts/ground.test.mjs",
+      "proves": "mono:"
+    },
+    {
       "id": "no-service-call-is-made-over-fetch",
       "protects": "D3",
       "stage": "7",

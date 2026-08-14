@@ -21,7 +21,7 @@
  * forces a readback of everything behind the element and a blur, per frame, per
  * layer — acceptable for four fixed chips in a crown, ruinous for a scrolling
  * list of cards on a phone with a weak GPU. So every surface takes a SHARE OF THE
- * ACCENT instead. It is not translucency and it does not track the gradient
+ * BRAND instead. It is not translucency and it does not track the gradient
  * behind it, but it buys the thing translucency is actually for: the card is made
  * of the same colours as the screen it is on, rather than cut out of paper and
  * dropped onto it.
@@ -78,7 +78,7 @@ export const GROUND = {
 export const MIN_DELTA = 0.04;
 
 /**
- * How much of the accent each surface is made of.
+ * How much of the BRAND each surface is made of.
  *
  * ⚠️ LIGHT TAKES MORE THAN DARK, and that is not symmetry lost. A tint on white
  * has nowhere to go but toward the hue, so a small share reads; the same share on
@@ -92,9 +92,22 @@ export const GROUND_TINT = { light: 9, dark: 6 } as const;
 
 const grey = (l: number) => `oklch(${l} 0 0)`;
 
-/** A value with a share of the accent mixed into it. */
+/**
+ * A value with a share of the BRAND mixed into it.
+ *
+ * ⚠️ `--brand`, NOT `--accent`, AND THE SPLIT IS THE WHOLE DESIGN. The interface
+ * is monochrome — every control, every fill, every focus ring is a value rather
+ * than a hue — and a workspace's colour lives in the GROUND those controls sit
+ * on. So the surfaces still carry the brand, at the same strengths as before,
+ * and the buttons on them no longer do.
+ *
+ * ⚠️ THESE TWO WERE ONE TOKEN, AND THAT IS WHY THE ACCENT COULD NOT GO MONO.
+ * Making it neutral would have taken the sky, the ground tint and the focus ring
+ * with it — a mono UI on a grey page, which is not the thing anybody asked for.
+ * The token had to be split before the decision could even be tried.
+ */
 const tinted = (l: number, pct: number) =>
-  `color-mix(in oklab, ${grey(l)} ${100 - pct}%, var(--accent))`;
+  `color-mix(in oklab, ${grey(l)} ${100 - pct}%, var(--brand))`;
 
 /**
  * ⚠️ THE TOKENS ARE REDEFINED, AND THE COMPONENTS ARE NOT TOUCHED. This is the
@@ -125,8 +138,57 @@ function tier(mode: "light" | "dark"): string {
     `--field-shadow: none;`,
     `--border: transparent;`,
     `--field-border: transparent;`,
+    /*
+      ⚠️ THE INTERFACE IS MONOCHROME, AND THIS IS THE LINE THAT MAKES IT SO.
+      `--accent` is what HeroUI paints a primary button, a switch, a selected
+      row and a pressed control with — so at zero chroma every control in the
+      product is a VALUE against the ground rather than a hue on it.
+
+      ⚠️ AND THE POINT IS NOT RESTRAINT, IT IS THAT COLOUR BECOMES INFORMATION.
+      While the accent was a hue it was also the button, the link, the nav pill
+      and the sequential ramp — present on every screen, meaning nothing, and
+      needing a SECOND colour before anything could stand out. Against a mono
+      interface the one coloured thing on a screen is, by construction, the
+      thing that matters: a warning, a danger, a series in a chart.
+
+      ⚠️ IT IS NEAR-BLACK RATHER THAN BLACK, and near-white rather than white.
+      Pure black on a tinted white ground reads as a hole; a step off the end
+      keeps the control on the same material as everything around it.
+    */
+    `--accent: ${grey(mode === "light" ? 0.22 : 0.97)};`,
+    `--accent-foreground: ${grey(mode === "light" ? 0.99 : 0.15)};`,
+    /*
+      ⚠️ FOCUS IS THE ONE THING THAT MUST NOT GO MONO, and HeroUI defines
+      `--focus: var(--accent)` — so making the accent neutral would have made
+      the focus ring neutral too, on a monochrome interface, which is where it
+      is least findable. Somebody navigating by keyboard needs to see where they
+      are against a page that is otherwise all values; a fixed hue is the only
+      thing that guarantees it, and it is deliberately NOT the brand — a
+      workspace must not be able to choose a focus ring nobody can see.
+    */
+    `--focus: ${FOCUS};`,
+    /*
+      ⚠️ THE ONE HUE THE DATA IS ALLOWED TO BE WHEN IT IS NOT NAMING ANYTHING.
+      A line, an area, a meter fill, an emphasised series: marks that measure
+      rather than identify. It used to be `--accent`, which made it grey the
+      moment the interface went monochrome — and grey is already de-emphasis on
+      a chart, so "more of it" and "not the subject" would have been the same
+      language on the same plot.
+
+      ⚠️ LIGHTER IN DARK, WHICH IS SELECTED RATHER THAN DERIVED — the same rule
+      the categorical eight follow. One hue at one lightness reads correctly in
+      exactly one theme.
+    */
+    `--data: ${mode === "light" ? "oklch(0.55 0.15 250)" : "oklch(0.66 0.15 250)"};`,
   ].join(" ");
 }
+
+/**
+ * ⚠️ ONE HUE, THE PLATFORM'S, THE SAME IN EVERY WORKSPACE AND BOTH THEMES. It
+ * clears 3:1 against every tier in `GROUND` above — which is the actual
+ * requirement for a non-text indicator, and the reason it cannot be a value.
+ */
+export const FOCUS = "oklch(0.6204 0.195 253.83)";
 
 /**
  * ⚠️ THE SEPARATOR IS NOT A BORDER AND IS NOT BANNED. A rule BETWEEN two rows of
@@ -136,6 +198,24 @@ function tier(mode: "light" | "dark"): string {
  * and a worse one.
  */
 export const GROUND_CSS = [
+  /*
+    ⚠️ A DEFAULT BRAND, BECAUSE EVERY TIER IS A MIX WITH ONE. `--brand` is ours
+    rather than the library's, so nothing defines it until a workspace does — and
+    an undefined variable inside `color-mix` makes the whole declaration invalid,
+    which would take every surface in the product with it. This is the colour a
+    deployment has before anybody has chosen: present, quiet, and unmistakably a
+    hue rather than a grey, so an un-branded install still looks designed.
+
+    ⚠️ IT IS SET AT LOW SPECIFICITY AND FIRST, so a tenant's own `:root` block —
+    written later in the same stylesheet — wins without needing `!important`.
+  */
+  /*
+    ⚠️ THE LIBRARY'S OWN ACCENT, VERBATIM, so an un-branded deployment's ambience
+    is exactly what it was before the split. A default that is merely NEAR the
+    old one makes every screenshot in the repository subtly wrong and gives
+    nobody a reason for the difference.
+  */
+  `:root { --brand: oklch(0.6204 0.195 253.83); }`,
   `:root { ${tier("light")} }`,
   `[data-theme="dark"] { ${tier("dark")} }`,
   /*
@@ -149,7 +229,7 @@ export const GROUND_CSS = [
     card at L 0.98 on a UA-white page is DARKER than the page it sits on, so
     cards read as grey panels laid on white rather than as light surfaces raised
     off a ground. Painting it puts them back the right way round — and it is the
-    only way a workspace's accent reaches the page itself.
+    only way a workspace's brand reaches the page itself.
 
     ⚠️ ON `html` AND NOT ON THE PAGE. The ambience is a `::before` at
     `z-index: -1`, which paints BELOW its parent's own background — so giving

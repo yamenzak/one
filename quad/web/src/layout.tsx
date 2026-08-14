@@ -13,7 +13,7 @@
  * branding does not reach (D7).
  *
  * ⚠️ AND THE AMBIENCE IS AN ATTRIBUTE, NOT AN INLINE STYLE. `data-sky` is read
- * by one stylesheet rule built from theme tokens, so a workspace's accent
+ * by one stylesheet rule built from theme tokens, so a workspace's brand
  * reaches the background of every screen without any screen knowing branding
  * exists. An inline style would beat every token and freeze one page on ours.
  */
