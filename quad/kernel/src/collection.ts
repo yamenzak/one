@@ -83,6 +83,20 @@ export const CRUD: readonly CrudVerb[] = ["list", "read", "create", "update", "d
 export const operationsFor = (spec: CollectionSpec): readonly string[] =>
   CRUD.filter((verb) => !(spec.without ?? []).includes(verb)).map((verb) => `${spec.id}.${verb}`);
 
+/**
+ * ⚠️ THE NAME OF THE EVENT A CRUD WRITE RAISES, IN ONE PLACE. The runtime emits
+ * it and the manifest checks that notifications, steps and milestones wait for
+ * something real — and two implementations of this string is how a checklist
+ * item comes to wait for an event that is spelled slightly differently and can
+ * therefore never be ticked.
+ */
+export const eventFor = (spec: CollectionSpec, verb: CrudVerb): string => `${spec.id}.${verb}d`;
+
+/** Every event a collection's generated operations raise. */
+export const eventsFor = (spec: CollectionSpec): readonly string[] =>
+  CRUD.filter((v) => v !== "list" && v !== "read" && !(spec.without ?? []).includes(v))
+    .map((v) => eventFor(spec, v));
+
 /** ⚠️ Reads need the read key; anything that changes a record needs write. */
 export const permissionFor = (spec: CollectionSpec, verb: CrudVerb): string =>
   `${spec.permission}:${verb === "list" || verb === "read" ? "read" : "write"}`;

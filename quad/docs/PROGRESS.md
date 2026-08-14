@@ -17,8 +17,8 @@ reader can trust this table instead of re-reading the code.
 | 0 | Ground — workspace, docs, guard registry, standards | shipped |
 | 1 | Kernel — entities, declarations, gate algebra, problems | shipped |
 | 2 | Directory + placement | shipped |
-| 3 | Runtime — manifest → live worker | building |
-| 4 | Identity + tenancy | not started |
+| 3 | Runtime — manifest → live worker | shipped |
+| 4 | Identity + tenancy | building |
 | 5 | Surface — HeroUI shell, nav, sky, rendered settings | not started |
 | 6 | Money — plans, entitlements, credits | not started |
 | 7 | Services — ai and notify over RPC | not started |
@@ -67,7 +67,26 @@ The only code that touches a binding.
 - `sql.ts` · `handles.ts` — the one place an identifier is interpolated, and the
   shard id → binding derivation that throws rather than improvising.
 
-The guard registry, its six checks, and the standards that bind them.
+- `compose.ts` — a manifest becomes a surface. One collection produces five
+  operations, their routes, their permissions and their quota, and a generated
+  operation is indistinguishable downstream from a written one. Composition is
+  lazy and memoised per app (D4).
+- `serve.ts` — one request, one path: the door, the tenancy, the replay, all
+  seven gates in the kernel's order, the handler, the audit entry, the refusal.
+  A handler is given its own tenant's database, who is asking, the time and a
+  way to refuse — never the request, the env or a binding.
+- `audit.ts` — the entry is written by the runtime, for successes and refusals
+  alike, and a replay is answered before anything is spent.
+- `door.ts` (kernel) — the host IS the tenancy: five doors, an unrecognised host
+  is nothing rather than a default, and a workspace can never hold a label that
+  is infrastructure.
+
+**`@quad/hello` — the smallest complete app, and the reference.** A manifest and
+nothing else: no router, no schema, no migration, no gate call, no audit call.
+It declares every cross-cutting concern on purpose, because the next app is
+copied from it and anything absent here is absent everywhere.
+
+The guard registry, its eight checks, and the standards that bind them.
 
 ## Decisions, and how well each is defended
 
@@ -75,7 +94,7 @@ The guard registry, its six checks, and the standards that bind them.
 | # | Decision | Guarded by |
 |---|---|---|
 | D1 | The tenant is primary; an app is a capability switched on for it | 1 |
-| D2 | The name is Quad; packages are `@quad/*` | 1 |
+| D2 | The name is Quad; packages are `@quad/*` | 2 |
 | D3 | One worker on the request path; heavy work splits over RPC service bindings | 1 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 3 |
@@ -85,7 +104,7 @@ The guard registry, its six checks, and the standards that bind them.
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 1 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 2 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 14 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 18 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -112,7 +131,9 @@ the library decides FOR us.
 | `the-shared-layers-carry-no-product-vocabulary` | D12 | a shared module that knows what a client is, which has stopped being shared |
 | `the-framework-name-is-reserved-inside-the-framework` | D2 | `quad` meaning four different things inside the thing called Quad |
 | `no-more-than-five-primary-destinations` | D10 | a bottom bar that stopped being tappable and became a menu |
+| `no-handler-raises-its-own-cross-cutting-concern` | D12 | a concern an app can forget, forgotten invisibly — no error, no failing test, a capability that silently does not apply |
 | `no-cross-tenant-query-fans-out-over-shards` | D5 | an operator console that gets slower with every shard, until the sweep it runs times out |
+| `composition-is-lazy` | D4 | cold start growing with the catalogue, until the catalogue that was meant to grow cannot |
 | `a-declaration-is-a-literal-a-script-can-walk` | D8 | a declaration that has to be executed before it can be read, so every generated surface stops being derivable |
 | `a-library-decides-it-does-not-rule` | D9 | one of our own rules living inside somebody else's package, re-learned from their release notes |
 | `a-notification-nobody-can-receive-is-refused` | D12 | a message switched on in the policy screen that never arrives, so people stop trusting the ones that do |
@@ -122,12 +143,15 @@ the library decides FOR us.
 | `erasure-follows-a-column-a-declaration-named` | D12 | a deletion request that reports success and leaves the rows, because the sweep had nothing to follow |
 | `a-schema-runner-never-migrates-destructively` | D12 | a DROP running itself on every shard at 3am because somebody edited a declaration |
 | `an-identifier-that-is-not-a-name-never-reaches-a-statement` | D8 | a generated schema built from something a request supplied, which is the injection this whole design forecloses |
+| `an-app-imports-the-kernel-and-nothing-else-of-ours` | D12 | a manifest that can call the machinery, which is a manifest that can leave a gate out of the next handler |
+| `a-workspace-never-holds-an-infrastructure-label` | D2 | a customer answering on the hostname a certificate authority validates against, or on the operator's own door |
+| `every-gate-is-applied-by-the-runtime-not-the-app` | D12 | a handler that runs for somebody who was never allowed to call it, because one call site forgot the check |
+| `a-replay-spends-nothing` | D12 | a phone that retried in a basement getting a second charge, a second notification and two of what it made once |
+| `a-write-is-recorded-whether-it-succeeded-or-was-refused` | D12 | an incident review asking who tried and finding silence, because only the successes were recorded |
 | `no-heroui-component-is-restyled` *(owed)* | D7 | consistency that is maintained by care rather than enforced, which lasts until the first hurried screen |
 | `every-declaration-reaches-a-surface` *(owed)* | D12 | a mechanism built, tested and wired with nowhere a person can look — every suite green |
 | `every-surface-control-changes-behaviour` *(owed)* | D12 | a switch somebody turns on that does nothing, so they stop watching the thing it promised |
-| `no-handler-raises-its-own-cross-cutting-concern` *(owed)* | D12 | a concern an app can forget, forgotten invisibly — no error, no failing test, a capability that silently does not apply |
 | `a-vault-fact-is-never-stored-by-an-app` *(owed)* | D11 | an app writing the vault's own tables directly, so a fact exists with no grant, no consent record and no way to shred it |
-| `composition-is-lazy` *(owed)* | D4 | cold start growing with the catalogue, until the catalogue that was meant to grow cannot |
 | `no-service-call-is-made-over-fetch` *(owed)* | D3 | a wrong payload becoming a production error where it had been a compile error |
 <!-- /generated -->
 

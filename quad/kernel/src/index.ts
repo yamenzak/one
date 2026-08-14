@@ -12,6 +12,7 @@
 
 export * from "./primitives.js";
 export * from "./problem.js";
+export * from "./door.js";
 export * from "./field.js";
 export * from "./collection.js";
 export * from "./operation.js";

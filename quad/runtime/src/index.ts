@@ -12,3 +12,6 @@ export * from "./schema.js";
 export * from "./directory.js";
 export * from "./records.js";
 export * from "./handles.js";
+export * from "./compose.js";
+export * from "./audit.js";
+export * from "./serve.js";

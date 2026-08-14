@@ -153,8 +153,10 @@
       "id": "no-handler-raises-its-own-cross-cutting-concern",
       "protects": "D12",
       "stage": "3",
-      "status": "owed",
-      "fails": "a concern an app can forget, forgotten invisibly — no error, no failing test, a capability that silently does not apply"
+      "status": "live",
+      "fails": "a concern an app can forget, forgotten invisibly — no error, no failing test, a capability that silently does not apply",
+      "impl": "scripts/apps.test.mjs",
+      "proves": "concerns:"
     },
     {
       "id": "a-vault-fact-is-never-stored-by-an-app",
@@ -176,8 +178,10 @@
       "id": "composition-is-lazy",
       "protects": "D4",
       "stage": "3",
-      "status": "owed",
-      "fails": "cold start growing with the catalogue, until the catalogue that was meant to grow cannot"
+      "status": "live",
+      "fails": "cold start growing with the catalogue, until the catalogue that was meant to grow cannot",
+      "impl": "scripts/apps.test.mjs",
+      "proves": "lazy:"
     },
     {
       "id": "no-service-call-is-made-over-fetch",
@@ -266,6 +270,51 @@
       "impl": "runtime/test/placement.test.ts",
       "proves": "is not a name",
       "fails": "a generated schema built from something a request supplied, which is the injection this whole design forecloses"
+    },
+    {
+      "id": "an-app-imports-the-kernel-and-nothing-else-of-ours",
+      "protects": "D12",
+      "stage": "3",
+      "status": "live",
+      "impl": "scripts/apps.test.mjs",
+      "proves": "reach:",
+      "fails": "a manifest that can call the machinery, which is a manifest that can leave a gate out of the next handler"
+    },
+    {
+      "id": "a-workspace-never-holds-an-infrastructure-label",
+      "protects": "D2",
+      "stage": "3",
+      "status": "live",
+      "impl": "kernel/test/door.test.ts",
+      "proves": "the labels that are infrastructure",
+      "fails": "a customer answering on the hostname a certificate authority validates against, or on the operator's own door"
+    },
+    {
+      "id": "every-gate-is-applied-by-the-runtime-not-the-app",
+      "protects": "D12",
+      "stage": "3",
+      "status": "live",
+      "impl": "apps/hello/test/serve.test.ts",
+      "proves": "without the handler running",
+      "fails": "a handler that runs for somebody who was never allowed to call it, because one call site forgot the check"
+    },
+    {
+      "id": "a-replay-spends-nothing",
+      "protects": "D12",
+      "stage": "3",
+      "status": "live",
+      "impl": "apps/hello/test/serve.test.ts",
+      "proves": "answers a replay with the first answer",
+      "fails": "a phone that retried in a basement getting a second charge, a second notification and two of what it made once"
+    },
+    {
+      "id": "a-write-is-recorded-whether-it-succeeded-or-was-refused",
+      "protects": "D12",
+      "stage": "3",
+      "status": "live",
+      "impl": "apps/hello/test/serve.test.ts",
+      "proves": "records an attempt that was refused",
+      "fails": "an incident review asking who tried and finding silence, because only the successes were recorded"
     }
   ]
 }

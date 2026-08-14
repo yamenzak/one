@@ -24,7 +24,7 @@ import { foundingRole, undeclared, unholdable } from "./access.js";
 import type { Lane } from "./ai.js";
 import type { WhitelabelDef } from "./brand.js";
 import type { CollectionSpec } from "./collection.js";
-import { danglingRefs, operationsFor, quotasWithoutCeiling, refuseCollection } from "./collection.js";
+import { danglingRefs, eventsFor, operationsFor, quotasWithoutCeiling, refuseCollection } from "./collection.js";
 import type { MeterBook, PackDef } from "./credit.js";
 import { refusePacks, unbounded } from "./credit.js";
 import type { EntitlementDef, PlanSpec } from "./entitlement.js";
@@ -117,9 +117,18 @@ export const primaryOf = (screens: readonly ScreenSpec[]): readonly ScreenSpec[]
 
 /* --------------------------------------------------------------- derived --- */
 
-/** Every event any operation raises. What a notification, step or milestone waits on. */
-export const eventsOf = (spec: AppSpec): readonly string[] =>
-  [...new Set(spec.operations.flatMap((o) => o.emits ?? []))];
+/**
+ * Every event this app raises.
+ *
+ * ⚠️ INCLUDING THE ONES NOBODY WROTE. A collection's generated writes raise
+ * events exactly as a declared operation does, and leaving them out here would
+ * make the manifest refuse a notification about a note being created — the most
+ * ordinary thing an app could possibly want to be told about.
+ */
+export const eventsOf = (spec: AppSpec): readonly string[] => [...new Set([
+  ...spec.operations.flatMap((o) => o.emits ?? []),
+  ...spec.collections.flatMap(eventsFor),
+])];
 
 /**
  * ⚠️ THE VAULT KEY IS DERIVED FROM WHERE THE FIELD IS, never declared beside it.

@@ -134,7 +134,15 @@ export interface OperationSpec<I = unknown, O = unknown> {
   readonly handler: (ctx: unknown, input: I) => Promise<O>;
 }
 
-export type AnyOperation = OperationSpec<never, never>;
+/**
+ * ⚠️ AN OPERATION WITH ITS TYPES ERASED — `never` in, `unknown` out, and the
+ * asymmetry is the whole reason this line works. Input is contravariant, so a
+ * handler that wants a `Publish` is assignable to one that accepts `never`;
+ * output is covariant, so `never` there would reject every real handler and make
+ * a list of operations impossible to hold without a cast. A cast in the type
+ * that every declaration flows through is a cast that hides the next mistake.
+ */
+export type AnyOperation = OperationSpec<never, unknown>;
 
 export const operation = <I, O>(spec: OperationSpec<I, O>): OperationSpec<I, O> => spec;
 
