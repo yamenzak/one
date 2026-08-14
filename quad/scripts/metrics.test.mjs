@@ -117,6 +117,31 @@ if (missing.length) {
 }
 
 /**
+ * ⚠️ AND CARRYING THE FLOOR IS NOT THE SAME AS HAVING IT, WHICH IS WHY THIS
+ * CHECK EXISTS BESIDE THE ONE ABOVE. `.button` is `h-10 md:h-9` — a HARD 40px
+ * that gets SHORTER on a desktop — so a row that set `min-h-16` on a span inside
+ * the button was a 40px control with 68px of content hanging out of it. Every
+ * list in the product was that, the rule above was green throughout, and the
+ * only way anybody found out was measuring a rendered page.
+ *
+ * ⚠️ SO THE ROW MUST RELEASE THE LIBRARY'S HEIGHT AND ITS PADDING ON THE BUTTON
+ * ITSELF. `ROW.free` drops `h-10`; `ROW.flush` drops the `px-4` that, added to
+ * the card's own `p-4`, indented every row 32px past the separator meant to line
+ * up with it. A string on the inner span reaches neither.
+ */
+const unfree = pressable
+  .filter(([, , body]) => !/<Button[\s\S]*?ROW\.free[\s\S]*?ROW\.flush/.test(body))
+  .map(([, name]) => name);
+if (unfree.length) {
+  fail(`surfaces.tsx: ${unfree.join(", ")} keeps the library's own height and padding.\n` +
+       `       \`.button\` is h-10 md:h-9 px-4. Without \`ROW.free\` and \`ROW.flush\` ON THE\n` +
+       `       BUTTON, the row renders 40px tall with its content overflowing, and the\n` +
+       `       floor above is satisfied by a string that changes nothing.`);
+} else {
+  ok(`released: all ${pressable.length} row(s) drop the button's own height and gutter`);
+}
+
+/**
  * ⚠️ AND THE PAGE RESERVES ROOM FOR ITS NAV. A sticky island floats over what
  * precedes it, so without this the last card of every screen is cropped under
  * the nav — which is what shipped, on both specimens, until somebody looked at a

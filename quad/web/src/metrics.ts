@@ -22,17 +22,33 @@
 
 export const ROW = {
   /**
-   * ⚠️ 56px, NOT 44. 44 is the accessibility floor; 56 is what a list of them
-   * reads as — comfortable rather than merely legal — and it is what leaves room
-   * for a two-line row without the second line changing the row's height.
+   * ⚠️ 64px. 44 is the accessibility floor and 56 was merely comfortable; 64 is
+   * what a list of two-line rows actually needs before the description stops
+   * crowding the label. Measured against a product that reads well, not chosen.
    */
-  tap: "min-h-14",
+  tap: "min-h-16",
   /** A row that is not pressable: a field, a note, a step. */
-  still: "min-h-12",
+  still: "min-h-14",
   /** ⚠️ ONE value, on every row. This is the whole rhythm. */
   pad: "py-3",
   /** Between the lead glyph and the body. */
   gap: "gap-3",
+  /**
+   * ⚠️ A ROW OWNS NO HORIZONTAL PADDING, BECAUSE THE CARD AROUND IT ALREADY
+   * DOES. The library's `Card` is `p-4` and its `Button` is `px-4`, so a row
+   * built out of a button inside a card was indented 32px while its own
+   * separator was drawn at 36px from the card — which is the misalignment that
+   * made every list look hand-assembled. The gutter belongs to the container.
+   */
+  flush: "px-0",
+  /**
+   * ⚠️ AND IT OWNS NO FIXED HEIGHT EITHER — IT TELLS THE BUTTON TO DROP ITS OWN.
+   * `.button` is `h-10 md:h-9`: a hard 40px that SHRINKS to 36 on a desktop. A
+   * two-line row is 68px, so every list in the product was a 40px control with
+   * its content hanging out of it, and the touch target the metrics guard
+   * promised existed only in the markup.
+   */
+  free: "h-auto",
 } as const;
 
 /**
@@ -42,6 +58,36 @@ export const ROW = {
  * starts at the same x, whatever is in it.
  */
 export const LEAD = "flex size-6 shrink-0 items-center justify-center" as const;
+
+/**
+ * ⚠️ THE ICON SIZE IS LOCKED HERE AND NOWHERE ELSE. Every glyph in the product
+ * is drawn at these, so a list has one optical weight — the thing that was most
+ * obviously missing while the icons were text characters at whatever size the
+ * font gave them.
+ */
+export const ICON = { row: 20, crown: 20, quick: 22, nav: 22, face: 28 } as const;
+
+/**
+ * ⚠️ A FACE IS 40px, AND THE CROWN LOOKED EMPTY UNTIL IT WAS. A 24px avatar in a
+ * 64px bar leaves the whole thing top-light and unbalanced — which is most of
+ * why a crown reads as unfinished even when everything in it is correct.
+ */
+export const FACE = "size-10" as const;
+
+/**
+ * ⚠️ WHERE A SEPARATOR STARTS, AND THERE ARE TWO ANSWERS BECAUSE THERE ARE TWO
+ * LEADS. A rule that runs under the lead cuts the icon column in half and makes
+ * a list read as a table; one that starts where the labels start is what makes
+ * the leads read as a single column. So the inset is lead + gap — 24 + 12 for a
+ * glyph, 40 + 12 for a face — and a list of people using the glyph inset is
+ * exactly the ragged edge this file exists to prevent.
+ */
+export const INSET = { lead: "ml-9", face: "ml-13", none: "" } as const;
+
+export type Inset = keyof typeof INSET;
+
+/** ⚠️ One crown, one height. Two of them at different heights is two products. */
+export const CROWN = "min-h-16" as const;
 
 /* ------------------------------------------------------------------ stacks --- */
 
@@ -76,6 +122,15 @@ export const GUTTER = "px-4 md:px-6" as const;
 
 /** Above and below a band's content. */
 export const BAND_PAD = "py-6" as const;
+
+/**
+ * ⚠️ A HERO IS PADDED ABOVE AND NOT BELOW, AND THE REASON IS ARITHMETIC RATHER
+ * THAN TASTE. It sits inside a gapped `Stack`, so its own bottom padding adds to
+ * that gap — `py-6` under a `gap-6` is 48px of nothing between the figure and the
+ * first section, which is what made the specimen look like a screen with a
+ * missing block in it. Below a block in a stack, the stack's gap IS the spacing.
+ */
+export const HERO_PAD = "pt-6" as const;
 
 /* -------------------------------------------------------------- the chrome --- */
 

@@ -7,11 +7,16 @@
  * would stop matching the moment somebody changed their brand, and nobody would
  * connect the two.
  *
- * ⚠️ AND A PATTERN IS CSS, NOT AN IMAGE. A texture shipped as a PNG is bytes on
- * every cold load, a second asset to cache-bust, and — the part that matters — a
- * fixed colour, so it cannot follow a tenant's accent. Every pattern here is
- * built from `repeating-linear-gradient` and `radial-gradient`, which cost
- * nothing, scale to any density, and are tinted by a token.
+ * ⚠️ A PATTERN IS BARELY THERE, AND THE FIRST VERSION OF THIS FILE GOT THAT
+ * WRONG. `dots` and `weave` shipped at a strength where the repeat was plainly
+ * visible across a whole screen — which does not read as texture, it reads as a
+ * moiré or a rendering fault, and it was the single thing that made the product
+ * look counterfeit. A texture is felt, never seen. The tints below are a third of
+ * what they were, the repeat is finer, and both stop well before the fold.
+ *
+ * ⚠️ THEY ARE STILL CSS RATHER THAN IMAGES, for the reason that has not changed:
+ * a PNG is bytes on every cold load and a FIXED colour, so it cannot follow a
+ * tenant's accent.
  *
  * ⚠️ THE BLEED IS THE OTHER HALF. An ambience that stops at the crown's lower
  * edge draws a line across the page; one that fades has depth. `FADE` is the
@@ -64,8 +69,18 @@ const mix = (hue: string, pct: number) =>
  * that makes an ambient background look like a mistake.
  */
 export const FADE =
-  "mask-image: linear-gradient(180deg, black 0%, black 45%, transparent 100%); " +
-  "-webkit-mask-image: linear-gradient(180deg, black 0%, black 45%, transparent 100%)";
+  "mask-image: linear-gradient(180deg, black 0%, black 30%, transparent 100%); " +
+  "-webkit-mask-image: linear-gradient(180deg, black 0%, black 30%, transparent 100%)";
+
+/**
+ * ⚠️ THE LAYER IS A BAND AT THE TOP, NOT THE WHOLE PAGE, AND THIS IS THE BUG THE
+ * FADE HAD. Masked over `inset: 0` on a page taller than the screen, the ramp to
+ * transparent lands somewhere past the fold — so the pattern stayed at full
+ * strength for the entire visible screen and only faded on a page shorter than
+ * the viewport, which is never. Ambience belongs to the top of a screen, where
+ * the crown is; a height in `vh` is what makes the fade a thing anybody sees.
+ */
+export const REACH = "60vh";
 
 /** The background layer for one ambience, as CSS declarations. */
 export function ambienceCss(what: Ambience, tone: Tone = "neutral"): string {
@@ -75,19 +90,19 @@ export function ambienceCss(what: Ambience, tone: Tone = "neutral"): string {
       return "";
 
     case "calm":
-      return `background-image: radial-gradient(120% 80% at 50% -20%, ${mix(hue, 18)} 0%, transparent 60%)`;
+      return `background-image: radial-gradient(120% 90% at 50% -30%, ${mix(hue, 14)} 0%, transparent 65%)`;
 
     case "focus":
-      return `background-image: radial-gradient(60% 50% at 50% 40%, ${mix(hue, 12)} 0%, transparent 70%)`;
+      return `background-image: radial-gradient(70% 60% at 50% 25%, ${mix(hue, 10)} 0%, transparent 72%)`;
 
     case "lift":
-      return `background-image: linear-gradient(180deg, transparent 30%, ${mix(hue, 14)} 100%)`;
+      return `background-image: linear-gradient(180deg, ${mix(hue, 12)} 0%, transparent 70%)`;
 
     /* Two offset washes rather than one, so the eye has somewhere to travel. */
     case "mesh":
       return "background-image: " + [
-        `radial-gradient(80% 60% at 12% 0%, ${mix(hue, 20)} 0%, transparent 60%)`,
-        `radial-gradient(70% 55% at 92% 12%, ${mix(hue, 12)} 0%, transparent 62%)`,
+        `radial-gradient(80% 70% at 10% -10%, ${mix(hue, 16)} 0%, transparent 62%)`,
+        `radial-gradient(70% 60% at 95% 5%, ${mix(hue, 9)} 0%, transparent 64%)`,
       ].join(", ");
 
     /*
@@ -97,8 +112,10 @@ export function ambienceCss(what: Ambience, tone: Tone = "neutral"): string {
     */
     case "dots":
       return [
-        `background-image: radial-gradient(${mix(hue, 55)} 1px, transparent 1px)`,
-        `background-size: 14px 14px`,
+        /* ⚠️ 18% and 22px, from 55% and 14px. At the old values the grid was a
+           thing you looked AT rather than a surface the screen sat on. */
+        `background-image: radial-gradient(${mix(hue, 18)} 0.5px, transparent 0.5px)`,
+        `background-size: 22px 22px`,
         `background-position: 0 0`,
       ].join("; ");
 
@@ -107,8 +124,8 @@ export function ambienceCss(what: Ambience, tone: Tone = "neutral"): string {
     case "weave":
       return [
         "background-image: " + [
-          `repeating-linear-gradient(45deg, ${mix(hue, 10)} 0 1px, transparent 1px 6px)`,
-          `repeating-linear-gradient(-45deg, ${mix(hue, 7)} 0 1px, transparent 1px 6px)`,
+          /* ⚠️ One pass, not two crossed ones — the crosshatch read as moiré. */
+          `repeating-linear-gradient(45deg, ${mix(hue, 5)} 0 1px, transparent 1px 9px)`,
         ].join(", "),
       ].join("; ");
   }
@@ -134,7 +151,10 @@ export function ambienceStylesheet(): string {
        of any ancestor that happens to create a stacking context. */
     `[data-sky] { position: relative; isolation: isolate; }`,
     `[data-sky]:not([data-sky="plain"])::before {`,
-    `  content: ""; position: absolute; inset: 0; z-index: -1;`,
+    /* ⚠️ `bottom: auto` and a height — see `REACH`. `inset: 0` is what made the
+       fade invisible on every page longer than a screen. */
+    `  content: ""; position: absolute; top: 0; left: 0; right: 0;`,
+    `  height: ${REACH}; bottom: auto; z-index: -1;`,
     `  pointer-events: none; background-repeat: repeat;`,
     `}`,
     ...rules,
@@ -145,5 +165,19 @@ export function ambienceStylesheet(): string {
        would be one a workspace's branding never reaches (D7). */
     `[data-dot="true"] { border-radius: 9999px; background: var(--danger); }`,
     `[data-dot="true"][data-tone="accent"] { background: var(--accent); }`,
+    /*
+      ⚠️ ONE OPTICAL WEIGHT FOR EVERY GLYPH IN THE PRODUCT. An icon library takes
+      its size from its own props, so one caller passing nothing draws at the
+      library default beside one that passed 20 — and a list with two icon sizes
+      is the single most visible sign of a surface nobody owns. Setting it on the
+      BOX means a caller cannot get it wrong.
+    */
+    `[style*="--icon"] > svg { width: var(--icon); height: var(--icon); }`,
+    `[style*="--icon"] > svg { stroke-width: 1.75; }`,
+    /* ⚠️ THE ISLAND'S COLLAPSE, AS A RULE RATHER THAN AN INLINE STYLE. It shrinks
+       when its labels go to `sr-only`, and an inline `style` on the component
+       would beat every branding token it otherwise answers to. */
+    `[data-island="true"] { transition: all var(--default-transition-duration) var(--ease-out-fluid); }`,
+    `@media (prefers-reduced-motion: reduce) { [data-island="true"] { transition: none; } }`,
   ].join("\n");
 }

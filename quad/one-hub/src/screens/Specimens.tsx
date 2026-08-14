@@ -22,9 +22,11 @@ import {
   TileGrid, Title, ToggleRow, FieldRow, TYPE,
 } from "@quad/web";
 import { Button } from "@heroui/react";
+import { ChartColumn, Check, CircleUser, Clock, CreditCard, Ellipsis, EyeOff, FileText, Globe, House, KeyRound, Landmark, LogIn, Mail, MessagesSquare, Package, PiggyBank, Plus, ReceiptText, Trash2, TriangleAlert } from "lucide-react";
 
 const nothing = () => {};
-const glyph = (mark: string) => <span aria-hidden="true">{mark}</span>;
+/** ⚠️ Lucide, at ONE size set by the lead box — see `ICON` in metrics. */
+const glyph = (icon: React.ReactNode) => icon;
 
 /* ------------------------------------------------------------- a workshop --- */
 
@@ -35,21 +37,21 @@ function Workshop() {
       sky="weave"
       nav={<Island here="/" onGo={nothing}
         items={[
-          { id: "today", label: "Today", icon: glyph("⌂"), route: "/" },
-          { id: "jobs", label: "Jobs", icon: glyph("▤"), route: "/jobs", unread: true },
-          { id: "parts", label: "Parts", icon: glyph("⬡"), route: "/parts" },
-          { id: "people", label: "People", icon: glyph("◉"), route: "/people" },
+          { id: "today", label: "Today", icon: glyph(<House />), route: "/" },
+          { id: "jobs", label: "Jobs", icon: glyph(<FileText />), route: "/jobs", unread: true },
+          { id: "parts", label: "Parts", icon: glyph(<Package />), route: "/parts" },
+          { id: "people", label: "People", icon: glyph(<CircleUser />), route: "/people" },
         ]} />}
     >
       <AppCrown
-        face={glyph("◉")}
+        face={glyph(<CircleUser />)}
         unread
         onOpenAccount={nothing}
         onSearch={nothing}
         searchLabel="Search jobs"
         actions={[
-          { id: "cal", label: "Calendar", icon: glyph("▤"), onDo: nothing },
-          { id: "new", label: "New job", icon: glyph("+"), onDo: nothing },
+          { id: "cal", label: "Calendar", icon: glyph(<FileText />), onDo: nothing },
+          { id: "new", label: "New job", icon: glyph(<Plus />), onDo: nothing },
         ]}
       />
       <Band width="work">
@@ -61,10 +63,10 @@ function Workshop() {
             under={
               <QuickActions
                 actions={[
-                  { id: "in", label: "Check in", icon: glyph("→"), onDo: nothing },
-                  { id: "quote", label: "Quote", icon: glyph("≡"), onDo: nothing },
-                  { id: "parts", label: "Parts", icon: glyph("⬡"), onDo: nothing },
-                  { id: "more", label: "More", icon: glyph("…"), onDo: nothing },
+                  { id: "in", label: "Check in", icon: glyph(<LogIn />), onDo: nothing },
+                  { id: "quote", label: "Quote", icon: glyph(<ReceiptText />), onDo: nothing },
+                  { id: "parts", label: "Parts", icon: glyph(<Package />), onDo: nothing },
+                  { id: "more", label: "More", icon: glyph(<Ellipsis />), onDo: nothing },
                 ]}
               />
             }
@@ -72,29 +74,29 @@ function Workshop() {
 
           <Group label="On the stands">
             <PersonRow name="Priya Raman" under="Ribble CGR · brake bleed" when="In 40m" unread={2} onOpen={nothing} />
-            <RowRule />
+            <RowRule inset="face" />
             <PersonRow name="Tom Okafor" under="Brompton · full service" when="Today" onOpen={nothing} />
-            <RowRule />
+            <RowRule inset="face" />
             <PersonRow name="Lena Fischer" under="Waiting on a rear mech" when="Thu" onOpen={nothing} />
             <SeeAll onOpen={nothing} />
           </Group>
 
           <Group label="Waiting to be paid">
-            <AmountRow icon={glyph("◫")} label="Invoice 2043" under="Sent Monday" amount="£240.00" onOpen={nothing} />
+            <AmountRow icon={glyph(<Landmark />)} label="Invoice 2043" under="Sent Monday" amount="£240.00" onOpen={nothing} />
             <RowRule />
-            <AmountRow icon={glyph("◫")} label="Invoice 2041" under="Overdue by 6 days" amount="£85.00" onOpen={nothing} />
+            <AmountRow icon={glyph(<Landmark />)} label="Invoice 2041" under="Overdue by 6 days" amount="£85.00" onOpen={nothing} />
           </Group>
 
           <Group label="Worth a look">
             <OfferRow
-              icon={glyph("◍")}
+              icon={glyph(<Globe />)}
               label="Online booking"
               under="Let people book a slot themselves"
               offer={{ label: "Turn on", onDo: nothing }}
             />
             <RowRule />
             <OfferRow
-              icon={glyph("▦")}
+              icon={glyph(<ChartColumn />)}
               label="Parts supplier"
               under="Order without leaving a job"
               offer={{ label: "Connect", onDo: nothing }}
@@ -123,7 +125,7 @@ function Settings() {
 
           <Group>
             <ToggleRow
-              icon={glyph("◔")}
+              icon={glyph(<EyeOff />)}
               label="Quiet hours"
               under="Hold notifications between 8pm and 8am"
               value={quiet}
@@ -131,7 +133,7 @@ function Settings() {
             />
             <RowRule />
             <ToggleRow
-              icon={glyph("◑")}
+              icon={glyph(<MessagesSquare />)}
               label="Weekly digest"
               under="One summary on Monday morning"
               value={digest}
@@ -139,7 +141,7 @@ function Settings() {
             />
             <RowRule />
             <ToggleRow
-              icon={glyph("◍")}
+              icon={glyph(<Globe />)}
               label="Share anonymous usage"
               under="Helps us find what is slow"
               value={share}
@@ -148,11 +150,11 @@ function Settings() {
           </Group>
 
           <Group label="People" under="Who can do what in here">
-            <NavRow icon={glyph("◉")} label="Members" aside={<span className={TYPE.note}>12</span>} onOpen={nothing} />
+            <NavRow icon={glyph(<CircleUser />)} label="Members" aside={<span className={TYPE.note}>12</span>} onOpen={nothing} />
             <RowRule />
-            <NavRow icon={glyph("⚿")} label="Roles" under="Three custom roles" onOpen={nothing} />
+            <NavRow icon={glyph(<KeyRound />)} label="Roles" under="Three custom roles" onOpen={nothing} />
             <RowRule />
-            <NavRow icon={glyph("✉")} label="Invitations" aside={<span className={TYPE.note}>2</span>} onOpen={nothing} />
+            <NavRow icon={glyph(<Mail />)} label="Invitations" aside={<span className={TYPE.note}>2</span>} onOpen={nothing} />
           </Group>
 
           <Group label="This workspace">
@@ -162,7 +164,7 @@ function Settings() {
             <RowRule />
             <FieldRow label="Where records are kept" value="European Union" />
             <RowRule />
-            <ActionRow icon={glyph("✕")} label="Close this workspace" tone="danger" onDo={nothing} />
+            <ActionRow icon={glyph(<Trash2 />)} label="Close this workspace" tone="danger" onDo={nothing} />
           </Group>
         </Stack>
       </Band>
@@ -188,21 +190,21 @@ function Detail() {
             <RowRule />
             <CopyRow label="Route reference" value="RTE-2026-0814-NW" onCopy={nothing} />
             <RowRule />
-            <NoteRow icon={glyph("◷")}>
+            <NoteRow icon={glyph(<Clock />)}>
               Seals are checked at both ends. If one is broken on arrival, photograph it before
               opening and the load is treated as disputed.
             </NoteRow>
-            <NoteRow icon={glyph("⌂")}>
+            <NoteRow icon={glyph(<House />)}>
               Loads over 24 tonnes need a second signature at the gate.
             </NoteRow>
           </Group>
 
           <Group label="On the trailer">
-            <AmountRow icon={glyph("▦")} label="Pallets" amount="18" />
+            <AmountRow icon={glyph(<ChartColumn />)} label="Pallets" amount="18" />
             <RowRule />
-            <AmountRow icon={glyph("◈")} label="Weight" amount="21.4 t" />
+            <AmountRow icon={glyph(<PiggyBank />)} label="Weight" amount="21.4 t" />
             <RowRule />
-            <AmountRow icon={glyph("◔")} label="Temperature" under="Held since 04:10" amount="2 °C" tone="success" />
+            <AmountRow icon={glyph(<EyeOff />)} label="Temperature" under="Held since 04:10" amount="2 °C" tone="success" />
           </Group>
         </Stack>
       </Band>
@@ -224,10 +226,10 @@ function Flow() {
             figure={<span className={TYPE.title}>Get your first bed planted</span>}
           />
           <Group label="Before you can plant">
-            <StepRow icon={glyph("◉")} label="Tell us your plot size" under="So spacing is worked out for you" />
-            <StepRow icon={glyph("◔")} label="Pick your last frost date" under="We will hold seedlings until then" />
-            <StepRow icon={glyph("⬡")} label="Choose what you grow" under="Twelve to start, change any time" />
-            <StepRow icon={glyph("✓")} label="Confirm the bed" under="And we schedule the first watering" />
+            <StepRow icon={glyph(<CircleUser />)} label="Tell us your plot size" under="So spacing is worked out for you" />
+            <StepRow icon={glyph(<EyeOff />)} label="Pick your last frost date" under="We will hold seedlings until then" />
+            <StepRow icon={glyph(<Package />)} label="Choose what you grow" under="Twelve to start, change any time" />
+            <StepRow icon={glyph(<Check />)} label="Confirm the bed" under="And we schedule the first watering" />
           </Group>
           <Prose>
             Nothing is ordered until you confirm. You can stop after any step and come back to
@@ -251,20 +253,20 @@ function Start() {
       sky="calm"
       nav={<Island here="/" onGo={nothing}
         items={[
-          { id: "round", label: "Round", icon: glyph("⌂"), route: "/" },
-          { id: "ward", label: "Ward", icon: glyph("▭"), route: "/ward" },
-          { id: "notes", label: "Notes", icon: glyph("▤"), route: "/notes", unread: true },
-          { id: "team", label: "Team", icon: glyph("◉"), route: "/team" },
+          { id: "round", label: "Round", icon: glyph(<House />), route: "/" },
+          { id: "ward", label: "Ward", icon: glyph(<CreditCard />), route: "/ward" },
+          { id: "notes", label: "Notes", icon: glyph(<FileText />), route: "/notes", unread: true },
+          { id: "team", label: "Team", icon: glyph(<CircleUser />), route: "/team" },
         ]} />}
     >
       <AppCrown
-        face={glyph("◉")}
+        face={glyph(<CircleUser />)}
         onOpenAccount={nothing}
         onSearch={nothing}
         searchLabel="Search the ward"
         actions={[
-          { id: "chart", label: "Charts", icon: glyph("▦"), onDo: nothing },
-          { id: "add", label: "Admit", icon: glyph("+"), onDo: nothing },
+          { id: "chart", label: "Charts", icon: glyph(<ChartColumn />), onDo: nothing },
+          { id: "add", label: "Admit", icon: glyph(<Plus />), onDo: nothing },
         ]}
       />
       <Band width="work">
@@ -285,16 +287,16 @@ function Start() {
           <SectionTitle>Get set up</SectionTitle>
           <TileGrid
             tiles={[
-              { id: "beds", label: "Beds", icon: glyph("▭"), onOpen: nothing },
-              { id: "staff", label: "Staff", icon: glyph("◉"), onOpen: nothing },
-              { id: "rounds", label: "Rounds", icon: glyph("◷"), onOpen: nothing },
-              { id: "alerts", label: "Alerts", icon: glyph("!"), onOpen: nothing },
+              { id: "beds", label: "Beds", icon: glyph(<CreditCard />), onOpen: nothing },
+              { id: "staff", label: "Staff", icon: glyph(<CircleUser />), onOpen: nothing },
+              { id: "rounds", label: "Rounds", icon: glyph(<Clock />), onOpen: nothing },
+              { id: "alerts", label: "Alerts", icon: glyph(<TriangleAlert />), onOpen: nothing },
             ]}
           />
 
           <Group label="While you are here">
             <OfferRow
-              icon={glyph("▤")}
+              icon={glyph(<FileText />)}
               label="Import last night's handover"
               under="From the evening team"
               offer={{ label: "Import", onDo: nothing }}

@@ -86,19 +86,73 @@ const LAYOUT = [
 ];
 
 /**
- * ⚠️ AN INTERPOLATION NAMING A METRIC IS ALLOWED, AND ANYTHING ELSE IS NOT. Once
- * the spacing moved into `metrics.ts`, every placement read `${ROW.pad}` — which
- * this could neither verify nor sensibly refuse. Resolving the names it knows is
- * the honest middle: a metric is layout by construction (its own guard says so),
- * and an interpolation of anything else is a value this check cannot see, which
- * is exactly what it must not wave through.
+ * ⚠️ AN INTERPOLATION NAMING A METRIC IS RESOLVED, NOT TRUSTED. Once the spacing
+ * moved into `metrics.ts`, every placement read `${ROW.pad}` — a value this check
+ * could neither see nor sensibly refuse. The first version answered with a list
+ * of metric names to wave through, and that list was wrong within the day: `FACE`
+ * was added to `metrics.ts`, used exactly as `LEAD` is, and reported as a
+ * restyle. A guard whose maintenance is a second list of the thing it checks is a
+ * guard people edit to make green.
+ *
+ * ⚠️ SO THE VALUES ARE READ OUT OF `metrics.ts` AND PUT THROUGH THE SAME RULE AS
+ * EVERY OTHER UTILITY. A metric that is genuinely appearance — a colour, a
+ * radius — is then refused where it is used, which is the answer this always
+ * should have given.
  */
-const METRICS = /^\$\{(?:ROW|SPACE|WIDTH)\.\w+\}$|^\$\{(?:LEAD|HEAD_GAP|GUTTER|BAND_PAD|NAV_SPACE|ACTION_SPACE|SAFE_BOTTOM)\}$/;
+const METRIC_VALUES = (() => {
+  const src = readFileSync(join(QUAD, "web/src/metrics.ts"), "utf8");
+  const out = new Map();
+  /*
+    ⚠️ ONE DECLARATION AT A TIME, because a regex over the whole file gets this
+    wrong in a way that reads as a real finding. Matching `export const NAME = {…}`
+    with a lazy body runs a SINGLE-LINE object on to the next multi-line one's
+    closing brace, swallowing the declaration between them — so `SPACE.tight`
+    resolved to nothing and `gap-2` was reported as a restyle.
+  */
+  for (const chunk of src.split(/^export const /m).slice(1)) {
+    const name = chunk.match(/^(\w+)/)?.[1];
+    if (!name) continue;
+    const decl = chunk.slice(0, chunk.search(/^(?:export |\/\*)/m) + 1 || undefined);
+    const string = decl.match(/^\w+\s*=\s*"([^"]*)"/);
+    if (string) { out.set(name, string[1]); continue; }
+    for (const [, key, value] of decl.matchAll(/(\w+):\s*"([^"]*)"/g)) {
+      out.set(`${name}.${key}`, value);
+    }
+  }
+  return out;
+})();
+
+/** An interpolation of a metric, resolved to the utilities it actually is. */
+const metricClasses = (cls) => {
+  const m = cls.match(/^\$\{([\w.]+)\}$/);
+  if (!m) return null;
+  const value = METRIC_VALUES.get(m[1]);
+  return value === undefined ? null : value.split(/\s+/).filter(Boolean);
+};
 
 /** ⚠️ A responsive or state prefix does not change what the utility IS. */
 const bare = (cls) => cls.replace(/^(?:[a-z0-9]+:)+/, "").replace(/^[!-]/, "");
 
-const layoutOnly = (cls) => METRICS.test(cls) || LAYOUT.some((re) => re.test(bare(cls)));
+const plainLayout = (cls) => LAYOUT.some((re) => re.test(bare(cls)));
+
+/**
+ * ⚠️ PADDING IS REFUSED WHEN IT IS A NUMBER SOMEBODY PICKED AND ALLOWED WHEN IT
+ * CAME FROM `metrics.ts`, AND THE DISTINCTION IS THE WHOLE POINT OF THAT FILE.
+ * The rule started as a flat ban because a component's own density is the
+ * library's decision — right for making a `Button` chunkier, wrong for the case
+ * that actually came up: the library ships no ROW, so a full-width row is a
+ * `Button` inside a `Card` and pays BOTH their paddings, indented 32px with its
+ * separator drawn at 36. Refusing the fix left the misalignment in place and
+ * called it consistency. A metric is reviewed once, in one file, with its own
+ * guard over it — which is exactly the property the ban was reaching for.
+ */
+const PADDING = [/^p-/, /^(px|py|pt|pr|pb|pl)-/];
+const metricLayout = (cls) => plainLayout(cls) || PADDING.some((re) => re.test(bare(cls)));
+
+const layoutOnly = (cls) => {
+  const resolved = metricClasses(cls);
+  return resolved ? resolved.every(metricLayout) : plainLayout(cls);
+};
 
 /**
  * ⚠️ HEROUI COMPONENTS ARE FOUND BY WHAT WAS IMPORTED, not by a hardcoded list.
@@ -178,6 +232,42 @@ for (const file of FILES) {
   }
 }
 if (!raw) ok(`library: nothing hand-rolls a control HeroUI ships`);
+
+/**
+ * ⚠️ A COMPONENT THAT POSITIONS ITSELF IS USED INSIDE THE THING IT POSITIONS
+ * AGAINST. Some of the library's components are not laid out by the flow they
+ * appear in — they are placed relative to a wrapper (`Badge` against
+ * `Badge.Anchor`). Written without it, the component still compiles, still
+ * renders and still looks like a component; it simply takes itself out of the
+ * flow and lands on top of whatever is beside it.
+ *
+ * ⚠️ WHICH IS WHY THIS IS A GUARD AND NOT A NOTE. `PersonRow`'s unread count sat
+ * over the time beside it in every render anybody looked at, and the diff that
+ * caused it — `<Badge>` where every other file in the tree had written `<Chip>` —
+ * is the most reasonable-looking line in the file. The library's own
+ * documentation says to use `Chip` for a standalone label, so the fix is
+ * unambiguous once anybody knows; the guard is what makes anybody know.
+ */
+const ANCHORED = [
+  ["Badge", "Badge.Anchor", "Chip"],
+];
+let loose = 0;
+for (const file of FILES) {
+  const src = readFileSync(file, "utf8");
+  for (const [tag, wrapper, instead] of ANCHORED) {
+    /* The wrapper is a member of the same component, so a file that uses it at
+       all has imported the base name — count the tags, not the imports. */
+    const used = [...src.matchAll(new RegExp(`<${tag}(?![\\w.])`, "g"))].length;
+    const wrapped = [...src.matchAll(new RegExp(`<${wrapper.replace(".", "\\.")}\\b`, "g"))].length;
+    if (used > wrapped) {
+      loose++;
+      fail(`${rel(file)}: <${tag}> appears ${used}× with ${wrapped} <${wrapper}> around it (D7).\n` +
+           `       ${tag} is POSITIONED against its anchor — standalone it leaves the flow and\n` +
+           `       overlaps its neighbour. For a standalone label the library ships <${instead}>.`);
+    }
+  }
+}
+if (!loose) ok(`anchored: every positioned component sits inside the wrapper it positions against`);
 
 console.log(bad
   ? `\nheroui: ${bad} finding(s) — a screen branding will not reach.`

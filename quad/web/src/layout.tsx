@@ -21,14 +21,14 @@
 import * as React from "react";
 import type { Tone } from "@quad/kernel";
 import { PRIMARY_MAX } from "@quad/kernel";
-import { Button, Separator } from "@heroui/react";
+import { Button, Card, Separator } from "@heroui/react";
 /* ⚠️ `Ambience`, not `theme.ts`'s older four-value `Sky`. The two drifted the
    moment patterns were added, and a `Page` that could not be given `dots` was a
    vocabulary with a piece nothing could reach. */
 import type { Ambience } from "./ambience.js";
 import { TYPE } from "./type.js";
 import {
-  BAND_PAD, GUTTER, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
+  BAND_PAD, CROWN, FACE, GUTTER, HERO_PAD, ICON, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
   type Space, type Width,
 } from "./metrics.js";
 import { MOTION } from "./motion.js";
@@ -199,13 +199,13 @@ export function Crown(
   return (
     <header className="w-full">
       <Band bleed={bleed} width={width}>
-        <div className={`flex items-center ${SPACE.snug} ${BAND_PAD}`}>
+        <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
           {mark ? <span aria-hidden="true" className="flex items-center">{mark}</span> : null}
-          <div className="flex flex-col min-w-0">
+          <div className="flex min-w-0 grow flex-col">
             <strong className={TYPE.label}>{name}</strong>
             {under ? <span className={TYPE.note}>{under}</span> : null}
           </div>
-          {aside ? <div className={`ml-auto flex items-center ${SPACE.tight}`}>{aside}</div> : null}
+          {aside ? <div className={`flex shrink-0 items-center ${SPACE.tight}`}>{aside}</div> : null}
         </div>
       </Band>
       {ruled ? <Separator /> : null}
@@ -280,12 +280,18 @@ export function Balance({ eyebrow, figure, identifier, under }: {
   readonly under?: React.ReactNode;
 }) {
   return (
-    <div className={`flex flex-col items-center ${SPACE.tight} ${BAND_PAD} text-center`}>
-      {eyebrow ? <span className={TYPE.note}>{eyebrow}</span> : null}
-      <div className="flex items-baseline justify-center">{figure}</div>
-      {identifier ? (
-        <span className={`${TYPE.note} flex items-center ${SPACE.tight}`}>{identifier}</span>
-      ) : null}
+    /* ⚠️ TWO GROUPS, NOT ONE RUN. The eyebrow, the figure and the identifier are
+       ONE thing and belong tight together; whatever is under them is a separate
+       thing and needs air. Spacing them all identically is what made the
+       quick-actions read as a fourth line of the caption. */
+    <div className={`flex flex-col items-center ${SPACE.roomy} ${HERO_PAD} text-center`}>
+      <div className={`flex flex-col items-center ${SPACE.tight}`}>
+        {eyebrow ? <span className={TYPE.note}>{eyebrow}</span> : null}
+        <div className="flex items-baseline justify-center">{figure}</div>
+        {identifier ? (
+          <span className={`${TYPE.note} flex items-center ${SPACE.tight}`}>{identifier}</span>
+        ) : null}
+      </div>
       {under}
     </div>
   );
@@ -354,7 +360,22 @@ export function Island({ items, here, onGo }: {
       aria-label="Sections"
       className={`sticky bottom-0 z-10 flex justify-center ${PAD} ${SAFE_BOTTOM}`}
     >
-      <div className="flex items-center gap-1" style={{ transition: MOTION.travel }}>
+      {/* ⚠️ AN ISLAND NEEDS ITS OWN GROUND, AND IT DID NOT HAVE ONE. Four ghost
+          buttons over a transparent box are four buttons with the page showing
+          BETWEEN them — the specimen rendered "Booking" from the card underneath
+          straight through the nav's own "Booking" label, which reads as a
+          rendering fault rather than as a layout choice. `Card` is the library's
+          answer to "a raised surface with a ground and a radius", so this stays
+          themed rather than painted. */}
+      {/* ⚠️ THE TRANSITION IS AN ATTRIBUTE, NOT A `style`. An inline style beats
+          every token, so a component carrying one stops answering to branding —
+          the restyle guard refuses it, correctly, and the stylesheet is where
+          this rule belongs anyway. */}
+      {/* ⚠️ `flex-row` EXPLICITLY. `Card` stacks its children by default — as
+          `Switch` does — so `flex items-center` alone left four destinations in a
+          vertical column down the middle of the screen. A library component's
+          own direction is not the one you assume. */}
+      <Card variant="tertiary" data-island="true" className="flex flex-row items-center gap-1">
         {items.slice(0, PRIMARY_MAX).map((item) => {
           const at = item.route === here;
           return (
@@ -378,7 +399,7 @@ export function Island({ items, here, onGo }: {
             </Button>
           );
         })}
-      </div>
+      </Card>
     </nav>
   );
 }
@@ -455,9 +476,18 @@ export function AppCrown(
   return (
     <header className="w-full">
       <Band bleed="edge" width="work">
-        <div className={`flex items-center ${SPACE.snug} ${BAND_PAD}`}>
+        <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
           <Button variant="ghost" aria-label="Your account" onPress={onOpenAccount}>
-            <span className="relative flex items-center">
+            {/* ⚠️ A REAL 40px FACE — see `FACE`. A 24px glyph in a 64px bar is
+                what made every crown look top-light and unfinished. */}
+            <span
+              className={`relative flex ${FACE} items-center justify-center`}
+              /* ⚠️ THE FACE SETS ITS OWN GLYPH SIZE, because `.button` sizes every
+                 svg inside it to `size-5 sm:size-4` — so the 40px slot held a
+                 16px mark and the crown still read as top-light after the slot
+                 was fixed. */
+              style={{ ["--icon" as string]: `${ICON.face}px` }}
+            >
               {face}
               {unread
                 ? <span aria-hidden="true" className="absolute -top-1 -right-1"><Dot /></span>

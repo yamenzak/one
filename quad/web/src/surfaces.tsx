@@ -24,10 +24,11 @@
  * when the library changes its mind about a shadow (D7).
  */
 
-import { Avatar, Badge, Button, Card, Label, Separator, Switch } from "@heroui/react";
+import { Avatar, Button, Card, Chip, Label, Separator, Switch } from "@heroui/react";
 import type { Tone } from "@quad/kernel";
 import { TYPE } from "./type.js";
-import { HEAD_GAP, LEAD, PAD, ROW, SPACE } from "./metrics.js";
+import { FACE, HEAD_GAP, ICON, INSET, LEAD, PAD, ROW, SPACE } from "./metrics.js";
+import type { Inset } from "./metrics.js";
 
 /* ------------------------------------------------------------------ group --- */
 
@@ -60,9 +61,18 @@ export function Group({ label, under, children }: GroupProps) {
   );
 }
 
-/** ⚠️ Between rows, never after the last. `Group` cannot know, so the caller
-    interleaves — which is also what lets one card hold two runs of rows. */
-export const RowRule = () => <Separator />;
+/**
+ * ⚠️ BETWEEN ROWS, NEVER AFTER THE LAST. `Group` cannot know which is last, so
+ * the caller interleaves — which is also what lets one card hold two runs.
+ *
+ * ⚠️ AND IT IS INSET TO THE TEXT COLUMN — see `INSET`. Which inset depends on
+ * what the rows above and below LEAD with, so a run of people takes `face` and a
+ * run of glyph rows takes `lead`. Getting it wrong is not subtle once anybody
+ * looks: the rule stops 16px short of the labels it is meant to line up with.
+ */
+export const RowRule = ({ inset = "lead" }: { readonly inset?: Inset } = {}) => (
+  <div className={INSET[inset]}><Separator /></div>
+);
 
 /* ------------------------------------------------------------------- rows --- */
 
@@ -90,7 +100,14 @@ const Body = ({ label, under }: { readonly label: string; readonly under?: strin
 
 /** ⚠️ A FIXED BOX, so every label in a list starts at the same x — see `LEAD`. */
 const Lead = ({ icon }: { readonly icon?: React.ReactNode }) =>
-  icon ? <span aria-hidden="true" className={LEAD}>{icon}</span> : null;
+  icon
+    /* ⚠️ THE SIZE IS SET ON THE BOX, NOT ASKED OF THE ICON. Every icon library
+       reads `width`/`height` from its own props, so a caller who forgets one
+       draws at whatever the default is — and a list with two icon sizes in it is
+       the thing that reads as unfinished. Fixing it here means a caller cannot
+       get it wrong. */
+    ? <span aria-hidden="true" className={LEAD} style={{ ["--icon" as string]: `${ICON.row}px` }}>{icon}</span>
+    : null;
 
 /**
  * ⚠️ A ROW THAT GOES SOMEWHERE IS A BUTTON, NOT A DIV WITH AN onClick. The
@@ -108,7 +125,7 @@ export interface NavRowProps extends RowBase {
 
 export function NavRow({ icon, label, under, aside, onOpen, isDisabled }: NavRowProps) {
   return (
-    <Button variant="ghost" className="w-full justify-start" isDisabled={isDisabled} onPress={onOpen}>
+    <Button variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.flush} ${ROW.tap}`} isDisabled={isDisabled} onPress={onOpen}>
       <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
         <Lead icon={icon} />
         <Body label={label} under={under} />
@@ -130,7 +147,7 @@ export function ActionRow({ icon, label, under, onDo, tone = "neutral" }: RowBas
   return (
     <Button
       variant={tone === "danger" ? "danger" : "ghost"}
-      className="w-full justify-start"
+      className={`w-full justify-start ${ROW.free} ${ROW.flush} ${ROW.tap}`}
       onPress={onDo}
     >
       <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
@@ -224,17 +241,29 @@ export function PersonRow({ name, under, when, unread, face, onOpen }: {
   readonly onOpen: () => void;
 }) {
   return (
-    <Button variant="ghost" className="w-full justify-start" onPress={onOpen}>
+    <Button variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.flush} ${ROW.tap}`} onPress={onOpen}>
       <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
-        <Avatar className="shrink-0">
+        <Avatar className={`shrink-0 ${FACE}`}>
           {face ? <Avatar.Image src={face} alt="" /> : null}
           <Avatar.Fallback>{name.slice(0, 1).toUpperCase()}</Avatar.Fallback>
         </Avatar>
         <Body label={name} under={under} />
-        <span className="flex shrink-0 flex-col items-end gap-1">
+        {/* ⚠️ `Chip`, NOT `Badge`, AND THE DIFFERENCE IS NOT COSMETIC. A HeroUI
+            `Badge` is POSITIONED — it expects a `Badge.Anchor` around the thing
+            it marks. Standing alone it takes itself out of the flow, so the
+            count landed on top of the time beside it instead of under it. The
+            library's own docs say to use `Chip` for a standalone label; this is
+            the one place in the tree that did not. */}
+        {/* ⚠️ ON ONE LINE, NOT STACKED. Two lines of trailing meta need more
+            height than the row has, so the count sat on the separator below it —
+            and a row that grows to fit its own corner breaks the rhythm of every
+            row beside it. Time then count, in the reading direction. */}
+        <span className={`flex shrink-0 items-center ${SPACE.tight}`}>
           {when ? <span className={TYPE.note}>{when}</span> : null}
           {unread ? (
-            <Badge color="accent"><Badge.Label>{unread}</Badge.Label></Badge>
+            <Chip color="accent" variant="primary" size="sm">
+              <Chip.Label>{unread}</Chip.Label>
+            </Chip>
           ) : null}
         </span>
       </span>
@@ -263,7 +292,7 @@ export function AmountRow({ icon, label, under, amount, tone = "neutral", onOpen
     </span>
   );
   return onOpen
-    ? <Button variant="ghost" className="w-full justify-start" onPress={onOpen}>{inner}</Button>
+    ? <Button variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.flush} ${ROW.tap}`} onPress={onOpen}>{inner}</Button>
     : <div className="flex w-full">{inner}</div>;
 }
 
@@ -286,7 +315,10 @@ export function QuickActions({ actions }: {
     /* ⚠️ Four must FIT a phone. At 80px wide with a 24px gap they came to 392px
        against 390 available, so the fourth wrapped to its own line — which reads
        as a mistake rather than as a row. */
-    <div className={`flex flex-wrap items-start justify-center ${SPACE.snug} ${ROW.pad}`}>
+    /* ⚠️ NO VERTICAL PADDING OF ITS OWN. A cluster is spaced by whatever it sits
+       in; carrying its own pad on top of that container's gap is how a hero came
+       to have eighty pixels of nothing under it. */
+    <div className={`flex flex-wrap items-start justify-center ${SPACE.snug}`}>
       {actions.slice(0, 4).map((a) => (
         <div key={a.id} className={`flex w-16 flex-col items-center ${SPACE.tight}`}>
           <Button variant="secondary" aria-label={a.label} onPress={a.onDo}>{a.icon}</Button>

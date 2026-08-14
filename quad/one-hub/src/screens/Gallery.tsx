@@ -20,12 +20,13 @@ import { AppCrown, Balance, Band, CopyRow, Figure, Group, Grid, Island, Money, N
   TYPE, type Ambience } from "@quad/web";
 import { Button } from "@heroui/react";
 import { Sheet } from "../ui.js";
+import { ArrowLeftRight, ChevronRight, CirclePlus, CircleUser, Clock, Coins, CreditCard, Ellipsis, EyeOff, FileText, Globe, House, Landmark, Link2, MessagesSquare, Package, PiggyBank, Plane, Plus, Smartphone, Trash2, TriangleAlert, Users } from "lucide-react";
 
 const nothing = () => {};
 
-/** ⚠️ Text, not an icon font or an SVG import — the vocabulary is what is being
-    shown here, and a real icon set is a decision that has not been made. */
-const glyph = (mark: string) => <span aria-hidden="true">{mark}</span>;
+/** ⚠️ Lucide, at ONE size set by the lead box — see `ICON` in metrics. A caller
+    passing a size here is a caller who can get it wrong. */
+const glyph = (icon: React.ReactNode) => icon;
 
 const SKIES: readonly Ambience[] = ["calm", "focus", "lift", "mesh", "dots", "weave"];
 
@@ -47,10 +48,10 @@ export function Gallery() {
           under={
             <QuickActions
               actions={[
-                { id: "add", label: "Add money", icon: glyph("+"), onDo: nothing },
-                { id: "move", label: "Move", icon: glyph("⇄"), onDo: nothing },
-                { id: "details", label: "Details", icon: glyph("▤"), onDo: nothing },
-                { id: "more", label: "More", icon: glyph("…"), onDo: nothing },
+                { id: "add", label: "Add money", icon: glyph(<Plus />), onDo: nothing },
+                { id: "move", label: "Move", icon: glyph(<ArrowLeftRight />), onDo: nothing },
+                { id: "details", label: "Details", icon: glyph(<FileText />), onDo: nothing },
+                { id: "more", label: "More", icon: glyph(<Ellipsis />), onDo: nothing },
               ]}
             />
           }
@@ -75,10 +76,10 @@ export function Gallery() {
 
       {/* ----------------------------------------------------------- rows --- */}
       <Group label="Rows" under="Seven shapes cover every list in the product">
-        <NavRow icon={glyph("▸")} label="Goes somewhere" onOpen={nothing} />
+        <NavRow icon={glyph(<ChevronRight />)} label="Goes somewhere" onOpen={nothing} />
         <RowRule />
         <NavRow
-          icon={glyph("▸")}
+          icon={glyph(<ChevronRight />)}
           label="Goes somewhere, explained"
           under="One line saying what is behind it"
           aside={<span className={TYPE.note}>3</span>}
@@ -86,7 +87,7 @@ export function Gallery() {
         />
         <RowRule />
         <ToggleRow
-          icon={glyph("◔")}
+          icon={glyph(<EyeOff />)}
           label="Hide balances"
           under="Hide amounts for all balances and transactions"
           value={hide}
@@ -94,7 +95,7 @@ export function Gallery() {
         />
         <RowRule />
         <ToggleRow
-          icon={glyph("◑")}
+          icon={glyph(<MessagesSquare />)}
           label="Messaging with friends"
           under="Send and receive messages with other people here"
           value={flip}
@@ -104,14 +105,14 @@ export function Gallery() {
         <FieldRow label="Residential address" value="Woldegker Str. 8A, 13059, Berlin" onEdit={nothing} />
         <RowRule />
         <FieldRow label="Tax residency" value="Germany" />
-        <RowRule />
+        <RowRule inset="face" />
         <PersonRow name="Amir Al Tarsha" under="Sent you €2.69" when="Yesterday" unread={5} onOpen={nothing} />
+        <RowRule inset="face" />
+        <AmountRow icon={glyph(<PiggyBank />)} label="Savings" under="Two accounts" amount="€6,003" onOpen={nothing} />
         <RowRule />
-        <AmountRow icon={glyph("◈")} label="Savings" under="Two accounts" amount="€6,003" onOpen={nothing} />
+        <AmountRow icon={glyph(<Coins />)} label="Cash" amount="€1,169" />
         <RowRule />
-        <AmountRow icon={glyph("◇")} label="Cash" amount="€1,169" />
-        <RowRule />
-        <ActionRow icon={glyph("✕")} label="Close this workspace" tone="danger" onDo={nothing} />
+        <ActionRow icon={glyph(<Trash2 />)} label="Close this workspace" tone="danger" onDo={nothing} />
       </Group>
 
       {/* --------------------------------------------------- copy + notes --- */}
@@ -122,10 +123,10 @@ export function Gallery() {
         <RowRule />
         <CopyRow label="BIC / SWIFT code" value="REVODEB2" onCopy={nothing} />
         <RowRule />
-        <NoteRow icon={glyph("⌂")}>
+        <NoteRow icon={glyph(<House />)}>
           Eligible deposits are protected up to a value of €100,000, or more in exceptions.
         </NoteRow>
-        <NoteRow icon={glyph("◷")}>
+        <NoteRow icon={glyph(<Clock />)}>
           Local transfers can be instant or take up to two working days, depending on the sending bank.
         </NoteRow>
       </Group>
@@ -133,14 +134,14 @@ export function Gallery() {
       {/* -------------------------------------------------- offers + steps --- */}
       <Group label="Discover more">
         <OfferRow
-          icon={glyph("◍")}
+          icon={glyph(<Globe />)}
           label="International transfer"
           under="Fast, secure and low cost"
           offer={{ label: "Send", onDo: nothing }}
         />
         <RowRule />
         <OfferRow
-          icon={glyph("&")}
+          icon={glyph(<Users />)}
           label="Joint account"
           under="Manage money together"
           offer={{ label: "Open", onDo: nothing }}
@@ -148,16 +149,16 @@ export function Gallery() {
       </Group>
 
       <Group label="Before 25 August, your friends">
-        <StepRow icon={glyph("⚭")} label="Sign up with your link" under="And verify their identity" />
-        <StepRow icon={glyph("◎")} label="Add money to their account" under="By card or bank transfer" />
-        <StepRow icon={glyph("▤")} label="Order a physical card" under="And add it to a wallet" />
+        <StepRow icon={glyph(<Link2 />)} label="Sign up with your link" under="And verify their identity" />
+        <StepRow icon={glyph(<CirclePlus />)} label="Add money to their account" under="By card or bank transfer" />
+        <StepRow icon={glyph(<FileText />)} label="Order a physical card" under="And add it to a wallet" />
       </Group>
 
       {/* ------------------------------------------------------ truncated --- */}
       <Group label="Upcoming payments">
-        <AmountRow icon={glyph("◫")} label="REWE Pay" under="Recurring" amount="−€3.08" />
+        <AmountRow icon={glyph(<Landmark />)} label="REWE Pay" under="Recurring" amount="−€3.08" />
         <RowRule />
-        <AmountRow icon={glyph("◫")} label="Db Vertrieb GmbH" under="Monthly, next on 17 August" amount="−€63.00" />
+        <AmountRow icon={glyph(<Landmark />)} label="Db Vertrieb GmbH" under="Monthly, next on 17 August" amount="−€63.00" />
         <SeeAll onOpen={nothing} />
       </Group>
 
@@ -175,17 +176,17 @@ export function Gallery() {
         <SectionTitle>Shortcuts</SectionTitle>
         <QuickActions
           actions={[
-            { id: "fraud", label: "Report fraud", icon: glyph("!"), onDo: nothing },
-            { id: "card", label: "Lost card", icon: glyph("▭"), onDo: nothing },
-            { id: "device", label: "Lost device", icon: glyph("▯"), onDo: nothing },
+            { id: "fraud", label: "Report fraud", icon: glyph(<TriangleAlert />), onDo: nothing },
+            { id: "card", label: "Lost card", icon: glyph(<CreditCard />), onDo: nothing },
+            { id: "device", label: "Lost device", icon: glyph(<Smartphone />), onDo: nothing },
           ]}
         />
         <TileGrid
           tiles={[
-            { id: "a", label: "Miles", icon: glyph("✈"), onOpen: nothing },
-            { id: "b", label: "Stays", icon: glyph("⌂"), onOpen: nothing },
-            { id: "c", label: "eSIM", icon: glyph("▤"), onOpen: nothing },
-            { id: "d", label: "Shops", icon: glyph("⬡"), onOpen: nothing },
+            { id: "a", label: "Miles", icon: glyph(<Plane />), onOpen: nothing },
+            { id: "b", label: "Stays", icon: glyph(<House />), onOpen: nothing },
+            { id: "c", label: "eSIM", icon: glyph(<FileText />), onOpen: nothing },
+            { id: "d", label: "Shops", icon: glyph(<Package />), onOpen: nothing },
           ]}
         />
       </section>
@@ -214,7 +215,7 @@ export function Gallery() {
         ] as const).map(([where, one, two]) => (
           <AppCrown
             key={where}
-            face={glyph("◉")}
+            face={glyph(<CircleUser />)}
             unread={where === "Home"}
             onOpenAccount={nothing}
             onSearch={nothing}
@@ -237,10 +238,10 @@ export function Gallery() {
           here="/"
           onGo={nothing}
           items={[
-            { id: "home", label: "Home", icon: glyph("⌂"), route: "/" },
-            { id: "work", label: "Work", icon: glyph("▤"), route: "/work" },
-            { id: "pay", label: "Pay", icon: glyph("⇄"), route: "/pay", unread: true },
-            { id: "you", label: "You", icon: glyph("◉"), route: "/you" },
+            { id: "home", label: "Home", icon: glyph(<House />), route: "/" },
+            { id: "work", label: "Work", icon: glyph(<FileText />), route: "/work" },
+            { id: "pay", label: "Pay", icon: glyph(<ArrowLeftRight />), route: "/pay", unread: true },
+            { id: "you", label: "You", icon: glyph(<CircleUser />), route: "/you" },
           ]}
         />
       </section>

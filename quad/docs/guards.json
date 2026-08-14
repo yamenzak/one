@@ -381,6 +381,15 @@
       "fails": "a control missing the focus ring, the pressed state and the keyboard behaviour, which looks fine and so survives review"
     },
     {
+      "id": "every-positioned-component-sits-inside-its-anchor",
+      "protects": "D7",
+      "stage": "5",
+      "status": "live",
+      "impl": "scripts/heroui.test.mjs",
+      "proves": "anchored:",
+      "fails": "a count that lands on top of the time beside it, because a positioned component written without its anchor still compiles, still renders, and still looks like a component"
+    },
+    {
       "id": "a-stored-secret-is-never-rendered-back",
       "protects": "D11",
       "stage": "5",
