@@ -279,12 +279,12 @@ The guard registry, its checks, and the standards that bind them.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 5 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 6 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 7 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 2 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 3 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 10 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 37 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 38 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -376,6 +376,8 @@ the library decides FOR us.
 | `every-collection-records-who-and-when` | D12 | a record nobody can attribute, discovered at the moment somebody needs to know who changed it |
 | `the-generated-edit-actually-writes` | D12 | an edit that passes the gate, writes an audit entry saying it happened, answers 200 — and changes nothing |
 | `an-edit-cannot-land-on-somebody-elses-record` | D5 | a guessed id from another workspace answering 200 as though the change landed |
+| `the-product-talks-in-one-voice` | D7 | a product that sounds like several products — a caption with a full stop beside four without one, a control that says Submit, an error that says Oops |
+| `the-tone-rules-still-fire` | D12 | a green run that means nothing, because the checker's own rules stopped matching anything |
 <!-- /generated -->
 
 ## Commands

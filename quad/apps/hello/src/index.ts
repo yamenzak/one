@@ -48,7 +48,7 @@ interface Publish { readonly id: string }
 const publish = operation<Publish, { id: string; published: boolean }>({
   id: "note.publish",
   kind: "write",
-  summary: "Make a note visible to everybody in the workspace.",
+  summary: "Make a note visible to everybody here",
   input: { id: field.text({ label: "Note", required: true, holds: "none" }) },
   output: {
     id: field.text({ label: "Note", holds: "none" }),
@@ -126,7 +126,7 @@ export const HELLO: AppSpec = defineApp({
 
   notifications: {
     "note.published": {
-      id: "note.published", label: "A note was published", summary: "{who} published {title}.",
+      id: "note.published", label: "A note was published", summary: "{who} published {title}",
       category: "activity", author: "theirs", tone: "info", icon: "note",
       /* ⚠️ A permission, never a role name — a workspace's own role must receive
          these too, and matching on a name is how it silently stops. */

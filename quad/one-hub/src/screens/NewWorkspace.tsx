@@ -60,7 +60,7 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
   return (
     <Sheet
       title="Start a workspace"
-      lead="A workspace is a business. You can invite everybody else once it exists."
+      lead="A workspace is a business — invite everybody else once it exists"
     >
       {problem ? <Refusal problem={problem} /> : null}
 

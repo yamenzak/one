@@ -22,6 +22,7 @@ export * from "./gate.js";
 export * from "./dunning.js";
 export * from "./tenancy.js";
 export * from "./signin.js";
+export * from "./tone.js";
 
 export * from "./notify.js";
 export * from "./setting.js";

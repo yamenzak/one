@@ -87,7 +87,7 @@ describe("being told something", () => {
 
     const mine = await inboxOf(shard(), tenantId, "acc_alex");
     /* ⚠️ The values ARE the sentence: raised without them it renders "{who}". */
-    expect(mine[0]!.title).toBe("Sam published Q3 plan.");
+    expect(mine[0]!.title).toBe("Sam published Q3 plan");
     expect(mine[0]!.link).toBe("/");
   });
 

@@ -14,6 +14,7 @@
  */
 
 import { Band, Crown, Page, Spacer, TYPE } from "@quad/web";
+import { Gallery } from "./screens/Gallery.js";
 import { Waiting, Refusal } from "./ui.js";
 import { useSession } from "./session.js";
 import type { Face } from "./door.js";
@@ -24,7 +25,9 @@ import { Signpost } from "./screens/Signpost.js";
 import { Workspaces } from "./screens/Workspaces.js";
 
 /** What the Hub shows, as a name — the thing the guard and the tests read. */
-export type Screen = "waiting" | "stuck" | "signpost" | "sign-in" | "workspaces" | "new-workspace" | "elsewhere";
+export type Screen =
+  | "waiting" | "stuck" | "signpost" | "sign-in" | "workspaces" | "new-workspace"
+  | "elsewhere" | "gallery";
 
 /**
  * ⚠️ EVERY COMBINATION IS ANSWERED, INCLUDING THE ONES THAT SHOULD NOT HAPPEN.
@@ -32,8 +35,14 @@ export type Screen = "waiting" | "stuck" | "signpost" | "sign-in" | "workspaces"
  * occurs, nothing matches, and React renders nothing at all.
  */
 export function pickScreen(
-  face: Face | null, signedIn: boolean | null, stuck: boolean,
+  face: Face | null, signedIn: boolean | null, stuck: boolean, showcase = false,
 ): Screen {
+  /* ⚠️ THE VOCABULARY CATALOGUE IS A DEVELOPMENT SURFACE AND NEVER REACHABLE IN
+     PRODUCTION. A page listing every component a product has is a page that
+     leaks every capability it has, including the ones a workspace has not
+     bought. It is asked for by a query the deployment only honours in
+     development — see `App`. */
+  if (showcase) return "gallery";
   if (stuck) return "stuck";
   if (face === null) return "waiting";
   if (face === "signpost") return "signpost";
@@ -51,13 +60,18 @@ const LEAD: Readonly<Record<string, string>> = {
 
 export function App() {
   const { where, face, me, stuck } = useSession();
-  const screen = pickScreen(face, me === null ? null : me !== "nobody", stuck !== null);
+  /* ⚠️ Development only, and read from the DEPLOYMENT rather than the URL: a
+     query parameter alone would make the catalogue one link away in
+     production. */
+  const showcase = import.meta.env.DEV
+    && new URLSearchParams(location.search).has("gallery");
+  const screen = pickScreen(face, me === null ? null : me !== "nobody", stuck !== null, showcase);
 
   /* ⚠️ A SCREEN SOMEBODY WORKS IN AND A SCREEN SOMEBODY ARRIVES AT ARE NOT THE
      SAME LAYOUT. The first is a column under a ruled crown; the second is a
      centred sheet with no chrome. Using one for both makes the sign-in look like
      a settings page — which is how a product comes to feel like a form. */
-  const settled = screen === "workspaces";
+  const settled = screen === "workspaces" || screen === "gallery";
 
   return (
     /* ⚠️ The ambience is an attribute on the frame, read by a stylesheet rule
@@ -84,6 +98,7 @@ export function App() {
           {screen === "workspaces" && where ? <Workspaces where={where} /> : null}
           {screen === "new-workspace" && where ? <NewWorkspace where={where} /> : null}
           {screen === "elsewhere" && where ? <Elsewhere where={where} kind={where.kind} /> : null}
+          {screen === "gallery" ? <Gallery /> : null}
         </div>
       </Band>
       <Spacer />

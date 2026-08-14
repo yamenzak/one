@@ -712,6 +712,24 @@
       "impl": "apps/hello/test/serve.test.ts",
       "proves": "cannot reach a record that is not the caller's",
       "fails": "a guessed id from another workspace answering 200 as though the change landed"
+    },
+    {
+      "id": "the-product-talks-in-one-voice",
+      "protects": "D7",
+      "stage": "10",
+      "status": "live",
+      "impl": "scripts/tone.test.mjs",
+      "proves": "written string(s), all in one voice",
+      "fails": "a product that sounds like several products — a caption with a full stop beside four without one, a control that says Submit, an error that says Oops"
+    },
+    {
+      "id": "the-tone-rules-still-fire",
+      "protects": "D12",
+      "stage": "10",
+      "status": "live",
+      "impl": "scripts/tone.test.mjs",
+      "proves": "fire on the copy they exist to catch",
+      "fails": "a green run that means nothing, because the checker's own rules stopped matching anything"
     }
   ]
 }

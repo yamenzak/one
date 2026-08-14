@@ -15,7 +15,7 @@ export function Signpost({ where }: { readonly where: Where }) {
   return (
     <Sheet
       title="One"
-      lead="Every product on one account. Sign in to see your workspaces, or start one."
+      lead="Every product on one account — sign in, or start a workspace"
     >
       <div className="flex flex-wrap gap-2">
         <Button variant="primary" onPress={() => { location.assign(accountUrl(where, location)); }}>

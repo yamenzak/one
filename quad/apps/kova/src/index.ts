@@ -44,7 +44,7 @@ const client = collection({
        outside the grant log and outside crypto-shredding (D11). */
     conditions: field.long({ label: "Conditions and injuries", holds: "sensitive", vault: true }),
     startedOn: field.day({ label: "Started", holds: "none" }),
-    goal: field.text({ label: "What they are working towards", holds: "none", max: 200 }),
+    goal: field.text({ label: "Goal", holds: "none", max: 200 }),
   },
 });
 
@@ -146,7 +146,7 @@ interface Draft { readonly clientId: string; readonly weeks: number }
 const publish = operation<Publish, { id: string; published: boolean }>({
   id: "plan.publish",
   kind: "write",
-  summary: "Make a plan the client's active one.",
+  summary: "Make this the client's active plan",
   input: { id: field.text({ label: "Plan", required: true, holds: "none" }) },
   output: {
     id: field.text({ label: "Plan", holds: "none" }),
@@ -178,7 +178,7 @@ const publish = operation<Publish, { id: string; published: boolean }>({
 const history = operation<History, { items: unknown[] }>({
   id: "client.history",
   kind: "read",
-  summary: "What a client has logged.",
+  summary: "What a client has logged",
   input: {
     clientId: field.text({ label: "Client", required: true, holds: "none" }),
     since: field.day({ label: "Since", holds: "none" }),
@@ -203,7 +203,7 @@ const history = operation<History, { items: unknown[] }>({
 const draft = operation<Draft, { weeks: number }>({
   id: "plan.draft",
   kind: "write",
-  summary: "Draft a plan from what the client has been doing.",
+  summary: "Draft a plan from what the client has done",
   input: {
     clientId: field.text({ label: "Client", required: true, holds: "none" }),
     weeks: field.number({ label: "Weeks", required: true, holds: "none", min: 1, max: 12 }),
@@ -323,13 +323,13 @@ export const KOVA: AppSpec = defineApp({
 
   notifications: {
     "plan.published": {
-      id: "plan.published", label: "A plan was published", summary: "{coach} published {title}.",
+      id: "plan.published", label: "A plan was published", summary: "{coach} published {title}",
       category: "activity", author: "theirs", tone: "info", icon: "list",
       needs: "plan:read", on: "plan.published", link: "/plans",
       variables: ["coach", "title"], channels: ["inbox", "email", "push"],
     },
     "client.added": {
-      id: "client.added", label: "A client joined", summary: "{name} was added.",
+      id: "client.added", label: "A client joined", summary: "{name} was added",
       category: "activity", author: "theirs", tone: "success", icon: "people",
       needs: "client:read", on: "client.created", link: "/clients",
       variables: ["name"], channels: ["inbox", "email"],
@@ -423,7 +423,7 @@ export const KOVA: AppSpec = defineApp({
 
   jobs: {
     "lapsed-clients": {
-      id: "lapsed-clients", label: "Notice a client who has stopped",
+      id: "lapsed-clients", label: "A client went quiet",
       why: "Tells a coach when somebody has not logged anything for a fortnight.",
       schedule: "0 6 * * 1", scope: "per-tenant",
       onFail: { then: "park" },
@@ -462,7 +462,7 @@ export const KOVA: AppSpec = defineApp({
 
   help: {
     "about-clients": {
-      id: "about-clients", title: "What a client record holds", screen: "clients",
+      id: "about-clients", title: "The client record", screen: "clients",
       body: "Their name and goal live here. Conditions and injuries do not — those are kept "
         + "encrypted, behind their consent, and you see them only while they allow it.",
       terms: ["conditions", "injuries", "who can see", "medical"],

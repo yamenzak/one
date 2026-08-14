@@ -73,6 +73,10 @@ const LAYOUT = [
   /^(m|mt|mr|mb|ml|mx|my)-/,
   /^(flex|grid|inline-flex|inline-grid|block|inline|contents|hidden)$/,
   /^(flex|grid|basis|grow|shrink|order|col|row|justify|items|self|content|place)-/,
+  /* ⚠️ Bare `grow` and `shrink` are the same utilities without a value, and the
+     pattern above requires a hyphen — so a component asked to take the
+     remaining space was refused as a restyle. Placement, not appearance. */
+  /^(grow|shrink)$/,
   /^gap(-x|-y)?-/,
   /^(absolute|relative|fixed|sticky|static)$/,
   /^(inset|top|right|bottom|left|z)-/,
