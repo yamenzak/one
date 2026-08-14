@@ -15,6 +15,7 @@
 
 import { Band, Crown, Page, Spacer, TYPE } from "@quad/web";
 import { Gallery } from "./screens/Gallery.js";
+import { SPECIMEN_IDS, Specimen, type SpecimenId } from "./screens/Specimens.js";
 import { Waiting, Refusal } from "./ui.js";
 import { useSession } from "./session.js";
 import type { Face } from "./door.js";
@@ -63,8 +64,15 @@ export function App() {
   /* ⚠️ Development only, and read from the DEPLOYMENT rather than the URL: a
      query parameter alone would make the catalogue one link away in
      production. */
-  const showcase = import.meta.env.DEV
-    && new URLSearchParams(location.search).has("gallery");
+  const query = new URLSearchParams(location.search);
+  const showcase = import.meta.env.DEV && query.has("gallery");
+  /* ⚠️ A WHOLE SCREEN, ASSEMBLED FROM THE VOCABULARY AND NOTHING ELSE. The
+     catalogue proves each piece renders; a specimen proves a real screen can be
+     built without reaching around any of them. Development only, for the same
+     reason the catalogue is. */
+  const specimen = import.meta.env.DEV
+    ? SPECIMEN_IDS.find((id) => id === query.get("screen")) ?? null
+    : null;
   const screen = pickScreen(face, me === null ? null : me !== "nobody", stuck !== null, showcase);
 
   /* ⚠️ A SCREEN SOMEBODY WORKS IN AND A SCREEN SOMEBODY ARRIVES AT ARE NOT THE
@@ -72,6 +80,11 @@ export function App() {
      centred sheet with no chrome. Using one for both makes the sign-in look like
      a settings page — which is how a product comes to feel like a form. */
   const settled = screen === "workspaces" || screen === "gallery";
+
+  /* ⚠️ A specimen brings its OWN page, crown and ambience — that is the whole
+     claim being tested — so it replaces the Hub's frame rather than sitting
+     inside it. */
+  if (specimen) return <Specimen id={specimen as SpecimenId} />;
 
   return (
     /* ⚠️ The ambience is an attribute on the frame, read by a stylesheet rule

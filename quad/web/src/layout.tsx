@@ -22,7 +22,10 @@ import * as React from "react";
 import type { Tone } from "@quad/kernel";
 import { PRIMARY_MAX } from "@quad/kernel";
 import { Button, Separator } from "@heroui/react";
-import type { Sky } from "./theme.js";
+/* ⚠️ `Ambience`, not `theme.ts`'s older four-value `Sky`. The two drifted the
+   moment patterns were added, and a `Page` that could not be given `dots` was a
+   vocabulary with a piece nothing could reach. */
+import type { Ambience } from "./ambience.js";
 import { TYPE } from "./type.js";
 import { MOTION } from "./motion.js";
 
@@ -54,7 +57,7 @@ const WIDTH: Readonly<Record<Width, string>> = {
 
 export interface PageProps {
   /** ⚠️ Named, never a colour — see the header. */
-  readonly sky?: Sky;
+  readonly sky?: Ambience;
   readonly tone?: Tone;
   readonly children?: React.ReactNode;
 }
@@ -81,7 +84,7 @@ export interface BandProps {
   readonly bleed?: Bleed;
   readonly width?: Width;
   /** ⚠️ Its own ambience, so one section can lift while the page stays calm. */
-  readonly sky?: Sky;
+  readonly sky?: Ambience;
   readonly tone?: Tone;
   readonly children?: React.ReactNode;
 }
