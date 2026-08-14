@@ -21,6 +21,7 @@ import { NotificationPolicy, policyShown } from "../src/policy.js";
 import { FlagConsole, Shelf, saying, money } from "../src/console.js";
 import { Shell, reachable } from "../src/shell.js";
 import { brandCss, brandCssFor, readable, skyCss, colorFor } from "../src/theme.js";
+import { bespokeCss } from "../src/ambience.js";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node);
 
@@ -369,6 +370,18 @@ describe("a workspace's branding", () => {
     expect(skyCss("calm", "neutral")).toContain("var(--brand)");
     expect(skyCss("lift", "success")).toContain("var(--success)");
     expect(skyCss("calm")).not.toMatch(/#[0-9a-f]{6}/i);
+  });
+
+  /* ⚠️ A bespoke world is an IDENTITY: same seed, same world, forever — and it
+     obeys every rule the named ambiences do (tokens in, no hex out). */
+  it("composes a bespoke world deterministically from its seed", () => {
+    expect(bespokeCss(7)).toBe(bespokeCss(7));
+    expect(bespokeCss(7)).not.toBe(bespokeCss(8));
+    expect(bespokeCss(7)).toContain("var(--brand)");
+    expect(bespokeCss(7, "warning")).toContain("var(--warning)");
+    expect(bespokeCss(7)).not.toMatch(/#[0-9a-f]{6}/i);
+    /* The field is always the bottom layer — a bespoke world still owns the screen. */
+    expect(bespokeCss(7)).toMatch(/var\(--lumen, transparent\)\) 52%, transparent 96%\)$/);
   });
 
   it("maps what happened onto the library's colour names in one place", () => {

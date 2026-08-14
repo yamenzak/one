@@ -225,24 +225,39 @@ if (!grain) {
  * sign. So every sub-pixel pattern layer must run through `thread()`, which
  * carries the knob light turns off — and a new ambience whose fibres bypass it
  * is this exact complaint shipping again.
+ *
+ * ⚠️ MACRO LINE-WORK IS THE ONE PERMITTED EXCEPTION, AND PITCH IS THE LINE.
+ * `etch()` carries its own knob that light only DIMS: rings at 56px and graph
+ * lines at 44px are sparse enough that each line reads as printing, not grime.
+ * The boundary is 24px — an `etch()` layer at a finer pitch is a fibre wearing
+ * the wrong helper, and it fails here rather than shipping the complaint with
+ * a new name.
  */
-const fibres = [...AMBIENCE.matchAll(/repeating-linear-gradient\([^,]+,\s*\$\{(\w+)\(/g),
+const fibres = [...AMBIENCE.matchAll(/repeating-linear-gradient\([^,]+,\s*\$\{(\w+)\([^`]*?(\d+)px\)`/g),
   ...AMBIENCE.matchAll(/radial-gradient\(\$\{(\w+)\([^)]*\)\}\s*0?\.\d+px/g)];
-const loose_ = fibres.filter(([, fn]) => fn !== "thread");
+const loose_ = fibres.filter(([, fn]) => fn !== "thread" && fn !== "etch");
+const fine_ = fibres.filter(([, fn, pitch]) => fn === "etch" && Number(pitch ?? 0) < 24);
 if (!fibres.length) {
   fail(`ambience.ts: no texture layers found — if the fibres are gone, drop this check on purpose.`);
-} else if (loose_.length) {
+} else if (loose_.length || fine_.length) {
   for (const [whole, fn] of loose_) {
-    fail(`ambience.ts: a texture layer bypasses \`thread()\` — \`${whole.slice(0, 60)}…\` uses \`${fn}()\`.
+    fail(`ambience.ts: a texture layer bypasses \`thread()\`/\`etch()\` — \`${whole.slice(0, 60)}…\` uses \`${fn}()\`.
 ` +
          `       Fine dark marks on light paper are grime; the knob light turns off is
 ` +
-         `       \`--thread\`, and only \`thread()\` carries it.`);
+         `       \`--thread\`, and only \`thread()\` carries it. Macro line-work (≥24px) may use \`etch()\`.`);
+  }
+  for (const [whole, , pitch] of fine_) {
+    fail(`ambience.ts: an \`etch()\` layer at ${pitch}px pitch — that is micro-texture, and it
+` +
+         `       must use \`thread()\` so light can turn it off. \`${whole.slice(0, 60)}…\``);
   }
 } else if (!/--thread: 0/.test(AMBIENCE)) {
   fail(`ambience.ts: nothing sets \`--thread: 0\` in light, so every fibre still shows there.`);
+} else if (!/--etch: 0?\.\d+/.test(AMBIENCE)) {
+  fail(`ambience.ts: nothing dims \`--etch\` in light — etched lines at dark strength on paper.`);
 } else {
-  ok(`threads: ${fibres.length} texture layer(s), every fibre dies in light`);
+  ok(`threads: ${fibres.length} texture layer(s) — fibres die in light, etching dims`);
 }
 
 console.log(bad

@@ -75,8 +75,24 @@ like moments, the screen is two screens.
 | Sign-in, arrival, the front door | `calm` or the signature | first contact: quiet, or the material — never busy |
 | Celebration, milestone, reward | `aurora` | the only multi-hue ambience; spend it on somebody ELSE's achievement |
 | One object, one decision (paywall, confirm-delete) | `spotlight` | staged on purpose; use where the screen IS one thing |
+| A premium tier, a flagship pitch | `streak` | the one pure graphic: a neon ribbon whose drama is the darkness around it |
+| An announcement, a launch | `rays` | beams from above — something new arrived |
+| Devices, monitoring, live status | `arc` | concentric rings on a measure; reads as sonar, technical without being busy |
+| Planning boards, technical dashboards | `grid` | etched graph paper — the one pattern that survives light at half voice |
+| Levels, tiers, a progression ladder | `terrace` | stepped strata: the shape IS the concept |
+| A journey, terrain, long-run progress | `ridge` | drawn topographic contours — distance travelled, distance left |
+| Shared money, activity, anything with a current | `flow` | drawn parallel streams; movement without animation |
+| People, profiles, warmth | `bloom` | a tight organic cluster of light — a presence, not a place |
+| Creative tools, galleries | `prism` | two crisp slabs crossing; the overlap is the light |
 | Empty/blocked/maintenance interstitials | `plain` or `veil` | a big mood behind "nothing here" reads as sarcasm |
 | Everything else | `plain` | **the default.** Ambience everywhere is ambience nowhere |
+
+The twenty-one named ambiences fall into four families — soft light (the
+original twelve), geometry (`rays`, `arc`, `prism`, `terrace`, `grid`), drawn
+line art (`ridge`, `flow`), and staged graphics (`streak`) — and the family is
+part of the choice: an app whose signature is soft light can still spend
+`streak` on its one flagship screen, but two families on one SCREEN is two
+worlds fighting.
 
 Rules of thumb that outrank the table:
 
@@ -121,6 +137,18 @@ Rules of thumb that outrank the table:
   light mode gets the folds, poles and sweeps of the same ambience with
   `--thread: 0`. Never re-enable fibres in light "because they look subtle on
   my screen"; they are grime on somebody's brighter one. Guarded (`threads:`).
+- **Etched lines are not fibres, and pitch is the boundary.** Rings at 56px
+  (`arc`) and graph lines at 44px (`grid`) are sparse enough that each line
+  reads as printing, the way a ruled notebook is not a dirty page — so light
+  DIMS them (`--etch: 0.5`) instead of killing them, and the pattern survives
+  the theme at half voice. Below ~24px pitch it is micro-texture and must be a
+  fibre. The same guard enforces both, by pitch.
+- **Line art is drawn, achromatic, and theme-flipped.** `ridge` and `flow` are
+  computed SVG — an SVG data URI cannot carry a token, so the drawing carries
+  no colour at all: white strokes over the hue field in dark (light catching a
+  ridge), near-black strokes over the pastel in light (printing). Both work
+  over every brand because neither names one. A new drawing is new MATH in
+  `ambience.ts`, never a hand-authored path and never a bitmap.
 - **New patterns must be aperiodic or single-pitch.** Two repeating layers at
   close pitches beat into a moiré lattice — the grain is `feTurbulence` for
   exactly this reason. Guarded (`grain:`).
@@ -129,6 +157,25 @@ Rules of thumb that outrank the table:
   light-mode pass at `--sky: 0.55` with fibres off, and a row in this table
   saying which screen kind it serves. If no row wants it, it is a wallpaper,
   not an ambience.
+
+## Endless variety — the primitives, and bespoke worlds
+
+A named ambience is a RECIPE over a small primitive vocabulary in
+`ambience.ts`: `mix` (a sky-scaled tint), `pole` (a soft light), `thread`
+(micro-fibre, dark only), `etch` (macro line, dims in light), the conic fold,
+the repeating ring/beam, the drawn `art` layer, and the `field` under all of
+it. Twenty-one names is not the ceiling — a new ambience is a few lines of
+recipe, and the checklist below is the whole cost.
+
+**`bespokeCss(seed)` composes a world that belongs to nobody else.** A
+deterministic seed picks an archetype (pure light, a sweep, a fold, rings,
+beams) and jitters positions, angles and strengths within the ranges the named
+ambiences were tuned in — so a workspace can have a home no other workspace
+has, and it still obeys every rule on this page: hue from the tone, strength
+from `--sky`, the field, the grain, the fade. Same seed, same world, forever;
+a bespoke ambience is an identity, and identities do not drift. Use it for
+workspace-level distinction, never to dodge the screen-kind table — a screen
+inside an app still names a shape or `plain`.
 
 ## Motion
 
