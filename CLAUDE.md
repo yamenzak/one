@@ -861,8 +861,32 @@ checklist after it. **Start there rather than from recall** — the repository i
 the memory, which is the reason a deferral is a marker a script finds rather than
 a sentence somebody has to remember.
 
-**[platform/docs/PLAN.md](platform/docs/PLAN.md) is the PLAN for what replaces
-all of this, and much of it is not built.** A new framework directory that owns the
+## Quad — the framework, and One — the deployment
+
+⚠️ **`quad/` IS THE SUCCESSOR TO BOTH `platform/` AND EVERYTHING ABOVE, AND IT IS
+WHERE NEW STRUCTURAL WORK GOES.** Start at
+[quad/docs/PROGRESS.md](quad/docs/PROGRESS.md) — it is what exists today, with a
+stage table a script keeps honest — then [quad/docs/PLAN.md](quad/docs/PLAN.md)
+§1–§3 and [quad/docs/DECISIONS.md](quad/docs/DECISIONS.md). Nothing else is
+required to resume the work; **start there rather than from recall.**
+
+**The two names mean different things and neither is the other.** **Quad** is the
+FRAMEWORK — `@quad/kernel` (pure contracts), `@quad/runtime` (the only code that
+touches a binding), `@quad/web` (the browser half, router-free), and the
+reference apps. **One** is the DEPLOYMENT built on it: `quad/one` is the worker
+that answers every door for every product, `quad/one-hub` is the page a person
+opens at the root, `id.` and `setup.`. A product — Kova — is a manifest inside
+it. So "One" is what a customer types and "Quad" is what a contributor imports,
+and the day there is a second deployment the split is what makes that cheap.
+
+**`quad/` is INERT to the legacy tree by construction**: nothing in it is in
+`apps.json`, so `deploy.yml` can never select it. Its tests and guards DO run —
+`pnpm quad:test`, `quad:typecheck`, and `quad:gate`, which is inside the root
+`pnpm gate`. The old `platform/` tree is no longer in the root gate; run it with
+`pnpm one:gate` if you need it.
+
+**[platform/docs/PLAN.md](platform/docs/PLAN.md) was the plan Quad came out of,
+and it is superseded.** A new framework directory that owns the
 runtime, the data model, the surface (HTTP + AI tools + webhooks) and the chrome,
 driven by a typed manifest per app, with the apps living inside it. Four
 decisions are settled there — a declarative shell with code screens, absorbing

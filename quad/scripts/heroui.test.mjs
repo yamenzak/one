@@ -46,8 +46,16 @@ const filesIn = (dir) => {
   return out;
 };
 
+/**
+ * ⚠️ EVERY DIRECTORY IN THIS TREE THAT DRAWS SOMETHING, and `one-hub` is named
+ * here because it is the largest of them: the Hub is the first surface anybody
+ * sees, and a guard that covered the shared package and the reference app while
+ * leaving the real screens out would be a guard that reports green about the
+ * files nobody checked.
+ */
 const FILES = [
   ...filesIn("web/src"),
+  ...filesIn("one-hub/src"),
   ...readdirSync(join(QUAD, "apps"), { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .flatMap((e) => filesIn(`apps/${e.name}/src`)),

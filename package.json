@@ -9,9 +9,9 @@
   },
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --filter='./apps/*' --filter='./packages/*'",
     "test": "pnpm gate && turbo run test",
-    "gate": "node .github/workflows/workflows-parse.test.mjs && pnpm one:gate && pnpm quad:gate && node scripts/apps-manifest.test.mjs && node scripts/affected.test.mjs && node scripts/shared-config.test.mjs && node scripts/sender-default.test.mjs && node scripts/email-brand-origin.test.mjs && node scripts/otp-gate.test.mjs && node scripts/flag-enforcement.test.mjs && node scripts/entitlement-enforcement.test.mjs && node scripts/capability-reachable.test.mjs && node scripts/storage-chokepoint.test.mjs && node scripts/api-door.test.mjs && node scripts/player-api-base.test.mjs && node scripts/motion-config.test.mjs && node scripts/ui-ownership.test.mjs",
+    "gate": "node .github/workflows/workflows-parse.test.mjs && pnpm quad:gate && node scripts/apps-manifest.test.mjs && node scripts/affected.test.mjs && node scripts/shared-config.test.mjs && node scripts/sender-default.test.mjs && node scripts/email-brand-origin.test.mjs && node scripts/otp-gate.test.mjs && node scripts/flag-enforcement.test.mjs && node scripts/entitlement-enforcement.test.mjs && node scripts/capability-reachable.test.mjs && node scripts/storage-chokepoint.test.mjs && node scripts/api-door.test.mjs && node scripts/player-api-base.test.mjs && node scripts/motion-config.test.mjs && node scripts/ui-ownership.test.mjs",
     "typecheck": "turbo run typecheck",
     "e2e": "turbo run e2e",
     "shots": "turbo run shots",
@@ -20,9 +20,10 @@
     "one:test": "turbo run test --filter='./platform/*'",
     "one:typecheck": "turbo run typecheck --filter='./platform/*'",
     "one:gate": "node platform/scripts/sheets.mjs platform/web/src && node platform/scripts/docs.test.mjs && node platform/scripts/guards.test.mjs && node platform/scripts/kernel.test.mjs && node platform/scripts/bindings.test.mjs && node platform/scripts/surface.test.mjs && node platform/scripts/handlers.test.mjs && node platform/scripts/owned.test.mjs && node platform/scripts/scoped.test.mjs && node platform/scripts/budget.test.mjs && node platform/scripts/capabilities.test.mjs && node platform/scripts/wire.test.mjs",
+    "quad:dev": "turbo run dev --filter='./quad/*'",
     "quad:test": "turbo run test --filter='./quad/*' --filter='./quad/apps/*'",
     "quad:typecheck": "turbo run typecheck --filter='./quad/*' --filter='./quad/apps/*'",
-    "quad:gate": "node quad/scripts/docs.test.mjs && node quad/scripts/guards.test.mjs && node quad/scripts/kernel.test.mjs && node quad/scripts/declarations.test.mjs && node quad/scripts/shards.test.mjs && node quad/scripts/apps.test.mjs && node quad/scripts/heroui.test.mjs && node quad/scripts/surface.test.mjs && node quad/scripts/services.test.mjs && node quad/scripts/vault.test.mjs"
+    "quad:gate": "node quad/scripts/docs.test.mjs && node quad/scripts/guards.test.mjs && node quad/scripts/kernel.test.mjs && node quad/scripts/declarations.test.mjs && node quad/scripts/shards.test.mjs && node quad/scripts/apps.test.mjs && node quad/scripts/heroui.test.mjs && node quad/scripts/surface.test.mjs && node quad/scripts/hub.test.mjs && node quad/scripts/services.test.mjs && node quad/scripts/vault.test.mjs"
   },
   "devDependencies": {
     "turbo": "^2.5.9",

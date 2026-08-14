@@ -1,0 +1,40 @@
+/*
+  ⚠️ IMPORT ORDER IS LOAD-BEARING. Tailwind first, then HeroUI's styles — the
+  library's layers are declared against Tailwind's, and reversing them leaves
+  every component styled by whichever rule happened to win.
+*/
+@import "tailwindcss";
+@import "@heroui/styles";
+
+/*
+  ⚠️ TAILWIND ONLY SEES SOURCE IT IS POINTED AT, and a workspace package resolved
+  through `node_modules` is not found by the automatic detection. Miss one and
+  its components still mount, still typecheck and still pass every test — they
+  render with a subset of their classes, whichever ones some other file happened
+  to use too. Adding a workspace package with JSX in it? Add it here in the same
+  commit.
+*/
+@source "../../web/src";
+
+/*
+  ⚠️ THE AMBIENCE, AS A STYLESHEET RULE RATHER THAN A STYLE ON AN ELEMENT. The
+  shell sets `data-sky` on the frame; an inline style would beat every token and
+  a workspace's branding would stop reaching the background of every screen.
+
+  `prefers-reduced-motion` is not negotiable: a background that drifts is
+  pleasant to most people and makes some people ill.
+*/
+@media (prefers-reduced-motion: no-preference) {
+  [data-sky]:not([data-sky="plain"]) {
+    animation: quad-drift 24s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes quad-drift {
+  from {
+    background-position: 50% 0%;
+  }
+  to {
+    background-position: 50% 8%;
+  }
+}

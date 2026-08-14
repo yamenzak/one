@@ -577,6 +577,51 @@
       "impl": "apps/kova/test/kova.test.ts",
       "proves": "counts staff against the seats and clients against the clients",
       "fails": "a studio on the smallest plan unable to add the customers it exists to serve, refused for staff seats it was not asking for"
+    },
+    {
+      "id": "the-hub-has-one-door-to-the-api",
+      "protects": "D12",
+      "stage": "10",
+      "status": "live",
+      "impl": "scripts/hub.test.mjs",
+      "proves": "one API door:",
+      "fails": "an expired session that does not look expired — every screen showing the empty state its failed load produced, and every save failing into a toast"
+    },
+    {
+      "id": "the-browser-never-classifies-its-own-door",
+      "protects": "D3",
+      "stage": "10",
+      "status": "live",
+      "impl": "scripts/hub.test.mjs",
+      "proves": "doors: the Hub never classifies its own hostname",
+      "fails": "a page offering a control the runtime refuses, answered as a 404 with nothing on it to explain why"
+    },
+    {
+      "id": "every-screen-the-picker-names-is-drawn",
+      "protects": "D10",
+      "stage": "10",
+      "status": "live",
+      "impl": "scripts/hub.test.mjs",
+      "proves": "screens: every one the picker can name has a branch",
+      "fails": "a blank page, which is the same picture as a page that failed to load — so somebody reloads for a minute and then gives up"
+    },
+    {
+      "id": "a-code-that-could-not-be-sent-holds-no-cooldown",
+      "protects": "D12",
+      "stage": "10",
+      "status": "live",
+      "impl": "one/test/boot.test.ts",
+      "proves": "leaves nothing behind when the send failed",
+      "fails": "somebody locked out for a minute waiting on a code that was never delivered, told they are asking too often"
+    },
+    {
+      "id": "the-deployment-answers-on-every-door-it-serves",
+      "protects": "D3",
+      "stage": "10",
+      "status": "live",
+      "impl": "one/test/boot.test.ts",
+      "proves": "answers /health on every door",
+      "fails": "a deploy reporting green while the isolate throws in its first middleware — the page still loads, because static assets never reach the worker"
     }
   ]
 }

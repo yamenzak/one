@@ -103,7 +103,18 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
     /* ⚠️ An unrecognised host is nothing, never a default — see `doorFor`. */
     if (door.kind === "none") return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
 
-    if (url.pathname === "/health") return json({ ok: true, door: door.kind });
+    /*
+      ⚠️ THE DOOR IS REPORTED, SO THE BROWSER NEVER CLASSIFIES ITS OWN HOSTNAME.
+      A second classifier in the page is a second set of reserved labels and a
+      second idea of what a custom domain is — and when the two disagree, the
+      page offers a control the runtime refuses, which arrives as a 404 nobody
+      can explain. `root` comes with it for the same reason: the addresses of the
+      other doors are derived from a fact the deployment holds, not from a
+      constant baked into a bundle at build time.
+    */
+    if (url.pathname === "/health") {
+      return json({ ok: true, door: door.kind, root: wiring.roots.root });
+    }
     if (!url.pathname.startsWith("/api/")) return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
 
     const id = url.pathname.slice("/api/".length);
@@ -289,7 +300,15 @@ const recordOutcome = async (
  * write whose values are in the URL ends up in every access log on the way.
  */
 async function readInput(request: Request, url: URL): Promise<Record<string, unknown> | null> {
-  if (request.method === "GET") return Object.fromEntries(url.searchParams);
+  if (request.method === "GET") {
+    /* ⚠️ `forEach` rather than spreading the params: the Workers type for
+       `URLSearchParams` is not iterable without `DOM.Iterable`, so a spread
+       compiles here and fails in the one package that actually builds a worker
+       — which is the only place it matters. */
+    const out: Record<string, unknown> = {};
+    url.searchParams.forEach((value, key) => { out[key] = value; });
+    return out;
+  }
   const text = await request.text();
   if (!text.trim()) return {};
   try {

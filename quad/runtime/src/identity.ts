@@ -22,7 +22,9 @@
  */
 
 import type { AccountId } from "@quad/kernel";
-import { newSessionId } from "@quad/kernel";
+import {
+  CODE_COOLDOWN_MS, CODE_DIGITS, CODE_LIFE_MS, CODE_TRIES, newSessionId,
+} from "@quad/kernel";
 import type { SchemaModule } from "./schema.js";
 import type { Db } from "./sql.js";
 
@@ -44,14 +46,13 @@ export const IDENTITY_SCHEMA: SchemaModule = {
 
 /* ------------------------------------------------------------------ codes --- */
 
-/** ⚠️ Long enough that guessing is hopeless against the ceiling below, short
-    enough to be read off a phone and typed. */
-export const CODE_DIGITS = 6;
-export const CODE_LIFE_MS = 5 * 60 * 1000;
-/** ⚠️ A code with unlimited attempts is a six-digit password. */
-export const CODE_TRIES = 5;
-/** ⚠️ And a cooldown, so the inbox is not a place somebody else can flood. */
-export const CODE_COOLDOWN_MS = 60 * 1000;
+/**
+ * ⚠️ THE FOUR NUMBERS ARE THE KERNEL'S, because the page reads them too — a form
+ * drawing six boxes against a server issuing eight refuses every valid code, and
+ * says "that code is wrong" while doing it. Re-exported here so the callers that
+ * issue and spend read them from the module that does the work.
+ */
+export { CODE_COOLDOWN_MS, CODE_DIGITS, CODE_LIFE_MS, CODE_TRIES };
 
 const digits = (n: number): string => {
   const bytes = crypto.getRandomValues(new Uint8Array(n));
@@ -95,6 +96,18 @@ export async function issueCode(
     .bind(id, email, await hash(code, secret), now.toISOString(),
       new Date(now.getTime() + CODE_LIFE_MS).toISOString()).run();
   return { id, code };
+}
+
+/**
+ * ⚠️ A CODE THAT COULD NOT BE SENT MUST NOT HOLD THE COOLDOWN. The row is
+ * written before the send is attempted — it has to be, or a code could be
+ * delivered that we never recorded — so a send that fails leaves somebody
+ * waiting a minute for a code that does not exist, and the sentence they are
+ * shown is about sending too often. Undoing the issue is what makes "try again"
+ * true.
+ */
+export async function forgetCode(db: Db, id: string): Promise<void> {
+  await db.prepare(`DELETE FROM code WHERE id = ?`).bind(id).run();
 }
 
 /**

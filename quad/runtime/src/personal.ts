@@ -23,7 +23,9 @@ import {
   appsOfTenant, createTenant, forgetInvitation, invitationsFor, noteBelonging, tenantsOf,
   upsertAccount, type TenantRow,
 } from "./directory.js";
-import { endSession, issueCode, readSession, spendCode, startSession, type Session } from "./identity.js";
+import {
+  endSession, forgetCode, issueCode, readSession, spendCode, startSession, type Session,
+} from "./identity.js";
 import { claimInvitations, found, membersOf } from "./membership.js";
 import type { Db } from "./sql.js";
 
@@ -97,9 +99,18 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
         const issued = await issueCode(ctx.directory, email, deps.secret, ctx.now);
         if (issued === "too_soon") return ctx.fail("platform.too_many", { retryAfter: 60 });
 
-        /* ⚠️ A failure to send is a refusal, not a shrug — see `deliver`. */
-        try { await deps.deliver(email, issued.code); }
-        catch { ctx.fail("platform.unavailable"); }
+        /*
+          ⚠️ A FAILURE TO SEND IS A REFUSAL, NOT A SHRUG — see `deliver`. And the
+          issued code is withdrawn with it: the row is written before the send is
+          attempted, so leaving it there means the next attempt is refused as
+          "too often" while no code was ever delivered.
+        */
+        try {
+          await deps.deliver(email, issued.code);
+        } catch {
+          await forgetCode(ctx.directory, issued.id);
+          return ctx.fail("platform.unavailable");
+        }
         return { sent: true };
       },
     },

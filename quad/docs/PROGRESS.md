@@ -24,29 +24,41 @@ reader can trust this table instead of re-reading the code.
 | 7 | Services — ai and notify over RPC | shipped |
 | 8 | Vault + legal | shipped |
 | 9 | Kova on Quad | shipped |
+| 10 | One — the deployment and the Hub | shipped |
 
 ## What is NOT built, and where to pick it up
 
 ⚠️ **EVERY STAGE IN [PLAN.md](PLAN.md) §7 IS SHIPPED, WHICH IS NOT THE SAME AS
 FINISHED.** The framework holds together end to end and refuses the whole class
-of faults it was built to refuse; what it has not yet met is a browser, a
-deployment or a customer. Naming that here is the point of the document — the
-failure this framework is a catalogue of is a thing that looks complete because
-nothing is red.
+of faults it was built to refuse; what it has not yet met is a customer. Naming
+that here is the point of the document — the failure this framework is a
+catalogue of is a thing that looks complete because nothing is red.
 
 Honestly outstanding, in the order it will bite:
 
-1. **Nothing is deployed.** There is no `wrangler.jsonc`, no worker entry, no
-   binding for a real D1, and no CI job that ships this. Every suite runs against
-   Miniflare, which is the real runtime — but a deployment is a separate act, and
-   "provisioning becomes a feature flag" is a claim about tenants, not about the
-   first worker.
+1. **Nothing is deployed to Cloudflare.** `quad/one` is a real worker with a real
+   `wrangler.jsonc`, and `quad/one-hub` is the page it serves — both boot, and
+   the worker's own suite drives every door through Miniflare on the real
+   `*.localhost` topology. What is missing is the account: the D1 ids in that
+   config are placeholders, so a `wrangler deploy` would bind databases that do
+   not exist and answer every request 500. Provisioning and a CI job are the next
+   act.
 2. **Passkeys.** Sign-in is an emailed code. There is deliberately no credential
    table waiting for a ceremony — see the note under identity below.
-3. **The screens are components, not an application.** `@quad/web` renders every
-   declared surface, and `apps/hello` and `apps/kova` prove it against their real
-   manifests — but nothing assembles them into a page a person can open, because
-   that needs a router and the shell is deliberately router-free.
+3. **A workspace's own screens are components, not an application.** The Hub is
+   real: the signpost, the sign-in, the workspace list and the wizard are screens
+   a person opens (`quad/one-hub`). What no page assembles yet is the surface
+   BEHIND a workspace's door — `@quad/web` renders every declared screen and both
+   reference apps prove it against their real manifests, but the tenant door's
+   shell is not built, and it is what needs the router the shared shell
+   deliberately does not have.
+   - ⚠️ **And the account door is thinner than it sounds, for a reason worth
+     knowing.** It lists workspaces and nothing else, because the notification
+     policy, the consent sheet, the audit of who looked and "your data" are all
+     scoped to a workspace in this runtime — the preference row is per
+     `(tenant, account)` and the vault lives on a shard. They belong to a
+     workspace's own surface today. An account-WIDE version of any of them is a
+     new account-scoped operation, not a screen somebody forgot to add.
 4. **The service workers are contracts, not deployments.** `AiService` and
    `NotifyService` are the typed seam, and the runtime implements both — but they
    are called in-process today. Splitting them into bound workers is a
@@ -211,7 +223,41 @@ without Kova declaring either. A client's conditions and weight are vault-backed
 because a health fact in a product table is outside consent, outside the grant
 log and outside crypto-shredding.
 
-The guard registry, its thirteen checks, and the standards that bind them.
+**`@quad/one` — the deployment, and it is one file.** One worker answers every
+door for every product (D3): adding a product is a line in `APPS` and a row in a
+database — no worker, no domain binding, no provisioning workflow, no secret. It
+applies the platform's tables once per isolate and AWAITS it, because a request
+served while the schema is still being created answers "no such table" to
+whoever happened to be first, which is a fault that appears once per deploy and
+never reproduces. Everything else in the file is a value handed to `serve`.
+
+- Its suite is the one a previous platform did not have, and that cost a day: an
+  app shipped green from its deploy workflow while the auth factory threw in the
+  first middleware, so every route answered 500 — `/health` included — and the
+  page still loaded, because static assets never reach the worker. Nine tests,
+  driving the real host topology through Miniflare, which preserves the Host
+  exactly as the edge does.
+- ⚠️ **The D1 ids in `wrangler.jsonc` are placeholders on purpose.** A deploy
+  with them in place binds databases that do not exist.
+
+**`@quad/one-hub` — the page a person opens.** The signpost, sign-in with an
+emailed code, the workspace list, and the wizard that makes one — HeroUI v3 as it
+ships, themed through tokens, nothing restyled.
+
+- **No router, and that is a measurement.** Every screen is picked by two facts —
+  which door, and whether anybody is signed in — neither of which is in the path.
+  `pickScreen` is pure, so "every door resolves to a screen" is a test rather
+  than a walk through five hostnames; a state that resolves to nothing renders a
+  blank page, which is the same picture as a page that failed to load.
+- **The page never classifies its own hostname.** `/health` reports the door,
+  because the runtime already decided it with the reserved labels, the one-label
+  rule and the custom-domain test. A second classifier in the browser is a second
+  copy of all three.
+- **One door to the API**, with the expired-session decision made in it once —
+  and `null` rather than `[]` until an answer arrives, so a failed load is never
+  rendered as an empty one.
+
+The guard registry, its checks, and the standards that bind them.
 
 ## Decisions, and how well each is defended
 
@@ -220,16 +266,16 @@ The guard registry, its thirteen checks, and the standards that bind them.
 |---|---|---|
 | D1 | The tenant is primary; an app is a capability switched on for it | 3 |
 | D2 | The name is Quad; packages are `@quad/*` | 2 |
-| D3 | One worker on the request path; heavy work splits over RPC service bindings | 2 |
+| D3 | One worker on the request path; heavy work splits over RPC service bindings | 4 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 3 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
 | D7 | HeroUI v3 is the component layer, and its components are not restyled | 3 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 2 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
-| D10 | Five primary destinations, maximum | 2 |
+| D10 | Five primary destinations, maximum | 3 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 10 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 32 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 34 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -306,6 +352,11 @@ the library decides FOR us.
 | `a-real-product-needs-no-infrastructure-of-its-own` | D12 | a product that has to write its own router, schema, gates and audit, which is a product that can leave one of them out |
 | `a-persons-own-records-are-theirs-by-construction` | D11 | somebody's logbook readable by anybody in the workspace, because a handler forgot a WHERE |
 | `a-seat-ceiling-only-counts-roles-that-cost-a-seat` | D12 | a studio on the smallest plan unable to add the customers it exists to serve, refused for staff seats it was not asking for |
+| `the-hub-has-one-door-to-the-api` | D12 | an expired session that does not look expired — every screen showing the empty state its failed load produced, and every save failing into a toast |
+| `the-browser-never-classifies-its-own-door` | D3 | a page offering a control the runtime refuses, answered as a 404 with nothing on it to explain why |
+| `every-screen-the-picker-names-is-drawn` | D10 | a blank page, which is the same picture as a page that failed to load — so somebody reloads for a minute and then gives up |
+| `a-code-that-could-not-be-sent-holds-no-cooldown` | D12 | somebody locked out for a minute waiting on a code that was never delivered, told they are asking too often |
+| `the-deployment-answers-on-every-door-it-serves` | D3 | a deploy reporting green while the isolate throws in its first middleware — the page still loads, because static assets never reach the worker |
 <!-- /generated -->
 
 ## Commands

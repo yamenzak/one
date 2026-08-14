@@ -25,6 +25,15 @@
     // reason it was worth doing now — CACHEABLE: the SPA build lands in turbo's
     // cache with everything else instead of being a 24-second `pnpm --filter`
     // outside the graph on every run.
+    // The same edge, on the framework's own deployment. `@quad/one` serves
+    // `quad/one-hub/dist`; without the build its suite boots Miniflare against
+    // a missing directory and aborts reporting "no tests", which reads as a
+    // pass. Nothing in the dependency graph connects them — an
+    // `assets.directory` is a filesystem path.
+    "@quad/one#test": {
+      "dependsOn": ["^build", "@quad/one-hub#build"],
+      "outputs": ["coverage/**"]
+    },
     "@kova/api#test": {
       "dependsOn": ["^build", "@kova/app#build"],
       "outputs": ["coverage/**"]

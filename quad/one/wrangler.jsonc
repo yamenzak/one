@@ -1,0 +1,63 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "one",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-07-12",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // ⚠️ NO `routes` HERE, DELIBERATELY. Declaring them makes `wrangler dev`
+  // rewrite the incoming Host to the route's hostname, which collapses every
+  // door onto one — and the doors ARE the tenancy (see `kernel/door.ts`), so a
+  // collapsed Host is a development environment where none of this works and
+  // nothing says why. The production routes are a dashboard step.
+
+  "vars": {
+    // ⚠️ `ROOT` is what `doorFor` measures every hostname against. Locally it is
+    // `localhost`, because browsers resolve `*.localhost` to loopback and
+    // Miniflare preserves the Host exactly as the edge does — so
+    // `setup.localhost:8080` IS the setup door, with no flag pretending.
+    "ROOT": "localhost",
+
+    // ⚠️ NEVER SET TO `development` IN A DEPLOYED CONFIG. This block is the
+    // deployed one: in production the development lane would put sign-in codes
+    // in retained logs and let the AI mock fabricate output that is billed for.
+    // `wrangler dev` overrides it below.
+    "ENVIRONMENT": "production"
+  },
+
+  "dev": {
+    "port": 8080,
+    // The whole point of the local port: every door is a subdomain of it.
+    "local_protocol": "http"
+  },
+
+  "assets": {
+    // ⚠️ A FILESYSTEM PATH, NOT A PACKAGE DEPENDENCY — which is why `turbo.json`
+    // declares the build edge by hand. Nothing in the dependency graph connects
+    // this worker to the Hub's build, and a missing one does not fail: the
+    // worker boots and serves nothing, which reads as a broken deploy rather
+    // than a missing step.
+    "directory": "../one-hub/dist",
+    "binding": "ASSETS",
+    // The SPA owns its routing; every unknown path is its business.
+    "not_found_handling": "single-page-application"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DIRECTORY",
+      "database_name": "one-directory",
+      // ⚠️ A PLACEHOLDER UNTIL PROVISIONING WRITES THE REAL ONE. A deploy with
+      // this id in place would bind a database that does not exist and answer
+      // every request 500 — so nothing ships until it is replaced.
+      "database_id": "PLACEHOLDER-directory"
+    },
+    {
+      "binding": "SHARD_EU_1",
+      "database_name": "one-shard-eu-1",
+      "database_id": "PLACEHOLDER-shard-eu-1"
+    }
+  ],
+
+  "observability": { "enabled": true }
+}
