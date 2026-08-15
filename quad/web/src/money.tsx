@@ -32,8 +32,8 @@ export interface BillProps {
 /** ⚠️ What the figure is OF, which is a count rather than the word "total". */
 const said = (lines: number): string =>
   lines === 0
-    ? "every product here is on a free plan"
-    : lines === 1 ? "for one product" : `across ${lines} products`;
+    ? "Every product here is on a free plan"
+    : lines === 1 ? "For one product" : `Across ${lines} products`;
 
 export function Bill({ lines, total, currency, appName, mixed }: BillProps) {
   return (

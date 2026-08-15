@@ -41,6 +41,8 @@
  */
 
 import type { Tone } from "@quad/kernel";
+/* ⚠️ The pace and the curve are the vocabulary's, not this file's — see `DRIFT`. */
+import { DURATION, EASE } from "./motion.js";
 
 /**
  * ⚠️ TWELVE, AND `plain` IS STILL THE DEFAULT. Ambience everywhere is ambience
@@ -84,17 +86,41 @@ import type { Tone } from "@quad/kernel";
  *              activity, anything with a current.
  *   grid       etched graph paper. Planning, technical dashboards.
  */
+/**
+ * ⚠️ AND A FOURTH FAMILY: A SOURCE THAT MOVES. Twenty-one worlds and every one
+ * of them was STILL — which is why the set read as wallpaper however carefully
+ * each was composed. A real lit room is not still: the light has a source, the
+ * source has a temperature, and the whole thing breathes. Two more cover it,
+ * and they are the only two that move:
+ *
+ *   halo       high dynamic range. A near-white core against crushed darkness,
+ *              one dim counter-light, and a frame that takes the corners almost
+ *              to black — then the whole source drifts and breathes. The most
+ *              premium ground in the system and the one an arrival earns.
+ *   aura       the same light, wide and quiet. Nothing is hot, nothing is
+ *              crushed; it drifts slowly enough that nobody catches it moving.
+ *              For a screen somebody works ON rather than arrives at.
+ *
+ * ⚠️ HDR IS A SHAPE, NOT A BRIGHTNESS. What separates a lit source from a
+ * coloured blur is RANGE: a small core far brighter than anything else, a bloom
+ * that falls away fast, and darkness that goes further down than the page's own
+ * ground. Turning a soft pole up gives none of that — it gives a bigger blur.
+ * See `orb` and `hot` for the two halves, and the dark frame in `halo`'s layers
+ * for the third, which is the one everybody leaves out.
+ */
 export type Ambience =
   | "plain" | "calm" | "focus" | "lift" | "mesh" | "dots"
   | "weave" | "drape" | "aurora" | "veil" | "tide" | "spotlight"
   | "rays" | "arc" | "prism" | "terrace" | "streak" | "bloom"
-  | "ridge" | "flow" | "grid";
+  | "ridge" | "flow" | "grid"
+  | "halo" | "aura";
 
 export const AMBIENCES: readonly Ambience[] = [
   "plain", "calm", "focus", "lift", "mesh", "dots",
   "weave", "drape", "aurora", "veil", "tide", "spotlight",
   "rays", "arc", "prism", "terrace", "streak", "bloom",
   "ridge", "flow", "grid",
+  "halo", "aura",
 ];
 
 /**
@@ -194,11 +220,62 @@ const FIELD_WEIGHT: Readonly<Record<Exclude<Ambience, "plain">, number>> = {
   /* Geometry wants its lines legible against the field; graphics want dark. */
   rays: 0.6, arc: 0.65, prism: 0.7, terrace: 0.7, streak: 0.25,
   bloom: 0.75, ridge: 0.55, flow: 0.6, grid: 0.7,
+  /* ⚠️ `halo` IS THE LOWEST IN THE TABLE AND THAT IS THE POINT — a field is a
+     lit colour across the whole screen, which is the opposite of high dynamic
+     range. `aura` is the same light with the range given away, so it keeps a
+     field a screen can be worked on. */
+  halo: 0.16, aura: 0.55,
 };
 
 /** A soft pole of light: where, how wide, how strong. */
 const pole = (hue: string, pct: number, x: string, y: string, w: string, h: string) =>
   `radial-gradient(${w} ${h} at ${x} ${y}, ${mix(hue, pct)} 0%, transparent 72%)`;
+
+/**
+ * ⚠️ A BRIGHT LIGHT IS NOT A SATURATED ONE, AND THIS IS THE HALF EVERY CSS
+ * GLOW GETS WRONG. Turn a hue up and you get more of that hue; turn a real
+ * source up and it goes toward WHITE, because the sensor — eye or camera —
+ * runs out of range before the light does. A pure-brand core at ninety percent
+ * is a bright purple circle. A brand core mixed most of the way to white, with
+ * the brand surviving in the bloom around it, is a lamp.
+ *
+ * ⚠️ AND THE HUE STILL COMES FROM THE TOKEN, so a workspace's brand still owns
+ * the light — it owns the colour of the bloom rather than the colour of the
+ * filament, which is what happens in a room.
+ */
+const hot = (hue: string, pct: number) =>
+  `color-mix(in oklab, color-mix(in oklab, ${hue} 32%, oklch(1 0 0)) `
+  + `calc(var(--sky, 1) * ${pct}%), transparent)`;
+
+/**
+ * ⚠️ AN ORB IS NOT A POLE, AND THE DIFFERENCE IS DYNAMIC RANGE. `pole` ramps one
+ * strength to nothing across its whole radius — an even, soft light, which is
+ * right for twenty of the ambiences here. A high-range source is the opposite
+ * shape: a small core far brighter than anything else on the screen, a bloom
+ * that falls away fast, then a long tail into darkness. Four stops rather than
+ * two is the whole of it. A two-stop gradient cannot be both hot in the middle
+ * and dark at the edge, so every attempt at one arrives as an evenly-lit smudge
+ * — which is precisely what "a nice gradient" looks like, and precisely what
+ * this family exists to not be.
+ */
+const orb = (
+  hue: string, core: number, bloom: number, x: string, y: string, w: string, h: string,
+) =>
+  `radial-gradient(${w} ${h} at ${x} ${y}, `
+  + `${hot(hue, core)} 0%, ${hot(hue, Math.round(core * 0.6))} 8%, `
+  + `${mix(hue, bloom)} 20%, ${mix(hue, Math.round(bloom * 0.45))} 40%, `
+  + `${mix(hue, Math.round(bloom * 0.16))} 60%, transparent 82%)`;
+
+/**
+ * ⚠️ THE DARK IS A LAYER, NOT AN ABSENCE, AND IT IS WHY A SOURCE READS AS
+ * BRIGHT. `DEPTH` frames the whole screen gently and works under every
+ * ambience; this one is aimed AT the source and crushes everything the source
+ * is not, so the range between the core and the corner is wider than the page's
+ * own palette can express. Without it `halo` is `bloom` with a whiter middle.
+ */
+const crush = (x: string, y: string, pct: number) =>
+  `radial-gradient(140% 110% at ${x} ${y}, transparent 24%, `
+  + `color-mix(in oklab, var(--background) calc(var(--sky, 1) * ${pct}%), transparent) 100%)`;
 
 /**
  * ⚠️ LINE ART IS DRAWN, AND A DRAWING CANNOT FOLLOW A TOKEN — so it does not
@@ -541,6 +618,34 @@ function layers(what: Ambience, hue: string): readonly string[] {
         `repeating-linear-gradient(90deg, ${etch(hue, 10)} 0 1px, transparent 1px 44px)`,
         pole(hue, 14, "50%", "-14%", "120%", "70%"),
       ];
+
+    /*
+      ⚠️ THREE LAYERS AND EACH ONE IS LOAD-BEARING: the crush comes FIRST, so it
+      paints above the light and takes the corners down while leaving the core
+      untouched — that gap is the range. Then the source. Then a counter-light
+      at a seventh of its strength, because a screen lit from exactly one point
+      has a dead half, and a dead half reads as an unfinished gradient rather
+      than as a lit room.
+    */
+    case "halo":
+      return [
+        crush("68%", "2%", 82),
+        orb(hue, 56, 26, "68%", "2%", "115%", "84%"),
+        /* ⚠️ THE SPILL, AND WITHOUT IT THE SOURCE IS A STICKER. A lamp in a
+           room lights the room; a gradient that stops at its own radius is a
+           circle drawn on a wall. This is the same light, four times as wide
+           and an eighth as strong, and it is what joins the two. */
+        pole(hue, 13, "68%", "4%", "190%", "105%"),
+        pole(hue, 9, "2%", "62%", "95%", "72%"),
+      ];
+
+    /* The same source, wide and cool. Nothing hot, nothing crushed. */
+    case "aura":
+      return [
+        orb(hue, 30, 22, "50%", "-12%", "140%", "82%"),
+        pole(hue, 13, "88%", "32%", "70%", "56%"),
+        pole(hue, 8, "8%", "16%", "70%", "50%"),
+      ];
   }
 }
 
@@ -655,6 +760,40 @@ const GLASS_LIGHT = "blur(14px) saturate(1.5) contrast(1.04) brightness(1.05)";
  * tile the field itself at 22px and the whole world becomes confetti. Every
  * entry here spells out all of its ambience's layers, DEPTH first, field last.
  */
+/**
+ * WHICH WORLDS MOVE, AND BY HOW MUCH.
+ *
+ * ⚠️ ONE KEYFRAME FOR ALL OF THEM, PARAMETERISED. Two animated ambiences with
+ * two hand-written keyframes is how a third arrives with a third curve, and
+ * then the product has a motion vocabulary of one item per screen — the exact
+ * failure `motion.ts` exists to prevent, reintroduced by the file nobody
+ * thought of as motion.
+ *
+ * ⚠️ AND IT IS A `transform`, NOT A `background-position`. A drifting gradient
+ * repaints a full-viewport layer on every frame, on the main thread, forever;
+ * a transform on that same layer is handed to the compositor and costs
+ * approximately nothing. The difference is invisible on a laptop and is the
+ * whole experience on a phone.
+ *
+ * ⚠️ THE SCALE FLOOR IS WHAT KEEPS THE EDGE OFF SCREEN. The layer is exactly a
+ * viewport tall, so translating it by 3% would expose 3% of unlit ground at the
+ * top and a hard edge with it. Starting at 1.1 leaves 5% of overscan on every
+ * side — comfortably more than any translate below — which is why the scale
+ * never goes to 1 even at the quiet end of the breath.
+ */
+export const DRIFT: Partial<Record<Ambience, {
+  /** How far the source travels, as a share of the layer. */
+  readonly x: string; readonly y: string;
+  /** The breath: the layer's scale at each end. Never below 1.1 — see above. */
+  readonly from: number; readonly to: number;
+}>> = {
+  halo: { x: "3%", y: "2%", from: 1.1, to: 1.2 },
+  /* ⚠️ Quieter in every dimension: this one sits under work, not under an
+     arrival, and a ground somebody catches moving while reading is a ground
+     that has to be switched off. */
+  aura: { x: "1.5%", y: "1%", from: 1.1, to: 1.15 },
+};
+
 const EXTRAS: Partial<Record<Ambience, string>> = {
   dots: "background-size: auto, 22px 22px, auto, auto",
   ridge: "background-size: auto, 1300px 900px, auto, auto"
@@ -669,6 +808,31 @@ export function ambienceStylesheet(): string {
     const css = ambienceCss(a);
     const extra = EXTRAS[a] ? `; ${EXTRAS[a]}` : "";
     return `[data-sky="${a}"]::before { ${css}${extra}; ${FADE}; }`;
+  });
+
+  /*
+    ⚠️ THE BREATH, AND IT IS SWITCHED OFF BOTH WAYS. `prefers-reduced-motion` is
+    the operating system's answer and `data-reduce-motion` is the one reachable
+    from a settings screen inside the app — a ground that answered only the
+    first would keep moving for the person who turned it off where they could
+    see the switch. For some people this is not a preference.
+
+    ⚠️ `animation-direction: alternate` RATHER THAN A LOOP. A drift that runs to
+    its end and jumps back to the start is a twitch every N seconds, which is
+    far more noticeable than the movement itself — the one thing a ground must
+    never do is draw the eye.
+  */
+  const drifts = (Object.keys(DRIFT) as Ambience[]).flatMap((a) => {
+    const d = DRIFT[a]!;
+    return [
+      `[data-sky="${a}"]::before {`,
+      `  --drift-x: ${d.x}; --drift-y: ${d.y};`,
+      `  --drift-from: ${d.from}; --drift-to: ${d.to};`,
+      `  animation: quad-drift ${DURATION.ambient} ${EASE.plain} infinite alternate;`,
+      `}`,
+      `@media (prefers-reduced-motion: reduce) { [data-sky="${a}"]::before { animation: none; } }`,
+      `[data-reduce-motion="true"] [data-sky="${a}"]::before { animation: none; }`,
+    ];
   });
 
   /* ⚠️ The drawing is baked per theme — see `art`. The var sits on the HOST
@@ -702,6 +866,19 @@ export function ambienceStylesheet(): string {
     `  pointer-events: none;`,
     `}`,
     `[data-sky]:not([data-sky="plain"])::before { background-repeat: repeat; }`,
+    /*
+      ⚠️ ONE KEYFRAME FOR EVERY MOVING GROUND, AND THE NUMBERS COME IN AS
+      PROPERTIES — see `DRIFT`. It is the layer that moves rather than the light
+      inside it, which is what makes this cheap: a transform on a promoted layer
+      is the compositor's work, while a gradient whose stops move is a
+      full-viewport repaint on every frame.
+    */
+    `@keyframes quad-drift {`,
+    `  from { transform: translate3d(calc(var(--drift-x) * -1), calc(var(--drift-y) * -1), 0)`,
+    `                    scale(var(--drift-from)); }`,
+    `  to   { transform: translate3d(var(--drift-x), var(--drift-y), 0)`,
+    `                    scale(var(--drift-to)); }`,
+    `}`,
     /* ⚠️ The dither, unmasked — see the note above this function. */
     `[data-sky]:not([data-sky="plain"])::after {`,
     `  background-image: ${GRAIN};`,
@@ -710,6 +887,7 @@ export function ambienceStylesheet(): string {
     `  mix-blend-mode: overlay;`,
     `}`,
     ...rules,
+    ...drifts,
     /*
       ⚠️ A CARD-SIZED AMBIENCE FITS THE CARD. The reach above is one VIEWPORT,
       which is right for a screen and two bright streaks inside something the

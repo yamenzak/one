@@ -91,9 +91,16 @@ function Screen({ where, onGo, onLeave }: {
     ? person?.tenants.find((t) => t.slug === where.slug) ?? null
     : null;
 
-  /* ⚠️ `veil` rather than `aurora`: aurora carries a second hue by design
-     (`ambience.ts`), which a monochrome product renders as a green cast nobody
-     chose. */
+  /*
+    ⚠️ `halo` AT THE ROOT AND `aura` INSIDE — the two grounds that MOVE. The
+    root is where somebody lands, and a landing screen earns a lit source: a
+    near-white core, crushed corners, a slow breath. Inside is work, so it is
+    the same light with the range given away — wide, quiet, and slow enough
+    that nobody catches it moving. See `ambience.ts`.
+
+    ⚠️ AND NOT `aurora`, EVER, HERE: it carries a second hue by design, which a
+    monochrome product renders as a green cast nobody chose.
+  */
   /*
     ⚠️ THE ROOT HAS NO CROWN, BECAUSE THE FACE IS ITS HEADING. `Identity` puts
     the person at the top of it — their avatar, their address, what they are —
@@ -102,7 +109,7 @@ function Screen({ where, onGo, onLeave }: {
     way out, and that is `LeaveChip` on its own (`layout.tsx`).
   */
   return (
-    <Page sky={root ? "veil" : "calm"}>
+    <Page sky={root ? "halo" : "aura"}>
       {root
         ? (
           <Band width="read">

@@ -252,4 +252,21 @@ export const GROUND_CSS = [
     `[data-sky]` a background would hide every gradient behind it.
   */
   `html { background-color: var(--background); }`,
+  /*
+    ⚠️ A SHEET IS A NEW PAGE, NOT A FLOATING CHIP, AND `--overlay` CANNOT BE BOTH.
+    The library paints a popover, a menu and a drawer from the same token, and
+    those two want opposite values. A popover floats OVER content, so it has to
+    differ from the card behind it — which in light means going DARKER, because
+    the ladder already ends at white (see `raised`). A drawer covers the screen
+    and holds cards of its own, so at the raised value it came out as a muddy
+    grey slab with white cards laid on it: the ground/card relationship inverted
+    for the length of the sheet, which is exactly what it looked like.
+
+    ⚠️ SO THE DRAWER TAKES THE PAGE'S OWN GROUND, and every card inside it reads
+    against that ground the same way it does anywhere else. The backdrop dim is
+    what says "above"; the ground does not have to say it a second time. This is
+    a token rule in the shared stylesheet — the sanctioned way to change how the
+    library looks (D7) — rather than a class on a component in a screen.
+  */
+  `.drawer__dialog { background: var(--background); }`,
 ].join("\n");

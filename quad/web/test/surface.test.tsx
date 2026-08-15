@@ -21,7 +21,7 @@ import { NotificationPolicy, policyShown } from "../src/policy.js";
 import { FlagConsole, Shelf, saying, money } from "../src/console.js";
 import { Shell, reachable } from "../src/shell.js";
 import { brandCss, brandCssFor, readable, skyCss, colorFor } from "../src/theme.js";
-import { bespokeCss } from "../src/ambience.js";
+import { AMBIENCES, DRIFT, ambienceStylesheet, bespokeCss } from "../src/ambience.js";
 import { Documents, SubProcessors } from "../src/legal.js";
 import { Await } from "../src/state.js";
 import type { DocumentDef } from "@quad/kernel";
@@ -385,6 +385,34 @@ describe("a workspace's branding", () => {
     expect(bespokeCss(7)).not.toMatch(/#[0-9a-f]{6}/i);
     /* The field is always the bottom layer — a bespoke world still owns the screen. */
     expect(bespokeCss(7)).toMatch(/var\(--lumen, transparent\)\) 52%, transparent 96%\)$/);
+  });
+
+  /**
+   * ⚠️ A MOVING GROUND HAS THREE WAYS TO SHIP BROKEN AND ALL THREE ARE SILENT.
+   * It can move a layer that is not overscanned, which exposes bare ground and
+   * a hard edge at the top of every screen carrying it. It can keep moving for
+   * somebody who asked it to stop, which is a preference for most people and a
+   * symptom for some. And it can grow a second keyframe, which is how a motion
+   * vocabulary becomes one entry per screen. None of the three fails a render,
+   * so none of the three fails a test that only mounts something.
+   */
+  it("bounds every ambience that moves", () => {
+    const css = ambienceStylesheet();
+    const moving = Object.entries(DRIFT);
+    expect(moving.length).toBeGreaterThan(0);
+
+    /* ⚠️ The overscan rule — see `DRIFT`. A scale under 1.1 is an edge. */
+    for (const [name, d] of moving) {
+      expect(AMBIENCES, `${name} is not an ambience`).toContain(name);
+      expect(Math.min(d.from, d.to), `${name} scales below the overscan floor`)
+        .toBeGreaterThanOrEqual(1.1);
+      expect(css).toContain(`[data-sky="${name}"]::before { animation: none; }`);
+      expect(css).toContain(`[data-reduce-motion="true"] [data-sky="${name}"]::before`);
+    }
+
+    /* ⚠️ ONE keyframe, and it takes its numbers in — not one per ambience. */
+    expect([...css.matchAll(/@keyframes/g)]).toHaveLength(1);
+    expect(css).toContain("@keyframes quad-drift {");
   });
 
   it("maps what happened onto the library's colour names in one place", () => {
