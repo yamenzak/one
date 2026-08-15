@@ -1,6 +1,6 @@
 {
   "$comment": [
-    "THE GUARD REGISTRY — every enforcement promise Quad makes.",
+    "THE GUARD REGISTRY \u2014 every enforcement promise Quad makes.",
     "",
     "`scripts/guards.test.mjs` reads this file. Four rules make it more than a",
     "list:",
@@ -8,12 +8,12 @@
     "  1. A `live` guard names an implementation AND a literal string that",
     "     implementation contains. Rename the assertion and the registry fails,",
     "     so a guard cannot quietly stop existing.",
-    "  2. A `live` guard must actually RUN — reached by `pnpm quad:gate`,",
+    "  2. A `live` guard must actually RUN \u2014 reached by `pnpm quad:gate`,",
     "     `quad:test` or `quad:typecheck`. A check nobody invokes is no check.",
     "  3. Every guard names the DECISION it protects. A guard defending nothing",
     "     recorded is one whose reason is forgotten and which is then deleted as",
     "     noise by somebody who cannot see what it was for.",
-    "  4. An `owed` guard names a stage, and a SHIPPED stage may owe nothing —",
+    "  4. An `owed` guard names a stage, and a SHIPPED stage may owe nothing \u2014",
     "     which is what makes the stage table in PLAN.md mean anything.",
     "",
     "`fails` is a consequence in the world, never a restatement of the assertion:",
@@ -108,7 +108,7 @@
       "status": "live",
       "impl": "kernel/test/tenancy.test.ts",
       "proves": "counts a disabled app when deciding what a shard needs",
-      "fails": "records stranded by a move, readable again the day the product is switched back on — in a database that cannot read them"
+      "fails": "records stranded by a move, readable again the day the product is switched back on \u2014 in a database that cannot read them"
     },
     {
       "id": "every-document-declares-what-it-is",
@@ -196,7 +196,7 @@
       "protects": "D12",
       "stage": "5",
       "status": "live",
-      "fails": "a mechanism built, tested and wired with nowhere a person can look — every suite green",
+      "fails": "a mechanism built, tested and wired with nowhere a person can look \u2014 every suite green",
       "impl": "scripts/surface.test.mjs",
       "proves": "surfaced:"
     },
@@ -223,7 +223,7 @@
       "protects": "D12",
       "stage": "3",
       "status": "live",
-      "fails": "a concern an app can forget, forgotten invisibly — no error, no failing test, a capability that silently does not apply",
+      "fails": "a concern an app can forget, forgotten invisibly \u2014 no error, no failing test, a capability that silently does not apply",
       "impl": "scripts/apps.test.mjs",
       "proves": "concerns:"
     },
@@ -277,7 +277,7 @@
       "protects": "D7",
       "stage": "5",
       "status": "live",
-      "fails": "a confident zero on the first paint — a badge, an all-caught-up, a no-media-yet — every one of them a wrong answer wearing a loading state's excuse",
+      "fails": "a confident zero on the first paint \u2014 a badge, an all-caught-up, a no-media-yet \u2014 every one of them a wrong answer wearing a loading state's excuse",
       "impl": "scripts/states.test.mjs",
       "proves": "seeds:"
     },
@@ -304,7 +304,7 @@
       "protects": "D7",
       "stage": "5",
       "status": "live",
-      "fails": "an effect that is exported, imported, and never injected — so it has never once run, and looks exactly like a design decision",
+      "fails": "an effect that is exported, imported, and never injected \u2014 so it has never once run, and looks exactly like a design decision",
       "impl": "scripts/states.test.mjs",
       "proves": "mounted:"
     },
@@ -322,7 +322,7 @@
       "protects": "D7",
       "stage": "5",
       "status": "live",
-      "fails": "an accent that is the button, the link, the nav pill and the ramp all at once — present on every screen, meaning nothing, and needing a second colour before anything can stand out",
+      "fails": "an accent that is the button, the link, the nav pill and the ramp all at once \u2014 present on every screen, meaning nothing, and needing a second colour before anything can stand out",
       "impl": "scripts/ground.test.mjs",
       "proves": "mono:"
     },
@@ -340,7 +340,7 @@
       "protects": "D7",
       "stage": "5",
       "status": "live",
-      "fails": "fine dark fibres over light paper behind a hero — which a person described, accurately, as dusty and dirty",
+      "fails": "fine dark fibres over light paper behind a hero \u2014 which a person described, accurately, as dusty and dirty",
       "impl": "scripts/motion.test.mjs",
       "proves": "threads:"
     },
@@ -747,7 +747,7 @@
       "status": "live",
       "impl": "scripts/hub.test.mjs",
       "proves": "one API door:",
-      "fails": "an expired session that does not look expired — every screen showing the empty state its failed load produced, and every save failing into a toast"
+      "fails": "an expired session that does not look expired \u2014 every screen showing the empty state its failed load produced, and every save failing into a toast"
     },
     {
       "id": "the-browser-never-classifies-its-own-door",
@@ -765,7 +765,7 @@
       "status": "live",
       "impl": "scripts/hub.test.mjs",
       "proves": "screens: every one the picker can name has a branch",
-      "fails": "a blank page, which is the same picture as a page that failed to load — so somebody reloads for a minute and then gives up"
+      "fails": "a blank page, which is the same picture as a page that failed to load \u2014 so somebody reloads for a minute and then gives up"
     },
     {
       "id": "a-code-that-could-not-be-sent-holds-no-cooldown",
@@ -783,7 +783,7 @@
       "status": "live",
       "impl": "one/test/boot.test.ts",
       "proves": "answers /health on every door",
-      "fails": "a deploy reporting green while the isolate throws in its first middleware — the page still loads, because static assets never reach the worker"
+      "fails": "a deploy reporting green while the isolate throws in its first middleware \u2014 the page still loads, because static assets never reach the worker"
     },
     {
       "id": "quad-is-off-the-production-deploy-path",
@@ -801,7 +801,7 @@
       "status": "live",
       "impl": "scripts/inert.test.mjs",
       "proves": "collide with none of",
-      "fails": "one product reading another's rows, or a deploy replacing a live worker — a worker name is account-wide and provisioning finds a database by name"
+      "fails": "one product reading another's rows, or a deploy replacing a live worker \u2014 a worker name is account-wide and provisioning finds a database by name"
     },
     {
       "id": "ones-wildcard-never-covers-a-live-tenants-address",
@@ -828,7 +828,7 @@
       "status": "live",
       "impl": "scripts/motion.test.mjs",
       "proves": "curves: no screen writes its own easing or duration",
-      "fails": "a product where a drawer, a toast and a card each decelerate differently — nothing broken, nothing nameable, and it reads as cheap"
+      "fails": "a product where a drawer, a toast and a card each decelerate differently \u2014 nothing broken, nothing nameable, and it reads as cheap"
     },
     {
       "id": "motion-answers-to-the-reduced-motion-setting",
@@ -864,7 +864,7 @@
       "status": "live",
       "impl": "scripts/provenance.test.mjs",
       "proves": "update: the generated edit goes through",
-      "fails": "an edit that passes the gate, writes an audit entry saying it happened, answers 200 — and changes nothing"
+      "fails": "an edit that passes the gate, writes an audit entry saying it happened, answers 200 \u2014 and changes nothing"
     },
     {
       "id": "an-edit-cannot-land-on-somebody-elses-record",
@@ -882,7 +882,7 @@
       "status": "live",
       "impl": "scripts/tone.test.mjs",
       "proves": "written string(s), all in one voice",
-      "fails": "a product that sounds like several products — a caption with a full stop beside four without one, a control that says Submit, an error that says Oops"
+      "fails": "a product that sounds like several products \u2014 a caption with a full stop beside four without one, a control that says Submit, an error that says Oops"
     },
     {
       "id": "the-tone-rules-still-fire",
@@ -945,7 +945,7 @@
       "status": "live",
       "impl": "scripts/agent.test.mjs",
       "proves": "optout:",
-      "fails": "a tool hidden from the list and still callable — or a distinct refusal that confirms the name to the model that was refused it"
+      "fails": "a tool hidden from the list and still callable \u2014 or a distinct refusal that confirms the name to the model that was refused it"
     },
     {
       "id": "the-tool-catalogue-means-callable",
@@ -972,7 +972,7 @@
       "status": "live",
       "impl": "scripts/access.test.mjs",
       "proves": "context:",
-      "fails": "a role in the second product grants nothing, silently, for everybody — every suite green because every suite has one app"
+      "fails": "a role in the second product grants nothing, silently, for everybody \u2014 every suite green because every suite has one app"
     },
     {
       "id": "every-assignment-is-bounded-per-authority",
@@ -1107,7 +1107,7 @@
       "status": "live",
       "impl": "scripts/ai-action.test.mjs",
       "proves": "lane:",
-      "fails": "a deployment decision shipped through a product release — wrong the day the provider retires the row, and different in every app, with nothing failing"
+      "fails": "a deployment decision shipped through a product release \u2014 wrong the day the provider retires the row, and different in every app, with nothing failing"
     },
     {
       "id": "an-edited-prompt-is-bounded-at-both-levels",
@@ -1126,6 +1126,15 @@
       "impl": "scripts/ai-action.test.mjs",
       "proves": "resolution:",
       "fails": "the bill stops matching what anybody was shown, because the run used a different model or different words than the console reported"
+    },
+    {
+      "id": "a-screen-names-a-shape-and-the-shape-places-the-action",
+      "protects": "D7",
+      "stage": "17",
+      "status": "live",
+      "impl": "scripts/shape.test.mjs",
+      "proves": "primary: every screen has at most one",
+      "fails": "the one thing a screen is for lands somewhere different on every screen \u2014 buried at the foot of a long list on one, pinned on the next \u2014 so somebody has to hunt for it and the product reads as assembled by different people"
     }
   ]
 }

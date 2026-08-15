@@ -97,32 +97,101 @@ everything on it costs a scroll, a scan, and a mistake.
 
 ---
 
-## 4. Layout
+## 4. Layout — you do not write one, you name one
 
-**The failure this section exists to prevent: every screen looking like every
-other screen.** Heading, card, list. Heading, card, list. It is consistent, and
-it is unreadable, because consistency at that level removes the only signal a
-reader has for *what kind of screen am I on*.
+**A screen declares what KIND of page it is and hands over its content.** That
+is the whole of the layout system, and it exists because the alternative was
+measured: twenty screens each hand-assembling the same five decisions — column
+width, waiting skeleton, what "nothing here" says, how blocks arrive, and where
+the one action goes — and every one of them getting four right and one wrong.
+Nobody can point at the file that is wrong, because none of them is. The product
+is wrong in aggregate, and the only fix that holds is to stop asking.
 
-A screen should be recognisable from across the room by its **shape**:
+```tsx
+<Screen
+  shape="list"
+  does={{ label: "Invite somebody", onDo: open }}
+  of={members.of} again={members.again}
+  nothing={{ says: "Nobody here yet", under: "An invitation arrives by email" }}
+  then={(data) => <Listing … />}
+/>
+```
 
-- **A screen about a number** opens with the number, big, and nothing above it
-  but the crown. Money does this. So should anything with one answer.
-- **A screen about a person or a workspace** opens with the face and the name,
-  centred, then rows.
-- **A screen about a list** opens with the list. No preamble.
-- **A screen about a choice** opens with the choices side by side, not stacked.
-- **A screen about a state** opens with the state and the one control that
-  changes it.
+Everything else is decided: the width, the skeleton, the stack and its gaps, the
+arrival stagger, the crown and its collapse, and where "Invite somebody" lands
+at each size. The screen's author chose a shape and wrote the content.
 
-Use the whole width. A phone is one column, but a desktop is not — `Grid`,
-`Columns` and `Split` exist and are under-used. Two figures that answer one
-question belong side by side, not stacked with a gap.
+### The eight shapes
 
-**Density is a decision.** Not everything is a full-width row. A count belongs
-in the corner of the row it counts. A rarely-used action belongs in a menu on
-the block it acts on, not as a full row of its own. Three related toggles are a
-`ToggleButtonGroup`, not three rows.
+| Shape | The page is about | Primary action |
+|---|---|---|
+| `list` | a collection somebody scans and adds to | usually "add one of these" |
+| `detail` | one subject and its facts | usually the thing you do TO it |
+| `figure` | one number, everything else supporting it | often none — a figure is read |
+| `board` | destinations or measures as tiles, some wider | often none |
+| `settings` | many independent controls, each saving itself | **refused** — see below |
+| `form` | a sequence of fields and one submit | the submit |
+| `reader` | prose — a policy, a document | often "accept" |
+| `decision` | one object, one choice | the choice |
+
+They are kinds of PURPOSE, not kinds of arrangement. "Two columns" is not a
+shape; it is a consequence, and naming consequences is how a preset system
+becomes a second CSS with worse names.
+
+**A `settings` screen cannot have a primary action, and that is the most useful
+row in the table.** Every control on one saves itself the moment it changes
+(`useAction`, `useConfirmedState`). A Save button beside them makes it a screen
+where half the controls save themselves and half do not, and nobody can tell
+which by looking. The shape refuses it; a guard catches it before it runs.
+
+### Where the primary action goes
+
+**Never at the foot of the content.** The roster shipped "Invite somebody" as
+the last row of the roster. With three members that is fine. With thirty it is
+invisible: whoever is at the bottom of a long page scrolls to the top to act, or
+whoever is at the top scrolls to the bottom, and which of the two happens was
+never decided by anybody.
+
+It lands in three places and the shape picks between them:
+
+- **Phone** — docked above the thumb, at the bottom of the viewport on a short
+  page and the bottom of the scroll on a long one.
+- **Desktop** — in the crown, labelled, where the eye already is.
+- **Empty screen** — inside the empty state, and the dock stands down. Two
+  copies of the same button on a page with nothing else on it is the fault the
+  whole system exists to remove.
+
+**The action appears when there is something to act on.** No dock over a
+skeleton — a press against data that has not arrived. None over a refusal — the
+only useful control is "try again", and it is in the refusal where the
+explanation is. None over an empty state, which already carries it.
+
+### One screen, one primary, two secondaries at most
+
+Not a style rule — a definition. A page with two things it is for is two pages,
+and the moment a second `does` would be needed the right edit is a second screen
+or a sheet. `also` is for the two or three things somebody might reach for
+*while* doing the primary one, and it is capped in the type.
+
+### Five outcomes, not four
+
+`waiting`, `nothing`, `trouble`, the content — and **`refused`**. "You may not
+see this" is a fact about the person, known before any request is made; a
+`Problem` is a fact about a request that failed. Five screens used to answer it
+with a bare sentence returned EARLY, above the frame, which took the crown with
+it: no title, no way back, a sentence alone on a page. A refusal is content.
+
+### Within the shape
+
+Use the whole width. A phone is one column, a desktop is not — `Grid`, `Columns`
+and `Split` exist and are under-used, and `board` gives you a real grid where
+`Tile` items can be `wide` or `tall`. Two figures that answer one question belong
+side by side, not stacked with a gap.
+
+**Density is a decision.** Not everything is a full-width row. A count belongs in
+the corner of the row it counts. A rarely-used action belongs in a menu on the
+block it acts on. Three related toggles are a `ToggleButtonGroup`, not three
+rows.
 
 **Never wrap a single control in a card.** A card is a container for a *group*.
 One button inside a card is a button with a box drawn round it — put it where it
@@ -130,10 +199,10 @@ belongs: in the crown, at the end of the row it acts on, or under the block it
 finishes.
 
 **Charts are part of the vocabulary and are barely used.** `@quad/web/chart`
-ships nine chart forms, five figure blocks and four round ones, with the rule
-for picking between them written at the top of the file. Anywhere the product
-shows a trend, a share, or a ratio against a limit as a number in text, it is
-throwing away the one thing that reads instantly.
+ships nine chart forms, five figure blocks and four round ones, with the rule for
+picking between them written at the top of the file. Anywhere the product shows a
+trend, a share, or a ratio against a limit as a number in text, it is throwing
+away the one thing that reads instantly.
 
 ---
 
@@ -198,6 +267,8 @@ Some of this is guarded and some is judgement. What is checked today:
 - `heroui` — no component is restyled; layout utilities only.
 - `states` — four outcomes, shaped skeletons, one rhythm.
 - `surface` — every declaration reaches a screen; every field kind a control.
+- `shape` — no screen draws its own crown or pins its own action; at most one
+  primary per screen; a `settings` screen carries none.
 
 What is **not** checked, and is therefore on the person writing the screen:
 placement, density, whether a screen is doing two jobs, and whether the reader

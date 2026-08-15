@@ -1,0 +1,216 @@
+/**
+ * A SCREEN NAMES A SHAPE, AND EVERYTHING ELSE FOLLOWS FROM IT.
+ *
+ * ⚠️ THE FAULT THIS GUARDS AGAINST IS THE ONE THE PRESET SYSTEM EXISTS FOR, AND
+ * IT COMES BACK BY ADDITION RATHER THAN BY EDIT. Nobody rewrites a screen to
+ * hand-build its layout again; somebody writes the TWENTY-FIRST screen, does not
+ * know `Screen` is there, assembles a crown and a stack the way the twenty
+ * before it looked, and gets four of the five decisions right. The product
+ * drifts one screen at a time and no diff is wrong.
+ *
+ * ⚠️ SO WHAT IS CHECKED IS STRUCTURAL, NOT AESTHETIC. Whether a screen is
+ * beautiful is not a question a script can ask. Whether it draws its own crown,
+ * pins its own action, or claims two primaries at once are all the same question
+ * with an answer — and each is the exact shape of a real regression:
+ *
+ *   OWN CROWN     a screen rendering `PageCrown` itself has taken over the one
+ *                 decision the router makes, so its title and its way back are
+ *                 its own to get wrong.
+ *   OWN DOCK      a `sticky bottom-` control in a screen is a second answer to
+ *                 where the primary action goes, beside the shape's.
+ *   TWO PRIMARIES a screen with two `does` is two screens (DESIGN.md §1).
+ *   SETTINGS ACT  a `settings` screen with an action is one where half the
+ *                 controls save themselves and half do not.
+ *
+ * ⚠️ AND THE VOCABULARY ITSELF IS EXEMPT BY NAME, not by pattern. `screen.tsx`
+ * and `layout.tsx` are where the crown and the dock are DEFINED; an exemption
+ * matched by a wildcard is one a new file can wander into.
+ */
+
+import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const QUAD = join(HERE, "..");
+
+let bad = 0;
+const fail = (m) => { console.error(`BAD  ${m}`); bad++; };
+const ok = (m) => console.log(`ok   ${m}`);
+const rel = (p) => p.slice(QUAD.length + 1);
+
+const filesIn = (dir, re = /\.tsx$/) => {
+  const at = join(QUAD, dir);
+  if (!existsSync(at)) return [];
+  const out = [];
+  const walk = (path) => {
+    for (const e of readdirSync(path, { withFileTypes: true })) {
+      const full = join(path, e.name);
+      if (e.isDirectory()) walk(full);
+      else if (re.test(e.name)) out.push(full);
+    }
+  };
+  walk(at);
+  return out;
+};
+
+/** ⚠️ Comments describe the rules, so matching them reports the rule as a breach. */
+const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+/**
+ * ⚠️ THE TWO FILES THAT DEFINE THE CHROME, BY NAME. `screen.tsx` places the
+ * crown and the dock; `layout.tsx` draws them. Everything else is a caller.
+ */
+const DEFINES_CHROME = new Set(["web/src/screen.tsx", "web/src/layout.tsx"]);
+
+/**
+ * ⚠️ THE SURFACES THAT ARE NOT SCREENS, AND EACH IS EXEMPT FOR A STATED REASON.
+ * A door is its own page with no router above it and no way back; the gallery
+ * is a specimen board that draws chrome on purpose to show it. Neither is a
+ * screen inside a routed surface, which is what the rules below are about.
+ */
+const NOT_A_SCREEN = new Set([
+  "one-hub/src/screens/SignIn.tsx",
+  "one-hub/src/screens/Signpost.tsx",
+  "one-hub/src/screens/NewWorkspace.tsx",
+  "one-hub/src/screens/Elsewhere.tsx",
+  "one-hub/src/screens/Gallery.tsx",
+  "one-hub/src/screens/Specimens.tsx",
+  "one-hub/src/App.tsx",
+  "one-hub/src/hub/Hub.tsx",
+  "one-hub/src/centre/AppSurface.tsx",
+  "one-hub/src/centre/Product.tsx",
+  "one-hub/src/centre/Choose.tsx",
+]);
+
+const SCREENS = [
+  ...filesIn("one-hub/src"),
+  ...readdirSync(join(QUAD, "apps"), { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .flatMap((e) => filesIn(`apps/${e.name}/src`)),
+].filter((f) => !NOT_A_SCREEN.has(rel(f)));
+
+/* ------------------------------------------------------- nobody crowns itself --- */
+
+let crowns = 0;
+for (const file of SCREENS) {
+  const src = strip(readFileSync(file, "utf8"));
+  if (!/<PageCrown\b/.test(src)) continue;
+  crowns++;
+  fail(`${rel(file)}: draws its own <PageCrown>.\n`
+    + `       The title and the way back are properties of the ADDRESS, not of the\n`
+    + `       screen — a router already knows both. Name a \`shape\` on \`Screen\`\n`
+    + `       and let \`Framed\` supply them (@quad/web's screen.tsx).`);
+}
+if (!crowns) ok(`crown: no screen draws its own`);
+
+/* ------------------------------------------------------------- nobody docks --- */
+
+let docks = 0;
+for (const file of SCREENS) {
+  const src = strip(readFileSync(file, "utf8"));
+  for (const [, cls] of src.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
+    if (!/\bsticky\b/.test(cls ?? "") || !/\bbottom-0\b/.test(cls ?? "")) continue;
+    docks++;
+    fail(`${rel(file)}: pins its own control to the bottom.\n`
+      + `       Where the primary action goes is the SHAPE's decision and it differs\n`
+      + `       by breakpoint — docked on a phone, in the crown on a desktop. Two\n`
+      + `       answers is how a screen comes to show the same button twice.`);
+  }
+}
+if (!docks) ok(`dock: no screen pins its own action`);
+
+/**
+ * ⚠️ FINDING WHERE AN OPENING TAG ENDS NEEDS A SCANNER, NOT `indexOf(">")`, and
+ * the naive version passed its own mutation test while missing the case it was
+ * written for. `does={{ label: "A", onDo: () => undefined }}` contains a `>` —
+ * inside an arrow, inside a brace, inside the attribute — so the "head" the
+ * check read was eleven characters long and every attribute after it invisible.
+ * A guard that cannot see the thing it forbids is worse than no guard, because
+ * the green run is taken as evidence.
+ */
+const openingTag = (src, from) => {
+  let depth = 0, quote = "";
+  for (let i = from; i < src.length; i++) {
+    const c = src[i];
+    if (quote) { if (c === quote && src[i - 1] !== "\\") quote = ""; continue; }
+    if (c === '"' || c === "'" || c === "`") { quote = c; continue; }
+    if (c === "{") depth++;
+    else if (c === "}") depth--;
+    else if (c === ">" && depth === 0) return src.slice(from, i + 1);
+  }
+  return src.slice(from);
+};
+
+/* ------------------------------------------------------------ one primary --- */
+
+let doubles = 0;
+for (const file of SCREENS) {
+  const src = strip(readFileSync(file, "utf8"));
+  /* ⚠️ Per `<Screen` element, not per file: a file may legitimately hold two
+     screens (a picker and the thing it picks), and each gets one action. */
+  for (const at of [...src.matchAll(/<Screen\b/g)].map((m) => m.index)) {
+    const head = openingTag(src, at);
+    const count = (head.match(/\bdoes=/g) ?? []).length;
+    if (count <= 1) continue;
+    doubles++;
+    fail(`${rel(file)}: a <Screen> with ${count} primary actions.\n`
+      + `       A page with two things it is for is two pages (DESIGN.md §1). The\n`
+      + `       edit is a second screen or a sheet, never a second \`does\`.`);
+  }
+}
+if (!doubles) ok(`primary: every screen has at most one`);
+
+/* ------------------------------------------------- a settings screen saves --- */
+
+let saves = 0;
+for (const file of SCREENS) {
+  const src = strip(readFileSync(file, "utf8"));
+  for (const at of [...src.matchAll(/<Screen\b/g)].map((m) => m.index)) {
+    const head = openingTag(src, at);
+    if (!/shape="settings"/.test(head) || !/\bdoes=/.test(head)) continue;
+    saves++;
+    fail(`${rel(file)}: a "settings" screen with a primary action.\n`
+      + `       Every control on a settings screen saves itself the moment it\n`
+      + `       changes. A Save button beside them makes it a screen where half do\n`
+      + `       and half do not, and nobody can tell which by looking.`);
+  }
+}
+if (!saves) ok(`settings: none carries a save`);
+
+/* ------------------------------------------- the shape table is the system --- */
+
+/**
+ * ⚠️ THE PRESETS ARE CHECKED AS A SET, because the value of a preset system is
+ * that a screen's author has somewhere to LAND. Below about six kinds of page
+ * the honest answer to "which shape is this" is "none of them", and the next
+ * screen is hand-built with the whole argument re-run.
+ */
+const screenSrc = readFileSync(join(QUAD, "web/src/screen.tsx"), "utf8");
+const shapes = [...screenSrc.matchAll(/^  (\w+): \{ width:/gm)].map((m) => m[1]);
+if (shapes.length < 6) {
+  fail(`web/src/screen.tsx: only ${shapes.length} shapes.\n`
+    + `       A preset system somebody cannot find their page in is one they opt\n`
+    + `       out of, and the screen after that is hand-built again.`);
+} else {
+  ok(`shapes: ${shapes.join(", ")}`);
+}
+
+/* ⚠️ Every shape a screen names must be one the table defines — a typo'd shape
+   is a TypeScript error today and a runtime lookup tomorrow if the type ever
+   widens, and this costs nothing. */
+let unknown = 0;
+for (const file of SCREENS) {
+  const src = strip(readFileSync(file, "utf8"));
+  for (const [, named] of src.matchAll(/shape="(\w+)"/g)) {
+    if (shapes.includes(named)) continue;
+    unknown++;
+    fail(`${rel(file)}: names shape "${named}", which the table does not define.`);
+  }
+}
+if (!unknown) ok(`named: every shape a screen asks for exists`);
+
+console.log(bad
+  ? `\nshape: ${bad} screen(s) laying themselves out.`
+  : `\nshape: every screen declares one, and the shape places the action.`);
+process.exit(bad ? 1 : 0);
