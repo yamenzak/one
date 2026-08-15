@@ -23,7 +23,7 @@
  * `null` and the root's crown says so by having no leave control at all.
  */
 
-import { Band, Over, Page, PageCrown, Spacer, TYPE } from "@quad/web";
+import { Band, CROWN, LeaveChip, Over, Page, PageCrown, Spacer, TYPE } from "@quad/web";
 import type { Belonging, Me } from "../api.js";
 import { useSession } from "../session.js";
 import { HubHome } from "./Home.js";
@@ -90,14 +90,30 @@ function Screen({ where, onGo, onLeave }: {
   /* ⚠️ `veil` rather than `aurora`: aurora carries a second hue by design
      (`ambience.ts`), which a monochrome product renders as a green cast nobody
      chose. */
+  /*
+    ⚠️ THE ROOT HAS NO CROWN, BECAUSE THE FACE IS ITS HEADING. `Identity` puts
+    the person at the top of it — their avatar, their address, what they are —
+    and a display heading over that is a second name for a screen the face has
+    already named. What the crown was carrying that the root still needs is the
+    way out, and that is `LeaveChip` on its own (`layout.tsx`).
+  */
   return (
     <Page sky={root ? "veil" : "calm"}>
-      <PageCrown
-        title={root ? "One" : where.at === "workspace" ? held?.name ?? where.slug : nameOf(where)}
-        leave={root ? "dismiss" : "back"}
-        back={onLeave ?? undefined}
-        under={<span className={TYPE.note}>{said(where, person, held)}</span>}
-      />
+      {root
+        ? (
+          <Band bleed="edge" width="read">
+            <div className={`flex ${CROWN} items-center`}>
+              {onLeave ? <LeaveChip leave="dismiss" onDo={onLeave} /> : null}
+            </div>
+          </Band>
+        )
+        : (
+          <PageCrown
+            title={where.at === "workspace" ? held?.name ?? where.slug : nameOf(where)}
+            back={onLeave ?? undefined}
+            under={<span className={TYPE.note}>{said(where, person, held)}</span>}
+          />
+        )}
       <Band width="read">
         <div className="py-2">
           {root

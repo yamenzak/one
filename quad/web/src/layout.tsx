@@ -39,7 +39,7 @@ import { MOTION } from "./motion.js";
 export type { Space, Width };
 /* ⚠️ The metrics a SCREEN legitimately needs, re-exported here so nothing
    reaches into `metrics.ts` past the vocabulary. */
-export { CODE_SLOT, SPACE, WIDTH };
+export { CODE_SLOT, CROWN, SPACE, WIDTH };
 
 /* ------------------------------------------------------------------ bleed --- */
 
@@ -319,6 +319,34 @@ export function Crown(
 /* ------------------------------------------------------------- page crown --- */
 
 /**
+ * THE WAY OUT, AS A CHIP.
+ *
+ * ⚠️ EXTRACTED BECAUSE A SURFACE CAN NEED THE CONTROL WITHOUT THE HEADING. The
+ * hub's root is an identity block — a face, an address, a list — and a display
+ * heading over it would be a second name for a screen the face already names.
+ * It still needs the same × in the same place at the same size, and a second
+ * copy of it drifts the day one of them gets a new size.
+ */
+export function LeaveChip({ leave = "back", label, onDo }: {
+  readonly leave?: "back" | "dismiss";
+  readonly label?: string;
+  readonly onDo: () => void;
+}) {
+  return (
+    <Button
+      isIconOnly
+      size={CROWN_SIZE}
+      variant="ghost"
+      data-glass="true"
+      aria-label={label ?? (leave === "dismiss" ? "Close" : "Back")}
+      onPress={onDo}
+    >
+      {leave === "dismiss" ? <X /> : <Back />}
+    </Button>
+  );
+}
+
+/**
  * THE HEADER AN INNER PAGE HAS: a way back, the page's name, and the name
  * COLLAPSES.
  *
@@ -376,18 +404,7 @@ export function PageCrown({ title, back, backLabel, leave = "back", actions = []
       <header className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
         <Band bleed="edge" width="work">
           <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
-            {back ? (
-              <Button
-                isIconOnly
-                size={CROWN_SIZE}
-                variant="ghost"
-                data-glass="true"
-                aria-label={backLabel ?? (leave === "dismiss" ? "Close" : "Back")}
-                onPress={back}
-              >
-                {leave === "dismiss" ? <X /> : <Back />}
-              </Button>
-            ) : null}
+            {back ? <LeaveChip leave={leave} label={backLabel} onDo={back} /> : null}
 
             {/*
               ⚠️ `aria-hidden`, BECAUSE THE `h1` BELOW IS THE PAGE'S NAME. Two

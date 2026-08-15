@@ -24,8 +24,8 @@ import type { ScreenSpec, Tone } from "@quad/kernel";
 import { PRIMARY_MAX, primaryOf } from "@quad/kernel";
 import { Avatar, Button, Chip, Separator, Tooltip } from "@heroui/react";
 import {
-  Banknote, Bell, Calendar, Circle, ClipboardList, Cog, Coins, FileText, House,
-  Inbox as InboxGlyph, NotebookPen, Package, Shield, Sun, Users,
+  Banknote, Bell, Building2, Calendar, Circle, ClipboardList, Cog, Coins, FileText, House,
+  Inbox as InboxGlyph, NotebookPen, Package, Shield, Sun, UserRound, Users,
 } from "lucide-react";
 import { Island } from "./layout.js";
 import { skyCss, type Sky } from "./theme.js";
@@ -41,6 +41,10 @@ import { GUTTER, NAV_SPACE, PAD, ROW, SPACE } from "./metrics.js";
 const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
   home: <House />, house: <House />, sun: <Sun />,
   people: <Users />, users: <Users />,
+  /* ⚠️ A WORKSPACE IS A BUSINESS AND A PERSON IS ONE PERSON, and both were
+     landing on the neutral mark — an anonymous circle in a menu, which is the
+     one glyph that says nothing at all. */
+  workspace: <Building2 />, person: <UserRound />,
   money: <Coins />, coins: <Coins />, bank: <Banknote />,
   settings: <Cog />, cog: <Cog />,
   trust: <Shield />, shield: <Shield />,

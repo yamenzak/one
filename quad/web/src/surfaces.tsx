@@ -28,7 +28,9 @@ import * as React from "react";
 import { Avatar, Button, Card, Chip, Label, Separator, Skeleton, Switch } from "@heroui/react";
 import type { Tone } from "@quad/kernel";
 import { TYPE } from "./type.js";
-import { CARD_ROWS, CROWN_SIZE, FACE, HEAD_GAP, ICON, INSET, LEAD, PAD, ROW, SPACE } from "./metrics.js";
+import {
+  CARD_ROWS, CROWN_SIZE, FACE, HEAD_GAP, ICON, INSET, LEAD, PAD, ROW, SPACE,
+} from "./metrics.js";
 import type { Inset } from "./metrics.js";
 import { ARRIVE, arriveAt } from "./motion.js";
 import { Tally } from "./tally.js";
@@ -127,6 +129,60 @@ function ruled(children: React.ReactNode): React.ReactNode {
 }
 
 /** ⚠️ Exported for the two-runs-in-one-card case above; screens rarely need it. */
+/* --------------------------------------------------------------- identity --- */
+
+/**
+ * WHO THIS IS — a face, a name, and one line under it, centred.
+ *
+ * ⚠️ THE FACE IS THE HEADING ON AN ACCOUNT SURFACE. A screen about a person
+ * given a display heading has two things naming it: the word "Account" and the
+ * person's own face, one of which somebody recognises instantly and the other
+ * of which they have to read. Every product that shows a person a screen about
+ * themselves needs this, which is why it is here and not in the hub.
+ *
+ * ⚠️ AND IT IS CENTRED, WHICH ALMOST NOTHING ELSE HERE IS. A centred block says
+ * "this is about you" the way a left-aligned one cannot — it is the one place
+ * on any screen where the subject is the reader.
+ */
+export function Identity({ name, under, aside, face }: {
+  readonly name: string;
+  readonly under?: string;
+  /** A chip beside the line under — a role, a standing, a plan. */
+  readonly aside?: React.ReactNode;
+  /** An image, when there is one. The initial stands in when there is not. */
+  readonly face?: string;
+}) {
+  return (
+    <div className={`flex flex-col items-center text-center ${SPACE.snug}`}>
+      {/*
+        ⚠️ THE LIBRARY'S LARGEST, NOT A SIZE OF OURS. `.avatar` sizes the BOX and
+        the letter inside it together — `sm` is `size-8`/`text-sm`, `lg` is
+        `size-12`/`text-base` — so a class that widens the box alone leaves the
+        initial at whatever the variant set. The first build did exactly that and
+        produced an 88px panel with a 14px letter adrift in the middle of it.
+
+        ⚠️ AND IT IS A SQUIRCLE BECAUSE THE LIBRARY DRAWS IT THAT WAY. Every
+        avatar in the product is `rounded-3xl`; a round one here would be the
+        single circular face in the whole interface, which is a restyle wearing
+        a design decision's clothes (D7).
+      */}
+      <Avatar size="lg">
+        {face ? <Avatar.Image src={face} alt="" /> : null}
+        <Avatar.Fallback>{name.slice(0, 1).toUpperCase()}</Avatar.Fallback>
+      </Avatar>
+      <div className={`flex flex-col items-center ${SPACE.hair}`}>
+        <strong className={TYPE.title}>{name}</strong>
+        {under || aside ? (
+          <span className={`flex flex-wrap items-center justify-center ${SPACE.tight}`}>
+            {under ? <span className={TYPE.note}>{under}</span> : null}
+            {aside}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ place --- */
 
 /**
