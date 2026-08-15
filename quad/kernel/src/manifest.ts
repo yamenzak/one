@@ -30,6 +30,7 @@ import type { CollectionSpec } from "./collection.js";
 import { danglingRefs, eventsFor, operationsFor, quotasWithoutCeiling, refuseCollection } from "./collection.js";
 import type { MeterBook, PackDef } from "./credit.js";
 import { refusePacks, unbounded } from "./credit.js";
+import { unknownInPrompt } from "./ai.js";
 import type { EntitlementDef, PlanSpec } from "./entitlement.js";
 import { refuseCatalog, unenforced } from "./entitlement.js";
 import { holdingsIn, type Holding } from "./field.js";
@@ -314,6 +315,32 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
 
   for (const id of unbounded(spec.meters ?? {})) {
     at(`meter ${id}`, "no output ceiling, so the reserve is a guess and the platform pays the difference");
+  }
+
+  /*
+    ⚠️ AN AI ACTION IS REFUSED AT COMPOSITION FOR THE SAME REASON A METER IS
+    (D19). A prompt naming a variable the action does not offer sends a literal
+    brace to a model — invisibly, with a subtly wrong answer rather than a
+    visible failure — and an action with no output ceiling reserves a guess,
+    which the platform pays the difference on.
+  */
+  for (const o of spec.operations) {
+    const ai = o.ai;
+    if (!ai) continue;
+    if (!(ai.maxOutput > 0)) {
+      at(`operation ${o.id}`, "generates with no output ceiling, so the reserve is a guess");
+    }
+    for (const bad of unknownInPrompt(ai, ai.prompt)) {
+      at(`operation ${o.id}`, `its prompt names "{${bad}}", which it does not declare`);
+    }
+    /* ⚠️ A variable nothing names is a value a caller must supply and nothing
+       uses — the harmless direction, and still a promise the screen makes. */
+    for (const unused of ai.variables.filter((v) => !ai.prompt.includes(`{${v}}`))) {
+      at(`operation ${o.id}`, `declares "{${unused}}" and its prompt never names it`);
+    }
+    if (o.kind !== "write") {
+      at(`operation ${o.id}`, "generates, which spends credits, and a read may not spend");
+    }
   }
 
   /* --- the surface -------------------------------------------------------- */

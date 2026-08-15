@@ -20,7 +20,9 @@
  * row would be an outage the feature caused.
  */
 
-import type { AppId, Allowance, AppSpec, FlagBook, TenantId } from "@quad/kernel";
+import type { AppId, Allowance, AppSpec, FlagBook, ModelRow, TenantId } from "@quad/kernel";
+import { inLane, refusePrompt } from "@quad/kernel";
+import { actionsOf, bind, bindingsOf, running } from "./ai-actions.js";
 import { adjust, subscriptionFor } from "./billing.js";
 import { appsOfTenant, shards } from "./directory.js";
 import { runsOf } from "./jobs.js";
@@ -89,9 +91,14 @@ export interface OperatorDeps {
    * every workspace; no roster and no role can answer this.
    */
   readonly isOperator: (email: string | null) => boolean;
+  /** ⚠️ The model catalogue — the platform's, and the same rows metering reads. */
+  readonly models?: () => Promise<readonly ModelRow[]>;
 }
 
-export function operatorOps(deps: OperatorDeps): PersonalBook {
+export function operatorOps(input: OperatorDeps): PersonalBook {
+  /* ⚠️ A deployment with no catalogue wired has NO models, which every reader
+     already handles as "the lane has nothing enabled" — never a throw. */
+  const deps = { models: async (): Promise<readonly ModelRow[]> => [], ...input };
   const every = () => Object.values(deps.apps).map((make) => make());
 
   /* ⚠️ Every operation here asks, first. The door filter keeps these off other
@@ -184,6 +191,80 @@ export function operatorOps(deps: OperatorDeps): PersonalBook {
         if (!every().some((a) => a.flags && id in a.flags)) return ctx.fail("platform.not_found");
         await setDeploymentFlag(ctx.directory, id, input.on === true, ctx.now);
         return { id, on: input.on === true };
+      },
+    },
+
+    /*
+      ⚠️ EVERY GENERATING ACTION EVERY PRODUCT DECLARES, WITH WHAT IT RUNS ON
+      (D19). The catalogue rows travel with it because the binding is a choice
+      among them, and a screen that had to fetch them separately would be a
+      screen that can offer a model the lane cannot use.
+    */
+    "op.ai": {
+      kind: "read", needs: "session", doors: ["operator"],
+      async run(ctx): Promise<unknown> {
+        operator(ctx);
+        const models = await deps.models();
+        const apps = await Promise.all(every().map(async (a) => {
+          const bound = await bindingsOf(ctx.directory, a.id);
+          return {
+            id: a.id, name: a.name, mark: a.mark,
+            actions: actionsOf(a).map((action) => {
+              const binding = bound.find((b) => b.action === action.id);
+              const now = running(action.ai, models, binding, undefined);
+              return {
+                id: action.id, summary: action.summary,
+                lane: action.ai.lane,
+                variables: action.ai.variables,
+                brandable: action.ai.brandable === true,
+                declared: action.ai.prompt,
+                prompt: now.prompt,
+                wordedBy: now.wordedBy,
+                model: now.model?.id ?? null,
+                bound: binding?.model ?? null,
+                /* ⚠️ Only the rows this lane can actually use — see `lanesFor`. */
+                choices: inLane(models, action.ai.lane).filter((m) => m.enabled)
+                  .map((m) => ({ id: m.id, label: m.label, provider: m.provider })),
+              };
+            }),
+          };
+        }));
+        return { apps };
+      },
+    },
+
+    "op.ai.bind": {
+      kind: "write", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const appId = String(input.app ?? "");
+        const actionId = String(input.action ?? "");
+        const app = deps.apps[appId]?.();
+        const action = app ? actionsOf(app).find((a) => a.id === actionId) : undefined;
+        if (!action) return ctx.fail("platform.not_found");
+
+        const change: { model?: string | null; prompt?: string | null } = {};
+        if (input.model !== undefined) {
+          const wants = input.model === null ? null : String(input.model);
+          /* ⚠️ Only a row this lane can use, and only an enabled one — a
+             binding to anything else is a binding that silently falls back. */
+          if (wants !== null) {
+            const models = await deps.models();
+            const usable = inLane(models, action.ai.lane).some((m) => m.id === wants && m.enabled);
+            if (!usable) return ctx.fail("platform.invalid");
+          }
+          change.model = wants;
+        }
+        if (input.prompt !== undefined) {
+          const text = input.prompt === null ? null : String(input.prompt);
+          if (text !== null) {
+            const refused = refusePrompt(action.ai, text, "operator");
+            if (refused.length) return ctx.fail("platform.invalid", { detail: refused.join(", ") });
+          }
+          change.prompt = text;
+        }
+        await bind(ctx.directory, appId, actionId, change, ctx.now);
+        return { app: appId, action: actionId };
       },
     },
 

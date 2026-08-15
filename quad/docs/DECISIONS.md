@@ -359,3 +359,33 @@ tenant's door; a console that decides for itself who may open it; maintenance
 enforced anywhere but the one operation path; a maintenance mode that blocks
 signing out, leaving, or the operator door itself; a read of the switch that
 fails closed.
+
+---
+
+## D19 — An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward
+
+An operation that generates says `ai: { lane, prompt, variables, maxOutput,
+brandable? }` — the same shape every other cross-cutting concern has (D12). It
+never names a model: the operator binds a row from that lane's enabled
+catalogue, and the lane's election answers when nobody has, including when a
+binding no longer resolves. The prompt is a letterhead whose variables are
+declared, refused at composition if it names one it does not offer. Wording
+narrows in one direction — app → operator → tenant — and a tenant may reword
+only actions the app marked `brandable`, asked by the kernel at the write.
+One resolver (`running`) answers for the run and for both screens. Decided
+2026-08-14, with stage 16.
+
+**Why.** A model id in a manifest is a deployment decision shipped through a
+product release: unchangeable without one, wrong the day the provider retires
+the row, and separately wrong in every app — none of which fails anything,
+because a stale-but-live model answers perfectly well. And an unbounded prompt
+edit is the notification-letterhead bug with the volume up: a template naming
+`{coach}` renders a brace to a person, who reports it; a PROMPT naming it
+sends the brace into a model's instructions, and the answer is subtly wrong
+rather than visibly broken.
+
+**Therefore never:** a model id in an app's source; a prompt stored without
+asking the kernel; a tenant rewording an action the app did not mark
+brandable; a generating action with no output ceiling (the reserve is a
+ceiling on revenue); a run that resolves a different model or different words
+than the screens report; a read that generates.

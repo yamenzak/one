@@ -18,7 +18,8 @@
  */
 
 import type { AppSpec, TenantId } from "@quad/kernel";
-import { PUBLIC, checkSome, disclose } from "@quad/kernel";
+import { PUBLIC, checkSome, disclose, refusePrompt } from "@quad/kernel";
+import { actionsOf, word, wordingOf } from "./ai-actions.js";
 import type { PlatformCtx } from "./member-ops.js";
 import type { Resolved } from "./compose.js";
 import type { SchemaModule } from "./schema.js";
@@ -118,6 +119,50 @@ export function settingOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           if (def.level === "person") person[def.id] = { value: personRows[def.id] };
         }
         return { tenant, person };
+      }),
+
+    /*
+      ⚠️ THE WORKSPACE'S OWN WORDING FOR WHAT IT MAY REWORD (D19). Only actions
+      the app declared `brandable` — asked by the kernel at the write, so the
+      rule is true of the API and the import as well as of the screen.
+    */
+    "ai.wording": op("ai.wording", "read", "What the AI features say, and in whose words.",
+      async (ctx, input) => {
+        if (!ctx.accountId) return ctx.fail("platform.unauthorized");
+        const target = targetOf(ctx, input);
+        if (!target) return ctx.fail("platform.not_found");
+        const theirs = await wordingOf(ctx.db, ctx.tenantId as TenantId, target.id);
+        return {
+          items: actionsOf(target)
+            .filter((a) => a.ai.brandable)
+            .map((a) => ({
+              id: a.id, summary: a.summary,
+              variables: a.ai.variables,
+              declared: a.ai.prompt,
+              prompt: theirs[a.id] ?? null,
+            })),
+        };
+      }),
+
+    "ai.word": op("ai.word", "write", "Put an AI feature in your own words.",
+      async (ctx, input) => {
+        if (!ctx.accountId) return ctx.fail("platform.unauthorized");
+        const target = targetOf(ctx, input);
+        if (!target) return ctx.fail("platform.not_found");
+        /* ⚠️ Workspace authority — this is the workspace's voice, not a
+           person's preference. */
+        const mine = await ctx.permissionsIn(target.id);
+        if (!mine.has("tenant:manage")) return ctx.fail("platform.forbidden");
+
+        const action = actionsOf(target).find((a) => a.id === String(input.action ?? ""));
+        if (!action) return ctx.fail("platform.not_found");
+        const text = input.prompt === null ? null : String(input.prompt ?? "");
+        if (text !== null) {
+          const refused = refusePrompt(action.ai, text, "tenant");
+          if (refused.length) return ctx.fail("platform.invalid", { detail: refused.join(", ") });
+        }
+        await word(ctx.db, ctx.tenantId as TenantId, target.id, action.id, text, ctx.now);
+        return { action: action.id };
       }),
 
     "setting.write": op("setting.write", "write", "Change a setting.",

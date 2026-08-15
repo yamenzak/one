@@ -19,6 +19,7 @@
  */
 
 import type { FieldSpec, Fields } from "./field.js";
+import type { AiActionSpec } from "./ai.js";
 import type { Tone } from "./primitives.js";
 
 /* ------------------------------------------------------------------ gates --- */
@@ -120,6 +121,14 @@ export interface OperationSpec<I = unknown, O = unknown> {
   readonly quota?: string;
   /** What one call costs, where it costs something. */
   readonly credits?: number;
+  /**
+   * ⚠️ THE GENERATING HALF, DECLARED LIKE EVERY OTHER CONCERN (D12, D19). An
+   * operation that says `ai` names a LANE and a prompt; the model is bound by
+   * the operator and the reserve is computed from the bound row's rates. An
+   * app that reached for a model id instead would be a product carrying a
+   * deployment decision through a release.
+   */
+  readonly ai?: AiActionSpec;
 
   readonly idempotency: Idempotency;
   readonly audit?: Audit<I>;

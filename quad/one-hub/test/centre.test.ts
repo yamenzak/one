@@ -9,6 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import { STOP_BRANCHES } from "../src/centre/Centre.js";
+import { STOPS, stopFor } from "../src/console/Console.js";
 import { AREAS, areasFor, parseStop, pathFor } from "../src/centre/route.js";
 
 const APPS = ["kova", "hello"];
@@ -54,6 +55,17 @@ describe("the apps under it", () => {
     for (const path of ["/", "/people", "/money", "/settings", "/trust", "/inbox", "/kova", "/kova/plans"]) {
       expect(pathFor(parseStop(path, APPS, OWNER))).toBe(path);
     }
+  });
+});
+
+describe("the console's stops", () => {
+  /* ⚠️ Five is the ceiling (D10), and every path answers — an unknown one is
+     the first screen rather than nothing. */
+  it("is five destinations, and resolves every path", () => {
+    expect(STOPS).toHaveLength(5);
+    for (const stop of STOPS) expect(stopFor(stop.route)).toBe(stop.id);
+    expect(stopFor("/no-such-thing")).toBe("tenants");
+    expect(stopFor("")).toBe("tenants");
   });
 });
 

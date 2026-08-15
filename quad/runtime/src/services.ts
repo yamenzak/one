@@ -20,7 +20,7 @@
  */
 
 import type { AppId, Channel, Instant, Lane, ModelRow, TenantId } from "@quad/kernel";
-import { defaultIn, plan as planRun, type Planned } from "@quad/kernel";
+import { boundModel, plan as planRun, type Planned } from "@quad/kernel";
 import { release, reserve, settle } from "./credits.js";
 import type { Db } from "./sql.js";
 
@@ -49,6 +49,14 @@ export interface Ask {
   readonly maxOutput: number;
   /** ⚠️ Arabic runs nearer two characters per token; English nearer four. */
   readonly charsPerUnit?: number;
+  /**
+   * ⚠️ THE OPERATOR'S BINDING FOR THIS ACTION, IF THERE IS ONE (D19). Resolved
+   * by the caller through `running`, because the binding also decides the
+   * PROMPT — and a run that resolved the model here while the prompt was
+   * resolved there is a run whose reserve is computed from one thing and whose
+   * instructions are another.
+   */
+  readonly model?: string | null;
 }
 
 export interface Generated {
@@ -117,7 +125,9 @@ export const MOCK_ALLOWED = (environment: string): boolean => environment === "d
  */
 export async function generate(deps: AiDeps, ask: Ask): Promise<Generated | AiRefusal> {
   const rows = await deps.models();
-  const model = defaultIn(rows, ask.lane);
+  /* ⚠️ The bound row when it still resolves, the lane's election otherwise —
+     one function, so a retired model degrades rather than fails (D19). */
+  const model = boundModel(rows, ask.lane, ask.model);
   if (!model) return "no_model";
 
   const rate = { input: model.input, output: model.output, markup: model.markup };

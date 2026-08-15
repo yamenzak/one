@@ -27,6 +27,7 @@ export * from "./packages.js";
 export * from "./settings.js";
 export * from "./money-ops.js";
 export * from "./centre-ops.js";
+export * from "./ai-actions.js";
 export * from "./operator.js";
 export * from "./member-ops.js";
 export * from "./personal.js";

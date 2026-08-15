@@ -75,6 +75,39 @@ const publish = operation<Publish, { id: string; published: boolean }>({
   },
 });
 
+/**
+ * ⚠️ A GENERATING OPERATION NAMES A LANE AND A PROMPT, NEVER A MODEL (D19).
+ * Which row it runs on is the operator's binding; the prompt is a letterhead
+ * whose variables are declared, and `brandable` says a workspace may put it in
+ * its own voice — which a drafting tone should be, and an extraction rule
+ * should not.
+ */
+const draft = operation<{ about: string }, { text: string }>({
+  id: "note.draft",
+  kind: "write",
+  summary: "Draft a note from a line about it",
+  input: { about: field.text({ label: "About", required: true, holds: "none" }) },
+  output: { text: field.text({ label: "Draft", holds: "none" }) },
+  permission: "note:write",
+  idempotency: { mode: "none" },
+  emits: ["note.drafted"],
+  /* ⚠️ What the record says. A generation is a spend, and "who asked for
+     what" is exactly the entry somebody reads when a bill looks wrong. */
+  audit: (input) => ({ subject: input.about, verb: "drafted" }),
+  ai: {
+    lane: "text",
+    prompt: "Write a short note about {about}. Keep it to one paragraph.",
+    variables: ["about"],
+    maxOutput: 800,
+    brandable: true,
+  },
+  async handler(_ctx, input) {
+    /* ⚠️ The handler does not choose a model and does not build the prompt —
+       the platform resolves both from the declaration and the binding. */
+    return { text: `Draft about ${input.about}` };
+  },
+});
+
 /* --------------------------------------------------------------- the rest --- */
 
 export const HELLO: AppSpec = defineApp({
@@ -113,7 +146,7 @@ export const HELLO: AppSpec = defineApp({
   ],
 
   collections: [note],
-  operations: [publish],
+  operations: [publish, draft],
 
   screens: [
     { id: "notes", route: "/", label: "Notes", nav: "primary", icon: "note",

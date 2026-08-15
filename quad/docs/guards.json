@@ -1054,6 +1054,33 @@
       "impl": "scripts/operator.test.mjs",
       "proves": "maintenance:",
       "fails": "a closed deployment serves right through the agent door, or an unprovisioned switch refuses every request over our own missing row"
+    },
+    {
+      "id": "an-app-names-a-lane-never-a-model",
+      "protects": "D19",
+      "stage": "16",
+      "status": "live",
+      "impl": "scripts/ai-action.test.mjs",
+      "proves": "lane:",
+      "fails": "a deployment decision shipped through a product release — wrong the day the provider retires the row, and different in every app, with nothing failing"
+    },
+    {
+      "id": "an-edited-prompt-is-bounded-at-both-levels",
+      "protects": "D19",
+      "stage": "16",
+      "status": "live",
+      "impl": "scripts/ai-action.test.mjs",
+      "proves": "words:",
+      "fails": "a variable nothing offers is sent to a model as a literal brace, and the answer comes back subtly wrong with nobody the wiser"
+    },
+    {
+      "id": "the-run-and-the-screens-read-one-resolution",
+      "protects": "D19",
+      "stage": "16",
+      "status": "live",
+      "impl": "scripts/ai-action.test.mjs",
+      "proves": "resolution:",
+      "fails": "the bill stops matching what anybody was shown, because the run used a different model or different words than the console reported"
     }
   ]
 }

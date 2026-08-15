@@ -123,6 +123,8 @@ describe("what the manifest produced", () => {
   */
   it("derives every route from the declarations alone", () => {
     expect(surfaceOfComposed(compose(HELLO)).map((r) => `${r.method} ${r.path}`)).toEqual([
+      "POST /api/ai.word",
+      "GET /api/ai.wording",
       "GET /api/centre.view",
       "GET /api/inbox.list",
       "POST /api/inbox.policy",
@@ -136,6 +138,7 @@ describe("what the manifest produced", () => {
       "GET /api/money.view",
       "POST /api/note.create",
       "POST /api/note.delete",
+      "POST /api/note.draft",
       "GET /api/note.list",
       "POST /api/note.publish",
       "GET /api/note.read",

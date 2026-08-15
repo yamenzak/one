@@ -105,6 +105,105 @@ export interface ToolEntry {
   readonly input: Readonly<Record<string, unknown>>;
 }
 
+/* ---------------------------------------------------------------- actions --- */
+
+/**
+ * WHAT ONE GENERATING OPERATION ASKS FOR (D19).
+ *
+ * ⚠️ AN APP NAMES A LANE, NEVER A MODEL. A model id in a manifest is a
+ * deployment decision baked into a product: it cannot be changed without a
+ * release, it is wrong the day a provider retires the row, and every app then
+ * carries a different idea of which model is current. The app says what KIND of
+ * work this is; the operator binds the row; the election answers when nobody
+ * has.
+ *
+ * ⚠️ AND THE PROMPT IS A LETTERHEAD, WITH ITS VARIABLES DECLARED — exactly the
+ * notification contract, because it is exactly the same problem: text somebody
+ * may edit that must keep naming only what exists. A prompt naming `{coach}`
+ * where the action offers `{trainer}` renders the brace and the word into a
+ * model's instructions, which is worse than rendering it to a person: nobody
+ * sees it, and the answer is subtly wrong instead of visibly broken.
+ *
+ * ⚠️ `brandable` IS THE TENANT'S PERMISSION TO EDIT IT, and it is per action
+ * rather than global. A studio's plan-draft tone is the studio's voice; a
+ * lab-extraction prompt is not anybody's to edit, and the difference is a
+ * product decision the app declares.
+ */
+export interface AiActionSpec {
+  readonly lane: Lane;
+  /** The instructions, with `{placeholders}` drawn from `variables`. */
+  readonly prompt: string;
+  /** ⚠️ What the prompt may name. Anything else is refused at the edit. */
+  readonly variables: readonly string[];
+  /**
+   * ⚠️ THE CEILING THE RESERVE IS COMPUTED FROM, never "whatever it returns".
+   * A reserve is a ceiling on revenue: every token an estimate fails to count
+   * is a token the platform pays for and the tenant does not.
+   */
+  readonly maxOutput: number;
+  /** Whether a workspace may put the prompt in its own words. */
+  readonly brandable?: boolean;
+}
+
+/** ⚠️ Enough for instructions, not for a corpus. */
+export const MAX_PROMPT = 8_000;
+
+export type PromptRefusal = "empty" | "too_long" | "unknown_variable" | "not_theirs";
+
+/**
+ * What an edited prompt can get wrong.
+ *
+ * ⚠️ `level` IS THE AUTHORITY ASKING, AND IT DECIDES ONE OF THESE. The operator
+ * may reword any action; a tenant may reword only what the app declared
+ * `brandable`. Refusing that at the write rather than in a screen is what makes
+ * it true of the API, the import and the second screen as well.
+ */
+export function refusePrompt(
+  def: AiActionSpec, text: string, level: "operator" | "tenant",
+): readonly PromptRefusal[] {
+  const out: PromptRefusal[] = [];
+  if (level === "tenant" && !def.brandable) out.push("not_theirs");
+  if (!text.trim()) out.push("empty");
+  if (text.length > MAX_PROMPT) out.push("too_long");
+  if (namedIn(text).some((n) => !def.variables.includes(n))) out.push("unknown_variable");
+  return out;
+}
+
+const namedIn = (text: string): readonly string[] =>
+  [...text.matchAll(/\{([a-zA-Z0-9_]+)\}/g)].map((m) => m[1]!);
+
+/** The variables a prompt named that the action does not offer. */
+export const unknownInPrompt = (def: AiActionSpec, text: string): readonly string[] =>
+  [...new Set(namedIn(text).filter((n) => !def.variables.includes(n)))];
+
+/**
+ * ⚠️ AN UNFILLED PLACEHOLDER IS SENT TO THE MODEL AS ITSELF, so every declared
+ * variable resolves to something — the empty string where a caller had nothing
+ * — rather than to a literal brace in the instructions.
+ */
+export const sayPrompt = (
+  text: string, values: Readonly<Record<string, string>>,
+): string => text.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, name: string) => values[name] ?? "");
+
+/**
+ * The model an action runs on: the operator's binding if it names an enabled
+ * row IN THE ACTION'S OWN LANE, and the lane's election otherwise.
+ *
+ * ⚠️ A BINDING THAT NO LONGER RESOLVES FALLS BACK RATHER THAN FAILING. A model
+ * retired by its provider would otherwise take every bound action down until
+ * somebody edited a row, and the election is exactly the answer for "nobody has
+ * chosen" — which is what a dead binding amounts to.
+ */
+export function boundModel(
+  rows: readonly ModelRow[], lane: Lane, bound: string | null | undefined,
+): ModelRow | null {
+  if (bound) {
+    const named = inLane(rows, lane).find((r) => r.id === bound && r.enabled);
+    if (named) return named;
+  }
+  return defaultIn(rows, lane);
+}
+
 /* ------------------------------------------------------------------ rules --- */
 
 export type AiRefusal =

@@ -17,17 +17,19 @@ import type { ScreenSpec } from "@quad/kernel";
 import { Await, Shell, Working } from "@quad/web";
 import { useSession } from "../session.js";
 import { useLoad } from "../centre/data.js";
+import { Actions } from "./Actions.js";
 import { Tenants } from "./Tenants.js";
 import { Switches } from "./Switches.js";
 import { Works } from "./Works.js";
 import { Ground } from "./Ground.js";
 
-/* ⚠️ Four destinations, and they are the operator's whole world. The kernel's
-   ceiling is five; a fifth here would be a screen somebody invented. */
-export type Stop = "tenants" | "switches" | "works" | "ground";
+/* ⚠️ Five destinations, which is the kernel's ceiling exactly (D10) — a sixth
+   is a sign something belongs inside one of these rather than beside them. */
+export type Stop = "tenants" | "actions" | "switches" | "works" | "ground";
 
 export const STOPS: readonly { readonly id: Stop; readonly route: string; readonly label: string; readonly icon: string }[] = [
   { id: "tenants", route: "/", label: "Tenants", icon: "people" },
+  { id: "actions", route: "/actions", label: "Actions", icon: "note" },
   { id: "switches", route: "/switches", label: "Switches", icon: "settings" },
   { id: "works", route: "/works", label: "Works", icon: "list" },
   { id: "ground", route: "/ground", label: "Ground", icon: "package" },
@@ -85,6 +87,7 @@ export function Console() {
             onGo={go}
           >
             {at === "tenants" ? <Tenants /> : null}
+            {at === "actions" ? <Actions /> : null}
             {at === "switches" ? <Switches /> : null}
             {at === "works" ? <Works /> : null}
             {at === "ground" ? <Ground /> : null}

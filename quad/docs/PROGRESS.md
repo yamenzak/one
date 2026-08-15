@@ -30,6 +30,7 @@ reader can trust this table instead of re-reading the code.
 | 13 | The package rail — a priced bundle of timed grants, one ledger, one clock | shipped |
 | 14 | The tenant centre — the shell with the router: five areas + app screens inside | shipped |
 | 15 | The operator console — the same shell on `admin.`, and the maintenance switch | shipped |
+| 16 | AI actions — a lane per action, a model the operator binds, words that narrow | shipped |
 
 ## What is NOT built, and where to pick it up
 
@@ -462,6 +463,31 @@ Ground (shards, region, room left).
   allow-list, the adjustment, the flags and all three maintenance modes
   through the real hostnames.
 
+**AI actions — a lane, a letterhead, and one resolver (D19).** An operation
+that generates declares `ai: { lane, prompt, variables, maxOutput, brandable? }`
+— the same shape every other cross-cutting concern has. It never names a model.
+
+- **The operator binds the row**, per action, from the lane's enabled
+  catalogue; the lane's election answers when nobody has bound anything, and
+  when a binding no longer resolves — so a model retired by its provider
+  degrades instead of taking every bound action down.
+- **Words narrow in one direction**: the app declares, the operator may reword
+  anything for the deployment, a workspace may reword only what the app marked
+  `brandable` — a drafting tone is the workspace's voice, a lab-extraction
+  rule is nobody's. Both write paths ask the kernel, so the rule holds for the
+  API and the import as well as the screen.
+- **The prompt is a letterhead**, and the manifest refuses one that names a
+  variable it does not declare, one whose declared variable it never names, an
+  action with no output ceiling, and a READ that generates. `sayPrompt` fills
+  every declared variable, so an unfilled one is empty rather than a brace.
+- **One resolver, `running`** — read by the run, the console and the
+  workspace's own screen. The console's Actions screen lists every generating
+  action every product declares, with only the rows its lane can use.
+- `scripts/ai-action.test.mjs` holds the three promises (seven mutations
+  tried, seven caught); `kernel/test/ai-action.test.ts` proves the letterhead
+  and the fallback; `apps/hello/test/ai-actions.test.ts` drives the binding
+  and both wording levels through the real doors.
+
 **`@quad/one-hub` — the page a person opens.** The signpost, sign-in with an
 emailed code, the workspace list, and the wizard that makes one — HeroUI v3 as it
 ships, themed through tokens, nothing restyled.
@@ -504,6 +530,7 @@ The guard registry, its checks, and the standards that bind them.
 | D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 4 |
 | D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 0 |
 | D18 | The operator stands outside every workspace, and the console is a door rather than a role | 2 |
+| D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 3 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -633,6 +660,9 @@ the library decides FOR us.
 | `a-cross-app-operation-names-its-target` | D15 | the second product's packages and settings are unreachable for ever, because the route resolves whichever app is first on the tenant's list |
 | `the-console-is-on-the-operator-door-and-asks-who-is-there` | D18 | the deployment's own console answers at a workspace's address, or admits anybody holding a session, and looks exactly like working software |
 | `maintenance-is-asked-in-the-one-operation-path` | D18 | a closed deployment serves right through the agent door, or an unprovisioned switch refuses every request over our own missing row |
+| `an-app-names-a-lane-never-a-model` | D19 | a deployment decision shipped through a product release — wrong the day the provider retires the row, and different in every app, with nothing failing |
+| `an-edited-prompt-is-bounded-at-both-levels` | D19 | a variable nothing offers is sent to a model as a literal brace, and the answer comes back subtly wrong with nobody the wiser |
+| `the-run-and-the-screens-read-one-resolution` | D19 | the bill stops matching what anybody was shown, because the run used a different model or different words than the console reported |
 <!-- /generated -->
 
 ## Commands
