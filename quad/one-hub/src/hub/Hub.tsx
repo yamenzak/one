@@ -23,7 +23,9 @@
  * `null` and the root's crown says so by having no leave control at all.
  */
 
-import { Band, CROWN, LeaveChip, Over, Page, PageCrown, Spacer, TYPE } from "@quad/web";
+import {
+  Band, CROWN, LeaveChip, Over, Page, PageCrown, Spacer, TYPE, sentence,
+} from "@quad/web";
 import type { Belonging, Me } from "../api.js";
 import { useSession } from "../session.js";
 import { HubHome } from "./Home.js";
@@ -148,7 +150,11 @@ const said = (
        holds, and what you are in it. A description true of every workspace
        anybody is in is a line nobody reads twice. */
     if (where.at === "workspace") {
-      const products = (held?.apps ?? []).join(" · ");
+      /* ⚠️ AN APP ID IS NOT A NAME — see `sentence`. `me.who` carries ids
+         because it answers before there is a tenancy to read manifests from, so
+         the workspace's line read "kova · you are owner" in the middle of a
+         screen where every other word is capitalised. */
+      const products = (held?.apps ?? []).map(sentence).join(" · ");
       const role = held?.platformRole ? `you are ${held.platformRole}` : "waiting for you to claim it";
       return products ? `${products} · ${role}` : role;
     }

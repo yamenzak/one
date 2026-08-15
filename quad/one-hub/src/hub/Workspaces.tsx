@@ -14,7 +14,9 @@
  */
 
 import { Chip } from "@heroui/react";
-import { Group, NavRow, Nothing, PersonRow, Stack, glyphOf } from "@quad/web";
+import {
+  Group, NavRow, Nothing, PersonRow, Stack, glyphOf, sentence,
+} from "@quad/web";
 import { useSession } from "../session.js";
 import { here, hubAt, isHere, setupUrl, tenantUrl } from "../door.js";
 import { pathOf, type Where } from "./where.js";
@@ -81,7 +83,10 @@ export function Workspaces({ onGo }: { readonly onGo: (to: Where) => void }) {
 
 /** ⚠️ The role and the products, which is what the row is for — see the header. */
 const said = (apps: readonly string[] | undefined, role: string | null | undefined): string => {
-  const products = (apps ?? []).join(" · ");
+  /* ⚠️ AN APP ID IS NOT A NAME — see `sentence`. `me.who` carries ids because it
+     answers before there is a tenancy to read manifests from, so every row read
+     "kova · owner" on a screen where nothing else is lower case. */
+  const products = (apps ?? []).map(sentence).join(" · ");
   if (!role) return products || "Waiting for you to claim it";
   return products ? `${products} · ${role}` : role;
 };

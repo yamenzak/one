@@ -23,6 +23,7 @@ import { Shell, reachable } from "../src/shell.js";
 import { brandCss, brandCssFor, readable, skyCss, colorFor } from "../src/theme.js";
 import { bespokeCss } from "../src/ambience.js";
 import { Documents, SubProcessors } from "../src/legal.js";
+import { Await } from "../src/state.js";
 import type { DocumentDef } from "@quad/kernel";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node);
@@ -440,5 +441,56 @@ describe("the legal surfaces", () => {
     expect(out).toContain("Terms");
     expect(out).toContain("Read and accept");
     expect(out).toContain("Accepted");
+  });
+});
+
+/* ---------------------------------------------------------------- outcomes --- */
+
+/**
+ * ⚠️ "NONE SUPPLIED" AND "DRAW NOTHING" ARE DIFFERENT ANSWERS, and conflating
+ * them fails in the direction nobody looks at. The empty branch was chosen by
+ * truthiness, so `nothing={null}` — a caller deliberately asking for silence —
+ * fell through to `then` with an empty array: In your words drew a section
+ * heading and its description over no rows, which reads as a page that failed
+ * to load rather than as an answer.
+ */
+describe("the four outcomes", () => {
+  const loaded = <T,>(data: T) => ({ status: "loaded", data }) as never;
+
+  it("draws nothing when a caller asks for nothing on an empty result", () => {
+    const out = html(
+      <Await
+        of={loaded<readonly string[]>([])}
+        waiting={<span>waiting</span>}
+        nothing={null}
+        then={() => <span>CONTENT</span>}
+      />,
+    );
+    expect(out).not.toContain("CONTENT");
+    expect(out).toBe("");
+  });
+
+  it("still renders content on an empty result when no empty state was supplied", () => {
+    const out = html(
+      <Await
+        of={loaded<readonly string[]>([])}
+        waiting={<span>waiting</span>}
+        then={(rows: readonly string[]) => <span>rows: {rows.length}</span>}
+      />,
+    );
+    expect(out).toContain("rows: 0");
+  });
+
+  it("prefers the supplied empty state over the content branch", () => {
+    const out = html(
+      <Await
+        of={loaded<readonly string[]>([])}
+        waiting={<span>waiting</span>}
+        nothing={<span>NOTHING YET</span>}
+        then={() => <span>CONTENT</span>}
+      />,
+    );
+    expect(out).toContain("NOTHING YET");
+    expect(out).not.toContain("CONTENT");
   });
 });

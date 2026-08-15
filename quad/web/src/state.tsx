@@ -85,7 +85,15 @@ export function Await<T>({ of, waiting: skeleton, nothing, isNothing, then, agai
   const empty = isNothing
     ? isNothing(of.data)
     : Array.isArray(of.data) && of.data.length === 0;
-  if (empty && nothing) return <>{nothing}</>;
+  /*
+    ⚠️ `undefined` IS "NONE SUPPLIED"; `null` IS "DRAW NOTHING", AND THEY ARE NOT
+    THE SAME ANSWER. The test was truthiness, so a caller who deliberately
+    asked for silence on an empty result got the CONTENT branch instead — `then`
+    ran with an empty array, and In your words drew a section heading and its
+    description over no rows at all. A screen that looks half-loaded is the worst
+    reading of an empty one, and the caller had said exactly what it wanted.
+  */
+  if (empty && nothing !== undefined) return <>{nothing}</>;
 
   return <>{then(of.data)}</>;
 }

@@ -29,7 +29,7 @@ import type { Me } from "../api.js";
 import { useLoad, type InboxView } from "../centre/data.js";
 import { useSession } from "../session.js";
 import { hubAt, operatorUrl } from "../door.js";
-import { pathOf, type Where } from "./where.js";
+import { nameOf, pathOf, type Where } from "./where.js";
 
 export function HubHome({ person, onGo }: {
   readonly person: Me | null;
@@ -59,9 +59,10 @@ export function HubHome({ person, onGo }: {
         under={workspaces === null
           ? undefined
           : workspaces.length === 1 ? "1 workspace" : `${workspaces.length} workspaces`}
-        aside={person?.operator
-          ? <Chip color="warning" variant="soft"><Chip.Label>Operator</Chip.Label></Chip>
-          : undefined}
+        /* ⚠️ NO OPERATOR CHIP. It was `warning` amber — the one hue on a
+           monochrome screen, for a standing rather than a problem — and it said
+           the same word as the only row an operator gets, four rows below it. A
+           badge that repeats a destination is a badge doing nothing. */
       />
 
       <Group>
@@ -87,7 +88,11 @@ export function HubHome({ person, onGo }: {
         />
         <NavRow
           icon={glyphOf("person")}
-          label="Your details"
+          /* ⚠️ THE ROW IS NAMED BY WHERE IT GOES, not by a synonym. It said
+             "Your details" and the screen it opens is called "You" — a name
+             changing under somebody mid-tap is the smallest kind of lie a menu
+             can tell, and `nameOf` is where that name already lives. */
+          label={nameOf({ at: "you" })}
           onOpen={() => onGo({ at: "you" })}
         />
       </Group>

@@ -59,7 +59,16 @@ function AppWording({ app, among }: {
       waiting={<FormWaiting fields={1} />}
       again={of.again}
       isNothing={(d) => d.items.length === 0}
-      nothing={null}
+      /* ⚠️ SAID, NOT SILENT. A product with nothing to reword used to render
+         literally nothing, so a workspace whose only product has no brandable
+         action got a screen with a heading and no content — which reads as a
+         page that failed to load rather than as an answer. */
+      nothing={(
+        <Nothing
+          says="Nothing here is yours to reword"
+          under={`Every AI feature ${app.name} has uses the product's own words`}
+        />
+      )}
       /* ⚠️ The product's name only where there is more than one of them — see
          `distinguishing`. The crown already named the screen and the workspace. */
       then={(data) => (

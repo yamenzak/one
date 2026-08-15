@@ -356,7 +356,13 @@ export function NavRow({ icon, label, under, aside, onOpen, isDisabled }: NavRow
 
 /** A row that DOES something rather than going somewhere — so, no chevron. */
 export function ActionRow({ icon, label, under, onDo, tone = "neutral" }: RowBase & {
-  readonly onDo: () => void; readonly tone?: Tone;
+  /**
+   * ⚠️ OPTIONAL, BECAUSE A ROW IS ALSO A TRIGGER. Used inside `Confirm` the
+   * press is react-aria's — the row opens the dialogue and the dialogue owns
+   * the act. Requiring a handler there means passing a function that does
+   * nothing, which is a lie in the shape of a prop.
+   */
+  readonly onDo?: () => void; readonly tone?: Tone;
 }) {
   return (
     /*

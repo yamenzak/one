@@ -28,7 +28,12 @@ export function InboxScreen({ onGo, onSeen }: {
   };
 
   return (
-    <Section label="Inbox" under="Everything you were told, however you chose to hear it">
+    /* ⚠️ NO HEADING OF ITS OWN — THE CROWN IS THE SCREEN'S NAME. This drew
+       "Inbox" and the same sentence the crown had already put four lines above
+       it, so the screen said its own name twice and its own description twice
+       before a single notification. `Hub.tsx` states the rule; this was the one
+       screen breaking it. */
+    <Section>
       <Stack space="snug">
         <Inbox
           notes={inbox.of.status === "ready"
