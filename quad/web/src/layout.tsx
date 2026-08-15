@@ -372,7 +372,7 @@ export function LeaveChip({ leave = "back", label, onDo }: {
  * `edges:` can stay green.
  */
 export function PageCrown({
-  title, back, backLabel, leave = "back", actions = [], under,
+  title, back, backLabel, leave = "back", actions = [], does, under,
   bleed = "edge", width = "work",
 }: {
   readonly title: string;
@@ -404,6 +404,23 @@ export function PageCrown({
    */
   readonly leave?: "back" | "dismiss";
   readonly actions?: readonly Slot[];
+  /**
+   * ⚠️ THE PRIMARY ACTION, ON A WIDE SCREEN ONLY — and it arrives already
+   * decided. A `Screen` hands the SAME act to this and to its docked bar and
+   * shows exactly one of them by breakpoint (`screen.tsx`); declaring it twice
+   * is how the crown comes to say "Invite" while the bar says "Add somebody".
+   *
+   * ⚠️ AND IT IS LABELLED HERE RATHER THAN ICON-ONLY. There is room at this
+   * size, and an unlabelled primary is a guess — the icon-only treatment is for
+   * `actions`, which are secondary and recoverable.
+   */
+  readonly does?: {
+    readonly label: string;
+    readonly icon?: React.ReactNode;
+    readonly onDo: () => void;
+    readonly tone?: "danger";
+    readonly disabled?: boolean;
+  };
   /**
    * ⚠️ THE ROW THAT SCROLLS AWAY WITH THE TITLE — a scope picker, a date range.
    * It belongs to the heading rather than to the content, and pinning it would
@@ -464,6 +481,21 @@ export function PageCrown({
                 {a.icon}
               </Button>
             ))}
+
+            {/* ⚠️ `hidden md:flex`, because below it the same act is a docked
+                bar where a thumb already is — see `screen.tsx`. */}
+            {does ? (
+              <Button
+                className="hidden md:flex"
+                size={CROWN_SIZE}
+                variant={does.tone === "danger" ? "danger" : "primary"}
+                isDisabled={does.disabled}
+                onPress={does.onDo}
+              >
+                {does.icon}
+                {does.label}
+              </Button>
+            ) : null}
           </div>
         </Band>
       </header>

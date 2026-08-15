@@ -1,0 +1,363 @@
+/**
+ * A SCREEN IS A DECLARATION, NOT A LAYOUT.
+ *
+ * ⚠️ THE FAULT THIS EXISTS TO REMOVE IS NOT UGLINESS, IT IS DRIFT. Every screen
+ * in the hub hand-assembled the same five decisions — which column width, which
+ * skeleton, what "nothing here" says, where the one action goes, how the content
+ * arrives — and each got most of them right and one of them wrong. Nobody can
+ * point at the file that is wrong, because none of them is: the product is
+ * wrong, in aggregate, and the only fix that holds is to stop asking.
+ *
+ * ⚠️ SO A SCREEN NAMES ITS SHAPE AND HANDS OVER SLOTS. `shape` is what KIND of
+ * page this is — a collection, a subject, a number, a board, a form. Everything
+ * that follows from that is decided here, once: the width, the waiting skeleton,
+ * how content is stacked, and — the one that keeps being got wrong by hand —
+ * where the primary action lands at each size.
+ *
+ * ⚠️ WHERE THE PRIMARY ACTION GOES IS THE WHOLE ARGUMENT. The roster put "Invite
+ * somebody" at the FOOT of the list. With three people that is fine and with
+ * thirty it is invisible: somebody at the bottom of a long page has to scroll to
+ * the top to act, or somebody at the top has to scroll to the bottom, and which
+ * of the two depends on a decision nobody made. It is DOCKED on a phone, where a
+ * thumb already is, and it sits in the crown on a desktop, where the eye already
+ * is. One declaration, both answers, no screen involved.
+ *
+ * ⚠️ AND ONE SCREEN HAS ONE PRIMARY ACTION. Not a style rule — a definition. A
+ * page with two things it is for is two pages, and the moment a second `does`
+ * would be needed the right edit is a second screen or a sheet. `also` is for
+ * the two or three things somebody might reach for while doing the primary one,
+ * and it is capped in the type.
+ */
+
+import * as React from "react";
+import { Button } from "@heroui/react";
+import { Band, PageCrown, Spacer, type Slot, type Width } from "./layout.js";
+import { Await, Nothing, RowsWaiting, FigureWaiting, FormWaiting, TextWaiting, TilesWaiting, nothingIn, type Loaded } from "./state.js";
+import { Stack } from "./layout.js";
+import { PAD, SAFE_BOTTOM, SPACE } from "./metrics.js";
+import { ARRIVE, arriveAt } from "./motion.js";
+
+/* ------------------------------------------------------------------ shape --- */
+
+/**
+ * WHAT KIND OF PAGE THIS IS.
+ *
+ * ⚠️ EIGHT, AND THEY ARE KINDS OF PURPOSE RATHER THAN KINDS OF ARRANGEMENT.
+ * "Two columns" is not a shape — it is a consequence, and naming consequences is
+ * how a preset system becomes a second CSS with worse names. What a screen knows
+ * about itself is what it is FOR, and every arrangement below falls out of that.
+ *
+ *   list      a collection somebody scans and adds to. A roster, a catalogue.
+ *   detail    one subject and its facts. A person, a workspace, a product.
+ *   figure    one number is the point, everything else supports it. A bill.
+ *   board     destinations or measures as tiles, some wider than others.
+ *   settings  many independent controls, each saving itself. No primary — see
+ *             below, this one is enforced.
+ *   form      a sequence of fields and ONE submit. The submit is the primary.
+ *   reader    prose. A policy, a document, an explanation.
+ *   decision  one object, one choice. A plan, a paywall, a confirmation.
+ */
+export type Shape =
+  | "list" | "detail" | "figure" | "board" | "settings" | "form" | "reader" | "decision";
+
+/**
+ * ⚠️ THE TABLE IS THE PRESET SYSTEM. Everything a shape decides is a row here,
+ * so adding a ninth kind of page is a row rather than a component — and, more to
+ * the point, so the answer to "how wide is a form" is in ONE place for every app
+ * that will ever be built on this.
+ */
+const SHAPES: Readonly<Record<Shape, {
+  /** ⚠️ `read` for anything with sentences in it; `work` for columns. */
+  readonly width: Width;
+  /** ⚠️ Shaped like what is coming — a spinner is a layout that will jump. */
+  readonly waiting: () => React.ReactNode;
+  /** How the content's own blocks are spaced. */
+  readonly space: "snug" | "roomy";
+  /**
+   * ⚠️ WHETHER A PRIMARY ACTION IS EVEN LEGAL HERE. `settings` is the one that
+   * says no, and it is the most useful entry in the table: a settings screen
+   * with a Save button is a screen where half the controls save themselves and
+   * half do not, and nobody can tell which by looking (see `useAction`).
+   */
+  readonly primary: "docked" | "none";
+}>> = {
+  list: { width: "read", waiting: () => <RowsWaiting rows={4} />, space: "roomy", primary: "docked" },
+  detail: { width: "read", waiting: () => <RowsWaiting rows={3} />, space: "roomy", primary: "docked" },
+  figure: { width: "read", waiting: () => <FigureWaiting count={2} />, space: "roomy", primary: "docked" },
+  board: { width: "work", waiting: () => <TilesWaiting tiles={6} />, space: "roomy", primary: "docked" },
+  settings: { width: "read", waiting: () => <FormWaiting fields={4} />, space: "roomy", primary: "none" },
+  form: { width: "read", waiting: () => <FormWaiting fields={4} />, space: "roomy", primary: "docked" },
+  reader: { width: "read", waiting: () => <TextWaiting lines={6} />, space: "roomy", primary: "docked" },
+  decision: { width: "read", waiting: () => <TilesWaiting tiles={3} />, space: "roomy", primary: "docked" },
+};
+
+/* ------------------------------------------------------------------- acts --- */
+
+/**
+ * THE ONE THING A SCREEN IS FOR.
+ *
+ * ⚠️ A LABEL THAT IS A VERB, ALWAYS. "Invite somebody", not "People management".
+ * The control says what happens; the toast afterwards says it happened, in the
+ * same words (DESIGN.md §2).
+ */
+export interface Act {
+  readonly label: string;
+  readonly icon?: React.ReactNode;
+  readonly onDo: () => void;
+  /** ⚠️ Reserved for a primary that destroys. Rare, and never a default. */
+  readonly tone?: "danger";
+  readonly disabled?: boolean;
+}
+
+/* ------------------------------------------------------------------ frame --- */
+
+/**
+ * WHO THE SCREEN IS AND HOW YOU LEAVE IT — supplied by whatever routes, not by
+ * the screen.
+ *
+ * ⚠️ A SCREEN DOES NOT KNOW ITS OWN NAME, AND IT MUST NOT. The name and the way
+ * out are properties of WHERE the screen sits: the same content is "People"
+ * under a workspace and a step you go back from, and a router already knows
+ * both. Twenty screens each passing their own title is twenty places to get the
+ * back behaviour subtly wrong — the root dismissed with an ×, everything inside
+ * left with an arrow — and the third one always does.
+ *
+ * ⚠️ SO IT IS CONTEXT RATHER THAN PROPS. Threading four values through every
+ * branch of a router's switch is the same information written twenty times, and
+ * the day a fifth is added it is written twenty more.
+ */
+export interface Frame {
+  readonly title: string;
+  readonly under?: React.ReactNode;
+  readonly back?: () => void;
+  readonly leave?: "back" | "dismiss";
+}
+
+const FrameContext = React.createContext<Frame | null>(null);
+
+/** Wraps whatever a router renders for one address. */
+export function Framed({ frame, children }: {
+  readonly frame: Frame;
+  readonly children: React.ReactNode;
+}) {
+  return <FrameContext.Provider value={frame}>{children}</FrameContext.Provider>;
+}
+
+/* ----------------------------------------------------------------- screen --- */
+
+export interface ScreenProps<T> {
+  readonly shape: Shape;
+  /** ⚠️ Absent takes the router's — see `Frame`. Named only where it differs. */
+  readonly title?: string;
+  /** ⚠️ A FACT, or nothing. Not a description of the screen — DESIGN.md §1. */
+  readonly under?: React.ReactNode;
+  readonly back?: () => void;
+  readonly leave?: "back" | "dismiss";
+  /** ⚠️ ONE. See the header; `settings` refuses it outright. */
+  readonly does?: Act;
+  /** ⚠️ At most two, and they are crown chips. A third is a sheet. */
+  readonly also?: readonly Slot[];
+
+  /* --- the data, and therefore the four outcomes ------------------------- */
+
+  /**
+   * ⚠️ HANDED TO THE SCREEN RATHER THAN WRAPPED INSIDE IT, because the primary
+   * action's PLACE depends on the outcome — see `does` below. A screen that
+   * resolved its own `Await` and then rendered a dock would offer "Invite
+   * somebody" over a skeleton and again inside its own empty state.
+   */
+  readonly of?: Loaded<T>;
+  readonly then?: (data: T) => React.ReactNode;
+  readonly isNothing?: (data: T) => boolean;
+  readonly again?: () => void;
+  /** Overrides the shape's own skeleton where the content is unusual. */
+  readonly waiting?: React.ReactNode;
+  /** ⚠️ What is true when the answer is legitimately nothing. */
+  readonly nothing?: { readonly says: string; readonly under?: string };
+  /** For a screen with no request behind it. */
+  readonly children?: React.ReactNode;
+}
+
+/**
+ * ⚠️ THE ACTION APPEARS WHEN THERE IS SOMETHING TO ACT ON, which is three rules
+ * in one and each was a real screen:
+ *
+ *   WAITING  — no dock. A primary button floating over a skeleton invites a
+ *              press against data that has not arrived.
+ *   TROUBLE  — no dock. The only useful control is "try again", and it is in
+ *              the refusal where the explanation is.
+ *   NOTHING  — no dock; the action moves INTO the empty state instead. An empty
+ *              screen with a docked bar shows the same words twice, once in the
+ *              only thing on the page and once bolted to the bottom of it.
+ *
+ * A screen with no request at all is always ready, which is the fourth case and
+ * needs no branch.
+ */
+const shows = <T,>(of: Loaded<T> | undefined, isNothing?: (d: T) => boolean): "act" | "empty" | "no" =>
+  of === undefined ? "act"
+    : of.status !== "ready" ? "no"
+      : nothingIn(of.data, isNothing) ? "empty" : "act";
+
+export function Screen<T = unknown>({
+  shape, title, under, back, leave, does, also = [],
+  of, then, isNothing, again, waiting, nothing, children,
+}: ScreenProps<T>) {
+  const preset = SHAPES[shape];
+  const where = shows(of, isNothing);
+  const frame = React.useContext(FrameContext);
+  /* ⚠️ The screen's own value wins where it has one, because a screen CAN know
+     something the router does not — a workspace's real name behind a slug. */
+  const name = title ?? frame?.title ?? "";
+  const sub = under ?? frame?.under;
+  const out = back ?? frame?.back;
+  const how = leave ?? frame?.leave;
+
+  /* ⚠️ A `settings` SCREEN WITH A PRIMARY IS A BUG, AND IT IS LOUD RATHER THAN
+     IGNORED. Silently dropping it would leave somebody wondering why their
+     button never rendered; a guard catches it before this ever runs, and this
+     catches the case the guard cannot see (a shape chosen at runtime). */
+  if (preset.primary === "none" && does) {
+    throw new Error(
+      `A "${shape}" screen cannot have a primary action — its controls save themselves.`,
+    );
+  }
+
+  const body = of !== undefined
+    ? (
+      <Await
+        of={of}
+        again={again}
+        waiting={waiting ?? preset.waiting()}
+        isNothing={isNothing}
+        nothing={nothing
+          ? (
+            <Nothing
+              says={nothing.says}
+              under={nothing.under}
+              /* ⚠️ The way out lives IN the empty state — see `shows`. */
+              does={does ? <Button variant="primary" onPress={does.onDo}>{does.label}</Button> : undefined}
+            />
+          )
+          : undefined}
+        then={(data) => <Arriving space={preset.space}>{then?.(data)}</Arriving>}
+      />
+    )
+    : <Arriving space={preset.space}>{children}</Arriving>;
+
+  return (
+    <>
+      <PageCrown
+        bleed="hold"
+        width={preset.width}
+        title={name}
+        under={sub}
+        back={out}
+        leave={how}
+        actions={also.slice(0, 2)}
+        /* ⚠️ THE SAME ACT, DRAWN TWICE AND SHOWN ONCE — see `PageCrown`. Two
+           declarations would drift the day one of them gets new copy. */
+        does={where === "act" ? does : undefined}
+      />
+
+      <Band bleed="hold" width={preset.width}>
+        <div className="pb-2">{body}</div>
+      </Band>
+
+      {/* ⚠️ THE SCREEN OWNS THE SPACE UNDER ITS CONTENT, so the dock below is at
+          the bottom of the VIEWPORT on a short page and at the bottom of the
+          SCROLL on a long one. Without it a page with three rows on it put the
+          primary action floating in the middle of an empty screen — sticky does
+          nothing on a page that does not scroll, which is exactly the page
+          where it looks most like a mistake. */}
+      <Spacer />
+
+      {/*
+        ⚠️ DOCKED ON A PHONE ONLY, because on a desktop the crown is already in
+        view and a bar welded across the bottom of a wide window is a mobile
+        pattern wearing a desktop's clothes.
+      */}
+      {where === "act" && does
+        ? (
+          <div className={`sticky bottom-0 z-10 w-full md:hidden ${PAD} ${SAFE_BOTTOM}`}>
+            <Band bleed="hold" width={preset.width}>
+              <Button
+                className="w-full"
+                variant={does.tone === "danger" ? "danger" : "primary"}
+                isDisabled={does.disabled}
+                onPress={does.onDo}
+              >
+                {does.icon}
+                {does.label}
+              </Button>
+            </Band>
+          </div>
+        )
+        : null}
+    </>
+  );
+}
+
+/* --------------------------------------------------------------- arriving --- */
+
+/**
+ * ⚠️ EVERY SCREEN'S CONTENT ARRIVES, AND NO SCREEN ASKS FOR IT. Applying the
+ * stagger by hand means the screens that were written after somebody remembered
+ * have it and the rest do not, which is worse than none of them having it — an
+ * inconsistency reads as a bug where an absence reads as a choice.
+ *
+ * ⚠️ IT IS HEROUI'S OWN `enter` KEYFRAME, driven by `--tw-enter-*`. A hand-rolled
+ * one sits outside the library's reduced-motion handling and keeps moving for
+ * somebody who asked it to stop (`motion.ts`).
+ */
+function Arriving({ space, children }: {
+  readonly space: "snug" | "roomy";
+  readonly children: React.ReactNode;
+}) {
+  const blocks = React.Children.toArray(children).filter(Boolean);
+  return (
+    <Stack space={space}>
+      {blocks.map((child, i) => (
+        <div key={i} {...ARRIVE} style={arriveAt(i)}>{child}</div>
+      ))}
+    </Stack>
+  );
+}
+
+/* ------------------------------------------------------------------ board --- */
+
+/**
+ * A GRID WHOSE ITEMS ARE NOT ALL THE SAME SIZE.
+ *
+ * ⚠️ THE SPANS ARE WHAT MAKES IT A BOARD RATHER THAN A LIST WITH COLUMNS. A grid
+ * of identical tiles says every one of them matters equally, which is almost
+ * never true and is the reason a wall of equal cards reads as a menu somebody
+ * gave up sorting. One wide tile at the top is a hierarchy, expressed in the
+ * only channel a grid has.
+ *
+ * ⚠️ AND IT IS TWO COLUMNS ON A PHONE, ALWAYS. One column is a list and should
+ * have been declared as one; three is a phone showing 100px-wide cards. The
+ * widening happens at `md`, where there is room for it and not before.
+ */
+export function Board({ children }: { readonly children: React.ReactNode }) {
+  return (
+    <div className={`grid grid-cols-2 md:grid-cols-4 ${SPACE.snug}`}>{children}</div>
+  );
+}
+
+/**
+ * ⚠️ `wide` AND `tall` RATHER THAN NUMBERS. A tile that could ask for four
+ * columns is a tile that breaks the board on a phone, where there are two — so
+ * the vocabulary offers the two spans a two-column grid can honour and nothing
+ * else. On a wide board they become two of four, which is the same proportion.
+ */
+export function Tile({ wide, tall, children }: {
+  readonly wide?: boolean;
+  readonly tall?: boolean;
+  readonly children: React.ReactNode;
+}) {
+  return (
+    <div className={`${wide ? "col-span-2" : ""} ${tall ? "row-span-2" : ""} min-w-0`}>
+      {children}
+    </div>
+  );
+}

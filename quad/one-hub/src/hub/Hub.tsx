@@ -24,7 +24,7 @@
  */
 
 import {
-  Band, CROWN, LeaveChip, Over, Page, PageCrown, Spacer, TYPE, sentence,
+  Band, CROWN, Framed, LeaveChip, Over, Page, Spacer, sentence,
 } from "@quad/web";
 import type { Ambience } from "@quad/web";
 import type { Belonging, Me } from "../api.js";
@@ -103,38 +103,45 @@ function Screen({ where, onGo, onLeave }: {
     and a display heading over that is a second name for a screen the face has
     already named. What the crown was carrying that the root still needs is the
     way out, and that is `LeaveChip` on its own (`layout.tsx`).
+
+    ⚠️ AND EVERYTHING ELSE IS `Framed` RATHER THAN CROWNED HERE. The name, the
+    way out and the fact under it are properties of the ADDRESS, so they are
+    decided once and handed down; what KIND of page it is, and the one thing it
+    is for, are the screen's own and it declares them (`@quad/web`'s `Screen`).
+    Before this the frame drew a crown around content that then had to guess its
+    own width, its own skeleton and where to put its action — and twenty screens
+    guessed twenty times.
   */
   return (
     <Page sky={groundOf(where)}>
       {root
         ? (
-          <Band width="read">
-            <div className={`flex ${CROWN} items-center`}>
-              {onLeave ? <LeaveChip leave="dismiss" onDo={onLeave} /> : null}
-            </div>
-          </Band>
+          <>
+            <Band width="read">
+              <div className={`flex ${CROWN} items-center`}>
+                {onLeave ? <LeaveChip leave="dismiss" onDo={onLeave} /> : null}
+              </div>
+            </Band>
+            <Band width="read">
+              <div className="py-2"><HubHome person={person} onGo={onGo} /></div>
+            </Band>
+          </>
         )
         : (
-          <PageCrown
-            /* ⚠️ THE SAME COLUMN AS THE CONTENT UNDER IT — see `PageCrown`. The
-               hub is one held column at reading width on every screen it has; a
-               crown left edge-bled put "Money" 240px to the left of the bill it
-               names, on the same screen. */
-            bleed="hold"
-            width="read"
-            title={where.at === "workspace" ? held?.name ?? where.slug : nameOf(where)}
-            back={onLeave ?? undefined}
-            under={<span className={TYPE.note}>{said(where, person, held)}</span>}
-          />
+          <Framed
+            frame={{
+              title: where.at === "workspace" ? held?.name ?? where.slug : nameOf(where),
+              under: said(where, person, held),
+              back: onLeave ?? undefined,
+              leave: "back",
+            }}
+          >
+            <Inside where={where} onGo={onGo} />
+          </Framed>
         )}
-      <Band width="read">
-        <div className="py-2">
-          {root
-            ? <HubHome person={person} onGo={onGo} />
-            : <Inside where={where} onGo={onGo} />}
-        </div>
-      </Band>
-      <Spacer />
+      {/* ⚠️ Only the root needs one — every `Screen` owns its own (`screen.tsx`),
+          and two would split the slack and leave the dock halfway up. */}
+      {root ? <Spacer /> : null}
     </Page>
   );
 }

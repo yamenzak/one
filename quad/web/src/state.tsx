@@ -82,9 +82,7 @@ export function Await<T>({ of, waiting: skeleton, nothing, isNothing, then, agai
   if (of.status === "waiting") return <>{skeleton}</>;
   if (of.status === "trouble") return <Trouble problem={of.problem} again={again} />;
 
-  const empty = isNothing
-    ? isNothing(of.data)
-    : Array.isArray(of.data) && of.data.length === 0;
+  const empty = nothingIn(of.data, isNothing);
   /*
     ⚠️ `undefined` IS "NONE SUPPLIED"; `null` IS "DRAW NOTHING", AND THEY ARE NOT
     THE SAME ANSWER. The test was truthiness, so a caller who deliberately
@@ -97,6 +95,21 @@ export function Await<T>({ of, waiting: skeleton, nothing, isNothing, then, agai
 
   return <>{then(of.data)}</>;
 }
+
+/**
+ * ⚠️ WHAT "EMPTY" MEANS, IN ONE PLACE, BECAUSE TWO THINGS NEED THE ANSWER.
+ * `Await` needs it to choose a branch, and `Screen` needs it to decide where the
+ * primary action goes — an empty screen carries it inside the empty state and a
+ * populated one docks it (see `screen.tsx`). Two implementations of "is there
+ * anything here" is how a screen comes to show the same button twice.
+ *
+ * ⚠️ AND ANYTHING THAT IS NOT A LIST IS THE CALLER'S TO DEFINE. An array of
+ * length zero is the case that is always empty; a `{ items: [], total: 0 }` is
+ * not something this can guess about, and guessing wrong renders "nothing here"
+ * over a real answer.
+ */
+export const nothingIn = <T,>(data: T, isNothing?: (d: T) => boolean): boolean =>
+  isNothing ? isNothing(data) : Array.isArray(data) && data.length === 0;
 
 /* ---------------------------------------------------------------- trouble --- */
 

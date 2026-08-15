@@ -1,6 +1,15 @@
 /**
  * PEOPLE — one roster, and nothing else on the screen.
  *
+ * ⚠️ THE SCREEN IS A `list` AND ITS ONE ACTION IS "INVITE SOMEBODY", DECLARED
+ * RATHER THAN PLACED. It used to sit as the last row of the roster, which is
+ * fine at three members and invisible at thirty: whoever is at the bottom of a
+ * long page has to scroll to the top to act, or whoever is at the top has to
+ * scroll to the bottom, and which of the two was never decided. The `list` shape
+ * docks it above the thumb on a phone and puts it in the crown on a desktop, and
+ * on an EMPTY roster moves it into the empty state — the one place all three are
+ * decided is `screen.tsx`.
+ *
  * ⚠️ THE ONE ROSTER IS THE POINT (D15). A person appears once, with their
  * platform office and what they are in each product — not once per product.
  * Every control here lands on a bounded operation: the screen can offer a role
@@ -20,8 +29,8 @@ import { useState } from "react";
 import { PLATFORM_ROLES } from "@quad/kernel";
 import { Button, Card, Chip } from "@heroui/react";
 import {
-  Agree, Await, Choice, Confirm, Group, Listing, Menu, NavRow, Nothing, NumberInput,
-  Picks, RowsWaiting, Stack, TextInput, Tray, glyphOf, notice, money as saidMoney,
+  Await, Choice, Confirm, Listing, Menu, Nothing, RowsWaiting, Screen, Stack, TextInput, Tray,
+  notice, money as saidMoney,
 } from "@quad/web";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView, type HoldingLine, type MemberLine, type PackageLine } from "./data.js";
@@ -41,24 +50,30 @@ export function People({ view }: { readonly view: CentreView }) {
      so the largest target on the screen did nothing and the smallest did
      everything (DESIGN.md §5). One tray, opened by the list. */
   const [opened, setOpened] = useState<MemberLine | null>(null);
+  const [inviting, setInviting] = useState(false);
 
   return (
-    <Stack space="roomy">
-      {/* ⚠️ NO HEADING OF ITS OWN: the hub's crown is the screen's name, and a
-          section repeating it puts the same word on the page twice. */}
-      {/* ⚠️ THE LIST FIRST, THEN THE WAY TO ADD TO IT. Above the roster the
-          invite is the first thing on a screen whose subject is who is already
-          here — and it put a `+` row over a list it is not part of. Every other
-          "make a new one" in the hub sits at the foot of its own list. */}
-      <Stack space="snug">
+    <>
+      <Screen
+        shape="list"
+        does={manage ? { label: "Invite somebody", onDo: () => setInviting(true) } : undefined}
+        of={members.of}
+        again={members.again}
+        isNothing={(d) => d.items.length === 0}
+        waiting={<RowsWaiting rows={4} />}
+        nothing={{
+          says: "Nobody here yet",
+          under: "Invite somebody by email — they join by signing in as that address",
+        }}
+        then={(data) => (
           <Listing
             label="Members"
-            of={members.of.status === "ready"
-              ? { status: "ready", data: members.of.data.items }
-              : members.of.status === "trouble" ? members.of : { status: "waiting" }}
-            again={members.again}
+            of={{ status: "ready", data: data.items }}
             rowKey={(m) => m.id}
-            says={{ nothing: "Nobody here yet", under: "Invite somebody by email to get started" }}
+            /* ⚠️ EMPTY IS THE SCREEN'S NOW, NOT THE LISTING'S. Two components
+               both able to answer "there is nothing here" is two answers, and
+               only one of them can also stand the primary action down. */
+            says={{ nothing: "Nobody here yet" }}
             /* ⚠️ A ROSTER IS A LIST OF PEOPLE BEFORE IT IS A TABLE. On a phone
                the three columns were a scroll box with two of them cut off
                mid-word; the same rows carry the same facts in the shape the
@@ -98,11 +113,18 @@ export function People({ view }: { readonly view: CentreView }) {
               },
             ]}
           />
-          {manage ? <InviteTray view={view} onDone={members.again} /> : null}
-      </Stack>
+        )}
+      />
 
       {/* ⚠️ ONE TRAY FOR THE LIST, not one per row. Mounting a drawer per member
           means forty drawers in the tree on a roster of forty. */}
+      {inviting ? (
+        <InviteTray
+          view={view}
+          onClose={() => setInviting(false)}
+          onDone={() => { members.again(); setInviting(false); }}
+        />
+      ) : null}
       {opened ? (
         <MemberActions
           view={view}
@@ -111,7 +133,7 @@ export function People({ view }: { readonly view: CentreView }) {
           onClose={() => setOpened(null)}
         />
       ) : null}
-    </Stack>
+    </>
   );
 }
 
@@ -120,7 +142,11 @@ const nameOf = (view: CentreView, appId: string): string =>
 
 /* ------------------------------------------------------------------ invite --- */
 
-function InviteTray({ view, onDone }: { readonly view: CentreView; readonly onDone: () => void }) {
+function InviteTray({ view, onDone, onClose }: {
+  readonly view: CentreView;
+  readonly onDone: () => void;
+  readonly onClose: () => void;
+}) {
   const [email, setEmail] = useState("");
   const [platformRole, setPlatformRole] = useState("staff");
   const [appRoles, setAppRoles] = useState<Record<string, string>>({});
@@ -134,46 +160,40 @@ function InviteTray({ view, onDone }: { readonly view: CentreView; readonly onDo
   };
 
   return (
-    <div>
-      {/* ⚠️ A ROW, NOT A FLOATING PRIMARY. It sat above the roster as a bare
-          button attached to nothing — the one control on the screen with no
-          card under it. Every other "make a new one of these" in the hub is a
-          row with a `+` at the foot of the list it adds to, and this is that. */}
-      <Tray
-        trigger={(
-          <Group>
-            <NavRow icon={glyphOf("add")} label="Invite somebody" onOpen={() => undefined} />
-          </Group>
-        )}
-        title="Invite somebody"
-        actions={<Button slot="close" variant="primary" isDisabled={!email.includes("@")} onPress={() => void invite()}>Send the invitation</Button>}
-      >
-        <Stack space="roomy">
-          <TextInput label="Email" kind="email" value={email} onChange={setEmail}
-            help="They sign in as this address — that is how the invitation is claimed." />
+    /* ⚠️ THE TRAY HAS NO TRIGGER OF ITS OWN — the screen's primary action opens
+       it. A trigger here would be a second copy of the same control, in a place
+       the shape did not choose, which is the fault this whole pass removes. */
+    <Tray
+      isOpen
+      onOpenChange={(open) => { if (!open) onClose(); }}
+      title="Invite somebody"
+      actions={<Button slot="close" variant="primary" isDisabled={!email.includes("@")} onPress={() => void invite()}>Send the invitation</Button>}
+    >
+      <Stack space="roomy">
+        <TextInput label="Email" kind="email" value={email} onChange={setEmail}
+          help="They sign in as this address — that is how the invitation is claimed." />
+        <Choice
+          label="In the workspace"
+          value={platformRole}
+          onChange={(v) => setPlatformRole(v ?? "staff")}
+          options={Object.keys(PLATFORM_ROLES).map((id) => ({ id, label: id, help: ROLE_SAID[id] }))}
+        />
+        {view.apps.map((app) => (
           <Choice
-            label="In the workspace"
-            value={platformRole}
-            onChange={(v) => setPlatformRole(v ?? "staff")}
-            options={Object.keys(PLATFORM_ROLES).map((id) => ({ id, label: id, help: ROLE_SAID[id] }))}
+            key={app.id}
+            label={`In ${app.name}`}
+            value={appRoles[app.id] ?? null}
+            onChange={(v) => setAppRoles((prev) => {
+              const next = { ...prev };
+              if (v) next[app.id] = v; else delete next[app.id];
+              return next;
+            })}
+            options={app.roles.map((id) => ({ id, label: id }))}
+            placeholder="Not a user"
           />
-          {view.apps.map((app) => (
-            <Choice
-              key={app.id}
-              label={`In ${app.name}`}
-              value={appRoles[app.id] ?? null}
-              onChange={(v) => setAppRoles((prev) => {
-                const next = { ...prev };
-                if (v) next[app.id] = v; else delete next[app.id];
-                return next;
-              })}
-              options={app.roles.map((id) => ({ id, label: id }))}
-              placeholder="Not a user"
-            />
-          ))}
-        </Stack>
-      </Tray>
-    </div>
+        ))}
+      </Stack>
+    </Tray>
   );
 }
 
