@@ -11,7 +11,7 @@
  * record. A ceiling withholds email and push; it never withholds the fact.
  */
 
-import { Await, FormWaiting, NoteRow, NotificationPolicy, Nothing, Stack, distinguishing, notice } from "@quad/web";
+import { NoteRow, NotificationPolicy, Screen, distinguishing, notice } from "@quad/web";
 import { api } from "../api.js";
 import { useLoad, type CentreView } from "./data.js";
 import type { PolicyAnswer } from "./Told.js";
@@ -26,22 +26,18 @@ export function Notices({ view }: { readonly view: CentreView }) {
     of.again();
   };
 
-  if (!view.you.platform.includes("tenant:manage")) {
-    return (
-      <Nothing
-        says="Only an owner or a manager may set this"
-        under="Your own settings are under You"
-      />
-    );
-  }
-
   return (
-    <Await
+    /* ⚠️ `settings` — every control here saves itself the moment it changes, so
+       the shape refuses a primary action outright (`screen.tsx`). */
+    <Screen
+      shape="settings"
+      refused={view.you.platform.includes("tenant:manage")
+        ? undefined
+        : { says: "Only an owner or a manager may set this", under: "Your own settings are under You" }}
       of={of.of}
-      waiting={<FormWaiting fields={3} />}
       again={of.again}
       then={(told) => (
-        <Stack space="roomy">
+        <>
           {view.apps.map((app) => (
             <NotificationPolicy
               key={app.id}
@@ -60,7 +56,7 @@ export function Notices({ view }: { readonly view: CentreView }) {
             Everybody may narrow this further for themselves, and the inbox keeps the
             record whatever is switched off here.
           </NoteRow>
-        </Stack>
+        </>
       )}
     />
   );

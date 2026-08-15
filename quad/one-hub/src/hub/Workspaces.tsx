@@ -15,7 +15,7 @@
 
 import { Chip } from "@heroui/react";
 import {
-  Group, NavRow, Nothing, PersonRow, Stack, glyphOf, sentence,
+  Group, Nothing, PersonRow, Screen, sentence,
 } from "@quad/web";
 import { useSession } from "../session.js";
 import { here, hubAt, isHere, setupUrl, tenantUrl } from "../door.js";
@@ -45,7 +45,14 @@ export function Workspaces({ onGo }: { readonly onGo: (to: Where) => void }) {
   const start = () => { if (where) location.assign(setupUrl(where, here())); };
 
   return (
-    <Stack space="roomy">
+    /* ⚠️ `list`, and STARTING ONE IS THE PRIMARY. It used to be a `+` row under
+       the list of workspaces you already belong to — which is a row somebody
+       scrolls past on the way to nothing, since the list above it is the thing
+       they came for. Declared, it docks and crowns like every other. */
+    <Screen
+      shape="list"
+      does={{ label: "Start a workspace", onDo: start }}
+    >
       {person && belongs.length === 0
         ? (
           <Nothing
@@ -73,11 +80,7 @@ export function Workspaces({ onGo }: { readonly onGo: (to: Where) => void }) {
             ))}
           </Group>
         )}
-
-      <Group>
-        <NavRow icon={glyphOf("add")} label="Start a workspace" onOpen={start} />
-      </Group>
-    </Stack>
+    </Screen>
   );
 }
 

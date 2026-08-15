@@ -15,7 +15,7 @@
 import { useState } from "react";
 import { Button, Card } from "@heroui/react";
 import {
-  Await, FormWaiting, Group, LongText, NavRow, Nothing, Row, Stack, glyphOf, notice,
+  Group, LongText, NavRow, Row, Screen, Stack, glyphOf, notice,
 } from "@quad/web";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView } from "./data.js";
@@ -35,14 +35,7 @@ export function Wording({ view, app, onGo }: {
 }) {
   /* ⚠️ Changing what a product says on the workspace's behalf is the
      workspace's decision, so it needs the workspace's authority. */
-  if (!view.you.platform.includes("tenant:manage")) {
-    return (
-      <Nothing
-        says="Only an owner or a manager may change these words"
-        under="Ask somebody who runs this workspace"
-      />
-    );
-  }
+  const mayNot = !view.you.platform.includes("tenant:manage");
 
   /* ⚠️ ONE PRODUCT IS THE SCREEN; SEVERAL ARE A LIST — the same rule Settings
      follows, for the same reason (DESIGN.md §3). Nobody pays a tap for a menu
@@ -50,13 +43,30 @@ export function Wording({ view, app, onGo }: {
   const only = view.apps.length === 1 ? view.apps[0] : undefined;
   const chosen = app ? view.apps.find((a) => a.id === app) : only;
 
+  /* ⚠️ THE REFUSAL IS CONTENT, NOT AN EARLY RETURN. Returned above the frame it
+     took the crown with it — a sentence alone on a page with no name and no way
+     back (`screen.tsx`). */
+  if (mayNot) {
+    return (
+      <Screen
+        shape="settings"
+        refused={{
+          says: "Only an owner or a manager may change these words",
+          under: "Ask somebody who runs this workspace",
+        }}
+      />
+    );
+  }
+
   if (!chosen) {
     return (
-      <Group>
-        {view.apps.map((a) => (
-          <NavRow key={a.id} icon={glyphOf("note")} label={a.name} onOpen={() => onGo(a.id)} />
-        ))}
-      </Group>
+      <Screen shape="list">
+        <Group>
+          {view.apps.map((a) => (
+            <NavRow key={a.id} icon={glyphOf("note")} label={a.name} onOpen={() => onGo(a.id)} />
+          ))}
+        </Group>
+      </Screen>
     );
   }
 
@@ -67,27 +77,25 @@ function AppWording({ app }: { readonly app: CentreApp }) {
   const of = useLoad<{ items: readonly WordingLine[] }>("ai.wording", { app: app.id });
 
   return (
-    <Await
+    /* ⚠️ `settings` — each wording saves itself. And SAID, not silent: a product
+       with nothing to reword used to render literally nothing, so a workspace
+       whose only product has no brandable action got a heading over no content,
+       which reads as a page that failed to load rather than as an answer. */
+    <Screen
+      shape="settings"
       of={of.of}
-      waiting={<FormWaiting fields={1} />}
       again={of.again}
       isNothing={(d) => d.items.length === 0}
-      /* ⚠️ SAID, NOT SILENT. A product with nothing to reword used to render
-         literally nothing, so a workspace whose only product has no brandable
-         action got a screen with a heading and no content — which reads as a
-         page that failed to load rather than as an answer. */
-      nothing={(
-        <Nothing
-          says="Nothing here is yours to reword"
-          under={`Every AI feature ${app.name} has uses the product's own words`}
-        />
-      )}
+      nothing={{
+        says: "Nothing here is yours to reword",
+        under: `Every AI feature ${app.name} has uses the product's own words`,
+      }}
       then={(data) => (
-        <Stack space="snug">
+        <>
           {data.items.map((line) => (
             <WordingRow key={line.id} app={app} line={line} onDone={of.again} />
           ))}
-        </Stack>
+        </>
       )}
     />
   );

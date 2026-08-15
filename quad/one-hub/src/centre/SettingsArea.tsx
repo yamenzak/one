@@ -19,7 +19,7 @@
  * to be two screens (DESIGN.md §3).
  */
 
-import { Await, FormWaiting, Group, NavRow, Nothing, Settings, Stack, glyphOf, notice } from "@quad/web";
+import { Group, NavRow, Screen, Settings, glyphOf, notice } from "@quad/web";
 import { settingsOn } from "@quad/kernel";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView } from "./data.js";
@@ -35,7 +35,17 @@ export function SettingsArea({ view, app, onGo }: {
   const settable = view.apps.filter(has);
 
   if (!settable.length) {
-    return <Nothing says="Nothing to change here" under="No product in this workspace declares a setting" />;
+    /* ⚠️ INSIDE THE FRAME, NOT ABOVE IT — a sentence returned early takes the
+       crown with it, leaving a page with no name and no way back. */
+    return (
+      <Screen
+        shape="settings"
+        refused={{
+          says: "Nothing to change here",
+          under: "No product in this workspace declares a setting",
+        }}
+      />
+    );
   }
 
   /* ⚠️ ONE PRODUCT IS THE SCREEN; SEVERAL ARE A LIST — see the header. */
@@ -44,11 +54,13 @@ export function SettingsArea({ view, app, onGo }: {
 
   if (!chosen) {
     return (
-      <Group>
-        {settable.map((a) => (
-          <NavRow key={a.id} icon={glyphOf("settings")} label={a.name} onOpen={() => onGo(a.id)} />
-        ))}
-      </Group>
+      <Screen shape="list">
+        <Group>
+          {settable.map((a) => (
+            <NavRow key={a.id} icon={glyphOf("settings")} label={a.name} onOpen={() => onGo(a.id)} />
+          ))}
+        </Group>
+      </Screen>
     );
   }
 
@@ -74,15 +86,18 @@ function AppSettings({ app }: { readonly app: CentreApp }) {
   };
 
   return (
-    <Await
+    /* ⚠️ `settings` — every control writes on change (see `write`), so the shape
+       refuses a primary action. A Save button here would be a screen where half
+       the controls save themselves and half do not. */
+    <Screen
+      shape="settings"
       of={stored.of}
-      waiting={<FormWaiting fields={3} />}
       again={stored.again}
       then={(data) => (
         /* ⚠️ WHOSE SETTING IT IS RIDES ON THE GROUP, not on a heading of its
            own. Each declared group is already a card with a name on it, and a
            line under that name is where "everyone" against "only you" belongs. */
-        <Stack space="roomy">
+        <>
           {hasTenant ? (
             <Settings
               book={app.settings}
@@ -103,7 +118,7 @@ function AppSettings({ app }: { readonly app: CentreApp }) {
               onChange={(id, value) => void write(id, value)}
             />
           ) : null}
-        </Stack>
+        </>
       )}
     />
   );

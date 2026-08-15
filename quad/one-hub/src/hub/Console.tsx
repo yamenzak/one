@@ -19,7 +19,7 @@
  * lives behind that workspace's own address.
  */
 
-import { Group, NavRow, Nothing, Stack, glyphOf } from "@quad/web";
+import { Group, NavRow, Screen, glyphOf } from "@quad/web";
 import { useSession } from "../session.js";
 import { Actions } from "../console/Actions.js";
 import { Ground } from "../console/Ground.js";
@@ -52,15 +52,22 @@ export function ConsoleHome({ onGo }: { readonly onGo: (to: Where) => void }) {
      never this page. Five rows that all refuse is worse than one sentence. */
   if (person && !person.operator) {
     return (
-      <Nothing
-        says="The console admits operators only"
-        under="Everything you can reach is under Workspaces"
+      <Screen
+        shape="board"
+        refused={{
+          says: "The console admits operators only",
+          under: "Everything you can reach is under Workspaces",
+        }}
       />
     );
   }
 
   return (
-    <Stack space="roomy">
+    /* ⚠️ `board` — five destinations, and the shape gives them the wide column
+       so a desktop shows them as a board rather than as five rows down the
+       middle of a 1600px window. No primary: a console is a way IN to five
+       things, not a place where one of them is the point. */
+    <Screen shape="board">
       {/* ⚠️ Unlabelled: the crown already says where this is, and a heading
           repeating it is the same sentence twice — see `Hub.tsx`. */}
       {/*
@@ -82,7 +89,7 @@ export function ConsoleHome({ onGo }: { readonly onGo: (to: Where) => void }) {
           />
         ))}
       </Group>
-    </Stack>
+    </Screen>
   );
 }
 

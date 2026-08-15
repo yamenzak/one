@@ -17,7 +17,7 @@
 import { useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import {
-  AmountRow, Await, ControlRow, Group, Identity, NumberInput, Nothing, RowsWaiting, Stack, Tray,
+  AmountRow, ControlRow, Group, Identity, NumberInput, RowsWaiting, Screen, Stack, Tray,
   notice, sentence,
 } from "@quad/web";
 import type { Allowance, EntitlementDef, PlanSpec } from "@quad/kernel";
@@ -52,17 +52,20 @@ export function OneTenant({ id }: { readonly id: string }) {
   const of = useLoad<{ items: readonly TenantLine[]; apps: readonly AppLine[] }>("op.tenants");
 
   return (
-    <Await
+    /* ⚠️ `detail` — one subject and its facts, with no primary: an operator
+       comes here to LOOK, and the one thing they change is per product, so it
+       opens from the product's own row. */
+    <Screen
+      shape="detail"
       of={of.of}
-      waiting={<RowsWaiting rows={3} />}
       again={of.again}
+      waiting={<RowsWaiting rows={3} />}
+      isNothing={(d) => !d.items.some((t) => t.id === id)}
+      nothing={{ says: "No such workspace", under: "It may have been closed since this list was read" }}
       then={(data) => {
-        const tenant = data.items.find((t) => t.id === id);
-        if (!tenant) {
-          return <Nothing says="No such workspace" under="It may have been closed since this list was read" />;
-        }
+        const tenant = data.items.find((t) => t.id === id)!;
         return (
-          <Stack space="roomy">
+          <>
             {/* ⚠️ A SCREEN ABOUT A WORKSPACE OPENS WITH ITS NAME AND WHERE IT
                 LIVES — the shape §4 asks for, and the two facts an operator
                 needs before any of the rest means anything. */}
@@ -98,7 +101,7 @@ export function OneTenant({ id }: { readonly id: string }) {
                 ? <ControlRow label="No product here"><span /></ControlRow>
                 : null}
             </Group>
-          </Stack>
+          </>
         );
       }}
     />

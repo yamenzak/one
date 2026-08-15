@@ -174,6 +174,15 @@ export interface ScreenProps<T> {
   readonly waiting?: React.ReactNode;
   /** ⚠️ What is true when the answer is legitimately nothing. */
   readonly nothing?: { readonly says: string; readonly under?: string };
+  /**
+   * ⚠️ A FIFTH OUTCOME, AND IT IS NOT `trouble`. "You may not see this" is a
+   * fact about the person, known before any request is made — a `Problem` is a
+   * fact about a request that failed. Screens used to answer it with a bare
+   * `Nothing` returned EARLY, above the frame, which took the crown with it: no
+   * title, no way back, a sentence alone on a page. The refusal is content now,
+   * and the screen it refuses still has a name and a way out of it.
+   */
+  readonly refused?: { readonly says: string; readonly under?: string };
   /** For a screen with no request behind it. */
   readonly children?: React.ReactNode;
 }
@@ -200,10 +209,11 @@ const shows = <T,>(of: Loaded<T> | undefined, isNothing?: (d: T) => boolean): "a
 
 export function Screen<T = unknown>({
   shape, title, under, back, leave, does, also = [],
-  of, then, isNothing, again, waiting, nothing, children,
+  of, then, isNothing, again, waiting, nothing, refused, children,
 }: ScreenProps<T>) {
   const preset = SHAPES[shape];
-  const where = shows(of, isNothing);
+  /* ⚠️ A refusal offers nothing to act on, so the primary stands down with it. */
+  const where = refused ? "no" : shows(of, isNothing);
   const frame = React.useContext(FrameContext);
   /* ⚠️ The screen's own value wins where it has one, because a screen CAN know
      something the router does not — a workspace's real name behind a slug. */
@@ -222,7 +232,9 @@ export function Screen<T = unknown>({
     );
   }
 
-  const body = of !== undefined
+  const body = refused
+    ? <Nothing says={refused.says} under={refused.under} />
+    : of !== undefined
     ? (
       <Await
         of={of}
@@ -309,11 +321,25 @@ export function Screen<T = unknown>({
  * one sits outside the library's reduced-motion handling and keeps moving for
  * somebody who asked it to stop (`motion.ts`).
  */
+/**
+ * ⚠️ FRAGMENTS ARE FLATTENED, AND SKIPPING THAT COSTS EVERY GAP ON THE SCREEN.
+ * `then` naturally returns `<>…</>` — it is the shape the type asks for — and
+ * `React.Children.toArray` counts that as ONE child. So the stack had a single
+ * item, its `gap` applied between nothing, and three cards ran together with
+ * their radii overlapping. Nothing throws, nothing warns, and it looks like a
+ * z-index bug rather than a missing gap.
+ */
+const blocksIn = (node: React.ReactNode): React.ReactNode[] =>
+  React.Children.toArray(node).flatMap((child) =>
+    React.isValidElement(child) && child.type === React.Fragment
+      ? blocksIn((child.props as { readonly children?: React.ReactNode }).children)
+      : [child]);
+
 function Arriving({ space, children }: {
   readonly space: "snug" | "roomy";
   readonly children: React.ReactNode;
 }) {
-  const blocks = React.Children.toArray(children).filter(Boolean);
+  const blocks = blocksIn(children).filter(Boolean);
   return (
     <Stack space={space}>
       {blocks.map((child, i) => (

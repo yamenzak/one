@@ -13,7 +13,7 @@
 import { useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import {
-  Await, Choice, Group, LongText, NavRow, Nothing, RowsWaiting, Stack, Tray, glyphOf, notice,
+  Choice, Group, LongText, NavRow, Screen, Stack, Tray, glyphOf, notice,
 } from "@quad/web";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
@@ -46,13 +46,14 @@ export function Actions({ app, onGo }: {
   const of = useLoad<AiAnswer>("op.ai");
 
   return (
-    /* ⚠️ The crown already says "Actions" and what they are — see `Hub.tsx`. */
-    <Await
+    /* ⚠️ `list` with no primary — an action exists because a product declared
+       one, so there is nothing here to add. */
+    <Screen
+      shape="list"
       of={of.of}
-      waiting={<RowsWaiting rows={3} />}
       again={of.again}
       isNothing={(d) => d.apps.every((a) => a.actions.length === 0)}
-      nothing={<Nothing says="No product here declares a generating action" />}
+      nothing={{ says: "No product here declares a generating action" }}
       then={(data) => {
         const shown = data.apps.filter((a) => a.actions.length);
         /*

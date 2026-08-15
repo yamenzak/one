@@ -12,8 +12,8 @@
 
 import { Button } from "@heroui/react";
 import {
-  Await, ControlRow, FlagConsole, Group, NoteRow, Nothing, RowRule, RowsWaiting, Stack, TYPE,
-  notice, sentence,
+  Await, ControlRow, FlagConsole, Group, NoteRow, Nothing, RowRule, RowsWaiting, Screen, Stack,
+  TYPE, notice, sentence,
 } from "@quad/web";
 import type { FlagBook } from "@quad/kernel";
 import { api } from "../api.js";
@@ -49,7 +49,9 @@ export function Switches() {
   };
 
   return (
-    <Stack space="roomy">
+    /* ⚠️ `settings` — two independent controls, each saving the moment it is
+       pressed, and no submit anywhere. The shape refuses a primary outright. */
+    <Screen shape="settings">
       {/* ⚠️ The crown already says "Switches" — see `Hub.tsx`. This screen drew
           it a second time over the flags, four lines under the first. */}
       <Await
@@ -118,6 +120,6 @@ export function Switches() {
           </Stack>
         )}
       />
-    </Stack>
+    </Screen>
   );
 }

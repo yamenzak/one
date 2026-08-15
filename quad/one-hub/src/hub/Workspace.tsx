@@ -18,7 +18,7 @@
  */
 
 import { Button, Chip } from "@heroui/react";
-import { Group, NavRow, Nothing, Row, Stack, glyphOf } from "@quad/web";
+import { Group, NavRow, Row, Screen, glyphOf } from "@quad/web";
 import { useSession } from "../session.js";
 import { tenantUrl } from "../door.js";
 import { OF_WORKSPACE, OFTEN, nameOf, partsFor, type Where, type WorkspacePart } from "./where.js";
@@ -50,9 +50,12 @@ export function OneWorkspace({ slug, onGo }: {
 
   if (person && !workspace) {
     return (
-      <Nothing
-        says="You are not in this workspace"
-        under="It may have been closed, or your access taken away"
+      <Screen
+        shape="detail"
+        refused={{
+          says: "You are not in this workspace",
+          under: "It may have been closed, or your access taken away",
+        }}
       />
     );
   }
@@ -63,22 +66,21 @@ export function OneWorkspace({ slug, onGo }: {
   const mine = new Set(partsFor(role));
 
   return (
-    <Stack space="roomy">
-      {/* ⚠️ THE PRODUCT COMES FIRST, BECAUSE IT IS WHY MOST PEOPLE OPENED THIS.
-          It was the last thing on the screen, under five rows of administration
-          — so the one action somebody wants daily sat below the five they want
-          twice a year. */}
-      <Row>
-        <Button
-          variant="primary"
-          size="lg"
-          fullWidth
-          onPress={() => { if (where) location.assign(tenantUrl(slug, where, location)); }}
-        >
-          Open {workspace?.name ?? slug}
-        </Button>
-      </Row>
-
+    /*
+      ⚠️ `detail` — one subject, its state, and the ways into it. And OPENING
+      THE PRODUCT IS THE PRIMARY ACTION, which is why it is declared rather than
+      drawn: it was a full-width button at the top of the content, which is
+      right on a short screen and wrong the moment the list of parts is longer
+      than the fold. Declared, it docks under the thumb and sits in the crown,
+      and every other screen in the hub places its own action the same way.
+    */
+    <Screen
+      shape="detail"
+      does={{
+        label: `Open ${workspace?.name ?? slug}`,
+        onDo: () => { if (where) location.assign(tenantUrl(slug, where, location)); },
+      }}
+    >
       {/* ⚠️ THE PROBLEM COMES BEFORE THE LIST, NOT INSIDE IT. A failed payment
           filed as the first row of a menu is a row; above the menu it is the
           reason the person is looking. */}
@@ -112,6 +114,6 @@ export function OneWorkspace({ slug, onGo }: {
             ))}
           </Group>
         ))}
-    </Stack>
+    </Screen>
   );
 }

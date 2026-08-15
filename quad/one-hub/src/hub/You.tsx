@@ -19,7 +19,7 @@
  */
 
 import {
-  ActionRow, Confirm, Group, Identity, NavRow, RowRule, Stack, glyphOf, notice,
+  ActionRow, Confirm, Group, Identity, NavRow, RowRule, Screen, glyphOf, notice,
 } from "@quad/web";
 import { useSession } from "../session.js";
 import type { Where } from "./where.js";
@@ -29,7 +29,11 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
   const person = me && me !== "nobody" ? me : null;
 
   return (
-    <Stack space="roomy">
+    /* ⚠️ `detail` — one subject (you), the two places that are yours, and the
+       one destructive thing. Signing out is NOT a primary action: a primary is
+       what the screen is FOR, and nobody opens their account to leave it. It
+       stays the last row, after a rule, in the danger voice (DESIGN.md §5). */
+    <Screen shape="detail">
       <Identity name={person?.email ?? "You"} under={person?.operator ? "Operator" : undefined} />
 
       <Group>
@@ -69,6 +73,6 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
           Your workspaces stay exactly as they are. You will need a new code to come back.
         </Confirm>
       </Group>
-    </Stack>
+    </Screen>
   );
 }

@@ -14,9 +14,7 @@
  */
 
 import { Chip } from "@heroui/react";
-import {
-  AmountRow, Await, Bill, FigureWaiting, Group, Stack, glyphOf,
-} from "@quad/web";
+import { AmountRow, Bill, Group, Screen, glyphOf } from "@quad/web";
 import { useLoad, type CentreView, type MoneyView } from "./data.js";
 
 export function Money({ view, onGo }: {
@@ -27,15 +25,17 @@ export function Money({ view, onGo }: {
   const money = useLoad<MoneyView>("money.view");
 
   return (
-    <Await
+    /* ⚠️ `figure` — one number is what the screen is for and everything under it
+       supports that number. No primary action: a bill is READ. Changing a plan
+       is a purchase and it is its own screen (`Plan.tsx`). */
+    <Screen
+      shape="figure"
       of={money.of}
-      waiting={<FigureWaiting count={2} />}
       again={money.again}
       then={(data) => {
         const priced = new Map(data.bill.lines.map((l) => [l.appId, l]));
         return (
-          <Stack space="roomy">
-            {/* ⚠️ The crown names the screen — see hub/Hub.tsx. */}
+          <>
             <Bill
               lines={data.bill.lines}
               total={data.bill.total}
@@ -82,7 +82,7 @@ export function Money({ view, onGo }: {
                 );
               })}
             </Group>
-          </Stack>
+          </>
         );
       }}
     />

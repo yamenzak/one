@@ -8,22 +8,25 @@
  */
 
 import { Chip } from "@heroui/react";
-import { Await, FigureWaiting, Nothing, Shelf, Stack, notice } from "@quad/web";
+import { Screen, Shelf, notice } from "@quad/web";
 import { useLoad, type MoneyView } from "./data.js";
 
 export function Plan({ app }: { readonly app: string }) {
   const money = useLoad<MoneyView>("money.view");
 
   return (
-    <Await
+    /* ⚠️ `decision` — one object, one choice, staged. It is the one shape whose
+       whole job is to make a purchase legible, and nothing else is on it. */
+    <Screen
+      shape="decision"
       of={money.of}
-      waiting={<FigureWaiting count={1} />}
       again={money.again}
+      isNothing={(d) => !d.apps.some((a) => a.id === app)}
+      nothing={{ says: "No such product here" }}
       then={(data) => {
-        const held = data.apps.find((a) => a.id === app);
-        if (!held) return <Nothing says="No such product here" />;
+        const held = data.apps.find((a) => a.id === app)!;
         return (
-          <Stack space="snug">
+          <>
             {held.status === "past_due"
               ? (
                 <Chip color="warning" variant="soft">
@@ -39,7 +42,7 @@ export function Plan({ app }: { readonly app: string }) {
                  nowhere, so the screen says so instead of pretending. */
               onChoose={() => notice.warn("Changing plans arrives with the payment rail.")}
             />
-          </Stack>
+          </>
         );
       }}
     />

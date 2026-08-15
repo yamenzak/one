@@ -12,7 +12,7 @@
  * looking for their own email switch.
  */
 
-import { Await, FormWaiting, NotificationPolicy, Nothing, Stack, notice } from "@quad/web";
+import { NotificationPolicy, Nothing, Screen, notice } from "@quad/web";
 import { api } from "../api.js";
 import { useLoad, type CentreView } from "./data.js";
 import { distinguishing } from "@quad/web";
@@ -33,12 +33,14 @@ export function Told({ view }: { readonly view: CentreView }) {
   };
 
   return (
-    <Await
+    /* ⚠️ `settings` — every switch here saves itself, so the shape refuses a
+       primary action outright (`screen.tsx`). */
+    <Screen
+      shape="settings"
       of={of.of}
-      waiting={<FormWaiting fields={3} />}
       again={of.again}
       then={(told) => (
-        <Stack space="roomy">
+        <>
           {/* ⚠️ The inbox always keeps the record, so this is only about what
               ELSE reaches somebody — said once, on the screen, rather than under
               every product's heading. */}
@@ -58,7 +60,7 @@ export function Told({ view }: { readonly view: CentreView }) {
           {view.apps.length === 0
             ? <Nothing says="Nothing here sends notifications yet" />
             : null}
-        </Stack>
+        </>
       )}
     />
   );

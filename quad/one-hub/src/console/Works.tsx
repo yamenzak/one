@@ -7,7 +7,7 @@
  * draws exactly that — this is the console pointing it at the deployment.
  */
 
-import { Await, Jobs, Nothing, RowsWaiting } from "@quad/web";
+import { Jobs, Screen } from "@quad/web";
 import type { JobBook } from "@quad/kernel";
 import { useLoad } from "../centre/data.js";
 
@@ -25,16 +25,17 @@ export function Works() {
   const of = useLoad<WorksAnswer>("op.jobs");
 
   return (
-    /* ⚠️ The crown already says "Works" and what they are — see `Hub.tsx`. */
-    <Await
-        of={of.of}
-        waiting={<RowsWaiting rows={3} />}
-        again={of.again}
-        isNothing={(d) => Object.keys(d.book).length === 0}
-        nothing={<Nothing says="No product here declares a job" />}
-        then={(data) => (
-          <Jobs book={data.book} runs={data.runs} missedMs={A_DAY} now={Date.now()} />
-        )}
-      />
+    /* ⚠️ `list` — a collection somebody scans. Nothing is added here: a job
+       exists because a product declared one, so the shape carries no action. */
+    <Screen
+      shape="list"
+      of={of.of}
+      again={of.again}
+      isNothing={(d) => Object.keys(d.book).length === 0}
+      nothing={{ says: "No product here declares a job" }}
+      then={(data) => (
+        <Jobs book={data.book} runs={data.runs} missedMs={A_DAY} now={Date.now()} />
+      )}
+    />
   );
 }

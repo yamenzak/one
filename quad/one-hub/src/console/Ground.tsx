@@ -13,7 +13,7 @@
  * too late — which is the whole failure the chart vocabulary exists to prevent.
  */
 
-import { Await, Group, Meter, Nothing, RowsWaiting, Stack, sentence } from "@quad/web";
+import { Group, Meter, Screen, sentence } from "@quad/web";
 import type { Shard } from "@quad/kernel";
 import { useLoad } from "../centre/data.js";
 
@@ -21,15 +21,15 @@ export function Ground() {
   const of = useLoad<{ items: readonly Shard[] }>("op.shards");
 
   return (
-    /* ⚠️ The crown already says "Ground" and what it is — see `Hub.tsx`. */
-    <Await
+    /* ⚠️ `list` — shards are declared by the deployment, never added here. */
+    <Screen
+      shape="list"
       of={of.of}
-      waiting={<RowsWaiting rows={2} />}
       again={of.again}
       isNothing={(d) => d.items.length === 0}
-      nothing={<Nothing says="No shard is registered" under="Placement has nowhere to put a workspace" />}
+      nothing={{ says: "No shard is registered", under: "Placement has nowhere to put a workspace" }}
       then={(data) => (
-        <Stack space="roomy">
+        <>
           {data.items.map((s) => (
             /* ⚠️ THE SHARD'S NAME IS THE GROUP'S, AND WHERE IT IS IS THE ONE
                FACT THAT IS NOT THE BAR. Which schemas are applied is a list, and
@@ -46,7 +46,7 @@ export function Ground() {
               </div>
             </Group>
           ))}
-        </Stack>
+        </>
       )}
     />
   );

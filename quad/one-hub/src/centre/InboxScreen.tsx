@@ -6,7 +6,7 @@
  * guess. Marking one as seen is pressing it; the broom sweeps the rest.
  */
 
-import { Inbox, Section, Stack } from "@quad/web";
+import { Inbox, Screen } from "@quad/web";
 import { api } from "../api.js";
 import { useLoad, type InboxView } from "./data.js";
 
@@ -28,22 +28,18 @@ export function InboxScreen({ onGo, onSeen }: {
   };
 
   return (
-    /* ⚠️ NO HEADING OF ITS OWN — THE CROWN IS THE SCREEN'S NAME. This drew
-       "Inbox" and the same sentence the crown had already put four lines above
-       it, so the screen said its own name twice and its own description twice
-       before a single notification. `Hub.tsx` states the rule; this was the one
-       screen breaking it. */
-    <Section>
-      <Stack space="snug">
-        <Inbox
-          notes={inbox.of.status === "ready"
-            ? inbox.of.data.items.map((n) => ({ ...n }))
-            : null}
-          failed={inbox.of.status === "trouble"}
-          onOpen={(n) => void open(n)}
-          onSeenAll={() => void sweep()}
-        />
-      </Stack>
-    </Section>
+    /* ⚠️ `list` WITH NO PRIMARY. Nothing is added to an inbox by the person
+       reading it; "mark everything seen" is a secondary and `Inbox` draws it
+       where it belongs, beside what it clears. */
+    <Screen shape="list">
+      <Inbox
+        notes={inbox.of.status === "ready"
+          ? inbox.of.data.items.map((n) => ({ ...n }))
+          : null}
+        failed={inbox.of.status === "trouble"}
+        onOpen={(n) => void open(n)}
+        onSeenAll={() => void sweep()}
+      />
+    </Screen>
   );
 }

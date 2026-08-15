@@ -9,7 +9,7 @@
  */
 
 import {
-  Documents, Group, NavRow, Nothing, Section, Stack, SubProcessors, distinguishing, glyphOf,
+  Documents, Group, NavRow, Nothing, Screen, Section, SubProcessors, distinguishing, glyphOf,
 } from "@quad/web";
 import type { Where } from "../door.js";
 import { accountUrl } from "../door.js";
@@ -23,9 +23,11 @@ export function Trust({ view, where }: {
   const processing = view.apps.filter((a) => Object.keys(a.processors).length > 0);
 
   return (
-    <Stack space="roomy">
-      {/* ⚠️ The crown names the screen — see hub/Hub.tsx. */}
-      <Stack space="roomy">
+    /* ⚠️ `detail` — one subject (what is held about you here) and its facts.
+       Nothing on it is a primary action: the account-wide ways out live at the
+       account, and the row below is a way THERE rather than a thing done here. */
+    <Screen shape="detail">
+      <>
           {documented.map((app) => (
             /* ⚠️ THE HEADING NAMES THE BLOCK, NOT THE BLOCK AND ITS OWNER. Two
                em-dashed compounds per product is a heading somebody parses
@@ -47,7 +49,7 @@ export function Trust({ view, where }: {
           {!documented.length && !processing.length
             ? <Nothing says="Nothing to disclose" under="No product here names a document or a third party" />
             : null}
-      </Stack>
+      </>
 
       {/* ⚠️ A ROW, NOT A BUTTON IN A CARD OF ITS OWN (DESIGN.md §4). Exporting,
           ending sessions and closing an account cover every workspace, so they
@@ -61,6 +63,6 @@ export function Trust({ view, where }: {
           onOpen={() => { if (where) location.assign(accountUrl(where, location)); }}
         />
       </Group>
-    </Stack>
+    </Screen>
   );
 }

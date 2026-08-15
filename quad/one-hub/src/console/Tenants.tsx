@@ -8,7 +8,7 @@
  */
 
 import { Chip } from "@heroui/react";
-import { Await, Listing, TableWaiting, sentence } from "@quad/web";
+import { Listing, Screen, TableWaiting, sentence } from "@quad/web";
 import type { Allowance, EntitlementDef, PlanSpec } from "@quad/kernel";
 import { useLoad } from "../centre/data.js";
 
@@ -41,18 +41,23 @@ export function Tenants({ onGo }: { readonly onGo: (id: string) => void }) {
   const of = useLoad<{ items: readonly TenantLine[]; apps: readonly AppLine[] }>("op.tenants");
 
   return (
-    /* ⚠️ The crown already says "Tenants" and what they are — see `Hub.tsx`.
-       This drew both again, four lines under the first. */
-    <Await
+    /* ⚠️ `list`, and it carries NO primary action — a workspace is created by
+       somebody signing up at the setup door, never by an operator. A "new
+       workspace" button here would be a control for a thing that does not
+       exist, which is worse than an absent one. */
+    <Screen
+      shape="list"
       of={of.of}
-      waiting={<TableWaiting cols={4} rows={6} />}
       again={of.again}
+      isNothing={(d) => d.items.length === 0}
+      waiting={<TableWaiting cols={4} rows={6} />}
+      nothing={{ says: "No workspaces yet", under: "The first one arrives through the setup door" }}
       then={(data) => (
         <Listing
           label="Workspaces"
           of={{ status: "ready", data: data.items }}
           rowKey={(t) => t.id}
-          says={{ nothing: "No workspaces yet", under: "The first one arrives through the setup door" }}
+          says={{ nothing: "No workspaces yet" }}
           /*
             ⚠️ FOUR COLUMNS IN A PHONE'S WIDTH IS NOT A TABLE — see `Listing`.
             "Northwind Strength" wrapped to two lines, "DE · eu-1" to two more,

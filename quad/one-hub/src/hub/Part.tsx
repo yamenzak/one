@@ -13,7 +13,7 @@
  * a workspace, rather than tabs in a bar that never goes away.
  */
 
-import { Await, Working } from "@quad/web";
+import { Screen } from "@quad/web";
 import { useCentre } from "../centre/data.js";
 import { People } from "../centre/People.js";
 import { Money } from "../centre/Money.js";
@@ -39,43 +39,38 @@ export function WorkspacePart({ part, slug, app, onGo }: {
   const { where } = useSession();
   const { of, again } = useCentre();
 
-  return (
-    <Await
-      of={of}
-      waiting={<Working says="Opening this workspace" />}
-      again={again}
-      then={(view) => {
-        switch (part) {
-          case "people": return <People view={view} />;
-          case "money":
-            return (
-              <Money
-                view={view}
-                onGo={(id) => onGo({ at: "plan", slug, app: id })}
-              />
-            );
-          case "plan": return <Plan app={app ?? ""} />;
-          case "packages": return <Packages view={view} />;
-          case "settings":
-            return (
-              <SettingsArea
-                view={view}
-                app={app}
-                onGo={(id) => onGo({ at: "settings", slug, app: id })}
-              />
-            );
-          case "notices": return <Notices view={view} />;
-          case "trust": return <Trust view={view} where={where} />;
-          case "wording":
-            return (
-              <Wording
-                view={view}
-                app={app}
-                onGo={(id) => onGo({ at: "wording", slug, app: id })}
-              />
-            );
-        }
-      }}
-    />
-  );
+  /* ⚠️ THE FRAME HAS TO SURVIVE THE WAIT — see `TellingMe`. This drew a bare
+     spinner over the whole surface, so every workspace screen was nameless and
+     un-leavable while the centre view loaded. Each part below renders its own
+     `Screen`, which is where the crown comes from once the answer is here. */
+  if (of.status !== "ready") {
+    return <Screen shape="detail" of={of} again={again} then={() => null} />;
+  }
+  const view = of.data;
+
+  switch (part) {
+    case "people": return <People view={view} />;
+    case "money":
+      return <Money view={view} onGo={(id) => onGo({ at: "plan", slug, app: id })} />;
+    case "plan": return <Plan app={app ?? ""} />;
+    case "packages": return <Packages view={view} />;
+    case "settings":
+      return (
+        <SettingsArea
+          view={view}
+          app={app}
+          onGo={(id) => onGo({ at: "settings", slug, app: id })}
+        />
+      );
+    case "notices": return <Notices view={view} />;
+    case "trust": return <Trust view={view} where={where} />;
+    case "wording":
+      return (
+        <Wording
+          view={view}
+          app={app}
+          onGo={(id) => onGo({ at: "wording", slug, app: id })}
+        />
+      );
+  }
 }
