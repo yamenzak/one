@@ -131,6 +131,19 @@ export function App() {
      announced. */
   if (specimen) return <><NoticeHost /><Specimen id={specimen as SpecimenId} /></>;
 
+  /*
+    ⚠️ A DOOR IS THE PAGE, AND THAT IS WHY IT IS NOT IN THE FRAME BELOW. These
+    three screens brought their own `Arrival` — mark, name, one claim, one
+    action, the ambience full-bleed. Sitting them inside the Hub's crown put the
+    product's name on the screen twice and the raw hostname under it, which is
+    the first thing anybody ever sees of this product.
+  */
+  if (screen === "signpost" && where) return <><NoticeHost /><Signpost where={where} /></>;
+  if (screen === "sign-in") return <><NoticeHost /><SignIn lead={LEAD[face ?? ""] ?? LEAD.hub!} /></>;
+  if (screen === "new-workspace" && where) {
+    return <><NoticeHost /><NewWorkspace where={where} /></>;
+  }
+
   return (
     /* ⚠️ The ambience is an attribute on the frame, read by a stylesheet rule
        built from theme tokens — never an inline style, which would beat every
@@ -152,9 +165,6 @@ export function App() {
         >
           {screen === "waiting" ? <Working says="Getting your workspaces" /> : null}
           {screen === "stuck" && stuck ? <Trouble problem={stuck} /> : null}
-          {screen === "signpost" && where ? <Signpost where={where} /> : null}
-          {screen === "sign-in" ? <SignIn lead={LEAD[face ?? ""] ?? LEAD.hub!} /> : null}
-          {screen === "new-workspace" && where ? <NewWorkspace where={where} /> : null}
           {screen === "elsewhere" && where ? <Elsewhere where={where} kind={where.kind} /> : null}
           {screen === "gallery" ? <Gallery /> : null}
         </div>

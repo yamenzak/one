@@ -7,6 +7,17 @@
  *
  * ⚠️ THE NUMBER OF BOXES IS THE KERNEL'S. A form drawing six against a server
  * issuing eight refuses every valid code and blames the person while doing it.
+ *
+ * ⚠️ THE PRIMARY IS NEVER DEAD AT REST. It was disabled until the field had
+ * something in it, so the first thing anybody saw on the product's front door
+ * was a grey slab — indistinguishable from a control that is broken, at the one
+ * moment there is nothing else on the screen to judge it by. It stays live and
+ * says what is missing when it is pressed, which is also the only version that
+ * works for somebody who submits with the keyboard.
+ *
+ * ⚠️ AND THE SCREEN'S NAME CHANGES WITH THE STEP. "Sign in to One" over a code
+ * field is the heading for the previous screen: the address has been given, the
+ * code is somewhere else, and what the person needs told is which inbox.
  */
 
 import { useState } from "react";
@@ -14,8 +25,28 @@ import { Button, Form, InputOTP, Label, REGEXP_ONLY_DIGITS, TextField, Input } f
 import type { Problem } from "@quad/kernel";
 import { CODE_DIGITS } from "@quad/kernel";
 import { useSession } from "../session.js";
-import { Cluster, SPACE, Trouble } from "@quad/web";
-import { Sheet } from "../ui.js";
+import { Arrival, AsideRoute, SPACE, Trouble } from "@quad/web";
+
+/* ⚠️ Checked here rather than by `isRequired`, which draws a red asterisk on the
+   only field on the screen — a required marker beside the one thing there is to
+   fill in is noise that teaches somebody to stop reading markers. */
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+const NOT_AN_ADDRESS: Problem = {
+  code: "platform.invalid",
+  status: 400,
+  title: "That does not look like an email address",
+  retryable: false,
+  tone: "warning",
+};
+
+const SHORT_CODE: Problem = {
+  code: "platform.invalid",
+  status: 400,
+  title: `The code is ${CODE_DIGITS} digits`,
+  retryable: false,
+  tone: "warning",
+};
 
 export function SignIn({ lead }: { readonly lead: string }) {
   const { askForCode, enter } = useSession();
@@ -30,15 +61,18 @@ export function SignIn({ lead }: { readonly lead: string }) {
   const [problem, setProblem] = useState<Problem | null>(null);
 
   const send = async () => {
+    const address = email.trim().toLowerCase();
+    if (!EMAIL.test(address)) { setProblem(NOT_AN_ADDRESS); return; }
     setBusy(true);
     setProblem(null);
-    const out = await askForCode(email.trim().toLowerCase());
+    const out = await askForCode(address);
     setBusy(false);
     if (!out.ok) return setProblem(out.problem);
     setSent(true);
   };
 
   const finish = async () => {
+    if (code.length !== CODE_DIGITS) { setProblem(SHORT_CODE); return; }
     setBusy(true);
     setProblem(null);
     const out = await enter(email.trim().toLowerCase(), code);
@@ -49,80 +83,85 @@ export function SignIn({ lead }: { readonly lead: string }) {
     if (!out.ok) { setProblem(out.problem); setCode(""); }
   };
 
-  return (
-    <Sheet title="Sign in to One" lead={lead}>
-      {problem ? <Trouble problem={problem} /> : null}
-
-      {sent
-        ? (
-          <Form
-            className={`flex flex-col ${SPACE.snug}`}
-            onSubmit={(e) => { e.preventDefault(); void finish(); }}
-          >
-            <div className={`flex flex-col ${SPACE.tight}`}>
-              <Label>The code we sent to {email}</Label>
-              <InputOTP
-                autoFocus
-                maxLength={CODE_DIGITS}
-                pattern={REGEXP_ONLY_DIGITS}
-                value={code}
-                onChange={setCode}
-                onComplete={() => { void finish(); }}
-                isDisabled={busy}
-              >
-                <InputOTP.Group>
-                  <InputOTP.Slot index={0} />
-                  <InputOTP.Slot index={1} />
-                  <InputOTP.Slot index={2} />
-                </InputOTP.Group>
-                <InputOTP.Separator />
-                <InputOTP.Group>
-                  <InputOTP.Slot index={3} />
-                  <InputOTP.Slot index={4} />
-                  <InputOTP.Slot index={5} />
-                </InputOTP.Group>
-              </InputOTP>
-            </div>
-
-            <Cluster>
-              <Button
-                type="submit"
-                variant="primary"
-                isPending={busy}
-                isDisabled={code.length !== CODE_DIGITS}
-              >
-                Sign in
-              </Button>
-              {/* ⚠️ A way back. Without one, a typo in the address is a dead end
-                  somebody escapes by reloading the page. */}
-              <Button variant="ghost" isDisabled={busy} onPress={() => { setSent(false); setCode(""); }}>
-                Use a different address
-              </Button>
-            </Cluster>
-          </Form>
-        )
-        : (
-          <Form
-            className={`flex flex-col ${SPACE.snug}`}
-            onSubmit={(e) => { e.preventDefault(); void send(); }}
-          >
-            <TextField
-              isRequired
-              fullWidth
-              name="email"
-              type="email"
-              value={email}
-              onChange={setEmail}
-              isDisabled={busy}
-            >
-              <Label>Your email address</Label>
-              <Input autoFocus placeholder="you@example.com" />
-            </TextField>
-            <Button type="submit" variant="primary" isPending={busy} isDisabled={!email.trim()}>
-              Send me a code
-            </Button>
-          </Form>
+  if (sent) {
+    return (
+      <Arrival
+        name="Check your email"
+        claim={`We sent a ${CODE_DIGITS}-digit code to ${email}.`}
+        aside={(
+          <AsideRoute
+            says="Wrong address?"
+            label="Use a different one"
+            isDisabled={busy}
+            onDo={() => { setSent(false); setCode(""); }}
+          />
         )}
-    </Sheet>
+      >
+        {problem ? <Trouble problem={problem} /> : null}
+        <Form
+          className={`flex flex-col ${SPACE.snug}`}
+          onSubmit={(e) => { e.preventDefault(); void finish(); }}
+        >
+          {/* ⚠️ The label is `sr-only`: the claim above already says what this
+              is, in a sentence, and a second "the code we sent to …" over the
+              boxes is the same fact twice. It stays in the accessibility tree,
+              because the boxes on their own are six unnamed inputs. */}
+          <Label className="sr-only">Your code</Label>
+          <InputOTP
+            autoFocus
+            maxLength={CODE_DIGITS}
+            pattern={REGEXP_ONLY_DIGITS}
+            value={code}
+            onChange={setCode}
+            onComplete={() => { void finish(); }}
+            isDisabled={busy}
+          >
+            <InputOTP.Group>
+              <InputOTP.Slot index={0} />
+              <InputOTP.Slot index={1} />
+              <InputOTP.Slot index={2} />
+            </InputOTP.Group>
+            <InputOTP.Separator />
+            <InputOTP.Group>
+              <InputOTP.Slot index={3} />
+              <InputOTP.Slot index={4} />
+              <InputOTP.Slot index={5} />
+            </InputOTP.Group>
+          </InputOTP>
+
+          {/* ⚠️ Live at rest here too. `onComplete` submits the moment the
+              sixth digit lands, so this is the fallback — and a fallback that
+              is grey until the form no longer needs it helps nobody. */}
+          <Button type="submit" variant="primary" size="lg" fullWidth isPending={busy}>
+            Sign in
+          </Button>
+        </Form>
+      </Arrival>
+    );
+  }
+
+  return (
+    <Arrival name="One" claim={lead}>
+      {problem ? <Trouble problem={problem} /> : null}
+      <Form
+        className={`flex flex-col ${SPACE.snug}`}
+        onSubmit={(e) => { e.preventDefault(); void send(); }}
+      >
+        <TextField
+          fullWidth
+          name="email"
+          type="email"
+          value={email}
+          onChange={setEmail}
+          isDisabled={busy}
+        >
+          <Label>Email</Label>
+          <Input autoFocus autoComplete="email" placeholder="you@example.com" />
+        </TextField>
+        <Button type="submit" variant="primary" size="lg" fullWidth isPending={busy}>
+          Send me a code
+        </Button>
+      </Form>
+    </Arrival>
   );
 }

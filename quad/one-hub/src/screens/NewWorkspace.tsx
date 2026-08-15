@@ -24,9 +24,8 @@ import type { Problem } from "@quad/kernel";
 import { EEA, slugOk } from "@quad/kernel";
 import { api } from "../api.js";
 import { byName } from "../countries.js";
-import { accountUrl, tenantUrl, type Where } from "../door.js";
-import { Cluster, SPACE, Trouble } from "@quad/web";
-import { Sheet } from "../ui.js";
+import { accountUrl, here, tenantUrl, type Where } from "../door.js";
+import { Arrival, AsideRoute, SPACE, Trouble } from "@quad/web";
 
 /** ⚠️ From the name, but only until somebody types their own — a slug that
     silently follows the name is a slug that changes under an edit. */
@@ -59,9 +58,16 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
   };
 
   return (
-    <Sheet
-      title="Start a workspace"
-      lead="A workspace is a business — invite everybody else once it exists"
+    <Arrival
+      name="Start a workspace"
+      claim="A workspace is a business. Invite everybody else once it exists."
+      aside={(
+        <AsideRoute
+          says="Already in one?"
+          label="Go to your workspaces"
+          href={accountUrl(where, here())}
+        />
+      )}
     >
       {problem ? <Trouble problem={problem} /> : null}
 
@@ -120,24 +126,17 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
           </ComboBox.Popover>
         </ComboBox>
 
-        <Cluster>
-          <Button
-            type="submit"
-            variant="primary"
-            isPending={busy}
-            isDisabled={!name.trim() || !addressOk || !country}
-          >
-            Create it
-          </Button>
-          <Button
-            variant="ghost"
-            isDisabled={busy}
-            onPress={() => { location.assign(accountUrl(where, location)); }}
-          >
-            Back to your workspaces
-          </Button>
-        </Cluster>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          fullWidth
+          isPending={busy}
+          isDisabled={!name.trim() || !addressOk || !country}
+        >
+          Create it
+        </Button>
       </Form>
-    </Sheet>
+    </Arrival>
   );
 }

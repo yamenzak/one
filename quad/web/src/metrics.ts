@@ -284,11 +284,18 @@ export const SAFE_TOP = "pt-[env(safe-area-inset-top)]" as const;
 /* ------------------------------------------------------------------ widths --- */
 
 /**
- * ⚠️ TWO, NOT FIVE. `read` is prose and forms — near 65 characters, which is
+ * ⚠️ THREE, NOT FIVE. `read` is prose and forms — near 65 characters, which is
  * where reading speed peaks. `work` is anything with columns. A scale nobody can
  * hold in their head is a scale people opt out of.
+ *
+ * ⚠️ AND `door` IS THE THIRD BECAUSE A DOOR IS NOT A DOCUMENT. An entry screen
+ * at reading width is a 672px email field with a 672px button under it, which
+ * reads as a form that has been stretched rather than laid out — the eye has no
+ * reason to travel that far for one word. It is the one width a person is asked
+ * to look at with nothing else on the screen.
  */
 export const WIDTH = {
+  door: "max-w-sm",
   read: "max-w-2xl",
   work: "max-w-6xl",
 } as const;

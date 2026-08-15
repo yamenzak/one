@@ -31,6 +31,18 @@ export interface Where {
 /** ⚠️ The port travels with the address, or every hop in development is a 404. */
 const port = (location: Location): string => (location.port ? `:${location.port}` : "");
 
+/**
+ * ⚠️ THE PAGE'S OWN ADDRESS, OR A STAND-IN WHERE THERE IS NO DOM. A door's
+ * second route is an `href` now, which means it is built while the component
+ * RENDERS rather than when somebody presses something — and the screens are
+ * rendered to a string in the suite, where `location` does not exist. Reaching
+ * for the global at render is what makes a screen provable only in a browser.
+ */
+export const here = (): Location =>
+  (typeof location === "undefined"
+    ? { protocol: "https:", port: "" } as Location
+    : location);
+
 const at = (label: string | null, where: Where, location: Location): string =>
   `${location.protocol}//${label ? `${label}.` : ""}${where.root}${port(location)}`;
 
