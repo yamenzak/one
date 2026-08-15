@@ -20,7 +20,9 @@
  * on the page somebody edits deliberately became the one nobody scrolled to.
  */
 
-import { Await, FormWaiting, NotificationPolicy, Section, Settings, Stack, notice } from "@quad/web";
+import {
+  Await, FormWaiting, NotificationPolicy, Reveal, Section, Settings, Stack, notice,
+} from "@quad/web";
 import { settingsOn } from "@quad/kernel";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView } from "./data.js";
@@ -162,18 +164,24 @@ function Told({ view, app, told, again }: {
         available={["inbox", "email", "push"]}
         onChange={(id, channels) => void narrow(id, channels)}
       />
+      {/* ⚠️ THE CEILING IS FOLDED AWAY, BECAUSE IT IS THE SAME LIST TWICE. An
+          owner sets their own notifications often and the whole workspace's
+          almost never, and drawing both open put two identical tables of every
+          notification type on one screen — the second one, the rarer and more
+          consequential, indistinguishable at a glance from the first. */}
       {manage ? (
-        <NotificationPolicy
-          book={app.notifications}
-          level="tenant"
-          label="How everybody is told"
-          under="The ceiling each person narrows their own settings under"
-          policy={told.policy}
-          preference={{}}
-          held={held}
-          available={["inbox", "email", "push"]}
-          onChange={(id, channels) => void ceiling(id, channels)}
-        />
+        <Reveal label="Set the ceiling for everybody">
+          <NotificationPolicy
+            book={app.notifications}
+            level="tenant"
+            under="The ceiling each person narrows their own settings under"
+            policy={told.policy}
+            preference={{}}
+            held={held}
+            available={["inbox", "email", "push"]}
+            onChange={(id, channels) => void ceiling(id, channels)}
+          />
+        </Reveal>
       ) : null}
     </Stack>
   );

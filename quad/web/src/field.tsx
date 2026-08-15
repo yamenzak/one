@@ -18,8 +18,13 @@
 
 import type { FieldSpec } from "@quad/kernel";
 import {
-  Description, Input, Label, ListBox, NumberField, Select, Switch, TextArea, TextField,
+  Calendar, ColorArea, ColorField, ColorPicker, ColorSlider, ColorSwatch,
+  DateField, DatePicker, Description, Input, Label, ListBox, NumberField, Select, Switch,
+  TextArea, TextField,
 } from "@heroui/react";
+import { parseDate, parseDateTime } from "@internationalized/date";
+import type { DateValue } from "@internationalized/date";
+import { sentence } from "./type.js";
 
 export interface FieldProps {
   readonly name: string;
@@ -78,12 +83,24 @@ export function Field({ name, spec, value, onChange, disabled, set, bare }: Fiel
           </Select.Trigger>
           <Select.Popover>
             <ListBox>
-              {(spec.values ?? []).map((option) => (
-                <ListBox.Item key={option} id={option} textValue={option}>
-                  {option}
-                  <ListBox.ItemIndicator />
-                </ListBox.Item>
-              ))}
+              {/*
+                ⚠️ AN OPTION IS AN ID AND A PERSON READS A WORD. `comfortable`
+                and `not_started` are wire values, and they were rendered
+                verbatim — a settings row saying "comfortable" in the middle of
+                a screen where every other word is capitalised reads as a bug.
+                `labels` is the app's own naming (kg, lb, RGB — things sentence
+                case would get wrong); `sentence` is what happens when it says
+                nothing, and it is right far more often than the raw id.
+              */}
+              {(spec.values ?? []).map((option) => {
+                const said = spec.labels?.[option] ?? sentence(option);
+                return (
+                  <ListBox.Item key={option} id={option} textValue={said}>
+                    {said}
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
+                );
+              })}
             </ListBox>
           </Select.Popover>
           {help ? <Description>{help}</Description> : null}
@@ -108,48 +125,111 @@ export function Field({ name, spec, value, onChange, disabled, set, bare }: Fiel
       );
 
     /*
-      ⚠️ A COLOUR IS A SWATCH. This kind is declared, and it fell through to the
-      text case — so a workspace's brand colour was a box containing `#2563eb`,
-      to be typed correctly by somebody who already knows hex. The library ships
-      no colour component at 3.2.4, so this is its own `Input` with the native
-      type: a real swatch, a real picker, and the theme still owns the box.
+      ⚠️ A COLOUR IS THE LIBRARY'S COLOUR PICKER. This kind is declared and fell
+      through to the text case, so a workspace's brand colour was a box holding
+      `#2563eb`, to be typed correctly by somebody who already knows hex. The
+      first fix was a native `<input type="color">`, which is a swatch and
+      nothing else — no presets, no keyboard channel entry, and a browser
+      dialogue that belongs to the operating system rather than to this product.
+      `ColorPicker` is a swatch trigger over an area, a hue slider and a hex
+      field, themed like everything else (D7).
+
+      ⚠️ THE VALUE CROSSES AS A HEX STRING, because that is what is stored. The
+      picker's own `Color` object is a rendering detail and must not reach a
+      manifest's setting.
     */
     case "colour":
       return (
-        <TextField
-          value={typeof value === "string" ? value : "#000000"}
-          isDisabled={disabled || pending}
-          onChange={(next) => onChange(next)}
-          aria-label={bare ? label : undefined}
+        <ColorPicker
+          value={typeof value === "string" && value ? value : "#000000"}
+          onChange={(next) => onChange(next.toString("hex"))}
         >
-          {bare ? null : <Label>{label}</Label>}
-          {/* ⚠️ SIZED, OR THE SWATCH IS A LINE. A native colour input paints its
-              swatch in the content box, and the library's input is a full-width
-              text field one line tall — so the colour came out as a 3px rule
-              floating in a wide empty box. A swatch is a square you can see. */}
-          <Input type="color" className="h-9 w-16" />
-          {help ? <Description>{help}</Description> : null}
-        </TextField>
+          {/* ⚠️ THE TRIGGER TAKES THE DISABLED STATE, because react-aria's
+              `ColorPicker` is state and has no interactive surface of its own —
+              the trigger is the button, and it is what a person can press. */}
+          <ColorPicker.Trigger isDisabled={disabled || pending}>
+            <ColorSwatch size="lg" />
+            {bare ? null : <Label>{label}</Label>}
+          </ColorPicker.Trigger>
+          <ColorPicker.Popover>
+            <ColorArea
+              aria-label={`${label} — saturation and brightness`}
+              className="max-w-full"
+              colorSpace="hsb"
+              xChannel="saturation"
+              yChannel="brightness"
+            >
+              <ColorArea.Thumb />
+            </ColorArea>
+            <ColorSlider aria-label={`${label} — hue`} channel="hue" colorSpace="hsb">
+              <ColorSlider.Track><ColorSlider.Thumb /></ColorSlider.Track>
+            </ColorSlider>
+            {/* ⚠️ The hex field stays, because a brand colour is usually one
+                somebody was GIVEN rather than one they are choosing. */}
+            <ColorField aria-label={`${label} — hex`}>
+              <ColorField.Group variant="secondary">
+                <ColorField.Prefix><ColorSwatch size="xs" /></ColorField.Prefix>
+                <ColorField.Input />
+              </ColorField.Group>
+            </ColorField>
+          </ColorPicker.Popover>
+        </ColorPicker>
       );
 
     /*
-      ⚠️ AND A DATE IS A DATE FIELD, for the same reason and with the same
-      remedy. A text box asking for a day gets `12/03` from half of Europe and
-      the other half of it from everywhere else.
+      ⚠️ AND A DAY IS THE LIBRARY'S DATE PICKER, for the same reason. A text box
+      asking for a date gets `12/03` from half of Europe and the other half of it
+      from everywhere else; a native `<input type="date">` fixes the ambiguity
+      and hands the calendar to the operating system, which is a different
+      product appearing inside this one.
+
+      ⚠️ AN UNPARSEABLE STORED VALUE IS `null`, NOT A THROW. `parseDate` raises
+      on anything that is not exactly its format, and a row written before this
+      kind existed would take the whole screen down rather than show one empty
+      field.
     */
     case "day":
     case "instant":
       return (
-        <TextField
-          value={typeof value === "string" ? value : ""}
+        <DatePicker
+          value={asDate(value, spec.kind)}
+          granularity={spec.kind === "day" ? "day" : "minute"}
           isDisabled={disabled || pending}
-          onChange={(next) => onChange(next)}
+          onChange={(next) => onChange(next ? next.toString() : null)}
           aria-label={bare ? label : undefined}
         >
           {bare ? null : <Label>{label}</Label>}
-          <Input type={spec.kind === "day" ? "date" : "datetime-local"} />
+          <DateField.Group fullWidth>
+            <DateField.Input>{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
+            <DateField.Suffix>
+              <DatePicker.Trigger><DatePicker.TriggerIndicator /></DatePicker.Trigger>
+            </DateField.Suffix>
+          </DateField.Group>
           {help ? <Description>{help}</Description> : null}
-        </TextField>
+          <DatePicker.Popover>
+            <Calendar aria-label={label}>
+              <Calendar.Header>
+                <Calendar.YearPickerTrigger>
+                  <Calendar.YearPickerTriggerHeading />
+                  <Calendar.YearPickerTriggerIndicator />
+                </Calendar.YearPickerTrigger>
+                <Calendar.NavButton slot="previous" />
+                <Calendar.NavButton slot="next" />
+              </Calendar.Header>
+              <Calendar.Grid>
+                <Calendar.GridHeader>
+                  {(day) => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}
+                </Calendar.GridHeader>
+                <Calendar.GridBody>{(date) => <Calendar.Cell date={date} />}</Calendar.GridBody>
+              </Calendar.Grid>
+              <Calendar.YearPickerGrid>
+                <Calendar.YearPickerGridBody>
+                  {({ year }) => <Calendar.YearPickerCell year={year} />}
+                </Calendar.YearPickerGridBody>
+              </Calendar.YearPickerGrid>
+            </Calendar>
+          </DatePicker.Popover>
+        </DatePicker>
       );
 
     case "long":
@@ -180,5 +260,15 @@ export function Field({ name, spec, value, onChange, disabled, set, bare }: Fiel
           {help ? <Description>{help}</Description> : null}
         </TextField>
       );
+  }
+}
+
+/** ⚠️ See the `day` case — a stored value this cannot read is empty, never a throw. */
+function asDate(value: unknown, kind: "day" | "instant"): DateValue | null {
+  if (typeof value !== "string" || !value) return null;
+  try {
+    return kind === "day" ? parseDate(value) : parseDateTime(value.replace(/Z$/, ""));
+  } catch {
+    return null;
   }
 }

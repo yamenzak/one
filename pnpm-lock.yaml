@@ -1549,6 +1549,9 @@ importers:
       '@heroui/styles':
         specifier: ^3.0.5
         version: 3.2.4(tailwind-merge@3.6.0)(tailwindcss@4.3.2)
+      '@internationalized/date':
+        specifier: ^3.12.3
+        version: 3.12.3
       '@quad/kernel':
         specifier: workspace:*
         version: link:../kernel

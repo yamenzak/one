@@ -55,7 +55,14 @@ export type Author = "ours" | "theirs";
 export interface NotificationDef {
   readonly id: string;
   readonly label: string;
-  /** One line, in the reader's terms. It is the inbox row and the email subject. */
+  /**
+   * One line, in the reader's terms. It is the inbox row and the email subject.
+   *
+   * ⚠️ IT IS A TEMPLATE, SO IT IS ONLY EVER SHOWN FILLED. `{coach} published
+   * {title}` is what a person reads AFTER dispatch has put real names in it; a
+   * surface that lists notification TYPES — a policy screen, a catalogue — has
+   * nothing to fill it with and must show the `label` instead.
+   */
   readonly summary: string;
   readonly category: Category;
   readonly author: Author;

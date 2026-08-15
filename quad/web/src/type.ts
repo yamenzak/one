@@ -161,3 +161,23 @@ export const FACE_CSS = [
      heavier than the same face in a design tool. */
   `html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }`,
 ].join("\n");
+
+/* ------------------------------------------------------------------ words --- */
+
+/**
+ * AN ID, SAID THE WAY A PERSON READS IT.
+ *
+ * ⚠️ A WIRE VALUE IS NOT COPY, AND RENDERING ONE VERBATIM IS THE TELL. `metric`,
+ * `comfortable`, `not_started` and `past_due` are keys — chosen so a machine can
+ * compare them — and a settings row showing "comfortable" in the middle of a
+ * screen where every other word is capitalised reads as something unfinished.
+ *
+ * ⚠️ IT IS A FALLBACK, NEVER A TRANSLATION. `kg` becomes "Kg" and `RGB` would
+ * become "Rgb", which is why every declaration that has a real name for its
+ * options should say so — this is what happens when it does not, and it is right
+ * far more often than the raw id.
+ */
+export const sentence = (id: string): string => {
+  const words = id.replace(/[_-]+/g, " ").replace(/([a-z\d])([A-Z])/g, "$1 $2").trim();
+  return words ? words[0]!.toUpperCase() + words.slice(1).toLowerCase() : id;
+};

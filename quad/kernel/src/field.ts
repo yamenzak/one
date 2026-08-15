@@ -49,6 +49,14 @@ export interface FieldSpec {
   readonly max?: number;
   /** `enum` only. The closed set. */
   readonly values?: readonly string[];
+  /**
+   * ⚠️ `enum` only, AND THE OPTION'S NAME RATHER THAN ITS ID. A value is a key a
+   * machine compares; what a person reads is a word. Absent, the surface
+   * sentence-cases the id, which is right for `comfortable` and wrong for `kg`
+   * and `RGB` — so a declaration whose options are not ordinary words says them
+   * here.
+   */
+  readonly labels?: Readonly<Record<string, string>>;
   /** `ref` only. The collection this points at. */
   readonly to?: string;
   /** `media` only. Which purpose bucket the object belongs to. */

@@ -17,9 +17,8 @@
 
 import type { Channel, NotificationBook, NotificationDef, Policy, Preference } from "@quad/kernel";
 import { INTERRUPTS, channelsFor, inAudience } from "@quad/kernel";
-import { Label, Switch } from "@heroui/react";
+import { ToggleButton, ToggleButtonGroup } from "@heroui/react";
 import { ControlRow, Group } from "./surfaces.js";
-import { SPACE } from "./metrics.js";
 
 export interface PolicyProps {
   readonly book: NotificationBook;
@@ -66,41 +65,59 @@ export function NotificationPolicy(
           <ControlRow
             key={def.id}
             label={def.label}
-            /* ⚠️ Said, not merely disabled — see the header. One line, and the
-               most important of the three when more than one is true. */
+            /*
+              ⚠️ NOT `def.summary`, AND THIS IS THE ONE SCREEN THAT GETS IT
+              WRONG. A summary is a TEMPLATE — "{coach} published {title}" —
+              filled at dispatch with the names of real people. Everywhere else
+              it is rendered after that; here it was rendered before, so the row
+              under "A plan was published" read literally `{coach} published
+              {title}`. The label already says which notification this is, which
+              is the only question this screen asks.
+
+              ⚠️ AND WHAT REPLACES IT IS SAID, NOT MERELY DISABLED — see the
+              header. A disabled control with no reason reads as broken.
+            */
             under={locked
               ? "Always sent — this one needs you to do something"
               : missing
                 ? "Some channels are not set up on this deployment"
-                : def.summary}
+                : undefined}
           >
-            <span className={`flex items-center ${SPACE.snug}`}>
-              {def.channels.filter((c) => c !== "inbox").map((channel) => {
-                const offered = available.includes(channel) && ceiling.includes(channel);
-                return (
-                  <Switch
-                    key={channel}
-                    isSelected={on.includes(channel)}
-                    isDisabled={locked || !offered}
-                    onChange={(next) => onChange(def.id, toggle(on, channel, next))}
-                  >
-                    {/* ⚠️ THE WORD BEFORE THE SWITCH, because two bare switches
-                        side by side are two controls nobody can name. */}
-                    <Switch.Content><Label>{CHANNEL_LABEL[channel]}</Label></Switch.Content>
-                    <Switch.Control><Switch.Thumb /></Switch.Control>
-                  </Switch>
-                );
-              })}
-            </span>
+            {/*
+              ⚠️ THE CHANNELS ARE ONE CONTROL, NOT TWO SWITCHES. A switch is a
+              thing that is on or off by itself; "where does this go" is one
+              question with a set of answers, and two unlabelled switches
+              floating side by side in a card was neither readable nor nameable.
+              `ToggleButtonGroup` in `multiple` mode IS that question, and it
+              takes about half the width.
+            */}
+            <ToggleButtonGroup
+              selectionMode="multiple"
+              size="sm"
+              isDisabled={locked}
+              selectedKeys={new Set(on.filter((c) => c !== "inbox"))}
+              onSelectionChange={(keys) => onChange(
+                def.id,
+                [...def.channels.filter((c) => c === "inbox"), ...[...keys] as Channel[]],
+              )}
+            >
+              {def.channels.filter((c) => c !== "inbox").map((channel, i) => (
+                <ToggleButton
+                  key={channel}
+                  id={channel}
+                  isDisabled={!(available.includes(channel) && ceiling.includes(channel))}
+                >
+                  {i > 0 ? <ToggleButtonGroup.Separator /> : null}
+                  {CHANNEL_LABEL[channel]}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
           </ControlRow>
         );
       })}
     </Group>
   );
 }
-
-const toggle = (on: readonly Channel[], channel: Channel, next: boolean): readonly Channel[] =>
-  next ? [...new Set([...on, channel])] : on.filter((c) => c !== channel);
 
 /**
  * ⚠️ WHAT THE SCREEN OFFERS, AS DATA — for the guard, and for the same reason
