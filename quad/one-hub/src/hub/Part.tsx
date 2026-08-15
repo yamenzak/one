@@ -18,6 +18,7 @@ import { useCentre } from "../centre/data.js";
 import { People } from "../centre/People.js";
 import { Money } from "../centre/Money.js";
 import { Packages } from "../centre/Packages.js";
+import { Plan } from "../centre/Plan.js";
 import { SettingsArea } from "../centre/SettingsArea.js";
 import { Trust } from "../centre/Trust.js";
 import { Wording } from "../centre/Wording.js";
@@ -26,7 +27,7 @@ import type { Where } from "./where.js";
 import { useSession } from "../session.js";
 
 export type Part =
-  | "people" | "money" | "packages" | "settings" | "notices" | "trust" | "wording";
+  | "people" | "money" | "plan" | "packages" | "settings" | "notices" | "trust" | "wording";
 
 export function WorkspacePart({ part, slug, app, onGo }: {
   readonly part: Part;
@@ -46,7 +47,14 @@ export function WorkspacePart({ part, slug, app, onGo }: {
       then={(view) => {
         switch (part) {
           case "people": return <People view={view} />;
-          case "money": return <Money view={view} />;
+          case "money":
+            return (
+              <Money
+                view={view}
+                onGo={(id) => onGo({ at: "plan", slug, app: id })}
+              />
+            );
+          case "plan": return <Plan app={app ?? ""} />;
           case "packages": return <Packages view={view} />;
           case "settings":
             return (

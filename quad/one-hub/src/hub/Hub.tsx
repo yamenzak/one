@@ -43,7 +43,7 @@ import { HUB, above, nameOf, parseWhere, pathOf, type Where } from "./where.js";
    address the parser can produce with no branch renders a blank page. */
 export const HUB_SCREENS: readonly Where["at"][] = [
   "home", "you", "inbox", "told", "workspaces", "workspace",
-  "people", "money", "packages", "settings", "notices", "wording", "trust",
+  "people", "money", "plan", "packages", "settings", "notices", "wording", "trust",
   "console", "tenants", "tenant", "actions", "switches", "works", "ground",
 ];
 
@@ -175,7 +175,7 @@ function Inside({ where, onGo }: {
     case "told": return <TellingMe />;
     case "workspaces": return <Workspaces onGo={onGo} />;
     case "workspace": return <OneWorkspace slug={where.slug} onGo={onGo} />;
-    case "people": case "money": case "packages": case "settings": case "notices":
+    case "people": case "money": case "plan": case "packages": case "settings": case "notices":
     case "trust": case "wording":
       return (
         <WorkspacePart

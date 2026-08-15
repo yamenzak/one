@@ -60,6 +60,12 @@ export type Where =
   /** What this workspace SELLS — its own catalogue, not what it pays us. */
   | { readonly at: "packages"; readonly slug: string }
   /**
+   * ⚠️ ONE PRODUCT'S PRICE LIST. A bill is read monthly and a plan is changed
+   * once a year, so the catalogue is a screen the bill's own row opens rather
+   * than four catalogues stacked under a total (DESIGN.md §3).
+   */
+  | { readonly at: "plan"; readonly slug: string; readonly app: string }
+  /**
    * ⚠️ PER PRODUCT, AND `app` IS HOW SOMEBODY DESCENDS INTO ONE. Without it the
    * screen listed EVERY product's settings in one column with the product's name
    * repeated as a heading — fine with one product and a report with six
@@ -153,6 +159,11 @@ export function parseWhere(path: string): Where {
     if (!slug) return { at: "workspaces" };
     const part = tail[1];
     if (part === undefined) return { at: "workspace", slug };
+    /* ⚠️ Not in `OF_WORKSPACE`: it is reached from Money's rows, never from the
+       workspace's own menu, so it is an address without being a destination. */
+    if (part === "plan") {
+      return tail[2] ? { at: "plan", slug, app: tail[2] } : { at: "money", slug };
+    }
     if (!isWorkspacePart(part)) return { at: "workspace", slug };
     /* ⚠️ A THIRD SEGMENT IS THE PRODUCT, on the two screens that have one per
        product. Anywhere else it is noise and the screen is the answer. */
@@ -187,6 +198,7 @@ export function pathOf(where: Where): string {
     case "tenant": return `${HUB}/console/tenants/${where.id}`;
     case "tenants": case "switches": case "works": case "ground":
       return `${HUB}/console/${where.at}`;
+    case "plan": return `${HUB}/w/${where.slug}/plan/${where.app}`;
     case "settings": case "wording":
       return `${HUB}/w/${where.slug}/${where.at}${where.app ? `/${where.app}` : ""}`;
     default: return `${HUB}/w/${where.slug}/${where.at}`;
@@ -215,6 +227,7 @@ export function above(where: Where): Where | null {
     case "tenant": return { at: "tenants" };
     case "tenants": case "switches": case "works": case "ground":
       return { at: "console" };
+    case "plan": return { at: "money", slug: where.slug };
     case "settings": case "wording":
       return where.app ? { at: where.at, slug: where.slug } : { at: "workspace", slug: where.slug };
     default: return { at: "workspace", slug: where.slug };
@@ -233,6 +246,7 @@ export const nameOf = (where: Where): string => {
     case "people": return "People";
     case "money": return "Money";
     case "packages": return "Packages";
+    case "plan": return "Plans";
     case "settings": return "Settings";
     case "notices": return "What everybody is told";
     case "trust": return "Data & Trust";
