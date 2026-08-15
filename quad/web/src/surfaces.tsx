@@ -569,8 +569,14 @@ export function PersonRow({ name, under, when, unread, aside, goes, face, onOpen
  * proportional digits ripples, and the reader ends up doing the arithmetic on
  * the ripple rather than on the values.
  */
-export function AmountRow({ icon, label, under, amount, tone = "neutral", onOpen }: RowBase & {
+export function AmountRow({ icon, label, under, amount, aside, tone = "neutral", onOpen }: RowBase & {
   readonly amount: string;
+  /**
+   * ⚠️ AFTER THE AMOUNT, AND IT IS A CONTROL RATHER THAN A SECOND FACT. A price
+   * list somebody maintains needs a way to take a row off the shelf, and the
+   * alternative was a third column on a phone or a card per item.
+   */
+  readonly aside?: React.ReactNode;
   readonly tone?: Tone;
   readonly onOpen?: () => void;
 }) {
@@ -579,6 +585,7 @@ export function AmountRow({ icon, label, under, amount, tone = "neutral", onOpen
       <Lead icon={icon} />
       <Body label={label} under={under} />
       <span className={`shrink-0 ${TYPE.label} tabular-nums`} data-tone={tone}>{amount}</span>
+      {aside}
       {onOpen ? <span aria-hidden="true" className={TYPE.note}>›</span> : null}
     </span>
   );

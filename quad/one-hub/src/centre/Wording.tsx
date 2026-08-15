@@ -15,7 +15,7 @@
 import { useState } from "react";
 import { Button, Card } from "@heroui/react";
 import {
-  Await, FormWaiting, LongText, Nothing, Row, Section, Stack, distinguishing, notice,
+  Await, FormWaiting, Group, LongText, NavRow, Nothing, Row, Stack, glyphOf, notice,
 } from "@quad/web";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView } from "./data.js";
@@ -28,7 +28,11 @@ export interface WordingLine {
   readonly prompt: string | null;
 }
 
-export function Wording({ view }: { readonly view: CentreView }) {
+export function Wording({ view, app, onGo }: {
+  readonly view: CentreView;
+  readonly app?: string;
+  readonly onGo: (appId: string) => void;
+}) {
   /* ⚠️ Changing what a product says on the workspace's behalf is the
      workspace's decision, so it needs the workspace's authority. */
   if (!view.you.platform.includes("tenant:manage")) {
@@ -40,17 +44,26 @@ export function Wording({ view }: { readonly view: CentreView }) {
     );
   }
 
-  return (
-    <Stack space="roomy">
-      {view.apps.map((app) => <AppWording key={app.id} app={app} among={view.apps} />)}
-    </Stack>
-  );
+  /* ⚠️ ONE PRODUCT IS THE SCREEN; SEVERAL ARE A LIST — the same rule Settings
+     follows, for the same reason (DESIGN.md §3). Nobody pays a tap for a menu
+     with one item on it, and nobody should read six products' prompts stacked. */
+  const only = view.apps.length === 1 ? view.apps[0] : undefined;
+  const chosen = app ? view.apps.find((a) => a.id === app) : only;
+
+  if (!chosen) {
+    return (
+      <Group>
+        {view.apps.map((a) => (
+          <NavRow key={a.id} icon={glyphOf("note")} label={a.name} onOpen={() => onGo(a.id)} />
+        ))}
+      </Group>
+    );
+  }
+
+  return <AppWording app={chosen} />;
 }
 
-function AppWording({ app, among }: {
-  readonly app: CentreApp;
-  readonly among: readonly CentreApp[];
-}) {
+function AppWording({ app }: { readonly app: CentreApp }) {
   const of = useLoad<{ items: readonly WordingLine[] }>("ai.wording", { app: app.id });
 
   return (
@@ -69,19 +82,12 @@ function AppWording({ app, among }: {
           under={`Every AI feature ${app.name} has uses the product's own words`}
         />
       )}
-      /* ⚠️ The product's name only where there is more than one of them — see
-         `distinguishing`. The crown already named the screen and the workspace. */
       then={(data) => (
-        <Section
-          label={distinguishing(among, app.name)}
-          under="What it says on your behalf, when you want it said differently"
-        >
-          <Stack space="snug">
-            {data.items.map((line) => (
-              <WordingRow key={line.id} app={app} line={line} onDone={of.again} />
-            ))}
-          </Stack>
-        </Section>
+        <Stack space="snug">
+          {data.items.map((line) => (
+            <WordingRow key={line.id} app={app} line={line} onDone={of.again} />
+          ))}
+        </Stack>
       )}
     />
   );

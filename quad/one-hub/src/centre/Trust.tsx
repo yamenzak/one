@@ -8,8 +8,9 @@
  * of duplicating them behind a second door.
  */
 
-import { Button, Card } from "@heroui/react";
-import { Documents, Section, Stack, SubProcessors, distinguishing } from "@quad/web";
+import {
+  Documents, Group, NavRow, Nothing, Section, Stack, SubProcessors, distinguishing, glyphOf,
+} from "@quad/web";
 import type { Where } from "../door.js";
 import { accountUrl } from "../door.js";
 import type { CentreView } from "./data.js";
@@ -44,34 +45,22 @@ export function Trust({ view, where }: {
             </Section>
           ))}
           {!documented.length && !processing.length
-            ? (
-              <Card>
-                <Card.Header>
-                  <Card.Title>Nothing to disclose</Card.Title>
-                  <Card.Description>
-                    The products here declare no legal documents and no sub-processors.
-                  </Card.Description>
-                </Card.Header>
-              </Card>
-            )
+            ? <Nothing says="Nothing to disclose" under="No product here names a document or a third party" />
             : null}
       </Stack>
 
-      <Section
-        label="You, everywhere"
-        under="Export, sessions and closing cover every workspace, so they live there"
-      >
-        <Card>
-          <Card.Content>
-            <Button
-              variant="secondary"
-              onPress={() => { if (where) location.assign(accountUrl(where, location)); }}
-            >
-              Open your account
-            </Button>
-          </Card.Content>
-        </Card>
-      </Section>
+      {/* ⚠️ A ROW, NOT A BUTTON IN A CARD OF ITS OWN (DESIGN.md §4). Exporting,
+          ending sessions and closing an account cover every workspace, so they
+          live at the account rather than being copied behind each one — and
+          saying so is what this row is for. */}
+      <Group>
+        <NavRow
+          icon={glyphOf("person")}
+          label="Your account"
+          under="Export, sessions and closing, for every workspace at once"
+          onOpen={() => { if (where) location.assign(accountUrl(where, location)); }}
+        />
+      </Group>
     </Stack>
   );
 }

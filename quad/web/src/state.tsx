@@ -185,10 +185,18 @@ const statusOf = (tone: Problem["tone"]): Status => STATUS[tone] ?? "default";
  * ⚠️ AND IT CARRIES THE ACTION THAT WOULD END IT, where there is one. An empty
  * state with no way out of it is a dead end with good manners.
  */
-export function Nothing({ says, under, offer }: {
+export function Nothing({ says, under, offer, does }: {
   readonly says: string;
   readonly under?: string;
   readonly offer?: { readonly label: string; readonly onDo: () => void };
+  /**
+   * ⚠️ FOR AN ACTION THAT IS NOT A CALLBACK — a sheet's trigger, a file picker.
+   * Without it, a screen whose only way forward opens a `Tray` had to put that
+   * trigger in a `Card` of its own next to the empty state, which is a button
+   * with a box drawn round it (DESIGN.md §4). The way out of nothing belongs
+   * INSIDE the nothing.
+   */
+  readonly does?: React.ReactNode;
 }) {
   return (
     <EmptyState {...ARRIVE} className={`flex flex-col items-center ${SPACE.snug} ${PAD}`}>
@@ -198,6 +206,7 @@ export function Nothing({ says, under, offer }: {
           deciding what an accent looks like, which is the library's answer and
           not ours (D7). */}
       {offer ? <Button variant="primary" onPress={offer.onDo}>{offer.label}</Button> : null}
+      {does}
     </EmptyState>
   );
 }

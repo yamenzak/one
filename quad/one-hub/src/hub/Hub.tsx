@@ -35,13 +35,14 @@ import { OneWorkspace } from "./Workspace.js";
 import { WorkspacePart } from "./Part.js";
 import { ConsoleHome, ConsolePart } from "./Console.js";
 import { InboxScreen } from "../centre/InboxScreen.js";
+import { TellingMe } from "./TellingMe.js";
 import { HUB, above, nameOf, parseWhere, pathOf, type Where } from "./where.js";
 
 /* ⚠️ Every branch this file draws, named — the guard reads it, because an
    address the parser can produce with no branch renders a blank page. */
 export const HUB_SCREENS: readonly Where["at"][] = [
-  "home", "you", "inbox", "workspaces", "workspace",
-  "people", "money", "settings", "trust", "wording",
+  "home", "you", "inbox", "told", "workspaces", "workspace",
+  "people", "money", "packages", "settings", "notices", "wording", "trust",
   "console", "tenants", "actions", "switches", "works", "ground",
 ];
 
@@ -135,44 +136,32 @@ function Screen({ where, onGo, onLeave }: {
 }
 
 /**
- * One line under each screen's name, in the house voice.
- *
- * ⚠️ A SCREEN INSIDE A WORKSPACE NAMES THE WORKSPACE. "Money" over "one bill,
- * however many products" is true of every workspace anybody is in; four levels
- * from the root, on a surface reached from any door, whose bill it is is the
- * question somebody actually has.
+ * ⚠️ A FACT, OR NOTHING AT ALL. Every screen used to carry a sentence under its
+ * name — "Your details, how you sign in, and what is held about you", "The
+ * deployment itself, and nobody else's business" — and every one of them was
+ * EXPLAINING the screen to somebody already standing on it. A description is a
+ * symptom: if a screen needs one, the name or the contents are wrong
+ * (DESIGN.md §1). What survives is what a person could not work out by looking:
+ * which workspace this is, and what they are in it.
  */
 const said = (
   where: Where, person: Me | null, held: Belonging | null,
 ): string | undefined => {
   if ("slug" in where) {
     /* ⚠️ ONE WORKSPACE'S LINE IS WHAT THE NAME DOES NOT SAY: which products it
-       holds, and what you are in it. A description true of every workspace
-       anybody is in is a line nobody reads twice. */
+       holds, and what you are in it. */
     if (where.at === "workspace") {
       /* ⚠️ AN APP ID IS NOT A NAME — see `sentence`. `me.who` carries ids
-         because it answers before there is a tenancy to read manifests from, so
-         the workspace's line read "kova · you are owner" in the middle of a
-         screen where every other word is capitalised. */
+         because it answers before there is a tenancy to read manifests from. */
       const products = (held?.apps ?? []).map(sentence).join(" · ");
       const role = held?.platformRole ? `you are ${held.platformRole}` : "waiting for you to claim it";
       return products ? `${products} · ${role}` : role;
     }
+    /* ⚠️ WHOSE WORKSPACE THIS IS, four levels from the root, on a surface
+       reachable from any door. It is the one question the name does not answer. */
     return held?.name ?? where.slug;
   }
-  switch (where.at) {
-    case "home": return person?.email ?? undefined;
-    case "you": return "Your details, how you sign in, and what is held about you";
-    case "inbox": return "Everything you were told, however you chose to hear it";
-    case "workspaces": return "Everywhere you belong, across every product";
-    case "console": return "The deployment itself, and nobody else's business";
-    case "tenants": return "Every workspace here, and what each is on";
-    case "actions": return "What each product generates, and the model behind it";
-    case "switches": return "Ours to turn on, and the one that closes every door";
-    case "works": return "What runs on its own, and when it last did";
-    case "ground": return "Where records live, and the room left";
-    default: return undefined;
-  }
+  return where.at === "home" ? person?.email ?? undefined : undefined;
 };
 
 function Inside({ where, onGo }: {
@@ -182,13 +171,28 @@ function Inside({ where, onGo }: {
   switch (where.at) {
     case "you": return <You onGo={onGo} />;
     case "inbox": return <InboxScreen onGo={() => undefined} onSeen={() => undefined} />;
+    case "told": return <TellingMe />;
     case "workspaces": return <Workspaces onGo={onGo} />;
     case "workspace": return <OneWorkspace slug={where.slug} onGo={onGo} />;
-    case "people": case "money": case "settings": case "trust": case "wording":
-      return <WorkspacePart part={where.at} slug={where.slug} />;
+    case "people": case "money": case "packages": case "settings": case "notices":
+    case "trust": case "wording":
+      return (
+        <WorkspacePart
+          part={where.at}
+          slug={where.slug}
+          app={"app" in where ? where.app : undefined}
+          onGo={onGo}
+        />
+      );
     case "console": return <ConsoleHome onGo={onGo} />;
     case "tenants": case "actions": case "switches": case "works": case "ground":
-      return <ConsolePart part={where.at} />;
+      return (
+        <ConsolePart
+          part={where.at}
+          app={"app" in where ? where.app : undefined}
+          onGo={onGo}
+        />
+      );
     /* ⚠️ Home is drawn by the frame above — it is the only screen with no title
        of its own, because the lockup IS its title. */
     case "home": return null;

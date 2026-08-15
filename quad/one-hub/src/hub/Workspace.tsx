@@ -21,7 +21,7 @@ import { Button, Chip } from "@heroui/react";
 import { Group, NavRow, Nothing, Row, Stack, glyphOf } from "@quad/web";
 import { useSession } from "../session.js";
 import { tenantUrl } from "../door.js";
-import { OF_WORKSPACE, nameOf, partsFor, type Where, type WorkspacePart } from "./where.js";
+import { OF_WORKSPACE, OFTEN, nameOf, partsFor, type Where, type WorkspacePart } from "./where.js";
 
 /**
  * ⚠️ A GLYPH PER ROW AND NO DESCRIPTION, WHICH IS THE HOME'S GRAMMAR. Every row
@@ -33,7 +33,9 @@ import { OF_WORKSPACE, nameOf, partsFor, type Where, type WorkspacePart } from "
 const GLYPH: Readonly<Record<WorkspacePart, string>> = {
   people: "people",
   money: "money",
+  packages: "package",
   settings: "settings",
+  notices: "bell",
   trust: "trust",
   wording: "note",
 };
@@ -88,20 +90,28 @@ export function OneWorkspace({ slug, onGo }: {
         </Row>
       ) : null}
 
-      {/* ⚠️ The workspace's own name and what you are in it are the crown's —
-          see `Hub.tsx`. An unlabelled group is the whole of this screen. */}
-      <Group>
-        {/* ⚠️ Every member may look at the roster; only some may change it, and
-            the screen behind that row is what decides it, not the row. */}
-        {OF_WORKSPACE.filter((p) => mine.has(p)).map((part) => (
-          <NavRow
-            key={part}
-            icon={glyphOf(GLYPH[part])}
-            label={nameOf({ at: part, slug })}
-            onOpen={() => onGo({ at: part, slug })}
-          />
+      {/* ⚠️ TWO CARDS: WHAT YOU COME BACK TO, AND WHAT YOU SET UP ONCE — see
+          `OFTEN` in `where.ts`. Six rows in one run is a menu with no shape, and
+          the roster somebody opens weekly deserves not to sit in the same block
+          as a sub-processor list they will read once.
+
+          ⚠️ Every member may look at the roster; only some may change it, and
+          the screen behind that row is what decides it, not the row. */}
+      {[OF_WORKSPACE.filter((p) => OFTEN.includes(p)), OF_WORKSPACE.filter((p) => !OFTEN.includes(p))]
+        .map((run) => run.filter((p) => mine.has(p)))
+        .filter((run) => run.length > 0)
+        .map((run) => (
+          <Group key={run[0]}>
+            {run.map((part) => (
+              <NavRow
+                key={part}
+                icon={glyphOf(GLYPH[part])}
+                label={nameOf({ at: part, slug })}
+                onOpen={() => onGo({ at: part, slug })}
+              />
+            ))}
+          </Group>
         ))}
-      </Group>
     </Stack>
   );
 }

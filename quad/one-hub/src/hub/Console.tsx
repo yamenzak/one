@@ -87,10 +87,15 @@ export function ConsoleHome({ onGo }: { readonly onGo: (to: Where) => void }) {
 }
 
 /** ⚠️ The bodies are the ones that already existed — this is only the seam. */
-export function ConsolePart({ part }: { readonly part: ConsolePartId }) {
+export function ConsolePart({ part, app, onGo }: {
+  readonly part: ConsolePartId;
+  readonly app?: string;
+  readonly onGo: (to: Where) => void;
+}) {
   switch (part) {
     case "tenants": return <Tenants />;
-    case "actions": return <Actions />;
+    case "actions":
+      return <Actions app={app} onGo={(id) => onGo({ at: "actions", app: id })} />;
     case "switches": return <Switches />;
     case "works": return <Works />;
     case "ground": return <Ground />;

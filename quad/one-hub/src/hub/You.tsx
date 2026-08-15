@@ -2,17 +2,24 @@
  * YOU — who you are, everywhere.
  *
  * ⚠️ EVERYTHING HERE FOLLOWS THE PERSON RATHER THAN THE WORKSPACE. The address
- * you sign in with, what you have been told, the tokens you minted, the way
- * out of an account — none of them belongs to any one workspace, and filing
- * them under one means visiting four places to change one fact about yourself.
+ * you sign in with, what you have been told, how you want to be told it, the way
+ * out of an account — none of them belongs to any one workspace, and filing them
+ * under one means visiting four places to change one fact about yourself.
  *
- * ⚠️ AND SIGNING OUT IS HERE BECAUSE IT IS ABOUT YOU. It sat in an avatar menu
- * in a workspace's chrome, which is the one place it reads as leaving THAT
- * workspace rather than leaving.
+ * ⚠️ THE FACE IS THE SCREEN'S SHAPE, AND THE EMAIL IS THE FACE'S CAPTION. It was
+ * a `FieldRow` in a card of its own — a labelled fact about a person, on a screen
+ * whose crown already said it was about them. `Identity` says the same thing in
+ * the shape every account surface anybody trusts uses, and it gives this screen a
+ * silhouette that is not the silhouette of every other screen (DESIGN.md §4).
+ *
+ * ⚠️ AND SIGNING OUT IS THE LAST ROW OF THE LAST CARD, NOT A CARD OF ITS OWN. A
+ * card is a container for a GROUP; one button inside one is a button with a box
+ * drawn round it. Every phone anybody owns puts sign-out at the bottom of the
+ * account list, after a rule, and there is no reason to be different.
  */
 
 import {
-  ActionRow, Confirm, FieldRow, Group, NavRow, Stack, glyphOf, notice,
+  ActionRow, Confirm, Group, Identity, NavRow, RowRule, Stack, glyphOf, notice,
 } from "@quad/web";
 import { useSession } from "../session.js";
 import type { Where } from "./where.js";
@@ -22,41 +29,29 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
   const person = me && me !== "nobody" ? me : null;
 
   return (
-    /*
-      ⚠️ THREE CARDS AND NO HEADINGS, BECAUSE THE GAP ALREADY SAYS IT. Each of
-      these was a `Group` with a label AND a line under it — six lines of chrome
-      over three rows of content, on a screen whose crown had already said what
-      it was. A gap between two cards says "these are different kinds of thing"
-      (`surfaces.tsx`); a heading over each says it a second time.
-
-      ⚠️ AND THE LINE ABOUT PASSWORDS IS GONE. "A code goes here every time — no
-      password to lose" is marketing, on a screen a person opened to change
-      their address. They are already signed in; there is nothing to sell.
-    */
     <Stack space="roomy">
-      {/* ⚠️ A FACT, NOT A DESTINATION. It was a disabled `NavRow`, which draws a
-          chevron — a promise that something is behind it, greyed out, with
-          nothing anywhere saying why it cannot be pressed. */}
-      <Group>
-        <FieldRow label="Email" value={person?.email ?? "Your address"} />
-      </Group>
+      <Identity name={person?.email ?? "You"} under={person?.operator ? "Operator" : undefined} />
 
       <Group>
         <NavRow
           icon={glyphOf("inbox")}
           label="Inbox"
-          under="Everything anywhere has told you"
           onOpen={() => onGo({ at: "inbox" })}
         />
-      </Group>
-
-      <Group>
+        <RowRule />
+        <NavRow
+          icon={glyphOf("bell")}
+          label="How you are told"
+          onOpen={() => onGo({ at: "told" })}
+        />
+        {/* ⚠️ The rules are placed by hand here, which is what tells `Group` to
+            stop interleaving its own — one card, two runs. */}
+        <RowRule />
         {/*
-          ⚠️ DANGER IS A VOICE, NOT A FILL — `surfaces.tsx` says so and this was
-          the screen breaking it. A soft-red pill sitting alone in a card is an
-          alarm going off on an account page; the destructive ROW is the ordinary
-          row shape in the danger tone, and the two-step it opens is where the
-          red button belongs.
+          ⚠️ DANGER IS A VOICE, NOT A FILL. A filled red control is for the
+          confirming button INSIDE the two-step, where somebody is already
+          reading carefully; as a row in a list it is an alarm going off on an
+          account page.
         */}
         <Confirm
           trigger={<ActionRow label="Sign out" tone="danger" />}

@@ -11,10 +11,9 @@
  */
 
 import { useState } from "react";
-import { Button } from "@heroui/react";
+import { Button, Chip } from "@heroui/react";
 import {
-  Await, Choice, Group, LongText, NavRow, Nothing, RowsWaiting, Stack, Tray, distinguishing,
-  notice,
+  Await, Choice, Group, LongText, NavRow, Nothing, RowsWaiting, Stack, Tray, glyphOf, notice,
 } from "@quad/web";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
@@ -40,12 +39,14 @@ interface AiAnswer {
   }[];
 }
 
-export function Actions() {
+export function Actions({ app, onGo }: {
+  readonly app?: string;
+  readonly onGo: (appId: string) => void;
+}) {
   const of = useLoad<AiAnswer>("op.ai");
 
   return (
-    /* ⚠️ The crown already says "Actions" and what they are — see `Hub.tsx`.
-       This screen drew both a second time, four lines under the first. */
+    /* ⚠️ The crown already says "Actions" and what they are — see `Hub.tsx`. */
     <Await
       of={of.of}
       waiting={<RowsWaiting rows={3} />}
@@ -54,28 +55,44 @@ export function Actions() {
       nothing={<Nothing says="No product here declares a generating action" />}
       then={(data) => {
         const shown = data.apps.filter((a) => a.actions.length);
-        return (
-          <Stack space="roomy">
-            {/*
-              ⚠️ AN ACTION IS A ROW THAT OPENS ITS OWN SHEET. Each was a `Card`
-              with a title, an id line, two label-and-chip pairs stacked in its
-              content and a button under those — six elements to say what a row
-              says in two, once per action. The sheet already existed; only the
-              way in was a card.
+        /*
+          ⚠️ ONE PRODUCT AT A TIME — the same rule the workspace's own screens
+          follow (DESIGN.md §3). A deployment with six products and forty actions
+          was one column of forty rows under six repeated headings; a deployment
+          with one is a menu of one, so the list stands down and its actions are
+          the screen.
+        */
+        const only = shown.length === 1 ? shown[0] : undefined;
+        const chosen = app ? shown.find((a) => a.id === app) : only;
 
-              ⚠️ AND NO GLYPH CHARACTER IN THE HEADING. `app.mark` is a text
-              character from a manifest, so "◈ Hello" renders at whatever weight
-              and baseline the reader's font gives it, beside a name that
-              already says which product this is.
-            */}
-            {shown.map((app) => (
-              <Group key={app.id} label={distinguishing(shown, app.name)}>
-                {app.actions.map((action) => (
-                  <BindTray key={action.id} app={app.id} action={action} onDone={of.again} />
-                ))}
-              </Group>
+        if (!chosen) {
+          return (
+            <Group>
+              {shown.map((a) => (
+                <NavRow
+                  key={a.id}
+                  icon={glyphOf("sparkle")}
+                  label={a.name}
+                  aside={<Chip variant="soft"><Chip.Label>{a.actions.length}</Chip.Label></Chip>}
+                  onOpen={() => onGo(a.id)}
+                />
+              ))}
+            </Group>
+          );
+        }
+
+        return (
+          /*
+            ⚠️ AN ACTION IS A ROW THAT OPENS ITS OWN SHEET. Each was a `Card`
+            with a title, an id line, two label-and-chip pairs stacked in its
+            content and a button under those — six elements to say what a row
+            says in two. The sheet already existed; only the way in was a card.
+          */
+          <Group>
+            {chosen.actions.map((action) => (
+              <BindTray key={action.id} app={chosen.id} action={action} onDone={of.again} />
             ))}
-          </Stack>
+          </Group>
         );
       }}
     />

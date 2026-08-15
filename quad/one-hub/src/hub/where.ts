@@ -44,24 +44,52 @@ export type Where =
    * anything.
    */
   | { readonly at: "inbox" }
+  /**
+   * ⚠️ HOW YOU ARE TOLD IS YOURS, NOT A WORKSPACE'S — and it used to share a
+   * screen with the workspace's CEILING, which is a different operation done by
+   * a different person for a different reason (DESIGN.md §3). Narrowing your own
+   * email is a preference; deciding what everybody here may be sent is
+   * administration.
+   */
+  | { readonly at: "told" }
   | { readonly at: "workspaces" }
   /** One workspace: what it includes, and the way into everything about it. */
   | { readonly at: "workspace"; readonly slug: string }
   | { readonly at: "people"; readonly slug: string }
   | { readonly at: "money"; readonly slug: string }
-  | { readonly at: "settings"; readonly slug: string }
+  /** What this workspace SELLS — its own catalogue, not what it pays us. */
+  | { readonly at: "packages"; readonly slug: string }
+  /**
+   * ⚠️ PER PRODUCT, AND `app` IS HOW SOMEBODY DESCENDS INTO ONE. Without it the
+   * screen listed EVERY product's settings in one column with the product's name
+   * repeated as a heading — fine with one product and a report with six
+   * (DESIGN.md §3). With one product there is nothing to choose between, so the
+   * list stands down and its settings are the screen.
+   */
+  | { readonly at: "settings"; readonly slug: string; readonly app?: string }
   | { readonly at: "trust"; readonly slug: string }
+  /** What everybody in this workspace may be sent. The ceiling, not a preference. */
+  | { readonly at: "notices"; readonly slug: string }
   /** What its AI features say on its behalf, where the product allows editing. */
-  | { readonly at: "wording"; readonly slug: string }
+  | { readonly at: "wording"; readonly slug: string; readonly app?: string }
   | { readonly at: "console" }
   | { readonly at: "tenants" }
-  | { readonly at: "actions" }
+  | { readonly at: "actions"; readonly app?: string }
   | { readonly at: "switches" }
   | { readonly at: "works" }
   | { readonly at: "ground" };
 
 /** Every screen a workspace has, in the order its own screen lists them. */
-export const OF_WORKSPACE = ["people", "money", "settings", "trust", "wording"] as const;
+export const OF_WORKSPACE = ["people", "money", "packages", "settings", "notices", "wording", "trust"] as const;
+
+/**
+ * ⚠️ WHAT SOMEBODY COMES BACK TO, AND WHAT THEY SET UP ONCE. Six rows in one
+ * card is a menu with no shape: the roster somebody opens weekly sits in the
+ * same run as the sub-processor list they will read once, and the frequent one
+ * loses its prominence to the rare one (DESIGN.md §3). Two cards, and the gap
+ * between them is the whole of the explanation.
+ */
+export const OFTEN: readonly WorkspacePart[] = ["people", "money"];
 export const OF_CONSOLE = ["tenants", "actions", "switches", "works", "ground"] as const;
 
 export type WorkspacePart = typeof OF_WORKSPACE[number];
@@ -85,7 +113,8 @@ export const partsFor = (role: string | null): readonly WorkspacePart[] => {
   const runs = role === "owner" || role === "manager";
   /* ⚠️ People is drawn for everybody: a customer may see who coaches them,
      and the screen itself decides what any of them can change. */
-  return OF_WORKSPACE.filter((p) => runs || (p !== "money" && p !== "wording"));
+  const OWNED: readonly WorkspacePart[] = ["money", "packages", "wording", "notices"];
+  return OF_WORKSPACE.filter((p) => runs || !OWNED.includes(p));
 };
 
 const isWorkspacePart = (v: string): v is WorkspacePart =>
@@ -108,6 +137,7 @@ export function parseWhere(path: string): Where {
 
   if (head === "you") return { at: "you" };
   if (head === "inbox") return { at: "inbox" };
+  if (head === "told") return { at: "told" };
   if (head === "workspaces") return { at: "workspaces" };
 
   if (head === "w") {
@@ -115,13 +145,21 @@ export function parseWhere(path: string): Where {
     if (!slug) return { at: "workspaces" };
     const part = tail[1];
     if (part === undefined) return { at: "workspace", slug };
-    return isWorkspacePart(part) ? { at: part, slug } : { at: "workspace", slug };
+    if (!isWorkspacePart(part)) return { at: "workspace", slug };
+    /* ⚠️ A THIRD SEGMENT IS THE PRODUCT, on the two screens that have one per
+       product. Anywhere else it is noise and the screen is the answer. */
+    const app = tail[2];
+    return app && (part === "settings" || part === "wording")
+      ? { at: part, slug, app }
+      : { at: part, slug };
   }
 
   if (head === "console") {
     const part = tail[0];
     if (part === undefined) return { at: "console" };
-    return isConsolePart(part) ? { at: part } : { at: "console" };
+    if (!isConsolePart(part)) return { at: "console" };
+    const app = tail[1];
+    return app && part === "actions" ? { at: part, app } : { at: part };
   }
 
   return { at: "home" };
@@ -132,11 +170,15 @@ export function pathOf(where: Where): string {
     case "home": return HUB;
     case "you": return `${HUB}/you`;
     case "inbox": return `${HUB}/inbox`;
+    case "told": return `${HUB}/told`;
     case "workspaces": return `${HUB}/workspaces`;
     case "workspace": return `${HUB}/w/${where.slug}`;
     case "console": return `${HUB}/console`;
-    case "tenants": case "actions": case "switches": case "works": case "ground":
+    case "actions": return `${HUB}/console/actions${where.app ? `/${where.app}` : ""}`;
+    case "tenants": case "switches": case "works": case "ground":
       return `${HUB}/console/${where.at}`;
+    case "settings": case "wording":
+      return `${HUB}/w/${where.slug}/${where.at}${where.app ? `/${where.app}` : ""}`;
     default: return `${HUB}/w/${where.slug}/${where.at}`;
   }
 }
@@ -154,9 +196,16 @@ export function above(where: Where): Where | null {
   switch (where.at) {
     case "home": return null;
     case "you": case "inbox": case "workspaces": case "console": return { at: "home" };
+    /* ⚠️ How you are told is a detail of YOU, so leaving it goes back there
+       rather than to the root — the crown's arrow has to agree with how
+       somebody got here. */
+    case "told": return { at: "you" };
     case "workspace": return { at: "workspaces" };
-    case "tenants": case "actions": case "switches": case "works": case "ground":
+    case "actions": return where.app ? { at: "actions" } : { at: "console" };
+    case "tenants": case "switches": case "works": case "ground":
       return { at: "console" };
+    case "settings": case "wording":
+      return where.app ? { at: where.at, slug: where.slug } : { at: "workspace", slug: where.slug };
     default: return { at: "workspace", slug: where.slug };
   }
 }
@@ -167,11 +216,14 @@ export const nameOf = (where: Where): string => {
     case "home": return "Hub";
     case "you": return "You";
     case "inbox": return "Inbox";
+    case "told": return "How you are told";
     case "workspaces": return "Workspaces";
     case "workspace": return "Workspace";
     case "people": return "People";
     case "money": return "Money";
+    case "packages": return "Packages";
     case "settings": return "Settings";
+    case "notices": return "What everybody is told";
     case "trust": return "Data & Trust";
     case "wording": return "In your words";
     case "console": return "Operator";

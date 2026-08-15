@@ -1,70 +1,59 @@
 /**
- * SETTINGS — generated from the declarations, two authorities on one screen.
+ * SETTINGS — what a product is set to, for this workspace and for you.
  *
  * ⚠️ NO APP WROTE ANY OF THIS. Each product's declared settings render through
  * the platform's one Settings surface; the workspace's rows save with the
- * declaration's own `needs`, a person's rows are theirs. The notification
- * policy is the same two levels: the workspace sets a ceiling, you narrow your
- * own — same door, different authority, and the screen says which is which.
+ * declaration's own `needs`, a person's rows are theirs.
  *
- * ⚠️ ONE SECTION PER PRODUCT, HOLDING EVERYTHING ABOUT IT. This was two passes
- * over the same list — every product's settings, then every product's
- * notification policy — so a workspace with two products read them A, B, A, B,
- * and each block re-stated whose it was in a heading of its own. With ONE
- * product that came out as four headings all beginning "Kova — ": the word that
- * varies buried at the end, after the words they share.
+ * ⚠️ ONE PRODUCT AT A TIME, AND THE LIST IS HOW YOU CHOOSE ONE. This screen used
+ * to render EVERY product's settings in one column with the product's name
+ * repeated as a heading — fine with one product, a report with six, and the
+ * customer with six is the one to design for (DESIGN.md §3). With one product
+ * there is nothing to choose between, so the list stands down and its settings
+ * ARE the screen; nobody pays a tap for a menu with one item on it.
  *
- * ⚠️ WHAT THE PRODUCTS SAY ON THIS WORKSPACE'S BEHALF IS ITS OWN SCREEN — see
- * `Wording.tsx`. It was a third section under here, below every product's
- * settings and every product's notification policy, which is how the one thing
- * on the page somebody edits deliberately became the one nobody scrolled to.
+ * ⚠️ AND WHAT THE WHOLE WORKSPACE IS TOLD IS NOT HERE. It was a second half of
+ * this screen: a person narrowing their own email, and an owner deciding what
+ * every colleague may be sent, one under the other. Same subject, different
+ * operation, different authority, different frequency — which is three reasons
+ * to be two screens (DESIGN.md §3).
  */
 
-import {
-  Await, FormWaiting, NotificationPolicy, Reveal, Section, Settings, Stack, distinguishing,
-  notice,
-} from "@quad/web";
+import { Await, FormWaiting, Group, NavRow, Nothing, Settings, Stack, glyphOf, notice } from "@quad/web";
 import { settingsOn } from "@quad/kernel";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView } from "./data.js";
 
-interface PolicyAnswer {
-  readonly policy: Readonly<Record<string, readonly ("inbox" | "email" | "push")[]>>;
-  readonly preference: Readonly<Record<string, readonly ("inbox" | "email" | "push")[]>>;
+export function SettingsArea({ view, app, onGo }: {
+  readonly view: CentreView;
+  /** Which product's settings, when the workspace holds more than one. */
+  readonly app?: string;
+  readonly onGo: (appId: string) => void;
+}) {
+  const has = (a: CentreApp) =>
+    settingsOn(a.settings, "tenant").length > 0 || settingsOn(a.settings, "person").length > 0;
+  const settable = view.apps.filter(has);
+
+  if (!settable.length) {
+    return <Nothing says="Nothing to change here" under="No product in this workspace declares a setting" />;
+  }
+
+  /* ⚠️ ONE PRODUCT IS THE SCREEN; SEVERAL ARE A LIST — see the header. */
+  const only = settable.length === 1 ? settable[0] : undefined;
+  const chosen = app ? settable.find((a) => a.id === app) : only;
+
+  if (!chosen) {
+    return (
+      <Group>
+        {settable.map((a) => (
+          <NavRow key={a.id} icon={glyphOf("settings")} label={a.name} onOpen={() => onGo(a.id)} />
+        ))}
+      </Group>
+    );
+  }
+
+  return <AppSettings app={chosen} />;
 }
-
-export function SettingsArea({ view }: { readonly view: CentreView }) {
-  /* ⚠️ ONE LOAD FOR THE WHOLE SCREEN, because the policy is the PERSON's and the
-     workspace's rather than a product's. Read here and handed down, instead of
-     inside a loop that would ask for the same rows once per product. */
-  const inbox = useLoad<PolicyAnswer>("inbox.settings");
-
-  return (
-    <Await
-      of={inbox.of}
-      waiting={<FormWaiting fields={3} />}
-      again={inbox.again}
-      then={(told) => (
-        <Stack space="roomy">
-          {/* ⚠️ The crown names the screen — see hub/Hub.tsx. */}
-          {view.apps.map((app) => (
-            /* ⚠️ NO HEADING WHERE THERE IS ONE PRODUCT — see `distinguishing`.
-               The crown named the screen and the workspace; a third line naming
-               the only product there is was read before every setting. */
-            <Section key={app.id} label={distinguishing(view.apps, app.name)}>
-              <Stack space="roomy">
-                <AppSettings app={app} />
-                <Told view={view} app={app} told={told} again={inbox.again} />
-              </Stack>
-            </Section>
-          ))}
-        </Stack>
-      )}
-    />
-  );
-}
-
-/* ---------------------------------------------------------------- settings --- */
 
 interface StoredAnswer {
   readonly tenant: Readonly<Record<string, { value?: unknown; set?: boolean }>>;
@@ -77,7 +66,6 @@ function AppSettings({ app }: { readonly app: CentreApp }) {
 
   const hasTenant = settingsOn(app.settings, "tenant").length > 0;
   const hasPerson = settingsOn(app.settings, "person").length > 0;
-  if (!hasTenant && !hasPerson) return null;
 
   const write = async (id: string, value: unknown) => {
     const out = await api.post("setting.write", { app: app.id, id, value });
@@ -129,64 +117,3 @@ const flat = (
   Object.fromEntries(Object.entries(rows)
     .filter(([, v]) => v.value !== undefined)
     .map(([k, v]) => [k, v.value]));
-
-/* ----------------------------------------------------------- notifications --- */
-
-function Told({ view, app, told, again }: {
-  readonly view: CentreView;
-  readonly app: CentreApp;
-  readonly told: PolicyAnswer;
-  readonly again: () => void;
-}) {
-  const manage = view.you.platform.includes("tenant:manage");
-  const held = new Set(app.permissions);
-
-  const narrow = async (id: string, channels: readonly string[]) => {
-    const out = await api.post("inbox.preference", { type: id, channels });
-    if (!out.ok) { notice.fail(out.problem.title); return; }
-    notice.ok("Saved.");
-    again();
-  };
-
-  const ceiling = async (id: string, channels: readonly string[]) => {
-    const out = await api.post("inbox.policy", { type: id, channels });
-    if (!out.ok) { notice.fail(out.problem.title); return; }
-    notice.ok("Saved for the whole workspace.");
-    again();
-  };
-
-  return (
-    <Stack space="roomy">
-      <NotificationPolicy
-        book={app.notifications}
-        level="person"
-        label="How you are told"
-        under="Email and push you may refuse — the inbox keeps the record"
-        policy={told.policy}
-        preference={told.preference}
-        held={held}
-        available={["inbox", "email", "push"]}
-        onChange={(id, channels) => void narrow(id, channels)}
-      />
-      {/* ⚠️ THE CEILING IS FOLDED AWAY, BECAUSE IT IS THE SAME LIST TWICE. An
-          owner sets their own notifications often and the whole workspace's
-          almost never, and drawing both open put two identical tables of every
-          notification type on one screen — the second one, the rarer and more
-          consequential, indistinguishable at a glance from the first. */}
-      {manage ? (
-        <Reveal label="Set the ceiling for everybody">
-          <NotificationPolicy
-            book={app.notifications}
-            level="tenant"
-            under="The ceiling each person narrows their own settings under"
-            policy={told.policy}
-            preference={{}}
-            held={held}
-            available={["inbox", "email", "push"]}
-            onChange={(id, channels) => void ceiling(id, channels)}
-          />
-        </Reveal>
-      ) : null}
-    </Stack>
-  );
-}

@@ -1,5 +1,5 @@
 /**
- * PEOPLE — one roster, two authorities, and the packages beside them.
+ * PEOPLE — one roster, and nothing else on the screen.
  *
  * ⚠️ THE ONE ROSTER IS THE POINT (D15). A person appears once, with their
  * platform office and what they are in each product — not once per product.
@@ -7,17 +7,21 @@
  * the gate would refuse, but only until the answer comes back, and the answer
  * is a sentence.
  *
- * ⚠️ AND A PACKAGE SITS BESIDE THE ROLES BECAUSE IT IS THE SAME GESTURE WITH A
- * CLOCK (D16). Composing one looks like composing a role, plus a price and a
- * period; granting one is the same door inviting is.
+ * ⚠️ AND THE PACKAGES LEFT, WHICH IS THE WHOLE OF WHAT CHANGED HERE. Composing
+ * one IS the same gesture as composing a role (D16), and that is an argument
+ * about the mechanism rather than about the screen: a roster is who works here
+ * and a catalogue is what the business sells. One control changes a person's
+ * access and the other changes a price, which is two screens (DESIGN.md §3) —
+ * and with six products the catalogue was six cards of empty state stacked under
+ * a list of staff.
  */
 
 import { useState } from "react";
 import { PLATFORM_ROLES } from "@quad/kernel";
 import { Button, Card, Chip } from "@heroui/react";
 import {
-  Agree, Await, Choice, Confirm, Group, Listing, Menu, MoneyInput, NavRow, Nothing, NumberInput,
-  Picks, RowsWaiting, Section, Stack, TextInput, Tray, glyphOf, notice, money as saidMoney,
+  Agree, Await, Choice, Confirm, Group, Listing, Menu, NavRow, Nothing, NumberInput,
+  Picks, RowsWaiting, Stack, TextInput, Tray, glyphOf, notice, money as saidMoney,
 } from "@quad/web";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView, type HoldingLine, type MemberLine, type PackageLine } from "./data.js";
@@ -96,8 +100,6 @@ export function People({ view }: { readonly view: CentreView }) {
           />
           {manage ? <InviteTray view={view} onDone={members.again} /> : null}
       </Stack>
-
-      {manage ? <Packages view={view} /> : null}
     </Stack>
   );
 }
@@ -311,146 +313,5 @@ function AppHoldings({ app, member }: { readonly app: CentreApp; readonly member
         </Card>
       )}
     />
-  );
-}
-
-/* ---------------------------------------------------------------- packages --- */
-
-function Packages({ view }: { readonly view: CentreView }) {
-  return (
-    <Section
-      label="Packages"
-      under="A bundle of capabilities with a price and a clock"
-    >
-      <Stack space="snug">
-        {view.apps.map((app) => <AppPackages key={app.id} app={app} />)}
-      </Stack>
-    </Section>
-  );
-}
-
-function AppPackages({ app }: { readonly app: CentreApp }) {
-  const sold = useLoad<{ items: readonly PackageLine[] }>("package.list", { app: app.id });
-
-  return (
-    <Card>
-      <Card.Header>
-        {/* ⚠️ NO GLYPH CHARACTER. `app.mark` is a text character from a
-            manifest, so it renders at whatever weight and baseline the reader's
-            font gives it, beside a name that already says which product this
-            is — see `Mark` for why the one drawn mark in the product is drawn. */}
-        <Card.Title>{app.name}</Card.Title>
-      </Card.Header>
-      <Card.Content>
-        <Stack space="snug">
-          <Await
-            of={sold.of}
-            waiting={<RowsWaiting rows={2} />}
-            again={sold.again}
-            isNothing={(d) => d.items.length === 0}
-            /* ⚠️ Not "below": the button is inside this state, not under it. */
-            nothing={<Nothing says="Nothing on sale yet" under="Compose one to start selling" />}
-            then={(data) => (
-              <Stack space="tight">
-                {data.items.map((p) => (
-                  <div key={p.id} className="flex flex-wrap items-center justify-between">
-                    <span>{p.name}</span>
-                    <span className="tabular-nums">
-                      {saidMoney(p.priceCents, p.currency)} / {p.periodDays} days
-                    </span>
-                    <ArchiveButton app={app} pkg={p} onDone={sold.again} />
-                  </div>
-                ))}
-              </Stack>
-            )}
-          />
-          <ComposeTray app={app} onDone={sold.again} />
-        </Stack>
-      </Card.Content>
-    </Card>
-  );
-}
-
-function ArchiveButton({ app, pkg, onDone }: {
-  readonly app: CentreApp; readonly pkg: PackageLine; readonly onDone: () => void;
-}) {
-  const archive = async () => {
-    const out = await api.post("package.archive", { id: pkg.id, app: app.id });
-    if (!out.ok) { notice.fail(out.problem.title); return; }
-    notice.ok(`${pkg.name} is off the shelf. Live holdings run out their clock.`);
-    onDone();
-  };
-  return (
-    <Confirm
-      trigger={<Button variant="ghost">Stop selling</Button>}
-      title={`Stop selling ${pkg.name}?`}
-      act={{ label: "Stop selling", onDo: () => void archive() }}
-    >
-      Nobody new can buy it. Anybody holding it keeps it until their time runs out.
-    </Confirm>
-  );
-}
-
-/* ⚠️ A SELECTION'S EMPTY IS A FACT, NOT A LOADING STATE. Nothing is picked
-   until the person picks it — this is form input, and the `Loaded` rule is
-   about answers that have not arrived. */
-const NOTHING_PICKED: readonly string[] = [];
-
-function ComposeTray({ app, onDone }: { readonly app: CentreApp; readonly onDone: () => void }) {
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState<number | undefined>(500);
-  const [period, setPeriod] = useState<number | undefined>(30);
-  const [grace, setGrace] = useState<number | undefined>(3);
-  const [grants, setGrants] = useState(NOTHING_PICKED);
-  const [oncePer, setOncePer] = useState(false);
-
-  const compose = async () => {
-    const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    const out = await api.post("package.create", {
-      app: app.id, id, name: name.trim(),
-      priceCents: price ?? 0, currency: "EUR",
-      periodDays: period ?? 30, graceDays: grace ?? 3,
-      grants, oncePer,
-    });
-    if (!out.ok) { notice.fail(out.problem.title); return; }
-    notice.ok(`${name.trim()} is on the shelf.`);
-    setName(""); setGrants(NOTHING_PICKED);
-    onDone();
-  };
-
-  return (
-    <div>
-      <Tray
-        trigger={<Button variant="secondary">Compose a package</Button>}
-        title={`A package in ${app.name}`}
-        actions={
-          <Button
-            slot="close"
-            variant="primary"
-            isDisabled={!name.trim() || grants.length === 0}
-            onPress={() => void compose()}
-          >
-            Put it on the shelf
-          </Button>
-        }
-      >
-        <Stack space="roomy">
-          <TextInput label="Name" value={name} onChange={setName} placeholder="Strength coaching" />
-          <MoneyInput label="Price" currency="EUR" value={price} onChange={setPrice}
-            help="Zero is a real price — a free package works the same way." />
-          <NumberInput label="Days one purchase buys" value={period} onChange={setPeriod} min={1} />
-          <NumberInput label="Grace days" value={grace} onChange={setGrace} min={0}
-            help="After expiry it still works this long, while both sides are told." />
-          <Picks
-            label="What holding it lets them do"
-            value={grants}
-            onChange={setGrants}
-            options={app.sellable.map((p) => ({ id: p, label: p }))}
-          />
-          <Agree label="One per customer" value={oncePer} onChange={setOncePer}
-            help="A starter offer. The ledger remembers even after it lapses." />
-        </Stack>
-      </Tray>
-    </div>
   );
 }
