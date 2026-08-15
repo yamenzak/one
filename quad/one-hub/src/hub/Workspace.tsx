@@ -18,18 +18,24 @@
  */
 
 import { Button, Chip } from "@heroui/react";
-import { Group, NavRow, Nothing, Row, Stack } from "@quad/web";
+import { Group, NavRow, Nothing, Row, Stack, glyphOf } from "@quad/web";
 import { useSession } from "../session.js";
 import { tenantUrl } from "../door.js";
 import { OF_WORKSPACE, nameOf, partsFor, type Where, type WorkspacePart } from "./where.js";
 
-/** One line per row, in the house voice — the name itself is `nameOf`. */
-const SAID: Readonly<Record<WorkspacePart, string>> = {
-  people: "Staff, customers, roles and packages",
-  money: "What this workspace pays, and what it holds",
-  settings: "The workspace's choices, and your own",
-  trust: "What is held about people, and the promises around it",
-  wording: "What the AI features say on this workspace's behalf",
+/**
+ * ⚠️ A GLYPH PER ROW AND NO DESCRIPTION, WHICH IS THE HOME'S GRAMMAR. Every row
+ * here carried a sentence, so five destinations came out as ten lines of text —
+ * a wall to read where the home beside it is a list to scan. The sentence is
+ * what each screen says when somebody arrives on it, which is where it is
+ * useful and where it is not competing with four others.
+ */
+const GLYPH: Readonly<Record<WorkspacePart, string>> = {
+  people: "people",
+  money: "money",
+  settings: "settings",
+  trust: "trust",
+  wording: "note",
 };
 
 export function OneWorkspace({ slug, onGo }: {
@@ -56,6 +62,21 @@ export function OneWorkspace({ slug, onGo }: {
 
   return (
     <Stack space="roomy">
+      {/* ⚠️ THE PRODUCT COMES FIRST, BECAUSE IT IS WHY MOST PEOPLE OPENED THIS.
+          It was the last thing on the screen, under five rows of administration
+          — so the one action somebody wants daily sat below the five they want
+          twice a year. */}
+      <Row>
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          onPress={() => { if (where) location.assign(tenantUrl(slug, where, location)); }}
+        >
+          Open {workspace?.name ?? slug}
+        </Button>
+      </Row>
+
       {/* ⚠️ THE PROBLEM COMES BEFORE THE LIST, NOT INSIDE IT. A failed payment
           filed as the first row of a menu is a row; above the menu it is the
           reason the person is looking. */}
@@ -75,21 +96,12 @@ export function OneWorkspace({ slug, onGo }: {
         {OF_WORKSPACE.filter((p) => mine.has(p)).map((part) => (
           <NavRow
             key={part}
+            icon={glyphOf(GLYPH[part])}
             label={nameOf({ at: part, slug })}
-            under={SAID[part]}
             onOpen={() => onGo({ at: part, slug })}
           />
         ))}
       </Group>
-
-      <Row>
-        <Button
-          variant="primary"
-          onPress={() => { if (where) location.assign(tenantUrl(slug, where, location)); }}
-        >
-          Open {workspace?.name ?? slug}
-        </Button>
-      </Row>
     </Stack>
   );
 }

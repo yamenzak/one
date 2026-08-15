@@ -441,11 +441,27 @@ export function FieldRow({ label, value, onEdit }: {
  * ⚠️ THE TRAILING META IS TIME, NOT AN ACTION. A list of people is scanned for
  * "when", and putting a button there makes every row a decision.
  */
-export function PersonRow({ name, under, when, unread, face, onOpen }: {
+export function PersonRow({ name, under, when, unread, aside, goes, face, onOpen }: {
   readonly name: string;
   readonly under?: string;
   readonly when?: string;
   readonly unread?: number;
+  /**
+   * ⚠️ THE CORNER'S THIRD SHAPE, FOR A STATE RATHER THAN A COUNT. `when` and
+   * `unread` cover a conversation; a row that is a WORKSPACE has neither and
+   * does have a standing — "needs attention" is not a number and not a time.
+   * Drawn last, so time then count then state reads left to right.
+   */
+  readonly aside?: React.ReactNode;
+  /**
+   * ⚠️ WHETHER TO PROMISE WHAT IS BEHIND IT. A roster row opens a person and
+   * its corner is a TIME, so a chevron there would be a third thing in a corner
+   * that already has two. A row that is purely a destination — a workspace in a
+   * list of workspaces — has an empty corner and sits beside rows that do draw
+   * one, and the missing chevron reads as the row being different rather than
+   * as the corner being busy.
+   */
+  readonly goes?: boolean;
   readonly face?: string;
   readonly onOpen: () => void;
 }) {
@@ -474,6 +490,8 @@ export function PersonRow({ name, under, when, unread, face, onOpen }: {
               <Chip.Label>{unread}</Chip.Label>
             </Chip>
           ) : null}
+          {aside}
+          {goes ? <span aria-hidden="true" className={TYPE.note}>›</span> : null}
         </span>
       </span>
     </Button>

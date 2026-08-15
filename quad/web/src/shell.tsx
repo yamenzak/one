@@ -25,7 +25,7 @@ import { PRIMARY_MAX, primaryOf } from "@quad/kernel";
 import { Avatar, Button, Chip, Separator, Tooltip } from "@heroui/react";
 import {
   Banknote, Bell, Building2, Calendar, Circle, ClipboardList, Cog, Coins, FileText, House,
-  Inbox as InboxGlyph, NotebookPen, Package, Shield, Sun, UserRound, Users,
+  Inbox as InboxGlyph, NotebookPen, Package, Plus, Shield, Sun, UserRound, Users,
 } from "lucide-react";
 import { Island } from "./layout.js";
 import { skyCss, type Sky } from "./theme.js";
@@ -51,6 +51,9 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
   inbox: <InboxGlyph />, bell: <Bell />,
   note: <NotebookPen />, file: <FileText />, list: <ClipboardList />,
   calendar: <Calendar />, package: <Package />,
+  /* ⚠️ Making a new one of something is a row like any other, and it needs a
+     mark like any other — a menu with one unmarked row reads as a mistake. */
+  add: <Plus />,
 };
 
 export const glyphOf = (name?: string): React.ReactNode =>

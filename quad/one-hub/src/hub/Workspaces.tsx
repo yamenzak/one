@@ -14,9 +14,9 @@
  */
 
 import { Chip } from "@heroui/react";
-import { Group, NavRow, Nothing, Stack } from "@quad/web";
+import { Group, NavRow, Nothing, PersonRow, Stack, glyphOf } from "@quad/web";
 import { useSession } from "../session.js";
-import { hubAt, isHere, tenantUrl } from "../door.js";
+import { here, hubAt, isHere, setupUrl, tenantUrl } from "../door.js";
 import { pathOf, type Where } from "./where.js";
 
 export function Workspaces({ onGo }: { readonly onGo: (to: Where) => void }) {
@@ -36,29 +36,44 @@ export function Workspaces({ onGo }: { readonly onGo: (to: Where) => void }) {
     location.assign(hubAt(tenantUrl(slug, where, location), pathOf({ at: "workspace", slug })));
   };
 
-  if (person && belongs.length === 0) {
-    return (
-      <Nothing
-        says="You are not in any workspace yet"
-        under="An invitation arrives by email, and signing in as that address claims it"
-      />
-    );
-  }
+  /* ⚠️ STARTING ONE IS ALWAYS OFFERED, AND THIS IS THE ONLY PLACE IT LIVES FOR
+     SOMEBODY WHO IS ALREADY SIGNED IN. The signpost used to carry it and does
+     not exist any more; the sign-in carries it for people with no session. A
+     person with one workspace who wants a second had nowhere to go. */
+  const start = () => { if (where) location.assign(setupUrl(where, here())); };
 
   return (
     <Stack space="roomy">
-      <Group>
-        {belongs.map((w) => (
-          <NavRow
-            key={w.slug}
-            label={w.name}
-            under={said(w.apps, w.platformRole)}
-            aside={w.attention
-              ? <Chip color="warning" variant="soft"><Chip.Label>Needs attention</Chip.Label></Chip>
-              : undefined}
-            onOpen={() => open(w.slug)}
+      {person && belongs.length === 0
+        ? (
+          <Nothing
+            says="You are not in any workspace yet"
+            under="An invitation arrives by email, and signing in as that address claims it"
           />
-        ))}
+        )
+        : (
+          /* ⚠️ A FACE PER ROW, LIKE THE ROSTER AND LIKE THE HOME. A workspace is
+             a thing with a name somebody recognises; a list of them with no mark
+             is a list of strings, and it was the one list in the hub with no
+             lead at all. */
+          <Group>
+            {belongs.map((w) => (
+              <PersonRow
+                key={w.slug}
+                goes
+                name={w.name}
+                under={said(w.apps, w.platformRole)}
+                aside={w.attention
+                  ? <Chip color="warning" variant="soft"><Chip.Label>Needs attention</Chip.Label></Chip>
+                  : undefined}
+                onOpen={() => open(w.slug)}
+              />
+            ))}
+          </Group>
+        )}
+
+      <Group>
+        <NavRow icon={glyphOf("add")} label="Start a workspace" onOpen={start} />
       </Group>
     </Stack>
   );
