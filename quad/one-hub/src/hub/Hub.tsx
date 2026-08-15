@@ -101,7 +101,7 @@ function Screen({ where, onGo, onLeave }: {
     <Page sky={root ? "veil" : "calm"}>
       {root
         ? (
-          <Band bleed="edge" width="read">
+          <Band width="read">
             <div className={`flex ${CROWN} items-center`}>
               {onLeave ? <LeaveChip leave="dismiss" onDo={onLeave} /> : null}
             </div>
@@ -109,6 +109,12 @@ function Screen({ where, onGo, onLeave }: {
         )
         : (
           <PageCrown
+            /* ⚠️ THE SAME COLUMN AS THE CONTENT UNDER IT — see `PageCrown`. The
+               hub is one held column at reading width on every screen it has; a
+               crown left edge-bled put "Money" 240px to the left of the bill it
+               names, on the same screen. */
+            bleed="hold"
+            width="read"
             title={where.at === "workspace" ? held?.name ?? where.slug : nameOf(where)}
             back={onLeave ?? undefined}
             under={<span className={TYPE.note}>{said(where, person, held)}</span>}

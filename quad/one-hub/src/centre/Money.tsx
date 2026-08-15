@@ -9,7 +9,7 @@
  */
 
 import { Card, Chip } from "@heroui/react";
-import { Await, Bill, Figure, FigureWaiting, Section, Shelf, Stack, notice } from "@quad/web";
+import { Await, Bill, Figure, FigureWaiting, Grid, Section, Shelf, Stack, notice } from "@quad/web";
 import { useLoad, type CentreView, type MoneyView } from "./data.js";
 
 export function Money({ view }: { readonly view: CentreView }) {
@@ -23,28 +23,36 @@ export function Money({ view }: { readonly view: CentreView }) {
       again={money.again}
       then={(data) => (
         <Stack space="roomy">
-          {/* ⚠️ The crown names the screen — see hub/Hub.tsx. */}
-          <Bill
-            lines={data.bill.lines}
-            total={data.bill.total}
-            currency={data.bill.currency}
-            appName={(id) => data.apps.find((a) => a.id === id)?.name ?? id}
-          />
+          {/* ⚠️ THE TWO FIGURES SIT SIDE BY SIDE, BECAUSE THEY ARE ONE ANSWER.
+              What this costs and what is left to spend are the two numbers
+              somebody opens this screen for; stacked, each took a third of a
+              phone and the second was below the fold on a desktop. The crown
+              names the screen — see hub/Hub.tsx. */}
+          <Grid min="18rem">
+            <Bill
+              lines={data.bill.lines}
+              total={data.bill.total}
+              currency={data.bill.currency}
+              appName={(id) => data.apps.find((a) => a.id === id)?.name ?? id}
+            />
 
-          <Card>
-            <Card.Header>
-              <Card.Title>Credits</Card.Title>
-              <Card.Description>
-                Spent by the features that generate things. Topping up is coming with the payment rail.
-              </Card.Description>
-            </Card.Header>
-            <Card.Content>
-              <Figure value={data.balance.spendable.toLocaleString("en")} of="credits available" />
-            </Card.Content>
-          </Card>
+            <Card>
+              <Card.Header>
+                <Card.Title>Credits</Card.Title>
+                <Card.Description>What the generating features spend.</Card.Description>
+              </Card.Header>
+              <Card.Content>
+                <Figure value={data.balance.spendable.toLocaleString("en")} of="left to spend" />
+              </Card.Content>
+            </Card>
+          </Grid>
 
+          {/* ⚠️ NO GLYPH CHARACTER IN THE LABEL. `app.mark` is a text character
+              from a manifest, so it renders at whatever weight and baseline the
+              reader's font gives it, beside a name that already says which
+              product this is. */}
           {data.apps.map((app) => (
-            <Section key={app.id} label={`${app.mark} ${app.name}`}
+            <Section key={app.id} label={app.name}
               under={app.planId ? undefined : "This product has no plan yet."}>
               <Stack space="snug">
                 {app.status === "past_due"

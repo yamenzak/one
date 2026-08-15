@@ -14,6 +14,7 @@
 import type { JobBook, PackDef } from "@quad/kernel";
 import { Button, Card, Chip, Meter, ProgressBar, Separator } from "@heroui/react";
 import { money } from "./console.js";
+import { Figure, Grid } from "./layout.js";
 import { SPACE } from "./metrics.js";
 
 /* ------------------------------------------------------------------- bill --- */
@@ -26,27 +27,40 @@ export interface BillProps {
   readonly mixed?: boolean;
 }
 
+/** ⚠️ What the figure is OF, which is a count rather than the word "total". */
+const said = (lines: number): string =>
+  lines === 0
+    ? "every product here is on a free plan"
+    : lines === 1 ? "for one product" : `across ${lines} products`;
+
 export function Bill({ lines, total, currency, appName, mixed }: BillProps) {
   return (
     <Card>
       <Card.Header>
         <Card.Title>What this workspace pays</Card.Title>
-        <Card.Description>One invoice, one line per product.</Card.Description>
+        {/* ⚠️ THE PROMISE IS ONLY MADE WHERE IT IS KEPT. "One line per product"
+            over a card with no lines on it describes a document the reader is
+            not looking at. */}
+        {lines.length > 0 ? <Card.Description>One invoice, one line per product.</Card.Description> : null}
       </Card.Header>
       <Card.Content>
-        <div className={`flex flex-col ${SPACE.tight}`}>
-          {lines.length === 0
-            ? <span>Nothing yet — every product here is on a free plan.</span>
-            : lines.map((line) => (
+        <div className={`flex flex-col ${SPACE.snug}`}>
+          {/*
+            ⚠️ THE TOTAL IS THE FIGURE, AT THE TOP. It was a bold row at the
+            BOTTOM of a list, the same size as the lines above it — so the one
+            number the screen exists to answer was the last thing on it and
+            looked like a subtotal. A screen about money leads with the amount;
+            what it is made of belongs under it.
+          */}
+          <Figure value={money(total, currency)} of={said(lines.length)} />
+          {lines.length > 0 ? <Separator /> : null}
+          <div className={`flex flex-col ${SPACE.tight}`}>
+            {lines.map((line) => (
               <div key={line.appId} className={`flex justify-between ${SPACE.snug}`}>
                 <span>{appName(line.appId)} · {line.planId}</span>
-                <span>{money(line.price, line.currency)}</span>
+                <span className="tabular-nums">{money(line.price, line.currency)}</span>
               </div>
             ))}
-          <Separator />
-          <div className={`flex justify-between ${SPACE.snug}`}>
-            <strong>Total</strong>
-            <strong>{money(total, currency)}</strong>
           </div>
           {/*
             ⚠️ A MIXED-CURRENCY BILL IS SAID, NOT SUMMED. Adding euros to dirhams
@@ -122,7 +136,9 @@ export function Wallet({ balance, held, spentByApp, appName, packs, onBuy }: Wal
         </Card.Content>
       </Card>
 
-      <div className={`grid ${SPACE.snug} md:grid-cols-3`}>
+      {/* ⚠️ Auto-fit for the same reason the plan shelf is — a catalogue has
+          however many packs somebody priced. See `Shelf`. */}
+      <Grid min="15rem">
         {[...packs].sort((a, b) => a.order - b.order).map((pack) => (
           <Card key={pack.id}>
             <Card.Header>
@@ -145,7 +161,7 @@ export function Wallet({ balance, held, spentByApp, appName, packs, onBuy }: Wal
             </Card.Footer>
           </Card>
         ))}
-      </div>
+      </Grid>
     </div>
   );
 }

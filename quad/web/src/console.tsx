@@ -15,7 +15,10 @@
 import type { Allowance, EntitlementDef, FlagBook, FlagDef, PlanSpec } from "@quad/kernel";
 import { UNLIMITED, overdue, resolve, settableBy } from "@quad/kernel";
 import { Button, Card, Chip, Label, Separator, Switch } from "@heroui/react";
+import { Grid } from "./layout.js";
 import { SPACE } from "./metrics.js";
+import { TYPE } from "./type.js";
+import { Reveal } from "./blocks.js";
 
 /* ------------------------------------------------------------------ flags --- */
 
@@ -119,37 +122,73 @@ export function Shelf({ plans, entitlements, current, onChoose }: ShelfProps) {
   const keys = Object.entries(entitlements).filter(([, def]) => !def.reserved);
 
   return (
-    <div className={`grid ${SPACE.snug} md:grid-cols-3`}>
-      {shown.map((plan) => (
-        <Card key={plan.id}>
-          <Card.Header>
-            <Card.Title>{plan.name}</Card.Title>
-            <Card.Description>{plan.said}</Card.Description>
-          </Card.Header>
-          <Card.Content>
-            <div className={`flex flex-col ${SPACE.tight}`}>
-              <strong>{money(plan.price, plan.currency)}</strong>
-              {plan.trialDays
-                ? <Chip color="success" variant="soft"><Chip.Label>{plan.trialDays} days free</Chip.Label></Chip>
-                : null}
-              <Separator />
-              <dl className={`flex flex-col ${SPACE.hair}`}>
-                {keys.map(([key, def]) => (
-                  <div key={key} className={`flex justify-between ${SPACE.snug}`}>
-                    <dt>{def.label}</dt>
-                    <dd>{saying(plan.includes[key] ?? false)}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          </Card.Content>
-          <Card.Footer>
-            {plan.id === current
-              ? <Chip color="success" variant="primary"><Chip.Label>Your plan</Chip.Label></Chip>
-              : <Button variant="primary" onPress={() => onChoose(plan.id)}>Choose {plan.name}</Button>}
-          </Card.Footer>
-        </Card>
-      ))}
-    </div>
+    /*
+      ⚠️ AUTO-FIT, NOT THREE COLUMNS. A catalogue has however many plans somebody
+      priced: at `md:grid-cols-3` a fourth one orphans onto a row of its own,
+      full width in a two-thirds gap, reading as a plan of a different kind. It
+      is also three columns in a `read` column, where each card is 190px wide.
+      The minimum is what a price and an entitlement list need; the count is
+      whatever fits.
+    */
+    <Grid min="15rem">
+      {shown.map((plan) => {
+        const mine = plan.id === current;
+        const includes = (
+          <dl className={`flex flex-col ${SPACE.hair}`}>
+            {keys.map(([key, def]) => (
+              <div key={key} className={`flex justify-between ${SPACE.snug}`}>
+                <dt>{def.label}</dt>
+                <dd>{saying(plan.includes[key] ?? false)}</dd>
+              </div>
+            ))}
+          </dl>
+        );
+        return (
+          <Card key={plan.id}>
+            <Card.Header>
+              <Card.Title>{plan.name}</Card.Title>
+              <Card.Description>{plan.said}</Card.Description>
+            </Card.Header>
+            <Card.Content>
+              <div className={`flex flex-col ${SPACE.tight}`}>
+                <strong className={TYPE.figure}>{money(plan.price, plan.currency)}</strong>
+                {/*
+                  ⚠️ A TRIAL IS AN OFFER, NOT A SUCCESS. `success` is the token
+                  for something that WENT WELL — a payment cleared, a job
+                  finished — and spending it on a sales badge is what makes
+                  green stop meaning anything on the screens where it is load
+                  bearing. It also puts a hue on a product whose interface is
+                  values (`ground.ts`).
+                */}
+                {plan.trialDays
+                  ? <Chip variant="soft"><Chip.Label>{plan.trialDays} days free</Chip.Label></Chip>
+                  : null}
+                <Separator />
+                {/*
+                  ⚠️ THE LIST IS FOR COMPARING, AND A PHONE CANNOT COMPARE. Three
+                  plans stacked with every entitlement each is a screen somebody
+                  scrolls past rather than reads. The plan they are ON keeps its
+                  list, because that is a fact about them rather than a
+                  comparison; the others fold behind a disclosure.
+                */}
+                {mine ? includes : (
+                  <>
+                    <div className="hidden md:block">{includes}</div>
+                    <div className="md:hidden">
+                      <Reveal label="What is included">{includes}</Reveal>
+                    </div>
+                  </>
+                )}
+              </div>
+            </Card.Content>
+            <Card.Footer>
+              {mine
+                ? <Chip variant="primary"><Chip.Label>Your plan</Chip.Label></Chip>
+                : <Button variant="primary" onPress={() => onChoose(plan.id)}>Choose {plan.name}</Button>}
+            </Card.Footer>
+          </Card>
+        );
+      })}
+    </Grid>
   );
 }

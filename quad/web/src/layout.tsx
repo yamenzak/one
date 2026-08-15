@@ -371,8 +371,22 @@ export function LeaveChip({ leave = "back", label, onDo }: {
  * ambience is built that way. That is the whole separation, and it is why
  * `edges:` can stay green.
  */
-export function PageCrown({ title, back, backLabel, leave = "back", actions = [], under }: {
+export function PageCrown({
+  title, back, backLabel, leave = "back", actions = [], under,
+  bleed = "edge", width = "work",
+}: {
   readonly title: string;
+  /**
+   * ⚠️ A CROWN TAKES THE SHAPE OF WHAT IT CROWNS, AND THE DEFAULT IS ONLY A
+   * DEFAULT. Edge-bled, the heading sits against the page's own gutter, which is
+   * right over content that is also edge-bled. Over a HELD column it is wrong by
+   * however wide the screen is: the hub's crown put "Money" 240px to the left of
+   * the bill it names, which reads as two pages sharing one scroll. Name the
+   * same `bleed`/`width` here that the content under it uses. Both bands take
+   * them, so the back control, the title and the first card share one left edge.
+   */
+  readonly bleed?: Bleed;
+  readonly width?: Width;
   /**
    * ⚠️ ABSENT MEANS THERE IS NOWHERE TO GO, AND THAT IS A REAL STATE. A surface
    * opened as the page itself has nothing underneath it — a control that closes
@@ -402,7 +416,7 @@ export function PageCrown({ title, back, backLabel, leave = "back", actions = []
   return (
     <>
       <header className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
-        <Band bleed="edge" width="work">
+        <Band bleed={bleed} width={width}>
           <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
             {back ? <LeaveChip leave={leave} label={backLabel} onDo={back} /> : null}
 
@@ -460,7 +474,7 @@ export function PageCrown({ title, back, backLabel, leave = "back", actions = []
           first build ran the scope row straight into the first section heading,
           two rows of words at the same left edge with nothing saying which
           belongs to which. */}
-      <Band bleed="edge" width="work">
+      <Band bleed={bleed} width={width}>
         <div className={`flex flex-col ${HEAD_GAP} ${TITLE_PAD}`}>
           <h1
             className={TYPE.display}
