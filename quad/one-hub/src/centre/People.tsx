@@ -16,8 +16,8 @@ import { useState } from "react";
 import { PLATFORM_ROLES } from "@quad/kernel";
 import { Button, Card, Chip } from "@heroui/react";
 import {
-  Agree, Await, Choice, Confirm, Listing, Menu, MoneyInput, Nothing, NumberInput, Picks,
-  RowsWaiting, Section, Stack, TextInput, Tray, notice, money as saidMoney,
+  Agree, Await, Choice, Confirm, Group, Listing, Menu, MoneyInput, NavRow, Nothing, NumberInput,
+  Picks, RowsWaiting, Section, Stack, TextInput, Tray, glyphOf, notice, money as saidMoney,
 } from "@quad/web";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView, type HoldingLine, type MemberLine, type PackageLine } from "./data.js";
@@ -37,8 +37,11 @@ export function People({ view }: { readonly view: CentreView }) {
     <Stack space="roomy">
       {/* ⚠️ NO HEADING OF ITS OWN: the hub's crown is the screen's name, and a
           section repeating it puts the same word on the page twice. */}
+      {/* ⚠️ THE LIST FIRST, THEN THE WAY TO ADD TO IT. Above the roster the
+          invite is the first thing on a screen whose subject is who is already
+          here — and it put a `+` row over a list it is not part of. Every other
+          "make a new one" in the hub sits at the foot of its own list. */}
       <Stack space="snug">
-          {manage ? <InviteTray view={view} onDone={members.again} /> : null}
           <Listing
             label="Members"
             of={members.of.status === "ready"
@@ -47,6 +50,21 @@ export function People({ view }: { readonly view: CentreView }) {
             again={members.again}
             rowKey={(m) => m.id}
             says={{ nothing: "Nobody here yet", under: "Invite somebody by email to get started" }}
+            /* ⚠️ A ROSTER IS A LIST OF PEOPLE BEFORE IT IS A TABLE. On a phone
+               the three columns were a scroll box with two of them cut off
+               mid-word; the same rows carry the same facts in the shape the
+               rest of the hub already uses. Columns survive on a desktop, where
+               comparing a hundred members down a page is what they are for. */
+            asRow={(m) => ({
+              name: m.email,
+              under: [
+                m.platformRole,
+                ...Object.entries(m.appRoles).map(([appId, role]) => `${nameOf(view, appId)}: ${role}`),
+              ].join(" · "),
+              aside: m.accepted
+                ? undefined
+                : <Chip color="warning" variant="soft"><Chip.Label>Invited</Chip.Label></Chip>,
+            })}
             cols={[
               { id: "email", label: "Email", cell: (m) => m.email },
               {
@@ -76,6 +94,7 @@ export function People({ view }: { readonly view: CentreView }) {
                 : []),
             ]}
           />
+          {manage ? <InviteTray view={view} onDone={members.again} /> : null}
       </Stack>
 
       {manage ? <Packages view={view} /> : null}
@@ -103,8 +122,16 @@ function InviteTray({ view, onDone }: { readonly view: CentreView; readonly onDo
 
   return (
     <div>
+      {/* ⚠️ A ROW, NOT A FLOATING PRIMARY. It sat above the roster as a bare
+          button attached to nothing — the one control on the screen with no
+          card under it. Every other "make a new one of these" in the hub is a
+          row with a `+` at the foot of the list it adds to, and this is that. */}
       <Tray
-        trigger={<Button variant="primary">Invite somebody</Button>}
+        trigger={(
+          <Group>
+            <NavRow icon={glyphOf("add")} label="Invite somebody" onOpen={() => undefined} />
+          </Group>
+        )}
         title="Invite somebody"
         actions={<Button slot="close" variant="primary" isDisabled={!email.includes("@")} onPress={() => void invite()}>Send the invitation</Button>}
       >
@@ -308,7 +335,11 @@ function AppPackages({ app }: { readonly app: CentreApp }) {
   return (
     <Card>
       <Card.Header>
-        <Card.Title>{app.mark} {app.name}</Card.Title>
+        {/* ⚠️ NO GLYPH CHARACTER. `app.mark` is a text character from a
+            manifest, so it renders at whatever weight and baseline the reader's
+            font gives it, beside a name that already says which product this
+            is — see `Mark` for why the one drawn mark in the product is drawn. */}
+        <Card.Title>{app.name}</Card.Title>
       </Card.Header>
       <Card.Content>
         <Stack space="snug">
@@ -317,7 +348,8 @@ function AppPackages({ app }: { readonly app: CentreApp }) {
             waiting={<RowsWaiting rows={2} />}
             again={sold.again}
             isNothing={(d) => d.items.length === 0}
-            nothing={<Nothing says="Nothing on sale yet" under="Compose the first package below" />}
+            /* ⚠️ Not "below": the button is inside this state, not under it. */
+            nothing={<Nothing says="Nothing on sale yet" under="Compose one to start selling" />}
             then={(data) => (
               <Stack space="tight">
                 {data.items.map((p) => (

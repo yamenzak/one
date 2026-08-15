@@ -17,11 +17,24 @@
  * ⚠️ AND PAGES APPEAR ONLY WHEN THERE ARE PAGES. A pager under nine rows is
  * furniture; the table paginates itself past `pageSize` and stays honest about
  * the count either way.
+ *
+ * ⚠️ A TABLE ON A PHONE IS NOT A TABLE, WHICH IS WHY `asRow` EXISTS. Three
+ * columns in a 340px column is a horizontal scroll box with two of them cut off
+ * mid-word — the roster shipped exactly that, and the `ScrollContainer` doing
+ * its job is what made it look deliberate. Columns are for comparing values
+ * down a page, and a phone has no page to compare down.
+ *
+ * ⚠️ AND THE CALLER SAYS HOW IT COLLAPSES, BECAUSE ONLY THE CALLER KNOWS. Which
+ * column is the name, which is the line under it, which belongs in the corner —
+ * none of that is recoverable from `cols`, and a component guessing it is a
+ * component that guesses wrong on the third table anybody writes. A table with
+ * no `asRow` keeps scrolling, which is right for one nobody opens on a phone.
  */
 
 import * as React from "react";
 import { Pagination, Table } from "@heroui/react";
 import { Await, Nothing, TableWaiting, type Loaded } from "./state.js";
+import { Group, PersonRow } from "./surfaces.js";
 import { TYPE } from "./type.js";
 
 export interface Col<T> {
@@ -47,9 +60,22 @@ export interface ListingProps<T> {
   readonly again?: () => void;
   /** What this table is, for the screen reader. */
   readonly label: string;
+  /**
+   * ⚠️ THE SAME ROWS WHERE THERE IS NO ROOM FOR COLUMNS — see the header. The
+   * corner takes whatever the table put in its last columns: a state, a count,
+   * a control.
+   */
+  readonly asRow?: (row: T) => {
+    readonly name: string;
+    readonly under?: string;
+    readonly aside?: React.ReactNode;
+    readonly face?: string;
+  };
 }
 
-export function Listing<T>({ of, cols, rowKey, onOpen, pageSize = 10, says, again, label }: ListingProps<T>) {
+export function Listing<T>(
+  { of, cols, rowKey, onOpen, pageSize = 10, says, again, label, asRow }: ListingProps<T>,
+) {
   const [order, setOrder] = React.useState<{ readonly id: string; readonly up: boolean } | null>(null);
   const [page, setPage] = React.useState(1);
 
@@ -76,6 +102,35 @@ export function Listing<T>({ of, cols, rowKey, onOpen, pageSize = 10, says, agai
              `ScrollContainer` that exists to prevent exactly that sat there
              with nothing to do. */
           <div className="flex min-w-0 flex-col">
+            {/*
+              ⚠️ BOTH SHAPES RENDER AND CSS PICKS ONE, rather than a hook
+              measuring the viewport. A width read in JavaScript is a width that
+              is wrong on the first paint and right one frame later, which is a
+              table that visibly becomes a list every time somebody opens the
+              screen — and it is wrong in every server-rendered test.
+            */}
+            {asRow ? (
+              <div className="md:hidden">
+                <Group>
+                  {shown.map((row) => {
+                    const it = asRow(row);
+                    return (
+                      <PersonRow
+                        key={rowKey(row)}
+                        goes={onOpen !== undefined}
+                        name={it.name}
+                        under={it.under}
+                        aside={it.aside}
+                        face={it.face}
+                        onOpen={() => onOpen?.(row)}
+                      />
+                    );
+                  })}
+                </Group>
+              </div>
+            ) : null}
+
+            <div className={asRow ? "hidden md:block" : undefined}>
             {/* ⚠️ `Table` is the frame and `Table.Content` is the table — the
                 sorting and row-action props live on Content, which is the
                 react-aria half. Putting them on the frame typechecks nothing
@@ -120,6 +175,7 @@ export function Listing<T>({ of, cols, rowKey, onOpen, pageSize = 10, says, agai
                 </Table.Content>
               </Table.ScrollContainer>
             </Table>
+            </div>
             {sorted.length > pageSize ? (
               <Paged page={at} pages={pages} count={sorted.length} pageSize={pageSize} onPage={setPage} />
             ) : null}
