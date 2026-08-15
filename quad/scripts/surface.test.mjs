@@ -27,6 +27,17 @@ import { dirname, join } from "node:path";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const QUAD = join(HERE, "..");
 
+/** ⚠️ Read from the one table, so "shipped" means the same thing to every check. */
+let stages = null;
+const shippedStages = () => {
+  if (!stages) {
+    const progress = readFileSync(join(QUAD, "docs/PROGRESS.md"), "utf8");
+    stages = new Set(
+      [...progress.matchAll(/^\|\s*(\d+)\s*\|[^|]*\|\s*shipped\s*\|/gm)].map((m) => m[1]));
+  }
+  return stages;
+};
+
 let bad = 0;
 const fail = (m) => { console.error(`BAD  ${m}`); bad++; };
 const ok = (m) => console.log(`ok   ${m}`);
@@ -108,11 +119,65 @@ if (!missing) {
   ok(`surfaced: ${declared.length - CORE.length} declaration kind(s), each rendered or owed`);
 }
 
+/* -------------------------------------------------------- every field kind --- */
+
+/**
+ * ⚠️ AND A DECLARED FIELD KIND MUST REACH A CONTROL, WHICH IS THE SAME RULE ONE
+ * LEVEL DOWN. `Field` ends in a `default` that renders a text box, so a kind
+ * nobody wrote a case for does not fail — it renders as somewhere to type,
+ * looking finished. `colour` shipped that way: a workspace's brand colour was a
+ * box containing `#2563eb`, to be typed correctly by somebody who already knows
+ * hex, on a screen where every other row worked.
+ *
+ * ⚠️ SHARING THE TEXT BOX IS A DECISION, SO IT IS WRITTEN DOWN. `text`, `email`
+ * and `url` differ only by the input's `type`, and saying so here is what makes
+ * the silence about a fourth one a failure rather than a habit.
+ */
+const AS_TEXT = new Set(["text", "email", "url"]);
+const NO_CONTROL_YET = {
+  json: "18",
+  media: "18",
+  ref: "18",
+};
+
+const kinds = (() => {
+  const src = readFileSync(join(QUAD, "kernel/src/field.ts"), "utf8");
+  const decl = src.match(/export type FieldKind =([\s\S]*?);/);
+  return decl ? [...decl[1].matchAll(/"([a-z]+)"/g)].map((m) => m[1]) : [];
+})();
+
+const controls = (() => {
+  const src = readFileSync(join(QUAD, "web/src/field.tsx"), "utf8");
+  return new Set([...src.matchAll(/case "([a-z]+)":/g)].map((m) => m[1]));
+})();
+
+let unhandled = 0;
+if (!kinds.length) {
+  unhandled++;
+  fail("FieldKind could not be read from kernel/src/field.ts — this check is inert.");
+}
+for (const kind of kinds) {
+  if (controls.has(kind) || AS_TEXT.has(kind)) continue;
+  const owes = NO_CONTROL_YET[kind];
+  if (owes && !shippedStages().has(owes)) continue;
+  unhandled++;
+  fail(`field kind "${kind}" has no case in web/src/field.tsx and is not listed as text.\n` +
+       `       It renders as a text box, which looks finished and accepts anything.`);
+}
+if (!unhandled) {
+  ok(`controls: ${kinds.length} field kind(s), each with a control, text by declaration, or owed`);
+}
+
+/* ⚠️ A kind owed against a SHIPPED stage is the same contradiction the surface
+   list has, so it is the same question asked of the same table. */
+for (const [kind, stage] of Object.entries(NO_CONTROL_YET)) {
+  if (!shippedStages().has(stage)) continue;
+  fail(`field kind "${kind}" owes a control at stage ${stage}, which PROGRESS.md calls shipped.`);
+}
+
 /* ------------------------------------------------------- shipped owes none --- */
 
-const progress = readFileSync(join(QUAD, "docs/PROGRESS.md"), "utf8");
-const shipped = new Set(
-  [...progress.matchAll(/^\|\s*(\d+)\s*\|[^|]*\|\s*shipped\s*\|/gm)].map((m) => m[1]));
+const shipped = shippedStages();
 
 let early = 0;
 for (const [field, entry] of Object.entries(SURFACES)) {

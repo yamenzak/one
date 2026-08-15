@@ -421,6 +421,42 @@ export function ToggleRow({ icon, label, under, value, onChange, isDisabled }: R
 }
 
 /**
+ * A LABEL, WHAT IT MEANS, AND THE CONTROL THAT SETS IT.
+ *
+ * ⚠️ THE EIGHTH SHAPE, AND IT IS THE ONE EVERY SETTINGS SCREEN NEEDS. `ToggleRow`
+ * is this specialised to a switch; everything that is not a switch — a choice, a
+ * number, a key, a colour — had nowhere to go, so three separate components each
+ * drew a CARD per setting with a title, a description and a full-width form
+ * control inside it. That is the grammar of a wizard step, repeated once per
+ * row, and a screen of twelve of them is twelve cards deep.
+ *
+ * ⚠️ THE ROW WRAPS RATHER THAN TRUNCATES, AND THE FLOOR IS WHAT MAKES IT. A
+ * control pinned to the corner with `shrink-0` beside a growing label shortens
+ * the LABEL — "A plan was published" becomes "A plan was pu…" so that two
+ * switches can stay on one line, which is the wrong thing to give up. With a
+ * floor under the words the control drops to its own line instead, on a phone
+ * only, where there is genuinely no room for both.
+ */
+export function ControlRow({ icon, label, under, wide, children }: RowBase & {
+  /** ⚠️ For a control that needs the width whatever the screen is — a textarea. */
+  readonly wide?: boolean;
+  readonly children: React.ReactNode;
+}) {
+  return (
+    <div className={`flex flex-wrap items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
+      <Lead icon={icon} />
+      {/* ⚠️ THE FLOOR IS A FEW WORDS, NOT A COLUMN. At 12rem it was wider than
+          most labels, so on a phone EVERY control dropped to a line of its own
+          and a list of six settings came out twelve rows tall. The words wrap
+          before the control moves; the control moves only when even that will
+          not fit. */}
+      <span className="flex min-w-32 grow"><Body label={label} under={under} /></span>
+      <span className={wide ? "w-full" : "shrink-0"}>{children}</span>
+    </div>
+  );
+}
+
+/**
  * A stored fact and the way to change it.
  *
  * ⚠️ THE LABEL IS ABOVE THE VALUE AND QUIETER THAN IT. The value is what

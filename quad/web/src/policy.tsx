@@ -17,7 +17,8 @@
 
 import type { Channel, NotificationBook, NotificationDef, Policy, Preference } from "@quad/kernel";
 import { INTERRUPTS, channelsFor, inAudience } from "@quad/kernel";
-import { Card, Chip, Label, Switch } from "@heroui/react";
+import { Label, Switch } from "@heroui/react";
+import { ControlRow, Group } from "./surfaces.js";
 import { SPACE } from "./metrics.js";
 
 export interface PolicyProps {
@@ -29,6 +30,9 @@ export interface PolicyProps {
   readonly held: ReadonlySet<string>;
   /** What this deployment can actually deliver. */
   readonly available: readonly Channel[];
+  /** The group's heading, and whose policy it is in a line. */
+  readonly label?: string;
+  readonly under?: string;
   readonly onChange: (id: string, channels: readonly Channel[]) => void;
 }
 
@@ -37,60 +41,61 @@ const CHANNEL_LABEL: Readonly<Record<Channel, string>> = {
 };
 
 export function NotificationPolicy(
-  { book, level, policy, preference, held, available, onChange }: PolicyProps,
+  { book, level, label, under, policy, preference, held, available, onChange }: PolicyProps,
 ) {
   const mine = Object.values(book).filter((def) => inAudience(def, held));
 
   return (
-    <div className={`flex flex-col ${SPACE.snug}`}>
+    /*
+      ⚠️ ONE GROUP OF ROWS, NOT A CARD PER NOTIFICATION. Eight types came out as
+      eight cards, each with a title, a summary and two unlabelled switches
+      floating in its content — a screen somebody scrolls rather than sets.
+
+      ⚠️ AND THE SWITCHES SIT AT THE END OF THE ROW, WRAPPING UNDER ON A PHONE.
+      See `ControlRow`: pinning them to the corner would shorten the words that
+      say which notification this is, which is the half nobody can guess.
+    */
+    <Group label={label} under={under}>
       {mine.map((def) => {
         const on = channelsFor(def, policy, preference, available);
         const ceiling = level === "person" ? (policy[def.id] ?? def.channels) : def.channels;
         const locked = def.category === "action";
+        const missing = def.channels.some((c) => !available.includes(c));
 
         return (
-          <Card key={def.id}>
-            <Card.Header>
-              <Card.Title>{def.label}</Card.Title>
-              <Card.Description>{def.summary}</Card.Description>
-            </Card.Header>
-            <Card.Content>
-              <div className={`flex flex-wrap items-center ${SPACE.snug}`}>
-                {def.channels.filter((c) => c !== "inbox").map((channel) => {
-                  const offered = available.includes(channel) && ceiling.includes(channel);
-                  return (
-                    <Switch
-                      key={channel}
-                      isSelected={on.includes(channel)}
-                      isDisabled={locked || !offered}
-                      onChange={(next) => onChange(def.id, toggle(on, channel, next))}
-                    >
-                      <Switch.Control><Switch.Thumb /></Switch.Control>
-                      <Switch.Content><Label>{CHANNEL_LABEL[channel]}</Label></Switch.Content>
-                    </Switch>
-                  );
-                })}
-                {/* ⚠️ Said, not merely disabled — see the header. */}
-                {locked
-                  ? (
-                    <Chip color="accent" variant="soft">
-                      <Chip.Label>Always sent — this one needs you to do something</Chip.Label>
-                    </Chip>
-                  )
-                  : null}
-                {def.channels.some((c) => !available.includes(c))
-                  ? (
-                    <Chip color="default" variant="soft">
-                      <Chip.Label>Some channels are not set up on this deployment</Chip.Label>
-                    </Chip>
-                  )
-                  : null}
-              </div>
-            </Card.Content>
-          </Card>
+          <ControlRow
+            key={def.id}
+            label={def.label}
+            /* ⚠️ Said, not merely disabled — see the header. One line, and the
+               most important of the three when more than one is true. */
+            under={locked
+              ? "Always sent — this one needs you to do something"
+              : missing
+                ? "Some channels are not set up on this deployment"
+                : def.summary}
+          >
+            <span className={`flex items-center ${SPACE.snug}`}>
+              {def.channels.filter((c) => c !== "inbox").map((channel) => {
+                const offered = available.includes(channel) && ceiling.includes(channel);
+                return (
+                  <Switch
+                    key={channel}
+                    isSelected={on.includes(channel)}
+                    isDisabled={locked || !offered}
+                    onChange={(next) => onChange(def.id, toggle(on, channel, next))}
+                  >
+                    {/* ⚠️ THE WORD BEFORE THE SWITCH, because two bare switches
+                        side by side are two controls nobody can name. */}
+                    <Switch.Content><Label>{CHANNEL_LABEL[channel]}</Label></Switch.Content>
+                    <Switch.Control><Switch.Thumb /></Switch.Control>
+                  </Switch>
+                );
+              })}
+            </span>
+          </ControlRow>
         );
       })}
-    </div>
+    </Group>
   );
 }
 

@@ -18,13 +18,20 @@
 
 import type { SettingBook, SettingDef, Level } from "@quad/kernel";
 import { disclose, groupsOn, settingsOn } from "@quad/kernel";
-import { Card, Chip, Separator } from "@heroui/react";
 import { Field } from "./field.js";
+import { ControlRow, Group, ToggleRow } from "./surfaces.js";
+import { Nothing } from "./state.js";
 import { SPACE } from "./metrics.js";
 
 export interface SettingsProps {
   readonly book: SettingBook;
   readonly level: Level;
+  /**
+   * ⚠️ WHOSE SETTINGS THESE ARE, IN A LINE — "Everyone in this workspace" or
+   * "Only you". It is the one fact a settings screen must not leave ambiguous,
+   * and the level alone does not carry it to the reader.
+   */
+  readonly under?: string;
   /** What is stored. A key that is absent falls back to the declaration's. */
   readonly stored: Readonly<Record<string, unknown>>;
   readonly held: ReadonlySet<string>;
@@ -37,13 +44,11 @@ export interface SettingsProps {
 const visible = (def: SettingDef, held: ReadonlySet<string>): boolean =>
   !def.needs || held.has(def.needs);
 
-export function Settings({ book, level, stored, held, includes, onChange }: SettingsProps) {
+export function Settings({ book, level, under, stored, held, includes, onChange }: SettingsProps) {
   const groups = groupsOn(book, level);
   const mine = settingsOn(book, level).filter((s) => visible(s, held));
 
-  if (!mine.length) {
-    return <Card><Card.Header><Card.Title>Nothing to change here</Card.Title></Card.Header></Card>;
-  }
+  if (!mine.length) return <Nothing says="Nothing to change here" />;
 
   return (
     <div className={`flex flex-col ${SPACE.roomy}`}>
@@ -51,34 +56,64 @@ export function Settings({ book, level, stored, held, includes, onChange }: Sett
         const rows = mine.filter((s) => s.group === group);
         if (!rows.length) return null;
         return (
-          <Card key={group}>
-            <Card.Header><Card.Title>{group}</Card.Title></Card.Header>
-            <Card.Content>
-              <div className={`flex flex-col ${SPACE.roomy}`}>
-                {rows.map((def, i) => {
-                  const locked = !!def.entitlement && includes ? !includes(def.entitlement) : false;
-                  const shown = disclose(def, stored);
-                  return (
-                    <div key={def.id} className={`flex flex-col ${SPACE.tight}`}>
-                      {i > 0 ? <Separator /> : null}
-                      <Field
-                        name={def.id}
-                        spec={def.field}
-                        value={"value" in shown ? shown.value : undefined}
-                        set={"set" in shown ? shown.set : undefined}
-                        disabled={locked}
-                        onChange={(value) => onChange(def.id, value)}
-                      />
-                      {/* ⚠️ Shown and locked, because it is something they can buy. */}
-                      {locked
-                        ? <Chip color="warning" variant="soft"><Chip.Label>Your plan does not include this</Chip.Label></Chip>
-                        : null}
-                    </div>
-                  );
-                })}
-              </div>
-            </Card.Content>
-          </Card>
+          /*
+            ⚠️ A GROUP OF ROWS, NOT A CARD PER SETTING. Every declared setting
+            used to be a `Card` with a title, a description and a full-width
+            form control stacked inside — the shape of one step of a wizard,
+            drawn once per row. A settings screen is a list of facts you change:
+            the name and what it means on the left, the control at the end.
+
+            ⚠️ AND THE AUTHORITY IS SAID ONCE, HERE. Whether a row changes
+            something for the whole workspace or only for the reader is the one
+            thing this screen must not leave ambiguous, and it was carried in a
+            section heading per app per level — four headings all starting with
+            the product's name on a workspace with one product.
+          */
+          <Group key={group} label={group} under={under}>
+            {rows.map((def) => {
+              const locked = !!def.entitlement && includes ? !includes(def.entitlement) : false;
+              const shown = disclose(def, stored);
+              const value = "value" in shown ? shown.value : undefined;
+              const set = "set" in shown ? shown.set : undefined;
+              /* ⚠️ Shown and locked, because it is something they can buy — so
+                 the reason rides on the row rather than as a chip under it. */
+              const help = locked ? "Your plan does not include this" : def.field.help;
+
+              if (def.field.kind === "bool") {
+                return (
+                  <ToggleRow
+                    key={def.id}
+                    label={def.field.label}
+                    under={help}
+                    value={value === true}
+                    isDisabled={locked || value === undefined}
+                    onChange={(next) => onChange(def.id, next)}
+                  />
+                );
+              }
+
+              return (
+                <ControlRow
+                  key={def.id}
+                  label={def.field.label}
+                  under={help}
+                  /* ⚠️ A textarea takes the width whatever the screen is; every
+                     other control sits at the end of the row. */
+                  wide={def.field.kind === "long"}
+                >
+                  <Field
+                    bare
+                    name={def.id}
+                    spec={def.field}
+                    value={value}
+                    set={set}
+                    disabled={locked}
+                    onChange={(next) => onChange(def.id, next)}
+                  />
+                </ControlRow>
+              );
+            })}
+          </Group>
         );
       })}
     </div>

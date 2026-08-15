@@ -30,11 +30,20 @@ export interface FieldProps {
   readonly disabled?: boolean;
   /** For a secret: whether one is stored. The value itself never arrives. */
   readonly set?: boolean;
+  /**
+   * ⚠️ THE CONTROL ALONE, FOR A ROW THAT ALREADY SAID WHAT IT IS. A settings
+   * list puts the name and its explanation on the left and the control at the
+   * end; rendering the library's `Label` and `Description` in there too says
+   * everything twice, once quietly and once again quieter. The label is not
+   * dropped — it becomes the control's `aria-label`, because a bare `Select` in
+   * a row is nameless to anybody not looking at it.
+   */
+  readonly bare?: boolean;
 }
 
-export function Field({ name, spec, value, onChange, disabled, set }: FieldProps) {
+export function Field({ name, spec, value, onChange, disabled, set, bare }: FieldProps) {
   const label = spec.label;
-  const help = spec.help;
+  const help = bare ? undefined : spec.help;
   const pending = value === undefined;
 
   switch (spec.kind) {
@@ -60,8 +69,9 @@ export function Field({ name, spec, value, onChange, disabled, set }: FieldProps
           isDisabled={disabled || pending}
           onSelectionChange={(key) => onChange(key)}
           placeholder="Choose one"
+          aria-label={bare ? label : undefined}
         >
-          <Label>{label}</Label>
+          {bare ? null : <Label>{label}</Label>}
           <Select.Trigger>
             <Select.Value />
             <Select.Indicator />
@@ -89,11 +99,57 @@ export function Field({ name, spec, value, onChange, disabled, set }: FieldProps
           minValue={spec.min}
           maxValue={spec.max}
           onChange={(next) => onChange(next)}
+          aria-label={bare ? label : undefined}
         >
-          <Label>{label}</Label>
+          {bare ? null : <Label>{label}</Label>}
           <Input />
           {help ? <Description>{help}</Description> : null}
         </NumberField>
+      );
+
+    /*
+      ⚠️ A COLOUR IS A SWATCH. This kind is declared, and it fell through to the
+      text case — so a workspace's brand colour was a box containing `#2563eb`,
+      to be typed correctly by somebody who already knows hex. The library ships
+      no colour component at 3.2.4, so this is its own `Input` with the native
+      type: a real swatch, a real picker, and the theme still owns the box.
+    */
+    case "colour":
+      return (
+        <TextField
+          value={typeof value === "string" ? value : "#000000"}
+          isDisabled={disabled || pending}
+          onChange={(next) => onChange(next)}
+          aria-label={bare ? label : undefined}
+        >
+          {bare ? null : <Label>{label}</Label>}
+          {/* ⚠️ SIZED, OR THE SWATCH IS A LINE. A native colour input paints its
+              swatch in the content box, and the library's input is a full-width
+              text field one line tall — so the colour came out as a 3px rule
+              floating in a wide empty box. A swatch is a square you can see. */}
+          <Input type="color" className="h-9 w-16" />
+          {help ? <Description>{help}</Description> : null}
+        </TextField>
+      );
+
+    /*
+      ⚠️ AND A DATE IS A DATE FIELD, for the same reason and with the same
+      remedy. A text box asking for a day gets `12/03` from half of Europe and
+      the other half of it from everywhere else.
+    */
+    case "day":
+    case "instant":
+      return (
+        <TextField
+          value={typeof value === "string" ? value : ""}
+          isDisabled={disabled || pending}
+          onChange={(next) => onChange(next)}
+          aria-label={bare ? label : undefined}
+        >
+          {bare ? null : <Label>{label}</Label>}
+          <Input type={spec.kind === "day" ? "date" : "datetime-local"} />
+          {help ? <Description>{help}</Description> : null}
+        </TextField>
       );
 
     case "long":
@@ -117,8 +173,9 @@ export function Field({ name, spec, value, onChange, disabled, set }: FieldProps
           isDisabled={disabled || pending}
           type={spec.kind === "email" ? "email" : spec.kind === "url" ? "url" : "text"}
           onChange={(next) => onChange(next)}
+          aria-label={bare ? label : undefined}
         >
-          <Label>{label}</Label>
+          {bare ? null : <Label>{label}</Label>}
           <Input placeholder={set ? "Stored. Type to replace it." : undefined} />
           {help ? <Description>{help}</Description> : null}
         </TextField>

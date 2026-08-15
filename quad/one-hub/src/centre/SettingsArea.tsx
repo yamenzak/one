@@ -7,6 +7,13 @@
  * policy is the same two levels: the workspace sets a ceiling, you narrow your
  * own — same door, different authority, and the screen says which is which.
  *
+ * ⚠️ ONE SECTION PER PRODUCT, HOLDING EVERYTHING ABOUT IT. This was two passes
+ * over the same list — every product's settings, then every product's
+ * notification policy — so a workspace with two products read them A, B, A, B,
+ * and each block re-stated whose it was in a heading of its own. With ONE
+ * product that came out as four headings all beginning "Kova — ": the word that
+ * varies buried at the end, after the words they share.
+ *
  * ⚠️ WHAT THE PRODUCTS SAY ON THIS WORKSPACE'S BEHALF IS ITS OWN SCREEN — see
  * `Wording.tsx`. It was a third section under here, below every product's
  * settings and every product's notification policy, which is how the one thing
@@ -18,16 +25,36 @@ import { settingsOn } from "@quad/kernel";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView } from "./data.js";
 
-export function SettingsArea({ view }: { readonly view: CentreView }) {
-  return (
-    <Stack space="roomy">
-      {/* ⚠️ The crown names the screen — see hub/Hub.tsx. */}
-      <Stack space="roomy">
-        {view.apps.map((app) => <AppSettings key={app.id} view={view} app={app} />)}
-      </Stack>
+interface PolicyAnswer {
+  readonly policy: Readonly<Record<string, readonly ("inbox" | "email" | "push")[]>>;
+  readonly preference: Readonly<Record<string, readonly ("inbox" | "email" | "push")[]>>;
+}
 
-      <NotificationsSection view={view} />
-    </Stack>
+export function SettingsArea({ view }: { readonly view: CentreView }) {
+  /* ⚠️ ONE LOAD FOR THE WHOLE SCREEN, because the policy is the PERSON's and the
+     workspace's rather than a product's. Read here and handed down, instead of
+     inside a loop that would ask for the same rows once per product. */
+  const inbox = useLoad<PolicyAnswer>("inbox.settings");
+
+  return (
+    <Await
+      of={inbox.of}
+      waiting={<FormWaiting fields={3} />}
+      again={inbox.again}
+      then={(told) => (
+        <Stack space="roomy">
+          {/* ⚠️ The crown names the screen — see hub/Hub.tsx. */}
+          {view.apps.map((app) => (
+            <Section key={app.id} label={app.name}>
+              <Stack space="roomy">
+                <AppSettings app={app} />
+                <Told view={view} app={app} told={told} again={inbox.again} />
+              </Stack>
+            </Section>
+          ))}
+        </Stack>
+      )}
+    />
   );
 }
 
@@ -38,7 +65,7 @@ interface StoredAnswer {
   readonly person: Readonly<Record<string, { value?: unknown }>>;
 }
 
-function AppSettings({ view, app }: { readonly view: CentreView; readonly app: CentreApp }) {
+function AppSettings({ app }: { readonly app: CentreApp }) {
   const stored = useLoad<StoredAnswer>("setting.read", { app: app.id });
   const held = new Set([...app.permissions]);
 
@@ -58,28 +85,29 @@ function AppSettings({ view, app }: { readonly view: CentreView; readonly app: C
       waiting={<FormWaiting fields={3} />}
       again={stored.again}
       then={(data) => (
+        /* ⚠️ WHOSE SETTING IT IS RIDES ON THE GROUP, not on a heading of its
+           own. Each declared group is already a card with a name on it, and a
+           line under that name is where "everyone" against "only you" belongs. */
         <Stack space="roomy">
           {hasTenant ? (
-            <Section label={`${app.name} — this workspace`}>
-              <Settings
-                book={app.settings}
-                level="tenant"
-                stored={flat(data.tenant)}
-                held={held}
-                onChange={(id, value) => void write(id, value)}
-              />
-            </Section>
+            <Settings
+              book={app.settings}
+              level="tenant"
+              under="Everyone in this workspace"
+              stored={flat(data.tenant)}
+              held={held}
+              onChange={(id, value) => void write(id, value)}
+            />
           ) : null}
           {hasPerson ? (
-            <Section label={`${app.name} — just for you`}>
-              <Settings
-                book={app.settings}
-                level="person"
-                stored={flat(data.person)}
-                held={held}
-                onChange={(id, value) => void write(id, value)}
-              />
-            </Section>
+            <Settings
+              book={app.settings}
+              level="person"
+              under="Only you"
+              stored={flat(data.person)}
+              held={held}
+              onChange={(id, value) => void write(id, value)}
+            />
           ) : null}
         </Stack>
       )}
@@ -98,75 +126,55 @@ const flat = (
 
 /* ----------------------------------------------------------- notifications --- */
 
-interface PolicyAnswer {
-  readonly policy: Readonly<Record<string, readonly ("inbox" | "email" | "push")[]>>;
-  readonly preference: Readonly<Record<string, readonly ("inbox" | "email" | "push")[]>>;
-}
-
-function NotificationsSection({ view }: { readonly view: CentreView }) {
-  const stored = useLoad<PolicyAnswer>("inbox.settings");
+function Told({ view, app, told, again }: {
+  readonly view: CentreView;
+  readonly app: CentreApp;
+  readonly told: PolicyAnswer;
+  readonly again: () => void;
+}) {
   const manage = view.you.platform.includes("tenant:manage");
+  const held = new Set(app.permissions);
 
   const narrow = async (id: string, channels: readonly string[]) => {
     const out = await api.post("inbox.preference", { type: id, channels });
     if (!out.ok) { notice.fail(out.problem.title); return; }
     notice.ok("Saved.");
-    stored.again();
+    again();
   };
 
   const ceiling = async (id: string, channels: readonly string[]) => {
     const out = await api.post("inbox.policy", { type: id, channels });
     if (!out.ok) { notice.fail(out.problem.title); return; }
     notice.ok("Saved for the whole workspace.");
-    stored.again();
+    again();
   };
 
   return (
-    <Await
-      of={stored.of}
-      waiting={<FormWaiting fields={2} />}
-      again={stored.again}
-      then={(data) => (
-        <Stack space="roomy">
-          {view.apps.map((app) => {
-            const held = new Set(app.permissions);
-            return (
-              <Stack key={app.id} space="roomy">
-                <Section
-                  label={`${app.name} — how you are told`}
-                  under="Email and push you may refuse — the inbox keeps the record"
-                >
-                  <NotificationPolicy
-                    book={app.notifications}
-                    level="person"
-                    policy={data.policy}
-                    preference={data.preference}
-                    held={held}
-                    available={["inbox", "email", "push"]}
-                    onChange={(id, channels) => void narrow(id, channels)}
-                  />
-                </Section>
-                {manage ? (
-                  <Section
-                    label={`${app.name} — the workspace's ceiling`}
-                    under="The ceiling everybody narrows their own settings under"
-                  >
-                    <NotificationPolicy
-                      book={app.notifications}
-                      level="tenant"
-                      policy={data.policy}
-                      preference={{}}
-                      held={held}
-                      available={["inbox", "email", "push"]}
-                      onChange={(id, channels) => void ceiling(id, channels)}
-                    />
-                  </Section>
-                ) : null}
-              </Stack>
-            );
-          })}
-        </Stack>
-      )}
-    />
+    <Stack space="roomy">
+      <NotificationPolicy
+        book={app.notifications}
+        level="person"
+        label="How you are told"
+        under="Email and push you may refuse — the inbox keeps the record"
+        policy={told.policy}
+        preference={told.preference}
+        held={held}
+        available={["inbox", "email", "push"]}
+        onChange={(id, channels) => void narrow(id, channels)}
+      />
+      {manage ? (
+        <NotificationPolicy
+          book={app.notifications}
+          level="tenant"
+          label="How everybody is told"
+          under="The ceiling each person narrows their own settings under"
+          policy={told.policy}
+          preference={{}}
+          held={held}
+          available={["inbox", "email", "push"]}
+          onChange={(id, channels) => void ceiling(id, channels)}
+        />
+      ) : null}
+    </Stack>
   );
 }

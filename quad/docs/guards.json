@@ -192,6 +192,15 @@
       "proves": "surfaced:"
     },
     {
+      "id": "every-declared-field-kind-reaches-a-control",
+      "protects": "D12",
+      "stage": "17",
+      "status": "live",
+      "fails": "a declared kind falling through to a text box, which looks finished and accepts anything",
+      "impl": "scripts/surface.test.mjs",
+      "proves": "controls:"
+    },
+    {
       "id": "every-surface-control-changes-behaviour",
       "protects": "D12",
       "stage": "5",

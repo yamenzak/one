@@ -558,6 +558,12 @@ export function Title(
  * block it names and the block before it. `Group` has always paired a label with
  * its card at `HEAD_GAP`; everything that is not a card had no way to say the
  * same thing, which is why the specimens did it wrong every time.
+ *
+ * ⚠️ AND IT IS A STEP ABOVE `Group`, BECAUSE IT CONTAINS ONE. Both drew their
+ * label at `TYPE.section`, so a section holding three groups came out as four
+ * headings of identical weight and the nesting was invisible — "Kova", then
+ * "Studio", then "Appearance", each reading as a peer of the last. A heading
+ * that does not outrank what it heads is a heading doing no work.
  */
 export function Section(
   { label, under, children }: {
@@ -569,7 +575,7 @@ export function Section(
   return (
     <section className={`flex flex-col ${HEAD_GAP}`}>
       <div className={`flex flex-col ${SPACE.hair}`}>
-        <h2 className={TYPE.section}>{label}</h2>
+        <h2 className={TYPE.title}>{label}</h2>
         {under ? <p className={TYPE.note}>{under}</p> : null}
       </div>
       {children}
