@@ -92,11 +92,11 @@ function Screen({ where, onGo, onLeave }: {
     : null;
 
   /*
-    ⚠️ `halo` AT THE ROOT AND `aura` INSIDE — the two grounds that MOVE. The
-    root is where somebody lands, and a landing screen earns a lit source: a
-    near-white core, crushed corners, a slow breath. Inside is work, so it is
-    the same light with the range given away — wide, quiet, and slow enough
-    that nobody catches it moving. See `ambience.ts`.
+    ⚠️ `silk` AT THE ROOT AND `aura` INSIDE — the two grounds that MOVE. The
+    root is where somebody lands, and a landing screen earns the drawn one: a
+    field of 1px contours on near-black, breathing slowly enough that nobody
+    catches it. Inside is work, so it is a single wide soft light and no
+    drawing at all. See `ambience.ts`.
 
     ⚠️ AND NOT `aurora`, EVER, HERE: it carries a second hue by design, which a
     monochrome product renders as a green cast nobody chose.
@@ -109,7 +109,7 @@ function Screen({ where, onGo, onLeave }: {
     way out, and that is `LeaveChip` on its own (`layout.tsx`).
   */
   return (
-    <Page sky={root ? "halo" : "aura"}>
+    <Page sky={root ? "silk" : "aura"}>
       {root
         ? (
           <Band width="read">

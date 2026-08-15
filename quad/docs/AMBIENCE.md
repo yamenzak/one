@@ -75,8 +75,8 @@ like moments, the screen is two screens.
 | Sign-in, arrival, the front door | `calm` or the signature | first contact: quiet, or the material — never busy |
 | Celebration, milestone, reward | `aurora` | the only multi-hue ambience; spend it on somebody ELSE's achievement |
 | One object, one decision (paywall, confirm-delete) | `spotlight` | staged on purpose; use where the screen IS one thing |
-| An arrival — the hub root, a product's front page | `halo` | the lit source: a near-white core, crushed corners, a slow breath. The most premium ground here, and the one an arrival earns |
-| A screen somebody works ON for a while | `aura` | the same light with the range given away — wide, quiet, and slow enough that nobody catches it moving |
+| An arrival — the hub root, a product's front page | `silk` | swept 1px contours on near-black, breathing so slowly nobody catches it. The premium ground here, and the one an arrival earns |
+| A screen somebody works ON for a while | `aura` | no drawing at all — one wide, soft light, quiet enough to work under |
 | A premium tier, a flagship pitch | `streak` | the one pure graphic: a neon ribbon whose drama is the darkness around it |
 | An announcement, a launch | `rays` | beams from above — something new arrived |
 | Devices, monitoring, live status | `arc` | concentric rings on a measure; reads as sonar, technical without being busy |
@@ -91,20 +91,27 @@ like moments, the screen is two screens.
 
 The twenty-three named ambiences fall into five families — soft light (the
 original twelve), geometry (`rays`, `arc`, `prism`, `terrace`, `grid`), drawn
-line art (`ridge`, `flow`), staged graphics (`streak`), and a moving source
-(`halo`, `aura`) — and the family is part of the choice: an app whose signature
+line art (`ridge`, `flow`), staged graphics (`streak`), and a moving ground
+(`silk`, `aura`) — and the family is part of the choice: an app whose signature
 is soft light can still spend `streak` on its one flagship screen, but two
 families on one SCREEN is two worlds fighting.
 
-**High dynamic range is a SHAPE, not a brightness**, and it is what separates
-`halo` from a coloured blur. A lit source has a small core far brighter than
-anything else, a bloom that falls away fast, and darkness that goes further
-down than the page's own ground — three layers (`orb`, its spill, `crush`), and
-the third is the one everybody leaves out. Turning a soft pole up does not
-produce it; it produces a bigger blur. And a bright light is not a saturated
-one: `hot` mixes the brand most of the way to white for the core, because a
-real source runs the sensor out of range before it runs out of colour. The
-brand survives in the bloom, which is where it survives in a room.
+**The premium dark ground is a LINE FIELD, not a light**, and that correction
+cost a round. The obvious reading of "make it feel high dynamic range" is a
+bright source on black. It was built: at any strength that reads as a source it
+is a BLOB — a smudge on the lens, pulling the eye to a place with nothing in
+it. What the products that do this well actually ship is the opposite. The
+ground is essentially black; the only thing on it is very fine lines at a
+hundredth of the contrast of anything else on screen; and the eye reads
+MATERIAL rather than light, so nothing competes with the one figure the screen
+is for. `silk` is that, and its field weight is the lowest in the table because
+a lit colour across the screen is the single thing that destroys it.
+
+**A line field bunches or it is a pattern.** Evenly spaced curves are wallpaper
+however wavy each one is; curves whose spacing opens and closes across the
+frame read as a surface with a shape under it, the way a contour map has a hill
+in it. In `silkArt` that comes from a power curve on the line index and a warp
+whose amplitude varies per line — two terms, neither decorative.
 
 Rules of thumb that outrank the table:
 
@@ -174,9 +181,10 @@ Rules of thumb that outrank the table:
 
 A named ambience is a RECIPE over a small primitive vocabulary in
 `ambience.ts`: `mix` (a sky-scaled tint), `pole` (a soft light), `hot` (a core
-mixed toward white), `orb` (a high-range source), `crush` (the darkness that
-makes one read as bright), `thread` (micro-fibre, dark only), `etch` (macro
-line, dims in light), the conic fold, the repeating ring/beam, the drawn `art`
+mixed toward white — a bright light is not a saturated one), `orb` (a source
+with range in it), `crush` (darkness deeper than the page's own ground),
+`thread` (micro-fibre, dark only), `etch` (macro line, dims in light), the
+conic fold, the repeating ring/beam, the drawn `art`
 layer, and the `field` under all of it. Twenty-three names is not the ceiling — a new ambience is a few lines of
 recipe, and the checklist below is the whole cost.
 
@@ -199,7 +207,7 @@ and twenty-one of the twenty-three are still.
 **Two do, and the rule they answer to is that nobody may catch them.** A real
 lit room is not still — the light has a source and the whole thing breathes —
 and a world that is perfectly frozen reads as wallpaper however carefully it is
-composed. `halo` and `aura` declare a drift in `DRIFT`, and everything about it
+composed. `silk` and `aura` declare a drift in `DRIFT`, and everything about it
 is bounded:
 
 - **It is a `transform` on the layer, never moving gradient stops.** A drifting
@@ -218,6 +226,10 @@ is bounded:
 - **The scale never goes below 1.1.** The layer is exactly a viewport tall, so a
   translate on an unscaled layer exposes bare ground and a hard edge at the top.
   The overscan is what keeps the world edgeless while it moves.
+- **The amplitude is smaller for a drawing than for a wash.** Ten percent of
+  scale on a soft gradient is a breath; the same on a field of 1px lines slides
+  every line across its neighbour's place and reads as a crawl. `silk` moves a
+  third as far as a gradient would.
 - **Both reduced-motion switches stop it, non-negotiably** — the OS setting and
   a `data-reduce-motion` ancestor. Either alone leaves half the people who asked
   still watching it, and for some of them this is not a preference.

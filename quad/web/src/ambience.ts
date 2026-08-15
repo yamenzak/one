@@ -87,40 +87,40 @@ import { DURATION, EASE } from "./motion.js";
  *   grid       etched graph paper. Planning, technical dashboards.
  */
 /**
- * ⚠️ AND A FOURTH FAMILY: A SOURCE THAT MOVES. Twenty-one worlds and every one
- * of them was STILL — which is why the set read as wallpaper however carefully
- * each was composed. A real lit room is not still: the light has a source, the
- * source has a temperature, and the whole thing breathes. Two more cover it,
- * and they are the only two that move:
+ * ⚠️ AND A FOURTH FAMILY: A GROUND THAT MOVES. Twenty-one worlds and every one
+ * of them was STILL, which is why the set read as wallpaper however carefully
+ * each was composed. Two more cover it, and they are the only two that move:
  *
- *   halo       high dynamic range. A near-white core against crushed darkness,
- *              one dim counter-light, and a frame that takes the corners almost
- *              to black — then the whole source drifts and breathes. The most
- *              premium ground in the system and the one an arrival earns.
- *   aura       the same light, wide and quiet. Nothing is hot, nothing is
- *              crushed; it drifts slowly enough that nobody catches it moving.
- *              For a screen somebody works ON rather than arrives at.
+ *   silk       swept contours on near-black. A field of 1px lines that bunch
+ *              and open across the frame, breathing so slowly nobody catches
+ *              it. The premium ground, and the one an arrival earns.
+ *   aura       no drawing at all — one wide, soft light, quiet enough to work
+ *              under. For a screen somebody works ON rather than arrives at.
  *
- * ⚠️ HDR IS A SHAPE, NOT A BRIGHTNESS. What separates a lit source from a
- * coloured blur is RANGE: a small core far brighter than anything else, a bloom
- * that falls away fast, and darkness that goes further down than the page's own
- * ground. Turning a soft pole up gives none of that — it gives a bigger blur.
- * See `orb` and `hot` for the two halves, and the dark frame in `halo`'s layers
- * for the third, which is the one everybody leaves out.
+ * ⚠️ THE PREMIUM DARK GROUND IS A LINE FIELD, NOT A LIGHT, AND THAT IS THE
+ * CORRECTION THIS FAMILY EXISTS TO RECORD. The obvious reading of "high dynamic
+ * range" is a bright source on black. It was built, and at any strength that
+ * reads as a source it is a BLOB — a smudge on the lens, drawing the eye to a
+ * place with nothing in it. What the reference products actually do is the
+ * opposite: the ground is essentially black and carries only very fine lines at
+ * a hundredth of the contrast of anything else on screen. The eye reads
+ * material rather than light, and nothing competes with the one figure the
+ * screen is for. `silkArt` is that drawing; the near-zero field weight is what
+ * keeps the black black.
  */
 export type Ambience =
   | "plain" | "calm" | "focus" | "lift" | "mesh" | "dots"
   | "weave" | "drape" | "aurora" | "veil" | "tide" | "spotlight"
   | "rays" | "arc" | "prism" | "terrace" | "streak" | "bloom"
   | "ridge" | "flow" | "grid"
-  | "halo" | "aura";
+  | "silk" | "aura";
 
 export const AMBIENCES: readonly Ambience[] = [
   "plain", "calm", "focus", "lift", "mesh", "dots",
   "weave", "drape", "aurora", "veil", "tide", "spotlight",
   "rays", "arc", "prism", "terrace", "streak", "bloom",
   "ridge", "flow", "grid",
-  "halo", "aura",
+  "silk", "aura",
 ];
 
 /**
@@ -220,11 +220,11 @@ const FIELD_WEIGHT: Readonly<Record<Exclude<Ambience, "plain">, number>> = {
   /* Geometry wants its lines legible against the field; graphics want dark. */
   rays: 0.6, arc: 0.65, prism: 0.7, terrace: 0.7, streak: 0.25,
   bloom: 0.75, ridge: 0.55, flow: 0.6, grid: 0.7,
-  /* ⚠️ `halo` IS THE LOWEST IN THE TABLE AND THAT IS THE POINT — a field is a
-     lit colour across the whole screen, which is the opposite of high dynamic
-     range. `aura` is the same light with the range given away, so it keeps a
-     field a screen can be worked on. */
-  halo: 0.16, aura: 0.55,
+  /* ⚠️ `silk` IS THE LOWEST IN THE TABLE AND THAT IS THE POINT — the whole
+     design is fine lines on near-black, and a lit colour field across the
+     screen is the one thing that destroys it. `aura` is the opposite end:
+     no drawing at all, so the field is what it has. */
+  silk: 0.06, aura: 0.55,
 };
 
 /** A soft pole of light: where, how wide, how strong. */
@@ -270,8 +270,10 @@ const orb = (
  * ⚠️ THE DARK IS A LAYER, NOT AN ABSENCE, AND IT IS WHY A SOURCE READS AS
  * BRIGHT. `DEPTH` frames the whole screen gently and works under every
  * ambience; this one is aimed AT the source and crushes everything the source
- * is not, so the range between the core and the corner is wider than the page's
- * own palette can express. Without it `halo` is `bloom` with a whiter middle.
+ * is not, so the range between a light and the corner is wider than the page's
+ * own palette can express. `silk` uses it for the other half of the same
+ * effect: no source at all, just a corner taken properly to black so the
+ * contours have something to be drawn on.
  */
 const crush = (x: string, y: string, pct: number) =>
   `radial-gradient(140% 110% at ${x} ${y}, transparent 24%, `
@@ -329,6 +331,56 @@ function flowArt(stroke: string, alpha: number): string {
 }
 
 /**
+ * SWEPT CONTOURS — the one drawing that is the whole ground rather than a
+ * texture over one.
+ *
+ * ⚠️ THE PREMIUM DARK GROUND IS A LINE FIELD, NOT A LIGHT. The obvious reading
+ * of "high dynamic range" is a bright source on black, and it is wrong: at any
+ * strength that reads as a source it is a blob, and a blob on a screen is a
+ * smudge on the lens. What the reference does is the opposite — the ground is
+ * essentially BLACK and the only thing on it is a field of very fine lines,
+ * a hundredth of the contrast of anything else on the screen. The eye reads
+ * material rather than light, and nothing competes with a single figure.
+ *
+ * ⚠️ IT BUNCHES, WHICH IS THE WHOLE DIFFERENCE FROM `flow`. Evenly spaced
+ * curves are a pattern; curves whose spacing OPENS and CLOSES across the frame
+ * are a surface with a shape under it, the way a contour map has a hill in it.
+ * The spacing here comes from a power curve on the line index and a warp that
+ * varies with both x and the line — two terms, and neither is decoration.
+ */
+function silkArt(stroke: string, alpha: number): string {
+  const W = 1400, H = 1000, LINES = 46;
+  const paths: string[] = [];
+  for (let k = 0; k < LINES; k++) {
+    const t = k / (LINES - 1);
+    /* ⚠️ `t ** 1.35` is the bunching: lines crowd at the top and open out
+       downward, so the field has somewhere to be dense and somewhere to
+       breathe. A linear base is a ruled page. */
+    const base = -260 + Math.pow(t, 1.35) * (H + 520);
+    const pts: string[] = [];
+    for (let x = 0; x <= W; x += 20) {
+      /* ⚠️ THE FIRST TERM'S AMPLITUDE VARIES WITH THE LINE, which is what makes
+         neighbours converge and separate. Equal amplitudes give parallel
+         curves — a pattern — however wavy each one is. */
+      const warp =
+        (95 + 130 * Math.sin(t * 2.2)) * Math.sin(x / 540 + t * 1.35)
+        + 70 * Math.sin(x / 230 + t * 3.4)
+        + 26 * Math.cos(x / 115 + t * 6.1);
+      /* A long diagonal so the field SWEEPS rather than sits. */
+      const y = base + warp - x * 0.22;
+      pts.push(`${x ? "L" : "M"}${x} ${y.toFixed(1)}`);
+    }
+    paths.push(
+      `<path d="${pts.join(" ")}" fill="none" stroke="${stroke}"`
+      + ` stroke-opacity="${(alpha * (0.55 + 0.45 * Math.sin(t * 3.1))).toFixed(3)}"`
+      + ` stroke-width="1"/>`,
+    );
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"`
+    + ` viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${paths.join("")}</svg>`;
+}
+
+/**
  * Both variants of each drawing, baked once at module load. Alphas are tuned
  * per sign: white needs more presence over a glowing field than black needs
  * over a pastel one.
@@ -336,6 +388,7 @@ function flowArt(stroke: string, alpha: number): string {
 const ART = {
   ridge: { dark: art(ridgeArt("#fff", 0.15)), light: art(ridgeArt("#000", 0.09)) },
   flow: { dark: art(flowArt("#fff", 0.17)), light: art(flowArt("#000", 0.1)) },
+  silk: { dark: art(silkArt("#fff", 0.13)), light: art(silkArt("#000", 0.1)) },
 } as const;
 
 /**
@@ -627,16 +680,18 @@ function layers(what: Ambience, hue: string): readonly string[] {
       has a dead half, and a dead half reads as an unfinished gradient rather
       than as a lit room.
     */
-    case "halo":
+    /*
+      ⚠️ THE DRAWING IS THE WHOLE GROUND HERE — see `silkArt`. Everything else
+      is restraint: one very wide, very low pole so the field has somewhere
+      slightly brighter for the lines to cross, and a `crush` so the far corner
+      goes properly black rather than merely dark. No `orb`. The lines are the
+      subject and a source would out-shout them.
+    */
+    case "silk":
       return [
-        crush("68%", "2%", 82),
-        orb(hue, 56, 26, "68%", "2%", "115%", "84%"),
-        /* ⚠️ THE SPILL, AND WITHOUT IT THE SOURCE IS A STICKER. A lamp in a
-           room lights the room; a gradient that stops at its own radius is a
-           circle drawn on a wall. This is the same light, four times as wide
-           and an eighth as strong, and it is what joins the two. */
-        pole(hue, 13, "68%", "4%", "190%", "105%"),
-        pole(hue, 9, "2%", "62%", "95%", "72%"),
+        crush("74%", "-6%", 88),
+        `var(--art)`,
+        pole(hue, 9, "74%", "-8%", "150%", "85%"),
       ];
 
     /* The same source, wide and cool. Nothing hot, nothing crushed. */
@@ -787,7 +842,10 @@ export const DRIFT: Partial<Record<Ambience, {
   /** The breath: the layer's scale at each end. Never below 1.1 — see above. */
   readonly from: number; readonly to: number;
 }>> = {
-  halo: { x: "3%", y: "2%", from: 1.1, to: 1.2 },
+  /* ⚠️ SMALLER THAN IT LOOKS, BECAUSE THE SUBJECT IS 1px LINES. A ten percent
+     scale on a soft gradient is a breath; the same on a line field slides every
+     line across its neighbour's place and reads as a moiré crawl. */
+  silk: { x: "1.5%", y: "1%", from: 1.1, to: 1.14 },
   /* ⚠️ Quieter in every dimension: this one sits under work, not under an
      arrival, and a ground somebody catches moving while reading is a ground
      that has to be switched off. */
@@ -801,6 +859,9 @@ const EXTRAS: Partial<Record<Ambience, string>> = {
     + "; background-position: 0 0, right -220px top -180px, 0 0, 0 0",
   flow: "background-size: auto, 100% 800px, auto, auto"
     + "; background-repeat: repeat, no-repeat, repeat, repeat",
+  /* DEPTH, crush, art, pole, field — the drawing fills the reach exactly. */
+  silk: "background-size: auto, auto, 100% 100%, auto, auto"
+    + "; background-repeat: repeat, repeat, no-repeat, repeat, repeat",
 };
 
 export function ambienceStylesheet(): string {
