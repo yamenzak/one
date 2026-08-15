@@ -24,8 +24,9 @@ import type { ScreenSpec, Tone } from "@quad/kernel";
 import { PRIMARY_MAX, primaryOf } from "@quad/kernel";
 import { Avatar, Button, Chip, Separator, Tooltip } from "@heroui/react";
 import {
-  Banknote, Bell, Building2, Calendar, Circle, ClipboardList, Cog, Coins, FileText, House,
-  Inbox as InboxGlyph, NotebookPen, Package, Plus, Shield, Sun, UserRound, Users,
+  Banknote, Bell, Building2, Calendar, Circle, ClipboardList, Clock, Cog, Coins, Database,
+  FileText, House, Inbox as InboxGlyph, NotebookPen, Package, Plus, Shield, Sparkles, Sun,
+  UserRound, Users,
 } from "lucide-react";
 import { Island } from "./layout.js";
 import { skyCss, type Sky } from "./theme.js";
@@ -54,6 +55,11 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
   /* ⚠️ Making a new one of something is a row like any other, and it needs a
      mark like any other — a menu with one unmarked row reads as a mistake. */
   add: <Plus />,
+  /* ⚠️ THE OPERATOR CONSOLE'S FIVE, and they were the reason this list needed
+     extending rather than a reason to reach for `Circle`. A name nobody mapped
+     draws the neutral mark, which in a five-row menu is five identical circles
+     — the one outcome worse than no glyph at all. */
+  sparkle: <Sparkles />, clock: <Clock />, database: <Database />,
 };
 
 export const glyphOf = (name?: string): React.ReactNode =>

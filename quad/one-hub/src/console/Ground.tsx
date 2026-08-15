@@ -8,7 +8,7 @@
  */
 
 import { Card, Chip } from "@heroui/react";
-import { Await, Figure, Grid, RowsWaiting, Section, Stack } from "@quad/web";
+import { Await, Figure, Grid, Nothing, RowsWaiting, Stack } from "@quad/web";
 import type { Shard } from "@quad/kernel";
 import { useLoad } from "../centre/data.js";
 
@@ -16,12 +16,13 @@ export function Ground() {
   const of = useLoad<{ items: readonly Shard[] }>("op.shards");
 
   return (
-    <Section label="Ground" under="Where records live, per region, and the room left">
-      <Await
+    /* ⚠️ The crown already says "Ground" and what it is — see `Hub.tsx`. */
+    <Await
         of={of.of}
         waiting={<RowsWaiting rows={2} />}
         again={of.again}
         isNothing={(d) => d.items.length === 0}
+        nothing={<Nothing says="No shard is registered" under="Placement has nowhere to put a workspace" />}
         then={(data) => (
           <Grid min="15rem">
             {data.items.map((s) => (
@@ -47,6 +48,5 @@ export function Ground() {
           </Grid>
         )}
       />
-    </Section>
   );
 }

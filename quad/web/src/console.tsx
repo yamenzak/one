@@ -14,9 +14,9 @@
 
 import type { Allowance, EntitlementDef, FlagBook, FlagDef, PlanSpec } from "@quad/kernel";
 import { UNLIMITED, overdue, resolve, settableBy } from "@quad/kernel";
-import { Card, Chip, Label, Switch, Table } from "@heroui/react";
+import { Table } from "@heroui/react";
 import { Stack } from "./layout.js";
-import { AmountRow, Group } from "./surfaces.js";
+import { AmountRow, Group, ToggleRow } from "./surfaces.js";
 import { SPACE } from "./metrics.js";
 import { Reveal } from "./blocks.js";
 
@@ -26,6 +26,9 @@ export interface FlagConsoleProps {
   readonly book: FlagBook;
   /** Where this console sits. A tenant may not set an operator's switch. */
   readonly level: "operator" | "tenant" | "person";
+  /** The group's heading, and what these switches are, in a line. */
+  readonly label?: string;
+  readonly under?: string;
   readonly deployment: Readonly<Record<string, boolean>>;
   readonly tenant?: Readonly<Record<string, boolean>>;
   readonly person?: Readonly<Record<string, boolean>>;
@@ -34,11 +37,24 @@ export interface FlagConsoleProps {
 }
 
 export function FlagConsole(props: FlagConsoleProps) {
-  const { book, level, deployment, tenant, person, today, onSet } = props;
+  const { book, level, label, under, deployment, tenant, person, today, onSet } = props;
   const late = new Set(overdue(book, today as never));
 
   return (
-    <div className={`flex flex-col ${SPACE.snug}`}>
+    /*
+      ⚠️ A FLAG IS A ROW WITH A SWITCH ON IT — which is `ToggleRow`, and which is
+      what every other switch in this product already is. Each flag was a `Card`
+      with a title, a description and a content area holding the switch and up to
+      three chips; the switch rendered its own word UNDER itself, so a list of
+      four flags was four cards deep and each said "Off" in a place nothing else
+      does.
+
+      ⚠️ AND THE STAGE, THE LOCK AND THE RETIREMENT ARE ONE LINE, NOT THREE CHIPS.
+      Only one of them is ever the thing worth knowing, and it is always the most
+      alarming one that is true — so the row says that and the rest is noise it
+      does not need to carry.
+    */
+    <Group label={label} under={under}>
       {Object.values(book).map((def: FlagDef) => {
         const switches = {
           deployment: deployment[def.id],
@@ -49,47 +65,25 @@ export function FlagConsole(props: FlagConsoleProps) {
         const mine = settableBy(def, switches).includes(level);
 
         return (
-          <Card key={def.id}>
-            <Card.Header>
-              <Card.Title>{def.label}</Card.Title>
-              <Card.Description>{def.why}</Card.Description>
-            </Card.Header>
-            <Card.Content>
-              <div className={`flex flex-wrap items-center ${SPACE.snug}`}>
-                <Switch isSelected={on} isDisabled={!mine} onChange={(next) => onSet(def.id, next)}>
-                  <Switch.Control><Switch.Thumb /></Switch.Control>
-                  <Switch.Content><Label>{on ? "On" : "Off"}</Label></Switch.Content>
-                </Switch>
-
-                {/* ⚠️ Says WHY it cannot be changed here, because a disabled
-                    control with no reason reads as broken. */}
-                {!mine
-                  ? (
-                    <Chip color="default" variant="soft">
-                      <Chip.Label>Switched off further up — only an operator can change it</Chip.Label>
-                    </Chip>
-                  )
-                  : null}
-
-                <Chip color={def.stage === "on" ? "success" : "default"} variant="soft">
-                  <Chip.Label>{def.stage}</Chip.Label>
-                </Chip>
-
-                {/* ⚠️ Reported, never enforced: taking a capability away on a
-                    date somebody typed a year ago is an outage nobody asked for. */}
-                {late.has(def.id)
-                  ? (
-                    <Chip color="warning" variant="soft">
-                      <Chip.Label>Past its retirement date — this should be the product now</Chip.Label>
-                    </Chip>
-                  )
-                  : null}
-              </div>
-            </Card.Content>
-          </Card>
+          <ToggleRow
+            key={def.id}
+            label={def.label}
+            /* ⚠️ Says WHY it cannot be changed here, because a disabled control
+               with no reason reads as broken. Reported, never enforced: taking a
+               capability away on a date somebody typed a year ago is an outage
+               nobody asked for. */
+            under={!mine
+              ? "Switched off further up — only an operator can change it"
+              : late.has(def.id)
+                ? "Past its retirement date — this should be the product now"
+                : def.why}
+            value={on}
+            isDisabled={!mine}
+            onChange={(next) => onSet(def.id, next)}
+          />
         );
       })}
-    </div>
+    </Group>
   );
 }
 

@@ -11,9 +11,10 @@
  */
 
 import { useState } from "react";
-import { Button, Card, Chip } from "@heroui/react";
+import { Button } from "@heroui/react";
 import {
-  Await, Choice, LongText, RowsWaiting, Section, Stack, Tray, notice,
+  Await, Choice, Group, LongText, NavRow, Nothing, RowsWaiting, Stack, Tray, distinguishing,
+  notice,
 } from "@quad/web";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
@@ -43,55 +44,56 @@ export function Actions() {
   const of = useLoad<AiAnswer>("op.ai");
 
   return (
-    <Section label="Actions" under="What each product generates, and the model behind it">
-      <Await
-        of={of.of}
-        waiting={<RowsWaiting rows={3} />}
-        again={of.again}
-        isNothing={(d) => d.apps.every((a) => a.actions.length === 0)}
-        then={(data) => (
+    /* ⚠️ The crown already says "Actions" and what they are — see `Hub.tsx`.
+       This screen drew both a second time, four lines under the first. */
+    <Await
+      of={of.of}
+      waiting={<RowsWaiting rows={3} />}
+      again={of.again}
+      isNothing={(d) => d.apps.every((a) => a.actions.length === 0)}
+      nothing={<Nothing says="No product here declares a generating action" />}
+      then={(data) => {
+        const shown = data.apps.filter((a) => a.actions.length);
+        return (
           <Stack space="roomy">
-            {data.apps.filter((a) => a.actions.length).map((app) => (
-              <Section key={app.id} label={`${app.mark} ${app.name}`}>
-                <Stack space="snug">
-                  {app.actions.map((action) => (
-                    <Card key={action.id}>
-                      <Card.Header>
-                        <Card.Title>{action.summary}</Card.Title>
-                        <Card.Description>{action.id} · {action.lane}</Card.Description>
-                      </Card.Header>
-                      <Card.Content>
-                        <Stack space="snug">
-                          <div className="flex flex-wrap items-center justify-between">
-                            <span>{action.model ?? "No model in this lane"}</span>
-                            {action.bound
-                              ? <Chip color="accent" variant="soft"><Chip.Label>Bound</Chip.Label></Chip>
-                              : <Chip color="default" variant="soft"><Chip.Label>Chosen for you</Chip.Label></Chip>}
-                          </div>
-                          <div className="flex flex-wrap items-center justify-between">
-                            <span>
-                              {action.wordedBy === "app" ? "The product's own words"
-                                : action.wordedBy === "operator" ? "Your words"
-                                  : "A workspace's words"}
-                            </span>
-                            {action.brandable
-                              ? <Chip color="default" variant="soft"><Chip.Label>Workspaces may reword</Chip.Label></Chip>
-                              : null}
-                          </div>
-                          <BindTray app={app.id} action={action} onDone={of.again} />
-                        </Stack>
-                      </Card.Content>
-                    </Card>
-                  ))}
-                </Stack>
-              </Section>
+            {/*
+              ⚠️ AN ACTION IS A ROW THAT OPENS ITS OWN SHEET. Each was a `Card`
+              with a title, an id line, two label-and-chip pairs stacked in its
+              content and a button under those — six elements to say what a row
+              says in two, once per action. The sheet already existed; only the
+              way in was a card.
+
+              ⚠️ AND NO GLYPH CHARACTER IN THE HEADING. `app.mark` is a text
+              character from a manifest, so "◈ Hello" renders at whatever weight
+              and baseline the reader's font gives it, beside a name that
+              already says which product this is.
+            */}
+            {shown.map((app) => (
+              <Group key={app.id} label={distinguishing(shown, app.name)}>
+                {app.actions.map((action) => (
+                  <BindTray key={action.id} app={app.id} action={action} onDone={of.again} />
+                ))}
+              </Group>
             ))}
           </Stack>
-        )}
-      />
-    </Section>
+        );
+      }}
+    />
   );
 }
+
+/**
+ * ⚠️ THE TWO FACTS AN OPERATOR OPENED THIS FOR: what answers it, and whose
+ * words it uses. The lane and the action's id are in the sheet, where somebody
+ * changing a binding needs them — on the row they are a second line of
+ * identifiers under a summary that already named the thing.
+ */
+const said = (action: Action): string => [
+  action.model ?? "No model in this lane",
+  action.wordedBy === "app" ? "the product's own words"
+    : action.wordedBy === "operator" ? "your words"
+      : "a workspace's words",
+].join(" · ");
 
 function BindTray({ app, action, onDone }: {
   readonly app: string;
@@ -109,7 +111,7 @@ function BindTray({ app, action, onDone }: {
 
   return (
     <Tray
-      trigger={<Button variant="secondary">Change it</Button>}
+      trigger={<NavRow label={action.summary} under={said(action)} />}
       title={action.summary}
       actions={
         <Button slot="close" variant="primary" onPress={() => void bind({ prompt })}>

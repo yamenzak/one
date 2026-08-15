@@ -331,7 +331,13 @@ const Lead = ({ icon }: { readonly icon?: React.ReactNode }) =>
  * reader.
  */
 export interface NavRowProps extends RowBase {
-  readonly onOpen: () => void;
+  /**
+   * ⚠️ OPTIONAL, BECAUSE A ROW IS ALSO A TRIGGER. Used as a `Tray` or `Confirm`
+   * trigger the press is react-aria's — the row opens the sheet and the sheet
+   * owns what happens. Requiring a handler there means passing a function that
+   * does nothing, which is a lie in the shape of a prop.
+   */
+  readonly onOpen?: () => void;
   /** A count, a status, a value — whatever sits before the chevron. */
   readonly aside?: React.ReactNode;
   readonly isDisabled?: boolean;

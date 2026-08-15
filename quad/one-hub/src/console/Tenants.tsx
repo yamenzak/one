@@ -11,7 +11,7 @@
 import { useState } from "react";
 import { Button, Card, Chip } from "@heroui/react";
 import {
-  Await, Choice, Listing, NumberInput, Section, Stack, TableWaiting, Tray, notice,
+  Await, Choice, Listing, NumberInput, Stack, TableWaiting, Tray, notice, sentence,
 } from "@quad/web";
 import type { Allowance, EntitlementDef, PlanSpec } from "@quad/kernel";
 import { api } from "../api.js";
@@ -46,46 +46,64 @@ export function Tenants() {
   const of = useLoad<{ items: readonly TenantLine[]; apps: readonly AppLine[] }>("op.tenants");
 
   return (
-    <Section label="Tenants" under="Every workspace on this deployment, and what it holds">
-      <Await
-        of={of.of}
-        waiting={<TableWaiting cols={4} rows={6} />}
-        again={of.again}
-        then={(data) => (
-          <Listing
-            label="Workspaces"
-            of={{ status: "ready", data: data.items }}
-            rowKey={(t) => t.id}
-            says={{ nothing: "No workspaces yet", under: "The first one arrives through the setup door" }}
-            cols={[
-              { id: "name", label: "Workspace", cell: (t) => t.name, by: (a, b) => a.name.localeCompare(b.name) },
-              { id: "slug", label: "Address", cell: (t) => t.slug },
-              { id: "where", label: "Where", cell: (t) => `${t.country} · ${t.shardId}` },
-              {
-                id: "plans", label: "On",
-                cell: (t) => t.apps.length
-                  ? t.apps.map((a) => `${a.id}: ${a.planId ?? "—"}`).join(" · ")
-                  : "—",
-              },
-              {
-                id: "state", label: "",
-                cell: (t) => t.closedAt
-                  ? <Chip color="danger" variant="soft"><Chip.Label>Closed</Chip.Label></Chip>
-                  : t.apps.some((a) => a.status === "past_due")
-                    ? <Chip color="warning" variant="soft"><Chip.Label>Past due</Chip.Label></Chip>
-                    : null,
-              },
-              {
-                id: "act", label: "",
-                cell: (t) => <AdjustTray tenant={t} apps={data.apps} onDone={of.again} />,
-              },
-            ]}
-          />
-        )}
-      />
-    </Section>
+    /* ⚠️ The crown already says "Tenants" and what they are — see `Hub.tsx`.
+       This drew both again, four lines under the first. */
+    <Await
+      of={of.of}
+      waiting={<TableWaiting cols={4} rows={6} />}
+      again={of.again}
+      then={(data) => (
+        <Listing
+          label="Workspaces"
+          of={{ status: "ready", data: data.items }}
+          rowKey={(t) => t.id}
+          says={{ nothing: "No workspaces yet", under: "The first one arrives through the setup door" }}
+          /*
+            ⚠️ FOUR COLUMNS IN A PHONE'S WIDTH IS NOT A TABLE — see `Listing`.
+            "Northwind Strength" wrapped to two lines, "DE · eu-1" to two more,
+            and the control column was off the edge. The same rows, with what
+            identifies a workspace on one line and where it lives under it.
+          */
+          asRow={(t) => ({
+            name: t.name,
+            under: [t.slug, `${t.country} · ${t.shardId}`, standing(t)]
+              .filter(Boolean).join(" · "),
+            aside: <AdjustTray tenant={t} apps={data.apps} onDone={of.again} />,
+          })}
+          cols={[
+            { id: "name", label: "Workspace", cell: (t) => t.name, by: (a, b) => a.name.localeCompare(b.name) },
+            { id: "slug", label: "Address", cell: (t) => t.slug },
+            { id: "where", label: "Where", cell: (t) => `${t.country} · ${t.shardId}` },
+            {
+              id: "plans", label: "On",
+              /* ⚠️ AN APP ID IS NOT A NAME — see `sentence`. The column read
+                 "kova: —" beside a workspace whose own name is capitalised. */
+              cell: (t) => t.apps.length
+                ? t.apps.map((a) => `${sentence(a.id)}: ${a.planId ?? "—"}`).join(" · ")
+                : "—",
+            },
+            {
+              id: "state", label: "",
+              cell: (t) => t.closedAt
+                ? <Chip color="danger" variant="soft"><Chip.Label>Closed</Chip.Label></Chip>
+                : t.apps.some((a) => a.status === "past_due")
+                  ? <Chip color="warning" variant="soft"><Chip.Label>Past due</Chip.Label></Chip>
+                  : null,
+            },
+            {
+              id: "act", label: "",
+              cell: (t) => <AdjustTray tenant={t} apps={data.apps} onDone={of.again} />,
+            },
+          ]}
+        />
+      )}
+    />
   );
 }
+
+/** ⚠️ The one word worth carrying to a phone row, and nothing when all is well. */
+const standing = (t: TenantLine): string =>
+  t.closedAt ? "closed" : t.apps.some((a) => a.status === "past_due") ? "past due" : "";
 
 function AdjustTray({ tenant, apps, onDone }: {
   readonly tenant: TenantLine;

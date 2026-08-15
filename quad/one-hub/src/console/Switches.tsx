@@ -10,8 +10,11 @@
  * people find their records where they left them; only the writes wait.
  */
 
-import { Button, Card, Chip } from "@heroui/react";
-import { Await, FlagConsole, Section, Stack, RowsWaiting, notice } from "@quad/web";
+import { Button } from "@heroui/react";
+import {
+  Await, ControlRow, FlagConsole, Group, NoteRow, Nothing, RowRule, RowsWaiting, Stack, TYPE,
+  notice, sentence,
+} from "@quad/web";
 import type { FlagBook } from "@quad/kernel";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
@@ -47,66 +50,74 @@ export function Switches() {
 
   return (
     <Stack space="roomy">
-      <Section label="Maintenance" under="Ours, not theirs — nobody reading the notice did anything">
-        <Await
-          of={care.of}
-          waiting={<RowsWaiting rows={1} />}
-          again={care.again}
-          then={(now) => (
-            <Card>
-              <Card.Header>
-                <Card.Title>The deployment is {MODES.find((m) => m.id === now.mode)?.label.toLowerCase()}</Card.Title>
-                <Card.Description>
-                  The operator door, sign-in and leaving always keep working
-                </Card.Description>
-              </Card.Header>
-              <Card.Content>
-                <Stack space="snug">
-                  {MODES.map((m) => (
-                    <div key={m.id} className="flex flex-wrap items-center justify-between">
-                      <span>{m.label} — {m.said}</span>
-                      {m.id === now.mode
-                        ? <Chip color="success" variant="primary"><Chip.Label>Now</Chip.Label></Chip>
-                        : (
-                          <Button
-                            variant={m.id === "full" ? "danger-soft" : "secondary"}
-                            onPress={() => void mode(m.id)}
-                          >
-                            {m.id === "off" ? "Open it" : `Switch to ${m.label.toLowerCase()}`}
-                          </Button>
-                        )}
-                    </div>
-                  ))}
-                </Stack>
-              </Card.Content>
-            </Card>
-          )}
-        />
-      </Section>
+      {/* ⚠️ The crown already says "Switches" — see `Hub.tsx`. This screen drew
+          it a second time over the flags, four lines under the first. */}
+      <Await
+        of={care.of}
+        waiting={<RowsWaiting rows={1} />}
+        again={care.again}
+        then={(now) => (
+          /*
+            ⚠️ THREE STATES ARE THREE ROWS, AND THE ONE IN FORCE IS MARKED. It
+            was a `Card` holding three sentences with a button under each — so
+            the choice read as three separate decisions rather than as one
+            setting with three values, and the current one wore a green chip on
+            a monochrome product for a state that is neither good nor bad.
+          */
+          <Group
+            label="Maintenance"
+            under="Ours, not theirs — nobody reading the notice did anything"
+          >
+            {MODES.map((m) => (
+              <ControlRow key={m.id} label={m.label} under={m.said}>
+                {m.id === now.mode
+                  ? <span className={TYPE.note}>In force</span>
+                  : (
+                    <Button
+                      /* ⚠️ Closing every door is the one that gets the red. */
+                      variant={m.id === "full" ? "danger-soft" : "secondary"}
+                      onPress={() => void mode(m.id)}
+                    >
+                      Switch
+                    </Button>
+                  )}
+              </ControlRow>
+            ))}
+            <RowRule />
+            {/* ⚠️ THE EXEMPTIONS ARE THE FEATURE, so they are stated where the
+                switch is rather than in a description above it. */}
+            <NoteRow>
+              The operator door, signing in and leaving always keep working, whatever this is set to.
+            </NoteRow>
+          </Group>
+        )}
+      />
 
-      <Section label="Switches" under="Ours to turn on, per product, for everybody">
-        <Await
-          of={flags.of}
-          waiting={<RowsWaiting rows={3} />}
-          again={flags.again}
-          isNothing={(d) => Object.keys(d.books).length === 0}
-          then={(data) => (
-            <Stack space="roomy">
-              {Object.entries(data.books).map(([appId, book]) => (
-                <Section key={appId} label={appId}>
-                  <FlagConsole
-                    book={book}
-                    level="operator"
-                    deployment={data.deployment}
-                    today={new Date().toISOString().slice(0, 10)}
-                    onSet={(id, on) => void set(id, on)}
-                  />
-                </Section>
-              ))}
-            </Stack>
-          )}
-        />
-      </Section>
+      <Await
+        of={flags.of}
+        waiting={<RowsWaiting rows={3} />}
+        again={flags.again}
+        isNothing={(d) => Object.keys(d.books).length === 0}
+        nothing={<Nothing says="No product here declares a flag" />}
+        then={(data) => (
+          <Stack space="roomy">
+            {Object.entries(data.books).map(([appId, book]) => (
+              <FlagConsole
+                key={appId}
+                book={book}
+                level="operator"
+                /* ⚠️ AN APP ID IS NOT A NAME — see `sentence`. These headings
+                   read "hello" and "kova" at display weight, in a column where
+                   nothing else is lower case. */
+                label={sentence(appId)}
+                deployment={data.deployment}
+                today={new Date().toISOString().slice(0, 10)}
+                onSet={(id, on) => void set(id, on)}
+              />
+            ))}
+          </Stack>
+        )}
+      />
     </Stack>
   );
 }

@@ -15,7 +15,7 @@ import type { JobBook, PackDef } from "@quad/kernel";
 import { Button, Card, Chip, Meter, ProgressBar } from "@heroui/react";
 import { money } from "./console.js";
 import { Balance, Grid, Stack } from "./layout.js";
-import { AmountRow, Group } from "./surfaces.js";
+import { AmountRow, ControlRow, Group } from "./surfaces.js";
 import { TYPE } from "./type.js";
 import { SPACE } from "./metrics.js";
 
@@ -188,59 +188,48 @@ export interface JobsProps {
  */
 export function Jobs({ book, runs, missedMs, now }: JobsProps) {
   return (
-    <div className={`flex flex-col ${SPACE.snug}`}>
+    /*
+      ⚠️ A JOB IS A ROW, AND ITS STATE IS A SENTENCE. Each was a `Card` with a
+      title, a description and a content area of up to four chips — so a
+      deployment with six jobs was six cards deep and the one thing worth seeing
+      was a filled red pill repeated down the page.
+
+      ⚠️ AND "HAS NEVER RUN" IS NOT AN ALARM. `danger` filled is the loudest
+      thing this product can draw, and on a fresh deployment every job has never
+      run — so the screen an operator opens first is entirely red, which teaches
+      them the colour means nothing. Quiet is a STATE, said in words; only a
+      failed run is a failure.
+    */
+    <Group>
       {Object.values(book).map((job) => {
         const last = runs.filter((r) => r.jobId === job.id)
           .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))[0];
         const quiet = !last || now - Date.parse(last.startedAt) > missedMs;
-        const hanging = last && !last.endedAt;
 
         return (
-          <Card key={job.id}>
-            <Card.Header>
-              <Card.Title>{job.label}</Card.Title>
-              <Card.Description>{job.why}</Card.Description>
-            </Card.Header>
-            <Card.Content>
-              <div className={`flex flex-wrap items-center ${SPACE.snug}`}>
-                {/* ⚠️ "Has not run" is the headline, because it is the failure
-                    that produces no error anywhere. */}
-                {quiet
-                  ? (
-                    <Chip color="danger" variant="primary">
-                      <Chip.Label>{last ? "Has not run since " + last.startedAt.slice(0, 16) : "Has never run"}</Chip.Label>
-                    </Chip>
-                  )
-                  : null}
-                {hanging
-                  ? (
-                    <Chip color="warning" variant="soft">
-                      <Chip.Label>Started and never came back</Chip.Label>
-                    </Chip>
-                  )
-                  : null}
-                {last?.ok === false
-                  ? (
-                    <Chip color="danger" variant="soft">
-                      <Chip.Label>Last run failed: {last.detail}</Chip.Label>
-                    </Chip>
-                  )
-                  : null}
-                {last?.ok === true && !quiet
-                  ? (
-                    <Chip color="success" variant="soft">
-                      <Chip.Label>{last.touched} handled at {last.startedAt.slice(11, 16)}</Chip.Label>
-                    </Chip>
-                  )
-                  : null}
-                <ProgressBar value={0} isIndeterminate={!!hanging} aria-label="Running">
-                  <ProgressBar.Track><ProgressBar.Fill /></ProgressBar.Track>
-                </ProgressBar>
-              </div>
-            </Card.Content>
-          </Card>
+          <ControlRow key={job.id} label={job.label} under={job.why}>
+            <span className={`${TYPE.note} text-end`} data-tone={last?.ok === false ? "danger" : "neutral"}>
+              {lastRun(last, quiet)}
+            </span>
+          </ControlRow>
         );
       })}
-    </div>
+    </Group>
   );
 }
+
+/**
+ * ⚠️ ONE LINE, AND THE WORST TRUE THING FIRST. A failed run, then a run that
+ * started and never came back, then silence, then the ordinary answer — an
+ * operator scanning this is looking for the one that is wrong, and four chips
+ * on a row is four things to rule out per job.
+ */
+const lastRun = (
+  last: JobsProps["runs"][number] | undefined, quiet: boolean,
+): string => {
+  if (last?.ok === false) return `Last run failed: ${last.detail ?? "no detail"}`;
+  if (last && !last.endedAt) return "Started and never came back";
+  if (!last) return "Has never run";
+  if (quiet) return `Nothing since ${last.startedAt.slice(0, 16).replace("T", " ")}`;
+  return `${last.touched} handled at ${last.startedAt.slice(11, 16)}`;
+};
