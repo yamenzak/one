@@ -45,6 +45,20 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
   const addressOk = address.length > 0 && slugOk(address);
 
   const create = async () => {
+    const missing = !name.trim()
+      ? "Give the workspace a name"
+      : !addressOk
+        ? "The address can only hold letters, numbers and hyphens"
+        : !country
+          ? "Say where the business is"
+          : null;
+    if (missing) {
+      setProblem({
+        code: "platform.invalid", status: 400, title: missing,
+        retryable: false, tone: "warning",
+      });
+      return;
+    }
     setBusy(true);
     setProblem(null);
     const out = await api.post<{ slug: string }>("me.tenant.create", {
@@ -60,10 +74,10 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
   return (
     <Arrival
       name="Start a workspace"
-      claim="A workspace is a business. Invite everybody else once it exists."
+      claim="A business, with everybody in it. Invite them once it exists."
       aside={(
         <AsideRoute
-          says="Already in one?"
+          says="Already have one?"
           label="Go to your workspaces"
           href={accountUrl(where, here())}
         />
@@ -72,7 +86,12 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
       {problem ? <Trouble problem={problem} /> : null}
 
       <Form className={`flex flex-col ${SPACE.snug}`} onSubmit={(e) => { e.preventDefault(); void create(); }}>
-        <TextField isRequired fullWidth name="name" value={name} onChange={setName} isDisabled={busy}>
+        {/* ⚠️ NO `isRequired`, WHICH IS WHAT DRAWS THE RED ASTERISK. Every field
+            on this screen is required — a marker beside all three says nothing
+            except that the product marks things, and it is the same noise that
+            was removed from the sign-in. What is missing is said when somebody
+            presses the button, once, in words. */}
+        <TextField fullWidth name="name" value={name} onChange={setName} isDisabled={busy}>
           <Label>What is it called?</Label>
           <Input autoFocus placeholder="Northwind Fitness" />
         </TextField>
@@ -93,11 +112,16 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
                 Letters, numbers and hyphens only — it is a web address, so it has to be one.
               </FieldError>
             )
-            : <Description>{address || "…"}.{where.root}</Description>}
+            /* ⚠️ THE PREVIEW IS AN ADDRESS OR IT IS NOTHING. With the field
+               empty it rendered `….localhost`, which is not a URL, is not a
+               hint, and is the first thing on the screen that looks broken.
+               Nothing is said until there is something to say. */
+            : address
+              ? <Description>{address}.{where.root}</Description>
+              : <Description>This is where the workspace will live</Description>}
         </TextField>
 
         <ComboBox
-          isRequired
           selectedKey={country}
           onSelectionChange={(key) => setCountry(key === null ? null : String(key))}
           isDisabled={busy}
@@ -126,14 +150,11 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
           </ComboBox.Popover>
         </ComboBox>
 
-        <Button
-          type="submit"
-          variant="primary"
-          size="lg"
-          fullWidth
-          isPending={busy}
-          isDisabled={!name.trim() || !addressOk || !country}
-        >
+        {/* ⚠️ Live at rest, like every other primary here. Disabled until three
+            fields are right, it is a grey slab for the whole time somebody is
+            filling the form in — and it never says which of the three is the
+            one holding it back. */}
+        <Button type="submit" variant="primary" size="lg" fullWidth isPending={busy}>
           Create it
         </Button>
       </Form>

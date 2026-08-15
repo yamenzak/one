@@ -163,9 +163,17 @@ export function Place({ name, said, foot, tone = "neutral", at, onOpen }: {
        library component beats every token, so branding stops reaching it — and
        a place is one thing arriving, which is what a wrapper says. */
     <div {...ARRIVE} style={at === undefined ? undefined : arriveAt(at)}>
-      {/* ⚠️ The ambience is an attribute read by a stylesheet built from theme
-          tokens — never an inline gradient, for the same reason. */}
-      <Card data-sky="aurora" data-tone={tone} data-reach="card">
+      {/*
+        ⚠️ The ambience is an attribute read by a stylesheet built from theme
+        tokens — never an inline gradient, for the same reason.
+
+        ⚠️ AND IT IS `veil`, NOT `aurora`. Aurora is the one ambience that mixes
+        a SECOND hue by design — `--success` — so on a deployment whose brand is
+        neutral every place on the screen came out green: three cards tinted a
+        colour nobody chose, on the surface a person opens most. A single-hue
+        sweep follows whatever brand it is given, including none.
+      */}
+      <Card data-sky="veil" data-tone={tone} data-reach="card">
         <Card.Content>
           {/* ⚠️ THE WHOLE CARD IS THE TARGET, and it is a real Button — the
               focus ring, the pressed state and every keyboard behaviour come
