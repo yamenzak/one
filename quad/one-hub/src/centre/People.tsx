@@ -36,6 +36,11 @@ const ROLE_SAID: Readonly<Record<string, string>> = {
 export function People({ view }: { readonly view: CentreView }) {
   const members = useLoad<{ items: readonly MemberLine[] }>("member.list");
   const manage = view.you.platform.includes("member:manage");
+  /* ⚠️ THE ROW OPENS THE PERSON, which is what a roster is for. The tray used to
+     hang off a "Manage" button in the corner, leaving the row itself inert —
+     so the largest target on the screen did nothing and the smallest did
+     everything (DESIGN.md §5). One tray, opened by the list. */
+  const [opened, setOpened] = useState<MemberLine | null>(null);
 
   return (
     <Stack space="roomy">
@@ -59,6 +64,7 @@ export function People({ view }: { readonly view: CentreView }) {
                mid-word; the same rows carry the same facts in the shape the
                rest of the hub already uses. Columns survive on a desktop, where
                comparing a hundred members down a page is what they are for. */
+            onOpen={manage ? (m) => setOpened(m) : undefined}
             asRow={(m) => ({
               name: m.email,
               under: [
@@ -90,16 +96,21 @@ export function People({ view }: { readonly view: CentreView }) {
                   ? null
                   : <Chip color="warning" variant="soft"><Chip.Label>Invited</Chip.Label></Chip>,
               },
-              ...(manage
-                ? [{
-                  id: "act", label: "",
-                  cell: (m: MemberLine) => <MemberActions view={view} member={m} onDone={members.again} />,
-                }]
-                : []),
             ]}
           />
           {manage ? <InviteTray view={view} onDone={members.again} /> : null}
       </Stack>
+
+      {/* ⚠️ ONE TRAY FOR THE LIST, not one per row. Mounting a drawer per member
+          means forty drawers in the tree on a roster of forty. */}
+      {opened ? (
+        <MemberActions
+          view={view}
+          member={opened}
+          onDone={() => { members.again(); setOpened(null); }}
+          onClose={() => setOpened(null)}
+        />
+      ) : null}
     </Stack>
   );
 }
@@ -168,10 +179,11 @@ function InviteTray({ view, onDone }: { readonly view: CentreView; readonly onDo
 
 /* ------------------------------------------------------------------- rows --- */
 
-function MemberActions({ view, member, onDone }: {
+function MemberActions({ view, member, onDone, onClose }: {
   readonly view: CentreView;
   readonly member: MemberLine;
   readonly onDone: () => void;
+  readonly onClose: () => void;
 }) {
   const setPlatform = async (role: string) => {
     const out = await api.post("member.role", { id: member.id, platformRole: role });
@@ -195,10 +207,7 @@ function MemberActions({ view, member, onDone }: {
   };
 
   return (
-    <Tray
-      trigger={<Button variant="ghost" aria-label={`Manage ${member.email}`}>Manage</Button>}
-      title={member.email}
-    >
+    <Tray isOpen onOpenChange={(open) => { if (!open) onClose(); }} title={member.email}>
       <Stack space="roomy">
         <Choice
           label="In the workspace"

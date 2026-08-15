@@ -28,14 +28,24 @@ import { AlertDialog, Button, Drawer, Dropdown, Label, Modal, Popover, Toast } f
 
 /* ------------------------------------------------------------------- tray --- */
 
-export function Tray({ trigger, title, children, actions }: {
-  readonly trigger: React.ReactNode;
+export function Tray({ trigger, title, children, actions, isOpen, onOpenChange }: {
+  /**
+   * ⚠️ OPTIONAL, BECAUSE THE THING THAT OPENS A TRAY IS OFTEN A WHOLE ROW. A
+   * trigger has to be a single pressable element, so a list whose subject is a
+   * person could only offer a "Manage" button in the corner — leaving the row
+   * itself inert next to a chevron-less control, which is the opposite of what
+   * a roster should feel like. Controlled, the LIST opens the tray and the tray
+   * needs no trigger of its own (DESIGN.md §5).
+   */
+  readonly trigger?: React.ReactNode;
   readonly title: string;
   readonly children: React.ReactNode;
   readonly actions?: React.ReactNode;
+  readonly isOpen?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 }) {
   return (
-    <Drawer>
+    <Drawer isOpen={isOpen} onOpenChange={onOpenChange}>
       {trigger}
       <Drawer.Backdrop>
         <Drawer.Content>
