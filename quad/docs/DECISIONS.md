@@ -332,3 +332,30 @@ already knows. Data over the wire keeps one bundle honest: the same
 people, billing, settings, consent or notification screen inside a product; a
 screen drawn in an app's frame except through `mountScreen`; a centre area
 rendered for somebody whose platform keys cannot open it.
+
+---
+
+## D18 — The operator stands outside every workspace, and the console is a door rather than a role
+
+Operator operations are personal operations restricted to the `admin.` door,
+each asking one further question the deployment answers: is this address an
+operator? Who counts is injected configuration — `OPERATOR_EMAILS`, with a
+development fallback and nobody at all when a live deployment leaves it
+unset. Maintenance is the host gate one level up: `readonly` refuses writes
+and serves reads, `full` withholds both, and it is asked once inside
+`performOperation` so both doors obey it — while the operator door, `/health`
+and the personal lane are never reached by that check, which is the exemption
+list by construction. The switch fails open. Decided 2026-08-14, with stage 15.
+
+**Why.** A role cannot express "operator": roles are held inside workspaces
+and the operator is outside all of them, so an operator role would have to
+exist in every workspace and be granted by somebody in it. And maintenance
+asked at the HTTP route is the D12 failure in its purest form — the agent
+door serves right through a closed deployment, invisibly, with every suite
+green.
+
+**Therefore never:** an operator role in a roster; an operator operation on a
+tenant's door; a console that decides for itself who may open it; maintenance
+enforced anywhere but the one operation path; a maintenance mode that blocks
+signing out, leaving, or the operator door itself; a read of the switch that
+fails closed.

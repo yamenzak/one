@@ -42,7 +42,7 @@ export const tenantUrl = (slug: string, where: Where, location: Location): strin
  * "we have a screen for it" drifting apart is how a page comes to render nothing
  * at all.
  */
-export type Face = "signpost" | "hub" | "create" | "centre" | "elsewhere";
+export type Face = "signpost" | "hub" | "create" | "centre" | "console" | "elsewhere";
 
 export const faceFor = (kind: DoorKind): Face => {
   switch (kind) {
@@ -52,9 +52,10 @@ export const faceFor = (kind: DoorKind): Face => {
     /* ⚠️ A workspace's own address IS the centre — the shell, the five areas
        and the products inside it. */
     case "tenant": return "centre";
-    /* ⚠️ Served by this worker, not by this bundle. The console and the device
-       door are their own surfaces; saying so beats a blank page. */
-    case "operator":
+    /* ⚠️ The deployment's own door — the console, on the same shell. */
+    case "operator": return "console";
+    /* ⚠️ Served by this worker, not by this bundle. A screen is a device with
+       its own pinned origin; saying so beats a blank page. */
     case "device":
     case "none": return "elsewhere";
   }

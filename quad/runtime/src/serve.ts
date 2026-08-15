@@ -26,6 +26,7 @@ import { answerMcp } from "./mcp.js";
 import type { PlatformCtx } from "./member-ops.js";
 import { keyFor, record, remember, seen, entryFor } from "./audit.js";
 import { clearCookie, sessionIdFrom, setCookie, type Session } from "./identity.js";
+import { maintenanceMode } from "./operator.js";
 import { whoIs, type PersonalBook, type PersonalCtx } from "./personal.js";
 import type { TenantRow } from "./directory.js";
 import type { Db } from "./sql.js";
@@ -211,6 +212,18 @@ export async function performOperation(
 ): Promise<Performed> {
   const { composed, op } = found;
   const catalog = composed.catalog;
+
+  /*
+    ⚠️ MAINTENANCE IS ASKED HERE AND NOWHERE ELSE, so the agent door cannot
+    forget it (D12). `readonly` refuses the writes and serves the reads;
+    `full` withholds everything this path serves. The operator door, `/health`
+    and the personal lane never reach this function — which is the exemption
+    list, by construction rather than by remembering.
+  */
+  const care = await maintenanceMode(wiring.directory);
+  if (care === "full" || (care === "readonly" && op.kind === "write")) {
+    return { kind: "refused", problem: problem(catalog, "platform.maintenance") };
+  }
 
   /* --- a replay is answered before anything is spent ---------------------- */
 

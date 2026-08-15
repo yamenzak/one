@@ -29,6 +29,7 @@ reader can trust this table instead of re-reading the code.
 | 12 | Multi-app access — a platform role for the workspace, a role per app inside it | shipped |
 | 13 | The package rail — a priced bundle of timed grants, one ledger, one clock | shipped |
 | 14 | The tenant centre — the shell with the router: five areas + app screens inside | shipped |
+| 15 | The operator console — the same shell on `admin.`, and the maintenance switch | shipped |
 
 ## What is NOT built, and where to pick it up
 
@@ -58,16 +59,14 @@ Honestly outstanding, in the order it will bite:
      fail the guard.
 2. **Passkeys.** Sign-in is an emailed code. There is deliberately no credential
    table waiting for a ceremony — see the note under identity below.
-3. **A workspace's own screens are components, not an application.**
-   ⚠️ **[CENTER.md](CENTER.md) is the plan for this** — the tenant centre, the
-   multi-app access model, the package rail and the operator console; stages
-   12–16. The Hub is
-   real: the signpost, the sign-in, the workspace list and the wizard are screens
-   a person opens (`quad/one-hub`). What no page assembles yet is the surface
-   BEHIND a workspace's door — `@quad/web` renders every declared screen and both
-   reference apps prove it against their real manifests, but the tenant door's
-   shell is not built, and it is what needs the router the shared shell
-   deliberately does not have.
+3. **A product's own screens are still notices.** [CENTER.md](CENTER.md)'s
+   stages 12–15 shipped: the tenant centre, the multi-app access model, the
+   package rail and the operator console are all live surfaces a person opens.
+   What is NOT there is the inside of an app's own screens — `AppSurface`
+   routes to them inside the shell and `mountScreen` is the seam they register
+   through, but nothing is registered, so a product's screen renders an honest
+   notice. Filling that is app-migration work, one screen at a time, and it is
+   the only remaining shape of "declared and not drawn".
    - ⚠️ **And the account door is thinner than it sounds, for a reason worth
      knowing.** It lists workspaces and nothing else, because the notification
      policy, the consent sheet, the audit of who looked and "your data" are all
@@ -438,6 +437,31 @@ crown, the designed Island as the phone nav in every context.
 - Verified in a real browser against the real worker on the real host
   topology — every area photographed at phone width, light and dark.
 
+**The operator console — the deployment looking at itself (D18).** The same
+shell on `admin.`, four destinations: Tenants (every workspace, what each is
+on, and the absolute either-direction adjustment), Switches (our flags per
+product, and maintenance), Works (the jobs nobody watches, by last run) and
+Ground (shards, region, room left).
+
+- **Two bounds, both per operation**: the `admin.` door, and an address the
+  DEPLOYMENT names (`OPERATOR_EMAILS`; a development fallback, and nobody at
+  all when a live deployment leaves it unset). A role could not express it —
+  roles live inside workspaces and an operator is outside all of them.
+- **Maintenance is asked once, inside `performOperation`**, so both doors
+  obey it: `readonly` refuses writes and serves reads, `full` withholds both,
+  while the operator door, `/health` and the personal lane are never reached
+  by that check — the exemption list by construction, so leaving is never
+  something our maintenance can prevent. The read fails OPEN.
+- **A real bug fell out of writing the suite**: `adjust` returned early when a
+  workspace had no subscription row, so the console's one write answered 200
+  and changed nothing on every workspace that had not chosen a plan. It now
+  materialises the parking row as `incomplete`, which `standingFor` reads
+  exactly as "no row" — nothing gated, the adjustment lands.
+- `scripts/operator.test.mjs` holds both promises structurally (six mutations
+  tried, six caught); `apps/hello/test/operator.test.ts` drives the door, the
+  allow-list, the adjustment, the flags and all three maintenance modes
+  through the real hostnames.
+
 **`@quad/one-hub` — the page a person opens.** The signpost, sign-in with an
 emailed code, the workspace list, and the wizard that makes one — HeroUI v3 as it
 ships, themed through tokens, nothing restyled.
@@ -479,6 +503,7 @@ The guard registry, its checks, and the standards that bind them.
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
 | D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 4 |
 | D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 0 |
+| D18 | The operator stands outside every workspace, and the console is a door rather than a role | 2 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -606,6 +631,8 @@ the library decides FOR us.
 | `every-centre-stop-has-a-branch` | D10 | a path the parser can produce renders a blank page, which is the same picture as a page that failed to load |
 | `an-unreachable-area-resolves-away-before-it-renders` | D15 | a customer opens People and every call on the screen is a 403 dressed as a broken page |
 | `a-cross-app-operation-names-its-target` | D15 | the second product's packages and settings are unreachable for ever, because the route resolves whichever app is first on the tenant's list |
+| `the-console-is-on-the-operator-door-and-asks-who-is-there` | D18 | the deployment's own console answers at a workspace's address, or admits anybody holding a session, and looks exactly like working software |
+| `maintenance-is-asked-in-the-one-operation-path` | D18 | a closed deployment serves right through the agent door, or an unprovisioned switch refuses every request over our own missing row |
 <!-- /generated -->
 
 ## Commands

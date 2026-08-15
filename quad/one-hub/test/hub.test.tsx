@@ -40,8 +40,8 @@ describe("which screen the Hub is", () => {
       for (const signedIn of [true, false, null]) {
         const screen = pickScreen(faceFor(kind), signedIn, false);
         expect(screen, `${kind} / signedIn=${signedIn}`).not.toBe(undefined);
-        expect(["waiting", "stuck", "signpost", "sign-in", "workspaces", "new-workspace", "centre", "elsewhere"])
-          .toContain(screen satisfies Screen);
+        expect(["waiting", "stuck", "signpost", "sign-in", "workspaces", "new-workspace",
+          "centre", "console", "elsewhere"]).toContain(screen satisfies Screen);
       }
     }
   });
@@ -62,6 +62,10 @@ describe("which screen the Hub is", () => {
     expect(pickScreen("centre", false, false)).toBe("sign-in");
     expect(pickScreen("centre", true, false)).toBe("centre");
     expect(pickScreen("centre", null, false)).toBe("waiting");
+    /* ⚠️ And the operator door: the console admits operators, and the
+       deployment decides who those are — never the page. */
+    expect(pickScreen("console", false, false)).toBe("sign-in");
+    expect(pickScreen("console", true, false)).toBe("console");
   });
 
   it("shows workspaces on the account door and the wizard on the setup door", () => {

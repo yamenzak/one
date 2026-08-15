@@ -152,8 +152,24 @@ export async function grandfather(
 
 export async function adjust(
   db: Db, tenantId: TenantId, appId: AppId, key: string, value: Allowance | null,
+  now = new Date(),
 ): Promise<void> {
-  const sub = await subscriptionFor(db, tenantId, appId);
+  /*
+    ⚠️ A WORKSPACE THAT NEVER CHOSE A PLAN HAS NO ROW, AND AN ADJUSTMENT MUST
+    STILL LAND. Returning early answered the console 200 and changed nothing —
+    a silent no-op on the one write the operator has. The row is materialised
+    on the parking plan as `incomplete`, which `standingFor` reads exactly as
+    "no row at all": mid-signup, not a debtor, nothing gated.
+  */
+  const existing = await subscriptionFor(db, tenantId, appId);
+  if (!existing) {
+    await db.prepare(
+      `INSERT INTO subscription (tenant_id, app_id, plan_id, status, at, past_due_at, trial_ends_at, overrides_json, adjustments_json)
+       VALUES (?, ?, '', 'incomplete', ?, NULL, NULL, '{}', '{}')
+       ON CONFLICT(tenant_id, app_id) DO NOTHING`)
+      .bind(tenantId, appId, now.toISOString()).run();
+  }
+  const sub = existing ?? await subscriptionFor(db, tenantId, appId);
   if (!sub) return;
   const next = { ...sub.adjustments };
   /* ⚠️ `null` clears one key rather than resetting everything — which is the

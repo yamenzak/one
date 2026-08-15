@@ -20,6 +20,7 @@ import { SPECIMEN_IDS, Specimen, type SpecimenId } from "./screens/Specimens.js"
 import { useSession } from "./session.js";
 import type { Face } from "./door.js";
 import { Centre } from "./centre/Centre.js";
+import { Console } from "./console/Console.js";
 import { Elsewhere } from "./screens/Elsewhere.js";
 import { NewWorkspace } from "./screens/NewWorkspace.js";
 import { SignIn } from "./screens/SignIn.js";
@@ -29,7 +30,7 @@ import { Workspaces } from "./screens/Workspaces.js";
 /** What the Hub shows, as a name — the thing the guard and the tests read. */
 export type Screen =
   | "waiting" | "stuck" | "signpost" | "sign-in" | "workspaces" | "new-workspace"
-  | "centre" | "elsewhere" | "gallery";
+  | "centre" | "console" | "elsewhere" | "gallery";
 
 /**
  * ⚠️ EVERY COMBINATION IS ANSWERED, INCLUDING THE ONES THAT SHOULD NOT HAPPEN.
@@ -53,12 +54,14 @@ export function pickScreen(
   if (signedIn === null) return "waiting";
   if (!signedIn) return "sign-in";
   if (face === "centre") return "centre";
+  if (face === "console") return "console";
   return face === "create" ? "new-workspace" : "workspaces";
 }
 
 const LEAD: Readonly<Record<string, string>> = {
   create: "Sign in first — a workspace belongs to somebody.",
   centre: "Sign in to open this workspace.",
+  console: "Sign in. The console admits operators only.",
   hub: "We will email you a code. There is no password to remember or lose.",
 };
 
@@ -87,6 +90,8 @@ export function App() {
   /* ⚠️ The centre brings its OWN shell — crown, nav, areas — so it replaces the
      Hub's frame exactly as a specimen does, rather than sitting inside it. */
   if (screen === "centre") return <><NoticeHost /><Centre /></>;
+  /* ⚠️ The console brings the same shell, pointed at the deployment. */
+  if (screen === "console") return <><NoticeHost /><Console /></>;
 
   /* ⚠️ A specimen brings its OWN page, crown and ambience — that is the whole
      claim being tested — so it replaces the Hub's frame rather than sitting

@@ -82,6 +82,13 @@ export const PLATFORM_PROBLEMS: ProblemCatalog = {
     title: "Something else changed first",
     detail: "Reload and have another look before trying again.",
   },
+  /* ⚠️ Ours, not theirs: nobody reading this did anything, and nobody can pay
+     to end it. The one problem that names the platform as the cause. */
+  "platform.maintenance": {
+    status: 503, retryable: true, tone: "warning",
+    title: "One is being looked after",
+    detail: "Everything is safe where you left it. Try again shortly.",
+  },
   "platform.too_many": {
     status: 429, retryable: true, tone: "warning",
     title: "Too quickly",

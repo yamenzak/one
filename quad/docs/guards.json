@@ -1036,6 +1036,24 @@
       "impl": "scripts/access.test.mjs",
       "proves": "target:",
       "fails": "the second product's packages and settings are unreachable for ever, because the route resolves whichever app is first on the tenant's list"
+    },
+    {
+      "id": "the-console-is-on-the-operator-door-and-asks-who-is-there",
+      "protects": "D18",
+      "stage": "15",
+      "status": "live",
+      "impl": "scripts/operator.test.mjs",
+      "proves": "door:",
+      "fails": "the deployment's own console answers at a workspace's address, or admits anybody holding a session, and looks exactly like working software"
+    },
+    {
+      "id": "maintenance-is-asked-in-the-one-operation-path",
+      "protects": "D18",
+      "stage": "15",
+      "status": "live",
+      "impl": "scripts/operator.test.mjs",
+      "proves": "maintenance:",
+      "fails": "a closed deployment serves right through the agent door, or an unprovisioned switch refuses every request over our own missing row"
     }
   ]
 }

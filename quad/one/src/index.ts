@@ -19,9 +19,9 @@
 import type { AppSpec } from "@quad/kernel";
 import {
   AUDIT_SCHEMA, BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA,
-  JOBS_SCHEMA, MEMBERSHIP_SCHEMA, PACKAGE_SCHEMA, REPLAY_SCHEMA, SETTING_SCHEMA, VAULT_SCHEMA,
+  JOBS_SCHEMA, MEMBERSHIP_SCHEMA, OPERATOR_SCHEMA, PACKAGE_SCHEMA, REPLAY_SCHEMA, SETTING_SCHEMA, VAULT_SCHEMA,
   NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, locator, memberFor, noteShardApp,
-  permissionsResolver, personalOps, schemaFor, serve, sessionIdFrom, shardFor, whoIs,
+  operatorOps, permissionsResolver, personalOps, schemaFor, serve, sessionIdFrom, shardFor, whoIs,
   type Db, type TenantRow,
 } from "@quad/runtime";
 import { hello } from "@quad/hello";
@@ -43,7 +43,7 @@ const APPS: Readonly<Record<string, () => AppSpec>> = { hello, kova };
  * it, everything reports success, and a column that was supposed to exist
  * silently never does.
  */
-const DIRECTORY_MODULES = [DIRECTORY_SCHEMA, IDENTITY_SCHEMA, BILLING_SCHEMA, JOBS_SCHEMA];
+const DIRECTORY_MODULES = [DIRECTORY_SCHEMA, IDENTITY_SCHEMA, BILLING_SCHEMA, JOBS_SCHEMA, OPERATOR_SCHEMA];
 const SHARD_MODULES = [MEMBERSHIP_SCHEMA, PACKAGE_SCHEMA, SETTING_SCHEMA, AUDIT_SCHEMA, REPLAY_SCHEMA, INBOX_SCHEMA, VAULT_SCHEMA];
 
 export interface Env {
@@ -54,6 +54,12 @@ export interface Env {
   readonly ROOT: string;
   readonly ENVIRONMENT: string;
   readonly AUTH_SECRET: string;
+  /**
+   * ⚠️ WHO MAY OPEN THE OPERATOR CONSOLE — comma-separated addresses. Empty in
+   * development means the signed-in developer; empty anywhere else means the
+   * console admits NOBODY, which is the honest reading of "unconfigured".
+   */
+  readonly OPERATOR_EMAILS?: string;
   /** ⚠️ Absent means this deployment cannot charge — see `standingFor`. */
   readonly STRIPE_KEY?: string;
   readonly [binding: string]: unknown;
@@ -138,16 +144,34 @@ const handler = (env: Env) => {
       something — a sign-in that answers "check your email" with nothing sent is
       a product that appears to work and cannot be used.
     */
-    personal: personalOps({
-      secret: env.AUTH_SECRET,
-      appId: "kova",
-      deliver: async (to, code) => {
-        if (env.ENVIRONMENT !== "development") {
-          throw new Error("this deployment has no mailer configured");
-        }
-        console.log(`[sign-in] ${to} → ${code}`);
-      },
-    }),
+    personal: {
+      ...personalOps({
+        secret: env.AUTH_SECRET,
+        appId: "kova",
+        deliver: async (to, code) => {
+          if (env.ENVIRONMENT !== "development") {
+            throw new Error("this deployment has no mailer configured");
+          }
+          console.log(`[sign-in] ${to} → ${code}`);
+        },
+      }),
+      /*
+        ⚠️ THE OPERATOR OPERATIONS RIDE THE PERSONAL LANE, on the operator door
+        only, with the deployment deciding who counts. The development fallback
+        admits the signed-in developer and NOBODY in production — an empty
+        allow-list on a live deployment is unconfigured, not open.
+      */
+      ...operatorOps({
+        apps: APPS,
+        isOperator: (email) => {
+          if (!email) return false;
+          const listed = (env.OPERATOR_EMAILS ?? "")
+            .split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+          if (listed.length) return listed.includes(email.toLowerCase());
+          return env.ENVIRONMENT === "development";
+        },
+      }),
+    },
 
     /*
       ⚠️ ONE FUNCTION FOR THE WHOLE RESOLUTION. The workspace, its shard, its
