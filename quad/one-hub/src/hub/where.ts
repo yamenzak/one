@@ -136,6 +136,16 @@ const isWorkspacePart = (v: string): v is WorkspacePart =>
 const isConsolePart = (v: string): v is ConsolePart =>
   (OF_CONSOLE as readonly string[]).includes(v);
 
+/**
+ * ⚠️ WHETHER AN ADDRESS IS THE OPERATOR'S SIDE, DERIVED FROM `OF_CONSOLE` RATHER
+ * THAN LISTED. A hand-written list beside the one that already exists is a list
+ * that goes stale the day a console screen is added — silently, because the new
+ * screen simply reads as somebody's workspace.
+ */
+export const isConsole = (where: Where): boolean =>
+  where.at === "console" || where.at === "tenant"
+  || (OF_CONSOLE as readonly string[]).includes(where.at);
+
 /** Whether a path is the hub's at all — the page under it renders otherwise. */
 export const inHub = (path: string): boolean =>
   path === HUB || path.startsWith(`${HUB}/`);

@@ -75,8 +75,9 @@ like moments, the screen is two screens.
 | Sign-in, arrival, the front door | `calm` or the signature | first contact: quiet, or the material — never busy |
 | Celebration, milestone, reward | `aurora` | the only multi-hue ambience; spend it on somebody ELSE's achievement |
 | One object, one decision (paywall, confirm-delete) | `spotlight` | staged on purpose; use where the screen IS one thing |
-| An arrival — the hub root, a product's front page | `silk` | swept 1px contours on near-black, breathing so slowly nobody catches it. The premium ground here, and the one an arrival earns |
-| A screen somebody works ON for a while | `aura` | no drawing at all — one wide, soft light, quiet enough to work under |
+| An arrival — the hub root, a product's front page | `silk` | swept 1px contours on near-black, breathing so slowly nobody catches it. The premium ground, and the one an arrival earns |
+| A screen somebody works ON for a while | `linen` | the same cloth pulled flat: fewer lines, half the bend, more air. Darker than the arrival, not lighter |
+| The operator's side — a deployment rather than a business | `wire` | near-straight and fanned. Schematic rather than woven, which says where you are before a word is read |
 | A premium tier, a flagship pitch | `streak` | the one pure graphic: a neon ribbon whose drama is the darkness around it |
 | An announcement, a launch | `rays` | beams from above — something new arrived |
 | Devices, monitoring, live status | `arc` | concentric rings on a measure; reads as sonar, technical without being busy |
@@ -89,10 +90,10 @@ like moments, the screen is two screens.
 | Empty/blocked/maintenance interstitials | `plain` or `veil` | a big mood behind "nothing here" reads as sarcasm |
 | Everything else | `plain` | **the default.** Ambience everywhere is ambience nowhere |
 
-The twenty-three named ambiences fall into five families — soft light (the
+The twenty-four named ambiences fall into five families — soft light (the
 original twelve), geometry (`rays`, `arc`, `prism`, `terrace`, `grid`), drawn
-line art (`ridge`, `flow`), staged graphics (`streak`), and a moving ground
-(`silk`, `aura`) — and the family is part of the choice: an app whose signature
+line art (`ridge`, `flow`), staged graphics (`streak`), and a drawn ground that
+moves (`silk`, `linen`, `wire`) — and the family is part of the choice: an app whose signature
 is soft light can still spend `streak` on its one flagship screen, but two
 families on one SCREEN is two worlds fighting.
 
@@ -110,8 +111,27 @@ a lit colour across the screen is the single thing that destroys it.
 **A line field bunches or it is a pattern.** Evenly spaced curves are wallpaper
 however wavy each one is; curves whose spacing opens and closes across the
 frame read as a surface with a shape under it, the way a contour map has a hill
-in it. In `silkArt` that comes from a power curve on the line index and a warp
-whose amplitude varies per line — two terms, neither decorative.
+in it. In `weaveArt` that comes from a power curve on the line index and a
+swell whose amplitude varies per line — two terms, neither decorative.
+
+**A surface wears ONE material, so the three drawn grounds are one generator at
+three settings.** The hub shipped a drawn field on its arrival and a soft grey
+wash one step in, and walking into a workspace changed what the product
+appeared to be made of — while the wash, being a lit colour behind eight rows
+of content, read as dust rather than as a world. Variation belongs in the
+DRAWING: how many lines, how far they bend, how hard they bunch (`Weave`,
+`WEAVES`). Two rules came out of that and both generalise:
+
+- **A working ground is DARKER than an arrival, never lighter.** The instinct
+  when a screen feels busy is to soften its ground by lifting it. Lifting it is
+  what makes the grey; take the light away instead.
+- **A drawing is sized `cover`, never `100% 100%`.** Stretching to the viewport
+  squeezes the drawing's width into a phone while pulling its height over a tall
+  screen, so the slope multiplies and the lines close up — a calm field on a
+  desktop and corduroy on a phone, from one stylesheet. And it is sampled
+  coarsely and drawn as curves rather than finely as a polyline: same bytes, and
+  the faceting a polyline shows when scaled UP is the phone's problem, not the
+  laptop's.
 
 Rules of thumb that outrank the table:
 
@@ -185,7 +205,7 @@ mixed toward white — a bright light is not a saturated one), `orb` (a source
 with range in it), `crush` (darkness deeper than the page's own ground),
 `thread` (micro-fibre, dark only), `etch` (macro line, dims in light), the
 conic fold, the repeating ring/beam, the drawn `art`
-layer, and the `field` under all of it. Twenty-three names is not the ceiling — a new ambience is a few lines of
+layer, and the `field` under all of it. Twenty-four names is not the ceiling — a new ambience is a few lines of
 recipe, and the checklist below is the whole cost.
 
 **`bespokeCss(seed)` composes a world that belongs to nobody else.** A
@@ -202,12 +222,12 @@ inside an app still names a shape or `plain`.
 
 **Most ambiences do not move, and that is still the default.** A background
 that moves on its own schedule is a background somebody cannot stop watching,
-and twenty-one of the twenty-three are still.
+and twenty-one of the twenty-four are still.
 
 **Two do, and the rule they answer to is that nobody may catch them.** A real
 lit room is not still — the light has a source and the whole thing breathes —
 and a world that is perfectly frozen reads as wallpaper however carefully it is
-composed. `silk` and `aura` declare a drift in `DRIFT`, and everything about it
+composed. `silk`, `linen` and `wire` declare a drift in `DRIFT`, and everything about it
 is bounded:
 
 - **It is a `transform` on the layer, never moving gradient stops.** A drifting

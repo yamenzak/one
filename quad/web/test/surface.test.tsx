@@ -415,6 +415,23 @@ describe("a workspace's branding", () => {
     expect(css).toContain("@keyframes quad-drift {");
   });
 
+  /**
+   * ⚠️ A DRAWN GROUND STRETCHED TO THE VIEWPORT IS A DIFFERENT DRAWING ON EVERY
+   * SCREEN, and the one it is worst on is the phone: 700 units of width squeezed
+   * into 342px while 520 of height is pulled over 844 multiplies the slope, and
+   * a calm field becomes corduroy. Nothing catches it — the CSS is valid, the
+   * drawing is correct, and the desktop it was designed on looks right.
+   */
+  it("sizes every drawn ground to cover rather than stretching it", () => {
+    const css = ambienceStylesheet();
+    for (const name of ["silk", "linen", "wire"] as const) {
+      const rule = css.split("\n").find((l) => l.startsWith(`[data-sky="${name}"]::before {`));
+      expect(rule, `${name} has no rule`).toBeTruthy();
+      expect(rule).toContain("background-size: auto, auto, cover, auto, auto");
+      expect(rule).not.toContain("100% 100%");
+    }
+  });
+
   it("maps what happened onto the library's colour names in one place", () => {
     expect(colorFor("neutral")).toBe("default");
     expect(colorFor("info")).toBe("accent");

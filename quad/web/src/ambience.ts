@@ -87,40 +87,36 @@ import { DURATION, EASE } from "./motion.js";
  *   grid       etched graph paper. Planning, technical dashboards.
  */
 /**
- * ⚠️ AND A FOURTH FAMILY: A GROUND THAT MOVES. Twenty-one worlds and every one
- * of them was STILL, which is why the set read as wallpaper however carefully
- * each was composed. Two more cover it, and they are the only two that move:
+ * ⚠️ AND A FIFTH FAMILY: A DRAWN GROUND THAT MOVES. Twenty-one worlds and every
+ * one of them was STILL, which is why the set read as wallpaper however
+ * carefully each was composed. Three more cover it, they share one generator,
+ * and they are the only three that move:
  *
- *   silk       swept contours on near-black. A field of 1px lines that bunch
- *              and open across the frame, breathing so slowly nobody catches
- *              it. The premium ground, and the one an arrival earns.
- *   aura       no drawing at all — one wide, soft light, quiet enough to work
- *              under. For a screen somebody works ON rather than arrives at.
+ *   silk       swept contours on near-black, bunching hard. An arrival.
+ *   linen      the same cloth pulled flat — fewer lines, half the bend, more
+ *              air. A screen somebody works ON for a while.
+ *   wire       near-straight and fanned. Schematic rather than woven; the
+ *              operator's side, where the subject is a deployment.
  *
- * ⚠️ THE PREMIUM DARK GROUND IS A LINE FIELD, NOT A LIGHT, AND THAT IS THE
- * CORRECTION THIS FAMILY EXISTS TO RECORD. The obvious reading of "high dynamic
- * range" is a bright source on black. It was built, and at any strength that
- * reads as a source it is a BLOB — a smudge on the lens, drawing the eye to a
- * place with nothing in it. What the reference products actually do is the
- * opposite: the ground is essentially black and carries only very fine lines at
- * a hundredth of the contrast of anything else on screen. The eye reads
- * material rather than light, and nothing competes with the one figure the
- * screen is for. `silkArt` is that drawing; the near-zero field weight is what
- * keeps the black black.
+ * ⚠️ THEY ARE ONE MATERIAL AT THREE STRENGTHS, WHICH IS THE WHOLE POINT OF
+ * HAVING THREE. A surface wears one material (see the three levels in
+ * AMBIENCE.md): the hub carried a drawing on its arrival and a soft grey wash
+ * one step in, so walking into it changed what the product was made of. The
+ * variation belongs in the drawing. See `Weave` and `WEAVES`.
  */
 export type Ambience =
   | "plain" | "calm" | "focus" | "lift" | "mesh" | "dots"
   | "weave" | "drape" | "aurora" | "veil" | "tide" | "spotlight"
   | "rays" | "arc" | "prism" | "terrace" | "streak" | "bloom"
   | "ridge" | "flow" | "grid"
-  | "silk" | "aura";
+  | "silk" | "linen" | "wire";
 
 export const AMBIENCES: readonly Ambience[] = [
   "plain", "calm", "focus", "lift", "mesh", "dots",
   "weave", "drape", "aurora", "veil", "tide", "spotlight",
   "rays", "arc", "prism", "terrace", "streak", "bloom",
   "ridge", "flow", "grid",
-  "silk", "aura",
+  "silk", "linen", "wire",
 ];
 
 /**
@@ -220,11 +216,11 @@ const FIELD_WEIGHT: Readonly<Record<Exclude<Ambience, "plain">, number>> = {
   /* Geometry wants its lines legible against the field; graphics want dark. */
   rays: 0.6, arc: 0.65, prism: 0.7, terrace: 0.7, streak: 0.25,
   bloom: 0.75, ridge: 0.55, flow: 0.6, grid: 0.7,
-  /* ⚠️ `silk` IS THE LOWEST IN THE TABLE AND THAT IS THE POINT — the whole
-     design is fine lines on near-black, and a lit colour field across the
-     screen is the one thing that destroys it. `aura` is the opposite end:
-     no drawing at all, so the field is what it has. */
-  silk: 0.06, aura: 0.55,
+  /* ⚠️ THE THREE LOWEST IN THE TABLE, AND THAT IS THE POINT — the whole design
+     is fine lines on near-black, and a lit colour field across the screen is
+     the one thing that destroys it. The working two are lower still: a ground
+     somebody reads over should be a value, not a colour. */
+  silk: 0.06, linen: 0.04, wire: 0.04,
 };
 
 /** A soft pole of light: where, how wide, how strong. */
@@ -331,54 +327,128 @@ function flowArt(stroke: string, alpha: number): string {
 }
 
 /**
- * SWEPT CONTOURS — the one drawing that is the whole ground rather than a
- * texture over one.
+ * THE DRAWN GROUND — one generator, three characters.
  *
- * ⚠️ THE PREMIUM DARK GROUND IS A LINE FIELD, NOT A LIGHT. The obvious reading
- * of "high dynamic range" is a bright source on black, and it is wrong: at any
- * strength that reads as a source it is a blob, and a blob on a screen is a
- * smudge on the lens. What the reference does is the opposite — the ground is
- * essentially BLACK and the only thing on it is a field of very fine lines,
- * a hundredth of the contrast of anything else on the screen. The eye reads
- * material rather than light, and nothing competes with a single figure.
+ * ⚠️ THE PREMIUM DARK GROUND IS A LINE FIELD, NOT A LIGHT, and that correction
+ * cost a round. The obvious reading of "high dynamic range" is a bright source
+ * on black; it was built, and at any strength that reads as a source it is a
+ * BLOB — a smudge on the lens, pulling the eye to the brightest thing on screen,
+ * which is a place with nothing in it. What the products that do this well ship
+ * is the opposite: the ground is essentially black and carries only very fine
+ * lines at a hundredth of the contrast of anything else. The eye reads MATERIAL
+ * rather than light, and nothing competes with the one figure the screen is for.
  *
- * ⚠️ IT BUNCHES, WHICH IS THE WHOLE DIFFERENCE FROM `flow`. Evenly spaced
- * curves are a pattern; curves whose spacing OPENS and CLOSES across the frame
- * are a surface with a shape under it, the way a contour map has a hill in it.
- * The spacing here comes from a power curve on the line index and a warp that
- * varies with both x and the line — two terms, and neither is decoration.
+ * ⚠️ AND A SURFACE WEARS ONE MATERIAL, WHICH IS WHY THIS IS A FAMILY RATHER THAN
+ * AN AMBIENCE. The hub's arrival was drawn lines and its inner screens were a
+ * soft grey wash, so walking one step in changed what the product was made of.
+ * The variation belongs in the DRAWING — how many lines, how far they bend, how
+ * hard they bunch — not in swapping to another family. Same machinery, three
+ * settings, and a person moving between them feels depth rather than a change
+ * of subject.
  */
-function silkArt(stroke: string, alpha: number): string {
-  const W = 1400, H = 1000, LINES = 46;
-  const paths: string[] = [];
-  for (let k = 0; k < LINES; k++) {
-    const t = k / (LINES - 1);
-    /* ⚠️ `t ** 1.35` is the bunching: lines crowd at the top and open out
-       downward, so the field has somewhere to be dense and somewhere to
-       breathe. A linear base is a ruled page. */
-    const base = -260 + Math.pow(t, 1.35) * (H + 520);
-    const pts: string[] = [];
-    for (let x = 0; x <= W; x += 20) {
-      /* ⚠️ THE FIRST TERM'S AMPLITUDE VARIES WITH THE LINE, which is what makes
-         neighbours converge and separate. Equal amplitudes give parallel
-         curves — a pattern — however wavy each one is. */
-      const warp =
-        (95 + 130 * Math.sin(t * 2.2)) * Math.sin(x / 540 + t * 1.35)
-        + 70 * Math.sin(x / 230 + t * 3.4)
-        + 26 * Math.cos(x / 115 + t * 6.1);
-      /* A long diagonal so the field SWEEPS rather than sits. */
-      const y = base + warp - x * 0.22;
-      pts.push(`${x ? "L" : "M"}${x} ${y.toFixed(1)}`);
-    }
-    paths.push(
-      `<path d="${pts.join(" ")}" fill="none" stroke="${stroke}"`
-      + ` stroke-opacity="${(alpha * (0.55 + 0.45 * Math.sin(t * 3.1))).toFixed(3)}"`
-      + ` stroke-width="1"/>`,
+interface Weave {
+  /** How many lines across the frame. Density is the loudest knob here. */
+  readonly lines: number;
+  /**
+   * ⚠️ THE POWER ON THE LINE INDEX, AND 1 IS EVEN. Evenly spaced curves are
+   * wallpaper however wavy each one is; spacing that opens and closes reads as
+   * a surface with a shape under it, the way a contour map has a hill in it.
+   */
+  readonly bunch: number;
+  /** The long diagonal, as a fall per unit of width. A field SWEEPS or it sits. */
+  readonly sweep: number;
+  /** How much more the last line falls than the first — a fan rather than a slab. */
+  readonly fan: number;
+  /**
+   * ⚠️ THE LONG TERM'S AMPLITUDE RANGE, AND THE RANGE IS THE POINT. Equal
+   * amplitudes give parallel curves; amplitudes that vary per line make
+   * neighbours converge and separate, which is the second half of bunching.
+   */
+  readonly swell: readonly [number, number];
+  /** The long term's wavelength. Larger is calmer. */
+  readonly wave: number;
+  /** The second term, which stops the long curve reading as a single sine. */
+  readonly ripple: number;
+}
+
+/*
+  ⚠️ A SMALL COORDINATE SPACE, ON PURPOSE. Every number here ends up URI-encoded
+  inside a stylesheet, so a 1400-wide viewBox costs a digit per coordinate over a
+  700-wide one across some thousands of them. The space is arbitrary — only the
+  RATIOS matter — so the cheap one wins.
+*/
+const WEAVE_W = 700, WEAVE_H = 520;
+
+/**
+ * ⚠️ SAMPLED COARSELY AND DRAWN SMOOTH, WHICH IS BOTH CHEAPER AND BETTER. A
+ * polyline fine enough not to facet needs a vertex every few units, and every
+ * vertex is two numbers URI-encoded into a stylesheet; a Catmull-Rom through
+ * one fifth as many points costs the same bytes and has no corners at all. The
+ * faceting is invisible on a laptop and plainly there on a phone, which is the
+ * screen the drawing is scaled UP on.
+ *
+ * ⚠️ ONLY `y` NEEDS A TANGENT. The samples are evenly spaced in `x`, so both
+ * control points sit exactly a third of a step either side, and the arithmetic
+ * that is left is the curve's own.
+ */
+const smooth = (ys: readonly number[], step: number): string => {
+  const at = (i: number) => ys[Math.max(0, Math.min(ys.length - 1, i))]!;
+  const out = [`M0 ${Math.round(at(0))}`];
+  for (let i = 0; i < ys.length - 1; i++) {
+    const x0 = i * step;
+    out.push(
+      `C${Math.round(x0 + step / 3)} ${Math.round(at(i) + (at(i + 1) - at(i - 1)) / 6)}`
+      + ` ${Math.round(x0 + (step * 2) / 3)} ${Math.round(at(i + 1) - (at(i + 2) - at(i)) / 6)}`
+      + ` ${x0 + step} ${Math.round(at(i + 1))}`,
     );
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"`
-    + ` viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${paths.join("")}</svg>`;
+  return out.join("");
+};
+
+function weaveArt(w: Weave, stroke: string, alpha: number): string {
+  const STEP = 35;
+  const paths: string[] = [];
+  for (let k = 0; k < w.lines; k++) {
+    const t = k / (w.lines - 1);
+    const base = -140 + Math.pow(t, w.bunch) * (WEAVE_H + 280);
+    const swell = w.swell[0] + (w.swell[1] - w.swell[0]) * (0.5 + 0.5 * Math.sin(t * 2.2));
+    const fall = w.sweep * (1 - w.fan / 2 + w.fan * t);
+    const ys: number[] = [];
+    for (let x = 0; x <= WEAVE_W; x += STEP) {
+      ys.push(
+        base
+        + swell * Math.sin(x / (w.wave / 2.6) + t * 1.35)
+        + w.ripple * Math.sin(x / (w.wave / 6) + t * 3.4)
+        - x * fall,
+      );
+    }
+    /* ⚠️ Opacity varies per line; everything else is shared on the `<g>` — the
+       whole drawing is one string in a stylesheet, so an attribute repeated a
+       hundred times is a hundred copies of it shipped on every cold load. */
+    paths.push(
+      `<path d="${smooth(ys, STEP)}"`
+      + ` stroke-opacity="${(alpha * (0.55 + 0.45 * Math.sin(t * 3.1))).toFixed(2)}"/>`,
+    );
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${WEAVE_W}" height="${WEAVE_H}"`
+    + ` viewBox="0 0 ${WEAVE_W} ${WEAVE_H}">`
+    + `<g fill="none" stroke="${stroke}" stroke-width="1">${paths.join("")}</g></svg>`;
 }
+
+/**
+ * ⚠️ THREE SETTINGS, AND THE ORDER IS AN ORDER OF PRESENCE. An arrival can
+ * carry a drawing somebody notices; a screen with a roster and eight rows on it
+ * cannot, and the same drawing at the same strength behind both is what makes a
+ * working screen feel busy for a reason nobody can name.
+ */
+const WEAVES: Readonly<Record<"silk" | "linen" | "wire", Weave>> = {
+  /** The arrival. Deep swells, hard bunching, a long sweep. */
+  silk: { lines: 44, bunch: 1.35, sweep: 0.22, fan: 0.3, swell: [48, 112], wave: 540, ripple: 34 },
+  /** Work. The same cloth pulled flat — half the bend, fewer lines, more air. */
+  linen: { lines: 30, bunch: 1.1, sweep: 0.12, fan: 0.2, swell: [14, 30], wave: 760, ripple: 9 },
+  /** The console. Near-straight and fanned: schematic rather than woven. */
+  wire: { lines: 26, bunch: 1, sweep: 0.16, fan: 1.1, swell: [3, 9], wave: 900, ripple: 3 },
+};
 
 /**
  * Both variants of each drawing, baked once at module load. Alphas are tuned
@@ -388,7 +458,9 @@ function silkArt(stroke: string, alpha: number): string {
 const ART = {
   ridge: { dark: art(ridgeArt("#fff", 0.15)), light: art(ridgeArt("#000", 0.09)) },
   flow: { dark: art(flowArt("#fff", 0.17)), light: art(flowArt("#000", 0.1)) },
-  silk: { dark: art(silkArt("#fff", 0.13)), light: art(silkArt("#000", 0.1)) },
+  silk: { dark: art(weaveArt(WEAVES.silk, "#fff", 0.13)), light: art(weaveArt(WEAVES.silk, "#000", 0.1)) },
+  linen: { dark: art(weaveArt(WEAVES.linen, "#fff", 0.1)), light: art(weaveArt(WEAVES.linen, "#000", 0.075)) },
+  wire: { dark: art(weaveArt(WEAVES.wire, "#fff", 0.09)), light: art(weaveArt(WEAVES.wire, "#000", 0.07)) },
 } as const;
 
 /**
@@ -681,11 +753,16 @@ function layers(what: Ambience, hue: string): readonly string[] {
       than as a lit room.
     */
     /*
-      ⚠️ THE DRAWING IS THE WHOLE GROUND HERE — see `silkArt`. Everything else
+      ⚠️ THE DRAWING IS THE WHOLE GROUND HERE — see `weaveArt`. Everything else
       is restraint: one very wide, very low pole so the field has somewhere
       slightly brighter for the lines to cross, and a `crush` so the far corner
-      goes properly black rather than merely dark. No `orb`. The lines are the
-      subject and a source would out-shout them.
+      goes properly black rather than merely dark. No source. The lines are the
+      subject and a light would out-shout them.
+
+      ⚠️ AND THE WORKING TWO ARE DARKER THAN THE ARRIVAL, not lighter. The
+      instinct is to soften a busy screen's ground by lifting it; lifting it is
+      what produces a dusty grey, and a dusty grey behind eight rows of content
+      is the thing that reads as unfinished. Take the light away instead.
     */
     case "silk":
       return [
@@ -694,13 +771,20 @@ function layers(what: Ambience, hue: string): readonly string[] {
         pole(hue, 9, "74%", "-8%", "150%", "85%"),
       ];
 
-    /* The same source, wide and cool. Nothing hot, nothing crushed. */
-    case "aura":
+    case "linen":
       return [
-        orb(hue, 30, 22, "50%", "-12%", "140%", "82%"),
-        pole(hue, 13, "88%", "32%", "70%", "56%"),
-        pole(hue, 8, "8%", "16%", "70%", "50%"),
+        crush("62%", "-10%", 94),
+        `var(--art)`,
+        pole(hue, 6, "62%", "-12%", "160%", "90%"),
       ];
+
+    case "wire":
+      return [
+        crush("50%", "-12%", 94),
+        `var(--art)`,
+        pole(hue, 6, "50%", "-14%", "170%", "90%"),
+      ];
+
   }
 }
 
@@ -844,13 +928,25 @@ export const DRIFT: Partial<Record<Ambience, {
 }>> = {
   /* ⚠️ SMALLER THAN IT LOOKS, BECAUSE THE SUBJECT IS 1px LINES. A ten percent
      scale on a soft gradient is a breath; the same on a line field slides every
-     line across its neighbour's place and reads as a moiré crawl. */
+     line across its neighbour's place and reads as a crawl. */
   silk: { x: "1.5%", y: "1%", from: 1.1, to: 1.14 },
-  /* ⚠️ Quieter in every dimension: this one sits under work, not under an
-     arrival, and a ground somebody catches moving while reading is a ground
-     that has to be switched off. */
-  aura: { x: "1.5%", y: "1%", from: 1.1, to: 1.15 },
+  /* ⚠️ Quieter still, in both: these sit under WORK, and a ground somebody
+     catches moving while reading is a ground that has to be switched off. */
+  linen: { x: "1%", y: "0.6%", from: 1.1, to: 1.12 },
+  wire: { x: "1%", y: "0.6%", from: 1.1, to: 1.12 },
 };
+
+/**
+ * ⚠️ EVERY DRAWN GROUND HAS THE SAME FIVE LAYERS, SO IT HAS THE SAME RULE — and
+ * the drawing is `cover`, never `100% 100%`. Stretching it to the viewport
+ * squeezes 700 units of width into a 342px phone while pulling 520 of height
+ * over 844, so the slope triples and the lines close up: a calm field on a
+ * desktop is corduroy on a phone. `cover` keeps the drawing's own proportions
+ * everywhere and crops instead, which for a texture costs nothing.
+ */
+const WEAVE_LAYERS = "background-size: auto, auto, cover, auto, auto"
+  + "; background-repeat: repeat, repeat, no-repeat, repeat, repeat"
+  + "; background-position: 0 0, 0 0, center top, 0 0, 0 0";
 
 const EXTRAS: Partial<Record<Ambience, string>> = {
   dots: "background-size: auto, 22px 22px, auto, auto",
@@ -860,8 +956,7 @@ const EXTRAS: Partial<Record<Ambience, string>> = {
   flow: "background-size: auto, 100% 800px, auto, auto"
     + "; background-repeat: repeat, no-repeat, repeat, repeat",
   /* DEPTH, crush, art, pole, field — the drawing fills the reach exactly. */
-  silk: "background-size: auto, auto, 100% 100%, auto, auto"
-    + "; background-repeat: repeat, repeat, no-repeat, repeat, repeat",
+  silk: WEAVE_LAYERS, linen: WEAVE_LAYERS, wire: WEAVE_LAYERS,
 };
 
 export function ambienceStylesheet(): string {

@@ -26,6 +26,7 @@
 import {
   Band, CROWN, LeaveChip, Over, Page, PageCrown, Spacer, TYPE, sentence,
 } from "@quad/web";
+import type { Ambience } from "@quad/web";
 import type { Belonging, Me } from "../api.js";
 import { useSession } from "../session.js";
 import { HubHome } from "./Home.js";
@@ -37,7 +38,7 @@ import { ConsoleHome, ConsolePart } from "./Console.js";
 import { OneTenant } from "../console/OneTenant.js";
 import { InboxScreen } from "../centre/InboxScreen.js";
 import { TellingMe } from "./TellingMe.js";
-import { HUB, above, nameOf, parseWhere, pathOf, type Where } from "./where.js";
+import { HUB, above, isConsole, nameOf, parseWhere, pathOf, type Where } from "./where.js";
 
 /* ⚠️ Every branch this file draws, named — the guard reads it, because an
    address the parser can produce with no branch renders a blank page. */
@@ -92,12 +93,7 @@ function Screen({ where, onGo, onLeave }: {
     : null;
 
   /*
-    ⚠️ `silk` AT THE ROOT AND `aura` INSIDE — the two grounds that MOVE. The
-    root is where somebody lands, and a landing screen earns the drawn one: a
-    field of 1px contours on near-black, breathing slowly enough that nobody
-    catches it. Inside is work, so it is a single wide soft light and no
-    drawing at all. See `ambience.ts`.
-
+    ⚠️ ONE MATERIAL ACROSS THE WHOLE HUB, AT THREE STRENGTHS — see `groundOf`.
     ⚠️ AND NOT `aurora`, EVER, HERE: it carries a second hue by design, which a
     monochrome product renders as a green cast nobody chose.
   */
@@ -109,7 +105,7 @@ function Screen({ where, onGo, onLeave }: {
     way out, and that is `LeaveChip` on its own (`layout.tsx`).
   */
   return (
-    <Page sky={root ? "silk" : "aura"}>
+    <Page sky={groundOf(where)}>
       {root
         ? (
           <Band width="read">
@@ -142,6 +138,28 @@ function Screen({ where, onGo, onLeave }: {
     </Page>
   );
 }
+
+/**
+ * WHICH GROUND, FROM THE ADDRESS — one decision for every screen in the hub.
+ *
+ * ⚠️ THE HUB WEARS ONE MATERIAL AND VARIES ITS STRENGTH, NOT ITS FAMILY. It
+ * carried a drawn line field on its arrival and a soft grey wash one step in,
+ * so walking into a workspace changed what the product appeared to be made of
+ * — and the wash, being a lit colour behind eight rows of content, read as a
+ * dusty grey rather than as a world. All three below are the same drawing at
+ * three settings (`ambience.ts`), and the two a person works on are DARKER
+ * than the one they land on rather than lighter.
+ *
+ * ⚠️ AND IT IS READ FROM THE ADDRESS, so no screen picks its own. A screen
+ * that chose would be a screen somebody has to remember to update, and the
+ * hub has twenty of them.
+ */
+const groundOf = (where: Where): Ambience => {
+  if (where.at === "home") return "silk";
+  /* ⚠️ The operator's side is about a deployment rather than a business, and
+     the drawing says so before a word is read: schematic, not woven. */
+  return isConsole(where) ? "wire" : "linen";
+};
 
 /**
  * ⚠️ A FACT, OR NOTHING AT ALL. Every screen used to carry a sentence under its
