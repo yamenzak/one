@@ -19,7 +19,7 @@
  * to be two screens (DESIGN.md §3).
  */
 
-import { Group, NavRow, Screen, Settings, glyphOf, notice } from "@quad/web";
+import { Screen, Settings, Whichever, glyphOf, notice } from "@quad/web";
 import { settingsOn } from "@quad/kernel";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView } from "./data.js";
@@ -34,37 +34,24 @@ export function SettingsArea({ view, app, onGo }: {
     settingsOn(a.settings, "tenant").length > 0 || settingsOn(a.settings, "person").length > 0;
   const settable = view.apps.filter(has);
 
-  if (!settable.length) {
-    /* ⚠️ INSIDE THE FRAME, NOT ABOVE IT — a sentence returned early takes the
-       crown with it, leaving a page with no name and no way back. */
-    return (
-      <Screen
-        shape="settings"
-        refused={{
-          says: "Nothing to change here",
-          under: "No product in this workspace declares a setting",
-        }}
-      />
-    );
-  }
-
-  /* ⚠️ ONE PRODUCT IS THE SCREEN; SEVERAL ARE A LIST — see the header. */
-  const only = settable.length === 1 ? settable[0] : undefined;
-  const chosen = app ? settable.find((a) => a.id === app) : only;
-
-  if (!chosen) {
-    return (
-      <Screen shape="list">
-        <Group>
-          {settable.map((a) => (
-            <NavRow key={a.id} icon={glyphOf("settings")} label={a.name} onOpen={() => onGo(a.id)} />
-          ))}
-        </Group>
-      </Screen>
-    );
-  }
-
-  return <AppSettings app={chosen} />;
+  /* ⚠️ ONE PRODUCT IS THE SCREEN; SEVERAL ARE A LIST — and the four branches
+     that says (none, one, several-chosen, several-unchosen) are `Whichever`'s
+     now. Three screens wrote them by hand. */
+  return (
+    <Whichever
+      items={settable}
+      id={(a) => a.id}
+      name={(a) => a.name}
+      icon={glyphOf("settings")}
+      chosen={app}
+      onChoose={onGo}
+      nothing={{
+        says: "Nothing to change here",
+        under: "No product in this workspace declares a setting",
+      }}
+      then={(a) => <AppSettings app={a} />}
+    />
+  );
 }
 
 interface StoredAnswer {

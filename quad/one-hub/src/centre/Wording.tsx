@@ -15,7 +15,7 @@
 import { useState } from "react";
 import { Button, Card } from "@heroui/react";
 import {
-  Group, LongText, NavRow, Row, Screen, Stack, glyphOf, notice,
+  LongText, Row, Screen, Stack, Whichever, glyphOf, notice,
 } from "@quad/web";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView } from "./data.js";
@@ -37,12 +37,6 @@ export function Wording({ view, app, onGo }: {
      workspace's decision, so it needs the workspace's authority. */
   const mayNot = !view.you.platform.includes("tenant:manage");
 
-  /* ⚠️ ONE PRODUCT IS THE SCREEN; SEVERAL ARE A LIST — the same rule Settings
-     follows, for the same reason (DESIGN.md §3). Nobody pays a tap for a menu
-     with one item on it, and nobody should read six products' prompts stacked. */
-  const only = view.apps.length === 1 ? view.apps[0] : undefined;
-  const chosen = app ? view.apps.find((a) => a.id === app) : only;
-
   /* ⚠️ THE REFUSAL IS CONTENT, NOT AN EARLY RETURN. Returned above the frame it
      took the crown with it — a sentence alone on a page with no name and no way
      back (`screen.tsx`). */
@@ -58,19 +52,19 @@ export function Wording({ view, app, onGo }: {
     );
   }
 
-  if (!chosen) {
-    return (
-      <Screen shape="list">
-        <Group>
-          {view.apps.map((a) => (
-            <NavRow key={a.id} icon={glyphOf("note")} label={a.name} onOpen={() => onGo(a.id)} />
-          ))}
-        </Group>
-      </Screen>
-    );
-  }
-
-  return <AppWording app={chosen} />;
+  /* ⚠️ One product is the screen; several are a list — see `Whichever`. */
+  return (
+    <Whichever
+      items={view.apps}
+      id={(a) => a.id}
+      name={(a) => a.name}
+      icon={glyphOf("note")}
+      chosen={app}
+      onChoose={onGo}
+      nothing={{ says: "Nothing here is yours to reword" }}
+      then={(a) => <AppWording app={a} />}
+    />
+  );
 }
 
 function AppWording({ app }: { readonly app: CentreApp }) {

@@ -32,6 +32,7 @@
 import * as React from "react";
 import { Button } from "@heroui/react";
 import { Band, PageCrown, Spacer, type Slot, type Width } from "./layout.js";
+import { Group, NavRow } from "./surfaces.js";
 import { Await, Nothing, RowsWaiting, FigureWaiting, FormWaiting, TextWaiting, TilesWaiting, nothingIn, type Loaded } from "./state.js";
 import { Stack } from "./layout.js";
 import { PAD, SAFE_BOTTOM, SPACE } from "./metrics.js";
@@ -81,7 +82,12 @@ const SHAPES: Readonly<Record<Shape, {
    */
   readonly primary: "docked" | "none";
 }>> = {
-  list: { width: "read", waiting: () => <RowsWaiting rows={4} />, space: "roomy", primary: "docked" },
+  /* ⚠️ `work`, BECAUSE A LIST BECOMES A TABLE. `Listing` collapses to rows on a
+     phone and opens into columns above `md` — at reading width those columns
+     were squeezed into 42% of a desktop with black either side, which reads as
+     a page that failed to fill rather than as a held column. Rows inside a card
+     are perfectly happy wider; four columns at 672px are not. */
+  list: { width: "work", waiting: () => <RowsWaiting rows={4} />, space: "roomy", primary: "docked" },
   detail: { width: "read", waiting: () => <RowsWaiting rows={3} />, space: "roomy", primary: "docked" },
   figure: { width: "read", waiting: () => <FigureWaiting count={2} />, space: "roomy", primary: "docked" },
   board: { width: "work", waiting: () => <TilesWaiting tiles={6} />, space: "roomy", primary: "docked" },
@@ -385,5 +391,59 @@ export function Tile({ wide, tall, children }: {
     <div className={`${wide ? "col-span-2" : ""} ${tall ? "row-span-2" : ""} min-w-0`}>
       {children}
     </div>
+  );
+}
+
+/* -------------------------------------------------------------- whichever --- */
+
+/**
+ * WHICHEVER ONE THE ADDRESS NAMES — and where there is only one, it IS the
+ * screen.
+ *
+ * ⚠️ THREE SCREENS SHIPPED THIS BY HAND AND A FOURTH WAS ABOUT TO. Settings,
+ * In your words and the operator's AI actions each hold a thing per product, and
+ * each wrote the same four branches: none, exactly one, several with a choice
+ * made, several without. Written four times it is four places to get the middle
+ * two wrong — and the middle two are the interesting ones.
+ *
+ * ⚠️ NOBODY PAYS A TAP FOR A MENU WITH ONE ITEM ON IT. A workspace with a single
+ * product should land on that product's screen, not on a list containing it;
+ * the list is a cost that only earns itself once there is a choice to make. That
+ * rule was stated in three separate comments and implemented three times.
+ *
+ * ⚠️ AND THE CHOICE IS AN ADDRESS, NOT A STATE. `chosen` comes from the router
+ * and `onChoose` navigates, so going back from a product's screen lands on the
+ * list rather than on whatever was before the whole surface. A local `useState`
+ * here would make the back control skip a level, which is the kind of thing
+ * nobody files and everybody feels.
+ */
+export function Whichever<T>({
+  items, id, name, icon, chosen, onChoose, then, nothing,
+}: {
+  readonly items: readonly T[];
+  readonly id: (item: T) => string;
+  readonly name: (item: T) => string;
+  readonly icon?: React.ReactNode;
+  /** Which one the address names. Absent means the choice has not been made. */
+  readonly chosen?: string;
+  readonly onChoose: (id: string) => void;
+  readonly then: (item: T) => React.ReactNode;
+  /** What is true when there is nothing to choose between at all. */
+  readonly nothing: { readonly says: string; readonly under?: string };
+}) {
+  if (items.length === 0) return <Screen shape="list" refused={nothing} />;
+
+  const only = items.length === 1 ? items[0] : undefined;
+  const pick = chosen ? items.find((i) => id(i) === chosen) : only;
+  if (pick) return <>{then(pick)}</>;
+
+  return (
+    <Screen shape="list">
+      <Group>
+        {items.map((item) => (
+          <NavRow key={id(item)} icon={icon} label={name(item)} onOpen={() => onChoose(id(item))} />
+        ))}
+      </Group>
+    </Screen>
   );
 }

@@ -13,7 +13,7 @@
 import { useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import {
-  Choice, Group, LongText, NavRow, Screen, Stack, Tray, glyphOf, notice,
+  Choice, Group, LongText, NavRow, Screen, Stack, Tray, Whichever, glyphOf, notice,
 } from "@quad/web";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
@@ -45,57 +45,43 @@ export function Actions({ app, onGo }: {
 }) {
   const of = useLoad<AiAnswer>("op.ai");
 
+  /* ⚠️ THE OUTER WAIT CANNOT BE A `Screen`, BECAUSE `Whichever` RENDERS ONE.
+     Two would draw two crowns; so this resolves the answer first and hands the
+     shape over. The waiting and trouble cases still get a framed screen — see
+     `Part.tsx` for the same seam and the same reason. */
+  if (of.of.status !== "ready") {
+    return <Screen shape="list" of={of.of} again={of.again} then={() => null} />;
+  }
+  const shown = of.of.data.apps.filter((a) => a.actions.length);
+
   return (
-    /* ⚠️ `list` with no primary — an action exists because a product declared
-       one, so there is nothing here to add. */
-    <Screen
-      shape="list"
-      of={of.of}
-      again={of.again}
-      isNothing={(d) => d.apps.every((a) => a.actions.length === 0)}
+    /* ⚠️ ONE PRODUCT AT A TIME — the same rule the workspace's own screens
+       follow (DESIGN.md §3), and the same component. A deployment with six
+       products and forty actions was one column of forty rows under six
+       repeated headings. */
+    <Whichever
+      items={shown}
+      id={(a) => a.id}
+      name={(a) => a.name}
+      icon={glyphOf("sparkle")}
+      chosen={app}
+      onChoose={onGo}
       nothing={{ says: "No product here declares a generating action" }}
-      then={(data) => {
-        const shown = data.apps.filter((a) => a.actions.length);
-        /*
-          ⚠️ ONE PRODUCT AT A TIME — the same rule the workspace's own screens
-          follow (DESIGN.md §3). A deployment with six products and forty actions
-          was one column of forty rows under six repeated headings; a deployment
-          with one is a menu of one, so the list stands down and its actions are
-          the screen.
-        */
-        const only = shown.length === 1 ? shown[0] : undefined;
-        const chosen = app ? shown.find((a) => a.id === app) : only;
-
-        if (!chosen) {
-          return (
-            <Group>
-              {shown.map((a) => (
-                <NavRow
-                  key={a.id}
-                  icon={glyphOf("sparkle")}
-                  label={a.name}
-                  aside={<Chip variant="soft"><Chip.Label>{a.actions.length}</Chip.Label></Chip>}
-                  onOpen={() => onGo(a.id)}
-                />
-              ))}
-            </Group>
-          );
-        }
-
-        return (
-          /*
+      then={(chosen) => (
+        <Screen shape="list">
+          {/*
             ⚠️ AN ACTION IS A ROW THAT OPENS ITS OWN SHEET. Each was a `Card`
             with a title, an id line, two label-and-chip pairs stacked in its
             content and a button under those — six elements to say what a row
             says in two. The sheet already existed; only the way in was a card.
-          */
+          */}
           <Group>
             {chosen.actions.map((action) => (
               <BindTray key={action.id} app={chosen.id} action={action} onDone={of.again} />
             ))}
           </Group>
-        );
-      }}
+        </Screen>
+      )}
     />
   );
 }
