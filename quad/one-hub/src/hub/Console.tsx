@@ -93,7 +93,7 @@ export function ConsolePart({ part, app, onGo }: {
   readonly onGo: (to: Where) => void;
 }) {
   switch (part) {
-    case "tenants": return <Tenants />;
+    case "tenants": return <Tenants onGo={(id) => onGo({ at: "tenant", id })} />;
     case "actions":
       return <Actions app={app} onGo={(id) => onGo({ at: "actions", app: id })} />;
     case "switches": return <Switches />;

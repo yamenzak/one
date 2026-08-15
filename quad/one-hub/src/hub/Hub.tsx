@@ -34,6 +34,7 @@ import { Workspaces } from "./Workspaces.js";
 import { OneWorkspace } from "./Workspace.js";
 import { WorkspacePart } from "./Part.js";
 import { ConsoleHome, ConsolePart } from "./Console.js";
+import { OneTenant } from "../console/OneTenant.js";
 import { InboxScreen } from "../centre/InboxScreen.js";
 import { TellingMe } from "./TellingMe.js";
 import { HUB, above, nameOf, parseWhere, pathOf, type Where } from "./where.js";
@@ -43,7 +44,7 @@ import { HUB, above, nameOf, parseWhere, pathOf, type Where } from "./where.js";
 export const HUB_SCREENS: readonly Where["at"][] = [
   "home", "you", "inbox", "told", "workspaces", "workspace",
   "people", "money", "packages", "settings", "notices", "wording", "trust",
-  "console", "tenants", "actions", "switches", "works", "ground",
+  "console", "tenants", "tenant", "actions", "switches", "works", "ground",
 ];
 
 export function Hub({ path, onGo, onClose }: {
@@ -193,6 +194,7 @@ function Inside({ where, onGo }: {
           onGo={onGo}
         />
       );
+    case "tenant": return <OneTenant id={where.id} />;
     /* ⚠️ Home is drawn by the frame above — it is the only screen with no title
        of its own, because the lockup IS its title. */
     case "home": return null;

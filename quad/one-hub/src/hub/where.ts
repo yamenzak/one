@@ -74,6 +74,14 @@ export type Where =
   | { readonly at: "wording"; readonly slug: string; readonly app?: string }
   | { readonly at: "console" }
   | { readonly at: "tenants" }
+  /**
+   * ⚠️ ONE WORKSPACE, FROM THE OPERATOR'S SIDE. The list answered "who is here"
+   * and then every other question about a workspace was a tray hanging off a
+   * table cell — which is a screen's worth of facts squeezed into a popover, and
+   * unusable the moment a customer has six products across two branches
+   * (DESIGN.md §3).
+   */
+  | { readonly at: "tenant"; readonly id: string }
   | { readonly at: "actions"; readonly app?: string }
   | { readonly at: "switches" }
   | { readonly at: "works" }
@@ -158,6 +166,7 @@ export function parseWhere(path: string): Where {
     const part = tail[0];
     if (part === undefined) return { at: "console" };
     if (!isConsolePart(part)) return { at: "console" };
+    if (part === "tenants" && tail[1]) return { at: "tenant", id: tail[1] };
     const app = tail[1];
     return app && part === "actions" ? { at: part, app } : { at: part };
   }
@@ -175,6 +184,7 @@ export function pathOf(where: Where): string {
     case "workspace": return `${HUB}/w/${where.slug}`;
     case "console": return `${HUB}/console`;
     case "actions": return `${HUB}/console/actions${where.app ? `/${where.app}` : ""}`;
+    case "tenant": return `${HUB}/console/tenants/${where.id}`;
     case "tenants": case "switches": case "works": case "ground":
       return `${HUB}/console/${where.at}`;
     case "settings": case "wording":
@@ -202,6 +212,7 @@ export function above(where: Where): Where | null {
     case "told": return { at: "you" };
     case "workspace": return { at: "workspaces" };
     case "actions": return where.app ? { at: "actions" } : { at: "console" };
+    case "tenant": return { at: "tenants" };
     case "tenants": case "switches": case "works": case "ground":
       return { at: "console" };
     case "settings": case "wording":
@@ -228,6 +239,7 @@ export const nameOf = (where: Where): string => {
     case "wording": return "In your words";
     case "console": return "Operator";
     case "tenants": return "Tenants";
+    case "tenant": return "Workspace";
     case "actions": return "Actions";
     case "switches": return "Switches";
     case "works": return "Works";
