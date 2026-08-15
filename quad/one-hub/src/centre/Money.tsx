@@ -15,7 +15,10 @@
  */
 
 import { Chip } from "@heroui/react";
-import { AmountRow, Await, Bill, FigureWaiting, Group, Section, Shelf, Stack, glyphOf, notice } from "@quad/web";
+import {
+  AmountRow, Await, Bill, FigureWaiting, Group, Section, Shelf, Stack, distinguishing, glyphOf,
+  notice,
+} from "@quad/web";
 import { useLoad, type CentreView, type MoneyView } from "./data.js";
 
 export function Money({ view }: { readonly view: CentreView }) {
@@ -53,9 +56,14 @@ export function Money({ view }: { readonly view: CentreView }) {
           {/* ⚠️ NO GLYPH CHARACTER IN THE LABEL. `app.mark` is a text character
               from a manifest, so it renders at whatever weight and baseline the
               reader's font gives it, beside a name that already says which
-              product this is. */}
+              product this is.
+
+              ⚠️ AND NO LABEL AT ALL ON A WORKSPACE WITH ONE PRODUCT — see
+              `distinguishing`. The crown already said which screen and which
+              workspace; a third heading naming the only product there is is a
+              line to read before the prices. */}
           {data.apps.map((app) => (
-            <Section key={app.id} label={app.name}
+            <Section key={app.id} label={distinguishing(data.apps, app.name)}
               under={app.planId ? undefined : "This product has no plan yet."}>
               <Stack space="snug">
                 {app.status === "past_due"

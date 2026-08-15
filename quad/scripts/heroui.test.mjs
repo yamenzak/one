@@ -465,6 +465,35 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
   }
 }
 
+/* ---------------------------------------------------- a table is a collection --- */
+
+/**
+ * ⚠️ A `Table.Column` OUTSIDE `Table.Content` THROWS DURING RENDER, so the screen
+ * around it is a blank page rather than a broken table. `Table` is the frame;
+ * the collection is `Table.Content`, which is the react-aria half. Putting the
+ * header straight under the frame typechecks — every part is a real component
+ * and the nesting is plausible — and then react-aria says "cannot be rendered
+ * outside a collection" at runtime and React unmounts the tree.
+ *
+ * ⚠️ THAT IS THE WORST SHAPE A UI DEFECT CAN HAVE, which is why it is worth a
+ * static check as well as the render test that now covers the one instance: it
+ * produces no partial output, no warning anybody sees, and nothing to tell
+ * "broken" from "not built yet". Data & Trust shipped blank in every build.
+ */
+{
+  let tables = 0;
+  for (const file of FILES) {
+    const src = readFileSync(file, "utf8");
+    if (!/<Table\.Header\b/.test(src)) continue;
+    tables++;
+    if (!/<Table\.Content\b/.test(src)) {
+      fail(`${rel(file)}: <Table.Header> with no <Table.Content> — the collection ` +
+           `react-aria needs.\n       This throws during render, so the whole screen is blank.`);
+    }
+  }
+  if (!bad) ok(`collection: ${tables} table(s), each inside the collection it needs`);
+}
+
 console.log(bad
   ? `\nheroui: ${bad} finding(s) — a screen branding will not reach.`
   : `\nheroui: components as they ship, themed through tokens.`);

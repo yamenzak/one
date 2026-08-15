@@ -30,6 +30,15 @@
       "fails": "a crown of four controls at three different widths, because a button with only a glyph in it still lays out w-fit px-4"
     },
     {
+      "id": "a-table-is-inside-the-collection-it-needs",
+      "protects": "D7",
+      "stage": "17",
+      "status": "live",
+      "fails": "a Table.Column outside Table.Content throwing during render, so the whole screen is blank",
+      "impl": "scripts/heroui.test.mjs",
+      "proves": "collection:"
+    },
+    {
       "id": "a-row-of-equals-shares-its-width",
       "protects": "D7",
       "stage": "5",

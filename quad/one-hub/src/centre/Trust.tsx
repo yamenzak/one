@@ -9,7 +9,7 @@
  */
 
 import { Button, Card } from "@heroui/react";
-import { Documents, Section, Stack, SubProcessors } from "@quad/web";
+import { Documents, Section, Stack, SubProcessors, distinguishing } from "@quad/web";
 import type { Where } from "../door.js";
 import { accountUrl } from "../door.js";
 import type { CentreView } from "./data.js";
@@ -26,14 +26,18 @@ export function Trust({ view, where }: {
       {/* ⚠️ The crown names the screen — see hub/Hub.tsx. */}
       <Stack space="roomy">
           {documented.map((app) => (
-            <Section key={app.id} label={`${app.name} — the documents`}>
+            /* ⚠️ THE HEADING NAMES THE BLOCK, NOT THE BLOCK AND ITS OWNER. Two
+               em-dashed compounds per product is a heading somebody parses
+               rather than reads, and on a workspace with one product the half
+               before the dash distinguished nothing at all. */
+            <Section key={app.id} label={distinguishing(documented, app.name) ?? "The documents"}>
               <Documents documents={Object.values(app.documents)} outstanding={[]} onAccept={() => {}} />
             </Section>
           ))}
           {processing.map((app) => (
             <Section
               key={app.id}
-              label={`${app.name} — who else touches the data`}
+              label={distinguishing(processing, app.name) ?? "Who else touches the data"}
               under="Every third party a fact can reach, named"
             >
               <SubProcessors book={app.processors} />

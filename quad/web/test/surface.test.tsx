@@ -22,6 +22,8 @@ import { FlagConsole, Shelf, saying, money } from "../src/console.js";
 import { Shell, reachable } from "../src/shell.js";
 import { brandCss, brandCssFor, readable, skyCss, colorFor } from "../src/theme.js";
 import { bespokeCss } from "../src/ambience.js";
+import { Documents, SubProcessors } from "../src/legal.js";
+import type { DocumentDef } from "@quad/kernel";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node);
 
@@ -388,5 +390,55 @@ describe("a workspace's branding", () => {
     expect(colorFor("neutral")).toBe("default");
     expect(colorFor("info")).toBe("accent");
     expect(colorFor("danger")).toBe("danger");
+  });
+});
+
+/* ----------------------------------------------------------------- legal --- */
+
+/**
+ * ⚠️ THESE TWO WERE UNTESTED AND ONE OF THEM RENDERED NOTHING. `SubProcessors`
+ * put `Table.Header` straight under `Table`, skipping `Table.Content` — which is
+ * the collection react-aria needs — so it threw "cannot be rendered outside a
+ * collection" and took the WHOLE Data & Trust screen down to a blank page. It
+ * typechecked, and every suite was green, because nothing ever rendered it.
+ *
+ * ⚠️ SO THE ASSERTION IS THAT IT RENDERS AT ALL, and that is not a weak test
+ * here: a screen-level component that throws during render is the one failure
+ * that produces no partial output, no console warning a person would see, and no
+ * difference between "broken" and "not built yet".
+ */
+describe("the legal surfaces", () => {
+  it("renders the sub-processor table, which needs the collection to exist", () => {
+    const out = html(
+      <SubProcessors
+        book={{
+          stripe: {
+            id: "stripe", name: "Stripe", role: "Payments", country: "IE",
+            receives: ["contact"],
+          },
+        }}
+      />,
+    );
+    expect(out).toContain("Stripe");
+    expect(out).toContain("Payments");
+  });
+
+  it("renders documents, and says which one is still owed", () => {
+    const docs = [
+      {
+        id: "terms", kind: "terms", title: "Terms", version: "2026-01-01" as never,
+        mustAccept: true, binds: "tenant", url: "/terms",
+      },
+      {
+        id: "privacy", kind: "privacy", title: "Privacy", version: "2026-01-01" as never,
+        mustAccept: false, binds: "person", url: "/privacy",
+      },
+    ] as const satisfies readonly DocumentDef[];
+    const out = html(
+      <Documents documents={docs} outstanding={[docs[0]!]} onAccept={() => {}} />,
+    );
+    expect(out).toContain("Terms");
+    expect(out).toContain("Read and accept");
+    expect(out).toContain("Accepted");
   });
 });

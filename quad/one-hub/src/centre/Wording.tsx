@@ -14,7 +14,9 @@
 
 import { useState } from "react";
 import { Button, Card } from "@heroui/react";
-import { Await, FormWaiting, LongText, Nothing, Row, Section, Stack, notice } from "@quad/web";
+import {
+  Await, FormWaiting, LongText, Nothing, Row, Section, Stack, distinguishing, notice,
+} from "@quad/web";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView } from "./data.js";
 
@@ -40,12 +42,15 @@ export function Wording({ view }: { readonly view: CentreView }) {
 
   return (
     <Stack space="roomy">
-      {view.apps.map((app) => <AppWording key={app.id} app={app} />)}
+      {view.apps.map((app) => <AppWording key={app.id} app={app} among={view.apps} />)}
     </Stack>
   );
 }
 
-function AppWording({ app }: { readonly app: CentreApp }) {
+function AppWording({ app, among }: {
+  readonly app: CentreApp;
+  readonly among: readonly CentreApp[];
+}) {
   const of = useLoad<{ items: readonly WordingLine[] }>("ai.wording", { app: app.id });
 
   return (
@@ -55,9 +60,11 @@ function AppWording({ app }: { readonly app: CentreApp }) {
       again={of.again}
       isNothing={(d) => d.items.length === 0}
       nothing={null}
+      /* ⚠️ The product's name only where there is more than one of them — see
+         `distinguishing`. The crown already named the screen and the workspace. */
       then={(data) => (
         <Section
-          label={app.name}
+          label={distinguishing(among, app.name)}
           under="What it says on your behalf, when you want it said differently"
         >
           <Stack space="snug">

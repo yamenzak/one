@@ -567,21 +567,45 @@ export function Title(
  */
 export function Section(
   { label, under, children }: {
-    readonly label: string;
+    /**
+     * ⚠️ ABSENT IS A REAL ANSWER — see `distinguishing`. A section whose heading
+     * separates it from nothing is a line of chrome, and they stack: a phone
+     * showed "Settings", the workspace's name, "Kova", "Studio" and "Everyone
+     * in this workspace" before the first control it could change.
+     */
+    readonly label?: string;
     readonly under?: string;
     readonly children?: React.ReactNode;
   },
 ) {
   return (
     <section className={`flex flex-col ${HEAD_GAP}`}>
-      <div className={`flex flex-col ${SPACE.hair}`}>
-        <h2 className={TYPE.title}>{label}</h2>
-        {under ? <p className={TYPE.note}>{under}</p> : null}
-      </div>
+      {label || under ? (
+        <div className={`flex flex-col ${SPACE.hair}`}>
+          {label ? <h2 className={TYPE.title}>{label}</h2> : null}
+          {under ? <p className={TYPE.note}>{under}</p> : null}
+        </div>
+      ) : null}
       {children}
     </section>
   );
 }
+
+/**
+ * THE NAME OF ONE OF SEVERAL — or nothing, when it is the only one.
+ *
+ * ⚠️ A HEADING EXISTS TO SEPARATE, SO ONE THING NEEDS NONE. Every screen in the
+ * hub loops the workspace's products and heads each block with the product's
+ * name; on a workspace with ONE product that name distinguishes it from nothing
+ * and is read before every screen, under two headings that already scoped it.
+ * The same block with two products needs it badly, which is why this is a
+ * question about the list rather than a decision per screen.
+ *
+ * ⚠️ AND IT IS HERE RATHER THAN IN EACH SCREEN so the rule cannot be applied to
+ * four of the five. The list is the argument; the name is what to say about it.
+ */
+export const distinguishing = <T,>(among: readonly T[], name: string): string | undefined =>
+  among.length > 1 ? name : undefined;
 
 /** ⚠️ For a heading with nothing structurally under it. Prefer `Section`. */
 export function SectionTitle({ children }: { readonly children: React.ReactNode }) {

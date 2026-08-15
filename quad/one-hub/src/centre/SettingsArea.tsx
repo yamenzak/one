@@ -21,7 +21,8 @@
  */
 
 import {
-  Await, FormWaiting, NotificationPolicy, Reveal, Section, Settings, Stack, notice,
+  Await, FormWaiting, NotificationPolicy, Reveal, Section, Settings, Stack, distinguishing,
+  notice,
 } from "@quad/web";
 import { settingsOn } from "@quad/kernel";
 import { api } from "../api.js";
@@ -47,7 +48,10 @@ export function SettingsArea({ view }: { readonly view: CentreView }) {
         <Stack space="roomy">
           {/* ⚠️ The crown names the screen — see hub/Hub.tsx. */}
           {view.apps.map((app) => (
-            <Section key={app.id} label={app.name}>
+            /* ⚠️ NO HEADING WHERE THERE IS ONE PRODUCT — see `distinguishing`.
+               The crown named the screen and the workspace; a third line naming
+               the only product there is was read before every setting. */
+            <Section key={app.id} label={distinguishing(view.apps, app.name)}>
               <Stack space="roomy">
                 <AppSettings app={app} />
                 <Told view={view} app={app} told={told} again={inbox.again} />
