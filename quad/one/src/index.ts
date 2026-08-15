@@ -21,7 +21,8 @@ import {
   AI_ACTION_SCHEMA, AUDIT_SCHEMA, BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA,
   JOBS_SCHEMA, MEMBERSHIP_SCHEMA, OPERATOR_SCHEMA, PACKAGE_SCHEMA, REPLAY_SCHEMA, SETTING_SCHEMA, VAULT_SCHEMA,
   NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, locator, memberFor, noteShardApp,
-  operatorOps, permissionsResolver, personalOps, schemaFor, serve, sessionIdFrom, shardFor, whoIs,
+  operatorOps, permissionsResolver, personalOps, schemaFor, serve, sessionIdFrom, shardFor,
+  subscriptionFor, whoIs,
   type Db, type TenantRow,
 } from "@quad/runtime";
 import { hello } from "@quad/hello";
@@ -131,6 +132,22 @@ const handler = (env: Env) => {
   const directory = env.DIRECTORY as unknown as Db;
   const shardOf = (tenant: TenantRow) => shardFor(env as never, tenant.shardId);
 
+  /*
+    ⚠️ WHO RUNS THE DEPLOYMENT, DECIDED ONCE. The console is behind it and the
+    hub draws the operator's place from it, and two copies of this rule is how
+    a place gets drawn over a console that then refuses every call. The
+    development fallback admits the signed-in developer and NOBODY in
+    production — an empty allow-list on a live deployment is unconfigured, not
+    open.
+  */
+  const isOperator = (email: string | null): boolean => {
+    if (!email) return false;
+    const listed = (env.OPERATOR_EMAILS ?? "")
+      .split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+    if (listed.length) return listed.includes(email.toLowerCase());
+    return env.ENVIRONMENT === "development";
+  };
+
   return serve({
     roots: { root: env.ROOT },
     apps: APPS,
@@ -154,6 +171,15 @@ const handler = (env: Env) => {
           }
           console.log(`[sign-in] ${to} → ${code}`);
         },
+        /* ⚠️ The same allow-list the console is behind (D18) — the hub draws
+           the operator's place from this, and a place drawn over nothing is a
+           promise the next screen takes back. */
+        isOperator,
+        /* ⚠️ Injected because the money tables are a module a deployment may
+           not have applied — see `IdentityDeps`. Only a workspace that stopped
+           paying carries a badge; one on every row is texture. */
+        needsAttention: async (db, tenantId, appId) =>
+          (await subscriptionFor(db, tenantId, appId))?.status === "past_due",
       }),
       /*
         ⚠️ THE OPERATOR OPERATIONS RIDE THE PERSONAL LANE, on the operator door
@@ -161,16 +187,7 @@ const handler = (env: Env) => {
         admits the signed-in developer and NOBODY in production — an empty
         allow-list on a live deployment is unconfigured, not open.
       */
-      ...operatorOps({
-        apps: APPS,
-        isOperator: (email) => {
-          if (!email) return false;
-          const listed = (env.OPERATOR_EMAILS ?? "")
-            .split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
-          if (listed.length) return listed.includes(email.toLowerCase());
-          return env.ENVIRONMENT === "development";
-        },
-      }),
+      ...operatorOps({ apps: APPS, isOperator }),
     },
 
     /*

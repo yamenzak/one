@@ -60,7 +60,11 @@ export function SessionProvider({ children }: { readonly children: React.ReactNo
       const health = await api.health();
       if (!live) return;
       if (!health.ok) { setStuck(health.problem); return; }
-      setWhere({ kind: health.value.door as DoorKind, root: health.value.root });
+      setWhere({
+        kind: health.value.door as DoorKind,
+        root: health.value.root,
+        slug: health.value.slug ?? null,
+      });
       await refresh();
     })();
     return () => { live = false; };

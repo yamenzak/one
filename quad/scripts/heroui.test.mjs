@@ -81,7 +81,14 @@ const LAYOUT = [
   /^(absolute|relative|fixed|sticky|static)$/,
   /^(inset|top|right|bottom|left|z)-/,
   /^(overflow|overscroll)-/,
-  /^(sr-only|not-sr-only|truncate|whitespace-nowrap)$/,
+  /* ⚠️ EVERY `whitespace-` VALUE, NOT JUST `nowrap`. The list held the one that
+     stops text wrapping and refused the one that lets it — and letting it is
+     the case that comes up, because `.button` ships `whitespace-nowrap` and a
+     row whose second line is a sentence then sets its own min-content width
+     and pushes a phone sideways. Text flow is placement; which value is right
+     is the caller's. */
+  /^(sr-only|not-sr-only|truncate)$/,
+  /^whitespace-/,
   /^(aspect|columns)-/,
 ];
 

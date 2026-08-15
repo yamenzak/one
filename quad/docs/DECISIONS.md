@@ -389,3 +389,31 @@ asking the kernel; a tenant rewording an action the app did not mark
 brandable; a generating action with no output ceiling (the reserve is a
 ceiling on revenue); a run that resolves a different model or different words
 than the screens report; a read that generates.
+
+## D20 — The hub is one surface presented over the product, reachable from every door, and it is a route
+
+Who you are, everywhere you belong, and — for the few who hold it — the
+deployment itself are ONE surface, opened over whatever somebody was doing and
+dismissed back onto it. It is not an app: no nav bar, no tabs, no shell of its
+own. Its screens are ADDRESSES under a `/hub` prefix reserved on every door, so
+a person can link to one, land on one and reload one; `where.ts` parses the
+location and decides what is above each screen, and leaving is never a choice a
+screen's author makes. A workspace is managed at its OWN origin — opening one
+from anywhere else is a full page load that arrives with the hub already open on
+it. A workspace's own address is the PRODUCT and nothing else. Decided
+2026-08-15.
+
+**Why.** The first build gave the tenant centre five permanent tabs (people,
+money, settings, trust, a cross-app home) and the operator console five more,
+each on its own hostname with its own shell — so the thing somebody signed in to
+use sat one level below four surfaces they visit twice a year, their account
+lived at a third address, and three shells drifted apart the week they existed.
+None of that fails a test: every screen renders, every call answers, and the
+product is chaos. Those five are things you go and do once and then leave, which
+is a presented surface, not a bar that never goes away.
+
+**Therefore never:** a nav bar over the account, the workspace or the console; a
+second shell for the operator; a hub screen held in component state rather than
+at an address; a workspace's records answered from another door; a product path
+under `/hub`; a `Title` under a `PageCrown` that repeats it; a dismiss control on
+a door with nothing underneath.

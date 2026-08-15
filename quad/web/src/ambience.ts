@@ -710,6 +710,15 @@ export function ambienceStylesheet(): string {
     `  mix-blend-mode: overlay;`,
     `}`,
     ...rules,
+    /*
+      ⚠️ A CARD-SIZED AMBIENCE FITS THE CARD. The reach above is one VIEWPORT,
+      which is right for a screen and two bright streaks inside something the
+      size of a destination card — the shapes are composed for a wide field and
+      only the top corner of one lands. Same layers, same tokens, one height.
+    */
+    `[data-sky][data-reach="card"]::before, [data-sky][data-reach="card"]::after {`,
+    `  height: 100%;`,
+    `}`,
     /* ⚠️ A bleeding ambience must reach the edge even inside a padded column. */
     `[data-bleed="edge"]::before, [data-bleed="edge"]::after {`,
     `  left: 50%; right: auto; width: 100vw; transform: translateX(-50%);`,

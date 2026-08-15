@@ -43,8 +43,8 @@ export function AppSurface({ app, route }: {
           <Card.Header>
             <Card.Title>{app.mark} {declared?.label ?? app.name}</Card.Title>
             <Card.Description>
-              This screen ships with {app.name}. The workspace, its people, its money and its
-              settings are already live in the areas on the left.
+              This screen ships with {app.name}. The workspace itself — its people, its money,
+              its settings — is already live, in the hub.
             </Card.Description>
           </Card.Header>
         </Card>

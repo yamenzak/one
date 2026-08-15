@@ -126,8 +126,18 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
       other doors are derived from a fact the deployment holds, not from a
       constant baked into a bundle at build time.
     */
+    /*
+      ⚠️ AND THE SLUG COMES WITH IT, for exactly the same reason. A page that
+      worked out which workspace it was on by cutting the hostname apart would
+      be that second classifier one more time — and the hub asks the question
+      constantly, because opening a workspace is a route where it already is
+      and a full page load anywhere else.
+    */
     if (url.pathname === "/health") {
-      return json({ ok: true, door: door.kind, root: wiring.roots.root });
+      return json({
+        ok: true, door: door.kind, root: wiring.roots.root,
+        slug: door.kind === "tenant" ? door.slug : null,
+      });
     }
     /*
       ⚠️ THE AGENT DOOR, AND IT IS THE SAME BUILDING (D13). `/mcp` answers on a

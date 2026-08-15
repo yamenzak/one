@@ -1,11 +1,18 @@
 /**
- * THE HUB — one page, and the door decides what it is.
+ * WHAT THIS PAGE IS — the door decides, and the hub is over all of it.
  *
- * ⚠️ NO ROUTER, AND THAT IS A MEASUREMENT RATHER THAN A PRINCIPLE. Every screen
- * here is picked by two facts — which door, and whether anybody is signed in —
- * neither of which is in the path. A router over one destination per door is a
- * dependency that renders the same element; the first account screen that is
- * genuinely a second place to be is when one earns its way in.
+ * ⚠️ THE HUB IS NOT A DOOR. It is a surface presented over whatever somebody
+ * was doing, reachable from every one of them: who you are, everywhere you
+ * belong, and — for the few who hold it — the deployment itself. It used to be
+ * an app per door with a nav bar of its own, so a person's account lived on one
+ * hostname, their workspace's roster on another, and the operator console on a
+ * third, each with a permanent bar over it announcing four places they visit
+ * twice a year.
+ *
+ * ⚠️ SO EVERY DOOR ANSWERS `/hub`, AND WHAT IS UNDERNEATH DIFFERS. On a
+ * workspace's own address the product is underneath and the hub dismisses back
+ * onto it; on the account and operator doors there is nothing underneath and
+ * the hub IS the page, which is why it is handed no way out there.
  *
  * ⚠️ AND THE PICK IS A PURE FUNCTION, so it is a test rather than a click
  * through five hostnames. The bug it exists to catch is a state that resolves to
@@ -18,19 +25,20 @@ import { Gallery } from "./screens/Gallery.js";
 import { SPECIMEN_IDS, Specimen, type SpecimenId } from "./screens/Specimens.js";
 
 import { useSession } from "./session.js";
+import { useTravel } from "./nav.js";
 import type { Face } from "./door.js";
-import { Centre } from "./centre/Centre.js";
-import { Console } from "./console/Console.js";
+import { Product } from "./centre/Product.js";
+import { Hub } from "./hub/Hub.js";
+import { HUB, inHub, pathOf } from "./hub/where.js";
 import { Elsewhere } from "./screens/Elsewhere.js";
 import { NewWorkspace } from "./screens/NewWorkspace.js";
 import { SignIn } from "./screens/SignIn.js";
 import { Signpost } from "./screens/Signpost.js";
-import { Workspaces } from "./screens/Workspaces.js";
 
-/** What the Hub shows, as a name — the thing the guard and the tests read. */
+/** What the page shows, as a name — the thing the guard and the tests read. */
 export type Screen =
-  | "waiting" | "stuck" | "signpost" | "sign-in" | "workspaces" | "new-workspace"
-  | "centre" | "console" | "elsewhere" | "gallery";
+  | "waiting" | "stuck" | "signpost" | "sign-in" | "hub" | "new-workspace"
+  | "product" | "elsewhere" | "gallery";
 
 /**
  * ⚠️ EVERY COMBINATION IS ANSWERED, INCLUDING THE ONES THAT SHOULD NOT HAPPEN.
@@ -53,9 +61,12 @@ export function pickScreen(
   /* Every remaining door needs somebody. */
   if (signedIn === null) return "waiting";
   if (!signedIn) return "sign-in";
-  if (face === "centre") return "centre";
-  if (face === "console") return "console";
-  return face === "create" ? "new-workspace" : "workspaces";
+  if (face === "centre") return "product";
+  if (face === "create") return "new-workspace";
+  /* ⚠️ THE ACCOUNT DOOR AND THE OPERATOR DOOR ARE THE SAME PAGE. Both are the
+     hub with nothing underneath; what an operator holds is a place ON it, not a
+     product of its own — see `hub/Console.tsx`. */
+  return "hub";
 }
 
 const LEAD: Readonly<Record<string, string>> = {
@@ -67,6 +78,7 @@ const LEAD: Readonly<Record<string, string>> = {
 
 export function App() {
   const { where, face, me, stuck } = useSession();
+  const { path, beneath, go } = useTravel();
   /* ⚠️ Development only, and read from the DEPLOYMENT rather than the URL: a
      query parameter alone would make the catalogue one link away in
      production. */
@@ -85,17 +97,35 @@ export function App() {
      SAME LAYOUT. The first is a column under a ruled crown; the second is a
      centred sheet with no chrome. Using one for both makes the sign-in look like
      a settings page — which is how a product comes to feel like a form. */
-  const settled = screen === "workspaces" || screen === "gallery";
+  const settled = screen === "gallery";
 
-  /* ⚠️ The centre brings its OWN shell — crown, nav, areas — so it replaces the
-     Hub's frame exactly as a specimen does, rather than sitting inside it. */
-  if (screen === "centre") return <><NoticeHost /><Centre /></>;
-  /* ⚠️ The console brings the same shell, pointed at the deployment. */
-  if (screen === "console") return <><NoticeHost /><Console /></>;
+  /* ⚠️ The hub is the whole page here: the account door and the operator door
+     have nothing underneath, so it is handed no way out. */
+  if (screen === "hub") {
+    return <><NoticeHost /><Hub path={path} onGo={go} onClose={null} /></>;
+  }
+
+  /* ⚠️ A workspace's own address is the PRODUCT, with the hub pulled over it —
+     and the product does not move while it is open (`beneath`). */
+  if (screen === "product") {
+    return (
+      <>
+        <NoticeHost />
+        <Product
+          path={beneath}
+          onGo={go}
+          onOpenHub={() => go(HUB)}
+          onOpenInbox={() => go(pathOf({ at: "inbox" }))}
+        />
+        {inHub(path)
+          ? <Hub path={path} onGo={go} onClose={() => go(beneath)} />
+          : null}
+      </>
+    );
+  }
 
   /* ⚠️ A specimen brings its OWN page, crown and ambience — that is the whole
-     claim being tested — so it replaces the Hub's frame rather than sitting
-     inside it. */
+     claim being tested — so it replaces the frame rather than sitting inside it. */
   /* ⚠️ `NoticeHost` mounts ONCE, beside whichever frame renders — two hosts
      would show every notice twice, which reads as a fault in the thing being
      announced. */
@@ -124,7 +154,6 @@ export function App() {
           {screen === "stuck" && stuck ? <Trouble problem={stuck} /> : null}
           {screen === "signpost" && where ? <Signpost where={where} /> : null}
           {screen === "sign-in" ? <SignIn lead={LEAD[face ?? ""] ?? LEAD.hub!} /> : null}
-          {screen === "workspaces" && where ? <Workspaces where={where} /> : null}
           {screen === "new-workspace" && where ? <NewWorkspace where={where} /> : null}
           {screen === "elsewhere" && where ? <Elsewhere where={where} kind={where.kind} /> : null}
           {screen === "gallery" ? <Gallery /> : null}

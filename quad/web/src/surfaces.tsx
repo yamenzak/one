@@ -25,7 +25,7 @@
  */
 
 import * as React from "react";
-import { Avatar, Button, Card, Chip, Label, Separator, Switch } from "@heroui/react";
+import { Avatar, Button, Card, Chip, Label, Separator, Skeleton, Switch } from "@heroui/react";
 import type { Tone } from "@quad/kernel";
 import { TYPE } from "./type.js";
 import { CARD_ROWS, CROWN_SIZE, FACE, HEAD_GAP, ICON, INSET, LEAD, PAD, ROW, SPACE } from "./metrics.js";
@@ -127,6 +127,74 @@ function ruled(children: React.ReactNode): React.ReactNode {
 }
 
 /** ⚠️ Exported for the two-runs-in-one-card case above; screens rarely need it. */
+/* ------------------------------------------------------------------ place --- */
+
+/**
+ * A PLACE — a destination that is somewhere to GO rather than something to SET.
+ *
+ * ⚠️ A PLACE IS NOT A BIG ROW, AND THAT IS THE WHOLE DISTINCTION. A row says
+ * "somewhere to go and change something"; a place says "somewhere". The
+ * difference is carried by the light, by the size of the name, and by the fact
+ * that the entire card is the target — a button inside one would be a second
+ * thing to hit on a surface that is already the offer.
+ *
+ * ⚠️ THE ONLY THING THAT VARIES BETWEEN PLACES IS THE TONE. Same ambience, same
+ * shape, one token moved — so three places on one screen read as three of the
+ * same kind of thing rather than as three designs. Given free rein each would
+ * grow its own gradient and the screen would stop being a set.
+ *
+ * ⚠️ AND THE FOOT IS THE ONE FACT THAT SAVES OPENING IT. `null` is not known
+ * yet and waits; a value speaks; `undefined` draws no foot at all. Somebody
+ * with four workspaces told "None yet" for the length of a round trip is a
+ * wrong answer wearing a loading state's excuse.
+ */
+export function Place({ name, said, foot, tone = "neutral", at, onOpen }: {
+  readonly name: string;
+  /** What this place IS, in a line. Never a list of its contents. */
+  readonly said: string;
+  readonly foot?: React.ReactNode | null;
+  readonly tone?: Tone;
+  /** Its place in a sequence of blocks — the only stagger there is. */
+  readonly at?: number;
+  readonly onOpen: () => void;
+}) {
+  return (
+    /* ⚠️ THE ARRIVAL IS ON THE BLOCK, NOT ON THE CONTROL. An inline style on a
+       library component beats every token, so branding stops reaching it — and
+       a place is one thing arriving, which is what a wrapper says. */
+    <div {...ARRIVE} style={at === undefined ? undefined : arriveAt(at)}>
+      {/* ⚠️ The ambience is an attribute read by a stylesheet built from theme
+          tokens — never an inline gradient, for the same reason. */}
+      <Card data-sky="aurora" data-tone={tone} data-reach="card">
+        <Card.Content>
+          {/* ⚠️ THE WHOLE CARD IS THE TARGET, and it is a real Button — the
+              focus ring, the pressed state and every keyboard behaviour come
+              with it, none of which is visible in a screenshot and all of which
+              is visible to somebody not using a mouse. */}
+          <Button
+            variant="ghost"
+            className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush}`}
+            onPress={onOpen}
+          >
+            <span className={`flex w-full min-w-0 flex-col items-start text-left ${SPACE.tight} ${PAD}`}>
+              <span className={TYPE.section}>{name}</span>
+              <span className={TYPE.note}>{said}</span>
+              {foot !== undefined ? (
+                <span className="flex w-full items-center justify-between pt-2">
+                  {foot === null
+                    ? <Skeleton className="h-4 w-24" />
+                    : <span className={TYPE.label}>{foot}</span>}
+                  <span aria-hidden="true" className={TYPE.note}>›</span>
+                </span>
+              ) : null}
+            </span>
+          </Button>
+        </Card.Content>
+      </Card>
+    </div>
+  );
+}
+
 export const RowRule = ({ inset = "lead" }: { readonly inset?: Inset } = {}) => (
   <div className={INSET[inset]}><Separator /></div>
 );
@@ -191,7 +259,7 @@ export interface NavRowProps extends RowBase {
 
 export function NavRow({ icon, label, under, aside, onOpen, isDisabled }: NavRowProps) {
   return (
-    <Button variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.flush} ${ROW.tap}`} isDisabled={isDisabled} onPress={onOpen}>
+    <Button variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.tap}`} isDisabled={isDisabled} onPress={onOpen}>
       <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
         <Lead icon={icon} />
         <Body label={label} under={under} />
@@ -222,7 +290,7 @@ export function ActionRow({ icon, label, under, onDo, tone = "neutral" }: RowBas
     */
     <Button
       variant="ghost"
-      className={`w-full justify-start ${ROW.free} ${ROW.flush} ${ROW.tap}`}
+      className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.tap}`}
       onPress={onDo}
     >
       <span
@@ -318,7 +386,7 @@ export function PersonRow({ name, under, when, unread, face, onOpen }: {
   readonly onOpen: () => void;
 }) {
   return (
-    <Button variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.flush} ${ROW.tap}`} onPress={onOpen}>
+    <Button variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.tap}`} onPress={onOpen}>
       <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
         <Avatar className={`shrink-0 ${FACE}`}>
           {face ? <Avatar.Image src={face} alt="" /> : null}
@@ -369,7 +437,7 @@ export function AmountRow({ icon, label, under, amount, tone = "neutral", onOpen
     </span>
   );
   return onOpen
-    ? <Button variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.flush} ${ROW.tap}`} onPress={onOpen}>{inner}</Button>
+    ? <Button variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.tap}`} onPress={onOpen}>{inner}</Button>
     : <div className="flex w-full">{inner}</div>;
 }
 

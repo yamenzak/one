@@ -31,6 +31,7 @@ reader can trust this table instead of re-reading the code.
 | 14 | The tenant centre — the shell with the router: five areas + app screens inside | shipped |
 | 15 | The operator console — the same shell on `admin.`, and the maintenance switch | shipped |
 | 16 | AI actions — a lane per action, a model the operator binds, words that narrow | shipped |
+| 17 | The hub — one surface over the product, reachable from every door, addressed | shipped |
 
 ## What is NOT built, and where to pick it up
 
@@ -488,15 +489,42 @@ that generates declares `ai: { lane, prompt, variables, maxOutput, brandable? }`
   and the fallback; `apps/hello/test/ai-actions.test.ts` drives the binding
   and both wording levels through the real doors.
 
+**Stage 17 — THE HUB (D20).** One surface: who you are, everywhere you belong,
+and the deployment itself, presented OVER whatever somebody was doing and
+dismissed back onto it. It replaces two five-tab shells — the tenant centre and
+the operator console — that each sat permanently over the product somebody
+actually signed in to use.
+
+- **It is a route, not a popup.** Every screen has an address under `/hub`, a
+  prefix reserved on every door; `hub/where.ts` is a parser and a printer, so
+  the whole information architecture is a table of tests with no DOM in it, and
+  `above()` decides the way out from where a screen SITS rather than from what
+  its author remembered. An unreadable path is the root, never a blank page.
+- **One frame names every screen**, so the crown IS the title — a `Title` under
+  it puts the same word on the page twice. A door with nothing underneath (the
+  account door, the operator door) is handed no way out at all, because an ×
+  that closes onto a backdrop is a control that appears to do nothing.
+- **A workspace is managed at its own origin.** Opening one from anywhere else
+  is a full page load that arrives with the hub already open on it (`hubAt`) —
+  the alternative is a screen that loads here and refuses every call it makes.
+  `/health` reports the slug for the same reason it reports the door.
+- **A workspace's own address is the PRODUCT.** Its declared screens, its
+  switcher, its inbox and one control into the hub; the five areas are gone from
+  the bar. One product opens directly — a chooser with one card is a screen whose
+  entire content is a button.
+- **A row somebody cannot open is not drawn** — `partsFor` in `where.ts`, a pure
+  table rather than a walk through four sign-ins, and never the enforcement.
+
 **`@quad/one-hub` — the page a person opens.** The signpost, sign-in with an
-emailed code, the workspace list, and the wizard that makes one — HeroUI v3 as it
+emailed code, the doors, and the wizard that makes a workspace — HeroUI v3 as it
 ships, themed through tokens, nothing restyled.
 
-- **No router, and that is a measurement.** Every screen is picked by two facts —
-  which door, and whether anybody is signed in — neither of which is in the path.
-  `pickScreen` is pure, so "every door resolves to a screen" is a test rather
+- **The DOOR picks the page, and the pick is pure.** Which door, and whether
+  anybody is signed in — neither is in the path. `pickScreen` is a test rather
   than a walk through five hostnames; a state that resolves to nothing renders a
-  blank page, which is the same picture as a page that failed to load.
+  blank page, which is the same picture as a page that failed to load. One
+  router on the page (`nav.ts`), because the hub is a route over a product and
+  two owners of history means the back gesture means two things.
 - **The page never classifies its own hostname.** `/health` reports the door,
   because the runtime already decided it with the reserved labels, the one-label
   rule and the custom-domain test. A second classifier in the browser is a second
@@ -531,6 +559,7 @@ The guard registry, its checks, and the standards that bind them.
 | D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 0 |
 | D18 | The operator stands outside every workspace, and the console is a door rather than a role | 2 |
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 3 |
+| D20 | The hub is one surface presented over the product, reachable from every door, and it is a route | 3 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -656,7 +685,10 @@ the library decides FOR us.
 | `a-renewal-extends-and-never-stacks` | D16 | two overlapping windows for one purchase, and which one the resolver reads decides what somebody paid for |
 | `the-rails-granting-operations-are-not-tools` | D16 | a model composes or applies what a payment buys from a sentence in a document |
 | `every-centre-stop-has-a-branch` | D10 | a path the parser can produce renders a blank page, which is the same picture as a page that failed to load |
-| `an-unreachable-area-resolves-away-before-it-renders` | D15 | a customer opens People and every call on the screen is a 403 dressed as a broken page |
+| `an-unreachable-area-resolves-away-before-it-renders` | D15 | a customer opens Money and every call on the screen is a 403 dressed as a broken page |
+| `every-hub-screen-has-an-address` | D20 | a screen held in component state cannot be linked to, landed on or reloaded, and a refusal saying "read this first" has nowhere to send anybody |
+| `leaving-is-decided-by-where-a-screen-sits` | D20 | two screens get the way out right by hand and the third goes home from three levels in, or a cycle makes the back button never leave |
+| `the-hub-prefix-is-never-a-products-path` | D20 | an app ships a screen under /hub, it is unreachable, and its author finds out from somebody who could not open it |
 | `a-cross-app-operation-names-its-target` | D15 | the second product's packages and settings are unreachable for ever, because the route resolves whichever app is first on the tenant's list |
 | `the-console-is-on-the-operator-door-and-asks-who-is-there` | D18 | the deployment's own console answers at a workspace's address, or admits anybody holding a session, and looks exactly like working software |
 | `maintenance-is-asked-in-the-one-operation-path` | D18 | a closed deployment serves right through the agent door, or an unprovisioned switch refuses every request over our own missing row |

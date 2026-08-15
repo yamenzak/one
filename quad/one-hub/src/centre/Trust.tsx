@@ -23,11 +23,8 @@ export function Trust({ view, where }: {
 
   return (
     <Stack space="roomy">
-      <Section
-        label="Data & Trust"
-        under="What is held about people, and the promises around it"
-      >
-        <Stack space="roomy">
+      {/* ⚠️ The crown names the screen — see hub/Hub.tsx. */}
+      <Stack space="roomy">
           {documented.map((app) => (
             <Section key={app.id} label={`${app.name} — the documents`}>
               <Documents documents={Object.values(app.documents)} outstanding={[]} onAccept={() => {}} />
@@ -54,8 +51,7 @@ export function Trust({ view, where }: {
               </Card>
             )
             : null}
-        </Stack>
-      </Section>
+      </Stack>
 
       <Section
         label="You, everywhere"

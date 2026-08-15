@@ -1,80 +1,75 @@
 /**
- * WHERE A PATH LANDS IN THE CENTRE — pure, so it is a table rather than a walk.
+ * WHERE A PATH LANDS ON A WORKSPACE'S OWN ADDRESS — pure, so it is a table
+ * rather than a walk.
  *
  * ⚠️ EVERY PATH RESOLVES TO SOMETHING. A stop with no screen renders a blank
- * page, which is the same picture as a page that failed to load — so unknown
- * addresses land on Home, and areas the caller cannot reach resolve away
- * BEFORE they render rather than after their first refused call.
+ * page, which is the same picture as a page that failed to load — so an
+ * unknown address lands on the choice of product rather than on nothing.
+ *
+ * ⚠️ AND ONE PRODUCT IS NOT A CHOICE. A chooser with a single card is a screen
+ * whose entire content is a button, so a workspace with one app opens it.
  */
 
 import { describe, expect, it } from "vitest";
-import { STOP_BRANCHES } from "../src/centre/Centre.js";
-import { STOPS, stopFor } from "../src/console/Console.js";
-import { AREAS, areasFor, parseStop, pathFor } from "../src/centre/route.js";
+import { parseStop, pathFor } from "../src/centre/route.js";
+import { HUB_SCREENS } from "../src/hub/Hub.js";
+import { OF_CONSOLE, OF_WORKSPACE, parseWhere, pathOf } from "../src/hub/where.js";
 
 const APPS = ["kova", "hello"];
-const OWNER = new Set(["member:read", "member:manage", "tenant:manage", "billing:read", "billing:manage"]);
-const CUSTOMER = new Set<string>();
 
-describe("the five areas", () => {
-  it("is five, which is the ceiling (D10)", () => {
-    expect(AREAS).toHaveLength(5);
+describe("the product under a workspace's address", () => {
+  it("routes a product's screens by its own id", () => {
+    expect(parseStop("/kova", APPS)).toEqual({ kind: "app", app: "kova", route: "/" });
+    expect(parseStop("/kova/plans", APPS)).toEqual({ kind: "app", app: "kova", route: "/plans" });
   });
 
-  it("resolves each area's route, gated by what the caller holds", () => {
-    expect(parseStop("/", APPS, OWNER)).toEqual({ kind: "area", area: "home" });
-    expect(parseStop("/people", APPS, OWNER)).toEqual({ kind: "area", area: "people" });
-    expect(parseStop("/money", APPS, OWNER)).toEqual({ kind: "area", area: "money" });
-    expect(parseStop("/settings", APPS, OWNER)).toEqual({ kind: "area", area: "settings" });
-    expect(parseStop("/trust", APPS, OWNER)).toEqual({ kind: "area", area: "trust" });
-    expect(parseStop("/inbox", APPS, OWNER)).toEqual({ kind: "area", area: "inbox" });
+  it("opens the only product rather than offering a choice of one", () => {
+    expect(parseStop("/", ["kova"])).toEqual({ kind: "app", app: "kova", route: "/" });
+    expect(parseStop("/", APPS)).toEqual({ kind: "choose" });
+    /* ⚠️ And nothing switched on is still a screen, never a blank page. */
+    expect(parseStop("/", [])).toEqual({ kind: "choose" });
   });
 
-  /* ⚠️ An area somebody cannot reach resolves AWAY — parsing `/people` for a
-     customer would draw a screen whose every call the gate refuses. */
-  it("sends a customer home from the areas their role cannot open", () => {
-    expect(parseStop("/people", APPS, CUSTOMER)).toEqual({ kind: "area", area: "home" });
-    expect(parseStop("/money", APPS, CUSTOMER)).toEqual({ kind: "area", area: "home" });
-    expect(parseStop("/settings", APPS, CUSTOMER)).toEqual({ kind: "area", area: "settings" });
-    expect(areasFor(CUSTOMER).map((a) => a.area)).toEqual(["home", "settings", "trust"]);
-  });
-});
-
-describe("the apps under it", () => {
-  it("routes an enabled product's screens inside the shell", () => {
-    expect(parseStop("/kova", APPS, OWNER)).toEqual({ kind: "app", app: "kova", route: "/" });
-    expect(parseStop("/kova/plans", APPS, OWNER)).toEqual({ kind: "app", app: "kova", route: "/plans" });
-  });
-
-  it("lands an unknown address on Home rather than on nothing", () => {
-    expect(parseStop("/no-such-thing", APPS, OWNER)).toEqual({ kind: "area", area: "home" });
-    expect(parseStop("/scena/wall", APPS, OWNER)).toEqual({ kind: "area", area: "home" });
+  it("lands an unknown address on the choice rather than on nothing", () => {
+    expect(parseStop("/no-such-thing", APPS)).toEqual({ kind: "choose" });
+    expect(parseStop("/scena/wall", APPS)).toEqual({ kind: "choose" });
   });
 
   it("writes the path back the way it parses it", () => {
-    for (const path of ["/", "/people", "/money", "/settings", "/trust", "/inbox", "/kova", "/kova/plans"]) {
-      expect(pathFor(parseStop(path, APPS, OWNER))).toBe(path);
+    for (const path of ["/", "/kova", "/kova/plans", "/hello"]) {
+      expect(pathFor(parseStop(path, APPS))).toBe(path);
     }
   });
-});
 
-describe("the console's stops", () => {
-  /* ⚠️ Five is the ceiling (D10), and every path answers — an unknown one is
-     the first screen rather than nothing. */
-  it("is five destinations, and resolves every path", () => {
-    expect(STOPS).toHaveLength(5);
-    for (const stop of STOPS) expect(stopFor(stop.route)).toBe(stop.id);
-    expect(stopFor("/no-such-thing")).toBe("tenants");
-    expect(stopFor("")).toBe("tenants");
+  /* ⚠️ THE HUB'S PREFIX IS RESERVED ON EVERY DOOR, and this is the half that
+     bites here: a product screen at `/hub/anything` would be unreachable, and
+     the app's author would find out from a person who could not open it. */
+  it("never claims a hub address as a product's", () => {
+    expect(parseStop("/hub", [...APPS, "hub"])).toEqual({ kind: "choose" });
+    expect(parseStop("/hub/w/northwind/people", APPS)).toEqual({ kind: "choose" });
   });
 });
 
-describe("every stop has a branch", () => {
-  /* ⚠️ The shell's dispatch and the parser must name the same set — a stop with
-     no branch renders a blank page with every suite green. */
-  it("draws each area and the app surface", () => {
-    for (const a of AREAS) expect(STOP_BRANCHES).toContain(a.area);
-    expect(STOP_BRANCHES).toContain("inbox");
-    expect(STOP_BRANCHES).toContain("app");
+describe("every address in the hub has a branch", () => {
+  /* ⚠️ The frame's dispatch and the parser must name the same set — an address
+     with no branch renders a blank page with every suite green. */
+  it("draws every screen the parser can produce", () => {
+    const reachable = [
+      "/hub", "/hub/you", "/hub/inbox", "/hub/workspaces", "/hub/w/northwind",
+      ...OF_WORKSPACE.map((p) => `/hub/w/northwind/${p}`),
+      "/hub/console",
+      ...OF_CONSOLE.map((p) => `/hub/console/${p}`),
+    ];
+    for (const path of reachable) {
+      expect(HUB_SCREENS, path).toContain(parseWhere(path).at);
+    }
+  });
+
+  it("names no screen the parser can never produce", () => {
+    const produced = new Set(HUB_SCREENS.map((at) =>
+      at === "workspace" || (OF_WORKSPACE as readonly string[]).includes(at)
+        ? parseWhere(pathOf({ at, slug: "northwind" } as never)).at
+        : parseWhere(pathOf({ at } as never)).at));
+    for (const at of HUB_SCREENS) expect(produced, at).toContain(at);
   });
 });

@@ -80,6 +80,55 @@ export function Dialog({ trigger, title, children, actions }: {
   );
 }
 
+/* ------------------------------------------------------------------- over --- */
+
+/**
+ * A SURFACE PRESENTED OVER WHATEVER SOMEBODY WAS DOING.
+ *
+ * ⚠️ IT IS A ROUTE, NOT A POPUP, AND IT NEVER OWNS `open`. A person can link to
+ * it, land on it and reload it — so which surface is showing is the address's
+ * business, and a component holding that state is a surface nobody can send
+ * anybody to.
+ *
+ * ⚠️ AND IT COVERS THE VIEWPORT RATHER THAN DIMMING IT. A dimmed layer under an
+ * opaque one is a gradient nobody asked for, visible as a seam either side of a
+ * capped column; what is underneath is not context here, it is where somebody
+ * came from and where dismissing returns them.
+ *
+ * ⚠️ IT DECLARES THAT IT SCROLLS. A screen's crown reads the nearest scrolling
+ * ancestor to collapse its title, so a presented surface that did not say so
+ * would leave every title inside it frozen at full size.
+ */
+export function Over({ open, onClose, label, children }: {
+  readonly open: boolean;
+  readonly onClose: () => void;
+  /** What this surface IS, for a reader — the visible title is inside it. */
+  readonly label: string;
+  readonly children: React.ReactNode;
+}) {
+  return (
+    /* ⚠️ `full` AND `opaque` ARE THE LIBRARY'S OWN, not a className fight. HeroUI
+       ships a full-viewport size and an opaque backdrop; forcing an ordinary
+       modal into the same shape with `rounded-none border-0 p-0` is the restyle
+       D7 refuses, and it comes apart on the first library update. */
+    <Modal isOpen={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      {/* ⚠️ `opaque` and `full` are the library's own variants — see above. Each
+          part takes the one that is its own business: the backdrop decides how
+          it covers, the container decides the size and who scrolls. */}
+      <Modal.Backdrop variant="opaque">
+        <Modal.Container size="full" scroll="inside">
+          {/* ⚠️ No `Modal.CloseTrigger` — the way out is the screen's own crown,
+              which is where somebody looks for it and which knows whether this
+              is a dismiss or a step back. Two ways out is one too many. */}
+          <Modal.Dialog aria-label={label} data-scroll="true">
+            {children}
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
+  );
+}
+
 /* ---------------------------------------------------------------- confirm --- */
 
 /**

@@ -18,7 +18,7 @@ import { Elsewhere } from "../src/screens/Elsewhere.js";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node);
 
-const WHERE: Where = { kind: "account", root: "one.4dl.app" };
+const WHERE: Where = { kind: "account", root: "one.4dl.app", slug: null };
 /** ⚠️ Not a browser's — a fixture, so the port half is exercised too. */
 const LOCATION = { protocol: "https:", port: "" } as Location;
 const DEV = { protocol: "http:", port: "8080" } as Location;
@@ -40,8 +40,8 @@ describe("which screen the Hub is", () => {
       for (const signedIn of [true, false, null]) {
         const screen = pickScreen(faceFor(kind), signedIn, false);
         expect(screen, `${kind} / signedIn=${signedIn}`).not.toBe(undefined);
-        expect(["waiting", "stuck", "signpost", "sign-in", "workspaces", "new-workspace",
-          "centre", "console", "elsewhere"]).toContain(screen satisfies Screen);
+        expect(["waiting", "stuck", "signpost", "sign-in", "hub", "new-workspace",
+          "product", "elsewhere"]).toContain(screen satisfies Screen);
       }
     }
   });
@@ -58,18 +58,21 @@ describe("which screen the Hub is", () => {
   it("asks for a sign-in on every door that needs one", () => {
     expect(pickScreen("hub", false, false)).toBe("sign-in");
     expect(pickScreen("create", false, false)).toBe("sign-in");
-    /* ⚠️ A workspace's own address included: the centre is behind a session. */
+    /* ⚠️ A workspace's own address included: the product is behind a session. */
     expect(pickScreen("centre", false, false)).toBe("sign-in");
-    expect(pickScreen("centre", true, false)).toBe("centre");
+    expect(pickScreen("centre", true, false)).toBe("product");
     expect(pickScreen("centre", null, false)).toBe("waiting");
     /* ⚠️ And the operator door: the console admits operators, and the
        deployment decides who those are — never the page. */
     expect(pickScreen("console", false, false)).toBe("sign-in");
-    expect(pickScreen("console", true, false)).toBe("console");
   });
 
-  it("shows workspaces on the account door and the wizard on the setup door", () => {
-    expect(pickScreen("hub", true, false)).toBe("workspaces");
+  /* ⚠️ THE ACCOUNT DOOR AND THE OPERATOR DOOR ARE ONE PAGE. Both are the hub
+     with nothing underneath; what an operator holds is a place on it, so a
+     second shell for the console would be a second design nobody maintains. */
+  it("opens the hub on the account door and on the operator door", () => {
+    expect(pickScreen("hub", true, false)).toBe("hub");
+    expect(pickScreen("console", true, false)).toBe("hub");
     expect(pickScreen("create", true, false)).toBe("new-workspace");
   });
 
@@ -106,7 +109,7 @@ describe("the addresses it sends people to", () => {
   /* ⚠️ The port travels with the address, or every hop in development lands on
      port 80 and 404s — which reads as "the door is broken", not "the link is". */
   it("carries the port and the scheme it is running under", () => {
-    const local: Where = { kind: "account", root: "localhost" };
+    const local: Where = { kind: "account", root: "localhost", slug: null };
     expect(setupUrl(local, DEV)).toBe("http://setup.localhost:8080");
     expect(signpostUrl(local, DEV)).toBe("http://localhost:8080");
   });

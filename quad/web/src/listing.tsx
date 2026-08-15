@@ -69,7 +69,13 @@ export function Listing<T>({ of, cols, rowKey, onOpen, pageSize = 10, says, agai
         const shown = sorted.slice((at - 1) * pageSize, at * pageSize);
 
         return (
-          <div className="flex flex-col">
+          /* ⚠️ `min-w-0` OR THE SCROLL CONTAINER NEVER SCROLLS. A flex item's
+             floor is its content, so a table wider than the column made the
+             COLUMN wider — the header's last label was cut off by the page's
+             own edge and the whole screen scrolled sideways, while the
+             `ScrollContainer` that exists to prevent exactly that sat there
+             with nothing to do. */
+          <div className="flex min-w-0 flex-col">
             {/* ⚠️ `Table` is the frame and `Table.Content` is the table — the
                 sorting and row-action props live on Content, which is the
                 react-aria half. Putting them on the frame typechecks nothing

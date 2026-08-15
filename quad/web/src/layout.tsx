@@ -340,10 +340,24 @@ export function Crown(
  * ambience is built that way. That is the whole separation, and it is why
  * `edges:` can stay green.
  */
-export function PageCrown({ title, back, backLabel = "Back", actions = [], under }: {
+export function PageCrown({ title, back, backLabel, leave = "back", actions = [], under }: {
   readonly title: string;
-  readonly back: () => void;
+  /**
+   * ⚠️ ABSENT MEANS THERE IS NOWHERE TO GO, AND THAT IS A REAL STATE. A surface
+   * opened as the page itself has nothing underneath it — a control that closes
+   * onto a backdrop appears to do nothing, which is worse than not being there.
+   * The page still has a NAME, so the heading stays either way.
+   */
+  readonly back?: () => void;
   readonly backLabel?: string;
+  /**
+   * ⚠️ THE WAY OUT IS A PROPERTY OF WHERE THIS SCREEN SITS, NOT A CHOICE. The
+   * root of a presented surface is DISMISSED and gets an ×; a screen one level
+   * inside is left UPWARDS and gets an arrow. Two screens get that right by
+   * hand and the third gets it wrong — which is the class of thing a frame
+   * exists to decide once.
+   */
+  readonly leave?: "back" | "dismiss";
   readonly actions?: readonly Slot[];
   /**
    * ⚠️ THE ROW THAT SCROLLS AWAY WITH THE TITLE — a scope picker, a date range.
@@ -359,16 +373,18 @@ export function PageCrown({ title, back, backLabel = "Back", actions = [], under
       <header className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
         <Band bleed="edge" width="work">
           <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
-            <Button
-              isIconOnly
-              size={CROWN_SIZE}
-              variant="ghost"
-              data-glass="true"
-              aria-label={backLabel}
-              onPress={back}
-            >
-              <Back />
-            </Button>
+            {back ? (
+              <Button
+                isIconOnly
+                size={CROWN_SIZE}
+                variant="ghost"
+                data-glass="true"
+                aria-label={backLabel ?? (leave === "dismiss" ? "Close" : "Back")}
+                onPress={back}
+              >
+                {leave === "dismiss" ? <X /> : <Back />}
+              </Button>
+            ) : null}
 
             {/*
               ⚠️ `aria-hidden`, BECAUSE THE `h1` BELOW IS THE PAGE'S NAME. Two
@@ -467,6 +483,12 @@ function useScrolledPast(down = 56, up = 32): boolean {
 }
 
 /** ⚠️ Drawn here for the same reason `Lens` is — no icon library in this layer. */
+const X = () => (
+  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
+  </svg>
+);
+
 const Back = () => (
   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M19 12H5" strokeLinecap="round" />
@@ -725,7 +747,13 @@ export function Island({ items, here, onGo }: {
                  paints over a static one whatever the DOM order, so without it
                  the sliding pill covers the four labels it is meant to sit
                  under. */
-              className={`relative grow basis-0 flex-col justify-center gap-1 ${ROW.free} ${ISLAND_ITEM}`}
+              /* ⚠️ `min-w-0` IS WHAT MAKES THE COLUMNS EQUAL RATHER THAN FAIR.
+                 A flex item's floor is its CONTENT, so five words wider than a
+                 fifth of a phone each take what they need and the bar overflows
+                 its own card — the fifth destination sat half off the screen,
+                 on the reference product, at the reference width. The pill's
+                 arithmetic assumes a partition; this is what gives it one. */
+              className={`relative min-w-0 grow basis-0 flex-col justify-center gap-1 ${ROW.free} ${ISLAND_ITEM}`}
               onPress={() => onGo(item.route)}
             >
               <span
@@ -754,7 +782,7 @@ export function Island({ items, here, onGo }: {
                 carries nothing at all.
               */}
               <span
-                className="flex overflow-hidden"
+                className="flex w-full justify-center overflow-hidden"
                 style={{
                   maxHeight: folded ? 0 : "1rem",
                   opacity: folded ? 0 : 1,
@@ -764,7 +792,7 @@ export function Island({ items, here, onGo }: {
               >
                 <span
                   data-here={isHere ? "true" : undefined}
-                  className={`${TYPE.note} leading-none`}
+                  className={`${TYPE.note} truncate leading-none`}
                 >
                   {item.label}
                 </span>

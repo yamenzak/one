@@ -23,17 +23,13 @@ export function Money({ view }: { readonly view: CentreView }) {
       again={money.again}
       then={(data) => (
         <Stack space="roomy">
-          <Section
-            label="Money"
-            under="One bill, however many products the workspace holds"
-          >
-            <Bill
-              lines={data.bill.lines}
-              total={data.bill.total}
-              currency={data.bill.currency}
-              appName={(id) => data.apps.find((a) => a.id === id)?.name ?? id}
-            />
-          </Section>
+          {/* ⚠️ The crown names the screen — see hub/Hub.tsx. */}
+          <Bill
+            lines={data.bill.lines}
+            total={data.bill.total}
+            currency={data.bill.currency}
+            appName={(id) => data.apps.find((a) => a.id === id)?.name ?? id}
+          />
 
           <Card>
             <Card.Header>

@@ -1,60 +1,48 @@
 /**
- * WHERE IN THE CENTRE SOMEBODY IS — a pure read of the path.
+ * WHERE IN A WORKSPACE SOMEBODY IS — a pure read of the path.
  *
- * ⚠️ THE FIRST QUAD SURFACE THAT NEEDS A REAL ROUTER, AND IT IS STILL A PURE
- * FUNCTION FIRST. Five fixed areas, then the apps under `/<app>/…` — and every
- * path resolves to SOMETHING, because a path that resolves to nothing renders
- * a blank page, which is the same picture as a page that failed to load. An
- * address nobody recognises lands on Home, where the person can see where
- * they are.
+ * ⚠️ A WORKSPACE'S OWN ADDRESS IS THE PRODUCT, AND NOTHING ELSE. It used to be
+ * five fixed areas in a permanent bottom bar — people, money, settings, trust —
+ * with the products filed underneath them, so the thing somebody came here to
+ * use was one level down from four things they visit twice a year. Those four
+ * are the hub's now (`hub/where.ts`), reached from anywhere, over anything.
  *
- * ⚠️ AN AREA SOMEBODY CANNOT REACH RESOLVES AWAY BEFORE IT RENDERS. People
- * needs `member:read` and Money needs `billing:read`; parsing them for a
- * customer would draw a screen whose every call the gate refuses.
+ * ⚠️ EVERY PATH RESOLVES TO SOMETHING. A path that resolves to nothing renders
+ * a blank page, which is the same picture as a page that failed to load — so an
+ * address nobody recognises lands where the person can see where they are.
+ *
+ * ⚠️ AND `/hub` IS NOT PARSED HERE. It is reserved on every door, decided one
+ * level up, so a product can never discover that one of its screens is
+ * unreachable because the platform took the name.
  */
 
-/** The five fixed areas (D10) — plus the inbox, which the crown opens and the
-    nav never lists: it is about *what happened*, not *where you are going*. */
-export type Area = "home" | "people" | "money" | "settings" | "trust" | "inbox";
+import { inHub } from "../hub/where.js";
 
 export type Stop =
-  | { readonly kind: "area"; readonly area: Area }
+  /** No product open: the choice of which, or the reason there is none. */
+  | { readonly kind: "choose" }
   | { readonly kind: "app"; readonly app: string; readonly route: string };
 
-export const AREAS: readonly {
-  readonly area: Area; readonly route: string; readonly label: string;
-  /** Absent = everybody in the workspace, customers included. */
-  readonly needs?: string;
-}[] = [
-  { area: "home", route: "/", label: "Home" },
-  { area: "people", route: "/people", label: "People", needs: "member:read" },
-  { area: "money", route: "/money", label: "Money", needs: "billing:read" },
-  { area: "settings", route: "/settings", label: "Settings" },
-  /* ⚠️ One word on the tab; the screen itself says "Data & Trust". Five labels
-     share a phone's width, and a clipped tab reads as a broken one. */
-  { area: "trust", route: "/trust", label: "Trust" },
-];
-
-export const areasFor = (platform: ReadonlySet<string>): typeof AREAS =>
-  AREAS.filter((a) => !a.needs || platform.has(a.needs));
-
-export function parseStop(
-  path: string, apps: readonly string[], platform: ReadonlySet<string>,
-): Stop {
+/**
+ * ⚠️ ONE PRODUCT IS NOT A CHOICE. A workspace with a single app opens it — a
+ * chooser with one card is a screen whose only content is a button.
+ */
+export function parseStop(path: string, apps: readonly string[]): Stop {
   const clean = path.replace(/\/+$/, "") || "/";
-  if (clean === "/inbox") return { kind: "area", area: "inbox" };
-  const fixed = areasFor(platform).find((a) => a.route === clean);
-  if (fixed) return { kind: "area", area: fixed.area };
-
   const [, head, ...rest] = clean.split("/");
-  if (head && apps.includes(head)) {
+
+  /* ⚠️ Refused here as well as decided one level up. An app id that collided
+     with the hub's prefix would make one of its screens unreachable, and its
+     author would find out from somebody who could not open it. */
+  if (head && !inHub(clean) && apps.includes(head)) {
     return { kind: "app", app: head, route: `/${rest.join("/")}` };
   }
+  if (clean === "/" && apps.length === 1 && apps[0]) {
+    return { kind: "app", app: apps[0], route: "/" };
+  }
   /* ⚠️ Never nothing — see the header. */
-  return { kind: "area", area: "home" };
+  return { kind: "choose" };
 }
 
 export const pathFor = (stop: Stop): string =>
-  stop.kind === "area"
-    ? (stop.area === "inbox" ? "/inbox" : AREAS.find((a) => a.area === stop.area)?.route ?? "/")
-    : `/${stop.app}${stop.route === "/" ? "" : stop.route}`;
+  stop.kind === "choose" ? "/" : `/${stop.app}${stop.route === "/" ? "" : stop.route}`;

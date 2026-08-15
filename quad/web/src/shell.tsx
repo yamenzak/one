@@ -78,6 +78,13 @@ export interface ShellProps {
   readonly onGo: (route: string) => void;
   readonly onSwitchApp?: (appId: string) => void;
   readonly onOpenInbox?: () => void;
+  /**
+   * ⚠️ THE WAY INTO THE HUB, AND IT IS THE ONLY ONE A PRODUCT NEEDS. Who you
+   * are, everywhere you belong and everything about this workspace are one
+   * surface pulled OVER the product — so the chrome spends one control on it
+   * rather than a nav slot on each. Absent leaves the face as a face.
+   */
+  readonly onOpenHub?: () => void;
   readonly children?: React.ReactNode;
 }
 
@@ -90,7 +97,7 @@ export const reachable = (
   screens.filter((s) => held.has(s.permission) && (!s.flag || flags[s.flag] === true));
 
 export function Shell(props: ShellProps) {
-  const { screens, here, held, flags, crown, onGo, onSwitchApp, onOpenInbox, children } = props;
+  const { screens, here, held, flags, crown, onGo, onSwitchApp, onOpenInbox, onOpenHub, children } = props;
 
   const mine = reachable(screens, held, flags);
   /* ⚠️ Sliced as well as refused at composition: a deployment reading a manifest
@@ -134,9 +141,21 @@ export function Shell(props: ShellProps) {
             </Button>
           ) : null}
 
-          <Avatar>
-            <Avatar.Fallback>{(crown.personEmail ?? "?").slice(0, 1).toUpperCase()}</Avatar.Fallback>
-          </Avatar>
+          {onOpenHub
+            ? (
+              <Button isIconOnly variant="ghost" aria-label="Account and workspaces" onPress={onOpenHub}>
+                <Avatar size="sm">
+                  <Avatar.Fallback>
+                    {(crown.personEmail ?? "?").slice(0, 1).toUpperCase()}
+                  </Avatar.Fallback>
+                </Avatar>
+              </Button>
+            )
+            : (
+              <Avatar>
+                <Avatar.Fallback>{(crown.personEmail ?? "?").slice(0, 1).toUpperCase()}</Avatar.Fallback>
+              </Avatar>
+            )}
         </div>
       </header>
       <Separator />

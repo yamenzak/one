@@ -49,6 +49,15 @@ export const ROW = {
    * promised existed only in the markup.
    */
   free: "h-auto",
+  /**
+   * ⚠️ AND IT LETS THE WORDS WRAP. `.button` is `whitespace-nowrap`, which is
+   * right for a control labelled with two words and ruinous for a row whose
+   * second line is a sentence: the text sets the button's min-content width,
+   * the button widens the card, the card widens the page, and a phone scrolls
+   * sideways with a description hanging over the edge of its own card. Every
+   * row and every place IS a button, so this rides wherever `free` does.
+   */
+  wrap: "whitespace-normal",
 } as const;
 
 /**
@@ -154,7 +163,14 @@ export const ISLAND_PAD = "p-1" as const;
  * sat on the rim. A minimum height and a centred column is the fix, because it
  * puts the air on both sides without anybody choosing two numbers.
  */
-export const ISLAND_ITEM = "py-2" as const;
+/*
+ * ⚠️ AND IT OWNS ALMOST NO HORIZONTAL PADDING, FOR THE SAME REASON A ROW OWNS
+ * NONE. `.button` is `px-4`: with five destinations on a 390px phone that is
+ * 32 of the 78 pixels a column has, so every label truncated to four
+ * characters — "Tod…", "Clie…", "Pro…" — while the bar itself fitted
+ * perfectly. The gutter belongs to the island, not to each item inside it.
+ */
+export const ISLAND_ITEM = "px-1 py-2" as const;
 
 /**
  * ⚠️ FOUR PIXELS, AND THE PILL IS INSET BY IT WITHOUT KNOWING IT IS. The pill is

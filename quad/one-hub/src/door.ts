@@ -19,6 +19,13 @@ export interface Where {
   readonly kind: DoorKind;
   /** `one.4dl.app` — everything under it is ours. */
   readonly root: string;
+  /**
+   * ⚠️ WHICH WORKSPACE THIS DOOR IS, WHEN IT IS ONE — reported, never derived.
+   * The hub asks constantly: opening a workspace is a route where it already
+   * is and a full page load anywhere else. Cutting it out of the hostname
+   * would be the second classifier this file exists to refuse.
+   */
+  readonly slug: string | null;
 }
 
 /** ⚠️ The port travels with the address, or every hop in development is a 404. */
@@ -34,6 +41,23 @@ export const signpostUrl = (where: Where, location: Location): string => at(null
 /** Where a workspace lives. */
 export const tenantUrl = (slug: string, where: Where, location: Location): string =>
   at(slug, where, location);
+
+/** The deployment's own door. */
+export const operatorUrl = (where: Where, location: Location): string =>
+  at("admin", where, location);
+
+/**
+ * ⚠️ THE HUB TRAVELS BETWEEN DOORS AS AN ADDRESS, WHICH IS WHAT MAKES IT ONE
+ * SURFACE. A workspace is managed at its own origin — that is where its records
+ * are and where its operations answer — so opening one from the account door is
+ * a full page load that arrives with the hub ALREADY OPEN on that workspace,
+ * rather than a screen that loads and then refuses every call it makes.
+ */
+export const hubAt = (origin: string, path: string): string => `${origin}${path}`;
+
+/** Whether this door IS the given workspace — see `hubAt` and `Where.slug`. */
+export const isHere = (slug: string, where: Where): boolean =>
+  where.kind === "tenant" && where.slug === slug;
 
 /**
  * ⚠️ THE ONE PLACE THAT DECIDES WHAT THE HUB IS FOR, GIVEN A DOOR. A pure

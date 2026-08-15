@@ -120,10 +120,30 @@ export interface Health {
   /** ⚠️ Classified by the SERVER — see `door.ts`. */
   readonly door: string;
   readonly root: string;
+  /** Which workspace this door is, when it is one. Reported, never derived. */
+  readonly slug?: string | null;
 }
 
+/**
+ * ⚠️ WHO YOU ARE EVERYWHERE, which is what the hub is built from. None of this
+ * is a fact about one workspace, which is exactly why the hub can be opened
+ * from any door and show the same thing.
+ */
 export interface Me {
   readonly accountId: string;
   readonly email: string | null;
-  readonly tenants: readonly { readonly slug: string; readonly name: string }[];
+  /** ⚠️ An ACCOUNT fact — an operator stands outside every workspace (D18). */
+  readonly operator?: boolean;
+  readonly tenants: readonly Belonging[];
+}
+
+export interface Belonging {
+  readonly slug: string;
+  readonly name: string;
+  /** One of the platform's four offices, or `null` while a claim is pending. */
+  readonly platformRole?: string | null;
+  readonly appRoles?: Readonly<Record<string, string>>;
+  readonly apps?: readonly string[];
+  /** ⚠️ Only where it is worth saying — see `me.who`. */
+  readonly attention?: boolean;
 }

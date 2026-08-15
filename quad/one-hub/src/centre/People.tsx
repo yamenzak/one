@@ -35,11 +35,9 @@ export function People({ view }: { readonly view: CentreView }) {
 
   return (
     <Stack space="roomy">
-      <Section
-        label="People"
-        under="Staff and customers, one roster, across every product"
-      >
-        <Stack space="snug">
+      {/* ⚠️ NO HEADING OF ITS OWN: the hub's crown is the screen's name, and a
+          section repeating it puts the same word on the page twice. */}
+      <Stack space="snug">
           {manage ? <InviteTray view={view} onDone={members.again} /> : null}
           <Listing
             label="Members"
@@ -78,8 +76,7 @@ export function People({ view }: { readonly view: CentreView }) {
                 : []),
             ]}
           />
-        </Stack>
-      </Section>
+      </Stack>
 
       {manage ? <Packages view={view} /> : null}
     </Stack>

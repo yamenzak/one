@@ -27,7 +27,7 @@ import {
   endSession, forgetCode, issueCode, mintToken, readSession, revokeToken, spendCode,
   startSession, tokensOf, type Session,
 } from "./identity.js";
-import { claimInvitations, found, membersOf } from "./membership.js";
+import { claimInvitations, found, memberFor, membersOf } from "./membership.js";
 import type { Db } from "./sql.js";
 
 /* ------------------------------------------------------------------ shape --- */
@@ -70,6 +70,24 @@ export interface IdentityDeps {
   readonly deliver: (to: string, code: string) => Promise<void>;
   /** Which role a workspace's founder gets. Derived from the app, not named. */
   readonly appId: string;
+  /**
+   * ⚠️ WHETHER THIS ADDRESS RUNS THE DEPLOYMENT (D18), injected for the same
+   * reason the console injects it: an operator is outside every workspace, so
+   * no role and no roster can answer. Absent means this deployment has no
+   * operator surface, which answers `false` for everybody.
+   */
+  readonly isOperator?: (email: string | null) => boolean;
+  /**
+   * ⚠️ WHETHER A WORKSPACE NEEDS SOMEBODY'S ATTENTION, ASKED RATHER THAN READ.
+   * The answer lives in the money module, which a deployment may not have
+   * applied — reading its table from here made `me.who` throw
+   * `no such table: subscription` on one that had not, and `me.who` is the one
+   * call every door makes before it can draw anything. Absent means nothing is
+   * flagged, which is the honest answer when nothing is being charged.
+   */
+  readonly needsAttention?: (
+    directory: Db, tenantId: TenantId, appId: string,
+  ) => Promise<boolean>;
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -159,14 +177,47 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
 
     /* --------------------------------------------------------------- you --- */
 
+    /*
+      ⚠️ WHAT THE HUB IS BUILT FROM, AND IT IS AN ACCOUNT'S ANSWER. Who you are,
+      everywhere you belong and whether you run the deployment — none of which
+      is a fact about any one workspace, which is why the hub can be opened
+      from every door and show the same thing.
+
+      ⚠️ THE ROLE COMES FROM EACH WORKSPACE'S OWN SHARD, which is a fan-out and
+      is bounded by how many workspaces one person is in — a handful, not a
+      catalogue. It is worth it: a list of workspaces with no role and no
+      standing is a list nobody can scan, and the alternative is publishing
+      memberships into the directory, where another product's worker could
+      read them (D5).
+    */
     "me.who": {
       kind: "read", needs: "session",
       async run(ctx): Promise<unknown> {
         const accountId = ctx.session!.accountId;
         const tenants = await tenantsOf(ctx.directory, accountId);
+        const belongs = await Promise.all(tenants.map(async (t) => {
+          const apps = await appsOfTenant(ctx.directory, t.id);
+          const member = await memberFor(ctx.shardOf(t), t.id, accountId);
+          /* ⚠️ Only where it is worth saying. A badge on every row is texture;
+             one on the workspace that stopped paying is why somebody looked. */
+          const owing = deps.needsAttention
+            ? await Promise.all(apps.map((appId) =>
+              deps.needsAttention!(ctx.directory, t.id, appId)))
+            : [];
+          return {
+            slug: t.slug, name: t.name,
+            platformRole: member?.platformRole ?? null,
+            appRoles: member?.appRoles ?? {},
+            apps,
+            attention: owing.some(Boolean),
+          };
+        }));
         return {
           accountId, email: ctx.email,
-          tenants: tenants.map((t) => ({ slug: t.slug, name: t.name })),
+          /* ⚠️ An account fact, not a workspace one — an operator stands
+             outside every workspace, so no roster could answer it. */
+          operator: deps.isOperator?.(ctx.email) === true,
+          tenants: belongs,
         };
       },
     },
