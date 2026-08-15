@@ -26,7 +26,7 @@ import type { Problem } from "@quad/kernel";
 import { CODE_DIGITS } from "@quad/kernel";
 import { useSession } from "../session.js";
 import { here, setupUrl } from "../door.js";
-import { Arrival, AsideRoute, SPACE, Trouble } from "@quad/web";
+import { Arrival, AsideRoute, CODE_SLOT, SPACE, Trouble } from "@quad/web";
 
 /* ⚠️ Checked here rather than by `isRequired`, which draws a red asterisk on the
    only field on the screen — a required marker beside the one thing there is to
@@ -125,15 +125,15 @@ export function SignIn({ lead }: { readonly lead?: string }) {
             className="w-full"
           >
             <InputOTP.Group className="grow">
-              <InputOTP.Slot index={0} className="grow" />
-              <InputOTP.Slot index={1} className="grow" />
-              <InputOTP.Slot index={2} className="grow" />
+              <InputOTP.Slot index={0} className={`grow ${CODE_SLOT}`} />
+              <InputOTP.Slot index={1} className={`grow ${CODE_SLOT}`} />
+              <InputOTP.Slot index={2} className={`grow ${CODE_SLOT}`} />
             </InputOTP.Group>
             <InputOTP.Separator />
             <InputOTP.Group className="grow">
-              <InputOTP.Slot index={3} className="grow" />
-              <InputOTP.Slot index={4} className="grow" />
-              <InputOTP.Slot index={5} className="grow" />
+              <InputOTP.Slot index={3} className={`grow ${CODE_SLOT}`} />
+              <InputOTP.Slot index={4} className={`grow ${CODE_SLOT}`} />
+              <InputOTP.Slot index={5} className={`grow ${CODE_SLOT}`} />
             </InputOTP.Group>
           </InputOTP>
 

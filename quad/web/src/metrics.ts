@@ -173,6 +173,16 @@ export const ISLAND_PAD = "p-1" as const;
 export const ISLAND_ITEM = "px-1 py-2" as const;
 
 /**
+ * ⚠️ A CODE BOX IS TALLER THAN IT IS WIDE, AND THE LIBRARY'S DEFAULT IS NOT.
+ * Six slots sharing a form's width come out around 52px across; at the library's
+ * own 40px height that is a landscape box holding one digit, and a row of them
+ * reads as a control that was stretched to fit rather than sized. 64 puts each
+ * box back on the portrait side of square — the proportion every code field
+ * anybody trusts uses — and matches the tap target every other row here has.
+ */
+export const CODE_SLOT = "h-16" as const;
+
+/**
  * ⚠️ FOUR PIXELS, AND THE PILL IS INSET BY IT WITHOUT KNOWING IT IS. The pill is
  * absolutely positioned, and a percentage width on an absolute box resolves
  * against the containing block's PADDING box — so inset the bar and the pill

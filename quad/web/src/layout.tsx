@@ -28,7 +28,8 @@ import { Avatar, Button, Card, Separator } from "@heroui/react";
 import type { Ambience } from "./ambience.js";
 import { TYPE } from "./type.js";
 import {
-  BAND_PAD, CROWN, CROWN_CHIP, CROWN_SIZE, FACE, GUTTER, HEAD_GAP, HERO_PAD, ICON, ISLAND_ITEM,
+  BAND_PAD, CODE_SLOT, CROWN, CROWN_CHIP, CROWN_SIZE, FACE, GUTTER, HEAD_GAP, HERO_PAD, ICON,
+  ISLAND_ITEM,
   ISLAND_PAD,
   SAFE_TOP, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, TITLE_PAD, WIDTH,
   type Space, type Width,
@@ -36,7 +37,9 @@ import {
 import { MOTION } from "./motion.js";
 
 export type { Space, Width };
-export { SPACE, WIDTH };
+/* ⚠️ The metrics a SCREEN legitimately needs, re-exported here so nothing
+   reaches into `metrics.ts` past the vocabulary. */
+export { CODE_SLOT, SPACE, WIDTH };
 
 /* ------------------------------------------------------------------ bleed --- */
 

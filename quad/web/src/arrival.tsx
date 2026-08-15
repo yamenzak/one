@@ -25,75 +25,79 @@ import type { Ambience } from "./ambience.js";
 /* ------------------------------------------------------------------- mark --- */
 
 /**
- * THE MARK IS A FRAME, AND A PRODUCT IS WHAT SITS INSIDE IT.
+ * THE MARK IS THE WORD, DRAWN.
  *
- * ⚠️ THAT IS A SYSTEM RATHER THAN A LOGO, WHICH IS THE POINT ON A PLATFORM WHERE
- * A PRODUCT IS A MANIFEST. The deployment is the bare diamond; a product is the
- * same diamond with something in the middle of it. A new app gets an identity
- * that already belongs to the family instead of a drawing somebody commissions,
- * and four marks side by side read as four of one thing rather than four things.
+ * ⚠️ IT IS A WORDMARK RATHER THAN A SYMBOL, AND THAT SETTLES WHAT GOES BESIDE
+ * IT. A symbol needs the name written next to it to be worth anything on a
+ * product nobody has heard of yet; a wordmark IS the name, so the heading beside
+ * it is free to say what the SCREEN is — "Sign in", "Check your email" — instead
+ * of repeating the product for the second time on the same page.
  *
- * ⚠️ IT INHERITS `currentColor` AND NEVER TAKES THE ACCENT. The interface is
- * values and the data is hues (`ground.ts`); a mark tinted with the brand is the
- * one piece of chrome that stops working the moment a workspace picks a colour
- * close to the ground it sits on.
+ * ⚠️ ONE GEOMETRY, ONE WEIGHT, RECTANGULAR COUNTERS. Heavy lowercase on a square
+ * grid: the outer corners carry a large radius and every counter is a sharp
+ * rectangle, which is the whole character of it — soft outside, hard inside. The
+ * `o` is cut at the top-left, and that chamfer is the one asymmetry in the word;
+ * without it three round letters in a row read as a font rather than as a mark.
  *
- * ⚠️ AND IT IS DRAWN, NOT TYPED. `◇` and `◈` stood in for this everywhere — a
- * glyph whose weight, size and vertical alignment are whatever the reader's font
- * decides, which is why the crown's mark sat a pixel low on one machine and
- * looked bold on another.
- */
-/**
- * ⚠️ AND THE DEPLOYMENT'S OWN INNER IS THE NUMERAL, BECAUSE THE PRODUCT IS
- * CALLED ONE. A bare frame is a shape; a frame with a `1` in it is a name
- * somebody can say out loud after seeing it once, which is the entire job of a
- * mark at 18 pixels in a crown. It is drawn as a stem and a flag rather than
- * set as text — a glyph inside an SVG is the reader's font again, at whatever
- * weight and baseline their machine decides.
+ * ⚠️ FILLED, IN `currentColor`, WITH `evenodd` DOING THE COUNTERS. The interface
+ * is values and the data is hues (`ground.ts`), so it inherits ink and never
+ * takes the accent — a mark tinted with the brand is the one piece of chrome
+ * that stops working the moment a workspace picks a colour near its ground.
+ * Cutting the counters with a fill rule rather than a second shape means the
+ * whole word is one path per letter and cannot come apart at small sizes.
+ *
+ * ⚠️ AND IT IS DRAWN, NOT SET. `◇` stood in for this, and text set in a font
+ * would be no better: weight, width and baseline would be whatever the reader's
+ * machine decides, which is how a mark comes to look bold on one screen and thin
+ * on the next.
  */
 export type MarkSize = "nav" | "row" | "crown" | "door";
-export type MarkInner = "one" | "none" | "solid" | "ring";
 
-const MARK_PX: Readonly<Record<MarkSize, number>> = {
-  nav: 18, row: 20, crown: 24, door: 56,
+/* ⚠️ HEIGHT, NOT SIZE. The word is 2.68 wide for every 1 tall, so anything that
+   set a square box would letterbox it — the caller says how tall, the aspect
+   does the rest. */
+const MARK_H: Readonly<Record<MarkSize, number>> = {
+  nav: 14, row: 16, crown: 18, door: 44,
 };
 
-/* ⚠️ ONE GEOMETRY AT EVERY SIZE, AND THE STROKE SCALES WITH IT. A fixed stroke
-   makes the 18px mark a blob and the 56px one a hairline — the two sizes stop
-   being the same shape, which is the only thing a mark has to be. */
-const STROKE: Readonly<Record<MarkSize, number>> = {
-  nav: 2.4, row: 2.2, crown: 2, door: 2,
-};
+/*
+  ⚠️ THE LETTERS, ON A 100-UNIT GRID. Stem 26, outer radius 30, counters sharp,
+  8 units between letters — tight, because the three are one word rather than
+  three shapes. Written as constants so the proportions are readable and a
+  change is a number rather than a re-drawing.
+*/
+const LETTER_O =
+  "M34,0 H54 A30,30 0 0 1 84,30 V70 A30,30 0 0 1 54,100 H30 A30,30 0 0 1 0,70 V34 Z"
+  + "M26,26 H58 V74 H26 Z";
+const LETTER_N =
+  "M0,30 A30,30 0 0 1 30,0 H54 A30,30 0 0 1 84,30 V100 H0 Z"
+  + "M26,30 H58 V100 H26 Z";
+const LETTER_E =
+  "M30,0 H54 A30,30 0 0 1 84,30 V100 H30 A30,30 0 0 1 0,70 V30 A30,30 0 0 1 30,0 Z"
+  + "M26,26 H58 V46 H26 Z"
+  + "M26,58 H84 V78 H26 Z";
 
-export function Mark({ size = "crown", inner = "none", label }: {
+export function Mark({ size = "crown", label }: {
   readonly size?: MarkSize;
-  readonly inner?: MarkInner;
   /** An accessible name. Absent means decorative, beside text that already says it. */
   readonly label?: string;
 }) {
-  const px = MARK_PX[size];
+  const h = MARK_H[size];
   return (
     <svg
-      width={px}
-      height={px}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={STROKE[size]}
-      strokeLinejoin="round"
-      strokeLinecap="round"
+      height={h}
+      width={h * 2.68}
+      viewBox="0 0 268 100"
+      fill="currentColor"
+      fillRule="evenodd"
       role={label ? "img" : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
       className="shrink-0"
     >
-      <path d="M12 2.6 21.4 12 12 21.4 2.6 12Z" />
-      {/* ⚠️ The stem sits ON the diamond's vertical axis and the flag hangs to
-          its left, so the numeral is optically centred rather than measured —
-          a `1` centred by its bounding box always reads a hair right. */}
-      {inner === "one" ? <path d="M10.5 9.6 12.4 7.9v8.2" /> : null}
-      {inner === "solid" ? <path d="M12 8.2 15.8 12 12 15.8 8.2 12Z" fill="currentColor" /> : null}
-      {inner === "ring" ? <path d="M12 7.6 16.4 12 12 16.4 7.6 12Z" /> : null}
+      <path d={LETTER_O} />
+      <g transform="translate(92 0)"><path d={LETTER_N} /></g>
+      <g transform="translate(184 0)"><path d={LETTER_E} /></g>
     </svg>
   );
 }
@@ -113,15 +117,18 @@ export function Mark({ size = "crown", inner = "none", label }: {
  * one thing to do; the other route belongs under it, in a voice that says so.
  */
 /**
- * ⚠️ `veil`, NOT `aurora`, AND THE REASON IS IN `ambience.ts`. Aurora is the one
- * ambience that mixes a SECOND hue — `--success` — by design, so it stays green
- * however neutral a deployment's brand is: a monochrome product using it looks
- * like a monochrome product with a bug. Veil is one broad directional sweep from
- * a single hue, described in that file as the ground for a single large figure,
- * which is exactly what a door is.
+ * ⚠️ `spotlight`, AND IT IS THE DARKEST THING IN THE VOCABULARY FOR A REASON.
+ * `FIELD_WEIGHT` in `ambience.ts` runs it at half — "staging IS darkness" — so
+ * it is one hard pool of light with a long falloff and a weighted corner,
+ * against a ground that stays near black. That is the whole range a door has to
+ * work with: nothing else is on the screen, so the contrast between the lit part
+ * and the dark part IS the composition.
+ *
+ * ⚠️ NOT `aurora`, WHICH MIXES A SECOND HUE — `--success` — BY DESIGN. It stays
+ * green however neutral the brand goes, so a monochrome product using it looks
+ * like a monochrome product with a bug.
  */
-export function Arrival({ mark = "one", name, claim, children, aside, sky = "veil" }: {
-  readonly mark?: MarkInner;
+export function Arrival({ name, claim, children, aside, sky = "spotlight" }: {
   readonly name: string;
   /** One line. What this is, or what is about to happen. */
   readonly claim?: string;
@@ -143,15 +150,24 @@ export function Arrival({ mark = "one", name, claim, children, aside, sky = "vei
               `DOOR_MOTION`. Staggering the name and the form separately from the
               mark is what makes it a sequence rather than a page fading in. */}
           <Stack space="roomy">
-            <Stack space="tight">
-              <div {...ARRIVE_MARK} style={doorAt(0)}>
-                <Mark size="door" inner={mark} label={name} />
-              </div>
-              <div {...ARRIVE_RISE} style={doorAt(1)}>
-                <h1 className={TYPE.display}>{name}</h1>
-                {claim ? <p className={`${TYPE.body} text-muted`}>{claim}</p> : null}
-              </div>
-            </Stack>
+            {/* ⚠️ THE WORDMARK IS THE PRODUCT'S NAME AND THE HEADING IS THE
+                SCREEN'S, so the two never say the same thing — see `Mark`. They
+                are a `roomy` apart rather than `tight`: set close together they
+                read as one lockup, and "one Check your email" is not a lockup. */}
+            <div {...ARRIVE_MARK} style={doorAt(0)}>
+              <Mark size="door" label="One" />
+            </div>
+            <div {...ARRIVE_RISE} style={doorAt(1)}>
+              {/*
+                ⚠️ `title`, NOT `display`, AND THE WORDMARK IS WHY. `display` is
+                the one thing a screen exists to show, and on a door that is the
+                mark — a heading at the same weight beside it makes two things
+                competing to be the first thing read, which is the state where a
+                page has no hierarchy rather than two.
+              */}
+              <h1 className={TYPE.title}>{name}</h1>
+              {claim ? <p className={`${TYPE.body} text-muted`}>{claim}</p> : null}
+            </div>
 
             <div {...ARRIVE_RISE} style={doorAt(2)}>
               <div className={`flex flex-col ${SPACE.snug}`}>{children}</div>
