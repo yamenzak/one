@@ -25,6 +25,7 @@ import { Button, Form, InputOTP, Label, REGEXP_ONLY_DIGITS, TextField, Input } f
 import type { Problem } from "@quad/kernel";
 import { CODE_DIGITS } from "@quad/kernel";
 import { useSession } from "../session.js";
+import { here, setupUrl } from "../door.js";
 import { Arrival, AsideRoute, SPACE, Trouble } from "@quad/web";
 
 /* ⚠️ Checked here rather than by `isRequired`, which draws a red asterisk on the
@@ -48,8 +49,8 @@ const SHORT_CODE: Problem = {
   tone: "warning",
 };
 
-export function SignIn({ lead }: { readonly lead: string }) {
-  const { askForCode, enter } = useSession();
+export function SignIn({ lead }: { readonly lead?: string }) {
+  const { askForCode, enter, where, face } = useSession();
 
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -87,7 +88,7 @@ export function SignIn({ lead }: { readonly lead: string }) {
     return (
       <Arrival
         name="Check your email"
-        claim={`We sent a ${CODE_DIGITS}-digit code to ${email}.`}
+        claim={`Code sent to ${email}`}
         aside={(
           <AsideRoute
             says="Wrong address?"
@@ -107,6 +108,12 @@ export function SignIn({ lead }: { readonly lead: string }) {
               boxes is the same fact twice. It stays in the accessibility tree,
               because the boxes on their own are six unnamed inputs. */}
           <Label className="sr-only">Your code</Label>
+          {/* ⚠️ THE BOXES SPAN THE FORM, LIKE EVERY OTHER CONTROL ON IT. At
+              their intrinsic size they sat two thirds of the way across, under
+              a full-width button and over a full-width one — a row that stops
+              short reads as a control that failed to size itself rather than as
+              a decision. The groups grow and the slots share them, so six boxes
+              divide the width instead of a seventh being invented for it. */}
           <InputOTP
             autoFocus
             maxLength={CODE_DIGITS}
@@ -115,17 +122,18 @@ export function SignIn({ lead }: { readonly lead: string }) {
             onChange={setCode}
             onComplete={() => { void finish(); }}
             isDisabled={busy}
+            className="w-full"
           >
-            <InputOTP.Group>
-              <InputOTP.Slot index={0} />
-              <InputOTP.Slot index={1} />
-              <InputOTP.Slot index={2} />
+            <InputOTP.Group className="grow">
+              <InputOTP.Slot index={0} className="grow" />
+              <InputOTP.Slot index={1} className="grow" />
+              <InputOTP.Slot index={2} className="grow" />
             </InputOTP.Group>
             <InputOTP.Separator />
-            <InputOTP.Group>
-              <InputOTP.Slot index={3} />
-              <InputOTP.Slot index={4} />
-              <InputOTP.Slot index={5} />
+            <InputOTP.Group className="grow">
+              <InputOTP.Slot index={3} className="grow" />
+              <InputOTP.Slot index={4} className="grow" />
+              <InputOTP.Slot index={5} className="grow" />
             </InputOTP.Group>
           </InputOTP>
 
@@ -140,8 +148,20 @@ export function SignIn({ lead }: { readonly lead: string }) {
     );
   }
 
+  /* ⚠️ THE OTHER ROUTE LIVES HERE NOW, BECAUSE THE SIGNPOST DOES NOT. It is
+     offered on the account door only: from the setup door you are already
+     there, and from a workspace's own address starting a second one is the
+     invitation a previous platform shipped by accident. */
+  const start = face === "hub" && where ? setupUrl(where, here()) : null;
+
   return (
-    <Arrival name="One" claim={lead}>
+    <Arrival
+      name="Sign in"
+      claim={lead}
+      aside={start
+        ? <AsideRoute says="New here?" label="Start a workspace" href={start} />
+        : undefined}
+    >
       {problem ? <Trouble problem={problem} /> : null}
       <Form
         className={`flex flex-col ${SPACE.snug}`}

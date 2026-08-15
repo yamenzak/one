@@ -69,11 +69,18 @@ export function pickScreen(
   return "hub";
 }
 
+/*
+  ⚠️ WHAT THE DOOR IS FOR, NOT WHAT THE PRODUCT IS PROUD OF. Every line here
+  used to sell something: one account, no password to remember. Neither is a
+  thing the person standing at the door is deciding — they came to get in, and a
+  claim under the heading is worth its space only when it says something they do
+  not already know. The account door says nothing at all, because "Sign in" over
+  an email field is already the whole sentence.
+*/
 const LEAD: Readonly<Record<string, string>> = {
-  create: "Sign in first — a workspace belongs to somebody.",
-  centre: "Sign in to open this workspace.",
-  console: "Sign in. The console admits operators only.",
-  hub: "We will email you a code. There is no password to remember or lose.",
+  create: "A workspace belongs to somebody",
+  centre: "to open this workspace",
+  console: "the console admits operators only",
 };
 
 export function App() {
@@ -139,7 +146,7 @@ export function App() {
     the first thing anybody ever sees of this product.
   */
   if (screen === "signpost" && where) return <><NoticeHost /><Signpost where={where} /></>;
-  if (screen === "sign-in") return <><NoticeHost /><SignIn lead={LEAD[face ?? ""] ?? LEAD.hub!} /></>;
+  if (screen === "sign-in") return <><NoticeHost /><SignIn lead={LEAD[face ?? ""]} /></>;
   if (screen === "new-workspace" && where) {
     return <><NoticeHost /><NewWorkspace where={where} /></>;
   }

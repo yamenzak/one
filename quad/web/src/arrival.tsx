@@ -16,7 +16,7 @@
 
 import * as React from "react";
 import { Link } from "@heroui/react";
-import { ARRIVE, arriveAt } from "./motion.js";
+import { ARRIVE_MARK, ARRIVE_RISE, doorAt } from "./motion.js";
 import { GUTTER, SPACE, WIDTH } from "./metrics.js";
 import { TYPE } from "./type.js";
 import { Page, Spacer, Stack } from "./layout.js";
@@ -43,8 +43,16 @@ import type { Ambience } from "./ambience.js";
  * decides, which is why the crown's mark sat a pixel low on one machine and
  * looked bold on another.
  */
+/**
+ * ⚠️ AND THE DEPLOYMENT'S OWN INNER IS THE NUMERAL, BECAUSE THE PRODUCT IS
+ * CALLED ONE. A bare frame is a shape; a frame with a `1` in it is a name
+ * somebody can say out loud after seeing it once, which is the entire job of a
+ * mark at 18 pixels in a crown. It is drawn as a stem and a flag rather than
+ * set as text — a glyph inside an SVG is the reader's font again, at whatever
+ * weight and baseline their machine decides.
+ */
 export type MarkSize = "nav" | "row" | "crown" | "door";
-export type MarkInner = "none" | "solid" | "ring";
+export type MarkInner = "one" | "none" | "solid" | "ring";
 
 const MARK_PX: Readonly<Record<MarkSize, number>> = {
   nav: 18, row: 20, crown: 24, door: 56,
@@ -80,6 +88,10 @@ export function Mark({ size = "crown", inner = "none", label }: {
       className="shrink-0"
     >
       <path d="M12 2.6 21.4 12 12 21.4 2.6 12Z" />
+      {/* ⚠️ The stem sits ON the diamond's vertical axis and the flag hangs to
+          its left, so the numeral is optically centred rather than measured —
+          a `1` centred by its bounding box always reads a hair right. */}
+      {inner === "one" ? <path d="M10.5 9.6 12.4 7.9v8.2" /> : null}
       {inner === "solid" ? <path d="M12 8.2 15.8 12 12 15.8 8.2 12Z" fill="currentColor" /> : null}
       {inner === "ring" ? <path d="M12 7.6 16.4 12 12 16.4 7.6 12Z" /> : null}
     </svg>
@@ -100,7 +112,15 @@ export function Mark({ size = "crown", inner = "none", label }: {
  * ⚠️ `aside` IS THE QUIET WAY OUT AND IT IS NEVER A SECOND PRIMARY. A door has
  * one thing to do; the other route belongs under it, in a voice that says so.
  */
-export function Arrival({ mark = "none", name, claim, children, aside, sky = "aurora" }: {
+/**
+ * ⚠️ `veil`, NOT `aurora`, AND THE REASON IS IN `ambience.ts`. Aurora is the one
+ * ambience that mixes a SECOND hue — `--success` — by design, so it stays green
+ * however neutral a deployment's brand is: a monochrome product using it looks
+ * like a monochrome product with a bug. Veil is one broad directional sweep from
+ * a single hue, described in that file as the ground for a single large figure,
+ * which is exactly what a door is.
+ */
+export function Arrival({ mark = "one", name, claim, children, aside, sky = "veil" }: {
   readonly mark?: MarkInner;
   readonly name: string;
   /** One line. What this is, or what is about to happen. */
@@ -118,21 +138,27 @@ export function Arrival({ mark = "none", name, claim, children, aside, sky = "au
             arithmetically: a short block placed at exactly 50% reads as low,
             because the eye takes the middle of a page to be above its middle. */}
         <div className="min-h-dvh flex flex-col justify-center pt-12 pb-[14vh] md:justify-start md:pt-[22vh] md:pb-12">
+          {/* ⚠️ FOUR BLOCKS, ARRIVING IN THE ORDER SOMEBODY READS THEM. The mark
+              turns in first and everything else rises under it — see
+              `DOOR_MOTION`. Staggering the name and the form separately from the
+              mark is what makes it a sequence rather than a page fading in. */}
           <Stack space="roomy">
-            <div {...ARRIVE} style={arriveAt(0)}>
-              <Stack space="tight">
+            <Stack space="tight">
+              <div {...ARRIVE_MARK} style={doorAt(0)}>
                 <Mark size="door" inner={mark} label={name} />
+              </div>
+              <div {...ARRIVE_RISE} style={doorAt(1)}>
                 <h1 className={TYPE.display}>{name}</h1>
                 {claim ? <p className={`${TYPE.body} text-muted`}>{claim}</p> : null}
-              </Stack>
-            </div>
+              </div>
+            </Stack>
 
-            <div {...ARRIVE} style={arriveAt(1)}>
+            <div {...ARRIVE_RISE} style={doorAt(2)}>
               <div className={`flex flex-col ${SPACE.snug}`}>{children}</div>
             </div>
 
             {aside
-              ? <div {...ARRIVE} style={arriveAt(2)}>{aside}</div>
+              ? <div {...ARRIVE_RISE} style={doorAt(3)}>{aside}</div>
               : null}
           </Stack>
         </div>

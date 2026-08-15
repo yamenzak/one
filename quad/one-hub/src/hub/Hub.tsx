@@ -87,8 +87,11 @@ function Screen({ where, onGo, onLeave }: {
     ? person?.tenants.find((t) => t.slug === where.slug) ?? null
     : null;
 
+  /* ⚠️ `veil` rather than `aurora`: aurora carries a second hue by design
+     (`ambience.ts`), which a monochrome product renders as a green cast nobody
+     chose. */
   return (
-    <Page sky={root ? "aurora" : "calm"}>
+    <Page sky={root ? "veil" : "calm"}>
       <PageCrown
         title={root ? "One" : where.at === "workspace" ? held?.name ?? where.slug : nameOf(where)}
         leave={root ? "dismiss" : "back"}

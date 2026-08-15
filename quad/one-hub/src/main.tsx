@@ -1,7 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  ARRIVE_MOTION, CHART_MOTION, FACE_CSS, GROUND_CSS, SKY_MOTION, ambienceStylesheet,
+  ARRIVE_MOTION, CHART_MOTION, DOOR_MOTION, FACE_CSS, GROUND_CSS, SKY_MOTION, ambienceStylesheet,
+  brandCss,
   applyAppearance,
 } from "@quad/web";
 import "./styles.css";
@@ -35,9 +36,31 @@ applyAppearance();
   is missing does not throw, it simply does not animate. `scripts/motion.test.mjs`
   asserts the set now.
 */
+/** One's own colour: a true neutral, so nothing derived from it carries a hue. */
+const MONO = "oklch(0.62 0 0)";
+
 const sky = document.createElement("style");
 sky.textContent = [
-  FACE_CSS, GROUND_CSS, ambienceStylesheet(), SKY_MOTION, ARRIVE_MOTION, CHART_MOTION,
+  FACE_CSS, GROUND_CSS, ambienceStylesheet(), SKY_MOTION, ARRIVE_MOTION, DOOR_MOTION, CHART_MOTION,
+  /*
+    ⚠️ ONE'S OWN BRAND, AND IT IS MONOCHROME. `GROUND_CSS` ships a blue as the
+    colour a deployment has before anybody chooses — right for a framework,
+    wrong for this product. Every tier, every surface and the ambience behind
+    every screen are `color-mix`es with `--brand`, so one neutral value makes
+    the whole interface graphite without a single component knowing.
+
+    ⚠️ ZERO CHROMA RATHER THAN A NEAR-GREY. A full-bleed gradient is where a
+    hue nobody asked for shows up first, and at the size of a phone screen
+    "almost neutral" reads as a colour chosen badly rather than as monochrome.
+
+    ⚠️ AND IT IS `brandCss`, NOT A RULE IN `styles.css`. The first attempt was
+    exactly that and changed nothing: this block is appended to `<head>` AFTER
+    the stylesheet, so the framework default won on source order and the whole
+    product stayed blue with every check green. Going through the same function
+    a workspace's branding goes through means it lands in the same place, in the
+    same order, and a tenant's own choice still wins after it.
+  */
+  brandCss({ accent: MONO }),
 ].join("\n");
 document.head.append(sky);
 

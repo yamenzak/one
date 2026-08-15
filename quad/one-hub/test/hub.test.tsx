@@ -118,10 +118,18 @@ describe("the addresses it sends people to", () => {
 /* ----------------------------------------------------------------- screens --- */
 
 describe("what the screens actually put on the page", () => {
-  it("points the signpost at both real doors", () => {
+  /*
+    ⚠️ THE ROOT IS NOT A SCREEN, AND THIS IS WHAT THAT MEANS. It offered two
+    buttons to two other pages — one of which everybody arriving wanted — so it
+    was a step whose entire content was pointing at the next step. It travels
+    now, and what it renders while travelling is a reason, not a blank page:
+    the redirect is a round trip, and nothing on screen for the length of it is
+    indistinguishable from a page that failed.
+  */
+  it("asks the root for nothing and says where it is going", () => {
     const out = html(<Signpost where={WHERE} />);
-    expect(out).toContain("Sign in");
-    expect(out).toContain("Start a workspace");
+    expect(out).toContain("Taking you to the sign-in");
+    expect(out).not.toContain("Start a workspace");
   });
 
   /* ⚠️ Every door the Hub is not gets a sentence of its own. A shared "not

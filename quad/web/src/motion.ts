@@ -59,6 +59,15 @@ export const DURATION = {
   instant: "var(--default-transition-duration)",
   quick: "180ms",
   moderate: "260ms",
+  /**
+   * ⚠️ A FIFTH, FOR THE ONE MOMENT A PERSON SEES ONCE. Everything else here is
+   * paced for something done repeatedly, where anything slower than a fifth of
+   * a second is a tax paid on every repetition. A door is entered before
+   * anybody is signed in, at most a few times ever, with nothing else on the
+   * screen competing for the eye — the only place in the product where a longer
+   * curve is an impression rather than a delay.
+   */
+  stately: "560ms",
   ambient: "24s",
 } as const;
 
@@ -156,3 +165,54 @@ export const ARRIVE_MOTION = [
   `@media (prefers-reduced-motion: reduce) { [data-arrive="true"] { animation: none; } }`,
   `[data-reduce-motion="true"] [data-arrive="true"] { animation: none; }`,
 ].join("\n");
+
+/**
+ * THE DOOR'S ENTRANCE — the one sequence in the product that is allowed to be
+ * an impression.
+ *
+ * ⚠️ IT IS STILL THE LIBRARY'S OWN `enter` KEYFRAME, WITH DIFFERENT VARIABLES.
+ * HeroUI ships `--tw-enter-opacity`, `-scale`, `-rotate`, `-blur` and
+ * `-translate-*` against one animation, so a mark that turns into place and a
+ * heading that rises are the SAME animation given different numbers — not two
+ * hand-rolled keyframes with their own curves, which is the version that keeps
+ * moving for somebody who asked motion to stop.
+ *
+ * ⚠️ THE MARK TURNS AND THE REST RISES, WHICH IS THE WHOLE CHOREOGRAPHY. Every
+ * block moving the same way is a page sliding; one element behaving differently
+ * is the thing the eye lands on first, and on a door that element should be the
+ * mark. Kept to two behaviours because a third is a screen with an opinion
+ * about itself.
+ */
+export const DOOR_MOTION = [
+  `[data-arrive="mark"] {`,
+  `  animation: enter ${DURATION.stately} ${EASE.travel} var(--tw-animation-delay, 0s) both;`,
+  `  --tw-enter-opacity: 0;`,
+  `  --tw-enter-scale: 0.6;`,
+  `  --tw-enter-rotate: -35deg;`,
+  `  --tw-enter-blur: 6px;`,
+  `}`,
+  `[data-arrive="rise"] {`,
+  `  animation: enter ${DURATION.moderate} ${EASE.enter} var(--tw-animation-delay, 0s) both;`,
+  `  --tw-enter-opacity: 0;`,
+  `  --tw-enter-translate-y: 0.75rem;`,
+  `  --tw-enter-blur: 3px;`,
+  `}`,
+  `@media (prefers-reduced-motion: reduce) {`,
+  `  [data-arrive="mark"], [data-arrive="rise"] { animation: none; }`,
+  `}`,
+  `[data-reduce-motion="true"] [data-arrive="mark"],`,
+  `[data-reduce-motion="true"] [data-arrive="rise"] { animation: none; }`,
+].join("\n");
+
+export const ARRIVE_MARK = { "data-arrive": "mark" } as const;
+export const ARRIVE_RISE = { "data-arrive": "rise" } as const;
+
+/**
+ * ⚠️ A DOOR'S STAGGER IS SLOWER THAN A LIST'S, AND UNCAPPED BECAUSE IT IS FOUR
+ * BLOCKS. `arriveAt` caps at six steps of 40ms so a long list does not take a
+ * second and a half to appear; a door has a mark, a name, a form and a line
+ * under it, and at 40ms apart they arrive as one flash rather than as a
+ * sequence somebody notices.
+ */
+export const doorAt = (index: number): React.CSSProperties =>
+  ({ ["--tw-animation-delay" as string]: `${index * 110}ms` });
