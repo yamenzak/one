@@ -12,9 +12,11 @@
  */
 
 import type { JobBook, PackDef } from "@quad/kernel";
-import { Button, Card, Chip, Meter, ProgressBar, Separator } from "@heroui/react";
+import { Button, Card, Chip, Meter, ProgressBar } from "@heroui/react";
 import { money } from "./console.js";
-import { Figure, Grid } from "./layout.js";
+import { Balance, Grid, Stack } from "./layout.js";
+import { AmountRow, Group } from "./surfaces.js";
+import { TYPE } from "./type.js";
 import { SPACE } from "./metrics.js";
 
 /* ------------------------------------------------------------------- bill --- */
@@ -35,48 +37,48 @@ const said = (lines: number): string =>
 
 export function Bill({ lines, total, currency, appName, mixed }: BillProps) {
   return (
-    <Card>
-      <Card.Header>
-        <Card.Title>What this workspace pays</Card.Title>
-        {/* ⚠️ THE PROMISE IS ONLY MADE WHERE IT IS KEPT. "One line per product"
-            over a card with no lines on it describes a document the reader is
-            not looking at. */}
-        {lines.length > 0 ? <Card.Description>One invoice, one line per product.</Card.Description> : null}
-      </Card.Header>
-      <Card.Content>
-        <div className={`flex flex-col ${SPACE.snug}`}>
-          {/*
-            ⚠️ THE TOTAL IS THE FIGURE, AT THE TOP. It was a bold row at the
-            BOTTOM of a list, the same size as the lines above it — so the one
-            number the screen exists to answer was the last thing on it and
-            looked like a subtotal. A screen about money leads with the amount;
-            what it is made of belongs under it.
-          */}
-          <Figure value={money(total, currency)} of={said(lines.length)} />
-          {lines.length > 0 ? <Separator /> : null}
-          <div className={`flex flex-col ${SPACE.tight}`}>
-            {lines.map((line) => (
-              <div key={line.appId} className={`flex justify-between ${SPACE.snug}`}>
-                <span>{appName(line.appId)} · {line.planId}</span>
-                <span className="tabular-nums">{money(line.price, line.currency)}</span>
-              </div>
-            ))}
-          </div>
-          {/*
-            ⚠️ A MIXED-CURRENCY BILL IS SAID, NOT SUMMED. Adding euros to dirhams
-            produces a number that means nothing, on the one document people
-            actually read.
-          */}
-          {mixed
-            ? (
-              <Chip color="warning" variant="soft">
-                <Chip.Label>Some products here are priced in another currency and are billed separately</Chip.Label>
-              </Chip>
-            )
-            : null}
-        </div>
-      </Card.Content>
-    </Card>
+    <Stack space="snug">
+      {/*
+        ⚠️ THE AMOUNT IS THE SCREEN, NOT A FIELD ON A CARD. This was a titled
+        card with a description, a figure and a list inside it — three levels of
+        chrome around one number, on the screen whose entire question is that
+        number. A hero has no chrome to read past.
+      */}
+      <Balance
+        eyebrow="Every month"
+        figure={<span className={TYPE.display}>{money(total, currency)}</span>}
+        identifier={said(lines.length)}
+      />
+
+      {/* ⚠️ THE LINES ARE ROWS, WHICH IS WHAT EVERY OTHER LIST IN THIS PRODUCT
+          IS. A `dt`/`dd` run inside a card is a second list grammar, and it is
+          the one that reads as a printout. */}
+      {lines.length > 0 ? (
+        <Group>
+          {lines.map((line) => (
+            <AmountRow
+              key={line.appId}
+              label={appName(line.appId)}
+              under={line.planId}
+              amount={money(line.price, line.currency)}
+            />
+          ))}
+        </Group>
+      ) : null}
+
+      {/*
+        ⚠️ A MIXED-CURRENCY BILL IS SAID, NOT SUMMED. Adding euros to dirhams
+        produces a number that means nothing, on the one document people
+        actually read.
+      */}
+      {mixed
+        ? (
+          <Chip color="warning" variant="soft">
+            <Chip.Label>Some products here are priced in another currency and are billed separately</Chip.Label>
+          </Chip>
+        )
+        : null}
+    </Stack>
   );
 }
 

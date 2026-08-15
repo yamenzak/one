@@ -14,10 +14,10 @@
 
 import type { Allowance, EntitlementDef, FlagBook, FlagDef, PlanSpec } from "@quad/kernel";
 import { UNLIMITED, overdue, resolve, settableBy } from "@quad/kernel";
-import { Button, Card, Chip, Label, Separator, Switch } from "@heroui/react";
-import { Grid } from "./layout.js";
+import { Card, Chip, Label, Switch, Table } from "@heroui/react";
+import { Stack } from "./layout.js";
+import { AmountRow, Group } from "./surfaces.js";
 import { SPACE } from "./metrics.js";
-import { TYPE } from "./type.js";
 import { Reveal } from "./blocks.js";
 
 /* ------------------------------------------------------------------ flags --- */
@@ -122,73 +122,75 @@ export function Shelf({ plans, entitlements, current, onChoose }: ShelfProps) {
   const keys = Object.entries(entitlements).filter(([, def]) => !def.reserved);
 
   return (
-    /*
-      ⚠️ AUTO-FIT, NOT THREE COLUMNS. A catalogue has however many plans somebody
-      priced: at `md:grid-cols-3` a fourth one orphans onto a row of its own,
-      full width in a two-thirds gap, reading as a plan of a different kind. It
-      is also three columns in a `read` column, where each card is 190px wide.
-      The minimum is what a price and an entitlement list need; the count is
-      whatever fits.
-    */
-    <Grid min="15rem">
-      {shown.map((plan) => {
-        const mine = plan.id === current;
-        const includes = (
-          <dl className={`flex flex-col ${SPACE.hair}`}>
-            {keys.map(([key, def]) => (
-              <div key={key} className={`flex justify-between ${SPACE.snug}`}>
-                <dt>{def.label}</dt>
-                <dd>{saying(plan.includes[key] ?? false)}</dd>
-              </div>
-            ))}
-          </dl>
-        );
-        return (
-          <Card key={plan.id}>
-            <Card.Header>
-              <Card.Title>{plan.name}</Card.Title>
-              <Card.Description>{plan.said}</Card.Description>
-            </Card.Header>
-            <Card.Content>
-              <div className={`flex flex-col ${SPACE.tight}`}>
-                <strong className={TYPE.figure}>{money(plan.price, plan.currency)}</strong>
-                {/*
-                  ⚠️ A TRIAL IS AN OFFER, NOT A SUCCESS. `success` is the token
-                  for something that WENT WELL — a payment cleared, a job
-                  finished — and spending it on a sales badge is what makes
-                  green stop meaning anything on the screens where it is load
-                  bearing. It also puts a hue on a product whose interface is
-                  values (`ground.ts`).
-                */}
-                {plan.trialDays
-                  ? <Chip variant="soft"><Chip.Label>{plan.trialDays} days free</Chip.Label></Chip>
-                  : null}
-                <Separator />
-                {/*
-                  ⚠️ THE LIST IS FOR COMPARING, AND A PHONE CANNOT COMPARE. Three
-                  plans stacked with every entitlement each is a screen somebody
-                  scrolls past rather than reads. The plan they are ON keeps its
-                  list, because that is a fact about them rather than a
-                  comparison; the others fold behind a disclosure.
-                */}
-                {mine ? includes : (
-                  <>
-                    <div className="hidden md:block">{includes}</div>
-                    <div className="md:hidden">
-                      <Reveal label="What is included">{includes}</Reveal>
-                    </div>
-                  </>
-                )}
-              </div>
-            </Card.Content>
-            <Card.Footer>
-              {mine
-                ? <Chip variant="primary"><Chip.Label>Your plan</Chip.Label></Chip>
-                : <Button variant="primary" onPress={() => onChoose(plan.id)}>Choose {plan.name}</Button>}
-            </Card.Footer>
-          </Card>
-        );
-      })}
-    </Grid>
+    <Stack space="snug">
+      {/*
+        ⚠️ A PLAN IS A ROW WITH A PRICE ON IT, NOT A CARD WITH A TABLE IN IT.
+        The card version drew the SAME five entitlement labels once per plan —
+        four columns of "Staff / Clients / Plans / AI drafting / Your own
+        branding", most of the values an em dash — which is a spreadsheet with
+        chrome around it, and it was the ugliest thing on the screen. A row says
+        the name, what the plan is for, and what it costs; that is the whole of
+        what somebody scanning a price list reads.
+      */}
+      <Group>
+        {shown.map((plan) => {
+          const mine = plan.id === current;
+          return (
+            <AmountRow
+              key={plan.id}
+              label={plan.name}
+              /* ⚠️ A TRIAL BELONGS ON THE PLAN IT IS ON, IN WORDS. It was a chip,
+                 and a chip on a sales badge is a hue on a product whose
+                 interface is values. */
+              under={mine
+                ? "Your plan"
+                : plan.trialDays ? `${plan.said} · ${plan.trialDays} days free` : plan.said}
+              amount={money(plan.price, plan.currency)}
+              /* ⚠️ NO CHEVRON ON THE ONE YOU ARE ON, because there is nowhere to
+                 go. A row that promises something and does nothing is worse than
+                 a row that promises nothing. */
+              onOpen={mine ? undefined : () => onChoose(plan.id)}
+            />
+          );
+        })}
+      </Group>
+
+      {/*
+        ⚠️ A COMPARISON IS ONE TABLE, AND IT IS THE ONE THING HERE THAT SHOULD
+        SCROLL ON A PHONE. Plans across, what they include down: the labels are
+        written once, and the eye can travel a row to see where a number
+        changes — which is the only reason anybody opens this. Folded away by
+        default, because most people arriving here already know which plan they
+        want and are looking for the price.
+      */}
+      <Reveal label="Compare what each includes">
+        <Table>
+          <Table.ScrollContainer>
+            <Table.Content aria-label="What each plan includes">
+              <Table.Header>
+                <Table.Column id="what" isRowHeader>What</Table.Column>
+                {shown.map((plan) => (
+                  <Table.Column key={plan.id} id={plan.id} className="text-end">
+                    {plan.name}
+                  </Table.Column>
+                ))}
+              </Table.Header>
+              <Table.Body>
+                {keys.map(([key, def]) => (
+                  <Table.Row key={key}>
+                    <Table.Cell>{def.label}</Table.Cell>
+                    {shown.map((plan) => (
+                      <Table.Cell key={plan.id} className="text-end tabular-nums">
+                        {saying(plan.includes[key] ?? false)}
+                      </Table.Cell>
+                    ))}
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table.Content>
+          </Table.ScrollContainer>
+        </Table>
+      </Reveal>
+    </Stack>
   );
 }

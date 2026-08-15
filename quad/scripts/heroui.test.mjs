@@ -90,6 +90,19 @@ const LAYOUT = [
   /^(sr-only|not-sr-only|truncate)$/,
   /^whitespace-/,
   /^(aspect|columns)-/,
+  /* ⚠️ ALIGNMENT IS WHERE TEXT SITS IN ITS BOX, WHICH IS PLACEMENT. A column of
+     amounts ragged-left is unreadable at a glance, and a table cell is the one
+     element where only the caller knows which columns are numbers. The values
+     are listed exactly rather than as `^text-`, so `text-sm` and `text-danger`
+     — a size and a colour, both the library's answer — stay refused. */
+  /^text-(start|end|center|left|right|justify|balance|pretty|wrap|nowrap)$/,
+  /* ⚠️ AND TABULAR FIGURES ARE A MEASUREMENT, NOT A TYPEFACE. Proportional
+     digits make a column ripple, so the reader compares the ripple rather than
+     the values; the variant does not change the face, the size or the weight.
+     ⚠️ This was refused while `listing.tsx` set the SAME two utilities and
+     passed — its are behind a ternary, which this check cannot see. A rule that
+     holds only where somebody wrote the literal inline is not a rule. */
+  /^(tabular|proportional|lining|oldstyle|ordinal|slashed-zero|normal)-nums$/,
 ];
 
 /**

@@ -13,7 +13,7 @@
 
 import * as React from "react";
 import {
-  Accordion, Breadcrumbs, Disclosure, Kbd, ProgressCircle, Tabs, type KbdKey,
+  Accordion, Breadcrumbs, Button, Disclosure, Kbd, ProgressCircle, Tabs, type KbdKey,
 } from "@heroui/react";
 import { Check } from "lucide-react";
 import { SPACE } from "./metrics.js";
@@ -140,7 +140,17 @@ export function PageTabs({ tabs, value, onChange, label }: {
 
 /* ----------------------------------------------------------------- reveal --- */
 
-/** One fold-out. For detail that most readers rightly skip. */
+/**
+ * One fold-out. For detail that most readers rightly skip.
+ *
+ * ⚠️ THE TRIGGER IS A `Button slot="trigger"`, WHICH IS THE LIBRARY'S OWN SHAPE.
+ * `.disclosure__trigger` is `inline-block`, and `.disclosure__indicator` is
+ * `ms-auto` — an auto margin does nothing inside an inline box, so the chevron
+ * flowed after the words and wrapped to a line of its own under them, centred,
+ * looking like a rendering fault. A `Button` is `inline-flex items-center`, the
+ * auto margin resolves, and the row is a row. The fix is the documented
+ * composition, not a class of ours (D7).
+ */
 export function Reveal({ label, children }: {
   readonly label: string;
   readonly children: React.ReactNode;
@@ -148,10 +158,10 @@ export function Reveal({ label, children }: {
   return (
     <Disclosure>
       <Disclosure.Heading>
-        <Disclosure.Trigger>
+        <Button slot="trigger" variant="ghost" fullWidth>
           {label}
           <Disclosure.Indicator />
-        </Disclosure.Trigger>
+        </Button>
       </Disclosure.Heading>
       <Disclosure.Content>{children}</Disclosure.Content>
     </Disclosure>

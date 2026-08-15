@@ -118,8 +118,24 @@ function ruled(children: React.ReactNode): React.ReactNode {
   const rows = React.Children.toArray(children).filter(Boolean);
   if (rows.some((r) => React.isValidElement(r) && r.type === RowRule)) return rows;
 
-  const insetOf = (node: React.ReactNode): Inset =>
-    (React.isValidElement(node) ? (node.type as Ruled).lead : undefined) ?? "lead";
+  /*
+    ⚠️ AND A ROW WHOSE LEAD IS OPTIONAL IS ASKED PER ELEMENT, NOT PER TYPE. Most
+    rows always lead the same way, which is what the static declaration is for.
+    `AmountRow` does not: with a glyph it is a wallet line, without one it is a
+    plan and a price — and a plan list ruled at the glyph inset draws every rule
+    36px in from labels that are flush against the card. The element knows; the
+    component cannot.
+  */
+  const insetOf = (node: React.ReactNode): Inset => {
+    if (!React.isValidElement(node)) return "lead";
+    const declared = (node.type as Ruled).lead ?? "lead";
+    if (declared !== "lead") return declared;
+    /* ⚠️ ABSENT AND FALSY ARE THE SAME ANSWER. The first version asked whether
+       the prop was PRESENT, which an omitted one is not — so every row that
+       simply never passed an icon kept the glyph inset, which is every row this
+       was written for. */
+    return (node.props as { readonly icon?: React.ReactNode }).icon ? "lead" : "none";
+  };
 
   return rows.flatMap((row, i) => (i === 0
     ? [row]

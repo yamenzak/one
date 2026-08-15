@@ -6,10 +6,16 @@
  * What its customers pay THE WORKSPACE lives with the packages in People; here
  * it is the shelf side: which plan each product is on, and what a step up
  * would include.
+ *
+ * ⚠️ ONE FIGURE, THEN ROWS. This screen was three stacked card decks — a titled
+ * bill card, a titled credits card, and a grid of plan cards each holding the
+ * same five-line entitlement table. Every fact on it was true and none of it was
+ * readable. It is the hub's own grammar now, which is the grammar of every other
+ * screen here: the number somebody came for, and rows under it.
  */
 
-import { Card, Chip } from "@heroui/react";
-import { Await, Bill, Figure, FigureWaiting, Grid, Section, Shelf, Stack, notice } from "@quad/web";
+import { Chip } from "@heroui/react";
+import { AmountRow, Await, Bill, FigureWaiting, Group, Section, Shelf, Stack, glyphOf, notice } from "@quad/web";
 import { useLoad, type CentreView, type MoneyView } from "./data.js";
 
 export function Money({ view }: { readonly view: CentreView }) {
@@ -23,29 +29,26 @@ export function Money({ view }: { readonly view: CentreView }) {
       again={money.again}
       then={(data) => (
         <Stack space="roomy">
-          {/* ⚠️ THE TWO FIGURES SIT SIDE BY SIDE, BECAUSE THEY ARE ONE ANSWER.
-              What this costs and what is left to spend are the two numbers
-              somebody opens this screen for; stacked, each took a third of a
-              phone and the second was below the fold on a desktop. The crown
-              names the screen — see hub/Hub.tsx. */}
-          <Grid min="18rem">
-            <Bill
-              lines={data.bill.lines}
-              total={data.bill.total}
-              currency={data.bill.currency}
-              appName={(id) => data.apps.find((a) => a.id === id)?.name ?? id}
-            />
+          {/* ⚠️ The crown names the screen — see hub/Hub.tsx. */}
+          <Bill
+            lines={data.bill.lines}
+            total={data.bill.total}
+            currency={data.bill.currency}
+            appName={(id) => data.apps.find((a) => a.id === id)?.name ?? id}
+          />
 
-            <Card>
-              <Card.Header>
-                <Card.Title>Credits</Card.Title>
-                <Card.Description>What the generating features spend.</Card.Description>
-              </Card.Header>
-              <Card.Content>
-                <Figure value={data.balance.spendable.toLocaleString("en")} of="left to spend" />
-              </Card.Content>
-            </Card>
-          </Grid>
+          {/* ⚠️ CREDITS IS A ROW, NOT A SECOND HERO. It is a real number and it
+              is not the one this screen answers — a card of its own beside the
+              bill made two figures compete, and the reader has to decide which
+              is the subject before reading either. */}
+          <Group>
+            <AmountRow
+              icon={glyphOf("coins")}
+              label="Credits"
+              under="Spent by AI features"
+              amount={data.balance.spendable.toLocaleString("en")}
+            />
+          </Group>
 
           {/* ⚠️ NO GLYPH CHARACTER IN THE LABEL. `app.mark` is a text character
               from a manifest, so it renders at whatever weight and baseline the
