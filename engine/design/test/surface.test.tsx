@@ -20,7 +20,7 @@ import { Settings, settingsShown } from "../src/rendered/settings.js";
 import { NotificationPolicy, policyShown } from "../src/rendered/policy.js";
 import { FlagConsole, Shelf, saying, money } from "../src/rendered/console.js";
 import { Shell, reachable } from "../src/frame/shell.js";
-import { crownFor } from "../src/frame/layout.js";
+import { crownFor } from "../src/frame/crown.js";
 import { brandCss, brandCssFor, readable, colorFor } from "../src/tokens/theme.js";
 import { ambienceStylesheet, skyWorld, worldCss } from "../src/tokens/ambience.js";
 import { SKIES } from "../src/scene/index.js";

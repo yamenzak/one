@@ -31,16 +31,19 @@
 
 import * as React from "react";
 import { Button } from "@heroui/react";
-import {
-  Band, Docked, Page, PageCrown, Spacer, Title, useCrownSocket, type Slot, type Width,
-} from "./layout.js";
+import { Band, Page } from "./page.js";
+import { PageCrown, useCrownSocket, type Slot } from "./crown.js";
+import { Docked } from "./chrome.js";
+import { Spacer } from "../parts/arrange.js";
+import { Title } from "../parts/heads.js";
+import type { Width } from "../tokens/metrics.js";
 import { Group, NavRow } from "../parts/surfaces.js";
 import { worldFor, type FaceOf } from "../parts/face.js";
 import type { Tone } from "@engine/kernel";
 import type { Sky } from "../tokens/ambience.js";
 import type { Density } from "../scene/index.js";
 import { Await, Nothing, RowsWaiting, FigureWaiting, FormWaiting, TextWaiting, TilesWaiting, nothingIn, type Loaded } from "../parts/state.js";
-import { Stack } from "./layout.js";
+import { Stack } from "../parts/arrange.js";
 import { PAD, SAFE_BOTTOM, SPACE } from "../tokens/metrics.js";
 import { ARRIVE, arriveAt } from "../tokens/motion.js";
 

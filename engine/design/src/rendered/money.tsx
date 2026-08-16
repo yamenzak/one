@@ -14,7 +14,8 @@
 import type { JobBook, PackDef } from "@engine/kernel";
 import { Button, Card, Chip, Meter, ProgressBar } from "@heroui/react";
 import { money } from "./console.js";
-import { Balance, Grid, Stack } from "../frame/layout.js";
+import { Grid, Stack } from "../parts/arrange.js";
+import { Balance } from "../parts/heads.js";
 import { AmountRow, ControlRow, Group } from "../parts/surfaces.js";
 import { TYPE } from "../tokens/type.js";
 import { SPACE } from "../tokens/metrics.js";

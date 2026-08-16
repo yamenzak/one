@@ -6,7 +6,7 @@
  * checkable way stops being read for the parts that are right.
  */
 
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -52,7 +52,7 @@ if (what === "guards") {
     ["rendered", "whole surfaces drawn from a kernel declaration"],
     ["chart", "the data vocabulary — a number as a shape"],
   ];
-  const DECL = /^export\s+(?:declare\s+)?(?:async\s+)?(?:function|const|let|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/gm;
+  const DECL = /^export\s+(?:declare\s+)?(?:async\s+)?(function|const|let|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/gm;
   const walk = (dir, out = []) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const at = join(dir, e.name);
@@ -61,6 +61,35 @@ if (what === "guards") {
     }
     return out;
   };
+  /**
+   * ⚠️ WHAT THE ENTRY POINT ACTUALLY RE-EXPORTS, NOT EVERY DECLARATION. Counting
+   * `export` keywords published `chart/scale.ts`'s nineteen drawing helpers as
+   * design-system vocabulary — `linePath`, `polar`, `band`, `place` — none used
+   * by any caller outside the package, and every one a promise the moment it is
+   * listed as one.
+   */
+  const surfaced = (() => {
+    const seen = new Set();
+    const walkBarrel = (file, dir) => {
+      const src = readFileSync(file, "utf8");
+      for (const m of src.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}\s+from\s+"\.\/([\w./-]+)\.js"/g)) {
+        for (const n of m[1].split(",")) {
+          const name = n.trim().replace(/^type\s+/, "").split(" as ").pop().trim();
+          if (name) seen.add(name);
+        }
+      }
+      for (const m of src.matchAll(/export\s+\*\s+from\s+"\.\/([\w./-]+)\.js"/g)) {
+        const base = join(dir, m[1].replace(/\.js$/, ""));
+        const at = [`${base}.ts`, `${base}.tsx`, join(base, "index.ts")].find((f) => existsSync(f));
+        if (!at) continue;
+        if (at.endsWith("index.ts")) { walkBarrel(at, dirname(at)); continue; }
+        for (const d of readFileSync(at, "utf8").matchAll(DECL)) seen.add(d[2]);
+      }
+    };
+    walkBarrel(join(ENGINE, "design/src/index.ts"), join(ENGINE, "design/src"));
+    return seen;
+  })();
+
   console.log("| Home | What it is for | Ships |");
   console.log("|---|---|---|");
   let all = 0;
@@ -69,12 +98,16 @@ if (what === "guards") {
     const found = [];
     for (const file of walk(join(ENGINE, "design/src", home))) {
       const src = readFileSync(file, "utf8");
-      for (const m of src.matchAll(DECL)) found.push([m[1], file]);
+      for (const m of src.matchAll(DECL)) if (surfaced.has(m[2])) found.push([m[2], file]);
     }
     found.sort((a, b) => a[0].localeCompare(b[0]));
     all += found.length;
-    console.log(`| \`${home}/\` | ${what_} | ${found.length} |`);
-    detail.push([home, found]);
+    /* ⚠️ A HOME THAT SURFACES NOTHING IS A FACT, NOT A GAP. `scene/` is reached
+       only through `Page`'s `sky` NAME — an app declares a world, it never
+       assembles one — so zero here is the design working. The old count implied
+       otherwise by counting declarations nobody could import. */
+    console.log(`| \`${home}/\` | ${what_} | ${found.length || "internal"} |`);
+    if (found.length) detail.push([home, found]);
   }
   console.log("");
   console.log(`**${all} exports.** Every one is reachable as \`import { … } from "@engine/design"\`;`);

@@ -215,7 +215,7 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-hub/src")];
     behind, with no file that is wrong.
   */
   const PAINTS = /\bworldCss\s*\(|data-field/;
-  const MOUNTERS = new Set(["design/src/frame/layout.tsx", "design/src/tokens/ambience.ts"]);
+  const MOUNTERS = new Set(["design/src/frame/page.tsx", "design/src/tokens/ambience.ts"]);
   const ALL = [...filesIn("design/src", /\.tsx?$/), ...filesIn("one-hub/src")];
   let painters = 0;
   for (const file of ALL) {

@@ -61,7 +61,9 @@ const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$
  * ⚠️ THE TWO FILES THAT DEFINE THE CHROME, BY NAME. `screen.tsx` places the
  * crown and the dock; `layout.tsx` draws them. Everything else is a caller.
  */
-const DEFINES_CHROME = new Set(["design/src/frame/screen.tsx", "design/src/frame/layout.tsx"]);
+const DEFINES_CHROME = new Set([
+  "design/src/frame/screen.tsx", "design/src/frame/crown.tsx", "design/src/frame/chrome.tsx",
+]);
 
 /**
  * ⚠️ THE SURFACES THAT ARE NOT SCREENS, AND EACH IS EXEMPT FOR A STATED REASON.

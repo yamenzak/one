@@ -26,7 +26,21 @@
  * first. Composition over TIME is never round; that is `StackedChart`.
  */
 
-export * from "./scale.js";
+/*
+ * ⚠️ THE ARITHMETIC IS NOT THE VOCABULARY, AND ONLY TWO OF ITS NAMES ARE. A
+ * caller builds a `Series` out of `Point`s and may pin an axis with a `Span`;
+ * everything else in `scale.ts` — `linePath`, `arcPath`, `polar`, `band`,
+ * `stack`, `place`, `norm` — is how a chart is DRAWN, and it was all reaching a
+ * screen through `export *`. Nineteen names, none of them used outside this
+ * directory, published as the design system's public surface.
+ *
+ * ⚠️ WHAT THAT COSTS IS THE FREEDOM TO CHANGE THEM. A drawing helper nobody can
+ * see is one this package may rewrite; the same helper exported is a promise to
+ * whoever imported it. `charts.tsx`, `circles.tsx` and `figures.tsx` import from
+ * `./scale.js` directly, which is what a sibling does — the ban is on an APP
+ * reaching in, and a guard says so.
+ */
+export type { Point, Span } from "./scale.js";
 export * from "./palette.js";
 export * from "./charts.js";
 export * from "./circles.js";

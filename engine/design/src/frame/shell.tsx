@@ -29,9 +29,11 @@ import {
   Boxes, FileText, House, Inbox as InboxGlyph, NotebookPen, Package, Plus, Shield, Sparkles, Sun,
   UserRound, Users,
 } from "lucide-react";
+import { Page } from "./page.js";
+import { Island } from "./chrome.js";
 import {
-  Crown, CrownSocketProvider, Island, Page, crownFor, type CrownClaim, type Slot,
-} from "./layout.js";
+  Crown, CrownSocketProvider, crownFor, type CrownClaim, type Slot,
+} from "./crown.js";
 import { type Sky } from "../tokens/ambience.js";
 import { PAD, SPACE } from "../tokens/metrics.js";
 import { Face, appFace, worldFor, type FaceOf } from "../parts/face.js";

@@ -617,12 +617,12 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
  * least able to afford it — and it is the shape a "simplification" takes.
  */
 {
-  const src = readFileSync(join(ENGINE, "design/src/frame/layout.tsx"), "utf8");
+  const src = readFileSync(join(ENGINE, "design/src/frame/chrome.tsx"), "utf8");
   const body = (src.split(/\nexport /).find((b) => b.startsWith("function Island")) ?? "")
     .replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
 
   if (!body) {
-    fail(`design/src/frame/layout.tsx: no \`Island\` to check — if it moved, move this with it.`);
+    fail(`design/src/frame/chrome.tsx: no \`Island\` to check — if it moved, move this with it.`);
   } else {
     /* ⚠️ Both halves off the SAME name, or the bar can name what it did not
        highlight. `isHere` is that name; a second one is the defect. */
@@ -645,15 +645,15 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
     const leaves = /transform:\s*away\s*\?/.test(body);
 
     if (!marks || !names) {
-      fail(`design/src/frame/layout.tsx: the nav's fill and its label are not one condition (D7).\n` +
+      fail(`design/src/frame/chrome.tsx: the nav's fill and its label are not one condition (D7).\n` +
            `       fill from \`isHere\`: ${marks}; label from \`isHere\`: ${names}.\n` +
            `       Two expressions is a bar that highlights one item and names another.`);
     } else if (gone) {
-      fail(`design/src/frame/layout.tsx: a closed label is removed rather than narrowed.\n` +
+      fail(`design/src/frame/chrome.tsx: a closed label is removed rather than narrowed.\n` +
            `       \`display: none\` takes it out of the accessibility tree, which is five\n` +
            `       unnamed buttons to the one group the icon carries nothing for.`);
     } else if (!leaves) {
-      fail(`design/src/frame/layout.tsx: the nav does not leave by \`transform\`.\n` +
+      fail(`design/src/frame/chrome.tsx: the nav does not leave by \`transform\`.\n` +
            `       Animating height or padding on scroll is layout work on every frame.`);
     } else {
       ok(`travel: the nav names one destination, and leaves on the compositor`);
@@ -668,7 +668,7 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
  * ABLE TO MOVE ANYTHING. Everything in this session — the crown becoming one
  * component, the dock becoming one, the scene engine replacing twenty-four
  * grounds — was possible because the only thing anybody had was the name of an
- * export. One `@engine/design/src/frame/layout.js` in an app and the file's PATH
+ * export. One `@engine/design/src/frame/chrome.js` in an app and the file's PATH
  * is public: it cannot be split, renamed, or folded into another without
  * breaking a caller nobody remembers.
  *

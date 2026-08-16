@@ -80,14 +80,14 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 <!-- generated: node scripts/inventory.mjs vocabulary -->
 | Home | What it is for | Ships |
 |---|---|---|
-| `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 84 |
-| `scene/` | the ambience engine — families, marks, the world behind a screen | 25 |
-| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 61 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 94 |
+| `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 56 |
+| `scene/` | the ambience engine — families, marks, the world behind a screen | internal |
+| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 46 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 109 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 44 |
-| `chart/` | the data vocabulary — a number as a shape | 59 |
+| `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**367 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**294 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -95,37 +95,28 @@ there is no deep import, and a guard says so.
 - `tokens/ambience.ts` — `ambienceStylesheet`, `FADE`, `MATTE`, `ON_SCENE`, `REACH`, `skyWorld`, `World`, `worldCss`
 - `tokens/appearance.ts` — `Appearance`, `APPEARANCE_KEY`, `APPEARANCE_SCRIPT`, `APPEARANCES`, `applyAppearance`, `preferred`, `remember`, `resolve`, `stored`
 - `tokens/ground.ts` — `CONTROL_TINT`, `FOCUS`, `GROUND`, `GROUND_CSS`, `GROUND_TINT`, `MIN_DELTA`, `TINT`
-- `tokens/metrics.ts` — `ACTION_SPACE`, `BAND_PAD`, `CARD_ROWS`, `CODE_SLOT`, `CROWN`, `CROWN_CHIP`, `CROWN_SIZE`, `FACE_PX`, `GUTTER`, `HEAD_GAP`, `HERO_PAD`, `ICON`, `Inset`, `INSET`, `ISLAND_HERE`, `ISLAND_ITEM`, `ISLAND_PAD`, `LEAD`, `NAV_SPACE`, `PAD`, `ROW`, `SAFE_BOTTOM`, `SAFE_TOP`, `Space`, `SPACE`, `TITLE_PAD`, `Width`, `WIDTH`
 - `tokens/motion.ts` — `ARRIVE`, `ARRIVE_MARK`, `ARRIVE_MOTION`, `ARRIVE_RISE`, `arriveAt`, `BEAT`, `DOOR_MOTION`, `doorAt`, `Duration`, `DURATION`, `Ease`, `EASE`, `Intent`, `MOTION`, `REDUCED`, `transition`, `turns`, `useStill`
 - `tokens/theme.ts` — `brandCss`, `brandCssFor`, `colorFor`, `readable`, `SKY_MOTION`
 - `tokens/type.ts` — `FACE_CSS`, `FACE_STACK`, `MARK_STACK`, `MONO_STACK`, `Role`, `ROLES`, `sentence`, `text`, `TYPE`
 
-### `scene/`
-
-- `scene/aura.ts` — `AURA`
-- `scene/blobs.ts` — `BLOBS`
-- `scene/cloth.ts` — `CLOTH`
-- `scene/etch.ts` — `ETCH`
-- `scene/glow.ts` — `GLOW`
-- `scene/index.ts` — `FAMILIES`, `SceneFamily`, `SKIES`, `Sky`
-- `scene/loops.ts` — `LOOPS`
-- `scene/scene.ts` — `Density`, `DENSITY`, `Family`, `hash`, `Palette`, `pick`, `prng`, `render`, `Rendered`, `scatter`, `Scene`, `Speck`, `Tiles`, `Variant`
-- `scene/space.ts` — `SPACE`
-
 ### `frame/`
 
 - `frame/arrival.tsx` — `Arrival`, `AsideRoute`, `Mark`, `MarkSize`
-- `frame/layout.tsx` — `Balance`, `Band`, `BandProps`, `Bleed`, `Center`, `Cluster`, `Columns`, `Crown`, `CrownClaim`, `crownFor`, `CrownProps`, `CrownSocketProvider`, `distinguishing`, `Docked`, `Figure`, `Grid`, `Island`, `LeaveChip`, `Page`, `PageCrown`, `PageProps`, `Prose`, `Rail`, `Row`, `Section`, `SectionTitle`, `Slot`, `Spacer`, `Stack`, `Title`, `useCrownSocket`, `useNight`
+- `frame/chrome.tsx` — `Docked`, `Island`
+- `frame/crown.tsx` — `Crown`, `CrownClaim`, `crownFor`, `CrownProps`, `CrownSocketProvider`, `LeaveChip`, `PageCrown`, `Slot`, `useCrownSocket`
 - `frame/overlay.tsx` — `Confirm`, `Dialog`, `Menu`, `MenuItem`, `notice`, `NoticeHost`, `Over`, `Peek`, `Tray`
+- `frame/page.tsx` — `Band`, `BandProps`, `Bleed`, `Page`, `PageProps`, `useNight`
 - `frame/screen.tsx` — `Act`, `Board`, `Frame`, `Framed`, `Layout`, `LayoutProps`, `Screen`, `ScreenProps`, `Shape`, `Tile`, `Whichever`
 - `frame/shell.tsx` — `CrownInfo`, `glyphOf`, `reachable`, `Shell`, `ShellProps`
 
 ### `parts/`
 
+- `parts/arrange.tsx` — `Center`, `Cluster`, `Columns`, `Grid`, `Rail`, `Row`, `Spacer`, `Stack`
 - `parts/beside.tsx` — `Hint`, `Pip`
 - `parts/blocks.tsx` — `Crumbs`, `Faq`, `Gauge`, `Hotkey`, `Moment`, `PageTabs`, `Reveal`, `Step`, `Steps`, `TabSpec`, `Timeline`
 - `parts/face.tsx` — `appFace`, `Face`, `FaceKind`, `FaceOf`, `FaceProps`, `FaceSize`, `ONE_FACE`, `Orb`, `placeFace`, `whoFace`, `worldFor`
 - `parts/forms.tsx` — `Agree`, `Choice`, `CodeEntry`, `DateInput`, `Dates`, `Dial`, `LongText`, `Lookup`, `MoneyInput`, `NumberInput`, `NumberInputProps`, `OneOf`, `Option`, `PeriodId`, `PeriodInput`, `PERIODS`, `Picks`, `Said`, `SearchInput`, `SecretInput`, `Segmented`, `spanOf`, `Tags`, `TextInput`, `TextInputProps`, `TimeInput`
+- `parts/heads.tsx` — `Balance`, `distinguishing`, `Figure`, `Prose`, `Section`, `SectionTitle`, `Title`
 - `parts/listing.tsx` — `Col`, `Listing`, `ListingProps`, `Paged`
 - `parts/state.tsx` — `Await`, `AwaitProps`, `ChartWaiting`, `FigureWaiting`, `FormWaiting`, `Loaded`, `Nothing`, `nothingIn`, `ready`, `RowsWaiting`, `TableWaiting`, `TextWaiting`, `TilesWaiting`, `trouble`, `Trouble`, `waiting`, `Working`
 - `parts/surfaces.tsx` — `ActionRow`, `AmountRow`, `ControlRow`, `CopyRow`, `FieldRow`, `Group`, `GroupProps`, `Identity`, `Money`, `NavRow`, `NavRowProps`, `NoteRow`, `OfferRow`, `PersonRow`, `Place`, `QuickActions`, `SeeAll`, `Sheet`, `StepRow`, `TileGrid`, `ToggleRow`
@@ -150,7 +141,7 @@ there is no deep import, and a guard says so.
 - `chart/circles.tsx` — `CompositionBar`, `DonutChart`, `Ring`, `Rings`
 - `chart/figures.tsx` — `ChartPanel`, `Delta`, `Hero`, `Meter`, `Stat`, `StatRow`
 - `chart/palette.ts` — `assign`, `AXIS`, `DATA`, `emphasis`, `GRID`, `magnitude`, `polarity`, `pole`, `QUIET`, `SEPARATOR`, `seriesColour`, `SLOTS`
-- `chart/scale.ts` — `arcPath`, `arcs`, `areaPath`, `band`, `barPath`, `barPathX`, `compact`, `compactLike`, `extent`, `grouped`, `isGap`, `linePath`, `norm`, `place`, `Placed`, `Point`, `polar`, `Segment`, `Span`, `stack`, `stackSpan`, `ticks`
+- `chart/scale.ts` — `Point`, `Span`
 <!-- /generated -->
 
 ## What is guarded

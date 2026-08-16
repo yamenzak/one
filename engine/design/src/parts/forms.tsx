@@ -34,6 +34,9 @@ import {
 } from "@heroui/react";
 import { CODE_SLOT, SPACE } from "../tokens/metrics.js";
 
+/* ⚠️ The code box's height, beside the control that sets it. */
+export { CODE_SLOT };
+
 /* ---------------------------------------------------------------- grammar --- */
 
 /** The four sentences every control speaks. See the header. */

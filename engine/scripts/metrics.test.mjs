@@ -177,7 +177,7 @@ if (leadless.length) {
  * the nav — which is what shipped, on both specimens, until somebody looked at a
  * photograph of it.
  */
-const layout = readFileSync(join(ENGINE, "design/src/frame/layout.tsx"), "utf8");
+const layout = readFileSync(join(ENGINE, "design/src/frame/page.tsx"), "utf8");
 if (!/NAV_SPACE/.test(layout) || !/nav\?: React\.ReactNode/.test(layout)) {
   fail(`layout.tsx: \`Page\` does not reserve room for a nav.\n` +
        `       The island cannot do it: by the time it lays out, the content is sized.`);

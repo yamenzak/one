@@ -231,7 +231,7 @@ if (!unmounted) ok(`mounted: all ${exported.size} shared stylesheet(s) reach the
  * is what keeps this from being a ban on `flex`.
  */
 const FRAME = /className="[^"]*\b(?:flex|grid)\b[^"]*\bgap(?:-[xy])?-(?:\d+|\[[^\]]*\])/g;
-const FRAME_DEFINES = new Set(["design/src/frame/layout.tsx", "design/src/tokens/metrics.ts"]);
+const FRAME_DEFINES = new Set(["design/src/parts/arrange.tsx", "design/src/tokens/metrics.ts"]);
 
 let framed = 0;
 for (const file of FILES) {

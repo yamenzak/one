@@ -160,7 +160,7 @@ if (roles.length < 4) {
  * That one refuses `text-2xl` on a HeroUI component; nothing stopped it on a
  * bare `<h1>`, which is exactly where a screen reaches for one.
  */
-const DEFINES_TYPE = new Set(["design/src/tokens/type.ts", "design/src/frame/layout.tsx"]);
+const DEFINES_TYPE = new Set(["design/src/tokens/type.ts", "design/src/parts/heads.tsx"]);
 let sizes = 0;
 for (const file of SOURCES) {
   const name = rel(file);

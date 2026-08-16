@@ -15,7 +15,7 @@
 import type { Allowance, EntitlementDef, FlagBook, FlagDef, PlanSpec } from "@engine/kernel";
 import { UNLIMITED, overdue, resolve, settableBy } from "@engine/kernel";
 import { Table } from "@heroui/react";
-import { Stack } from "../frame/layout.js";
+import { Stack } from "../parts/arrange.js";
 import { AmountRow, Group, ToggleRow } from "../parts/surfaces.js";
 import type { FaceOf } from "../parts/face.js";
 import { SPACE } from "../tokens/metrics.js";

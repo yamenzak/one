@@ -19,7 +19,8 @@ import { Link } from "@heroui/react";
 import { ARRIVE_MARK, ARRIVE_RISE, doorAt } from "../tokens/motion.js";
 import { GUTTER, SPACE, WIDTH } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
-import { Page, Spacer, Stack } from "./layout.js";
+import { Page } from "./page.js";
+import { Spacer, Stack } from "../parts/arrange.js";
 import type { Sky } from "../tokens/ambience.js";
 import { ONE_FACE, worldFor } from "../parts/face.js";
 
