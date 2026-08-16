@@ -31,6 +31,13 @@ folder above it.
 | [DESIGN.md](DESIGN.md) | the design language — the rules, the screen shapes, where the one action goes, the checks a screen has to pass | read once |
 | [AMBIENCE.md](AMBIENCE.md) | the world behind the screen — the families, the three ways to make a field, the hem, what a seed reaches | read when a screen needs a ground |
 
+⚠️ **AND THE TEST GROUND IS `apps/hello`.** Its five screens are built from
+nothing but this package, take their data as props, and render with no session,
+no worker and no database — `pnpm --filter @engine/hub dev`, then
+`?screen=/reports`. That last property is the one that matters: four defects
+this package shipped were invisible to every suite and obvious in a photograph,
+and none of them would have been reachable behind a sign-in.
+
 **Building a screen? Pick the shape (DESIGN.md §4), reach for what already exists
 (below), and let the guards say the rest.** None of this needs reading end to
 end — a guard fails with the reason and the section, which is the whole point of

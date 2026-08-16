@@ -553,6 +553,25 @@ that widened every second. A five-segment filter ran off a 390px screen. And the
 guard above. The suites were green for all four, which is the argument for
 shooting the screen rather than trusting the run.
 
+**`@engine/hello` — the reference app, and the UI test ground.** Five screens
+built from nothing but `@engine/design`, over a sample world written down in
+`screens/sample.ts` where anybody can read it. Hello is the MOCK app — no
+customers, no database — so sample content is what it honestly has.
+
+- **The routes come from the manifest, not from a list beside them.** A second
+  list is a second answer to "what screens does this app have", and they drift
+  in the direction nobody notices: a screen declared and never drawn renders an
+  honest notice, which reads as unfinished rather than as a mistake.
+- **Every screen takes its data as props**, so any of them renders with no
+  session, no worker and no database. That is what replaced the catalogue and
+  the specimen board, and it is a better claim than either: a catalogue proves
+  each piece renders, a specimen proves a screen COULD be assembled from the
+  vocabulary, and an app's own screen proves one WAS.
+- **The sample world keeps the awkward cases** — a gap in the series, somebody
+  who has not accepted an invitation, a note nobody published. A demo where
+  everything is present and tidy renders every empty state exactly never, and
+  `ground.screens.test.tsx` asserts all three are still there.
+
 **`@engine/hub` (`engine/one-hub/`) — the page a person opens.** The signpost, sign-in with an
 emailed code, the doors, and the wizard that makes a workspace — HeroUI v3 as it
 ships, themed through tokens, nothing restyled.

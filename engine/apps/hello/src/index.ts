@@ -159,6 +159,12 @@ export const HELLO: AppSpec = defineApp({
        a flag no screen and no operation is behind changes nothing when pressed. */
     { id: "search", route: "/search", label: "Search", nav: "secondary", icon: "search",
       permission: "note:read", flag: "note-search" },
+    /* ⚠️ DECLARED SO THE CHART VOCABULARY HAS A HOME IN A REAL APP. A figure is
+       the one part of the design system that cannot be judged from a catalogue —
+       it needs a series with a gap in it, an axis, a period to filter by and a
+       number beside it — and a screen is where those meet. */
+    { id: "reports", route: "/reports", label: "Reports", nav: "secondary", icon: "chart",
+      permission: "note:read" },
   ],
 
   notifications: {

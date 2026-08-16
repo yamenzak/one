@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The Hub — the page a person opens at the signpost, the account door and the setup door. Sign in with an emailed code, see your workspaces, make one, leave one.",
+  "description": "The Hub \u2014 the page a person opens at the signpost, the account door and the setup door. Sign in with an emailed code, see your workspaces, make one, leave one.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -12,12 +12,13 @@
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
+    "@engine/design": "workspace:*",
+    "@engine/hello": "workspace:*",
+    "@engine/kernel": "workspace:*",
     "@fontsource-variable/geist": "^5.3.0",
     "@fontsource-variable/onest": "^5.3.0",
     "@heroui/react": "^3.0.5",
     "@heroui/styles": "^3.0.5",
-    "@engine/kernel": "workspace:*",
-    "@engine/design": "workspace:*",
     "lucide-react": "^1.31.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

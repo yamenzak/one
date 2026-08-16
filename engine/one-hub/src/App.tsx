@@ -21,8 +21,7 @@
  */
 
 import { Band, Crown, Layout, NoticeHost, ONE_FACE, Spacer, Trouble, Working, whoFace } from "@engine/design";
-import { Gallery } from "./screens/Gallery.js";
-import { SPECIMEN_IDS, Specimen, type SpecimenId } from "./screens/Specimens.js";
+import { HELLO_ROUTES, HelloScreen } from "@engine/hello/screens";
 
 import { useSession } from "./session.js";
 import { useTravel } from "./nav.js";
@@ -38,7 +37,7 @@ import { Signpost } from "./screens/Signpost.js";
 /** What the page shows, as a name — the thing the guard and the tests read. */
 export type Screen =
   | "waiting" | "stuck" | "signpost" | "sign-in" | "hub" | "new-workspace"
-  | "product" | "elsewhere" | "gallery";
+  | "product" | "elsewhere" | "ground";
 
 /**
  * ⚠️ EVERY COMBINATION IS ANSWERED, INCLUDING THE ONES THAT SHOULD NOT HAPPEN.
@@ -48,12 +47,12 @@ export type Screen =
 export function pickScreen(
   face: Face | null, signedIn: boolean | null, stuck: boolean, showcase = false,
 ): Screen {
-  /* ⚠️ THE VOCABULARY CATALOGUE IS A DEVELOPMENT SURFACE AND NEVER REACHABLE IN
-     PRODUCTION. A page listing every component a product has is a page that
-     leaks every capability it has, including the ones a workspace has not
-     bought. It is asked for by a query the deployment only honours in
-     development — see `App`. */
-  if (showcase) return "gallery";
+  /* ⚠️ THE TEST GROUND IS A DEVELOPMENT SURFACE AND NEVER REACHABLE IN
+     PRODUCTION. It renders the reference app's screens over a sample world with
+     no session behind them — which is the point, and also why it must never be
+     one query parameter away from a real deployment. It is asked for by a query
+     the deployment only honours in development, see `App`. */
+  if (showcase) return "ground";
   if (stuck) return "stuck";
   if (face === null) return "waiting";
   if (face === "signpost") return "signpost";
@@ -90,21 +89,21 @@ export function App() {
      query parameter alone would make the catalogue one link away in
      production. */
   const query = new URLSearchParams(location.search);
-  const showcase = import.meta.env.DEV && query.has("gallery");
-  /* ⚠️ A WHOLE SCREEN, ASSEMBLED FROM THE VOCABULARY AND NOTHING ELSE. The
-     catalogue proves each piece renders; a specimen proves a real screen can be
-     built without reaching around any of them. Development only, for the same
-     reason the catalogue is. */
-  const specimen = import.meta.env.DEV
-    ? SPECIMEN_IDS.find((id) => id === query.get("screen")) ?? null
+  /* ⚠️ THE ROUTE IS THE REFERENCE APP'S OWN, so what the ground renders is what
+     a real screen renders — not a specimen built to look like one. A specimen
+     proves a screen COULD be assembled from the vocabulary; the app's own screen
+     proves one WAS, which is a different claim and the only one worth making. */
+  const ground = import.meta.env.DEV
+    ? HELLO_ROUTES.find((r) => r === (query.get("screen") ?? "")) ?? null
     : null;
+  const showcase = import.meta.env.DEV && query.has("ground") && ground === null;
   const screen = pickScreen(face, me === null ? null : me !== "nobody", stuck !== null, showcase);
 
   /* ⚠️ A SCREEN SOMEBODY WORKS IN AND A SCREEN SOMEBODY ARRIVES AT ARE NOT THE
      SAME LAYOUT. The first is a column under a ruled crown; the second is a
      centred sheet with no chrome. Using one for both makes the sign-in look like
      a settings page — which is how a product comes to feel like a form. */
-  const settled = screen === "gallery";
+  const settled = screen === "ground";
 
   /* ⚠️ The hub is the whole page here: the account door and the operator door
      have nothing underneath, so it is handed no way out. */
@@ -131,12 +130,12 @@ export function App() {
     );
   }
 
-  /* ⚠️ A specimen brings its OWN page, crown and ambience — that is the whole
-     claim being tested — so it replaces the frame rather than sitting inside it. */
-  /* ⚠️ `NoticeHost` mounts ONCE, beside whichever frame renders — two hosts
+  /* ⚠️ A SCREEN BRINGS ITS OWN PAGE, CROWN AND AMBIENCE — that is the whole
+     claim being tested — so it replaces the frame rather than sitting inside it.
+     ⚠️ `NoticeHost` mounts ONCE, beside whichever frame renders — two hosts
      would show every notice twice, which reads as a fault in the thing being
      announced. */
-  if (specimen) return <><NoticeHost /><Specimen id={specimen as SpecimenId} /></>;
+  if (ground) return <><NoticeHost /><HelloScreen route={ground} /></>;
 
   /*
     ⚠️ A DOOR IS THE PAGE, AND THAT IS WHY IT IS NOT IN THE FRAME BELOW. These
@@ -188,7 +187,7 @@ export function App() {
           {screen === "waiting" ? <Working says="Getting your workspaces" /> : null}
           {screen === "stuck" && stuck ? <Trouble problem={stuck} /> : null}
           {screen === "elsewhere" && where ? <Elsewhere where={where} kind={where.kind} /> : null}
-          {screen === "gallery" ? <Gallery /> : null}
+          {screen === "ground" ? <HelloScreen route="/" /> : null}
         </div>
       </Band>
       <Spacer />

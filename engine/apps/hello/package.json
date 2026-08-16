@@ -5,7 +5,8 @@
   "type": "module",
   "description": "The smallest complete app on OneEngine: one collection, one operation, and every cross-cutting declaration wired. It exists to be proved \u2014 every stage's exit criterion is asserted against it.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./screens": "./src/screens/index.tsx"
   },
   "types": "./src/index.ts",
   "scripts": {
@@ -15,9 +16,11 @@
     "clean": "rm -rf .turbo *.tsbuildinfo"
   },
   "dependencies": {
+    "@engine/design": "workspace:*",
     "@engine/kernel": "workspace:*",
     "@engine/runtime": "workspace:*",
-    "@engine/design": "workspace:*"
+    "@heroui/react": "^3.0.5",
+    "react": "^19.2.0"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.8.55",
