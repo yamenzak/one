@@ -1315,6 +1315,42 @@
       "impl": "scripts/heroui.test.mjs",
       "proves": "dock: ",
       "fails": "a hand-rolled dock skips the rules the declaration carries \u2014 a primary over a skeleton, over a refusal, or duplicated inside an empty state"
+    },
+    {
+      "id": "one-source-for-every-measurement",
+      "protects": "D7",
+      "stage": "19",
+      "status": "live",
+      "impl": "scripts/metrics.test.mjs",
+      "proves": "spacing:",
+      "fails": "a component picking its own padding or gap, so a list ends up with three rhythms and no wrong line to point at \u2014 the check existed and ran nowhere, with sixteen findings accumulated behind it"
+    },
+    {
+      "id": "a-pressable-row-clears-the-touch-floor",
+      "protects": "D7",
+      "stage": "19",
+      "status": "live",
+      "impl": "scripts/metrics.test.mjs",
+      "proves": "target:",
+      "fails": "a row somebody taps rendering under 64px, which reads as a mis-tap rather than as a small target"
+    },
+    {
+      "id": "a-pressable-row-drops-the-button-s-own-metrics",
+      "protects": "D7",
+      "stage": "19",
+      "status": "live",
+      "impl": "scripts/metrics.test.mjs",
+      "proves": "released:",
+      "fails": "a row satisfying the touch floor with a string that changes nothing, because the button's own height and gutter still win"
+    },
+    {
+      "id": "the-page-reserves-room-for-its-nav",
+      "protects": "D7",
+      "stage": "19",
+      "status": "live",
+      "impl": "scripts/metrics.test.mjs",
+      "proves": "chrome:",
+      "fails": "a sticky island floating over the last card on every screen \u2014 the island cannot fix it, since by the time it lays out the content above is already sized"
     }
   ]
 }

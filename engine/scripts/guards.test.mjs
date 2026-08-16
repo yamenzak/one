@@ -78,11 +78,22 @@ ok(`binding: ${live.length} live guard(s) bound to a real assertion`);
 
 /* -------------------------------------------------------------- invoked --- */
 
+/**
+ * ⚠️ THE GATE NAMES ITS GUARDS IN `gate.mjs` NOW, NOT IN A `&&` CHAIN, so this
+ * reads both. It matters more than it looks: `metrics.test.mjs` was a
+ * two-hundred-line check in neither the chain nor this registry — the design
+ * README listed it as a guard, and it had been accumulating findings that
+ * nothing ran and nothing knew about.
+ */
 const scripts = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).scripts;
-const commands = [scripts["engine:gate"] ?? "", scripts["engine:test"] ?? "", scripts["engine:typecheck"] ?? ""].join(" ");
+const commands = [
+  scripts["engine:gate"] ?? "", scripts["engine:test"] ?? "", scripts["engine:typecheck"] ?? "",
+  readFileSync(join(ENGINE, "scripts/gate.mjs"), "utf8"),
+].join(" ");
 for (const g of live) {
   /* A vitest file is reached by `engine:test`; an .mjs guard has to be named. */
-  if (g.impl.endsWith(".mjs") && !commands.includes(g.impl.replace(/^/, "engine/"))) {
+  const stem = g.impl.replace(/^scripts\//, "").replace(/\.test\.mjs$/, "");
+  if (g.impl.endsWith(".mjs") && !commands.includes(`engine/${g.impl}`) && !commands.includes(`"${stem}"`)) {
     fail(`${g.id}: ${g.impl} is not named by engine:gate, so it never runs`);
   }
 }

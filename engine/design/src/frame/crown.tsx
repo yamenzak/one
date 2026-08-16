@@ -18,8 +18,7 @@ import { Button, Card } from "@heroui/react";
 import { ON_SCENE } from "../tokens/ambience.js";
 import { TYPE } from "../tokens/type.js";
 import {
-  BAND_PAD, CROWN, CROWN_CHIP, CROWN_SIZE, GUTTER, HEAD_GAP, ICON, SAFE_TOP, SPACE, TITLE_PAD,
-  WIDTH,
+  BAND_PAD, CROWN, CROWN_CHIP, CROWN_HERO_PAD, CROWN_SIZE, GUTTER, HEAD_GAP, ICON, SAFE_TOP, SPACE, TITLE_PAD, WIDTH,
 } from "../tokens/metrics.js";
 import type { Width } from "../tokens/metrics.js";
 
@@ -662,7 +661,7 @@ export function PageCrown({
                    picture paints after in-flow content and the name vanished
                    behind a planet with nothing in the DOM to show for it. */
                 className={`relative col-start-1 row-start-1 self-center justify-self-center w-full
-                  flex flex-col items-center text-center ${SPACE.tight} px-4 py-6`}
+                  flex flex-col items-center text-center ${SPACE.tight} ${CROWN_HERO_PAD}`}
                 /* ⚠️ ON THE WRAPPER, BECAUSE `text-shadow` INHERITS. */
                 style={{ gridArea: "1 / 1", textShadow: ON_SCENE }}
               >

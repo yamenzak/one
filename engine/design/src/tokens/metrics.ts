@@ -282,6 +282,39 @@ export const BAND_PAD = "py-6" as const;
  */
 export const HERO_PAD = "pt-6" as const;
 
+/**
+ * ⚠️ ONE THIRD DOWN, NOT HALF — the optical centre of a door screen. A sign-in
+ * placed at true centre reads as low, because the eye puts the middle of a page
+ * above its geometric one; the phone value and the desktop value differ because
+ * a phone has a keyboard about to take the bottom third.
+ */
+export const DOOR_PAD = "pt-12 pb-[14vh] md:pt-[22vh] md:pb-12" as const;
+
+/**
+ * ⚠️ THE PULL THAT LETS A RAIL BLEED PAST ITS GUTTER, and it is the exact
+ * negative of `GUTTER`. Written out it was a second copy of those numbers, so
+ * changing the gutter moved every column on every screen except the scrolling
+ * ones — which would have looked like a rail bug rather than a mismatched pair.
+ */
+export const BLEED_PULL = "-mx-4 md:-mx-6" as const;
+
+/** ⚠️ The crown's own centred block — a wordmark and a line, on the door. */
+export const CROWN_HERO_PAD = "px-4 py-6" as const;
+
+/** ⚠️ A screen's name, when the crown has stood down and the Band carries it. */
+export const SCREEN_TITLE_PAD = "pt-2 pb-4" as const;
+
+/**
+ * ⚠️ AN OPTICAL NUDGE INSIDE ONE COMPONENT, NAMED RATHER THAN INLINE. Four
+ * pixels under a face that leads a card, eight above a card's own footer, and
+ * the run under a timeline entry. None is a rhythm anything else can see — but
+ * a number nobody can name is one that drifts the first time somebody has a
+ * reason, which is the whole argument of this file.
+ */
+export const NUDGE = {
+  under: "pb-1", over: "pt-2", entry: "pb-6", body: "pb-2",
+} as const;
+
 /* -------------------------------------------------------------- the chrome --- */
 
 /**

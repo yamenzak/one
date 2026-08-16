@@ -44,7 +44,9 @@ import type { Sky } from "../tokens/ambience.js";
 import type { Density } from "../scene/index.js";
 import { Await, Nothing, RowsWaiting, FigureWaiting, FormWaiting, TextWaiting, TilesWaiting, nothingIn, type Loaded } from "../parts/state.js";
 import { Stack } from "../parts/arrange.js";
-import { PAD, SAFE_BOTTOM, SPACE } from "../tokens/metrics.js";
+import {
+  NUDGE, PAD, SAFE_BOTTOM, SCREEN_TITLE_PAD, SPACE,
+} from "../tokens/metrics.js";
 import { ARRIVE, arriveAt } from "../tokens/motion.js";
 
 /* ------------------------------------------------------------------ shape --- */
@@ -402,12 +404,12 @@ export function Screen<T = unknown>({
 
       {heading ? (
         <Band bleed="hold" width={preset.width}>
-          <div className="pt-2 pb-4"><Title under={typeof sub === "string" ? sub : undefined}>{name}</Title></div>
+          <div className={SCREEN_TITLE_PAD}><Title under={typeof sub === "string" ? sub : undefined}>{name}</Title></div>
         </Band>
       ) : null}
 
       <Band bleed="hold" width={preset.width}>
-        <div className="pb-2">{body}</div>
+        <div className={NUDGE.body}>{body}</div>
       </Band>
 
       {/* ⚠️ THE SCREEN OWNS THE SPACE UNDER ITS CONTENT, so the dock below is at

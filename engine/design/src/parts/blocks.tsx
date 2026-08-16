@@ -16,7 +16,9 @@ import {
   Accordion, Breadcrumbs, Button, Disclosure, Kbd, ProgressCircle, Tabs, type KbdKey,
 } from "@heroui/react";
 import { Check } from "lucide-react";
-import { SPACE } from "../tokens/metrics.js";
+import {
+  NUDGE, SPACE,
+} from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 
 /* ------------------------------------------------------------------ steps --- */
@@ -87,7 +89,7 @@ export function Timeline({ moments }: { readonly moments: readonly Moment[] }) {
             <span className="mt-2 size-2 shrink-0 rounded-full bg-current" />
             {i < moments.length - 1 ? <span className="w-px grow bg-current opacity-30" /> : null}
           </span>
-          <div className={`flex flex-col pb-6 ${SPACE.hair}`}>
+          <div className={`flex flex-col ${NUDGE.entry} ${SPACE.hair}`}>
             <span className={TYPE.note}>{m.when}</span>
             <span className={TYPE.label}>{m.label}</span>
             {m.under ? <span className={TYPE.note}>{m.under}</span> : null}

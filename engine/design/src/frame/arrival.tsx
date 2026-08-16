@@ -17,7 +17,9 @@
 import * as React from "react";
 import { Link } from "@heroui/react";
 import { ARRIVE_MARK, ARRIVE_RISE, doorAt } from "../tokens/motion.js";
-import { GUTTER, SPACE, WIDTH } from "../tokens/metrics.js";
+import {
+  DOOR_PAD, GUTTER, SPACE, WIDTH,
+} from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 import { Page } from "./page.js";
 import { Spacer, Stack } from "../parts/arrange.js";
@@ -169,7 +171,7 @@ export function Arrival({ name, claim, children, aside, sky }: {
         {/* ⚠️ ONE THIRD DOWN, NOT HALF. Optically centred rather than
             arithmetically: a short block placed at exactly 50% reads as low,
             because the eye takes the middle of a page to be above its middle. */}
-        <div className="min-h-dvh flex flex-col justify-center pt-12 pb-[14vh] md:justify-start md:pt-[22vh] md:pb-12">
+        <div className={`min-h-dvh flex flex-col justify-center md:justify-start ${DOOR_PAD}`}>
           {/* ⚠️ FOUR BLOCKS, ARRIVING IN THE ORDER SOMEBODY READS THEM. The mark
               turns in first and everything else rises under it — see
               `DOOR_MOTION`. Staggering the name and the form separately from the

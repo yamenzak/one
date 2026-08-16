@@ -70,6 +70,13 @@ for (const file of FILES) {
      scale a component legitimately owns, because nothing else can see them. */
   for (const one of found) {
     if (/^gap-(?:0\.5|1)$/.test(one)) continue;
+    /* ⚠️ A ZERO REMOVES A RHYTHM RATHER THAN PICKING ONE, and both in the tree
+       cancel a HeroUI default the design does not want: `.card__content` ships
+       `gap-1`, so four pixels sat between every row on top of the spacing that
+       already said where one ended, and a contentless badge is padded for a
+       digit it does not contain. There is no scale to disagree with here — the
+       library's own number is what is being switched off. */
+    if (/^(?:p|px|py|pt|pb|pl|pr|gap|gap-x|gap-y)-0$/.test(one)) continue;
     loose++;
     fail(`${name}: writes "${one}" itself.\n` +
          `       Every padding and gap comes from \`metrics.ts\`. One file picking its own\n` +
@@ -141,35 +148,20 @@ if (unfree.length) {
   ok(`released: all ${pressable.length} row(s) drop the button's own height and gutter`);
 }
 
-/**
- * ⚠️ A ROW WITHOUT A GLYPH DECLARES SO, OR ITS SEPARATOR STARTS IN MIDAIR.
- * `Group` derives each rule's inset from the row below it and defaults to the
- * glyph column, which is right for most rows and wrong for exactly two kinds:
- * one that leads with a face (52px, not 36) and one that leads with nothing at
- * all (flush). Both shipped wrong — a list of people ruled at the glyph inset,
- * and a card of copyable fields ruled 36px in from labels that were flush
- * against the card.
+/*
+ * ⚠️ THE `insets:` CHECK WAS HERE AND IS DELETED, BECAUSE THE RULE IT PROTECTED
+ * IS GONE. It made every row declare where its separator should start, so a
+ * leadless row was not ruled at the glyph column — and separators were removed
+ * from cards entirely (`surfaces.tsx`: a row is 24px from its neighbour and 4px
+ * from its own second line, and the ratio already says what the line said). The
+ * `Ruled` type it named does not exist in the tree.
  *
- * ⚠️ SO A ROW THAT RENDERS NO `<Lead>` MUST BE IN THE DECLARATION BLOCK. It is a
- * property rather than a name because the minifier renames functions — see
- * `surfaces.tsx` — and it is checked here because the default is silent: a new
- * row type gets the glyph inset and nobody finds out until somebody looks at a
- * render.
+ * ⚠️ A CHECK WHOSE PREMISE DIED IS SATISFIED BY WRITING DEAD CODE. Its remedy
+ * asked for `(FieldRow as Ruled).lead = "none"` — a property nothing reads, on a
+ * type nothing declares, added only to make a guard stop talking. That is worse
+ * than the finding: deleting a check is visible in a diff, and a line of
+ * ceremonial code is not.
  */
-const declared = new Set(
-  [...surfaces.matchAll(/\((\w+) as Ruled\)\.lead\s*=/g)].map((m) => m[1]),
-);
-const leadless = blocks
-  .map((b) => [/^function (\w*Row)/.exec(b)[1], b])
-  .filter(([name, body]) => !/<Lead\b/.test(body) && !declared.has(name))
-  .map(([name]) => name);
-if (leadless.length) {
-  fail(`surfaces.tsx: ${leadless.join(", ")} renders no <Lead> and declares no \`lead\`.\n` +
-       `       Group will rule it at the glyph inset, so its separator starts 36px in\n` +
-       `       from labels that are flush. Add \`(${leadless[0]} as Ruled).lead = "none"\`.`);
-} else {
-  ok(`insets: every row either leads with a glyph or says what it leads with`);
-}
 
 /**
  * ⚠️ AND THE PAGE RESERVES ROOM FOR ITS NAV. A sticky island floats over what

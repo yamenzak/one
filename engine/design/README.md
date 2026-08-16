@@ -162,7 +162,9 @@ consequence rather than on a style. The ones about this package:
 - **`states`** — four outcomes everywhere, skeletons shaped like what is coming.
 - **`motion`** — no screen writes its own curve or duration; every keyframe is
   switched off both ways.
-- **`metrics`** — no screen contains a measurement.
+- **`metrics`** — no component picks its own padding or gap; a pressable row
+  clears the touch floor and actually drops the button's own metrics to do it;
+  the page reserves room for its nav.
 - **`tone`** — label length, sentence case, full stops.
 - **`surface`** — every declaration reaches a screen; every field kind has a
   control.

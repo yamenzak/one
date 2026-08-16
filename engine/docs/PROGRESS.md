@@ -584,7 +584,7 @@ The guard registry, its checks, and the standards that bind them.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 5 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 46 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 50 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
@@ -756,6 +756,10 @@ the library decides FOR us.
 | `a-lattice-repeats-on-whole-cells` | D7 | a cell that does not divide the tile leaves half-cells down every seam — a ruled line across the page at the one pitch the eye is best at finding, and invisible in the source |
 | `one-door-into-the-design-system` | D7 | a file path inside the design system becomes public, so nothing in it can be renamed, split or folded away again |
 | `one-docked-action-declared-not-wrapped` | D7 | a hand-rolled dock skips the rules the declaration carries — a primary over a skeleton, over a refusal, or duplicated inside an empty state |
+| `one-source-for-every-measurement` | D7 | a component picking its own padding or gap, so a list ends up with three rhythms and no wrong line to point at — the check existed and ran nowhere, with sixteen findings accumulated behind it |
+| `a-pressable-row-clears-the-touch-floor` | D7 | a row somebody taps rendering under 64px, which reads as a mis-tap rather than as a small target |
+| `a-pressable-row-drops-the-button-s-own-metrics` | D7 | a row satisfying the touch floor with a string that changes nothing, because the button's own height and gutter still win |
+| `the-page-reserves-room-for-its-nav` | D7 | a sticky island floating over the last card on every screen — the island cannot fix it, since by the time it lays out the content above is already sized |
 <!-- /generated -->
 
 ## Commands

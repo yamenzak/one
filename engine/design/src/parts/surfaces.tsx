@@ -29,7 +29,7 @@ import { Button, Card, Chip, Label, Skeleton, Switch } from "@heroui/react";
 import type { Tone } from "@engine/kernel";
 import { TYPE } from "../tokens/type.js";
 import {
-  CARD_ROWS, CROWN_SIZE, HEAD_GAP, ICON, INSET, LEAD, PAD, ROW, SPACE,
+  CARD_ROWS, CROWN_SIZE, HEAD_GAP, ICON, INSET, LEAD, NUDGE, PAD, ROW, SPACE,
 } from "../tokens/metrics.js";
 import type { Inset } from "../tokens/metrics.js";
 import { ARRIVE, arriveAt } from "../tokens/motion.js";
@@ -239,11 +239,11 @@ export function Place({ name, said, foot, face, tone = "neutral", at, onOpen }: 
                   text turns the card into a tall row; a place is a destination
                   and reads top-down, which is what makes it different from
                   the rows under it. */}
-              {face ? <span className="pb-1"><Face of={face} name={name} /></span> : null}
+              {face ? <span className={NUDGE.under}><Face of={face} name={name} /></span> : null}
               <span className={TYPE.section}>{name}</span>
               <span className={TYPE.note}>{said}</span>
               {foot !== undefined ? (
-                <span className="flex w-full items-center justify-between pt-2">
+                <span className={`flex w-full items-center justify-between ${NUDGE.over}`}>
                   {foot === null
                     ? <Skeleton className="h-4 w-24" />
                     : <span className={TYPE.label}>{foot}</span>}

@@ -23,7 +23,7 @@
     "engine:dev": "turbo run dev --filter='./engine/*'",
     "engine:test": "turbo run test --filter='./engine/*' --filter='./engine/apps/*'",
     "engine:typecheck": "turbo run typecheck --filter='./engine/*' --filter='./engine/apps/*'",
-    "engine:gate": "node engine/scripts/inert.test.mjs && node engine/scripts/docs.test.mjs && node engine/scripts/guards.test.mjs && node engine/scripts/kernel.test.mjs && node engine/scripts/declarations.test.mjs && node engine/scripts/shards.test.mjs && node engine/scripts/apps.test.mjs && node engine/scripts/heroui.test.mjs && node engine/scripts/ground.test.mjs && node engine/scripts/motion.test.mjs && node engine/scripts/states.test.mjs && node engine/scripts/shape.test.mjs && node engine/scripts/face.test.mjs && node engine/scripts/scene.test.mjs && node --experimental-strip-types engine/scripts/tone.test.mjs && node engine/scripts/provenance.test.mjs && node engine/scripts/surface.test.mjs && node engine/scripts/hub.test.mjs && node engine/scripts/services.test.mjs && node engine/scripts/agent.test.mjs && node engine/scripts/access.test.mjs && node engine/scripts/package.test.mjs && node engine/scripts/operator.test.mjs && node engine/scripts/ai-action.test.mjs && node engine/scripts/vault.test.mjs"
+    "engine:gate": "node engine/scripts/gate.mjs"
   },
   "devDependencies": {
     "turbo": "^2.5.9",
