@@ -176,9 +176,23 @@ export const HELLO: AppSpec = defineApp({
   collections: [note],
   operations: [publish, draft],
 
+  /*
+    ⚠️ THREE OF EIGHT NAME A GROUND, AND THE FIVE THAT DO NOT ARE THE POINT.
+    AMBIENCE.md's rule is that ambience everywhere is ambience nowhere: what
+    earns a world is a screen somebody ARRIVES at — a result, a home, something
+    they read — and never a form and never a list. A reference app that painted
+    all eight would teach the next app to do the same, which is how a product
+    ends up with a ground behind its settings.
+
+    ⚠️ A SCREEN THAT NAMES NOTHING STILL HAS ONE: the shell falls back to the
+    PRODUCT's own world, a lattice seeded from the app's face (`Shell`). So the
+    five plain screens are not bare — they are the product, and the three named
+    ones are somewhere else inside it.
+  */
   screens: [
+    /* ⚠️ A list. The product's own lattice, and nothing of its own. */
     { id: "notes", route: "/", label: "Notes", nav: "primary", icon: "note",
-      permission: "note:read", sky: "glow", tone: "neutral" },
+      permission: "note:read", tone: "neutral" },
     { id: "people", route: "/people", label: "People", nav: "primary", icon: "people",
       permission: "member:read" },
     { id: "settings", route: "/settings", label: "Settings", nav: "secondary", icon: "cog",
@@ -191,21 +205,27 @@ export const HELLO: AppSpec = defineApp({
        the one part of the design system that cannot be judged from a catalogue —
        it needs a series with a gap in it, an axis, a period to filter by and a
        number beside it — and a screen is where those meet. */
+    /* ⚠️ `etch` — ruled geometry, which AMBIENCE.md points at monitoring and
+       planning. A sheet of measures is the screen that ground was described for. */
     { id: "reports", route: "/reports", label: "Reports", nav: "secondary", icon: "chart",
-      permission: "note:read" },
+      permission: "note:read", sky: "etch" },
     /* ⚠️ REACHED FROM A SCREEN RATHER THAN FROM THE NAV, WHICH IS WHAT `none`
        MEANS. A note is opened from the list and written from the list's one
        action; putting either in the nav would advertise two destinations for
        the place somebody is already standing. */
+    /* ⚠️ `cloth` — a premium dark ground for a screen somebody stays on. Reading
+       a note is the only thing in this app that is not scanning. */
     { id: "note", route: "/note", label: "A note", nav: "none", icon: "note",
-      permission: "note:read" },
+      permission: "note:read", sky: "cloth" },
     { id: "write", route: "/write", label: "Write a note", nav: "none", icon: "note",
       permission: "note:write" },
     /* ⚠️ THE APP'S OWN GUIDE, MILESTONES AND HELP HAVE TO LAND SOMEWHERE. All
        three are declared below and were drawn nowhere — a checklist nobody can
        open is a checklist nobody completes, and the manifest cannot tell. */
+    /* ⚠️ `glow` — pure light, no marks, which is what a page wants behind it when
+       it wants anything. An arrival is the case the family exists for. */
     { id: "start", route: "/start", label: "Getting started", nav: "secondary", icon: "star",
-      permission: "note:read" },
+      permission: "note:read", sky: "glow" },
   ],
 
   notifications: {

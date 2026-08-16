@@ -33,6 +33,11 @@ import {
 } from "../tokens/metrics.js";
 import type { Inset } from "../tokens/metrics.js";
 import { ARRIVE, arriveAt } from "../tokens/motion.js";
+/* ⚠️ ONE MOUNTER — `scene.test.mjs` keeps `worldCss` and `data-field` to
+   `page.tsx`, and `useScenery` is the door it hands out. A card painting its own
+   would get the picture and none of what the engine learns next. */
+import { useScenery } from "../frame/page.js";
+import type { Sky } from "../scene/index.js";
 import { Face, type FaceOf } from "./face.js";
 import { Tally } from "./tally.js";
 
@@ -58,6 +63,23 @@ export interface GroupProps {
    * `arriveAt`.
    */
   readonly at?: number;
+  /**
+   * ⚠️ A CARD MAY WEAR A WORLD, AND IT IS THE SAME ENGINE A PAGE USES. Not a
+   * gradient, not a texture: a family and a seed, through `useScenery`, so the
+   * grain, the matte, the drift and both reduced-motion opt-outs all reach it —
+   * and so a workspace's brand does too. `Place` reached for this by stamping
+   * `data-sky` by hand, which got it the page's own ground repainted inside the
+   * card (`--world-ground` is an inherited custom property, so the attribute
+   * matched a rule whose value was the page's) and a family name — `veil` —
+   * that the engine has not had since it was rewritten.
+   *
+   * ⚠️ SPARINGLY. AMBIENCE.md's rule is the whole of it: ambience everywhere is
+   * ambience nowhere. A card earns a ground when it is a destination or a
+   * result, never when it is four rows of settings.
+   */
+  readonly sky?: Sky;
+  /** ⚠️ Which one of the family — see `PageProps.seedling`. */
+  readonly seedling?: string;
   readonly children?: React.ReactNode;
 }
 
@@ -70,12 +92,19 @@ export interface GroupProps {
  * four beats. `arriveAt` is offered for exactly that — a stagger BETWEEN blocks,
  * capped, never within one.
  */
-export function Group({ label, under, face, at, children }: GroupProps) {
+export function Group({ label, under, face, at, sky, seedling, children }: GroupProps) {
+  const own = useScenery({ sky, seedling, reach: "card" });
   return (
+    /* ⚠️ THE WORLD'S VARIABLES GO ON OUR OWN ELEMENT AND THE ATTRIBUTE GOES ON
+       THE CARD, which needs no wrapper because this section is already here. A
+       `style` on a library component overrides the theme outright and `heroui`
+       refuses one; custom properties INHERIT, so setting them a level out and
+       stamping `data-sky` on the card is the same paint through the theme's own
+       channel rather than around it. */
     <section
       {...ARRIVE}
-      style={at === undefined ? undefined : arriveAt(at)}
       className={`flex flex-col ${HEAD_GAP}`}
+      style={{ ...(at === undefined ? undefined : arriveAt(at)), ...own.css }}
     >
       {label ? (
         /* ⚠️ THE MARK IS BESIDE THE HEADING BLOCK, NOT ABOVE IT, so the label
@@ -90,7 +119,11 @@ export function Group({ label, under, face, at, children }: GroupProps) {
           </div>
         </div>
       ) : null}
-      <Card className={CARD_ROWS}>
+      {/* ⚠️ THE WORLD GOES ON THE CARD ITSELF, not on a wrapper — the layers are
+          the card's own pseudo-elements and they take its radius (`inherit`),
+          which is what stops a rounded card being square where its ground is. */}
+      <Card className={CARD_ROWS} {...(own.css ? own.attrs : {})}>
+        {own.field}
         {/* ⚠️ `gap-0` — `.card__content` ships `gap-1`, so four pixels sat
             between every row ON TOP of the separator that already says where
             one ends. A rule with air either side of it is a rule you notice. */}
@@ -191,7 +224,7 @@ export function Identity({ name, under, aside, face }: {
  * with four workspaces told "None yet" for the length of a round trip is a
  * wrong answer wearing a loading state's excuse.
  */
-export function Place({ name, said, foot, face, tone = "neutral", at, onOpen }: {
+export function Place({ name, said, foot, face, tone = "neutral", sky = "glow", at, onOpen }: {
   readonly name: string;
   /** What this place IS, in a line. Never a list of its contents. */
   readonly said: string;
@@ -204,26 +237,34 @@ export function Place({ name, said, foot, face, tone = "neutral", at, onOpen }: 
   readonly face?: FaceOf;
   readonly foot?: React.ReactNode | null;
   readonly tone?: Tone;
+  /**
+   * ⚠️ A DESTINATION EARNS A GROUND — see `GroupProps.sky`. It seeds on the
+   * place's own NAME, so a shelf of them is a row of different worlds in one
+   * material rather than the same picture repeated.
+   */
+  readonly sky?: Sky;
   /** Its place in a sequence of blocks — the only stagger there is. */
   readonly at?: number;
   readonly onOpen: () => void;
 }) {
+  const own = useScenery({ sky, seedling: `place|${name}`, reach: "card" });
   return (
     /* ⚠️ THE ARRIVAL IS ON THE BLOCK, NOT ON THE CONTROL. An inline style on a
        library component beats every token, so branding stops reaching it — and
        a place is one thing arriving, which is what a wrapper says. */
-    <div {...ARRIVE} style={at === undefined ? undefined : arriveAt(at)}>
+    /* ⚠️ The world's variables here and the attribute on the card — see `Group`. */
+    <div {...ARRIVE} style={{ ...(at === undefined ? undefined : arriveAt(at)), ...own.css }}>
       {/*
-        ⚠️ The ambience is an attribute read by a stylesheet built from theme
-        tokens — never an inline gradient, for the same reason.
-
-        ⚠️ AND IT IS `veil`, NOT `aurora`. Aurora is the one ambience that mixes
-        a SECOND hue by design — `--success` — so on a deployment whose brand is
-        neutral every place on the screen came out green: three cards tinted a
-        colour nobody chose, on the surface a person opens most. A single-hue
-        sweep follows whatever brand it is given, including none.
+        ⚠️ THE WORLD IS BUILT BY THE ENGINE, NOT NAMED IN AN ATTRIBUTE. This
+        stamped `data-sky="veil"` — a family the engine has not had since it was
+        rewritten, when nine hand-drawn grounds became one seeded `glow`. The
+        attribute still matched the ground rules, and `--world-ground` is an
+        inherited custom property, so every card quietly repainted the PAGE's
+        own world at card size: never wrong-looking, never right either, and
+        identical on all three cards.
       */}
-      <Card data-sky="veil" data-tone={tone} data-reach="card">
+      <Card {...(own.css ? own.attrs : {})} data-tone={tone}>
+        {own.field}
         <Card.Content>
           {/* ⚠️ THE WHOLE CARD IS THE TARGET, and it is a real Button — the
               focus ring, the pressed state and every keyboard behaviour come

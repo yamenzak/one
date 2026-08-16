@@ -342,7 +342,15 @@ describe("the shell", () => {
       product,
     );
     expect(out.name).toBe("Priya Raman");
-    expect(out.collapses).toBe(true);
+    /*
+      ⚠️ AND IT SHOWS THE NAME AT REST, WHICH THIS PINNED THE OTHER WAY ROUND.
+      `collapses` means "the content carries this name in full", and a socketed
+      sub-page's content carries no heading at all — `Screen` draws one only for
+      a destination, because a sub-page's crown is meant to BE the name. Asserted
+      as `true`, this test was pinning the bug: every sub-page inside a Shell was
+      a back arrow, two chips and nothing saying where you were.
+    */
+    expect(out.collapses).toBe(false);
     expect(out.back).toBeTruthy();
     /* ⚠️ The account does NOT lead a sub-page — the way out does, and a crown
        refuses both at once. */

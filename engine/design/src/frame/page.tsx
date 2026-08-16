@@ -84,6 +84,79 @@ export interface PageProps {
   readonly children?: React.ReactNode;
 }
 
+
+/* --------------------------------------------------------------- scenery --- */
+
+/**
+ * A WORLD, MOUNTED — THE ONE PLACE THAT TURNS A FAMILY INTO PAINT.
+ *
+ * ⚠️ `Page` AND `Band` HAD A COPY EACH, AND A THIRD WAS ABOUT TO EXIST. The
+ * three lines are trivial and that is exactly the problem: the day the engine
+ * learns something — a reduced-motion opt-out, a matte, a per-theme day — a
+ * mounter that has its own copy gets the picture and none of what came after,
+ * and the two look identical until one of them does. `scene.test.mjs` keeps
+ * `worldCss` and `data-field` to this file for the same reason; this is what
+ * makes that rule livable rather than a wall.
+ *
+ * ⚠️ IT RETURNS ATTRIBUTES AND AN ELEMENT, NOT A WRAPPER. Whatever wears a
+ * ground has to BE the element the attributes sit on — a card is `Card`, a page
+ * is the page — so a component that wrapped its caller would put the world on a
+ * box with no radius, no surface and no idea what it contains.
+ */
+export function useScenery(
+  { sky, seedling, world, density = "even", reach }: {
+    readonly sky?: Sky;
+    readonly seedling?: string;
+    readonly world?: World;
+    readonly density?: Density;
+    /**
+     * ⚠️ `card` MEANS "AS TALL AS WHAT WEARS IT". The default reach is one
+     * VIEWPORT, which is right for a screen and wrong inside anything smaller:
+     * the shapes are composed for a wide field, so only the top corner of one
+     * lands and it reads as a smudge rather than as a world.
+     */
+    readonly reach?: "card";
+  },
+): {
+  readonly attrs: Record<string, string>;
+  readonly css?: React.CSSProperties;
+  readonly field: React.ReactNode;
+} {
+  const night = useNight();
+  const scene = world ?? (!sky || sky === "plain"
+    ? null
+    : skyWorld(sky as Exclude<Sky, "plain">, seedling ?? sky));
+  const own = scene ? worldCss(scene, { night, density }) : null;
+  if (!own) return { attrs: { "data-sky": "plain" }, field: null };
+  return {
+    attrs: { "data-sky": "world", ...(reach ? { "data-reach": reach } : {}) },
+    css: own.css as React.CSSProperties,
+    /*
+      ⚠️ THE FIELD IS AN ELEMENT, AND IT HAS TO BE. It was a `background-image`
+      carrying its own `<style>`, which is the better design and does not work:
+      Chromium renders an SVG used as a background STATICALLY, so every star in
+      the product was frozen from the day the field was written. Measured — the
+      same file animates as an `<img>` and as inline SVG, and does not animate
+      as a background.
+
+      ⚠️ INNER HTML, AND IT IS ENGINE-GENERATED — a `<pattern>` and a `<rect>`
+      composed by `render` from a family's own declarations. Nothing a person
+      typed reaches this string, and there is no other way to hand a browser a
+      subtree of SVG built as text.
+    */
+    field: own.field
+      ? (
+        <svg
+          aria-hidden="true"
+          data-field="true"
+          {...(reach ? { "data-reach": reach } : {})}
+          dangerouslySetInnerHTML={{ __html: own.field }}
+        />
+      )
+      : null,
+  };
+}
+
 /**
  * The frame every screen sits in.
  *
@@ -108,7 +181,6 @@ export function Page(
     theme actually is here (`ThemeProvider` writes `data-theme` on the root) and
     a first render that guessed wrong would swap the sky one frame later.
   */
-  const night = useNight();
   /* ⚠️ THE PAGE OWNS IT BECAUSE THE PAGE OWNS THE CROWN'S ROOM — see
      `useHemOnScroll`. Every address goes through here, so one listener covers
      every crown in the product and no crown has to remember. */
@@ -116,14 +188,13 @@ export function Page(
   /* ⚠️ ONE PATH FOR BOTH. A subject's world and a named sky differ only in where
      the family and the two colours came from — everything after that is the same
      engine, which is what "one engine powers every scene" has to mean. */
-  const scene = world ?? (sky === "plain" ? null : skyWorld(sky as Exclude<Sky, "plain">, seedling ?? sky));
-  const own = scene ? worldCss(scene, { night, density }) : null;
+  const own = useScenery({ sky, seedling, world, density });
   return (
     <div
       className="min-h-dvh flex flex-col"
-      data-sky={own ? "world" : "plain"}
+      {...own.attrs}
       data-tone={tone}
-      style={own?.css as React.CSSProperties | undefined}
+      style={own.css}
     >
       {/*
         ⚠️ THE FIELD IS AN ELEMENT, AND IT HAS TO BE. It was a `background-image`
@@ -138,15 +209,7 @@ export function Page(
         typed reaches this string, and there is no other way to hand a browser a
         subtree of SVG built as text.
       */}
-      {own?.field
-        ? (
-          <svg
-            aria-hidden="true"
-            data-field="true"
-            dangerouslySetInnerHTML={{ __html: own.field }}
-          />
-        )
-        : null}
+      {own.field}
       {/* ⚠️ THE DOCK'S FLOOR IS THE PAGE'S TO SET — see `DOCK_FLOOR`. A screen's
           primary action pins to the bottom, and so does the nav; only the page
           knows whether there is a nav to clear. */}
@@ -250,12 +313,11 @@ export interface BandProps {
  * sections are inset and some are not, for no reason anybody remembers.
  */
 export function Band({ bleed = "hold", width = "read", sky, seedling, tone, children }: BandProps) {
-  const night = useNight();
   /* ⚠️ THE SAME ENGINE A PAGE USES, because a section that lifts is a scene at a
-     smaller reach and not a second mechanism. */
-  const own = sky && sky !== "plain"
-    ? worldCss(skyWorld(sky as Exclude<Sky, "plain">, seedling ?? sky), { night, density: "even" })
-    : null;
+     smaller reach and not a second mechanism — and now literally the same call,
+     rather than the same three lines written twice. */
+  const own = useScenery({ sky, seedling, reach: "card" });
+  const lit = own.css !== undefined;
 
   const inner = bleed === "flush"
     ? "w-full"
@@ -266,14 +328,11 @@ export function Band({ bleed = "hold", width = "read", sky, seedling, tone, chil
   return (
     <section
       className="w-full"
-      {...(own ? { "data-sky": "world", "data-reach": "card" } : {})}
+      {...(lit ? own.attrs : {})}
       {...(tone ? { "data-tone": tone } : {})}
-      style={own?.css as React.CSSProperties | undefined}
+      style={own.css}
     >
-      {own?.field
-        ? <svg aria-hidden="true" data-field="true" data-reach="card"
-            dangerouslySetInnerHTML={{ __html: own.field }} />
-        : null}
+      {own.field}
       <div className={inner}>{children}</div>
     </section>
   );

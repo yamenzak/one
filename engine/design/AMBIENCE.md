@@ -91,6 +91,41 @@ paint marks with them. There is no picture behind a screen, only the theme, and
 nothing and the field is silently absent. `SKIES` is derived from `Family.ink`,
 so a family that changes its ink moves between the two sets on its own.
 
+## A card may wear one too
+
+**`Page`, `Band`, `Group` and `Place` mount a world, and all four call
+`useScenery`.** That is the whole surface: a family, a seed, and `reach: "card"`
+where the thing wearing it is smaller than a screen. It exists because the
+default reach is one VIEWPORT — the shapes are composed for a wide field, so
+inside a card only the top corner of one lands and it reads as a smudge.
+
+```tsx
+<Group label="Pinned" sky="glow" seedling={`note|${id}`}>
+<Place name={n.title} said={n.said} sky="glow" onOpen={…} />
+```
+
+⚠️ **THE SAME RULE APPLIES, HARDER.** Ambience everywhere is ambience nowhere,
+and a list of eight cards each with its own world is eight grounds competing
+with the content on top of them. A card earns one when it is a DESTINATION or a
+RESULT — a shelf of places, a plan somebody is choosing between — never four
+rows of settings.
+
+⚠️ **AND IT IS A DECLARATION, NEVER AN ATTRIBUTE.** `Place` used to stamp
+`data-sky="veil"` by hand, and all three things that were wrong with it are the
+same mistake:
+
+- `veil` has not been a family since the engine replaced twenty-four drawn
+  grounds with seven seeded ones. The attribute still matched the ground rules,
+  because they select on `[data-sky]:not([data-sky="plain"])` rather than on a
+  name.
+- `--world-ground` is an INHERITED custom property, so what those rules painted
+  was the page's own world, at card size, on every card. Never obviously wrong,
+  never right, and identical on all three.
+- The layers took no radius, so a 24px-rounded card was square wherever its
+  ground reached a corner. `border-radius: inherit` is the fix, and it is a
+  no-op on a page, which is why it was missing for as long as a page was the
+  only thing wearing a world.
+
 ## The three ways to make a field
 
 | primitive | what it is | who uses it |

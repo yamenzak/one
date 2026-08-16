@@ -76,9 +76,20 @@ which ship in the product:
   that draws a title in content — so a screen's fact vanished depending on
   whether the shell's crown happened to be standing.
 
-**A component catalogue could not have found any of the three.** They are
-properties of a screen inside a frame, which is why the ground is an app rather
-than a gallery.
+- **A sub-page inside a Shell had no name.** `crownFor` claimed `collapses: true`
+  — "the content carries this name in full, so hide the small copy until it
+  scrolls away" — while `Screen` draws that heading only for a DESTINATION,
+  because a sub-page's crown is meant to be the one place its name appears. Both
+  halves were individually right; together, every sub-page in the product was a
+  back arrow, two chips and nothing saying where you were. A test asserted the
+  wrong half.
+- **A card wearing a world was rounded and sharp at once.** The ground layers are
+  the host's own pseudo-elements and took no radius — a no-op on a page, which is
+  why it survived for as long as a page was the only thing wearing one.
+
+**A component catalogue could not have found any of these.** They are properties
+of a screen inside a frame, which is why the ground is an app rather than a
+gallery.
 
 **Building a screen? Pick the shape (DESIGN.md §4), reach for what already exists
 (below), and let the guards say the rest.** None of this needs reading end to
@@ -131,12 +142,12 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 |---|---|---|
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 56 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | internal |
-| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 46 |
+| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 47 |
 | `parts/` | rows, cards, lists, controls, the four outcomes | 109 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 44 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**294 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**295 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -154,7 +165,7 @@ there is no deep import, and a guard says so.
 - `frame/chrome.tsx` — `Docked`, `Island`
 - `frame/crown.tsx` — `Crown`, `CrownClaim`, `crownFor`, `CrownProps`, `CrownSocketProvider`, `LeaveChip`, `PageCrown`, `Slot`, `useCrownSocket`
 - `frame/overlay.tsx` — `Confirm`, `Dialog`, `Menu`, `MenuItem`, `notice`, `NoticeHost`, `Over`, `Peek`, `Tray`
-- `frame/page.tsx` — `Band`, `BandProps`, `Bleed`, `Page`, `PageProps`, `useNight`
+- `frame/page.tsx` — `Band`, `BandProps`, `Bleed`, `Page`, `PageProps`, `useNight`, `useScenery`
 - `frame/screen.tsx` — `Act`, `Board`, `Frame`, `Framed`, `Layout`, `LayoutProps`, `Screen`, `ScreenProps`, `Shape`, `Tile`, `Whichever`
 - `frame/shell.tsx` — `CrownInfo`, `glyphOf`, `reachable`, `Shell`, `ShellProps`
 

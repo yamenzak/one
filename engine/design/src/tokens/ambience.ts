@@ -413,6 +413,8 @@ export function ambienceStylesheet(): string {
     `[data-field] {`,
     `  position: absolute; top: 0; left: 0; right: 0; width: 100%;`,
     `  height: ${REACH}; z-index: -1; pointer-events: none;`,
+    /* ⚠️ THE HOST'S OWN RADIUS — see the ground layers below for what this fixes. */
+    `  border-radius: inherit;`,
     `  ${MATTE};`,
     `}`,
   ];
@@ -487,6 +489,19 @@ export function ambienceStylesheet(): string {
     `  content: ""; position: absolute; top: 0; left: 0; right: 0;`,
     `  height: ${REACH}; bottom: auto; z-index: -1;`,
     `  pointer-events: none;`,
+    /*
+      ⚠️ THE HOST'S OWN RADIUS, AND WITHOUT IT A CARD IS ROUNDED AND SHARP AT
+      ONCE. A page has no radius so this is a no-op there, which is why it was
+      missing for as long as a page was the only thing wearing a ground; a card
+      is 24px round and these layers were square, so the world's own light ran
+      into all four corners past the card's edge. It reads as a rendering fault
+      rather than as ambience, and it is the first thing anybody notices.
+
+      ⚠️ IT CANNOT BE `overflow: hidden` ON THE HOST. That makes the host a
+      scroll container, and every sticky crown and nav inside one stops
+      sticking — the note beside `overflow-x: clip` below is the same trap.
+    */
+    `  border-radius: inherit;`,
     `}`,
     /* ⚠️ The dither, over everything, at a rounding error — see `GRAIN`. */
     `[data-sky]:not([data-sky="plain"])::after {`,

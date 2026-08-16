@@ -467,7 +467,19 @@ export function crownFor(claim: CrownClaim | null, product: {
   /* ⚠️ A WAY OUT IS WHAT MAKES IT A SUB-PAGE — see `useCrownSocket`. */
   if (claim?.back) {
     return {
-      back: claim.back, leave: claim.leave, name: claim.title, collapses: true,
+      /*
+        ⚠️ `collapses: false`, AND IT WAS `true` — WHICH LEFT A SUB-PAGE WITH NO
+        NAME AT ALL. `collapses` means "the content carries this name in full, so
+        hide the small copy until it scrolls away", and it is right for
+        `PageCrown`, which draws both. A socketed sub-page draws neither: `Screen`
+        renders its heading in content only when there is NO way out (a
+        destination under a standing shell crown), precisely because a sub-page's
+        crown is supposed to be the one place its name appears. Both halves were
+        individually correct and together they meant every sub-page inside a
+        Shell was a back arrow, two action chips and nothing saying where you
+        were — until you scrolled, on a page that often has nothing to scroll.
+      */
+      back: claim.back, leave: claim.leave, name: claim.title, collapses: false,
       also: claim.also.slice(0, 2) as unknown as readonly [Slot, Slot],
       does: claim.does,
     };
