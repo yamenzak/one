@@ -12,7 +12,7 @@
 
 import { Button } from "@heroui/react";
 import {
-  Await, ControlRow, FlagConsole, Group, NoteRow, Nothing, RowRule, RowsWaiting, Screen, Stack,
+  Await, ControlRow, FlagConsole, Group, NoteRow, Nothing, RowsWaiting, Screen, Stack,
   TYPE, notice, sentence,
 } from "@quad/web";
 import type { FlagBook } from "@quad/kernel";
@@ -85,7 +85,6 @@ export function Switches() {
                   )}
               </ControlRow>
             ))}
-            <RowRule />
             {/* ⚠️ THE EXEMPTIONS ARE THE FEATURE, so they are stated where the
                 switch is rather than in a description above it. */}
             <NoteRow>

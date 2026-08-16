@@ -25,7 +25,7 @@
  */
 
 import * as React from "react";
-import { Avatar, Button, Card, Chip, Label, Separator, Skeleton, Switch } from "@heroui/react";
+import { Avatar, Button, Card, Chip, Label, Skeleton, Switch } from "@heroui/react";
 import type { Tone } from "@quad/kernel";
 import { TYPE } from "./type.js";
 import {
@@ -79,7 +79,7 @@ export function Group({ label, under, at, children }: GroupProps) {
             between every row ON TOP of the separator that already says where
             one ends. A rule with air either side of it is a rule you notice. */}
         <Card.Content className="gap-0">
-          <div className="flex flex-col">{ruled(children)}</div>
+          <div className="flex flex-col">{children}</div>
         </Card.Content>
       </Card>
     </section>
@@ -87,64 +87,26 @@ export function Group({ label, under, at, children }: GroupProps) {
 }
 
 /**
- * ⚠️ BETWEEN ROWS, NEVER AFTER THE LAST — and `Group` draws it, not the caller.
+ * ⚠️ A CARD'S ROWS ARE SEPARATED BY RHYTHM, NOT BY A LINE — and this is the last
+ * edge in the product to go. Every other border and shadow was banned long ago
+ * (`ground.test.mjs`'s `edges:`), and the row rule survived on the argument that
+ * a list needs dividing. It does not: a row is 24px from its neighbour and 4px
+ * from its own second line, and a six-to-one ratio is what says "these two lines
+ * are one thing and that is another". The line adds nothing the spacing has not
+ * already said.
  *
- * ⚠️ THE INSET DEPENDS ON WHAT THE ROWS LEAD WITH, WHICH IS WHY ASKING THE
- * CALLER WAS THE WRONG DESIGN. A rule should start where the labels start: 36px
- * after a glyph, 52px after a face, and flush against a row with no lead at all.
- * Every one of those three was wrong somewhere in the specimens the first time
- * anybody looked at a render — a list of people ruled at the glyph inset, and a
- * card of copyable fields ruled 36px in from labels that were flush. Nobody
- * writing a screen should have to know that, and `Group` already has the one
- * thing needed to work it out: the rows themselves.
+ * ⚠️ AND IT WAS ASYMMETRIC, WHICH IS WHAT MADE IT LOOK HAND-ASSEMBLED. It was
+ * inset 52px on the left to clear the glyph and flush to the card on the right,
+ * so every list ended in a hairline that started in the middle of the row and
+ * ran off the edge. Fixing the inset would have produced a tidier line; the
+ * question was whether to draw one at all.
  *
- * ⚠️ AND A ROW DECLARES ITS OWN LEAD AS A PROPERTY, NOT BY ITS NAME. The obvious
- * version of this reads `component.name` and matches it against a list — which
- * works in development and silently stops working in the build, because the
- * minifier renames every function it can see. Every rule in the product would
- * quietly fall back to the glyph inset in production and nowhere else, which is
- * the worst shape a defect can have. A property is a string literal; nothing
- * renames it.
+ * ⚠️ SO A BREAK BETWEEN TWO RUNS IS A SECOND CARD, which the `Group` grammar
+ * already had — the workspace screen separates what you come back to from what
+ * you set up once exactly that way. It reads as two things because it IS two
+ * things, at every size, with no rule to align to anything.
  */
-interface Ruled { lead?: Inset }
 
-/**
- * ⚠️ AND IT ONLY INTERLEAVES WHEN THE CALLER SUPPLIED NONE. One card holding two
- * separate runs is a real shape — a list and then a total, say — and the way to
- * express it is a rule the caller places by hand. Detecting that and standing
- * down keeps both possible without a second component.
- */
-function ruled(children: React.ReactNode): React.ReactNode {
-  const rows = React.Children.toArray(children).filter(Boolean);
-  if (rows.some((r) => React.isValidElement(r) && r.type === RowRule)) return rows;
-
-  /*
-    ⚠️ AND A ROW WHOSE LEAD IS OPTIONAL IS ASKED PER ELEMENT, NOT PER TYPE. Most
-    rows always lead the same way, which is what the static declaration is for.
-    `AmountRow` does not: with a glyph it is a wallet line, without one it is a
-    plan and a price — and a plan list ruled at the glyph inset draws every rule
-    36px in from labels that are flush against the card. The element knows; the
-    component cannot.
-  */
-  const insetOf = (node: React.ReactNode): Inset => {
-    if (!React.isValidElement(node)) return "lead";
-    const declared = (node.type as Ruled).lead ?? "lead";
-    if (declared !== "lead") return declared;
-    /* ⚠️ ABSENT AND FALSY ARE THE SAME ANSWER. The first version asked whether
-       the prop was PRESENT, which an omitted one is not — so every row that
-       simply never passed an icon kept the glyph inset, which is every row this
-       was written for. */
-    return (node.props as { readonly icon?: React.ReactNode }).icon ? "lead" : "none";
-  };
-
-  return rows.flatMap((row, i) => (i === 0
-    ? [row]
-    /* ⚠️ The rule belongs to the row BELOW it — that is the one whose label it
-       has to line up with, and the one somebody's eye travels to next. */
-    : [<RowRule key={`rule-${i}`} inset={insetOf(row)} />, row]));
-}
-
-/** ⚠️ Exported for the two-runs-in-one-card case above; screens rarely need it. */
 /* --------------------------------------------------------------- identity --- */
 
 /**
@@ -274,10 +236,6 @@ export function Place({ name, said, foot, tone = "neutral", at, onOpen }: {
     </div>
   );
 }
-
-export const RowRule = ({ inset = "lead" }: { readonly inset?: Inset } = {}) => (
-  <div className={INSET[inset]}><Separator /></div>
-);
 
 /* ------------------------------------------------------------------- rows --- */
 
@@ -879,14 +837,3 @@ export function SeeAll({ label = "See all", onOpen }: {
     </div>
   );
 }
-
-/* ------------------------------------------------------------- the leads --- */
-
-/**
- * ⚠️ WHAT EACH ROW LEADS WITH, DECLARED ONCE, BESIDE THE ROWS THEMSELVES. A row
- * that says nothing leads with a glyph, which is the common case — so adding a
- * row type is only a decision here when it is one of the other two.
- */
-(PersonRow as Ruled).lead = "face";
-(FieldRow as Ruled).lead = "none";
-(CopyRow as Ruled).lead = "none";

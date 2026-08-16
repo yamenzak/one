@@ -228,9 +228,9 @@ away the one thing that reads instantly.
 | One of many | `Select` | At the end of the row |
 | A value to type | `ControlRow` + bare field | At the end of the row |
 | Something that opens | `NavRow` | The whole row, chevron at the end |
-| The screen's main action | `Button variant="primary"` | The crown, or pinned at the bottom |
+| The screen's main action | `does` on the `Screen` | The shape decides — §4 |
 | A rare action on a block | A menu (`⋯`) | The block's corner |
-| Something destructive | `ActionRow tone="danger"` | Last row of the last card, after a rule — never a card of its own |
+| Something destructive | `ActionRow tone="danger"` | Its own card, last |
 
 **An icon replaces a word only when the icon is unambiguous** — close, back,
 more, add. Everything else gets the word. An icon-only button that needs a
@@ -239,6 +239,19 @@ meaning.
 
 **A count is a chip in the corner of the row it belongs to**, never a sentence.
 Zero is not a chip — zero is nothing at all.
+
+**There is no line between rows.** Rows in a card are separated by rhythm: 24px
+between two rows against 4px inside one, and a six-to-one ratio already says
+"these two lines are one thing and that is another". The hairline was the last
+edge in a product that banned borders and shadows everywhere else, and it was
+asymmetric — inset past the glyph on the left, flush to the card on the right —
+which is what made every list look hand-assembled.
+
+**A break between two runs is a second CARD.** That is how the workspace screen
+separates what you come back to from what you set up once, and how the account
+screen separates the two places that are yours from the way out. Two cards read
+as two things because they ARE two things, at every size, with nothing to align
+to anything.
 
 ---
 

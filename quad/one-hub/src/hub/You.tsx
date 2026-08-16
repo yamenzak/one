@@ -19,7 +19,7 @@
  */
 
 import {
-  ActionRow, Confirm, Group, Identity, NavRow, RowRule, Screen, glyphOf, notice,
+  ActionRow, Confirm, Group, Identity, NavRow, Screen, glyphOf, notice,
 } from "@quad/web";
 import { useSession } from "../session.js";
 import type { Where } from "./where.js";
@@ -31,8 +31,8 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
   return (
     /* ⚠️ `detail` — one subject (you), the two places that are yours, and the
        one destructive thing. Signing out is NOT a primary action: a primary is
-       what the screen is FOR, and nobody opens their account to leave it. It
-       stays the last row, after a rule, in the danger voice (DESIGN.md §5). */
+       what the screen is FOR, and nobody opens their account to leave it. It is
+       a card of its own, in the danger voice (DESIGN.md §5). */
     <Screen shape="detail">
       <Identity name={person?.email ?? "You"} under={person?.operator ? "Operator" : undefined} />
 
@@ -42,15 +42,22 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
           label="Inbox"
           onOpen={() => onGo({ at: "inbox" })}
         />
-        <RowRule />
         <NavRow
           icon={glyphOf("bell")}
           label="How you are told"
           onOpen={() => onGo({ at: "told" })}
         />
-        {/* ⚠️ The rules are placed by hand here, which is what tells `Group` to
-            stop interleaving its own — one card, two runs. */}
-        <RowRule />
+      </Group>
+
+      {/*
+        ⚠️ ITS OWN CARD, BECAUSE IT IS ITS OWN KIND OF THING. Signing out sat as
+        the third row of the card holding the two places you go — separated from
+        them by a hairline, which is a line asking somebody to notice a
+        difference the layout was not making. Two cards make the difference
+        structural: these are places, that is an exit, and the gap says so at
+        every size with nothing to align.
+      */}
+      <Group>
         {/*
           ⚠️ DANGER IS A VOICE, NOT A FILL. A filled red control is for the
           confirming button INSIDE the two-step, where somebody is already

@@ -178,6 +178,33 @@ for (const file of SCREENS) {
 }
 if (!saves) ok(`settings: none carries a save`);
 
+/* ----------------------------------------------------------- no hairlines --- */
+
+/**
+ * ⚠️ A BREAK BETWEEN TWO RUNS IS A SECOND CARD, NEVER A LINE. Rows in a card are
+ * separated by rhythm — 24px between two rows against 4px inside one — and the
+ * hairline that used to sit between them was the last edge in a product that
+ * banned borders and shadows everywhere else. It was also asymmetric: inset past
+ * the glyph on the left, flush to the card on the right, which is what made
+ * every list look hand-assembled.
+ *
+ * ⚠️ THE WAY IT COMES BACK IS A SCREEN THAT WANTS TO SEPARATE TWO THINGS and
+ * reaches for the library's `Separator`, which is right there and looks like the
+ * answer. The answer is a second `Group`. `@quad/web` still uses it where a
+ * divider is genuinely structural — a menu's sections, the shell's rails — and
+ * those are not screens.
+ */
+let hairlines = 0;
+for (const file of SCREENS) {
+  const src = strip(readFileSync(file, "utf8"));
+  if (!/<Separator\b/.test(src)) continue;
+  hairlines++;
+  fail(`${rel(file)}: draws a hairline between rows.\n`
+    + `       Two runs in one card is two cards. The gap says it at every size and\n`
+    + `       has nothing to align to (DESIGN.md §5).`);
+}
+if (!hairlines) ok(`hairlines: no screen draws one`);
+
 /* ------------------------------------------------- a comment that renders --- */
 
 /**

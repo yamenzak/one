@@ -126,27 +126,41 @@ export function Shelf({ plans, entitlements, current, onChoose }: ShelfProps) {
         the name, what the plan is for, and what it costs; that is the whole of
         what somebody scanning a price list reads.
       */}
+      {/*
+        ⚠️ WHAT YOU HAVE AND WHAT YOU COULD HAVE ARE TWO CARDS, because they are
+        two kinds of thing. In one card the plan somebody is ON was the first row
+        of a price list, distinguished from the three below it only by a missing
+        chevron — so the answer to "what am I paying for" and the answer to "what
+        else is there" were the same list, and the eye had to read all four to
+        find the first. A gap says it at every size, with no rule to align.
+      */}
       <Group>
-        {shown.map((plan) => {
-          const mine = plan.id === current;
-          return (
-            <AmountRow
-              key={plan.id}
-              label={plan.name}
-              /* ⚠️ A TRIAL BELONGS ON THE PLAN IT IS ON, IN WORDS. It was a chip,
-                 and a chip on a sales badge is a hue on a product whose
-                 interface is values. */
-              under={mine
-                ? "Your plan"
-                : plan.trialDays ? `${plan.said} · ${plan.trialDays} days free` : plan.said}
-              amount={money(plan.price, plan.currency)}
-              /* ⚠️ NO CHEVRON ON THE ONE YOU ARE ON, because there is nowhere to
-                 go. A row that promises something and does nothing is worse than
-                 a row that promises nothing. */
-              onOpen={mine ? undefined : () => onChoose(plan.id)}
-            />
-          );
-        })}
+        {shown.filter((p) => p.id === current).map((plan) => (
+          <AmountRow
+            key={plan.id}
+            label={plan.name}
+            under="Your plan"
+            amount={money(plan.price, plan.currency)}
+            /* ⚠️ NO CHEVRON: there is nowhere to go from the one you are on, and
+               a row that promises something and does nothing is worse than a row
+               that promises nothing. */
+          />
+        ))}
+      </Group>
+
+      <Group>
+        {shown.filter((plan) => plan.id !== current).map((plan) => (
+          <AmountRow
+            key={plan.id}
+            label={plan.name}
+            /* ⚠️ A TRIAL BELONGS ON THE PLAN IT IS ON, IN WORDS. It was a chip,
+               and a chip on a sales badge is a hue on a product whose interface
+               is values. */
+            under={plan.trialDays ? `${plan.said} · ${plan.trialDays} days free` : plan.said}
+            amount={money(plan.price, plan.currency)}
+            onOpen={() => onChoose(plan.id)}
+          />
+        ))}
       </Group>
 
       {/*
