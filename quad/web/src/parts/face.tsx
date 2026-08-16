@@ -265,6 +265,83 @@ function QuadPlate() {
   );
 }
 
+/* ------------------------------------------------------------------- orb --- */
+
+/**
+ * THE SAME SUBJECT, BIG ENOUGH TO BE THE SCREEN.
+ *
+ * ⚠️ NOT AN AVATAR AND DELIBERATELY NOT ON A PLATE. `Face` is a slot in a row —
+ * HeroUI's box, its squircle, its fallback letter, three sizes the library owns.
+ * A hero is a PICTURE: it has no ground, no letter to fall back to and no fixed
+ * size, and pushing it through the plate would mean a fourth avatar variant
+ * whose only caller wants none of what the variant is for.
+ *
+ * ⚠️ AND IT IS STILL BAKED THROUGH THE ONE RESOLVER. Which picture, whether it
+ * moves and what a seed means are `bake`'s, exactly as for every face — this
+ * only asks for a bigger one. A hero that generated its own would be the second
+ * source this file exists to prevent.
+ *
+ * ⚠️ IT MOVES, BECAUSE AT THIS SIZE THE MOVEMENT IS THE POINT. The rule that
+ * stills a chip is about a twitch in the corner of the eye at 32px; a planet
+ * filling half a phone that does not turn is a photograph of one.
+ */
+export function Orb({ of, size = 280 }: {
+  readonly of: FaceOf;
+  /** ⚠️ CSS pixels. Baked at twice this, like every other face. */
+  readonly size?: number;
+}) {
+  const at = React.useRef<HTMLImageElement>(null);
+  const still = useStill(at);
+  const src = React.useMemo(
+    () => (of.kind === "person" || of.kind === "workspace"
+      ? bake(of.kind, of.seed, !still, size * 2)
+      : null),
+    [of.kind, of.seed, still, size],
+  );
+  if (!src) return null;
+  return (
+    /*
+      ⚠️ THE EDGE IS DISSOLVED, NOT CROPPED, AND AT THIS SIZE THAT IS THE WHOLE
+      DIFFERENCE BETWEEN A WORLD AND A STICKER. The drawing carries its own deep
+      background — right at 40px, where the disc IS the avatar, and wrong at 280
+      where a hard circle of one navy sits on a ground of another with a visible
+      seam. Fading the outer band means what survives is the planet, its ring and
+      the stars nearest it, over the sky the screen is already wearing.
+
+      ⚠️ THE STOPS CLEAR THE RING. The body fills about 55% of the canvas and the
+      ring reaches past 70%; cutting at 62% would slice it, which looks like a
+      rendering fault rather than a choice.
+
+      ⚠️ `closest-side` IS LOAD-BEARING AND ITS ABSENCE IS INVISIBLE IN DARK. A
+      radial gradient sizes to the farthest CORNER by default, so 100% is the
+      half-diagonal and the four corners of a square element are still partly
+      opaque at any stop short of it: the picture comes out a squircle, not a
+      circle. Over a near-black sky the leftover corners are the same value as
+      the ground and nobody sees them; on paper the same picture is a dark
+      rounded square sitting on pale grey — an app icon where a world should be.
+      `closest-side` makes 100% the half-WIDTH, so the corners are past the end
+      of the ramp and gone.
+
+      ⚠️ AND THE ALT IS EMPTY: the name is right there, and a screen reader that
+      said it twice would read the page's heading to somebody twice.
+    */
+    <img
+      ref={at}
+      src={src}
+      alt=""
+      width={size}
+      height={size}
+      className="block"
+      style={{
+        width: size,
+        height: size,
+        maskImage: "radial-gradient(circle closest-side at 50% 50%, #000 64%, transparent 94%)",
+        WebkitMaskImage: "radial-gradient(circle closest-side at 50% 50%, #000 64%, transparent 94%)",
+      }}
+    />
+  );
+}
+
 /* ------------------------------------------------------------------- face --- */
 
 export interface FaceProps {
@@ -284,6 +361,8 @@ export interface FaceProps {
    */
   readonly name?: string;
   readonly size?: FaceSize;
+  /** ⚠️ The subject AS the screen — see `Orb`. No plate, no letter, no scale. */
+  readonly hero?: boolean;
 }
 
 /**
@@ -296,7 +375,7 @@ export interface FaceProps {
  * name it belongs to, so an alt text repeats it — a screen reader then says
  * "Northwind Strength, Northwind Strength" down a list of ten.
  */
-export function Face({ of, name, size = "row" }: FaceProps) {
+export function Face({ of, name, size = "row", hero }: FaceProps) {
   /*
     ⚠️ THE ONLY MOTION IN THIS PRODUCT `motion.ts`'S RULES CANNOT REACH. The
     animation is a `<style>` element inside an SVG being used as an IMAGE, so it
@@ -323,6 +402,12 @@ export function Face({ of, name, size = "row" }: FaceProps) {
       : null),
     [kind, seed, moving, size],
   );
+
+  /* ⚠️ THE HERO IS A PICTURE, NOT A PLATE — see `Orb`. It is asked for here
+     rather than by a separate import so every face in the product still comes
+     through one component, which is what the guard is about. */
+  if (hero && of) return <Orb of={of} />;
+
   return (
     <Plate ref={at} size={VARIANT[size]} className="shrink-0">
       {src ? <Plate.Image src={src} alt="" /> : null}

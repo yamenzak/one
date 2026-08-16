@@ -97,9 +97,12 @@ const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "");
     `appFace(id, mark)` puts it on the plate every face wears.
 
     ⚠️ AND THE SHAPE IS THE CHECK. Only a PROPERTY read rendered as a standalone
-    JSX child is refused, and the property is matched by its ENDING — `{app.mark}`
+    JSX CHILD is refused, and the property is matched by its ENDING — `{app.mark}`
     and `{crown.appMark}` alike. The first version asked for `.mark` exactly and
-    passed the crown, which is where the defect actually was. `mark: a.mark` building a payload and
+    passed the crown, which is where the defect actually was; the second caught
+    `className={TYPE.wordmark}`, because an attribute value has the same braces
+    as a child. What separates them is the character before the brace: an
+    attribute has `=`, a child never does. `mark: a.mark` building a payload and
     `appFace(a.id, a.mark)` are how it is meant to travel and neither matches;
     nor does a bare `{mark}`, which is `Crown`'s ReactNode slot for whatever a
     door puts over itself and has nothing to do with a manifest.
@@ -107,7 +110,7 @@ const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "");
   let checked = 0;
   for (const file of FILES) {
     const src = code(readFileSync(file, "utf8"));
-    for (const m of src.matchAll(/\{\s*[\w?]+(?:[.?]+\w+)*\.\w*[Mm]ark\s*\}/g)) {
+    for (const m of src.matchAll(/(?<![=\w])\{\s*[\w?]+(?:[.?]+\w+)*\.\w*[Mm]ark\s*\}/g)) {
       checked++;
       fail(`${rel(file)}: renders ${m[0]} as text.\n` +
            `       A mark is a product's identity — put it on the plate every face wears: ` +
@@ -128,9 +131,17 @@ const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "");
     anywhere. So the resolver holds no colours of its own: it matches the fills
     in the drawn SVG against the STYLE'S declared palette, and a hex literal
     appearing here is the shortcut being taken.
+
+    ⚠️ BLACK AND WHITE ARE NOT COLOURS HERE, THEY ARE ALPHA. The hero's mask is
+    a ramp from `#000` to `transparent`, where the black carries no hue at all —
+    it is the opaque end of a gradient. No planet palette holds either, so
+    excluding them cannot let a real second palette through.
   */
+  const ALPHA = new Set(["#000", "#fff", "#000000", "#ffffff"]);
   const src = code(readFileSync(join(QUAD, RESOLVER), "utf8"));
-  const hexes = [...src.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((m) => m[0]);
+  const hexes = [...src.matchAll(/#[0-9a-fA-F]{3,8}\b/g)]
+    .map((m) => m[0].toLowerCase())
+    .filter((h) => !ALPHA.has(h));
   if (hexes.length) {
     fail(`${RESOLVER}: holds a colour of its own (${hexes.slice(0, 3).join(", ")}).\n` +
          `       A world's palette is read from the picture that was drawn, matched against ` +

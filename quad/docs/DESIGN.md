@@ -284,12 +284,35 @@ Three things follow from that and are decided for you.
   It gets the initial, because a face for somebody who has not arrived yet is a
   picture of nobody.
 
-**And a workspace's screen is its planet's sky.** Opening one puts you on the
-world its face showed — same deep, same light, its own stars — so the row
-somebody pressed and the page they arrived on are visibly one place. Only the
-arrival: its People, Money and Settings keep the hub's working material, because
-an arrival nobody leaves is not an arrival. See
+**And a workspace's screen is its planet's sky, with the planet as the screen.**
+Opening one puts you on the world its face showed — same deep, its own stars —
+and the world is drawn at the size of the page with the name across it. A page
+about one named thing that has a picture of itself does not want a heading above
+a thumbnail; that is a caption over an icon. The picture at the size of the
+screen with the name on it is a title card, and it is the composition that says
+"here" rather than "about here".
+
+Only the arrival: its People, Money and Settings keep the hub's working material,
+because an arrival nobody leaves is not an arrival. See
 [`AMBIENCE.md`](AMBIENCE.md) — `world`.
+
+### Two faces, and the split is the oldest one in typography
+
+A text face is drawn to disappear at 16px over many lines; a display face is
+drawn to be looked at, once, large. One face doing both is the compromise every
+design system starts with and every distinctive one leaves.
+
+- **Headings wear the mark** — `wordmark`, `display`, `title`, `section`,
+  `figure`. Onest: squared bowls, tight apertures, a high x-height, so a word at
+  44px locks into one shape rather than reading as a row of letters. It also
+  rhymes with the interface's own geometry, where every plate and card is a
+  squircle.
+- **Running text wears the text face** — `body`, `label`, `note`. Geist, as
+  before.
+- **The mark's fallback is the text face, never a system one.** A heading in
+  Geist because the display file has not arrived is the product looking like
+  itself at a slightly different weight; a heading in whatever the device serves
+  is a face nobody chose, at the largest size on the screen.
 
 **A break between two runs is a second CARD.** That is how the workspace screen
 separates what you come back to from what you set up once, and how the account

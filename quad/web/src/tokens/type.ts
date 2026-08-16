@@ -37,11 +37,26 @@ export const TYPE = {
    * a heading, and never twice on a screen. If two things want this, neither is
    * the answer to what the screen is for.
    */
-  display: "text-[2.5rem] md:text-5xl font-bold tabular-nums tracking-[-0.03em] leading-[1.05]",
+  display: "font-mark text-[2.5rem] md:text-5xl font-bold tabular-nums tracking-[-0.035em] leading-[1.05]",
+  /**
+   * ⚠️ A NAME THAT IS ACTING AS A MARK, AND THE TRACKING IS THE WHOLE ROLE. A
+   * workspace's name over its own planet is not a heading somebody reads on the
+   * way to the content — it IS the content of that moment, and at that job the
+   * difference between a title and a wordmark is almost entirely letter-fit.
+   * `display`'s `-0.03em` is tuned for a NUMBER, where the digits are already
+   * even; a word set that loosely at 48px reads as a heading scaled up. Pulled
+   * to `-0.055em` at 800 the letters lock into one shape, which is what a mark
+   * is.
+   *
+   * ⚠️ AND `text-balance`, BECAUSE A TWO-WORD NAME MUST NOT ORPHAN ITS SECOND.
+   * "Northwind Strength" breaking to leave "Strength" alone under a nine-letter
+   * line is the single thing that makes a large name look unset.
+   */
+  wordmark: "font-mark text-[2.75rem] md:text-6xl font-extrabold tracking-[-0.05em] leading-[0.95] text-balance",
   /** What this screen is. One per screen, at the top. */
-  title: "text-[1.75rem] font-semibold tracking-[-0.02em] leading-tight text-balance",
+  title: "font-mark text-[1.75rem] font-semibold tracking-[-0.025em] leading-tight text-balance",
   /** What this part of the screen is. */
-  section: "text-xl font-semibold tracking-[-0.01em] text-balance",
+  section: "font-mark text-xl font-semibold tracking-[-0.015em] text-balance",
   /** Prose. `text-pretty` is what stops a two-line paragraph orphaning a word. */
   body: "text-base leading-relaxed text-pretty",
   /** Names a control or a value. Not a heading — it labels something beside it. */
@@ -54,7 +69,7 @@ export const TYPE = {
    * the ripple rather than on the values. This is the number in a ROW or a stat
    * block; the one a screen is built around is `display`.
    */
-  figure: "text-2xl font-bold tabular-nums tracking-[-0.02em]",
+  figure: "font-mark text-2xl font-bold tabular-nums tracking-[-0.025em]",
   /**
    * ⚠️ THE FRACTIONAL PART OF AN AMOUNT, RELATIVE TO ITS WHOLE. `€1,051.70` at
    * one size is a number; with a smaller `.70` it is a sum of money, because the
@@ -149,9 +164,45 @@ export const MONO_STACK = [
   "monospace",
 ].join(", ");
 
+/**
+ * ⚠️ A SECOND FACE, FOR HEADINGS ONLY, AND THE SPLIT IS THE OLDEST ONE IN
+ * TYPOGRAPHY. A text face is drawn to disappear at 16px over many lines; a
+ * display face is drawn to be LOOKED at, once, large. One face doing both is
+ * the compromise every design system starts with and every distinctive one
+ * leaves — a heading in the body face is legible and anonymous, which is
+ * exactly what a workspace's name over its own planet must not be.
+ *
+ * ⚠️ ONEST, AND THE REASON IS THE COUNTERS. Squared bowls, tight apertures and
+ * a high x-height mean a word at 44px locks into ONE shape rather than reading
+ * as a row of letters — which is the whole difference between a heading and a
+ * mark. It also rhymes with the interface's own geometry, where every plate and
+ * card is a squircle.
+ *
+ * ⚠️ THE FALLBACK IS THE TEXT FACE, NOT A SYSTEM ONE. If the display file has
+ * not arrived, a heading set in Geist is the product looking like itself at a
+ * slightly different weight; a heading in whatever Android serves is a heading
+ * in a face nobody chose, at the largest size on the screen.
+ */
+export const MARK_STACK = [
+  '"Onest Variable"',
+  '"Onest"',
+  FACE_STACK,
+].join(", ");
+
 export const FACE_CSS = [
-  `:root { --font-sans: ${FACE_STACK}; --font-mono: ${MONO_STACK}; }`,
+  `:root { --font-sans: ${FACE_STACK}; --font-mono: ${MONO_STACK}; --font-mark: ${MARK_STACK}; }`,
   `html, body { font-family: var(--font-sans); }`,
+  /*
+    ⚠️ A PLAIN CLASS, NOT A TAILWIND THEME ENTRY, AND THE REASON IS ONE SOURCE.
+    `@theme { --font-mark: … }` would generate the utility, but the stack would
+    then be written in a CSS file as well as here — two lists that agree until
+    somebody edits one. A rule beside the stack it uses cannot disagree with it.
+
+    ⚠️ AND IT BEATS INHERITANCE WHATEVER THE ORDER. `font-family` set on the
+    element always wins over the `html, body` rule above, so this does not depend
+    on where the injected sheet lands relative to Tailwind's.
+  */
+  `.font-mark { font-family: var(--font-mark); }`,
   /* ⚠️ A number is read, not spelled — every figure in the product is lining by
      default, so a column of them cannot sit at different heights. */
   `html { font-variant-numeric: lining-nums; }`,

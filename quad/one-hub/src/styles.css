@@ -14,6 +14,14 @@
   the stack and the features over it — see `type.ts` for why both halves exist.
 */
 @import "@fontsource-variable/geist";
+/*
+  ⚠️ THE HEADING FACE, AND IT IS A SECOND FILE ON PURPOSE — see `MARK_STACK`.
+  A text face drawn to disappear over many lines and a display face drawn to be
+  looked at once are different jobs, and one face doing both is the compromise
+  every design system starts with.
+*/
+@import "@fontsource-variable/onest";
+
 
 /*
   ⚠️ TAILWIND ONLY SEES SOURCE IT IS POINTED AT, and a workspace package resolved

@@ -530,34 +530,72 @@ export function PageCrown({
           two rows of words at the same left edge with nothing saying which
           belongs to which. */}
       <Band bleed={bleed} width={width}>
-        <div className={`flex flex-col ${HEAD_GAP} ${TITLE_PAD}`}>
-          {/* ⚠️ ABOVE THE NAME AND LEFT-ALIGNED WITH IT, so the face and the
-              heading are one block that fades together when the crown collapses.
-              Beside the name it would push a long one onto two lines at exactly
-              the width where it already wraps. */}
-          {face
-            ? (
+        {face
+          ? (
+            /*
+              ⚠️ THE SUBJECT IS THE SCREEN, AND THE NAME SITS ON IT. A page about
+              one named thing that has a picture of itself does not need a
+              heading ABOVE a thumbnail — that is a caption over an icon, which
+              is what the first build was. The picture at the size of the screen
+              with the name across it is a title card, and it is the one
+              composition that says "here" rather than "about here".
+
+              ⚠️ THE NAME IS ON A GRID CELL, NOT ABSOLUTELY POSITIONED. Both
+              share one cell, so the block is as tall as the orb and the content
+              under it never has to know a hero happened. Absolute positioning
+              would take the name out of flow and the crown would collapse to
+              nothing on a long name.
+            */
+            <div
+              className={`grid ${TITLE_PAD}`}
+              style={{
+                opacity: past ? 0 : 1,
+                transition: past ? MOTION.exit : MOTION.enter,
+              }}
+            >
               <span
+                className="col-start-1 row-start-1 justify-self-center"
+                style={{ gridArea: "1 / 1" }}
+              >
+                <Face of={face} hero />
+              </span>
+              {/* ⚠️ NO SCRIM, AND THAT WAS TRIED FIRST. A wash under the name
+                  to hold its contrast over a lit sphere is the obvious move and
+                  it is visible: the plate is wider than the planet, so its edges
+                  sit on plain sky as two dark patches either side of the world.
+                  What holds the type instead is WEIGHT — 800 at 44px over a
+                  mid-value body — and the mask, which keeps the brightest part
+                  of the limb away from the edges of the words. */}
+              <span
+                /* ⚠️ `relative` IS NOT COSMETIC HERE. The orb carries a
+                   `mask-image`, and a mask CREATES A STACKING CONTEXT — so the
+                   picture paints in the positioned step, after in-flow content,
+                   and the name vanished behind a planet with nothing in the DOM
+                   to show for it. Anything sharing a cell with a masked element
+                   has to be positioned to sit above it. */
+                className={`relative col-start-1 row-start-1 self-center justify-self-center w-full
+                  flex flex-col items-center text-center ${SPACE.tight} px-4 py-6`}
+                style={{ gridArea: "1 / 1" }}
+              >
+                <h1 className={TYPE.wordmark}>{title}</h1>
+                {under}
+              </span>
+            </div>
+          )
+          : (
+            <div className={`flex flex-col ${HEAD_GAP} ${TITLE_PAD}`}>
+              <h1
+                className={TYPE.display}
                 style={{
                   opacity: past ? 0 : 1,
                   transition: past ? MOTION.exit : MOTION.enter,
                 }}
               >
-                <Face of={face} size="panel" />
-              </span>
-            )
-            : null}
-          <h1
-            className={TYPE.display}
-            style={{
-              opacity: past ? 0 : 1,
-              transition: past ? MOTION.exit : MOTION.enter,
-            }}
-          >
-            {title}
-          </h1>
-          {under}
-        </div>
+                {title}
+              </h1>
+              {under}
+            </div>
+          )}
       </Band>
     </>
   );

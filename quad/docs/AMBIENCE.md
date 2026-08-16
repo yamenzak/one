@@ -274,11 +274,15 @@ than a family.
   avatar style's own declared palette (`worldOf` in `parts/face.tsx`) — not
   re-derived from the slug with a hash of ours. Two generators agree until one
   of them is edited; one source cannot disagree with itself.
-- **The theme decides which of the two leads.** A planet's deep is a near-black
-  navy or teal: over a dark page it is the night it is meant to be, and mixed
-  into paper it is a desaturated slate with the hue gone. Light leads with the
-  planet's BODY colour instead — the same rule the field states, applied to a
-  palette that is not the brand's.
+- **The ground is the SPACE, not the planet, in both themes.** This led with the
+  planet's body colour in light for one build, on the argument that a deep mixed
+  into paper loses its hue. True — and the right answer only while the planet on
+  the screen was 48px and the ground had to carry the identity. With the world
+  drawn at the size of the screen the hue is the SUBJECT's, and a ground in the
+  same colour flattens the two into one wash: a pale apricot behind a big orange
+  planet is mush, a receding blue-grey behind it is composition. Light takes the
+  deep quietly (`--world-far`), because at the field's own strength a near-black
+  on paper is a slab.
 - **The stars are seeded and tiled.** Same workspace, same sky, forever; tiled
   at their own size so the constellation does not change shape with the window.
   They drift at half the weaves' distance, because a point that travels is a

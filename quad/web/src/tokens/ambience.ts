@@ -824,9 +824,9 @@ function layers(what: Ambience, hue: string): readonly string[] {
         /* ⚠️ THE DEEP, MIXED TOWARD `--lumen` EXACTLY AS `field` DOES. This is
            the layer that would otherwise be a black rectangle on a light page. */
         `linear-gradient(180deg, `
-          + `color-mix(in oklab, var(--world-ink) calc(var(--field, 1) * 88%), var(--lumen, transparent)) 0%, `
-          + `color-mix(in oklab, var(--world-ink) calc(var(--field, 1) * 62%), var(--lumen, transparent)) 58%, `
-          + `color-mix(in oklab, var(--world-ink) calc(var(--field, 1) * 38%), var(--lumen, transparent)) 100%)`,
+          + `color-mix(in oklab, var(--world-ink) calc(var(--field, 1) * var(--world-far, 1) * 88%), var(--lumen, transparent)) 0%, `
+          + `color-mix(in oklab, var(--world-ink) calc(var(--field, 1) * var(--world-far, 1) * 62%), var(--lumen, transparent)) 58%, `
+          + `color-mix(in oklab, var(--world-ink) calc(var(--field, 1) * var(--world-far, 1) * 38%), var(--lumen, transparent)) 100%)`,
       ];
 
   }
@@ -1179,18 +1179,27 @@ export function ambienceStylesheet(): string {
   });
 
   /*
-    ⚠️ WHICH OF A PLANET'S TWO COLOURS LEADS, DECIDED BY THE THEME AND NOWHERE
-    ELSE. A planet's deep is a near-black navy or teal: over a dark page it is
-    the night it is meant to be, and mixed into paper it is a desaturated slate
-    — the hue disappears and every world comes out the same grey. Light leads
-    with the planet's BODY colour instead, which is `field`'s rule stated again:
-    the value lightens, the hue stays committed. Both selector forms, because
-    the theme stamp may be on the host or on an ancestor.
+    ⚠️ THE GROUND IS THE SPACE, NOT THE PLANET, AND THE HERO IS WHY. This led
+    with the planet's BODY colour in light for one build, on the argument that a
+    deep mixed into paper loses its hue — true, and it was the right answer while
+    the only planet on the screen was 48px and the ground had to carry the
+    identity. With the world drawn at the size of the screen the hue is the
+    SUBJECT's, and a ground in the same colour flattens the two into one wash: a
+    pale apricot behind a big orange planet is mush, a receding blue-grey behind
+    it is composition. So both themes take the deep, and light takes it QUIETLY —
+    `--world-far` is what pulls it back, because at the field's own strength a
+    near-black on paper is a slab.
+
+    ⚠️ Both selector forms, because the theme stamp may be on the host or on an
+    ancestor.
   */
   const worldInk = [
-    `[data-sky="world"] { --world-ink: var(--world-deep); }`,
+    `[data-sky="world"] { --world-ink: var(--world-deep); --world-far: 1; }`,
     `[data-theme="light"] [data-sky="world"], [data-theme="light"][data-sky="world"] {`,
-    `  --world-ink: var(--world-lit);`,
+    /* ⚠️ QUIETER ON PAPER, BUT NOT SO QUIET THAT THE HUE LEAVES. At 0.42 a deep
+       came through as neutral grey and every workspace looked the same on a
+       light screen, which is the whole point of a per-workspace ground gone. */
+    `  --world-far: 0.62;`,
     `}`,
   ];
 
