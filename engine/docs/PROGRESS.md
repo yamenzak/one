@@ -221,13 +221,13 @@ refuse — it reads as built and passes every test.
   `Center`. A container that picks its own gap is a layout nobody designed: the
   Hub had twenty-three of them at four different values, each defensible, with
   nobody able to point at which was wrong.
-- **[DESIGN.md](DESIGN.md) IS THE DESIGN LANGUAGE, and it governs every screen
+- **[DESIGN.md](../design/DESIGN.md) IS THE DESIGN LANGUAGE, and it governs every screen
   in this tree.** Who the reader is, what a screen is allowed to be for, where a
   thing lives, and the checks a screen has to pass before it is done. Read it
   before designing or changing a surface — most of what it says is judgement no
   guard can hold, which is exactly why it is written down.
 - **Every ground comes from one engine, governed by
-  [AMBIENCE.md](AMBIENCE.md)** — seven FAMILIES, each seeded, replacing the
+  [AMBIENCE.md](../design/AMBIENCE.md)** — seven FAMILIES, each seeded, replacing the
   twenty-four hand-written ambiences entirely. Four belong to a SUBJECT (a
   workspace, a person, a product, the deployment) and three a screen may name;
   why `plain` is still the default rather than a failure to choose is there too.

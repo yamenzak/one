@@ -19,6 +19,23 @@ would bind the design system to one deployment, which is the exact split
 import and a guard says so — the directories below are for a person reading the
 package, not for its callers.
 
+## Start here
+
+Three documents, and they are in this directory on purpose: everything needed to
+build a screen is one `ls` away rather than split between a package and a docs
+folder above it.
+
+| | | |
+|---|---|---|
+| **This file** | what exists, where it lives, and what an app may not do | the index |
+| [DESIGN.md](DESIGN.md) | the design language — the rules, the screen shapes, where the one action goes, the checks a screen has to pass | read once |
+| [AMBIENCE.md](AMBIENCE.md) | the world behind the screen — the families, the three ways to make a field, the hem, what a seed reaches | read when a screen needs a ground |
+
+**Building a screen? Pick the shape (DESIGN.md §4), reach for what already exists
+(below), and let the guards say the rest.** None of this needs reading end to
+end — a guard fails with the reason and the section, which is the whole point of
+writing them down.
+
 ## The engines
 
 Six directories, and three of them are engines rather than component folders.
@@ -26,8 +43,8 @@ An engine takes a DECLARATION and produces a result nobody hand-assembles.
 
 | | takes | produces | read |
 |---|---|---|---|
-| **scene** | a family, a seed, a density | a ground, a field of live marks, and the colour type sits on | [AMBIENCE.md](../docs/AMBIENCE.md) |
-| **frame** | a shape, a subject, an act | a page: width, crown, skeleton, empty state, arrival, where the one action lands | [DESIGN.md](../docs/DESIGN.md) §4 |
+| **scene** | a family, a seed, a density | a ground, a field of live marks, and the colour type sits on | [AMBIENCE.md](AMBIENCE.md) |
+| **frame** | a shape, a subject, an act | a page: width, crown, skeleton, empty state, arrival, where the one action lands | [DESIGN.md](DESIGN.md) §4 |
 | **rendered** | a kernel declaration | a whole working surface — settings, a policy, a console, a shelf | — |
 
 ## The six directories, and what decides which one a file is in
@@ -54,6 +71,88 @@ the rows, the columns, which controls a permission hides and which an
 entitlement locks. Put a file in `parts/` if an app could use it without ever
 having heard of a `SettingSpec`.
 
+## What it ships
+
+⚠️ **DERIVED, NEVER TYPED.** A hand-written list of a package's exports is wrong
+within a week, and a list that is mostly right is one somebody trusts about the
+part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
+
+<!-- generated: node scripts/inventory.mjs vocabulary -->
+| Home | What it is for | Ships |
+|---|---|---|
+| `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 84 |
+| `scene/` | the ambience engine — families, marks, the world behind a screen | 25 |
+| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 61 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 93 |
+| `rendered/` | whole surfaces drawn from a kernel declaration | 44 |
+| `chart/` | the data vocabulary — a number as a shape | 59 |
+
+**366 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+there is no deep import, and a guard says so.
+
+### `tokens/`
+
+- `tokens/ambience.ts` — `ambienceStylesheet`, `FADE`, `MATTE`, `ON_SCENE`, `REACH`, `skyWorld`, `World`, `worldCss`
+- `tokens/appearance.ts` — `Appearance`, `APPEARANCE_KEY`, `APPEARANCE_SCRIPT`, `APPEARANCES`, `applyAppearance`, `preferred`, `remember`, `resolve`, `stored`
+- `tokens/ground.ts` — `CONTROL_TINT`, `FOCUS`, `GROUND`, `GROUND_CSS`, `GROUND_TINT`, `MIN_DELTA`, `TINT`
+- `tokens/metrics.ts` — `ACTION_SPACE`, `BAND_PAD`, `CARD_ROWS`, `CODE_SLOT`, `CROWN`, `CROWN_CHIP`, `CROWN_SIZE`, `FACE_PX`, `GUTTER`, `HEAD_GAP`, `HERO_PAD`, `ICON`, `Inset`, `INSET`, `ISLAND_HERE`, `ISLAND_ITEM`, `ISLAND_PAD`, `LEAD`, `NAV_SPACE`, `PAD`, `ROW`, `SAFE_BOTTOM`, `SAFE_TOP`, `Space`, `SPACE`, `TITLE_PAD`, `Width`, `WIDTH`
+- `tokens/motion.ts` — `ARRIVE`, `ARRIVE_MARK`, `ARRIVE_MOTION`, `ARRIVE_RISE`, `arriveAt`, `BEAT`, `DOOR_MOTION`, `doorAt`, `Duration`, `DURATION`, `Ease`, `EASE`, `Intent`, `MOTION`, `REDUCED`, `transition`, `turns`, `useStill`
+- `tokens/theme.ts` — `brandCss`, `brandCssFor`, `colorFor`, `readable`, `SKY_MOTION`
+- `tokens/type.ts` — `FACE_CSS`, `FACE_STACK`, `MARK_STACK`, `MONO_STACK`, `Role`, `ROLES`, `sentence`, `text`, `TYPE`
+
+### `scene/`
+
+- `scene/aura.ts` — `AURA`
+- `scene/blobs.ts` — `BLOBS`
+- `scene/cloth.ts` — `CLOTH`
+- `scene/etch.ts` — `ETCH`
+- `scene/glow.ts` — `GLOW`
+- `scene/index.ts` — `FAMILIES`, `SceneFamily`, `SKIES`, `Sky`
+- `scene/loops.ts` — `LOOPS`
+- `scene/scene.ts` — `Density`, `DENSITY`, `Family`, `hash`, `Palette`, `pick`, `prng`, `render`, `Rendered`, `scatter`, `Scene`, `Speck`, `Tiles`, `Variant`
+- `scene/space.ts` — `SPACE`
+
+### `frame/`
+
+- `frame/arrival.tsx` — `Arrival`, `AsideRoute`, `Mark`, `MarkSize`
+- `frame/layout.tsx` — `Balance`, `Band`, `BandProps`, `Bleed`, `Center`, `Cluster`, `Columns`, `Crown`, `CrownClaim`, `crownFor`, `CrownProps`, `CrownSocketProvider`, `distinguishing`, `Docked`, `Figure`, `Grid`, `Island`, `LeaveChip`, `Page`, `PageCrown`, `PageProps`, `Prose`, `Rail`, `Row`, `Section`, `SectionTitle`, `Slot`, `Spacer`, `Stack`, `Title`, `useCrownSocket`, `useNight`
+- `frame/overlay.tsx` — `Confirm`, `Dialog`, `Menu`, `MenuItem`, `notice`, `NoticeHost`, `Over`, `Peek`, `Tray`
+- `frame/screen.tsx` — `Act`, `Board`, `Frame`, `Framed`, `Layout`, `LayoutProps`, `Screen`, `ScreenProps`, `Shape`, `Tile`, `Whichever`
+- `frame/shell.tsx` — `CrownInfo`, `glyphOf`, `reachable`, `Shell`, `ShellProps`
+
+### `parts/`
+
+- `parts/beside.tsx` — `Hint`, `Pip`
+- `parts/blocks.tsx` — `Crumbs`, `Faq`, `Gauge`, `Hotkey`, `Moment`, `PageTabs`, `Reveal`, `Step`, `Steps`, `TabSpec`, `Timeline`
+- `parts/face.tsx` — `appFace`, `Face`, `FaceKind`, `FaceOf`, `FaceProps`, `FaceSize`, `ONE_FACE`, `Orb`, `placeFace`, `whoFace`, `worldFor`
+- `parts/forms.tsx` — `Agree`, `Choice`, `CodeEntry`, `DateInput`, `Dates`, `Dial`, `LongText`, `Lookup`, `MoneyInput`, `NumberInput`, `NumberInputProps`, `OneOf`, `Option`, `PeriodId`, `PeriodInput`, `PERIODS`, `Picks`, `Said`, `SearchInput`, `SecretInput`, `Segmented`, `spanOf`, `Tags`, `TextInput`, `TextInputProps`, `TimeInput`
+- `parts/listing.tsx` — `Col`, `Listing`, `ListingProps`, `Paged`
+- `parts/state.tsx` — `Await`, `AwaitProps`, `ChartWaiting`, `FigureWaiting`, `FormWaiting`, `Loaded`, `Nothing`, `nothingIn`, `ready`, `RowsWaiting`, `TableWaiting`, `TextWaiting`, `TilesWaiting`, `trouble`, `Trouble`, `waiting`, `Working`
+- `parts/surfaces.tsx` — `ActionRow`, `AmountRow`, `ControlRow`, `CopyRow`, `FieldRow`, `Group`, `GroupProps`, `Identity`, `Money`, `NavRow`, `NavRowProps`, `NoteRow`, `OfferRow`, `PersonRow`, `Place`, `QuickActions`, `SeeAll`, `StepRow`, `TileGrid`, `ToggleRow`
+- `parts/tally.tsx` — `Tally`, `TallyProps`
+
+### `rendered/`
+
+- `rendered/ai.tsx` — `AiLanes`, `LanesProps`
+- `rendered/console.tsx` — `FlagConsole`, `FlagConsoleProps`, `money`, `saying`, `Shelf`, `ShelfProps`
+- `rendered/field.tsx` — `Field`, `FieldProps`
+- `rendered/guide.tsx` — `Guide`, `GuideProps`, `Help`, `HelpProps`, `Milestones`, `MilestonesProps`
+- `rendered/inbox.tsx` — `Bell`, `BellProps`, `Inbox`, `InboxProps`, `Note`
+- `rendered/legal.tsx` — `Documents`, `DocumentsProps`, `Ropa`, `SubProcessors`
+- `rendered/money.tsx` — `Bill`, `BillProps`, `Jobs`, `JobsProps`, `Wallet`, `WalletProps`
+- `rendered/policy.tsx` — `NotificationPolicy`, `Offered`, `PolicyProps`, `policyShown`
+- `rendered/settings.tsx` — `Settings`, `SettingsProps`, `settingsShown`
+- `rendered/vault.tsx` — `ConsentProps`, `ConsentSheet`, `Look`, `MineProps`, `MyData`, `WhoLooked`
+
+### `chart/`
+
+- `chart/charts.tsx` — `AreaChart`, `BarChart`, `CHART_MOTION`, `ChartTable`, `ColumnChart`, `Datum`, `DivergingChart`, `DumbbellChart`, `HeatmapChart`, `LineChart`, `SCATTER_MAX`, `ScatterChart`, `Series`, `Sparkline`, `StackedChart`
+- `chart/circles.tsx` — `CompositionBar`, `DonutChart`, `Ring`, `Rings`
+- `chart/figures.tsx` — `ChartPanel`, `Delta`, `Hero`, `Meter`, `Stat`, `StatRow`
+- `chart/palette.ts` — `assign`, `AXIS`, `DATA`, `emphasis`, `GRID`, `magnitude`, `polarity`, `pole`, `QUIET`, `SEPARATOR`, `seriesColour`, `SLOTS`
+- `chart/scale.ts` — `arcPath`, `arcs`, `areaPath`, `band`, `barPath`, `barPathX`, `compact`, `compactLike`, `extent`, `grouped`, `isGap`, `linePath`, `norm`, `place`, `Placed`, `Point`, `polar`, `Segment`, `Span`, `stack`, `stackSpan`, `ticks`
+<!-- /generated -->
+
 ## What is guarded
 
 `scripts/` holds the checks; each names the decision it protects and fails on a
@@ -76,15 +175,6 @@ consequence rather than on a style. The ones about this package:
 - **`tone`** — label length, sentence case, full stops.
 - **`surface`** — every declaration reaches a screen; every field kind has a
   control.
-
-## Where the rules live
-
-- [`engine/docs/DESIGN.md`](../docs/DESIGN.md) — the design language: the eight
-  rules, the eight screen shapes, where the primary action goes, the checks a
-  screen has to pass.
-- [`engine/docs/AMBIENCE.md`](../docs/AMBIENCE.md) — the world behind the screen:
-  the seven families, the three ways to make a field, the hem, and what a seed
-  reaches.
 
 ## What an app may not do
 

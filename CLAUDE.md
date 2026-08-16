@@ -870,6 +870,13 @@ stage table a script keeps honest — then [engine/docs/PLAN.md](engine/docs/PLA
 §1–§3 and [engine/docs/DECISIONS.md](engine/docs/DECISIONS.md). Nothing else is
 required to resume the work; **start there rather than from recall.**
 
+⚠️ **BUILDING A SCREEN IS A DIFFERENT STARTING POINT, AND IT IS
+[engine/design/README.md](engine/design/README.md).** The design language and the
+ambience engine live beside the package that draws them — `DESIGN.md` and
+`AMBIENCE.md` are in `engine/design/`, not in `engine/docs/` — so everything
+needed to build a surface is one `ls` away. The README's export list is
+generated, so "does this already exist" is a question with a current answer.
+
 **The two names mean different things and neither is the other.** **OneEngine** is the
 FRAMEWORK — `@engine/kernel` (pure contracts), `@engine/runtime` (the only code that
 touches a binding), **`@engine/design`** — the browser half and the design system
