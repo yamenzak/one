@@ -67,6 +67,16 @@ const Tail = ({ help, error }: Pick<Said, "help" | "error">) => (
 
 /* ------------------------------------------------------------------- text --- */
 
+/**
+ * ⚠️ `name` AND `autoFocus` ARE MECHANICS, NOT SENTENCES, WHICH IS WHY THEY ARE
+ * HERE AND NOT IN `Said`. They are also the whole reason two screens went round
+ * this grammar: the sign-in and the workspace wizard each hand-built a
+ * `TextField` + `Label` + `Input` because the shared control could not be
+ * focused on arrival or named for a form. A grammar missing a mechanic is a
+ * grammar that gets bypassed, and once bypassed its label, help, error and
+ * disabled placement are all decided again, by hand, on the two screens a person
+ * meets first.
+ */
 export interface TextInputProps extends Said {
   /** `undefined` = not known yet; the control renders pending. */
   readonly value: string | undefined;
@@ -76,12 +86,21 @@ export interface TextInputProps extends Said {
   /** Something before/after the text — a glyph, a unit, a fixed prefix. */
   readonly before?: React.ReactNode;
   readonly after?: React.ReactNode;
+  /** For form submission, and for a browser that fills things in. */
+  readonly name?: string;
+  readonly autoComplete?: string;
+  /** ⚠️ One per screen. Two fields both claiming the caret is a race. */
+  readonly autoFocus?: boolean;
 }
 
-export function TextInput({ value, onChange, kind = "text", placeholder, before, after, ...p }: TextInputProps) {
+export function TextInput({
+  value, onChange, kind = "text", placeholder, before, after, name, autoComplete, autoFocus, ...p
+}: TextInputProps) {
   const pending = value === undefined;
   return (
     <TextField
+      fullWidth
+      name={name}
       value={value ?? ""}
       onChange={onChange}
       type={kind === "text" ? undefined : kind}
@@ -92,11 +111,11 @@ export function TextInput({ value, onChange, kind = "text", placeholder, before,
       {before || after ? (
         <InputGroup>
           {before ? <InputGroup.Prefix>{before}</InputGroup.Prefix> : null}
-          <InputGroup.Input placeholder={placeholder} />
+          <InputGroup.Input autoFocus={autoFocus} autoComplete={autoComplete} placeholder={placeholder} />
           {after ? <InputGroup.Suffix>{after}</InputGroup.Suffix> : null}
         </InputGroup>
       ) : (
-        <Input placeholder={placeholder} />
+        <Input autoFocus={autoFocus} autoComplete={autoComplete} placeholder={placeholder} />
       )}
       <Tail help={p.help} error={p.error} />
     </TextField>
@@ -276,15 +295,18 @@ export function Choice({ value, onChange, options, placeholder, ...p }: Said & {
  * same grammar; the difference is that typing narrows. Past a dozen options,
  * `Choice` is the wrong control and this is the right one.
  */
-export function Lookup({ value, onChange, options, placeholder, ...p }: Said & {
+export function Lookup({ value, onChange, options, placeholder, name, autoFocus, ...p }: Said & {
   readonly value: string | undefined | null;
   readonly onChange: (id: string) => void;
   readonly options: readonly Option[];
   readonly placeholder?: string;
+  readonly name?: string;
+  readonly autoFocus?: boolean;
 }) {
   const pending = value === undefined;
   return (
     <ComboBox
+      name={name}
       selectedKey={value ?? null}
       onSelectionChange={(key) => { if (key !== null) onChange(String(key)); }}
       {...said(p)}
@@ -292,7 +314,7 @@ export function Lookup({ value, onChange, options, placeholder, ...p }: Said & {
     >
       <Label>{p.label}</Label>
       <ComboBox.InputGroup>
-        <Input placeholder={placeholder ?? "Type to search"} />
+        <Input autoFocus={autoFocus} placeholder={placeholder ?? "Type to search"} />
         <ComboBox.Trigger />
       </ComboBox.InputGroup>
       <ComboBox.Popover>

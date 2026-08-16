@@ -556,7 +556,7 @@ The guard registry, its checks, and the standards that bind them.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 5 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 45 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 46 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
@@ -588,6 +588,7 @@ the library decides FOR us.
 | `an-icon-only-control-is-named-to-a-pointer-too` | D7 | forty-four glyphs with an aria-label each and no tooltip anywhere, so the product reads correctly aloud and shows everybody else a shape — sharpest on the crown's trail, whose icons are the app's own and whose row is on every screen |
 | `every-tailwind-source-path-resolves` | D7 | a @source naming a directory that no longer exists, which is not an error but a smaller stylesheet — 185 utility classes the design package alone used were never emitted, .md:hidden and .absolute among them, with every component still mounting and every test still green |
 | `no-screen-assembles-a-control-the-package-ships` | D7 | a screen writing out six <InputOTP.Slot> under a comment saying the number of boxes is the server's, so raising it leaves a form that refuses every valid code and blames the person |
+| `no-app-keeps-a-drawer-of-shared-furniture` | D7 | a ui.tsx inside an app, which is where a second app's components accumulate one at a time — the one that existed had already lost two of its three exports to the package and recorded that in its own header |
 | `no-source-holds-a-character-nothing-renders` | D8 | a literal backspace inside a guard's regex, which makes the pattern unmatchable while diff, grep and review all render the line as correct — the check then reports green about the one defect it was written to catch |
 | `a-table-is-inside-the-collection-it-needs` | D7 | a Table.Column outside Table.Content throwing during render, so the whole screen is blank |
 | `a-row-of-equals-shares-its-width` | D7 | a nav of four destinations at four widths, with the current one inheriting whichever width its own label happened to make |

@@ -57,6 +57,15 @@
       "fails": "a screen writing out six <InputOTP.Slot> under a comment saying the number of boxes is the server's, so raising it leaves a form that refuses every valid code and blames the person"
     },
     {
+      "id": "no-app-keeps-a-drawer-of-shared-furniture",
+      "protects": "D7",
+      "stage": "17",
+      "status": "live",
+      "impl": "scripts/heroui.test.mjs",
+      "proves": "furniture:",
+      "fails": "a ui.tsx inside an app, which is where a second app's components accumulate one at a time \u2014 the one that existed had already lost two of its three exports to the package and recorded that in its own header"
+    },
+    {
       "id": "no-source-holds-a-character-nothing-renders",
       "protects": "D8",
       "stage": "17",

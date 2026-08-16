@@ -873,3 +873,42 @@ export function SeeAll({ label = "See all", onOpen }: {
     </div>
   );
 }
+
+
+/* ------------------------------------------------------------------ sheet --- */
+
+/**
+ * ONE CARD, CENTRED, WITH A HEADING AND A COLUMN UNDER IT.
+ *
+ * ⚠️ IT WAS AN APP'S OWN FURNITURE, IN A FILE CALLED `ui.tsx`, and that file's
+ * own header recorded that two of its three pieces had already left for this
+ * package. A titled card with a stacked body is not a fact about any product —
+ * it is what a 404, a confirmation and a one-question screen all are — so the
+ * third piece was the last of a pattern, not an exception to it.
+ *
+ * ⚠️ PLACEMENT, NOTHING ELSE. The moment it sets a colour or a radius it becomes
+ * a surface a workspace's branding does not reach, and nobody finds out until
+ * somebody with a strong brand asks why one page still looks like ours.
+ */
+export function Sheet({ title, lead, children }: {
+  readonly title: string;
+  /** One line under the title. What this is, or what just happened. */
+  readonly lead?: string;
+  readonly children: React.ReactNode;
+}) {
+  return (
+    <Card className="w-full max-w-lg">
+      <Card.Header>
+        <Card.Title>{title}</Card.Title>
+        {lead ? <Card.Description>{lead}</Card.Description> : null}
+      </Card.Header>
+      <Card.Content>
+        {/* ⚠️ THE GAP COMES FROM THE SCALE, NOT FROM HERE. It was `gap-4`, which
+            is not a step on it — so a sheet's rows sat a pixel apart from every
+            other stack in the product, defensibly, and nobody could point at
+            which one was wrong. */}
+        <div className={`flex flex-col ${SPACE.snug}`}>{children}</div>
+      </Card.Content>
+    </Card>
+  );
+}

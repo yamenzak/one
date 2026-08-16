@@ -284,6 +284,15 @@ if (!raw) ok(`library: nothing hand-rolls a control HeroUI ships`);
  */
 const COMPOSED = [
   [/<InputOTP\.Slot\b/, "InputOTP.Slot", "CodeEntry"],
+  /* ⚠️ `forms.tsx` EXISTS SO EVERY CONTROL SPEAKS THE SAME FOUR SENTENCES —
+     label, help, error, disabled, in the same places. A screen assembling its
+     own places those four by hand, and the two screens that did it are the two
+     a person meets first: signing in and creating a workspace. Both bypassed the
+     grammar for two mechanics it was missing, `name` and `autoFocus`, which is
+     how a grammar comes to be optional. */
+  [/<TextField\b/, "TextField", "TextInput"],
+  [/<ComboBox\b/, "ComboBox", "Lookup"],
+  [/<Select\b/, "Select", "Choice"],
 ];
 let assembled = 0;
 for (const file of FILES) {
@@ -298,6 +307,37 @@ for (const file of FILES) {
   }
 }
 if (!assembled) ok(`composed: no screen assembles a control the package already ships`);
+
+/**
+ * ⚠️ AND AN APP DOES NOT KEEP A DRAWER OF SHARED FURNITURE. `one-hub/src/ui.tsx`
+ * was exactly that, and its own header recorded the pattern: two of its three
+ * exports had already left for the package, one at a time, each after somebody
+ * noticed a second app would want it. The third — a titled card with a stacked
+ * body — was the last of a pattern rather than an exception to it.
+ *
+ * ⚠️ THE TEST IS THE NAME, WHICH IS BLUNT AND IS THE POINT. Whether a component
+ * is product-specific cannot be decided by a script; whether somebody has
+ * started a `ui`, `components`, `shared` or `common` file in an app can be, and
+ * that file is where the furniture accumulates. A screen file exporting a
+ * screen-specific piece is fine and always was — this fails on the DRAWER, not
+ * on the piece.
+ */
+const DRAWERS = /^(ui|components?|shared|common|widgets|primitives|design)\.(tsx?|ts)$/;
+let drawers = 0;
+for (const dir of ["one-hub/src", ...readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
+  .filter((e) => e.isDirectory()).map((e) => `apps/${e.name}/src`)]) {
+  const at = join(ENGINE, dir);
+  if (!existsSync(at)) continue;
+  for (const e of readdirSync(at, { withFileTypes: true })) {
+    if (e.isDirectory() ? !DRAWERS.test(`${e.name}.tsx`) : !DRAWERS.test(e.name)) continue;
+    drawers++;
+    fail(`${dir}/${e.name}: an app keeping a drawer of shared furniture (D7).\n` +
+         `       This is where a second app's components accumulate one at a time. If a\n` +
+         `       piece is about the product it belongs beside the screen that uses it; if\n` +
+         `       it is not, it belongs in @engine/design.`);
+  }
+}
+if (!drawers) ok(`furniture: no app keeps a drawer of shared components`);
 
 /**
  * ⚠️ TAILWIND ONLY EMITS WHAT IT WAS POINTED AT, AND A PATH THAT NO LONGER

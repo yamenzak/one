@@ -13,7 +13,7 @@
 
 import { Button } from "@heroui/react";
 import { signpostUrl, type DoorKind, type Where } from "../door.js";
-import { Sheet } from "../ui.js";
+import { Sheet } from "@engine/design";
 
 const WHAT: Readonly<Record<string, string>> = {
   operator: "This is the operator console's door. Its screens are not part of the Hub.",

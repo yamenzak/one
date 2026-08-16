@@ -83,11 +83,11 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 84 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 25 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 61 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 93 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 94 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 44 |
 | `chart/` | the data vocabulary — a number as a shape | 59 |
 
-**366 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**367 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -128,7 +128,7 @@ there is no deep import, and a guard says so.
 - `parts/forms.tsx` — `Agree`, `Choice`, `CodeEntry`, `DateInput`, `Dates`, `Dial`, `LongText`, `Lookup`, `MoneyInput`, `NumberInput`, `NumberInputProps`, `OneOf`, `Option`, `PeriodId`, `PeriodInput`, `PERIODS`, `Picks`, `Said`, `SearchInput`, `SecretInput`, `Segmented`, `spanOf`, `Tags`, `TextInput`, `TextInputProps`, `TimeInput`
 - `parts/listing.tsx` — `Col`, `Listing`, `ListingProps`, `Paged`
 - `parts/state.tsx` — `Await`, `AwaitProps`, `ChartWaiting`, `FigureWaiting`, `FormWaiting`, `Loaded`, `Nothing`, `nothingIn`, `ready`, `RowsWaiting`, `TableWaiting`, `TextWaiting`, `TilesWaiting`, `trouble`, `Trouble`, `waiting`, `Working`
-- `parts/surfaces.tsx` — `ActionRow`, `AmountRow`, `ControlRow`, `CopyRow`, `FieldRow`, `Group`, `GroupProps`, `Identity`, `Money`, `NavRow`, `NavRowProps`, `NoteRow`, `OfferRow`, `PersonRow`, `Place`, `QuickActions`, `SeeAll`, `StepRow`, `TileGrid`, `ToggleRow`
+- `parts/surfaces.tsx` — `ActionRow`, `AmountRow`, `ControlRow`, `CopyRow`, `FieldRow`, `Group`, `GroupProps`, `Identity`, `Money`, `NavRow`, `NavRowProps`, `NoteRow`, `OfferRow`, `PersonRow`, `Place`, `QuickActions`, `SeeAll`, `Sheet`, `StepRow`, `TileGrid`, `ToggleRow`
 - `parts/tally.tsx` — `Tally`, `TallyProps`
 
 ### `rendered/`
@@ -189,6 +189,12 @@ The point of naming this is that an app stops having a choice. Guarded today:
 - **No app writes a measurement, a curve, a duration or a colour** (`metrics`,
   `motion`, `ground`).
 - **No app restyles a component** (`heroui`).
+- **No app assembles a control this package ships** — a `TextField`, a
+  `ComboBox`, a `Select` or an `InputOTP` put together by hand places the four
+  sentences itself, and drifts (`heroui` `composed:`).
+- **No app keeps a drawer of shared furniture** — no `ui.tsx`, no `components/`.
+  That is where a second app's components accumulate one at a time
+  (`heroui` `furniture:`).
 
 ⚠️ **A guard is what makes a rule real.** Everything above was also written in a
 paragraph at some point, and the paragraphs did not hold: the shell's crown

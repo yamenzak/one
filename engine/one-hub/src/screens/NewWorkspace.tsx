@@ -17,15 +17,13 @@
  */
 
 import { useMemo, useState } from "react";
-import {
-  Button, ComboBox, Description, FieldError, Form, Input, Label, ListBox, TextField,
-} from "@heroui/react";
+import { Button, Form } from "@heroui/react";
 import type { Problem } from "@engine/kernel";
 import { EEA, slugOk } from "@engine/kernel";
 import { api } from "../api.js";
 import { byName } from "../countries.js";
 import { accountUrl, here, tenantUrl, type Where } from "../door.js";
-import { Arrival, AsideRoute, SPACE, Trouble } from "@engine/design";
+import { Arrival, AsideRoute, Lookup, SPACE, TextInput, Trouble } from "@engine/design";
 
 /** ⚠️ From the name, but only until somebody types their own — a slug that
     silently follows the name is a slug that changes under an edit. */
@@ -91,64 +89,46 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
             except that the product marks things, and it is the same noise that
             was removed from the sign-in. What is missing is said when somebody
             presses the button, once, in words. */}
-        <TextField fullWidth name="name" value={name} onChange={setName} isDisabled={busy}>
-          <Label>What is it called?</Label>
-          <Input autoFocus placeholder="Northwind Fitness" />
-        </TextField>
+        <TextInput
+          label="What is it called?"
+          name="name"
+          value={name}
+          onChange={setName}
+          disabled={busy}
+          autoFocus
+          placeholder="Northwind Fitness"
+        />
 
-        <TextField
-          fullWidth
+        <TextInput
+          label="Its address"
           name="slug"
           value={address}
           onChange={(next) => { setChosen(true); setSlug(next); }}
-          isDisabled={busy}
-          isInvalid={address.length > 0 && !addressOk}
-        >
-          <Label>Its address</Label>
-          <Input placeholder="northwind" />
-          {address.length > 0 && !addressOk
-            ? (
-              <FieldError>
-                Letters, numbers and hyphens only — it is a web address, so it has to be one.
-              </FieldError>
-            )
-            /* ⚠️ THE PREVIEW IS AN ADDRESS OR IT IS NOTHING. With the field
-               empty it rendered `….localhost`, which is not a URL, is not a
-               hint, and is the first thing on the screen that looks broken.
-               Nothing is said until there is something to say. */
-            : address
-              ? <Description>{address}.{where.root}</Description>
-              : <Description>This is where the workspace will live</Description>}
-        </TextField>
+          disabled={busy}
+          placeholder="northwind"
+          error={address.length > 0 && !addressOk
+            ? "Letters, numbers and hyphens only — it is a web address, so it has to be one."
+            : undefined}
+          /* ⚠️ THE PREVIEW IS AN ADDRESS OR IT IS NOTHING. With the field empty
+             it rendered `….localhost`, which is not a URL, is not a hint, and is
+             the first thing on the screen that looks broken. Nothing is said
+             until there is something to say. */
+          help={address ? `${address}.${where.root}` : "This is where the workspace will live"}
+        />
 
-        <ComboBox
-          selectedKey={country}
-          onSelectionChange={(key) => setCountry(key === null ? null : String(key))}
-          isDisabled={busy}
-        >
-          <Label>Where is the business?</Label>
-          <ComboBox.InputGroup>
-            <Input placeholder="Search countries…" />
-            <ComboBox.Trigger />
-          </ComboBox.InputGroup>
-          {/* ⚠️ Said before it is chosen, not discovered afterwards: where the
-              records live follows from this answer. */}
-          <Description>
-            {country && EEA.includes(country)
-              ? "Records for this workspace stay in the EU."
-              : "This decides where the workspace's records are kept."}
-          </Description>
-          <ComboBox.Popover>
-            <ListBox>
-              {countries.map((c) => (
-                <ListBox.Item key={c.code} id={c.code} textValue={c.name}>
-                  {c.name}
-                  <ListBox.ItemIndicator />
-                </ListBox.Item>
-              ))}
-            </ListBox>
-          </ComboBox.Popover>
-        </ComboBox>
+        {/* ⚠️ Said before it is chosen, not discovered afterwards: where the
+            records live follows from this answer. */}
+        <Lookup
+          label="Where is the business?"
+          value={country}
+          onChange={setCountry}
+          disabled={busy}
+          placeholder="Search countries…"
+          options={countries.map((c) => ({ id: c.code, label: c.name }))}
+          help={country && EEA.includes(country)
+            ? "Records for this workspace stay in the EU."
+            : "This decides where the workspace's records are kept."}
+        />
 
         {/* ⚠️ Live at rest, like every other primary here. Disabled until three
             fields are right, it is a grey slab for the whole time somebody is

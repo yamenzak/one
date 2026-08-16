@@ -14,10 +14,9 @@
  */
 
 import { useState } from "react";
-import { Balance, Band, Crown, CopyRow, Figure, Group, Grid, Island, Money, NavRow, ActionRow,
-  ToggleRow, FieldRow, NoteRow, OfferRow, PersonRow, AmountRow, QuickActions, SeeAll,
-  StepRow, TileGrid, Nothing, Row, Section, Stack, Title, Cluster, SPACE,
-  TYPE, type Sky } from "@engine/design";
+import {
+  ActionRow, AmountRow, Balance, Band, Cluster, CopyRow, Crown, FieldRow, Figure, Grid, Group, Island, Money, NavRow, NoteRow, Nothing, OfferRow, PersonRow, QuickActions, Row, Section, SeeAll, Sheet, type Sky, SPACE, Stack, StepRow, TileGrid, Title, ToggleRow, TYPE,
+} from "@engine/design";
 import {
   Agree, Choice, CodeEntry, Confirm, Crumbs, DateInput, Dialog, Faq, FormWaiting, Gauge, Hotkey, Listing,
   PeriodInput, type PeriodId,
@@ -27,7 +26,6 @@ import {
 } from "@engine/design";
 import { Button } from "@heroui/react";
 import { CODE_DIGITS, PLATFORM_PROBLEMS, problem } from "@engine/kernel";
-import { Sheet } from "../ui.js";
 import { ArrowLeftRight, ChevronRight, CirclePlus, CircleUser, Clock, Coins, CreditCard, Ellipsis, EyeOff, FileText, Globe, House, Landmark, Link2, MessagesSquare, Package, PiggyBank, Plane, Plus, Smartphone, Trash2, TriangleAlert, Users } from "lucide-react";
 
 const nothing = () => {};

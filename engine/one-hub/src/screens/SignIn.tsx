@@ -21,12 +21,12 @@
  */
 
 import { useState } from "react";
-import { Button, Form, Label, TextField, Input } from "@heroui/react";
+import { Button, Form } from "@heroui/react";
 import type { Problem } from "@engine/kernel";
 import { CODE_DIGITS } from "@engine/kernel";
 import { useSession } from "../session.js";
 import { here, setupUrl } from "../door.js";
-import { Arrival, AsideRoute, CodeEntry, SPACE, Trouble } from "@engine/design";
+import { Arrival, AsideRoute, CodeEntry, SPACE, TextInput, Trouble } from "@engine/design";
 
 /* ⚠️ Checked here rather than by `isRequired`, which draws a red asterisk on the
    only field on the screen — a required marker beside the one thing there is to
@@ -145,17 +145,17 @@ export function SignIn({ lead }: { readonly lead?: string }) {
         className={`flex flex-col ${SPACE.snug}`}
         onSubmit={(e) => { e.preventDefault(); void send(); }}
       >
-        <TextField
-          fullWidth
+        <TextInput
+          label="Email"
           name="email"
-          type="email"
+          kind="email"
           value={email}
           onChange={setEmail}
-          isDisabled={busy}
-        >
-          <Label>Email</Label>
-          <Input autoFocus autoComplete="email" placeholder="you@example.com" />
-        </TextField>
+          disabled={busy}
+          autoFocus
+          autoComplete="email"
+          placeholder="you@example.com"
+        />
         <Button type="submit" variant="primary" size="lg" fullWidth isPending={busy}>
           Send me a code
         </Button>
