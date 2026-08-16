@@ -366,22 +366,61 @@ Five decisions in it are worth knowing before adding a family.
   ground shows through and the world is at full strength at the edges. A guard
   refuses the scrim.
 
-### Two families, and they are different in KIND
+### Four families, one per kind of subject
 
 `FAMILIES` in `web/src/scene/index.ts` is the whole list, and a family not in it
-is a family nothing can reach.
+is a family nothing can reach. Every kind of FACE has one, and the world falls
+out of what the subject IS — nothing picks it per screen (`worldFor`).
 
-| | **space** — a workspace | **aura** — a person |
-|---|---|---|
-| what it is | a landscape you look AT | an atmosphere you stand IN |
-| the base | linear: deep overhead, light at the horizon | radial: light in the middle, falling away everywhere |
-| the marks | ~190 tiny sharp stars per megapixel | ~7 enormous soft blooms |
-| the beat | a twinkle — most of the way out, in 3–5s | a breath — a fifth of a stop, over 13–19s |
+| | **space** — a workspace | **aura** — a person | **loops** — a product | **blobs** — the deployment |
+|---|---|---|---|---|
+| what it is | a landscape you look AT | an atmosphere you stand IN | a system, so a lattice | the thing all of them are inside |
+| the base | linear: deep overhead, light at the horizon | radial: light in the middle | a low wash under the weave | one broad diagonal |
+| the marks | ~190 tiny sharp stars per megapixel | ~7 enormous soft blooms | one tile in four rotations, edge to edge | ~4 generated silhouettes |
+| the beat | a twinkle — most of the way out, in 3–5s | a breath — a fifth of a stop, over 13–19s | a quarter TURN, in 47–71s | a breath |
+| the colours | read from its planet | read from its mood | the theme (`ink: "fixed"`) | the theme (`ink: "fixed"`) |
 
 ⚠️ **The cheap second family is the first one with another palette, and it would
-prove nothing.** A workspace is somewhere you visit; a person is not. One is a
-view and the other is a room, and the two grounds say so before a word is read —
-which is also how somebody knows whose screen they are on.
+prove nothing.** A workspace is somewhere you visit; a person is not; a product
+is neither. Each ground says which before a word is read, which is also how
+somebody knows whose screen they are on.
+
+⚠️ **`loops` is a TRUCHET, and it is the shortest declaration here.** One tile —
+two quarter-arcs joining adjacent edge midpoints — laid on a grid with each cell
+independently turned. The arcs run off every edge into their neighbours, so the
+field becomes long continuous curves that loop, branch and close; a 12 × 9 grid
+has 4^108 arrangements and every one is recognisably the same pattern. It is also
+why `Tiles` exists: `scatter` jitters on purpose, and a truchet three pixels out
+is a field of curves ending in mid-air. **Adjacency is the mark.**
+
+⚠️ **And its motion is a TURN, not a fade.** A line has no brightness to give;
+what it has is orientation. One tile turning by a quarter re-routes every curve
+running through it, so the field re-draws itself without a mark appearing or
+disappearing. Hold for four fifths, turn in the rest — never something you catch
+moving, only something that was different when you looked back.
+
+⚠️ **`blobs` is the one whose MARKS are generated rather than chosen.** Every
+other family picks from a list of shapes somebody drew; a silhouette here is
+computed from the stream — a closed spline whose radius wanders under two
+harmonics — so no two are alike and all are the same kind of thing. It is also
+the only family that takes the rng `Variant.draw` has always been handed, which
+until now made that hook a claim rather than a capability.
+
+⚠️ **Density means the opposite thing to a lattice, and getting it backwards is
+visible.** For a scatter, presence is HOW MANY, so `quiet` is fewer marks. A
+lattice has no count — it fills what it is given — so presence is HOW BIG, and
+dividing by the density produced a coarse bold weave with metre-wide arcs under
+`quiet`, which is louder than the default in every way.
+
+⚠️ **`ink: "fixed"` is a promise, and it is what lets a brand wear a family.** A
+workspace and a person have a PICTURE to read two colours out of; a product and
+the deployment have only the theme, and `var(--brand)` inside an SVG is a string
+rather than a colour — it resolves to nothing, the mark is painted with nothing,
+and the field is absent with no error anywhere. A `fixed` family draws in white
+or black and lets the ground carry the hue. ⚠️ Its ground also has to be far
+weaker than a picture-fed one: this product is MONOCHROME, so a quarter of
+`--brand` is a grey wash, and the first render of `loops` was a flat grey wall
+with the pattern invisible underneath it.
 
 ⚠️ **A light is not a hue, and this is where ignoring it shows worst.** `moods`
 picks faces from twelve saturated colours, and mixing a yellow straight into a
@@ -494,15 +533,26 @@ on a surface — `[data-sky] *` would put a shadow under every word in the produ
    variants already in them; each is a candidate family, and a screen kind picks a
    family the way it picks a shape today.
 
-⚠️ **What is NOT yet done, and should not be claimed.** TWO families exist —
-`space` and `aura`, two skies each, on two screens. The twenty-four brand-hued
+⚠️ **What is NOT yet done, and should not be claimed.** FOUR families exist, two
+skies each, one per kind of face, all four bound. The twenty-four brand-hued
 ambiences above are still hand-written gradient stacks and none of them has been
-ported; `silk`/`linen`/`wire` are the obvious next, because they are already one
-generator at three settings and would need the engine's one missing primitive (a
-DRAWN mark rather than a scattered one). Three of the four things the engine was
-designed for are done — the LAYOUT binding, type derived from the scene, and a
-family that is not space. What has no code at all is per-instance settings on top
-of a shared family (the "every wallet is glass, each wallet is its own glass"
-case). It is deliberately unbuilt rather than forgotten: nothing in this product
-yet needs two instances of one family to diverge beyond their seed, and a
-mechanism with no consumer is the failure this repository has a document about.
+ported — `silk`/`linen`/`wire` are the obvious next, because they are already one
+generator at three settings and the lattice primitive they needed now exists.
+
+**What the seed reaches, precisely**, because "endless variation" is the kind of
+claim that drifts:
+
+| | varies by seed |
+|---|---|
+| where a mark lands | ✅ `scatter`, every family |
+| which variant it is | ✅ `pick`, every family |
+| the SHAPE of the mark | ✅ `blobs` only — the others choose from a drawn list |
+| the ground under it | ✅ `loops` and `blobs`; ❌ `space` and `aura`, which ignore the stream they are handed and so give two workspaces with the same palette the same ground to the pixel |
+| how many, how loud | ⚠️ a SETTING (`density`), not the seed |
+
+**The one thing with no code at all is per-instance settings over a shared
+family** — the "every wallet is glass, each wallet is its own glass" case, where
+two instances diverge by something a person chose rather than by their seed. It
+is deliberately unbuilt: nothing here yet needs it, and a mechanism with no
+consumer is the failure this repository has a document about. The moment a
+second consumer of one family wants to differ, that is the change.

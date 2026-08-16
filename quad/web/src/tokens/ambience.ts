@@ -42,7 +42,7 @@
 
 import type { Tone } from "@quad/kernel";
 /* ⚠️ The pace and the curve are the vocabulary's, not this file's — see `DRIFT`. */
-import { BEAT, DURATION, EASE } from "./motion.js";
+import { BEAT, DURATION, EASE, turns } from "./motion.js";
 import { DENSITY, FAMILIES, render, type Density, type SceneFamily } from "../scene/index.js";
 
 /**
@@ -1212,8 +1212,22 @@ export function ambienceStylesheet(): string {
   const beats = [
     `@media (prefers-reduced-motion: no-preference) {`,
     ...names.flatMap((b) => [
-      `@keyframes quad-${b} { 0%, 100% { opacity: 1 } 50% { opacity: ${BEAT[b].dip} } }`,
-      `.q-${b} { animation: quad-${b} ${BEAT[b].period} ${EASE.plain} infinite ${BEAT[b].delay}; }`,
+      /*
+        ⚠️ A TURN NEEDS `fill-box`, AND WITHOUT IT THE TILE ORBITS THE PAGE. An
+        SVG element's default `transform-origin` is the user-space ORIGIN, not
+        its own middle — so a rotation meant to spin a tile in place swings it
+        around the top-left corner of the whole picture instead. It is the one
+        line that separates "the pattern re-routes itself" from "everything
+        slides off the screen", and nothing warns.
+      */
+      turns(b)
+        ? `@keyframes quad-${b} {`
+          + ` 0%, 17% { transform: rotate(0deg) } 23%, 42% { transform: rotate(90deg) }`
+          + ` 48%, 67% { transform: rotate(180deg) } 73%, 92% { transform: rotate(270deg) }`
+          + ` 98%, 100% { transform: rotate(360deg) } }`
+        : `@keyframes quad-${b} { 0%, 100% { opacity: 1 } 50% { opacity: ${(BEAT[b] as { dip: number }).dip} } }`,
+      `.q-${b} { animation: quad-${b} ${BEAT[b].period} ${EASE.plain} infinite ${BEAT[b].delay};`
+        + `${turns(b) ? " transform-box: fill-box; transform-origin: center;" : ""} }`,
     ]),
     `}`,
     /* ⚠️ The in-app switch, for whom this is not a preference — see `REDUCED`. */

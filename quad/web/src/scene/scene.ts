@@ -145,6 +145,32 @@ export interface Speck {
   readonly variants: readonly Variant[];
 }
 
+/**
+ * MARKS ON AN EXACT GRID, WHICH IS A DIFFERENT PRIMITIVE FROM A SCATTER.
+ *
+ * ⚠️ A SCATTER CANNOT MAKE A PATTERN, AND THAT IS THE WHOLE REASON THIS EXISTS.
+ * `scatter` jitters on purpose — evenness from the cells, irregularity from the
+ * offset — which is exactly right for stars and destroys anything whose marks
+ * have to MEET. A truchet is one tile in four rotations whose curves run off the
+ * edges into its neighbours: shift a tile by three pixels and every line in the
+ * field ends in mid-air. Adjacency is the mark.
+ *
+ * ⚠️ A TILE DRAWS IN THE UNIT SQUARE and the engine scales it. That way the
+ * geometry survives the cell size changing with density — one declaration, every
+ * scale — and a stroke width is a fraction of the cell rather than a number
+ * somebody tuned at one zoom.
+ *
+ * ⚠️ AND DENSITY RESIZES THE CELL, NOT A COUNT. A lattice has no count: it fills
+ * what it is given. `quiet` makes the cells larger and the pattern calmer, which
+ * is the same intent arriving through the only knob a grid has.
+ */
+export interface Tiles {
+  readonly id: string;
+  /** The cell edge in tile units at density 1. */
+  readonly cell: number;
+  readonly variants: readonly Variant[];
+}
+
 export interface Family {
   readonly id: string;
   /** What a palette has to fill for this family to be drawable. */
@@ -156,8 +182,27 @@ export interface Family {
    */
   readonly ground: (p: Palette, r: () => number) => readonly string[];
   readonly specks?: readonly Speck[];
-  /** ⚠️ The canvas the specks are drawn on and TILED at — see `render`. */
+  /** ⚠️ Marks that must MEET — see `Tiles`. A family has these or specks. */
+  readonly tiles?: readonly Tiles[];
+  /**
+   * ⚠️ The canvas the marks are drawn on and TILED at, in CSS pixels — see
+   * `render`. A lattice ROUNDS it to a whole number of cells, because a pattern
+   * whose repeat cuts a cell in half has a visible seam every tile.
+   */
   readonly tile?: { readonly w: number; readonly h: number };
+  /**
+   * WHERE A MARK'S COLOUR COMES FROM, AND IT IS A PROMISE RATHER THAN A STYLE.
+   *
+   * ⚠️ `fixed` MEANS THE MARKS ARE ACHROMATIC AND THE PALETTE MAY BE CSS
+   * CUSTOM PROPERTIES. That matters because a world's two colours come from two
+   * different places: a workspace and a person have a PICTURE to read them out
+   * of, while a product and the deployment have only the theme — and `var(--brand)`
+   * inside an SVG is a string, not a colour. It resolves to nothing, the mark is
+   * painted with nothing, and the field is simply absent with no error anywhere.
+   * A `fixed` family draws in white or black and lets the GROUND carry the hue,
+   * which is what makes it usable from a brand.
+   */
+  readonly ink?: "palette" | "fixed";
   /**
    * ⚠️ WHAT THE MARKS SHARE, EMITTED ONCE. A star is a filled circle and needs
    * nothing; a BLOOM is soft-edged, and the only way to draw a soft edge in SVG
@@ -262,22 +307,65 @@ export function render(scene: Scene): Rendered {
   const density = scene.density ?? 1;
   const r = prng(hash(`${family.id}|${scene.seed}`));
 
-  const tile = family.tile ?? { w: 1400, h: 1000 };
-  const megapixels = (tile.w * tile.h) / 1_000_000;
-
+  const want = family.tile ?? { w: 1400, h: 1000 };
   const marks: string[] = [];
 
+  /*
+    ⚠️ THE BEAT GETS ITS OWN `<g>`, NESTED INSIDE THE PLACEMENT. In SVG2 the
+    `transform` ATTRIBUTE is the CSS `transform` property, so a keyframe
+    animating `transform` REPLACES the translate that put the mark where it
+    belongs — every turning tile would snap to the origin and orbit it. Two
+    elements, one for where it is and one for what it does, and neither can
+    overwrite the other.
+  */
+  const placed = (at: string, beat: string | null, body: string) =>
+    `<g transform="${at}">${beat ? `<g class="q-${beat}">${body}</g>` : body}</g>`;
+
+  /* ⚠️ THE SHARE IS DRAWN PER INSTANCE, from the same stream, so which marks
+     move is part of the world rather than a second decision. */
+  const beatOf = (v: Variant) => (v.beat && r() < (v.moving ?? 0) ? v.beat : null);
+
+  /*
+    ⚠️ A LATTICE DECIDES THE TILE, and it has to. The pattern repeats at the tile
+    size, so a cell that does not divide it exactly is a row of half-cells down
+    every seam — visible as a ruled line across the page, at the one pitch the
+    eye is best at finding. The cell is taken as close to what the family asked
+    for as a whole number of them allows, and the tile becomes their sum.
+  */
+  /*
+    ⚠️ DENSITY RESIZES A LATTICE THE OPPOSITE WAY FROM A SCATTER, AND THE FIRST
+    VERSION HAD IT BACKWARDS. For a scatter, presence is HOW MANY: `quiet` means
+    fewer marks. For a lattice there is no count — it fills what it is given — so
+    presence is HOW BIG, and dividing by the density made `quiet` produce a
+    coarse bold weave with metre-wide arcs, which is louder than the default in
+    every way that matters. Both directions mean the same thing to the person
+    asking: more of the family, or less of it.
+  */
+  const lattice = family.tiles?.[0];
+  const cell = lattice ? lattice.cell * Math.sqrt(density) : 0;
+  const cols = lattice ? Math.max(1, Math.round(want.w / cell)) : 0;
+  const rows = lattice ? Math.max(1, Math.round(want.h / cell)) : 0;
+  const tile = lattice ? { w: cols * cell, h: rows * cell } : want;
+
+  for (const t of family.tiles ?? []) {
+    for (let iy = 0; iy < rows; iy += 1) {
+      for (let ix = 0; ix < cols; ix += 1) {
+        const v = pick(r, t.variants);
+        const beat = beatOf(v);
+        const at = `translate(${+(ix * cell).toFixed(1)} ${+(iy * cell).toFixed(1)})`
+          + ` scale(${+cell.toFixed(2)})`;
+        marks.push(placed(at, beat, v.draw(palette, r)));
+      }
+    }
+  }
+
+  const megapixels = (tile.w * tile.h) / 1_000_000;
   for (const speck of family.specks ?? []) {
     const count = Math.round(speck.per * megapixels * density);
     for (const [x, y] of scatter(r, tile.w, tile.h, count)) {
       const v = pick(r, speck.variants);
-      /* ⚠️ THE SHARE IS DRAWN PER INSTANCE, from the same stream, so which marks
-         move is part of the world rather than a second decision. */
-      const beat = v.beat && r() < (v.moving ?? 0) ? v.beat : null;
-      const body = v.draw(palette, r);
-      marks.push(beat
-        ? `<g class="q-${beat}" transform="translate(${x} ${y})">${body}</g>`
-        : `<g transform="translate(${x} ${y})">${body}</g>`);
+      const beat = beatOf(v);
+      marks.push(placed(`translate(${x} ${y})`, beat, v.draw(palette, r)));
     }
   }
 

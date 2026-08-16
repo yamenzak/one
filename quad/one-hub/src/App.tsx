@@ -20,7 +20,7 @@
  * page, which is the same picture as a page that failed to load.
  */
 
-import { Band, Crown, NoticeHost, Page, Spacer, Trouble, Working, TYPE } from "@quad/web";
+import { Band, Crown, Layout, NoticeHost, ONE_FACE, Spacer, Trouble, Working, TYPE } from "@quad/web";
 import { Gallery } from "./screens/Gallery.js";
 import { SPECIMEN_IDS, Specimen, type SpecimenId } from "./screens/Specimens.js";
 
@@ -152,10 +152,21 @@ export function App() {
   }
 
   return (
-    /* ⚠️ The ambience is an attribute on the frame, read by a stylesheet rule
-       built from theme tokens — never an inline style, which would beat every
-       token and stop a workspace's branding reaching any screen. */
-    <Page sky="calm">
+    /*
+      ⚠️ THE DEPLOYMENT'S OWN WORLD, ON THE DOOR THAT IS THE DEPLOYMENT. Every
+      other subject in this product has a face and a ground from it — a workspace
+      is a planet on its own sky, a person is their own aura — and ONE was the
+      one identity standing on a named material like any other screen. It is
+      `blobs`: shapes with no grid at all, because the deployment is the thing
+      every workspace and every product is INSIDE, and a lattice or a horizon
+      would put it beside them instead.
+
+      ⚠️ AND ITS TWO COLOURS ARE THE THEME'S, not a picture's. ONE's mark is
+      drawn rather than generated, so there is nothing to read — `worldFor` hands
+      the family `var(--background)` and `var(--brand)`, which is why that family
+      draws in ink and lets the ground carry the hue (`Family.ink`).
+    */
+    <Layout subject={ONE_FACE}>
       <NoticeHost />
       <Crown
         name="One"
@@ -177,6 +188,6 @@ export function App() {
         </div>
       </Band>
       <Spacer />
-    </Page>
+    </Layout>
   );
 }

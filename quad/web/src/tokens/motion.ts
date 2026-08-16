@@ -112,6 +112,20 @@ export const REDUCED = { "data-reduce-motion": "true" } as const;
  * renderer gets to assume — and it was a constant, which is why the first aura
  * pulsed like a warning light.
  */
+/**
+ * ⚠️ AND A BEAT IS A FADE **OR** A TURN, WHICH IS NOT A SECOND KIND OF THING SO
+ * MUCH AS THE SECOND THING A MARK CAN DO WITHOUT COSTING A LAYOUT. A pattern of
+ * interlocking arcs has no brightness to give — what it has is ORIENTATION, and
+ * rotating one tile by a quarter re-routes every curve running through it. The
+ * lines that met now miss and two others join, so the whole field re-draws
+ * itself without a single mark appearing or disappearing.
+ *
+ * ⚠️ HOLD, SNAP, HOLD — never a continuous spin. A tile turning steadily is a
+ * spinning graphic and the eye locks onto it; a tile that sits still for four
+ * fifths of its cycle and turns in the remaining fifth is a pattern that was
+ * different when you looked back. The rhythm is taken from the avatar style
+ * these came from, which had already solved it.
+ */
 export const BEAT = {
   /* A sky's three: small, sharp marks, so they may go most of the way out. */
   medium: { period: "5.2s", delay: "2s", dip: 0.3 },
@@ -120,7 +134,13 @@ export const BEAT = {
   /* An aura's two: enormous and soft, so they barely move and take an age. */
   swell: { period: "13s", delay: "0s", dip: 0.62 },
   breathe: { period: "19s", delay: "6.5s", dip: 0.78 },
+  /* A lattice's two. Minutes, not seconds — see above. */
+  quarter: { period: "47s", delay: "0s", turn: true },
+  half: { period: "71s", delay: "17s", turn: true },
 } as const;
+
+/** ⚠️ Every beat is one or the other, and the stylesheet asks which. */
+export const turns = (beat: keyof typeof BEAT): boolean => "turn" in BEAT[beat];
 
 /**
  * WHETHER MOTION IS SWITCHED OFF FOR THIS ELEMENT.

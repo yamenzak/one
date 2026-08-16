@@ -30,8 +30,10 @@ import {
 } from "lucide-react";
 import { Island } from "./layout.js";
 import { skyCss, type Sky } from "../tokens/theme.js";
+import { worldCss } from "../tokens/ambience.js";
+import { useNight } from "./layout.js";
 import { GUTTER, NAV_SPACE, PAD, ROW, SPACE } from "../tokens/metrics.js";
-import { Face, appFace, type FaceOf } from "../parts/face.js";
+import { Face, appFace, worldFor, type FaceOf } from "../parts/face.js";
 
 /**
  * ⚠️ AN ICON IS A NAME IN A MANIFEST AND A GLYPH HERE. The manifest stays pure
@@ -127,12 +129,39 @@ export function Shell(props: ShellProps) {
   const secondary = mine.filter((s) => s.nav === "secondary");
   const at = mine.find((s) => s.route === here);
 
+  /*
+    ⚠️ THE PRODUCT'S OWN GROUND, WHERE A SCREEN HAS NOT NAMED ONE — and from the
+    SAME face already in the crown, so the mark over the door and the world under
+    the page are one subject. A product is a SYSTEM, so its family is a lattice:
+    structure, adjacency, a pattern that re-routes itself rather than a place you
+    visit or a room you stand in.
+
+    ⚠️ A SCREEN THAT NAMES AN AMBIENCE STILL WINS. The per-screen table is a real
+    design decision — a report wants `tide`, a paywall wants `spotlight` — and
+    replacing all of them with one product ground would delete it. What this
+    fills is the DEFAULT, which was `plain`: nothing at all, on most screens of
+    every product.
+
+    ⚠️ AND `quiet`, BECAUSE THIS IS WHERE PEOPLE WORK. The hub's arrivals run
+    `rich`; a screen with a table on it gets the same world with a third of the
+    marks, which is the whole reason density is an intent rather than a number.
+  */
+  const world = at?.sky ? null : worldFor(appFace(crown.appId)) ?? null;
+  const night = useNight();
+  const own = world ? worldCss(world, { night, density: "quiet" }) : null;
+
   return (
     <div
       className="min-h-dvh flex flex-col"
-      data-sky={at?.sky ?? "plain"}
-      style={{ ...skyStyle(at?.sky as Sky | undefined, at?.tone) }}
+      data-sky={own ? "world" : at?.sky ?? "plain"}
+      style={own
+        ? (own.css as React.CSSProperties)
+        : { ...skyStyle(at?.sky as Sky | undefined, at?.tone) }}
     >
+      {/* ⚠️ An element, not a background — see `Page`. */}
+      {own?.field
+        ? <svg aria-hidden="true" data-field="true" dangerouslySetInnerHTML={{ __html: own.field }} />
+        : null}
       {/* ------------------------------------------------------------ crown --- */}
       <header className={`flex items-center ${SPACE.snug} ${GUTTER} ${ROW.pad}`}>
         {/* ⚠️ THE SAME PLATE EVERY OTHER FACE WEARS. A lone glyph beside a

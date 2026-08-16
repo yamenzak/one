@@ -1243,6 +1243,24 @@
       "impl": "web/test/scene.test.ts",
       "proves": "has both skies",
       "fails": "one sky registered twice is the made-up rule coming back — a night ground turned down for light mode, which is grey every time"
+    },
+    {
+      "id": "a-fixed-ink-family-bakes-no-custom-property",
+      "protects": "D7",
+      "stage": "17",
+      "status": "live",
+      "impl": "web/test/scene.test.ts",
+      "proves": "keeps a CSS custom property out of any mark",
+      "fails": "`var(--brand)` inside an SVG is a string rather than a colour — the mark is painted with nothing and the whole field is absent, with a valid document and no error anywhere"
+    },
+    {
+      "id": "a-lattice-repeats-on-whole-cells",
+      "protects": "D7",
+      "stage": "17",
+      "status": "live",
+      "impl": "web/test/scene.test.ts",
+      "proves": "lays a lattice on whole cells",
+      "fails": "a cell that does not divide the tile leaves half-cells down every seam — a ruled line across the page at the one pitch the eye is best at finding, and invisible in the source"
     }
   ]
 }

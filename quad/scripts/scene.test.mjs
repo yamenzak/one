@@ -125,24 +125,30 @@ const DRAWN = [...filesIn("web/src"), ...filesIn("one-hub/src")];
   /*
     ⚠️ A COUNT IS RIGHT FOR ONE CANVAS AND WRONG FOR EVERY OTHER — the same field
     is sparse on a desktop and crowded on a phone, and whichever one it was tuned
-    on is the one that looks correct. A family declares a rate per area and the
-    engine multiplies; the seam is `per`, and a family without one is a family
-    that will be re-tuned per device forever.
+    on is the one that looks correct. A family declares an amount the engine can
+    SCALE, never a number of marks.
+
+    ⚠️ TWO PRIMITIVES, ONE RULE, and the second is why this reads for either. A
+    SPECK is scattered, so its amount is `per` — elements per megapixel. A TILE is
+    laid on a lattice, which has no count at all: it fills what it is given, and
+    its only knob is the `cell`. Both survive a change of screen; a literal count
+    survives one screen.
   */
   const families = ENGINE.filter((f) => /:\s*Family\b/.test(readFileSync(f, "utf8")));
-  let specks = 0;
+  let marks = 0;
   for (const file of families) {
     const src = readFileSync(file, "utf8");
     for (const [, block] of src.matchAll(/\bid:\s*"[^"]+",\s*([\s\S]{0,200}?)variants:/g)) {
-      specks++;
-      if (!/\bper:\s*\d/.test(block)) {
-        fail(`${rel(file)}: a speck declares no \`per\`.\n` +
-             `       Density is elements per megapixel, so one world is the same world at ` +
-             `every size. A count is tuned for whichever screen it was written on.`);
+      marks++;
+      if (!/\b(?:per|cell):\s*\d/.test(block)) {
+        fail(`${rel(file)}: a mark kind declares neither \`per\` nor \`cell\`.\n` +
+             `       A scatter is sized per megapixel and a lattice by its cell, so one world ` +
+             `is the same world at every size. A count is tuned for whichever screen it was ` +
+             `written on.`);
       }
     }
   }
-  if (!bad) ok(`density: ${specks} speck kind(s), every one a rate per area`);
+  if (!bad) ok(`density: ${marks} mark kind(s), every one sized by area or by cell`);
 }
 
 /* ------------------------------------------ a scene is bound, not built --- */

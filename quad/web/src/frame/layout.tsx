@@ -167,7 +167,7 @@ export function Page(
  * paint and swap it on the second, which reads as a flash rather than as a
  * theme. Both sources, in the order the stylesheet resolves them.
  */
-function useNight(): boolean {
+export function useNight(): boolean {
   const read = () => {
     if (typeof document === "undefined") return true;
     const stamped = document.documentElement.getAttribute("data-theme");

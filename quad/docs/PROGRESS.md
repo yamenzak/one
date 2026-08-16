@@ -551,7 +551,7 @@ The guard registry, its checks, and the standards that bind them.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 5 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 39 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 41 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 2 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
@@ -715,6 +715,8 @@ the library decides FOR us.
 | `a-family-renders-every-mark-it-references` | D7 | a soft mark fills with a gradient id nothing defines — a valid SVG, a rendered page, and a family's whole atmosphere silently absent |
 | `a-family-fills-every-slot-it-declares` | D7 | an unfilled slot interpolates `undefined` into CSS, the browser drops that one declaration, and a four-layer ground quietly becomes three |
 | `a-family-has-two-skies-and-a-veil` | D7 | one sky registered twice is the made-up rule coming back — a night ground turned down for light mode, which is grey every time |
+| `a-fixed-ink-family-bakes-no-custom-property` | D7 | `var(--brand)` inside an SVG is a string rather than a colour — the mark is painted with nothing and the whole field is absent, with a valid document and no error anywhere |
+| `a-lattice-repeats-on-whole-cells` | D7 | a cell that does not divide the tile leaves half-cells down every seam — a ruled line across the page at the one pitch the eye is best at finding, and invisible in the source |
 <!-- /generated -->
 
 ## Commands

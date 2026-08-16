@@ -6,9 +6,13 @@
 export * from "./scene.js";
 export * from "./space.js";
 export * from "./aura.js";
+export * from "./loops.js";
+export * from "./blobs.js";
 
 import { SPACE } from "./space.js";
 import { AURA } from "./aura.js";
+import { LOOPS } from "./loops.js";
+import { BLOBS } from "./blobs.js";
 
 /**
  * EVERY WORLD THIS PRODUCT HAS, IN ONE PLACE.
@@ -24,7 +28,7 @@ import { AURA } from "./aura.js";
  * made-up rule for the other theme, which is the mistake `space` made and spent
  * three builds on. Two skies is the shape.
  */
-export const FAMILIES = { space: SPACE, aura: AURA } as const;
+export const FAMILIES = { space: SPACE, aura: AURA, loops: LOOPS, blobs: BLOBS } as const;
 
 /** ⚠️ Named, never handed over — a family composed at a call site is exactly
     what this directory exists to stop. */

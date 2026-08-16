@@ -21,6 +21,7 @@ import { GUTTER, SPACE, WIDTH } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 import { Page, Spacer, Stack } from "./layout.js";
 import type { Ambience } from "../tokens/ambience.js";
+import { ONE_FACE, worldFor } from "../parts/face.js";
 
 /* ------------------------------------------------------------------- mark --- */
 
@@ -128,16 +129,39 @@ export function Mark({ size = "crown", label }: {
  * green however neutral the brand goes, so a monochrome product using it looks
  * like a monochrome product with a bug.
  */
-export function Arrival({ name, claim, children, aside, sky = "spotlight" }: {
+/**
+ * ⚠️ AND BY DEFAULT IT IS THE DEPLOYMENT'S OWN WORLD RATHER THAN A NAMED
+ * MATERIAL, WHICH IS THE ONE PLACE THAT MATTERS MOST. This is ONE's front door —
+ * the sign-in, the start of a workspace — so it is the first thing anybody ever
+ * sees of the product, and it was standing on `spotlight` like any other screen.
+ * Every other identity here has a ground of its own: a workspace is a planet on
+ * its own sky, a person is their own aura. The deployment had a face and no
+ * world.
+ *
+ * ⚠️ IT IS `blobs`: shapes with no grid at all, because ONE is the thing every
+ * workspace and every product is INSIDE. A horizon would make it a place you
+ * visit and a lattice would make it a system you use; a field of soft
+ * silhouettes is neither, which is the only honest answer for the container.
+ *
+ * ⚠️ `sky` STILL OVERRIDES, and a caller that names one gets it. A door in a
+ * particular mood is a real thing to want; what is wrong is that mood being the
+ * only option.
+ */
+export function Arrival({ name, claim, children, aside, sky }: {
   readonly name: string;
   /** One line. What this is, or what is about to happen. */
   readonly claim?: string;
   readonly children: React.ReactNode;
   readonly aside?: React.ReactNode;
+  /** ⚠️ Absent is the deployment's own world — see above. */
   readonly sky?: Ambience;
 }) {
   return (
-    <Page sky={sky}>
+    <Page
+      sky={sky}
+      world={sky ? undefined : worldFor(ONE_FACE) ?? undefined}
+      density="rich"
+    >
       {/* ⚠️ `door` RATHER THAN `read`, AND THE REASON IS IN `metrics.ts`: a
           sign-in form at prose width is a field the width of a paragraph. */}
       <div className={`w-full ${WIDTH.door} mx-auto ${GUTTER}`}>

@@ -247,15 +247,38 @@ export interface FaceOf {
  * the reading. `planets` calls the body `planet`; `moods` calls the face `face`.
  * Both call the ground `background`, so `deep` needs no table.
  */
-const SKY: Partial<Record<FaceKind, {
+/**
+ * ⚠️ AND THE OTHER TWO HAVE NO PICTURE, WHICH IS WHY THEY GET A DIFFERENT KIND
+ * OF FAMILY. A product wears the glyph its manifest declared and the deployment
+ * wears a fixed mark — neither is generated, so there is nothing to read two
+ * colours out of. What they have is the THEME, so their palette is
+ * `var(--background)` and `var(--brand)`; and because `var()` inside an SVG is a
+ * string rather than a colour, their families draw in white or black and let the
+ * ground carry the hue (`Family.ink`).
+ *
+ * ⚠️ THE FOUR ARE FOUR DIFFERENT WORLDS AND THAT IS THE POINT. A place is
+ * somewhere you look at from outside; a person is a room you stand in; a product
+ * is a SYSTEM, so it gets a lattice — structure, adjacency, a pattern that
+ * re-routes itself; and the deployment is the thing all of them are inside, so
+ * it gets shapes with no grid at all. Nobody chooses this per screen: it falls
+ * out of what the subject IS.
+ */
+const SKY: Record<FaceKind, {
   readonly family: SceneFamily;
-  readonly of: "person" | "workspace";
+  /** The style to read, or the theme — see above. */
+  readonly of?: "person" | "workspace";
   /** The style's own name for the colour that is the LIGHT. */
-  readonly lit: string;
-}>> = {
+  readonly lit?: string;
+}> = {
   workspace: { family: "space", of: "workspace", lit: "planet" },
   person: { family: "aura", of: "person", lit: "face" },
+  app: { family: "loops" },
+  one: { family: "blobs" },
 };
+
+/* ⚠️ The theme's two, for the kinds with no picture. Read by CSS, never baked
+   into a mark — see `Family.ink`. */
+const THEME = { deep: "var(--background)", lit: "var(--brand)" } as const;
 
 /**
  * THE SUBJECT'S WORLD, FROM THE SAME DECLARATION THAT DREW ITS FACE.
@@ -285,18 +308,25 @@ const SKY: Partial<Record<FaceKind, {
  * declared — so there is no palette to read, and the page keeps its material.
  */
 export function worldFor(of: FaceOf | undefined): World | null {
-  const sky = of && SKY[of.kind];
-  if (!of || !sky) return null;
+  if (!of) return null;
+  const sky = SKY[of.kind];
+
+  /* ⚠️ No picture, so the theme — see `SKY`. Nothing to read and nothing to
+     cache: the two values are custom properties the stylesheet resolves. */
+  const { of: style, lit } = sky;
+  if (!style || !lit) {
+    return { family: sky.family, deep: THEME.deep, lit: THEME.lit, seed: of.seed };
+  }
 
   const key = `${of.kind}|${of.seed}`;
   const cached = worlds.get(key);
   if (cached !== undefined) return cached;
 
-  const svg = new Avatar(styleFor(sky.of), { seed: of.seed, size: 64, scale: FILL }).toString();
+  const svg = new Avatar(styleFor(style), { seed: of.seed, size: 64, scale: FILL }).toString();
   const fills = [...svg.matchAll(/fill="(#[0-9a-fA-F]{3,8})"/g)].map((m) => m[1]!.toLowerCase());
-  const deep = fills.find((c) => palette(sky.of, "background").has(c));
-  const lit = fills.find((c) => palette(sky.of, sky.lit).has(c));
-  const world = deep && lit ? { family: sky.family, deep, lit, seed: of.seed } : null;
+  const deep = fills.find((c) => palette(style, "background").has(c));
+  const body = fills.find((c) => palette(style, lit).has(c));
+  const world = deep && body ? { family: sky.family, deep, lit: body, seed: of.seed } : null;
   worlds.set(key, world);
   return world;
 }

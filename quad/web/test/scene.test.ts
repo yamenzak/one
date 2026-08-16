@@ -127,6 +127,52 @@ describe("every family", () => {
     }
   });
 
+  it("keeps a CSS custom property out of any mark that promised to be achromatic", () => {
+    /*
+      ⚠️ `var(--brand)` INSIDE AN SVG IS A STRING, NOT A COLOUR. Nothing resolves
+      it — the mark is painted with nothing and the field is simply absent, with
+      a valid document, a valid stylesheet and no error anywhere. It matters
+      because a world's two colours come from two places: a workspace and a
+      person have a PICTURE to read them out of, and a product and the deployment
+      have only the theme. `ink: "fixed"` is the promise that a family's marks
+      are achromatic and so may be used from a brand; this is the promise being
+      kept.
+    */
+    const THEME: Palette = { deep: "var(--background)", lit: "var(--brand)" };
+    for (const [id, family] of skies()) {
+      if (family.ink !== "fixed") continue;
+      const made = render({ family, seed: "one", palette: THEME, density: 1 });
+      expect(made.field, `${id} bakes a custom property into a mark`).not.toContain("var(");
+      /* ⚠️ The ground is CSS, so there it is exactly right — and a `fixed`
+         family that put NOTHING of the palette on the ground would be a world
+         with no hue at all. */
+      expect(made.ground, `${id} takes no colour from its palette`).toContain("var(");
+    }
+  });
+
+  it("lays a lattice on whole cells, so its own repeat has no seam", () => {
+    /*
+      ⚠️ A PATTERN REPEATS AT THE TILE SIZE, so a cell that does not divide it
+      exactly is a row of half-cells down every seam — a ruled line across the
+      page at the one pitch the eye is best at finding, and invisible in the
+      source. The engine takes the cell as close to the family's own as a whole
+      number of them allows and makes the tile their sum.
+    */
+    for (const [id, family] of skies()) {
+      const lattice = family.tiles?.[0];
+      if (!lattice) continue;
+      const field = render({ family, seed: "kova", palette: PALETTE, density: 1 }).field;
+      const w = Number(/pattern id="[^"]+" width="([\d.]+)"/.exec(field)?.[1]);
+      const cells = [...field.matchAll(/scale\(([\d.]+)\)/g)].map((m) => Number(m[1]));
+      expect(cells.length, `${id} laid no tiles`).toBeGreaterThan(0);
+      const cell = cells[0]!;
+      /* ⚠️ Every cell the same, or it is not a lattice. */
+      expect(new Set(cells).size, `${id} lays cells of more than one size`).toBe(1);
+      expect(Math.abs((w / cell) - Math.round(w / cell)), `${id} repeats mid-cell`)
+        .toBeLessThan(1e-6);
+    }
+  });
+
   it("scopes the ids it emits, so two fields on one page cannot collide", () => {
     /*
       ⚠️ IDS ARE DOCUMENT-SCOPED NOW, WHICH THEY WERE NOT INSIDE A DATA URI. Two
