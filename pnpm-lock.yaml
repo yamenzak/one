@@ -1360,15 +1360,15 @@ importers:
 
   quad/apps/hello:
     dependencies:
+      '@quad/design':
+        specifier: workspace:*
+        version: link:../../design
       '@quad/kernel':
         specifier: workspace:*
         version: link:../../kernel
       '@quad/runtime':
         specifier: workspace:*
         version: link:../../runtime
-      '@quad/web':
-        specifier: workspace:*
-        version: link:../../web
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 0.8.55
@@ -1394,19 +1394,68 @@ importers:
 
   quad/apps/kova:
     dependencies:
+      '@quad/design':
+        specifier: workspace:*
+        version: link:../../design
       '@quad/kernel':
         specifier: workspace:*
         version: link:../../kernel
       '@quad/runtime':
         specifier: workspace:*
         version: link:../../runtime
-      '@quad/web':
-        specifier: workspace:*
-        version: link:../../web
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 0.8.55
         version: 0.8.55(@cloudflare/workers-types@4.20260702.1)(@vitest/runner@3.2.7)(@vitest/snapshot@3.2.7)(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)(tsx@4.23.9))
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.2.0
+        version: 19.2.3(@types/react@19.2.17)
+      react:
+        specifier: ^19.2.0
+        version: 19.2.7
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.7(react@19.2.7)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)(tsx@4.23.9)
+
+  quad/design:
+    dependencies:
+      '@dicebear/core':
+        specifier: ^10.4.0
+        version: 10.4.0
+      '@dicebear/styles':
+        specifier: ^10.4.0
+        version: 10.4.0
+      '@fontsource-variable/geist':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@heroui/react':
+        specifier: ^3.0.5
+        version: 3.2.4(@react-aria/i18n@3.13.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@react-aria/ssr@3.10.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@react-aria/utils@3.34.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@react-spectrum/provider@3.11.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-aria-components@1.20.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-aria@3.51.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(tailwindcss@4.3.2)
+      '@heroui/styles':
+        specifier: ^3.0.5
+        version: 3.2.4(tailwind-merge@3.4.0)(tailwindcss@4.3.2)
+      '@internationalized/date':
+        specifier: ^3.12.3
+        version: 3.12.3
+      '@quad/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      lucide-react:
+        specifier: ^1.31.0
+        version: 1.31.0(react@19.2.7)
+      tailwind-variants:
+        specifier: ^3.1.1
+        version: 3.3.1(tailwind-merge@3.4.0)(tailwindcss@4.3.2)
+    devDependencies:
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.17
@@ -1483,13 +1532,13 @@ importers:
         version: 3.2.4(@react-aria/i18n@3.13.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@react-aria/ssr@3.10.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@react-aria/utils@3.34.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@react-spectrum/provider@3.11.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-aria-components@1.20.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-aria@3.51.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(tailwindcss@4.3.2)
       '@heroui/styles':
         specifier: ^3.0.5
-        version: 3.2.4(tailwind-merge@3.4.0)(tailwindcss@4.3.2)
+        version: 3.2.4(tailwind-merge@3.6.0)(tailwindcss@4.3.2)
+      '@quad/design':
+        specifier: workspace:*
+        version: link:../design
       '@quad/kernel':
         specifier: workspace:*
         version: link:../kernel
-      '@quad/web':
-        specifier: workspace:*
-        version: link:../web
       lucide-react:
         specifier: ^1.31.0
         version: 1.31.0(react@19.2.7)
@@ -1534,55 +1583,6 @@ importers:
       '@cloudflare/vitest-pool-workers':
         specifier: 0.8.55
         version: 0.8.55(@cloudflare/workers-types@4.20260702.1)(@vitest/runner@3.2.7)(@vitest/snapshot@3.2.7)(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)(tsx@4.23.9))
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)(tsx@4.23.9)
-
-  quad/web:
-    dependencies:
-      '@dicebear/core':
-        specifier: ^10.4.0
-        version: 10.4.0
-      '@dicebear/styles':
-        specifier: ^10.4.0
-        version: 10.4.0
-      '@fontsource-variable/geist':
-        specifier: ^5.3.0
-        version: 5.3.0
-      '@heroui/react':
-        specifier: ^3.0.5
-        version: 3.2.4(@react-aria/i18n@3.13.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@react-aria/ssr@3.10.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@react-aria/utils@3.34.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@react-spectrum/provider@3.11.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-aria-components@1.20.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-aria@3.51.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(tailwindcss@4.3.2)
-      '@heroui/styles':
-        specifier: ^3.0.5
-        version: 3.2.4(tailwind-merge@3.6.0)(tailwindcss@4.3.2)
-      '@internationalized/date':
-        specifier: ^3.12.3
-        version: 3.12.3
-      '@quad/kernel':
-        specifier: workspace:*
-        version: link:../kernel
-      lucide-react:
-        specifier: ^1.31.0
-        version: 1.31.0(react@19.2.7)
-      tailwind-variants:
-        specifier: ^3.1.1
-        version: 3.3.1(tailwind-merge@3.6.0)(tailwindcss@4.3.2)
-    devDependencies:
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.17
-      '@types/react-dom':
-        specifier: ^19.2.0
-        version: 19.2.3(@types/react@19.2.17)
-      react:
-        specifier: ^19.2.0
-        version: 19.2.7
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.2.7(react@19.2.7)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
