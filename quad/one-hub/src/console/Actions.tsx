@@ -13,7 +13,7 @@
 import { useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import {
-  Choice, Group, LongText, NavRow, Screen, Stack, Tray, Whichever, glyphOf, notice,
+  Choice, Group, LongText, NavRow, Screen, Stack, Tray, Whichever, appFace, notice,
 } from "@quad/web";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
@@ -63,7 +63,7 @@ export function Actions({ app, onGo }: {
       items={shown}
       id={(a) => a.id}
       name={(a) => a.name}
-      icon={glyphOf("sparkle")}
+      face={(a) => appFace(a.id, a.mark)}
       chosen={app}
       onChoose={onGo}
       nothing={{ says: "No product here declares a generating action" }}

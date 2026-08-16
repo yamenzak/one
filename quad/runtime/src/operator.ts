@@ -175,9 +175,16 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
       kind: "read", needs: "session", doors: ["operator"],
       async run(ctx): Promise<unknown> {
         operator(ctx);
-        const books: Record<string, FlagBook> = {};
-        for (const a of every()) if (a.flags && Object.keys(a.flags).length) books[a.id] = a.flags;
-        return { books, deployment: await deploymentFlags(ctx.directory) };
+        /* ⚠️ THE APP'S IDENTITY TRAVELS WITH ITS BOOK, and it did not: this
+           answered a map keyed by app id, so the console had nothing to head a
+           section with but the id — rendered through `sentence()`, which
+           capitalises a key and calls it a name. A product's name and its mark
+           are declared; manufacturing one of them at the screen is how "hello"
+           came to be a heading. */
+        const apps = every()
+          .filter((a) => a.flags && Object.keys(a.flags).length)
+          .map((a) => ({ id: a.id, name: a.name, mark: a.mark, book: a.flags as FlagBook }));
+        return { apps, deployment: await deploymentFlags(ctx.directory) };
       },
     },
 

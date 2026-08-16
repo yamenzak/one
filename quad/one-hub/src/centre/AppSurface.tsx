@@ -9,8 +9,7 @@
  * are indistinguishable and only one of them gets reported.
  */
 
-import { Card } from "@heroui/react";
-import { Section, Stack } from "@quad/web";
+import { Group, NoteRow, Section, Stack, appFace } from "@quad/web";
 import type { CentreApp } from "./data.js";
 
 /**
@@ -37,17 +36,23 @@ export function AppSurface({ app, route }: {
   if (Mounted) return <Mounted app={app} />;
 
   return (
+    /* ⚠️ THE PRODUCT WEARS ITS PLATE HERE TOO. The mark was a bare glyph set
+       inline in the title, so it read as a character somebody had typed rather
+       than as the product's mark — and it was the one place in the hub where a
+       product appeared with no ground under it. */
     <Section label={declared?.label ?? app.name}>
       <Stack space="snug">
-        <Card>
-          <Card.Header>
-            <Card.Title>{app.mark} {declared?.label ?? app.name}</Card.Title>
-            <Card.Description>
-              This screen ships with {app.name}. The workspace itself — its people, its money,
-              its settings — is already live, in the hub.
-            </Card.Description>
-          </Card.Header>
-        </Card>
+        {/* ⚠️ THE CARD IS ABOUT THE PRODUCT, THE PAGE IS ABOUT THE SCREEN. Both
+            were headed "Today" for a moment — the section title and the card
+            title saying the same word twice, four lines apart. What the note
+            actually says is which product this screen belongs to, so that is
+            what the card is headed. */}
+        <Group face={appFace(app.id, app.mark)} label={app.name}>
+          <NoteRow>
+            This screen ships with {app.name}. The workspace itself — its people, its money,
+            its settings — is already live, in the hub.
+          </NoteRow>
+        </Group>
       </Stack>
     </Section>
   );

@@ -86,6 +86,37 @@ const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "");
   if (!bad) ok(`plate: ${checked} file(s), none drawing a face of its own`);
 }
 
+/* ------------------------------------------- a product's mark wears a plate --- */
+{
+  /*
+    ⚠️ `{app.mark}` IS A CHARACTER, NOT A MARK. A manifest's mark is one glyph,
+    and dropped straight into JSX it renders as text somebody typed — no ground
+    under it, no size of its own, and a different optical weight from every face
+    beside it. The crown did exactly that: a product's glyph and a person's face
+    sat in the same bar at two different sizes with two different treatments.
+    `appFace(id, mark)` puts it on the plate every face wears.
+
+    ⚠️ AND THE SHAPE IS THE CHECK. Only a PROPERTY read rendered as a standalone
+    JSX child is refused, and the property is matched by its ENDING — `{app.mark}`
+    and `{crown.appMark}` alike. The first version asked for `.mark` exactly and
+    passed the crown, which is where the defect actually was. `mark: a.mark` building a payload and
+    `appFace(a.id, a.mark)` are how it is meant to travel and neither matches;
+    nor does a bare `{mark}`, which is `Crown`'s ReactNode slot for whatever a
+    door puts over itself and has nothing to do with a manifest.
+  */
+  let checked = 0;
+  for (const file of FILES) {
+    const src = code(readFileSync(file, "utf8"));
+    for (const m of src.matchAll(/\{\s*[\w?]+(?:[.?]+\w+)*\.\w*[Mm]ark\s*\}/g)) {
+      checked++;
+      fail(`${rel(file)}: renders ${m[0]} as text.\n` +
+           `       A mark is a product's identity — put it on the plate every face wears: ` +
+           `<Face of={appFace(id, mark)} />.`);
+    }
+  }
+  if (!checked) ok("mark: no product's glyph rendered as a bare character");
+}
+
 /* ------------------------------------------------- a seed is an identity --- */
 {
   /*

@@ -551,7 +551,7 @@ The guard registry, its checks, and the standards that bind them.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 5 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 29 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 30 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 2 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
@@ -705,6 +705,7 @@ the library decides FOR us.
 | `a-screen-names-a-shape-and-the-shape-places-the-action` | D7 | the one thing a screen is for lands somewhere different on every screen — buried at the foot of a long list on one, pinned on the next — so somebody has to hunt for it and the product reads as assembled by different people; and a block comment written between two tags ships four lines of design rationale to production as body text |
 | `one-subject-wears-one-face-everywhere` | D7 | the same person is a picture in the crown, a letter in the roster and a different letter in a table — because each surface seeded a face from whatever field it happened to hold, and every one of them looks correct on its own |
 | `a-face-is-seeded-on-an-identity-not-a-label` | D7 | somebody gets a new face the day they correct the spelling of their name, and a workspace gets a new one the day it is renamed — so a picture people had learned to recognise means nothing; and a face fetched from api.dicebear.com puts a third party in the request path of every roster, unnamed on the trust screen |
+| `a-products-mark-wears-the-plate-every-face-wears` | D7 | a product appears beside a person as a bare character somebody typed — no ground under it, a different optical weight from every face in the same bar — so a workspace with six products is six identical glyphs and the label does all the work |
 <!-- /generated -->
 
 ## Commands

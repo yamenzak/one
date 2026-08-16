@@ -15,7 +15,7 @@
 import { useState } from "react";
 import { Button, Card } from "@heroui/react";
 import {
-  LongText, Row, Screen, Stack, Whichever, glyphOf, notice,
+  LongText, Row, Screen, Stack, Whichever, appFace, notice,
 } from "@quad/web";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView } from "./data.js";
@@ -58,7 +58,7 @@ export function Wording({ view, app, onGo }: {
       items={view.apps}
       id={(a) => a.id}
       name={(a) => a.name}
-      icon={glyphOf("note")}
+      face={(a) => appFace(a.id, a.mark)}
       chosen={app}
       onChoose={onGo}
       nothing={{ says: "Nothing here is yours to reword" }}

@@ -13,14 +13,19 @@
 import { Button } from "@heroui/react";
 import {
   Await, ControlRow, FlagConsole, Group, NoteRow, Nothing, RowsWaiting, Screen, Stack,
-  TYPE, notice, sentence,
+  TYPE, appFace, notice,
 } from "@quad/web";
 import type { FlagBook } from "@quad/kernel";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
 
 interface FlagsAnswer {
-  readonly books: Readonly<Record<string, FlagBook>>;
+  /** ⚠️ THE APP, NOT JUST ITS BOOK — see `op.flags`. A section headed by a key
+      capitalised into a name is a name nobody declared. */
+  readonly apps: readonly {
+    readonly id: string; readonly name: string; readonly mark: string;
+    readonly book: FlagBook;
+  }[];
   readonly deployment: Readonly<Record<string, boolean>>;
 }
 
@@ -98,19 +103,17 @@ export function Switches() {
         of={flags.of}
         waiting={<RowsWaiting rows={3} />}
         again={flags.again}
-        isNothing={(d) => Object.keys(d.books).length === 0}
+        isNothing={(d) => d.apps.length === 0}
         nothing={<Nothing says="No product here declares a flag" />}
         then={(data) => (
           <Stack space="roomy">
-            {Object.entries(data.books).map(([appId, book]) => (
+            {data.apps.map((app) => (
               <FlagConsole
-                key={appId}
-                book={book}
+                key={app.id}
+                book={app.book}
                 level="operator"
-                /* ⚠️ AN APP ID IS NOT A NAME — see `sentence`. These headings
-                   read "hello" and "kova" at display weight, in a column where
-                   nothing else is lower case. */
-                label={sentence(appId)}
+                face={appFace(app.id, app.mark)}
+                label={app.name}
                 deployment={data.deployment}
                 today={new Date().toISOString().slice(0, 10)}
                 onSet={(id, on) => void set(id, on)}

@@ -19,7 +19,7 @@
  * to be two screens (DESIGN.md §3).
  */
 
-import { Screen, Settings, Whichever, glyphOf, notice } from "@quad/web";
+import { Screen, Settings, Whichever, appFace, notice } from "@quad/web";
 import { settingsOn } from "@quad/kernel";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView } from "./data.js";
@@ -42,7 +42,7 @@ export function SettingsArea({ view, app, onGo }: {
       items={settable}
       id={(a) => a.id}
       name={(a) => a.name}
-      icon={glyphOf("settings")}
+      face={(a) => appFace(a.id, a.mark)}
       chosen={app}
       onChoose={onGo}
       nothing={{

@@ -14,7 +14,7 @@
  */
 
 import { Chip } from "@heroui/react";
-import { AmountRow, Bill, Group, Screen, glyphOf } from "@quad/web";
+import { AmountRow, Bill, Group, Screen, appFace, glyphOf } from "@quad/web";
 import { useLoad, type CentreView, type MoneyView } from "./data.js";
 
 export function Money({ view, onGo }: {
@@ -66,6 +66,7 @@ export function Money({ view, onGo }: {
                 return (
                   <AmountRow
                     key={app.id}
+                    face={appFace(app.id, app.mark)}
                     label={app.name}
                     under={app.status === "past_due"
                       ? "The last payment did not go through"

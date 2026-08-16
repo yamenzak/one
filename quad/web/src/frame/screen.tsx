@@ -33,6 +33,7 @@ import * as React from "react";
 import { Button } from "@heroui/react";
 import { Band, PageCrown, Spacer, type Slot, type Width } from "./layout.js";
 import { Group, NavRow } from "../parts/surfaces.js";
+import type { FaceOf } from "../parts/face.js";
 import { Await, Nothing, RowsWaiting, FigureWaiting, FormWaiting, TextWaiting, TilesWaiting, nothingIn, type Loaded } from "../parts/state.js";
 import { Stack } from "./layout.js";
 import { PAD, SAFE_BOTTOM, SPACE } from "../tokens/metrics.js";
@@ -418,12 +419,21 @@ export function Tile({ wide, tall, children }: {
  * nobody files and everybody feels.
  */
 export function Whichever<T>({
-  items, id, name, icon, chosen, onChoose, then, nothing,
+  items, id, name, icon, face, chosen, onChoose, then, nothing,
 }: {
   readonly items: readonly T[];
   readonly id: (item: T) => string;
   readonly name: (item: T) => string;
+  /** ⚠️ The same glyph for every item — a CATEGORY, not an identity. */
   readonly icon?: React.ReactNode;
+  /**
+   * ⚠️ PER ITEM, AND IT IS WHAT THIS LIST ACTUALLY WANTS. Every caller here is
+   * choosing between PRODUCTS, and every one of them passed one glyph for the
+   * whole list — so a workspace with six products was six identical cogs with
+   * the label doing all the work. A face makes the list scannable, which is the
+   * only reason a list exists rather than a menu of words.
+   */
+  readonly face?: (item: T) => FaceOf;
   /** Which one the address names. Absent means the choice has not been made. */
   readonly chosen?: string;
   readonly onChoose: (id: string) => void;
@@ -441,7 +451,13 @@ export function Whichever<T>({
     <Screen shape="list">
       <Group>
         {items.map((item) => (
-          <NavRow key={id(item)} icon={icon} label={name(item)} onOpen={() => onChoose(id(item))} />
+          <NavRow
+            key={id(item)}
+            icon={icon}
+            face={face?.(item)}
+            label={name(item)}
+            onOpen={() => onChoose(id(item))}
+          />
         ))}
       </Group>
     </Screen>

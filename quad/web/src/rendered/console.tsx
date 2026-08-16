@@ -17,6 +17,7 @@ import { UNLIMITED, overdue, resolve, settableBy } from "@quad/kernel";
 import { Table } from "@heroui/react";
 import { Stack } from "../frame/layout.js";
 import { AmountRow, Group, ToggleRow } from "../parts/surfaces.js";
+import type { FaceOf } from "../parts/face.js";
 import { SPACE } from "../tokens/metrics.js";
 import { Reveal } from "../parts/blocks.js";
 
@@ -28,6 +29,8 @@ export interface FlagConsoleProps {
   readonly level: "operator" | "tenant" | "person";
   /** The group's heading, and what these switches are, in a line. */
   readonly label?: string;
+  /** ⚠️ Whose switches these are — a product, drawn beside the heading. */
+  readonly face?: FaceOf;
   readonly under?: string;
   readonly deployment: Readonly<Record<string, boolean>>;
   readonly tenant?: Readonly<Record<string, boolean>>;
@@ -37,7 +40,7 @@ export interface FlagConsoleProps {
 }
 
 export function FlagConsole(props: FlagConsoleProps) {
-  const { book, level, label, under, deployment, tenant, person, today, onSet } = props;
+  const { book, level, label, face, under, deployment, tenant, person, today, onSet } = props;
   const late = new Set(overdue(book, today as never));
 
   return (
@@ -54,7 +57,7 @@ export function FlagConsole(props: FlagConsoleProps) {
       alarming one that is true — so the row says that and the rest is noise it
       does not need to carry.
     */
-    <Group label={label} under={under}>
+    <Group label={label} face={face} under={under}>
       {Object.values(book).map((def: FlagDef) => {
         const switches = {
           deployment: deployment[def.id],

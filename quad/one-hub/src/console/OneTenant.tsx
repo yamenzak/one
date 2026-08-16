@@ -18,7 +18,7 @@ import { useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import {
   AmountRow, ControlRow, Group, Identity, NumberInput, RowsWaiting, Screen, Stack, Tray,
-  notice, placeFace, sentence,
+  appFace, notice, placeFace, sentence,
 } from "@quad/web";
 import type { Allowance, EntitlementDef, PlanSpec } from "@quad/kernel";
 import { api } from "../api.js";
@@ -44,6 +44,7 @@ interface TenantLine {
 interface AppLine {
   readonly id: string;
   readonly name: string;
+  readonly mark: string;
   readonly entitlements: Readonly<Record<string, EntitlementDef>>;
   readonly plans: readonly PlanSpec[];
 }
@@ -85,6 +86,7 @@ export function OneTenant({ id }: { readonly id: string }) {
                 return (
                   <ControlRow
                     key={held.id}
+                    face={appFace(held.id, app?.mark)}
                     label={app?.name ?? sentence(held.id)}
                     under={[
                       held.planId ?? "no plan",

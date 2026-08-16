@@ -260,6 +260,14 @@ resolver.** `<Face of={whoFace(accountId)} />`, `placeFace(slug)`,
 | A product | the glyph its manifest declared | a generated mark would read as a logo nobody chose |
 | One | the framework's four-cell plate | the deployment is not one of the products in it |
 
+**A product wears its plate wherever it is a row, a card or a section** — the
+crown, the switcher, the chooser, the bill, every per-product console. Never as a
+bare `{app.mark}`: a glyph dropped into JSX is a character somebody typed, with
+no ground under it and a different optical weight from every face beside it. A
+guard refuses it. In prose — "Kova · owner" under a workspace's name — a product
+stays a word, because a mark inside a sentence is a second lead in a row that
+already has one.
+
 Three things follow from that and are decided for you.
 
 - **A seed is an identity, never a label.** The resolvers take an account id and

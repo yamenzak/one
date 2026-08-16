@@ -1153,6 +1153,15 @@
       "impl": "scripts/face.test.mjs",
       "proves": "seed: ",
       "fails": "somebody gets a new face the day they correct the spelling of their name, and a workspace gets a new one the day it is renamed — so a picture people had learned to recognise means nothing; and a face fetched from api.dicebear.com puts a third party in the request path of every roster, unnamed on the trust screen"
+    },
+    {
+      "id": "a-products-mark-wears-the-plate-every-face-wears",
+      "protects": "D7",
+      "stage": "17",
+      "status": "live",
+      "impl": "scripts/face.test.mjs",
+      "proves": "mark: ",
+      "fails": "a product appears beside a person as a bare character somebody typed — no ground under it, a different optical weight from every face in the same bar — so a workspace with six products is six identical glyphs and the label does all the work"
     }
   ]
 }

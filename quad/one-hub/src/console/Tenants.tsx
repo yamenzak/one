@@ -77,10 +77,18 @@ export function Tenants({ onGo }: { readonly onGo: (id: string) => void }) {
             { id: "where", label: "Where", cell: (t) => `${t.country} · ${t.shardId}` },
             {
               id: "plans", label: "On",
-              /* ⚠️ AN APP ID IS NOT A NAME — see `sentence`. The column read
-                 "kova: —" beside a workspace whose own name is capitalised. */
+              /* ⚠️ AN APP ID IS NOT A NAME, AND `sentence` WAS ONLY THE SECOND
+                 BEST ANSWER. It capitalises a key — right for "kova", wrong for
+                 anything hyphenated or capitalised in its own manifest — and the
+                 answer already carries every product's DECLARED name beside the
+                 workspaces. Looked up, this column says what the product calls
+                 itself; `sentence` stays as the last resort for a product this
+                 deployment no longer serves. */
               cell: (t) => t.apps.length
-                ? t.apps.map((a) => `${sentence(a.id)}: ${a.planId ?? "—"}`).join(" · ")
+                ? t.apps.map((a) => {
+                  const app = data.apps.find((x) => x.id === a.id);
+                  return `${app?.name ?? sentence(a.id)}: ${a.planId ?? "—"}`;
+                }).join(" · ")
                 : "—",
             },
             {

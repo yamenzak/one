@@ -41,6 +41,14 @@ import { Tally } from "./tally.js";
 export interface GroupProps {
   /** ⚠️ Only where the grouping does not already say it — see the header. */
   readonly label?: string;
+  /**
+   * ⚠️ WHEN THE CARD IS ABOUT A SUBJECT, THE HEADING SHOWS IT. A column of
+   * per-product cards headed by nothing but the product's name is a report —
+   * six identical headings differing in one word, which is what somebody has to
+   * read rather than see. A mark beside the name makes it a section they can
+   * find by looking.
+   */
+  readonly face?: FaceOf;
   /** One line under the label, for a group whose consequence is not obvious. */
   readonly under?: string;
   /**
@@ -62,7 +70,7 @@ export interface GroupProps {
  * four beats. `arriveAt` is offered for exactly that — a stagger BETWEEN blocks,
  * capped, never within one.
  */
-export function Group({ label, under, at, children }: GroupProps) {
+export function Group({ label, under, face, at, children }: GroupProps) {
   return (
     <section
       {...ARRIVE}
@@ -70,9 +78,16 @@ export function Group({ label, under, at, children }: GroupProps) {
       className={`flex flex-col ${HEAD_GAP}`}
     >
       {label ? (
-        <div className={`flex flex-col ${SPACE.hair}`}>
-          <h2 className={TYPE.section}>{label}</h2>
-          {under ? <p className={TYPE.note}>{under}</p> : null}
+        /* ⚠️ THE MARK IS BESIDE THE HEADING BLOCK, NOT ABOVE IT, so the label
+           and its line under stay one thing and the mark reads as belonging to
+           both. `chip` because a heading is not a row — a 40px plate here would
+           be taller than the two lines beside it. */
+        <div className={`flex items-center ${ROW.gap}`}>
+          {face ? <Face of={face} name={label} size="chip" /> : null}
+          <div className={`flex min-w-0 flex-col ${SPACE.hair}`}>
+            <h2 className={TYPE.section}>{label}</h2>
+            {under ? <p className={TYPE.note}>{under}</p> : null}
+          </div>
         </div>
       ) : null}
       <Card className={CARD_ROWS}>
@@ -246,8 +261,16 @@ export function Place({ name, said, foot, face, tone = "neutral", at, onOpen }: 
 /* ------------------------------------------------------------------- rows --- */
 
 interface RowBase {
-  /** A glyph, a mark, an avatar. Kept small and optical rather than boxed. */
+  /** A glyph, kept small and optical inside the lead's chip. */
   readonly icon?: React.ReactNode;
+  /**
+   * ⚠️ A SUBJECT IN THE LEAD, WHERE A GLYPH WOULD OTHERWISE GO — and it WINS,
+   * because a row about a person or a product should show that person or that
+   * product rather than a category icon. Every per-product screen picked one
+   * glyph for the whole list, so a workspace with six products was six identical
+   * cogs and the label was the only thing telling them apart.
+   */
+  readonly face?: FaceOf;
   readonly label: string;
   /** ⚠️ ONE LINE, AND NO FULL STOP — see `tone.ts`. */
   readonly under?: string;
@@ -267,9 +290,15 @@ const Body = ({ label, under }: { readonly label: string; readonly under?: strin
   </span>
 );
 
-/** ⚠️ A FIXED BOX, so every label in a list starts at the same x — see `LEAD`. */
-const Lead = ({ icon }: { readonly icon?: React.ReactNode }) =>
-  icon
+/**
+ * ⚠️ A FIXED BOX, so every label in a list starts at the same x — see `LEAD`.
+ * A face and the glyph chip are the same 40px, which is why one can stand in for
+ * the other without the text column moving.
+ */
+const Lead = ({ icon, face }: { readonly icon?: React.ReactNode; readonly face?: FaceOf }) =>
+  face
+    ? <Face of={face} />
+    : icon
     /* ⚠️ THE SIZE IS SET ON THE BOX, NOT ASKED OF THE ICON. Every icon library
        reads `width`/`height` from its own props, so a caller who forgets one
        draws at whatever the default is — and a list with two icon sizes in it is
@@ -307,11 +336,11 @@ export interface NavRowProps extends RowBase {
   readonly isDisabled?: boolean;
 }
 
-export function NavRow({ icon, label, under, aside, onOpen, isDisabled }: NavRowProps) {
+export function NavRow({ icon, face, label, under, aside, onOpen, isDisabled }: NavRowProps) {
   return (
     <Button variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.tap}`} isDisabled={isDisabled} onPress={onOpen}>
       <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
-        <Lead icon={icon} />
+        <Lead icon={icon} face={face} />
         <Body label={label} under={under} />
         <span className={`flex shrink-0 items-center ${SPACE.tight}`}>
           {aside}
@@ -325,7 +354,7 @@ export function NavRow({ icon, label, under, aside, onOpen, isDisabled }: NavRow
 }
 
 /** A row that DOES something rather than going somewhere — so, no chevron. */
-export function ActionRow({ icon, label, under, onDo, tone = "neutral" }: RowBase & {
+export function ActionRow({ icon, face, label, under, onDo, tone = "neutral" }: RowBase & {
   /**
    * ⚠️ OPTIONAL, BECAUSE A ROW IS ALSO A TRIGGER. Used inside `Confirm` the
    * press is react-aria's — the row opens the dialogue and the dialogue owns
@@ -352,7 +381,7 @@ export function ActionRow({ icon, label, under, onDo, tone = "neutral" }: RowBas
       <span
         className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}${tone === "danger" ? " text-danger" : ""}`}
       >
-        <Lead icon={icon} />
+        <Lead icon={icon} face={face} />
         <Body label={label} under={under} />
       </span>
     </Button>
@@ -364,7 +393,7 @@ export function ActionRow({ icon, label, under, onDo, tone = "neutral" }: RowBas
  * text outside the `Switch` makes a row where tapping the words does nothing —
  * which on a phone is most of the row.
  */
-export function ToggleRow({ icon, label, under, value, onChange, isDisabled }: RowBase & {
+export function ToggleRow({ icon, face, label, under, value, onChange, isDisabled }: RowBase & {
   readonly value: boolean;
   readonly onChange: (next: boolean) => void;
   readonly isDisabled?: boolean;
@@ -386,7 +415,7 @@ export function ToggleRow({ icon, label, under, value, onChange, isDisabled }: R
     >
       <Switch.Content className="grow">
         <span className={`flex items-center ${ROW.gap}`}>
-          <Lead icon={icon} />
+          <Lead icon={icon} face={face} />
           <Label><Body label={label} under={under} /></Label>
         </span>
       </Switch.Content>
@@ -413,14 +442,14 @@ export function ToggleRow({ icon, label, under, value, onChange, isDisabled }: R
  * floor under the words the control drops to its own line instead, on a phone
  * only, where there is genuinely no room for both.
  */
-export function ControlRow({ icon, label, under, wide, children }: RowBase & {
+export function ControlRow({ icon, face, label, under, wide, children }: RowBase & {
   /** ⚠️ For a control that needs the width whatever the screen is — a textarea. */
   readonly wide?: boolean;
   readonly children: React.ReactNode;
 }) {
   return (
     <div className={`flex flex-wrap items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
-      <Lead icon={icon} />
+      <Lead icon={icon} face={face} />
       {/* ⚠️ THE FLOOR IS A FEW WORDS, NOT A COLUMN. At 12rem it was wider than
           most labels, so on a phone EVERY control dropped to a line of its own
           and a list of six settings came out twelve rows tall. The words wrap
@@ -531,7 +560,7 @@ export function PersonRow({ name, under, when, unread, aside, goes, face, onOpen
  * proportional digits ripples, and the reader ends up doing the arithmetic on
  * the ripple rather than on the values.
  */
-export function AmountRow({ icon, label, under, amount, aside, tone = "neutral", onOpen }: RowBase & {
+export function AmountRow({ icon, face, label, under, amount, aside, tone = "neutral", onOpen }: RowBase & {
   readonly amount: string;
   /**
    * ⚠️ AFTER THE AMOUNT, AND IT IS A CONTROL RATHER THAN A SECOND FACT. A price
@@ -544,7 +573,7 @@ export function AmountRow({ icon, label, under, amount, aside, tone = "neutral",
 }) {
   const inner = (
     <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
-      <Lead icon={icon} />
+      <Lead icon={icon} face={face} />
       <Body label={label} under={under} />
       <span className={`shrink-0 ${TYPE.label} tabular-nums`} data-tone={tone}>{amount}</span>
       {aside}
@@ -777,13 +806,14 @@ export function CopyRow({ label, value, onCopy }: {
  * enforces, and having a component for each is what stops somebody splitting the
  * difference.
  */
-export function NoteRow({ icon, children }: {
+export function NoteRow({ icon, face, children }: {
   readonly icon?: React.ReactNode;
+  readonly face?: FaceOf;
   readonly children: React.ReactNode;
 }) {
   return (
     <div className={`flex items-start ${ROW.gap} ${ROW.pad}`}>
-      <Lead icon={icon} />
+      <Lead icon={icon} face={face} />
       <p className={TYPE.body}>{children}</p>
     </div>
   );
@@ -796,12 +826,12 @@ export function NoteRow({ icon, children }: {
  * chevron says "there is more to read"; a button says "this starts now". Using
  * one for the other is how somebody ends up in a flow they were browsing.
  */
-export function OfferRow({ icon, label, under, offer }: RowBase & {
+export function OfferRow({ icon, face, label, under, offer }: RowBase & {
   readonly offer: { readonly label: string; readonly onDo: () => void };
 }) {
   return (
     <div className={`flex items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
-      <Lead icon={icon} />
+      <Lead icon={icon} face={face} />
       <Body label={label} under={under} />
       <span className="shrink-0">
         <Button variant="secondary" onPress={offer.onDo}>{offer.label}</Button>
@@ -818,10 +848,10 @@ export function OfferRow({ icon, label, under, offer }: RowBase & {
  * rather than prose is that each item is one thing, with its own qualifier
  * underneath.
  */
-export function StepRow({ icon, label, under }: RowBase) {
+export function StepRow({ icon, face, label, under }: RowBase) {
   return (
     <div className={`flex items-start ${ROW.gap} ${ROW.pad} ${ROW.still}`}>
-      <Lead icon={icon} />
+      <Lead icon={icon} face={face} />
       <Body label={label} under={under} />
     </div>
   );
