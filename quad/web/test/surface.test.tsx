@@ -359,8 +359,18 @@ describe("a workspace's branding", () => {
      never see, having set it on their own screen in daylight. */
   it("carries a second theme when one was given", () => {
     const css = brandCssFor({ ground: "#ffffff" }, { ground: "#0b0b0b" });
-    expect(css).toContain(`:root[data-theme="dark"]`);
+    expect(css).toContain(`[data-theme="dark"]`);
     expect(css).toContain("#0b0b0b");
+  });
+
+  /* ⚠️ AND THE DARK HALF IS NOT BOUND TO THE DOCUMENT ELEMENT, so one screen can
+     be a dark room inside a light app (`Page`'s `world`). Bound to `:root` the
+     tokens could only ever switch for the whole page, and the library's own are
+     already written the scopable way — ours were the half that could not
+     follow. */
+  it("scopes the second theme to any element, not only the root", () => {
+    const css = brandCssFor({ ground: "#ffffff" }, { ground: "#0b0b0b" });
+    expect(css).not.toContain(`:root[data-theme="dark"]`);
   });
 
   it("knows an unreadable pair from a readable one", () => {

@@ -155,6 +155,49 @@ const bake = (kind: "person" | "workspace", seed: string, moving: boolean, px: n
   return svg;
 };
 
+/**
+ * THE WORLD WITHOUT ITS SKY.
+ *
+ * ⚠️ THE STYLE IS A COMPOSITION, NOT A PICTURE, AND THAT IS THE WHOLE POINT OF
+ * USING ONE. `planets` declares a planet, its surface, its shade, its ring, its
+ * moons and TWELVE separate stars over a background — so asking for the half
+ * that is the world is a matter of turning the other half off, not of hiding it
+ * afterwards. Every star drops to probability zero and the background takes an
+ * eight-digit hex whose alpha is zero, which is the only way `backgroundColor`
+ * accepts "none": the schema wants a colour, and a colour with no opacity is
+ * one.
+ *
+ * ⚠️ THE SPACE HALF IS NOT RENDERED, IT IS LEARNED FROM. Twelve stars on a fixed
+ * grid is right inside a 40px disc and thin across a viewport, so the ambience
+ * scatters its own — with the same five magnitudes, the same weights and the
+ * same twinkle timings the style declares (`starArt` in `ambience.ts`). What
+ * comes from here is the two colours; what comes from there is a sky.
+ */
+const bakeWorld = (seed: string, moving: boolean, px: number): string => {
+  const key = `world|${moving ? "m" : "s"}|${px}|${seed}`;
+  const had = drawn.get(key);
+  if (had !== undefined) return had;
+  const svg = new Avatar(styleFor("workspace"), {
+    seed,
+    size: px,
+    /* ⚠️ NO `scale` HERE. The 1.2 that fills a circular plate is a crop
+       compensation; on transparency it only makes the ring touch the edges. */
+    backgroundColor: [CLEAR],
+    ...STARLESS,
+    ...(moving ? { animationVariant: ["slow"] as const } : {}),
+  } as never).toDataUri();
+  drawn.set(key, svg);
+  return svg;
+};
+
+/** ⚠️ Zero alpha. `"transparent"` is refused — the schema wants a colour. */
+const CLEAR = "#00000000";
+
+/** ⚠️ All twelve, by name, because the style names them that way. */
+const STARLESS = Object.fromEntries(
+  Array.from({ length: 12 }, (_, i) => [`${i === 0 ? "star" : `star${String(i + 1).padStart(2, "0")}`}Probability`, 0]),
+);
+
 /* ------------------------------------------------------------------ seeds --- */
 
 /**
@@ -293,52 +336,27 @@ export function Orb({ of, size = 280 }: {
   const at = React.useRef<HTMLImageElement>(null);
   const still = useStill(at);
   const src = React.useMemo(
-    () => (of.kind === "person" || of.kind === "workspace"
-      ? bake(of.kind, of.seed, !still, size * 2)
-      : null),
+    () => (of.kind === "workspace"
+      ? bakeWorld(of.seed, !still, size * 2)
+      : of.kind === "person" ? bake(of.kind, of.seed, !still, size * 2) : null),
     [of.kind, of.seed, still, size],
   );
   if (!src) return null;
   return (
     /*
-      ⚠️ THE EDGE IS DISSOLVED, NOT CROPPED, AND AT THIS SIZE THAT IS THE WHOLE
-      DIFFERENCE BETWEEN A WORLD AND A STICKER. The drawing carries its own deep
-      background — right at 40px, where the disc IS the avatar, and wrong at 280
-      where a hard circle of one navy sits on a ground of another with a visible
-      seam. Fading the outer band means what survives is the planet, its ring and
-      the stars nearest it, over the sky the screen is already wearing.
-
-      ⚠️ THE STOPS CLEAR THE RING. The body fills about 55% of the canvas and the
-      ring reaches past 70%; cutting at 62% would slice it, which looks like a
-      rendering fault rather than a choice.
-
-      ⚠️ `closest-side` IS LOAD-BEARING AND ITS ABSENCE IS INVISIBLE IN DARK. A
-      radial gradient sizes to the farthest CORNER by default, so 100% is the
-      half-diagonal and the four corners of a square element are still partly
-      opaque at any stop short of it: the picture comes out a squircle, not a
-      circle. Over a near-black sky the leftover corners are the same value as
-      the ground and nobody sees them; on paper the same picture is a dark
-      rounded square sitting on pale grey — an app icon where a world should be.
-      `closest-side` makes 100% the half-WIDTH, so the corners are past the end
-      of the ramp and gone.
+      ⚠️ NOTHING IS MASKED, BECAUSE NOTHING NEEDS TO BE — see `bakeWorld`. The
+      first build took the whole avatar and faded its edge to hide the deep
+      square the drawing carries, which is a workaround for a picture that was
+      never asked for correctly. The style COMPOSES, so the sky can simply be
+      left out and what arrives is a planet on transparency: no crop, no seam, no
+      circle where a world should be, and the ring and moons free to reach past
+      wherever a mask would have ended.
 
       ⚠️ AND THE ALT IS EMPTY: the name is right there, and a screen reader that
       said it twice would read the page's heading to somebody twice.
     */
-    <img
-      ref={at}
-      src={src}
-      alt=""
-      width={size}
-      height={size}
-      className="block"
-      style={{
-        width: size,
-        height: size,
-        maskImage: "radial-gradient(circle closest-side at 50% 50%, #000 64%, transparent 94%)",
-        WebkitMaskImage: "radial-gradient(circle closest-side at 50% 50%, #000 64%, transparent 94%)",
-      }}
-    />
+    <img ref={at} src={src} alt="" width={size} height={size}
+      className="block" style={{ width: size, height: size }} />
   );
 }
 

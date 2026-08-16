@@ -87,6 +87,32 @@ export const transition = (
 export const REDUCED = { "data-reduce-motion": "true" } as const;
 
 /**
+ * THE SKY'S THREE TWINKLE PERIODS.
+ *
+ * ⚠️ HERE RATHER THAN WHERE THEY ARE USED, BECAUSE THE RULE IS THAT NO FILE
+ * WRITES ITS OWN DURATION, AND A GENERATED PICTURE IS NOT AN EXCEPTION. The star
+ * field carries its own `<style>` element (`starArt`), which is what lets its
+ * motion travel with the image and switch itself off — but the numbers in it are
+ * still durations, and a duration invented in the file that happened to need it
+ * is exactly what `MOTION` exists to prevent.
+ *
+ * ⚠️ THREE, AND THEY DO NOT DIVIDE INTO EACH OTHER. A field on one shared period
+ * pulses in unison, which reads as a fault rather than as a sky and is
+ * unmistakable once seen. The delays offset the three again, so the brightest
+ * star is never in phase with the one beside it. Taken from the avatar style
+ * these worlds come from, which had already solved it.
+ *
+ * ⚠️ AND THEY ARE LONG. Every other value here is under a second because it
+ * describes a control settling; a sky is the one thing in the product meant to
+ * be noticed only if you look at it for a while.
+ */
+export const TWINKLE = {
+  medium: { period: "5.2s", delay: "2s" },
+  large: { period: "3.7s", delay: "2.7s" },
+  sparkle: { period: "2.8s", delay: "1.4s" },
+} as const;
+
+/**
  * WHETHER MOTION IS SWITCHED OFF FOR THIS ELEMENT.
  *
  * ⚠️ FOR THE MOTION CSS CANNOT REACH, AND ONLY FOR THAT. Almost everything here

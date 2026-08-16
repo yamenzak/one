@@ -35,7 +35,7 @@ import {
   SAFE_TOP, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, TITLE_PAD, WIDTH,
   type Space, type Width,
 } from "../tokens/metrics.js";
-import { MOTION } from "../tokens/motion.js";
+import { MOTION, useStill } from "../tokens/motion.js";
 import { Face, type FaceOf } from "../parts/face.js";
 
 export type { Space, Width };
@@ -102,13 +102,55 @@ export interface PageProps {
  * which reads as a broken layout rather than as a unit bug.
  */
 export function Page({ sky = "plain", world, tone = "neutral", nav, children }: PageProps) {
-  const own = world ? worldCss(world) : null;
+  /* ⚠️ The twinkle is CSS inside the star field's own SVG, so switching it off
+     is a different picture — see `starsFor`. */
+  const at = React.useRef<HTMLDivElement>(null);
+  const still = useStill(at);
+  const own = world ? worldCss(world, !still) : null;
   return (
     <div
+      ref={at}
       className="min-h-dvh flex flex-col"
       data-sky={own ? "world" : sky}
+      /*
+        ⚠️ A WORLD IS A DARK ROOM IN BOTH THEMES, AND THAT IS THE ANSWER TO THE
+        ONE THING LIGHT MODE COULD NOT DO. Space is dark. Every attempt to make
+        it pale is the same attempt to make a night sky out of paper: lead with
+        the planet's body colour and the ground competes with the planet, lead
+        with its deep and a near-black mixed into white is a grey nobody chose.
+        Neither is washed because it is tuned wrong — both are washed because the
+        subject is a night and the ground was being asked to be day.
+
+        ⚠️ SO THE SCREEN STOPS ASKING. Stamping the theme scopes every token
+        inside it — ours and the library's — so the cards, the type and the
+        controls are all the dark set, and somebody in light mode walks from a
+        paper hub into a lit room. That is what an arrival IS; a title card that
+        matched the page it was announcing would not be one.
+
+        ⚠️ AND IT IS THE ONLY PLACE IN THE PRODUCT THAT DOES THIS. A screen that
+        picked its own theme would be a screen somebody's preference does not
+        reach, which is why it is `Page`'s decision, taken with a world and never
+        otherwise.
+      */
+      {...(own ? { "data-theme": "dark" } : {})}
       data-tone={tone}
-      style={own as React.CSSProperties | undefined}
+      /*
+        ⚠️ `color` AND `background` ARE RE-DECLARED HERE, AND WITHOUT THEM THE
+        STAMP ABOVE DOES ALMOST NOTHING. `color` is INHERITED: `body` resolves
+        `var(--foreground)` once, in the light theme, and every descendant
+        inherits the computed value — redefining the token further down the tree
+        cannot reach back up and re-run it. The title came out near-black on a
+        night sky and looked like a z-index fault rather than a cascade one.
+        Setting both on the element that carries the stamp is what makes the
+        subtree resolve against its own tokens.
+      */
+      style={own
+        ? ({
+          ...own,
+          color: "var(--foreground)",
+          background: "var(--background)",
+        } as React.CSSProperties)
+        : undefined}
     >
       <div className={`flex grow flex-col ${nav ? NAV_SPACE : ""}`}>{children}</div>
       {nav}

@@ -132,12 +132,13 @@ const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "");
     in the drawn SVG against the STYLE'S declared palette, and a hex literal
     appearing here is the shortcut being taken.
 
-    ⚠️ BLACK AND WHITE ARE NOT COLOURS HERE, THEY ARE ALPHA. The hero's mask is
-    a ramp from `#000` to `transparent`, where the black carries no hue at all —
-    it is the opaque end of a gradient. No planet palette holds either, so
-    excluding them cannot let a real second palette through.
+    ⚠️ BLACK, WHITE AND FULLY TRANSPARENT ARE NOT COLOURS HERE, THEY ARE ALPHA.
+    The planet is asked for with `#00000000` because that is the only way
+    DiceBear's schema accepts "no background" — it wants a colour, and a colour
+    with no opacity is one. No planet palette holds any of these, so excluding
+    them cannot let a real second palette through.
   */
-  const ALPHA = new Set(["#000", "#fff", "#000000", "#ffffff"]);
+  const ALPHA = new Set(["#000", "#fff", "#000000", "#ffffff", "#00000000"]);
   const src = code(readFileSync(join(QUAD, RESOLVER), "utf8"));
   const hexes = [...src.matchAll(/#[0-9a-fA-F]{3,8}\b/g)]
     .map((m) => m[0].toLowerCase())

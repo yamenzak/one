@@ -88,7 +88,12 @@ export function brandCss(theme: Theme): string {
 export function brandCssFor(light: Theme, dark?: Theme): string {
   const one = brandCss(light);
   if (!dark) return one;
-  const other = brandCss(dark).replace(/^:root/, `:root[data-theme="dark"]`);
+  /* ⚠️ `[data-theme="dark"]` WITHOUT `:root`, SO THE THEME IS SCOPABLE. Bound to
+     the document element these tokens could only ever switch for the whole page
+     — and one screen legitimately wants to be a dark room inside a light app
+     (`Page`'s `world`). The library's own tokens are already written this way
+     (`.dark, [data-theme=dark]`); ours were the half that could not follow. */
+  const other = brandCss(dark).replace(/^:root/, `[data-theme="dark"]`);
   return `${one}\n${other}`;
 }
 

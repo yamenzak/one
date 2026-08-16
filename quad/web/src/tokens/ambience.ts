@@ -42,7 +42,7 @@
 
 import type { Tone } from "@quad/kernel";
 /* ⚠️ The pace and the curve are the vocabulary's, not this file's — see `DRIFT`. */
-import { DURATION, EASE } from "./motion.js";
+import { DURATION, EASE, TWINKLE } from "./motion.js";
 
 /**
  * ⚠️ TWELVE, AND `plain` IS STILL THE DEFAULT. Ambience everywhere is ambience
@@ -824,9 +824,9 @@ function layers(what: Ambience, hue: string): readonly string[] {
         /* ⚠️ THE DEEP, MIXED TOWARD `--lumen` EXACTLY AS `field` DOES. This is
            the layer that would otherwise be a black rectangle on a light page. */
         `linear-gradient(180deg, `
-          + `color-mix(in oklab, var(--world-ink) calc(var(--field, 1) * var(--world-far, 1) * 88%), var(--lumen, transparent)) 0%, `
-          + `color-mix(in oklab, var(--world-ink) calc(var(--field, 1) * var(--world-far, 1) * 62%), var(--lumen, transparent)) 58%, `
-          + `color-mix(in oklab, var(--world-ink) calc(var(--field, 1) * var(--world-far, 1) * 38%), var(--lumen, transparent)) 100%)`,
+          + `color-mix(in oklab, var(--world-ink) 92%, var(--background)) 0%, `
+          + `color-mix(in oklab, var(--world-ink) 70%, var(--background)) 56%, `
+          + `color-mix(in oklab, var(--world-ink) 42%, var(--background)) 100%)`,
       ];
 
   }
@@ -907,31 +907,74 @@ export interface World {
 }
 
 /**
- * ⚠️ SCATTERED BY A SEED, NEVER BY `Math.random`. A world is an identity: the
- * same workspace has the same stars in the same places forever, on every device
- * and after every deploy. This is the same rule `bespokeCss` states and the same
- * generator, for the same reason.
+ * A SKY, SCATTERED BY A SEED.
  *
- * ⚠️ THREE MAGNITUDES, AND THE FAINT ONES DO THE WORK. A field of equal dots is
- * a texture; a field where most are barely there and a few are not is a sky.
- * The brightest are capped at a handful, because a star somebody's eye lands on
- * is a star competing with the content.
+ * ⚠️ NEVER BY `Math.random`. A world is an identity: the same workspace has the
+ * same stars in the same places forever, on every device and after every deploy.
+ * Same rule and same generator as `bespokeCss`.
+ *
+ * ⚠️ FIVE MAGNITUDES AT THE STYLE'S OWN WEIGHTS, AND THAT IS BORROWED RATHER
+ * THAN INVENTED. `planets` declares faint(2) small(3) medium(3) large(1)
+ * sparkle(1) with radii .7/.8/1.1/1.4 and opacities .5/.85/.85/.9 — a
+ * distribution somebody tuned, where most stars are barely there and a few are
+ * not. A field of equal dots is a texture; that ratio is a sky.
+ *
+ * ⚠️ AND THE TWINKLE IS INSIDE THE PICTURE, WHICH IS THE LESSON WORTH TAKING.
+ * The style animates its own stars from a `<style>` element in its own SVG,
+ * behind its own `prefers-reduced-motion: no-preference` guard — so the motion
+ * travels with the image, survives being used as a background, and switches
+ * itself off without a single rule from us. The three brightest magnitudes
+ * twinkle at the style's own periods and offsets; the two faintest never do,
+ * because a sky where everything moves is a sky nobody can read over.
  */
-function starArt(seed: number): string {
+function starArt(seed: number, moving: boolean): string {
   const r = mulberry32(seed);
-  const W = 1200, H = 900;
-  const dots: string[] = [];
-  for (let i = 0; i < 170; i += 1) {
-    const x = (r() * W).toFixed(1);
-    const y = (r() * H).toFixed(1);
-    const t = r();
-    /* Faint and small by default; a few brighter; three or four that carry. */
-    const rad = t > 0.97 ? 1.5 : t > 0.86 ? 1.05 : 0.7;
-    const a = t > 0.97 ? 0.95 : t > 0.86 ? 0.62 : 0.3 + r() * 0.2;
-    dots.push(`<circle cx="${x}" cy="${y}" r="${rad}" fill="#fff" fill-opacity="${a.toFixed(2)}"/>`);
+  const W = 1400, H = 1000;
+
+  /* ⚠️ Cumulative weights, so the ratio is the table rather than a chain of
+     thresholds somebody has to re-derive when a magnitude is added. */
+  const KINDS: readonly {
+    readonly w: number; readonly r: number; readonly a: number; readonly tw: string | null;
+  }[] = [
+    { w: 2, r: 0.7, a: 0.5, tw: null },
+    { w: 3, r: 0.8, a: 0.85, tw: null },
+    { w: 3, r: 1.1, a: 0.85, tw: "m" },
+    { w: 1, r: 1.4, a: 0.9, tw: "l" },
+    /* ⚠️ `r: 0` MARKS THE SPARKLE, which is a path rather than a circle. */
+    { w: 1, r: 0, a: 0.9, tw: "s" },
+  ];
+  const total = KINDS.reduce((n, k) => n + k.w, 0);
+
+  const marks: string[] = [];
+  for (let i = 0; i < 260; i += 1) {
+    const x = +(r() * W).toFixed(1);
+    const y = +(r() * H).toFixed(1);
+    let pick = r() * total;
+    let k = KINDS[0]!;
+    for (const kind of KINDS) { pick -= kind.w; if (pick <= 0) { k = kind; break; } }
+    const cls = moving && k.tw ? ` class="tw-${k.tw}"` : "";
+    marks.push(k.r === 0
+      /* ⚠️ THE SPARKLE IS A FOUR-POINT PATH, not a bigger dot — the one shape in
+         the set that reads as a STAR rather than as a speck, which is why it is
+         the rarest and the fastest to twinkle. */
+      ? `<path${cls} transform="translate(${x} ${y}) scale(0.42)" d="M5 1.8Q5.5 4.5 8.2 5 5.5 5.5 5 8.2 4.5 5.5 1.8 5 4.5 4.5 5 1.8" fill="#fff" fill-opacity="${k.a}"/>`
+      : `<circle${cls} cx="${x}" cy="${y}" r="${k.r}" fill="#fff" fill-opacity="${k.a}"/>`);
   }
+
+  /* ⚠️ THE PERIODS ARE `motion.ts`'S, NOT THIS FILE'S — see `TWINKLE`. A
+     generated picture carrying its own stylesheet is still a place a duration
+     could be invented, and the guard is right to say so. */
+  const beat = (cls: string, t: { readonly period: string; readonly delay: string }) =>
+    `.${cls}{animation:qTw ${t.period} ease-in-out infinite ${t.delay}}`;
+  const motion = moving
+    ? `<style>@media (prefers-reduced-motion: no-preference){`
+      + `@keyframes qTw{0%,100%{opacity:1}50%{opacity:.3}}`
+      + beat("tw-m", TWINKLE.medium) + beat("tw-l", TWINKLE.large) + beat("tw-s", TWINKLE.sparkle)
+      + `}</style>`
+    : "";
+
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`
-    + dots.join("") + `</svg>`;
+    + motion + marks.join("") + `</svg>`;
 }
 
 /** ⚠️ A hash rather than a random — see `starArt`. FNV-1a, as elsewhere. */
@@ -954,11 +997,11 @@ const seedOf = (text: string): number => {
  * would be a screen that could put anything there — and the first one to do it
  * is a page a workspace's branding no longer reaches (D7).
  */
-export function worldCss(world: World): Readonly<Record<string, string>> {
+export function worldCss(world: World, moving = true): Readonly<Record<string, string>> {
   return {
     "--world-deep": world.deep,
     "--world-lit": world.lit,
-    "--world-stars": starsFor(world.seed),
+    "--world-stars": starsFor(world.seed, moving),
   };
 }
 
@@ -969,11 +1012,18 @@ export function worldCss(world: World): Readonly<Record<string, string>> {
 */
 const skies = new Map<string, string>();
 
-const starsFor = (seed: string): string => {
-  const had = skies.get(seed);
+/**
+ * ⚠️ TWO BAKES PER SEED, LIKE EVERY FACE, AND FOR THE SAME REASON. The twinkle
+ * is CSS inside the SVG, where no rule of ours reaches — so switching it off
+ * means serving a different picture. The style's own guard covers the operating
+ * system's setting; the still bake is what covers the switch inside the app.
+ */
+const starsFor = (seed: string, moving: boolean): string => {
+  const key = `${moving ? "m" : "s"}|${seed}`;
+  const had = skies.get(key);
   if (had !== undefined) return had;
-  const url = art(starArt(seedOf(seed)));
-  skies.set(seed, url);
+  const url = art(starArt(seedOf(seed), moving));
+  skies.set(key, url);
   return url;
 };
 
@@ -1179,28 +1229,15 @@ export function ambienceStylesheet(): string {
   });
 
   /*
-    ⚠️ THE GROUND IS THE SPACE, NOT THE PLANET, AND THE HERO IS WHY. This led
-    with the planet's BODY colour in light for one build, on the argument that a
-    deep mixed into paper loses its hue — true, and it was the right answer while
-    the only planet on the screen was 48px and the ground had to carry the
-    identity. With the world drawn at the size of the screen the hue is the
-    SUBJECT's, and a ground in the same colour flattens the two into one wash: a
-    pale apricot behind a big orange planet is mush, a receding blue-grey behind
-    it is composition. So both themes take the deep, and light takes it QUIETLY —
-    `--world-far` is what pulls it back, because at the field's own strength a
-    near-black on paper is a slab.
-
-    ⚠️ Both selector forms, because the theme stamp may be on the host or on an
-    ancestor.
+    ⚠️ ONE INK AND NO THEME SPLIT, BECAUSE A WORLD CARRIES ITS OWN THEME. `Page`
+    stamps `data-theme="dark"` wherever it is given one (see there for why), so
+    the light branch these rules used to have could only ever fire on a page that
+    no longer exists. Two builds were spent tuning it — first leading with the
+    planet's body colour, then with its deep at a reduced strength — and both
+    were the same mistake in different clothes: asking paper to be a night sky.
   */
   const worldInk = [
-    `[data-sky="world"] { --world-ink: var(--world-deep); --world-far: 1; }`,
-    `[data-theme="light"] [data-sky="world"], [data-theme="light"][data-sky="world"] {`,
-    /* ⚠️ QUIETER ON PAPER, BUT NOT SO QUIET THAT THE HUE LEAVES. At 0.42 a deep
-       came through as neutral grey and every workspace looked the same on a
-       light screen, which is the whole point of a per-workspace ground gone. */
-    `  --world-far: 0.62;`,
-    `}`,
+    `[data-sky="world"] { --world-ink: var(--world-deep); }`,
   ];
 
   /* ⚠️ The drawing is baked per theme — see `art`. The var sits on the HOST

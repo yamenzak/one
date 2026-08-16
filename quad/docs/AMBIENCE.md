@@ -265,30 +265,66 @@ crown and island only). An ambience decision never changes a control.
 
 ## `world` — the one ambience that is not the brand's
 
-**A workspace's face is a planet seen from outside. Its own screen is that
-planet's sky, from the same two colours.** Nothing else in the product has an
-identity a ground can be built from, which is why this is one ambience rather
-than a family.
+**A workspace's face is a planet. Its own screen is that planet, at the size of
+the screen, in its own sky.** Nothing else in the product has an identity a
+ground can be built from, which is why this is one ambience rather than a family
+— and why it is the prototype for everything in the next section.
 
-- **The colours come out of the picture that was drawn**, matched against the
-  avatar style's own declared palette (`worldOf` in `parts/face.tsx`) — not
-  re-derived from the slug with a hash of ours. Two generators agree until one
-  of them is edited; one source cannot disagree with itself.
-- **The ground is the SPACE, not the planet, in both themes.** This led with the
-  planet's body colour in light for one build, on the argument that a deep mixed
-  into paper loses its hue. True — and the right answer only while the planet on
-  the screen was 48px and the ground had to carry the identity. With the world
-  drawn at the size of the screen the hue is the SUBJECT's, and a ground in the
-  same colour flattens the two into one wash: a pale apricot behind a big orange
-  planet is mush, a receding blue-grey behind it is composition. Light takes the
-  deep quietly (`--world-far`), because at the field's own strength a near-black
-  on paper is a slab.
-- **The stars are seeded and tiled.** Same workspace, same sky, forever; tiled
-  at their own size so the constellation does not change shape with the window.
-  They drift at half the weaves' distance, because a point that travels is a
-  point the eye follows.
-- **Only the arrival lands.** People, Money and Settings under the same
-  workspace keep `linen`. An arrival somebody never leaves is not an arrival,
-  and those are screens with eight rows on them — where a lit colour field is
-  the fault the hub's three materials exist to avoid. Landing is a moment;
-  working is a material.
+- **The style is DECOMPOSED, not masked.** `planets` declares a planet, a
+  surface, a shade, a ring, moons and twelve stars over a background, so the half
+  that is the world is had by turning the other half off: every star to
+  probability zero and a background whose alpha is zero (`#00000000`, the only
+  spelling the schema accepts for "none"). The planet arrives on transparency —
+  no crop, no seam, and the ring free to reach wherever it likes. The first build
+  took the whole picture and faded its edge to hide the square it carried, which
+  is a workaround for a picture that was never asked for correctly.
+- **The space half is learned from, not rendered.** Twelve stars on a fixed grid
+  is right inside a 40px disc and thin across a viewport, so the field scatters
+  its own — at the style's five magnitudes, its weights and its twinkle periods.
+  What comes from the picture is two colours; what comes from the style is a
+  vocabulary.
+- **The animation lives inside the generated SVG.** The style animates its own
+  stars from a `<style>` element in its own document, behind its own
+  `prefers-reduced-motion: no-preference` guard, so the motion travels with the
+  image, survives being used as a background, and switches itself off without a
+  rule from us. Ours does the same. The periods are still `motion.ts`'s: a
+  generated picture is a place a duration could be invented, and it is not an
+  exemption.
+- **A world is a DARK ROOM in both themes,** and that is the answer to the one
+  thing light mode could not do. Space is dark. Leading with the planet's body
+  colour makes the ground compete with the planet; leading with its deep makes a
+  near-black into white, which is a grey nobody chose. Neither is washed because
+  it is tuned wrong — both are washed because the subject is a night and the
+  ground was being asked to be day. So the page stamps its own theme, every token
+  inside it resolves dark, and somebody in light mode walks from a paper hub into
+  a lit room. It is the only screen in the product that does this.
+- **Only the arrival lands.** People, Money and Settings under the same workspace
+  keep `linen`. An arrival somebody never leaves is not an arrival, and those are
+  screens with eight rows on them. Landing is a moment; working is a material.
+
+## What this is a prototype of
+
+**The next ambience system is this one, generalised** — and the four things
+`world` had to solve are the four the generalisation needs.
+
+1. **A ground is a COMPOSITION, not a gradient.** Components, each with weighted
+   variants, over named colour slots, assembled by a seed. That is how a style
+   yields endless distinct results that are all recognisably one family, and it is
+   why every knob stays reviewable: nothing a seed can reach was not drawn by
+   somebody.
+2. **Motion belongs inside the picture.** A generated layer that carries its own
+   `<style>` needs no rule, no keyframe registration and no opt-out plumbing — it
+   is correct as a background, as an `<img>`, and in a document that has never
+   heard of our stylesheet. This is the single most useful thing the avatar styles
+   teach.
+3. **Two bakes per seed, always.** Moving and still. The `<style>` inside an SVG
+   is unreachable from outside, so switching motion off is a different picture —
+   the same rule faces already follow.
+4. **A family is a set of styles, not a set of gradients.** `blobs`, `glass`,
+   `loops`, `squircles` and `waves` are five composition grammars with animation
+   variants already in them; each is a candidate family, and a screen kind picks a
+   family the way it picks a shape today.
+
+⚠️ **What is NOT yet done, and should not be claimed:** the twenty-four
+brand-hued ambiences above are still hand-written gradient stacks. `world` is one
+composed ground, on one screen. The rewrite is the work, not this section.
