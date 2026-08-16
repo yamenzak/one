@@ -11,7 +11,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev --filter='./apps/*' --filter='./packages/*'",
     "test": "pnpm gate && turbo run test",
-    "gate": "node .github/workflows/workflows-parse.test.mjs && pnpm quad:gate && node scripts/apps-manifest.test.mjs && node scripts/affected.test.mjs && node scripts/shared-config.test.mjs && node scripts/sender-default.test.mjs && node scripts/email-brand-origin.test.mjs && node scripts/otp-gate.test.mjs && node scripts/flag-enforcement.test.mjs && node scripts/entitlement-enforcement.test.mjs && node scripts/capability-reachable.test.mjs && node scripts/storage-chokepoint.test.mjs && node scripts/api-door.test.mjs && node scripts/player-api-base.test.mjs && node scripts/motion-config.test.mjs && node scripts/ui-ownership.test.mjs",
+    "gate": "node .github/workflows/workflows-parse.test.mjs && pnpm engine:gate && node scripts/apps-manifest.test.mjs && node scripts/affected.test.mjs && node scripts/shared-config.test.mjs && node scripts/sender-default.test.mjs && node scripts/email-brand-origin.test.mjs && node scripts/otp-gate.test.mjs && node scripts/flag-enforcement.test.mjs && node scripts/entitlement-enforcement.test.mjs && node scripts/capability-reachable.test.mjs && node scripts/storage-chokepoint.test.mjs && node scripts/api-door.test.mjs && node scripts/player-api-base.test.mjs && node scripts/motion-config.test.mjs && node scripts/ui-ownership.test.mjs",
     "typecheck": "turbo run typecheck",
     "e2e": "turbo run e2e",
     "shots": "turbo run shots",
@@ -20,10 +20,10 @@
     "one:test": "turbo run test --filter='./platform/*'",
     "one:typecheck": "turbo run typecheck --filter='./platform/*'",
     "one:gate": "node platform/scripts/sheets.mjs platform/web/src && node platform/scripts/docs.test.mjs && node platform/scripts/guards.test.mjs && node platform/scripts/kernel.test.mjs && node platform/scripts/bindings.test.mjs && node platform/scripts/surface.test.mjs && node platform/scripts/handlers.test.mjs && node platform/scripts/owned.test.mjs && node platform/scripts/scoped.test.mjs && node platform/scripts/budget.test.mjs && node platform/scripts/capabilities.test.mjs && node platform/scripts/wire.test.mjs",
-    "quad:dev": "turbo run dev --filter='./quad/*'",
-    "quad:test": "turbo run test --filter='./quad/*' --filter='./quad/apps/*'",
-    "quad:typecheck": "turbo run typecheck --filter='./quad/*' --filter='./quad/apps/*'",
-    "quad:gate": "node quad/scripts/inert.test.mjs && node quad/scripts/docs.test.mjs && node quad/scripts/guards.test.mjs && node quad/scripts/kernel.test.mjs && node quad/scripts/declarations.test.mjs && node quad/scripts/shards.test.mjs && node quad/scripts/apps.test.mjs && node quad/scripts/heroui.test.mjs && node quad/scripts/ground.test.mjs && node quad/scripts/motion.test.mjs && node quad/scripts/states.test.mjs && node quad/scripts/shape.test.mjs && node quad/scripts/face.test.mjs && node quad/scripts/scene.test.mjs && node --experimental-strip-types quad/scripts/tone.test.mjs && node quad/scripts/provenance.test.mjs && node quad/scripts/surface.test.mjs && node quad/scripts/hub.test.mjs && node quad/scripts/services.test.mjs && node quad/scripts/agent.test.mjs && node quad/scripts/access.test.mjs && node quad/scripts/package.test.mjs && node quad/scripts/operator.test.mjs && node quad/scripts/ai-action.test.mjs && node quad/scripts/vault.test.mjs"
+    "engine:dev": "turbo run dev --filter='./engine/*'",
+    "engine:test": "turbo run test --filter='./engine/*' --filter='./engine/apps/*'",
+    "engine:typecheck": "turbo run typecheck --filter='./engine/*' --filter='./engine/apps/*'",
+    "engine:gate": "node engine/scripts/inert.test.mjs && node engine/scripts/docs.test.mjs && node engine/scripts/guards.test.mjs && node engine/scripts/kernel.test.mjs && node engine/scripts/declarations.test.mjs && node engine/scripts/shards.test.mjs && node engine/scripts/apps.test.mjs && node engine/scripts/heroui.test.mjs && node engine/scripts/ground.test.mjs && node engine/scripts/motion.test.mjs && node engine/scripts/states.test.mjs && node engine/scripts/shape.test.mjs && node engine/scripts/face.test.mjs && node engine/scripts/scene.test.mjs && node --experimental-strip-types engine/scripts/tone.test.mjs && node engine/scripts/provenance.test.mjs && node engine/scripts/surface.test.mjs && node engine/scripts/hub.test.mjs && node engine/scripts/services.test.mjs && node engine/scripts/agent.test.mjs && node engine/scripts/access.test.mjs && node engine/scripts/package.test.mjs && node engine/scripts/operator.test.mjs && node engine/scripts/ai-action.test.mjs && node engine/scripts/vault.test.mjs"
   },
   "devDependencies": {
     "turbo": "^2.5.9",

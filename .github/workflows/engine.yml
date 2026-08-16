@@ -1,0 +1,277 @@
+name: OneEngine
+
+# ONE — the framework's own deployment. Separate from `deploy.yml` on purpose,
+# and the separation is the safety property rather than tidiness.
+#
+# ── Why this cannot touch the live product ──────────────────────────────────
+#
+# `deploy.yml`, `ci.yml` and `provision.yml` derive every app they touch from
+# `apps.json`. OneEngine is absent from it, so none of the three can select One —
+# and `engine/scripts/inert.test.mjs` (in `pnpm engine:gate`, and run below before
+# anything is created) fails if somebody registers it there, if the worker name
+# collides with a live one, if a D1 name does, or if `ROOT` overlaps a route a
+# paying tenant answers on. That last one is the collision nobody sees coming:
+# One serves `*.${ROOT}`, so a `ROOT` of `4dl.app` would put One's wildcard over
+# `<slug>.kova.4dl.app` and route precedence, not intent, would decide who
+# answers a customer's address.
+#
+# The reverse direction is the `paths:` filter below: a push that changes only
+# `apps/` or `packages/` runs nothing here.
+#
+# ── Secrets ─────────────────────────────────────────────────────────────────
+#
+#   CLOUDFLARE_API_TOKEN   — the same account token deploy.yml uses
+#   CLOUDFLARE_ACCOUNT_ID  — the account id
+#
+# ⚠️ AND THE WORKER GETS NEITHER. `AUTH_SECRET` is a WORKER secret, set once by
+# the provision path below and never re-put — nothing else is. One makes no
+# Cloudflare API call at runtime and has no code path that could use a token, so
+# putting one in `env` would be handing every request handler the account.
+on:
+  push:
+    branches: [main, claude/quad]
+    paths:
+      - "engine/**"
+      - ".github/workflows/engine.yml"
+      # The root files the engine's build actually depends on. Deliberately NOT a
+      # catch-all: a Kova-only change must not mint a One version.
+      - "turbo.json"
+      - "pnpm-lock.yaml"
+      - "package.json"
+  pull_request:
+    branches: [main]
+    paths:
+      - "engine/**"
+      - ".github/workflows/engine.yml"
+  workflow_dispatch:
+    inputs:
+      provision:
+        description: "Create the D1 databases One binds, and commit their ids"
+        type: boolean
+        default: false
+      deploy:
+        description: "Deploy after the gate passes"
+        type: boolean
+        default: true
+
+concurrency:
+  # NOT cancel-in-progress: the provision path commits resource ids, and a run
+  # cancelled between creating a database and writing its id leaves an orphan
+  # nobody knows about.
+  group: engine-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ── The gate. Credential-free, and nothing below runs without it. ─────────
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Before install, dependency-free, for the reason the other workflows run
+      # theirs there: a check that needs the workspace installed cannot guard the
+      # workspace's own install. A broken workflow does not fail — it does not
+      # RUN, and GitHub lists it by filename with nothing saying why.
+      - run: node .github/workflows/workflows-parse.test.mjs
+      # ⚠️ THE ISOLATION CHECK, AND IT RUNS FIRST. Everything else here is about
+      # whether OneEngine works; this is about whether OneEngine can reach the deployment a
+      # customer is using.
+      - run: node engine/scripts/inert.test.mjs
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Same cache the other workflows keep, same reasoning: turbo keys each task
+      # on the content of its inputs, so a package that changed misses and
+      # re-runs. A stale cache cannot make a broken commit pass; it can only fail
+      # to save time.
+      - uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-
+
+      - run: pnpm engine:gate
+      - run: pnpm engine:typecheck
+
+      # ⚠️ SERIALLY. `ci.yml` documents why at length: three Workers-pool suites
+      # started at turbo's default concurrency on a 2-core runner get one of them
+      # KILLED — no assertion, no stack, a `workerd` left orphaned — and `retry`
+      # cannot help, because the runtime dies before a test exists to retry.
+      - run: pnpm turbo run test --filter='./engine/*' --filter='./engine/apps/*' --concurrency=1
+
+  # ── Create the databases One binds, and write their ids in. ───────────────
+  #
+  # ⚠️ MANUAL, AND THAT IS DELIBERATE. `deploy.yml` find-or-creates a KV
+  # namespace on its own deploy path and explains why that is safe there: the
+  # worst case is an empty namespace. A DATABASE is not that. `wrangler d1
+  # create` succeeds under any name it has not seen, so a config whose name had
+  # drifted would quietly get a second, empty database — and every request would
+  # then succeed against it while the real rows sat somewhere else.
+  #
+  # Idempotent: it lists first and creates only what is missing. Creating on the
+  # basis of a FAILED list is how duplicates get made, so a list that errors
+  # stops the job rather than proceeding.
+  provision:
+    needs: gate
+    if: github.event_name == 'workflow_dispatch' && inputs.provision
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The BRANCH, not the triggering SHA: this job commits the ids, and a
+          # commit built on an older SHA is rejected the moment the branch moves.
+          ref: ${{ github.ref_name }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Create what is missing, and bind it
+        working-directory: engine/one
+        run: |
+          set -euo pipefail
+
+          # Wrangler prints a version banner to STDOUT before the JSON payload,
+          # so `--json | jq` dies with "Invalid numeric literal". Drop everything
+          # before the first line that opens an array or object.
+          json_only() { awk 'f || /^[[:space:]]*[[{]/ { f = 1; print }'; }
+
+          if ! list=$(pnpm exec wrangler d1 list --json 2>&1 | json_only); then
+            echo "::error::Cannot list D1 databases. The API token is probably missing D1:Edit."
+            exit 1
+          fi
+
+          for name in $(node ../scripts/bind-ids.mjs --names); do
+            id=$(printf '%s' "$list" | jq -r --arg n "$name" '.[]? | select(.name == $n) | .uuid' | head -1)
+            if [ -z "$id" ]; then
+              echo "Creating D1 '$name'…"
+              pnpm exec wrangler d1 create "$name" >/dev/null
+              id=$(pnpm exec wrangler d1 list --json 2>/dev/null | json_only \
+                   | jq -r --arg n "$name" '.[]? | select(.name == $n) | .uuid' | head -1)
+            fi
+            if [ -z "$id" ]; then
+              echo "::error::Could not create or read back D1 '$name'."
+              exit 1
+            fi
+            node ../scripts/bind-ids.mjs "$name" "$id"
+          done
+
+      # ⚠️ The guard runs AGAIN, against the file this job just wrote. A binder
+      # that wrote a real id into the wrong binding would point the directory at
+      # a shard, and every cross-tenant question at one workspace's records.
+      - run: node engine/scripts/inert.test.mjs
+
+      - name: Record the ids
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- engine/one/wrangler.jsonc; then
+            echo "Already bound — nothing to commit."
+            exit 0
+          fi
+          git add engine/one/wrangler.jsonc
+          git commit -m "Bind One's D1 databases [skip ci]"
+          # A GITHUB_TOKEN push starts no new workflow run, so this cannot loop.
+          git push origin HEAD:${{ github.ref_name }}
+
+      # ⚠️ SET ONCE, NEVER RE-PUT. Rewriting it invalidates every sign-in code in
+      # flight, and the reason this is a WORKER secret rather than a repo one is
+      # that a repo secret is readable by every workflow run in the repository.
+      - name: Mint AUTH_SECRET if the worker has none
+        working-directory: engine/one
+        run: |
+          set -uo pipefail
+          if pnpm exec wrangler secret list 2>/dev/null | grep -q AUTH_SECRET; then
+            echo "::notice::AUTH_SECRET already set — leaving it alone."
+            exit 0
+          fi
+          node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))" \
+            | pnpm exec wrangler secret put AUTH_SECRET
+          echo "::notice::Minted AUTH_SECRET."
+
+  # ── Deploy. ───────────────────────────────────────────────────────────────
+  #
+  # `claude/quad` is in the trigger because that is where the work is and there
+  # is nothing on the other end to protect yet. Remove it the day One carries a
+  # real tenant.
+  deploy:
+    needs: [gate, provision]
+    # `always()` because `provision` is skipped on an ordinary push, and a
+    # skipped need would otherwise skip this too. The gate's result is still
+    # required — a failed gate must never reach here.
+    if: >-
+      always() && needs.gate.result == 'success'
+      && needs.provision.result != 'failure'
+      && github.event_name != 'pull_request'
+      && (github.event_name != 'workflow_dispatch' || inputs.deploy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The BRANCH: `provision` may have just committed the resource ids, and
+          # the triggering SHA is the commit before that one.
+          ref: ${{ github.ref_name }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-
+
+      # ⚠️ A CONFIG STILL BINDING PLACEHOLDERS IS SKIPPED, NOT FAILED. Deploying
+      # against one does not error — wrangler binds *something* — and the worker
+      # comes up pointing at nothing, which is a green run and a dead product.
+      - id: ready
+        run: |
+          set -uo pipefail
+          if node engine/scripts/bind-ids.mjs --ready; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::One is not provisioned — skipping its deploy. Run this workflow with 'provision' ticked."
+          fi
+
+      # The worker serves `engine/one-hub/dist` through its `assets` binding, and
+      # an `assets.directory` is a filesystem path rather than a package
+      # dependency. `turbo.json` declares the edge for the TEST task; the deploy
+      # needs it built here too.
+      - name: Build the Hub
+        if: steps.ready.outputs.go == 'true'
+        run: pnpm turbo run build --filter=@engine/one-hub
+
+      - name: Deploy
+        if: steps.ready.outputs.go == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: engine/one
+          command: deploy
+
+      # ⚠️ "DEPLOYED" IS NOT "WORKING", and only a request tells them apart. The
+      # `ready` step above asks whether the CONFIG is real; it is blind to a
+      # worker that deploys perfectly and throws on every request. A hostname
+      # that does not resolve yet is a notice — DNS and the routes are dashboard
+      # steps — while one that resolves and answers wrongly is a failure.
+      - name: Verify it can actually boot
+        if: steps.ready.outputs.go == 'true'
+        run: node engine/scripts/boot-check.mjs

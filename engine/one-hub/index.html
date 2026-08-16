@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>One</title>
+    <meta name="description" content="Your workspaces." />
+    <!-- ⚠️ The ground is painted before a single component mounts. Without it a
+         cold start on a dark device is a white flash, which reads as a fault. -->
+    <meta name="color-scheme" content="light dark" />
+    <!-- ⚠️ BEFORE THE STYLESHEET, AND BEFORE THE BUNDLE. HeroUI has no
+         `prefers-color-scheme` rule at all — dark is `[data-theme="dark"]` on the
+         document — so this is what selects it, and doing it from the bundle
+         instead means the browser has already painted the light theme by the
+         time React mounts. `APPEARANCE_SCRIPT` in @engine/web is this string. -->
+    <script>
+      (function () {
+        try {
+          var c = localStorage.getItem("one:appearance");
+          if (c !== "light" && c !== "dark") {
+            c = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          }
+          document.documentElement.dataset.theme = c;
+          document.documentElement.style.colorScheme = c;
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

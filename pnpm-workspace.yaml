@@ -1,8 +1,8 @@
 packages:
   # Quad — the framework the apps move onto. Inert by construction: nothing here
   # is in apps.json, so `deploy.yml` can never select it — but its tests DO run.
-  - "quad/*"
-  - "quad/apps/*"
+  - "engine/*"
+  - "engine/apps/*"
   # The previous platform. Still the reference implementation of most mechanisms;
   # read it for HOW, not for WHAT. Same inertness for the same reason.
   - "platform/*"
