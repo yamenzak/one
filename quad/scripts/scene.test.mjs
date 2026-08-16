@@ -193,6 +193,49 @@ const DRAWN = [...filesIn("web/src"), ...filesIn("one-hub/src")];
   }
 }
 
+/* --------------------------------------------- one thing paints a ground --- */
+{
+  /*
+    ⚠️ CHOOSING A WORLD IS A DECISION; PAINTING ONE IS A MECHANISM, AND ONLY THE
+    DECISION IS ALLOWED TO BE IN MORE THAN ONE PLACE. `Page` and `Band` mount a
+    scene — the custom properties, the field element, the tone stamp, the room
+    reserved for a nav — and everything else in the product hands them a `sky` or
+    a `subject` and stops there.
+
+    ⚠️ THE SHELL BROKE THIS AND NOTHING NOTICED. It called `worldCss` and rendered
+    its own `<svg data-field>`, which is the same picture by a second route — so
+    the shell got the ground and would have missed every later thing `Page`
+    learns to do. That is not a hypothetical: `NAV_SPACE`, `data-tone` and the
+    reduced-motion opt-out all live on `Page` today and none of them reached the
+    chrome around every product's screens.
+
+    ⚠️ AND IT IS INVISIBLE IN A SCREENSHOT, which is the whole reason it is here.
+    A second painter looks exactly like the first one until the first one gains a
+    feature — at which point the difference is a screen that is subtly a version
+    behind, with no file that is wrong.
+  */
+  const PAINTS = /\bworldCss\s*\(|data-field/;
+  const MOUNTERS = new Set(["web/src/frame/layout.tsx", "web/src/tokens/ambience.ts"]);
+  const ALL = [...filesIn("web/src", /\.tsx?$/), ...filesIn("one-hub/src")];
+  let painters = 0;
+  for (const file of ALL) {
+    if (MOUNTERS.has(rel(file).split("\\").join("/"))) continue;
+    const m = code(readFileSync(file, "utf8")).match(PAINTS);
+    if (m) {
+      painters++;
+      fail(`${rel(file)}: paints a ground itself — \`${m[0]}\`.\n` +
+           `       \`Page\` and \`Band\` are what mount a scene. A second painter gets the ` +
+           `picture and none of the things the frame learns next, and the two look identical ` +
+           `until one of them does.`);
+    }
+  }
+  if (!ALL.length) {
+    fail("no surface files found — this guard would pass over an empty list.");
+  } else if (!painters) {
+    ok(`mount: ${ALL.length} surface file(s), one frame paints every ground`);
+  }
+}
+
 console.log(bad
   ? `\nscene: ${bad} finding(s) — a world that is not the same world twice.`
   : `\nscene: seeded, compositor-only, masked rather than washed, sized by area, bound not built.`);

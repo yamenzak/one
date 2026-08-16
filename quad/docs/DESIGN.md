@@ -99,6 +99,79 @@ everything on it costs a scroll, a scan, and a mistake.
 
 ## 4. Layout — you do not write one, you name one
 
+### First: the five names, and two of them are not layers
+
+The obvious model is a stack — shell, then ambience, then chrome, then layout,
+then components — and it is wrong in a way that matters, because two of those
+five are not containers at all. Nothing is ever *inside* the ambience. Nothing is
+ever *inside* the chrome. They are **materials**: what a container is made of and
+what floats on top of it, and they cut across every level rather than sitting at
+one.
+
+**Three containers, and they nest:**
+
+| | What it is | How many per address |
+|---|---|---|
+| **Page** | the floor: a ground, a tone, and the room a nav needs | **exactly one, always** |
+| **Shell** or **Layout** | a Page, dressed — see below | one, and which of the two is the question |
+| **Screen** | the shape: width, skeleton, empty state, arrival, where the one action goes | one per Page |
+
+**Two materials, and they cut across:**
+
+| | What it is | Who applies it |
+|---|---|---|
+| **Ambience** | what a Page's ground is made of — a family, a seed, a density | `Page` and `Band`, and nothing else (guarded) |
+| **Chrome** | the treatment on anything floating over a ground — `data-chrome`, `data-capsule`, `data-here` | one stylesheet, read by every control that floats |
+
+So the order is not `shell > ambience > chrome > layout`. It is
+**Page → (Shell | Layout) → Screen → components**, with ambience *inside* the
+Page and chrome *on top of* whatever floats.
+
+### Shell and Layout are siblings, not levels
+
+This is the answer to "does every screen get a layout, even a full-screen
+modal?" — **yes, every address gets a Page, and there are exactly two ways to
+dress one:**
+
+- **`Layout`** — a Page with a SUBJECT (or a material) and a frame. Used where an
+  address stands on its own: the hub, a full-screen surface, a sheet promoted to
+  a page, a door. **It has no nav, because most addresses are not destinations.**
+- **`Shell`** — a Page with a product's chrome: the crown, the desktop sidebar,
+  and the island over five destinations. Used where an address is one of a
+  product's screens.
+
+Both render `Page`. Neither wraps the other, and an address gets one of them —
+which is why a full-screen modal is a `Layout` with no nav rather than a Shell
+with its nav suppressed. Suppression is where a nav that should not be there
+comes back.
+
+⚠️ **`Shell` did NOT render `Page` until the commit that added this section.** It
+called `worldCss` and hand-rendered its own field element — the same picture by a
+second route, so it got the ground and would have missed everything `Page` learns
+next. `NAV_SPACE`, the tone stamp and the reduced-motion opt-out already lived on
+`Page` and none of them reached the chrome around every product's screens. The
+`mount:` check in `scripts/scene.test.mjs` is what makes that a test failure
+rather than a thing somebody notices a year later.
+
+### Why ambience is not a level
+
+A level is something you enter. You cannot enter the ambience — a screen never
+says "put me inside the world", it says **`sky="cloth"`** or **`subject={face}`**
+and the Page it is already inside changes what it is made of. The engine
+(`web/src/scene`) turns that into a ground, a field and a veil; `Page` mounts all
+three. That is why the guard names exactly two mounters: a third would be a
+second version of the material with no file that is wrong.
+
+### Why chrome is not a level either
+
+Chrome is what a control wears when it floats over a ground it does not control:
+the back chip, the compact title, the crown's actions, the nav island. It is a
+`data-` attribute and one stylesheet rule, so **both** Shell and Layout draw
+chrome and neither owns it. Making it a level would mean a "chrome layer" between
+the page and its content — which is a plate across the top of every screen, and
+that is the exact thing the glass pass removed.
+
+
 **A screen declares what KIND of page it is and hands over its content.** That
 is the whole of the layout system, and it exists because the alternative was
 measured: twenty screens each hand-assembling the same five decisions — column

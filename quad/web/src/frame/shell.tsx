@@ -20,7 +20,7 @@
  * dependency and that version.
  */
 
-import type { ScreenSpec, Tone } from "@quad/kernel";
+import type { ScreenSpec } from "@quad/kernel";
 import { PRIMARY_MAX, primaryOf } from "@quad/kernel";
 import { Button, Chip, Separator, Tooltip } from "@heroui/react";
 import {
@@ -28,10 +28,9 @@ import {
   FileText, House, Inbox as InboxGlyph, NotebookPen, Package, Plus, Shield, Sparkles, Sun,
   UserRound, Users,
 } from "lucide-react";
-import { Island } from "./layout.js";
-import { skyWorld, worldCss, type Sky } from "../tokens/ambience.js";
-import { useNight } from "./layout.js";
-import { GUTTER, NAV_SPACE, PAD, ROW, SPACE } from "../tokens/metrics.js";
+import { Island, Page } from "./layout.js";
+import { type Sky } from "../tokens/ambience.js";
+import { GUTTER, PAD, ROW, SPACE } from "../tokens/metrics.js";
 import { Face, appFace, worldFor, type FaceOf } from "../parts/face.js";
 
 /**
@@ -145,26 +144,37 @@ export function Shell(props: ShellProps) {
     `rich`; a screen with a table on it gets the same world with a third of the
     marks, which is the whole reason density is an intent rather than a number.
   */
+  /*
+    ⚠️ THE SHELL DECIDES WHICH WORLD; `Page` IS WHAT MOUNTS IT. This file used to
+    call `worldCss` and hand-render its own `<svg data-field>`, which is the
+    two-places-must-agree fault the layout work exists to remove, reintroduced
+    one level up: a grain, a vignette, a reduced-motion opt-out or a `data-tone`
+    added to `Page` would have reached every screen in the product except the
+    shell around them. Choosing a ground is a decision; painting one is a
+    mechanism, and only the decision belongs here.
+  */
   const named = at?.sky as Sky | undefined;
-  const world = named && named !== "plain"
-    /* ⚠️ SEEDED ON THE SCREEN'S OWN ROUTE, which is the whole gain over a name.
-       Two screens of one product naming `glow` are two grounds of one material
-       rather than the same picture twice, and nobody chose either of them. */
-    ? skyWorld(named, `${crown.appId}|${at?.route ?? ""}`)
-    : worldFor(appFace(crown.appId)) ?? null;
-  const night = useNight();
-  const own = world ? worldCss(world, { night, density: "quiet" }) : null;
+  /* ⚠️ SEEDED ON THE SCREEN'S OWN ROUTE, which is the whole gain over a name.
+     Two screens of one product naming `glow` are two grounds of one material
+     rather than the same picture twice, and nobody chose either of them. */
+  const lit = named && named !== "plain"
+    ? { sky: named, seedling: `${crown.appId}|${at?.route ?? ""}` }
+    : { world: worldFor(appFace(crown.appId)) ?? undefined };
 
   return (
-    <div
-      className="min-h-dvh flex flex-col"
-      data-sky={own ? "world" : "plain"}
-      style={own?.css as React.CSSProperties | undefined}
+    <Page
+      {...lit}
+      density="quiet"
+      /* ⚠️ THE NAV IS THE PAGE'S — see `PageProps.nav`. A sticky island floats
+         over whatever precedes it, and only the page can reserve the room. */
+      nav={<div className="md:hidden"><Island
+        here={here}
+        onGo={onGo}
+        items={primary.map((s) => ({
+          id: s.id, label: s.label, route: s.route, icon: glyphOf(s.icon ?? s.id),
+        }))}
+      /></div>}
     >
-      {/* ⚠️ An element, not a background — see `Page`. */}
-      {own?.field
-        ? <svg aria-hidden="true" data-field="true" dangerouslySetInnerHTML={{ __html: own.field }} />
-        : null}
       {/* ------------------------------------------------------------ crown --- */}
       <header className={`flex items-center ${SPACE.snug} ${GUTTER} ${ROW.pad}`}>
         {/* ⚠️ THE SAME PLATE EVERY OTHER FACE WEARS. A lone glyph beside a
@@ -234,22 +244,14 @@ export function Shell(props: ShellProps) {
           ))}
         </nav>
 
-        <main className={`flex-1 min-w-0 ${PAD} ${NAV_SPACE} md:${PAD}`}>{children}</main>
+        {/* ⚠️ NO `NAV_SPACE` HERE ANY MORE — `Page` adds it, because `Page` is
+            what was handed the nav and therefore what knows there is one to
+            reserve room for. Set in both places it is twice the room under the
+            last card, which is the failure mode of every measurement that lives
+            in two files. */}
+        <main className={`flex-1 min-w-0 ${PAD}`}>{children}</main>
       </div>
-
-      {/* ⚠️ THE ISLAND, not a welded bar — glass, one travelling pill, labels
-          that fold while somebody scrolls. The same component every specimen
-          uses, so the phone nav cannot drift from the design. */}
-      <div className="md:hidden">
-        <Island
-          here={here}
-          onGo={onGo}
-          items={primary.map((s) => ({
-            id: s.id, label: s.label, route: s.route, icon: glyphOf(s.icon ?? s.id),
-          }))}
-        />
-      </div>
-    </div>
+    </Page>
   );
 }
 
