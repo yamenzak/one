@@ -138,6 +138,19 @@ They are kinds of PURPOSE, not kinds of arrangement. "Two columns" is not a
 shape; it is a consequence, and naming consequences is how a preset system
 becomes a second CSS with worse names.
 
+**Two of the eight have no screen on them yet — `form` and `reader` — and that
+is deliberate rather than an oversight.** Everywhere else in this system an
+unused thing is a smell (an ambience no row wants is wallpaper), and the reason
+this is different is what a shape IS: somewhere for the *next* screen to land. A
+table a screen's author cannot find their page in is one they opt out of, and
+the screen after that is hand-built with the whole argument re-run. Six is the
+floor the guard enforces; a ninth needs a page nobody could file today.
+
+**A door is not a screen.** The sign-in, the signpost and the setup wizard have
+no router above them and nowhere to go back to — a crown there is a control
+that closes onto a backdrop. They keep `Arrival`, and the guard exempts them by
+name.
+
 **A `settings` screen cannot have a primary action, and that is the most useful
 row in the table.** Every control on one saves itself the moment it changes
 (`useAction`, `useConfirmedState`). A Save button beside them makes it a screen
