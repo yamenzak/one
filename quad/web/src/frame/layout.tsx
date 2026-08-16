@@ -36,6 +36,7 @@ import {
   type Space, type Width,
 } from "../tokens/metrics.js";
 import { MOTION, useStill } from "../tokens/motion.js";
+import type { Density } from "../scene/index.js";
 import { Face, type FaceOf } from "../parts/face.js";
 
 export type { Space, Width };
@@ -73,13 +74,18 @@ export interface PageProps {
    * outside; its own screen is that planet's sky, from the same two colours
    * (`worldCss`). Supplied, it wins over `sky` — a page has one ground.
    *
-   * ⚠️ AND IT IS STILL NOT AN INLINE BACKGROUND. What goes on the element is
-   * three custom PROPERTIES the `world` rules read, so the fade, the grain, the
-   * vignette, the drift, both reduced-motion opt-outs and the per-theme choice
-   * of which colour leads all still apply. An inline `background-image` would
-   * beat every token and freeze one page on ours.
+   * ⚠️ AND IT IS STILL NOT AN INLINE BACKGROUND. What goes on the element is two
+   * custom PROPERTIES the `world` rules read, so the fade, the grain, the
+   * vignette, the drift and both reduced-motion opt-outs all still apply. An
+   * inline `background-image` would beat every token and freeze one page on ours.
    */
   readonly world?: World;
+  /**
+   * ⚠️ HOW MUCH OF ITSELF THE GROUND SHOWS, AS AN INTENT RATHER THAN A NUMBER. A
+   * screen knows how much of it is content; what that means in stars is the
+   * engine's. A page of rows takes `quiet`, an arrival takes `rich`.
+   */
+  readonly density?: Density;
   readonly tone?: Tone;
   /**
    * ⚠️ THE NAV IS THE PAGE'S, NOT THE CONTENT'S, AND THIS IS WHY. A sticky island
@@ -101,61 +107,63 @@ export interface PageProps {
  * is a page whose last control sits under the address bar until you scroll,
  * which reads as a broken layout rather than as a unit bug.
  */
-export function Page({ sky = "plain", world, tone = "neutral", nav, children }: PageProps) {
-  /* ⚠️ The twinkle is CSS inside the star field's own SVG, so switching it off
-     is a different picture — see `starsFor`. */
+export function Page(
+  { sky = "plain", world, density = "even", tone = "neutral", nav, children }: PageProps,
+) {
+  /* ⚠️ The motion is CSS inside the field's own SVG, so switching it off is a
+     different picture — see `render`. */
   const at = React.useRef<HTMLDivElement>(null);
   const still = useStill(at);
-  const own = world ? worldCss(world, !still) : null;
+  /*
+    ⚠️ THE THEME PICKS A SKY, AND THIS REPLACES A RULE THAT SHOULD NEVER HAVE
+    BEEN ONE. For one build a world was a dark room in both themes, because every
+    attempt at a pale night sky came out grey and "space is dark, so commit"
+    looked like a decision. It was three failed attempts wearing one: the family
+    declares a `day` as well as a `night` — different ground, different specks,
+    light from above rather than from underfoot — so light mode gets a real
+    daytime sky and nobody has to be told to accept a black page.
+
+    ⚠️ READ SYNCHRONOUSLY AND FROM THE DOCUMENT, because a stamp is what the
+    theme actually is here (`ThemeProvider` writes `data-theme` on the root) and
+    a first render that guessed wrong would swap the sky one frame later.
+  */
+  const night = useNight();
+  const own = world ? worldCss(world, { night, moving: !still, density }) : null;
   return (
     <div
       ref={at}
       className="min-h-dvh flex flex-col"
       data-sky={own ? "world" : sky}
-      /*
-        ⚠️ A WORLD IS A DARK ROOM IN BOTH THEMES, AND THAT IS THE ANSWER TO THE
-        ONE THING LIGHT MODE COULD NOT DO. Space is dark. Every attempt to make
-        it pale is the same attempt to make a night sky out of paper: lead with
-        the planet's body colour and the ground competes with the planet, lead
-        with its deep and a near-black mixed into white is a grey nobody chose.
-        Neither is washed because it is tuned wrong — both are washed because the
-        subject is a night and the ground was being asked to be day.
-
-        ⚠️ SO THE SCREEN STOPS ASKING. Stamping the theme scopes every token
-        inside it — ours and the library's — so the cards, the type and the
-        controls are all the dark set, and somebody in light mode walks from a
-        paper hub into a lit room. That is what an arrival IS; a title card that
-        matched the page it was announcing would not be one.
-
-        ⚠️ AND IT IS THE ONLY PLACE IN THE PRODUCT THAT DOES THIS. A screen that
-        picked its own theme would be a screen somebody's preference does not
-        reach, which is why it is `Page`'s decision, taken with a world and never
-        otherwise.
-      */
-      {...(own ? { "data-theme": "dark" } : {})}
       data-tone={tone}
-      /*
-        ⚠️ `color` AND `background` ARE RE-DECLARED HERE, AND WITHOUT THEM THE
-        STAMP ABOVE DOES ALMOST NOTHING. `color` is INHERITED: `body` resolves
-        `var(--foreground)` once, in the light theme, and every descendant
-        inherits the computed value — redefining the token further down the tree
-        cannot reach back up and re-run it. The title came out near-black on a
-        night sky and looked like a z-index fault rather than a cascade one.
-        Setting both on the element that carries the stamp is what makes the
-        subtree resolve against its own tokens.
-      */
-      style={own
-        ? ({
-          ...own,
-          color: "var(--foreground)",
-          background: "var(--background)",
-        } as React.CSSProperties)
-        : undefined}
+      style={own as React.CSSProperties | undefined}
     >
       <div className={`flex grow flex-col ${nav ? NAV_SPACE : ""}`}>{children}</div>
       {nav}
     </div>
   );
+}
+
+/**
+ * ⚠️ WHICH THEME IS IN FORCE, READ RATHER THAN GUESSED. `ThemeProvider` stamps
+ * `data-theme` on the document element and the system preference decides when it
+ * has not; a component that assumed either would pick the wrong sky on the first
+ * paint and swap it on the second, which reads as a flash rather than as a
+ * theme. Both sources, in the order the stylesheet resolves them.
+ */
+function useNight(): boolean {
+  const read = () => {
+    if (typeof document === "undefined") return true;
+    const stamped = document.documentElement.getAttribute("data-theme");
+    if (stamped) return stamped === "dark";
+    return typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches;
+  };
+  const [night, setNight] = React.useState(read);
+  React.useEffect(() => {
+    const on = new MutationObserver(() => setNight(read()));
+    on.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => on.disconnect();
+  }, []);
+  return night;
 }
 
 /* ------------------------------------------------------------------- band --- */

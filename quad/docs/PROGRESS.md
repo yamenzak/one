@@ -551,7 +551,7 @@ The guard registry, its checks, and the standards that bind them.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 5 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 31 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 35 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 2 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
@@ -707,6 +707,10 @@ the library decides FOR us.
 | `a-face-is-seeded-on-an-identity-not-a-label` | D7 | somebody gets a new face the day they correct the spelling of their name, and a workspace gets a new one the day it is renamed — so a picture people had learned to recognise means nothing; and a face fetched from api.dicebear.com puts a third party in the request path of every roster, unnamed on the trust screen |
 | `a-products-mark-wears-the-plate-every-face-wears` | D7 | a product appears beside a person as a bare character somebody typed — no ground under it, a different optical weight from every face in the same bar — so a workspace with six products is six identical glyphs and the label does all the work |
 | `a-workspaces-sky-is-its-planets-own-colours` | D7 | the ground somebody lands on is a different world from the planet in the row they pressed — because the sky's colours were re-derived by a hash of ours instead of read out of the picture, and the two agreed until one of them was edited |
+| `a-world-is-the-same-world-twice` | D7 | a workspace's sky is a different place on every reload, which nobody reports because nobody can hold two of them side by side |
+| `a-ground-animates-on-the-compositor-only` | D7 | a full-viewport layer repaints every frame for ever on a phone — invisible on the laptop it was written on, and the first thing a reviewer blames on the device |
+| `a-ground-is-masked-rather-than-washed` | D7 | one screen's contrast problem is fixed with a scrim, and every workspace's brand is grey behind a film nobody outside that file can see |
+| `a-scene-is-sized-by-area-not-by-count` | D7 | the same world is sparse on a desktop and crowded on a phone, and whichever screen it was tuned on is the only one it looks right on |
 <!-- /generated -->
 
 ## Commands

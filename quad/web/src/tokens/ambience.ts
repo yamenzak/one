@@ -42,7 +42,8 @@
 
 import type { Tone } from "@quad/kernel";
 /* ⚠️ The pace and the curve are the vocabulary's, not this file's — see `DRIFT`. */
-import { DURATION, EASE, TWINKLE } from "./motion.js";
+import { DURATION, EASE } from "./motion.js";
+import { DENSITY, SPACE, render, type Density } from "../scene/index.js";
 
 /**
  * ⚠️ TWELVE, AND `plain` IS STILL THE DEFAULT. Ambience everywhere is ambience
@@ -552,6 +553,43 @@ export const FADE = (() => {
 })();
 
 /**
+ * THE VIGNETTE, AND IT IS A MASK RATHER THAN A WASH.
+ *
+ * ⚠️ THE DIFFERENCE IS THE WHOLE POINT. A ground that has to be COVERED to be
+ * readable is a ground that is too loud, and the cover is a grey film over
+ * somebody's brand: a scrim, a `bg-black/40`, an overlay div — every one of them
+ * makes the world dimmer everywhere rather than quieter where it matters, and
+ * every one is a decision a screen took locally that nobody can see from the
+ * outside. What a scene does instead is RECEDE: its own alpha drops where
+ * content sits, so the page's own ground shows through and the world is still at
+ * full strength at the edges.
+ *
+ * ⚠️ AN ELLIPSE DOWN THE READING COLUMN, because that is where content is on
+ * every shape in the system — `read` and `work` are both centred, and the two
+ * bands a screen is built from are the same column at two widths. Wide enough to
+ * clear a card, soft enough that the boundary is never a shape somebody can see.
+ *
+ * ⚠️ AND IT MULTIPLIES WITH `FADE`, WHICH IS WHY BOTH ARE IN ONE PROPERTY.
+ * `mask-image` takes a list and composites it — the vertical ramp and this
+ * ellipse together are one matte, and separating them into `mask-image` and
+ * `-webkit-mask-image` on different rules is how one of them silently stops
+ * applying.
+ */
+export const MATTE = (() => {
+  const ramp = "linear-gradient(180deg, black 0%, black 62%, "
+    + "color-mix(in oklab, black 60%, transparent) 84%, transparent 100%)";
+  /* ⚠️ `transparent` at the CENTRE — a mask is alpha, so transparent is where
+     the ground is hidden and black is where it survives. Written the other way
+     round the world appears only behind the text, which looks like a bug in the
+     one place it is hardest to notice. */
+  const column = "radial-gradient(58% 46% at 50% 46%,"
+    + " transparent 0%, color-mix(in oklab, black 55%, transparent) 46%, black 78%)";
+  const both = `${ramp}, ${column}`;
+  return `mask-image: ${both}; -webkit-mask-image: ${both};`
+    + ` mask-composite: intersect; -webkit-mask-composite: source-in`;
+})();
+
+/**
  * ⚠️ ONE VIEWPORT, NOT A BAND — see the header. A ground that stops behind the
  * crown draws a line across the page; one that lasts a screen and fades has
  * depth, and is gone by the time anybody has scrolled past it.
@@ -799,35 +837,18 @@ function layers(what: Ambience, hue: string): readonly string[] {
       ];
 
     /*
-      ⚠️ A WORKSPACE'S OWN SKY, IN THE PLANET'S COLOURS — see `worldCss` for
-      what sets the three properties and why.
+      ⚠️ A WORKSPACE'S OWN SKY, AND NEITHER LAYER IS WRITTEN HERE ANY MORE. The
+      ground and the speck field are both composed by the scene engine
+      (`scene/`) from a declared family and a seed — this is only where they are
+      mounted, so every knob the ambience system already has still applies.
 
-      ⚠️ `--world-ink` IS THE HALF THAT MAKES LIGHT WORK, and it is decided by
-      the STYLESHEET rather than here. A planet's deep is a near-black navy or
-      teal: over a dark page it is the night it is meant to be, and mixed into
-      paper it is a desaturated slate — the hue disappears and the world becomes
-      grey. Light therefore leads with the planet's BODY colour instead, which is
-      the same principle `field` states as "the value lightens; the hue stays
-      committed". One property, two rules, no second stack.
+      ⚠️ TWO PROPERTIES, NOT ONE, because they size differently: the field TILES
+      at its own dimensions and the ground fills the reach. `EXTRAS` spells both
+      out, and `background-size` cycles, so a missing entry tiles the ground at
+      the field's size and the whole world becomes wallpaper.
     */
     case "world":
-      return [
-        `var(--world-stars, none)`,
-        /* The ground underfoot, lit by the world's own colour. */
-        `radial-gradient(150% 62% at 50% 112%, `
-          + `color-mix(in oklab, var(--world-lit) calc(var(--sky, 1) * 30%), transparent) 0%,`
-          + ` transparent 66%)`,
-        /* A far, quiet halo of the same light, high and off-centre. */
-        `radial-gradient(95% 48% at 74% -14%, `
-          + `color-mix(in oklab, var(--world-lit) calc(var(--sky, 1) * 12%), transparent) 0%,`
-          + ` transparent 70%)`,
-        /* ⚠️ THE DEEP, MIXED TOWARD `--lumen` EXACTLY AS `field` DOES. This is
-           the layer that would otherwise be a black rectangle on a light page. */
-        `linear-gradient(180deg, `
-          + `color-mix(in oklab, var(--world-ink) 92%, var(--background)) 0%, `
-          + `color-mix(in oklab, var(--world-ink) 70%, var(--background)) 56%, `
-          + `color-mix(in oklab, var(--world-ink) 42%, var(--background)) 100%)`,
-      ];
+      return [`var(--world-art, none)`, `var(--world-ground, none)`];
 
   }
 }
@@ -869,28 +890,20 @@ function mulberry32(seed: number): () => number {
 /* ------------------------------------------------------------------ world --- */
 
 /**
- * A WORKSPACE'S OWN SKY, DERIVED FROM ITS PLANET.
+ * A WORKSPACE'S OWN SKY — the first scene, and the shape every ambience should
+ * become.
  *
- * ⚠️ THE POINT IS THE ARRIVAL. A workspace's face is a planet seen from
- * outside; opening that workspace puts you ON it — the same deep, the same
- * light, its stars scattered across the whole viewport. Two surfaces that share
- * a palette read as one place, and the row somebody pressed is the thing they
- * are now standing on. Nothing else in the product can say that, because
- * nothing else has an identity a ground can be built from.
+ * ⚠️ NOTHING IS DRAWN HERE. `scene/` holds the engine and `scene/space.ts` holds
+ * the family; this is the binding — two colours in, two CSS properties out. The
+ * first three builds of this drew the star field, the gradient and the twinkle
+ * by hand in this file, which is exactly how twenty-four ambiences came to be
+ * twenty-four afternoons.
  *
- * ⚠️ AND THE COLOURS ARE THE PLANET'S, NOT A SECOND GUESS AT THEM. They come
- * out of the picture that was drawn (`face.tsx`'s `worldOf`), matched against
- * the style's own declared palette — so the sky cannot drift from the planet,
- * and a palette DiceBear changes moves both together. Re-deriving them from the
- * slug with our own hash would be two generators that agree until one of them
- * is edited.
- *
- * ⚠️ EVERY THEME KNOB STILL APPLIES, WHICH IS WHAT KEEPS IT FROM BEING A BLACK
- * RECTANGLE ON PAPER. The deep mixes toward `--lumen` exactly as `field` does —
- * transparent in dark, so a navy over near-black is a glow; paper in light, so
- * the same navy is a pale wash. The stars carry `--thread`, which light sets to
- * zero: there are no stars in daylight, and a field of fine dark marks on paper
- * has a name (see `etch`).
+ * ⚠️ AND THE THEME PICKS A SKY RATHER THAN A STRENGTH. `space` declares a
+ * `night` and a `day` — different grounds, different specks, different light —
+ * so light mode gets a real daytime sky instead of a night sky turned down. The
+ * rule this replaces ("a world is a dark room in both themes") was not a design
+ * decision, it was three failed attempts wearing one.
  */
 export interface World {
   /** The planet's own deep — its background, straight out of the picture. */
@@ -898,134 +911,48 @@ export interface World {
   /** The planet's body colour: the light this world is lit by. */
   readonly lit: string;
   /**
-   * ⚠️ THE SEED TRAVELS WITH THE COLOURS, IN ONE OBJECT, so a caller cannot
-   * hand over one and forget the other. As two arguments this was a `world`
-   * prop and a `worldSeed` prop that had to agree — and a page given the
-   * colours but no seed is a sky with no stars, which looks deliberate.
+   * ⚠️ THE SEED TRAVELS WITH THE COLOURS, IN ONE OBJECT, so a caller cannot hand
+   * over one and forget the other. As two arguments this was a `world` prop and
+   * a `worldSeed` prop that had to agree — and a page given the colours but no
+   * seed is a sky with no stars, which looks deliberate.
    */
   readonly seed: string;
 }
 
-/**
- * A SKY, SCATTERED BY A SEED.
- *
- * ⚠️ NEVER BY `Math.random`. A world is an identity: the same workspace has the
- * same stars in the same places forever, on every device and after every deploy.
- * Same rule and same generator as `bespokeCss`.
- *
- * ⚠️ FIVE MAGNITUDES AT THE STYLE'S OWN WEIGHTS, AND THAT IS BORROWED RATHER
- * THAN INVENTED. `planets` declares faint(2) small(3) medium(3) large(1)
- * sparkle(1) with radii .7/.8/1.1/1.4 and opacities .5/.85/.85/.9 — a
- * distribution somebody tuned, where most stars are barely there and a few are
- * not. A field of equal dots is a texture; that ratio is a sky.
- *
- * ⚠️ AND THE TWINKLE IS INSIDE THE PICTURE, WHICH IS THE LESSON WORTH TAKING.
- * The style animates its own stars from a `<style>` element in its own SVG,
- * behind its own `prefers-reduced-motion: no-preference` guard — so the motion
- * travels with the image, survives being used as a background, and switches
- * itself off without a single rule from us. The three brightest magnitudes
- * twinkle at the style's own periods and offsets; the two faintest never do,
- * because a sky where everything moves is a sky nobody can read over.
- */
-function starArt(seed: number, moving: boolean): string {
-  const r = mulberry32(seed);
-  const W = 1400, H = 1000;
-
-  /* ⚠️ Cumulative weights, so the ratio is the table rather than a chain of
-     thresholds somebody has to re-derive when a magnitude is added. */
-  const KINDS: readonly {
-    readonly w: number; readonly r: number; readonly a: number; readonly tw: string | null;
-  }[] = [
-    { w: 2, r: 0.7, a: 0.5, tw: null },
-    { w: 3, r: 0.8, a: 0.85, tw: null },
-    { w: 3, r: 1.1, a: 0.85, tw: "m" },
-    { w: 1, r: 1.4, a: 0.9, tw: "l" },
-    /* ⚠️ `r: 0` MARKS THE SPARKLE, which is a path rather than a circle. */
-    { w: 1, r: 0, a: 0.9, tw: "s" },
-  ];
-  const total = KINDS.reduce((n, k) => n + k.w, 0);
-
-  const marks: string[] = [];
-  for (let i = 0; i < 260; i += 1) {
-    const x = +(r() * W).toFixed(1);
-    const y = +(r() * H).toFixed(1);
-    let pick = r() * total;
-    let k = KINDS[0]!;
-    for (const kind of KINDS) { pick -= kind.w; if (pick <= 0) { k = kind; break; } }
-    const cls = moving && k.tw ? ` class="tw-${k.tw}"` : "";
-    marks.push(k.r === 0
-      /* ⚠️ THE SPARKLE IS A FOUR-POINT PATH, not a bigger dot — the one shape in
-         the set that reads as a STAR rather than as a speck, which is why it is
-         the rarest and the fastest to twinkle. */
-      ? `<path${cls} transform="translate(${x} ${y}) scale(0.42)" d="M5 1.8Q5.5 4.5 8.2 5 5.5 5.5 5 8.2 4.5 5.5 1.8 5 4.5 4.5 5 1.8" fill="#fff" fill-opacity="${k.a}"/>`
-      : `<circle${cls} cx="${x}" cy="${y}" r="${k.r}" fill="#fff" fill-opacity="${k.a}"/>`);
-  }
-
-  /* ⚠️ THE PERIODS ARE `motion.ts`'S, NOT THIS FILE'S — see `TWINKLE`. A
-     generated picture carrying its own stylesheet is still a place a duration
-     could be invented, and the guard is right to say so. */
-  const beat = (cls: string, t: { readonly period: string; readonly delay: string }) =>
-    `.${cls}{animation:qTw ${t.period} ease-in-out infinite ${t.delay}}`;
-  const motion = moving
-    ? `<style>@media (prefers-reduced-motion: no-preference){`
-      + `@keyframes qTw{0%,100%{opacity:1}50%{opacity:.3}}`
-      + beat("tw-m", TWINKLE.medium) + beat("tw-l", TWINKLE.large) + beat("tw-s", TWINKLE.sparkle)
-      + `}</style>`
-    : "";
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`
-    + motion + marks.join("") + `</svg>`;
-}
-
-/** ⚠️ A hash rather than a random — see `starArt`. FNV-1a, as elsewhere. */
-const seedOf = (text: string): number => {
-  let h = 2166136261;
-  for (let i = 0; i < text.length; i += 1) {
-    h ^= text.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-};
-
-/**
- * THE THREE PROPERTIES `world` READS. Hand the result to `Page` and a
- * workspace's planet becomes the ground under its screen.
- *
- * ⚠️ PROPERTIES, NOT A BACKGROUND. What a screen sets is three VALUES; the
- * layers that use them are written once in `layers("world")` and the theme rules
- * are written once in the stylesheet. A screen handed a whole `background-image`
- * would be a screen that could put anything there — and the first one to do it
- * is a page a workspace's branding no longer reaches (D7).
- */
-export function worldCss(world: World, moving = true): Readonly<Record<string, string>> {
-  return {
-    "--world-deep": world.deep,
-    "--world-lit": world.lit,
-    "--world-stars": starsFor(world.seed, moving),
-  };
-}
-
 /*
-  ⚠️ BAKED PER SEED AND KEPT, because a workspace's sky is rebuilt on every
-  render of the screen it is on — and 170 circles through `encodeURIComponent`
-  is not free at 60fps while somebody scrolls.
+  ⚠️ BAKED PER SCENE AND KEPT. A workspace's sky is rebuilt on every render of
+  the screen it is on, and two hundred marks through `encodeURIComponent` is not
+  free at 60fps while somebody scrolls.
 */
-const skies = new Map<string, string>();
+const skies = new Map<string, { readonly art: string; readonly ground: string }>();
 
 /**
- * ⚠️ TWO BAKES PER SEED, LIKE EVERY FACE, AND FOR THE SAME REASON. The twinkle
- * is CSS inside the SVG, where no rule of ours reaches — so switching it off
- * means serving a different picture. The style's own guard covers the operating
- * system's setting; the still bake is what covers the switch inside the app.
+ * THE PROPERTIES `world` READS. Hand the result to `Page` and a workspace's
+ * planet becomes the ground under its screen.
+ *
+ * ⚠️ PROPERTIES, NOT A BACKGROUND. What a screen sets is VALUES; which layers
+ * use them is written once in `layers("world")`. A screen handed a whole
+ * `background-image` would be a screen that could put anything there — and the
+ * first one to do it is a page a workspace's branding no longer reaches (D7).
  */
-const starsFor = (seed: string, moving: boolean): string => {
-  const key = `${moving ? "m" : "s"}|${seed}`;
-  const had = skies.get(key);
-  if (had !== undefined) return had;
-  const url = art(starArt(seedOf(seed), moving));
-  skies.set(key, url);
-  return url;
-};
+export function worldCss(
+  world: World, at: { readonly night: boolean; readonly moving: boolean; readonly density: Density },
+): Readonly<Record<string, string>> {
+  const key = `${world.seed}|${world.deep}|${world.lit}|${at.night ? "n" : "d"}`
+    + `|${at.moving ? "m" : "s"}|${at.density}`;
+  let made = skies.get(key);
+  if (!made) {
+    made = render({
+      family: at.night ? SPACE.night : SPACE.day,
+      seed: world.seed,
+      palette: { deep: world.deep, lit: world.lit },
+      density: DENSITY[at.density],
+      motion: at.moving,
+    });
+    skies.set(key, made);
+  }
+  return { "--world-art": made.art, "--world-ground": made.ground };
+}
 
 /**
  * ⚠️ BESPOKE IS COMPOSED FROM THE SAME PRIMITIVES, WHICH IS WHAT KEEPS
@@ -1200,7 +1127,12 @@ export function ambienceStylesheet(): string {
   const rules = AMBIENCES.filter((a) => a !== "plain").map((a) => {
     const css = ambienceCss(a);
     const extra = EXTRAS[a] ? `; ${EXTRAS[a]}` : "";
-    return `[data-sky="${a}"]::before { ${css}${extra}; ${FADE}; }`;
+    /* ⚠️ A SCENE RECEDES UNDER CONTENT; A NAMED AMBIENCE ONLY FADES DOWN THE
+       PAGE — see `MATTE`. The composed grounds carry marks a reader's eye lands
+       on, which is what the column matte is for; the hand-written gradient
+       stacks are soft everywhere and a hole in the middle of one would be
+       visible as a shape. */
+    return `[data-sky="${a}"]::before { ${css}${extra}; ${a === "world" ? MATTE : FADE}; }`;
   });
 
   /*

@@ -1171,6 +1171,42 @@
       "impl": "scripts/face.test.mjs",
       "proves": "palette: ",
       "fails": "the ground somebody lands on is a different world from the planet in the row they pressed — because the sky's colours were re-derived by a hash of ours instead of read out of the picture, and the two agreed until one of them was edited"
+    },
+    {
+      "id": "a-world-is-the-same-world-twice",
+      "protects": "D7",
+      "stage": "17",
+      "status": "live",
+      "impl": "scripts/scene.test.mjs",
+      "proves": "seed: ",
+      "fails": "a workspace's sky is a different place on every reload, which nobody reports because nobody can hold two of them side by side"
+    },
+    {
+      "id": "a-ground-animates-on-the-compositor-only",
+      "protects": "D7",
+      "stage": "17",
+      "status": "live",
+      "impl": "scripts/scene.test.mjs",
+      "proves": "motion: ",
+      "fails": "a full-viewport layer repaints every frame for ever on a phone — invisible on the laptop it was written on, and the first thing a reviewer blames on the device"
+    },
+    {
+      "id": "a-ground-is-masked-rather-than-washed",
+      "protects": "D7",
+      "stage": "17",
+      "status": "live",
+      "impl": "scripts/scene.test.mjs",
+      "proves": "wash: ",
+      "fails": "one screen's contrast problem is fixed with a scrim, and every workspace's brand is grey behind a film nobody outside that file can see"
+    },
+    {
+      "id": "a-scene-is-sized-by-area-not-by-count",
+      "protects": "D7",
+      "stage": "17",
+      "status": "live",
+      "impl": "scripts/scene.test.mjs",
+      "proves": "density: ",
+      "fails": "the same world is sparse on a desktop and crowded on a phone, and whichever screen it was tuned on is the only one it looks right on"
     }
   ]
 }

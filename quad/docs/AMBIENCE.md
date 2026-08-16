@@ -302,6 +302,58 @@ ground can be built from, which is why this is one ambience rather than a family
   keep `linen`. An arrival somebody never leaves is not an arrival, and those are
   screens with eight rows on them. Landing is a moment; working is a material.
 
+## The scene engine
+
+**A ground is a COMPOSITION, not a gradient**, and `web/src/scene/` is the
+engine that says so. It exists because the twenty-four named ambiences above are
+twenty-four worlds each drawn once — the twenty-fifth is the same afternoon
+again, and none of them can be varied per workspace at all.
+
+```
+family + seed + settings  →  a ground and a speck field
+```
+
+- **A FAMILY** declares what a kind of world is made of: named colour SLOTS, a
+  GROUND built from them, and SPECKS — each with weighted variants and, for the
+  ones that may move, which beat and what share of them keep it. `space` is the
+  first, with a `night` and a `day`.
+- **A SEED** decides which world you get. Same seed, same world, forever — a
+  scene is an identity, and `Math.random` appears nowhere in the directory.
+- **SETTINGS** are density and motion. Nothing else.
+
+Five decisions in it are worth knowing before adding a family.
+
+- **Density is a rate per megapixel, and a screen names an intent.** `quiet` for
+  a page of rows, `even` by default, `rich` for an arrival. A count would be
+  right for one canvas and wrong for every other; an intent keeps the number out
+  of the call site, where somebody would tune it for their own screen.
+- **Scatter is a jittered grid, which is blue noise for free.** Independent x and
+  y produce clumps and bald patches and the eye reads both as structure. Cells
+  give evenness, the offset within each gives irregularity, and it costs one pass
+  instead of the rejection sampling a true Poisson disc needs.
+- **Only a share of the marks that CAN move actually do.** A field where
+  everything twinkles is a field nobody can read over — the movement stops
+  reading as life and starts reading as noise. About a third of the bright stars,
+  half the sparkles, none of the faint.
+- **The motion lives inside the generated SVG**, behind its own
+  `prefers-reduced-motion` guard, and animates opacity only. It travels with the
+  image, needs no keyframe registered anywhere, and stays on the compositor —
+  anything else on a layer this size repaints the viewport every frame, for ever,
+  and looks identical on the machine it was written on.
+- **The vignette is a MASK, not a wash.** A ground that has to be covered to be
+  readable is a ground that is too loud, and the cover is a grey film over
+  somebody's brand. A scene's own alpha drops where content sits, so the page's
+  ground shows through and the world is at full strength at the edges. A guard
+  refuses the scrim.
+
+**And light mode is a real sky rather than a rule.** For one build a world was a
+dark room in both themes, because every attempt at a pale night came out grey and
+"space is dark, so commit" looked like a decision. It was three failed attempts
+wearing one. `day` is a different set of decisions — light from above rather than
+underfoot, the deep surviving only as the blue a sky keeps at its zenith, the
+horizon warmed most of the way to white, and haze instead of stars. That is what
+a family is for.
+
 ## What this is a prototype of
 
 **The next ambience system is this one, generalised** — and the four things
@@ -325,6 +377,12 @@ ground can be built from, which is why this is one ambience rather than a family
    variants already in them; each is a candidate family, and a screen kind picks a
    family the way it picks a shape today.
 
-⚠️ **What is NOT yet done, and should not be claimed:** the twenty-four
-brand-hued ambiences above are still hand-written gradient stacks. `world` is one
-composed ground, on one screen. The rewrite is the work, not this section.
+⚠️ **What is NOT yet done, and should not be claimed.** ONE family exists —
+`space`, in two skies, on one screen. The twenty-four brand-hued ambiences above
+are still hand-written gradient stacks and none of them has been ported. Four
+things the engine is designed for have no code at all: a family bound to a LAYOUT
+(so the layout knows where the matte goes and what slot the subject fills), type
+that derives its treatment from the scene under it, per-instance settings on top
+of a shared family (the "every wallet is glass, each wallet is its own glass"
+case), and any family that is not space. The engine is the foundation; the rest
+is the work.

@@ -131,7 +131,7 @@ function Screen({ where, onGo, onLeave }: {
       lit colour field is the fault `groundOf` was written to fix. Landing is a
       moment; working is a material.
     */
-    <Page sky={groundOf(where)} world={world}>
+    <Page sky={groundOf(where)} world={world} density={world ? "rich" : "even"}>
       {root
         ? (
           <>

@@ -98,11 +98,31 @@ if (!curves) ok(`curves: no screen writes its own easing or duration`);
  * ⚠️ SO A KEYFRAME IS LEGAL WHEN THE SAME FILE SWITCHES IT OFF BOTH WAYS: the
  * media query for the OS setting, and the `data-reduce-motion` ancestor for the
  * in-app one. Either alone leaves half the people who asked still watching it.
+ *
+ * ⚠️ AND A KEYFRAME INSIDE A GENERATED PICTURE ANSWERS THE SAME QUESTION WITH
+ * DIFFERENT MACHINERY. A scene's motion lives in a `<style>` element inside its
+ * own SVG (`scene/`), which is a document of its own: `data-reduce-motion` on an
+ * ancestor of the page is invisible to it, and no selector of ours crosses the
+ * boundary. What covers the in-app switch there is a SECOND BAKE — the still
+ * picture, served instead — so the shape to look for is the media query the SVG
+ * carries PLUS a conditionally emitted `<style>`: the branch that produces the
+ * still picture is the in-app opt-out. Accepting the page's spelling and refusing
+ * this one would have meant either an unswitchable animation or no generated
+ * motion at all.
+ *
+ * ⚠️ THE CONDITION IS WHAT IS CHECKED, NOT THE WORD "moving". The first version
+ * looked for that identifier and passed a mutation that removed the branch
+ * entirely — `Variant.moving` is a different thing in the same file, and one
+ * name matching somewhere is not an assertion about anything.
  */
-const offBoth = (src, name) =>
-  /prefers-reduced-motion:\s*reduce/.test(src)
-  && /data-reduce-motion="true"/.test(src)
-  && new RegExp(`animation:[^;]*${name}`).test(src);
+const offBoth = (src, name) => {
+  if (!new RegExp(`animation:[^;]*${name}`).test(src)) return false;
+  /* The page's two opt-outs. */
+  if (/prefers-reduced-motion:\s*reduce/.test(src) && /data-reduce-motion="true"/.test(src)) return true;
+  /* A generated picture's: its own guard, plus a still bake to serve instead. */
+  return /prefers-reduced-motion:\s*no-preference/.test(src)
+    && /\?\s*`?<style>/.test(src);
+};
 
 let frames = 0;
 for (const file of SOURCES) {
