@@ -11,7 +11,7 @@
  * record. A ceiling withholds email and push; it never withholds the fact.
  */
 
-import { NoteRow, NotificationPolicy, Screen, distinguishing, notice } from "@quad/web";
+import { NoteRow, NotificationPolicy, Screen, distinguishing, notice } from "@quad/design";
 import { api } from "../api.js";
 import { useLoad, type CentreView } from "./data.js";
 import type { PolicyAnswer } from "./Told.js";

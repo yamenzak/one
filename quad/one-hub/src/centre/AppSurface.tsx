@@ -9,7 +9,7 @@
  * are indistinguishable and only one of them gets reported.
  */
 
-import { Group, NoteRow, Section, Stack, appFace } from "@quad/web";
+import { Group, NoteRow, Section, Stack, appFace } from "@quad/design";
 import type { CentreApp } from "./data.js";
 
 /**

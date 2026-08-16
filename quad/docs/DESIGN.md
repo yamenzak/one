@@ -257,7 +257,7 @@ rather than a thing somebody notices a year later.
 A level is something you enter. You cannot enter the ambience — a screen never
 says "put me inside the world", it says **`sky="cloth"`** or **`subject={face}`**
 and the Page it is already inside changes what it is made of. The engine
-(`web/src/scene`) turns that into a ground, a field and a veil; `Page` mounts all
+(`design/src/scene`) turns that into a ground, a field and a veil; `Page` mounts all
 three. That is why the guard names exactly two mounters: a third would be a
 second version of the material with no file that is wrong.
 
@@ -417,7 +417,7 @@ One button inside a card is a button with a box drawn round it — put it where 
 belongs: in the crown, at the end of the row it acts on, or under the block it
 finishes.
 
-**Charts are part of the vocabulary and are barely used.** `@quad/web/chart`
+**Charts are part of the vocabulary and are barely used.** `@quad/design/chart`
 ships nine chart forms, five figure blocks and four round ones, with the rule for
 picking between them written at the top of the file. Anywhere the product shows a
 trend, a share, or a ratio against a limit as a number in text, it is throwing

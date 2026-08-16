@@ -14,7 +14,7 @@
  */
 
 import { Chip } from "@heroui/react";
-import { AmountRow, Bill, Group, Screen, appFace, glyphOf } from "@quad/web";
+import { AmountRow, Bill, Group, Screen, appFace, glyphOf } from "@quad/design";
 import { useLoad, type CentreView, type MoneyView } from "./data.js";
 
 export function Money({ view, onGo }: {

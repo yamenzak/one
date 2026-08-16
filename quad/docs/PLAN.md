@@ -135,7 +135,7 @@ blocker — but it is the one that is expensive to discover late.
                 no React. Everything here is testable with no fixture at all.
 @quad/runtime   The ONLY code that touches a binding. Turns a manifest into a
                 live worker: routing, gates, storage, dispatch, jobs.
-@quad/web       Browser screens. HeroUI v3. Router-free — an app brings its own.
+@quad/design       Browser screens. HeroUI v3. Router-free — an app brings its own.
 apps/*          Manifests. Product vocabulary lives here and nowhere else.
 services/*      Service-bound workers over RPC: ai, notify. See D3.
 ```
@@ -233,7 +233,7 @@ cascade · credit metering · the role builder · the help centre · the app swi
 ⚠️ **COMPONENTS ARE NOT RESTYLED (D7).** Consistency comes from using the
 library as it ships and theming it through tokens — not from every screen making
 its own choices carefully. A guard refuses custom `className` styling on HeroUI
-components in `@quad/web`. A tenant whose package includes whitelabel edits the
+components in `@quad/design`. A tenant whose package includes whitelabel edits the
 **theme**, and every component adapts with no screen changing.
 
 **The working sequence, every time, no exceptions:** decide what is being built →

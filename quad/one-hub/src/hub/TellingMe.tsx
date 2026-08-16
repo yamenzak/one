@@ -4,7 +4,7 @@
  * a workspace's own screens do, rather than the hub's frame knowing about it.
  */
 
-import { Screen } from "@quad/web";
+import { Screen } from "@quad/design";
 import { useCentre } from "../centre/data.js";
 import { Told } from "../centre/Told.js";
 

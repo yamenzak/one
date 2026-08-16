@@ -16,7 +16,7 @@
 import { Chip } from "@heroui/react";
 import {
   Group, Nothing, PersonRow, Screen, placeFace, sentence,
-} from "@quad/web";
+} from "@quad/design";
 import { useSession } from "../session.js";
 import { here, hubAt, isHere, setupUrl, tenantUrl } from "../door.js";
 import { pathOf, type Where } from "./where.js";

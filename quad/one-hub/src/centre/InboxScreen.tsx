@@ -6,7 +6,7 @@
  * guess. Marking one as seen is pressing it; the broom sweeps the rest.
  */
 
-import { Inbox, Screen } from "@quad/web";
+import { Inbox, Screen } from "@quad/design";
 import { api } from "../api.js";
 import { useLoad, type InboxView } from "./data.js";
 

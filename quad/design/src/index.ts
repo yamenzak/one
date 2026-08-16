@@ -1,5 +1,5 @@
 /**
- * @quad/web — the browser half.
+ * @quad/design — the browser half.
  *
  * ⚠️ ROUTER-FREE, ON PURPOSE. A shared shell that imported a router would make
  * every app take that dependency and that version; `onGo` hands the route back

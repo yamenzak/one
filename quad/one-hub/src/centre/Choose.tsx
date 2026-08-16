@@ -13,7 +13,7 @@
  * a chooser with one card is a screen whose entire content is a button.
  */
 
-import { Nothing, Place, Stack, Title, appFace } from "@quad/web";
+import { Nothing, Place, Stack, Title, appFace } from "@quad/design";
 import type { CentreView } from "./data.js";
 
 export function Choose({ view, onGo }: {

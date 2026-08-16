@@ -17,7 +17,7 @@ import { Button, Chip } from "@heroui/react";
 import {
   Agree, AmountRow, Await, Choice, Confirm, Group, MoneyInput, NumberInput, Picks, RowsWaiting,
   Nothing, Screen, Stack, TextInput, Tray, notice, money as saidMoney,
-} from "@quad/web";
+} from "@quad/design";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView, type PackageLine } from "./data.js";
 

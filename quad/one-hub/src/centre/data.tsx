@@ -13,7 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import type {
   DocumentBook, NotificationBook, ScreenSpec, SettingBook, SubProcessorBook,
 } from "@quad/kernel";
-import { ready, trouble, waiting, type Loaded } from "@quad/web";
+import { ready, trouble, waiting, type Loaded } from "@quad/design";
 import { api } from "../api.js";
 
 /* ----------------------------------------------------------------- shapes --- */

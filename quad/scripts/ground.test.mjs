@@ -42,7 +42,7 @@ const filesIn = (dir) => {
 };
 
 const FILES = [
-  ...filesIn("web/src"),
+  ...filesIn("design/src"),
   ...filesIn("one-hub/src"),
   ...readdirSync(join(QUAD, "apps"), { withFileTypes: true })
     .filter((e) => e.isDirectory())
@@ -74,7 +74,7 @@ const bare = (cls) => cls.replace(/^(?:[a-z0-9]+:)+/, "").replace(/^[!-]/, "");
  * every token this rule is about; matching its own text would make the guard
  * fail on its own fix.
  */
-const DEFINES = new Set(["web/src/tokens/ground.ts"]);
+const DEFINES = new Set(["design/src/tokens/ground.ts"]);
 
 let edges = 0;
 for (const file of FILES) {
@@ -120,7 +120,7 @@ if (!edges) ok(`edges: ${FILES.length} file(s), none draws a border or a shadow`
  * the one that was three percent apart, and it is also the one nobody renders
  * first.
  */
-const GROUND_SRC = readFileSync(join(QUAD, "web/src/tokens/ground.ts"), "utf8");
+const GROUND_SRC = readFileSync(join(QUAD, "design/src/tokens/ground.ts"), "utf8");
 const num = (re) => {
   const m = re.exec(GROUND_SRC);
   return m ? Number(m[1]) : null;
@@ -340,11 +340,11 @@ if (!/`--focus: \$\{FOCUS\};`/.test(GROUND_SRC)) {
  * any of this — and it is a one-word change in a file about branding, which is
  * the last place anybody would look for it.
  */
-const THEME_SRC = readFileSync(join(QUAD, "web/src/tokens/theme.ts"), "utf8")
+const THEME_SRC = readFileSync(join(QUAD, "design/src/tokens/theme.ts"), "utf8")
   .replace(/\/\*[\s\S]*?\*\//g, "");
 if (/put\(TOKENS\.accent/.test(THEME_SRC) || /accent: "--accent"/.test(THEME_SRC)) {
   mono++;
-  fail(`web/src/tokens/theme.ts: a workspace can still write \`--accent\`.\n` +
+  fail(`design/src/tokens/theme.ts: a workspace can still write \`--accent\`.\n` +
        `       Their colour is \`--brand\` — the ground, the surfaces and the ambience.\n` +
        `       The accent is the interface, and the interface is ours and monochrome.`);
 }
@@ -354,7 +354,7 @@ if (/put\(TOKENS\.accent/.test(THEME_SRC) || /accent: "--accent"/.test(THEME_SRC
  * be grey — and grey already means de-emphasis on a plot here. "More of it" and
  * "not the subject" would be the same language, on the same chart.
  */
-for (const file of FILES.filter((f) => rel(f).startsWith("web/src/chart/"))) {
+for (const file of FILES.filter((f) => rel(f).startsWith("design/src/chart/"))) {
   const src = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
   if (/var\(--accent\)/.test(src)) {
     mono++;

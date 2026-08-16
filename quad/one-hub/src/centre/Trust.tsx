@@ -10,7 +10,7 @@
 
 import {
   Documents, Group, NavRow, Nothing, Screen, Section, SubProcessors, distinguishing, glyphOf,
-} from "@quad/web";
+} from "@quad/design";
 import type { Where } from "../door.js";
 import { accountUrl } from "../door.js";
 import type { CentreView } from "./data.js";

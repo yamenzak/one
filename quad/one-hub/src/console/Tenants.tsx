@@ -8,7 +8,7 @@
  */
 
 import { Chip } from "@heroui/react";
-import { Listing, Screen, TableWaiting, placeFace, sentence } from "@quad/web";
+import { Listing, Screen, TableWaiting, placeFace, sentence } from "@quad/design";
 import type { Allowance, EntitlementDef, PlanSpec } from "@quad/kernel";
 import { useLoad } from "../centre/data.js";
 

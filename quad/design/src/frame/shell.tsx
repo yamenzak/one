@@ -72,7 +72,7 @@ export const glyphOf = (name?: string): React.ReactNode =>
 /**
  * ⚠️ THE DATA IN THE CROWN, NOT THE CROWN ITSELF. `Crown` is the component in
  * `layout.tsx`; this is what the Shell needs to draw one. Sharing the name made
- * `@quad/web` export two different things under it, and the ambiguity is the
+ * `@quad/design` export two different things under it, and the ambiguity is the
  * kind a bundler resolves silently in whichever order it happened to read.
  */
 export interface CrownInfo {

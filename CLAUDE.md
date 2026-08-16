@@ -872,8 +872,9 @@ required to resume the work; **start there rather than from recall.**
 
 **The two names mean different things and neither is the other.** **Quad** is the
 FRAMEWORK — `@quad/kernel` (pure contracts), `@quad/runtime` (the only code that
-touches a binding), `@quad/web` (the browser half, router-free), and the
-reference apps. **One** is the DEPLOYMENT built on it: `quad/one` is the worker
+touches a binding), **`@quad/design`** — the browser half and the design system
+every app draws with, named **OneDesign**, router-free — and the reference apps.
+**One** is the DEPLOYMENT built on it: `quad/one` is the worker
 that answers every door for every product, `quad/one-hub` is the page a person
 opens at the root, `id.` and `setup.`. A product — Kova — is a manifest inside
 it. So "One" is what a customer types and "Quad" is what a contributor imports,

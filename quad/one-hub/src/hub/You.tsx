@@ -20,7 +20,7 @@
 
 import {
   ActionRow, Confirm, Group, Identity, NavRow, Screen, glyphOf, notice, whoFace,
-} from "@quad/web";
+} from "@quad/design";
 import { useSession } from "../session.js";
 import type { Where } from "./where.js";
 

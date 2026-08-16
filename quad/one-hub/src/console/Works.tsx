@@ -7,7 +7,7 @@
  * draws exactly that — this is the console pointing it at the deployment.
  */
 
-import { Jobs, Screen } from "@quad/web";
+import { Jobs, Screen } from "@quad/design";
 import type { JobBook } from "@quad/kernel";
 import { useLoad } from "../centre/data.js";
 

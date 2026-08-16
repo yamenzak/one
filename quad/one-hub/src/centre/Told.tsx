@@ -12,10 +12,10 @@
  * looking for their own email switch.
  */
 
-import { NotificationPolicy, Nothing, Screen, notice } from "@quad/web";
+import { NotificationPolicy, Nothing, Screen, notice } from "@quad/design";
 import { api } from "../api.js";
 import { useLoad, type CentreView } from "./data.js";
-import { distinguishing } from "@quad/web";
+import { distinguishing } from "@quad/design";
 
 export interface PolicyAnswer {
   readonly policy: Readonly<Record<string, readonly ("inbox" | "email" | "push")[]>>;

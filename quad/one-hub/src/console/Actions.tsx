@@ -14,7 +14,7 @@ import { useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import {
   Choice, Group, LongText, NavRow, Screen, Stack, Tray, Whichever, appFace, notice,
-} from "@quad/web";
+} from "@quad/design";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
 

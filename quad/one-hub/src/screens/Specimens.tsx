@@ -22,15 +22,15 @@ import {
   Await, Trouble, Working, RowsWaiting, ChartWaiting, FigureWaiting, TilesWaiting, TextWaiting,
   waiting, ready, trouble, type Loaded,
   TileGrid, Title, ToggleRow, FieldRow, PageCrown, TYPE, Layout, Screen,
-} from "@quad/web";
+} from "@quad/design";
 import {
   ChartPanel, ColumnChart, CompositionBar, DivergingChart, DonutChart, HeatmapChart, Hero,
   LineChart, Meter, Ring, Rings, StackedChart, Stat, StatRow,
-} from "@quad/web";
+} from "@quad/design";
 import {
   Agree, Confirm, Crumbs, DateInput, Listing, Menu, MoneyInput, OneOf, PageTabs, Picks,
   SearchInput, Segmented, Steps, TextInput, Timeline, Tray, notice, type Col,
-} from "@quad/web";
+} from "@quad/design";
 import { Button } from "@heroui/react";
 import { PLATFORM_PROBLEMS, problem } from "@quad/kernel";
 import { ChartColumn, Check, CircleUser, Clock, CreditCard, Ellipsis, EyeOff, FileText, Globe, House, KeyRound, Landmark, LogIn, Mail, MessagesSquare, Package, PiggyBank, Plus, ReceiptText, Trash2, TriangleAlert } from "lucide-react";

@@ -54,7 +54,7 @@ const filesIn = (dir) => {
  * files nobody checked.
  */
 const FILES = [
-  ...filesIn("web/src"),
+  ...filesIn("design/src"),
   ...filesIn("one-hub/src"),
   ...readdirSync(join(QUAD, "apps"), { withFileTypes: true })
     .filter((e) => e.isDirectory())
@@ -120,7 +120,7 @@ const LAYOUT = [
  * should have given.
  */
 const METRIC_VALUES = (() => {
-  const src = readFileSync(join(QUAD, "web/src/tokens/metrics.ts"), "utf8");
+  const src = readFileSync(join(QUAD, "design/src/tokens/metrics.ts"), "utf8");
   const out = new Map();
   /*
     ⚠️ ONE DECLARATION AT A TIME, because a regex over the whole file gets this
@@ -414,7 +414,7 @@ if (!lozenge) ok(`shapes: every icon-only control asks the library to be one`);
   which is its content's by choice. What replaced this check is `travel` below.
 */
 const EQUALS = [
-  ["web/src/parts/surfaces.tsx", "TileGrid", /w-full flex-col/],
+  ["design/src/parts/surfaces.tsx", "TileGrid", /w-full flex-col/],
 ];
 let uneven = 0;
 for (const [file, group, needs] of EQUALS) {
@@ -470,12 +470,12 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
  * least able to afford it — and it is the shape a "simplification" takes.
  */
 {
-  const src = readFileSync(join(QUAD, "web/src/frame/layout.tsx"), "utf8");
+  const src = readFileSync(join(QUAD, "design/src/frame/layout.tsx"), "utf8");
   const body = (src.split(/\nexport /).find((b) => b.startsWith("function Island")) ?? "")
     .replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
 
   if (!body) {
-    fail(`web/src/frame/layout.tsx: no \`Island\` to check — if it moved, move this with it.`);
+    fail(`design/src/frame/layout.tsx: no \`Island\` to check — if it moved, move this with it.`);
   } else {
     /* ⚠️ Both halves off the SAME name, or the bar can name what it did not
        highlight. `isHere` is that name; a second one is the defect. */
@@ -498,20 +498,50 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
     const leaves = /transform:\s*away\s*\?/.test(body);
 
     if (!marks || !names) {
-      fail(`web/src/frame/layout.tsx: the nav's fill and its label are not one condition (D7).\n` +
+      fail(`design/src/frame/layout.tsx: the nav's fill and its label are not one condition (D7).\n` +
            `       fill from \`isHere\`: ${marks}; label from \`isHere\`: ${names}.\n` +
            `       Two expressions is a bar that highlights one item and names another.`);
     } else if (gone) {
-      fail(`web/src/frame/layout.tsx: a closed label is removed rather than narrowed.\n` +
+      fail(`design/src/frame/layout.tsx: a closed label is removed rather than narrowed.\n` +
            `       \`display: none\` takes it out of the accessibility tree, which is five\n` +
            `       unnamed buttons to the one group the icon carries nothing for.`);
     } else if (!leaves) {
-      fail(`web/src/frame/layout.tsx: the nav does not leave by \`transform\`.\n` +
+      fail(`design/src/frame/layout.tsx: the nav does not leave by \`transform\`.\n` +
            `       Animating height or padding on scroll is layout work on every frame.`);
     } else {
       ok(`travel: the nav names one destination, and leaves on the compositor`);
     }
   }
+}
+
+/* ---------------------------------------------- one door into the system --- */
+
+/**
+ * ⚠️ `@quad/design` HAS ONE ENTRY, AND A DEEP IMPORT IS HOW A PACKAGE STOPS BEING
+ * ABLE TO MOVE ANYTHING. Everything in this session — the crown becoming one
+ * component, the dock becoming one, the scene engine replacing twenty-four
+ * grounds — was possible because the only thing anybody had was the name of an
+ * export. One `@quad/design/src/frame/layout.js` in an app and the file's PATH
+ * is public: it cannot be split, renamed, or folded into another without
+ * breaking a caller nobody remembers.
+ *
+ * ⚠️ AND `exports` DOES NOT ENFORCE IT HERE. The package resolves through the
+ * workspace, where TypeScript and Vite will happily follow a relative path into
+ * `../../design/src/…` — which typechecks, bundles, and is invisible in review.
+ * The subpath map is the intent; this is the mechanism.
+ */
+{
+  const DEEP = /from\s+["'](?:@quad\/design\/[^"']+|[./][^"']*\/design\/src\/[^"']+)["']/;
+  let deep = 0;
+  for (const file of [...filesIn("one-hub/src"), ...filesIn("apps")]) {
+    const m = readFileSync(file, "utf8").match(DEEP);
+    if (!m) continue;
+    deep++;
+    fail(`${rel(file)}: reaches inside the design system — \`${m[0]}\`.\n` +
+         `       There is one door: \`import { … } from "@quad/design"\`. A path that is public\n` +
+         `       is a path nothing can rename, split or fold away again.`);
+  }
+  if (!deep) ok(`door: one entry into @quad/design, no path made public`);
 }
 
 /* ------------------------------------------- one dock, and it is declared --- */
@@ -532,13 +562,13 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
  * already offers the same words in the only thing on the page.
  *
  * ⚠️ AND IT IS A GUARD RATHER THAN A PRIVATE EXPORT because there is no privacy
- * to be had: `@quad/web` is one entry point and a screen can import anything in
+ * to be had: `@quad/design` is one entry point and a screen can import anything in
  * it. What decides whether a thing is internal here is whether something fails
  * when it is used from outside.
  */
 {
   const DOCK = /\bDocked\b/;
-  const FRAME = "web/src/frame/";
+  const FRAME = "design/src/frame/";
   let hand = 0;
   for (const file of [...filesIn("one-hub/src"), ...filesIn("apps")]) {
     const src = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
@@ -549,7 +579,7 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
          `       docked below it, and NOWHERE while the screen is waiting, refused or empty.`);
   }
   /* ⚠️ And the one implementation is where it says it is. */
-  const inFrame = filesIn("web/src/frame").filter((f) => DOCK.test(readFileSync(f, "utf8")));
+  const inFrame = filesIn("design/src/frame").filter((f) => DOCK.test(readFileSync(f, "utf8")));
   if (!inFrame.length) {
     fail(`${FRAME}: no \`Docked\` to check — if it moved, move this guard with it.`);
   } else if (!hand) {

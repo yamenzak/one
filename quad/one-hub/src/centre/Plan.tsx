@@ -8,7 +8,7 @@
  */
 
 import { Chip } from "@heroui/react";
-import { Screen, Shelf, notice } from "@quad/web";
+import { Screen, Shelf, notice } from "@quad/design";
 import { useLoad, type MoneyView } from "./data.js";
 
 export function Plan({ app }: { readonly app: string }) {

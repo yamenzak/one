@@ -17,13 +17,13 @@ import { useState } from "react";
 import { Balance, Band, Crown, CopyRow, Figure, Group, Grid, Island, Money, NavRow, ActionRow,
   ToggleRow, FieldRow, NoteRow, OfferRow, PersonRow, AmountRow, QuickActions, SeeAll,
   StepRow, TileGrid, Nothing, Row, Section, Stack, Title, Cluster, SPACE,
-  TYPE, type Sky } from "@quad/web";
+  TYPE, type Sky } from "@quad/design";
 import {
   Agree, Choice, Confirm, Crumbs, DateInput, Dialog, Faq, FormWaiting, Gauge, Hotkey, Listing,
   LongText, Lookup, Menu, MoneyInput, NumberInput, OneOf, PageTabs, Peek, Picks, Reveal,
   SearchInput, SecretInput, Segmented, Dial, Steps, Tags, TextInput, Timeline, TimeInput,
   Tray, notice, ready, trouble, waiting, type Col, type Loaded,
-} from "@quad/web";
+} from "@quad/design";
 import { Button } from "@heroui/react";
 import { PLATFORM_PROBLEMS, problem } from "@quad/kernel";
 import { Sheet } from "../ui.js";

@@ -25,8 +25,8 @@
 
 import {
   Band, CROWN, Layout, LeaveChip, Over, Spacer, placeFace, sentence, whoFace,
-} from "@quad/web";
-import type { FaceOf, Sky } from "@quad/web";
+} from "@quad/design";
+import type { FaceOf, Sky } from "@quad/design";
 import type { Belonging, Me } from "../api.js";
 import { useSession } from "../session.js";
 import { HubHome } from "./Home.js";
@@ -107,7 +107,7 @@ function Screen({ where, onGo, onLeave }: {
     ⚠️ AND EVERYTHING ELSE IS `Framed` RATHER THAN CROWNED HERE. The name, the
     way out and the fact under it are properties of the ADDRESS, so they are
     decided once and handed down; what KIND of page it is, and the one thing it
-    is for, are the screen's own and it declares them (`@quad/web`'s `Screen`).
+    is for, are the screen's own and it declares them (`@quad/design`'s `Screen`).
     Before this the frame drew a crown around content that then had to guess its
     own width, its own skeleton and where to put its action — and twenty screens
     guessed twenty times.

@@ -18,7 +18,7 @@
  */
 
 import { useEffect } from "react";
-import { Working } from "@quad/web";
+import { Working } from "@quad/design";
 import { accountUrl, here, type Where } from "../door.js";
 
 export function Signpost({ where }: { readonly where: Where }) {

@@ -117,7 +117,7 @@ no screen knowing. React Aria underneath keeps the accessibility floor the
 previous attempt had with Radix.
 
 **Therefore never:** a `className` that restyles a HeroUI component in
-`@quad/web`; a hand-built control HeroUI already ships; a colour literal outside
+`@quad/design`; a hand-built control HeroUI already ships; a colour literal outside
 the theme tokens. Build sequence is always: decide → ask the HeroUI MCP what fits
 → build with it.
 

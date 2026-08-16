@@ -1,7 +1,7 @@
 /**
  * THE HUB'S OWN FURNITURE — one piece, and it is one because the other two left.
  *
- * ⚠️ `Refusal` AND `Waiting` USED TO LIVE HERE AND ARE `@quad/web`'S NOW. That
+ * ⚠️ `Refusal` AND `Waiting` USED TO LIVE HERE AND ARE `@quad/design`'S NOW. That
  * is the whole point of this file being short: a refusal drawn from a `Problem`
  * and a "we are fetching" line are not things about the Hub, they are things
  * every app has, and two of them existing meant two answers to the same
@@ -15,7 +15,7 @@
  */
 
 import { Card } from "@heroui/react";
-import { SPACE } from "@quad/web";
+import { SPACE } from "@quad/design";
 
 /** One column, centred, with room to breathe. Placement, nothing else. */
 export function Sheet(

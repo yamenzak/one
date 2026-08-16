@@ -2,7 +2,7 @@
  * THE SETTINGS STORE, AND THE TWO OPERATIONS OVER IT.
  *
  * ⚠️ AN APP DECLARES A SETTING AND NEVER STORES ONE. The rows live here, the
- * screens are the platform's (`@quad/web` renders the book), and these two
+ * screens are the platform's (`@quad/design` renders the book), and these two
  * operations are the only path between them — so "who may change it" is asked
  * in exactly one place, with the level deciding the authority: a `person` row
  * is the caller's own, a `tenant` row needs the declaration's `needs`, and an

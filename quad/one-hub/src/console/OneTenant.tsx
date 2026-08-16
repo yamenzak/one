@@ -19,7 +19,7 @@ import { Button, Chip } from "@heroui/react";
 import {
   AmountRow, ControlRow, Group, Identity, NumberInput, RowsWaiting, Screen, Stack, Tray,
   appFace, notice, placeFace, sentence,
-} from "@quad/web";
+} from "@quad/design";
 import type { Allowance, EntitlementDef, PlanSpec } from "@quad/kernel";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";

@@ -38,18 +38,18 @@ const filesIn = (dir, ext = /\.tsx?$/) => {
 
 /*
   ⚠️ THE PATH IS ASSERTED, NOT ASSUMED. The first version of this pointed at
-  `quad/scene` — the engine is at `web/src/scene` — so every check ran over an
+  `quad/scene` — the engine is at `design/src/scene` — so every check ran over an
   empty list and the guard reported four cheerful passes. A check that finds
   nothing and says so in green is worse than no check, because it is also a
   claim.
 */
-const ENGINE = filesIn("web/src/scene");
+const ENGINE = filesIn("design/src/scene");
 if (!ENGINE.length) {
-  fail("web/src/scene: the engine is not where this guard looks.\n" +
+  fail("design/src/scene: the engine is not where this guard looks.\n" +
        "       Every check below would pass over an empty list, which is a green run " +
        "asserting nothing.");
 }
-const DRAWN = [...filesIn("web/src"), ...filesIn("one-hub/src")];
+const DRAWN = [...filesIn("design/src"), ...filesIn("one-hub/src")];
 
 /* ---------------------------------------------- a world is never random --- */
 {
@@ -165,7 +165,7 @@ const DRAWN = [...filesIn("web/src"), ...filesIn("one-hub/src")];
     ⚠️ SO THE COMPOSER IS THE VOCABULARY'S AND A SCREEN NAMES A SUBJECT.
     `Layout` reads the world from the SAME face it puts in the crown
     (`worldFor`), so there is no second derivation to keep in step. Everything
-    outside `web/src` is a screen, and a screen naming any of these is building
+    outside `design/src` is a screen, and a screen naming any of these is building
     a world by hand.
 
     ⚠️ AND IT IS NOT ABOUT THESE THREE IDENTIFIERS. It is about the shape: a
@@ -215,8 +215,8 @@ const DRAWN = [...filesIn("web/src"), ...filesIn("one-hub/src")];
     behind, with no file that is wrong.
   */
   const PAINTS = /\bworldCss\s*\(|data-field/;
-  const MOUNTERS = new Set(["web/src/frame/layout.tsx", "web/src/tokens/ambience.ts"]);
-  const ALL = [...filesIn("web/src", /\.tsx?$/), ...filesIn("one-hub/src")];
+  const MOUNTERS = new Set(["design/src/frame/layout.tsx", "design/src/tokens/ambience.ts"]);
+  const ALL = [...filesIn("design/src", /\.tsx?$/), ...filesIn("one-hub/src")];
   let painters = 0;
   for (const file of ALL) {
     if (MOUNTERS.has(rel(file).split("\\").join("/"))) continue;
@@ -259,7 +259,7 @@ const DRAWN = [...filesIn("web/src"), ...filesIn("one-hub/src")];
   */
   const EDGE = /sticky\s+(?:[\w:-]+\s+)*?(top|bottom)-0/;
   let pinned = 0;
-  for (const file of filesIn("web/src", /\.tsx$/)) {
+  for (const file of filesIn("design/src", /\.tsx$/)) {
     for (const tag of readFileSync(file, "utf8").matchAll(/<[a-zA-Z][^<>]*?>/gs)) {
       const at = EDGE.exec(tag[0]);
       if (!at) continue;

@@ -16,7 +16,7 @@ import { useState } from "react";
 import { Button, Card } from "@heroui/react";
 import {
   LongText, Row, Screen, Stack, Whichever, appFace, notice,
-} from "@quad/web";
+} from "@quad/design";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView } from "./data.js";
 

@@ -19,7 +19,7 @@
  * to be two screens (DESIGN.md §3).
  */
 
-import { Screen, Settings, Whichever, appFace, notice } from "@quad/web";
+import { Screen, Settings, Whichever, appFace, notice } from "@quad/design";
 import { settingsOn } from "@quad/kernel";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView } from "./data.js";

@@ -20,7 +20,7 @@
  * page, which is the same picture as a page that failed to load.
  */
 
-import { Band, Crown, Layout, NoticeHost, ONE_FACE, Spacer, Trouble, Working, whoFace } from "@quad/web";
+import { Band, Crown, Layout, NoticeHost, ONE_FACE, Spacer, Trouble, Working, whoFace } from "@quad/design";
 import { Gallery } from "./screens/Gallery.js";
 import { SPECIMEN_IDS, Specimen, type SpecimenId } from "./screens/Specimens.js";
 

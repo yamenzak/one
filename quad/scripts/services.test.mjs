@@ -46,7 +46,7 @@ const APPS = existsSync(join(QUAD, "apps"))
     .filter((e) => e.isDirectory()).map((e) => `apps/${e.name}/src`)
   : [];
 
-const FILES = ["runtime/src", "web/src", ...APPS].flatMap(filesIn);
+const FILES = ["runtime/src", "design/src", ...APPS].flatMap(filesIn);
 const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 /* --------------------------------------------------------------- over http --- */

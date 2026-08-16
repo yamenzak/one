@@ -13,7 +13,7 @@
  * too late — which is the whole failure the chart vocabulary exists to prevent.
  */
 
-import { Board, Group, Meter, Screen, Tile, sentence } from "@quad/web";
+import { Board, Group, Meter, Screen, Tile, sentence } from "@quad/design";
 import type { Shard } from "@quad/kernel";
 import { useLoad } from "../centre/data.js";
 

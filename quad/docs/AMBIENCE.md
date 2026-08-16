@@ -2,9 +2,9 @@
 
 kind: guide
 
-**How a screen gets a world behind it.** There is one engine — `web/src/scene/` —
+**How a screen gets a world behind it.** There is one engine — `design/src/scene/` —
 and everything on this page is either how to use it or a decision inside it that
-cost something to learn. `web/src/tokens/ambience.ts` is where a scene is mounted
+cost something to learn. `design/src/tokens/ambience.ts` is where a scene is mounted
 on a page, and that is now the only thing left in that file.
 
 ## The system in one paragraph
@@ -44,7 +44,7 @@ vary per workspace at all. Each of the seven is *every* world in its own space.
 
 ## The seven families
 
-`FAMILIES` in `web/src/scene/index.ts` is the whole list, and a family not in it
+`FAMILIES` in `design/src/scene/index.ts` is the whole list, and a family not in it
 is a family nothing can reach.
 
 ### Four belong to a SUBJECT

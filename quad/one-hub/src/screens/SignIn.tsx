@@ -26,7 +26,7 @@ import type { Problem } from "@quad/kernel";
 import { CODE_DIGITS } from "@quad/kernel";
 import { useSession } from "../session.js";
 import { here, setupUrl } from "../door.js";
-import { Arrival, AsideRoute, CODE_SLOT, SPACE, Trouble } from "@quad/web";
+import { Arrival, AsideRoute, CODE_SLOT, SPACE, Trouble } from "@quad/design";
 
 /* ⚠️ Checked here rather than by `isRequired`, which draws a red asterisk on the
    only field on the screen — a required marker beside the one thing there is to

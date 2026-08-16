@@ -13,7 +13,7 @@
  * a workspace, rather than tabs in a bar that never goes away.
  */
 
-import { Screen } from "@quad/web";
+import { Screen } from "@quad/design";
 import { useCentre } from "../centre/data.js";
 import { People } from "../centre/People.js";
 import { Money } from "../centre/Money.js";

@@ -19,7 +19,7 @@
 
 import {
   Await, Band, Crown, Face, Page, Shell, Spacer, TYPE, Working, whoFace,
-} from "@quad/web";
+} from "@quad/design";
 import type { ScreenSpec } from "@quad/kernel";
 import { Button } from "@heroui/react";
 import { useSession } from "../session.js";

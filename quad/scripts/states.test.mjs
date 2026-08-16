@@ -53,7 +53,7 @@ const filesIn = (dir, re = /\.tsx?$/) => {
 const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 const FILES = [
-  ...filesIn("web/src"),
+  ...filesIn("design/src"),
   ...filesIn("one-hub/src"),
 ];
 
@@ -61,7 +61,7 @@ const FILES = [
  * ⚠️ `state.tsx` IS THE FILE THAT PROVIDES THE ANSWER, so it is the one place
  * the words appear legitimately. The list can only shrink.
  */
-const DEFINES = new Set(["web/src/parts/state.tsx"]);
+const DEFINES = new Set(["design/src/parts/state.tsx"]);
 
 /* ------------------------------------------------------- the hand-rolled --- */
 
@@ -118,7 +118,7 @@ if (!seeded) ok(`seeds: no collection starts as a fact it has not learned`);
  * for, and this asserts the pairing — a row skeleton that stops naming `ROW.tap`
  * is a list that resizes, silently, on every load.
  */
-const STATE = readFileSync(join(QUAD, "web/src/parts/state.tsx"), "utf8");
+const STATE = readFileSync(join(QUAD, "design/src/parts/state.tsx"), "utf8");
 const SHAPED = [
   ["RowsWaiting", /ROW\.tap/, "the row height rows actually are"],
   ["ChartWaiting", /aspect-\[320\/120\]/, "the chart frame's own aspect"],
@@ -160,7 +160,7 @@ if (!shapeless) ok(`shaped: ${SHAPED.length} skeleton(s), each the geometry of i
  * `animation:` at a time.
  */
 const MOTION_DEFINES = new Set([
-  "web/src/tokens/motion.ts", "web/src/tokens/ambience.ts", "web/src/chart/charts.tsx",
+  "design/src/tokens/motion.ts", "design/src/tokens/ambience.ts", "design/src/chart/charts.tsx",
 ]);
 let loose = 0;
 for (const file of FILES) {
@@ -188,9 +188,9 @@ if (!loose) ok(`kinds: nothing animates outside the three named ways`);
  * ⚠️ AND THE IMPORT BEING PRESENT IS WHAT MADE IT INVISIBLE. It read as wired at
  * a glance, in the one file anybody would check.
  */
-const WEB_INDEX = readFileSync(join(QUAD, "web/src/index.ts"), "utf8");
+const WEB_INDEX = readFileSync(join(QUAD, "design/src/index.ts"), "utf8");
 const exported = new Set();
-for (const file of filesIn("web/src", /\.tsx?$/)) {
+for (const file of filesIn("design/src", /\.tsx?$/)) {
   for (const [, id] of readFileSync(file, "utf8").matchAll(/^export const (\w*(?:_MOTION|_CSS))\b/gm)) {
     exported.add(id);
   }
@@ -207,7 +207,7 @@ for (const entry of filesIn("one-hub/src", /^main\.tsx$/)) {
     if (!WEB_INDEX.includes("export * from")) continue;
     if (!join_.includes(id)) {
       unmounted++;
-      fail(`${rel(entry)}: \`${id}\` is exported by @quad/web and never injected.\n` +
+      fail(`${rel(entry)}: \`${id}\` is exported by @quad/design and never injected.\n` +
            `       A stylesheet that is not in the join does not throw — it simply does not\n` +
            `       apply, which looks exactly like a decision nobody made.`);
     }
@@ -231,7 +231,7 @@ if (!unmounted) ok(`mounted: all ${exported.size} shared stylesheet(s) reach the
  * is what keeps this from being a ban on `flex`.
  */
 const FRAME = /className="[^"]*\b(?:flex|grid)\b[^"]*\bgap(?:-[xy])?-(?:\d+|\[[^\]]*\])/g;
-const FRAME_DEFINES = new Set(["web/src/frame/layout.tsx", "web/src/tokens/metrics.ts"]);
+const FRAME_DEFINES = new Set(["design/src/frame/layout.tsx", "design/src/tokens/metrics.ts"]);
 
 let framed = 0;
 for (const file of FILES) {

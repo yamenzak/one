@@ -19,7 +19,7 @@
  * lives behind that workspace's own address.
  */
 
-import { Group, NavRow, Screen, glyphOf } from "@quad/web";
+import { Group, NavRow, Screen, glyphOf } from "@quad/design";
 import { useSession } from "../session.js";
 import { Actions } from "../console/Actions.js";
 import { Ground } from "../console/Ground.js";

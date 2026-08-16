@@ -18,7 +18,7 @@
  */
 
 import { Button, Chip } from "@heroui/react";
-import { Group, NavRow, Row, Screen, glyphOf } from "@quad/web";
+import { Group, NavRow, Row, Screen, glyphOf } from "@quad/design";
 import { useSession } from "../session.js";
 import { tenantUrl } from "../door.js";
 import { OF_WORKSPACE, OFTEN, nameOf, partsFor, type Where, type WorkspacePart } from "./where.js";

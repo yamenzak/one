@@ -45,7 +45,7 @@ const filesIn = (dir) => {
 };
 
 const FILES = [
-  ...filesIn("web/src"),
+  ...filesIn("design/src"),
   ...filesIn("one-hub/src"),
   ...readdirSync(join(QUAD, "apps"), { withFileTypes: true })
     .filter((e) => e.isDirectory())
@@ -57,7 +57,7 @@ const FILES = [
  * PICTURE". Everywhere else asks it. The exemption is by path rather than by a
  * comment, because a comment is something a hurried screen can also write.
  */
-const RESOLVER = "web/src/parts/face.tsx";
+const RESOLVER = "design/src/parts/face.tsx";
 
 /**
  * ⚠️ THE PROSE IS WHERE THE RULE IS EXPLAINED, SO THE PROSE IS WHERE THE

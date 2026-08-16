@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 import { PLATFORM_ROLES, eventsOf, primaryOf, type Channel } from "@quad/kernel";
 import {
   FlagConsole, Guide, NotificationPolicy, Settings, Shelf, Shell, settingsShown, policyShown,
-} from "@quad/web";
+} from "@quad/design";
 import { HELLO } from "../src/index.js";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node);

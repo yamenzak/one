@@ -14,7 +14,7 @@ import { Button } from "@heroui/react";
 import {
   Await, ControlRow, FlagConsole, Group, NoteRow, Nothing, RowsWaiting, Screen, Stack,
   TYPE, appFace, notice,
-} from "@quad/web";
+} from "@quad/design";
 import type { FlagBook } from "@quad/kernel";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";

@@ -53,7 +53,7 @@ const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\
 */
 const exempt = (src) => /fan-out-exempt:\s*\S+/.test(src);
 
-const FILES = [...sourcesIn("runtime/src"), ...sourcesIn("web/src"), ...sourcesIn("apps")];
+const FILES = [...sourcesIn("runtime/src"), ...sourcesIn("design/src"), ...sourcesIn("apps")];
 
 /* ------------------------------------------------------------- both halves --- */
 

@@ -112,7 +112,7 @@ ok(`vocabulary: ${shared} shared file(s), ${hits} unexplained product noun(s)`);
 /**
  * ⚠️ THE FRAMEWORK'S OWN NAME IS RESERVED INSIDE IT (D2). `quad` is also a
  * geometry word and a CSS word, so without this it becomes a local variable in
- * `@quad/web` and the name of the thing stops naming the thing.
+ * `@quad/design` and the name of the thing stops naming the thing.
  */
 let reservedHits = 0;
 for (const pkg of ["kernel", "runtime", "web"]) {

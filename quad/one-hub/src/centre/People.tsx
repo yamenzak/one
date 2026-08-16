@@ -31,7 +31,7 @@ import { Button, Card, Chip } from "@heroui/react";
 import {
   Await, Choice, Confirm, Listing, Menu, Nothing, RowsWaiting, Screen, Stack, TextInput, Tray,
   notice, money as saidMoney, whoFace,
-} from "@quad/web";
+} from "@quad/design";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView, type HoldingLine, type MemberLine, type PackageLine } from "./data.js";
 

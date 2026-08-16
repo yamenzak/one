@@ -25,7 +25,7 @@ import { EEA, slugOk } from "@quad/kernel";
 import { api } from "../api.js";
 import { byName } from "../countries.js";
 import { accountUrl, here, tenantUrl, type Where } from "../door.js";
-import { Arrival, AsideRoute, SPACE, Trouble } from "@quad/web";
+import { Arrival, AsideRoute, SPACE, Trouble } from "@quad/design";
 
 /** ⚠️ From the name, but only until somebody types their own — a slug that
     silently follows the name is a slug that changes under an edit. */

@@ -24,7 +24,7 @@
  */
 
 import { Chip } from "@heroui/react";
-import { Group, Identity, NavRow, Stack, glyphOf, whoFace } from "@quad/web";
+import { Group, Identity, NavRow, Stack, glyphOf, whoFace } from "@quad/design";
 import type { Me } from "../api.js";
 import { useLoad, type InboxView } from "../centre/data.js";
 import { useSession } from "../session.js";

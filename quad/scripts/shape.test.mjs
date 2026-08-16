@@ -61,7 +61,7 @@ const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$
  * ⚠️ THE TWO FILES THAT DEFINE THE CHROME, BY NAME. `screen.tsx` places the
  * crown and the dock; `layout.tsx` draws them. Everything else is a caller.
  */
-const DEFINES_CHROME = new Set(["web/src/frame/screen.tsx", "web/src/frame/layout.tsx"]);
+const DEFINES_CHROME = new Set(["design/src/frame/screen.tsx", "design/src/frame/layout.tsx"]);
 
 /**
  * ⚠️ THE SURFACES THAT ARE NOT SCREENS, AND EACH IS EXEMPT FOR A STATED REASON.
@@ -100,7 +100,7 @@ for (const file of SCREENS) {
   fail(`${rel(file)}: draws its own <PageCrown>.\n`
     + `       The title and the way back are properties of the ADDRESS, not of the\n`
     + `       screen — a router already knows both. Name a \`shape\` on \`Screen\`\n`
-    + `       and let \`Framed\` supply them (@quad/web's screen.tsx).`);
+    + `       and let \`Framed\` supply them (@quad/design's screen.tsx).`);
 }
 if (!crowns) ok(`crown: no screen draws its own`);
 
@@ -190,7 +190,7 @@ if (!saves) ok(`settings: none carries a save`);
  *
  * ⚠️ THE WAY IT COMES BACK IS A SCREEN THAT WANTS TO SEPARATE TWO THINGS and
  * reaches for the library's `Separator`, which is right there and looks like the
- * answer. The answer is a second `Group`. `@quad/web` still uses it where a
+ * answer. The answer is a second `Group`. `@quad/design` still uses it where a
  * divider is genuinely structural — a menu's sections, the shell's rails — and
  * those are not screens.
  */
@@ -221,7 +221,7 @@ if (!hairlines) ok(`hairlines: no screen draws one`);
  * name rather than by luck.
  */
 let leaked = 0;
-for (const file of [...SCREENS, ...filesIn("web/src")]) {
+for (const file of [...SCREENS, ...filesIn("design/src")]) {
   const src = readFileSync(file, "utf8");
   for (const at of [...src.matchAll(/\/\*/g)].map((m) => m.index)) {
     let i = at - 1;
@@ -239,7 +239,7 @@ if (!leaked) ok(`comments: none renders as text`);
 /* --------------------------------------------------- nothing sits loose --- */
 
 /**
- * ⚠️ A FILE THAT LANDS AT THE ROOT OF `web/src` IS A FILE NOBODY CLASSIFIED, and
+ * ⚠️ A FILE THAT LANDS AT THE ROOT OF `design/src` IS A FILE NOBODY CLASSIFIED, and
  * that is how a flat package comes back one file at a time. The five directories
  * each answer a question (see `web/README.md`) — is it a value, does it wrap a
  * screen, could any app use it, does it take a declaration, is it data — and a
@@ -249,12 +249,12 @@ if (!leaked) ok(`comments: none renders as text`);
  * and belongs to none of the five.
  */
 const HOMES = ["tokens", "frame", "parts", "rendered", "chart"];
-const loose = readdirSync(join(QUAD, "web/src"), { withFileTypes: true })
+const loose = readdirSync(join(QUAD, "design/src"), { withFileTypes: true })
   .filter((e) => e.isFile() && /\.tsx?$/.test(e.name) && e.name !== "index.ts")
   .map((e) => e.name);
 if (loose.length) {
   for (const name of loose) {
-    fail(`web/src/${name}: sits outside every directory.\n`
+    fail(`design/src/${name}: sits outside every directory.\n`
       + `       Put it in one of ${HOMES.join(", ")} — each answers a question about\n`
       + `       what the file IS (web/README.md). A file at the root is one nobody\n`
       + `       classified, and that is how a flat package comes back.`);
@@ -271,10 +271,10 @@ if (loose.length) {
  * the honest answer to "which shape is this" is "none of them", and the next
  * screen is hand-built with the whole argument re-run.
  */
-const screenSrc = readFileSync(join(QUAD, "web/src/frame/screen.tsx"), "utf8");
+const screenSrc = readFileSync(join(QUAD, "design/src/frame/screen.tsx"), "utf8");
 const shapes = [...screenSrc.matchAll(/^  (\w+): \{ width:/gm)].map((m) => m[1]);
 if (shapes.length < 6) {
-  fail(`web/src/frame/screen.tsx: only ${shapes.length} shapes.\n`
+  fail(`design/src/frame/screen.tsx: only ${shapes.length} shapes.\n`
     + `       A preset system somebody cannot find their page in is one they opt\n`
     + `       out of, and the screen after that is hand-built again.`);
 } else {

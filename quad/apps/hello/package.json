@@ -17,7 +17,7 @@
   "dependencies": {
     "@quad/kernel": "workspace:*",
     "@quad/runtime": "workspace:*",
-    "@quad/web": "workspace:*"
+    "@quad/design": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.8.55",

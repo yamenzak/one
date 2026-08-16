@@ -114,7 +114,7 @@ if (!raised) ok(`concerns: no app applies a gate, a schema, an audit or a route 
  */
 const TOP_LEVEL = /^(?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*compose\s*\(/gm;
 let eager = 0;
-for (const dir of ["runtime/src", "web/src", ...appDirs.map((a) => `apps/${a}/src`)]) {
+for (const dir of ["runtime/src", "design/src", ...appDirs.map((a) => `apps/${a}/src`)]) {
   const at = join(QUAD, dir);
   if (!existsSync(at)) continue;
   const walk = (path) => {
