@@ -227,21 +227,17 @@ export function emailSql(id) {
 export function discoverWorkerDirs() {
   const out = [];
   /*
-    ⚠️ BOTH TREES, and `platform/` is the one that would have been missed.
-
-    This walked `apps/` only, which was complete for as long as `apps/` was the
-    only place a worker could live. `platform/` changes that: a `wrangler.jsonc`
-    there would be invisible to the registry check, so it could ship — or fail to
-    ship — with nothing saying why. That is the same silence this guard exists to
-    break, one directory over, and it is cheaper to close before the directory
-    has anything in it than after.
+    ⚠️ `apps/` IS THE ONLY TREE THIS REGISTRY GOVERNS, AND THE OTHER WORKER IS
+    COVERED SOMEWHERE ELSE ON PURPOSE. A `wrangler.jsonc` outside `apps/` is
+    invisible here, which for `engine/` is the design rather than a hole: One
+    must never be selectable by `deploy.yml`, and `engine/scripts/inert.test.mjs`
+    fails if it is ever registered or if its worker or database names collide
+    with a live one. Two guards asking opposite questions of the same file, each
+    where it belongs — widening this walk would put them in contradiction.
   */
-  for (const tree of ["apps", "platform"]) {
-    if (!existsSync(join(ROOT, tree))) continue;
-    for (const name of readdirSync(join(ROOT, tree))) {
-      const dir = join(tree, name);
-      if (existsSync(join(ROOT, dir, "wrangler.jsonc"))) out.push(dir);
-    }
+  for (const name of readdirSync(join(ROOT, "apps"))) {
+    const dir = join("apps", name);
+    if (existsSync(join(ROOT, dir, "wrangler.jsonc"))) out.push(dir);
   }
   return out;
 }

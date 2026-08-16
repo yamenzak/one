@@ -1,10 +1,9 @@
 packages:
-  # Quad — the framework the apps move onto. Inert by construction: nothing here
-  # is in apps.json, so `deploy.yml` can never select it — but its tests DO run.
+  # OneEngine — the framework, and One, the deployment built on it. Inert by
+  # construction: nothing here is in apps.json, so `deploy.yml` can never select
+  # it — but its tests and guards DO run.
   - "engine/*"
   - "engine/apps/*"
-  # The previous platform. Still the reference implementation of most mechanisms;
-  # read it for HOW, not for WHAT. Same inertness for the same reason.
-  - "platform/*"
+  # The live 4DL products and the packages they share.
   - "apps/*"
   - "packages/*"

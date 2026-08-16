@@ -834,36 +834,29 @@ deliverability pre-flight — was mounted by Kova and by neither other app. Read
 before assuming a shared capability reaches every product, and before adding an
 app.
 
-⚠️ **[platform/docs/STANDARDS.md](platform/docs/STANDARDS.md) governs
-`platform/**` — and this legacy tree not at all.** That is deliberate rather than
-an oversight: `apps/*`, `packages/@4dl/*` and every document beside this one are
-deleted at stage 9, and an exemption list for doomed files is a promise to fix
-something nobody intends to fix. The rules that bite over there: **a deferral is
-a marker in a comment, never a sentence** — it is FOUND by a script rather than
-remembered, which is the only property that survives a compressed conversation,
-and a stage cannot be flipped to `shipped` while anything still defers to it; an
-inventory lives in a verified generated block or not at all; every document
-declares a `kind`; and ⚠️ **a comment states the INVARIANT, never the incident**
-— "the reserve is a ceiling on revenue" stays true forever, while "Scena's copy
-under-counted four ways" describes a codebase that will not exist and reads as a
-live warning about an impossible problem. If a past defect is worth preventing,
-that is a test, not a paragraph.
-[platform/docs/README.md](platform/docs/README.md) and
-[platform/docs/DEFERRED.md](platform/docs/DEFERRED.md) are generated —
-`node platform/scripts/docs.test.mjs --write`. Enforced in `pnpm gate`;
-`pnpm one:test`, `one:typecheck` and `one:gate` run the platform alone.
+⚠️ **THERE WAS A SECOND "ONE" IN THIS REPOSITORY AND IT IS GONE.** `platform/`
+was the first attempt at what `engine/` is now — its own kernel, runtime, hello
+and coaching app — and it was abandoned the day OneEngine started. A superseded
+framework kept alongside its successor is not a reference, it is a second answer
+to every structural question, and the reader cannot tell which one is live. It
+was deleted on 2026-08-16 along with `_ui-archive/`, the interface language it
+carried, whose own README asked to be deleted once it stopped being consulted.
+`git log` is where both are read now.
 
-⚠️ **Picking the platform work back up? Start at
-[platform/docs/README.md](platform/docs/README.md)** — generated, so it cannot be
-stale: which stage is active, how many deferrals are open, every governed
-document by kind. [STANDARDS.md §9](platform/docs/STANDARDS.md) is the six-minute
-checklist after it. **Start there rather than from recall** — the repository is
-the memory, which is the reason a deferral is a marker a script finds rather than
-a sentence somebody has to remember.
+**Its rules survived it, which is why deleting it was cheap.** They govern
+`engine/` today, in [engine/docs/STANDARDS.md](engine/docs/STANDARDS.md): **a
+deferral is a marker in a comment, never a sentence** — `DEFER(engine-N)`, FOUND
+by a script rather than remembered, and a stage cannot be flipped to `shipped`
+while anything still defers to it; an inventory lives in a verified generated
+block or not at all; every document declares a `kind`; and ⚠️ **a comment states
+the INVARIANT, never the incident** — "the reserve is a ceiling on revenue" stays
+true forever, while "Scena's copy under-counted four ways" describes a codebase
+that will not exist and reads as a live warning about an impossible problem. If a
+past defect is worth preventing, that is a test, not a paragraph.
 
 ## OneEngine — the framework, and One — the deployment
 
-⚠️ **`engine/` IS THE SUCCESSOR TO BOTH `platform/` AND EVERYTHING ABOVE, AND IT IS
+⚠️ **`engine/` IS THE SUCCESSOR TO EVERYTHING ABOVE, AND IT IS
 WHERE NEW STRUCTURAL WORK GOES.** Start at
 [engine/docs/PROGRESS.md](engine/docs/PROGRESS.md) — it is what exists today, with a
 stage table a script keeps honest — then [engine/docs/PLAN.md](engine/docs/PLAN.md)
@@ -883,27 +876,15 @@ touches a binding), **`@engine/design`** — the browser half and the design sys
 every app draws with, named **OneDesign**, router-free — and the reference apps.
 **One** is the DEPLOYMENT built on it: `engine/one` is the worker
 that answers every door for every product, `engine/one-hub` is the page a person
-opens at the root, `id.` and `setup.`. A product — Kova — is a manifest inside
-it. So "One" is what a customer types and "OneEngine" is what a contributor imports,
+opens at the root, `id.` and `setup.`. A product is a manifest inside
+it, and `hello` is the only one — the coaching app that proved stage 9 left the
+tree on 2026-08-16 to be rewritten under a new name. So "One" is what a customer types and "OneEngine" is what a contributor imports,
 and the day there is a second deployment the split is what makes that cheap.
 
 **`engine/` is INERT to the legacy tree by construction**: nothing in it is in
 `apps.json`, so `deploy.yml` can never select it. Its tests and guards DO run —
 `pnpm engine:test`, `engine:typecheck`, and `engine:gate`, which is inside the root
-`pnpm gate`. The old `platform/` tree is no longer in the root gate; run it with
-`pnpm one:gate` if you need it.
-
-**[platform/docs/PLAN.md](platform/docs/PLAN.md) was the plan OneEngine came out of,
-and it is superseded.** A new framework directory that owns the
-runtime, the data model, the surface (HTTP + AI tools + webhooks) and the chrome,
-driven by a typed manifest per app, with the apps living inside it. Four
-decisions are settled there — a declarative shell with code screens, absorbing
-`@4dl/*` rather than wrapping it, Kova migrating first, and one 4DL identity with
-SSO — and each carries consequences that are cheap now and expensive later. Read
-it before starting anything structural, and read §7 before touching Kova's data:
-the migration pattern it prescribes is the one audit step 5.2 proved on Scena's
-billing tables, and it exists because the naive version is a total outage rather
-than a degraded feature.
+`pnpm gate`.
 
 **That whole class is a guard now.** `scripts/capability-reachable.test.mjs` (in
 `pnpm gate`) fails on any app — the template included — that applies a package's

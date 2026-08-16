@@ -32,18 +32,19 @@ So three rules govern everything written here:
 [DECISIONS.md](DECISIONS.md) for what is settled and what it forbids, then
 [PROGRESS.md](PROGRESS.md) for what exists today. Nothing else is required reading.
 
-⚠️ **AND THE PREDECESSOR IS `platform/`, WHICH STILL WORKS.** OneEngine is not a
-rescue — it is a second attempt made possible by the first having answered the
-hard questions. `platform/` is the reference implementation of nearly every
-mechanism here: read it for how, not for what. Its documents describe an
-architecture OneEngine deliberately departs from in the ways §2 sets out.
+⚠️ **AND THERE WAS A PREDECESSOR, WHICH IS NOW ONLY IN `git log`.** OneEngine is
+not a rescue — it is a second attempt made possible by the first having answered
+the hard questions. That first attempt lived in `platform/` and was the reference
+implementation of nearly every mechanism here; it was deleted on 2026-08-16,
+because a superseded framework kept beside its successor is a second answer to
+every structural question with nothing saying which one is live. §1 is what it
+got wrong, and that is the part worth keeping.
 
 ---
 
 ## 1. What changed, and why there is a second attempt
 
-`platform/` (the `@engine/*` tree) got the mechanisms right and the **topology**
-wrong. Three consequences, and each is the reason for one of OneEngine's decisions:
+The predecessor got the mechanisms right and the **topology** wrong. Three consequences, and each is the reason for one of OneEngine's decisions:
 
 **An app was a deployment.** Every product had its own worker, its own D1, KV and
 R2, its own domain binding, its own secrets, its own row in a registry, and a
@@ -206,7 +207,7 @@ which operations it calls
 ## 4. Autodiscovery — the set-and-forget rule
 
 ⚠️ **A DECLARATION THAT REACHES NO SURFACE IS THE FAILURE THIS FRAMEWORK EXISTS
-TO PREVENT.** `platform/` shipped it repeatedly: a mechanism fully built, tested
+TO PREVENT.** The predecessor shipped it repeatedly: a mechanism fully built, tested
 and wired, with nowhere a person could look — an entitlement nothing gated, a
 notification registry with no bell, a schema applied and no route to reach it.
 Every one of them passed every test.
