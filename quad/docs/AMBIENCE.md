@@ -342,11 +342,24 @@ Five decisions in it are worth knowing before adding a family.
   everything twinkles is a field nobody can read over — the movement stops
   reading as life and starts reading as noise. About a third of the bright stars,
   half the sparkles, none of the faint.
-- **The motion lives inside the generated SVG**, behind its own
-  `prefers-reduced-motion` guard, and animates opacity only. It travels with the
-  image, needs no keyframe registered anywhere, and stays on the compositor —
-  anything else on a layer this size repaints the viewport every frame, for ever,
-  and looks identical on the machine it was written on.
+- ⚠️ **The field is an ELEMENT, not a background image, and this is the one to
+  know.** It was a `background-image: url("data:image/svg+xml,…")` carrying its
+  own `<style>` — the better design, and it does not work: **Chromium renders an
+  SVG used as `background-image` statically.** Measured, the same file animates
+  as an `<img>` and as inline SVG and does not animate as a background, so every
+  star in this product was frozen from the day the field was written — with a
+  guard checking the keyframes were compositor-only, a test checking the still
+  bake differed, and nothing anywhere checking that anything moved. The field is
+  an inline `<svg>` laying one `<pattern>` now, so the browser still lays out two
+  elements whatever the field contains, and the beats are ordinary rules in
+  `ambienceStylesheet`. That also deletes the two-bake requirement: switching
+  motion off used to mean rendering a second picture and is now the rule not
+  applying.
+- **A beat animates opacity only** — anything else on a layer this size repaints
+  the viewport every frame, for ever, and looks identical on the machine it was
+  written on. How far it dips is the beat's (`BEAT.dip`), because `1 → .3` is
+  right for a star and is the whole page throbbing when the mark is a fifth of
+  the screen wide.
 - **The vignette is a MASK, not a wash.** A ground that has to be covered to be
   readable is a ground that is too loud, and the cover is a grey film over
   somebody's brand. A scene's own alpha drops where content sits, so the page's

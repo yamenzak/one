@@ -201,7 +201,6 @@ export interface Scene {
    * see `DENSITY`.
    */
   readonly density?: number;
-  readonly motion?: boolean;
 }
 
 /**
@@ -223,20 +222,43 @@ export type Density = keyof typeof DENSITY;
 /* ----------------------------------------------------------------- render --- */
 
 /**
- * ⚠️ THE SPECKS BECOME ONE TILED SVG, NOT ELEMENTS IN THE PAGE. Two hundred
- * nodes in the DOM is two hundred things the browser lays out, styles and
- * repaints; the same two hundred inside one background image is a texture the
- * compositor uploads once. It is also why the motion has to live INSIDE the
- * picture — see `beats`.
+ * ⚠️ ONE TILE, LAID BY A `<pattern>` IN A LIVE `<svg>` — NOT A BACKGROUND IMAGE,
+ * AND THIS IS THE MOST IMPORTANT SENTENCE IN THE FILE. The field was a
+ * `background-image: url("data:image/svg+xml,…")` carrying its own `<style>`,
+ * and the argument for it was good: the motion travels with the picture, needs
+ * no keyframe registered anywhere, and answers `prefers-reduced-motion` by
+ * itself. The argument was also wrong, because **Chromium renders an SVG used as
+ * `background-image` STATICALLY.** Measured: the same file animates as an
+ * `<img>` and does not animate as a background, so every star in this product
+ * had been still since the day the field was written — with a guard checking the
+ * keyframes were compositor-only, a test checking the still bake differed, and
+ * nothing anywhere checking that anything moved.
+ *
+ * ⚠️ SO THE FIELD IS AN ELEMENT AND THE BEATS ARE THE STYLESHEET'S. Inline SVG
+ * animates in every form (measured: plain, `<pattern>`, `<use>`, and a rotation
+ * inside a pattern), and a live element is reached by the page's own CSS — so
+ * `ambienceStylesheet` defines the beats once and a mark just carries the class.
+ * That also deletes the two-bake requirement: switching motion off used to mean
+ * rendering a second picture, and it is now the rule not applying.
+ *
+ * ⚠️ THE MARKS STILL LIVE INSIDE ONE ELEMENT rather than as two hundred nodes in
+ * the page. A `<pattern>` is a paint server: the browser lays out one `<svg>` and
+ * one `<rect>`, whatever the field contains.
  */
-export function render(scene: Scene): {
-  readonly art: string;
+export interface Rendered {
+  /**
+   * The `<svg>`'s children: a `<pattern>` holding the marks, and a `<rect>`
+   * filled with it. Engine-generated, so it is safe to set as inner HTML.
+   */
+  readonly field: string;
+  /** CSS `background-image` layers, topmost first. */
   readonly ground: string;
   /** ⚠️ Empty where the family declares none — see `Family.veil`. */
   readonly veil: string;
-} {
+}
+
+export function render(scene: Scene): Rendered {
   const { family, palette } = scene;
-  const moving = scene.motion !== false;
   const density = scene.density ?? 1;
   const r = prng(hash(`${family.id}|${scene.seed}`));
 
@@ -244,7 +266,6 @@ export function render(scene: Scene): {
   const megapixels = (tile.w * tile.h) / 1_000_000;
 
   const marks: string[] = [];
-  const beats = new Set<keyof typeof BEAT>();
 
   for (const speck of family.specks ?? []) {
     const count = Math.round(speck.per * megapixels * density);
@@ -252,48 +273,41 @@ export function render(scene: Scene): {
       const v = pick(r, speck.variants);
       /* ⚠️ THE SHARE IS DRAWN PER INSTANCE, from the same stream, so which marks
          move is part of the world rather than a second decision. */
-      const beat = moving && v.beat && r() < (v.moving ?? 0) ? v.beat : null;
-      if (beat) beats.add(beat);
+      const beat = v.beat && r() < (v.moving ?? 0) ? v.beat : null;
       const body = v.draw(palette, r);
       marks.push(beat
-        ? `<g class="b-${beat}" transform="translate(${x} ${y})">${body}</g>`
+        ? `<g class="q-${beat}" transform="translate(${x} ${y})">${body}</g>`
         : `<g transform="translate(${x} ${y})">${body}</g>`);
     }
   }
 
   /*
-    ⚠️ THE MOTION IS A `<style>` INSIDE THE PICTURE, AND THIS IS THE ENGINE'S
-    MOST USEFUL PROPERTY. It travels with the image, so the same file is correct
-    as a background, as an `<img>` and in a document that has never heard of our
-    stylesheet; it needs no keyframe registered anywhere; and its own
-    `prefers-reduced-motion` guard means the operating system's answer is honoured
-    without a rule from us. Only the beats actually used are emitted.
-
-    ⚠️ AND IT IS `opacity` ONLY. Opacity and transform are the two properties a
-    compositor can animate without touching layout or paint — anything else on a
-    layer this size is a full-viewport repaint every frame, forever, on a phone.
+    ⚠️ IDS ARE DOCUMENT-SCOPED NOW, WHICH THEY WERE NOT INSIDE A DATA URI. Two
+    fields on one page both declaring `#l` is the first one winning and the
+    second one's marks filling with nothing — silent, and exactly the kind of
+    thing that only happens once two screens are open at the same time. The
+    engine owns this whole string and nothing outside can reference into it, so
+    rewriting both halves of every pair is total: the conformance test already
+    proves the pairs match, so the rewrite cannot break one.
   */
-  const motion = beats.size
-    ? `<style>@media (prefers-reduced-motion: no-preference){`
-      /* ⚠️ ONE KEYFRAME PER BEAT, BECAUSE THE DIP IS THE BEAT'S. A single shared
-         `1 → .3` is right for a star and is the whole page throbbing when the
-         mark is a fifth of the screen wide — see `BEAT`. */
-      + [...beats].map((b) => `@keyframes qb-${b}{0%,100%{opacity:1}50%{opacity:${BEAT[b].dip}}}`).join("")
-      + [...beats].map((b) =>
-        `.b-${b}{animation:qb-${b} ${BEAT[b].period} ease-in-out infinite ${BEAT[b].delay}}`).join("")
-      + `}</style>`
-    : "";
+  const ns = `q${hash(`${family.id}|${scene.seed}`).toString(36)}`;
+  const scoped = (svg: string) =>
+    svg.replace(/\bid="([\w-]+)"/g, `id="${ns}-$1"`).replace(/url\(#([\w-]+)\)/g, `url(#${ns}-$1)`);
 
   const defs = marks.length && family.defs ? `<defs>${family.defs(palette)}</defs>` : "";
-
-  const art = marks.length
-    ? `url("data:image/svg+xml,${encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${tile.w}" height="${tile.h}"`
-      + ` viewBox="0 0 ${tile.w} ${tile.h}">${motion}${defs}${marks.join("")}</svg>`)}")`
-    : "none";
+  const body = scoped(`${defs}${marks.join("")}`);
 
   return {
-    art,
+    /* ⚠️ `userSpaceOnUse` AND THE TILE IS IN CSS PIXELS. A pattern in object
+       units would resize with the viewport, so the same world would be a
+       different constellation on a phone and on a laptop — which is what a
+       stretched sky looks like, and the reason the old background version pinned
+       an explicit `background-size`. */
+    field: marks.length
+      ? `<defs><pattern id="${ns}-tile" width="${tile.w}" height="${tile.h}"`
+        + ` patternUnits="userSpaceOnUse">${body}</pattern></defs>`
+        + `<rect width="100%" height="100%" fill="url(#${ns}-tile)"/>`
+      : "",
     ground: family.ground(palette, prng(hash(`${family.id}|ground|${scene.seed}`))).join(", "),
     veil: family.veil?.(palette) ?? "",
   };

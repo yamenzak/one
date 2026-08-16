@@ -110,10 +110,6 @@ export interface PageProps {
 export function Page(
   { sky = "plain", world, density = "even", tone = "neutral", nav, children }: PageProps,
 ) {
-  /* ⚠️ The motion is CSS inside the field's own SVG, so switching it off is a
-     different picture — see `render`. */
-  const at = React.useRef<HTMLDivElement>(null);
-  const still = useStill(at);
   /*
     ⚠️ THE THEME PICKS A SKY, AND THIS REPLACES A RULE THAT SHOULD NEVER HAVE
     BEEN ONE. For one build a world was a dark room in both themes, because every
@@ -128,15 +124,36 @@ export function Page(
     a first render that guessed wrong would swap the sky one frame later.
   */
   const night = useNight();
-  const own = world ? worldCss(world, { night, moving: !still, density }) : null;
+  const own = world ? worldCss(world, { night, density }) : null;
   return (
     <div
-      ref={at}
       className="min-h-dvh flex flex-col"
       data-sky={own ? "world" : sky}
       data-tone={tone}
-      style={own as React.CSSProperties | undefined}
+      style={own?.css as React.CSSProperties | undefined}
     >
+      {/*
+        ⚠️ THE FIELD IS AN ELEMENT, AND IT HAS TO BE. It was a `background-image`
+        carrying its own `<style>`, which is the better design and does not work:
+        Chromium renders an SVG used as a background STATICALLY, so every star in
+        the product was frozen from the day the field was written. Measured — the
+        same file animates as an `<img>` and as inline SVG, and does not animate
+        as a background. See `render`.
+
+        ⚠️ INNER HTML, AND IT IS ENGINE-GENERATED — a `<pattern>` and a `<rect>`
+        composed by `render` from a family's own declarations. Nothing a person
+        typed reaches this string, and there is no other way to hand a browser a
+        subtree of SVG built as text.
+      */}
+      {own?.field
+        ? (
+          <svg
+            aria-hidden="true"
+            data-field="true"
+            dangerouslySetInnerHTML={{ __html: own.field }}
+          />
+        )
+        : null}
       <div className={`flex grow flex-col ${nav ? NAV_SPACE : ""}`}>{children}</div>
       {nav}
     </div>

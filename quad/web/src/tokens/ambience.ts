@@ -42,7 +42,7 @@
 
 import type { Tone } from "@quad/kernel";
 /* ⚠️ The pace and the curve are the vocabulary's, not this file's — see `DRIFT`. */
-import { DURATION, EASE } from "./motion.js";
+import { BEAT, DURATION, EASE } from "./motion.js";
 import { DENSITY, FAMILIES, render, type Density, type SceneFamily } from "../scene/index.js";
 
 /**
@@ -848,7 +848,7 @@ function layers(what: Ambience, hue: string): readonly string[] {
       the field's size and the whole world becomes wallpaper.
     */
     case "world":
-      return [`var(--world-art, none)`, `var(--world-ground, none)`];
+      return [`var(--world-ground, none)`];
 
   }
 }
@@ -969,10 +969,10 @@ const halo = (colour: string): string => {
  * first one to do it is a page a workspace's branding no longer reaches (D7).
  */
 export function worldCss(
-  world: World, at: { readonly night: boolean; readonly moving: boolean; readonly density: Density },
-): Readonly<Record<string, string>> {
-  const key = `${world.family}|${world.seed}|${world.deep}|${world.lit}|${at.night ? "n" : "d"}`
-    + `|${at.moving ? "m" : "s"}|${at.density}`;
+  world: World, at: { readonly night: boolean; readonly density: Density },
+): { readonly css: Readonly<Record<string, string>>; readonly field: string } {
+  const key = `${world.family}|${world.seed}|${world.deep}|${world.lit}`
+    + `|${at.night ? "n" : "d"}|${at.density}`;
   let made = skies.get(key);
   if (!made) {
     made = render({
@@ -980,19 +980,17 @@ export function worldCss(
       seed: world.seed,
       palette: { deep: world.deep, lit: world.lit },
       density: DENSITY[at.density],
-      motion: at.moving,
     });
     skies.set(key, made);
   }
-  return {
-    "--world-art": made.art,
+  return { field: made.field, css: {
     "--world-ground": made.ground,
     /* ⚠️ SET EVEN WHERE THE FAMILY DECLARES NO VEIL, as `none` — because the
        token is read with a fallback and an absent property would inherit the
        PARENT scene's halo on a nested page. A world that says nothing about its
        type must say `none` rather than say nothing. */
     "--on-scene": made.veil ? halo(made.veil) : "none",
-  };
+  } };
 }
 
 /**
@@ -1152,16 +1150,12 @@ const EXTRAS: Partial<Record<Ambience, string>> = {
   /* DEPTH, crush, art, pole, field — the drawing fills the reach exactly. */
   silk: WEAVE_LAYERS, linen: WEAVE_LAYERS, wire: WEAVE_LAYERS,
   /*
-    ⚠️ FIVE ENTRIES FOR FIVE LAYERS, SPELLED OUT, because these lists CYCLE. The
-    stars are the only one that is a drawing, and they TILE — unlike every weave
-    above, which is one composition sized to the reach. A star field that had to
-    cover the viewport would be stretched on a phone and the constellation would
-    change shape with the window; tiled at its own size it is the same sky at
-    every width, which is what a sky is.
+    ⚠️ THE SPECKS ARE NOT HERE ANY MORE — see `Rendered`. A scene's marks are a
+    live `<svg>` element, because Chromium renders an SVG used as
+    `background-image` STATICALLY and every star in the product had been frozen
+    since the field was written. What is left on the pseudo-element is the
+    GROUND, which is gradients and needs no animation at all.
   */
-  world: "background-size: auto, 1200px 900px, auto, auto, auto"
-    + "; background-repeat: repeat, repeat, no-repeat, no-repeat, no-repeat"
-    + "; background-position: 0 0, 0 0, 0 0, 0 0, 0 0",
 };
 
 export function ambienceStylesheet(): string {
@@ -1201,6 +1195,44 @@ export function ambienceStylesheet(): string {
     ];
   });
 
+  /*
+    ⚠️ THE BEATS ARE THE STYLESHEET'S NOW, AND THAT IS THE HALF THAT MAKES THEM
+    RUN. They used to be a `<style>` element inside the field's own SVG, which is
+    the right design for a picture and the wrong one for a picture nothing
+    animates: an SVG used as `background-image` is rendered statically by
+    Chromium, so a star that declared a twinkle simply never twinkled. The field
+    is a live element now, so the page's own CSS reaches it — one definition
+    rather than one per scene, and both opt-outs for free.
+
+    ⚠️ ONE KEYFRAME PER BEAT, BECAUSE THE DIP IS THE BEAT'S. A single shared
+    `1 → .3` is right for a star and is the whole page throbbing when the mark is
+    a fifth of the screen wide — see `BEAT`.
+  */
+  const names = Object.keys(BEAT) as (Extract<keyof typeof BEAT, string>)[];
+  const beats = [
+    `@media (prefers-reduced-motion: no-preference) {`,
+    ...names.flatMap((b) => [
+      `@keyframes quad-${b} { 0%, 100% { opacity: 1 } 50% { opacity: ${BEAT[b].dip} } }`,
+      `.q-${b} { animation: quad-${b} ${BEAT[b].period} ${EASE.plain} infinite ${BEAT[b].delay}; }`,
+    ]),
+    `}`,
+    /* ⚠️ The in-app switch, for whom this is not a preference — see `REDUCED`. */
+    `[data-reduce-motion="true"] ${names.map((b) => `.q-${b}`).join(", ")} { animation: none; }`,
+  ];
+
+  /*
+    ⚠️ THE FIELD IS AN ELEMENT AND IT WEARS THE SAME MATTE THE GROUND DOES. Two
+    layers of one world receding differently would put a visible edge exactly
+    where content sits, which is the one place a ground must be invisible.
+  */
+  const field = [
+    `[data-field] {`,
+    `  position: absolute; top: 0; left: 0; right: 0; width: 100%;`,
+    `  height: ${REACH}; z-index: -1; pointer-events: none;`,
+    `  ${MATTE};`,
+    `}`,
+  ];
+
   /* ⚠️ The drawing is baked per theme — see `art`. The var sits on the HOST
      (pseudo-elements inherit it), both selector forms for the same reason as
      the `--sky` rule below. */
@@ -1225,6 +1257,8 @@ export function ambienceStylesheet(): string {
     `  --sky: 0.55; --thread: 0; --etch: 0.5; --lumen: oklch(0.985 0 0); --field: 0.62;`,
     `}`,
     ...artRules,
+    ...beats,
+    ...field,
     `[data-sky]:not([data-sky="plain"])::before,`,
     `[data-sky]:not([data-sky="plain"])::after {`,
     `  content: ""; position: absolute; top: 0; left: 0; right: 0;`,

@@ -17,6 +17,7 @@
 
 import { describe, expect, it } from "vitest";
 import { FAMILIES, render, type Family, type Palette } from "../src/scene/index.js";
+import { BEAT } from "../src/tokens/motion.js";
 
 /* ⚠️ Two real colours, because `color-mix` with a bad operand is dropped by the
    browser rather than reported, and a slot filled with `undefined` is exactly
@@ -29,9 +30,6 @@ const skies = (): readonly (readonly [string, Family])[] =>
 
 const drawn = (family: Family, seed = "northwind") =>
   render({ family, seed, palette: PALETTE, density: 1.8 });
-
-/** ⚠️ The art is a URI-encoded data URL — the marks have to come back out. */
-const svgOf = (art: string) => decodeURIComponent(art);
 
 describe("every family", () => {
   it("has both skies, and they are not the same picture", () => {
@@ -50,7 +48,7 @@ describe("every family", () => {
 
   it("resolves every mark it references", () => {
     for (const [id, family] of skies()) {
-      const svg = svgOf(drawn(family).art);
+      const svg = drawn(family).field;
       const used = new Set([...svg.matchAll(/url\(#([\w-]+)\)/g)].map((m) => m[1]));
       const made = new Set([...svg.matchAll(/\bid="([\w-]+)"/g)].map((m) => m[1]));
       for (const ref of used) {
@@ -68,7 +66,7 @@ describe("every family", () => {
   it("fills every slot it declares", () => {
     for (const [id, family] of skies()) {
       const made = drawn(family);
-      const all = `${svgOf(made.art)}${made.ground}${made.veil}`;
+      const all = `${made.field}${made.ground}${made.veil}`;
       /*
         ⚠️ A MISSING SLOT PRINTS `undefined` INTO CSS AND THE BROWSER DROPS THAT
         ONE DECLARATION. Not the rule — the declaration — so a four-layer ground
@@ -100,29 +98,49 @@ describe("every family", () => {
 
   it("is the same world for the same seed, and a different one for a different seed", () => {
     for (const [id, family] of skies()) {
-      expect(drawn(family, "atlas").art, `${id} is not stable for one seed`)
-        .toBe(drawn(family, "atlas").art);
-      expect(drawn(family, "atlas").art, `${id} draws one world for every seed`)
-        .not.toBe(drawn(family, "northwind").art);
+      expect(drawn(family, "atlas").field, `${id} is not stable for one seed`)
+        .toBe(drawn(family, "atlas").field);
+      expect(drawn(family, "atlas").field, `${id} draws one world for every seed`)
+        .not.toBe(drawn(family, "northwind").field);
     }
   });
 
-  it("moves only where it was asked to, and stands still when it is not", () => {
+  it("carries its beats as classes, never as a style element of its own", () => {
     for (const [id, family] of skies()) {
-      const moving = svgOf(drawn(family).art);
-      const still = svgOf(render({ family, seed: "northwind", palette: PALETTE, motion: false }).art);
+      const field = drawn(family).field;
       /*
-        ⚠️ THE STILL BAKE IS A DIFFERENT PICTURE, NOT A PAUSED ONE. The animation
-        is a `<style>` INSIDE the SVG and nothing outside can reach it, which is
-        the property that lets the motion travel with the image — and the reason
-        switching it off has to be a second render.
+        ⚠️ THIS IS THE ASSERTION THAT WOULD HAVE CAUGHT A YEAR OF STILL STARS.
+        The field used to carry a `<style>` inside its own SVG, which is the
+        better design and does not work: Chromium renders an SVG used as
+        `background-image` STATICALLY, so nothing declared in there ever ran. The
+        field is a live element now and the beats are `ambienceStylesheet`'s, so
+        a mark carries a CLASS and the rule reaches it.
+
+        ⚠️ A `<style>` HERE WOULD ALSO LEAK. Inline SVG is part of the page's own
+        document, so a rule inside it applies to everything — not to the picture.
       */
-      expect(still, `${id} carries motion into its still bake`).not.toContain("@keyframes");
-      if (moving.includes("@keyframes")) {
-        /* ⚠️ The picture's own guard, so the operating system's answer is
-           honoured without a rule from us. */
-        expect(moving, `${id} animates past a reduced-motion preference`)
-          .toContain("prefers-reduced-motion: no-preference");
+      expect(field, `${id} carries a <style> of its own`).not.toContain("<style");
+      for (const beat of [...field.matchAll(/class="q-([\w-]+)"/g)].map((m) => m[1]!)) {
+        expect(Object.keys(BEAT), `${id} carries a beat nothing defines: ${beat}`)
+          .toContain(beat);
+      }
+    }
+  });
+
+  it("scopes the ids it emits, so two fields on one page cannot collide", () => {
+    /*
+      ⚠️ IDS ARE DOCUMENT-SCOPED NOW, WHICH THEY WERE NOT INSIDE A DATA URI. Two
+      worlds on one page both declaring `#l` is the first one winning and the
+      second one's marks filling with nothing — silent, and only reachable once
+      two screens are open at once.
+    */
+    const seen = new Set<string>();
+    for (const [id, family] of skies()) {
+      for (const seed of ["atlas", "northwind"]) {
+        for (const m of render({ family, seed, palette: PALETTE }).field.matchAll(/\bid="([^"]+)"/g)) {
+          expect(seen.has(m[1]!), `${id}/${seed} re-uses the id ${m[1]}`).toBe(false);
+          seen.add(m[1]!);
+        }
       }
     }
   });

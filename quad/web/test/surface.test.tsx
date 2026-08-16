@@ -22,6 +22,7 @@ import { FlagConsole, Shelf, saying, money } from "../src/rendered/console.js";
 import { Shell, reachable } from "../src/frame/shell.js";
 import { brandCss, brandCssFor, readable, skyCss, colorFor } from "../src/tokens/theme.js";
 import { AMBIENCES, DRIFT, ambienceStylesheet, bespokeCss } from "../src/tokens/ambience.js";
+import { BEAT } from "../src/tokens/motion.js";
 import { Screen, Whichever } from "../src/frame/screen.js";
 import { ready, trouble, waiting } from "../src/parts/state.js";
 import { Documents, SubProcessors } from "../src/rendered/legal.js";
@@ -422,9 +423,41 @@ describe("a workspace's branding", () => {
       expect(css).toContain(`[data-reduce-motion="true"] [data-sky="${name}"]::before`);
     }
 
-    /* ⚠️ ONE keyframe, and it takes its numbers in — not one per ambience. */
-    expect([...css.matchAll(/@keyframes/g)]).toHaveLength(1);
+    /* ⚠️ ONE drift keyframe, and it takes its numbers in — not one per
+       ambience. Twenty-four grounds move; there is one rule for all of them. */
     expect(css).toContain("@keyframes quad-drift {");
+    expect([...css.matchAll(/@keyframes quad-drift/g)]).toHaveLength(1);
+
+    /*
+      ⚠️ AND ONE KEYFRAME PER BEAT, WHICH IS A DIFFERENT RULE WITH THE SAME
+      SHAPE. A beat's DIP is the beat's — a star may go most of the way out, a
+      bloom a fifth of the way — so these cannot share one, and the count is
+      bounded by the table rather than by how many scenes exist.
+
+      ⚠️ THE BEATS LIVE HERE AT ALL BECAUSE A PICTURE CANNOT CARRY THEM. The
+      field used to declare its own `<style>` inside an SVG served as
+      `background-image`, and Chromium renders those STATICALLY — so every star
+      in the product was frozen, with nothing failing. A live element and a rule
+      in this stylesheet is what makes the motion real, and it is also what makes
+      both opt-outs reach it.
+    */
+    const beats = Object.keys(BEAT);
+    expect(beats.length).toBeGreaterThan(0);
+    expect([...css.matchAll(/@keyframes quad-(?!drift)/g)]).toHaveLength(beats.length);
+    for (const beat of beats) {
+      expect(css, `${beat} has no keyframe`).toContain(`@keyframes quad-${beat} {`);
+      expect(css, `${beat} is not offered to the system preference`)
+        .toContain(`.q-${beat} { animation: quad-${beat}`);
+      expect(css, `${beat} cannot be switched off inside the app`)
+        .toContain(`.q-${beat}`);
+    }
+    expect(css).toContain(`[data-reduce-motion="true"] ${beats.map((b) => `.q-${b}`).join(", ")}`);
+
+    /* ⚠️ The field is an ELEMENT, and it wears the same matte the ground does —
+       two halves of one world receding differently is a visible edge exactly
+       where content sits. */
+    expect(css).toContain("[data-field] {");
+    expect(css).toMatch(/\[data-field\] \{[^}]*mask-image/);
   });
 
   /**

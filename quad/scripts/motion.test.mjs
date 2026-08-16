@@ -115,14 +115,20 @@ if (!curves) ok(`curves: no screen writes its own easing or duration`);
  * entirely — `Variant.moving` is a different thing in the same file, and one
  * name matching somewhere is not an assertion about anything.
  */
-const offBoth = (src, name) => {
-  if (!new RegExp(`animation:[^;]*${name}`).test(src)) return false;
-  /* The page's two opt-outs. */
-  if (/prefers-reduced-motion:\s*reduce/.test(src) && /data-reduce-motion="true"/.test(src)) return true;
-  /* A generated picture's: its own guard, plus a still bake to serve instead. */
-  return /prefers-reduced-motion:\s*no-preference/.test(src)
-    && /\?\s*`?<style>/.test(src);
-};
+/*
+  ⚠️ ONE LEGAL SHAPE, AND THIS USED TO HAVE TWO. The second was "a generated
+  picture carries its own `<style>` with its own `no-preference` guard, and a
+  still bake to serve instead" — which is a good design and blessed a defect:
+  Chromium renders an SVG used as `background-image` STATICALLY, so a keyframe
+  declared inside one never ran at all. The rule was excusing motion that did not
+  exist. A generated field is a live element now and its beats are ordinary page
+  CSS, so there is one shape again: the system preference AND the switch a person
+  can reach inside the app.
+*/
+const offBoth = (src, name) =>
+  new RegExp(`animation:[^;]*${name}`).test(src)
+  && (/prefers-reduced-motion:\s*(reduce|no-preference)/.test(src)
+    && /data-reduce-motion="true"/.test(src));
 
 let frames = 0;
 for (const file of SOURCES) {
