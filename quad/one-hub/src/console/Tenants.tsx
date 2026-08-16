@@ -8,7 +8,7 @@
  */
 
 import { Chip } from "@heroui/react";
-import { Listing, Screen, TableWaiting, sentence } from "@quad/web";
+import { Listing, Screen, TableWaiting, placeFace, sentence } from "@quad/web";
 import type { Allowance, EntitlementDef, PlanSpec } from "@quad/kernel";
 import { useLoad } from "../centre/data.js";
 
@@ -67,6 +67,7 @@ export function Tenants({ onGo }: { readonly onGo: (id: string) => void }) {
           onOpen={(t) => onGo(t.id)}
           asRow={(t) => ({
             name: t.name,
+            face: placeFace(t.slug),
             under: [t.slug, `${t.country} · ${t.shardId}`, standing(t)]
               .filter(Boolean).join(" · "),
           })}

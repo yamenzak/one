@@ -24,7 +24,7 @@
  */
 
 import { Chip } from "@heroui/react";
-import { Group, Identity, NavRow, Stack, glyphOf } from "@quad/web";
+import { Group, Identity, NavRow, Stack, glyphOf, whoFace } from "@quad/web";
 import type { Me } from "../api.js";
 import { useLoad, type InboxView } from "../centre/data.js";
 import { useSession } from "../session.js";
@@ -55,6 +55,7 @@ export function HubHome({ person, onGo }: {
   return (
     <Stack space="roomy">
       <Identity
+        face={person ? whoFace(person.accountId) : undefined}
         name={person?.email ?? "You"}
         under={workspaces === null
           ? undefined

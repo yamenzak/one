@@ -34,6 +34,7 @@
 import * as React from "react";
 import { Pagination, Table } from "@heroui/react";
 import { Await, Nothing, TableWaiting, type Loaded } from "./state.js";
+import type { FaceOf } from "./face.js";
 import { Group, PersonRow } from "./surfaces.js";
 import { TYPE } from "../tokens/type.js";
 
@@ -69,7 +70,8 @@ export interface ListingProps<T> {
     readonly name: string;
     readonly under?: string;
     readonly aside?: React.ReactNode;
-    readonly face?: string;
+    /** ⚠️ WHO OR WHAT, NOT A PICTURE — `whoFace`/`placeFace`/`appFace`. */
+    readonly face?: FaceOf;
   };
 }
 

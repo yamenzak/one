@@ -21,7 +21,7 @@
  * reason and can reach for one; what every product needs is that a drawer, a
  * toast and a page all decelerate the same way.
  */
-import type * as React from "react";
+import * as React from "react";
 
 /**
  * The six curves HeroUI defines, by what they are FOR rather than by their
@@ -85,6 +85,41 @@ export const transition = (
  * off its own and leave the library's running.
  */
 export const REDUCED = { "data-reduce-motion": "true" } as const;
+
+/**
+ * WHETHER MOTION IS SWITCHED OFF FOR THIS ELEMENT.
+ *
+ * ⚠️ FOR THE MOTION CSS CANNOT REACH, AND ONLY FOR THAT. Almost everything here
+ * animates through the two rules above, which answer both opt-outs for free. Two
+ * things cannot: a number counted in JavaScript, and a face whose animation is a
+ * `<style>` element INSIDE an SVG being used as an image. Those have to ask, and
+ * asking in two places is how they come to disagree.
+ *
+ * ⚠️ BOTH SIGNALS, AND THE SECOND IS THE HALF THAT IS ACTUALLY REACHABLE.
+ * `prefers-reduced-motion` is an operating-system setting; `data-reduce-motion`
+ * is what a switch inside the product sets, and it is the one somebody flips
+ * after an animation annoys them. Answering only the first means the app has a
+ * control that visibly does nothing.
+ *
+ * ⚠️ AND THE OS SETTING IS READ SYNCHRONOUSLY, WHICH IS LOAD-BEARING. Starting
+ * at `true` and correcting in an effect made the counter's first run take the
+ * bail-out path — which marks the value as already reached, so when the
+ * correction arrived there was nothing left to count from. The component never
+ * animated at all, in either setting, with every test green and the code reading
+ * exactly as intended.
+ */
+export function useStill(at: React.RefObject<HTMLElement | null>): boolean {
+  const [still, setStill] = React.useState(
+    () => typeof matchMedia === "function"
+      && matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+  /* ⚠️ The ancestor can only make it MORE still — an in-app switch turns motion
+     off, it never turns it back on over somebody's operating system. */
+  React.useEffect(() => {
+    if (at.current?.closest('[data-reduce-motion="true"]')) setStill(true);
+  }, [at]);
+  return still;
+}
 
 /**
  * ⚠️ A NAMED INTENT, NOT A DURATION AND A CURVE AT EVERY CALL SITE. `enter`,

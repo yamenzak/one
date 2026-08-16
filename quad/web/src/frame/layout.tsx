@@ -21,20 +21,21 @@
 import * as React from "react";
 import type { Tone } from "@quad/kernel";
 import { PRIMARY_MAX } from "@quad/kernel";
-import { Avatar, Button, Card, Separator } from "@heroui/react";
+import { Button, Card, Separator } from "@heroui/react";
 /* ⚠️ `Ambience`, not `theme.ts`'s older four-value `Sky`. The two drifted the
    moment patterns were added, and a `Page` that could not be given `dots` was a
    vocabulary with a piece nothing could reach. */
 import type { Ambience } from "../tokens/ambience.js";
 import { TYPE } from "../tokens/type.js";
 import {
-  BAND_PAD, CODE_SLOT, CROWN, CROWN_CHIP, CROWN_SIZE, FACE, GUTTER, HEAD_GAP, HERO_PAD, ICON,
+  BAND_PAD, CODE_SLOT, CROWN, CROWN_CHIP, CROWN_SIZE, GUTTER, HEAD_GAP, HERO_PAD, ICON,
   ISLAND_ITEM,
   ISLAND_PAD,
   SAFE_TOP, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, TITLE_PAD, WIDTH,
   type Space, type Width,
 } from "../tokens/metrics.js";
 import { MOTION } from "../tokens/motion.js";
+import { Face, type FaceOf } from "../parts/face.js";
 
 export type { Space, Width };
 /* ⚠️ The metrics a SCREEN legitimately needs, re-exported here so nothing
@@ -969,7 +970,7 @@ export interface AppCrownProps {
    * more generality than the slot has any use for, and it is exactly the freedom
    * that let a placeholder become the design.
    */
-  readonly who: { readonly name: string; readonly src?: string };
+  readonly who: { readonly name: string; readonly face?: FaceOf };
   readonly onOpenAccount: () => void;
   readonly onSearch: () => void;
   readonly searchLabel?: string;
@@ -1023,13 +1024,11 @@ export function AppCrown(
             onPress={onOpenAccount}
           >
             <span className="relative flex size-full items-center justify-center">
-              {/* ⚠️ THE LIBRARY'S `Avatar`, WHICH ALREADY KNOWS WHAT A MISSING
-                  FACE LOOKS LIKE: an initial on the theme's own tint, not an
-                  outline of a stranger. */}
-              <Avatar className="size-full">
-                {who.src ? <Avatar.Image src={who.src} alt="" /> : null}
-                <Avatar.Fallback>{who.name.slice(0, 1).toUpperCase()}</Avatar.Fallback>
-              </Avatar>
+              {/* ⚠️ ONE RESOLVER DRAWS EVERY FACE (`face.tsx`), AND IT IS STILL
+                  AT THIS SIZE. A crown avatar is 32px, where a breathing one is
+                  a twitch in the corner of the eye rather than a sign of life —
+                  the size decides that, not this caller. */}
+              <Face of={who.face} name={who.name} size="chip" />
               {unread
                 ? <span aria-hidden="true" className="absolute -top-0.5 -right-0.5"><Dot /></span>
                 : null}

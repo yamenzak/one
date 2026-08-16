@@ -13,7 +13,7 @@
  * a chooser with one card is a screen whose entire content is a button.
  */
 
-import { Nothing, Place, Stack, Title } from "@quad/web";
+import { Nothing, Place, Stack, Title, appFace } from "@quad/web";
 import type { CentreView } from "./data.js";
 
 export function Choose({ view, onGo }: {
@@ -38,6 +38,7 @@ export function Choose({ view, onGo }: {
             key={app.id}
             at={i}
             tone={i === 0 ? "info" : "neutral"}
+            face={appFace(app.id, app.mark)}
             name={app.name}
             said={app.screens.map((s) => s.label).slice(0, 3).join(" · ")}
             foot={view.you.appRoles[app.id]

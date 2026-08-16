@@ -17,9 +17,11 @@
  * does not quietly change the product underneath it.
  */
 
-import { Await, Band, Crown, Page, Shell, Spacer, TYPE, Working } from "@quad/web";
+import {
+  Await, Band, Crown, Face, Page, Shell, Spacer, TYPE, Working, whoFace,
+} from "@quad/web";
 import type { ScreenSpec } from "@quad/kernel";
-import { Avatar, Button } from "@heroui/react";
+import { Button } from "@heroui/react";
 import { useSession } from "../session.js";
 import { AppSurface } from "./AppSurface.js";
 import { Choose } from "./Choose.js";
@@ -37,7 +39,8 @@ export function Product({ path, onGo, onOpenHub, onOpenInbox }: {
   /* ⚠️ Polled gently, so the badge is honest without a socket. */
   const inbox = useLoad<InboxView>("inbox.list");
   const unread = inbox.of.status === "ready" ? inbox.of.data.unseen : undefined;
-  const email = me && me !== "nobody" ? me.email ?? undefined : undefined;
+  const person = me && me !== "nobody" ? me : null;
+  const email = person?.email ?? undefined;
 
   return (
     <Await
@@ -60,7 +63,7 @@ export function Product({ path, onGo, onOpenHub, onOpenInbox }: {
               <Crown
                 name={view.tenant.name}
                 under="One"
-                aside={<Face email={email} onOpen={onOpenHub} />}
+                aside={<You email={email} accountId={person?.accountId} onOpen={onOpenHub} />}
               />
               <Band width="read"><div className="py-2"><Choose view={view} onGo={onGo} /></div></Band>
               <Spacer />
@@ -78,6 +81,7 @@ export function Product({ path, onGo, onOpenHub, onOpenInbox }: {
             here={path}
             held={new Set(app.permissions)}
             crown={{
+              appId: app.id,
               appName: app.name,
               appMark: app.mark,
               tenantName: view.tenant.name,
@@ -87,6 +91,7 @@ export function Product({ path, onGo, onOpenHub, onOpenInbox }: {
                 .map((a) => ({ id: a.id, name: a.name, mark: a.mark })),
               unread,
               personEmail: email,
+              personFace: person ? whoFace(person.accountId) : undefined,
             }}
             onGo={onGo}
             onSwitchApp={(id) => onGo(`/${id}`)}
@@ -102,17 +107,20 @@ export function Product({ path, onGo, onOpenHub, onOpenInbox }: {
 }
 
 /** ⚠️ The same gesture the Shell's crown carries, on the one screen with none. */
-function Face({ email, onOpen }: {
+function You({ email, accountId, onOpen }: {
   readonly email: string | undefined;
+  readonly accountId: string | undefined;
   readonly onOpen: () => void;
 }) {
   return (
     <>
       <span className={TYPE.note}>{email}</span>
       <Button isIconOnly variant="ghost" aria-label="Account and workspaces" onPress={onOpen}>
-        <Avatar size="sm">
-          <Avatar.Fallback>{(email ?? "?").slice(0, 1).toUpperCase()}</Avatar.Fallback>
-        </Avatar>
+        {/* ⚠️ ONE RESOLVER, AND THE SIZE DECIDES THE MOVEMENT (`face.tsx`). This
+            slot drew its own initial-in-a-circle while the Shell's crown drew a
+            face, so the same person changed appearance on the one screen with
+            no product open. */}
+        <Face of={accountId ? whoFace(accountId) : undefined} name={email} size="chip" />
       </Button>
     </>
   );

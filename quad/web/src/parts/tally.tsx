@@ -29,6 +29,7 @@
  */
 
 import * as React from "react";
+import { useStill } from "../tokens/motion.js";
 
 /**
  * ⚠️ 700ms, WHICH IS LONGER THAN EVERY OTHER DURATION HERE AND SHOULD BE. The
@@ -41,34 +42,6 @@ const COUNT_MS = 700;
 
 /** ⚠️ Decelerating, so the last digits settle rather than slam. Matches `--ease-out-quart`. */
 const easeOutQuart = (t: number): number => 1 - (1 - t) ** 4;
-
-/**
- * ⚠️ BOTH SIGNALS, AND THE SECOND ONE IS THE HALF THAT IS ACTUALLY REACHABLE.
- * `prefers-reduced-motion` is an operating-system setting; `data-reduce-motion`
- * is what a switch inside the product sets, and it is the one somebody flips
- * after this animation annoys them. Answering only the first would mean the app
- * has a control that visibly does nothing here.
- */
-function useStill(at: React.RefObject<HTMLElement | null>): boolean {
-  /*
-    ⚠️ THE OS SETTING IS READ SYNCHRONOUSLY AND THAT IS LOAD-BEARING. Starting at
-    `true` and correcting in an effect meant the FIRST run of the counting effect
-    always took the bail-out path — which marks the value as already reached, so
-    when the correction arrived there was nothing left to count from. The result
-    was a component that never animated at all, in either setting, with every
-    test green and the code reading exactly as intended.
-  */
-  const [still, setStill] = React.useState(
-    () => typeof matchMedia === "function"
-      && matchMedia("(prefers-reduced-motion: reduce)").matches,
-  );
-  /* ⚠️ The ancestor can only make it MORE still — an in-app switch turns motion
-     off, it never turns it back on over somebody's operating system. */
-  React.useEffect(() => {
-    if (at.current?.closest('[data-reduce-motion="true"]')) setStill(true);
-  }, [at]);
-  return still;
-}
 
 export interface TallyProps {
   readonly value: number;

@@ -19,7 +19,7 @@
  */
 
 import {
-  ActionRow, Confirm, Group, Identity, NavRow, Screen, glyphOf, notice,
+  ActionRow, Confirm, Group, Identity, NavRow, Screen, glyphOf, notice, whoFace,
 } from "@quad/web";
 import { useSession } from "../session.js";
 import type { Where } from "./where.js";
@@ -34,7 +34,11 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
        what the screen is FOR, and nobody opens their account to leave it. It is
        a card of its own, in the danger voice (DESIGN.md §5). */
     <Screen shape="detail">
-      <Identity name={person?.email ?? "You"} under={person?.operator ? "Operator" : undefined} />
+      <Identity
+        face={person ? whoFace(person.accountId) : undefined}
+        name={person?.email ?? "You"}
+        under={person?.operator ? "Operator" : undefined}
+      />
 
       <Group>
         <NavRow

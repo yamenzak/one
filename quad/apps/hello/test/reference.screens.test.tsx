@@ -105,7 +105,7 @@ describe("everything hello declares reaches a screen", () => {
     const out = html(
       <Shell
         screens={HELLO.screens} here="/" held={OWNER} flags={{ "note-search": true }}
-        crown={{ appName: HELLO.name, appMark: HELLO.mark, tenantName: "Northwind" }}
+        crown={{ appId: HELLO.id, appName: HELLO.name, appMark: HELLO.mark, tenantName: "Northwind" }}
         onGo={() => {}}
       />,
     );

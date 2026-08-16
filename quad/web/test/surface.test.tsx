@@ -264,7 +264,7 @@ const SCREENS = [
 ];
 
 describe("the shell", () => {
-  const crown = { appName: "Hello", appMark: "◇", tenantName: "Northwind" };
+  const crown = { appId: "hello", appName: "Hello", appMark: "◇", tenantName: "Northwind" };
 
   /*
     ⚠️ A DESTINATION SOMEBODY CANNOT REACH IS NOT DRAWN. A nav item leading to a

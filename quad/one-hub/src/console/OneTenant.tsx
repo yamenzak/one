@@ -18,7 +18,7 @@ import { useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import {
   AmountRow, ControlRow, Group, Identity, NumberInput, RowsWaiting, Screen, Stack, Tray,
-  notice, sentence,
+  notice, placeFace, sentence,
 } from "@quad/web";
 import type { Allowance, EntitlementDef, PlanSpec } from "@quad/kernel";
 import { api } from "../api.js";
@@ -70,6 +70,7 @@ export function OneTenant({ id }: { readonly id: string }) {
                 LIVES — the shape §4 asks for, and the two facts an operator
                 needs before any of the rest means anything. */}
             <Identity
+              face={placeFace(tenant.slug)}
               name={tenant.name}
               under={`${tenant.slug} · ${tenant.country} · ${tenant.shardId}`}
               aside={tenant.closedAt

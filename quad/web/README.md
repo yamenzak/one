@@ -41,6 +41,9 @@ consequence rather than on a style. The ones about this package:
 - **`shape`** — no screen draws its own crown or pins its own action; at most one
   primary per screen; a `settings` screen carries none; no block comment renders
   as page text.
+- **`face`** — every face comes from the one resolver; a seed is an identity
+  rather than a label; the movement is asked for by name; no face is fetched from
+  a third party.
 - **`heroui`** — no component is restyled. Layout utilities only, on an
   allow-list rather than a deny-list.
 - **`ground`** — no borders, no shadows; the interface is monochrome and only

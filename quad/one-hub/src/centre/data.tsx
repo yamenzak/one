@@ -49,6 +49,8 @@ export interface CentreView {
 
 export interface MemberLine {
   readonly id: string;
+  /** ⚠️ The person across every workspace — see `member.list`. Empty until claimed. */
+  readonly accountId: string;
   readonly email: string;
   readonly platformRole: string;
   readonly appRoles: Readonly<Record<string, string>>;

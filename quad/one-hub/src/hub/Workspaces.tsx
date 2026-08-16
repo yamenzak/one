@@ -15,7 +15,7 @@
 
 import { Chip } from "@heroui/react";
 import {
-  Group, Nothing, PersonRow, Screen, sentence,
+  Group, Nothing, PersonRow, Screen, placeFace, sentence,
 } from "@quad/web";
 import { useSession } from "../session.js";
 import { here, hubAt, isHere, setupUrl, tenantUrl } from "../door.js";
@@ -70,6 +70,7 @@ export function Workspaces({ onGo }: { readonly onGo: (to: Where) => void }) {
               <PersonRow
                 key={w.slug}
                 goes
+                face={placeFace(w.slug)}
                 name={w.name}
                 under={said(w.apps, w.platformRole)}
                 aside={w.attention

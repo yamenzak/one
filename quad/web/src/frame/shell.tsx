@@ -22,7 +22,7 @@
 
 import type { ScreenSpec, Tone } from "@quad/kernel";
 import { PRIMARY_MAX, primaryOf } from "@quad/kernel";
-import { Avatar, Button, Chip, Separator, Tooltip } from "@heroui/react";
+import { Button, Chip, Separator, Tooltip } from "@heroui/react";
 import {
   Banknote, Bell, Building2, Calendar, Circle, ClipboardList, Clock, Cog, Coins, Database,
   FileText, House, Inbox as InboxGlyph, NotebookPen, Package, Plus, Shield, Sparkles, Sun,
@@ -31,6 +31,7 @@ import {
 import { Island } from "./layout.js";
 import { skyCss, type Sky } from "../tokens/theme.js";
 import { GUTTER, NAV_SPACE, PAD, ROW, SPACE } from "../tokens/metrics.js";
+import { Face, appFace, type FaceOf } from "../parts/face.js";
 
 /**
  * ⚠️ AN ICON IS A NAME IN A MANIFEST AND A GLYPH HERE. The manifest stays pure
@@ -72,6 +73,7 @@ export const glyphOf = (name?: string): React.ReactNode =>
  * kind a bundler resolves silently in whichever order it happened to read.
  */
 export interface CrownInfo {
+  readonly appId: string;
   readonly appName: string;
   readonly appMark: string;
   readonly tenantName: string;
@@ -79,6 +81,12 @@ export interface CrownInfo {
   readonly apps?: readonly { readonly id: string; readonly name: string; readonly mark: string }[];
   readonly unread?: number;
   readonly personEmail?: string;
+  /**
+   * ⚠️ THE ACCOUNT, NOT THE EMAIL. The face is drawn from an identity that does
+   * not change when somebody corrects their address (`face.tsx`); the email
+   * beside it is only the letter of last resort.
+   */
+  readonly personFace?: FaceOf;
 }
 
 export interface ShellProps {
@@ -127,7 +135,10 @@ export function Shell(props: ShellProps) {
     >
       {/* ------------------------------------------------------------ crown --- */}
       <header className={`flex items-center ${SPACE.snug} ${GUTTER} ${ROW.pad}`}>
-        <span aria-hidden="true">{crown.appMark}</span>
+        {/* ⚠️ THE SAME PLATE EVERY OTHER FACE WEARS. A lone glyph beside a
+            person and a workspace read as a typo in a row of pictures — and it
+            was the one mark in the crown with no ground under it. */}
+        <Face of={appFace(crown.appId, crown.appMark)} name={crown.appName} size="chip" />
         <div className="flex flex-col">
           <strong>{crown.tenantName}</strong>
           <small>{crown.appName}</small>
@@ -137,8 +148,8 @@ export function Shell(props: ShellProps) {
           {(crown.apps ?? []).length > 1 && onSwitchApp
             ? (crown.apps ?? []).map((other) => (
               <Tooltip key={other.id}>
-                <Button variant="ghost" aria-label={other.name} onPress={() => onSwitchApp(other.id)}>
-                  {other.mark}
+                <Button isIconOnly variant="ghost" aria-label={other.name} onPress={() => onSwitchApp(other.id)}>
+                  <Face of={appFace(other.id, other.mark)} name={other.name} size="chip" />
                 </Button>
                 <Tooltip.Content>{other.name}</Tooltip.Content>
               </Tooltip>
@@ -157,18 +168,10 @@ export function Shell(props: ShellProps) {
           {onOpenHub
             ? (
               <Button isIconOnly variant="ghost" aria-label="Account and workspaces" onPress={onOpenHub}>
-                <Avatar size="sm">
-                  <Avatar.Fallback>
-                    {(crown.personEmail ?? "?").slice(0, 1).toUpperCase()}
-                  </Avatar.Fallback>
-                </Avatar>
+                <Face of={crown.personFace} name={crown.personEmail} size="chip" />
               </Button>
             )
-            : (
-              <Avatar>
-                <Avatar.Fallback>{(crown.personEmail ?? "?").slice(0, 1).toUpperCase()}</Avatar.Fallback>
-              </Avatar>
-            )}
+            : <Face of={crown.personFace} name={crown.personEmail} />}
         </div>
       </header>
       <Separator />

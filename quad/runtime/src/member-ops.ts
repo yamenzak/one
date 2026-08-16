@@ -114,7 +114,16 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
     "member.list": op("member.list", "read", "member:read", "Everybody in this workspace.",
       async (ctx) => ({
         items: (await membersOf(ctx.db, ctx.tenantId as TenantId)).map((m) => ({
-          id: m.id, email: m.email, platformRole: m.platformRole, appRoles: m.appRoles,
+          id: m.id,
+          /* ⚠️ THE ACCOUNT, BESIDE THE MEMBERSHIP, AND THEY ARE NOT THE SAME
+             THING. `id` identifies this row in THIS workspace; `accountId`
+             identifies the person across all of them. A face drawn from the
+             row id would give one person a different face per workspace,
+             which is the whole thing accounts living under the deployment
+             exists to prevent. Empty until an invitation is claimed — there
+             is no account yet, and saying so beats inventing one. */
+          accountId: m.accountId,
+          email: m.email, platformRole: m.platformRole, appRoles: m.appRoles,
           accepted: m.acceptedAt !== null,
         })),
       })),

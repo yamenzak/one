@@ -25,14 +25,15 @@
  */
 
 import * as React from "react";
-import { Avatar, Button, Card, Chip, Label, Skeleton, Switch } from "@heroui/react";
+import { Button, Card, Chip, Label, Skeleton, Switch } from "@heroui/react";
 import type { Tone } from "@quad/kernel";
 import { TYPE } from "../tokens/type.js";
 import {
-  CARD_ROWS, CROWN_SIZE, FACE, HEAD_GAP, ICON, INSET, LEAD, PAD, ROW, SPACE,
+  CARD_ROWS, CROWN_SIZE, HEAD_GAP, ICON, INSET, LEAD, PAD, ROW, SPACE,
 } from "../tokens/metrics.js";
 import type { Inset } from "../tokens/metrics.js";
 import { ARRIVE, arriveAt } from "../tokens/motion.js";
+import { Face, type FaceOf } from "./face.js";
 import { Tally } from "./tally.js";
 
 /* ------------------------------------------------------------------ group --- */
@@ -127,27 +128,20 @@ export function Identity({ name, under, aside, face }: {
   readonly under?: string;
   /** A chip beside the line under — a role, a standing, a plan. */
   readonly aside?: React.ReactNode;
-  /** An image, when there is one. The initial stands in when there is not. */
-  readonly face?: string;
+  /**
+   * ⚠️ WHO OR WHAT THIS IS, NOT A PICTURE OF IT. `whoFace(accountId)`,
+   * `placeFace(slug)`, `appFace(id)` — one resolver draws all of them, so the
+   * same subject cannot wear a different face on two screens (`face.tsx`). The
+   * initial stands in until a caller says.
+   */
+  readonly face?: FaceOf;
 }) {
   return (
     <div className={`flex flex-col items-center text-center ${SPACE.snug}`}>
-      {/*
-        ⚠️ THE LIBRARY'S LARGEST, NOT A SIZE OF OURS. `.avatar` sizes the BOX and
-        the letter inside it together — `sm` is `size-8`/`text-sm`, `lg` is
-        `size-12`/`text-base` — so a class that widens the box alone leaves the
-        initial at whatever the variant set. The first build did exactly that and
-        produced an 88px panel with a 14px letter adrift in the middle of it.
-
-        ⚠️ AND IT IS A SQUIRCLE BECAUSE THE LIBRARY DRAWS IT THAT WAY. Every
-        avatar in the product is `rounded-3xl`; a round one here would be the
-        single circular face in the whole interface, which is a restyle wearing
-        a design decision's clothes (D7).
-      */}
-      <Avatar size="lg">
-        {face ? <Avatar.Image src={face} alt="" /> : null}
-        <Avatar.Fallback>{name.slice(0, 1).toUpperCase()}</Avatar.Fallback>
-      </Avatar>
+      {/* ⚠️ `panel` IS THE LARGEST OF THE THREE, AND THE SIZE IS THE ONLY THING
+          this surface decides about the face. Which picture, whether it moves
+          and what stands in when there is no identity are all `face.tsx`'s. */}
+      <Face of={face} name={name} size="panel" />
       <div className={`flex flex-col items-center ${SPACE.hair}`}>
         <strong className={TYPE.title}>{name}</strong>
         {under || aside ? (
@@ -182,10 +176,17 @@ export function Identity({ name, under, aside, face }: {
  * with four workspaces told "None yet" for the length of a round trip is a
  * wrong answer wearing a loading state's excuse.
  */
-export function Place({ name, said, foot, tone = "neutral", at, onOpen }: {
+export function Place({ name, said, foot, face, tone = "neutral", at, onOpen }: {
   readonly name: string;
   /** What this place IS, in a line. Never a list of its contents. */
   readonly said: string;
+  /**
+   * ⚠️ WHAT THIS PLACE IS, NOT A PICTURE OF IT — `appFace`/`placeFace`. A
+   * chooser of products with nothing but two lines of text on each card is a
+   * list of paragraphs: the one thing somebody scans for is which product, and
+   * a name in prose is slower to find than a mark.
+   */
+  readonly face?: FaceOf;
   readonly foot?: React.ReactNode | null;
   readonly tone?: Tone;
   /** Its place in a sequence of blocks — the only stagger there is. */
@@ -219,6 +220,11 @@ export function Place({ name, said, foot, tone = "neutral", at, onOpen }: {
             onPress={onOpen}
           >
             <span className={`flex w-full min-w-0 flex-col items-start text-left ${SPACE.tight} ${PAD}`}>
+              {/* ⚠️ ABOVE THE NAME, NOT BESIDE IT. A lead beside two lines of
+                  text turns the card into a tall row; a place is a destination
+                  and reads top-down, which is what makes it different from
+                  the rows under it. */}
+              {face ? <span className="pb-1"><Face of={face} name={name} /></span> : null}
               <span className={TYPE.section}>{name}</span>
               <span className={TYPE.note}>{said}</span>
               {foot !== undefined ? (
@@ -484,16 +490,14 @@ export function PersonRow({ name, under, when, unread, aside, goes, face, onOpen
    * as the corner being busy.
    */
   readonly goes?: boolean;
-  readonly face?: string;
+  /** ⚠️ WHO OR WHAT, NOT A PICTURE — see `Identity` and `face.tsx`. */
+  readonly face?: FaceOf;
   readonly onOpen: () => void;
 }) {
   return (
     <Button variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.tap}`} onPress={onOpen}>
       <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
-        <Avatar className={`shrink-0 ${FACE}`}>
-          {face ? <Avatar.Image src={face} alt="" /> : null}
-          <Avatar.Fallback>{name.slice(0, 1).toUpperCase()}</Avatar.Fallback>
-        </Avatar>
+        <Face of={face} name={name} />
         <Body label={name} under={under} />
         {/* ⚠️ `Chip`, NOT `Badge`, AND THE DIFFERENCE IS NOT COSMETIC. A HeroUI
             `Badge` is POSITIONED — it expects a `Badge.Anchor` around the thing

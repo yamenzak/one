@@ -30,7 +30,7 @@ import { PLATFORM_ROLES } from "@quad/kernel";
 import { Button, Card, Chip } from "@heroui/react";
 import {
   Await, Choice, Confirm, Listing, Menu, Nothing, RowsWaiting, Screen, Stack, TextInput, Tray,
-  notice, money as saidMoney,
+  notice, money as saidMoney, whoFace,
 } from "@quad/web";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView, type HoldingLine, type MemberLine, type PackageLine } from "./data.js";
@@ -82,6 +82,11 @@ export function People({ view }: { readonly view: CentreView }) {
             onOpen={manage ? (m) => setOpened(m) : undefined}
             asRow={(m) => ({
               name: m.email,
+              /* ⚠️ THE ACCOUNT, NOT THE ROW AND NOT THE EMAIL — see `face.tsx`.
+                 An unclaimed invitation has no account, so it keeps the
+                 initial: a face for somebody who has not arrived yet would be
+                 a picture of nobody. */
+              face: m.accountId ? whoFace(m.accountId) : undefined,
               under: [
                 m.platformRole,
                 ...Object.entries(m.appRoles).map(([appId, role]) => `${nameOf(view, appId)}: ${role}`),

@@ -247,6 +247,35 @@ edge in a product that banned borders and shadows everywhere else, and it was
 asymmetric — inset past the glyph on the left, flush to the card on the right —
 which is what made every list look hand-assembled.
 
+### Faces
+
+**A person, a workspace and a product each have one face, and it comes from one
+resolver.** `<Face of={whoFace(accountId)} />`, `placeFace(slug)`,
+`appFace(id, mark)` — nothing else draws an avatar, and a guard says so.
+
+|  | What is drawn | Why |
+|---|---|---|
+| A person | an animated mood | a face is what people recognise each other by |
+| A workspace | an animated planet | a workspace is its own world, seen from outside |
+| A product | the glyph its manifest declared | a generated mark would read as a logo nobody chose |
+| One | the framework's four-cell plate | the deployment is not one of the products in it |
+
+Three things follow from that and are decided for you.
+
+- **A seed is an identity, never a label.** The resolvers take an account id and
+  a slug because both outlive every edit; seeding on a name or an email gives
+  somebody a new face the day they fix their spelling. This is the payoff of
+  accounts living under the deployment rather than under each workspace — one
+  person, one face, in every workspace and every product.
+- **The size decides the movement.** A breathing face reads as alive at 40px and
+  as a twitch at 32px, so a `chip` is still and a `row` is not. Nobody passes a
+  flag. Under reduced motion every face is still, and that has to be a different
+  PICTURE — the animation lives inside the SVG, where no stylesheet of ours
+  reaches.
+- **Absent is a real answer.** An invitation nobody has claimed has no account.
+  It gets the initial, because a face for somebody who has not arrived yet is a
+  picture of nobody.
+
 **A break between two runs is a second CARD.** That is how the workspace screen
 separates what you come back to from what you set up once, and how the account
 screen separates the two places that are yours from the way out. Two cards read
@@ -295,6 +324,7 @@ Some of this is guarded and some is judgement. What is checked today:
 - `surface` — every declaration reaches a screen; every field kind a control.
 - `shape` — no screen draws its own crown or pins its own action; at most one
   primary per screen; a `settings` screen carries none.
+- `face` — one resolver draws every face; a seed is an identity, not a label.
 
 What is **not** checked, and is therefore on the person writing the screen:
 placement, density, whether a screen is doing two jobs, and whether the reader

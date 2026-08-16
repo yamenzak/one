@@ -90,8 +90,16 @@ export const ICON = { row: 20, crown: 20, quick: 22, nav: 24, face: 28, tile: 26
  * ⚠️ A FACE IS 40px, AND THE CROWN LOOKED EMPTY UNTIL IT WAS. A 24px avatar in a
  * 64px bar leaves the whole thing top-light and unbalanced — which is most of
  * why a crown reads as unfinished even when everything in it is correct.
+ *
+ * ⚠️ NUMBERS, NOT CLASSES, BECAUSE THE CLASS IS THE LIBRARY'S. `face.tsx` asks
+ * HeroUI for `sm`/`md`/`lg` — which ARE these three — rather than writing a
+ * size utility of its own, because `.avatar` sizes the box and the letter inside
+ * it TOGETHER: a class that widened the box alone left the fallback initial at
+ * whatever the variant set, and produced an 88px panel with a 14px letter adrift
+ * in the middle of it. What is written here is the only place the numbers exist,
+ * and what reads them is the resolution a face is baked at.
  */
-export const FACE = "size-10" as const;
+export const FACE_PX = { chip: 32, row: 40, panel: 48 } as const;
 
 /**
  * ⚠️ WHERE A SEPARATOR STARTS. A rule that runs under the lead cuts the icon
