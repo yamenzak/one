@@ -485,12 +485,9 @@ export function Gallery() {
             who={{ name: "Amara Osei" }}
             unread={where === "Home"}
             onOpenAccount={nothing}
-            onSearch={nothing}
-            searchLabel={`Search ${where.toLowerCase()}`}
-            actions={[
-              { id: "a", label: "First", icon: glyph(one), onDo: nothing },
-              { id: "b", label: "Second", icon: glyph(two), onDo: nothing },
-            ]}
+            find={{ label: `Search ${where.toLowerCase()}`, onOpen: nothing }}
+            also={{ id: "a", label: "First", icon: glyph(one), onDo: nothing }}
+            does={{ id: "b", label: "Second", icon: glyph(two), onDo: nothing }}
           />
         ))}
       </section>

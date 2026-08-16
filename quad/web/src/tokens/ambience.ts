@@ -207,6 +207,47 @@ export const ON_SCENE = "var(--on-scene, none)";
 const hemStop = (pct: number): string =>
   `color-mix(in oklab, var(--scene-veil, var(--background)) ${pct}%, transparent)`;
 
+/**
+ * THE HEM, IN ONE DIRECTION OR THE OTHER.
+ *
+ * ⚠️ ONE FUNCTION FOR BOTH EDGES, BECAUSE THEY ARE ONE IDEA AND WOULD DRIFT AS
+ * TWO. Written out twice, the top and the bottom are five numbers each that have
+ * to stay equal, and the first thing anybody tunes is one of them.
+ *
+ * ⚠️ `hold` HAS TO CLEAR THE PINNED ELEMENT'S OWN HEIGHT, or the fade begins
+ * inside it. Measured at the top, where an early version scaled the whole
+ * gradient down and put the falloff at 4.5rem against a crown nearly 6rem tall:
+ * a card's last line came through directly under the workspace's name. A crown
+ * and a nav are about the same height, so both hold for the same distance.
+ *
+ * ⚠️ AND THE TWO EDGES ARE THE SAME NUMBERS, WHICH IS NOT WHERE THIS STARTED.
+ * The top ran shorter on the theory that a page is read downwards — that at the
+ * bottom a fade is what content disappears INTO and reads as depth, while at the
+ * top the same length eats the first screenful. Shot both ways and the
+ * difference was not visible; what IS visible is the hold, which is why that is
+ * the number with an argument attached and this one is just symmetry.
+ */
+const hem = (edge: "top" | "bottom") => {
+  const far = edge === "top" ? "bottom" : "top";
+  /* hold: clears the crown or the bar. run: where the fade is finally gone. */
+  const [hold, run] = [6, 12];
+  const mid = (at: number) => +(hold + (run - hold) * at).toFixed(2);
+  return [
+    `[data-hem="${edge}"]::before {`,
+    `  content: ""; position: absolute; left: 0; right: 0;`,
+    `  ${edge}: 0; ${far}: -${run}rem;`,
+    `  pointer-events: none; z-index: -1;`,
+    /* ⚠️ The gradient runs AWAY from the edge it is hemming, so `to top` at the
+       bottom and `to bottom` at the top — the opaque end is always the screen's
+       own edge, where there is nothing to have a boundary against. */
+    `  background: linear-gradient(to ${far},`,
+    `    var(--scene-veil, var(--background)) 0,`,
+    `    ${hemStop(99)} ${hold}rem, ${hemStop(70)} ${mid(1 / 3)}rem,`,
+    `    ${hemStop(32)} ${mid(2 / 3)}rem, ${hemStop(0)} ${run}rem);`,
+    `}`,
+  ];
+};
+
 const halo = (colour: string): string => {
   const soft = (pct: number) => `color-mix(in oklab, ${colour} ${pct}%, transparent)`;
   return `0 1px 2px ${soft(88)}, 0 2px 16px ${soft(66)}, 0 0 40px ${soft(40)}`;
@@ -459,8 +500,9 @@ export function ambienceStylesheet(): string {
       the next caller believes.
     */
     /*
-      ⚠️ THE HEM — THE GROUND THICKENING UNDER WHATEVER IS DOCKED AT THE BOTTOM,
-      SO THE CHROME NEEDS NO PLATE OF ITS OWN.
+      ⚠️ THE HEM — THE GROUND THICKENING BEHIND WHATEVER IS PINNED TO AN EDGE,
+      SO THE CHROME NEEDS NO PLATE OF ITS OWN. Both edges: a crown at the top
+      and a nav or a docked action at the bottom.
 
       ⚠️ THE PROBLEM IT SOLVES IS COLLISION, NOT CONTRAST. A bar with its own
       fill is legible — and content still runs INTO it: the page's next row
@@ -504,13 +546,8 @@ export function ambienceStylesheet(): string {
       for; a hem on something static is a hem with nothing to be at the bottom
       of.
     */
-    `[data-hem="true"]::before {`,
-    `  content: ""; position: absolute; left: 0; right: 0; bottom: 0; top: -12rem;`,
-    `  pointer-events: none; z-index: -1;`,
-    `  background: linear-gradient(to top,`,
-    `    var(--scene-veil, var(--background)) 0,`,
-    `    ${hemStop(99)} 6rem, ${hemStop(70)} 8rem, ${hemStop(32)} 10rem, ${hemStop(0)} 12rem);`,
-    `}`,
+    ...hem("bottom"),
+    ...hem("top"),
     `[data-capsule="true"] { border-radius: 9999px; }`,
     /*
       ⚠️ THE NAV HAS NO FILL OF ITS OWN NOW — THE HEM IS ITS BACKGROUND — SO THE

@@ -179,8 +179,25 @@ export function Shell(props: ShellProps) {
         }))}
       />}
     >
-      {/* ------------------------------------------------------------ crown --- */}
-      <header className={`flex items-center ${SPACE.snug} ${GUTTER} ${ROW.pad}`}>
+      {/*
+        ------------------------------------------------------------ crown ---
+
+        ⚠️ PINNED, LIKE EVERY OTHER CROWN IN THE SYSTEM — and this one was not.
+        `Crown`, `PageCrown` and `AppCrown` are all `sticky top-0`, and the
+        argument is written out in `AppCrown`: a crown that scrolls away takes
+        the account, the switcher and the inbox with it, and every one of those
+        is something somebody reaches for in the middle of reading. The shell's
+        was the only one that left, which made it the only place in the product
+        where "where am I" was a thing you had to scroll back for.
+
+        ⚠️ AND THE `Separator` UNDER IT IS GONE WITH THE HEM. A hairline is how
+        chrome says "the page starts here" when it has no ground of its own to
+        say it with. It was the last horizontal rule in the product.
+      */}
+      <header
+        data-hem="top"
+        className={`sticky top-0 z-10 flex items-center ${SPACE.snug} ${GUTTER} ${ROW.pad}`}
+      >
         {/* ⚠️ THE SAME PLATE EVERY OTHER FACE WEARS. A lone glyph beside a
             person and a workspace read as a typo in a row of pictures — and it
             was the one mark in the crown with no ground under it. */}
@@ -220,7 +237,6 @@ export function Shell(props: ShellProps) {
             : <Face of={crown.personFace} name={crown.personEmail} />}
         </div>
       </header>
-      <Separator />
 
       {/* ------------------------------------------------------- the middle --- */}
       <div className="flex flex-1 min-h-0">

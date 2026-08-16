@@ -214,12 +214,26 @@ the ground thickening rather than a plate laid on top. Not glass: a
 `backdrop-filter` over a live field re-reads and re-blurs on every frame of every
 beat, and it *smears* as the marks move under it.
 
-**`data-hem` is for COLLISION — the page's own content arriving at a docked
-control's edge.** That is a different fault and no fill on the control can reach
+**`data-hem` is for COLLISION — the page's own content arriving at pinned
+chrome's edge.** That is a different fault and no fill on the control can reach
 it, because it happens *outside* the control: a face halved down the gutter, a
-heading reappearing in the gaps either side of a capsule. The hem is a fade
-built from `--scene-veil`, opaque at the very bottom of the screen and gone
-about 12rem up, so content dissolves into the ground on its way past.
+heading reappearing in the gaps either side of a capsule, a card running clean
+through the workspace's name in the crown. The hem is a fade built from
+`--scene-veil`, opaque at the screen's own edge and gone about 12rem in, so
+content dissolves into the ground on its way past.
+
+⚠️ **It names its edge — `data-hem="top"` or `"bottom"` — and there are seven of
+them**: four crowns and three docks. A person sees *one* crown and *one* dock,
+so which of the seven they landed on decides whether their page is cut. That is
+what the `hem:` check in `scripts/scene.test.mjs` is for, and it is the state the
+check was written in: three docks wore it and four crowns did not.
+
+⚠️ **`hold` is the number with an argument attached**: it must clear the pinned
+element's own height or the fade begins *inside* it. Measured at the top, where
+scaling the gradient down put the falloff at 4.5rem against a crown nearly 6rem
+tall and a card's last line came through directly under the workspace's name. The
+falloff length is the same at both ends — it was shorter at the top on a theory
+about reading downwards, shot both ways, and the difference was not visible.
 
 ⚠️ **A fade is not the plate the no-glass pass removed, and the difference is
 the edge.** Every treatment that pass deleted was a band with a *boundary* — a
@@ -244,6 +258,36 @@ left the ghost of a heading behind the icons.
 `transparent`.** `transparent` is transparent *black*, so a gradient
 interpolating toward it darkens as it fades — a grey bloom above the bar on a
 light page, from a rule that never names a grey.
+
+### What the hem let the chrome stop being
+
+Once content dissolves before it reaches a control, every fill that existed to
+survive that content is doing nothing. Both crowns and the nav lost theirs:
+
+| | was | is |
+|---|---|---|
+| nav bar | filled capsule | nothing — the hem |
+| nav, where you are | `--default` pill | ink: full foreground vs thinned `--muted` |
+| back / close | `data-chrome` chip | bare glyph |
+| compact page title | chip + capsule | plain text |
+| crown's secondary action | `tertiary` fill | bare glyph |
+| crown's primary action | `tertiary` fill — *identical to the secondary* | `primary`, the one filled thing up there |
+| crown's search | `data-chrome` fill | **unchanged** |
+| shell's crown | scrolled away, with a `Separator` under it | pinned, hem, no rule |
+
+⚠️ **Search keeps its fill, and that is not an exception — it is the point.** The
+rule is about the *cause*: a field with no affordance in it is a label. The fill
+and the lens are what make a row of words read as somewhere to type, and neither
+is doing contrast work. Everything else in that table had a surface *for
+contrast*, which is the job the hem took over.
+
+⚠️ **The two crown actions were drawn identically**, so a destination's main act
+— *New job*, *Admit*, *Export*; every caller's second slot without exception —
+sat beside a date picker at the same weight. They are `also` and `does` now:
+
+```
+( face )( find                    )( also )( does )
+```
 
 **With the hem under it, nothing in the nav is a surface.** No bar and no pill:
 the five items stand on the page, and "where am I" is answered entirely in ink —

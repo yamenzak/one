@@ -418,7 +418,7 @@ export function Crown(
 ) {
   return (
     /* ⚠️ THE BAR ITSELF IS NOT GLASS — see `AppCrown` for the whole argument. */
-    <header className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
+    <header data-hem="top" className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
       <Band bleed={bleed} width={width}>
         <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
           {mark ? <span aria-hidden="true" className="flex items-center">{mark}</span> : null}
@@ -450,11 +450,14 @@ export function LeaveChip({ leave = "back", label, onDo }: {
   readonly onDo: () => void;
 }) {
   return (
+    /* ⚠️ NO CHIP — the hem behind the crown is what holds it now. It carried
+       `data-chrome` so it stayed findable over whatever scrolled past; a fill
+       on the one control every screen has, purely for contrast, is the shape
+       the hem removes everywhere else too. */
     <Button
       isIconOnly
       size={CROWN_SIZE}
       variant="ghost"
-      data-chrome="true"
       aria-label={label ?? (leave === "dismiss" ? "Close" : "Back")}
       onPress={onDo}
     >
@@ -557,7 +560,7 @@ export function PageCrown({
 
   return (
     <>
-      <header className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
+      <header data-hem="top" className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
         <Band bleed={bleed} width={width}>
           <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
             {back ? <LeaveChip leave={leave} label={backLabel} onDo={back} /> : null}
@@ -568,19 +571,18 @@ export function PageCrown({
               reader and a duplicate to anybody navigating by them — the compact
               copy is a visual reminder, and it says so.
 
-              ⚠️ AND IT CARRIES ITS OWN GROUND, WHICH IS THE PRICE OF HAVING NO
-              BAR. With the header transparent, a card scrolling past arrives
-              directly behind these words — the first build drew "Analytics"
-              across a chart's own grid lines and its subject series, two sets of
-              ink in the same place. A plate behind the whole row would fix it
-              and is the thing being removed; a chip behind the TITLE fixes it
-              and is the same element the back control and the actions already
-              are. Chrome that needs a background is a chip, not a bar.
+              ⚠️ AND ITS CHIP IS GONE, BECAUSE THE HEM DOES WHAT THE CHIP WAS
+              FOR. With the header transparent and the page untreated, a card
+              scrolling past arrived directly behind these words — the first
+              build drew "Analytics" across a chart's own grid lines and its
+              subject series, two sets of ink in the same place. A capsule
+              behind the title fixed that where a plate behind the whole row
+              would have been a bar. The hem fixes it one level down: the card
+              has dissolved into the ground before it gets here, so the title is
+              a title again rather than a word in a lozenge.
             */}
             <span
               aria-hidden="true"
-              data-chrome="true"
-              data-capsule="true"
               className={`min-w-0 truncate ${TYPE.label} ${CROWN_CHIP}`}
               style={{
                 opacity: past ? 1 : 0,
@@ -593,13 +595,16 @@ export function PageCrown({
 
             <Spacer />
 
+            {/* ⚠️ QUIET, AND NO LONGER CHIPS — the same treatment `AppCrown`
+                gives `also`, so the two crowns say "secondary" the same way.
+                They were `tertiary` fills because they had to survive whatever
+                scrolled behind them; the hem does that now. */}
             {actions.map((a) => (
               <Button
                 key={a.id}
                 isIconOnly
                 size={CROWN_SIZE}
-                variant="tertiary"
-                data-chrome="true"
+                variant="ghost"
                 aria-label={a.label}
                 onPress={a.onDo}
               >
@@ -914,7 +919,7 @@ export function StickyAction({ children }: { readonly children: React.ReactNode 
        arriving at a docked control's edge and being sliced by it. A docked bar
        is not a special case of a nav — they are two things at one address. */
     <div
-      data-hem="true"
+      data-hem="bottom"
       className={`sticky bottom-0 z-10 flex w-full justify-center ${PAD} ${SAFE_BOTTOM}`}
     >
       <div className="w-full max-w-md">{children}</div>
@@ -1002,7 +1007,7 @@ export function Island({ items, here, onGo, only }: {
          the NAV rather than on the bar inside it, because what has to dissolve
          is the page's own content on its way past, and the bar is only 370px of
          a 402px screen. */
-      data-hem="true"
+      data-hem="bottom"
       className={`sticky bottom-0 z-10 flex justify-center ${GUTTER} ${PAD} ${SAFE_BOTTOM}`
         + (only === "phone" ? " md:hidden" : "")}
       style={{
@@ -1155,20 +1160,29 @@ const Dot = () => <span className="flex size-2" data-tone="danger" data-dot="tru
 /* ------------------------------------------------------------- app crown --- */
 
 /**
- * THE CROWN EVERY DESTINATION SHARES, WITH TWO SLOTS THAT ARE THE DESTINATION'S.
+ * THE CROWN EVERY DESTINATION SHARES: WHO · WHAT YOU ARE LOOKING FOR · TWO ACTS.
+ *
+ *     ( face )( find                    )( also )( does )
  *
  * ⚠️ THE FRAME IS FIXED AND ONLY THE LAST TWO CHANGE. Somebody's face on the
- * left and search in the middle are in the same place on every screen, so
- * neither is ever re-learned; the two trailing slots carry what THIS
- * destination's two most common actions are. A crown that changed wholesale per
- * screen would make the top of the app a thing you read rather than a thing you
- * use — and one that was identical everywhere would put the same two actions in
- * front of somebody four times, three of them wrong.
+ * left and the wide slot in the middle are in the same place on every screen, so
+ * neither is ever re-learned; the two trailing slots carry what THIS destination
+ * is for. A crown that changed wholesale per screen would make the top of the
+ * app a thing you read rather than a thing you use — and one that was identical
+ * everywhere would put the same two actions in front of somebody four times,
+ * three of them wrong.
  *
- * ⚠️ EXACTLY TWO, AND THE TYPE SAYS SO. A third fits on a wide phone and falls
- * off a narrow one, which is a layout that is correct on the device it was built
- * on. A destination with three candidates has to choose, which is the useful
- * conversation.
+ * ⚠️ THE TWO ARE NOT PEERS, AND THEY USED TO BE DRAWN AS IF THEY WERE. Both were
+ * `tertiary` icon chips, so a destination's main act — *New job*, *Admit*,
+ * *Export*; every caller's second slot, without exception — sat beside a date
+ * picker at identical weight, and the crown had four controls and no answer to
+ * "what is this screen for". They are named now: `also` is quiet and `does` is
+ * the one filled thing at the top of the app.
+ *
+ * ⚠️ TWO IS THE CEILING AND THE TYPE SAYS SO. A third fits on a wide phone and
+ * falls off a narrow one, which is a layout that is correct on the device it was
+ * built on. A destination with three candidates has to choose, which is the
+ * useful conversation.
  */
 export interface AppCrownProps {
   /**
@@ -1180,10 +1194,27 @@ export interface AppCrownProps {
    */
   readonly who: { readonly name: string; readonly face?: FaceOf };
   readonly onOpenAccount: () => void;
-  readonly onSearch: () => void;
-  readonly searchLabel?: string;
-  /** ⚠️ A tuple, not an array — the ceiling is the type rather than a slice. */
-  readonly actions?: readonly [] | readonly [Slot] | readonly [Slot, Slot];
+  /**
+   * THE WIDE SLOT — what somebody is looking for on this destination.
+   *
+   * ⚠️ IT IS A DECLARATION, NOT A NODE, FOR THE REASON `who` IS. Handing this
+   * slot arbitrary children is how the widest, most-seen element in the product
+   * becomes whatever the third caller needed that afternoon. `find` is the one
+   * shape there is a consumer for; the day a destination genuinely needs another
+   * this becomes a union with a second member, in review, on purpose.
+   */
+  readonly find: { readonly label: string; readonly onOpen: () => void };
+  /**
+   * ⚠️ QUIET, AND OPTIONAL. Something somebody might reach for while doing the
+   * primary one — a date range, a filter, a calendar.
+   */
+  readonly also?: Slot;
+  /**
+   * ⚠️ THE ONE THING THIS DESTINATION IS FOR, and the only filled control in the
+   * crown. Icon-only because it sits in a row of icons; the label is its
+   * accessible name and its tooltip, never text beside the glyph.
+   */
+  readonly does?: Slot;
   readonly unread?: boolean;
 }
 
@@ -1195,7 +1226,7 @@ export interface Slot {
 }
 
 export function AppCrown(
-  { who, onOpenAccount, onSearch, searchLabel = "Search", actions = [], unread }: AppCrownProps,
+  { who, onOpenAccount, find, also, does, unread }: AppCrownProps,
 ) {
   return (
     /*
@@ -1204,16 +1235,17 @@ export function AppCrown(
       every one of them is something somebody reaches for in the middle of
       reading — so it stays. What it must not do is become a PLATE.
 
-      ⚠️ THE GLASS IS ON THE CONTROLS, NEVER ON THE BAR, and this shipped the
-      wrong way round once. A full-width frosted strip is the thing the whole
-      no-edges pass exists to remove: it draws a horizontal band across the top
-      of every screen, with a visible boundary where the blur stops, which is a
-      border by another name. Blurring each chip instead gives the same
-      legibility over moving content and leaves the page one surface — the
-      reference product does exactly this, and it is why its header reads as
-      controls floating on the page rather than as a toolbar bolted to it.
+      ⚠️ AND THE HEM IS HOW IT STAYS LEGIBLE — the same fade the nav wears, the
+      other way up. This carried glass on the CHIPS for the same reason the nav
+      carried a fill: each control had to survive whatever scrolled behind it.
+      That was the right answer while the page under it was untreated, and it
+      left the crown as four opaque lozenges in a row with live content passing
+      between them. The hem treats the CAUSE — content dissolves into the
+      ground before it reaches the controls — so the chips can stop being
+      surfaces, and the one that stays a surface stays one because it is the
+      primary act rather than because it needed rescuing.
     */
-    <header className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
+    <header data-hem="top" className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
       <Band bleed="edge" width="work">
         <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
           {/* ⚠️ `isIconOnly`, AND IT IS THE WHOLE REASON THIS ROW READS AS A ROW.
@@ -1223,11 +1255,12 @@ export function AppCrown(
               widths. The library ships the modifier; we were not asking for it,
               and the result was the single clearest tell that this was a copy of
               a design rather than one. */}
+          {/* ⚠️ NO `data-chrome` ON THE FACE — a face already carries its own
+              ground (`Face`), so a chip behind it was a plate behind a plate. */}
           <Button
             isIconOnly
             size={CROWN_SIZE}
             variant="ghost"
-            data-chrome="true"
             aria-label="Your account"
             onPress={onOpenAccount}
           >
@@ -1243,21 +1276,22 @@ export function AppCrown(
             </span>
           </Button>
 
-          {/* ⚠️ SEARCH IS A BUTTON HERE, NOT A FIELD. A live input in the crown
+          {/* ⚠️ THE WIDE SLOT IS A BUTTON, NOT A FIELD. A live input in the crown
               is a keyboard on every screen the moment a thumb brushes it; the
               real search is a surface of its own.
 
-              ⚠️ AND IT CARRIES THE GLASS, WHICH IT DID NOT. A field with no
-              affordance in it is a label — every product that puts search in the
-              crown draws the lens, because that is what makes a row of words
-              read as somewhere to type. Ours said "Search jobs" and looked like
-              a heading. */}
+              ⚠️ AND IT IS THE ONE CHIP THAT KEEPS ITS SURFACE, which is not an
+              exception to the hem — it is the reason the rule is about the
+              CAUSE. A field with no affordance in it is a label: the fill and
+              the lens together are what make a row of words read as somewhere
+              to type, and neither is doing contrast work. Ours said "Search
+              jobs" with no ground and looked like a heading. */}
           <Button
             size={CROWN_SIZE}
             variant="tertiary"
             data-chrome="true"
             className={`grow justify-start ${SPACE.tight}`}
-            onPress={onSearch}
+            onPress={find.onOpen}
           >
             <Lens />
             {/* ⚠️ `text-muted` AND NOT `TYPE.note`, WHICH IS THE SIZE TOO. A
@@ -1266,22 +1300,39 @@ export function AppCrown(
                 step smaller than the field, which is the compressed look this
                 whole pass is about. Muted is a token; the size stays the
                 button's. */}
-            <span className="text-muted">{searchLabel}</span>
+            <span className="text-muted">{find.label}</span>
           </Button>
 
-          {actions.map((a) => (
+          {/* ⚠️ QUIET: no surface, so it reads as available rather than as
+              offered. The same treatment the nav's closed destinations get, and
+              for the same reason — the hem is behind it. */}
+          {also ? (
             <Button
-              key={a.id}
               isIconOnly
               size={CROWN_SIZE}
-              variant="tertiary"
-              data-chrome="true"
-              aria-label={a.label}
-              onPress={a.onDo}
+              variant="ghost"
+              aria-label={also.label}
+              onPress={also.onDo}
             >
-              {a.icon}
+              {also.icon}
             </Button>
-          ))}
+          ) : null}
+
+          {/* ⚠️ AND THE ONE FILLED THING AT THE TOP OF THE APP. `primary` is a
+              real tier rather than a heavier chip, so it survives every
+              workspace's branding and it is the same control the docked action
+              on a phone is — one product, one way of saying "this is the act". */}
+          {does ? (
+            <Button
+              isIconOnly
+              size={CROWN_SIZE}
+              variant="primary"
+              aria-label={does.label}
+              onPress={does.onDo}
+            >
+              {does.icon}
+            </Button>
+          ) : null}
         </div>
       </Band>
     </header>

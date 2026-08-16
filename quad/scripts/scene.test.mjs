@@ -236,38 +236,50 @@ const DRAWN = [...filesIn("web/src"), ...filesIn("one-hub/src")];
   }
 }
 
-/* ------------------------------------ everything docked wears the same hem --- */
+/* ------------------------------------ everything pinned wears the same hem --- */
 {
   /*
-    ⚠️ A CONTROL DOCKED AT THE BOTTOM CUTS THE PAGE UNLESS THE GROUND THICKENS
-    UNDER IT. Content does not stop at a floating bar — it arrives at the
-    capsule's rounded end and is SLICED by it, so a face is halved down the
-    gutter and a heading reappears in the gaps either side. That is a collision,
-    not a contrast problem, so no amount of fill on the bar itself fixes it; the
-    hem fades the page into its own ground on the way past (`data-hem`).
+    ⚠️ CHROME PINNED TO AN EDGE CUTS THE PAGE UNLESS THE GROUND THICKENS BEHIND
+    IT. Content does not stop at a floating bar — it arrives at the control's
+    own edge and is SLICED by it, so a face is halved down the gutter and a
+    heading reappears in the gaps either side. That is a collision, not a
+    contrast problem, so no amount of fill on the bar itself fixes it; the hem
+    fades the page into its own ground on the way past (`data-hem`).
 
-    ⚠️ AND THERE ARE THREE OF THEM, WHICH IS THE WHOLE REASON THIS IS A CHECK.
-    The nav island, `StickyAction` and a `Screen`'s docked primary are three
-    separate elements at ONE address — a person sees one dock, and whichever of
-    the three they happened to land on decides whether the page is cut. Two of
-    three getting it is the shape every guard in this file exists for.
+    ⚠️ BOTH EDGES, AND SEVEN ELEMENTS BETWEEN THEM, WHICH IS THE WHOLE REASON
+    THIS IS A CHECK. A person sees ONE crown and ONE dock; which of the seven
+    they happened to land on decides whether their page is cut. Some-of-them is
+    the shape every guard in this file exists for, and it is the state this one
+    was written in: three docks wore it and four crowns did not.
+
+    ⚠️ THE VALUE HAS TO NAME THE EDGE. `top` and `bottom` are different rules —
+    opposite gradient directions and different runs — so `data-hem="true"`
+    matches nothing and fails silently, which is exactly what a `true` left over
+    from the bottom-only version would do at the top.
   */
-  let docks = 0;
+  const EDGE = /sticky\s+(?:[\w:-]+\s+)*?(top|bottom)-0/;
+  let pinned = 0;
   for (const file of filesIn("web/src", /\.tsx$/)) {
     for (const tag of readFileSync(file, "utf8").matchAll(/<[a-zA-Z][^<>]*?>/gs)) {
-      if (!/sticky\s+bottom-0/.test(tag[0])) continue;
-      docks++;
-      if (!/data-hem/.test(tag[0])) {
-        fail(`${rel(file)}: docks at the bottom and wears no hem.\n` +
-             `       Add \`data-hem="true"\`. Without it the page's next row is cut by this ` +
-             `control's own edge, which reads as two layers fighting because it is.`);
+      const at = EDGE.exec(tag[0]);
+      if (!at) continue;
+      pinned++;
+      const wears = /data-hem="(top|bottom)"/.exec(tag[0]);
+      if (!wears) {
+        fail(`${rel(file)}: pins to the ${at[1]} and wears no hem.\n` +
+             `       Add \`data-hem="${at[1]}"\`. Without it the page's next row is cut by ` +
+             `this control's own edge, which reads as two layers fighting because it is.`);
+      } else if (wears[1] !== at[1]) {
+        fail(`${rel(file)}: pins to the ${at[1]} and hems the ${wears[1]}.\n` +
+             `       The fade would run off the far side of the screen — the opaque end has ` +
+             `to be the edge the element is pinned to.`);
       }
     }
   }
-  if (!docks) {
-    fail("no bottom-docked chrome found — this guard would pass over an empty list.");
+  if (!pinned) {
+    fail("no pinned chrome found — this guard would pass over an empty list.");
   } else if (!bad) {
-    ok(`hem: ${docks} bottom-docked surface(s), every one dissolving the page under it`);
+    ok(`hem: ${pinned} pinned surface(s), every one dissolving the page behind it`);
   }
 }
 

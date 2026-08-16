@@ -127,6 +127,33 @@ So the order is not `shell > ambience > chrome > layout`. It is
 **Page → (Shell | Layout) → Screen → components**, with ambience *inside* the
 Page and chrome *on top of* whatever floats.
 
+### The two crowns, and the one bar
+
+Chrome pins to an edge, and there are three pieces of it: a **crown** at the top,
+a **nav** at the bottom, and a **docked action** where a screen has one. All wear
+the hem (see [AMBIENCE.md](AMBIENCE.md)), so none of them needs a plate.
+
+Which crown an address gets follows from whether it is a *destination* or a
+*page*:
+
+| | for | shape |
+|---|---|---|
+| `AppCrown` | a product's destinations — the Shell's addresses | `( face )( find )( also )( does )` |
+| `PageCrown` | a page, a sub-page, a full-screen surface | back · a title that collapses in on scroll · `also`s · `does` |
+
+Both put the secondary in bare ink and the primary in a fill, so "what is this
+screen for" is answered the same way wherever somebody is. **`find` is the wide
+slot** — search on every screen that has one — and it is a typed declaration
+rather than arbitrary children, for the reason the avatar is: the widest,
+most-seen element in the product is exactly the one that otherwise becomes
+whatever the third caller needed that afternoon.
+
+⚠️ **`PageCrown`'s title collapses; `AppCrown`'s has none.** A page's name is
+both the biggest thing on it and something you still need four screens down, and
+one element cannot be both — so it is a display heading at rest and a compact
+line beside the back control once it has scrolled away. A destination does not
+have that problem: the nav already says where you are.
+
 ### Shell and Layout are siblings, not levels
 
 This is the answer to "does every screen get a layout, even a full-screen

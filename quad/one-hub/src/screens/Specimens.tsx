@@ -58,12 +58,9 @@ function Workshop() {
         who={{ name: "Amara Osei" }}
         unread
         onOpenAccount={nothing}
-        onSearch={nothing}
-        searchLabel="Search jobs"
-        actions={[
-          { id: "cal", label: "Calendar", icon: glyph(<FileText />), onDo: nothing },
-          { id: "new", label: "New job", icon: glyph(<Plus />), onDo: nothing },
-        ]}
+        find={{ label: "Search jobs", onOpen: nothing }}
+        also={{ id: "cal", label: "Calendar", icon: glyph(<FileText />), onDo: nothing }}
+        does={{ id: "new", label: "New job", icon: glyph(<Plus />), onDo: nothing }}
       />
       <Band width="work">
         <Stack space="roomy">
@@ -424,12 +421,9 @@ function Start() {
       <AppCrown
         who={{ name: "Amara Osei" }}
         onOpenAccount={nothing}
-        onSearch={nothing}
-        searchLabel="Search the ward"
-        actions={[
-          { id: "chart", label: "Charts", icon: glyph(<ChartColumn />), onDo: nothing },
-          { id: "add", label: "Admit", icon: glyph(<Plus />), onDo: nothing },
-        ]}
+        find={{ label: "Search the ward", onOpen: nothing }}
+        also={{ id: "chart", label: "Charts", icon: glyph(<ChartColumn />), onDo: nothing }}
+        does={{ id: "add", label: "Admit", icon: glyph(<Plus />), onDo: nothing }}
       />
       <Band width="work">
         <Stack space="roomy">
@@ -493,12 +487,9 @@ function Report() {
       <AppCrown
         who={{ name: "Amara Osei" }}
         onOpenAccount={nothing}
-        onSearch={nothing}
-        searchLabel="Search reports"
-        actions={[
-          { id: "range", label: "Date range", icon: glyph(<Clock />), onDo: nothing },
-          { id: "export", label: "Export", icon: glyph(<FileText />), onDo: nothing },
-        ]}
+        find={{ label: "Search reports", onOpen: nothing }}
+        also={{ id: "range", label: "Date range", icon: glyph(<Clock />), onDo: nothing }}
+        does={{ id: "export", label: "Export", icon: glyph(<FileText />), onDo: nothing }}
       />
       <Band width="work">
         <Stack space="roomy">

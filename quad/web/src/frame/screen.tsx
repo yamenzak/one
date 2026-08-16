@@ -392,7 +392,7 @@ export function Screen<T = unknown>({
       {where === "act" && does
         ? (
           <div
-            data-hem="true"
+            data-hem="bottom"
             className={`sticky bottom-0 z-10 w-full md:hidden ${PAD} ${SAFE_BOTTOM}`}
           >
             <Band bleed="hold" width={preset.width}>
