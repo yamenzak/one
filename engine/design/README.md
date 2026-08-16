@@ -75,7 +75,6 @@ which ship in the product:
 - And `Screen` **threw away any `under` that was not a string** on the one branch
   that draws a title in content — so a screen's fact vanished depending on
   whether the shell's crown happened to be standing.
-
 - **A sub-page inside a Shell had no name.** `crownFor` claimed `collapses: true`
   — "the content carries this name in full, so hide the small copy until it
   scrolls away" — while `Screen` draws that heading only for a DESTINATION,
@@ -83,9 +82,15 @@ which ship in the product:
   halves were individually right; together, every sub-page in the product was a
   back arrow, two chips and nothing saying where you were. A test asserted the
   wrong half.
-- **A card wearing a world was rounded and sharp at once.** The ground layers are
-  the host's own pseudo-elements and took no radius — a no-op on a page, which is
-  why it survived for as long as a page was the only thing wearing one.
+- **A card wearing a world was rounded and sharp at once**, in two ways. The
+  ground layers are the host's own pseudo-elements and took no radius — a no-op
+  on a page, which is why it survived while a page was the only thing wearing
+  one. And a rounded layer is then TRANSFORMED by the drift (`scale(1.14)`), so
+  it reaches ~20px past the card's corner; a seeded pole can land exactly there.
+- **The grain layer never receded with its world.** The ground and the field wear
+  the matte and the dither wore nothing, so at exactly `100vh` it stopped dead —
+  a measured four-level step, razor-edged, across the full width. On any page
+  taller than a viewport it reads as a scrim for a chrome that is not there.
 
 **A component catalogue could not have found any of these.** They are properties
 of a screen inside a frame, which is why the ground is an app rather than a

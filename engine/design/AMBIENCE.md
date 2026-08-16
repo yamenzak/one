@@ -122,9 +122,30 @@ same mistake:
   was the page's own world, at card size, on every card. Never obviously wrong,
   never right, and identical on all three.
 - The layers took no radius, so a 24px-rounded card was square wherever its
-  ground reached a corner. `border-radius: inherit` is the fix, and it is a
+  ground reached a corner. `border-radius: inherit` is half the fix and it is a
   no-op on a page, which is why it was missing for as long as a page was the
-  only thing wearing a world.
+  only thing wearing a world. The other half is that a rounded layer is then
+  TRANSFORMED — the drift is `scale(1.14)` plus a translate — so the rounded
+  shape is scaled past the card's own corner, ~20px of it on a 288px card, and a
+  seeded pole can sit exactly there. `[data-reach="card"]` clips on both axes;
+  the page clips the inline axis alone, because `hidden` would make it a scroll
+  container and every sticky crown inside one stops sticking.
+
+⚠️ **AND EVERY LAYER OF ONE WORLD RECEDES TOGETHER.** The ground wears the
+matte, the field wears the matte, and the GRAIN wore nothing — so at exactly
+`100vh` the dither stopped dead. Measured as a four-level step in luminance,
+razor-edged, across the full width of a page whose world had otherwise faded to
+almost nothing: on anything taller than a viewport it reads as a scrim for a
+chrome that is not there. It takes `FADE` rather than `MATTE` — the vertical
+ramp alone, no ellipse, because a dither at three percent has nothing to get out
+of the way of and a hole in it would leave the middle of every page undithered,
+which is where banding shows most. `FADE` had existed for this since the file
+was written and was applied to nothing.
+
+⚠️ **A GROUND ENDING ONE VIEWPORT DOWN IS THE DESIGN, NOT A BUG** — see `REACH`.
+Ambience belongs to the top of a screen and should be gone by the time somebody
+has scrolled one; what must never happen is an EDGE where it ends, which is what
+the two paragraphs above were.
 
 ## The three ways to make a field
 

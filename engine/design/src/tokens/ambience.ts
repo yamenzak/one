@@ -509,6 +509,23 @@ export function ambienceStylesheet(): string {
     `  background-repeat: repeat;`,
     `  opacity: ${GRAIN_OPACITY};`,
     `  mix-blend-mode: overlay;`,
+    /*
+      ⚠️ AND IT RECEDES WITH THE WORLD, WHICH IT DID NOT — SO THE GROUND ENDED IN
+      THE ONE THING THIS FILE'S HEADER SAYS IT MUST NOT HAVE. The ground layer
+      wears the matte and this one wore nothing, so at exactly `100vh` the dither
+      stopped dead: measured as a four-level step in luminance, razor-edged,
+      right across a page whose world had otherwise faded to almost nothing. On
+      anything taller than a viewport it reads as a scrim for a chrome that is
+      not there, which is what it was reported as.
+
+      ⚠️ `FADE` AND NOT `MATTE` — the vertical ramp alone, no ellipse. The hole
+      down the reading column is what keeps a WORLD off the words; a dither at
+      three percent has nothing to get out of the way of, and punching a hole in
+      it would leave the middle of every page undithered, which is where banding
+      is most visible. `FADE` has existed for this since the file was written
+      and was applied to nothing.
+    */
+    `  ${FADE};`,
     `}`,
     /*
       ⚠️ A CARD-SIZED AMBIENCE FITS THE CARD. The reach above is one VIEWPORT,
@@ -520,6 +537,22 @@ export function ambienceStylesheet(): string {
       + ` [data-field][data-reach="card"] {`,
     `  height: 100%;`,
     `}`,
+    /*
+      ⚠️ AND A CARD CLIPS ITS WORLD ON BOTH AXES, WHICH `border-radius: inherit`
+      ALONE DOES NOT DO. The layer is rounded and then TRANSFORMED — the drift is
+      `scale(1.14)` plus a translate, which is what there is to move — so the
+      rounded shape is scaled past the card's actual corner. On a 288px card that
+      is ~20px of overhang, and the brightest part of a seeded `glow` is a pole
+      that can sit exactly there: one square, lit corner on an otherwise rounded
+      card, which is the first thing anybody notices.
+
+      ⚠️ `clip`, AND ON BOTH AXES ONLY HERE. `hidden` makes an element a scroll
+      container and every `sticky` crown and nav inside one stops sticking, which
+      is why the page clips the inline axis alone (see below). A card has no
+      sticky descendant, so it can afford the block axis too — and `clip` honours
+      the border radius, which is the whole point.
+    */
+    `[data-sky][data-reach="card"] { overflow: clip; }`,
     /* ⚠️ A bleeding ambience must reach the edge even inside a padded column. */
     `[data-bleed="edge"]::before, [data-bleed="edge"]::after {`,
     `  left: 50%; right: auto; width: 100vw; transform: translateX(-50%);`,
