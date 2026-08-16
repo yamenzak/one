@@ -404,7 +404,7 @@ export function Screen<T = unknown>({
 
       {heading ? (
         <Band bleed="hold" width={preset.width}>
-          <div className={SCREEN_TITLE_PAD}><Title under={typeof sub === "string" ? sub : undefined}>{name}</Title></div>
+          <div className={SCREEN_TITLE_PAD}><Title under={sub}>{name}</Title></div>
         </Band>
       ) : null}
 

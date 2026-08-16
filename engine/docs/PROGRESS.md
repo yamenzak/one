@@ -581,6 +581,16 @@ proves the components exist, which nobody doubted.
   list is a second answer to "what screens does this app have", and they drift
   in the direction nobody notices: a screen declared and never drawn renders an
   honest notice, which reads as unfinished rather than as a mistake.
+- **And it wears the product's own frame** — the hub mounts `Shell` around it
+  with hello's manifest, exactly as `centre/Product.tsx` does for a real product.
+  Without that the ground tested the components and none of the frame, which is
+  the half a product cannot opt out of: `Shell` picks the world, `Page` mounts it
+  — the scene, the grain, the vignette, the hem and the scroll listener the hem
+  is driven by — and reserves the room for the island. Wrapping it found three
+  more defects, all of them live in the product and none reachable from a
+  catalogue: a title washed by a hem with no scroll listener behind it, a docked
+  primary action rendered inside the nav's hem, and a `Screen` discarding any
+  `under` that was not a string.
 - **Every screen takes its data as props**, so any of them renders with no
   session, no worker and no database. That is what replaced the catalogue and
   the specimen board, and it is a better claim than either: a catalogue proves

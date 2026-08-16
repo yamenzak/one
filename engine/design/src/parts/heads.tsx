@@ -24,7 +24,18 @@ import { HEAD_GAP, HERO_PAD, SPACE, TITLE_PAD } from "../tokens/metrics.js";
  * reads. A screen with three of them has none.
  */
 export function Title(
-  { children, under }: { readonly children: React.ReactNode; readonly under?: string },
+  { children, under }: {
+    readonly children: React.ReactNode;
+    /**
+     * ⚠️ A NODE, NOT A STRING, AND THE DIFFERENCE WAS A FACT THAT VANISHED.
+     * `ScreenProps.under` has always been a `ReactNode` and the crown draws one;
+     * this took `string`, so the ONE branch that renders a title in content —
+     * a destination inside a Shell, where the shell's crown stands — narrowed it
+     * and threw the rest away. A screen's count disappeared depending on where
+     * it was mounted, silently, having done nothing wrong.
+     */
+    readonly under?: React.ReactNode;
+  },
 ) {
   return (
     <div className={`flex flex-col ${SPACE.hair}`}>

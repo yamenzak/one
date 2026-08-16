@@ -57,6 +57,29 @@ found, in one pass:
 
 None of that is visible in a diff. All of it is visible in one screenshot.
 
+⚠️ **AND THE GROUND WEARS THE PRODUCT'S FRAME — `Shell`, `Page`, the scene, the
+hem, the island.** It did not at first, and that alone hid two more, both of
+which ship in the product:
+
+- **The crown's hem washed the page's own title.** It is a 176px gradient
+  reaching past the sticky header, driven by `--hem-top`, which `Page` sets from
+  the scroll position. Outside a `Page` nobody sets it, so it stayed at its
+  default and every screen wore a dark scrim across its heading — a vignette for
+  a chrome that was not there.
+- **The docked primary action rendered inside the nav's hem.** Both pin to
+  `bottom-0`, the nav's hem is ~90% opaque where the dock lands, and on a phone
+  the dock is the *only* copy of that action (the crown's is `hidden md:flex`).
+  So the one unmistakable control on every phone screen was a ghost. `Docked`
+  stands on `--dock-floor` now and at `z-20`, because chrome goes above chrome's
+  own scrim.
+- And `Screen` **threw away any `under` that was not a string** on the one branch
+  that draws a title in content — so a screen's fact vanished depending on
+  whether the shell's crown happened to be standing.
+
+**A component catalogue could not have found any of the three.** They are
+properties of a screen inside a frame, which is why the ground is an app rather
+than a gallery.
+
 **Building a screen? Pick the shape (DESIGN.md §4), reach for what already exists
 (below), and let the guards say the rest.** None of this needs reading end to
 end — a guard fails with the reason and the section, which is the whole point of

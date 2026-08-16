@@ -326,6 +326,25 @@ export const NUDGE = {
  */
 export const NAV_SPACE = "pb-28" as const;
 
+/**
+ * ⚠️ AND THE DOCK SITS ON TOP OF THE NAV RATHER THAN UNDER IT — the same
+ * distance, as a length, because they are two halves of one fact.
+ *
+ * ⚠️ THEY PIN TO THE SAME PLACE, AND `Docked`'s own header used to answer that
+ * with "a screen has this or an `Island`, never both". That rule was written
+ * when the only thing rendering both was a catalogue page. Every product screen
+ * renders both now: the shell brings the nav, and any screen with a primary
+ * action brings the dock — on a phone the dock is the ONLY copy of that action,
+ * because the crown's copy is `hidden md:flex`. So the primary action of every
+ * phone screen in the product sat inside the nav's hem, which is a 200px wash
+ * that is ~90% opaque where the dock lands. The button was legible as a ghost.
+ *
+ * ⚠️ IT IS A CUSTOM PROPERTY BECAUSE THE DOCK CANNOT ASK. `Page` knows whether
+ * it has a nav; the dock is rendered by a screen several levels inside the
+ * content. Same mechanism as `--hem-top`, for the same reason.
+ */
+export const DOCK_FLOOR = "7rem" as const;
+
 /** The same problem, for a screen whose one action is pinned instead. */
 export const ACTION_SPACE = "pb-24" as const;
 

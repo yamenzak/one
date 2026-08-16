@@ -54,11 +54,15 @@ import { Band } from "./page.js";
  * ⚠️ `pb-[env(safe-area-inset-bottom)]` IS NOT OPTIONAL. Without it the control
  * sits under the home indicator on every modern phone.
  *
- * ⚠️ A SCREEN HAS THIS OR AN `Island`, NEVER BOTH. They pin to the same place and
- * overlap — which the catalogue page demonstrated the first time it rendered
- * them together. It is also the right rule for a different reason: a screen with
- * one unmistakable action is not a screen somebody should be navigating away
- * from mid-decision.
+ * ⚠️ IT STACKS ON THE NAV RATHER THAN SHARING ITS FLOOR, AND THE RULE HERE USED
+ * TO BE "A SCREEN HAS THIS OR AN `Island`, NEVER BOTH". That was true when the
+ * only thing rendering both was a catalogue page. A product screen renders both
+ * by construction — the shell brings the nav, the screen brings its one action,
+ * and on a phone this is the ONLY copy of that action because the crown's is
+ * `hidden md:flex`. Both pinned to `bottom-0` put the primary control inside the
+ * nav's hem: a 200px wash, ~90% opaque where the dock lands, so the button was a
+ * ghost on every phone screen in the product. `--dock-floor` is the page's
+ * answer (see `DOCK_FLOOR`), and `z-20` puts chrome above chrome's own scrim.
  */
 export function Docked({ width = "read", children }: {
   readonly width?: Width;
@@ -69,7 +73,8 @@ export function Docked({ width = "read", children }: {
        arriving at a docked control's edge and being sliced by it. */
     <div
       data-hem="bottom"
-      className={`sticky bottom-0 z-10 w-full md:hidden ${PAD} ${SAFE_BOTTOM}`}
+      className={`sticky z-20 w-full md:hidden ${PAD} ${SAFE_BOTTOM}`}
+      style={{ bottom: "var(--dock-floor, 0px)" }}
     >
       {/* ⚠️ THE SHAPE'S OWN WIDTH, NOT A WIDTH OF ITS OWN. `max-w-md` was the
           hand-rolled half's answer, so a docked action on a `work`-width screen

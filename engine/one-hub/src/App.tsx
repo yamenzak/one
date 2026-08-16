@@ -20,7 +20,11 @@
  * page, which is the same picture as a page that failed to load.
  */
 
-import { Band, Crown, Layout, NoticeHost, ONE_FACE, Spacer, Trouble, Working, whoFace } from "@engine/design";
+import {
+  Band, Center, Crown, Layout, NoticeHost, ONE_FACE, Shell, Spacer, Trouble, Working,
+  whoFace,
+} from "@engine/design";
+import { HELLO } from "@engine/hello";
 import { HELLO_ROUTES, HelloScreen } from "@engine/hello/screens";
 
 import { useSession } from "./session.js";
@@ -93,17 +97,16 @@ export function App() {
      a real screen renders — not a specimen built to look like one. A specimen
      proves a screen COULD be assembled from the vocabulary; the app's own screen
      proves one WAS, which is a different claim and the only one worth making. */
+  /* ⚠️ `?ground` ALONE LANDS ON THE APP'S FIRST SCREEN, never on a bare one. It
+     used to fall through to the deployment's own frame with a screen dropped in
+     it — the hub's crown over a product's page, which is a layout no deployment
+     serves and therefore a layout nobody was testing. */
   const ground = import.meta.env.DEV
-    ? HELLO_ROUTES.find((r) => r === (query.get("screen") ?? "")) ?? null
+    ? HELLO_ROUTES.find((r) => r === (query.get("screen") ?? ""))
+      ?? (query.has("ground") ? HELLO_ROUTES[0] ?? null : null)
     : null;
-  const showcase = import.meta.env.DEV && query.has("ground") && ground === null;
+  const showcase = ground !== null;
   const screen = pickScreen(face, me === null ? null : me !== "nobody", stuck !== null, showcase);
-
-  /* ⚠️ A SCREEN SOMEBODY WORKS IN AND A SCREEN SOMEBODY ARRIVES AT ARE NOT THE
-     SAME LAYOUT. The first is a column under a ruled crown; the second is a
-     centred sheet with no chrome. Using one for both makes the sign-in look like
-     a settings page — which is how a product comes to feel like a form. */
-  const settled = screen === "ground";
 
   /* ⚠️ The hub is the whole page here: the account door and the operator door
      have nothing underneath, so it is handed no way out. */
@@ -130,28 +133,61 @@ export function App() {
     );
   }
 
-  /* ⚠️ A SCREEN BRINGS ITS OWN PAGE, CROWN AND AMBIENCE — that is the whole
-     claim being tested — so it replaces the frame rather than sitting inside it.
-     ⚠️ `NoticeHost` mounts ONCE, beside whichever frame renders — two hosts
+  /* ⚠️ `NoticeHost` mounts ONCE, beside whichever frame renders — two hosts
      would show every notice twice, which reads as a fault in the thing being
      announced. */
-  /* ⚠️ THE GROUND NAVIGATES, and it navigates through the same query the
-     deployment already honours. A test ground whose screens cannot reach each
-     other is one where every surface is opened by editing the address bar —
-     which is fine for a screenshot and useless for the thing the ground is
-     actually for, which is pressing what a person would press. */
-  if (ground) {
+  /*
+    ⚠️ THE GROUND WEARS THE PRODUCT'S OWN FRAME, AND FOR A WHILE IT DID NOT.
+    Rendering a screen on its own leaves out the largest half of this design
+    system: `Shell` picks the world, `Page` MOUNTS it — the scene, the grain, the
+    vignette, the hem, the scroll listener the hem's opacity is driven by — and
+    reserves the room for the island. A ground without it tests the components
+    and none of the frame, which is exactly the part a product cannot opt out of.
+
+    ⚠️ AND THE SYMPTOM WAS VISIBLE BEFORE THE CAUSE WAS. The crown's hem is a
+    176px wash that reaches past the sticky header, driven by `--hem-top`, which
+    `Page` sets from the scroll position — so with no `Page` the property stayed
+    at its default and every ground screen wore a permanent dark scrim across its
+    own heading. It reads as a vignette for a chrome that is not there, which is
+    what it was.
+
+    ⚠️ IT IS THE HUB THAT MOUNTS THE SHELL, NOT THE APP — the same call
+    `centre/Product.tsx` makes for a real product, with the same manifest. An app
+    that brought its own chrome would be an app that could get it wrong.
+  */
+  if (screen === "ground" && ground) {
+    const go = (next: string) => {
+      const to = new URL(location.href);
+      to.searchParams.set("screen", next);
+      location.assign(to.toString());
+    };
     return (
       <>
         <NoticeHost />
-        <HelloScreen
-          route={ground}
-          onGo={(next) => {
-            const to = new URL(location.href);
-            to.searchParams.set("screen", next);
-            location.assign(to.toString());
+        <Shell
+          screens={HELLO.screens}
+          here={ground}
+          /* ⚠️ Everything, because the ground is for looking at every screen —
+             what a permission HIDES is `reachable`'s job and it has its own
+             test. A ground that held two of four would be a ground where two
+             screens are unreachable and nothing says which. */
+          held={new Set(["note:read", "note:write", "member:read", "tenant:manage"])}
+          /* ⚠️ On, or the screen behind the flag is undrawable here — which is
+             the one screen whose whole point is that a flag decides. */
+          flags={{ "note-search": true }}
+          crown={{
+            appId: HELLO.id,
+            appName: HELLO.name,
+            appMark: HELLO.mark,
+            tenantName: "The test ground",
+            unread: 2,
+            personEmail: "somebody@example.com",
+            personFace: whoFace("ground"),
           }}
-        />
+          onGo={go}
+        >
+          <HelloScreen route={ground} onGo={go} />
+        </Shell>
       </>
     );
   }
@@ -195,18 +231,18 @@ export function App() {
           ? { name: me.email ?? "You", face: whoFace(me.accountId) }
           : undefined}
         name="One"
-        width={settled ? "work" : "read"}
+        width="read"
       />
-      <Band width={settled ? "work" : "read"}>
-        <div
-          className={settled
-            ? "py-8"
-            : "min-h-[68dvh] flex flex-col items-center justify-center gap-6 py-8"}
-        >
-          {screen === "waiting" ? <Working says="Getting your workspaces" /> : null}
-          {screen === "stuck" && stuck ? <Trouble problem={stuck} /> : null}
-          {screen === "elsewhere" && where ? <Elsewhere where={where} kind={where.kind} /> : null}
-          {screen === "ground" ? <HelloScreen route="/" /> : null}
+      <Band width="read">
+        {/* ⚠️ THE RHYTHM IS `Center`'s, NOT A `gap-6` WRITTEN HERE. A frame
+            picking its own spacing is the drift `metrics` exists to refuse, and
+            this one was invisible while the class sat inside a ternary. */}
+        <div className="min-h-[68dvh] flex items-center justify-center py-8">
+          <Center space="roomy">
+            {screen === "waiting" ? <Working says="Getting your workspaces" /> : null}
+            {screen === "stuck" && stuck ? <Trouble problem={stuck} /> : null}
+            {screen === "elsewhere" && where ? <Elsewhere where={where} kind={where.kind} /> : null}
+          </Center>
         </div>
       </Band>
       <Spacer />
