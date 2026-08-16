@@ -14,10 +14,10 @@
 import type { JobBook, PackDef } from "@quad/kernel";
 import { Button, Card, Chip, Meter, ProgressBar } from "@heroui/react";
 import { money } from "./console.js";
-import { Balance, Grid, Stack } from "./layout.js";
-import { AmountRow, ControlRow, Group } from "./surfaces.js";
-import { TYPE } from "./type.js";
-import { SPACE } from "./metrics.js";
+import { Balance, Grid, Stack } from "../frame/layout.js";
+import { AmountRow, ControlRow, Group } from "../parts/surfaces.js";
+import { TYPE } from "../tokens/type.js";
+import { SPACE } from "../tokens/metrics.js";
 
 /* ------------------------------------------------------------------- bill --- */
 

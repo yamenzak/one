@@ -13,9 +13,9 @@
 
 import type { DocumentDef, RopaEntry, SubProcessorBook } from "@quad/kernel";
 import { Button, Card, Chip, Table } from "@heroui/react";
-import { ControlRow, FieldRow, Group } from "./surfaces.js";
-import { SPACE } from "./metrics.js";
-import { TYPE } from "./type.js";
+import { ControlRow, FieldRow, Group } from "../parts/surfaces.js";
+import { SPACE } from "../tokens/metrics.js";
+import { TYPE } from "../tokens/type.js";
 
 export function Ropa({ rows }: { readonly rows: readonly RopaEntry[] }) {
   return (

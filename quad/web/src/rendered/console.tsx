@@ -15,10 +15,10 @@
 import type { Allowance, EntitlementDef, FlagBook, FlagDef, PlanSpec } from "@quad/kernel";
 import { UNLIMITED, overdue, resolve, settableBy } from "@quad/kernel";
 import { Table } from "@heroui/react";
-import { Stack } from "./layout.js";
-import { AmountRow, Group, ToggleRow } from "./surfaces.js";
-import { SPACE } from "./metrics.js";
-import { Reveal } from "./blocks.js";
+import { Stack } from "../frame/layout.js";
+import { AmountRow, Group, ToggleRow } from "../parts/surfaces.js";
+import { SPACE } from "../tokens/metrics.js";
+import { Reveal } from "../parts/blocks.js";
 
 /* ------------------------------------------------------------------ flags --- */
 

@@ -59,7 +59,7 @@ const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$
  * ⚠️ `motion.ts` AND `theme.ts` ARE THE VOCABULARY, so they are where the values
  * live. Everything else names them. The list can only shrink.
  */
-const DEFINES_MOTION = new Set(["web/src/motion.ts", "web/src/theme.ts"]);
+const DEFINES_MOTION = new Set(["web/src/tokens/motion.ts", "web/src/tokens/theme.ts"]);
 
 /* --------------------------------------------------------------- the curves --- */
 
@@ -121,10 +121,10 @@ if (!frames) ok(`keyframes: every one is switched off both ways`);
 
 /* ------------------------------------------------------------------- roles --- */
 
-const typeSrc = readFileSync(join(QUAD, "web/src/type.ts"), "utf8");
+const typeSrc = readFileSync(join(QUAD, "web/src/tokens/type.ts"), "utf8");
 const roles = [...typeSrc.matchAll(/^\s{2}(\w+):\s*"/gm)].map((m) => m[1]);
 if (roles.length < 4) {
-  fail(`web/src/type.ts: fewer than four roles — the scale is what everything else names.`);
+  fail(`web/src/tokens/type.ts: fewer than four roles — the scale is what everything else names.`);
 } else {
   ok(`roles: ${roles.join(", ")}`);
 }
@@ -134,7 +134,7 @@ if (roles.length < 4) {
  * That one refuses `text-2xl` on a HeroUI component; nothing stopped it on a
  * bare `<h1>`, which is exactly where a screen reaches for one.
  */
-const DEFINES_TYPE = new Set(["web/src/type.ts", "web/src/layout.tsx"]);
+const DEFINES_TYPE = new Set(["web/src/tokens/type.ts", "web/src/frame/layout.tsx"]);
 let sizes = 0;
 for (const file of SOURCES) {
   const name = rel(file);
@@ -165,7 +165,7 @@ if (!sizes) ok(`type: no screen picks its own size or weight`);
  * a title, which must be larger than a section, which must be larger than body
  * text, is the property that makes it a scale at all.
  */
-const TYPE_SRC = readFileSync(join(QUAD, "web/src/type.ts"), "utf8");
+const TYPE_SRC = readFileSync(join(QUAD, "web/src/tokens/type.ts"), "utf8");
 const STEP = { xs: 12, sm: 14, base: 16, lg: 18, xl: 20, "2xl": 24, "3xl": 30, "4xl": 36, "5xl": 48 };
 const sizeOf = (role) => {
   const decl = new RegExp(`\\b${role}: "([^"]*)"`).exec(TYPE_SRC);
@@ -203,7 +203,7 @@ if (missing.length) {
  * "Is this visible" is not a question a script can ask, but "is this periodic"
  * is the same question with an answer.
  */
-const AMBIENCE = readFileSync(join(QUAD, "web/src/ambience.ts"), "utf8");
+const AMBIENCE = readFileSync(join(QUAD, "web/src/tokens/ambience.ts"), "utf8");
 const grain = /const GRAIN = ([\s\S]*?);\n/.exec(AMBIENCE);
 if (!grain) {
   fail(`ambience.ts: no \`GRAIN\` to check — if the layer is gone, drop this guard on purpose.`);

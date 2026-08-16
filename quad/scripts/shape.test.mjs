@@ -61,7 +61,7 @@ const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$
  * ⚠️ THE TWO FILES THAT DEFINE THE CHROME, BY NAME. `screen.tsx` places the
  * crown and the dock; `layout.tsx` draws them. Everything else is a caller.
  */
-const DEFINES_CHROME = new Set(["web/src/screen.tsx", "web/src/layout.tsx"]);
+const DEFINES_CHROME = new Set(["web/src/frame/screen.tsx", "web/src/frame/layout.tsx"]);
 
 /**
  * ⚠️ THE SURFACES THAT ARE NOT SCREENS, AND EACH IS EXEMPT FOR A STATED REASON.
@@ -236,6 +236,33 @@ for (const file of [...SCREENS, ...filesIn("web/src")]) {
 }
 if (!leaked) ok(`comments: none renders as text`);
 
+/* --------------------------------------------------- nothing sits loose --- */
+
+/**
+ * ⚠️ A FILE THAT LANDS AT THE ROOT OF `web/src` IS A FILE NOBODY CLASSIFIED, and
+ * that is how a flat package comes back one file at a time. The five directories
+ * each answer a question (see `web/README.md`) — is it a value, does it wrap a
+ * screen, could any app use it, does it take a declaration, is it data — and a
+ * file with no answer is one whose author did not ask.
+ *
+ * ⚠️ THE BARREL IS THE ONE EXCEPTION, because it is the package's public surface
+ * and belongs to none of the five.
+ */
+const HOMES = ["tokens", "frame", "parts", "rendered", "chart"];
+const loose = readdirSync(join(QUAD, "web/src"), { withFileTypes: true })
+  .filter((e) => e.isFile() && /\.tsx?$/.test(e.name) && e.name !== "index.ts")
+  .map((e) => e.name);
+if (loose.length) {
+  for (const name of loose) {
+    fail(`web/src/${name}: sits outside every directory.\n`
+      + `       Put it in one of ${HOMES.join(", ")} — each answers a question about\n`
+      + `       what the file IS (web/README.md). A file at the root is one nobody\n`
+      + `       classified, and that is how a flat package comes back.`);
+  }
+} else {
+  ok(`homes: every file is in one of ${HOMES.length}`);
+}
+
 /* ------------------------------------------- the shape table is the system --- */
 
 /**
@@ -244,10 +271,10 @@ if (!leaked) ok(`comments: none renders as text`);
  * the honest answer to "which shape is this" is "none of them", and the next
  * screen is hand-built with the whole argument re-run.
  */
-const screenSrc = readFileSync(join(QUAD, "web/src/screen.tsx"), "utf8");
+const screenSrc = readFileSync(join(QUAD, "web/src/frame/screen.tsx"), "utf8");
 const shapes = [...screenSrc.matchAll(/^  (\w+): \{ width:/gm)].map((m) => m[1]);
 if (shapes.length < 6) {
-  fail(`web/src/screen.tsx: only ${shapes.length} shapes.\n`
+  fail(`web/src/frame/screen.tsx: only ${shapes.length} shapes.\n`
     + `       A preset system somebody cannot find their page in is one they opt\n`
     + `       out of, and the screen after that is hand-built again.`);
 } else {

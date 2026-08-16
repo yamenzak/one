@@ -12,10 +12,10 @@
  */
 
 import * as React from "react";
-import { TYPE } from "../type.js";
-import { PAD, SPACE } from "../metrics.js";
-import { ARRIVE, arriveAt } from "../motion.js";
-import { Tally } from "../tally.js";
+import { TYPE } from "../tokens/type.js";
+import { PAD, SPACE } from "../tokens/metrics.js";
+import { ARRIVE, arriveAt } from "../tokens/motion.js";
+import { Tally } from "../parts/tally.js";
 import { Sparkline } from "./charts.js";
 import { type Point, compact, compactLike } from "./scale.js";
 

@@ -120,7 +120,7 @@ const LAYOUT = [
  * should have given.
  */
 const METRIC_VALUES = (() => {
-  const src = readFileSync(join(QUAD, "web/src/metrics.ts"), "utf8");
+  const src = readFileSync(join(QUAD, "web/src/tokens/metrics.ts"), "utf8");
   const out = new Map();
   /*
     ⚠️ ONE DECLARATION AT A TIME, because a regex over the whole file gets this
@@ -405,8 +405,8 @@ if (!lozenge) ok(`shapes: every icon-only control asks the library to be one`);
  * widths converge, which is worse than obviously wrong: it looks nearly right.
  */
 const EQUALS = [
-  ["web/src/layout.tsx", "Island", /grow basis-0/],
-  ["web/src/surfaces.tsx", "TileGrid", /w-full flex-col/],
+  ["web/src/frame/layout.tsx", "Island", /grow basis-0/],
+  ["web/src/parts/surfaces.tsx", "TileGrid", /w-full flex-col/],
 ];
 let uneven = 0;
 for (const [file, group, needs] of EQUALS) {
@@ -451,13 +451,13 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
  * is the shape this checks: one pill, and no per-item variant that paints.
  */
 {
-  const island = readFileSync(join(QUAD, "web/src/layout.tsx"), "utf8")
+  const island = readFileSync(join(QUAD, "web/src/frame/layout.tsx"), "utf8")
     .split(/\nexport /).filter((b) => b.startsWith("function Island"))[0] ?? "";
   const body = island.replace(/\/\*[\s\S]*?\*\//g, "");
   const pills = [...body.matchAll(/data-pill=/g)].length;
   const switched = /variant=\{[^}]*\?/.test(body);
   if (pills !== 1 || switched) {
-    fail(`web/src/layout.tsx: the nav marks "here" by switching, not by moving (D7).\n` +
+    fail(`web/src/frame/layout.tsx: the nav marks "here" by switching, not by moving (D7).\n` +
          `       ${pills} pill(s) found${switched ? ", and an item paints its own variant" : ""}.\n` +
          `       One element that travels; the items stay ghost.`);
   } else {

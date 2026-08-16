@@ -22,9 +22,9 @@
  */
 
 import * as React from "react";
-import { TYPE } from "../type.js";
-import { SPACE } from "../metrics.js";
-import { MOTION } from "../motion.js";
+import { TYPE } from "../tokens/type.js";
+import { SPACE } from "../tokens/metrics.js";
+import { MOTION } from "../tokens/motion.js";
 import {
   AXIS, DATA, GRID, QUIET, SEPARATOR, assign, emphasis, magnitude, polarity, pole, seriesColour,
 } from "./palette.js";

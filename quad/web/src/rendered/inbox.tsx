@@ -17,9 +17,9 @@
  */
 
 import { Button, Card, Chip, Separator } from "@heroui/react";
-import { colorFor } from "./theme.js";
+import { colorFor } from "../tokens/theme.js";
 import type { Tone } from "@quad/kernel";
-import { SPACE } from "./metrics.js";
+import { SPACE } from "../tokens/metrics.js";
 
 export interface Note {
   readonly id: string;

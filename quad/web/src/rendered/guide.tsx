@@ -14,8 +14,8 @@
 import type { GuideBook, HelpBook, MilestoneBook } from "@quad/kernel";
 import { progressOf, reached, remaining } from "@quad/kernel";
 import { Button, Card, Chip, ProgressBar } from "@heroui/react";
-import { colorFor } from "./theme.js";
-import { SPACE } from "./metrics.js";
+import { colorFor } from "../tokens/theme.js";
+import { SPACE } from "../tokens/metrics.js";
 
 export interface GuideProps {
   readonly book: GuideBook;

@@ -77,7 +77,7 @@ const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$
  * the words it refuses; a checker that read its own banned-word list as a breach
  * would fail permanently and be deleted within the week.
  */
-const EXEMPT = new Set(["kernel/src/tone.ts", "web/src/type.ts", "scripts/tone.test.mjs"]);
+const EXEMPT = new Set(["kernel/src/tone.ts", "web/src/tokens/type.ts", "scripts/tone.test.mjs"]);
 
 let checked = 0;
 let found = 0;

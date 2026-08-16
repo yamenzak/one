@@ -61,7 +61,7 @@ const FILES = [
  * ⚠️ `state.tsx` IS THE FILE THAT PROVIDES THE ANSWER, so it is the one place
  * the words appear legitimately. The list can only shrink.
  */
-const DEFINES = new Set(["web/src/state.tsx"]);
+const DEFINES = new Set(["web/src/parts/state.tsx"]);
 
 /* ------------------------------------------------------- the hand-rolled --- */
 
@@ -118,7 +118,7 @@ if (!seeded) ok(`seeds: no collection starts as a fact it has not learned`);
  * for, and this asserts the pairing — a row skeleton that stops naming `ROW.tap`
  * is a list that resizes, silently, on every load.
  */
-const STATE = readFileSync(join(QUAD, "web/src/state.tsx"), "utf8");
+const STATE = readFileSync(join(QUAD, "web/src/parts/state.tsx"), "utf8");
 const SHAPED = [
   ["RowsWaiting", /ROW\.tap/, "the row height rows actually are"],
   ["ChartWaiting", /aspect-\[320\/120\]/, "the chart frame's own aspect"],
@@ -160,7 +160,7 @@ if (!shapeless) ok(`shaped: ${SHAPED.length} skeleton(s), each the geometry of i
  * `animation:` at a time.
  */
 const MOTION_DEFINES = new Set([
-  "web/src/motion.ts", "web/src/ambience.ts", "web/src/chart/charts.tsx",
+  "web/src/tokens/motion.ts", "web/src/tokens/ambience.ts", "web/src/chart/charts.tsx",
 ]);
 let loose = 0;
 for (const file of FILES) {
@@ -231,7 +231,7 @@ if (!unmounted) ok(`mounted: all ${exported.size} shared stylesheet(s) reach the
  * is what keeps this from being a ban on `flex`.
  */
 const FRAME = /className="[^"]*\b(?:flex|grid)\b[^"]*\bgap(?:-[xy])?-(?:\d+|\[[^\]]*\])/g;
-const FRAME_DEFINES = new Set(["web/src/layout.tsx", "web/src/metrics.ts"]);
+const FRAME_DEFINES = new Set(["web/src/frame/layout.tsx", "web/src/tokens/metrics.ts"]);
 
 let framed = 0;
 for (const file of FILES) {

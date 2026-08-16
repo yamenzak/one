@@ -24,9 +24,9 @@
 import * as React from "react";
 import { Alert, Button, EmptyState, Skeleton, Spinner } from "@heroui/react";
 import type { Problem } from "@quad/kernel";
-import { TYPE } from "./type.js";
-import { PAD, ROW, SPACE } from "./metrics.js";
-import { ARRIVE } from "./motion.js";
+import { TYPE } from "../tokens/type.js";
+import { PAD, ROW, SPACE } from "../tokens/metrics.js";
+import { ARRIVE } from "../tokens/motion.js";
 import { Group } from "./surfaces.js";
 
 /* ----------------------------------------------------------------- loaded --- */

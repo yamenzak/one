@@ -18,7 +18,7 @@
 import type { Channel, NotificationBook, NotificationDef, Policy, Preference } from "@quad/kernel";
 import { INTERRUPTS, channelsFor, inAudience } from "@quad/kernel";
 import { ToggleButton, ToggleButtonGroup } from "@heroui/react";
-import { ControlRow, Group } from "./surfaces.js";
+import { ControlRow, Group } from "../parts/surfaces.js";
 
 export interface PolicyProps {
   readonly book: NotificationBook;

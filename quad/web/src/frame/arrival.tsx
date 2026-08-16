@@ -16,11 +16,11 @@
 
 import * as React from "react";
 import { Link } from "@heroui/react";
-import { ARRIVE_MARK, ARRIVE_RISE, doorAt } from "./motion.js";
-import { GUTTER, SPACE, WIDTH } from "./metrics.js";
-import { TYPE } from "./type.js";
+import { ARRIVE_MARK, ARRIVE_RISE, doorAt } from "../tokens/motion.js";
+import { GUTTER, SPACE, WIDTH } from "../tokens/metrics.js";
+import { TYPE } from "../tokens/type.js";
 import { Page, Spacer, Stack } from "./layout.js";
-import type { Ambience } from "./ambience.js";
+import type { Ambience } from "../tokens/ambience.js";
 
 /* ------------------------------------------------------------------- mark --- */
 

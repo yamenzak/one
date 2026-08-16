@@ -15,7 +15,7 @@
 
 import type { Disclosure } from "@quad/kernel";
 import { Button, Card, Chip, Separator, Switch, Label } from "@heroui/react";
-import { SPACE } from "./metrics.js";
+import { SPACE } from "../tokens/metrics.js";
 
 export interface ConsentProps {
   readonly shown: readonly Disclosure[];

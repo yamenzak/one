@@ -19,9 +19,9 @@
 import type { SettingBook, SettingDef, Level } from "@quad/kernel";
 import { disclose, groupsOn, settingsOn } from "@quad/kernel";
 import { Field } from "./field.js";
-import { ControlRow, Group, ToggleRow } from "./surfaces.js";
-import { Nothing } from "./state.js";
-import { SPACE } from "./metrics.js";
+import { ControlRow, Group, ToggleRow } from "../parts/surfaces.js";
+import { Nothing } from "../parts/state.js";
+import { SPACE } from "../tokens/metrics.js";
 
 export interface SettingsProps {
   readonly book: SettingBook;

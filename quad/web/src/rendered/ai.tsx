@@ -21,7 +21,7 @@
 import type { Lane, ModelRow } from "@quad/kernel";
 import { defaultIn, inLane } from "@quad/kernel";
 import { Card, Chip, Switch, Label } from "@heroui/react";
-import { SPACE } from "./metrics.js";
+import { SPACE } from "../tokens/metrics.js";
 
 export interface LanesProps {
   /** What the app asked for. */

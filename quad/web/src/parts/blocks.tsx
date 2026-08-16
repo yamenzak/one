@@ -16,8 +16,8 @@ import {
   Accordion, Breadcrumbs, Button, Disclosure, Kbd, ProgressCircle, Tabs, type KbdKey,
 } from "@heroui/react";
 import { Check } from "lucide-react";
-import { SPACE } from "./metrics.js";
-import { TYPE } from "./type.js";
+import { SPACE } from "../tokens/metrics.js";
+import { TYPE } from "../tokens/type.js";
 
 /* ------------------------------------------------------------------ steps --- */
 

@@ -27,12 +27,12 @@
 import * as React from "react";
 import { Avatar, Button, Card, Chip, Label, Skeleton, Switch } from "@heroui/react";
 import type { Tone } from "@quad/kernel";
-import { TYPE } from "./type.js";
+import { TYPE } from "../tokens/type.js";
 import {
   CARD_ROWS, CROWN_SIZE, FACE, HEAD_GAP, ICON, INSET, LEAD, PAD, ROW, SPACE,
-} from "./metrics.js";
-import type { Inset } from "./metrics.js";
-import { ARRIVE, arriveAt } from "./motion.js";
+} from "../tokens/metrics.js";
+import type { Inset } from "../tokens/metrics.js";
+import { ARRIVE, arriveAt } from "../tokens/motion.js";
 import { Tally } from "./tally.js";
 
 /* ------------------------------------------------------------------ group --- */

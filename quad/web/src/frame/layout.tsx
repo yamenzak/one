@@ -25,16 +25,16 @@ import { Avatar, Button, Card, Separator } from "@heroui/react";
 /* ⚠️ `Ambience`, not `theme.ts`'s older four-value `Sky`. The two drifted the
    moment patterns were added, and a `Page` that could not be given `dots` was a
    vocabulary with a piece nothing could reach. */
-import type { Ambience } from "./ambience.js";
-import { TYPE } from "./type.js";
+import type { Ambience } from "../tokens/ambience.js";
+import { TYPE } from "../tokens/type.js";
 import {
   BAND_PAD, CODE_SLOT, CROWN, CROWN_CHIP, CROWN_SIZE, FACE, GUTTER, HEAD_GAP, HERO_PAD, ICON,
   ISLAND_ITEM,
   ISLAND_PAD,
   SAFE_TOP, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, TITLE_PAD, WIDTH,
   type Space, type Width,
-} from "./metrics.js";
-import { MOTION } from "./motion.js";
+} from "../tokens/metrics.js";
+import { MOTION } from "../tokens/motion.js";
 
 export type { Space, Width };
 /* ⚠️ The metrics a SCREEN legitimately needs, re-exported here so nothing

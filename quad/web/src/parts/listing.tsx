@@ -35,7 +35,7 @@ import * as React from "react";
 import { Pagination, Table } from "@heroui/react";
 import { Await, Nothing, TableWaiting, type Loaded } from "./state.js";
 import { Group, PersonRow } from "./surfaces.js";
-import { TYPE } from "./type.js";
+import { TYPE } from "../tokens/type.js";
 
 export interface Col<T> {
   readonly id: string;

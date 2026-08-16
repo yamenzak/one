@@ -32,11 +32,11 @@
 import * as React from "react";
 import { Button } from "@heroui/react";
 import { Band, PageCrown, Spacer, type Slot, type Width } from "./layout.js";
-import { Group, NavRow } from "./surfaces.js";
-import { Await, Nothing, RowsWaiting, FigureWaiting, FormWaiting, TextWaiting, TilesWaiting, nothingIn, type Loaded } from "./state.js";
+import { Group, NavRow } from "../parts/surfaces.js";
+import { Await, Nothing, RowsWaiting, FigureWaiting, FormWaiting, TextWaiting, TilesWaiting, nothingIn, type Loaded } from "../parts/state.js";
 import { Stack } from "./layout.js";
-import { PAD, SAFE_BOTTOM, SPACE } from "./metrics.js";
-import { ARRIVE, arriveAt } from "./motion.js";
+import { PAD, SAFE_BOTTOM, SPACE } from "../tokens/metrics.js";
+import { ARRIVE, arriveAt } from "../tokens/motion.js";
 
 /* ------------------------------------------------------------------ shape --- */
 

@@ -24,7 +24,7 @@ import {
 } from "@heroui/react";
 import { parseDate, parseDateTime } from "@internationalized/date";
 import type { DateValue } from "@internationalized/date";
-import { sentence } from "./type.js";
+import { sentence } from "../tokens/type.js";
 
 export interface FieldProps {
   readonly name: string;

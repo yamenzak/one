@@ -29,8 +29,8 @@ import {
   UserRound, Users,
 } from "lucide-react";
 import { Island } from "./layout.js";
-import { skyCss, type Sky } from "./theme.js";
-import { GUTTER, NAV_SPACE, PAD, ROW, SPACE } from "./metrics.js";
+import { skyCss, type Sky } from "../tokens/theme.js";
+import { GUTTER, NAV_SPACE, PAD, ROW, SPACE } from "../tokens/metrics.js";
 
 /**
  * ⚠️ AN ICON IS A NAME IN A MANIFEST AND A GLYPH HERE. The manifest stays pure

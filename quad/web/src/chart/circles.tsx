@@ -33,8 +33,8 @@
  */
 
 import * as React from "react";
-import { TYPE } from "../type.js";
-import { SPACE } from "../metrics.js";
+import { TYPE } from "../tokens/type.js";
+import { SPACE } from "../tokens/metrics.js";
 import { GRID, QUIET, assign, seriesColour } from "./palette.js";
 import { arcPath, arcs, compact } from "./scale.js";
 

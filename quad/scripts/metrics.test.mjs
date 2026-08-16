@@ -45,7 +45,7 @@ const filesIn = (dir) => {
  * choice is repeated everywhere and its drift is the product's.
  */
 const FILES = filesIn("web/src");
-const SOURCE = "web/src/metrics.ts";
+const SOURCE = "web/src/tokens/metrics.ts";
 
 const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
@@ -96,7 +96,7 @@ if (!tap) {
  * right. A floor defined and applied to three of five rows is a floor that reads
  * as enforced and is not.
  */
-const surfaces = strip(readFileSync(join(QUAD, "web/src/surfaces.tsx"), "utf8"));
+const surfaces = strip(readFileSync(join(QUAD, "web/src/parts/surfaces.tsx"), "utf8"));
 /* ⚠️ SPLIT ON THE DECLARATIONS, not a non-greedy match to the next `\n}` — that
    stops at the first brace at column zero, which is inside the first function.
    It reported "all 1 pressable rows" over eight of them, which is the exact
@@ -177,7 +177,7 @@ if (leadless.length) {
  * the nav — which is what shipped, on both specimens, until somebody looked at a
  * photograph of it.
  */
-const layout = readFileSync(join(QUAD, "web/src/layout.tsx"), "utf8");
+const layout = readFileSync(join(QUAD, "web/src/frame/layout.tsx"), "utf8");
 if (!/NAV_SPACE/.test(layout) || !/nav\?: React\.ReactNode/.test(layout)) {
   fail(`layout.tsx: \`Page\` does not reserve room for a nav.\n` +
        `       The island cannot do it: by the time it lays out, the content is sized.`);

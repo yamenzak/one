@@ -16,16 +16,16 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { field, flag, notification, setting, type Channel } from "@quad/kernel";
-import { Settings, settingsShown } from "../src/settings.js";
-import { NotificationPolicy, policyShown } from "../src/policy.js";
-import { FlagConsole, Shelf, saying, money } from "../src/console.js";
-import { Shell, reachable } from "../src/shell.js";
-import { brandCss, brandCssFor, readable, skyCss, colorFor } from "../src/theme.js";
-import { AMBIENCES, DRIFT, ambienceStylesheet, bespokeCss } from "../src/ambience.js";
-import { Screen, Whichever } from "../src/screen.js";
-import { ready, trouble, waiting } from "../src/state.js";
-import { Documents, SubProcessors } from "../src/legal.js";
-import { Await } from "../src/state.js";
+import { Settings, settingsShown } from "../src/rendered/settings.js";
+import { NotificationPolicy, policyShown } from "../src/rendered/policy.js";
+import { FlagConsole, Shelf, saying, money } from "../src/rendered/console.js";
+import { Shell, reachable } from "../src/frame/shell.js";
+import { brandCss, brandCssFor, readable, skyCss, colorFor } from "../src/tokens/theme.js";
+import { AMBIENCES, DRIFT, ambienceStylesheet, bespokeCss } from "../src/tokens/ambience.js";
+import { Screen, Whichever } from "../src/frame/screen.js";
+import { ready, trouble, waiting } from "../src/parts/state.js";
+import { Documents, SubProcessors } from "../src/rendered/legal.js";
+import { Await } from "../src/parts/state.js";
 import type { DocumentDef } from "@quad/kernel";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node);

@@ -48,26 +48,26 @@ const ok = (m) => console.log(`ok   ${m}`);
  * a guard entry that names no assertion keeps promising a check somebody deleted.
  */
 const SURFACES = {
-  screens: { file: "web/src/shell.tsx", renders: "export function Shell" },
-  settings: { file: "web/src/settings.tsx", renders: "export function Settings" },
-  notifications: { file: "web/src/policy.tsx", renders: "export function NotificationPolicy" },
-  flags: { file: "web/src/console.tsx", renders: "export function FlagConsole" },
-  plans: { file: "web/src/console.tsx", renders: "export function Shelf" },
-  entitlements: { file: "web/src/console.tsx", renders: "export function Shelf" },
-  whitelabel: { file: "web/src/theme.ts", renders: "export function brandCss" },
-  guide: { file: "web/src/guide.tsx", renders: "export function Guide" },
-  milestones: { file: "web/src/guide.tsx", renders: "export function Milestones" },
-  help: { file: "web/src/guide.tsx", renders: "export function Help" },
+  screens: { file: "web/src/frame/shell.tsx", renders: "export function Shell" },
+  settings: { file: "web/src/rendered/settings.tsx", renders: "export function Settings" },
+  notifications: { file: "web/src/rendered/policy.tsx", renders: "export function NotificationPolicy" },
+  flags: { file: "web/src/rendered/console.tsx", renders: "export function FlagConsole" },
+  plans: { file: "web/src/rendered/console.tsx", renders: "export function Shelf" },
+  entitlements: { file: "web/src/rendered/console.tsx", renders: "export function Shelf" },
+  whitelabel: { file: "web/src/tokens/theme.ts", renders: "export function brandCss" },
+  guide: { file: "web/src/rendered/guide.tsx", renders: "export function Guide" },
+  milestones: { file: "web/src/rendered/guide.tsx", renders: "export function Milestones" },
+  help: { file: "web/src/rendered/guide.tsx", renders: "export function Help" },
 
-  packs: { file: "web/src/money.tsx", renders: "export function Wallet" },
-  meters: { file: "web/src/money.tsx", renders: "export function Wallet" },
-  jobs: { file: "web/src/money.tsx", renders: "export function Jobs" },
+  packs: { file: "web/src/rendered/money.tsx", renders: "export function Wallet" },
+  meters: { file: "web/src/rendered/money.tsx", renders: "export function Wallet" },
+  jobs: { file: "web/src/rendered/money.tsx", renders: "export function Jobs" },
 
-  lanes: { file: "web/src/ai.tsx", renders: "export function AiLanes" },
-  vault: { file: "web/src/vault.tsx", renders: "export function MyData" },
-  purposes: { file: "web/src/vault.tsx", renders: "export function ConsentSheet" },
-  documents: { file: "web/src/legal.tsx", renders: "export function Documents" },
-  processors: { file: "web/src/legal.tsx", renders: "export function SubProcessors" },
+  lanes: { file: "web/src/rendered/ai.tsx", renders: "export function AiLanes" },
+  vault: { file: "web/src/rendered/vault.tsx", renders: "export function MyData" },
+  purposes: { file: "web/src/rendered/vault.tsx", renders: "export function ConsentSheet" },
+  documents: { file: "web/src/rendered/legal.tsx", renders: "export function Documents" },
+  processors: { file: "web/src/rendered/legal.tsx", renders: "export function SubProcessors" },
 
   /*
     ⚠️ NOTHING IS OWED TODAY, and the shape stays here on purpose: `{ owed: "N" }`
@@ -147,7 +147,7 @@ const kinds = (() => {
 })();
 
 const controls = (() => {
-  const src = readFileSync(join(QUAD, "web/src/field.tsx"), "utf8");
+  const src = readFileSync(join(QUAD, "web/src/rendered/field.tsx"), "utf8");
   return new Set([...src.matchAll(/case "([a-z]+)":/g)].map((m) => m[1]));
 })();
 
@@ -161,7 +161,7 @@ for (const kind of kinds) {
   const owes = NO_CONTROL_YET[kind];
   if (owes && !shippedStages().has(owes)) continue;
   unhandled++;
-  fail(`field kind "${kind}" has no case in web/src/field.tsx and is not listed as text.\n` +
+  fail(`field kind "${kind}" has no case in web/src/rendered/field.tsx and is not listed as text.\n` +
        `       It renders as a text box, which looks finished and accepts anything.`);
 }
 if (!unhandled) {
