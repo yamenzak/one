@@ -20,7 +20,7 @@
  * page, which is the same picture as a page that failed to load.
  */
 
-import { Band, Crown, Layout, NoticeHost, ONE_FACE, Spacer, Trouble, Working, TYPE } from "@quad/web";
+import { Band, Crown, Layout, NoticeHost, ONE_FACE, Spacer, Trouble, Working, whoFace } from "@quad/web";
 import { Gallery } from "./screens/Gallery.js";
 import { SPECIMEN_IDS, Specimen, type SpecimenId } from "./screens/Specimens.js";
 
@@ -168,12 +168,17 @@ export function App() {
     */
     <Layout subject={ONE_FACE}>
       <NoticeHost />
+      {/* ⚠️ THE LEAD IS THE ACCOUNT AND THERE IS NOWHERE FOR IT TO GO — this
+          IS the hub, so the face is a face rather than a button (`who` with no
+          `onOpen`). The email it used to carry as an `aside` is what the face
+          says now; the address under the name is the deployment's. */}
       <Crown
+        who={me && me !== "nobody"
+          ? { name: me.email ?? "You", face: whoFace(me.accountId) }
+          : undefined}
         name="One"
         under={where?.root}
         width={settled ? "work" : "read"}
-        ruled={settled}
-        aside={me && me !== "nobody" ? <span className={TYPE.note}>{me.email}</span> : null}
       />
       <Band width={settled ? "work" : "read"}>
         <div

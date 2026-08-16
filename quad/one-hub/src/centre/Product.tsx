@@ -60,10 +60,18 @@ export function Product({ path, onGo, onOpenHub, onOpenInbox }: {
         if (!app) {
           return (
             <Page sky="glow">
+              {/* ⚠️ THE SAME LEAD EVERY OTHER CROWN HAS. This screen used to
+                  hand-assemble an `aside` from a face and an email — the `You`
+                  helper — which is how the one screen with no product open came
+                  to draw somebody differently from every screen that has one. */}
               <Crown
+                who={{
+                  name: email ?? "You",
+                  face: person ? whoFace(person.accountId) : undefined,
+                  onOpen: onOpenHub,
+                }}
                 name={view.tenant.name}
                 under="One"
-                aside={<You email={email} accountId={person?.accountId} onOpen={onOpenHub} />}
               />
               <Band width="read"><div className="py-2"><Choose view={view} onGo={onGo} /></div></Band>
               <Spacer />
@@ -106,22 +114,3 @@ export function Product({ path, onGo, onOpenHub, onOpenInbox }: {
   );
 }
 
-/** ⚠️ The same gesture the Shell's crown carries, on the one screen with none. */
-function You({ email, accountId, onOpen }: {
-  readonly email: string | undefined;
-  readonly accountId: string | undefined;
-  readonly onOpen: () => void;
-}) {
-  return (
-    <>
-      <span className={TYPE.note}>{email}</span>
-      <Button isIconOnly variant="ghost" aria-label="Account and workspaces" onPress={onOpen}>
-        {/* ⚠️ ONE RESOLVER, AND THE SIZE DECIDES THE MOVEMENT (`face.tsx`). This
-            slot drew its own initial-in-a-circle while the Shell's crown drew a
-            face, so the same person changed appearance on the one screen with
-            no product open. */}
-        <Face of={accountId ? whoFace(accountId) : undefined} name={email} size="chip" />
-      </Button>
-    </>
-  );
-}

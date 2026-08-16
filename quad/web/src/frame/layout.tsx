@@ -430,59 +430,6 @@ export function Center({ space = "roomy", children }: {
   );
 }
 
-/* ------------------------------------------------------------------ crown --- */
-
-export interface CrownProps {
-  /** What is over the door. A mark, a name, or both. */
-  readonly mark?: React.ReactNode;
-  readonly name: string;
-  /** ⚠️ One line, and only where it says something the name does not. */
-  readonly under?: string;
-  /** Pushed to the far end: a bell, an avatar, a switcher. */
-  readonly aside?: React.ReactNode;
-  readonly bleed?: Bleed;
-  readonly width?: Width;
-  /**
-   * ⚠️ GONE, AND KEPT AS A NO-OP SO THE CALLERS THAT PASS IT STILL COMPILE.
-   * With borders and shadows banned everywhere else, this hairline became the
-   * ONE edge left in the product — which is the inconsistency the ban exists to
-   * remove, arriving from the last place anybody would look. A crown separates
-   * because it is at the top and because the ground under it is designed; a line
-   * under it is the old way of saying so.
-   */
-  readonly ruled?: boolean;
-}
-
-/**
- * THE CHROME ABOVE EVERY SCREEN.
- *
- * ⚠️ THE CROWN IS NOT A DESTINATION (D10). The switcher, the bell and the
- * account sit here precisely because they are about *where you are* rather than
- * *what you are doing* — putting any of them in the five primary destinations
- * spends a scarce slot on something every screen already has.
- */
-export function Crown(
-  { mark, name, under, aside, bleed = "hold", width = "read" }: CrownProps,
-) {
-  return (
-    /* ⚠️ THE BAR ITSELF IS NOT GLASS — see `AppCrown` for the whole argument. */
-    <header data-hem="top" className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
-      <Band bleed={bleed} width={width}>
-        <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
-          {mark ? <span aria-hidden="true" className="flex items-center">{mark}</span> : null}
-          <div className="flex min-w-0 grow flex-col">
-            <strong className={TYPE.label}>{name}</strong>
-            {under ? <span className={TYPE.note}>{under}</span> : null}
-          </div>
-          {aside ? <div className={`flex shrink-0 items-center ${SPACE.tight}`}>{aside}</div> : null}
-        </div>
-      </Band>
-    </header>
-  );
-}
-
-/* ------------------------------------------------------------- page crown --- */
-
 /**
  * THE WAY OUT, AS A CHIP.
  *
@@ -515,254 +462,6 @@ export function LeaveChip({ leave = "back", label, onDo }: {
 }
 
 /**
- * THE HEADER AN INNER PAGE HAS: a way back, the page's name, and the name
- * COLLAPSES.
- *
- * ⚠️ A PAGE'S NAME IS BOTH THE BIGGEST THING ON IT AND SOMETHING YOU STILL NEED
- * FOUR SCREENS DOWN, and one element cannot be both. At rest the title is a
- * display-weight heading under the back control, where it is the first thing
- * read; once it has scrolled away it comes back small, beside the back control,
- * where it costs one line and answers "what am I in" without anybody scrolling
- * up to ask. A header that pins the LARGE title instead spends a fifth of a
- * phone on a word; one that pins nothing leaves somebody four cards deep with a
- * back arrow to nowhere named.
- *
- * ⚠️ THE HANDOVER IS SEQUENCED, NOT A CROSS-FADE. `MOTION.exit` is shorter than
- * `MOTION.enter` by design, so the large title is gone before the compact one
- * arrives and the two are never both legible in the same frame — which is what
- * reading two sizes of the same word at once looks like, and it is the tell that
- * separates this from a naive opacity swap.
- *
- * ⚠️ AND THERE IS NO BAR. No plate, no hairline, no frosted strip: the back
- * control and the actions are glass CHIPS on the page's own ground, and the
- * ground under a crown is already a step lighter than the page because the
- * ambience is built that way. That is the whole separation, and it is why
- * `edges:` can stay green.
- */
-export function PageCrown({
-  title, face, back, backLabel, leave = "back", actions = [], does, under,
-  bleed = "edge", width = "work",
-}: {
-  readonly title: string;
-  /**
-   * ⚠️ THE SUBJECT THIS PAGE IS ABOUT, AND `Layout` IS WHAT SUPPLIES IT. Not a
-   * decoration and not a thumbnail: the picture at the size of the screen with
-   * the name across it is a TITLE CARD, and it is the one composition that says
-   * "here" rather than "about here". The ground under it is the same subject's
-   * own world, from the same declaration — see `Layout`.
-   */
-  readonly face?: FaceOf;
-  /**
-   * ⚠️ A CROWN TAKES THE SHAPE OF WHAT IT CROWNS, AND THE DEFAULT IS ONLY A
-   * DEFAULT. Edge-bled, the heading sits against the page's own gutter, which is
-   * right over content that is also edge-bled. Over a HELD column it is wrong by
-   * however wide the screen is: the hub's crown put "Money" 240px to the left of
-   * the bill it names, which reads as two pages sharing one scroll. Name the
-   * same `bleed`/`width` here that the content under it uses. Both bands take
-   * them, so the back control, the title and the first card share one left edge.
-   */
-  readonly bleed?: Bleed;
-  readonly width?: Width;
-  /**
-   * ⚠️ ABSENT MEANS THERE IS NOWHERE TO GO, AND THAT IS A REAL STATE. A surface
-   * opened as the page itself has nothing underneath it — a control that closes
-   * onto a backdrop appears to do nothing, which is worse than not being there.
-   * The page still has a NAME, so the heading stays either way.
-   */
-  readonly back?: () => void;
-  readonly backLabel?: string;
-  /**
-   * ⚠️ THE WAY OUT IS A PROPERTY OF WHERE THIS SCREEN SITS, NOT A CHOICE. The
-   * root of a presented surface is DISMISSED and gets an ×; a screen one level
-   * inside is left UPWARDS and gets an arrow. Two screens get that right by
-   * hand and the third gets it wrong — which is the class of thing a frame
-   * exists to decide once.
-   */
-  readonly leave?: "back" | "dismiss";
-  readonly actions?: readonly Slot[];
-  /**
-   * ⚠️ THE PRIMARY ACTION, ON A WIDE SCREEN ONLY — and it arrives already
-   * decided. A `Screen` hands the SAME act to this and to its docked bar and
-   * shows exactly one of them by breakpoint (`screen.tsx`); declaring it twice
-   * is how the crown comes to say "Invite" while the bar says "Add somebody".
-   *
-   * ⚠️ AND IT IS LABELLED HERE RATHER THAN ICON-ONLY. There is room at this
-   * size, and an unlabelled primary is a guess — the icon-only treatment is for
-   * `actions`, which are secondary and recoverable.
-   */
-  readonly does?: {
-    readonly label: string;
-    readonly icon?: React.ReactNode;
-    readonly onDo: () => void;
-    readonly tone?: "danger";
-    readonly disabled?: boolean;
-  };
-  /**
-   * ⚠️ THE ROW THAT SCROLLS AWAY WITH THE TITLE — a scope picker, a date range.
-   * It belongs to the heading rather than to the content, and pinning it would
-   * put two rows of chrome over every page.
-   */
-  readonly under?: React.ReactNode;
-}) {
-  const past = useScrolledPast();
-
-  return (
-    <>
-      <header data-hem="top" className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
-        <Band bleed={bleed} width={width}>
-          <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
-            {back ? <LeaveChip leave={leave} label={backLabel} onDo={back} /> : null}
-
-            {/*
-              ⚠️ `aria-hidden`, BECAUSE THE `h1` BELOW IS THE PAGE'S NAME. Two
-              elements carrying the same words is two headings to a screen
-              reader and a duplicate to anybody navigating by them — the compact
-              copy is a visual reminder, and it says so.
-
-              ⚠️ AND ITS CHIP IS GONE, BECAUSE THE HEM DOES WHAT THE CHIP WAS
-              FOR. With the header transparent and the page untreated, a card
-              scrolling past arrived directly behind these words — the first
-              build drew "Analytics" across a chart's own grid lines and its
-              subject series, two sets of ink in the same place. A capsule
-              behind the title fixed that where a plate behind the whole row
-              would have been a bar. The hem fixes it one level down: the card
-              has dissolved into the ground before it gets here, so the title is
-              a title again rather than a word in a lozenge.
-            */}
-            <span
-              aria-hidden="true"
-              className={`min-w-0 truncate ${TYPE.label} ${CROWN_CHIP}`}
-              style={{
-                opacity: past ? 1 : 0,
-                transform: past ? "none" : "translateY(0.375rem)",
-                transition: past ? MOTION.enter : MOTION.exit,
-              }}
-            >
-              {title}
-            </span>
-
-            <Spacer />
-
-            {/* ⚠️ QUIET, AND NO LONGER CHIPS — the same treatment `AppCrown`
-                gives `also`, so the two crowns say "secondary" the same way.
-                They were `tertiary` fills because they had to survive whatever
-                scrolled behind them; the hem does that now. */}
-            {actions.map((a) => (
-              <Button
-                key={a.id}
-                isIconOnly
-                size={CROWN_SIZE}
-                variant="ghost"
-                aria-label={a.label}
-                onPress={a.onDo}
-              >
-                {a.icon}
-              </Button>
-            ))}
-
-            {/* ⚠️ `hidden md:flex`, because below it the same act is a docked
-                bar where a thumb already is — see `screen.tsx`. */}
-            {does ? (
-              <Button
-                className="hidden md:flex"
-                size={CROWN_SIZE}
-                variant={does.tone === "danger" ? "danger" : "primary"}
-                isDisabled={does.disabled}
-                onPress={does.onDo}
-              >
-                {does.icon}
-                {does.label}
-              </Button>
-            ) : null}
-          </div>
-        </Band>
-      </header>
-
-      {/* ⚠️ THE PADDING IS BELOW THE HEADING, NOT AROUND IT. The crown above
-          already sets the top; `BAND_PAD` here would double it and push the
-          title down the screen. What was missing is air UNDER the block — the
-          first build ran the scope row straight into the first section heading,
-          two rows of words at the same left edge with nothing saying which
-          belongs to which. */}
-      <Band bleed={bleed} width={width}>
-        {face
-          ? (
-            /*
-              ⚠️ THE SUBJECT IS THE SCREEN, AND THE NAME SITS ON IT. A page about
-              one named thing that has a picture of itself does not need a
-              heading ABOVE a thumbnail — that is a caption over an icon, which
-              is what the first build was. The picture at the size of the screen
-              with the name across it is a title card, and it is the one
-              composition that says "here" rather than "about here".
-
-              ⚠️ THE NAME IS ON A GRID CELL, NOT ABSOLUTELY POSITIONED. Both
-              share one cell, so the block is as tall as the orb and the content
-              under it never has to know a hero happened. Absolute positioning
-              would take the name out of flow and the crown would collapse to
-              nothing on a long name.
-            */
-            <div
-              className={`grid ${TITLE_PAD}`}
-              style={{
-                opacity: past ? 0 : 1,
-                transition: past ? MOTION.exit : MOTION.enter,
-              }}
-            >
-              <span
-                className="col-start-1 row-start-1 justify-self-center"
-                style={{ gridArea: "1 / 1" }}
-              >
-                <Face of={face} hero />
-              </span>
-              {/* ⚠️ NO SCRIM, AND THAT WAS TRIED FIRST. A wash under the name
-                  to hold its contrast over a lit sphere is the obvious move and
-                  it is visible: the plate is wider than the planet, so its edges
-                  sit on plain sky as two dark patches either side of the world.
-                  What holds the type is WEIGHT — 800 at 44px over a mid-value
-                  body — the mask, which keeps the brightest part of the limb
-                  away from the edges of the words, and `ON_SCENE`: a halo in the
-                  ground's OWN colour, which has no shape and dims nothing. The
-                  scene derives it (`Family.veil`), so it is right in both skies
-                  and under every workspace without anybody choosing it. */}
-              <span
-                /* ⚠️ `relative` IS NOT COSMETIC HERE. The orb carries a
-                   `mask-image`, and a mask CREATES A STACKING CONTEXT — so the
-                   picture paints in the positioned step, after in-flow content,
-                   and the name vanished behind a planet with nothing in the DOM
-                   to show for it. Anything sharing a cell with a masked element
-                   has to be positioned to sit above it. */
-                className={`relative col-start-1 row-start-1 self-center justify-self-center w-full
-                  flex flex-col items-center text-center ${SPACE.tight} px-4 py-6`}
-                /* ⚠️ ON THE WRAPPER, BECAUSE `text-shadow` INHERITS. The name and
-                   whatever sits under it are one block of type on one ground —
-                   setting it twice is two places to forget it once. */
-                style={{ gridArea: "1 / 1", textShadow: ON_SCENE }}
-              >
-                <h1 className={TYPE.wordmark}>{title}</h1>
-                {under}
-              </span>
-            </div>
-          )
-          : (
-            <div className={`flex flex-col ${HEAD_GAP} ${TITLE_PAD}`}>
-              <h1
-                className={TYPE.display}
-                style={{
-                  opacity: past ? 0 : 1,
-                  transition: past ? MOTION.exit : MOTION.enter,
-                }}
-              >
-                {title}
-              </h1>
-              {under}
-            </div>
-          )}
-      </Band>
-    </>
-  );
-}
-
-/**
  * ⚠️ ONE THRESHOLD, NOT A SCROLL-LINKED FRACTION. Driving the swap off a
  * continuous offset means a state update per frame and a title that is half
  * faded for as long as somebody's finger is still — which reads as a rendering
@@ -786,6 +485,7 @@ function useScrolledPast(down = 56, up = 32): boolean {
   return past;
 }
 
+
 /** ⚠️ Drawn here for the same reason `Lens` is — no icon library in this layer. */
 const X = () => (
   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -799,6 +499,434 @@ const Back = () => (
     <path d="m12 19-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
+
+
+/* ------------------------------------------------------------------ crown --- */
+
+/**
+ * ONE ROW OVER EVERY SCREEN IN THE PRODUCT.
+ *
+ *     ( lead )( middle                        )( also )( does )
+ *
+ * ⚠️ THERE WERE FOUR OF THESE AND THEY WERE ONE SHAPE. `Crown` (a mark, a name,
+ * an `aside`), `AppCrown` (a face, a search, two actions), `PageCrown`'s row (a
+ * back control, a collapsing title, two actions) and — the one nobody could
+ * find — a hand-rolled `<header>` inside the Shell. Every one of them was
+ * something on the left, something in the middle and controls on the right, at
+ * four slightly different heights, with four spacings and four answers to what
+ * a secondary action looks like. That is not four components; it is one
+ * component written four times, which is why the Shell's copy was the only one
+ * that scrolled away and the only one with a rule under it.
+ *
+ * ⚠️ SO THE SHAPE IS THE SLOTS, AND THERE IS NO `kind` PROP. What a crown IS
+ * falls out of what it was handed: a face leads where you are somewhere, a way
+ * out leads where you can leave, the middle is a name or a search. A variant
+ * enum would be a fifth way to say the same thing and the first place the four
+ * would start drifting apart again.
+ *
+ * ⚠️ THE ROW IS ONE HEIGHT, ALWAYS, AND THAT IS THE POINT OF UNIFYING IT.
+ * `CROWN` is the row and `CROWN_SIZE` is every control in it, so a crown with a
+ * face, a search and two actions is four things of exactly one size on one
+ * baseline. The old set drew a 32px avatar beside a 44px field beside a 36px
+ * chip, which is the single clearest tell that a header was assembled rather
+ * than designed.
+ *
+ * ⚠️ AND NOTHING HERE IS A SURFACE EXCEPT `find` AND `does`. The hem behind the
+ * crown is the background (`data-hem`), so a control needs a fill only when the
+ * fill MEANS something: a field has to look like somewhere to type, and the one
+ * act a screen is for has to look like the answer. Everything else is ink.
+ */
+export interface CrownProps {
+  /* ------------------------------------------------------------- the lead --- */
+  /**
+   * WHOSE SCREEN THIS IS — the account, and it opens the hub.
+   *
+   * ⚠️ IDENTITY OR A WAY OUT, NEVER BOTH, and the refusal is loud. A crown with
+   * a face AND a back arrow has two leading controls of equal weight and no
+   * answer to which one leaves — which is a decision the caller has to make,
+   * not one this can average.
+   */
+  readonly who?: {
+    readonly name: string;
+    readonly face?: FaceOf;
+    readonly onOpen?: () => void;
+    /** ⚠️ A dot, never a count — see `Island`. */
+    readonly unread?: boolean;
+  };
+  /** ⚠️ Absent means there is nowhere to go, which is a real state — a surface
+      opened as the page itself has nothing underneath it. */
+  readonly back?: () => void;
+  /**
+   * ⚠️ THE WAY OUT IS A PROPERTY OF WHERE THIS SCREEN SITS, NOT A CHOICE. The
+   * root of a presented surface is DISMISSED and gets an ×; a screen one level
+   * inside is left UPWARDS and gets an arrow. Two screens get that right by
+   * hand and the third gets it wrong.
+   */
+  readonly leave?: "back" | "dismiss";
+  readonly backLabel?: string;
+
+  /* ----------------------------------------------------------- the middle --- */
+  /**
+   * WHERE YOU ARE. A name, optionally with a mark and a second line.
+   *
+   * ⚠️ A NAME OR A `find`, NEVER BOTH. They are the same slot — the widest one,
+   * the one somebody's eye lands in — and a header carrying a title AND a search
+   * field has neither of them wide enough to be either.
+   */
+  readonly name?: string;
+  /** ⚠️ One line, and only where it says something the name does not. */
+  readonly under?: string;
+  /** ⚠️ The product's own mark beside its name, at the row's own size. */
+  readonly mark?: FaceOf;
+  /**
+   * ⚠️ THE NAME ARRIVES ON SCROLL RATHER THAN BEING THERE. A page's name is both
+   * the biggest thing on it and something you still need four screens down, and
+   * one element cannot be both — so the display heading lives in the content and
+   * this is the compact copy that replaces it once it has gone. `false` on a
+   * destination, where the name is simply where you are.
+   */
+  readonly collapses?: boolean;
+  /**
+   * THE WIDE SLOT — what somebody is looking for on this destination.
+   *
+   * ⚠️ A DECLARATION, NOT A NODE, for the reason `who` is one. Handing the
+   * widest, most-seen element in the product arbitrary children is how it
+   * becomes whatever the third caller needed that afternoon.
+   */
+  readonly find?: { readonly label: string; readonly onOpen: () => void };
+
+  /* ------------------------------------------------------------ the trail --- */
+  /**
+   * ⚠️ QUIET, AND AT MOST TWO. A third fits on a wide phone and falls off a
+   * narrow one, which is a layout that is correct on the device it was built on.
+   * The ceiling is the TYPE rather than a slice, so a third is a compile error
+   * and the conversation about which two matter happens where it should.
+   */
+  readonly also?: readonly [] | readonly [Slot] | readonly [Slot, Slot];
+  /**
+   * ⚠️ THE ONE THING THIS SCREEN IS FOR, and the only filled control up here.
+   * Icon-only, because it sits in a row of icons; the label is its accessible
+   * name rather than text beside the glyph.
+   */
+  readonly does?: {
+    readonly label: string;
+    readonly icon?: React.ReactNode;
+    readonly onDo: () => void;
+    readonly tone?: "danger";
+    readonly disabled?: boolean;
+    /**
+     * ⚠️ WIDE SCREENS ONLY, FOR THE ACT THAT IS DOCKED BELOW `md`. A `Screen`
+     * hands the same act to this crown and to a bar above the thumb and shows
+     * exactly one of them; without this the phone gets both, six inches apart,
+     * saying the same thing. A destination's own act leaves it unset — there is
+     * no dock under it to defer to.
+     */
+    readonly wide?: boolean;
+  };
+
+  readonly bleed?: Bleed;
+  readonly width?: Width;
+  /** ⚠️ Gone, kept as a no-op so callers still compile — see the hem. */
+  readonly ruled?: boolean;
+}
+
+export interface Slot {
+  readonly id: string;
+  readonly label: string;
+  readonly icon: React.ReactNode;
+  readonly onDo: () => void;
+  /**
+   * ⚠️ A DOT, NEVER A COUNT, AND IT GOES ON THE CONTROL IT COUNTS. The inbox
+   * used to draw a numbered chip in the crown while the nav drew a dot — two
+   * answers to "something happened" in one product, and the numbered one was
+   * a differently-shaped control in a row of identical ones. What the chrome
+   * owes is that something is waiting, not how much; the number is on the
+   * screen the control opens.
+   */
+  readonly dot?: boolean;
+  /** ⚠️ Reserved for a primary that destroys. Rare, and never a default. */
+  readonly tone?: "danger";
+  readonly disabled?: boolean;
+}
+
+export function Crown({
+  who, back, leave = "back", backLabel,
+  name, under, mark, collapses = false, find,
+  also = [], does, bleed = "hold", width = "read",
+}: CrownProps) {
+  const past = useScrolledPast();
+  /* ⚠️ A collapsing name is HIDDEN until it is needed, and it is `aria-hidden`
+     because the display heading in the content is the page's real name. Two
+     elements carrying the same words is a duplicate to anybody navigating by
+     headings. */
+  const showName = !collapses || past;
+
+  if (who && back) {
+    throw new Error("A crown leads with a face or with a way out, never both.");
+  }
+  if (name && find) {
+    throw new Error("A crown's middle is a name or a search, never both.");
+  }
+
+  return (
+    <header data-hem="top" className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
+      <Band bleed={bleed} width={width}>
+        <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
+          {/* ------------------------------------------------------- lead --- */}
+          {who ? (
+            /* ⚠️ NO `data-chrome` — a face carries its own ground, so a chip
+               behind it is a plate behind a plate. */
+            <Button
+              isIconOnly
+              size={CROWN_SIZE}
+              variant="ghost"
+              aria-label={who.onOpen ? "Your account" : who.name}
+              isDisabled={!who.onOpen}
+              onPress={who.onOpen ?? (() => undefined)}
+            >
+              <span className="relative flex size-full items-center justify-center">
+                <Face of={who.face} name={who.name} size="chip" />
+                {who.unread
+                  ? <span aria-hidden="true" className="absolute -top-0.5 -right-0.5"><Dot /></span>
+                  : null}
+              </span>
+            </Button>
+          ) : null}
+          {back ? <LeaveChip leave={leave} label={backLabel} onDo={back} /> : null}
+
+          {/* ----------------------------------------------------- middle --- */}
+          {find ? (
+            /* ⚠️ THE ONE CHIP THAT KEEPS ITS SURFACE, and it is not an exception
+               to the hem — the rule is about the CAUSE. A field with no
+               affordance in it is a label; the fill and the lens together are
+               what make a row of words read as somewhere to type, and neither
+               is doing contrast work. */
+            <Button
+              size={CROWN_SIZE}
+              variant="tertiary"
+              data-chrome="true"
+              className={`grow justify-start ${SPACE.tight}`}
+              onPress={find.onOpen}
+            >
+              <Lens />
+              {/* ⚠️ `text-muted` at the CONTROL's size, not `TYPE.note` — a
+                  placeholder is secondary in colour, and the note role is 14px,
+                  so the words inside a 44px field came out a step smaller than
+                  the field. */}
+              <span className="text-muted">{find.label}</span>
+            </Button>
+          ) : null}
+
+          {name ? (
+            <div
+              {...(collapses ? { "aria-hidden": "true" as const } : {})}
+              className={`flex min-w-0 grow items-center ${SPACE.tight}`}
+              style={{
+                opacity: showName ? 1 : 0,
+                transform: showName ? "none" : "translateY(0.375rem)",
+                transition: showName ? MOTION.enter : MOTION.exit,
+              }}
+            >
+              {mark ? <Face of={mark} name={name} size="chip" /> : null}
+              <span className="flex min-w-0 flex-col">
+                <strong className={`truncate ${TYPE.label}`}>{name}</strong>
+                {under ? <span className={`truncate ${TYPE.note}`}>{under}</span> : null}
+              </span>
+            </div>
+          ) : null}
+
+          {/* ⚠️ Pushes the trail right on a crown whose middle is empty — a
+              collapsed page name leaves the row with nothing to stretch. */}
+          {!find && !name ? <Spacer /> : null}
+
+          {/* ------------------------------------------------------ trail --- */}
+          {also.map((a) => (
+            <Button
+              key={a.id}
+              isIconOnly
+              size={CROWN_SIZE}
+              variant="ghost"
+              aria-label={a.label}
+              onPress={a.onDo}
+            >
+              <span className="relative flex items-center">
+                {a.icon}
+                {a.dot
+                  ? <span aria-hidden="true" className="absolute -top-1 -right-1.5"><Dot /></span>
+                  : null}
+              </span>
+            </Button>
+          ))}
+          {does ? (
+            /* ⚠️ ICON-ONLY WHERE THERE IS A GLYPH, LABELLED WHERE THERE IS
+               NOT. An `isIconOnly` button handed no icon is a 44px empty
+               lozenge — which typechecks, renders, and is unpressable-looking.
+               The label is the accessible name either way. */
+            <Button
+              className={does.wide ? "hidden md:flex" : undefined}
+              isIconOnly={Boolean(does.icon)}
+              size={CROWN_SIZE}
+              variant={does.tone === "danger" ? "danger" : "primary"}
+              isDisabled={does.disabled}
+              /* ⚠️ ONLY WHERE THE GLYPH IS THE WHOLE CONTROL. A button whose
+                 visible text IS its name does not take an `aria-label` — that
+                 is the name said twice, once to a screen reader and once to
+                 anybody counting the words in the markup. */
+              aria-label={does.icon ? does.label : undefined}
+              onPress={does.onDo}
+            >
+              {does.icon ?? does.label}
+            </Button>
+          ) : null}
+        </div>
+      </Band>
+    </header>
+  );
+}
+
+/* -------------------------------------------------------------- page head --- */
+
+/**
+ * A PAGE'S CROWN AND ITS NAME — the row, plus the display heading under it.
+ *
+ * ⚠️ THIS IS `Crown` PLUS A BLOCK, NOT A SECOND CROWN. The row here is the same
+ * component every other surface uses; what this adds is the part that is not
+ * chrome at all — the big name, the subject's title card, and whatever scope row
+ * sits under them. Keeping those in the crown is what made a "crown" mean two
+ * different heights depending on which one you rendered.
+ *
+ * ⚠️ AND THE NAME IS IN TWO PLACES ON PURPOSE, SHOWN ONE AT A TIME. At rest it
+ * is a display heading in the content, where it is the first thing read; once it
+ * has scrolled away it comes back small in the crown, where it costs one line
+ * and answers "what am I in" without anybody scrolling up to ask. A header that
+ * pins the LARGE title spends a fifth of a phone on a word; one that pins
+ * nothing leaves somebody four cards deep with a back arrow to nowhere named.
+ *
+ * ⚠️ THE HANDOVER IS SEQUENCED, NOT A CROSS-FADE. `MOTION.exit` is shorter than
+ * `MOTION.enter`, so the large title is gone before the compact one arrives and
+ * the two are never both legible in one frame — which is what reading two sizes
+ * of the same word at once looks like, and it is the tell that separates this
+ * from a naive opacity swap.
+ */
+export function PageCrown({
+  title, face, back, backLabel, leave = "back", also = [], does, under,
+  bleed = "edge", width = "work",
+}: {
+  readonly title: string;
+  /**
+   * ⚠️ THE SUBJECT THIS PAGE IS ABOUT, AND `Layout` IS WHAT SUPPLIES IT. Not a
+   * decoration and not a thumbnail: the picture at the size of the screen with
+   * the name across it is a TITLE CARD, and it is the one composition that says
+   * "here" rather than "about here". The ground under it is the same subject's
+   * own world, from the same declaration — see `Layout`.
+   */
+  readonly face?: FaceOf;
+  /**
+   * ⚠️ A CROWN TAKES THE SHAPE OF WHAT IT CROWNS, AND THE DEFAULT IS ONLY A
+   * DEFAULT. Edge-bled, the heading sits against the page's own gutter, which is
+   * right over content that is also edge-bled. Over a HELD column it is wrong by
+   * however wide the screen is: the hub's crown put "Money" 240px to the left of
+   * the bill it names, which reads as two pages sharing one scroll.
+   */
+  readonly bleed?: Bleed;
+  readonly width?: Width;
+  readonly back?: () => void;
+  readonly backLabel?: string;
+  readonly leave?: "back" | "dismiss";
+  readonly also?: readonly [] | readonly [Slot] | readonly [Slot, Slot];
+  /**
+   * ⚠️ THE PRIMARY ACTION, ALREADY DECIDED. A `Screen` hands the SAME act to
+   * this and to its docked bar and shows exactly one of them by breakpoint
+   * (`screen.tsx`); declaring it twice is how the crown comes to say "Invite"
+   * while the bar says "Add somebody".
+   */
+  readonly does?: CrownProps["does"];
+  /**
+   * ⚠️ THE ROW THAT SCROLLS AWAY WITH THE TITLE — a scope picker, a date range.
+   * It belongs to the heading rather than to the content, and pinning it would
+   * put two rows of chrome over every page.
+   */
+  readonly under?: React.ReactNode;
+}) {
+  const past = useScrolledPast();
+
+  return (
+    <>
+      <Crown
+        bleed={bleed}
+        width={width}
+        back={back}
+        backLabel={backLabel}
+        leave={leave}
+        name={title}
+        collapses
+        also={also}
+        does={does}
+      />
+
+      {/* ⚠️ THE PADDING IS BELOW THE HEADING, NOT AROUND IT. The crown above
+          already sets the top; `BAND_PAD` here would double it and push the
+          title down the screen. What was missing is air UNDER the block. */}
+      <Band bleed={bleed} width={width}>
+        {face
+          ? (
+            /*
+              ⚠️ THE SUBJECT IS THE SCREEN, AND THE NAME SITS ON IT. A page about
+              one named thing that has a picture of itself does not need a
+              heading ABOVE a thumbnail — that is a caption over an icon. The
+              picture at the size of the screen with the name across it is a
+              title card, and it is the one composition that says "here".
+
+              ⚠️ THE NAME IS ON A GRID CELL, NOT ABSOLUTELY POSITIONED. Both
+              share one cell, so the block is as tall as the orb and the content
+              under it never has to know a hero happened.
+            */
+            <div
+              className={`grid ${TITLE_PAD}`}
+              style={{ opacity: past ? 0 : 1, transition: past ? MOTION.exit : MOTION.enter }}
+            >
+              <span
+                className="col-start-1 row-start-1 justify-self-center"
+                style={{ gridArea: "1 / 1" }}
+              >
+                <Face of={face} hero />
+              </span>
+              {/* ⚠️ NO SCRIM, AND THAT WAS TRIED FIRST. A wash under the name to
+                  hold its contrast over a lit sphere is the obvious move and it
+                  is visible: the plate is wider than the planet, so its edges sit
+                  on plain sky as two dark patches either side of the world. What
+                  holds the type is WEIGHT, the mask, and `ON_SCENE` — a halo in
+                  the ground's OWN colour, which has no shape and dims nothing. */}
+              <span
+                /* ⚠️ `relative` IS NOT COSMETIC HERE. The orb carries a
+                   `mask-image`, and a mask CREATES A STACKING CONTEXT — so the
+                   picture paints after in-flow content and the name vanished
+                   behind a planet with nothing in the DOM to show for it. */
+                className={`relative col-start-1 row-start-1 self-center justify-self-center w-full
+                  flex flex-col items-center text-center ${SPACE.tight} px-4 py-6`}
+                /* ⚠️ ON THE WRAPPER, BECAUSE `text-shadow` INHERITS. */
+                style={{ gridArea: "1 / 1", textShadow: ON_SCENE }}
+              >
+                <h1 className={TYPE.wordmark}>{title}</h1>
+                {under}
+              </span>
+            </div>
+          )
+          : (
+            <div className={`flex flex-col ${HEAD_GAP} ${TITLE_PAD}`}>
+              <h1
+                className={TYPE.display}
+                style={{ opacity: past ? 0 : 1, transition: past ? MOTION.exit : MOTION.enter }}
+              >
+                {title}
+              </h1>
+              {under}
+            </div>
+          )}
+      </Band>
+    </>
+  );
+}
 
 /* ------------------------------------------------------------------ heads --- */
 
@@ -1205,195 +1333,6 @@ function useScrollingDown(threshold = 6, top = 24): boolean {
 /** ⚠️ Its own element so the tone token colours it — see `Tone`. */
 const Dot = () => <span className="flex size-2" data-tone="danger" data-dot="true" />;
 
-/* ------------------------------------------------------------- app crown --- */
-
-/**
- * THE CROWN EVERY DESTINATION SHARES: WHO · WHAT YOU ARE LOOKING FOR · TWO ACTS.
- *
- *     ( face )( find                    )( also )( does )
- *
- * ⚠️ THE FRAME IS FIXED AND ONLY THE LAST TWO CHANGE. Somebody's face on the
- * left and the wide slot in the middle are in the same place on every screen, so
- * neither is ever re-learned; the two trailing slots carry what THIS destination
- * is for. A crown that changed wholesale per screen would make the top of the
- * app a thing you read rather than a thing you use — and one that was identical
- * everywhere would put the same two actions in front of somebody four times,
- * three of them wrong.
- *
- * ⚠️ THE TWO ARE NOT PEERS, AND THEY USED TO BE DRAWN AS IF THEY WERE. Both were
- * `tertiary` icon chips, so a destination's main act — *New job*, *Admit*,
- * *Export*; every caller's second slot, without exception — sat beside a date
- * picker at identical weight, and the crown had four controls and no answer to
- * "what is this screen for". They are named now: `also` is quiet and `does` is
- * the one filled thing at the top of the app.
- *
- * ⚠️ TWO IS THE CEILING AND THE TYPE SAYS SO. A third fits on a wide phone and
- * falls off a narrow one, which is a layout that is correct on the device it was
- * built on. A destination with three candidates has to choose, which is the
- * useful conversation.
- */
-export interface AppCrownProps {
-  /**
-   * ⚠️ A PERSON, NOT A NODE. This took `React.ReactNode` and every caller in the
-   * tree passed a LINE GLYPH — so the account slot, the one place a product puts
-   * somebody's face, rendered an outline of a generic head. An arbitrary node is
-   * more generality than the slot has any use for, and it is exactly the freedom
-   * that let a placeholder become the design.
-   */
-  readonly who: { readonly name: string; readonly face?: FaceOf };
-  readonly onOpenAccount: () => void;
-  /**
-   * THE WIDE SLOT — what somebody is looking for on this destination.
-   *
-   * ⚠️ IT IS A DECLARATION, NOT A NODE, FOR THE REASON `who` IS. Handing this
-   * slot arbitrary children is how the widest, most-seen element in the product
-   * becomes whatever the third caller needed that afternoon. `find` is the one
-   * shape there is a consumer for; the day a destination genuinely needs another
-   * this becomes a union with a second member, in review, on purpose.
-   */
-  readonly find: { readonly label: string; readonly onOpen: () => void };
-  /**
-   * ⚠️ QUIET, AND OPTIONAL. Something somebody might reach for while doing the
-   * primary one — a date range, a filter, a calendar.
-   */
-  readonly also?: Slot;
-  /**
-   * ⚠️ THE ONE THING THIS DESTINATION IS FOR, and the only filled control in the
-   * crown. Icon-only because it sits in a row of icons; the label is its
-   * accessible name and its tooltip, never text beside the glyph.
-   */
-  readonly does?: Slot;
-  readonly unread?: boolean;
-}
-
-export interface Slot {
-  readonly id: string;
-  readonly label: string;
-  readonly icon: React.ReactNode;
-  readonly onDo: () => void;
-}
-
-export function AppCrown(
-  { who, onOpenAccount, find, also, does, unread }: AppCrownProps,
-) {
-  return (
-    /*
-      ⚠️ PINNED, AND THE BAR ITSELF IS NOT A SURFACE. A crown that scrolls away
-      takes the account, the search and the screen's two actions with it, and
-      every one of them is something somebody reaches for in the middle of
-      reading — so it stays. What it must not do is become a PLATE.
-
-      ⚠️ AND THE HEM IS HOW IT STAYS LEGIBLE — the same fade the nav wears, the
-      other way up. This carried glass on the CHIPS for the same reason the nav
-      carried a fill: each control had to survive whatever scrolled behind it.
-      That was the right answer while the page under it was untreated, and it
-      left the crown as four opaque lozenges in a row with live content passing
-      between them. The hem treats the CAUSE — content dissolves into the
-      ground before it reaches the controls — so the chips can stop being
-      surfaces, and the one that stays a surface stays one because it is the
-      primary act rather than because it needed rescuing.
-    */
-    <header data-hem="top" className={`sticky top-0 z-10 w-full ${SAFE_TOP}`}>
-      <Band bleed="edge" width="work">
-        <div className={`flex items-center ${SPACE.snug} ${CROWN}`}>
-          {/* ⚠️ `isIconOnly`, AND IT IS THE WHOLE REASON THIS ROW READS AS A ROW.
-              Without it every control here is `w-fit px-4` — a 20px glyph in a
-              52×44 lozenge — so a crown built from an avatar, a field and two
-              actions came out as four different shapes at three different
-              widths. The library ships the modifier; we were not asking for it,
-              and the result was the single clearest tell that this was a copy of
-              a design rather than one. */}
-          {/* ⚠️ NO `data-chrome` ON THE FACE — a face already carries its own
-              ground (`Face`), so a chip behind it was a plate behind a plate. */}
-          <Button
-            isIconOnly
-            size={CROWN_SIZE}
-            variant="ghost"
-            aria-label="Your account"
-            onPress={onOpenAccount}
-          >
-            <span className="relative flex size-full items-center justify-center">
-              {/* ⚠️ ONE RESOLVER DRAWS EVERY FACE (`face.tsx`), AND IT IS STILL
-                  AT THIS SIZE. A crown avatar is 32px, where a breathing one is
-                  a twitch in the corner of the eye rather than a sign of life —
-                  the size decides that, not this caller. */}
-              <Face of={who.face} name={who.name} size="chip" />
-              {unread
-                ? <span aria-hidden="true" className="absolute -top-0.5 -right-0.5"><Dot /></span>
-                : null}
-            </span>
-          </Button>
-
-          {/* ⚠️ THE WIDE SLOT IS A BUTTON, NOT A FIELD. A live input in the crown
-              is a keyboard on every screen the moment a thumb brushes it; the
-              real search is a surface of its own.
-
-              ⚠️ AND IT IS THE ONE CHIP THAT KEEPS ITS SURFACE, which is not an
-              exception to the hem — it is the reason the rule is about the
-              CAUSE. A field with no affordance in it is a label: the fill and
-              the lens together are what make a row of words read as somewhere
-              to type, and neither is doing contrast work. Ours said "Search
-              jobs" with no ground and looked like a heading. */}
-          <Button
-            size={CROWN_SIZE}
-            variant="tertiary"
-            data-chrome="true"
-            className={`grow justify-start ${SPACE.tight}`}
-            onPress={find.onOpen}
-          >
-            <Lens />
-            {/* ⚠️ `text-muted` AND NOT `TYPE.note`, WHICH IS THE SIZE TOO. A
-                placeholder is secondary in COLOUR at the control's own size; the
-                note role is 14px, so the words inside a 44px field came out a
-                step smaller than the field, which is the compressed look this
-                whole pass is about. Muted is a token; the size stays the
-                button's. */}
-            <span className="text-muted">{find.label}</span>
-          </Button>
-
-          {/* ⚠️ QUIET: no surface, so it reads as available rather than as
-              offered. The same treatment the nav's closed destinations get, and
-              for the same reason — the hem is behind it. */}
-          {also ? (
-            <Button
-              isIconOnly
-              size={CROWN_SIZE}
-              variant="ghost"
-              aria-label={also.label}
-              onPress={also.onDo}
-            >
-              {also.icon}
-            </Button>
-          ) : null}
-
-          {/* ⚠️ AND THE ONE FILLED THING AT THE TOP OF THE APP. `primary` is a
-              real tier rather than a heavier chip, so it survives every
-              workspace's branding and it is the same control the docked action
-              on a phone is — one product, one way of saying "this is the act". */}
-          {does ? (
-            <Button
-              isIconOnly
-              size={CROWN_SIZE}
-              variant="primary"
-              aria-label={does.label}
-              onPress={does.onDo}
-            >
-              {does.icon}
-            </Button>
-          ) : null}
-        </div>
-      </Band>
-    </header>
-  );
-}
-
-/**
- * ⚠️ THE ONE GLYPH THE SHARED LAYER DRAWS ITSELF, and it is drawn rather than
- * imported for a reason that is not taste: `@quad/web` takes no icon library as
- * a dependency, because the app choosing one is the app\'s decision and a shared
- * package that picks for it is a shared package every app has to fight. A lens
- * is eleven characters of path data and it is the only mark this layer needs.
- */
 const Lens = () => (
   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="11" cy="11" r="7" />

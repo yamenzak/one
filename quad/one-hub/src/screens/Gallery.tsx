@@ -14,7 +14,7 @@
  */
 
 import { useState } from "react";
-import { AppCrown, Balance, Band, CopyRow, Figure, Group, Grid, Island, Money, NavRow, ActionRow,
+import { Balance, Band, Crown, CopyRow, Figure, Group, Grid, Island, Money, NavRow, ActionRow,
   ToggleRow, FieldRow, NoteRow, OfferRow, PersonRow, AmountRow, QuickActions, SeeAll,
   StepRow, TileGrid, Nothing, Row, Section, Stack, StickyAction, Title, Cluster, SPACE,
   TYPE, type Sky } from "@quad/web";
@@ -480,14 +480,12 @@ export function Gallery() {
           ["Payments", "▤", "+"],
           ["Points", "✦", "▭"],
         ] as const).map(([where, one, two]) => (
-          <AppCrown
+          <Crown
             key={where}
-            who={{ name: "Amara Osei" }}
-            unread={where === "Home"}
-            onOpenAccount={nothing}
+            who={{ name: "Amara Osei", onOpen: nothing, unread: where === "Home" }}
             find={{ label: `Search ${where.toLowerCase()}`, onOpen: nothing }}
-            also={{ id: "a", label: "First", icon: glyph(one), onDo: nothing }}
-            does={{ id: "b", label: "Second", icon: glyph(two), onDo: nothing }}
+            also={[{ id: "a", label: "First", icon: glyph(one), onDo: nothing }]}
+            does={{ label: "Second", icon: glyph(two), onDo: nothing }}
           />
         ))}
       </section>

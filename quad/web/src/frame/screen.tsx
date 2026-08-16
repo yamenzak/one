@@ -362,10 +362,14 @@ export function Screen<T = unknown>({
         under={sub}
         back={out}
         leave={how}
-        actions={also.slice(0, 2)}
+        /* ⚠️ THE CEILING IS THE CROWN'S TYPE AND THIS IS WHERE IT IS MET. A
+           screen may declare any number of `also`; two is what the row can
+           hold, so the slice happens once, here, rather than the crown
+           silently dropping the third. */
+        also={[also[0], also[1]].filter(Boolean) as unknown as readonly [Slot, Slot]}
         /* ⚠️ THE SAME ACT, DRAWN TWICE AND SHOWN ONCE — see `PageCrown`. Two
            declarations would drift the day one of them gets new copy. */
-        does={where === "act" ? does : undefined}
+        does={where === "act" && does ? { ...does, wide: true } : undefined}
       />
 
       <Band bleed="hold" width={preset.width}>

@@ -304,22 +304,34 @@ describe("the shell", () => {
     expect(out).not.toContain("Dest5");
   });
 
-  /* ⚠️ A count of nothing is not a zero badge. Zero is texture. */
-  it("shows no badge when there is nothing waiting", () => {
-    const out = html(
+  /*
+    ⚠️ A COUNT OF NOTHING IS NOT A ZERO BADGE. Zero is texture.
+
+    ⚠️ AND IT IS A DOT RATHER THAN A NUMBER NOW, WHICH IS A DECISION RATHER THAN
+    A DRIFT. This asserted `>3<` — a numbered chip — while the nav next to it
+    drew a dot for the same fact, so one product had two answers to "something
+    happened here" and the numbered one was a differently-shaped control in a
+    row of identical ones. What chrome owes is that something is waiting; the
+    number is on the screen the control opens. `Slot.dot` is the same mark the
+    island uses.
+  */
+  it("marks the inbox when something is waiting, and not before", () => {
+    const quiet = html(
       <Shell
         screens={SCREENS} here="/" held={new Set(["note:read"])} onGo={() => {}}
         crown={{ ...crown, unread: 0 }} onOpenInbox={() => {}}
       />,
     );
-    expect(out).toContain("Inbox");
-    const withSome = html(
+    expect(quiet).toContain("Notifications");
+    expect(quiet).not.toContain('data-dot="true"');
+
+    const waiting = html(
       <Shell
         screens={SCREENS} here="/" held={new Set(["note:read"])} onGo={() => {}}
         crown={{ ...crown, unread: 3 }} onOpenInbox={() => {}}
       />,
     );
-    expect(withSome).toContain(">3<");
+    expect(waiting).toContain('data-dot="true"');
   });
 });
 

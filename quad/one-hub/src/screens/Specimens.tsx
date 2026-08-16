@@ -16,7 +16,7 @@
 
 import { useState } from "react";
 import {
-  ActionRow, AmountRow, AppCrown, Balance, Band, CopyRow, Crown, Figure, Grid, Group,
+  ActionRow, AmountRow,  Balance, Band, CopyRow, Crown, Figure, Grid, Group,
   Island, Money, NavRow, Nothing, NoteRow, OfferRow, Page, PersonRow, Prose,
   QuickActions, Row, SeeAll, Section, Spacer, Stack, StepRow, StickyAction, Cluster, Rail,
   Await, Trouble, Working, RowsWaiting, ChartWaiting, FigureWaiting, TilesWaiting, TextWaiting,
@@ -54,13 +54,12 @@ function Workshop() {
           { id: "people", label: "People", icon: glyph(<CircleUser />), route: "/people" },
         ]} />}
     >
-      <AppCrown
-        who={{ name: "Amara Osei" }}
-        unread
-        onOpenAccount={nothing}
+      <Crown
+        who={{ name: "Amara Osei", onOpen: nothing }}
+        
         find={{ label: "Search jobs", onOpen: nothing }}
-        also={{ id: "cal", label: "Calendar", icon: glyph(<FileText />), onDo: nothing }}
-        does={{ id: "new", label: "New job", icon: glyph(<Plus />), onDo: nothing }}
+        also={[{ id: "a", label: "Calendar", icon: glyph(<FileText />), onDo: nothing }]}
+        does={{ label: "New job", icon: glyph(<Plus />), onDo: nothing }}
       />
       <Band width="work">
         <Stack space="roomy">
@@ -280,7 +279,7 @@ function Inner() {
       <PageCrown
         title="Analytics"
         back={nothing}
-        actions={[{ id: "range", label: "Date range", icon: glyph(<Clock />), onDo: nothing }]}
+        also={[{ id: "range", label: "Date range", icon: glyph(<Clock />), onDo: nothing }]}
         under={
           <Row>
             <Button size="sm" variant="ghost" data-chrome="true" onPress={nothing}>Personal</Button>
@@ -418,12 +417,11 @@ function Start() {
           { id: "team", label: "Team", icon: glyph(<CircleUser />), route: "/team" },
         ]} />}
     >
-      <AppCrown
-        who={{ name: "Amara Osei" }}
-        onOpenAccount={nothing}
+      <Crown
+        who={{ name: "Amara Osei", onOpen: nothing }}
         find={{ label: "Search the ward", onOpen: nothing }}
-        also={{ id: "chart", label: "Charts", icon: glyph(<ChartColumn />), onDo: nothing }}
-        does={{ id: "add", label: "Admit", icon: glyph(<Plus />), onDo: nothing }}
+        also={[{ id: "a", label: "Charts", icon: glyph(<ChartColumn />), onDo: nothing }]}
+        does={{ label: "Admit", icon: glyph(<Plus />), onDo: nothing }}
       />
       <Band width="work">
         <Stack space="roomy">
@@ -484,12 +482,11 @@ function Report() {
 
   return (
     <Page sky="glow">
-      <AppCrown
-        who={{ name: "Amara Osei" }}
-        onOpenAccount={nothing}
+      <Crown
+        who={{ name: "Amara Osei", onOpen: nothing }}
         find={{ label: "Search reports", onOpen: nothing }}
-        also={{ id: "range", label: "Date range", icon: glyph(<Clock />), onDo: nothing }}
-        does={{ id: "export", label: "Export", icon: glyph(<FileText />), onDo: nothing }}
+        also={[{ id: "a", label: "Date range", icon: glyph(<Clock />), onDo: nothing }]}
+        does={{ label: "Export", icon: glyph(<FileText />), onDo: nothing }}
       />
       <Band width="work">
         <Stack space="roomy">
@@ -675,7 +672,7 @@ function Backoffice() {
       <PageCrown
         title="Billing"
         back={nothing}
-        actions={[{
+        also={[{
           id: "new", label: "New invoice", icon: glyph(<Plus />), onDo: nothing,
         }]}
       />

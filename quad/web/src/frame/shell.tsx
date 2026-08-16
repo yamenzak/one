@@ -22,15 +22,15 @@
 
 import type { ScreenSpec } from "@quad/kernel";
 import { PRIMARY_MAX, primaryOf } from "@quad/kernel";
-import { Button, Chip, Separator, Tooltip } from "@heroui/react";
+import { Button, Separator } from "@heroui/react";
 import {
   Banknote, Bell, Building2, Calendar, Circle, ClipboardList, Clock, Cog, Coins, Database,
-  FileText, House, Inbox as InboxGlyph, NotebookPen, Package, Plus, Shield, Sparkles, Sun,
+  Boxes, FileText, House, Inbox as InboxGlyph, NotebookPen, Package, Plus, Shield, Sparkles, Sun,
   UserRound, Users,
 } from "lucide-react";
-import { Island, Page } from "./layout.js";
+import { Crown, Island, Page, type Slot } from "./layout.js";
 import { type Sky } from "../tokens/ambience.js";
-import { GUTTER, PAD, ROW, SPACE } from "../tokens/metrics.js";
+import { PAD, SPACE } from "../tokens/metrics.js";
 import { Face, appFace, worldFor, type FaceOf } from "../parts/face.js";
 
 /**
@@ -182,61 +182,44 @@ export function Shell(props: ShellProps) {
       {/*
         ------------------------------------------------------------ crown ---
 
-        ⚠️ PINNED, LIKE EVERY OTHER CROWN IN THE SYSTEM — and this one was not.
-        `Crown`, `PageCrown` and `AppCrown` are all `sticky top-0`, and the
-        argument is written out in `AppCrown`: a crown that scrolls away takes
-        the account, the switcher and the inbox with it, and every one of those
-        is something somebody reaches for in the middle of reading. The shell's
-        was the only one that left, which made it the only place in the product
-        where "where am I" was a thing you had to scroll back for.
+        ⚠️ IT IS `Crown` NOW, AND IT WAS THE ONLY ONE THAT WAS NOT. This was a
+        hand-rolled `<header>`: a face, two stacked names and a right-hand strip
+        of buttons, assembled here because it needed a shape the old `Crown`
+        did not have. Being the copy nobody could find is exactly why it was the
+        one that scrolled away, the one with a `Separator` under it, and the one
+        whose controls were three different heights.
 
-        ⚠️ AND THE `Separator` UNDER IT IS GONE WITH THE HEM. A hairline is how
-        chrome says "the page starts here" when it has no ground of its own to
-        say it with. It was the last horizontal rule in the product.
+        ⚠️ AND ITS SLOTS MAP WITHOUT INVENTING ANYTHING. The account leads (it
+        opens the hub), the product's mark and the two names are the middle, and
+        the trail is the switcher and the inbox.
+
+        ⚠️ THE PER-APP SWITCHER BUTTONS ARE GONE AND THAT IS A FIX. There was one
+        button per other product, gated on `apps.length > 1` — but `apps` is
+        already the OTHERS, so with exactly two products the list had one entry,
+        `1 > 1` was false, and the switcher never appeared at all. It is one
+        control to the hub now, which is the surface that lists them.
       */}
-      <header
-        data-hem="top"
-        className={`sticky top-0 z-10 flex items-center ${SPACE.snug} ${GUTTER} ${ROW.pad}`}
-      >
-        {/* ⚠️ THE SAME PLATE EVERY OTHER FACE WEARS. A lone glyph beside a
-            person and a workspace read as a typo in a row of pictures — and it
-            was the one mark in the crown with no ground under it. */}
-        <Face of={appFace(crown.appId, crown.appMark)} name={crown.appName} size="chip" />
-        <div className="flex flex-col">
-          <strong>{crown.tenantName}</strong>
-          <small>{crown.appName}</small>
-        </div>
-
-        <div className={`ml-auto flex items-center ${SPACE.tight}`}>
-          {(crown.apps ?? []).length > 1 && onSwitchApp
-            ? (crown.apps ?? []).map((other) => (
-              <Tooltip key={other.id}>
-                <Button isIconOnly variant="ghost" aria-label={other.name} onPress={() => onSwitchApp(other.id)}>
-                  <Face of={appFace(other.id, other.mark)} name={other.name} size="chip" />
-                </Button>
-                <Tooltip.Content>{other.name}</Tooltip.Content>
-              </Tooltip>
-            ))
-            : null}
-
-          {onOpenInbox ? (
-            <Button variant="ghost" aria-label="Notifications" onPress={onOpenInbox}>
-              {/* ⚠️ A count of nothing is not a zero badge. Zero is texture. */}
-              {crown.unread
-                ? <Chip color="danger" variant="primary"><Chip.Label>{crown.unread}</Chip.Label></Chip>
-                : "Inbox"}
-            </Button>
-          ) : null}
-
-          {onOpenHub
-            ? (
-              <Button isIconOnly variant="ghost" aria-label="Account and workspaces" onPress={onOpenHub}>
-                <Face of={crown.personFace} name={crown.personEmail} size="chip" />
-              </Button>
-            )
-            : <Face of={crown.personFace} name={crown.personEmail} />}
-        </div>
-      </header>
+      <Crown
+        bleed="edge"
+        width="work"
+        who={{
+          name: crown.personEmail ?? "You",
+          face: crown.personFace,
+          onOpen: onOpenHub,
+        }}
+        mark={appFace(crown.appId, crown.appMark)}
+        name={crown.tenantName}
+        under={crown.appName}
+        also={[
+          ...((crown.apps ?? []).length && onSwitchApp && onOpenHub
+            ? [{ id: "apps", label: "Your products", icon: <Boxes />, onDo: onOpenHub }]
+            : []),
+          ...(onOpenInbox
+            ? [{ id: "inbox", label: "Notifications", icon: <InboxGlyph />, onDo: onOpenInbox,
+                dot: Boolean(crown.unread) }]
+            : []),
+        ].slice(0, 2) as unknown as readonly [Slot, Slot]}
+      />
 
       {/* ------------------------------------------------------- the middle --- */}
       <div className="flex flex-1 min-h-0">

@@ -133,26 +133,45 @@ Chrome pins to an edge, and there are three pieces of it: a **crown** at the top
 a **nav** at the bottom, and a **docked action** where a screen has one. All wear
 the hem (see [AMBIENCE.md](AMBIENCE.md)), so none of them needs a plate.
 
-Which crown an address gets follows from whether it is a *destination* or a
-*page*:
+**There is one `Crown`, and its shape is its slots.** Three slots, one height:
 
-| | for | shape |
-|---|---|---|
-| `AppCrown` | a product's destinations — the Shell's addresses | `( face )( find )( also )( does )` |
-| `PageCrown` | a page, a sub-page, a full-screen surface | back · a title that collapses in on scroll · `also`s · `does` |
+```
+( lead )( middle                        )( also )( does )
+```
 
-Both put the secondary in bare ink and the primary in a fill, so "what is this
-screen for" is answered the same way wherever somebody is. **`find` is the wide
-slot** — search on every screen that has one — and it is a typed declaration
-rather than arbitrary children, for the reason the avatar is: the widest,
-most-seen element in the product is exactly the one that otherwise becomes
-whatever the third caller needed that afternoon.
+| slot | what goes in it |
+|---|---|
+| **lead** | `who` — the account, which opens the hub · **or** `back` / `dismiss`. Never both. |
+| **middle** | `name` (+ `under`, + `mark`, optionally `collapses`) · **or** `find`, the wide search slot. Never both. |
+| **trail** | up to two `also` (bare ink, optionally carrying a `dot`) and one `does` (the only fill up there) |
 
-⚠️ **`PageCrown`'s title collapses; `AppCrown`'s has none.** A page's name is
+Every real crown in the product falls out of which slots are filled:
+
+| surface | lead | middle | trail |
+|---|---|---|---|
+| a product's destination | account | `find` | `also`, `does` |
+| a product's shell | account | app mark + workspace / product | products, inbox |
+| a page or sub-page | back | name, **collapsing** | `also`, `does` |
+| a presented surface | dismiss | name, collapsing | `also`, `does` |
+| the hub's own root | account (no press) | "One" + the address | — |
+
+⚠️ **There is no `kind` prop, and that is the point.** What a crown *is* falls
+out of what it was handed. A variant enum would be a fifth way of saying the
+same thing and the first place the four would start drifting apart again — which
+is what they did: `Crown`, `AppCrown`, `PageCrown`'s row and a hand-rolled
+`<header>` inside the Shell were one shape written four times, at four heights,
+with four answers to what a secondary action looks like.
+
+⚠️ **`PageCrown` is `Crown` plus a block, not a second crown.** The row is the
+same component; what it adds is the part that is not chrome — the display
+heading, the subject's title card, and any scope row under them. A page's name is
 both the biggest thing on it and something you still need four screens down, and
-one element cannot be both — so it is a display heading at rest and a compact
-line beside the back control once it has scrolled away. A destination does not
-have that problem: the nav already says where you are.
+one element cannot be both, so the big one lives in the content and the crown
+carries the compact copy that replaces it once it has scrolled away.
+
+⚠️ **`find` is a typed declaration, not children**, for the reason `who` is: the
+widest, most-seen element in the product is exactly the one that otherwise
+becomes whatever the third caller needed that afternoon.
 
 ### Shell and Layout are siblings, not levels
 
