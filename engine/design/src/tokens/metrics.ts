@@ -323,8 +323,22 @@ export const NUDGE = {
  * nav — on both specimens, in the first render anybody looked at. The island
  * cannot fix this itself: by the time it is laid out, the content above it has
  * already been sized.
+ *
+ * ⚠️ AND IT IS ROOM FOR THE WHOLE STACK, NOT JUST THE NAV. The docked action
+ * stands ON the nav (`DOCK_FLOOR`), so on a phone the two of them are 180px of
+ * an 844px screen — and this reserved 112. The last row of the last card sat
+ * under the dock's hem permanently: half dissolved at the top of the scroll and
+ * still half dissolved at the bottom of it, because there was nothing left to
+ * scroll. The fix that made the dock legible is what made this wrong, and the
+ * two numbers have to move together.
+ *
+ * ⚠️ RESERVED WHETHER OR NOT A DOCK ARRIVES, because the page cannot know: a
+ * screen decides its primary action several levels inside the content, and the
+ * outcome it depends on has not resolved when this is laid out. Over-reserving
+ * costs blank space at the end of a scroll; under-reserving crops the thing
+ * somebody came to read.
  */
-export const NAV_SPACE = "pb-28" as const;
+export const NAV_SPACE = "pb-48" as const;
 
 /**
  * ⚠️ AND THE DOCK SITS ON TOP OF THE NAV RATHER THAN UNDER IT — the same
