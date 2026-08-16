@@ -214,24 +214,33 @@ const hemStop = (pct: number): string =>
  * TWO. Written out twice, the top and the bottom are five numbers each that have
  * to stay equal, and the first thing anybody tunes is one of them.
  *
- * ⚠️ `hold` HAS TO CLEAR THE PINNED ELEMENT'S OWN HEIGHT, or the fade begins
- * inside it. Measured at the top, where an early version scaled the whole
- * gradient down and put the falloff at 4.5rem against a crown nearly 6rem tall:
- * a card's last line came through directly under the workspace's name. A crown
- * and a nav are about the same height, so both hold for the same distance.
+ * ⚠️ `hold` IS WHERE THE CONTROLS END, NOT WHERE THE BOX DOES, AND THE
+ * DIFFERENCE BETWEEN THOSE IS WHAT MADE IT BITE. A crown is `min-h-16` and its
+ * controls are `h-11` centred in it, so the last pixel of a button is at 54px
+ * while the header's own box runs to 64 and the hold was set to 96 — forty-two
+ * pixels of FULL opacity below anything anybody can see, and then the falloff on
+ * top of that. The chrome stopped blending with the screen and started sitting
+ * on a panel with a soft edge, which is the plate this whole idea replaces.
  *
- * ⚠️ AND THE TWO EDGES ARE THE SAME NUMBERS, WHICH IS NOT WHERE THIS STARTED.
- * The top ran shorter on the theory that a page is read downwards — that at the
- * bottom a fade is what content disappears INTO and reads as depth, while at the
- * top the same length eats the first screenful. Shot both ways and the
- * difference was not visible; what IS visible is the hold, which is why that is
- * the number with an argument attached and this one is just symmetry.
+ * ⚠️ SO IT IS MEASURED, PER EDGE, AND THE TWO ARE NOT THE SAME. The crown's
+ * controls end 3.375rem from the top; the nav's bar begins 4.5rem from the
+ * bottom. Rounded up a notch each so the opaque part reaches the control's edge
+ * and stops — "barely reaching it" is the whole brief, because a hem that
+ * clears the control by a margin is a bar again.
+ *
+ * ⚠️ THE FALLOFF IS SHARED AND IT IS THE NUMBER WITH THE TENSION IN IT. Too
+ * short and the fade's own top edge becomes a visible line, which is the border
+ * being removed; too long and content dies halfway up a screen nobody has
+ * scrolled. An earlier version ran 12rem at both ends on the theory that a page
+ * is read downwards — shot both ways, no visible difference, and both were too
+ * much.
  */
 const hem = (edge: "top" | "bottom") => {
   const far = edge === "top" ? "bottom" : "top";
-  /* hold: clears the crown or the bar. run: where the fade is finally gone. */
-  const [hold, run] = [6, 12];
-  const mid = (at: number) => +(hold + (run - hold) * at).toFixed(2);
+  /* ⚠️ hold: measured to the control's own edge — see above. fade: shared. */
+  const [hold, fade] = edge === "top" ? [3.5, 3.5] : [4.75, 3.5];
+  const run = hold + fade;
+  const mid = (at: number) => +(hold + fade * at).toFixed(2);
   return [
     `[data-hem="${edge}"]::before {`,
     `  content: ""; position: absolute; left: 0; right: 0;`,

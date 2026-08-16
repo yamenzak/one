@@ -218,8 +218,8 @@ beat, and it *smears* as the marks move under it.
 chrome's edge.** That is a different fault and no fill on the control can reach
 it, because it happens *outside* the control: a face halved down the gutter, a
 heading reappearing in the gaps either side of a capsule, a card running clean
-through the workspace's name in the crown. The hem is a fade built from
-`--scene-veil`, opaque at the screen's own edge and gone about 12rem in, so
+through the workspace's name in the crown. The hem is a short fade built from
+`--scene-veil`, opaque at the screen's own edge and gone about 7rem in, so
 content dissolves into the ground on its way past.
 
 ⚠️ **It names its edge — `data-hem="top"` or `"bottom"` — and there are seven of
@@ -228,12 +228,21 @@ so which of the seven they landed on decides whether their page is cut. That is
 what the `hem:` check in `scripts/scene.test.mjs` is for, and it is the state the
 check was written in: three docks wore it and four crowns did not.
 
-⚠️ **`hold` is the number with an argument attached**: it must clear the pinned
-element's own height or the fade begins *inside* it. Measured at the top, where
-scaling the gradient down put the falloff at 4.5rem against a crown nearly 6rem
-tall and a card's last line came through directly under the workspace's name. The
-falloff length is the same at both ends — it was shorter at the top on a theory
-about reading downwards, shot both ways, and the difference was not visible.
+⚠️ **`hold` is where the CONTROLS end, not where the box does**, and the
+difference between those is what made the first version bite. A crown is
+`min-h-16` with `h-11` controls centred in it, so the last pixel of a button is
+at 54px — while the header's own box runs to 64 and the hold was set to 96.
+Forty-two pixels of full opacity below anything anybody can see, with the falloff
+*on top of that*: the chrome stopped blending with the screen and started sitting
+on a panel with a soft edge, which is the plate the hem exists to replace. It is
+measured per edge now (3.5rem at the top, 4.75rem at the bottom) and it barely
+reaches the control — a hem that clears the control by a margin is a bar again.
+
+⚠️ **The falloff is the number with the tension in it.** Too short and the fade's
+own top edge becomes a visible line, which is the border being removed; too long
+and content dies halfway up a screen nobody has scrolled. 3.5rem, shared. An
+earlier version ran to 12rem at both ends on a theory about pages being read
+downwards — shot both ways, no visible difference, and both were too much.
 
 ⚠️ **A fade is not the plate the no-glass pass removed, and the difference is
 the edge.** Every treatment that pass deleted was a band with a *boundary* — a
