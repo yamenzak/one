@@ -20,6 +20,7 @@ import { Balance, Band, Crown, CopyRow, Figure, Group, Grid, Island, Money, NavR
   TYPE, type Sky } from "@engine/design";
 import {
   Agree, Choice, CodeEntry, Confirm, Crumbs, DateInput, Dialog, Faq, FormWaiting, Gauge, Hotkey, Listing,
+  PeriodInput, type PeriodId,
   LongText, Lookup, Menu, MoneyInput, NumberInput, OneOf, PageTabs, Peek, Picks, Reveal,
   SearchInput, SecretInput, Segmented, Dial, Steps, Tags, TextInput, Timeline, TimeInput,
   Tray, notice, ready, trouble, waiting, type Col, type Loaded,
@@ -57,7 +58,7 @@ function FormsDemo() {
   const [days, setDays] = useState<readonly string[]>(["tue", "thu"]);
   const [level, setLevel] = useState<string | null>("keen");
   const [effort, setEffort] = useState<number | undefined>(7);
-  const [view, setView] = useState("month");
+  const [view, setView] = useState<PeriodId>("month");
   const [tags, setTags] = useState<readonly { id: string; label: string }[]>([
     { id: "a", label: "strength" }, { id: "b", label: "morning" }, { id: "c", label: "online" },
   ]);
@@ -110,9 +111,10 @@ function FormsDemo() {
         ]} />
         <Stack space="roomy">
           <Dial label="Effort ceiling" value={effort} onChange={setEffort} min={1} max={10} />
-          <Segmented label="Period" value={view} onChange={setView} options={[
-            { id: "week", label: "Week" }, { id: "month", label: "Month" }, { id: "year", label: "Year" },
-          ]} />
+          {/* ⚠️ A PERIOD IS ITS OWN CONTROL NOW. This was a `Segmented` of
+              Week/Month/Year that reported a word and no dates, so every caller
+              had to work out what "week" meant — differently. */}
+          <PeriodInput value={view} today="2026-08-16" onChange={(id) => setView(id)} />
           <Tags label="Labels" items={tags} onRemove={(id) => setTags(tags.filter((t) => t.id !== id))} />
           <SearchInput label="Search exercises" value={q} onChange={setQ} />
           {/* ⚠️ SIX HERE BECAUSE THE SERVER SAYS SIX. The boxes are counted from

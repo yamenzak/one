@@ -217,12 +217,17 @@ export function ChartPanel({ label, under, aside, at, children }: {
        be a jungle in miniature; they are sequenced instead — the panel eases in
        on the library's `enter`, and `data-draw` reveals the marks inside it. */
     <section {...ARRIVE} style={at === undefined ? undefined : arriveAt(at)} className={`flex flex-col ${SPACE.snug} ${PAD}`}>
-      <div className={`flex items-start justify-between ${SPACE.snug}`}>
+      {/* ⚠️ THE ASIDE TAKES ITS OWN ROW ON A PHONE, AND THAT IS NOT A REFINEMENT.
+          Beside the heading it is `shrink-0`, so the first real filter put in
+          this slot — a five-segment period — held its full width at 390 and ran
+          past the screen edge, over the panel's own title, with the last segment
+          cut off. A slot that only works while it is empty is not a slot. */}
+      <div className={`flex flex-col sm:flex-row sm:items-start sm:justify-between ${SPACE.snug}`}>
         <div className={`flex min-w-0 flex-col ${SPACE.hair}`}>
           <h3 className={TYPE.label}>{label}</h3>
           {under ? <p className={TYPE.note}>{under}</p> : null}
         </div>
-        {aside ? <div className="shrink-0">{aside}</div> : null}
+        {aside ? <div className="sm:shrink-0">{aside}</div> : null}
       </div>
       {children}
     </section>

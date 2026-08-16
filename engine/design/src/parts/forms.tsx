@@ -27,11 +27,12 @@
 
 import * as React from "react";
 import {
-  Checkbox, CheckboxGroup, ComboBox, DateField, Description, FieldError, Input, InputGroup,
+  Checkbox, CheckboxGroup, ComboBox, DateField, DateRangePicker, Description, FieldError, Input, InputGroup,
   InputOTP, Label, ListBox, NumberField, Radio, RadioGroup, REGEXP_ONLY_DIGITS, SearchField,
-  Select, Slider, Tag, TagGroup, TextArea, TextField, TimeField, ToggleButton, ToggleButtonGroup,
+  RangeCalendar, Select, Slider, Tag, TagGroup, TextArea, TextField, TimeField, ToggleButton,
+  ToggleButtonGroup,
 } from "@heroui/react";
-import { CODE_SLOT } from "../tokens/metrics.js";
+import { CODE_SLOT, SPACE } from "../tokens/metrics.js";
 
 /* ---------------------------------------------------------------- grammar --- */
 
@@ -418,9 +419,17 @@ export function Segmented({ value, onChange, options, ...p }: Omit<Said, "help" 
         if (first !== undefined) onChange(String(first));
       }}
       isDisabled={p.disabled === true}
+      /* ⚠️ IT DIVIDES A PHONE AND SITS AT ITS OWN SIZE ON A DESKTOP. At its
+         intrinsic width a five-segment control is ~363px, which is wider than
+         the column left inside a 390px screen — so it ran past the edge with its
+         last segment cut off, in the one place a filter is most likely to
+         appear. Below `sm` the group fills and the segments share it; from `sm`
+         it goes back to being content-sized, because a filter stretched across a
+         desktop panel is a control pretending to be a toolbar. */
+      className="w-full sm:w-auto"
     >
       {options.map((o, i) => (
-        <ToggleButton key={o.id} id={o.id}>
+        <ToggleButton key={o.id} id={o.id} className="grow basis-0 sm:grow-0 sm:basis-auto">
           {i > 0 ? <ToggleButtonGroup.Separator /> : null}
           {o.label}
         </ToggleButton>
@@ -562,5 +571,162 @@ export function CodeEntry({ digits, value, onChange, onDone, autoFocus, ...p }: 
         </React.Fragment>
       ))}
     </InputOTP>
+  );
+}
+
+/* ----------------------------------------------------------------- period --- */
+
+/**
+ * A stretch of time, both ends inclusive, as `YYYY-MM-DD`.
+ *
+ * ⚠️ NOT `Span` — the chart engine already has one, and its is `{min, max}` of
+ * NUMBERS. Two types called the same thing across one package's public surface
+ * is a compile error today and, if either ever loosened, a plot drawn over an
+ * axis it was never given.
+ */
+export interface Dates {
+  readonly from: string;
+  readonly to: string;
+}
+
+/**
+ * The named stretches, in the order they are offered.
+ *
+ * ⚠️ NAMED FIRST, DATES SECOND, BECAUSE THAT IS WHAT PEOPLE ACTUALLY WANT. Every
+ * report question is "how are we doing lately" long before it is "between the
+ * 3rd and the 19th"; a control that opens on a calendar makes the common answer
+ * two taps and a decision. The exact case is one more option, not the default.
+ */
+export const PERIODS = [
+  { id: "7d", label: "7 days" },
+  { id: "30d", label: "30 days" },
+  { id: "month", label: "Month" },
+  { id: "year", label: "Year" },
+] as const;
+
+export type PeriodId = (typeof PERIODS)[number]["id"] | "custom";
+
+const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+const DAY = 86_400_000;
+
+/**
+ * ⚠️ UTC THROUGHOUT, AND `Date.UTC` RATHER THAN `new Date(text)`. Parsing a
+ * `YYYY-MM-DD` string gives midnight UTC but reading it back through the local
+ * getters gives the previous day for anybody west of Greenwich — so a report run
+ * in New York would start and end one day early, every time, and look right to
+ * whoever wrote it.
+ *
+ * ⚠️ AND BOTH ENDS ARE INCLUSIVE, SO "7 DAYS" REACHES BACK SIX. Off by one here
+ * is a week that is eight days long, which nothing surfaces except a total that
+ * quietly disagrees with the one beside it.
+ */
+export function spanOf(id: PeriodId, today: string): Dates {
+  const [y, m, d] = today.split("-").map(Number) as [number, number, number];
+  const now = Date.UTC(y, m - 1, d);
+  switch (id) {
+    case "7d": return { from: iso(now - 6 * DAY), to: today };
+    case "30d": return { from: iso(now - 29 * DAY), to: today };
+    case "month": return { from: iso(Date.UTC(y, m - 1, 1)), to: today };
+    case "year": return { from: iso(Date.UTC(y, 0, 1)), to: today };
+    /* ⚠️ A custom span is the caller's; there is nothing to compute. */
+    case "custom": return { from: today, to: today };
+  }
+}
+
+/**
+ * THE PERIOD A FIGURE IS SHOWING — one row, above the plot.
+ *
+ * ⚠️ THIS SLOT EXISTED BEFORE ANYTHING FILLED IT. `ChartPanel.aside` was
+ * documented as "a range picker, a filter" while the product had neither, so two
+ * screens carried a crown action labelled "Date range" wired to nothing and one
+ * put a ghost button reading "This month" above a figure. A slot with no
+ * component to put in it is answered by hand, differently, every time.
+ *
+ * ⚠️ THE CALENDAR IS UNCONTROLLED AND REPORTS ISO STRINGS, for the same reason
+ * `DateInput` is: constructing its values needs `@internationalized/date`, and
+ * that dependency belongs to an app that wants a controlled calendar rather than
+ * to every consumer of this package. Choosing a NAMED period therefore cannot
+ * move the calendar — which is correct rather than a compromise, because a named
+ * period IS the answer and the calendar is what you open when it is not.
+ */
+export function PeriodInput({ value, onChange, today, label = "Period", ...p }: Omit<Said, "label"> & {
+  readonly value: PeriodId;
+  /** The chosen period, and the dates it resolves to. */
+  readonly onChange: (id: PeriodId, dates: Dates) => void;
+  /** `YYYY-MM-DD`. Passed in so the resolution is a pure function of it. */
+  readonly today: string;
+  readonly label?: string;
+}) {
+  return (
+    /* ⚠️ THE GAP COMES FROM `SPACE`, NOT FROM A NUMBER. The calendar appears
+       under the segments only for the exact case, so this is one thing said in
+       two parts rather than two things in a column — `tight` is that pair. */
+    <div className={`flex flex-col ${SPACE.tight}`}>
+      <Segmented
+        label={label}
+        value={value}
+        onChange={(id) => onChange(id as PeriodId, spanOf(id as PeriodId, today))}
+        options={[...PERIODS.map((x) => ({ id: x.id as string, label: x.label })), { id: "custom", label: "Dates" }]}
+        disabled={p.disabled}
+      />
+      {value === "custom" ? (
+        /* ⚠️ VERBOSE ON PURPOSE, AND WRITTEN ONCE. A range picker is a field
+           group, a separator, a trigger, a popover and a calendar with its own
+           header and grid — thirty lines of composition that every screen
+           wanting a date range would otherwise write again, slightly
+           differently. That is the whole argument for it being here. */
+        <DateRangePicker
+          isDisabled={p.disabled === true}
+          /* ⚠️ REPORTED ONLY WHEN BOTH ENDS ARE IN. A half-entered range is not
+             a period, and handing one on would redraw the figure over a span
+             the person is still in the middle of choosing. */
+          onChange={(v) => {
+            if (!v?.start || !v.end) return;
+            onChange("custom", { from: v.start.toString(), to: v.end.toString() });
+          }}
+        >
+          <Label className="sr-only">{label}</Label>
+          <DateField.Group fullWidth>
+            <DateField.Input slot="start">
+              {(segment) => <DateField.Segment segment={segment} />}
+            </DateField.Input>
+            <DateRangePicker.RangeSeparator />
+            <DateField.Input slot="end">
+              {(segment) => <DateField.Segment segment={segment} />}
+            </DateField.Input>
+            <DateField.Suffix>
+              <DateRangePicker.Trigger>
+                <DateRangePicker.TriggerIndicator />
+              </DateRangePicker.Trigger>
+            </DateField.Suffix>
+          </DateField.Group>
+          <DateRangePicker.Popover>
+            <RangeCalendar aria-label={label}>
+              <RangeCalendar.Header>
+                <RangeCalendar.YearPickerTrigger>
+                  <RangeCalendar.YearPickerTriggerHeading />
+                  <RangeCalendar.YearPickerTriggerIndicator />
+                </RangeCalendar.YearPickerTrigger>
+                <RangeCalendar.NavButton slot="previous" />
+                <RangeCalendar.NavButton slot="next" />
+              </RangeCalendar.Header>
+              <RangeCalendar.Grid>
+                <RangeCalendar.GridHeader>
+                  {(day) => <RangeCalendar.HeaderCell>{day}</RangeCalendar.HeaderCell>}
+                </RangeCalendar.GridHeader>
+                <RangeCalendar.GridBody>
+                  {(date) => <RangeCalendar.Cell date={date} />}
+                </RangeCalendar.GridBody>
+              </RangeCalendar.Grid>
+              <RangeCalendar.YearPickerGrid>
+                <RangeCalendar.YearPickerGridBody>
+                  {({ year }) => <RangeCalendar.YearPickerCell year={year} />}
+                </RangeCalendar.YearPickerGridBody>
+              </RangeCalendar.YearPickerGrid>
+            </RangeCalendar>
+          </DateRangePicker.Popover>
+        </DateRangePicker>
+      ) : null}
+    </div>
   );
 }

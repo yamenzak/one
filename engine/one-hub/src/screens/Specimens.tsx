@@ -18,6 +18,7 @@ import { useState } from "react";
 import {
   ActionRow, AmountRow,  Balance, Band, CopyRow, Crown, Figure, Grid, Group,
   Island, Money, NavRow, Nothing, NoteRow, OfferRow, Page, PersonRow, Prose,
+  PeriodInput, type PeriodId,
   QuickActions, Row, SeeAll, Section, Spacer, Stack, StepRow, Cluster, Rail,
   Await, Trouble, Working, RowsWaiting, ChartWaiting, FigureWaiting, TilesWaiting, TextWaiting,
   waiting, ready, trouble, type Loaded,
@@ -273,25 +274,38 @@ function States() {
  */
 function Inner() {
   const days = Array.from({ length: 31 }, (_, i) => i);
+  const [period, setPeriod] = useState<PeriodId>("month");
 
   return (
     <Page sky="cloth">
       <PageCrown
         title="Analytics"
         back={nothing}
-        also={[{ id: "range", label: "Date range", icon: glyph(<Clock />), onDo: nothing }]}
         under={
           <Row>
             <Button size="sm" variant="ghost" data-chrome="true" onPress={nothing}>Personal</Button>
             <Spacer />
-            <Button size="sm" variant="ghost" onPress={nothing}>This month</Button>
           </Row>
         }
       />
       <Band width="work">
         <Stack space="roomy">
           <Group label="Where it went">
-            <ChartPanel label="Spent" under="Against the same days last month">
+            {/* ⚠️ THE `aside` SLOT WAS DOCUMENTED AS "A RANGE PICKER, A FILTER"
+                WHILE THE PRODUCT HAD NEITHER — so this screen answered it with a
+                ghost button reading "This month" that did nothing, and the crown
+                carried a "Date range" action wired to nothing beside it. */}
+            <ChartPanel
+              label="Spent"
+              under="Against the same days last month"
+              aside={(
+                <PeriodInput
+                  value={period}
+                  today="2026-08-16"
+                  onChange={(id) => setPeriod(id)}
+                />
+              )}
+            >
               <LineChart
                 describes="Spend by day this month against last month"
                 series={[

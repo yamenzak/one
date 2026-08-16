@@ -15,7 +15,7 @@ import {
   Agree, Choice, CodeEntry, Crumbs, Faq, FormWaiting, Gauge, Hotkey, Listing, LongText, Lookup,
   MoneyInput, NumberInput, OneOf, PageTabs, Picks, SearchInput, SecretInput, Segmented,
   Dial, Steps, TableWaiting, Tags, TextInput, TimeInput, Timeline, DateInput,
-  ready, trouble, waiting, type Col,
+  PeriodInput, PERIODS, spanOf, ready, trouble, waiting, type Col,
 } from "../src/index.js";
 
 const nothing = () => {};
@@ -160,6 +160,78 @@ describe("the form grammar", () => {
   it("names itself, because the boxes on their own are N unnamed inputs", () => {
     const html = renderToStaticMarkup(<CodeEntry digits={6} value="" onChange={nothing} />);
     expect(html).toContain("Your code");
+  });
+});
+
+describe("a period", () => {
+  /*
+    ⚠️ THE SEGMENTS DIVIDE A PHONE AND SIT AT THEIR OWN SIZE ON A DESKTOP, and
+    this is pinned because it is one word from being wrong again. At its
+    intrinsic width a five-segment period is ~363px — wider than the column left
+    inside a 390px screen — so it ran past the edge with its last segment cut
+    off, over the panel's own title, in the one place a filter is most likely to
+    appear. Dropping `w-full` or `basis-0` restores exactly that.
+  */
+  it("fills a narrow container and lets the segments share it", () => {
+    const html = renderToStaticMarkup(
+      <PeriodInput value="month" today="2026-08-16" onChange={nothing} />,
+    );
+    expect(html).toContain("w-full sm:w-auto");
+    expect(html).toContain("grow basis-0 sm:grow-0 sm:basis-auto");
+  });
+
+  it("offers every named stretch and the exact case", () => {
+    const html = renderToStaticMarkup(
+      <PeriodInput value="month" today="2026-08-16" onChange={nothing} />,
+    );
+    for (const p of PERIODS) expect(html, p.id).toContain(p.label);
+    expect(html).toContain("Dates");
+    /* ⚠️ The calendar is only there for the exact case — a named period IS the
+       answer, and a range field under it would be a second one. */
+    expect(html).not.toContain("date-range-picker");
+  });
+
+  /*
+    ⚠️ BOTH ENDS INCLUSIVE, SO "7 DAYS" REACHES BACK SIX. Off by one here is a
+    week that is eight days long — which nothing surfaces except a total that
+    quietly disagrees with the one beside it.
+  */
+  it("counts a named stretch inclusively", () => {
+    expect(spanOf("7d", "2026-08-16")).toEqual({ from: "2026-08-10", to: "2026-08-16" });
+    expect(spanOf("30d", "2026-08-16")).toEqual({ from: "2026-07-18", to: "2026-08-16" });
+  });
+
+  it("starts a month and a year where the calendar does", () => {
+    expect(spanOf("month", "2026-08-16")).toEqual({ from: "2026-08-01", to: "2026-08-16" });
+    expect(spanOf("year", "2026-08-16")).toEqual({ from: "2026-01-01", to: "2026-08-16" });
+  });
+
+  /*
+    ⚠️ THE ARITHMETIC CROSSES BOUNDARIES, WHICH IS WHERE HAND-ROLLED DATE MATH
+    BREAKS. Reaching back over the turn of a month, a year, and February in a
+    leap year are three separate ways to be off by one.
+  */
+  it("reaches back across a month, a year and a leap day", () => {
+    expect(spanOf("7d", "2026-03-03").from).toBe("2026-02-25");
+    expect(spanOf("7d", "2026-01-03").from).toBe("2025-12-28");
+    expect(spanOf("7d", "2028-03-02").from).toBe("2028-02-25");
+    expect(spanOf("month", "2026-01-01")).toEqual({ from: "2026-01-01", to: "2026-01-01" });
+  });
+
+  /*
+    ⚠️ UTC THROUGHOUT. Parsing `YYYY-MM-DD` gives midnight UTC, and reading it
+    back through the LOCAL getters gives the previous day for anybody west of
+    Greenwich — so a report run in New York would start and end one day early,
+    every time, and look right to whoever wrote it. This test is what catches a
+    later edit to `new Date(text).getDate()`.
+  */
+  it("does not move with the machine's timezone", () => {
+    const was = process.env.TZ;
+    for (const tz of ["UTC", "America/Los_Angeles", "Pacific/Kiritimati"]) {
+      process.env.TZ = tz;
+      expect(spanOf("30d", "2026-08-16"), tz).toEqual({ from: "2026-07-18", to: "2026-08-16" });
+    }
+    process.env.TZ = was;
   });
 });
 
