@@ -59,6 +59,7 @@ import { Avatar as Plate } from "@heroui/react";
 import MOODS from "@dicebear/styles/moods.json" with { type: "json" };
 import PLANETS from "@dicebear/styles/planets.json" with { type: "json" };
 import { FACE_PX } from "../tokens/metrics.js";
+import type { World } from "../tokens/ambience.js";
 import { useStill } from "../tokens/motion.js";
 
 /* ------------------------------------------------------------------ kinds --- */
@@ -188,6 +189,48 @@ export interface FaceOf {
   /** ⚠️ `app` only — the character the manifest declared. See `appFace`. */
   readonly glyph?: string;
 }
+
+/* ------------------------------------------------------------------ world --- */
+
+/**
+ * THE TWO COLOURS A WORKSPACE'S SKY IS BUILT FROM — see `worldCss`.
+ *
+ * ⚠️ READ OUT OF THE PICTURE THAT WAS DRAWN, NOT DERIVED A SECOND TIME. The
+ * obvious alternative is to hash the slug here and index the palette ourselves,
+ * which works right up until DiceBear's own selection changes by one step — and
+ * then the sky is a different world from the planet in the row above it, with
+ * nothing failing anywhere. Matching the fills in the SVG against the style's
+ * OWN declared palette means both come from the same file: one edit moves them
+ * together, and a colour we do not recognise falls through to nothing rather
+ * than to a guess.
+ *
+ * ⚠️ AND IT IS THE STILL BAKE THAT IS PARSED. The animated one carries the same
+ * fills plus a `<style>` element; reading the smaller of the two is the same
+ * answer with less to go wrong, and it is already in the cache for any chip.
+ */
+export function worldOf(slug: string): World | null {
+  const cached = worlds.get(slug);
+  if (cached !== undefined) return cached;
+
+  const svg = new Avatar(styleFor("workspace"), { seed: slug, size: 64, scale: FILL }).toString();
+  const fills = [...svg.matchAll(/fill="(#[0-9a-fA-F]{3,8})"/g)].map((m) => m[1]!.toLowerCase());
+  const deep = fills.find((c) => DEEPS.has(c));
+  const lit = fills.find((c) => BODIES.has(c));
+  const world = deep && lit ? { deep, lit, seed: slug } : null;
+  worlds.set(slug, world);
+  return world;
+}
+
+const worlds = new Map<string, World | null>();
+
+/* ⚠️ THE STYLE'S OWN PALETTES, NOT COPIES OF THEM. A literal list here is a
+   list that is right today. */
+const palette = (name: "background" | "planet"): ReadonlySet<string> =>
+  new Set(((PLANETS as { colors: Record<string, { values: string[] }> })
+    .colors[name]?.values ?? []).map((c) => c.toLowerCase()));
+
+const DEEPS = palette("background");
+const BODIES = palette("planet");
 
 /* ------------------------------------------------------------- the plates --- */
 

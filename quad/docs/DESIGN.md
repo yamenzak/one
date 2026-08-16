@@ -284,6 +284,13 @@ Three things follow from that and are decided for you.
   It gets the initial, because a face for somebody who has not arrived yet is a
   picture of nobody.
 
+**And a workspace's screen is its planet's sky.** Opening one puts you on the
+world its face showed — same deep, same light, its own stars — so the row
+somebody pressed and the page they arrived on are visibly one place. Only the
+arrival: its People, Money and Settings keep the hub's working material, because
+an arrival nobody leaves is not an arrival. See
+[`AMBIENCE.md`](AMBIENCE.md) — `world`.
+
 **A break between two runs is a second CARD.** That is how the workspace screen
 separates what you come back to from what you set up once, and how the account
 screen separates the two places that are yours from the way out. Two cards read

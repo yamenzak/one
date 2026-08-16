@@ -25,7 +25,8 @@ import { Button, Card, Separator } from "@heroui/react";
 /* ⚠️ `Ambience`, not `theme.ts`'s older four-value `Sky`. The two drifted the
    moment patterns were added, and a `Page` that could not be given `dots` was a
    vocabulary with a piece nothing could reach. */
-import type { Ambience } from "../tokens/ambience.js";
+import type { Ambience, World } from "../tokens/ambience.js";
+import { worldCss } from "../tokens/ambience.js";
 import { TYPE } from "../tokens/type.js";
 import {
   BAND_PAD, CODE_SLOT, CROWN, CROWN_CHIP, CROWN_SIZE, GUTTER, HEAD_GAP, HERO_PAD, ICON,
@@ -66,6 +67,19 @@ export type Bleed = "hold" | "edge" | "flush";
 export interface PageProps {
   /** ⚠️ Named, never a colour — see the header. */
   readonly sky?: Ambience;
+  /**
+   * ⚠️ A GROUND BUILT FROM A SUBJECT RATHER THAN CHOSEN FROM THE TABLE, and the
+   * ONLY thing that may be handed one. A workspace's face is a planet seen from
+   * outside; its own screen is that planet's sky, from the same two colours
+   * (`worldCss`). Supplied, it wins over `sky` — a page has one ground.
+   *
+   * ⚠️ AND IT IS STILL NOT AN INLINE BACKGROUND. What goes on the element is
+   * three custom PROPERTIES the `world` rules read, so the fade, the grain, the
+   * vignette, the drift, both reduced-motion opt-outs and the per-theme choice
+   * of which colour leads all still apply. An inline `background-image` would
+   * beat every token and freeze one page on ours.
+   */
+  readonly world?: World;
   readonly tone?: Tone;
   /**
    * ⚠️ THE NAV IS THE PAGE'S, NOT THE CONTENT'S, AND THIS IS WHY. A sticky island
@@ -87,9 +101,15 @@ export interface PageProps {
  * is a page whose last control sits under the address bar until you scroll,
  * which reads as a broken layout rather than as a unit bug.
  */
-export function Page({ sky = "plain", tone = "neutral", nav, children }: PageProps) {
+export function Page({ sky = "plain", world, tone = "neutral", nav, children }: PageProps) {
+  const own = world ? worldCss(world) : null;
   return (
-    <div className="min-h-dvh flex flex-col" data-sky={sky} data-tone={tone}>
+    <div
+      className="min-h-dvh flex flex-col"
+      data-sky={own ? "world" : sky}
+      data-tone={tone}
+      style={own as React.CSSProperties | undefined}
+    >
       <div className={`flex grow flex-col ${nav ? NAV_SPACE : ""}`}>{children}</div>
       {nav}
     </div>
@@ -373,10 +393,12 @@ export function LeaveChip({ leave = "back", label, onDo }: {
  * `edges:` can stay green.
  */
 export function PageCrown({
-  title, back, backLabel, leave = "back", actions = [], does, under,
+  title, face, back, backLabel, leave = "back", actions = [], does, under,
   bleed = "edge", width = "work",
 }: {
   readonly title: string;
+  /** ⚠️ The subject this page is about, above its name — see `Frame.face`. */
+  readonly face?: FaceOf;
   /**
    * ⚠️ A CROWN TAKES THE SHAPE OF WHAT IT CROWNS, AND THE DEFAULT IS ONLY A
    * DEFAULT. Edge-bled, the heading sits against the page's own gutter, which is
@@ -509,6 +531,22 @@ export function PageCrown({
           belongs to which. */}
       <Band bleed={bleed} width={width}>
         <div className={`flex flex-col ${HEAD_GAP} ${TITLE_PAD}`}>
+          {/* ⚠️ ABOVE THE NAME AND LEFT-ALIGNED WITH IT, so the face and the
+              heading are one block that fades together when the crown collapses.
+              Beside the name it would push a long one onto two lines at exactly
+              the width where it already wraps. */}
+          {face
+            ? (
+              <span
+                style={{
+                  opacity: past ? 0 : 1,
+                  transition: past ? MOTION.exit : MOTION.enter,
+                }}
+              >
+                <Face of={face} size="panel" />
+              </span>
+            )
+            : null}
           <h1
             className={TYPE.display}
             style={{

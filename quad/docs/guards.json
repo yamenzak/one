@@ -1162,6 +1162,15 @@
       "impl": "scripts/face.test.mjs",
       "proves": "mark: ",
       "fails": "a product appears beside a person as a bare character somebody typed — no ground under it, a different optical weight from every face in the same bar — so a workspace with six products is six identical glyphs and the label does all the work"
+    },
+    {
+      "id": "a-workspaces-sky-is-its-planets-own-colours",
+      "protects": "D7",
+      "stage": "17",
+      "status": "live",
+      "impl": "scripts/face.test.mjs",
+      "proves": "palette: ",
+      "fails": "the ground somebody lands on is a different world from the planet in the row they pressed — because the sky's colours were re-derived by a hash of ours instead of read out of the picture, and the two agreed until one of them was edited"
     }
   ]
 }

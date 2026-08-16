@@ -135,6 +135,18 @@ export interface Act {
  */
 export interface Frame {
   readonly title: string;
+  /**
+   * ⚠️ WHOSE PAGE THIS IS, WHERE THE ADDRESS KNOWS AND THE SCREEN DOES NOT. A
+   * workspace's own screen is crowned with its name by the router; the planet
+   * that names it in every list belongs above that name, so the row somebody
+   * pressed and the page they arrived on are visibly the same subject.
+   *
+   * ⚠️ AND IT IS NOT `Identity`. That block is CENTRED, and centred means the
+   * subject is the reader — "this is about you". A crown face is left-aligned
+   * under the way back: the subject is something you navigated TO. Two shapes,
+   * two meanings, and a screen uses one or the other, never both.
+   */
+  readonly face?: FaceOf;
   readonly under?: React.ReactNode;
   readonly back?: () => void;
   readonly leave?: "back" | "dismiss";
@@ -269,6 +281,7 @@ export function Screen<T = unknown>({
         bleed="hold"
         width={preset.width}
         title={name}
+        face={frame?.face}
         under={sub}
         back={out}
         leave={how}

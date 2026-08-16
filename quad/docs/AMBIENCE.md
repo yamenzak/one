@@ -90,7 +90,7 @@ like moments, the screen is two screens.
 | Empty/blocked/maintenance interstitials | `plain` or `veil` | a big mood behind "nothing here" reads as sarcasm |
 | Everything else | `plain` | **the default.** Ambience everywhere is ambience nowhere |
 
-The twenty-four named ambiences fall into five families — soft light (the
+The twenty-four brand-hued ambiences fall into five families — soft light (the
 original twelve), geometry (`rays`, `arc`, `prism`, `terrace`, `grid`), drawn
 line art (`ridge`, `flow`), staged graphics (`streak`), and a drawn ground that
 moves (`silk`, `linen`, `wire`) — and the family is part of the choice: an app whose signature
@@ -262,3 +262,29 @@ needs an argument, not a `DRIFT` entry.
 The mono interface (`ground.ts`, guarded by `mono:`/`kin:`/`tiers:`), the
 chart palette (`chart/palette.ts`), and the glass on chrome (`ambience.ts`,
 crown and island only). An ambience decision never changes a control.
+
+## `world` — the one ambience that is not the brand's
+
+**A workspace's face is a planet seen from outside. Its own screen is that
+planet's sky, from the same two colours.** Nothing else in the product has an
+identity a ground can be built from, which is why this is one ambience rather
+than a family.
+
+- **The colours come out of the picture that was drawn**, matched against the
+  avatar style's own declared palette (`worldOf` in `parts/face.tsx`) — not
+  re-derived from the slug with a hash of ours. Two generators agree until one
+  of them is edited; one source cannot disagree with itself.
+- **The theme decides which of the two leads.** A planet's deep is a near-black
+  navy or teal: over a dark page it is the night it is meant to be, and mixed
+  into paper it is a desaturated slate with the hue gone. Light leads with the
+  planet's BODY colour instead — the same rule the field states, applied to a
+  palette that is not the brand's.
+- **The stars are seeded and tiled.** Same workspace, same sky, forever; tiled
+  at their own size so the constellation does not change shape with the window.
+  They drift at half the weaves' distance, because a point that travels is a
+  point the eye follows.
+- **Only the arrival lands.** People, Money and Settings under the same
+  workspace keep `linen`. An arrival somebody never leaves is not an arrival,
+  and those are screens with eight rows on them — where a lit colour field is
+  the fault the hub's three materials exist to avoid. Landing is a moment;
+  working is a material.

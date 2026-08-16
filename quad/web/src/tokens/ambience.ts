@@ -109,7 +109,16 @@ export type Ambience =
   | "weave" | "drape" | "aurora" | "veil" | "tide" | "spotlight"
   | "rays" | "arc" | "prism" | "terrace" | "streak" | "bloom"
   | "ridge" | "flow" | "grid"
-  | "silk" | "linen" | "wire";
+  | "silk" | "linen" | "wire"
+  /**
+   * ⚠️ THE ONE AMBIENCE WHOSE COLOURS ARE NOT THE THEME'S. Every name above is
+   * built from `--brand` through the tone; `world` is built from a SUBJECT — a
+   * workspace's own planet, three properties the caller sets on the element
+   * (`worldCss`). It is still a named ambience with a written stack rather than
+   * a slot for arbitrary CSS, so every knob applies and no screen can smuggle a
+   * gradient of its own past the tokens (D7).
+   */
+  | "world";
 
 export const AMBIENCES: readonly Ambience[] = [
   "plain", "calm", "focus", "lift", "mesh", "dots",
@@ -117,6 +126,7 @@ export const AMBIENCES: readonly Ambience[] = [
   "rays", "arc", "prism", "terrace", "streak", "bloom",
   "ridge", "flow", "grid",
   "silk", "linen", "wire",
+  "world",
 ];
 
 /**
@@ -221,6 +231,9 @@ const FIELD_WEIGHT: Readonly<Record<Exclude<Ambience, "plain">, number>> = {
      the one thing that destroys it. The working two are lower still: a ground
      somebody reads over should be a value, not a colour. */
   silk: 0.06, linen: 0.04, wire: 0.04,
+  /* ⚠️ NONE. `world` carries its own ground, in the planet's colours — the
+     brand field under it would be a second world mixed into the first. */
+  world: 0,
 };
 
 /** A soft pole of light: where, how wide, how strong. */
@@ -785,6 +798,37 @@ function layers(what: Ambience, hue: string): readonly string[] {
         pole(hue, 6, "50%", "-14%", "170%", "90%"),
       ];
 
+    /*
+      ⚠️ A WORKSPACE'S OWN SKY, IN THE PLANET'S COLOURS — see `worldCss` for
+      what sets the three properties and why.
+
+      ⚠️ `--world-ink` IS THE HALF THAT MAKES LIGHT WORK, and it is decided by
+      the STYLESHEET rather than here. A planet's deep is a near-black navy or
+      teal: over a dark page it is the night it is meant to be, and mixed into
+      paper it is a desaturated slate — the hue disappears and the world becomes
+      grey. Light therefore leads with the planet's BODY colour instead, which is
+      the same principle `field` states as "the value lightens; the hue stays
+      committed". One property, two rules, no second stack.
+    */
+    case "world":
+      return [
+        `var(--world-stars, none)`,
+        /* The ground underfoot, lit by the world's own colour. */
+        `radial-gradient(150% 62% at 50% 112%, `
+          + `color-mix(in oklab, var(--world-lit) calc(var(--sky, 1) * 30%), transparent) 0%,`
+          + ` transparent 66%)`,
+        /* A far, quiet halo of the same light, high and off-centre. */
+        `radial-gradient(95% 48% at 74% -14%, `
+          + `color-mix(in oklab, var(--world-lit) calc(var(--sky, 1) * 12%), transparent) 0%,`
+          + ` transparent 70%)`,
+        /* ⚠️ THE DEEP, MIXED TOWARD `--lumen` EXACTLY AS `field` DOES. This is
+           the layer that would otherwise be a black rectangle on a light page. */
+        `linear-gradient(180deg, `
+          + `color-mix(in oklab, var(--world-ink) calc(var(--field, 1) * 88%), var(--lumen, transparent)) 0%, `
+          + `color-mix(in oklab, var(--world-ink) calc(var(--field, 1) * 62%), var(--lumen, transparent)) 58%, `
+          + `color-mix(in oklab, var(--world-ink) calc(var(--field, 1) * 38%), var(--lumen, transparent)) 100%)`,
+      ];
+
   }
 }
 
@@ -822,6 +866,133 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/* ------------------------------------------------------------------ world --- */
+
+/**
+ * A WORKSPACE'S OWN SKY, DERIVED FROM ITS PLANET.
+ *
+ * ⚠️ THE POINT IS THE ARRIVAL. A workspace's face is a planet seen from
+ * outside; opening that workspace puts you ON it — the same deep, the same
+ * light, its stars scattered across the whole viewport. Two surfaces that share
+ * a palette read as one place, and the row somebody pressed is the thing they
+ * are now standing on. Nothing else in the product can say that, because
+ * nothing else has an identity a ground can be built from.
+ *
+ * ⚠️ AND THE COLOURS ARE THE PLANET'S, NOT A SECOND GUESS AT THEM. They come
+ * out of the picture that was drawn (`face.tsx`'s `worldOf`), matched against
+ * the style's own declared palette — so the sky cannot drift from the planet,
+ * and a palette DiceBear changes moves both together. Re-deriving them from the
+ * slug with our own hash would be two generators that agree until one of them
+ * is edited.
+ *
+ * ⚠️ EVERY THEME KNOB STILL APPLIES, WHICH IS WHAT KEEPS IT FROM BEING A BLACK
+ * RECTANGLE ON PAPER. The deep mixes toward `--lumen` exactly as `field` does —
+ * transparent in dark, so a navy over near-black is a glow; paper in light, so
+ * the same navy is a pale wash. The stars carry `--thread`, which light sets to
+ * zero: there are no stars in daylight, and a field of fine dark marks on paper
+ * has a name (see `etch`).
+ */
+export interface World {
+  /** The planet's own deep — its background, straight out of the picture. */
+  readonly deep: string;
+  /** The planet's body colour: the light this world is lit by. */
+  readonly lit: string;
+  /**
+   * ⚠️ THE SEED TRAVELS WITH THE COLOURS, IN ONE OBJECT, so a caller cannot
+   * hand over one and forget the other. As two arguments this was a `world`
+   * prop and a `worldSeed` prop that had to agree — and a page given the
+   * colours but no seed is a sky with no stars, which looks deliberate.
+   */
+  readonly seed: string;
+}
+
+/**
+ * ⚠️ SCATTERED BY A SEED, NEVER BY `Math.random`. A world is an identity: the
+ * same workspace has the same stars in the same places forever, on every device
+ * and after every deploy. This is the same rule `bespokeCss` states and the same
+ * generator, for the same reason.
+ *
+ * ⚠️ THREE MAGNITUDES, AND THE FAINT ONES DO THE WORK. A field of equal dots is
+ * a texture; a field where most are barely there and a few are not is a sky.
+ * The brightest are capped at a handful, because a star somebody's eye lands on
+ * is a star competing with the content.
+ */
+function starArt(seed: number): string {
+  const r = mulberry32(seed);
+  const W = 1200, H = 900;
+  const dots: string[] = [];
+  for (let i = 0; i < 170; i += 1) {
+    const x = (r() * W).toFixed(1);
+    const y = (r() * H).toFixed(1);
+    const t = r();
+    /* Faint and small by default; a few brighter; three or four that carry. */
+    const rad = t > 0.97 ? 1.5 : t > 0.86 ? 1.05 : 0.7;
+    const a = t > 0.97 ? 0.95 : t > 0.86 ? 0.62 : 0.3 + r() * 0.2;
+    dots.push(`<circle cx="${x}" cy="${y}" r="${rad}" fill="#fff" fill-opacity="${a.toFixed(2)}"/>`);
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`
+    + dots.join("") + `</svg>`;
+}
+
+/** ⚠️ A hash rather than a random — see `starArt`. FNV-1a, as elsewhere. */
+const seedOf = (text: string): number => {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+};
+
+/**
+ * THE THREE PROPERTIES `world` READS. Hand the result to `Page` and a
+ * workspace's planet becomes the ground under its screen.
+ *
+ * ⚠️ PROPERTIES, NOT A BACKGROUND. What a screen sets is three VALUES; the
+ * layers that use them are written once in `layers("world")` and the theme rules
+ * are written once in the stylesheet. A screen handed a whole `background-image`
+ * would be a screen that could put anything there — and the first one to do it
+ * is a page a workspace's branding no longer reaches (D7).
+ */
+export function worldCss(world: World): Readonly<Record<string, string>> {
+  return {
+    "--world-deep": world.deep,
+    "--world-lit": world.lit,
+    "--world-stars": starsFor(world.seed),
+  };
+}
+
+/*
+  ⚠️ BAKED PER SEED AND KEPT, because a workspace's sky is rebuilt on every
+  render of the screen it is on — and 170 circles through `encodeURIComponent`
+  is not free at 60fps while somebody scrolls.
+*/
+const skies = new Map<string, string>();
+
+const starsFor = (seed: string): string => {
+  const had = skies.get(seed);
+  if (had !== undefined) return had;
+  const url = art(starArt(seedOf(seed)));
+  skies.set(seed, url);
+  return url;
+};
+
+/**
+ * ⚠️ BESPOKE IS COMPOSED FROM THE SAME PRIMITIVES, WHICH IS WHAT KEEPS
+ * "ENDLESS" FROM MEANING "UNGOVERNED". A workspace (or an app's one special
+ * screen) can have a world of its own: a deterministic seed picks an archetype
+ * — pure light, a sweep, a fold, rings, beams — and jitters positions, angles
+ * and strengths within the ranges the named ambiences were tuned in. Every
+ * knob the system has still applies (`--sky`, `--thread`, `--etch`, `--lumen`,
+ * the field, the grain, the fade), the hue still comes from the tone, and
+ * nothing a seed can produce escapes the ranges a person already approved.
+ * Same seed, same world, forever — a bespoke ambience is an identity, so it
+ * must never drift under someone's feet.
+ *
+ * ⚠️ NO `Math.random()` ANYWHERE NEAR THIS. A bespoke world is derived from
+ * its seed the way a named ambience is derived from its name; randomness at
+ * call time would give a workspace a different home every visit.
+ */
 export function bespokeCss(seed: number, tone: Tone = "neutral"): string {
   const hue = HUE[tone];
   const r = mulberry32(seed);
@@ -934,6 +1105,11 @@ export const DRIFT: Partial<Record<Ambience, {
      catches moving while reading is a ground that has to be switched off. */
   linen: { x: "1%", y: "0.6%", from: 1.1, to: 1.12 },
   wire: { x: "1%", y: "0.6%", from: 1.1, to: 1.12 },
+  /* ⚠️ THE SLOWEST AND SMALLEST OF THE FOUR, and it is a sky rather than a
+     cloth: what moves is a field of points, and a point that travels is a point
+     the eye follows. Half the weaves' distance, so the drift reads as the
+     ground breathing rather than as the stars going anywhere. */
+  world: { x: "0.7%", y: "0.5%", from: 1.1, to: 1.13 },
 };
 
 /**
@@ -957,6 +1133,17 @@ const EXTRAS: Partial<Record<Ambience, string>> = {
     + "; background-repeat: repeat, no-repeat, repeat, repeat",
   /* DEPTH, crush, art, pole, field — the drawing fills the reach exactly. */
   silk: WEAVE_LAYERS, linen: WEAVE_LAYERS, wire: WEAVE_LAYERS,
+  /*
+    ⚠️ FIVE ENTRIES FOR FIVE LAYERS, SPELLED OUT, because these lists CYCLE. The
+    stars are the only one that is a drawing, and they TILE — unlike every weave
+    above, which is one composition sized to the reach. A star field that had to
+    cover the viewport would be stretched on a phone and the constellation would
+    change shape with the window; tiled at its own size it is the same sky at
+    every width, which is what a sky is.
+  */
+  world: "background-size: auto, 1200px 900px, auto, auto, auto"
+    + "; background-repeat: repeat, repeat, no-repeat, no-repeat, no-repeat"
+    + "; background-position: 0 0, 0 0, 0 0, 0 0, 0 0",
 };
 
 export function ambienceStylesheet(): string {
@@ -991,6 +1178,22 @@ export function ambienceStylesheet(): string {
     ];
   });
 
+  /*
+    ⚠️ WHICH OF A PLANET'S TWO COLOURS LEADS, DECIDED BY THE THEME AND NOWHERE
+    ELSE. A planet's deep is a near-black navy or teal: over a dark page it is
+    the night it is meant to be, and mixed into paper it is a desaturated slate
+    — the hue disappears and every world comes out the same grey. Light leads
+    with the planet's BODY colour instead, which is `field`'s rule stated again:
+    the value lightens, the hue stays committed. Both selector forms, because
+    the theme stamp may be on the host or on an ancestor.
+  */
+  const worldInk = [
+    `[data-sky="world"] { --world-ink: var(--world-deep); }`,
+    `[data-theme="light"] [data-sky="world"], [data-theme="light"][data-sky="world"] {`,
+    `  --world-ink: var(--world-lit);`,
+    `}`,
+  ];
+
   /* ⚠️ The drawing is baked per theme — see `art`. The var sits on the HOST
      (pseudo-elements inherit it), both selector forms for the same reason as
      the `--sky` rule below. */
@@ -1015,6 +1218,7 @@ export function ambienceStylesheet(): string {
     `  --sky: 0.55; --thread: 0; --etch: 0.5; --lumen: oklch(0.985 0 0); --field: 0.62;`,
     `}`,
     ...artRules,
+    ...worldInk,
     `[data-sky]:not([data-sky="plain"])::before,`,
     `[data-sky]:not([data-sky="plain"])::after {`,
     `  content: ""; position: absolute; top: 0; left: 0; right: 0;`,

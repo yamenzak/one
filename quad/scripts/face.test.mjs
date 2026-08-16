@@ -117,6 +117,27 @@ const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "");
   if (!checked) ok("mark: no product's glyph rendered as a bare character");
 }
 
+/* --------------------------------------- the sky and the planet are one --- */
+{
+  /*
+    ⚠️ A WORKSPACE'S GROUND IS ITS PLANET'S COLOURS, AND THE ONLY WAY THAT STAYS
+    TRUE IS BY READING THEM OUT OF THE PICTURE. The tempting shortcut is to hash
+    the slug here and index the palette ourselves — which agrees with DiceBear's
+    own selection right up until either side is edited, and then the sky is a
+    different world from the planet in the row above it with nothing failing
+    anywhere. So the resolver holds no colours of its own: it matches the fills
+    in the drawn SVG against the STYLE'S declared palette, and a hex literal
+    appearing here is the shortcut being taken.
+  */
+  const src = code(readFileSync(join(QUAD, RESOLVER), "utf8"));
+  const hexes = [...src.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((m) => m[0]);
+  if (hexes.length) {
+    fail(`${RESOLVER}: holds a colour of its own (${hexes.slice(0, 3).join(", ")}).\n` +
+         `       A world's palette is read from the picture that was drawn, matched against ` +
+         `the style's own values — a literal here is a second source that agrees until one is edited.`);
+  } else ok("palette: the sky's colours come from the planet, not from a copy of them");
+}
+
 /* ------------------------------------------------- a seed is an identity --- */
 {
   /*
