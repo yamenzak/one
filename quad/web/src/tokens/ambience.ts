@@ -41,7 +41,7 @@
  */
 
 /* ⚠️ The pace and the curve are the vocabulary's, not this file's — see `DRIFT`. */
-import { BEAT, DURATION, EASE, turns } from "./motion.js";
+import { BEAT, DURATION, EASE, transition, turns } from "./motion.js";
 import {
   DENSITY, FAMILIES, render, type Density, type SceneFamily, type Sky,
 } from "../scene/index.js";
@@ -234,6 +234,28 @@ const hemStop = (pct: number): string =>
  * scrolled. An earlier version ran 12rem at both ends on the theory that a page
  * is read downwards — shot both ways, no visible difference, and both were too
  * much.
+ *
+ * ⚠️ AND THE TOP ONE IS NOT THERE UNTIL SOMETHING IS BEHIND IT, WHICH IS THE
+ * DIFFERENCE BETWEEN A VIGNETTE AND A BAR. The hem is OPAQUE — it has to be, or
+ * a card's text reads straight through a crown title — and opaque against the
+ * world means the field's marks stop at the fade and resume below it. On a page
+ * nobody has scrolled that is a flat strip of one colour across the top with a
+ * pattern under it, which is a bar whatever the softness of its edge. Measured:
+ * with the hem hidden, the pattern runs through the crown; with it on, the top
+ * 110px has none.
+ *
+ * ⚠️ THE RESOLUTION IS THAT AT SCROLL ZERO THERE IS NOTHING TO DISSOLVE. The hem
+ * exists for content passing UNDER the chrome; before anybody scrolls there is
+ * none, so it fades in with the first movement and the crown sits on the world
+ * until then. Lowering the opacity instead was tried at four strengths and every
+ * one of them read a card through the title — the fault is not how strong it is,
+ * it is that it was on when it had no work to do.
+ *
+ * ⚠️ THE BOTTOM ONE IS ALWAYS ON, AND THAT IS NOT AN INCONSISTENCY. "Is anything
+ * behind the crown" is exactly `scrollY > 0`; "is anything behind the nav" is
+ * not answerable from the scroll position, because a page shorter than the
+ * viewport can still end underneath it. A cheap precise question at one end and
+ * no such question at the other.
  */
 const hem = (edge: "top" | "bottom") => {
   const far = edge === "top" ? "bottom" : "top";
@@ -253,6 +275,24 @@ const hem = (edge: "top" | "bottom") => {
     `    var(--scene-veil, var(--background)) 0,`,
     `    ${hemStop(99)} ${hold}rem, ${hemStop(70)} ${mid(1 / 3)}rem,`,
     `    ${hemStop(32)} ${mid(2 / 3)}rem, ${hemStop(0)} ${run}rem);`,
+    /*
+      ⚠️ THE STRENGTH IS A PROPERTY AND THE TRANSITION IS ON `opacity`, WHICH IS
+      THE ONLY SHAPE THAT ANIMATES. A custom property inside a gradient is not
+      interpolable — the browser swaps one gradient for another and the hem
+      appears in a single frame, which reads as a flash rather than as arriving.
+      Driving `opacity` from the property leaves the transition on a real
+      animatable property, and it is the compositor's.
+
+      ⚠️ IT DEFAULTS TO 1, so a page that mounts no listener at all — a test, a
+      screen rendered outside `Page` — gets the hem rather than nothing. A
+      missing feature should be the SAFE state, and the safe state here is the
+      one that cannot let a card read through a title.
+    */
+    `  opacity: var(--hem-${edge}, 1);`,
+    /* ⚠️ `moderate`, not `quick` — the hem arriving is ambient rather than a
+       response to a press, and at the pace of a control it reads as a flicker
+       on the first few pixels of a scroll. */
+    `  transition: ${transition("opacity", "moderate")};`,
     `}`,
   ];
 };

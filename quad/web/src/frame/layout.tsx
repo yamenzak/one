@@ -135,6 +135,10 @@ export function Page(
     a first render that guessed wrong would swap the sky one frame later.
   */
   const night = useNight();
+  /* ⚠️ THE PAGE OWNS IT BECAUSE THE PAGE OWNS THE CROWN'S ROOM — see
+     `useHemOnScroll`. Every address goes through here, so one listener covers
+     every crown in the product and no crown has to remember. */
+  useHemOnScroll();
   /* ⚠️ ONE PATH FOR BOTH. A subject's world and a named sky differ only in where
      the family and the two colours came from — everything after that is the same
      engine, which is what "one engine powers every scene" has to mean. */
@@ -173,6 +177,50 @@ export function Page(
       {nav}
     </div>
   );
+}
+
+/**
+ * THE TOP HEM ARRIVES WITH THE FIRST SCROLL, AND THAT IS THE DIFFERENCE BETWEEN
+ * A VIGNETTE AND A BAR.
+ *
+ * ⚠️ THE HEM IS OPAQUE AGAINST THE WORLD, NOT ONLY AGAINST CONTENT. It has to be
+ * — four weaker strengths were shot and every one let a card's text read through
+ * a crown title — and opaque means the field's marks stop where it starts. On a
+ * page nobody has scrolled that is a flat strip of one colour across the top
+ * with a pattern under it, which is a bar whatever the softness of its edge.
+ *
+ * ⚠️ SO THE FIX IS NOT HOW STRONG IT IS, IT IS WHEN IT IS THERE. The hem exists
+ * for content passing UNDER the chrome; at scroll zero there is none, so there
+ * is nothing to dissolve and the crown sits on the world.
+ *
+ * ⚠️ IT WRITES A PROPERTY RATHER THAN SETTING STATE, so a scroll costs a style
+ * write instead of a React render of every screen in the tree — and it writes
+ * only when the answer CHANGES, so resting at the top costs nothing at all.
+ *
+ * ⚠️ AND THE THRESHOLD IS NOT ZERO. A rubber band, a focus scroll, an image
+ * settling — anything that moves the page by a pixel would otherwise flicker the
+ * hem on and off under somebody's hands.
+ */
+function useHemOnScroll(at = 8): void {
+  React.useEffect(() => {
+    const root = document.documentElement;
+    let on: boolean | null = null;
+    const read = () => {
+      const now = scrollY > at;
+      if (now === on) return;
+      on = now;
+      root.style.setProperty("--hem-top", now ? "1" : "0");
+    };
+    read();
+    addEventListener("scroll", read, { passive: true });
+    return () => {
+      removeEventListener("scroll", read);
+      /* ⚠️ Cleared rather than left at whatever it was, because the property is
+         on the ROOT and outlives this page — a screen that unmounted while
+         scrolled would hand the next one a hem it never asked for. */
+      root.style.removeProperty("--hem-top");
+    };
+  }, [at]);
 }
 
 /**

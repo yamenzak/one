@@ -244,6 +244,27 @@ and content dies halfway up a screen nobody has scrolled. 3.5rem, shared. An
 earlier version ran to 12rem at both ends on a theory about pages being read
 downwards — shot both ways, no visible difference, and both were too much.
 
+⚠️ **The top hem arrives with the first scroll, and that is what makes it a
+vignette rather than a bar.** The hem is opaque against the *world*, not only
+against content — it has to be, and four weaker strengths were shot with every
+one letting a card's text read through a crown title. But opaque means the
+field's marks stop where it starts, so on a page nobody has scrolled it is a flat
+strip of one colour with a pattern under it, which is a bar whatever the softness
+of its edge. Measured: hide the hem and the pattern runs through the crown.
+
+The fault was not how strong it is, it is that it was on with no work to do — at
+scroll zero nothing is passing under the chrome. `--hem-top` goes 0 → 1 on the
+first few pixels, `Page` writes it (a style write, not a render, and only when
+the answer changes), and the rule drives `opacity` so the transition lands on a
+property that can actually animate. It defaults to **1**, so a page that mounts
+no listener gets the hem rather than nothing: the safe state is the one that
+cannot let a card read through a title.
+
+⚠️ **The bottom one is always on, and that is not an inconsistency.** "Is
+anything behind the crown" is exactly `scrollY > 0`. "Is anything behind the nav"
+is not answerable from the scroll position — a page shorter than the viewport can
+still end underneath it.
+
 ⚠️ **A fade is not the plate the no-glass pass removed, and the difference is
 the edge.** Every treatment that pass deleted was a band with a *boundary* — a
 line across the screen where it stopped, which is a border by another name. This
