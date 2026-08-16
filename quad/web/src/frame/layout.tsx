@@ -930,19 +930,25 @@ export function StickyAction({ children }: { readonly children: React.ReactNode 
  * Equal columns mean every label is squeezed to a fifth of the screen, so a
  * two-word destination truncates and a five-item nav is five abbreviations. The
  * bar that works is COMPACT: every destination is its icon, and the ONE somebody
- * is on expands to say so. Four glyphs and one named pill fit at any width, and
+ * is on expands to say so. Four glyphs and one named item fit at any width, and
  * the label that is showing is the only one anybody needs — a person does not
  * read the nav to find out where they are not.
+ *
+ * ⚠️ NOTHING HERE IS A SURFACE. No bar, no pill: the hem under the nav is the
+ * background (`data-hem`), and where you are is INK — full foreground against a
+ * distinctly recessive muted, plus the one word. Every surface this used to have
+ * was solving a problem the hem solves better: the bar was holding contrast
+ * against a moving field, and the pill was clearing the bar.
  *
  * ⚠️ THE EXPANSION IS THE TRAVEL, WHICH REPLACES A PILL THAT SLID. There was one
  * absolutely-positioned pill stepping by `index × 100%` of an equal column, and
  * the argument for it was that a single element MOVING says two destinations are
  * on one shelf while four backgrounds switching on and off do not. That argument
- * still holds and this is a better answer to it: the fill does not jump, it
- * grows out of one item while the one before it closes, so the motion is
- * continuous and it carries the label with it. It also needs no measuring, no
- * ref and no resize observer — which the equal-column pill only avoided by
- * forcing every item to the same width in the first place.
+ * still holds and this is a better answer to it: nothing jumps, because the word
+ * grows out of one item while the one before it closes — the motion is
+ * continuous and it IS the label. It also needs no measuring, no ref and no
+ * resize observer, which the equal-column pill only avoided by forcing every
+ * item to the same width in the first place.
  *
  * ⚠️ IT LEAVES DOWNWARDS AND COMES BACK UP. Reading and navigating are different
  * moments: during the first the nav is in the way, during the second it is the
@@ -1026,9 +1032,11 @@ export function Island({ items, here, onGo, only }: {
         collision rather than out-contrasting it, and leaves the five items
         standing on the page.
       */}
+      {/* ⚠️ AND NO `data-capsule` EITHER — there is no surface left to round.
+          The attribute would still match its rule and change nothing, which is
+          the state it was in before anybody noticed the nav was a rectangle. */}
       <div
         data-island="true"
-        data-capsule="true"
         className={`flex w-full ${WIDTH.read} flex-row items-center ${SPACE.hair} ${ISLAND_PAD}`}
       >
         {shown.map((item) => {
@@ -1036,8 +1044,9 @@ export function Island({ items, here, onGo, only }: {
           return (
             <Button
               key={item.id}
-              /* ⚠️ ALWAYS `ghost`. Where you are is the `data-here` fill, so a
-                 variant that painted its own would be a second marker. */
+              /* ⚠️ ALWAYS `ghost`. Where you are is ink now — `data-here` sets
+                 the colour and nothing else — so a variant that painted its own
+                 surface would put back the pill this design removed. */
               variant="ghost"
               aria-current={isHere ? "page" : undefined}
               data-here={isHere ? "true" : undefined}

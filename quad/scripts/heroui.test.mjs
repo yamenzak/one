@@ -484,8 +484,17 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
     /* ⚠️ `overflow-hidden` IS NOT `hidden`, and the first version of this could
        not tell them apart — `\b` matches after a dash, so the utility that makes
        the label narrow read as the utility that removes it. The closed label is
-       BUILT from `overflow-hidden`, so the guard failed on the correct code. */
-    const gone = /(?:className=[^\n]*(?<![\w-])hidden(?![\w-])|display:\s*["']?none)/.test(body);
+       BUILT from `overflow-hidden`, so the guard failed on the correct code.
+
+       ⚠️ AND NEITHER IS `md:hidden`, which is the same mistake one character
+       along. The nav hides itself above the breakpoint where the sidebar takes
+       over — a statement about the whole BAR at one width, not about a label at
+       any width — and `:` is neither a word character nor a dash, so the
+       original lookbehind let it through. It happened to sit on its own line, so
+       `[^\n]*` was all that stood between this guard and a false failure on
+       correct code, one reformat away. A variant prefix is excluded by name. */
+    const gone =
+      /(?:className=[^\n]*(?<![\w:-])hidden(?![\w-])|display:\s*["']?none)/.test(body);
     const leaves = /transform:\s*away\s*\?/.test(body);
 
     if (!marks || !names) {

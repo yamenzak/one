@@ -245,11 +245,17 @@ left the ghost of a heading behind the icons.
 interpolating toward it darkens as it fades — a grey bloom above the bar on a
 light page, from a rule that never names a grey.
 
-**With the hem under it, the nav needs no fill of its own.** The five items stand
-on the page; the closed four step back to `--muted` and the open one keeps the
-control tier and full ink. Two channels, no bar. The dimming is a *colour* rather
-than an opacity because the unread dot lives inside the button — fading the
-button fades the one mark whose whole job is to be noticed.
+**With the hem under it, nothing in the nav is a surface.** No bar and no pill:
+the five items stand on the page, and "where am I" is answered entirely in ink —
+full foreground against a distinctly thinned `--muted`, plus the one word. Every
+surface the nav used to have was solving a problem the hem solves better: the bar
+was holding contrast against a moving field, and the pill was clearing the bar.
+
+⚠️ The dimming is a *colour* rather than an opacity, because the unread dot lives
+inside the button — fading the button fades the one mark whose whole job is to be
+noticed, and the dot carries its own tone token. And the floor on how far it can
+be thinned is the **WCAG non-text 3:1**: a closed item is a glyph carrying a
+destination with no word beside it.
 
 ## What the seed reaches, precisely
 

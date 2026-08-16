@@ -451,13 +451,6 @@ export function ambienceStylesheet(): string {
     `    var(--surface-tertiary) 90%, var(--scene-veil, var(--surface-tertiary))) !important;`,
     `}`,
     /*
-      ⚠️ AND WHERE YOU ARE IS THE ONE THING THAT LIFTS OFF IT. A destination that
-      is merely a slightly different shade of the bar is a state nobody finds at
-      a glance; `--default` is the control tier, which the palette guarantees
-      clears the raised tier under it. It is the only opaque thing in the chrome,
-      and it is opaque because it is the answer to "where am I".
-    */
-    /*
       ⚠️ `data-capsule` HAD NO RULE AT ALL, WHICH IS WHY THE NAV WAS A RECTANGLE.
       Two elements carried the attribute and both were `Card`s, which bring their
       own radius — so the attribute meant nothing and nobody could tell. The nav
@@ -520,21 +513,47 @@ export function ambienceStylesheet(): string {
     `}`,
     `[data-capsule="true"] { border-radius: 9999px; }`,
     /*
-      ⚠️ THE NAV HAS NO FILL OF ITS OWN NOW — THE HEM IS ITS BACKGROUND. With a
-      capsule under them the five items read as one control and the open one
-      lifts off it; with the hem under them they read as five marks on the page,
-      which is only a nav if one of them is obviously the answer. So the closed
-      four step back to `--muted` and the open one keeps the control tier and
-      full ink. Two channels, and the bar itself is gone.
+      ⚠️ THE NAV HAS NO FILL OF ITS OWN NOW — THE HEM IS ITS BACKGROUND — SO THE
+      WHOLE "WHERE AM I" ANSWER IS INK. With a capsule under them the five items
+      read as one control and the open one lifts off it; with the hem under them
+      they read as five marks on a page, which is only a nav if one of them is
+      obviously the answer. It gets two channels, and neither is a surface: full
+      foreground against a distinctly recessive `--muted`, and the only word on
+      the bar.
+
+      ⚠️ THE CLOSED FOUR ARE PUSHED PAST `--muted`, WHICH IS THE ONE NUMBER HERE
+      SOMEBODY TUNED. `--muted` is the token for secondary TEXT and is calibrated
+      to be READ; beside an active item that is now only ink rather than
+      ink-on-a-pill, that is not enough separation to answer "where am I" at a
+      glance.
+
+      ⚠️ AND THE FLOOR IS A RULE, NOT TASTE. A closed item is a glyph carrying a
+      destination with no word beside it — the WCAG non-text-contrast case, 3:1
+      against what is behind it — so this can be thinned until it approaches that
+      and no further. A nav item nobody can find is worse than one that competes
+      with the active item, which is the direction this number moves under
+      pressure.
+
+      ⚠️ IT IS AN ALPHA ON A TOKEN RATHER THAN A SECOND COLOUR, so it follows
+      `--muted` in both themes and under every workspace. A hand-picked grey
+      here would be right on one ground and a hole in the other.
 
       ⚠️ COLOUR RATHER THAN OPACITY, because the unread dot is INSIDE the
       button. Fading the button fades the one mark on this bar whose whole job
       is to be noticed, and the dot carries its own tone token — so it survives
       a colour change and would not survive an alpha one.
     */
-    `[data-island="true"] button:not([data-here="true"]) { color: var(--muted); }`,
-    `[data-here="true"] { background-color: var(--default); border-radius: 9999px;`,
-    `  color: var(--foreground); }`,
+    `[data-island="true"] button:not([data-here="true"]) {`,
+    `  color: color-mix(in oklab, var(--muted) 58%, transparent); }`,
+    /*
+      ⚠️ WHERE YOU ARE IS INK, AND THAT ONLY BECAME POSSIBLE WITH THE HEM. This
+      painted `--default` — the control tier — and it had to: the bar under it
+      was a filled capsule, so the answer to "where am I" needed a surface that
+      clears the surface it sits on. With no bar there is nothing to clear, and a
+      lozenge inside nothing is a shape drawn round a word for its own sake: one
+      more edge, in a system that spent a whole pass removing them.
+    */
+    `[data-here="true"] { color: var(--foreground); }`,
     /*
       ⚠️ AND THE LABEL INSIDE IT HAS TO BE TOLD, WHICH IS A SPECIFICITY FACT
       RATHER THAN A DESIGN ONE. The open word is `TYPE.note`, and `note` is
