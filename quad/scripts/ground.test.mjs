@@ -297,6 +297,26 @@ if (!/`\.separator \{ background-color: color-mix\(in oklab, var\(--foreground\)
 }
 
 /**
+ * ⚠️ A FULL-SCREEN DIALOG WITH ITS OWN INSET IS A THIRD LAYER OF PADDING, and
+ * on a phone it is measured in the width of the words. `.modal__dialog` is `p-6`
+ * — correct for a CENTRED dialog, which floats and needs an edge — and the
+ * library's `--full` variant overrides width, height, shadow and radius while
+ * leaving that padding alone. Its own `.modal__container--full` zeroes padding
+ * for exactly this reason; the dialog inside it was missed.
+ *
+ * ⚠️ THE HUB IS PRESENTED OVER A PRODUCT, so the same card was NARROWER inside
+ * the hub than outside it on the same phone: 24 of dialog + 16 of gutter + 16 of
+ * card, against the product's 16 + 16. A 390px screen gave 112px to nesting.
+ */
+if (!/`\.modal__dialog--full \{ padding: 0; \}`/.test(GROUND_SRC)) {
+  mono++;
+  fail(`ground.ts: the full-screen dialog keeps the library's centred inset.\n` +
+       `       It is a third layer of horizontal padding under the band's gutter and\n` +
+       `       the card's own, so every presented screen is narrower than the same\n` +
+       `       screen outside the overlay — on the size where it matters most.`);
+}
+
+/**
  * ⚠️ FOCUS IS THE ONE THING THAT MUST NOT FOLLOW, and it is the half that gets
  * forgotten because it is the library's default rather than anything we wrote:
  * HeroUI ships `--focus: var(--accent)`. Left alone, going monochrome makes the

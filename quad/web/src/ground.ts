@@ -290,4 +290,24 @@ export const GROUND_CSS = [
     every list.
   */
   `.separator { background-color: color-mix(in oklab, var(--foreground) 12%, transparent); }`,
+  /*
+    ⚠️ A FULL-SCREEN DIALOG WITH A 24px INSET IS NOT A FULL-SCREEN DIALOG, AND
+    THE PADDING IT KEEPS IS ONE OF THREE. `.modal__dialog` is `p-6` — right for
+    a centred dialog, which floats and needs an edge — and the `--full` variant
+    overrides its width, height, shadow and radius while leaving that padding
+    alone. The library's own `.modal__container--full` sets padding to zero for
+    exactly this reason; the dialog inside it was missed.
+
+    ⚠️ THE COST IS MEASURED IN A PHONE'S WIDTH. 24px of dialog, then 16px of the
+    band's gutter, then 16px of the card's own — 56px each side before a word, so
+    a 390px screen gave 278px to text and 112px to nesting. The hub is presented
+    OVER a product whose own screens run at 16 + 16, so the same card came out
+    narrower inside the hub than outside it, on the same phone, for no reason
+    anybody could see.
+
+    ⚠️ AND IT IS THE `--full` VARIANT ONLY. A `Confirm` is a centred dialog and
+    keeps its inset; a drawer keeps its own for the same reason — its content
+    sits directly against the sheet with no band under it.
+  */
+  `.modal__dialog--full { padding: 0; }`,
 ].join("\n");
