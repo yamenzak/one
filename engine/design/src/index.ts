@@ -13,6 +13,7 @@
 export * from "./tokens/theme.js";
 export * from "./tokens/ambience.js";
 export * from "./parts/face.js";
+export * from "./parts/beside.js";
 export * from "./parts/surfaces.js";
 export * from "./parts/state.js";
 export * from "./frame/screen.js";

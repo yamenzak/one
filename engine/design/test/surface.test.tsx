@@ -375,7 +375,12 @@ describe("the shell", () => {
       />,
     );
     expect(quiet).toContain("Notifications");
-    expect(quiet).not.toContain('data-dot="true"');
+    /* ⚠️ THE LIBRARY'S OWN MARKER, NOT OURS. This asserted `data-dot="true"` —
+       a private span placed by hand with `absolute -top-N -right-N`, written out
+       at three call sites with three different offsets. `Badge.Anchor` has one
+       offset, so the mark now sits in the same place on the account, on a crown
+       action and in the nav. */
+    expect(quiet).not.toContain('data-slot="badge"');
 
     const waiting = html(
       <Shell
@@ -383,7 +388,11 @@ describe("the shell", () => {
         crown={{ ...crown, unread: 3 }} onOpenInbox={() => {}}
       />,
     );
-    expect(waiting).toContain('data-dot="true"');
+    expect(waiting).toContain('data-slot="badge"');
+    /* ⚠️ AND IT IS STILL A DOT RATHER THAN A `3`. The count reaches the badge
+       only where a caller asks for one; chrome says that something is waiting
+       and the number is on the screen the control opens. */
+    expect(waiting).not.toContain('data-slot="badge-label"');
   });
 });
 

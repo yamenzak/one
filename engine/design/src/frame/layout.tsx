@@ -36,6 +36,7 @@ import {
 import { MOTION, useStill } from "../tokens/motion.js";
 import type { Density } from "../scene/index.js";
 import { Face, type FaceOf } from "../parts/face.js";
+import { Hint, Pip } from "../parts/beside.js";
 
 export type { Space, Width };
 /* ⚠️ The metrics a SCREEN legitimately needs, re-exported here so nothing
@@ -444,22 +445,25 @@ export function LeaveChip({ leave = "back", label, onDo }: {
   readonly label?: string;
   readonly onDo: () => void;
 }) {
+  const says = label ?? (leave === "dismiss" ? "Close" : "Back");
   return (
     /* ⚠️ NO CHIP — the hem behind the crown is what holds it now. It carried
        `data-chrome` so it stayed findable over whatever scrolled past; a fill
        on the one control every screen has, purely for contrast, is the shape
        the hem removes everywhere else too. */
-    <Button
-      isIconOnly
-      size={CROWN_SIZE}
-      variant="ghost"
-      aria-label={label ?? (leave === "dismiss" ? "Close" : "Back")}
-      onPress={onDo}
-    >
-      <span className="flex items-center" style={{ ["--icon" as string]: `${ICON.crown}px` }}>
-        {leave === "dismiss" ? <X /> : <Back />}
-      </span>
-    </Button>
+    <Hint says={says}>
+      <Button
+        isIconOnly
+        size={CROWN_SIZE}
+        variant="ghost"
+        aria-label={says}
+        onPress={onDo}
+      >
+        <span className="flex items-center" style={{ ["--icon" as string]: `${ICON.crown}px` }}>
+          {leave === "dismiss" ? <X /> : <Back />}
+        </span>
+      </Button>
+    </Hint>
   );
 }
 
@@ -680,29 +684,28 @@ export function Crown({
           {who ? (
             /* ⚠️ NO `data-chrome` — a face carries its own ground, so a chip
                behind it is a plate behind a plate. */
-            <Button
-              isIconOnly
-              size={CROWN_SIZE}
-              variant="ghost"
-              aria-label={who.onOpen ? "Your account" : who.name}
-              isDisabled={!who.onOpen}
-              onPress={who.onOpen ?? (() => undefined)}
-            >
-              <span className="relative flex size-full items-center justify-center">
-                {/* ⚠️ `row`, NOT `chip`, AND THIS IS THE HEIGHT BUG. Every
-                    control here is 44px and every hit box matched — but the
-                    MARKS inside them did not: a 32px avatar beside a 44px field
-                    beside a 44px filled disc is three visual sizes in a row of
-                    four, which is what "the heights are inconsistent" actually
-                    looks like. `metrics.ts` says it outright — a face is 40px,
-                    and the crown looked empty until it was — and the crown was
-                    the one place still asking for the small one. */}
-                <Face of={who.face} name={who.name} size="row" />
-                {who.unread
-                  ? <span aria-hidden="true" className="absolute -top-0.5 -right-0.5"><Dot /></span>
-                  : null}
-              </span>
-            </Button>
+            <Hint says={who.onOpen ? "Your account" : who.name}>
+              <Button
+                isIconOnly
+                size={CROWN_SIZE}
+                variant="ghost"
+                aria-label={who.onOpen ? "Your account" : who.name}
+                isDisabled={!who.onOpen}
+                onPress={who.onOpen ?? (() => undefined)}
+              >
+                <Pip on={Boolean(who.unread)}>
+                  {/* ⚠️ `row`, NOT `chip`, AND THIS IS THE HEIGHT BUG. Every
+                      control here is 44px and every hit box matched — but the
+                      MARKS inside them did not: a 32px avatar beside a 44px
+                      field beside a 44px filled disc is three visual sizes in a
+                      row of four, which is what "the heights are inconsistent"
+                      actually looks like. `metrics.ts` says it outright — a face
+                      is 40px, and the crown looked empty until it was — and the
+                      crown was the one place still asking for the small one. */}
+                  <Face of={who.face} name={who.name} size="row" />
+                </Pip>
+              </Button>
+            </Hint>
           ) : null}
           {back ? <LeaveChip leave={leave} label={backLabel} onDo={back} /> : null}
 
@@ -752,54 +755,60 @@ export function Crown({
 
           {/* ------------------------------------------------------ trail --- */}
           {also.map((a) => (
-            <Button
-              key={a.id}
-              isIconOnly
-              size={CROWN_SIZE}
-              variant="ghost"
-              aria-label={a.label}
-              onPress={a.onDo}
-            >
-              {/* ⚠️ `.button` SIZES ITS OWN SVGS to `size-5 sm:size-4`, so the
-                  same crown drew 20px glyphs on a phone and 16px ones on a
-                  desktop — a control that changes size with the window, in the
-                  one row that is meant to be the product's constant. */}
-              <span
-                className="relative flex items-center"
-                style={{ ["--icon" as string]: `${ICON.crown}px` }}
+            /* ⚠️ THE SHARPEST HINT IN THE PRODUCT. These glyphs are the APP's —
+               nobody has seen them before — and this is the one row on every
+               screen. The `aria-label` said what they do and everybody not using
+               a screen reader got a shape. */
+            <Hint key={a.id} says={a.label}>
+              <Button
+                isIconOnly
+                size={CROWN_SIZE}
+                variant="ghost"
+                aria-label={a.label}
+                onPress={a.onDo}
               >
-                {a.icon}
-                {a.dot
-                  ? <span aria-hidden="true" className="absolute -top-1 -right-1.5"><Dot /></span>
-                  : null}
-              </span>
-            </Button>
+                <Pip on={Boolean(a.dot)}>
+                  {/* ⚠️ `.button` SIZES ITS OWN SVGS to `size-5 sm:size-4`, so
+                      the same crown drew 20px glyphs on a phone and 16px ones on
+                      a desktop — a control that changes size with the window, in
+                      the one row that is meant to be the product's constant. */}
+                  <span
+                    className="flex items-center"
+                    style={{ ["--icon" as string]: `${ICON.crown}px` }}
+                  >
+                    {a.icon}
+                  </span>
+                </Pip>
+              </Button>
+            </Hint>
           ))}
           {does ? (
             /* ⚠️ ICON-ONLY WHERE THERE IS A GLYPH, LABELLED WHERE THERE IS
                NOT. An `isIconOnly` button handed no icon is a 44px empty
                lozenge — which typechecks, renders, and is unpressable-looking.
                The label is the accessible name either way. */
-            <Button
-              className={does.wide ? "hidden md:flex" : undefined}
-              isIconOnly={Boolean(does.icon)}
-              size={CROWN_SIZE}
-              variant={does.tone === "danger" ? "danger" : "primary"}
-              isDisabled={does.disabled}
-              /* ⚠️ ONLY WHERE THE GLYPH IS THE WHOLE CONTROL. A button whose
-                 visible text IS its name does not take an `aria-label` — that
-                 is the name said twice, once to a screen reader and once to
-                 anybody counting the words in the markup. */
-              aria-label={does.icon ? does.label : undefined}
-              onPress={does.onDo}
-            >
-              <span
-                className="flex items-center"
-                style={{ ["--icon" as string]: `${ICON.crown}px` }}
+            <Hint says={does.label} when={Boolean(does.icon)}>
+              <Button
+                className={does.wide ? "hidden md:flex" : undefined}
+                isIconOnly={Boolean(does.icon)}
+                size={CROWN_SIZE}
+                variant={does.tone === "danger" ? "danger" : "primary"}
+                isDisabled={does.disabled}
+                /* ⚠️ ONLY WHERE THE GLYPH IS THE WHOLE CONTROL. A button whose
+                   visible text IS its name does not take an `aria-label` — that
+                   is the name said twice, once to a screen reader and once to
+                   anybody counting the words in the markup. */
+                aria-label={does.icon ? does.label : undefined}
+                onPress={does.onDo}
               >
-                {does.icon ?? does.label}
-              </span>
-            </Button>
+                <span
+                  className="flex items-center"
+                  style={{ ["--icon" as string]: `${ICON.crown}px` }}
+                >
+                  {does.icon ?? does.label}
+                </span>
+              </Button>
+            </Hint>
           ) : null}
         </div>
       </Band>
@@ -1424,19 +1433,21 @@ export function Island({ items, here, onGo, only }: {
                 + (isHere ? `shrink-0 ${ISLAND_HERE}` : `grow basis-0 min-w-0 ${ISLAND_ITEM}`)}
               onPress={() => onGo(item.route)}
             >
-              <span
-                aria-hidden="true"
-                className="relative flex shrink-0 items-center"
-                /* ⚠️ `.button` SIZES ITS OWN SVGS to `size-5 sm:size-4`, so every
-                   nav glyph drew at 16–20px under a 14px label — the one place
-                   in the product where the word outweighed the mark. */
-                style={{ ["--icon" as string]: `${ICON.nav}px` }}
-              >
-                {item.icon}
-                {item.unread
-                  ? <span aria-hidden="true" className="absolute -top-1 -right-2"><Dot /></span>
-                  : null}
-              </span>
+              {/* ⚠️ NO HINT HERE, AND THAT IS THE ONE DELIBERATE OMISSION. The
+                  nav is the phone half, where a tooltip never fires, and the
+                  word is already beside the glyph the moment the item is open. */}
+              <Pip on={Boolean(item.unread)}>
+                <span
+                  aria-hidden="true"
+                  className="flex shrink-0 items-center"
+                  /* ⚠️ `.button` SIZES ITS OWN SVGS to `size-5 sm:size-4`, so every
+                     nav glyph drew at 16–20px under a 14px label — the one place
+                     in the product where the word outweighed the mark. */
+                  style={{ ["--icon" as string]: `${ICON.nav}px` }}
+                >
+                  {item.icon}
+                </span>
+              </Pip>
               {/*
                 ⚠️ WIDTH, NOT DISPLAY — see the header. `max-width` from zero is
                 what makes the pill GROW rather than appear, and it keeps the
@@ -1512,9 +1523,6 @@ function useScrollingDown(threshold = 6, top = 24): boolean {
 
   return down;
 }
-
-/** ⚠️ Its own element so the tone token colours it — see `Tone`. */
-const Dot = () => <span className="flex size-2" data-tone="danger" data-dot="true" />;
 
 const Lens = () => (
   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -682,11 +682,6 @@ export function ambienceStylesheet(): string {
       which theme it is in.
     */
     `[data-chip="true"] { background-color: color-mix(in oklab, var(--foreground) 7%, transparent); }`,
-    /* ⚠️ THE UNREAD DOT, COLOURED BY ITS TONE RATHER THAN BY A LITERAL. It is
-       here rather than in a component because a component that named a colour
-       would be one a workspace's branding never reaches (D7). */
-    `[data-dot="true"] { border-radius: 9999px; background: var(--danger); }`,
-    `[data-dot="true"][data-tone="accent"] { background: var(--accent); }`,
     /*
       ⚠️ ONE OPTICAL WEIGHT FOR EVERY GLYPH IN THE PRODUCT. An icon library takes
       its size from its own props, so one caller passing nothing draws at the

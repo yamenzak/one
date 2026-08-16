@@ -10,7 +10,7 @@
   ⚠️ THE FACE IS SELF-HOSTED AND IMPORTED HERE, NOT LINKED FROM A CDN. A font CDN
   is a third party in the critical path of the first paint, a request that fails
   closed to a face nobody designed against, and a privacy claim to defend. The
-  variable file ships with the bundle. `@engine/web`'s `FACE_CSS` is what declares
+  variable file ships with the bundle. `@engine/design`'s `FACE_CSS` is what declares
   the stack and the features over it — see `type.ts` for why both halves exist.
 */
 @import "@fontsource-variable/geist";
@@ -30,11 +30,18 @@
   render with a subset of their classes, whichever ones some other file happened
   to use too. Adding a workspace package with JSX in it? Add it here in the same
   commit.
+
+  ⚠️ AND RENAMING ONE IS THE SAME COMMIT. This said `../../web/src` for as long
+  as the design package was called `web` and for a while after it was not — a
+  path that no longer exists, so Tailwind emitted nothing for `@engine/design` and
+  every class it alone used was silently absent. `scripts/heroui.test.mjs`
+  resolves this path now, because a missing directory is not an error here: it
+  is a stylesheet that simply gets smaller.
 */
-@source "../../web/src";
+@source "../../design/src";
 
 /*
-  ⚠️ THE AMBIENCE IS `@engine/web`'s `SKY_MOTION`, INJECTED BY `main.tsx` — not
+  ⚠️ THE AMBIENCE IS `@engine/design`'s `SKY_MOTION`, INJECTED BY `main.tsx` — not
   written here. It carried a hand-rolled `@keyframes` for exactly as long as
   nobody looked: a running animation is the one thing HeroUI's reduced-motion
   rules cannot switch off, so it kept moving for anybody who asked it to stop.

@@ -610,6 +610,8 @@ export function QuickActions({ actions }: {
     <div className={`flex flex-wrap items-start justify-center ${SPACE.snug}`}>
       {actions.slice(0, 4).map((a) => (
         <div key={a.id} className={`flex w-16 flex-col items-center ${SPACE.tight}`}>
+          {/* no-hint: the label is a sibling under the circle, so a tooltip
+              would float the same word an inch above where it already is. */}
           <Button
             /* ⚠️ `isIconOnly` MAKES IT A CIRCLE. Without it a `Button` is
                `w-fit px-4`, so a 22px glyph comes out in a 54×44 lozenge — four

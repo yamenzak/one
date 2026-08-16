@@ -270,6 +270,36 @@ for (const file of FILES) {
 if (!raw) ok(`library: nothing hand-rolls a control HeroUI ships`);
 
 /**
+ * ⚠️ TAILWIND ONLY EMITS WHAT IT WAS POINTED AT, AND A PATH THAT NO LONGER
+ * EXISTS IS NOT AN ERROR — IT IS A SMALLER STYLESHEET. `styles.css` said
+ * `@source "../../web/src"` for as long as the design package was called `web`
+ * and for a while after it was not, so **185 utility classes it alone used were
+ * never generated**: `.hidden`, `.md:hidden`, `.absolute`, `.bottom-0`,
+ * `.basis-0`, `.flex-1`, half the grid. Everything still mounted, typechecked
+ * and passed, because `one-hub/src` happened to use most of the same utilities —
+ * the ones it did not are the ones that silently stopped working.
+ *
+ * ⚠️ SO THE CHECK IS THAT THE DIRECTORY IS THERE, which is the whole of it. No
+ * build, no diff of two stylesheets, no snapshot: a `@source` naming somewhere
+ * that does not exist is always a mistake, and it is the only way this fails.
+ */
+let unpointed = 0;
+let pointed = 0;
+for (const sheet of ["one-hub/src/styles.css"]) {
+  const at = join(ENGINE, sheet);
+  if (!existsSync(at)) { fail(`${sheet}: named here but not in the tree.`); unpointed++; continue; }
+  for (const m of readFileSync(at, "utf8").matchAll(/@source\s+"([^"]+)"/g)) {
+    pointed++;
+    if (existsSync(join(dirname(at), m[1]))) continue;
+    unpointed++;
+    fail(`${sheet}: @source "${m[1]}" does not exist.\n` +
+         `       Tailwind emits nothing for it and says nothing. Every class only that\n` +
+         `       package uses is silently absent from the stylesheet.`);
+  }
+}
+if (!unpointed) ok(`sources: all ${pointed} @source path(s) resolve, so every package's classes are emitted`);
+
+/**
  * ⚠️ A COMPONENT THAT POSITIONS ITSELF IS USED INSIDE THE THING IT POSITIONS
  * AGAINST. Some of the library's components are not laid out by the flow they
  * appear in — they are placed relative to a wrapper (`Badge` against
@@ -385,6 +415,53 @@ for (const file of FILES) {
   }
 }
 if (!lozenge) ok(`shapes: every icon-only control asks the library to be one`);
+
+/**
+ * ⚠️ AN ICON-ONLY CONTROL TELLS A SCREEN READER WHAT IT DOES AND SHOWS EVERYBODY
+ * ELSE A SHAPE. Every one of them already carried an `aria-label`, so the
+ * product read correctly aloud and there were forty-four glyphs in it and no
+ * tooltips at all. The crown's trail is the sharp case: those icons are the
+ * APP's, nobody has seen them before, and that row is on every screen.
+ *
+ * ⚠️ A TOOLTIP IS NEVER THE ACCESSIBLE NAME. It is hover and focus only and
+ * never reaches a touch screen, so `Hint` is the sighted pointer user's copy of
+ * the `aria-label` rather than a replacement for it — which is why this checks
+ * for a hint IN ADDITION TO the label the check above already found.
+ *
+ * ⚠️ AND THE EXEMPTION IS A MARKER A SCRIPT FINDS, NOT A FILE ON A LIST. Two
+ * sites are correctly hint-less — the nav, which is the phone half where a
+ * tooltip never fires and whose word sits beside the glyph anyway, and the quick
+ * actions, whose label is a sibling under the circle. A file-level exemption
+ * would have covered the crown's four as well, since three of them live in the
+ * same file. Every reason is printed on every run, so a rubber stamp is visible.
+ */
+const NO_HINT = /no-hint:\s*([^*\n]+)/;
+let mute = 0;
+const excused = [];
+for (const file of FILES) {
+  const src = readFileSync(file, "utf8");
+  for (const m of src.matchAll(/<Button\b([^>]*)>([\s\S]*?)<\/Button>/g)) {
+    const [, attrs, body] = m;
+    if (!/isIconOnly/.test(attrs)) continue;
+    /* Words between the tags mean the control names itself and owes no hint. */
+    if (body.replace(/\{[^}]*\}|<[^>]*>|\/\*[\s\S]*?\*\//g, "").trim()) continue;
+    /* The wrapper and any excuse are both ABOVE the tag — read the run of source
+       leading up to it rather than trying to balance JSX. */
+    const before = src.slice(Math.max(0, m.index - 600), m.index);
+    const excuse = NO_HINT.exec(before);
+    if (/<Hint\b/.test(before)) continue;
+    if (excuse) { excused.push(`${rel(file)}: ${excuse[1].trim()}`); continue; }
+    mute++;
+    fail(`${rel(file)}: an icon-only <Button> with no <Hint> around it (D7).\n` +
+         `       Its \`aria-label\` names it aloud and shows everybody else a shape. Wrap it\n` +
+         `       in <Hint says={…}>, or state why not with a \`no-hint:\` marker.`);
+  }
+}
+if (!mute) {
+  ok(`hints: every icon-only control is named to a pointer too` +
+     (excused.length ? `, ${excused.length} excused` : ""));
+  for (const why of excused) console.log(`     ${why}`);
+}
 
 /**
  * ⚠️ A ROW OF EQUALS IS EQUAL, AND `.button` IS `w-fit`, SO IT NEVER IS BY
