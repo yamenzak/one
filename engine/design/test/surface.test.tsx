@@ -517,6 +517,21 @@ describe("a workspace's branding", () => {
     expect(scales.length).toBeGreaterThan(1);
     for (const at of scales) expect(at).toBeGreaterThanOrEqual(1.1);
 
+    /*
+      ⚠️ AND THE HOST CLIPS THAT OVERSCAN, WHICH NOTHING DID. A `scale(1.14)`
+      layer hangs ~90px past each edge at desktop width, so the DOCUMENT grew:
+      the page scrolled sideways into nothing, and further every second, because
+      the scroll area tracked the animation. Eight of ten screens did it and no
+      element was ever out of bounds — the overflow is a pseudo-element's, which
+      is exactly why looking for a wide child finds nothing.
+
+      ⚠️ `clip`, NEVER `hidden`. `hidden` makes this a scroll container and every
+      `sticky` crown and nav inside it stops sticking — measured, both ways.
+      Inline axis only, so the page still scrolls the way it is supposed to.
+    */
+    expect(css).toContain("[data-sky] { position: relative; isolation: isolate; overflow-x: clip;");
+    expect(css).not.toContain("[data-sky] { position: relative; isolation: isolate; overflow: hidden");
+
     /* ⚠️ ONE drift keyframe, and it takes its numbers in — not one per
        ambience. Twenty-four grounds move; there is one rule for all of them. */
     expect(css).toContain("@keyframes one-drift {");

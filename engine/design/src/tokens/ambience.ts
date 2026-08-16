@@ -419,8 +419,18 @@ export function ambienceStylesheet(): string {
 
   return [
     /* ⚠️ `-1` and `isolation` on the host, or the layer paints over the content
-       of any ancestor that happens to create a stacking context. */
-    `[data-sky] { position: relative; isolation: isolate; --sky: 1; }`,
+       of any ancestor that happens to create a stacking context.
+
+       ⚠️ AND THE HOST CLIPS SIDEWAYS, BECAUSE THE OVERSCAN BELOW IS MEANT TO BE
+       HIDDEN. The drifting layer is `scale(1.14)` and translated — that is what
+       there is to move — so at 1280 it hangs ~90px past each edge. Nothing was
+       clipping it, so the DOCUMENT grew: the page could be scrolled sideways
+       into nothing, and further every second, because the scroll area tracked
+       the animation. `clip` rather than `hidden` is load-bearing — `hidden`
+       makes this a scroll container and every `sticky` crown and nav inside it
+       stops sticking; and it is the inline axis alone, so the page still scrolls
+       the way it is supposed to. */
+    `[data-sky] { position: relative; isolation: isolate; overflow-x: clip; --sky: 1; }`,
     /*
       ⚠️ ONE MULTIPLIER PER THEME, AND IT IS DOWN TO ONE. This carried five —
       `--sky`, `--thread`, `--etch`, `--lumen`, `--field` — because twenty-four
