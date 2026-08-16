@@ -6,14 +6,26 @@
  * with no screen edited, and removing one takes the row away. The `settings`
  * shape refuses a primary action, because half these controls save themselves
  * and a Save button beside them says the other half do not.
+ *
+ * ⚠️ BOTH LEVELS, ON ONE SCREEN, BECAUSE THAT IS WHERE SOMEBODY LOOKS. A
+ * workspace's settings and your own are two audiences and one destination —
+ * splitting them across two routes means half of them are somewhere nobody goes.
+ * Tabs are right here for the reason `PageTabs` states: these are two facets of
+ * one subject, not two places.
+ *
+ * ⚠️ AND WHAT A PERMISSION HIDES IS THE RENDERER'S BUSINESS, NOT THIS SCREEN'S.
+ * `held` goes in and the rows a reader may not change do not come out — so a
+ * reader opening the workspace tab sees an honest, shorter list rather than a
+ * row that refuses when pressed.
  */
 
 import * as React from "react";
-import { Screen, Settings as Rendered } from "@engine/design";
+import { PageTabs, Screen, Settings as Rendered, Stack } from "@engine/design";
 import { HELLO } from "../index.js";
 
 export function Settings({ title, level, held, stored, onChange, includes }: {
   readonly title?: string;
+  /** Which tab opens. The other is one press away. */
   readonly level: "tenant" | "person";
   readonly held: ReadonlySet<string>;
   readonly stored: Readonly<Record<string, unknown>>;
@@ -21,15 +33,32 @@ export function Settings({ title, level, held, stored, onChange, includes }: {
   /** What the plan covers — a setting it does not is shown and locked, never hidden. */
   readonly includes?: (entitlement: string) => boolean;
 }) {
-  return (
-    <Screen shape="settings" title={title}>
+  const [tab, setTab] = React.useState<string>(level);
+
+  const book = HELLO.settings ?? {};
+  const of = (which: "tenant" | "person") => (
+    <Stack space="roomy">
       <Rendered
-        book={HELLO.settings ?? {}}
-        level={level}
+        book={book}
+        level={which}
         stored={stored}
         held={held}
         onChange={onChange}
         includes={includes}
+      />
+    </Stack>
+  );
+
+  return (
+    <Screen shape="settings" title={title}>
+      <PageTabs
+        label="Settings"
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { id: "tenant", label: "Workspace", content: of("tenant") },
+          { id: "person", label: "You", content: of("person") },
+        ]}
       />
     </Screen>
   );

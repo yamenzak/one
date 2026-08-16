@@ -26,8 +26,8 @@ import { PRIMARY_MAX, primaryOf } from "@engine/kernel";
 import { Button, Separator } from "@heroui/react";
 import {
   Banknote, Bell, Building2, Calendar, Circle, ClipboardList, Clock, Cog, Coins, Database,
-  Boxes, FileText, House, Inbox as InboxGlyph, NotebookPen, Package, Plus, Shield, Sparkles, Sun,
-  UserRound, Users,
+  Boxes, ChartColumn, FileText, House, Inbox as InboxGlyph, NotebookPen, Package, Plus, Search,
+  Shield, Sparkles, Star, Sun, UserRound, Users,
 } from "lucide-react";
 import { Page } from "./page.js";
 import { Island } from "./chrome.js";
@@ -66,6 +66,13 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
      draws the neutral mark, which in a five-row menu is five identical circles
      — the one outcome worse than no glyph at all. */
   sparkle: <Sparkles />, clock: <Clock />, database: <Database />,
+  /* ⚠️ AND THE THREE A MANIFEST ALREADY NAMED. `chart`, `search` and `star` are
+     in a reference app's own screen declarations, so the nav drew a neutral
+     circle for three of its destinations — the failure this map's own header
+     describes, reached by the app it was written for. A glyph name is data in a
+     manifest, so nothing can typecheck it; the only place it is visible is a
+     rendered nav. */
+  chart: <ChartColumn />, search: <Search />, star: <Star />,
 };
 
 export const glyphOf = (name?: string): React.ReactNode =>

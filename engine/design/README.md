@@ -31,12 +31,31 @@ folder above it.
 | [DESIGN.md](DESIGN.md) | the design language — the rules, the screen shapes, where the one action goes, the checks a screen has to pass | read once |
 | [AMBIENCE.md](AMBIENCE.md) | the world behind the screen — the families, the three ways to make a field, the hem, what a seed reaches | read when a screen needs a ground |
 
-⚠️ **AND THE TEST GROUND IS `apps/hello`.** Its five screens are built from
+⚠️ **AND THE TEST GROUND IS `apps/hello`.** Its eight screens are built from
 nothing but this package, take their data as props, and render with no session,
 no worker and no database — `pnpm --filter @engine/hub dev`, then
-`?screen=/reports`. That last property is the one that matters: four defects
-this package shipped were invisible to every suite and obvious in a photograph,
-and none of them would have been reachable behind a sign-in.
+`?screen=/reports`. That last property is the one that matters: every defect
+listed below was invisible to every suite and obvious in a photograph, and none
+of them would have been reachable behind a sign-in.
+
+⚠️ **EVERY COMPONENT HERE IS DRAWN THERE, OR THE REASON IS WRITTEN DOWN** —
+`scripts/showcase.test.mjs`, and the excuse list can only shrink. This is the
+guard with the best ratio in the tree, because an unrendered component is an
+ABSENCE: it typechecks, it has unit tests, and the first person to reach for it
+is the one who finds out. Writing hello's screens against the full vocabulary
+found, in one pass:
+
+| | |
+|---|---|
+| `Menu` | nested a `<button>` in a `<button>` — invalid HTML and a hydration error, on every dropdown in the product |
+| `Gauge` | drew its arc in `--accent`, which is monochrome here, so 62% and 0% were the same picture |
+| `Stat` / `Hero` | had `unit` as a PREFIX only, so `unit="min"` printed `min120`. `Meter` and `Ring` were given the `unit`/`suffix` split and these two were not |
+| `Milestones` | rendered `said` and dropped `label` — the explanation with no subject, in a chip stretched the width of the page |
+| `MoneyInput` | threw `Invalid currency code : €` from four frames inside `Intl`, naming neither itself nor its caller |
+| every chart | scaled its `fontSize: 8` axis labels with the panel, so a full-width plot had 30px numbers over a 16px title |
+| `glyphOf` | had no `chart`, `search` or `star` — three names a manifest in this repo already used, so three nav destinations drew a blank circle |
+
+None of that is visible in a diff. All of it is visible in one screenshot.
 
 **Building a screen? Pick the shape (DESIGN.md §4), reach for what already exists
 (below), and let the guards say the rest.** None of this needs reading end to

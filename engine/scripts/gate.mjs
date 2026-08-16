@@ -26,7 +26,7 @@ const ENGINE = join(HERE, "..");
    whose wrong answer costs the most. */
 const GUARDS = [
   "inert", "docs", "guards", "kernel", "declarations", "shards", "apps",
-  "heroui", "ground", "motion", "metrics", "states", "shape", "face", "scene",
+  "heroui", "ground", "motion", "metrics", "showcase", "states", "shape", "face", "scene",
   "provenance", "surface", "hub", "services", "agent", "access", "package",
   "operator", "ai-action", "vault",
 ];

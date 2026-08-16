@@ -19,6 +19,15 @@ import {
 
 /* ------------------------------------------------------------ collections --- */
 
+/**
+ * ⚠️ A NOTEBOOK ENTRY CARRIES ALL FOURTEEN DECLARABLE KINDS, AND THAT IS WHY THE
+ * COLLECTION IS THIS WIDE. `Field` turns a declaration into a control, and the
+ * only honest test of that is a real record whose values happen to span the
+ * whole set — a screen assembled to show one of each proves the components
+ * exist, which nobody doubted. What was in doubt is whether an app declaring an
+ * ordinary thing gets fourteen usable controls, and a note genuinely has a kind,
+ * a day it happened, a colour, a link, a cost and somebody to ask.
+ */
 const note = collection({
   id: "note",
   label: { one: "Note", many: "Notes" },
@@ -32,6 +41,25 @@ const note = collection({
     title: field.text({ label: "Title", required: true, holds: "none", max: 200 }),
     body: field.long({ label: "Body", holds: "none", max: 20_000 }),
     pinned: field.bool({ label: "Pinned", holds: "none" }),
+    kind: field.enum({
+      label: "Kind", holds: "none",
+      values: ["idea", "decision", "question", "record"],
+    }),
+    happened: field.day({ label: "Happened on", holds: "none" }),
+    remind: field.instant({ label: "Come back to it", holds: "none" }),
+    minutes: field.number({ label: "Minutes it took", holds: "none", min: 0, max: 600 }),
+    /* ⚠️ Minor units, because a float is a rounding error with a symbol on it. */
+    cost: field.money({ label: "What it cost", holds: "none" }),
+    colour: field.colour({ label: "Colour", holds: "none" }),
+    link: field.url({ label: "Link", holds: "none" }),
+    /* ⚠️ SOMEBODY ELSE'S ADDRESS, so it says so — and hello's processing record
+       is generated from exactly this word rather than written by hand. */
+    ask: field.email({ label: "Who to ask", holds: "contact" }),
+    cover: field.media({ label: "Cover", holds: "none", purpose: "note-cover" }),
+    /* ⚠️ A note points at the note it came out of, which is the same collection.
+       A reference needs no second collection to be real. */
+    follows: field.ref({ label: "Follows", holds: "none", to: "note" }),
+    extra: field.json({ label: "Extra", holds: "none" }),
   },
 });
 
@@ -165,6 +193,19 @@ export const HELLO: AppSpec = defineApp({
        number beside it — and a screen is where those meet. */
     { id: "reports", route: "/reports", label: "Reports", nav: "secondary", icon: "chart",
       permission: "note:read" },
+    /* ⚠️ REACHED FROM A SCREEN RATHER THAN FROM THE NAV, WHICH IS WHAT `none`
+       MEANS. A note is opened from the list and written from the list's one
+       action; putting either in the nav would advertise two destinations for
+       the place somebody is already standing. */
+    { id: "note", route: "/note", label: "A note", nav: "none", icon: "note",
+      permission: "note:read" },
+    { id: "write", route: "/write", label: "Write a note", nav: "none", icon: "note",
+      permission: "note:write" },
+    /* ⚠️ THE APP'S OWN GUIDE, MILESTONES AND HELP HAVE TO LAND SOMEWHERE. All
+       three are declared below and were drawn nowhere — a checklist nobody can
+       open is a checklist nobody completes, and the manifest cannot tell. */
+    { id: "start", route: "/start", label: "Getting started", nav: "secondary", icon: "star",
+      permission: "note:read" },
   ],
 
   notifications: {
@@ -188,10 +229,53 @@ export const HELLO: AppSpec = defineApp({
       fallback: false, needs: "tenant:manage",
       help: "New notes start at the top of the list.",
     },
+    "notes.default_kind": {
+      id: "notes.default_kind", level: "tenant", group: "Notes",
+      field: field.enum({
+        label: "What a new note is", holds: "none",
+        values: ["idea", "decision", "question", "record"],
+      }),
+      fallback: "idea", needs: "tenant:manage",
+      help: "Whoever writes it can still change it.",
+    },
+    "notes.weekly_target": {
+      id: "notes.weekly_target", level: "tenant", group: "Notes",
+      field: field.number({ label: "Notes a week", holds: "none", min: 0, max: 500 }),
+      fallback: 20, needs: "tenant:manage",
+      help: "What Reports measures a week against.",
+    },
+    /* ⚠️ A COLOUR SETTING IS THE ONE THAT PROVES `Field` PICKS A CONTROL RATHER
+       THAN A TEXT BOX. It fell through to `text` once, and a workspace's colour
+       was a field holding `#2563eb` to be typed correctly by somebody who
+       already knew hex. */
+    "notes.accent": {
+      id: "notes.accent", level: "tenant", group: "Appearance",
+      field: field.colour({ label: "Colour", holds: "none" }),
+      fallback: "#3f7d58", needs: "tenant:manage",
+    },
+    "notes.reply_to": {
+      id: "notes.reply_to", level: "tenant", group: "Email",
+      field: field.email({ label: "Where replies go", holds: "contact" }),
+      fallback: "", needs: "tenant:manage",
+    },
     "notes.density": {
       id: "notes.density", level: "person", group: "Appearance",
       field: field.enum({ label: "Density", holds: "none", values: ["comfortable", "compact"] }),
       fallback: "comfortable",
+    },
+    "notes.signature": {
+      id: "notes.signature", level: "person", group: "Appearance",
+      field: field.text({ label: "How you sign a note", holds: "none", max: 60 }),
+      fallback: "",
+    },
+    "notes.digest": {
+      id: "notes.digest", level: "person", group: "Email",
+      field: field.enum({
+        label: "Digest", holds: "none",
+        values: ["off", "daily", "weekly"],
+      }),
+      fallback: "weekly",
+      help: "One message with what was published since the last one.",
     },
   },
 
@@ -202,21 +286,41 @@ export const HELLO: AppSpec = defineApp({
     },
   },
 
+  /* ⚠️ MORE THAN ONE OF EACH, BECAUSE ONE OF ANYTHING IS NOT A LIST. A checklist
+     of a single step renders as a sentence, a trail of one moment renders as a
+     date, and neither shows what the component does with the second one. */
   guide: {
     "first-note": { id: "first-note", label: "Write your first note",
       why: "It is the whole product.", done: "note.created", link: "/", order: 1 },
+    /* ⚠️ EVERY STEP IS TICKED BY AN EVENT THIS APP ACTUALLY RAISES. A step whose
+       `done` nothing emits is a box that can never be crossed off, and the
+       manifest refuses one at composition rather than letting it sit there. */
+    "draft-one": { id: "draft-one", label: "Let it draft one for you",
+      why: "It is the fastest way to see what a note is.", done: "note.drafted",
+      link: "/write", order: 2 },
+    "publish-one": { id: "publish-one", label: "Publish a note",
+      why: "Publishing is what everybody else sees.", done: "note.published",
+      link: "/", order: 3 },
   },
 
   milestones: {
     "first-published": { id: "first-published", label: "First published note",
       said: "Everybody in the workspace can see it now.", on: "note.published",
       tone: "success", icon: "star" },
+    "ten-notes": { id: "ten-notes", label: "Ten notes", said: "The notebook is worth searching.",
+      on: "note.created", after: 10, tone: "info", icon: "note" },
   },
 
   help: {
     "about-notes": { id: "about-notes", title: "About notes", screen: "notes",
       body: "A note belongs to the workspace. Everybody who can read notes can read all of them.",
       terms: ["note", "share", "who can see"] },
+    "about-publishing": { id: "about-publishing", title: "Publishing", screen: "notes",
+      body: "A draft is yours until you publish it. Publishing tells everybody once and cannot be undone quietly.",
+      terms: ["publish", "draft"] },
+    "about-people": { id: "about-people", title: "Who is here", screen: "people",
+      body: "Invite somebody by email. They join by signing in as that address — there is nothing to accept.",
+      terms: ["invite", "seat"] },
   },
 
   whitelabel: { surfaces: ["shell", "email"], entitlement: "publishing" },

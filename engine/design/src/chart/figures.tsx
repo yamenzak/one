@@ -64,10 +64,20 @@ export function Delta({ value, of, upIsGood = true, unit = "" }: {
  * loose at display size — a standalone `121` set in tabular figures has a gap
  * either side of the ones. Tabular is for things that must align vertically.
  */
-export function Stat({ label, value, unit = "", delta, trend, upIsGood = true }: {
+export function Stat({ label, value, unit = "", suffix = "", delta, trend, upIsGood = true }: {
   readonly label: string;
   readonly value: number | string;
+  /** ⚠️ What goes BEFORE the number, which is a currency and nothing else. */
   readonly unit?: string;
+  /**
+   * ⚠️ AND WHAT GOES AFTER, WHICH IS EVERY OTHER UNIT THERE IS. `Meter` and
+   * `Ring` were given this split and the two figures were not — so a stat
+   * handed `unit="min"` rendered "min120", on the screen the whole chart
+   * vocabulary is judged on. A component cannot tell a currency symbol from a
+   * unit of measure by looking at the string, and guessing produces the same
+   * fault in the other direction.
+   */
+  readonly suffix?: string;
   readonly delta?: { readonly value: number; readonly of: string };
   readonly trend?: readonly Point[];
   readonly upIsGood?: boolean;
@@ -77,7 +87,7 @@ export function Stat({ label, value, unit = "", delta, trend, upIsGood = true }:
       <span className={TYPE.note}>{label}</span>
       <span className={`flex items-baseline ${SPACE.tight}`}>
         <span className={TYPE.figure} style={{ fontVariantNumeric: "proportional-nums" }}>
-          {unit}{typeof value === "number" ? compact(value) : value}
+          {unit}{typeof value === "number" ? compact(value) : value}{suffix}
         </span>
         {delta ? <Delta value={delta.value} of={delta.of} upIsGood={upIsGood} unit={unit} /> : null}
       </span>
@@ -110,10 +120,13 @@ export function StatRow({ children }: { readonly children: React.ReactNode }) {
  * decision anybody designed. It takes `display` from the type scale, which is
  * where the ≥ 48px rule already lives.
  */
-export function Hero({ eyebrow, value, unit = "", delta, upIsGood = true, count = true }: {
+export function Hero({ eyebrow, value, unit = "", suffix = "", delta, upIsGood = true, count = true }: {
   readonly eyebrow?: string;
   readonly value: number | string;
+  /** ⚠️ Before the number — a currency. See `Stat` for why there are two. */
   readonly unit?: string;
+  /** ⚠️ After it — every other unit of measure there is. */
+  readonly suffix?: string;
   readonly delta?: { readonly value: number; readonly of: string };
   readonly upIsGood?: boolean;
   /**
@@ -132,6 +145,7 @@ export function Hero({ eyebrow, value, unit = "", delta, upIsGood = true, count 
         {typeof value === "number"
           ? <Tally value={value} format={compactLike(value)} count={count} />
           : value}
+        {suffix}
       </span>
       {delta ? <Delta value={delta.value} of={delta.of} upIsGood={upIsGood} unit={unit} /> : null}
     </div>

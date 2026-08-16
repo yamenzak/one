@@ -199,8 +199,16 @@ export function Menu({ trigger, items }: {
   readonly items: readonly MenuItem[];
 }) {
   return (
+    /*
+      ⚠️ THE TRIGGER IS A DIRECT CHILD, NOT WRAPPED IN `Dropdown.Trigger`, and
+      that is the library's own documented shape. `Dropdown.Trigger` renders a
+      pressable of its own, so a `Button` inside it comes out as `<button>` in a
+      `<button>` — invalid HTML, a React hydration error, and a control whose
+      press target is ambiguous. Nothing about it is visible in a screenshot;
+      it was found by reading the console on a rendered page.
+    */
     <Dropdown>
-      <Dropdown.Trigger>{trigger}</Dropdown.Trigger>
+      {trigger}
       <Dropdown.Popover>
         <Dropdown.Menu>
           {items.map((item) => (

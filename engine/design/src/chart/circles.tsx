@@ -237,10 +237,13 @@ const SLICES_MAX = 5;
  * labelled by colour asks a reader to match a hue to a key and then estimate an
  * angle, twice, to recover a number the component was given.
  */
-export function DonutChart({ describes, data, unit = "", total: totalLabel }: {
+export function DonutChart({ describes, data, unit = "", suffix = "", total: totalLabel }: {
   readonly describes: string;
   readonly data: readonly { readonly label: string; readonly value: number }[];
+  /** ⚠️ Before the number — a currency. See `Ring` for why there are two. */
   readonly unit?: string;
+  /** ⚠️ After it — every other unit of measure there is. */
+  readonly suffix?: string;
   /** ⚠️ What the middle says. Defaults to the sum, which is usually right. */
   readonly total?: string;
 }) {
@@ -271,7 +274,7 @@ export function DonutChart({ describes, data, unit = "", total: totalLabel }: {
           x={MID} y={MID + 2} textAnchor="middle" dominantBaseline="middle"
           className={TYPE.figure} fill="currentColor" style={{ fontSize: 20 }}
         >
-          {totalLabel ?? `${unit}${compact(total)}`}
+          {totalLabel ?? `${unit}${compact(total)}${suffix}`}
         </text>
       </svg>
       <figcaption>
@@ -284,7 +287,7 @@ export function DonutChart({ describes, data, unit = "", total: totalLabel }: {
                 style={{ background: colours[i] }}
               />
               <span className="grow">{d.label}</span>
-              <span className="tabular-nums">{unit}{compact(d.value)}</span>
+              <span className="tabular-nums">{unit}{compact(d.value)}{suffix}</span>
             </li>
           ))}
         </ul>
@@ -324,10 +327,13 @@ function fold(
  * separating, and drawing a line between them is data-weight ink that is not
  * data — the card's own colour does it and disappears.
  */
-export function CompositionBar({ describes, data, unit = "" }: {
+export function CompositionBar({ describes, data, unit = "", suffix = "" }: {
   readonly describes: string;
   readonly data: readonly { readonly label: string; readonly value: number }[];
+  /** ⚠️ Before the number — a currency. See `Ring` for why there are two. */
   readonly unit?: string;
+  /** ⚠️ After it — every other unit of measure there is. */
+  readonly suffix?: string;
 }) {
   const dark = useDark();
   const shown = fold(data);
@@ -380,7 +386,7 @@ export function CompositionBar({ describes, data, unit = "" }: {
               />
               {d.label}
               <span className="tabular-nums" style={{ color: QUIET }}>
-                {unit}{compact(d.value)}
+                {unit}{compact(d.value)}{suffix}
               </span>
             </li>
           ))}

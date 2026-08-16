@@ -220,8 +220,27 @@ export function NumberInput({ value, onChange, min, max, step, format, ...p }: N
  * hand-rolled parser would have mangled — `1.000,50` is a number in Berlin.
  */
 export function MoneyInput({ currency, ...rest }: Omit<NumberInputProps, "format"> & {
+  /**
+   * ⚠️ AN ISO CODE, NEVER A SYMBOL — `EUR`, not `€`. And the trap is next door:
+   * `Money`, which DISPLAYS an amount, takes the symbol, because it prints the
+   * string verbatim. Two props called `currency` on the two money components,
+   * meaning opposite things.
+   */
   readonly currency: string;
 }) {
+  /*
+    ⚠️ REFUSED HERE RATHER THAN FOUR FRAMES INSIDE `Intl`. Passing the symbol
+    throws `Invalid currency code : €` out of `NumberFormatter`, which names
+    neither this component nor the screen that called it — the first render of
+    hello's form did exactly that, and the stack was entirely library code. This
+    is the same failure with the caller's name on it.
+  */
+  if (!/^[A-Z]{3}$/.test(currency)) {
+    throw new Error(
+      `MoneyInput needs an ISO currency code — "EUR", not "${currency}". ` +
+      `\`Money\` is the one that takes a symbol.`,
+    );
+  }
   return <NumberInput {...rest} format={{ style: "currency", currency }} />;
 }
 

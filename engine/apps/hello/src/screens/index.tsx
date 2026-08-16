@@ -1,5 +1,5 @@
 /**
- * HELLO'S BROWSER HALF — five screens, and the UI test ground.
+ * HELLO'S BROWSER HALF — eight screens, and the UI test ground.
  *
  * ⚠️ SEPARATE FROM THE MANIFEST ON PURPOSE. `../index.ts` is imported by the
  * WORKER, and a worker that imported React would pay for it in startup CPU on
@@ -15,19 +15,27 @@
  * ⚠️ AND THE SAMPLE WORLD IS THE APP'S OWN CONTENT, not a fixture. Hello is the
  * mock app — it has no customers and no database — so what it shows is written
  * down in `sample.ts` where anybody can read it.
+ *
+ * ⚠️ THE STATE LIVES HERE RATHER THAN IN THE SCREENS. A screen that owned its
+ * own period, query and filters would be a screen nobody could render into a
+ * chosen state — and photographing a chosen state is the whole reason this
+ * exists. One holder, and every screen below it is a function of its props.
  */
 
 import * as React from "react";
 import { ready, type Loaded, type PeriodId } from "@engine/design";
 import { HELLO } from "../index.js";
-import { NOTES, PEOPLE, READ, WRITTEN, type Note } from "./sample.js";
+import { NOTES, PEOPLE, READ, WRITTEN, type Note as OneNote } from "./sample.js";
+import { Note } from "./Note.js";
 import { Notes } from "./Notes.js";
 import { People } from "./People.js";
 import { Reports } from "./Reports.js";
 import { Search } from "./Search.js";
 import { Settings } from "./Settings.js";
+import { Start } from "./Start.js";
+import { Write } from "./Write.js";
 
-export { Notes, People, Reports, Search, Settings };
+export { Note, Notes, People, Reports, Search, Settings, Start, Write };
 export * from "./sample.js";
 
 const nothing = () => undefined;
@@ -41,13 +49,24 @@ const nothing = () => undefined;
 export const HELLO_ROUTES: readonly string[] =
   (HELLO.screens ?? []).map((s) => s.route);
 
+/** What ticks the guide, and how many times. Sample, like everything else here. */
+const DONE = ["note.created", "note.drafted"];
+const COUNTS = { "note.created": 6, "note.published": 3, "note.drafted": 2 };
+const HELD = new Set(["tenant:manage", "note:read", "note:write", "member:read"]);
+
 /**
  * Every screen with the sample world behind it, keyed by its declared route.
  * This is what the test ground renders and what a screenshot sweep walks.
  */
-export function HelloScreen({ route }: { readonly route: string }) {
+export function HelloScreen({ route, onGo }: {
+  readonly route: string;
+  /** ⚠️ Absent on the ground, where there is no router to go anywhere with. */
+  readonly onGo?: (route: string) => void;
+}) {
   const [q, setQ] = React.useState("");
+  const [recent, setRecent] = React.useState<readonly string[]>(["pricing", "onboarding"]);
   const [period, setPeriod] = React.useState<PeriodId>("30d");
+  const go = onGo ?? nothing;
 
   /* ⚠️ THE NAME COMES FROM THE MANIFEST, NOT FROM A STRING HERE. A screen titled
      by its own file is a screen whose name and whose nav entry are two facts
@@ -55,8 +74,8 @@ export function HelloScreen({ route }: { readonly route: string }) {
      second. */
   const title = (HELLO.screens ?? []).find((sc) => sc.route === route)?.label;
 
-  const notes: Loaded<readonly Note[]> = ready(NOTES);
-  const matches: Loaded<readonly Note[]> = ready(
+  const notes: Loaded<readonly OneNote[]> = ready(NOTES);
+  const matches: Loaded<readonly OneNote[]> = ready(
     q.trim()
       ? NOTES.filter((n) => `${n.title} ${n.said}`.toLowerCase().includes(q.trim().toLowerCase()))
       : NOTES,
@@ -68,25 +87,45 @@ export function HelloScreen({ route }: { readonly route: string }) {
       <Settings
         title={title}
         level="tenant"
-        held={new Set(["tenant:manage", "note:read", "note:write"])}
+        held={HELD}
         stored={{}}
         onChange={nothing}
       />
     );
-    case "/search": return <Search title={title} q={q} onQ={setQ} of={matches} />;
+    case "/search": return (
+      <Search
+        title={title}
+        q={q}
+        onQ={setQ}
+        of={matches}
+        recent={recent}
+        onRecent={(drop) => setRecent((was) => was.filter((r) => r !== drop))}
+      />
+    );
     case "/reports": return (
       <Reports
         title={title}
-        written={WRITTEN}
-        read={READ}
+        of={ready({ written: WRITTEN, read: READ })}
         today="2026-08-16"
         period={period}
         onPeriod={(id) => setPeriod(id)}
       />
     );
+    /* ⚠️ THE FIRST NOTE, BECAUSE THE GROUND HAS NO ROUTER TO CARRY AN ID. On a
+       real deployment this route takes one; here it is the note the sample world
+       leads with, which is what makes the screen photographable at all. */
+    case "/note": return (
+      <Note title={title} note={NOTES[0] as OneNote} onBack={() => go("/")} onPublish={nothing} onOpen={nothing} />
+    );
+    case "/write": return <Write title={title} onBack={() => go("/")} onSave={nothing} />;
+    case "/start": return (
+      <Start title={title} done={DONE} counts={COUNTS} held={HELD} onGo={go} />
+    );
     /* ⚠️ THE DEFAULT IS THE APP'S FIRST DECLARED SCREEN, not a blank. An
        unrecognised route rendering nothing is the same picture as a page that
        failed to load, and only one of them gets reported. */
-    default: return <Notes title={title ?? "Notes"} of={notes} onNew={nothing} onOpen={nothing} />;
+    default: return (
+      <Notes title={title ?? "Notes"} of={notes} onNew={() => go("/write")} onOpen={() => go("/note")} />
+    );
   }
 }

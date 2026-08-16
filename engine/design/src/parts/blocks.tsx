@@ -209,6 +209,15 @@ export function Gauge({ value, label, note }: {
     <div className={`flex items-center ${SPACE.snug}`}>
       <ProgressCircle aria-label={label} value={value}>
         <ProgressCircle.Track>
+          {/*
+            ⚠️ THE ARC DRAWS IN `--data` AND THAT RULE IS IN `ground.ts`, not
+            here. Left as the library ships it the fill is `--accent`, which is
+            monochrome in this interface — so a gauge at 62% and a gauge at 0%
+            drew the identical ring, on the component whose whole job is saying
+            how far along somebody is. `Meter` and `Ring` name the token
+            themselves because their marks are ours; this mark is the library's,
+            so the fix is a theme rule rather than a class or a style on it (D7).
+          */}
           <ProgressCircle.TrackCircle />
           <ProgressCircle.FillCircle />
         </ProgressCircle.Track>

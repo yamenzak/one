@@ -553,10 +553,29 @@ that widened every second. A five-segment filter ran off a 390px screen. And the
 guard above. The suites were green for all four, which is the argument for
 shooting the screen rather than trusting the run.
 
-**`@engine/hello` — the reference app, and the UI test ground.** Five screens
+**`@engine/hello` — the reference app, and the UI test ground.** Eight screens
 built from nothing but `@engine/design`, over a sample world written down in
 `screens/sample.ts` where anybody can read it. Hello is the MOCK app — no
 customers, no database — so sample content is what it honestly has.
+
+⚠️ **THE APP IDEA IS THE POINT, NOT DECORATION.** Hello is a shared notebook,
+and a note carries all fourteen kinds a field can be declared as — a kind, a day
+it happened, minutes, a cost, a colour, a link, somebody to ask, a cover, the
+note it follows. That is not padding to fill a form: `Field` turns a declaration
+into a control, and the only honest test of fourteen branches is an ordinary
+record that happens to need all of them. A screen assembled to show one of each
+proves the components exist, which nobody doubted.
+
+| route | shape | what it is for |
+|---|---|---|
+| `/` | `list` | the four outcomes, a rail of pinned cards, a sortable table |
+| `/note` | `detail` | the overlays — a menu, a confirmation, a peek, a dialog, a full-screen presentation. All five are things you do TO a subject, so nothing else has an honest place for them |
+| `/write` | `form` | the control grammar as one form, because four sentences per control only drift where there are eight of them |
+| `/people` | `list` | two trays the LIST opens — inviting, and one person |
+| `/reports` | `board` | every chart form, each on the question it is for |
+| `/search` | `list` | filters as an aside, and "nothing typed" as a state of its own |
+| `/settings` | `settings` | both levels, and nobody wrote it |
+| `/start` | `board` | the guide, the milestones and the help the manifest already declared and nothing drew |
 
 - **The routes come from the manifest, not from a list beside them.** A second
   list is a second answer to "what screens does this app have", and they drift
@@ -567,10 +586,21 @@ customers, no database — so sample content is what it honestly has.
   the specimen board, and it is a better claim than either: a catalogue proves
   each piece renders, a specimen proves a screen COULD be assembled from the
   vocabulary, and an app's own screen proves one WAS.
-- **The sample world keeps the awkward cases** — a gap in the series, somebody
-  who has not accepted an invitation, a note nobody published. A demo where
+- **The sample world keeps the awkward cases** — a gap in the series, an hour of
+  the week nobody has ever written in, somebody who has not accepted an
+  invitation, a note nobody published, a figure that went down. A demo where
   everything is present and tidy renders every empty state exactly never, and
-  `ground.screens.test.tsx` asserts all three are still there.
+  `ground.screens.test.tsx` asserts they are still there. Every series is written
+  out rather than generated from a sine, because a smooth wave is the one shape a
+  chart is never asked to draw.
+- **And the ground is a guard**, not a habit: `scripts/showcase.test.mjs` fails
+  on any component `@engine/design` exports and nothing renders. Nine are excused
+  in writing and the list can only shrink — seven are surfaces the HUB owes
+  (the wallet, the processing record, who looked at a vault field, the consent
+  sheet, the AI lanes), and two are arguments that the component should not be
+  drawn here at all. Writing the eight screens against the full vocabulary found
+  seven defects in the design system in one pass, every one of them invisible to
+  a diff and obvious in a photograph; `design/README.md` lists them.
 
 **`@engine/hub` (`engine/one-hub/`) — the page a person opens.** The signpost, sign-in with an
 emailed code, the doors, and the wizard that makes a workspace — HeroUI v3 as it
@@ -603,7 +633,7 @@ The guard registry, its checks, and the standards that bind them.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 5 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 50 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 52 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
@@ -779,6 +809,8 @@ the library decides FOR us.
 | `a-pressable-row-clears-the-touch-floor` | D7 | a row somebody taps rendering under 64px, which reads as a mis-tap rather than as a small target |
 | `a-pressable-row-drops-the-button-s-own-metrics` | D7 | a row satisfying the touch floor with a string that changes nothing, because the button's own height and gutter still win |
 | `the-page-reserves-room-for-its-nav` | D7 | a sticky island floating over the last card on every screen — the island cannot fix it, since by the time it lays out the content above is already sized |
+| `every-component-shipped-is-drawn-somewhere` | D7 | a component exported, tested, documented and rendered by nobody — an absence, which typechecks and has no failing test, and whose first caller is the one who finds out it nests a button, draws its arc in a monochrome accent, or prints "min120" |
+| `the-test-ground-draws-most-of-the-package` | D7 | apps/hello quietly ceasing to be where this package is tried, which would leave the excuse list as the only thing keeping the check green |
 <!-- /generated -->
 
 ## Commands

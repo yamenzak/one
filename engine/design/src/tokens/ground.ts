@@ -310,4 +310,16 @@ export const GROUND_CSS = [
     sits directly against the sheet with no band under it.
   */
   `.modal__dialog--full { padding: 0; }`,
+
+  /*
+    ⚠️ A PROGRESS CIRCLE MEASURES, SO IT DRAWS IN `--data`. The library's arc is
+    `--accent`, and this interface's accent is monochrome — so its fill and its
+    track were the same value, and a gauge at 62% drew the identical ring to a
+    gauge at 0%. `Meter` and `Ring` name the token themselves because they are
+    ours; this one is the library's, so the rule belongs here beside the other
+    tokens it ships that we turn off (D7 — the fix is a theme rule, never a
+    `className` or a `style` on the component).
+  */
+  `.progress-circle__track-circle { stroke: color-mix(in oklab, var(--foreground) 10%, transparent); }`,
+  `.progress-circle__fill-circle { stroke: var(--data); stroke-linecap: round; }`,
 ].join("\n");

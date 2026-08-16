@@ -77,7 +77,20 @@ interface FrameProps {
 function Frame({ describes, y, rules = true, children, under }: FrameProps) {
   return (
     <figure className={`flex w-full flex-col ${SPACE.tight}`}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={describes}>
+      {/*
+        ⚠️ IT SCALES, AND IT STOPS SCALING — the second half was missing. A 320
+        unit-wide viewBox stretched across a 1180px panel is a 3.7× zoom on
+        EVERYTHING in it, so the axis labels declared at `fontSize: 8` rendered
+        at thirty pixels: larger than the panel's own title, on a chart whose
+        title was the thing meant to be read first. Two panels of the same chart
+        then had type at two sizes depending on how wide their column happened
+        to be, which is the drift every measurement in this system exists to
+        stop. Twice the design size is where a label is still ≤ 16px.
+      */}
+      <svg
+        viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[40rem]" role="img"
+        aria-label={describes}
+      >
         <title>{describes}</title>
         {rules && y ? (
           <g>

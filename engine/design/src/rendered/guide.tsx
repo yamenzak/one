@@ -16,6 +16,7 @@ import { progressOf, reached, remaining } from "@engine/kernel";
 import { Button, Card, Chip, ProgressBar } from "@heroui/react";
 import { colorFor } from "../tokens/theme.js";
 import { SPACE } from "../tokens/metrics.js";
+import { TYPE } from "../tokens/type.js";
 
 export interface GuideProps {
   readonly book: GuideBook;
@@ -71,11 +72,26 @@ export function Milestones({ book, counts, already }: MilestonesProps) {
   const now = reached(book, counts, already);
   if (!now.length) return null;
   return (
-    <div className={`flex flex-col ${SPACE.tight}`}>
+    /*
+      ⚠️ `items-start`, OR EVERY CHIP IS THE WIDTH OF THE PAGE. A chip in a
+      column stretches to the cross axis, and a full-width lozenge holding four
+      words does not read as recognition — it reads as a banner.
+    */
+    <div className={`flex flex-col items-start ${SPACE.tight}`}>
       {now.map((m) => (
-        <Chip key={m.id} color={colorFor(m.tone)} variant="soft">
-          <Chip.Label>{m.said}</Chip.Label>
-        </Chip>
+        /*
+          ⚠️ THE LABEL IS THE RECOGNITION AND `said` IS THE EXPLANATION, and
+          only the second was drawn. "Everybody in the workspace can see it now"
+          on its own is a sentence with no subject — it never said WHAT had been
+          reached, which is the only thing a milestone is for. Both are declared;
+          both were always meant to be here.
+        */
+        <div key={m.id} className={`flex flex-col ${SPACE.hair}`}>
+          <Chip color={colorFor(m.tone)} variant="soft">
+            <Chip.Label>{m.label}</Chip.Label>
+          </Chip>
+          <span className={TYPE.note}>{m.said}</span>
+        </div>
       ))}
     </div>
   );

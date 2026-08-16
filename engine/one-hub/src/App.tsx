@@ -135,7 +135,26 @@ export function App() {
      ⚠️ `NoticeHost` mounts ONCE, beside whichever frame renders — two hosts
      would show every notice twice, which reads as a fault in the thing being
      announced. */
-  if (ground) return <><NoticeHost /><HelloScreen route={ground} /></>;
+  /* ⚠️ THE GROUND NAVIGATES, and it navigates through the same query the
+     deployment already honours. A test ground whose screens cannot reach each
+     other is one where every surface is opened by editing the address bar —
+     which is fine for a screenshot and useless for the thing the ground is
+     actually for, which is pressing what a person would press. */
+  if (ground) {
+    return (
+      <>
+        <NoticeHost />
+        <HelloScreen
+          route={ground}
+          onGo={(next) => {
+            const to = new URL(location.href);
+            to.searchParams.set("screen", next);
+            location.assign(to.toString());
+          }}
+        />
+      </>
+    );
+  }
 
   /*
     ⚠️ A DOOR IS THE PAGE, AND THAT IS WHY IT IS NOT IN THE FRAME BELOW. These

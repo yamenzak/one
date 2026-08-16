@@ -24,12 +24,26 @@ describe("hello draws every screen it declares", () => {
     expect(HELLO_ROUTES.length).toBeGreaterThan(3);
   });
 
+  /*
+    ⚠️ A SCREEN ABOUT ONE THING IS NAMED AFTER THAT THING, NOT AFTER ITSELF. The
+    nav calls it "A note" because a nav cannot know which; the page calls it by
+    the note's own title, because that is what somebody arriving is looking at.
+    So the rule below is "it drew a heading", and these are the routes whose
+    heading is their subject — named here, with the word it must carry, rather
+    than the check quietly accepting any non-empty render.
+  */
+  const SUBJECT: Readonly<Record<string, string>> = {
+    "/note": "Rewrite the onboarding email",
+  };
+
   it("renders something for every declared route", () => {
     for (const route of HELLO_ROUTES) {
       const out = html(route);
-      /* ⚠️ NOT `length > 0` — an empty `<div>` passes that. The screen's own
-         name is what proves a screen drew rather than a wrapper. */
-      const label = (HELLO.screens ?? []).find((s) => s.route === route)?.label ?? "";
+      /* ⚠️ NOT `length > 0` — an empty `<div>` passes that. A heading is what
+         proves a screen drew rather than a wrapper. */
+      const label = SUBJECT[route]
+        ?? (HELLO.screens ?? []).find((s) => s.route === route)?.label
+        ?? "";
       expect(out, route).toContain(label);
     }
   });
