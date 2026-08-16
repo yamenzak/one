@@ -142,18 +142,27 @@ the hem (see [AMBIENCE.md](AMBIENCE.md)), so none of them needs a plate.
 | slot | what goes in it |
 |---|---|
 | **lead** | `who` — the account, which opens the hub · **or** `back` / `dismiss`. Never both. |
-| **middle** | `name` (+ `under`, + `mark`, optionally `collapses`) · **or** `find`, the wide search slot. Never both. |
+| **middle** | one-line `name` (optionally `collapses`) · **or** `find`, the wide search slot. Never both. |
 | **trail** | up to two `also` (bare ink, optionally carrying a `dot`) and one `does` (the only fill up there) |
 
-Every real crown in the product falls out of which slots are filled:
+**And there are two shapes it is ever in.** Everything else was clutter:
 
-| surface | lead | middle | trail |
-|---|---|---|---|
-| a product's destination | account | `find` | `also`, `does` |
-| a product's shell | account | app mark + workspace / product | products, inbox |
-| a page or sub-page | back | name, **collapsing** | `also`, `does` |
-| a presented surface | dismiss | name, collapsing | `also`, `does` |
-| the hub's own root | account (no press) | "One" + the address | — |
+| shape | lead | middle | trail | used by |
+|---|---|---|---|---|
+| **find** | account | search | `also`, `does` | a product's destinations, the shell |
+| **name** | back / dismiss | the name, **collapsing** | `also`, `does` | a page, a sub-page, a presented surface |
+
+⚠️ **THE ROW IS ONE HEIGHT AND SO IS EVERY MARK IN IT.** The controls were
+already 44px each — matching hit boxes — while the marks inside them were not: a
+32px avatar beside a 44px field beside a 44px filled disc is three visual sizes
+in a row of four, and that is what "the heights look inconsistent" is. A face is
+`FACE_PX.row`, every glyph is `ICON.crown`, and neither changes with the window.
+
+⚠️ **A SECOND LINE AND A SECOND MARK ARE NOT A SHAPE, THEY ARE CLUTTER.** The
+shell's crown drew a face, then a product mark, then a workspace name stacked
+over a product name — two circles and a paragraph in a 64px row. What a crown
+owes is *whose* data this is; which product is the nav underneath, and choosing
+between them is the hub.
 
 ⚠️ **There is no `kind` prop, and that is the point.** What a crown *is* falls
 out of what it was handed. A variant enum would be a fifth way of saying the

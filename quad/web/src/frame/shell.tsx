@@ -198,6 +198,13 @@ export function Shell(props: ShellProps) {
         already the OTHERS, so with exactly two products the list had one entry,
         `1 > 1` was false, and the switcher never appeared at all. It is one
         control to the hub now, which is the surface that lists them.
+
+        ⚠️ AND THE MARK AND THE SECOND LINE ARE GONE WITH THEM. This drew a face,
+        then a product mark, then a workspace name stacked over a product name —
+        two circles and a paragraph in a 64px row, which is the clutter that made
+        it the crown nobody wanted. What a crown owes here is WHOSE data this is;
+        which product is the nav underneath, and choosing between them is the
+        hub. One face, one name.
       */}
       <Crown
         bleed="edge"
@@ -207,9 +214,7 @@ export function Shell(props: ShellProps) {
           face: crown.personFace,
           onOpen: onOpenHub,
         }}
-        mark={appFace(crown.appId, crown.appMark)}
         name={crown.tenantName}
-        under={crown.appName}
         also={[
           ...((crown.apps ?? []).length && onSwitchApp && onOpenHub
             ? [{ id: "apps", label: "Your products", icon: <Boxes />, onDo: onOpenHub }]

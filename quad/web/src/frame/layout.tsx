@@ -456,7 +456,9 @@ export function LeaveChip({ leave = "back", label, onDo }: {
       aria-label={label ?? (leave === "dismiss" ? "Close" : "Back")}
       onPress={onDo}
     >
-      {leave === "dismiss" ? <X /> : <Back />}
+      <span className="flex items-center" style={{ ["--icon" as string]: `${ICON.crown}px` }}>
+        {leave === "dismiss" ? <X /> : <Back />}
+      </span>
     </Button>
   );
 }
@@ -574,10 +576,12 @@ export interface CrownProps {
    * field has neither of them wide enough to be either.
    */
   readonly name?: string;
-  /** ⚠️ One line, and only where it says something the name does not. */
+  /**
+   * ⚠️ ONE LINE, AND ONLY WHERE IT SAYS SOMETHING THE NAME DOES NOT. A second
+   * line in a 64px row is what turned the shell's crown into a block of text
+   * beside two circles — see the Shell.
+   */
   readonly under?: string;
-  /** ⚠️ The product's own mark beside its name, at the row's own size. */
-  readonly mark?: FaceOf;
   /**
    * ⚠️ THE NAME ARRIVES ON SCROLL RATHER THAN BEING THERE. A page's name is both
    * the biggest thing on it and something you still need four screens down, and
@@ -651,7 +655,7 @@ export interface Slot {
 
 export function Crown({
   who, back, leave = "back", backLabel,
-  name, under, mark, collapses = false, find,
+  name, under, collapses = false, find,
   also = [], does, bleed = "hold", width = "read",
 }: CrownProps) {
   const past = useScrolledPast();
@@ -685,7 +689,15 @@ export function Crown({
               onPress={who.onOpen ?? (() => undefined)}
             >
               <span className="relative flex size-full items-center justify-center">
-                <Face of={who.face} name={who.name} size="chip" />
+                {/* ⚠️ `row`, NOT `chip`, AND THIS IS THE HEIGHT BUG. Every
+                    control here is 44px and every hit box matched — but the
+                    MARKS inside them did not: a 32px avatar beside a 44px field
+                    beside a 44px filled disc is three visual sizes in a row of
+                    four, which is what "the heights are inconsistent" actually
+                    looks like. `metrics.ts` says it outright — a face is 40px,
+                    and the crown looked empty until it was — and the crown was
+                    the one place still asking for the small one. */}
+                <Face of={who.face} name={who.name} size="row" />
                 {who.unread
                   ? <span aria-hidden="true" className="absolute -top-0.5 -right-0.5"><Dot /></span>
                   : null}
@@ -727,7 +739,6 @@ export function Crown({
                 transition: showName ? MOTION.enter : MOTION.exit,
               }}
             >
-              {mark ? <Face of={mark} name={name} size="chip" /> : null}
               <span className="flex min-w-0 flex-col">
                 <strong className={`truncate ${TYPE.label}`}>{name}</strong>
                 {under ? <span className={`truncate ${TYPE.note}`}>{under}</span> : null}
@@ -749,7 +760,14 @@ export function Crown({
               aria-label={a.label}
               onPress={a.onDo}
             >
-              <span className="relative flex items-center">
+              {/* ⚠️ `.button` SIZES ITS OWN SVGS to `size-5 sm:size-4`, so the
+                  same crown drew 20px glyphs on a phone and 16px ones on a
+                  desktop — a control that changes size with the window, in the
+                  one row that is meant to be the product's constant. */}
+              <span
+                className="relative flex items-center"
+                style={{ ["--icon" as string]: `${ICON.crown}px` }}
+              >
                 {a.icon}
                 {a.dot
                   ? <span aria-hidden="true" className="absolute -top-1 -right-1.5"><Dot /></span>
@@ -775,7 +793,12 @@ export function Crown({
               aria-label={does.icon ? does.label : undefined}
               onPress={does.onDo}
             >
-              {does.icon ?? does.label}
+              <span
+                className="flex items-center"
+                style={{ ["--icon" as string]: `${ICON.crown}px` }}
+              >
+                {does.icon ?? does.label}
+              </span>
             </Button>
           ) : null}
         </div>

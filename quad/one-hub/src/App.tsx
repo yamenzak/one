@@ -177,7 +177,6 @@ export function App() {
           ? { name: me.email ?? "You", face: whoFace(me.accountId) }
           : undefined}
         name="One"
-        under={where?.root}
         width={settled ? "work" : "read"}
       />
       <Band width={settled ? "work" : "read"}>
