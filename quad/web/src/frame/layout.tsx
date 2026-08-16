@@ -1234,30 +1234,54 @@ export function Balance({ eyebrow, figure, identifier, under }: {
 /**
  * THE ACTION A WHOLE SCREEN EXISTS FOR, PINNED WHERE A THUMB IS.
  *
+ * ⚠️ THIS WAS TWO COMPONENTS AND THEY HAD ALREADY DRIFTED. `StickyAction`, which
+ * a screen wrapped by hand, and the bar a `Screen` renders from its `does` —
+ * same place, same hem, same job, and they disagreed about both things there
+ * were to disagree about: one was `max-w-md` and the other took the shape's own
+ * width, one showed on a desktop and the other did not. Nothing made them agree,
+ * because nothing knew they were the same thing.
+ *
  * ⚠️ A LONG SCREEN WITH ITS ONLY CONTROL AT THE BOTTOM IS A SCREEN PEOPLE DO NOT
- * FINISH. Pinning it means the decision is always one reach away, and the
- * content scrolls behind it rather than under it.
+ * FINISH. The roster shipped "Invite somebody" as the last row of the roster:
+ * fine with three people, invisible with thirty — whoever is at the bottom
+ * scrolls to the top to act, or whoever is at the top scrolls to the bottom, and
+ * which of the two happens was never decided by anybody.
+ *
+ * ⚠️ IT IS THE PHONE HALF OF ONE ACT, WHICH IS WHY IT IS ALWAYS `md:hidden`. The
+ * crown carries the same `does` above the breakpoint, where the eye already is;
+ * a bar welded across the bottom of a wide window is a mobile pattern wearing a
+ * desktop's clothes. One declaration, both answers — so this is never the whole
+ * story of an action and must not be reachable on its own.
+ *
+ * ⚠️ AND IT IS NOT EXPORTED PAST THE FRAME, ENFORCED BY A GUARD. Reachable from
+ * a screen it is a way to pin a button that skips every rule the declaration
+ * carries: no dock over a skeleton, none over a refusal, and none over an empty
+ * state that already offers the same words. A hand-rolled dock has all three.
  *
  * ⚠️ `pb-[env(safe-area-inset-bottom)]` IS NOT OPTIONAL. Without it the control
- * sits under the home indicator on every modern phone — reachable, but with the
- * gesture bar over it, which reads as a layout somebody did not test.
+ * sits under the home indicator on every modern phone.
  *
  * ⚠️ A SCREEN HAS THIS OR AN `Island`, NEVER BOTH. They pin to the same place and
  * overlap — which the catalogue page demonstrated the first time it rendered
- * them together, with the button sitting across the nav. It is also the right
- * rule for a different reason: a screen with one unmistakable action is not a
- * screen somebody should be navigating away from mid-decision.
+ * them together. It is also the right rule for a different reason: a screen with
+ * one unmistakable action is not a screen somebody should be navigating away
+ * from mid-decision.
  */
-export function StickyAction({ children }: { readonly children: React.ReactNode }) {
+export function Docked({ width = "read", children }: {
+  readonly width?: Width;
+  readonly children: React.ReactNode;
+}) {
   return (
     /* ⚠️ THE SAME HEM THE NAV WEARS, because it is the same fault: content
-       arriving at a docked control's edge and being sliced by it. A docked bar
-       is not a special case of a nav — they are two things at one address. */
+       arriving at a docked control's edge and being sliced by it. */
     <div
       data-hem="bottom"
-      className={`sticky bottom-0 z-10 flex w-full justify-center ${PAD} ${SAFE_BOTTOM}`}
+      className={`sticky bottom-0 z-10 w-full md:hidden ${PAD} ${SAFE_BOTTOM}`}
     >
-      <div className="w-full max-w-md">{children}</div>
+      {/* ⚠️ THE SHAPE'S OWN WIDTH, NOT A WIDTH OF ITS OWN. `max-w-md` was the
+          hand-rolled half's answer, so a docked action on a `work`-width screen
+          sat narrower than everything above it. */}
+      <Band bleed="hold" width={width}>{children}</Band>
     </div>
   );
 }

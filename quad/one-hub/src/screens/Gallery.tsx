@@ -16,7 +16,7 @@
 import { useState } from "react";
 import { Balance, Band, Crown, CopyRow, Figure, Group, Grid, Island, Money, NavRow, ActionRow,
   ToggleRow, FieldRow, NoteRow, OfferRow, PersonRow, AmountRow, QuickActions, SeeAll,
-  StepRow, TileGrid, Nothing, Row, Section, Stack, StickyAction, Title, Cluster, SPACE,
+  StepRow, TileGrid, Nothing, Row, Section, Stack, Title, Cluster, SPACE,
   TYPE, type Sky } from "@quad/web";
 import {
   Agree, Choice, Confirm, Crumbs, DateInput, Dialog, Faq, FormWaiting, Gauge, Hotkey, Listing,
@@ -507,18 +507,6 @@ export function Gallery() {
             { id: "you", label: "You", icon: glyph(<CircleUser />), route: "/you" },
           ]}
         />
-      </section>
-
-      {/* --------------------------------------------------------- sticky --- */}
-      <section className={`flex flex-col ${SPACE.snug}`}>
-        <Section label="The one action">
-          <p className={TYPE.note}>
-            A screen has an island or a pinned action, never both — they occupy one place
-          </p>
-        </Section>
-        <StickyAction>
-          <Button variant="primary" className="w-full" onPress={nothing}>Invite friends</Button>
-        </StickyAction>
       </section>
 
       {/* ---------------------------------------------------------- sheet --- */}

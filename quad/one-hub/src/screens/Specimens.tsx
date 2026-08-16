@@ -18,10 +18,10 @@ import { useState } from "react";
 import {
   ActionRow, AmountRow,  Balance, Band, CopyRow, Crown, Figure, Grid, Group,
   Island, Money, NavRow, Nothing, NoteRow, OfferRow, Page, PersonRow, Prose,
-  QuickActions, Row, SeeAll, Section, Spacer, Stack, StepRow, StickyAction, Cluster, Rail,
+  QuickActions, Row, SeeAll, Section, Spacer, Stack, StepRow, Cluster, Rail,
   Await, Trouble, Working, RowsWaiting, ChartWaiting, FigureWaiting, TilesWaiting, TextWaiting,
   waiting, ready, trouble, type Loaded,
-  TileGrid, Title, ToggleRow, FieldRow, PageCrown, TYPE,
+  TileGrid, Title, ToggleRow, FieldRow, PageCrown, TYPE, Layout, Screen,
 } from "@quad/web";
 import {
   ChartPanel, ColumnChart, CompositionBar, DivergingChart, DonutChart, HeatmapChart, Hero,
@@ -375,9 +375,12 @@ function Detail() {
 /** Steps, and one unmistakable action. */
 function Flow() {
   return (
-    <Page sky="glow">
-      <Crown name="Greenhouse" under="New grower" width="read" ruled={false} />
-      <Band>
+    <Layout sky="glow" frame={{ title: "Greenhouse" }}>
+      <Screen
+        shape="decision"
+        under="New grower"
+        does={{ label: "Start planting", onDo: nothing }}
+      >
         <Stack space="roomy">
           <Balance
             eyebrow="Takes about ten minutes"
@@ -394,11 +397,8 @@ function Flow() {
             exactly where you were.
           </Prose>
         </Stack>
-      </Band>
-      <StickyAction>
-        <Button variant="primary" className="w-full" onPress={nothing}>Start planting</Button>
-      </StickyAction>
-    </Page>
+      </Screen>
+    </Layout>
   );
 }
 
@@ -757,9 +757,14 @@ function Enroll() {
   const [ok, setOk] = useState<boolean | undefined>(false);
 
   return (
-    <Page sky="glow">
-      <PageCrown title="New client" back={nothing} />
-      <Band>
+    /* ⚠️ A `Screen`, NOT A HAND-BUILT PAGE. This wrapped its own `StickyAction`
+       around its own button — which is how the dock came to exist twice. What a
+       screen declares is the ACT; where it lands at each size is the frame's. */
+    <Layout sky="glow" frame={{ title: "New client", back: nothing }}>
+      <Screen
+        shape="form"
+        does={{ label: "Continue to package", onDo: nothing }}
+      >
         <Stack space="roomy">
           <Steps
             at="detail"
@@ -797,11 +802,8 @@ function Enroll() {
             { id: "b", when: "First sign-in", label: "They finish their own intake", under: "Injuries, preferences, schedule" },
           ]} />
         </Stack>
-      </Band>
-      <StickyAction>
-        <Button variant="primary" className="w-full" onPress={nothing}>Continue to package</Button>
-      </StickyAction>
-    </Page>
+      </Screen>
+    </Layout>
   );
 }
 

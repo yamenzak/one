@@ -514,6 +514,49 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
   }
 }
 
+/* ------------------------------------------- one dock, and it is declared --- */
+
+/**
+ * ⚠️ THE DOCKED ACTION WAS TWO COMPONENTS AND THEY HAD ALREADY DRIFTED.
+ * `StickyAction`, wrapped by hand around a screen's own button, and the bar a
+ * `Screen` renders from its `does` — same place, same hem, same job, disagreeing
+ * about both things there were to disagree about: one was `max-w-md` and the
+ * other took the shape's own width, one showed on a desktop and the other did
+ * not. Nothing made them agree because nothing knew they were the same thing.
+ *
+ * ⚠️ SO THERE IS ONE, AND IT IS NOT REACHABLE FROM A SCREEN. What a screen
+ * declares is the ACT; where it lands at each size is the frame's. A hand-rolled
+ * dock skips every rule the declaration carries — no dock over a skeleton, which
+ * invites a press against data that has not arrived; none over a refusal, where
+ * the only useful control is "try again"; and none over an empty state that
+ * already offers the same words in the only thing on the page.
+ *
+ * ⚠️ AND IT IS A GUARD RATHER THAN A PRIVATE EXPORT because there is no privacy
+ * to be had: `@quad/web` is one entry point and a screen can import anything in
+ * it. What decides whether a thing is internal here is whether something fails
+ * when it is used from outside.
+ */
+{
+  const DOCK = /\bDocked\b/;
+  const FRAME = "web/src/frame/";
+  let hand = 0;
+  for (const file of [...filesIn("one-hub/src"), ...filesIn("apps")]) {
+    const src = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    if (!DOCK.test(src)) continue;
+    hand++;
+    fail(`${rel(file)}: docks an action by hand.\n` +
+         `       A screen declares \`does\` and the frame places it — in the crown above \`md\`,\n` +
+         `       docked below it, and NOWHERE while the screen is waiting, refused or empty.`);
+  }
+  /* ⚠️ And the one implementation is where it says it is. */
+  const inFrame = filesIn("web/src/frame").filter((f) => DOCK.test(readFileSync(f, "utf8")));
+  if (!inFrame.length) {
+    fail(`${FRAME}: no \`Docked\` to check — if it moved, move this guard with it.`);
+  } else if (!hand) {
+    ok(`dock: one docked action, declared rather than wrapped`);
+  }
+}
+
 /* ---------------------------------------------------- a table is a collection --- */
 
 /**

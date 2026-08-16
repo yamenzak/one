@@ -129,9 +129,23 @@ Page and chrome *on top of* whatever floats.
 
 ### The two crowns, and the one bar
 
-Chrome pins to an edge, and there are three pieces of it: a **crown** at the top,
-a **nav** at the bottom, and a **docked action** where a screen has one. All wear
-the hem (see [AMBIENCE.md](AMBIENCE.md)), so none of them needs a plate.
+Chrome pins to an edge, and there are three pieces of it — **one component
+each**: a **crown** at the top, a **nav** at the bottom, and a **docked action**
+where a screen has one. All wear the hem (see [AMBIENCE.md](AMBIENCE.md)), so
+none of them needs a plate.
+
+⚠️ **The docked action is declared, never wrapped.** A screen says `does`; the
+frame puts it in the crown above `md` where the eye is, docks it below where the
+thumb is, and shows exactly one. It was two components — `StickyAction` wrapped
+by hand and the bar `Screen` renders — which had already drifted on both things
+there were to drift on: one was `max-w-md` and the other took the shape's width,
+one showed on a desktop and the other did not. A guard now refuses a hand-rolled
+dock, because wrapping one skips the three rules the declaration carries: **no
+dock over a skeleton** (a press against data that has not arrived), **none over a
+refusal** (the only useful control is "try again"), and **none over an empty
+state** that already offers the same words.
+
+⚠️ **A screen has a dock or a nav, never both** — they pin to the same place.
 
 **There is one `Crown`, and its shape is its slots.** Three slots, one height:
 

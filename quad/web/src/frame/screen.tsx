@@ -32,7 +32,7 @@
 import * as React from "react";
 import { Button } from "@heroui/react";
 import {
-  Band, Page, PageCrown, Spacer, Title, useCrownSocket, type Slot, type Width,
+  Band, Docked, Page, PageCrown, Spacer, Title, useCrownSocket, type Slot, type Width,
 } from "./layout.js";
 import { Group, NavRow } from "../parts/surfaces.js";
 import { worldFor, type FaceOf } from "../parts/face.js";
@@ -415,33 +415,22 @@ export function Screen<T = unknown>({
           where it looks most like a mistake. */}
       <Spacer />
 
-      {/*
-        ⚠️ DOCKED ON A PHONE ONLY, because on a desktop the crown is already in
-        view and a bar welded across the bottom of a wide window is a mobile
-        pattern wearing a desktop's clothes.
-
-        ⚠️ AND IT WEARS THE HEM — the ground thickens under it, so the last card
-        dissolves on its way past rather than being sliced by the button's own
-        edge. The same rule the nav uses; see `ambienceStylesheet`.
-      */}
+      {/* ⚠️ ONE COMPONENT FOR THE DOCK — see `Docked`. The same act the crown
+          carries above `md`, and the crown's copy is `wide` so exactly one of
+          them is ever on screen. */}
       {where === "act" && does
         ? (
-          <div
-            data-hem="bottom"
-            className={`sticky bottom-0 z-10 w-full md:hidden ${PAD} ${SAFE_BOTTOM}`}
-          >
-            <Band bleed="hold" width={preset.width}>
-              <Button
-                className="w-full"
-                variant={does.tone === "danger" ? "danger" : "primary"}
-                isDisabled={does.disabled}
-                onPress={does.onDo}
-              >
-                {does.icon}
-                {does.label}
-              </Button>
-            </Band>
-          </div>
+          <Docked width={preset.width}>
+            <Button
+              className="w-full"
+              variant={does.tone === "danger" ? "danger" : "primary"}
+              isDisabled={does.disabled}
+              onPress={does.onDo}
+            >
+              {does.icon}
+              {does.label}
+            </Button>
+          </Docked>
         )
         : null}
     </>
