@@ -304,7 +304,7 @@ without Kova declaring either. A client's conditions and weight are vault-backed
 because a health fact in a product table is outside consent, outside the grant
 log and outside crypto-shredding.
 
-**`@engine/one` — the deployment, and it is one file.** One worker answers every
+**`@engine/worker` (`engine/one/`) — One's whole deployment, and it is one file.** One worker answers every
 door for every product (D3): adding a product is a line in `APPS` and a row in a
 database — no worker, no domain binding, no provisioning workflow, no secret. It
 applies the platform's tables once per isolate and AWAITS it, because a request
@@ -525,7 +525,7 @@ actually signed in to use.
 - **A row somebody cannot open is not drawn** — `partsFor` in `where.ts`, a pure
   table rather than a walk through four sign-ins, and never the enforcement.
 
-**`@engine/one-hub` — the page a person opens.** The signpost, sign-in with an
+**`@engine/hub` (`engine/one-hub/`) — the page a person opens.** The signpost, sign-in with an
 emailed code, the doors, and the wizard that makes a workspace — HeroUI v3 as it
 ships, themed through tokens, nothing restyled.
 

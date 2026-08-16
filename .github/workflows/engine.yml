@@ -256,7 +256,7 @@ jobs:
       # needs it built here too.
       - name: Build the Hub
         if: steps.ready.outputs.go == 'true'
-        run: pnpm turbo run build --filter=@engine/one-hub
+        run: pnpm turbo run build --filter=@engine/hub
 
       - name: Deploy
         if: steps.ready.outputs.go == 'true'
