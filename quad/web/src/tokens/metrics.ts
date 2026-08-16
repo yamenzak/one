@@ -161,7 +161,7 @@ export const TITLE_PAD = "pb-6" as const;
  * labels and 40 without — a bar with sixteen pixels of nothing around a row of
  * pills. Four is what a pill needs to not touch the edge it sits in.
  */
-export const ISLAND_PAD = "p-1" as const;
+export const ISLAND_PAD = "p-1.5" as const;
 
 /**
  * ⚠️ AND THE ITEM INSIDE IT HAS A HEIGHT, OR ITS CONTENT TOUCHES THE EDGES. With
@@ -178,7 +178,18 @@ export const ISLAND_PAD = "p-1" as const;
  * characters — "Tod…", "Clie…", "Pro…" — while the bar itself fitted
  * perfectly. The gutter belongs to the island, not to each item inside it.
  */
-export const ISLAND_ITEM = "px-1 py-2" as const;
+/**
+ * ⚠️ TWO SHAPES NOW, BECAUSE THE ITEMS ARE NO LONGER ALL THE SAME. Four hold a
+ * glyph and one holds a glyph and a word, so one padding for both makes the open
+ * pill either cramped or the closed ones fat. The closed one is square-ish
+ * around its icon; the open one has room at both ends of what it says.
+ *
+ * ⚠️ AND THE VERTICAL IS THE SAME ON BOTH, or the pill is a different height
+ * from the bar it sits in — which is the single most visible way this shape goes
+ * wrong, because the eye reads the mismatch as a rendering fault.
+ */
+export const ISLAND_ITEM = "px-2 py-2.5" as const;
+export const ISLAND_HERE = "px-4 py-2.5" as const;
 
 /**
  * ⚠️ A CODE BOX IS TALLER THAN IT IS WIDE, AND THE LIBRARY'S DEFAULT IS NOT.

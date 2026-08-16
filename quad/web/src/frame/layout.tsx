@@ -27,6 +27,7 @@ import { ON_SCENE, skyWorld, worldCss } from "../tokens/ambience.js";
 import { TYPE } from "../tokens/type.js";
 import {
   BAND_PAD, CODE_SLOT, CROWN, CROWN_CHIP, CROWN_SIZE, GUTTER, HEAD_GAP, HERO_PAD, ICON,
+  ISLAND_HERE,
   ISLAND_ITEM,
   ISLAND_PAD,
   SAFE_TOP, NAV_SPACE, PAD, ROW, SAFE_BOTTOM, SPACE, TITLE_PAD, WIDTH,
@@ -980,10 +981,14 @@ export function Island({ items, here, onGo }: {
       }}
     >
       {/*
-        ⚠️ IT SHRINKS TO ITS CONTENT NOW, AND THAT IS THE POINT OF THE SHAPE. The
-        old bar spanned the reading column because equal columns need a width to
-        divide; this one is as wide as five icons and one word, which is narrower
-        on every screen and identical on all of them.
+        ⚠️ IT SPANS THE COLUMN AND THE CLOSED ITEMS SHARE WHAT IS LEFT. A bar
+        sized to its own content came out 234px of 430 with a visible gap either
+        side, which reads as a control that did not finish loading rather than as
+        something floating over the page — and it packs four tap targets into the
+        middle third of the screen, which is the half of the argument that is
+        about thumbs rather than taste. The open pill takes the room its word
+        needs and the four glyphs divide the rest, so the bar is the same width
+        on every screen and the spacing falls out of the arithmetic.
 
         ⚠️ AND IT IS NOT GLASS. A `backdrop-filter` over a LIVE field re-reads and
         re-blurs the layer under it on every frame of every beat — see the chrome
@@ -994,7 +999,7 @@ export function Island({ items, here, onGo }: {
         data-island="true"
         data-chrome="true"
         data-capsule="true"
-        className={`flex flex-row items-center ${ISLAND_PAD}`}
+        className={`flex w-full ${WIDTH.read} flex-row items-center ${SPACE.hair} ${ISLAND_PAD}`}
       >
         {shown.map((item) => {
           const isHere = item.route === here;
@@ -1006,7 +1011,14 @@ export function Island({ items, here, onGo }: {
               variant="ghost"
               aria-current={isHere ? "page" : undefined}
               data-here={isHere ? "true" : undefined}
-              className={`shrink-0 flex-row items-center justify-center ${SPACE.tight} ${ROW.free} ${ISLAND_ITEM}`}
+              /* ⚠️ THE OPEN ONE IS CONTENT-SIZED AND THE CLOSED ONES DIVIDE THE
+                 REST. `grow basis-0` on the four is what makes them EQUAL rather
+                 than merely fair — with the default `basis-auto` flex hands out
+                 the leftover after each item's own content, so widths converge
+                 without matching, which is worse than obviously wrong because it
+                 looks nearly right. */
+              className={`flex-row items-center justify-center ${SPACE.tight} ${ROW.free} `
+                + (isHere ? `shrink-0 ${ISLAND_HERE}` : `grow basis-0 min-w-0 ${ISLAND_ITEM}`)}
               onPress={() => onGo(item.route)}
             >
               <span
