@@ -1216,6 +1216,33 @@
       "impl": "scripts/scene.test.mjs",
       "proves": "binding: ",
       "fails": "a screen derives the ground, the hero face and the density separately from one fact, and the day one of them is edited the crown wears one workspace's planet over another workspace's sky"
+    },
+    {
+      "id": "a-family-renders-every-mark-it-references",
+      "protects": "D7",
+      "stage": "17",
+      "status": "live",
+      "impl": "web/test/scene.test.ts",
+      "proves": "resolves every mark it references",
+      "fails": "a soft mark fills with a gradient id nothing defines — a valid SVG, a rendered page, and a family's whole atmosphere silently absent"
+    },
+    {
+      "id": "a-family-fills-every-slot-it-declares",
+      "protects": "D7",
+      "stage": "17",
+      "status": "live",
+      "impl": "web/test/scene.test.ts",
+      "proves": "fills every slot it declares",
+      "fails": "an unfilled slot interpolates `undefined` into CSS, the browser drops that one declaration, and a four-layer ground quietly becomes three"
+    },
+    {
+      "id": "a-family-has-two-skies-and-a-veil",
+      "protects": "D7",
+      "stage": "17",
+      "status": "live",
+      "impl": "web/test/scene.test.ts",
+      "proves": "has both skies",
+      "fails": "one sky registered twice is the made-up rule coming back — a night ground turned down for light mode, which is grey every time"
     }
   ]
 }

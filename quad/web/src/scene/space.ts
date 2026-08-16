@@ -78,7 +78,7 @@ const HAZE = {
  * the same light high and off-centre, and the deep behind everything.
  * `background-image` paints its first entry last, so this list reads as seen.
  */
-export const NIGHT: Family = {
+const NIGHT: Family = {
   id: "space.night",
   slots: ["deep", "lit"],
   tile: { w: 1400, h: 1000 },
@@ -102,7 +102,7 @@ export const NIGHT: Family = {
  * to reach this by turning a night sky's opacity down is what produced three
  * builds of grey.
  */
-export const DAY: Family = {
+const DAY: Family = {
   id: "space.day",
   slots: ["deep", "lit"],
   tile: { w: 1400, h: 1000 },

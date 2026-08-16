@@ -32,7 +32,7 @@
  * still visibly there at the edges. `scripts/scene.test.mjs` refuses the wash.
  */
 
-import { TWINKLE } from "../tokens/motion.js";
+import { BEAT } from "../tokens/motion.js";
 
 /* ------------------------------------------------------------------ seeds --- */
 
@@ -129,7 +129,7 @@ export interface Variant {
    * reading as noise. A variant that MAY move says so, and says how many of it
    * actually do.
    */
-  readonly beat?: keyof typeof TWINKLE;
+  readonly beat?: keyof typeof BEAT;
   /** 0..1. Absent means none of them. */
   readonly moving?: number;
 }
@@ -158,6 +158,19 @@ export interface Family {
   readonly specks?: readonly Speck[];
   /** ⚠️ The canvas the specks are drawn on and TILED at — see `render`. */
   readonly tile?: { readonly w: number; readonly h: number };
+  /**
+   * ⚠️ WHAT THE MARKS SHARE, EMITTED ONCE. A star is a filled circle and needs
+   * nothing; a BLOOM is soft-edged, and the only way to draw a soft edge in SVG
+   * is a gradient — which lives in `<defs>` and is referenced by id. Without a
+   * place to put it, a family either ships a `<defs>` inside every mark (the
+   * same twelve lines repeated two hundred times, in a stylesheet, on every cold
+   * load) or fakes the softness with concentric rings, which bands.
+   *
+   * ⚠️ IDS ARE SAFE HERE, WHICH THEY ARE NOT IN A PAGE. Each scene is its own
+   * SVG document inside its own data URI, so `#m` in one tile cannot be reached
+   * by another — the collision this would normally cause is structurally absent.
+   */
+  readonly defs?: (p: Palette) => string;
   /**
    * ⚠️ THE ONE COLOUR TYPE SITS AGAINST, AND IT EXISTS SO NOBODY EVER PUTS A
    * SCRIM UNDER A HEADING. Words laid directly on a world are the one place a
@@ -231,7 +244,7 @@ export function render(scene: Scene): {
   const megapixels = (tile.w * tile.h) / 1_000_000;
 
   const marks: string[] = [];
-  const beats = new Set<keyof typeof TWINKLE>();
+  const beats = new Set<keyof typeof BEAT>();
 
   for (const speck of family.specks ?? []) {
     const count = Math.round(speck.per * megapixels * density);
@@ -262,16 +275,21 @@ export function render(scene: Scene): {
   */
   const motion = beats.size
     ? `<style>@media (prefers-reduced-motion: no-preference){`
-      + `@keyframes qb{0%,100%{opacity:1}50%{opacity:.3}}`
+      /* ⚠️ ONE KEYFRAME PER BEAT, BECAUSE THE DIP IS THE BEAT'S. A single shared
+         `1 → .3` is right for a star and is the whole page throbbing when the
+         mark is a fifth of the screen wide — see `BEAT`. */
+      + [...beats].map((b) => `@keyframes qb-${b}{0%,100%{opacity:1}50%{opacity:${BEAT[b].dip}}}`).join("")
       + [...beats].map((b) =>
-        `.b-${b}{animation:qb ${TWINKLE[b].period} ease-in-out infinite ${TWINKLE[b].delay}}`).join("")
+        `.b-${b}{animation:qb-${b} ${BEAT[b].period} ease-in-out infinite ${BEAT[b].delay}}`).join("")
       + `}</style>`
     : "";
+
+  const defs = marks.length && family.defs ? `<defs>${family.defs(palette)}</defs>` : "";
 
   const art = marks.length
     ? `url("data:image/svg+xml,${encodeURIComponent(
       `<svg xmlns="http://www.w3.org/2000/svg" width="${tile.w}" height="${tile.h}"`
-      + ` viewBox="0 0 ${tile.w} ${tile.h}">${motion}${marks.join("")}</svg>`)}")`
+      + ` viewBox="0 0 ${tile.w} ${tile.h}">${motion}${defs}${marks.join("")}</svg>`)}")`
     : "none";
 
   return {

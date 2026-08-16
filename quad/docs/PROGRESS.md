@@ -551,7 +551,7 @@ The guard registry, its checks, and the standards that bind them.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 5 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 36 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 39 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 2 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
@@ -712,6 +712,9 @@ the library decides FOR us.
 | `a-ground-is-masked-rather-than-washed` | D7 | one screen's contrast problem is fixed with a scrim, and every workspace's brand is grey behind a film nobody outside that file can see |
 | `a-scene-is-sized-by-area-not-by-count` | D7 | the same world is sparse on a desktop and crowded on a phone, and whichever screen it was tuned on is the only one it looks right on |
 | `a-scene-is-bound-to-a-subject-not-built-by-a-screen` | D7 | a screen derives the ground, the hero face and the density separately from one fact, and the day one of them is edited the crown wears one workspace's planet over another workspace's sky |
+| `a-family-renders-every-mark-it-references` | D7 | a soft mark fills with a gradient id nothing defines — a valid SVG, a rendered page, and a family's whole atmosphere silently absent |
+| `a-family-fills-every-slot-it-declares` | D7 | an unfilled slot interpolates `undefined` into CSS, the browser drops that one declaration, and a four-layer ground quietly becomes three |
+| `a-family-has-two-skies-and-a-veil` | D7 | one sky registered twice is the made-up rule coming back — a night ground turned down for light mode, which is grey every time |
 <!-- /generated -->
 
 ## Commands

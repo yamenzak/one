@@ -59,7 +59,7 @@ import { Avatar as Plate } from "@heroui/react";
 import MOODS from "@dicebear/styles/moods.json" with { type: "json" };
 import PLANETS from "@dicebear/styles/planets.json" with { type: "json" };
 import { FACE_PX } from "../tokens/metrics.js";
-import type { World } from "../tokens/ambience.js";
+import type { SceneFamily, World } from "../tokens/ambience.js";
 import { useStill } from "../tokens/motion.js";
 
 /* ------------------------------------------------------------------ kinds --- */
@@ -236,62 +236,90 @@ export interface FaceOf {
 /* ------------------------------------------------------------------ world --- */
 
 /**
- * THE TWO COLOURS A WORKSPACE'S SKY IS BUILT FROM — see `worldCss`.
+ * ⚠️ TWO KINDS HAVE A WORLD AND THEY GET DIFFERENT ONES, WHICH IS THE POINT. A
+ * workspace is somewhere you look AT from outside — a planet on a starfield, and
+ * `space` is that seen large. A person is not a place you visit: the light is
+ * theirs and you are standing in it, so their ground is `aura`, an atmosphere
+ * with no horizon in it. Same two slots, same mechanism, two worlds — and
+ * nobody can mistake whose screen they are on.
+ *
+ * ⚠️ EACH STYLE NAMES ITS OWN SECOND COLOUR, and that is the only difference in
+ * the reading. `planets` calls the body `planet`; `moods` calls the face `face`.
+ * Both call the ground `background`, so `deep` needs no table.
+ */
+const SKY: Partial<Record<FaceKind, {
+  readonly family: SceneFamily;
+  readonly of: "person" | "workspace";
+  /** The style's own name for the colour that is the LIGHT. */
+  readonly lit: string;
+}>> = {
+  workspace: { family: "space", of: "workspace", lit: "planet" },
+  person: { family: "aura", of: "person", lit: "face" },
+};
+
+/**
+ * THE SUBJECT'S WORLD, FROM THE SAME DECLARATION THAT DREW ITS FACE.
+ *
+ * ⚠️ THIS IS THE SEAM `Layout` IS BUILT ON, and it exists because the two used
+ * to be derived separately from the same slug — `face: placeFace(where.slug)`
+ * beside a hand-built world, two expressions that have to agree and nothing
+ * checking that they do. Editing one is a page whose crown shows one workspace's
+ * planet over another workspace's sky, which no test can see and nobody can name
+ * from a screenshot.
  *
  * ⚠️ READ OUT OF THE PICTURE THAT WAS DRAWN, NOT DERIVED A SECOND TIME. The
- * obvious alternative is to hash the slug here and index the palette ourselves,
+ * obvious alternative is to hash the seed here and index the palette ourselves,
  * which works right up until DiceBear's own selection changes by one step — and
- * then the sky is a different world from the planet in the row above it, with
+ * then the sky is a different world from the face in the row above it, with
  * nothing failing anywhere. Matching the fills in the SVG against the style's
  * OWN declared palette means both come from the same file: one edit moves them
- * together, and a colour we do not recognise falls through to nothing rather
- * than to a guess.
+ * together, and a colour we do not recognise falls through to `null` rather than
+ * to a guess.
  *
  * ⚠️ AND IT IS THE STILL BAKE THAT IS PARSED. The animated one carries the same
  * fills plus a `<style>` element; reading the smaller of the two is the same
  * answer with less to go wrong, and it is already in the cache for any chip.
+ *
+ * ⚠️ `null` FOR A PRODUCT AND FOR THE DEPLOYMENT, and that is a real answer
+ * rather than a gap. Neither is generated — an app wears the glyph its manifest
+ * declared — so there is no palette to read, and the page keeps its material.
  */
-export function worldOf(slug: string): World | null {
-  const cached = worlds.get(slug);
+export function worldFor(of: FaceOf | undefined): World | null {
+  const sky = of && SKY[of.kind];
+  if (!of || !sky) return null;
+
+  const key = `${of.kind}|${of.seed}`;
+  const cached = worlds.get(key);
   if (cached !== undefined) return cached;
 
-  const svg = new Avatar(styleFor("workspace"), { seed: slug, size: 64, scale: FILL }).toString();
+  const svg = new Avatar(styleFor(sky.of), { seed: of.seed, size: 64, scale: FILL }).toString();
   const fills = [...svg.matchAll(/fill="(#[0-9a-fA-F]{3,8})"/g)].map((m) => m[1]!.toLowerCase());
-  const deep = fills.find((c) => DEEPS.has(c));
-  const lit = fills.find((c) => BODIES.has(c));
-  const world = deep && lit ? { deep, lit, seed: slug } : null;
-  worlds.set(slug, world);
+  const deep = fills.find((c) => palette(sky.of, "background").has(c));
+  const lit = fills.find((c) => palette(sky.of, sky.lit).has(c));
+  const world = deep && lit ? { family: sky.family, deep, lit, seed: of.seed } : null;
+  worlds.set(key, world);
   return world;
 }
-
-/**
- * THE SAME SUBJECT'S WORLD, FROM THE SAME DECLARATION THAT DREW ITS FACE.
- *
- * ⚠️ THIS IS THE SEAM `Layout` IS BUILT ON, and it exists because the two used
- * to be derived separately from the same slug — `face: placeFace(where.slug)`
- * beside `world={worldOf(where.slug)}`, two expressions that have to agree and
- * nothing checking that they do. Editing one is a page whose crown shows one
- * workspace's planet over another workspace's sky, which no test can see and
- * nobody can name from a screenshot.
- *
- * ⚠️ AND IT ANSWERS `null` FOR EVERYTHING THAT IS NOT A PLACE. A person is not a
- * world and a product is not a world — their faces are drawn from styles with no
- * sky in them, so there is nothing to read. That is a real answer, not a gap:
- * the page falls back to its material.
- */
-export const worldFor = (of: FaceOf | undefined): World | null =>
-  of?.kind === "workspace" ? worldOf(of.seed) : null;
 
 const worlds = new Map<string, World | null>();
 
 /* ⚠️ THE STYLE'S OWN PALETTES, NOT COPIES OF THEM. A literal list here is a
-   list that is right today. */
-const palette = (name: "background" | "planet"): ReadonlySet<string> =>
-  new Set(((PLANETS as { colors: Record<string, { values: string[] }> })
-    .colors[name]?.values ?? []).map((c) => c.toLowerCase()));
+   list that is right today — and with two styles it would be two lists that are
+   right today, which is how the second one comes to be wrong on its own. */
+const palettes = new Map<string, ReadonlySet<string>>();
 
-const DEEPS = palette("background");
-const BODIES = palette("planet");
+const palette = (of: "person" | "workspace", name: string): ReadonlySet<string> => {
+  const key = `${of}|${name}`;
+  let had = palettes.get(key);
+  if (!had) {
+    const json = (of === "person" ? MOODS : PLANETS) as {
+      colors?: Record<string, { values?: string[] }>;
+    };
+    had = new Set((json.colors?.[name]?.values ?? []).map((c) => c.toLowerCase()));
+    palettes.set(key, had);
+  }
+  return had;
+};
 
 /* ------------------------------------------------------------- the plates --- */
 

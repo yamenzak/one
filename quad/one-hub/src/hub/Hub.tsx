@@ -24,9 +24,9 @@
  */
 
 import {
-  Band, CROWN, Layout, LeaveChip, Over, Spacer, placeFace, sentence,
+  Band, CROWN, Layout, LeaveChip, Over, Spacer, placeFace, sentence, whoFace,
 } from "@quad/web";
-import type { Ambience } from "@quad/web";
+import type { Ambience, FaceOf } from "@quad/web";
 import type { Belonging, Me } from "../api.js";
 import { useSession } from "../session.js";
 import { HubHome } from "./Home.js";
@@ -113,23 +113,11 @@ function Screen({ where, onGo, onLeave }: {
     guessed twenty times.
   */
   return (
-    /*
-      ⚠️ ONE ADDRESS IN THE HUB LANDS SOMEWHERE RATHER THAN WEARING A MATERIAL,
-      and it is a workspace's own screen. `subject` is the whole of saying so:
-      the ground becomes that planet's sky, the crown becomes a title card
-      wearing the same planet, and the density becomes an arrival's. Those were
-      three expressions here, each deriving from `where.slug` and each able to
-      disagree with the other two — see `Layout`.
-
-      ⚠️ AND ONLY THAT ONE ADDRESS. People, Money and Settings under the same
-      workspace keep `linen`, because an arrival somebody never leaves is not an
-      arrival — and because those are screens with eight rows of content on them,
-      where a lit colour field is the fault `groundOf` was written to fix.
-      Landing is a moment; working is a material.
-    */
+    /* ⚠️ Two addresses land somewhere; everything else wears a material — see
+       `subjectOf`. */
     <Layout
       sky={groundOf(where)}
-      subject={where.at === "workspace" ? placeFace(where.slug) : undefined}
+      subject={subjectOf(where, person)}
       /* ⚠️ THE ROOT HAS NO FRAME, BECAUSE ITS FACE IS ITS HEADING — see below. */
       frame={root ? undefined : {
         title: where.at === "workspace" ? held?.name ?? where.slug : nameOf(where),
@@ -159,6 +147,37 @@ function Screen({ where, onGo, onLeave }: {
     </Layout>
   );
 }
+
+/**
+ * WHAT THIS SCREEN IS ABOUT, WHERE IT IS ABOUT ANYTHING — and two addresses in
+ * the hub are.
+ *
+ * ⚠️ THE HUB HAS EXACTLY TWO ARRIVALS AND THEY ARE THE TWO IDENTITIES IN THE
+ * PRODUCT. A workspace's own screen is that workspace's world; the root is
+ * YOURS. Everything else is a screen you work on — People, Money, Settings, the
+ * console — and those wear a material, because an arrival somebody never leaves
+ * is not an arrival and because a lit colour field behind eight rows of content
+ * is the fault `groundOf` was written to fix. Landing is a moment; working is a
+ * material.
+ *
+ * ⚠️ AND THE TWO WORLDS ARE DIFFERENT IN KIND, WHICH IS THE WHOLE PAYOFF OF THE
+ * SUBJECT BEING A FACE. A workspace's face is a planet, so its ground is space
+ * seen large — somewhere you look at from outside. A person's face is a mood, so
+ * theirs is an aura: light with no horizon in it, which is what standing in
+ * somebody's own place looks like rather than visiting it. Neither is chosen
+ * here. `worldFor` reads the kind off the face and the colours out of the
+ * picture, so this file names a subject and nothing else.
+ *
+ * ⚠️ `null` UNTIL THE SESSION RESOLVES, and that is why the root's subject is
+ * conditional. A face seeded on nothing is a different person's world for one
+ * frame, which is a flash of somebody else's colours on the screen that is
+ * supposed to be yours.
+ */
+const subjectOf = (where: Where, person: Me | null): FaceOf | undefined => {
+  if (where.at === "workspace") return placeFace(where.slug);
+  if (where.at === "home" && person) return whoFace(person.accountId);
+  return undefined;
+};
 
 /**
  * WHICH GROUND, FROM THE ADDRESS — one decision for every screen in the hub.

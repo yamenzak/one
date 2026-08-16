@@ -43,7 +43,7 @@
 import type { Tone } from "@quad/kernel";
 /* ⚠️ The pace and the curve are the vocabulary's, not this file's — see `DRIFT`. */
 import { DURATION, EASE } from "./motion.js";
-import { DENSITY, SPACE, render, type Density } from "../scene/index.js";
+import { DENSITY, FAMILIES, render, type Density, type SceneFamily } from "../scene/index.js";
 
 /**
  * ⚠️ TWELVE, AND `plain` IS STILL THE DEFAULT. Ambience everywhere is ambience
@@ -905,10 +905,15 @@ function mulberry32(seed: number): () => number {
  * rule this replaces ("a world is a dark room in both themes") was not a design
  * decision, it was three failed attempts wearing one.
  */
+/** ⚠️ Re-exported so a screen names a world without importing the engine. */
+export type { SceneFamily };
+
 export interface World {
-  /** The planet's own deep — its background, straight out of the picture. */
+  /** ⚠️ A place is a `space`; a person is an `aura`. See `worldFor`. */
+  readonly family: SceneFamily;
+  /** The subject's own deep — its background, straight out of the picture. */
   readonly deep: string;
-  /** The planet's body colour: the light this world is lit by. */
+  /** The subject's body colour: the light this world is lit by. */
   readonly lit: string;
   /**
    * ⚠️ THE SEED TRAVELS WITH THE COLOURS, IN ONE OBJECT, so a caller cannot hand
@@ -966,12 +971,12 @@ const halo = (colour: string): string => {
 export function worldCss(
   world: World, at: { readonly night: boolean; readonly moving: boolean; readonly density: Density },
 ): Readonly<Record<string, string>> {
-  const key = `${world.seed}|${world.deep}|${world.lit}|${at.night ? "n" : "d"}`
+  const key = `${world.family}|${world.seed}|${world.deep}|${world.lit}|${at.night ? "n" : "d"}`
     + `|${at.moving ? "m" : "s"}|${at.density}`;
   let made = skies.get(key);
   if (!made) {
     made = render({
-      family: at.night ? SPACE.night : SPACE.day,
+      family: FAMILIES[world.family][at.night ? "night" : "day"],
       seed: world.seed,
       palette: { deep: world.deep, lit: world.lit },
       density: DENSITY[at.density],

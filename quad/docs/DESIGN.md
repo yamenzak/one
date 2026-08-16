@@ -136,6 +136,14 @@ card wearing its face rather than a heading with a thumbnail over it, and the
 density becomes an arrival's rather than a working screen's. Absent, the page
 wears a named material and its crown is an ordinary display heading.
 
+**Which world follows from what the subject IS.** A workspace's face is a planet,
+so its ground is `space` seen large — somewhere you look at from outside. A
+person's face is a mood, so theirs is an `aura`: light with no horizon in it,
+which is what standing in somebody's own place looks like rather than visiting
+it. A product has a declared glyph and no palette, so it has no world and the
+page keeps its material. Nothing picks this; `worldFor` reads the kind off the
+face.
+
 ⚠️ **Three consequences of one fact, and that is the point.** They used to be
 three expressions in the router deriving from the same slug, each of which had to
 agree with the other two and none of which could tell when it did not. See

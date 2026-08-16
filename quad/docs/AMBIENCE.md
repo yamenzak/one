@@ -298,9 +298,15 @@ ground can be built from, which is why this is one ambience rather than a family
   ground was being asked to be day. So the page stamps its own theme, every token
   inside it resolves dark, and somebody in light mode walks from a paper hub into
   a lit room. It is the only screen in the product that does this.
-- **Only the arrival lands.** People, Money and Settings under the same workspace
-  keep `linen`. An arrival somebody never leaves is not an arrival, and those are
-  screens with eight rows on them. Landing is a moment; working is a material.
+- **Two addresses land; everything else wears a material.** A workspace's own
+  screen and the hub's ROOT are the two identities in the product, so they get
+  worlds. People, Money and Settings under the same workspace keep `linen` — an
+  arrival somebody never leaves is not an arrival, and those are screens with
+  eight rows on them. Landing is a moment; working is a material.
+- **The root is YOUR world, and it is a different family.** Your face is a mood,
+  so your ground is an `aura` rather than a starfield: light with no horizon in
+  it, which is what standing in somebody's own place looks like rather than
+  visiting it. Nothing chooses that — `worldFor` reads the kind off the face.
 
 ## The scene engine
 
@@ -314,9 +320,10 @@ family + seed + settings  →  a ground and a speck field
 ```
 
 - **A FAMILY** declares what a kind of world is made of: named colour SLOTS, a
-  GROUND built from them, and SPECKS — each with weighted variants and, for the
-  ones that may move, which beat and what share of them keep it. `space` is the
-  first, with a `night` and a `day`.
+  GROUND built from them, SPECKS — each with weighted variants and, for the ones
+  that may move, which beat and what share of them keep it — optional `defs` the
+  marks share, and the `veil` type sits against. Two exist: `space` and `aura`,
+  each with a `night` and a `day`.
 - **A SEED** decides which world you get. Same seed, same world, forever — a
   scene is an identity, and `Math.random` appears nowhere in the directory.
 - **SETTINGS** are density and motion. Nothing else.
@@ -345,6 +352,47 @@ Five decisions in it are worth knowing before adding a family.
   somebody's brand. A scene's own alpha drops where content sits, so the page's
   ground shows through and the world is at full strength at the edges. A guard
   refuses the scrim.
+
+### Two families, and they are different in KIND
+
+`FAMILIES` in `web/src/scene/index.ts` is the whole list, and a family not in it
+is a family nothing can reach.
+
+| | **space** — a workspace | **aura** — a person |
+|---|---|---|
+| what it is | a landscape you look AT | an atmosphere you stand IN |
+| the base | linear: deep overhead, light at the horizon | radial: light in the middle, falling away everywhere |
+| the marks | ~190 tiny sharp stars per megapixel | ~7 enormous soft blooms |
+| the beat | a twinkle — most of the way out, in 3–5s | a breath — a fifth of a stop, over 13–19s |
+
+⚠️ **The cheap second family is the first one with another palette, and it would
+prove nothing.** A workspace is somewhere you visit; a person is not. One is a
+view and the other is a room, and the two grounds say so before a word is read —
+which is also how somebody knows whose screen they are on.
+
+⚠️ **A light is not a hue, and this is where ignoring it shows worst.** `moods`
+picks faces from twelve saturated colours, and mixing a yellow straight into a
+dark teal ground gives KHAKI. It was built that way first and the top half of the
+page was mud — a chroma problem, not a strength one, so no opacity fixes it. What
+lights a night aura is the person's colour taken most of the way to WHITE, with
+their hue surviving in the falloff. (The same argument as `hot`, arriving a
+second time because it is about physics rather than about a file.)
+
+⚠️ **A soft mark needs a gradient, which is why `Family.defs` exists.** A filled
+circle at 8% alpha two hundred pixels wide is a visible disc — the eye finds a
+hard edge at any opacity. Ids are safe inside a scene because each one is its own
+SVG document inside its own data URI.
+
+⚠️ **How deep a beat dips is the beat's, not the renderer's.** `1 → .3` is right
+for a star and is the whole page throbbing when the mark is a fifth of the screen
+wide. `BEAT` carries `dip` and `render` emits one keyframe per beat.
+
+**`web/test/scene.test.ts` sweeps every family in the registry** — every
+referenced mark resolves, every declared slot is filled, both skies exist and
+differ, the veil is declared, the seed is stable, and the still bake carries no
+motion. It renders rather than reads, because the ids are built from template
+literals and a regex over the source passed cheerfully over zero files. It caught
+a shared `defs` shipping a gradient only one sky used, on its first run.
 
 **And light mode is a real sky rather than a rule.** For one build a world was a
 dark room in both themes, because every attempt at a pale night came out grey and
@@ -433,11 +481,15 @@ on a surface — `[data-sky] *` would put a shadow under every word in the produ
    variants already in them; each is a candidate family, and a screen kind picks a
    family the way it picks a shape today.
 
-⚠️ **What is NOT yet done, and should not be claimed.** ONE family exists —
-`space`, in two skies, on one screen. The twenty-four brand-hued ambiences above
-are still hand-written gradient stacks and none of them has been ported. Two of
-the four things the engine was designed for are done — the LAYOUT binding and
-type derived from the scene, both above — and two have no code at all:
-per-instance settings on top of a shared family (the "every wallet is glass, each
-wallet is its own glass" case), and any family that is not space. The engine is
-the foundation; the rest is the work.
+⚠️ **What is NOT yet done, and should not be claimed.** TWO families exist —
+`space` and `aura`, two skies each, on two screens. The twenty-four brand-hued
+ambiences above are still hand-written gradient stacks and none of them has been
+ported; `silk`/`linen`/`wire` are the obvious next, because they are already one
+generator at three settings and would need the engine's one missing primitive (a
+DRAWN mark rather than a scattered one). Three of the four things the engine was
+designed for are done — the LAYOUT binding, type derived from the scene, and a
+family that is not space. What has no code at all is per-instance settings on top
+of a shared family (the "every wallet is glass, each wallet is its own glass"
+case). It is deliberately unbuilt rather than forgotten: nothing in this product
+yet needs two instances of one family to diverge beyond their seed, and a
+mechanism with no consumer is the failure this repository has a document about.

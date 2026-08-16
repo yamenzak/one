@@ -87,29 +87,39 @@ export const transition = (
 export const REDUCED = { "data-reduce-motion": "true" } as const;
 
 /**
- * THE SKY'S THREE TWINKLE PERIODS.
+ * HOW A MARK IN A SCENE BREATHES — period, offset, and how far it dips.
  *
  * ⚠️ HERE RATHER THAN WHERE THEY ARE USED, BECAUSE THE RULE IS THAT NO FILE
- * WRITES ITS OWN DURATION, AND A GENERATED PICTURE IS NOT AN EXCEPTION. The star
- * field carries its own `<style>` element (`starArt`), which is what lets its
- * motion travel with the image and switch itself off — but the numbers in it are
- * still durations, and a duration invented in the file that happened to need it
- * is exactly what `MOTION` exists to prevent.
+ * WRITES ITS OWN DURATION, AND A GENERATED PICTURE IS NOT AN EXCEPTION. A
+ * scene's field carries its own `<style>` element (`render`), which is what lets
+ * its motion travel with the image and switch itself off — but the numbers in it
+ * are still durations, and a duration invented in the file that happened to need
+ * it is exactly what `MOTION` exists to prevent.
  *
- * ⚠️ THREE, AND THEY DO NOT DIVIDE INTO EACH OTHER. A field on one shared period
- * pulses in unison, which reads as a fault rather than as a sky and is
- * unmistakable once seen. The delays offset the three again, so the brightest
- * star is never in phase with the one beside it. Taken from the avatar style
- * these worlds come from, which had already solved it.
+ * ⚠️ NO TWO PERIODS DIVIDE INTO EACH OTHER. A field on one shared period pulses
+ * in unison, which reads as a fault rather than as a sky and is unmistakable
+ * once seen. The delays offset them again, so the brightest mark is never in
+ * phase with the one beside it.
  *
  * ⚠️ AND THEY ARE LONG. Every other value here is under a second because it
- * describes a control settling; a sky is the one thing in the product meant to
+ * describes a control settling; a scene is the one thing in the product meant to
  * be noticed only if you look at it for a while.
+ *
+ * ⚠️ `dip` IS WHY THIS IS A TABLE RATHER THAN THREE PERIODS. A star is a point:
+ * it can go most of the way out and back and still read as a star twinkling. A
+ * bloom is a fifth of the screen, and the same dip on one of those is the page
+ * throbbing. How deep a beat goes is a property of the beat, not a constant the
+ * renderer gets to assume — and it was a constant, which is why the first aura
+ * pulsed like a warning light.
  */
-export const TWINKLE = {
-  medium: { period: "5.2s", delay: "2s" },
-  large: { period: "3.7s", delay: "2.7s" },
-  sparkle: { period: "2.8s", delay: "1.4s" },
+export const BEAT = {
+  /* A sky's three: small, sharp marks, so they may go most of the way out. */
+  medium: { period: "5.2s", delay: "2s", dip: 0.3 },
+  large: { period: "3.7s", delay: "2.7s", dip: 0.3 },
+  sparkle: { period: "2.8s", delay: "1.4s", dip: 0.3 },
+  /* An aura's two: enormous and soft, so they barely move and take an age. */
+  swell: { period: "13s", delay: "0s", dip: 0.62 },
+  breathe: { period: "19s", delay: "6.5s", dip: 0.78 },
 } as const;
 
 /**
