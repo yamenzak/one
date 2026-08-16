@@ -20,6 +20,7 @@ import { Settings, settingsShown } from "../src/rendered/settings.js";
 import { NotificationPolicy, policyShown } from "../src/rendered/policy.js";
 import { FlagConsole, Shelf, saying, money } from "../src/rendered/console.js";
 import { Shell, reachable } from "../src/frame/shell.js";
+import { crownFor } from "../src/frame/layout.js";
 import { brandCss, brandCssFor, readable, colorFor } from "../src/tokens/theme.js";
 import { ambienceStylesheet, skyWorld, worldCss } from "../src/tokens/ambience.js";
 import { SKIES } from "../src/scene/index.js";
@@ -315,6 +316,57 @@ describe("the shell", () => {
     number is on the screen the control opens. `Slot.dot` is the same mark the
     island uses.
   */
+  /*
+    ⚠️ TWO CROWNS WOULD STACK, AND WHICH ONE WINS IS DECIDED BY A WAY OUT. Every
+    `Screen` renders a crown, so a shell that stood down whenever one appeared
+    would never draw its own again and the account, the workspace and the inbox
+    would be gone from every screen in the product. A SUB-PAGE has a way out and
+    owns the row; a DESTINATION has none, so the product's crown stands and takes
+    the screen's actions.
+
+    ⚠️ AND IT IS TESTED HERE RATHER THAN THROUGH A RENDER, because the publish
+    lands in a layout effect and `renderToStaticMarkup` runs none — a test of the
+    rendered shell would assert the state before any screen had spoken, which
+    passes for the wrong reason.
+  */
+  const act = (id: string) => ({ id, label: id, icon: null, onDo: () => {} });
+  const product = {
+    who: { name: "you@example.com" },
+    name: "Northwind Strength",
+    also: [act("apps"), act("inbox")],
+  };
+
+  it("stands the product's crown down for a screen with a way out", () => {
+    const out = crownFor(
+      { back: () => {}, leave: "back", title: "Priya Raman", also: [act("edit")] },
+      product,
+    );
+    expect(out.name).toBe("Priya Raman");
+    expect(out.collapses).toBe(true);
+    expect(out.back).toBeTruthy();
+    /* ⚠️ The account does NOT lead a sub-page — the way out does, and a crown
+       refuses both at once. */
+    expect(out.who).toBeUndefined();
+    expect(out.also?.map((a) => a.id)).toEqual(["edit"]);
+  });
+
+  it("keeps the product's crown for a destination, and takes its actions", () => {
+    const out = crownFor({ title: "Clients", also: [act("filter")], does: undefined }, product);
+    expect(out.name).toBe("Northwind Strength");
+    expect(out.who).toBeTruthy();
+    expect(out.back).toBeUndefined();
+    /* ⚠️ THE SCREEN'S OWN ACTS COME FIRST. The inbox is always there and can
+       afford to be the one that falls off a full row; a screen with two of its
+       own would otherwise show neither. */
+    expect(out.also?.map((a) => a.id)).toEqual(["filter", "apps"]);
+  });
+
+  it("is the product's own crown when no screen has spoken", () => {
+    const out = crownFor(null, product);
+    expect(out.who).toBeTruthy();
+    expect(out.also?.map((a) => a.id)).toEqual(["apps", "inbox"]);
+  });
+
   it("marks the inbox when something is waiting, and not before", () => {
     const quiet = html(
       <Shell

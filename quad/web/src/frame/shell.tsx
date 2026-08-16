@@ -20,6 +20,7 @@
  * dependency and that version.
  */
 
+import * as React from "react";
 import type { ScreenSpec } from "@quad/kernel";
 import { PRIMARY_MAX, primaryOf } from "@quad/kernel";
 import { Button, Separator } from "@heroui/react";
@@ -28,7 +29,9 @@ import {
   Boxes, FileText, House, Inbox as InboxGlyph, NotebookPen, Package, Plus, Shield, Sparkles, Sun,
   UserRound, Users,
 } from "lucide-react";
-import { Crown, Island, Page, type Slot } from "./layout.js";
+import {
+  Crown, CrownSocketProvider, Island, Page, crownFor, type CrownClaim, type Slot,
+} from "./layout.js";
 import { type Sky } from "../tokens/ambience.js";
 import { PAD, SPACE } from "../tokens/metrics.js";
 import { Face, appFace, worldFor, type FaceOf } from "../parts/face.js";
@@ -153,6 +156,16 @@ export function Shell(props: ShellProps) {
     shell around them. Choosing a ground is a decision; painting one is a
     mechanism, and only the decision belongs here.
   */
+  /*
+    ⚠️ A SCREEN INSIDE MAY OWN THE CROWN — see `useCrownSocket`. A sub-page has a
+    way out, so its crown replaces this one entirely; a destination has none, so
+    this crown stands and takes the screen's actions into its trail. Held as
+    state rather than read during render because the screen mounts BELOW this,
+    and the publish lands in a layout effect — before paint, so neither crown is
+    ever seen in the wrong place.
+  */
+  const [claim, setClaim] = React.useState<CrownClaim | null>(null);
+
   const named = at?.sky as Sky | undefined;
   /* ⚠️ SEEDED ON THE SCREEN'S OWN ROUTE, which is the whole gain over a name.
      Two screens of one product naming `glow` are two grounds of one material
@@ -209,21 +222,23 @@ export function Shell(props: ShellProps) {
       <Crown
         bleed="edge"
         width="work"
-        who={{
-          name: crown.personEmail ?? "You",
-          face: crown.personFace,
-          onOpen: onOpenHub,
-        }}
-        name={crown.tenantName}
-        also={[
-          ...((crown.apps ?? []).length && onSwitchApp && onOpenHub
-            ? [{ id: "apps", label: "Your products", icon: <Boxes />, onDo: onOpenHub }]
-            : []),
-          ...(onOpenInbox
-            ? [{ id: "inbox", label: "Notifications", icon: <InboxGlyph />, onDo: onOpenInbox,
-                dot: Boolean(crown.unread) }]
-            : []),
-        ].slice(0, 2) as unknown as readonly [Slot, Slot]}
+        {...crownFor(claim, {
+          who: {
+            name: crown.personEmail ?? "You",
+            face: crown.personFace,
+            onOpen: onOpenHub,
+          },
+          name: crown.tenantName,
+          also: [
+            ...((crown.apps ?? []).length && onSwitchApp && onOpenHub
+              ? [{ id: "apps", label: "Your products", icon: <Boxes />, onDo: onOpenHub }]
+              : []),
+            ...(onOpenInbox
+              ? [{ id: "inbox", label: "Notifications", icon: <InboxGlyph />, onDo: onOpenInbox,
+                  dot: Boolean(crown.unread) }]
+              : []),
+          ],
+        })}
       />
 
       {/* ------------------------------------------------------- the middle --- */}
@@ -257,7 +272,9 @@ export function Shell(props: ShellProps) {
             reserve room for. Set in both places it is twice the room under the
             last card, which is the failure mode of every measurement that lives
             in two files. */}
-        <main className={`flex-1 min-w-0 ${PAD}`}>{children}</main>
+        <main className={`flex-1 min-w-0 ${PAD}`}>
+          <CrownSocketProvider onClaim={setClaim}>{children}</CrownSocketProvider>
+        </main>
       </div>
     </Page>
   );

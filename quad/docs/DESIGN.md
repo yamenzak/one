@@ -158,6 +158,36 @@ already 44px each — matching hit boxes — while the marks inside them were no
 in a row of four, and that is what "the heights look inconsistent" is. A face is
 `FACE_PX.row`, every glyph is `ICON.crown`, and neither changes with the window.
 
+### When there is already a crown above you
+
+A `Shell` draws the product's crown; a `Screen` draws its own. Inside a shell,
+both would stack. **Which one wins is decided by whether the screen has a way
+out**, because "provides a crown" and "renders a crown" are not the same
+question — every `Screen` renders one, so a shell that stood down whenever one
+appeared would never draw its own again and the account, the workspace and the
+inbox would be gone from every screen in the product.
+
+| the screen | has a way out | what happens |
+|---|---|---|
+| a **sub-page** — somewhere you *went* | yes | it owns the row: back, its name, its actions. **The product's crown stands down.** The account and the inbox are one tap behind it. |
+| a **destination** — somewhere you *are* | no | the product's crown stands. The screen's name becomes a heading in the content, and it hands the crown its **actions**. |
+
+That is what a phone has always done with a pushed view, and it is the only
+split under which nothing is lost at either end.
+
+⚠️ **A destination's actions come first in the trail** and the product's fill
+what is left. A destination's own acts are what somebody came to the screen to
+do; the inbox is always there and can afford to be the one that falls off a full
+row. Ordered the other way, a screen with two actions of its own would show
+neither.
+
+⚠️ **The rule is `crownFor`, a pure function, and that is deliberate.** Left as a
+ternary inside the shell's JSX it is two crowns that have to agree about widths,
+hems and the order of a merged trail — checkable only by rendering a shell around
+a screen and reading the markup. As a function it is four assertions, and the
+publish itself lands in a layout effect so neither crown is ever painted in the
+wrong place.
+
 ⚠️ **A SECOND LINE AND A SECOND MARK ARE NOT A SHAPE, THEY ARE CLUTTER.** The
 shell's crown drew a face, then a product mark, then a workspace name stacked
 over a product name — two circles and a paragraph in a 64px row. What a crown

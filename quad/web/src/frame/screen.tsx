@@ -31,7 +31,9 @@
 
 import * as React from "react";
 import { Button } from "@heroui/react";
-import { Band, Page, PageCrown, Spacer, type Slot, type Width } from "./layout.js";
+import {
+  Band, Page, PageCrown, Spacer, Title, useCrownSocket, type Slot, type Width,
+} from "./layout.js";
 import { Group, NavRow } from "../parts/surfaces.js";
 import { worldFor, type FaceOf } from "../parts/face.js";
 import type { Tone } from "@quad/kernel";
@@ -352,25 +354,54 @@ export function Screen<T = unknown>({
     )
     : <Arriving space={preset.space}>{children}</Arriving>;
 
+  /*
+    ⚠️ THE CEILING IS THE CROWN'S TYPE AND THIS IS WHERE IT IS MET. A screen may
+    declare any number of `also`; two is what the row can hold, so the slice
+    happens once, here, rather than the crown silently dropping the third.
+
+    ⚠️ AND `does` IS THE SAME ACT DRAWN TWICE AND SHOWN ONCE — the crown above
+    `md`, the dock below it. Two declarations would drift the day one of them
+    gets new copy.
+  */
+  const trail = [also[0], also[1]].filter(Boolean) as readonly Slot[];
+  const act = where === "act" && does ? { ...does, wide: true } : undefined;
+
+  /*
+    ⚠️ A CROWN ABOVE US TAKES THIS ONE — see `useCrownSocket`. Inside a `Shell`
+    there is already a crown, and two of them stack; what happens next depends
+    on whether this screen is somewhere you WENT (it has a way out, so it owns
+    the crown and the shell's stands down) or somewhere you ARE (it has none, so
+    the shell's crown stands and this hands it the actions).
+  */
+  const socketed = useCrownSocket({ back: out, leave: how, title: name, also: trail, does: act });
+  const ownCrown = !socketed;
+  /* ⚠️ A DESTINATION'S NAME IS A HEADING, NOT CHROME. With the shell's crown
+     standing there is nothing to collapse into, so the name belongs in the
+     content where a heading belongs — which is where it was going to end up the
+     first time somebody looked at a screen with no crown of its own. */
+  const heading = socketed && !out;
+
   return (
     <>
-      <PageCrown
-        bleed="hold"
-        width={preset.width}
-        title={name}
-        face={subject ?? undefined}
-        under={sub}
-        back={out}
-        leave={how}
-        /* ⚠️ THE CEILING IS THE CROWN'S TYPE AND THIS IS WHERE IT IS MET. A
-           screen may declare any number of `also`; two is what the row can
-           hold, so the slice happens once, here, rather than the crown
-           silently dropping the third. */
-        also={[also[0], also[1]].filter(Boolean) as unknown as readonly [Slot, Slot]}
-        /* ⚠️ THE SAME ACT, DRAWN TWICE AND SHOWN ONCE — see `PageCrown`. Two
-           declarations would drift the day one of them gets new copy. */
-        does={where === "act" && does ? { ...does, wide: true } : undefined}
-      />
+      {ownCrown ? (
+        <PageCrown
+          bleed="hold"
+          width={preset.width}
+          title={name}
+          face={subject ?? undefined}
+          under={sub}
+          back={out}
+          leave={how}
+          also={trail as unknown as readonly [Slot, Slot]}
+          does={act}
+        />
+      ) : null}
+
+      {heading ? (
+        <Band bleed="hold" width={preset.width}>
+          <div className="pt-2 pb-4"><Title under={typeof sub === "string" ? sub : undefined}>{name}</Title></div>
+        </Band>
+      ) : null}
 
       <Band bleed="hold" width={preset.width}>
         <div className="pb-2">{body}</div>

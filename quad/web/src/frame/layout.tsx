@@ -807,6 +807,142 @@ export function Crown({
   );
 }
 
+/* ----------------------------------------------------------- crown socket --- */
+
+/**
+ * WHERE A SCREEN'S CROWN GOES WHEN SOMETHING ABOVE IT ALREADY HAS ONE.
+ *
+ * ⚠️ TWO CROWNS WOULD STACK, AND NOTHING WAS STOPPING THEM. A `Shell` draws the
+ * product's crown; a `Screen` draws its own. Nothing mounts an app screen inside
+ * a shell yet (`mountScreen` has no callers), so the collision has never been
+ * seen — which is exactly the state a thing is in the day before it ships.
+ *
+ * ⚠️ "PROVIDES ONE" IS NOT "RENDERS ONE", AND THE DIFFERENCE DECIDES THE WHOLE
+ * BEHAVIOUR. Every `Screen` renders a crown, so a shell that stood down whenever
+ * one appeared would never draw its own again — the account, the workspace and
+ * the inbox would be gone from every screen in the product. What distinguishes
+ * the two cases is a WAY OUT:
+ *
+ *   a SUB-PAGE has one. It is somewhere you went, its crown carries the way
+ *   back and its name, and the product's chrome is one tap behind it. The
+ *   shell's crown stands down.
+ *
+ *   a DESTINATION has none. It IS the product, the nav already says which one,
+ *   and its name belongs in the content as a heading. The shell's crown stands,
+ *   and the screen hands it the two things a crown can carry that a heading
+ *   cannot — its actions.
+ *
+ * That is what a phone has always done with a pushed view, and it is the only
+ * split under which nothing is lost at either end.
+ *
+ * ⚠️ THE HANDLERS ARE WRAPPED, NOT PUBLISHED. What crosses the socket is a
+ * SIGNATURE of primitives plus callbacks that read a ref — so a screen whose
+ * `onDo` closes over fresh state does not have to publish again to be correct,
+ * and publishing does not loop on a new object identity every render. Both are
+ * failure modes of the obvious version and neither is visible in a screenshot.
+ */
+export interface CrownClaim {
+  /** ⚠️ Present means a sub-page: the socket's own crown stands down. */
+  readonly back?: () => void;
+  readonly leave?: "back" | "dismiss";
+  readonly title: string;
+  readonly also: readonly Slot[];
+  readonly does?: CrownProps["does"];
+}
+
+const CrownSocket = React.createContext<((claim: CrownClaim | null) => void) | null>(null);
+
+/**
+ * WHICH CROWN WINS, AND WHAT IS IN IT — the whole rule, as a function.
+ *
+ * ⚠️ IT IS PURE BECAUSE THE BRANCH IS THE DESIGN. Left as a ternary inside the
+ * shell's JSX it is two crowns that have to agree about widths, hems and the
+ * order of a merged trail, checkable only by rendering a shell around a screen
+ * and reading the markup. As a function it is four assertions.
+ */
+export function crownFor(claim: CrownClaim | null, product: {
+  readonly who: CrownProps["who"];
+  readonly name: string;
+  readonly also: readonly Slot[];
+}): CrownProps {
+  /* ⚠️ A WAY OUT IS WHAT MAKES IT A SUB-PAGE — see `useCrownSocket`. */
+  if (claim?.back) {
+    return {
+      back: claim.back, leave: claim.leave, name: claim.title, collapses: true,
+      also: claim.also.slice(0, 2) as unknown as readonly [Slot, Slot],
+      does: claim.does,
+    };
+  }
+  return {
+    who: product.who,
+    name: product.name,
+    /*
+      ⚠️ THE SCREEN'S ACTIONS COME FIRST AND THE PRODUCT'S FILL WHAT IS LEFT. A
+      destination's own acts are what somebody came to the screen to do; the
+      inbox is always there and can afford to be the one that falls off a full
+      row. Ordered the other way, a screen with two actions of its own would
+      show neither.
+    */
+    also: [...(claim?.also ?? []), ...product.also].slice(0, 2) as unknown as readonly [Slot, Slot],
+    does: claim?.does,
+  };
+}
+
+/**
+ * ⚠️ A SOCKET IS OFFERED, NEVER REQUIRED. A `Screen` outside one — the hub, a
+ * door, a presented surface — draws its own crown exactly as before, and this
+ * whole mechanism is invisible to it.
+ */
+export function CrownSocketProvider({ onClaim, children }: {
+  readonly onClaim: (claim: CrownClaim | null) => void;
+  readonly children: React.ReactNode;
+}) {
+  return <CrownSocket.Provider value={onClaim}>{children}</CrownSocket.Provider>;
+}
+
+/**
+ * Publishes this screen's crown to whatever is above it, and reports whether
+ * anything took it.
+ */
+export function useCrownSocket(claim: CrownClaim): boolean {
+  const publish = React.useContext(CrownSocket);
+  const latest = React.useRef(claim);
+  latest.current = claim;
+
+  /* ⚠️ PRIMITIVES ONLY. A signature over the callbacks would change on every
+     render of the caller and republish forever. */
+  const sig = JSON.stringify([
+    claim.title, Boolean(claim.back), claim.leave,
+    claim.also.map((a) => [a.id, a.label, Boolean(a.dot)]),
+    claim.does ? [claim.does.label, Boolean(claim.does.disabled), claim.does.tone] : null,
+  ]);
+
+  const stable = React.useMemo<CrownClaim>(() => {
+    const now = () => latest.current;
+    return {
+      title: now().title,
+      leave: now().leave,
+      back: now().back ? () => now().back?.() : undefined,
+      also: now().also.map((a) => ({ ...a, onDo: () => {
+        now().also.find((b) => b.id === a.id)?.onDo();
+      } })),
+      does: now().does ? { ...now().does!, onDo: () => now().does?.onDo() } : undefined,
+    };
+    /* ⚠️ The signature IS the dependency — see above. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sig]);
+
+  React.useLayoutEffect(() => {
+    if (!publish) return;
+    publish(stable);
+    /* ⚠️ RELEASED ON THE WAY OUT, or the crown of a screen somebody has left
+       stays over the one they are on. */
+    return () => publish(null);
+  }, [publish, stable]);
+
+  return publish !== null;
+}
+
 /* -------------------------------------------------------------- page head --- */
 
 /**
