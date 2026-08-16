@@ -28,9 +28,10 @@
 import * as React from "react";
 import {
   Checkbox, CheckboxGroup, ComboBox, DateField, Description, FieldError, Input, InputGroup,
-  Label, ListBox, NumberField, Radio, RadioGroup, SearchField, Select, Slider, Tag, TagGroup,
-  TextArea, TextField, TimeField, ToggleButton, ToggleButtonGroup,
+  InputOTP, Label, ListBox, NumberField, Radio, RadioGroup, REGEXP_ONLY_DIGITS, SearchField,
+  Select, Slider, Tag, TagGroup, TextArea, TextField, TimeField, ToggleButton, ToggleButtonGroup,
 } from "@heroui/react";
+import { CODE_SLOT } from "../tokens/metrics.js";
 
 /* ---------------------------------------------------------------- grammar --- */
 
@@ -491,5 +492,75 @@ export function TimeInput({ onChange, ...p }: Said & {
       </TimeField.Group>
       <Tail help={p.help} error={p.error} />
     </TimeField>
+  );
+}
+
+/* ------------------------------------------------------------------- code --- */
+
+/**
+ * THE EMAILED CODE, AND THE BOXES ARE COUNTED RATHER THAN WRITTEN OUT.
+ *
+ * ⚠️ THE NUMBER OF BOXES IS THE SERVER'S, AND WRITING THEM OUT BREAKS THAT. The
+ * screen this came from opened by saying so — "a form drawing six against a
+ * server issuing eight refuses every valid code and blames the person while
+ * doing it" — and then drew six `<InputOTP.Slot index={0..5}>` by hand under the
+ * sentence. `maxLength` was already the kernel's constant, so raising it would
+ * have left a six-box form silently unable to accept anything. The slots are
+ * derived from `digits` here, which is the only version where that comment is
+ * true.
+ *
+ * ⚠️ AND THE BOXES SPAN THE FORM, LIKE EVERY OTHER CONTROL ON IT. At their
+ * intrinsic size they sit two thirds of the way across, under a full-width
+ * button and over another — a row that stops short reads as a control that
+ * failed to size itself rather than as a decision.
+ */
+export function CodeEntry({ digits, value, onChange, onDone, autoFocus, ...p }: Omit<Said, "label"> & {
+  readonly digits: number;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  /** Fired when the last box is filled — the code is complete, so submit. */
+  readonly onDone?: () => void;
+  readonly autoFocus?: boolean;
+  /**
+   * ⚠️ `sr-only`, ALWAYS, AND THAT IS WHY IT IS NOT IN `Said`. Whatever screen
+   * this is on has already said which inbox to look in, in a sentence; a second
+   * "the code we sent to …" over the boxes is the same fact twice. It stays in
+   * the accessibility tree because the boxes on their own are N unnamed inputs.
+   */
+  readonly label?: string;
+}) {
+  /* ⚠️ TWO GROUPS FOR ANYTHING LONGER THAN FOUR, ONE BELOW. A six-figure code
+     reads as two threes and an eight as two fours; a five reads as three and
+     two. Four or fewer is a single run — a separator there is punctuation
+     between two digits and one. */
+  const split = digits > 4 ? Math.ceil(digits / 2) : digits;
+  const groups: readonly (readonly [number, number])[] = split === digits
+    ? [[0, digits]]
+    : [[0, split], [split, digits]];
+  return (
+    <InputOTP
+      autoFocus={autoFocus}
+      maxLength={digits}
+      pattern={REGEXP_ONLY_DIGITS}
+      value={value}
+      onChange={onChange}
+      onComplete={onDone}
+      isDisabled={p.disabled === true}
+      className="w-full"
+      aria-label={p.label ?? "Your code"}
+    >
+      {groups.map(([from, to], at) => (
+        <React.Fragment key={from}>
+          {at > 0 ? <InputOTP.Separator /> : null}
+          {/* ⚠️ THE GROUPS GROW AND THE SLOTS SHARE THEM, so the boxes divide
+              the width instead of a further one being invented for it. */}
+          <InputOTP.Group className="grow">
+            {Array.from({ length: to - from }, (_, i) => (
+              <InputOTP.Slot key={from + i} index={from + i} className={`grow ${CODE_SLOT}`} />
+            ))}
+          </InputOTP.Group>
+        </React.Fragment>
+      ))}
+    </InputOTP>
   );
 }

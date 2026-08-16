@@ -19,13 +19,13 @@ import { Balance, Band, Crown, CopyRow, Figure, Group, Grid, Island, Money, NavR
   StepRow, TileGrid, Nothing, Row, Section, Stack, Title, Cluster, SPACE,
   TYPE, type Sky } from "@engine/design";
 import {
-  Agree, Choice, Confirm, Crumbs, DateInput, Dialog, Faq, FormWaiting, Gauge, Hotkey, Listing,
+  Agree, Choice, CodeEntry, Confirm, Crumbs, DateInput, Dialog, Faq, FormWaiting, Gauge, Hotkey, Listing,
   LongText, Lookup, Menu, MoneyInput, NumberInput, OneOf, PageTabs, Peek, Picks, Reveal,
   SearchInput, SecretInput, Segmented, Dial, Steps, Tags, TextInput, Timeline, TimeInput,
   Tray, notice, ready, trouble, waiting, type Col, type Loaded,
 } from "@engine/design";
 import { Button } from "@heroui/react";
-import { PLATFORM_PROBLEMS, problem } from "@engine/kernel";
+import { CODE_DIGITS, PLATFORM_PROBLEMS, problem } from "@engine/kernel";
 import { Sheet } from "../ui.js";
 import { ArrowLeftRight, ChevronRight, CirclePlus, CircleUser, Clock, Coins, CreditCard, Ellipsis, EyeOff, FileText, Globe, House, Landmark, Link2, MessagesSquare, Package, PiggyBank, Plane, Plus, Smartphone, Trash2, TriangleAlert, Users } from "lucide-react";
 
@@ -62,6 +62,7 @@ function FormsDemo() {
     { id: "a", label: "strength" }, { id: "b", label: "morning" }, { id: "c", label: "online" },
   ]);
   const [q, setQ] = useState("");
+  const [code, setCode] = useState("");
   const [ok, setOk] = useState<boolean | undefined>(false);
 
   const coaches = [
@@ -114,6 +115,9 @@ function FormsDemo() {
           ]} />
           <Tags label="Labels" items={tags} onRemove={(id) => setTags(tags.filter((t) => t.id !== id))} />
           <SearchInput label="Search exercises" value={q} onChange={setQ} />
+          {/* ⚠️ SIX HERE BECAUSE THE SERVER SAYS SIX. The boxes are counted from
+              the number, not written out — see `CodeEntry`. */}
+          <CodeEntry digits={CODE_DIGITS} value={code} onChange={setCode} />
           <Agree label="Email me a weekly summary" value={ok} onChange={setOk} />
           <LongText label="Anything else?" value={about} onChange={setAbout} placeholder="Injuries, preferences, schedule…" />
         </Stack>

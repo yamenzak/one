@@ -48,6 +48,24 @@
       "fails": "a @source naming a directory that no longer exists, which is not an error but a smaller stylesheet \u2014 185 utility classes the design package alone used were never emitted, .md:hidden and .absolute among them, with every component still mounting and every test still green"
     },
     {
+      "id": "no-screen-assembles-a-control-the-package-ships",
+      "protects": "D7",
+      "stage": "17",
+      "status": "live",
+      "impl": "scripts/heroui.test.mjs",
+      "proves": "composed:",
+      "fails": "a screen writing out six <InputOTP.Slot> under a comment saying the number of boxes is the server's, so raising it leaves a form that refuses every valid code and blames the person"
+    },
+    {
+      "id": "no-source-holds-a-character-nothing-renders",
+      "protects": "D8",
+      "stage": "17",
+      "status": "live",
+      "impl": "scripts/guards.test.mjs",
+      "proves": "legible:",
+      "fails": "a literal backspace inside a guard's regex, which makes the pattern unmatchable while diff, grep and review all render the line as correct \u2014 the check then reports green about the one defect it was written to catch"
+    },
+    {
       "id": "a-table-is-inside-the-collection-it-needs",
       "protects": "D7",
       "stage": "17",

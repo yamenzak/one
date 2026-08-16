@@ -17,7 +17,7 @@
  *              nothing. That is what makes the stage table mean something.
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -110,6 +110,53 @@ for (const g of owed) {
 const byStage = {};
 for (const g of owed) byStage[g.stage] = (byStage[g.stage] ?? 0) + 1;
 ok(`owed: ${owed.length} guard(s) outstanding — ${Object.entries(byStage).map(([s, n]) => `stage ${s}: ${n}`).join(", ") || "none"}`);
+
+/* --------------------------------------------------------------- legible --- */
+
+/**
+ * ⚠️ A GUARD'S REGEX CANNOT CONTAIN A CHARACTER NOBODY CAN SEE, AND ONE DID.
+ * `/<InputOTP\.Slot\b/` was written into a guard through a tool that read `\b`
+ * as an escape, so what landed in the file was a literal BACKSPACE where the
+ * word boundary should be. The regex is unmatchable. The guard ran, found
+ * nothing, and printed `ok` — about the one defect it had just been written to
+ * catch — and `git diff`, `grep` and review all render it as the correct line.
+ *
+ * ⚠️ WHICH IS THE WORST SHAPE A FAILURE CAN TAKE HERE: a check that reports
+ * green about the thing it exists to find. It only surfaced because the guard
+ * was mutation-tested; a guard added without that would have been permanently,
+ * invisibly inert.
+ *
+ * ⚠️ TAB IS THE ONE EXEMPTION, because a tab is a character somebody typed on
+ * purpose. Everything else in C0 is not.
+ */
+const INVISIBLE = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/;
+const walk = (dir, out = []) => {
+  const at = join(ENGINE, dir);
+  if (!existsSync(at)) return out;
+  for (const e of readdirSync(at, { withFileTypes: true })) {
+    if (e.name === "node_modules" || e.name === "dist" || e.name.startsWith(".")) continue;
+    const path = join(dir, e.name);
+    if (e.isDirectory()) walk(path, out);
+    else if (/\.(mjs|ts|tsx|css)$/.test(e.name)) out.push(path);
+  }
+  return out;
+};
+let hidden = 0;
+let read = 0;
+for (const rel of [...walk("scripts"), ...walk("kernel/src"), ...walk("runtime/src"),
+                   ...walk("design/src"), ...walk("one-hub/src"), ...walk("apps")]) {
+  read++;
+  const lines = readFileSync(join(ENGINE, rel), "utf8").split("\n");
+  lines.forEach((line, i) => {
+    if (!INVISIBLE.test(line)) return;
+    hidden++;
+    const at = [...line].findIndex((c) => INVISIBLE.test(c));
+    fail(`${rel}:${i + 1}: a character nothing renders, at column ${at + 1}.\n` +
+         `       It reads as correct in a diff, in grep and in review. In a regex it is a\n` +
+         `       pattern that can never match, and the check around it reports green.`);
+  });
+}
+if (!hidden) ok(`legible: ${read} source file(s), none holding a character nothing renders`);
 
 console.log(`\nguards: ${live.length} live, ${owed.length} owed, every promise accounted for.`);
 process.exit(bad ? 1 : 0);

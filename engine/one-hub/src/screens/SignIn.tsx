@@ -21,12 +21,12 @@
  */
 
 import { useState } from "react";
-import { Button, Form, InputOTP, Label, REGEXP_ONLY_DIGITS, TextField, Input } from "@heroui/react";
+import { Button, Form, Label, TextField, Input } from "@heroui/react";
 import type { Problem } from "@engine/kernel";
 import { CODE_DIGITS } from "@engine/kernel";
 import { useSession } from "../session.js";
 import { here, setupUrl } from "../door.js";
-import { Arrival, AsideRoute, CODE_SLOT, SPACE, Trouble } from "@engine/design";
+import { Arrival, AsideRoute, CodeEntry, SPACE, Trouble } from "@engine/design";
 
 /* ⚠️ Checked here rather than by `isRequired`, which draws a red asterisk on the
    only field on the screen — a required marker beside the one thing there is to
@@ -103,39 +103,17 @@ export function SignIn({ lead }: { readonly lead?: string }) {
           className={`flex flex-col ${SPACE.snug}`}
           onSubmit={(e) => { e.preventDefault(); void finish(); }}
         >
-          {/* ⚠️ The label is `sr-only`: the claim above already says what this
-              is, in a sentence, and a second "the code we sent to …" over the
-              boxes is the same fact twice. It stays in the accessibility tree,
-              because the boxes on their own are six unnamed inputs. */}
-          <Label className="sr-only">Your code</Label>
-          {/* ⚠️ THE BOXES SPAN THE FORM, LIKE EVERY OTHER CONTROL ON IT. At
-              their intrinsic size they sat two thirds of the way across, under
-              a full-width button and over a full-width one — a row that stops
-              short reads as a control that failed to size itself rather than as
-              a decision. The groups grow and the slots share them, so six boxes
-              divide the width instead of a seventh being invented for it. */}
-          <InputOTP
+          {/* ⚠️ THE BOXES ARE COUNTED FROM `CODE_DIGITS`, NOT WRITTEN OUT. This
+              was six hand-written slots under the header sentence saying they
+              must not be — see `CodeEntry`. */}
+          <CodeEntry
             autoFocus
-            maxLength={CODE_DIGITS}
-            pattern={REGEXP_ONLY_DIGITS}
+            digits={CODE_DIGITS}
             value={code}
             onChange={setCode}
-            onComplete={() => { void finish(); }}
-            isDisabled={busy}
-            className="w-full"
-          >
-            <InputOTP.Group className="grow">
-              <InputOTP.Slot index={0} className={`grow ${CODE_SLOT}`} />
-              <InputOTP.Slot index={1} className={`grow ${CODE_SLOT}`} />
-              <InputOTP.Slot index={2} className={`grow ${CODE_SLOT}`} />
-            </InputOTP.Group>
-            <InputOTP.Separator />
-            <InputOTP.Group className="grow">
-              <InputOTP.Slot index={3} className={`grow ${CODE_SLOT}`} />
-              <InputOTP.Slot index={4} className={`grow ${CODE_SLOT}`} />
-              <InputOTP.Slot index={5} className={`grow ${CODE_SLOT}`} />
-            </InputOTP.Group>
-          </InputOTP>
+            onDone={() => { void finish(); }}
+            disabled={busy}
+          />
 
           {/* ⚠️ Live at rest here too. `onComplete` submits the moment the
               sixth digit lands, so this is the fallback — and a fallback that

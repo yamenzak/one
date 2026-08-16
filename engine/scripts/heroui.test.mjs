@@ -270,6 +270,36 @@ for (const file of FILES) {
 if (!raw) ok(`library: nothing hand-rolls a control HeroUI ships`);
 
 /**
+ * ⚠️ AND A SCREEN DOES NOT ASSEMBLE A COMPOUND CONTROL THE PACKAGE ALREADY
+ * SHIPS. The sign-in screen opened by saying that "a form drawing six boxes
+ * against a server issuing eight refuses every valid code and blames the person
+ * while doing it" — and then drew six `<InputOTP.Slot index={0..5}>` by hand, a
+ * few lines under the sentence. Raising `CODE_DIGITS` would have left the form
+ * unable to accept anything, with nothing anywhere failing.
+ *
+ * ⚠️ WHAT MAKES IT CATCHABLE IS WHERE IT IS, NOT WHAT IT SAYS. The count cannot
+ * be checked — a literal six is correct today — but a SCREEN holding the pieces
+ * at all is the thing that goes wrong, because a screen is where nobody thinks
+ * to derive anything. `CodeEntry` counts them from the number it is given.
+ */
+const COMPOSED = [
+  [/<InputOTP\.Slot\b/, "InputOTP.Slot", "CodeEntry"],
+];
+let assembled = 0;
+for (const file of FILES) {
+  if (rel(file).startsWith("design/src/")) continue;
+  const src = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const [re, what, instead] of COMPOSED) {
+    if (!re.test(src)) continue;
+    assembled++;
+    fail(`${rel(file)}: a screen assembling <${what}> by hand (D7).\n` +
+         `       The package ships <${instead}>, which derives the pieces from the number it\n` +
+         `       is given. Written out, a screen and its server disagree in silence.`);
+  }
+}
+if (!assembled) ok(`composed: no screen assembles a control the package already ships`);
+
+/**
  * ⚠️ TAILWIND ONLY EMITS WHAT IT WAS POINTED AT, AND A PATH THAT NO LONGER
  * EXISTS IS NOT AN ERROR — IT IS A SMALLER STYLESHEET. `styles.css` said
  * `@source "../../web/src"` for as long as the design package was called `web`

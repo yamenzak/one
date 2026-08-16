@@ -12,7 +12,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { PLATFORM_PROBLEMS, problem } from "@engine/kernel";
 import {
-  Agree, Choice, Crumbs, Faq, FormWaiting, Gauge, Hotkey, Listing, LongText, Lookup,
+  Agree, Choice, CodeEntry, Crumbs, Faq, FormWaiting, Gauge, Hotkey, Listing, LongText, Lookup,
   MoneyInput, NumberInput, OneOf, PageTabs, Picks, SearchInput, SecretInput, Segmented,
   Dial, Steps, TableWaiting, Tags, TextInput, TimeInput, Timeline, DateInput,
   ready, trouble, waiting, type Col,
@@ -128,6 +128,38 @@ describe("the form grammar", () => {
       const html = renderToStaticMarkup(control);
       expect(html.length).toBeGreaterThan(40);
     }
+  });
+
+  /*
+    ⚠️ THE BOXES ARE COUNTED FROM THE SERVER'S NUMBER, NOT WRITTEN OUT. The
+    screen this came from opened by saying a form drawing six against a server
+    issuing eight refuses every valid code and blames the person while doing it —
+    and then drew six `<InputOTP.Slot index={0..5}>` by hand, a few lines below.
+    Raising `CODE_DIGITS` would have left a six-box form unable to accept
+    anything, with nothing failing.
+  */
+  const slots = (html: string) => [...html.matchAll(/data-slot="input-otp-slot"/g)].length;
+
+  it("draws exactly as many boxes as the code has digits", () => {
+    for (const digits of [4, 5, 6, 8]) {
+      const html = renderToStaticMarkup(
+        <CodeEntry digits={digits} value="" onChange={nothing} />,
+      );
+      expect(slots(html), `${digits} digits`).toBe(digits);
+    }
+  });
+
+  it("splits a long code in two and leaves a short one whole", () => {
+    const sep = (html: string) => [...html.matchAll(/data-slot="input-otp-separator"/g)].length;
+    expect(sep(renderToStaticMarkup(<CodeEntry digits={6} value="" onChange={nothing} />))).toBe(1);
+    /* ⚠️ Four or fewer is one run — a separator there is punctuation between two
+       digits and one, which is not a grouping anybody reads. */
+    expect(sep(renderToStaticMarkup(<CodeEntry digits={4} value="" onChange={nothing} />))).toBe(0);
+  });
+
+  it("names itself, because the boxes on their own are N unnamed inputs", () => {
+    const html = renderToStaticMarkup(<CodeEntry digits={6} value="" onChange={nothing} />);
+    expect(html).toContain("Your code");
   });
 });
 
