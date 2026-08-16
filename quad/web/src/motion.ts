@@ -162,6 +162,19 @@ export const ARRIVE_MOTION = [
   `  --tw-enter-opacity: 0;`,
   `  --tw-enter-translate-y: 0.5rem;`,
   `}`,
+  /*
+    ⚠️ A BLOCK ARRIVES ONCE. `Screen` now animates every top-level block it is
+    given, and several components animate THEMSELVES because they were built to
+    be dropped anywhere — so inside a screen both fired: the same element
+    translated half a rem inside a parent already translating half a rem, and
+    faded from zero inside a parent already fading from zero. Nothing looks
+    broken; it looks like a slightly bigger jump than everything else, on the
+    two screens that happen to use those components.
+
+    ⚠️ THE INNER ONE STANDS DOWN, NOT THE OUTER. The outer block is the thing
+    that arrived — the inner is part of it, and it is carried.
+  */
+  `[data-arrive="true"] [data-arrive="true"] { animation: none; }`,
   `@media (prefers-reduced-motion: reduce) { [data-arrive="true"] { animation: none; } }`,
   `[data-reduce-motion="true"] [data-arrive="true"] { animation: none; }`,
 ].join("\n");

@@ -269,4 +269,25 @@ export const GROUND_CSS = [
     library looks (D7) — rather than a class on a component in a screen.
   */
   `.drawer__dialog { background: var(--background); }`,
+  /*
+    ⚠️ EVERY HAIRLINE IN THE PRODUCT WAS INVISIBLE IN DARK, AND IT WAS MEASURED
+    RATHER THAN NOTICED. The library's separator is a literal —
+    `oklch(0.25 0.006 286)` — and our dark card is `oklch(0.243 0 0)`. Seven
+    thousandths of lightness apart: a rule that renders, occupies a pixel, and
+    separates nothing. Light mode happened to work (0.92 against 0.98), which is
+    why it survived every review: the person looking was in light.
+    "Sign out" sat directly under two navigation rows in one card with the
+    divider between them doing nothing at all.
+
+    ⚠️ SO IT IS A VEIL OF THE FOREGROUND, WHICH IS THE ONLY THING THAT WORKS ON
+    EVERY TIER. A fixed colour has to be right against the page, the card, the
+    raised tier and a sheet; a tenth of whatever the text is made of is a
+    hairline on all four, in both themes, and gets brighter exactly where the
+    ground gets darker. It is also the technique the row chip already uses.
+
+    ⚠️ AND IT CARRIED CHROMA — 0.006 at hue 286, a violet tint, in a product
+    whose whole interface is a value. Nobody could name it and it was there on
+    every list.
+  */
+  `.separator { background-color: color-mix(in oklab, var(--foreground) 12%, transparent); }`,
 ].join("\n");

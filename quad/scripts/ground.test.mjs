@@ -274,6 +274,29 @@ for (const [, decl] of GROUND_SRC.matchAll(/`--(?:accent|default|surface[\w-]*|b
 }
 
 /**
+ * ⚠️ THE HAIRLINE IS THE LIBRARY'S LITERAL, AND IT WAS INVISIBLE IN DARK — which
+ * is not a matter of taste and was measured rather than noticed. HeroUI paints
+ * `.separator` a fixed `oklch(0.25 0.006 286)`; our dark card is
+ * `oklch(0.243 0 0)`. Seven thousandths of lightness apart, so every divider in
+ * the product rendered, occupied a pixel and separated nothing. Light happened
+ * to work, which is why it survived every review: the person looking was in
+ * light.
+ *
+ * ⚠️ A FIXED COLOUR CANNOT DO THIS JOB. A hairline has to separate on the page,
+ * on a card, on the raised tier and inside a sheet, in two themes — and only a
+ * veil of the FOREGROUND is right on all of them at once, because it gets
+ * brighter exactly where the ground gets darker. The literal also carried
+ * chroma at hue 286 on a product whose whole interface is a value.
+ */
+if (!/`\.separator \{ background-color: color-mix\(in oklab, var\(--foreground\)/.test(GROUND_SRC)) {
+  mono++;
+  fail(`ground.ts: the separator is left as the library's literal.\n` +
+       `       It is a fixed colour a hair away from our dark card, so every divider\n` +
+       `       in the product is a pixel that separates nothing — and it is only ever\n` +
+       `       looked at in light, where it happens to work.`);
+}
+
+/**
  * ⚠️ FOCUS IS THE ONE THING THAT MUST NOT FOLLOW, and it is the half that gets
  * forgotten because it is the library's default rather than anything we wrote:
  * HeroUI ships `--focus: var(--accent)`. Left alone, going monochrome makes the
