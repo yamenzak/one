@@ -54,15 +54,18 @@ import { Band } from "./page.js";
  * ⚠️ `pb-[env(safe-area-inset-bottom)]` IS NOT OPTIONAL. Without it the control
  * sits under the home indicator on every modern phone.
  *
- * ⚠️ IT STACKS ON THE NAV RATHER THAN SHARING ITS FLOOR, AND THE RULE HERE USED
- * TO BE "A SCREEN HAS THIS OR AN `Island`, NEVER BOTH". That was true when the
- * only thing rendering both was a catalogue page. A product screen renders both
- * by construction — the shell brings the nav, the screen brings its one action,
- * and on a phone this is the ONLY copy of that action because the crown's is
- * `hidden md:flex`. Both pinned to `bottom-0` put the primary control inside the
- * nav's hem: a 200px wash, ~90% opaque where the dock lands, so the button was a
- * ghost on every phone screen in the product. `--dock-floor` is the page's
- * answer (see `DOCK_FLOOR`), and `z-20` puts chrome above chrome's own scrim.
+ * ⚠️ A SCREEN HAS THIS OR AN `Island`, NEVER BOTH — and the rule survived being
+ * overridden, which is the best evidence for it. For one day a product screen
+ * rendered both: they pin to the same place, so the dock was lifted onto the nav
+ * and given a higher layer to escape its hem. The result was 180px of an 844px
+ * phone in two objects with a gap between them, and a content column reserving
+ * room for one of them — so the last row of the last card sat under the other
+ * permanently, at the top of the scroll and still at the bottom of it.
+ *
+ * ⚠️ THE ACT GOES IN THE BAR INSTEAD (`Island.act`). `Screen` draws this only
+ * when nothing above it has taken the act, which is the standalone case: a
+ * screen with no shell around it, where there is no nav to share the foot of the
+ * page with.
  */
 export function Docked({ width = "read", children }: {
   readonly width?: Width;
@@ -73,8 +76,7 @@ export function Docked({ width = "read", children }: {
        arriving at a docked control's edge and being sliced by it. */
     <div
       data-hem="bottom"
-      className={`sticky z-20 w-full md:hidden ${PAD} ${SAFE_BOTTOM}`}
-      style={{ bottom: "var(--dock-floor, 0px)" }}
+      className={`sticky bottom-0 z-10 w-full md:hidden ${PAD} ${SAFE_BOTTOM}`}
     >
       {/* ⚠️ THE SHAPE'S OWN WIDTH, NOT A WIDTH OF ITS OWN. `max-w-md` was the
           hand-rolled half's answer, so a docked action on a `work`-width screen
@@ -127,7 +129,7 @@ export function Docked({ width = "read", children }: {
  * ⚠️ THE KERNEL REFUSES A SIXTH ITEM, and this slices too: a deployment
  * rendering a manifest it did not compose must not draw one either.
  */
-export function Island({ items, here, onGo, only }: {
+export function Island({ items, here, onGo, act, only }: {
   readonly items: readonly {
     readonly id: string; readonly label: string;
     readonly icon: React.ReactNode; readonly route: string;
@@ -137,6 +139,32 @@ export function Island({ items, here, onGo, only }: {
   }[];
   readonly here: string;
   readonly onGo: (route: string) => void;
+  /**
+   * THE SCREEN'S ONE ACTION, INSIDE THE BAR RATHER THAN ON A SECOND ONE.
+   *
+   * ⚠️ THIS IS WHY `Docked` AND `Island` NEVER APPEAR TOGETHER, and that rule is
+   * `Docked`'s own — it was overridden for one day and the day is instructive.
+   * Stacked, the two of them were 180px of an 844px phone with a gap between
+   * them, which reads as two floating objects rather than as the foot of the
+   * screen; and the content column reserved room for one of them, so the last
+   * row of the last card was under the other permanently.
+   *
+   * ⚠️ THE ACT IS THE ONE THING IN THE BAR WEARING A WORD. Today that is the
+   * destination somebody is on; with an act it is the act, because the crown
+   * already says where they are and the bar is at the thumb. Two labels in a
+   * 358px bar is a bar with no primary.
+   *
+   * ⚠️ AND IT TAKES THE ROOM THAT IS LEFT, TRUNCATING. Five destinations and a
+   * four-word verb do not fit a phone; the honest degradation is a shorter
+   * label rather than a dropped destination or a bar that wraps.
+   */
+  readonly act?: {
+    readonly label: string;
+    readonly icon?: React.ReactNode;
+    readonly onDo: () => void;
+    readonly tone?: "danger";
+    readonly disabled?: boolean;
+  };
   /**
    * ⚠️ THE BREAKPOINT IS A PROP BECAUSE A WRAPPER BREAKS `sticky`, AND THAT IS
    * NOT A STYLE OPINION — it is the bug this parameter exists to remove. A
@@ -202,7 +230,10 @@ export function Island({ items, here, onGo, only }: {
         className={`flex w-full ${WIDTH.read} flex-row items-center ${SPACE.hair} ${ISLAND_PAD}`}
       >
         {shown.map((item) => {
+          /* ⚠️ OPEN ONLY WHEN THERE IS NO ACT — see `act`. The bar carries one
+             word, and when a screen has something to do it is that. */
           const isHere = item.route === here;
+          const open = isHere && !act;
           return (
             <Button
               key={item.id}
@@ -219,7 +250,8 @@ export function Island({ items, here, onGo, only }: {
                  without matching, which is worse than obviously wrong because it
                  looks nearly right. */
               className={`flex-row items-center justify-center ${SPACE.tight} ${ROW.free} `
-                + (isHere ? `shrink-0 ${ISLAND_HERE}` : `grow basis-0 min-w-0 ${ISLAND_ITEM}`)}
+                + (open ? `shrink-0 ${ISLAND_HERE}` : `shrink-0 ${ISLAND_ITEM}`)
+                + (act ? "" : open ? "" : " grow basis-0 min-w-0")}
               onPress={() => onGo(item.route)}
             >
               {/* ⚠️ NO HINT HERE, AND THAT IS THE ONE DELIBERATE OMISSION. The
@@ -260,8 +292,8 @@ export function Island({ items, here, onGo, only }: {
                 className={`${TYPE.note} ${isHere ? "text-foreground" : ""}`
                   + " overflow-hidden whitespace-nowrap leading-none"}
                 style={{
-                  maxWidth: isHere ? "10rem" : 0,
-                  opacity: isHere ? 1 : 0,
+                  maxWidth: open ? "10rem" : 0,
+                  opacity: open ? 1 : 0,
                   transition: MOTION.reveal,
                 }}
               >
@@ -270,6 +302,46 @@ export function Island({ items, here, onGo, only }: {
             </Button>
           );
         })}
+
+        {/*
+          ⚠️ THE ACT TAKES WHAT IS LEFT, AND IT IS THE ONLY FILLED THING IN THE
+          BAR. The destinations are ink on the page's own ground (see above);
+          one primary among them is what makes it a primary rather than a sixth
+          glyph. `min-w-0` with a truncating label so five destinations and a
+          long verb degrade to a shorter verb rather than to a bar that wraps or
+          a destination that vanishes.
+        */}
+        {act ? (
+          <Button
+            /* ⚠️ NAMED, BECAUSE THE BAR PAINTS ITS BUTTONS MUTED — see the
+               `[data-island]` rule. The act is the one that keeps its variant's
+               own colour. */
+            data-act="true"
+            variant={act.tone === "danger" ? "danger" : "primary"}
+            isDisabled={act.disabled}
+            onPress={act.onDo}
+            className={`grow min-w-0 flex-row items-center justify-center ${SPACE.tight} ${ROW.free} ${ISLAND_HERE}`}
+          >
+            {act.icon ? (
+              <span
+                aria-hidden="true"
+                className="flex shrink-0 items-center"
+                style={{ ["--icon" as string]: `${ICON.nav}px` }}
+              >
+                {act.icon}
+              </span>
+            ) : null}
+            {/* ⚠️ NO TYPE CLASS AT ALL, AND THIS IS THE SECOND TIME IN THIS FILE.
+                `TYPE.note` is `text-sm text-muted` — a caption's colour, which on
+                a FILLED control beats the foreground its variant sets, so the one
+                word on the primary rendered grey on white. The destination label
+                three elements up carries the same warning for the same reason,
+                and answers it by overriding the colour; a filled button has no
+                colour to override it WITH, because the right one is the
+                variant's. So the button styles its own word, which is D7. */}
+            <span className="truncate leading-none">{act.label}</span>
+          </Button>
+        ) : null}
       </div>
     </nav>
   );

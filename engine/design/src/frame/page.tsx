@@ -11,7 +11,7 @@ import * as React from "react";
 import type { Tone } from "@engine/kernel";
 import type { Sky, World } from "../tokens/ambience.js";
 import { skyWorld, worldCss } from "../tokens/ambience.js";
-import { BAND_PAD, DOCK_FLOOR, GUTTER, NAV_SPACE, SAFE_TOP, WIDTH } from "../tokens/metrics.js";
+import { BAND_PAD, GUTTER, NAV_SPACE, SAFE_TOP, WIDTH } from "../tokens/metrics.js";
 import type { Width } from "../tokens/metrics.js";
 import { transition } from "../tokens/motion.js";
 import type { Density } from "../scene/index.js";
@@ -210,15 +210,7 @@ export function Page(
         subtree of SVG built as text.
       */}
       {own.field}
-      {/* ⚠️ THE DOCK'S FLOOR IS THE PAGE'S TO SET — see `DOCK_FLOOR`. A screen's
-          primary action pins to the bottom, and so does the nav; only the page
-          knows whether there is a nav to clear. */}
-      <div
-        className={`flex grow flex-col ${nav ? NAV_SPACE : ""}`}
-        style={{ ["--dock-floor" as string]: nav ? DOCK_FLOOR : "0px" }}
-      >
-        {children}
-      </div>
+      <div className={`flex grow flex-col ${nav ? NAV_SPACE : ""}`}>{children}</div>
       {nav}
     </div>
   );

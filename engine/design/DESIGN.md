@@ -145,7 +145,19 @@ dock over a skeleton** (a press against data that has not arrived), **none over 
 refusal** (the only useful control is "try again"), and **none over an empty
 state** that already offers the same words.
 
-⚠️ **A screen has a dock or a nav, never both** — they pin to the same place.
+⚠️ **A screen has a dock or a nav, never both** — they pin to the same place. So
+where there IS a nav, the nav takes the act: `Island.act`, arriving through the
+crown socket the screen already publishes itself through. The bar then carries
+the destinations as glyphs and the act as the one thing wearing a word, because
+the crown says where you are and the bar is at the thumb.
+
+⚠️ **THAT RULE SURVIVED BEING OVERRIDDEN, WHICH IS THE BEST EVIDENCE FOR IT.**
+For one day a product screen rendered both, stacked, the dock lifted onto the nav
+to escape its hem. Two floating objects, 180px of an 844px phone, and a content
+column reserving room for one of them — so the last row of the last card sat
+under the other permanently, at the top of the scroll and still at the bottom of
+it. What the rule had been missing was not an exception; it was somewhere for the
+act to go.
 
 **There is one `Crown`, and its shape is its slots.** Three slots, one height:
 

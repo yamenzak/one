@@ -196,6 +196,18 @@ export function Shell(props: ShellProps) {
         only="phone"
         here={here}
         onGo={onGo}
+        /*
+          ⚠️ THE SCREEN'S ACT, IN THE BAR — the phone half of the same
+          declaration the crown carries above `md`. It arrives through the crown
+          socket, which is already the seam a screen publishes itself through, so
+          the nav needs no second channel and cannot disagree with the crown
+          about what the button says.
+
+          ⚠️ AND `wide` IS THE CROWN'S BUSINESS, NOT THIS ONE'S. `Screen` marks
+          its act `wide` so the crown's copy is `hidden md:flex`; the bar is
+          `md:hidden` already, so exactly one of the two is ever on screen.
+        */
+        act={claim?.does}
         items={primary.map((s) => ({
           id: s.id, label: s.label, route: s.route, icon: glyphOf(s.icon ?? s.id),
         }))}

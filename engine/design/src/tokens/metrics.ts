@@ -324,40 +324,13 @@ export const NUDGE = {
  * cannot fix this itself: by the time it is laid out, the content above it has
  * already been sized.
  *
- * ⚠️ AND IT IS ROOM FOR THE WHOLE STACK, NOT JUST THE NAV. The docked action
- * stands ON the nav (`DOCK_FLOOR`), so on a phone the two of them are 180px of
- * an 844px screen — and this reserved 112. The last row of the last card sat
- * under the dock's hem permanently: half dissolved at the top of the scroll and
- * still half dissolved at the bottom of it, because there was nothing left to
- * scroll. The fix that made the dock legible is what made this wrong, and the
- * two numbers have to move together.
- *
- * ⚠️ RESERVED WHETHER OR NOT A DOCK ARRIVES, because the page cannot know: a
- * screen decides its primary action several levels inside the content, and the
- * outcome it depends on has not resolved when this is laid out. Over-reserving
- * costs blank space at the end of a scroll; under-reserving crops the thing
- * somebody came to read.
+ * ⚠️ AND IT IS THE NAV ALONE, BECAUSE NOTHING STACKS ON IT. A screen's act goes
+ * INTO the bar (`Island.act`) rather than onto a second one above it — see
+ * `Docked`, whose "never both" rule this is the other half of. This number was
+ * briefly the whole stack, which is what a page reserves when there is a stack.
  */
-export const NAV_SPACE = "pb-48" as const;
+export const NAV_SPACE = "pb-28" as const;
 
-/**
- * ⚠️ AND THE DOCK SITS ON TOP OF THE NAV RATHER THAN UNDER IT — the same
- * distance, as a length, because they are two halves of one fact.
- *
- * ⚠️ THEY PIN TO THE SAME PLACE, AND `Docked`'s own header used to answer that
- * with "a screen has this or an `Island`, never both". That rule was written
- * when the only thing rendering both was a catalogue page. Every product screen
- * renders both now: the shell brings the nav, and any screen with a primary
- * action brings the dock — on a phone the dock is the ONLY copy of that action,
- * because the crown's copy is `hidden md:flex`. So the primary action of every
- * phone screen in the product sat inside the nav's hem, which is a 200px wash
- * that is ~90% opaque where the dock lands. The button was legible as a ghost.
- *
- * ⚠️ IT IS A CUSTOM PROPERTY BECAUSE THE DOCK CANNOT ASK. `Page` knows whether
- * it has a nav; the dock is rendered by a screen several levels inside the
- * content. Same mechanism as `--hem-top`, for the same reason.
- */
-export const DOCK_FLOOR = "7rem" as const;
 
 /** The same problem, for a screen whose one action is pinned instead. */
 export const ACTION_SPACE = "pb-24" as const;

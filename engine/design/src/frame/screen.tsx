@@ -423,7 +423,21 @@ export function Screen<T = unknown>({
       {/* ⚠️ ONE COMPONENT FOR THE DOCK — see `Docked`. The same act the crown
           carries above `md`, and the crown's copy is `wide` so exactly one of
           them is ever on screen. */}
-      {where === "act" && does
+      {/*
+        ⚠️ NO DOCK WHERE A CHROME ABOVE HAS TAKEN THE ACT. Socketed, this screen
+        published its `does` to the shell — whose crown shows it above `md` and
+        whose NAV shows it below, in the bar (`Island.act`). A dock as well would
+        be the same act twice on a phone, six inches apart, which is the fault
+        `Crown`'s `wide` already exists to prevent one breakpoint over.
+
+        ⚠️ AND IT IS `Docked`'s OWN RULE, RESTORED. "A screen has this or an
+        `Island`, never both" was overridden for a day: stacked, the two were
+        180px of an 844px screen with a gap between them, and the content column
+        reserved room for one of them so the last row of the last card sat under
+        the other permanently. The rule was right; what was missing was somewhere
+        for the act to go.
+      */}
+      {where === "act" && does && !socketed
         ? (
           <Docked width={preset.width}>
             <Button

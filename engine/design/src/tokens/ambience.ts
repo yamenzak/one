@@ -695,7 +695,17 @@ export function ambienceStylesheet(): string {
       is to be noticed, and the dot carries its own tone token — so it survives
       a colour change and would not survive an alpha one.
     */
-    `[data-island="true"] button:not([data-here="true"]) {`,
+    /*
+      ⚠️ THE DESTINATIONS ARE INK — AND THE ACT IS NOT A DESTINATION. This rule
+      was written when the bar held nothing else, so it painted every button in
+      it muted and let `[data-here]` win back the one you are on. A screen's
+      primary action moved into the bar (`Island.act`), and it is a FILLED
+      control: the muted colour beat the variant's own foreground and the one
+      word on the primary rendered grey on white. Excluded by name rather than by
+      variant, because "which button is the act" is the bar's fact and not the
+      library's.
+    */
+    `[data-island="true"] button:not([data-here="true"]):not([data-act="true"]) {`,
     `  color: color-mix(in oklab, var(--muted) 58%, transparent); }`,
     /*
       ⚠️ WHERE YOU ARE IS INK, AND THAT ONLY BECAME POSSIBLE WITH THE HEM. This

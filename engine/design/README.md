@@ -69,9 +69,13 @@ which ship in the product:
 - **The docked primary action rendered inside the nav's hem.** Both pin to
   `bottom-0`, the nav's hem is ~90% opaque where the dock lands, and on a phone
   the dock is the *only* copy of that action (the crown's is `hidden md:flex`).
-  So the one unmistakable control on every phone screen was a ghost. `Docked`
-  stands on `--dock-floor` now and at `z-20`, because chrome goes above chrome's
-  own scrim.
+  So the one unmistakable control on every phone screen was a ghost. The first
+  fix stacked them and was wrong twice over — 180px of an 844px screen in two
+  floating objects, and a content column reserving room for one of them, so the
+  last row of the last card sat under the other permanently. **The bar absorbs
+  the act now** (`Island.act`), which restores `Docked`'s own rule: a screen has
+  a dock or an island, never both. `Screen` draws a dock only where nothing above
+  it has taken the act — the standalone case, with no nav to share a foot with.
 - And `Screen` **threw away any `under` that was not a string** on the one branch
   that draws a title in content — so a screen's fact vanished depending on
   whether the shell's crown happened to be standing.

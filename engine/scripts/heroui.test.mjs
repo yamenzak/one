@@ -624,10 +624,24 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
   if (!body) {
     fail(`design/src/frame/chrome.tsx: no \`Island\` to check — if it moved, move this with it.`);
   } else {
-    /* ⚠️ Both halves off the SAME name, or the bar can name what it did not
-       highlight. `isHere` is that name; a second one is the defect. */
+    /*
+      ⚠️ WHAT IS NAMED MUST BE WHAT IS HIGHLIGHTED, WHICH IS NOT THE SAME AS
+      "one variable". The first version demanded both halves read `isHere`, and
+      that is the rule stated as an implementation — it failed the day the label
+      became conditional on something FURTHER: with an act in the bar nothing is
+      named, because the act is the one thing wearing a word. Highlighting
+      without naming is the ordinary closed item; naming without highlighting is
+      the defect.
+
+      ⚠️ SO THE LABEL'S CONDITION MUST BE `isHere` OR DERIVED FROM IT IN THIS
+      BODY. A name declared `const open = isHere && …` can only ever be true
+      where `isHere` is, which is the invariant; a name declared from anything
+      else is exactly the bar naming what it did not highlight.
+    */
     const marks = /data-here=\{isHere/.test(body);
-    const names = /maxWidth:\s*isHere/.test(body);
+    const named = /maxWidth:\s*(\w+)/.exec(body)?.[1] ?? "";
+    const names = named === "isHere"
+      || new RegExp(`const ${named}\\s*=\\s*isHere\\s*&&`).test(body);
     /* ⚠️ `overflow-hidden` IS NOT `hidden`, and the first version of this could
        not tell them apart — `\b` matches after a dash, so the utility that makes
        the label narrow read as the utility that removes it. The closed label is
@@ -646,8 +660,10 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
 
     if (!marks || !names) {
       fail(`design/src/frame/chrome.tsx: the nav's fill and its label are not one condition (D7).\n` +
-           `       fill from \`isHere\`: ${marks}; label from \`isHere\`: ${names}.\n` +
-           `       Two expressions is a bar that highlights one item and names another.`);
+           `       fill from \`isHere\`: ${marks}; label from \`${named}\`, which is ` +
+           `neither \`isHere\` nor derived from it.\n` +
+           `       A condition that can be true where \`isHere\` is false is a bar that\n` +
+           `       highlights one destination and names another.`);
     } else if (gone) {
       fail(`design/src/frame/chrome.tsx: a closed label is removed rather than narrowed.\n` +
            `       \`display: none\` takes it out of the accessibility tree, which is five\n` +
