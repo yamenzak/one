@@ -116,8 +116,16 @@ export const MATTE = (() => {
      the ground is hidden and black is where it survives. Written the other way
      round the world appears only behind the text, which looks like a bug in the
      one place it is hardest to notice. */
-  const column = "radial-gradient(58% 46% at 50% 46%,"
-    + " transparent 0%, color-mix(in oklab, black 55%, transparent) 46%, black 78%)";
+  /*
+    ⚠️ WIDE ENOUGH TO CLEAR THE WHOLE READING AREA, NOT JUST A CARD. At 58% × 46%
+    the hole was narrower than the content on every shape in the system, so the
+    world ran at full strength either side of a column of text and behind most of
+    it — which is what makes a ground read as wallpaper rather than as depth. The
+    ellipse is the SAME idea as the hem one axis over: the material is strongest
+    where nothing is, and gone where something is.
+  */
+  const column = "radial-gradient(96% 70% at 50% 46%,"
+    + " transparent 0%, color-mix(in oklab, black 34%, transparent) 46%, black 80%)";
   const both = `${ramp}, ${column}`;
   return `mask-image: ${both}; -webkit-mask-image: ${both};`
     + ` mask-composite: intersect; -webkit-mask-composite: source-in`;

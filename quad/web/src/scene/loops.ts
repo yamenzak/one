@@ -54,10 +54,10 @@ const ARCS = "M0 .5A.5 .5 0 0 1 .5 0M.5 1A.5 .5 0 0 0 1 .5";
  * visible at all. A ground is fine lines at a hundredth of the contrast of
  * anything else on the screen; the same drawing, two orders of weight apart.
  */
-const turn = (deg: number, ink: string) => () =>
+const turn = (deg: number, ink: string, alpha: number) => () =>
   `<g${deg ? ` transform="rotate(${deg} .5 .5)"` : ""}>`
-  + `<path d="${ARCS}" fill="none" stroke="${ink}" stroke-opacity=".2"`
-  + ` stroke-width=".018" stroke-linecap="round"/></g>`;
+  + `<path d="${ARCS}" fill="none" stroke="${ink}" stroke-opacity="${alpha}"`
+  + ` stroke-width=".026" stroke-linecap="round"/></g>`;
 
 /**
  * ⚠️ HALF THE TILES TURN, SPLIT ACROSS TWO PERIODS THAT DO NOT DIVIDE INTO EACH
@@ -66,14 +66,28 @@ const turn = (deg: number, ink: string) => () =>
  * means the field is never in the same arrangement twice within an hour and
  * never changes anywhere you happen to be looking.
  */
-const weave = (ink: string) => ({
+/**
+ * ⚠️ THE CELL IS SMALL ENOUGH THAT THE MOTIF IS NOT A SHAPE. At 62 the arcs met
+ * in four-pointed stars about 80px across — big enough to read as a DRAWING, and
+ * a drawing behind a page is decoration competing with it rather than a ground
+ * under it. The same tile at 38 is a weave: material at arm's length, a pattern
+ * only if you go looking. Nothing about the family changed; a truchet is scale
+ * more than it is anything else.
+ *
+ * ⚠️ AND THE ALPHA IS A PARAMETER NOW, WHICH IT SAID IT WAS AND WAS NOT. `DAY`
+ * has carried a paragraph about black arcs at a third the strength since it was
+ * written, and both skies shipped at `.2` — so light mode was ink on paper at a
+ * white-light's opacity, which is precisely the printed pattern that paragraph
+ * describes as the thing to avoid. A comment is not a mechanism.
+ */
+const weave = (ink: string, alpha: number) => ({
   id: "arc",
-  cell: 62,
+  cell: 38,
   variants: [
-    { weight: 1, draw: turn(0, ink), beat: "quarter" as const, moving: 0.28 },
-    { weight: 1, draw: turn(90, ink), beat: "half" as const, moving: 0.28 },
-    { weight: 1, draw: turn(180, ink), beat: "quarter" as const, moving: 0.22 },
-    { weight: 1, draw: turn(270, ink), beat: "half" as const, moving: 0.22 },
+    { weight: 1, draw: turn(0, ink, alpha), beat: "quarter" as const, moving: 0.28 },
+    { weight: 1, draw: turn(90, ink, alpha), beat: "half" as const, moving: 0.28 },
+    { weight: 1, draw: turn(180, ink, alpha), beat: "quarter" as const, moving: 0.22 },
+    { weight: 1, draw: turn(270, ink, alpha), beat: "half" as const, moving: 0.22 },
   ],
 });
 
@@ -89,7 +103,7 @@ const NIGHT: Family = {
   slots: ["deep", "lit"],
   ink: "fixed",
   tile: { w: 1160, h: 900 },
-  tiles: [weave("#fff")],
+  tiles: [weave("#fff", 0.13)],
   veil: (p) => `color-mix(in oklab, ${p.deep} 88%, #000)`,
   /*
     ⚠️ FAR WEAKER THAN THE FAMILIES THAT READ A PICTURE, AND THE REASON IS THE
@@ -110,18 +124,18 @@ const NIGHT: Family = {
 };
 
 /**
- * ⚠️ BLACK ARCS AT A THIRD THE STRENGTH. A white line on near-black is light
- * caught on an edge and can be quite present; the same line in black on paper is
- * INK, and ink at the same opacity is a printed pattern somebody has to read
- * through. The pitch is identical and only the weight changes, which is what
- * keeps the two skies one family.
+ * ⚠️ BLACK ARCS AT ROUGHLY A THIRD THE STRENGTH, AND NOW ACTUALLY SO. A white
+ * line on near-black is light caught on an edge and can be quite present; the
+ * same line in black on paper is INK, and ink at the same opacity is a printed
+ * pattern somebody has to read through. The pitch is identical and only the
+ * weight changes, which is what keeps the two skies one family.
  */
 const DAY: Family = {
   id: "loops.day",
   slots: ["deep", "lit"],
   ink: "fixed",
   tile: { w: 1160, h: 900 },
-  tiles: [weave("#000")],
+  tiles: [weave("#000", 0.05)],
   veil: (p) => `color-mix(in oklab, ${p.deep} 8%, #fff)`,
   ground: (p, r) => [
     `radial-gradient(${60 + r() * 26}% ${44 + r() * 18}% at ${18 + r() * 64}% ${8 + r() * 26}%,`

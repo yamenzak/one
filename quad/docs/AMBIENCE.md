@@ -202,6 +202,34 @@ not per scene — a night's veil is near its deep and a day's near paper, and th
 same halo under both would outline the letters on one of them. ⚠️ And it is
 opt-in, never a rule on the page: text inside a card is already on a surface.
 
+### When a ground stops being ambience
+
+A world you *notice* is a world competing with the page. Three things push a
+field over that line, and `loops` had all three:
+
+| | was | is |
+|---|---|---|
+| the motif's **scale** | 62px cells → ~80px stars | 38px cells → a weave you read as material |
+| the **contrast** | `.2` on both skies | `.13` night, `.05` day |
+| where it **recedes** | a 58% × 46% hole — narrower than the content on it | 96% × 70%, clearing the whole reading area |
+
+⚠️ **Scale is the lever people reach for last and it matters most.** A truchet is
+scale more than it is anything else: the same tile at 80px is a *drawing* behind
+the page, and at 50px it is texture. Turning the opacity down instead gives you
+faint wallpaper — the same motif, harder to see, still a motif.
+
+⚠️ **The matte's column is the hem, one axis over.** The material is strongest
+where nothing is and gone where something is. At 58% the hole was narrower than
+the content on every shape in the system, so the world ran at full strength
+either side of a column of text and behind most of it.
+
+⚠️ **`loops` shipped with a paragraph describing behaviour it did not have** —
+"black arcs at a third the strength" over a `weave` that hardcoded `.2` for both
+skies. So light mode was ink on paper at a white-light's opacity, which is
+exactly the printed pattern that paragraph names as the thing to avoid. The alpha
+is a parameter now. **A comment is not a mechanism**, and the way to tell them
+apart is that one of them has a caller.
+
 ### Chrome on a scene: `data-chrome` and `data-hem`
 
 Two treatments, and they solve different problems. Reaching for the wrong one is
