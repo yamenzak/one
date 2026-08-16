@@ -286,7 +286,7 @@ function Inner() {
         actions={[{ id: "range", label: "Date range", icon: glyph(<Clock />), onDo: nothing }]}
         under={
           <Row>
-            <Button size="sm" variant="ghost" data-glass="true" onPress={nothing}>Personal</Button>
+            <Button size="sm" variant="ghost" data-chrome="true" onPress={nothing}>Personal</Button>
             <Spacer />
             <Button size="sm" variant="ghost" onPress={nothing}>This month</Button>
           </Row>

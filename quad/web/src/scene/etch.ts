@@ -94,8 +94,13 @@ const DAY: Family = {
   slots: ["deep", "lit"],
   ink: "fixed",
   tile: { w: 1184, h: 888 },
-  /* ⚠️ Halved rather than killed — see the header. A ruled page survives ink. */
-  tiles: [marks("#000", 0.08)],
+  /*
+    ⚠️ HALVED RATHER THAN KILLED — see the header — AND THEN HALVED AGAIN. Black
+    at eight percent on paper is a ruled page you read THROUGH; the same pattern
+    on near-black at sixteen is light catching an edge. Ink and light are not one
+    number at two strengths, which is the whole reason a family declares a `day`.
+  */
+  tiles: [marks("#000", 0.045)],
   veil: (p) => `color-mix(in oklab, ${p.deep} 8%, #fff)`,
   ground: (p, r) => [
     `radial-gradient(${100 + r() * 40}% ${56 + r() * 24}% at ${20 + r() * 60}% ${-16 + r() * 30}%,`

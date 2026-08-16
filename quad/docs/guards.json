@@ -53,8 +53,8 @@
       "stage": "5",
       "status": "live",
       "impl": "scripts/heroui.test.mjs",
-      "proves": "travel:",
-      "fails": "a marker that appears where the sliding one is still arriving, because a filled per-item variant can only switch on and off where one element can travel"
+      "proves": "travel: the nav names one destination",
+      "fails": "the nav's fill and its label come from two expressions, so it highlights one destination and names another — or a closed label is removed rather than narrowed, which is five unnamed buttons to the one group the icon carries nothing for"
     },
     {
       "id": "the-type-scale-has-a-top",

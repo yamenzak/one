@@ -202,9 +202,11 @@ refuse — it reads as built and passes every test.
   answers the donut's question more accurately and is the one to reach for first.
 - `layout.tsx`'s `PageCrown` — an inner page's header, where the page's name is
   the biggest thing on it at rest and comes back small beside the way out once it
-  has scrolled away. **The glass is on the CONTROLS, never on the bar**: a
-  full-width frosted strip has a boundary where the blur stops, which is a border
-  by another name, and it is the thing the no-edges pass exists to remove.
+  has scrolled away. **Chrome is made of the ground, never blurred over it**:
+  `backdrop-filter` re-reads and re-blurs the layer under a chip on every frame
+  of every beat now that the field is live, and a blur over moving marks smears
+  differently as they move. `data-chrome` fills a control with the world's own
+  hue at the palette's value instead — separable in both themes, no readback.
 - `state.tsx` — **the four outcomes, decided once**. Every surface that fetches
   can be waiting, empty, refused or full, and most products ship two of those
   because in development the request is instant and it succeeds. `Loaded<T>` has
@@ -415,7 +417,9 @@ sweep.
 Quad surface with a real router, and it is still a pure parse: five areas —
 Home, People, Money, Settings, Data & Trust — then every enabled product's
 declared screens inside the same shell under `/<app>/…`, the switcher in the
-crown, the designed Island as the phone nav in every context.
+crown, the designed Island as the phone nav in every context — compact now:
+every destination is its icon and only the one you are on expands to say its
+name, so five fit a phone without abbreviating any of them.
 
 - **The page holds no manifest.** `centre.view` sends the declarative slices —
   screens, settings, notification types, documents, processors, role names,
@@ -583,7 +587,7 @@ the library decides FOR us.
 | `an-icon-control-is-a-circle` | D7 | a crown of four controls at three different widths, because a button with only a glyph in it still lays out w-fit px-4 |
 | `a-table-is-inside-the-collection-it-needs` | D7 | a Table.Column outside Table.Content throwing during render, so the whole screen is blank |
 | `a-row-of-equals-shares-its-width` | D7 | a nav of four destinations at four widths, with the current one inheriting whichever width its own label happened to make |
-| `the-nav-marks-here-by-moving` | D10 | a marker that appears where the sliding one is still arriving, because a filled per-item variant can only switch on and off where one element can travel |
+| `the-nav-marks-here-by-moving` | D10 | the nav's fill and its label come from two expressions, so it highlights one destination and names another — or a closed label is removed rather than narrowed, which is five unnamed buttons to the one group the icon carries nothing for |
 | `the-type-scale-has-a-top` | D7 | a hero that renders at the size of the heading above it, because two roles resolved to the same size and neither looked wrong alone |
 | `the-grain-is-noise-not-a-pattern` | D7 | a visible lattice across every light screen, drawn by the layer whose whole job is to be invisible |
 | `a-tenant-is-never-placed-where-its-schema-is-missing` | D5 | every request for one customer answering "no such table", after a move that reported success |

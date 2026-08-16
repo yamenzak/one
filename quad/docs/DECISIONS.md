@@ -159,6 +159,13 @@ permission masks (a 64-key ceiling and audit rows nobody can read).
 Mobile is a bottom navigation island of at most five. Desktop is a sidebar with
 the same five primary. Depth happens *inside* a destination, as sub-areas.
 
+The island is COMPACT: every destination is its icon, and the one somebody is on
+expands to say its name. Five icon-and-label columns do not fit a phone — equal
+columns squeeze every label to a fifth of the screen, so a two-word destination
+truncates and a five-item nav becomes five abbreviations. The label that is
+showing is the only one anybody needs; nobody reads a nav to find out where they
+are not.
+
 **Why.** Five is where a bottom bar stops being tappable and starts being a menu.
 Beyond it, people stop navigating and start hunting.
 

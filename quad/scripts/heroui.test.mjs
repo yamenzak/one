@@ -404,8 +404,16 @@ if (!lozenge) ok(`shapes: every icon-only control asks the library to be one`);
  * after each item's own content, so a longer label still ends up wider. The
  * widths converge, which is worse than obviously wrong: it looks nearly right.
  */
+/*
+  ⚠️ `Island` WAS ON THIS LIST AND IS DELIBERATELY OFF IT. Equal columns were
+  right while every destination showed its label: five items each sized to their
+  own word is five different widths, and the pill inherited whichever width its
+  own label happened to make. The nav is COMPACT now — every destination is its
+  icon and only the one you are on expands — so items sizing to their content is
+  the design rather than the defect, and the width that matters is the bar's,
+  which is its content's by choice. What replaced this check is `travel` below.
+*/
 const EQUALS = [
-  ["web/src/frame/layout.tsx", "Island", /grow basis-0/],
   ["web/src/parts/surfaces.tsx", "TileGrid", /w-full flex-col/],
 ];
 let uneven = 0;
@@ -437,31 +445,63 @@ for (const [file, group, needs] of EQUALS) {
 if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
 
 /**
- * ⚠️ THE NAV'S CURRENT PLACE IS ONE ELEMENT THAT MOVES, NOT FOUR THAT SWITCH.
- * The obvious build is a filled variant on whichever item is active, and it is
- * strictly worse in a way nobody notices until the two are side by side: a
- * background can only appear and disappear, while a single element can TRAVEL,
- * and travelling is what says the two destinations are on one shelf rather than
- * being two unrelated screens. It is also the reason the items had to be equal
- * width first — with equal columns the pill's place is arithmetic rather than
- * something measured, so it can never be a frame behind.
+ * ⚠️ THE NAV NAMES EXACTLY ONE DESTINATION, AND THE FILL AND THE WORD COME FROM
+ * ONE CONDITION. That is the whole of the compact bar: four glyphs and one named
+ * pill fit at any width, and they only fit because the label is closed on
+ * everything else. Two ways to break it, both silent:
  *
- * ⚠️ AND THE ITEMS MUST STAY UNFILLED, or the marker appears where the sliding
- * one is still arriving. That is the shape a "simplification" would take, so it
- * is the shape this checks: one pill, and no per-item variant that paints.
+ *   - the fill and the label are driven by different expressions, so the bar
+ *     highlights one item and names another. It looks like a routing bug and it
+ *     is a nav bug.
+ *   - the label is hidden with `display: none` or `hidden`, which takes it out
+ *     of the accessibility tree — five unnamed buttons to anybody using a screen
+ *     reader, who are the one group for whom the icon carries nothing at all.
+ *
+ * ⚠️ THIS REPLACED A CHECK FOR ONE TRAVELLING PILL. That design was right and
+ * its argument still is — a background can only appear and disappear while a
+ * single element can MOVE, and moving is what says two destinations are on one
+ * shelf. The expansion is that movement now: the fill grows out of one item
+ * while the one before it closes, continuously, carrying the label with it. What
+ * the old shape needed was equal columns, which is what stopped five labels
+ * fitting a phone in the first place.
+ *
+ * ⚠️ AND THE BAR LEAVES BY `transform`. A nav that animated its height or its
+ * padding on scroll is layout work on every frame of every scroll, on the device
+ * least able to afford it — and it is the shape a "simplification" takes.
  */
 {
-  const island = readFileSync(join(QUAD, "web/src/frame/layout.tsx"), "utf8")
-    .split(/\nexport /).filter((b) => b.startsWith("function Island"))[0] ?? "";
-  const body = island.replace(/\/\*[\s\S]*?\*\//g, "");
-  const pills = [...body.matchAll(/data-pill=/g)].length;
-  const switched = /variant=\{[^}]*\?/.test(body);
-  if (pills !== 1 || switched) {
-    fail(`web/src/frame/layout.tsx: the nav marks "here" by switching, not by moving (D7).\n` +
-         `       ${pills} pill(s) found${switched ? ", and an item paints its own variant" : ""}.\n` +
-         `       One element that travels; the items stay ghost.`);
+  const src = readFileSync(join(QUAD, "web/src/frame/layout.tsx"), "utf8");
+  const body = (src.split(/\nexport /).find((b) => b.startsWith("function Island")) ?? "")
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+
+  if (!body) {
+    fail(`web/src/frame/layout.tsx: no \`Island\` to check — if it moved, move this with it.`);
   } else {
-    ok(`travel: the nav's current place is one pill that moves`);
+    /* ⚠️ Both halves off the SAME name, or the bar can name what it did not
+       highlight. `isHere` is that name; a second one is the defect. */
+    const marks = /data-here=\{isHere/.test(body);
+    const names = /maxWidth:\s*isHere/.test(body);
+    /* ⚠️ `overflow-hidden` IS NOT `hidden`, and the first version of this could
+       not tell them apart — `\b` matches after a dash, so the utility that makes
+       the label narrow read as the utility that removes it. The closed label is
+       BUILT from `overflow-hidden`, so the guard failed on the correct code. */
+    const gone = /(?:className=[^\n]*(?<![\w-])hidden(?![\w-])|display:\s*["']?none)/.test(body);
+    const leaves = /transform:\s*away\s*\?/.test(body);
+
+    if (!marks || !names) {
+      fail(`web/src/frame/layout.tsx: the nav's fill and its label are not one condition (D7).\n` +
+           `       fill from \`isHere\`: ${marks}; label from \`isHere\`: ${names}.\n` +
+           `       Two expressions is a bar that highlights one item and names another.`);
+    } else if (gone) {
+      fail(`web/src/frame/layout.tsx: a closed label is removed rather than narrowed.\n` +
+           `       \`display: none\` takes it out of the accessibility tree, which is five\n` +
+           `       unnamed buttons to the one group the icon carries nothing for.`);
+    } else if (!leaves) {
+      fail(`web/src/frame/layout.tsx: the nav does not leave by \`transform\`.\n` +
+           `       Animating height or padding on scroll is layout work on every frame.`);
+    } else {
+      ok(`travel: the nav names one destination, and leaves on the compositor`);
+    }
   }
 }
 

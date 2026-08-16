@@ -233,6 +233,14 @@ export function worldCss(
   }
   return { field: made.field, css: {
     "--world-ground": made.ground,
+    /*
+      ⚠️ THE GROUND'S OWN COLOUR, PUBLISHED, SO CHROME CAN BE MADE OF IT. A chip
+      floating on a scene has to be legible without being a hole punched in the
+      world — and the only fill that is neither is the world's own value, a
+      little denser. `--on-scene` uses the same colour for a halo; this is the
+      raw one, for a surface.
+    */
+    "--scene-veil": made.veil || "transparent",
     /* ⚠️ SET EVEN WHERE THE FAMILY DECLARES NO VEIL, as `none` — because the
        token is read with a fallback and an absent property would inherit the
        PARENT scene's halo on a nested page. A world that says nothing about its
@@ -241,15 +249,6 @@ export function worldCss(
   } };
 }
 
-/**
- * ⚠️ THE GLASS RECIPE, IN ONE PLACE AND IN THIS ORDER. Filters compose in the
- * order written: blurring first and correcting after is what recovers colour and
- * form; correcting first and blurring after averages the correction away.
- */
-const GLASS = "blur(11px) saturate(1.4) contrast(1.2) brightness(0.92)";
-
-/** ⚠️ Light's own stack — it LIFTS. See the milk-vs-smoke note at the rules. */
-const GLASS_LIGHT = "blur(14px) saturate(1.5) contrast(1.04) brightness(1.05)";
 
 
 /**
@@ -398,123 +397,87 @@ export function ambienceStylesheet(): string {
     `  left: 50%; right: auto; width: 100vw; transform: translateX(-50%);`,
     `}`,
     /*
-      ⚠️ CHROME OVER AN AMBIENCE IS GLASS, NOT PAINT. A solid pill over a lit
-      ground is a hole punched in it — the ground is the thing that makes the
-      screen, and every opaque control sitting on it takes a piece away. A
-      translucent fill of the FOREGROUND token blurs whatever is behind it, so
-      the same rule works on olive, on violet and on white without knowing which
-      it is on. This is also why a control here is never tinted with the accent:
-      see the icon rule below.
+      ⚠️ CHROME IS MADE OF THE GROUND NOW, AND THE BLUR IS GONE. It was glass —
+      `backdrop-filter: blur(11px) saturate(1.4) contrast(1.2) brightness(0.92)`
+      — and the argument for it was sound while the ground was a still picture:
+      blur what does not scroll, and a fixed bar over a static gradient costs one
+      readback. That argument died with the scene engine. The field is a LIVE
+      element with marks that twinkle, breathe and turn, so every frame of every
+      beat invalidates the backdrop under every chip and the browser re-reads and
+      re-blurs it — a per-frame full-layer readback for chrome nobody is looking
+      at, on the device least able to afford it.
 
-      ⚠️ GLASS IS FOR CHROME THAT DOES NOT SCROLL, WHICH IS THE ONLY LINE THAT
-      MATTERS. The cost is real — the backdrop is read back and blurred, per
-      frame, per layer — so a scrolling list of translucent cards is a phone
-      with a weak GPU working hard for nothing. Four fixed chips and one bar are
-      not that.
+      ⚠️ AND IT WOULD LOOK WRONG BEFORE IT LOOKED SLOW. A blur averages what is
+      behind it, so a chip over a moving field shows a smear that CHANGES as the
+      marks move under it — the one thing a fixed control must never do.
 
-      ⚠️ A NOTE HERE ONCE CLAIMED THE BLUR CANNOT SAMPLE THROUGH `[data-sky]`'s
-      `isolation: isolate`. Measured, it samples through it perfectly well; what
-      was wrong was the FILL — at twelve percent over a card there is nothing
-      for a blur to separate, so it looked flat and the flatness was diagnosed
-      as the blur being absent. A wrong cause in a comment is worse than no
-      comment, because the next person builds on it.
-    */
-    /*
-      ⚠️ A LONG BLUR AND A LIGHT FILL, IN THAT ORDER OF IMPORTANCE. What makes
-      glass read as glass is that the world behind it is RECOGNISABLE and
-      unreadable at the same time — colour and movement survive, detail does
-      not. That is a property of the blur radius, not of the opacity: a short
-      blur under a heavy fill is a frosted panel, which is a different and older
-      material. Twenty-eight pixels is past the point where 16px text stops
-      resolving into words, so the fill can stay light.
+      ⚠️ SO A CHIP IS A DENSER PATCH OF THE WORLD, WHICH IS THE THING GLASS WAS
+      IMITATING. `--scene-veil` is the ground's own colour, published by
+      `worldCss` — the same value the halo over a hero title is built from. A
+      fill of it reads as the ground THICKENING under the control rather than as
+      a plate laid on top: no readback, no smear, and it follows every family,
+      every seed and both themes without a second recipe.
 
-      ⚠️ AND THE SATURATION BOOST IS NOT A FLOURISH. Blurring averages colours
-      toward grey, so a plate over a coloured ground comes out duller than the
-      ground it is made of — which is exactly the "dusty" reading, arrived at by
-      a different route. Pushing saturation back up is what keeps the glass the
-      colour of what is behind it.
+      ⚠️ IT FALLS BACK TO THE RAISED TIER, and that is what makes it usable on a
+      page with no scene at all. `--surface-tertiary` is the tier the palette
+      guarantees clears both the page and a card, which is exactly the guarantee
+      a chip needs where there is no world to be made of.
     */
     /*
-      ⚠️ ONE FILTER STACK, WRITTEN ONCE. Blur is only the first term: saturation
-      puts back what averaging toward grey takes out, contrast keeps the shapes
-      behind from going flat, and a slight darkening is what stops a plate over
-      a bright ground reading as a wash. Four terms rather than one is the
-      difference between glass and a frosted panel.
-    */
-    /*
-      ⚠️ GLASS IS A VEIL OF THE RAISED TIER, NOT A WASH OF THE FOREGROUND, and
-      the difference is what makes it translucent rather than merely see-through.
-      A foreground tint at any strength a person can see past is one you can
-      READ past — the row under the nav came through it and collided with the
-      labels, two sets of words in the same place.
+      ⚠️ THE WORLD'S HUE AT THE PALETTE'S VALUE, AND THE FIRST VERSION HAD ONLY
+      THE FIRST HALF. A fill of the veil alone is right on a night ground — the
+      veil is dark, the chip reads as the ground thickening — and INVISIBLE on a
+      day one, because a light world's veil IS the paper. Measured: a bar at
+      `oklab(0.991 …)` on a page at `oklab(0.99 …)`, which is chrome nobody can
+      find. A chip has to be separable wherever it lands, in both themes, over
+      seven families.
 
-      ⚠️ AND THIS WAS THE ISLAND'S RULE ALONE, WHICH IS WHY THE CROWN HAD THE
-      SAME BUG A SECOND TIME. The base was a ten-percent foreground wash and only
-      the nav overrode it, so when the crown's chips became the only glass on the
-      screen a quick-action label read straight through the search field at full
-      size. There is one fill now: the value that was already proved.
+      ⚠️ SO THE VALUE COMES FROM `--surface-tertiary`, which the palette
+      GUARANTEES clears both the page and a card, and the hue comes from the
+      world. Neither alone is enough: the tier alone is the grey plate glass was
+      hiding, and the veil alone is the paper.
+    */
+    `[data-chrome="true"] {`,
+    `  background-color: color-mix(in oklab,`,
+    `    var(--surface-tertiary) 72%, var(--scene-veil, var(--surface-tertiary))) !important;`,
+    `}`,
+    `[data-chrome="true"]:hover {`,
+    `  background-color: color-mix(in oklab,`,
+    `    var(--surface-tertiary) 90%, var(--scene-veil, var(--surface-tertiary))) !important;`,
+    `}`,
+    /*
+      ⚠️ AND WHERE YOU ARE IS THE ONE THING THAT LIFTS OFF IT. A destination that
+      is merely a slightly different shade of the bar is a state nobody finds at
+      a glance; `--default` is the control tier, which the palette guarantees
+      clears the raised tier under it. It is the only opaque thing in the chrome,
+      and it is opaque because it is the answer to "where am I".
+    */
+    /*
+      ⚠️ `data-capsule` HAD NO RULE AT ALL, WHICH IS WHY THE NAV WAS A RECTANGLE.
+      Two elements carried the attribute and both were `Card`s, which bring their
+      own radius — so the attribute meant nothing and nobody could tell. The nav
+      is a plain element now and it came out square-ended, which is the same
+      defect finally becoming visible. An attribute nothing reads is a promise
+      the next caller believes.
+    */
+    `[data-capsule="true"] { border-radius: 9999px; }`,
+    `[data-here="true"] { background-color: var(--default); border-radius: 9999px;`,
+    `  color: var(--foreground); }`,
+    /*
+      ⚠️ AND THE LABEL INSIDE IT HAS TO BE TOLD, WHICH IS A SPECIFICITY FACT
+      RATHER THAN A DESIGN ONE. The open word is `TYPE.note`, and `note` is
+      `text-sm text-muted` — a single class, exactly as specific as this rule, so
+      which one wins is decided by stylesheet ORDER and not by intent. The
+      destination somebody is standing on then reads dimmer than the four icons
+      around it, which is the one thing the compact bar cannot afford: the word
+      that is showing is the whole point of it.
 
-      ⚠️ AND IT CANNOT BE A VEIL OF `--background` EITHER, which is the obvious
-      choice and the one that fails in the interesting place: over the page's own
-      ground it would BE the ground, so a chip would vanish exactly where there
-      is no card behind it. `--surface-tertiary` is the tier the palette
-      guarantees clears both the page and a card, so a veil of it is separable
-      wherever it lands — and a quarter of whatever is behind still comes
-      through, blurred, which is the whole effect.
+      ⚠️ THE ATTRIBUTE IS DOUBLED TO WIN, and that is deliberately visible. The
+      alternative is a colour class at the call site, and a component that names
+      a colour is a component a workspace's branding never reaches (D7). `inherit`
+      rather than the token, so there is still one source: the button above.
     */
-    `[data-glass="true"] {`,
-    `  background-color: color-mix(in oklab, var(--surface-tertiary) 76%, transparent) !important;`,
-    `  backdrop-filter: ${GLASS};`,
-    `  -webkit-backdrop-filter: ${GLASS};`,
-    `}`,
-    /*
-      ⚠️ THE PILL THAT MARKS WHERE YOU ARE, AS A RULE RATHER THAN A CLASS. It is
-      one element that TRAVELS between four equal columns — see `Island` — so it
-      needs a fill and a radius and nothing else. `--default` is the control
-      tier, which the palette guarantees clears both the raised tier under it
-      and the surfaces around it.
-    */
-    /*
-      ⚠️ THE PILL IS GLASS ON GLASS, which is the only way it reads as sitting ON
-      the bar rather than being cut out of it. Its backdrop is the bar's already
-      filtered plate, so it needs no blur of its own — a second blur of an
-      already blurred thing costs a full readback and changes almost nothing.
-      What it needs is to be BRIGHTER and a touch more saturated than what it
-      covers, which is what a raised piece of glass does to the light through it.
-    */
-    `[data-pill="true"] {`,
-    `  background-color: color-mix(in oklab, var(--default) 72%, transparent);`,
-    `  border-radius: 9999px;`,
-    `  backdrop-filter: brightness(1.14) saturate(1.25);`,
-    `  -webkit-backdrop-filter: brightness(1.14) saturate(1.25);`,
-    `}`,
-    `@media (prefers-reduced-motion: reduce) { [data-pill="true"] { transition: none !important; } }`,
-    `[data-glass="true"]:hover {`,
-    `  background-color: color-mix(in oklab, var(--surface-tertiary) 92%, transparent) !important;`,
-    `}`,
-    /*
-      ⚠️ DARK GLASS IS SMOKE, LIGHT GLASS IS MILK — one recipe cannot be both.
-      The dark stack darkens what passes under it (brightness 0.92), which over
-      a glowing field reads as depth. The same darkening over PAPER is a grey
-      film — the exact "dusty" reading, produced by the chrome itself — and the
-      grey tertiary veil doubles it. So light gets its own recipe: a veil of
-      the SURFACE tier (white-leaning, so the bar reads as material rather
-      than as shadow), and a filter that LIFTS — brightness above one — while
-      the saturation boost keeps the world's colour alive through it.
-    */
-    `[data-theme="light"] [data-glass="true"], [data-theme="light"][data-glass="true"] {`,
-    `  background-color: color-mix(in oklab, var(--surface) 68%, transparent) !important;`,
-    `  backdrop-filter: ${GLASS_LIGHT};`,
-    `  -webkit-backdrop-filter: ${GLASS_LIGHT};`,
-    `}`,
-    `[data-theme="light"] [data-glass="true"]:hover, [data-theme="light"][data-glass="true"]:hover {`,
-    `  background-color: color-mix(in oklab, var(--surface) 88%, transparent) !important;`,
-    `}`,
-    `[data-theme="light"] [data-pill="true"], [data-theme="light"][data-pill="true"] {`,
-    `  background-color: color-mix(in oklab, var(--surface) 85%, transparent);`,
-    `  backdrop-filter: brightness(1.04) saturate(1.2);`,
-    `  -webkit-backdrop-filter: brightness(1.04) saturate(1.2);`,
-    `}`,
+    `[data-here="true"][data-here] * { color: inherit; }`,
     /*
       ⚠️ A TILE IS A CARD YOU PRESS, NOT AN OVERSIZED CHIP. The control tier is
       tuned for chip-sized things between surfaces; spread across a 7rem square
@@ -533,8 +496,6 @@ export function ambienceStylesheet(): string {
       percent is a fill that works on a card in either theme without knowing
       which theme it is in.
     */
-    /* ⚠️ WHERE YOU ARE IS THE ONE LABEL YOU CAN READ — see `Island`. */
-    `[data-here="true"] { color: var(--foreground); }`,
     `[data-chip="true"] { background-color: color-mix(in oklab, var(--foreground) 7%, transparent); }`,
     /* ⚠️ THE UNREAD DOT, COLOURED BY ITS TONE RATHER THAN BY A LITERAL. It is
        here rather than in a component because a component that named a colour

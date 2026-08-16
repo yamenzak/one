@@ -453,7 +453,7 @@ export function LeaveChip({ leave = "back", label, onDo }: {
       isIconOnly
       size={CROWN_SIZE}
       variant="ghost"
-      data-glass="true"
+      data-chrome="true"
       aria-label={label ?? (leave === "dismiss" ? "Close" : "Back")}
       onPress={onDo}
     >
@@ -578,7 +578,7 @@ export function PageCrown({
             */}
             <span
               aria-hidden="true"
-              data-glass="true"
+              data-chrome="true"
               data-capsule="true"
               className={`min-w-0 truncate ${TYPE.label} ${CROWN_CHIP}`}
               style={{
@@ -598,7 +598,7 @@ export function PageCrown({
                 isIconOnly
                 size={CROWN_SIZE}
                 variant="tertiary"
-                data-glass="true"
+                data-chrome="true"
                 aria-label={a.label}
                 onPress={a.onDo}
               >
@@ -916,19 +916,36 @@ export function StickyAction({ children }: { readonly children: React.ReactNode 
 }
 
 /**
- * THE FLOATING NAV — five destinations maximum (D10), and it collapses.
+ * THE NAV — five destinations maximum (D10), and only where you are says its
+ * name.
  *
- * ⚠️ AN ISLAND RATHER THAN A BAR, and it is not decoration: a bar welded to the
- * bottom edge cuts the page in two, while an island floats over content that
- * visibly continues beneath it, so the page reads as longer than the screen.
+ * ⚠️ FIVE ICON-AND-LABEL COLUMNS DO NOT FIT A PHONE, AND THAT WAS THE OLD BAR.
+ * Equal columns mean every label is squeezed to a fifth of the screen, so a
+ * two-word destination truncates and a five-item nav is five abbreviations. The
+ * bar that works is COMPACT: every destination is its icon, and the ONE somebody
+ * is on expands to say so. Four glyphs and one named pill fit at any width, and
+ * the label that is showing is the only one anybody needs — a person does not
+ * read the nav to find out where they are not.
  *
- * ⚠️ IT SHEDS ITS LABELS WHILE SOMEBODY IS SCROLLING, and gets them back when
- * they stop. Reading and navigating are different moments: during the first the
- * nav is in the way, during the second it is the point. Shrinking rather than
- * hiding is what keeps it from feeling like the product took something away.
+ * ⚠️ THE EXPANSION IS THE TRAVEL, WHICH REPLACES A PILL THAT SLID. There was one
+ * absolutely-positioned pill stepping by `index × 100%` of an equal column, and
+ * the argument for it was that a single element MOVING says two destinations are
+ * on one shelf while four backgrounds switching on and off do not. That argument
+ * still holds and this is a better answer to it: the fill does not jump, it
+ * grows out of one item while the one before it closes, so the motion is
+ * continuous and it carries the label with it. It also needs no measuring, no
+ * ref and no resize observer — which the equal-column pill only avoided by
+ * forcing every item to the same width in the first place.
  *
- * ⚠️ AND THE LABEL GOES TO `sr-only`, NEVER TO `hidden`. A collapsed nav that
- * removed its labels from the accessibility tree would be four unnamed buttons
+ * ⚠️ IT LEAVES DOWNWARDS AND COMES BACK UP. Reading and navigating are different
+ * moments: during the first the nav is in the way, during the second it is the
+ * point. The whole bar translates out rather than shedding its labels, because a
+ * bar that changes SHAPE while you scroll is a thing moving in the corner of the
+ * eye — and a translate is the compositor's work while a height is the layout
+ * engine's, on every frame of a scroll.
+ *
+ * ⚠️ AND THE LABEL GOES TO ZERO WIDTH, NEVER TO `display: none`. A nav that
+ * removed its labels from the accessibility tree would be five unnamed buttons
  * to anybody using a screen reader — the one group for whom the icon carries
  * nothing at all.
  *
@@ -946,99 +963,55 @@ export function Island({ items, here, onGo }: {
   readonly here: string;
   readonly onGo: (route: string) => void;
 }) {
-  const folded = useScrollingDown();
+  const away = useScrollingDown();
   const shown = items.slice(0, PRIMARY_MAX);
-  const at = shown.findIndex((i) => i.route === here);
 
   return (
     <nav
       aria-label="Sections"
-      /* ⚠️ THE ISLAND SPANS THE COLUMN, IT DOES NOT SHRINK TO ITS WORDS. At
-         `w-fit` it came out 76% of the screen against a reference at 89%, with
-         a card visible either side of it — which reads as a bar that did not
-         finish loading rather than as a thing floating over the page. */
       className={`sticky bottom-0 z-10 flex justify-center ${GUTTER} ${PAD} ${SAFE_BOTTOM}`}
+      style={{
+        /* ⚠️ PAST ITS OWN HEIGHT PLUS THE SAFE AREA, or it rests half off the
+           bottom edge on a phone with a home indicator — which reads as a bar
+           that failed to finish rather than as one that left. */
+        transform: away ? "translateY(calc(100% + env(safe-area-inset-bottom)))" : "none",
+        opacity: away ? 0 : 1,
+        transition: away ? MOTION.exit : MOTION.enter,
+      }}
     >
-      {/* ⚠️ GLASS, AND THE COST IS ACCEPTABLE HERE FOR A REASON THAT IS ABOUT
-          THIS ELEMENT RATHER THAN ABOUT THE TECHNIQUE. `backdrop-filter` reads
-          back everything behind the element and blurs it, per frame — ruinous
-          across a scrolling list of cards, unremarkable for ONE fixed bar and
-          four crown chips. The rule is not "no blur"; it is "blur what does not
-          scroll".
+      {/*
+        ⚠️ IT SHRINKS TO ITS CONTENT NOW, AND THAT IS THE POINT OF THE SHAPE. The
+        old bar spanned the reading column because equal columns need a width to
+        divide; this one is as wide as five icons and one word, which is narrower
+        on every screen and identical on all of them.
 
-          ⚠️ AN EARLIER NOTE HERE CLAIMED THE BLUR COULD NOT WORK THROUGH
-          `[data-sky]`'s `isolation: isolate`. That was wrong — measured, the
-          backdrop samples through it fine. What was wrong was the fill. */}
-      <Card
-        variant="transparent"
+        ⚠️ AND IT IS NOT GLASS. A `backdrop-filter` over a LIVE field re-reads and
+        re-blurs the layer under it on every frame of every beat — see the chrome
+        rule in `ambience.ts`. `data-chrome` fills it with the ground's own
+        colour instead, which is what glass was imitating.
+      */}
+      <div
         data-island="true"
-        data-glass="true"
-        className={`w-full ${WIDTH.read} flex-row items-center ${ISLAND_PAD}`}
+        data-chrome="true"
+        data-capsule="true"
+        className={`flex flex-row items-center ${ISLAND_PAD}`}
       >
-        {/*
-          ⚠️ A TRACK INSIDE THE BAR'S PADDING, AND IT IS NOT A WRAPPER FOR ITS
-          OWN SAKE. The pill is absolutely positioned, and a percentage width on
-          an absolute box resolves against its containing block's PADDING box —
-          so with the pill parented to the bar, insetting the bar moved its edge
-          and not the pill's. A track is the box the pill's percentages are
-          honestly about, and the bar's four pixels then surround it.
-
-          ⚠️ AND `gap-0` IS LOAD-BEARING. `.card` ships `gap-3`, which nothing
-          here had overridden — so four items shared the width MINUS 36px of
-          gaps while the pill stepped by a clean quarter of the whole. The two
-          agree at the first destination and drift right by four pixels at every
-          one after it, which is exactly what it looked like. Arithmetic that
-          assumes a partition has to be given a partition.
-        */}
-        <div className="relative flex w-full flex-row items-center gap-0">
-        {/*
-          ⚠️ ONE PILL THAT TRAVELS, NOT FOUR BACKGROUNDS SWITCHING ON AND OFF.
-          A per-item fill can only appear and disappear; a single element can
-          MOVE, and moving is what tells somebody the two destinations are on
-          one shelf rather than two unrelated screens. It is also why the items
-          had to be equal width first — with equal columns the pill's place is
-          arithmetic (`index × 100%` of one column) and needs no measuring, no
-          ref, and no resize observer that can be one frame behind.
-        */}
-        {at >= 0 ? (
-          <span
-            aria-hidden="true"
-            data-pill="true"
-            className="absolute inset-y-0 left-0"
-            style={{
-              width: `${100 / shown.length}%`,
-              transform: `translateX(${at * 100}%)`,
-              transition: MOTION.travel,
-            }}
-          />
-        ) : null}
-
         {shown.map((item) => {
           const isHere = item.route === here;
           return (
             <Button
               key={item.id}
-              /* ⚠️ ALWAYS `ghost`. The filled state is the pill behind it now,
-                 so a variant that paints its own would be a second marker
-                 appearing where the first one is trying to arrive. */
+              /* ⚠️ ALWAYS `ghost`. Where you are is the `data-here` fill, so a
+                 variant that painted its own would be a second marker. */
               variant="ghost"
               aria-current={isHere ? "page" : undefined}
-              /* ⚠️ `relative` PUTS THE ITEM ABOVE THE PILL. A positioned element
-                 paints over a static one whatever the DOM order, so without it
-                 the sliding pill covers the four labels it is meant to sit
-                 under. */
-              /* ⚠️ `min-w-0` IS WHAT MAKES THE COLUMNS EQUAL RATHER THAN FAIR.
-                 A flex item's floor is its CONTENT, so five words wider than a
-                 fifth of a phone each take what they need and the bar overflows
-                 its own card — the fifth destination sat half off the screen,
-                 on the reference product, at the reference width. The pill's
-                 arithmetic assumes a partition; this is what gives it one. */
-              className={`relative min-w-0 grow basis-0 flex-col justify-center gap-1 ${ROW.free} ${ISLAND_ITEM}`}
+              data-here={isHere ? "true" : undefined}
+              className={`shrink-0 flex-row items-center justify-center ${SPACE.tight} ${ROW.free} ${ISLAND_ITEM}`}
               onPress={() => onGo(item.route)}
             >
               <span
                 aria-hidden="true"
-                className="relative flex items-center"
+                className="relative flex shrink-0 items-center"
                 /* ⚠️ `.button` SIZES ITS OWN SVGS to `size-5 sm:size-4`, so every
                    nav glyph drew at 16–20px under a 14px label — the one place
                    in the product where the word outweighed the mark. */
@@ -1050,38 +1023,39 @@ export function Island({ items, here, onGo }: {
                   : null}
               </span>
               {/*
-                ⚠️ THE LABEL FOLDS, IT IS NOT REMOVED. `sr-only` is a switch: the
-                bar jumps from one height to another and the content under it
-                jumps with it. Animating the label's own box means the BAR's
-                height is the animation, which is the whole effect asked for.
+                ⚠️ WIDTH, NOT DISPLAY — see the header. `max-width` from zero is
+                what makes the pill GROW rather than appear, and it keeps the
+                word in the accessibility tree while it is closed.
 
-                ⚠️ AND IT STAYS IN THE ACCESSIBILITY TREE while folded, which
-                `sr-only` also managed and `display: none` would not. A collapsed
-                nav that dropped its labels would be four unnamed buttons to
-                anybody using a screen reader — the one group for whom the icon
-                carries nothing at all.
+                ⚠️ `10rem` IS A CEILING, NOT A WIDTH. A max-width transition needs
+                a number to travel to and `auto` is not one; the span is still
+                sized by its text, so the ceiling only has to clear the longest
+                destination anybody would write.
+              */}
+              {/*
+                ⚠️ THE OPEN LABEL IS NOT `note`, AND THAT IS THE ONE COLOUR BUG
+                THIS SHAPE INVITES. `note` is `text-muted` — correct for a
+                caption and wrong for the only word in the nav, because a class
+                on the span beats the `color` the `data-here` fill sets on the
+                button, so the destination somebody IS on read dimmer than the
+                icons around it. The word that is showing is the whole point of
+                the bar; it takes full ink.
               */}
               <span
-                className="flex w-full justify-center overflow-hidden"
+                className={`${TYPE.note} ${isHere ? "text-foreground" : ""}`
+                  + " overflow-hidden whitespace-nowrap leading-none"}
                 style={{
-                  maxHeight: folded ? 0 : "1rem",
-                  opacity: folded ? 0 : 1,
-                  transform: folded ? "translateY(-0.25rem)" : "none",
+                  maxWidth: isHere ? "10rem" : 0,
+                  opacity: isHere ? 1 : 0,
                   transition: MOTION.reveal,
                 }}
               >
-                <span
-                  data-here={isHere ? "true" : undefined}
-                  className={`${TYPE.note} truncate leading-none`}
-                >
-                  {item.label}
-                </span>
+                {item.label}
               </span>
             </Button>
           );
         })}
-        </div>
-      </Card>
+      </div>
     </nav>
   );
 }
@@ -1202,7 +1176,7 @@ export function AppCrown(
             isIconOnly
             size={CROWN_SIZE}
             variant="ghost"
-            data-glass="true"
+            data-chrome="true"
             aria-label="Your account"
             onPress={onOpenAccount}
           >
@@ -1230,7 +1204,7 @@ export function AppCrown(
           <Button
             size={CROWN_SIZE}
             variant="tertiary"
-            data-glass="true"
+            data-chrome="true"
             className={`grow justify-start ${SPACE.tight}`}
             onPress={onSearch}
           >
@@ -1250,7 +1224,7 @@ export function AppCrown(
               isIconOnly
               size={CROWN_SIZE}
               variant="tertiary"
-              data-glass="true"
+              data-chrome="true"
               aria-label={a.label}
               onPress={a.onDo}
             >

@@ -225,7 +225,13 @@ consumer of one family wants to differ, that is the change.
 
 - **The colour tokens themselves** — `tokens/theme.ts`. A family names slots; the
   brand fills them.
-- **Glass, the pill and the chrome over a ground** — still in `ambience.ts`,
-  because they are about what sits ON a page rather than what a world is made of.
+- **Chrome over a ground** — still in `ambience.ts`, because it is about what
+  sits ON a page rather than what a world is made of. ⚠️ **It is no longer
+  glass.** A `backdrop-filter` over a still gradient costs one readback; over a
+  LIVE field it re-reads and re-blurs the layer under every chip on every frame
+  of every beat, and the smear CHANGES as the marks move under it — which is the
+  one thing a fixed control must never do. `--scene-veil` publishes the ground's
+  own colour, and a chip is the world's hue at the palette's value: separable in
+  both themes, over seven families, with no readback at all.
 - **Twenty-four names.** They are gone from the code, from the type, from the
   gallery and from here. If a screen wants one back, the answer is a seed.
