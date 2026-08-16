@@ -32,7 +32,7 @@
     {
       "id": "an-icon-only-control-is-named-to-a-pointer-too",
       "protects": "D7",
-      "stage": "17",
+      "stage": "19",
       "status": "live",
       "impl": "scripts/heroui.test.mjs",
       "proves": "hints:",
@@ -41,7 +41,7 @@
     {
       "id": "every-tailwind-source-path-resolves",
       "protects": "D7",
-      "stage": "17",
+      "stage": "19",
       "status": "live",
       "impl": "scripts/heroui.test.mjs",
       "proves": "sources:",
@@ -50,7 +50,7 @@
     {
       "id": "no-screen-assembles-a-control-the-package-ships",
       "protects": "D7",
-      "stage": "17",
+      "stage": "19",
       "status": "live",
       "impl": "scripts/heroui.test.mjs",
       "proves": "composed:",
@@ -59,7 +59,7 @@
     {
       "id": "no-app-keeps-a-drawer-of-shared-furniture",
       "protects": "D7",
-      "stage": "17",
+      "stage": "19",
       "status": "live",
       "impl": "scripts/heroui.test.mjs",
       "proves": "furniture:",
@@ -68,7 +68,7 @@
     {
       "id": "no-source-holds-a-character-nothing-renders",
       "protects": "D8",
-      "stage": "17",
+      "stage": "19",
       "status": "live",
       "impl": "scripts/guards.test.mjs",
       "proves": "legible:",

@@ -32,6 +32,7 @@ reader can trust this table instead of re-reading the code.
 | 15 | The operator console — the same shell on `admin.`, and the maintenance switch | shipped |
 | 16 | AI actions — a lane per action, a model the operator binds, words that narrow | shipped |
 | 17 | The hub — one surface over the product, reachable from every door, addressed | shipped |
+| 19 | OneDesign — the design system named, packaged, documented and fenced | shipped |
 
 ## What is NOT built, and where to pick it up
 
@@ -524,6 +525,33 @@ actually signed in to use.
   entire content is a button.
 - **A row somebody cannot open is not drawn** — `partsFor` in `where.ts`, a pure
   table rather than a walk through four sign-ins, and never the enforcement.
+
+**OneDesign — the design system, named and fenced (stage 19).** The framework was
+renamed OneEngine and every package scoped `@engine/*`; `DESIGN.md` and
+`AMBIENCE.md` moved into `engine/design/` beside the code they govern, and the
+README is the index over all three with a GENERATED list of what the package
+ships. The question a person asks before building anything — does this already
+exist — now has a current answer rather than six directories.
+
+- **`Pip` and `Hint`.** A mark on a control and a word about one. The mark was a
+  private span hand-placed at three call sites with three different offsets; the
+  word did not exist at all, against forty-four `aria-label`s.
+- **`CodeEntry`, `PeriodInput`, `Sheet`.** Each was being answered by hand
+  somewhere: six `InputOTP.Slot`s written out under a comment saying the count is
+  the server's, a `ChartPanel.aside` slot documented as "a range picker" while
+  the product had neither, and a titled card in an app's own `ui.tsx`.
+- **Four guards for what an app may not spawn** — `composed:`, `furniture:`,
+  `hints:`, `sources:` — and `legible:`, which exists because one of them shipped
+  inert: a literal backspace inside its regex made the pattern unmatchable, and
+  the check reported green about the exact defect it was written to catch.
+
+⚠️ **FOUR DEFECTS IN THIS STAGE WERE INVISIBLE TO EVERY TEST AND VISIBLE IN A
+PHOTOGRAPH.** A `@source` path left behind by an earlier rename meant 185 utility
+classes were never emitted, `.md:hidden` among them. The sky's drifting ground is
+`scale(1.14)` and nothing clipped it, so the document grew a horizontal scrollbar
+that widened every second. A five-segment filter ran off a 390px screen. And the
+guard above. The suites were green for all four, which is the argument for
+shooting the screen rather than trusting the run.
 
 **`@engine/hub` (`engine/one-hub/`) — the page a person opens.** The signpost, sign-in with an
 emailed code, the doors, and the wizard that makes a workspace — HeroUI v3 as it
