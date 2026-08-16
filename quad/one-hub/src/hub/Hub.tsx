@@ -26,7 +26,7 @@
 import {
   Band, CROWN, Layout, LeaveChip, Over, Spacer, placeFace, sentence, whoFace,
 } from "@quad/web";
-import type { Ambience, FaceOf } from "@quad/web";
+import type { FaceOf, Sky } from "@quad/web";
 import type { Belonging, Me } from "../api.js";
 import { useSession } from "../session.js";
 import { HubHome } from "./Home.js";
@@ -117,6 +117,7 @@ function Screen({ where, onGo, onLeave }: {
        `subjectOf`. */
     <Layout
       sky={groundOf(where)}
+      seedling={seedOf(where)}
       subject={subjectOf(where, person)}
       /* ⚠️ THE ROOT HAS NO FRAME, BECAUSE ITS FACE IS ITS HEADING — see below. */
       frame={root ? undefined : {
@@ -194,12 +195,19 @@ const subjectOf = (where: Where, person: Me | null): FaceOf | undefined => {
  * that chose would be a screen somebody has to remember to update, and the
  * hub has twenty of them.
  */
-const groundOf = (where: Where): Ambience => {
-  if (where.at === "home") return "silk";
+const groundOf = (where: Where): Sky => {
   /* ⚠️ The operator's side is about a deployment rather than a business, and
-     the drawing says so before a word is read: schematic, not woven. */
-  return isConsole(where) ? "wire" : "linen";
+     the material says so before a word is read: ruled, not woven. */
+  return isConsole(where) ? "etch" : "cloth";
 };
+
+/**
+ * ⚠️ AND WHICH ONE OF THE FAMILY, FROM THE ADDRESS. `silk`, `linen` and `wire`
+ * were three hand-tuned settings of one generator, which is what a seed is —
+ * so the hub's materials are two families now and every address inside them
+ * has a ground of its own. Nobody tunes a fourth.
+ */
+const seedOf = (where: Where): string => `hub|${where.at}`;
 
 /**
  * ⚠️ A FACT, OR NOTHING AT ALL. Every screen used to carry a sentence under its

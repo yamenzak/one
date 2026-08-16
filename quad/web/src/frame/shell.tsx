@@ -29,8 +29,7 @@ import {
   UserRound, Users,
 } from "lucide-react";
 import { Island } from "./layout.js";
-import { skyCss, type Sky } from "../tokens/theme.js";
-import { worldCss } from "../tokens/ambience.js";
+import { skyWorld, worldCss, type Sky } from "../tokens/ambience.js";
 import { useNight } from "./layout.js";
 import { GUTTER, NAV_SPACE, PAD, ROW, SPACE } from "../tokens/metrics.js";
 import { Face, appFace, worldFor, type FaceOf } from "../parts/face.js";
@@ -146,17 +145,21 @@ export function Shell(props: ShellProps) {
     `rich`; a screen with a table on it gets the same world with a third of the
     marks, which is the whole reason density is an intent rather than a number.
   */
-  const world = at?.sky ? null : worldFor(appFace(crown.appId)) ?? null;
+  const named = at?.sky as Sky | undefined;
+  const world = named && named !== "plain"
+    /* ⚠️ SEEDED ON THE SCREEN'S OWN ROUTE, which is the whole gain over a name.
+       Two screens of one product naming `glow` are two grounds of one material
+       rather than the same picture twice, and nobody chose either of them. */
+    ? skyWorld(named, `${crown.appId}|${at?.route ?? ""}`)
+    : worldFor(appFace(crown.appId)) ?? null;
   const night = useNight();
   const own = world ? worldCss(world, { night, density: "quiet" }) : null;
 
   return (
     <div
       className="min-h-dvh flex flex-col"
-      data-sky={own ? "world" : at?.sky ?? "plain"}
-      style={own
-        ? (own.css as React.CSSProperties)
-        : { ...skyStyle(at?.sky as Sky | undefined, at?.tone) }}
+      data-sky={own ? "world" : "plain"}
+      style={own?.css as React.CSSProperties | undefined}
     >
       {/* ⚠️ An element, not a background — see `Page`. */}
       {own?.field
@@ -250,14 +253,3 @@ export function Shell(props: ShellProps) {
   );
 }
 
-/**
- * ⚠️ THE AMBIENCE IS A STYLE ON THE FRAME, NOT A CLASS ON A COMPONENT. It is
- * derived from theme tokens (D7), so a workspace's brand reaches the background
- * of every screen without a single screen knowing that branding exists.
- */
-function skyStyle(sky: Sky | undefined, tone: Tone | undefined): React.CSSProperties {
-  const css = skyCss(sky ?? "plain", tone ?? "neutral");
-  if (!css) return {};
-  const [, value] = css.split(/:\s*/, 2);
-  return { backgroundImage: value };
-}

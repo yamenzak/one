@@ -17,7 +17,7 @@ import { useState } from "react";
 import { AppCrown, Balance, Band, CopyRow, Figure, Group, Grid, Island, Money, NavRow, ActionRow,
   ToggleRow, FieldRow, NoteRow, OfferRow, PersonRow, AmountRow, QuickActions, SeeAll,
   StepRow, TileGrid, Nothing, Row, Section, Stack, StickyAction, Title, Cluster, SPACE,
-  TYPE, type Ambience } from "@quad/web";
+  TYPE, type Sky } from "@quad/web";
 import {
   Agree, Choice, Confirm, Crumbs, DateInput, Dialog, Faq, FormWaiting, Gauge, Hotkey, Listing,
   LongText, Lookup, Menu, MoneyInput, NumberInput, OneOf, PageTabs, Peek, Picks, Reveal,
@@ -35,7 +35,10 @@ const nothing = () => {};
     passing a size here is a caller who can get it wrong. */
 const glyph = (icon: React.ReactNode) => icon;
 
-const SKIES: readonly Ambience[] = ["calm", "focus", "lift", "mesh", "dots", "weave"];
+/* ⚠️ EVERY FAMILY A SCREEN MAY NAME, and it is the whole list now rather than
+   six of twenty-four. Each is a material; which world you get inside it is the
+   seed, so the gallery shows one specimen of each rather than a catalogue. */
+const SKIES: readonly Sky[] = ["glow", "cloth", "etch", "loops", "blobs"];
 
 /* --------------------------------------------------------------- the forms --- */
 

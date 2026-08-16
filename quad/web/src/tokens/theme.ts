@@ -99,54 +99,6 @@ export function brandCssFor(light: Theme, dark?: Theme): string {
 
 /* -------------------------------------------------------------------- sky --- */
 
-/**
- * WHAT SITS BEHIND A SCREEN.
- *
- * ⚠️ A NAME, NOT A COLOUR (see the header). Each of these is a shape and a
- * motion; the colour comes from whatever the brand is at the time.
- *
- *   plain  nothing. The default, and most screens should stay here — ambience
- *          everywhere is ambience nowhere.
- *   calm   one wide, slow wash. For the place somebody arrives.
- *   focus  a tight vignette that pulls the eye to the middle. For one task.
- *   lift   a rising gradient. For something that just went well.
- */
-export type Sky = "plain" | "calm" | "focus" | "lift";
-
-export const SKIES: readonly Sky[] = ["plain", "calm", "focus", "lift"];
-
-/**
- * ⚠️ TONE SELECTS THE TOKEN, SKY SELECTS THE SHAPE. Keeping them separate is
- * what lets a warning-toned screen be calm and a success-toned one lift, without
- * eight combinations having to be drawn by hand.
- */
-const TONE_TOKEN: Readonly<Record<Tone, string>> = {
-  /* ⚠️ The ambience is where a brand lives now — see `TOKENS.brand`. */
-  neutral: "var(--brand)",
-  info: "var(--brand)",
-  success: "var(--success)",
-  warning: "var(--warning)",
-  danger: "var(--danger)",
-};
-
-export function skyCss(sky: Sky, tone: Tone = "neutral"): string {
-  const hue = TONE_TOKEN[tone];
-  switch (sky) {
-    case "plain": return "";
-    case "calm": return [
-      `background-image: radial-gradient(120% 80% at 50% -20%,`,
-      `color-mix(in oklab, ${hue} 18%, transparent) 0%, transparent 60%)`,
-    ].join(" ");
-    case "focus": return [
-      `background-image: radial-gradient(60% 50% at 50% 40%,`,
-      `color-mix(in oklab, ${hue} 12%, transparent) 0%, transparent 70%)`,
-    ].join(" ");
-    case "lift": return [
-      `background-image: linear-gradient(180deg, transparent 30%,`,
-      `color-mix(in oklab, ${hue} 14%, transparent) 100%)`,
-    ].join(" ");
-  }
-}
 
 /**
  * ⚠️ MOTION IS OPT-IN AND `prefers-reduced-motion` IS NOT NEGOTIABLE. An

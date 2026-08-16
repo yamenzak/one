@@ -312,13 +312,13 @@ export const KOVA: AppSpec = defineApp({
   /* ⚠️ Five, maximum (D10). Everything else lives inside one of them. */
   screens: [
     { id: "today", route: "/", label: "Today", nav: "primary", icon: "sun",
-      permission: "log:read", sky: "calm", tone: "neutral" },
+      permission: "log:read", sky: "glow", tone: "neutral" },
     { id: "clients", route: "/clients", label: "Clients", nav: "primary", icon: "people",
       permission: "client:read" },
     { id: "plans", route: "/plans", label: "Plans", nav: "primary", icon: "list",
-      permission: "plan:read", sky: "focus" },
+      permission: "plan:read", sky: "glow" },
     { id: "progress", route: "/progress", label: "Progress", nav: "primary", icon: "chart",
-      permission: "body:read", sky: "lift", tone: "success" },
+      permission: "body:read", sky: "glow", tone: "success" },
     { id: "studio", route: "/studio", label: "Studio", nav: "primary", icon: "cog",
       permission: "tenant:manage" },
     { id: "money", route: "/money", label: "Money", nav: "secondary", icon: "receipt",

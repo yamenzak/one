@@ -224,10 +224,11 @@ refuse — it reads as built and passes every test.
   thing lives, and the checks a screen has to pass before it is done. Read it
   before designing or changing a surface — most of what it says is judgement no
   guard can hold, which is exactly why it is written down.
-- **The twelve ambiences are governed by [AMBIENCE.md](AMBIENCE.md)** — which
-  of them a screen reaches for, at which of the three levels (app signature,
-  screen kind, one lifted band), the colour and texture rules, and why `plain`
-  is the default rather than a failure to choose.
+- **Every ground comes from one engine, governed by
+  [AMBIENCE.md](AMBIENCE.md)** — seven FAMILIES, each seeded, replacing the
+  twenty-four hand-written ambiences entirely. Four belong to a SUBJECT (a
+  workspace, a person, a product, the deployment) and three a screen may name;
+  why `plain` is still the default rather than a failure to choose is there too.
 - **The interface is monochrome and the data is not**, which is the palette's
   whole shape. `--accent` — what the library paints every control, switch and
   selected row with — is a VALUE at zero chroma, so the one coloured thing on a
@@ -551,7 +552,7 @@ The guard registry, its checks, and the standards that bind them.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 5 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 41 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 40 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 2 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
@@ -614,7 +615,6 @@ the library decides FOR us.
 | `no-container-picks-its-own-rhythm` | D7 | twenty screens at gap-2, gap-3, gap-4 and gap-10, each defensible, with nobody able to point at which one is wrong |
 | `the-interface-is-monochrome-and-the-data-is-not` | D7 | an accent that is the button, the link, the nav pill and the ramp all at once — present on every screen, meaning nothing, and needing a second colour before anything can stand out |
 | `a-control-clears-every-ground-it-sits-on` | D7 | four quick-action chips 0.025 from the light page reading as smudges, while a hand-picked pair list reported the palette sound |
-| `micro-texture-dies-in-light` | D7 | fine dark fibres over light paper behind a hero — which a person described, accurately, as dusty and dirty |
 | `no-service-call-is-made-over-fetch` | D3 | a wrong payload becoming a production error where it had been a compile error |
 | `a-declaration-is-a-literal-a-script-can-walk` | D8 | a declaration that has to be executed before it can be read, so every generated surface stops being derivable |
 | `a-library-decides-it-does-not-rule` | D9 | one of our own rules living inside somebody else's package, re-learned from their release notes |

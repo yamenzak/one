@@ -150,7 +150,7 @@ export const HELLO: AppSpec = defineApp({
 
   screens: [
     { id: "notes", route: "/", label: "Notes", nav: "primary", icon: "note",
-      permission: "note:read", sky: "calm", tone: "neutral" },
+      permission: "note:read", sky: "glow", tone: "neutral" },
     { id: "people", route: "/people", label: "People", nav: "primary", icon: "people",
       permission: "member:read" },
     { id: "settings", route: "/settings", label: "Settings", nav: "secondary", icon: "cog",

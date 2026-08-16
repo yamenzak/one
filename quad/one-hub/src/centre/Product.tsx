@@ -59,7 +59,7 @@ export function Product({ path, onGo, onOpenHub, onOpenInbox }: {
            which app somebody wants. */
         if (!app) {
           return (
-            <Page sky="calm">
+            <Page sky="glow">
               <Crown
                 name={view.tenant.name}
                 under="One"

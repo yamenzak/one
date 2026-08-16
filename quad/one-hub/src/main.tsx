@@ -11,7 +11,7 @@ import { SessionProvider } from "./session.js";
 
 /**
  * ⚠️ THE SKY IS ONE STYLE ELEMENT, BUILT FROM THE SHARED TOKENS. Every rule
- * comes from `@quad/web` — the gradients from `skyCss`, the motion from
+ * comes from `@quad/web` — the grounds from the scene engine, the motion from
  * `SKY_MOTION`, which is a transition on a token rather than an animation, so
  * both `prefers-reduced-motion` and a `data-reduce-motion` ancestor can stop it.
  *

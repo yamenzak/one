@@ -336,15 +336,6 @@
       "proves": "kin:"
     },
     {
-      "id": "micro-texture-dies-in-light",
-      "protects": "D7",
-      "stage": "5",
-      "status": "live",
-      "fails": "fine dark fibres over light paper behind a hero — which a person described, accurately, as dusty and dirty",
-      "impl": "scripts/motion.test.mjs",
-      "proves": "threads:"
-    },
-    {
       "id": "no-service-call-is-made-over-fetch",
       "protects": "D3",
       "stage": "7",

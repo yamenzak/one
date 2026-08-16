@@ -127,7 +127,7 @@ One level out, `Layout` is what a router renders for an address — the ground, 
 frame and the screen inside it:
 
 ```tsx
-<Layout sky="linen" subject={placeFace(slug)} frame={{ title, under, back }}>
+<Layout sky="cloth" subject={placeFace(slug)} frame={{ title, under, back }}>
 ```
 
 **`subject` is the one thing this page is about, and it decides three things at
@@ -140,9 +140,14 @@ wears a named material and its crown is an ordinary display heading.
 so its ground is `space` seen large — somewhere you look at from outside. A
 person's face is a mood, so theirs is an `aura`: light with no horizon in it,
 which is what standing in somebody's own place looks like rather than visiting
-it. A product has a declared glyph and no palette, so it has no world and the
-page keeps its material. Nothing picks this; `worldFor` reads the kind off the
-face.
+it. A product is a SYSTEM, so it gets `loops` — a lattice that re-routes itself.
+The deployment is what all of them are inside, so it gets `blobs`, which has no
+grid at all. Nothing picks this; `worldFor` reads the kind off the face.
+
+**And a page with no subject names a FAMILY, not a picture.** `glow`, `cloth` or
+`etch`, plus a `seedling` — so two screens naming the same one are two grounds of
+one material rather than the same background twice. There is no list of
+twenty-four named ambiences any more; there is an engine.
 
 ⚠️ **Three consequences of one fact, and that is the point.** They used to be
 three expressions in the router deriving from the same slug, each of which had to
@@ -323,7 +328,7 @@ screen with the name on it is a title card, and it is the composition that says
 
 Only the arrival: its People, Money and Settings keep the hub's working material,
 because an arrival nobody leaves is not an arrival. See
-[`AMBIENCE.md`](AMBIENCE.md) — `world`.
+[`AMBIENCE.md`](AMBIENCE.md) — the four subject families.
 
 ### Two faces, and the split is the oldest one in typography
 

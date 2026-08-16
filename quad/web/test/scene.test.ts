@@ -97,11 +97,20 @@ describe("every family", () => {
   });
 
   it("is the same world for the same seed, and a different one for a different seed", () => {
+    /*
+      ⚠️ THE WHOLE RENDER, NOT THE FIELD. This compared marks only and passed
+      four families for the wrong reason: `glow` HAS no marks — it is pure light,
+      which is exactly what most screens want behind them — so both seeds gave
+      the empty string and "different" was trivially false. A world is its ground
+      as much as its marks, and comparing all of it is what makes the seeded
+      ground a checked claim rather than a note.
+    */
+    const all = (family: Family, seed: string) => JSON.stringify(drawn(family, seed));
     for (const [id, family] of skies()) {
-      expect(drawn(family, "atlas").field, `${id} is not stable for one seed`)
-        .toBe(drawn(family, "atlas").field);
-      expect(drawn(family, "atlas").field, `${id} draws one world for every seed`)
-        .not.toBe(drawn(family, "northwind").field);
+      expect(all(family, "atlas"), `${id} is not stable for one seed`)
+        .toBe(all(family, "atlas"));
+      expect(all(family, "atlas"), `${id} draws one world for every seed`)
+        .not.toBe(all(family, "northwind"));
     }
   });
 

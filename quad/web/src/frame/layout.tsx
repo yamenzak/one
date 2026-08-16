@@ -22,11 +22,8 @@ import * as React from "react";
 import type { Tone } from "@quad/kernel";
 import { PRIMARY_MAX } from "@quad/kernel";
 import { Button, Card, Separator } from "@heroui/react";
-/* ⚠️ `Ambience`, not `theme.ts`'s older four-value `Sky`. The two drifted the
-   moment patterns were added, and a `Page` that could not be given `dots` was a
-   vocabulary with a piece nothing could reach. */
-import type { Ambience, World } from "../tokens/ambience.js";
-import { ON_SCENE, worldCss } from "../tokens/ambience.js";
+import type { Sky, World } from "../tokens/ambience.js";
+import { ON_SCENE, skyWorld, worldCss } from "../tokens/ambience.js";
 import { TYPE } from "../tokens/type.js";
 import {
   BAND_PAD, CODE_SLOT, CROWN, CROWN_CHIP, CROWN_SIZE, GUTTER, HEAD_GAP, HERO_PAD, ICON,
@@ -66,8 +63,21 @@ export type Bleed = "hold" | "edge" | "flush";
 /* ------------------------------------------------------------------- page --- */
 
 export interface PageProps {
-  /** ⚠️ Named, never a colour — see the header. */
-  readonly sky?: Ambience;
+  /**
+   * ⚠️ A FAMILY, NEVER A COLOUR AND NO LONGER ONE OF TWENTY-FOUR DRAWN WORLDS.
+   * `glow`, `cloth`, `etch`, `loops`, `blobs` — each is every ground in its own
+   * space, seeded by `seedling`, so two screens naming the same one are two
+   * worlds of one material rather than the same picture twice.
+   */
+  readonly sky?: Sky;
+  /**
+   * ⚠️ WHICH ONE OF THE FAMILY, AND IT WANTS THE SCREEN'S OWN IDENTITY. A route
+   * is ideal: every screen in a product then has a ground of its own inside the
+   * product's material, for free, with nobody choosing anything. Absent, every
+   * page naming that family is the same page — a legitimate answer, and why
+   * there is a default.
+   */
+  readonly seedling?: string;
   /**
    * ⚠️ A GROUND BUILT FROM A SUBJECT RATHER THAN CHOSEN FROM THE TABLE, and the
    * ONLY thing that may be handed one. A workspace's face is a planet seen from
@@ -108,7 +118,7 @@ export interface PageProps {
  * which reads as a broken layout rather than as a unit bug.
  */
 export function Page(
-  { sky = "plain", world, density = "even", tone = "neutral", nav, children }: PageProps,
+  { sky = "plain", seedling, world, density = "even", tone = "neutral", nav, children }: PageProps,
 ) {
   /*
     ⚠️ THE THEME PICKS A SKY, AND THIS REPLACES A RULE THAT SHOULD NEVER HAVE
@@ -124,11 +134,15 @@ export function Page(
     a first render that guessed wrong would swap the sky one frame later.
   */
   const night = useNight();
-  const own = world ? worldCss(world, { night, density }) : null;
+  /* ⚠️ ONE PATH FOR BOTH. A subject's world and a named sky differ only in where
+     the family and the two colours came from — everything after that is the same
+     engine, which is what "one engine powers every scene" has to mean. */
+  const scene = world ?? (sky === "plain" ? null : skyWorld(sky as Exclude<Sky, "plain">, seedling ?? sky));
+  const own = scene ? worldCss(scene, { night, density }) : null;
   return (
     <div
       className="min-h-dvh flex flex-col"
-      data-sky={own ? "world" : sky}
+      data-sky={own ? "world" : "plain"}
       data-tone={tone}
       style={own?.css as React.CSSProperties | undefined}
     >
@@ -188,8 +202,10 @@ export function useNight(): boolean {
 export interface BandProps {
   readonly bleed?: Bleed;
   readonly width?: Width;
-  /** ⚠️ Its own ambience, so one section can lift while the page stays calm. */
-  readonly sky?: Ambience;
+  /** ⚠️ Its own ground, so one section can lift while the page stays calm. */
+  readonly sky?: Sky;
+  /** ⚠️ Which one of the family — see `PageProps.seedling`. */
+  readonly seedling?: string;
   readonly tone?: Tone;
   readonly children?: React.ReactNode;
 }
@@ -202,7 +218,14 @@ export interface BandProps {
  * stays readable — and doing it per screen is how you get a product where some
  * sections are inset and some are not, for no reason anybody remembers.
  */
-export function Band({ bleed = "hold", width = "read", sky, tone, children }: BandProps) {
+export function Band({ bleed = "hold", width = "read", sky, seedling, tone, children }: BandProps) {
+  const night = useNight();
+  /* ⚠️ THE SAME ENGINE A PAGE USES, because a section that lifts is a scene at a
+     smaller reach and not a second mechanism. */
+  const own = sky && sky !== "plain"
+    ? worldCss(skyWorld(sky as Exclude<Sky, "plain">, seedling ?? sky), { night, density: "even" })
+    : null;
+
   const inner = bleed === "flush"
     ? "w-full"
     : bleed === "edge"
@@ -212,9 +235,14 @@ export function Band({ bleed = "hold", width = "read", sky, tone, children }: Ba
   return (
     <section
       className="w-full"
-      {...(sky ? { "data-sky": sky } : {})}
+      {...(own ? { "data-sky": "world", "data-reach": "card" } : {})}
       {...(tone ? { "data-tone": tone } : {})}
+      style={own?.css as React.CSSProperties | undefined}
     >
+      {own?.field
+        ? <svg aria-hidden="true" data-field="true" data-reach="card"
+            dangerouslySetInnerHTML={{ __html: own.field }} />
+        : null}
       <div className={inner}>{children}</div>
     </section>
   );

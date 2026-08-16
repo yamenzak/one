@@ -241,50 +241,25 @@ if (!grain) {
   ok(`grain: the dither is noise, with no pitch to see`);
 }
 
-/**
- * ⚠️ MICRO-TEXTURE DIES IN LIGHT, AND IT IS A SIGN PROBLEM RATHER THAN A
- * STRENGTH ONE. The ambience threads and dot fields are marks of the brand over
- * the ground: darker-than-nothing on a near-black screen, which reads as sheen,
- * and darker-than-the-paper on a light one, which reads as grime — a hero over
- * hatching that a person described, accurately, as dusty and dirty. `--sky`
- * already halves light mode and it still showed, because no multiplier fixes a
- * sign. So every sub-pixel pattern layer must run through `thread()`, which
- * carries the knob light turns off — and a new ambience whose fibres bypass it
- * is this exact complaint shipping again.
- *
- * ⚠️ MACRO LINE-WORK IS THE ONE PERMITTED EXCEPTION, AND PITCH IS THE LINE.
- * `etch()` carries its own knob that light only DIMS: rings at 56px and graph
- * lines at 44px are sparse enough that each line reads as printing, not grime.
- * The boundary is 24px — an `etch()` layer at a finer pitch is a fibre wearing
- * the wrong helper, and it fails here rather than shipping the complaint with
- * a new name.
- */
-const fibres = [...AMBIENCE.matchAll(/repeating-linear-gradient\([^,]+,\s*\$\{(\w+)\([^`]*?(\d+)px\)`/g),
-  ...AMBIENCE.matchAll(/radial-gradient\(\$\{(\w+)\([^)]*\)\}\s*0?\.\d+px/g)];
-const loose_ = fibres.filter(([, fn]) => fn !== "thread" && fn !== "etch");
-const fine_ = fibres.filter(([, fn, pitch]) => fn === "etch" && Number(pitch ?? 0) < 24);
-if (!fibres.length) {
-  fail(`ambience.ts: no texture layers found — if the fibres are gone, drop this check on purpose.`);
-} else if (loose_.length || fine_.length) {
-  for (const [whole, fn] of loose_) {
-    fail(`ambience.ts: a texture layer bypasses \`thread()\`/\`etch()\` — \`${whole.slice(0, 60)}…\` uses \`${fn}()\`.
-` +
-         `       Fine dark marks on light paper are grime; the knob light turns off is
-` +
-         `       \`--thread\`, and only \`thread()\` carries it. Macro line-work (≥24px) may use \`etch()\`.`);
-  }
-  for (const [whole, , pitch] of fine_) {
-    fail(`ambience.ts: an \`etch()\` layer at ${pitch}px pitch — that is micro-texture, and it
-` +
-         `       must use \`thread()\` so light can turn it off. \`${whole.slice(0, 60)}…\``);
-  }
-} else if (!/--thread: 0/.test(AMBIENCE)) {
-  fail(`ambience.ts: nothing sets \`--thread: 0\` in light, so every fibre still shows there.`);
-} else if (!/--etch: 0?\.\d+/.test(AMBIENCE)) {
-  fail(`ambience.ts: nothing dims \`--etch\` in light — etched lines at dark strength on paper.`);
-} else {
-  ok(`threads: ${fibres.length} texture layer(s) — fibres die in light, etching dims`);
-}
+/*
+  ⚠️ THIS IS WHERE THE `thread()` / `etch()` CHECK WAS, AND IT IS RETIRED ON
+  PURPOSE RATHER THAN LOST. Its own failure message said so: "if the fibres are
+  gone, drop this check on purpose." They are gone.
+
+  ⚠️ WHAT IT PROTECTED WAS REAL AND IS NOW STRUCTURAL. Micro-texture is a SIGN
+  problem, not a strength one: a field of marks finer than the eye separates
+  reads as sheen on near-black and as GRIME on paper, and no multiplier fixes a
+  sign — which is why light mode had to turn the fibres off outright with a knob
+  every new ambience had to remember. Twenty-four hand-written grounds each had
+  to remember it, and that is exactly the class of thing a guard is for.
+
+  ⚠️ A FAMILY DECLARES A `day` OF ITS OWN INSTEAD. There is nothing left to
+  remember: the light sky is a different set of decisions rather than the dark
+  one turned down, so `cloth` draws black thread at a third the weight and
+  `etch` halves rather than kills its rules, each said once in the file that
+  owns it. A guard over a knob that no longer exists is a guard that can only
+  ever be wrong.
+*/
 
 console.log(bad
   ? `\nmotion: ${bad} finding(s) — a product with no motion and no typography of its own.`

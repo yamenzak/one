@@ -185,6 +185,26 @@ export interface Family {
   /** ⚠️ Marks that must MEET — see `Tiles`. A family has these or specks. */
   readonly tiles?: readonly Tiles[];
   /**
+   * ONE COMPOSITION SIZED TO THE WHOLE TILE — the third and last way to make a
+   * field.
+   *
+   * ⚠️ A SWEPT LINE FIELD IS NEITHER SCATTERED NOR LAID. Its marks are lines
+   * that cross the entire frame: where each one goes depends on where the ones
+   * around it went, so no per-mark placement can produce it. `scatter` would
+   * give a heap of disconnected arcs and a lattice would chop every line into
+   * cells. What is left is to draw the whole thing at once.
+   *
+   * ⚠️ AND IT MUST TILE BY CONSTRUCTION, WHICH IS A REAL CONSTRAINT ON THE MATH
+   * RATHER THAN A NOTE. The field repeats at the tile, so a curve whose value at
+   * `x = 0` differs from its value at `x = w` shows a vertical crack down every
+   * repeat — one pixel wide, perfectly straight, the single most visible thing
+   * on a quiet ground. A composition that uses only whole numbers of cycles
+   * across the tile cannot have one.
+   */
+  readonly drawn?: (p: Palette, r: () => number, tile: {
+    readonly w: number; readonly h: number;
+  }) => string;
+  /**
    * ⚠️ The canvas the marks are drawn on and TILED at, in CSS pixels — see
    * `render`. A lattice ROUNDS it to a whole number of cells, because a pattern
    * whose repeat cuts a cell in half has a visible seam every tile.
@@ -358,6 +378,8 @@ export function render(scene: Scene): Rendered {
       }
     }
   }
+
+  if (family.drawn) marks.push(family.drawn(palette, r, tile));
 
   const megapixels = (tile.w * tile.h) / 1_000_000;
   for (const speck of family.specks ?? []) {

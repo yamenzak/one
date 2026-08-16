@@ -20,8 +20,9 @@ import { Settings, settingsShown } from "../src/rendered/settings.js";
 import { NotificationPolicy, policyShown } from "../src/rendered/policy.js";
 import { FlagConsole, Shelf, saying, money } from "../src/rendered/console.js";
 import { Shell, reachable } from "../src/frame/shell.js";
-import { brandCss, brandCssFor, readable, skyCss, colorFor } from "../src/tokens/theme.js";
-import { AMBIENCES, DRIFT, ambienceStylesheet, bespokeCss } from "../src/tokens/ambience.js";
+import { brandCss, brandCssFor, readable, colorFor } from "../src/tokens/theme.js";
+import { ambienceStylesheet, skyWorld, worldCss } from "../src/tokens/ambience.js";
+import { SKIES } from "../src/scene/index.js";
 import { BEAT } from "../src/tokens/motion.js";
 import { Screen, Whichever } from "../src/frame/screen.js";
 import { ready, trouble, waiting } from "../src/parts/state.js";
@@ -379,25 +380,38 @@ describe("a workspace's branding", () => {
     expect(readable("#eeeeee", "#ffffff")).toBe(false);
   });
 
-  /* ⚠️ The sky names a shape and takes its colour from the tokens, so a brand
-     change reaches the background of every screen with nothing else edited. */
-  it("derives the ambience from tokens rather than from a colour", () => {
-    expect(skyCss("plain")).toBe("");
-    expect(skyCss("calm", "neutral")).toContain("var(--brand)");
-    expect(skyCss("lift", "success")).toContain("var(--success)");
-    expect(skyCss("calm")).not.toMatch(/#[0-9a-f]{6}/i);
+  /*
+    ⚠️ A NAMED SKY TAKES ITS COLOUR FROM THE TOKENS, so a brand change reaches
+    the background of every screen with nothing else edited. This used to be
+    twenty-four hand-written stacks each of which had to remember; it is one
+    binding now, and what it hands the engine is `var(--background)` and
+    `var(--brand)` rather than anything a file here chose.
+  */
+  it("derives a named sky from tokens rather than from a colour", () => {
+    for (const sky of SKIES) {
+      const made = worldCss(skyWorld(sky as "glow"), { night: true, density: "even" });
+      expect(made.css["--world-ground"], `${sky} names no token`).toContain("var(--brand)");
+      /* ⚠️ Black, white and full transparency are ALPHA rather than colour — a
+         family mixes toward them to darken and to lighten. Any other literal is
+         a hue this file chose, which is the thing that cannot follow a brand. */
+      const hues = [...(made.css["--world-ground"] ?? "").matchAll(/#[0-9a-f]{3,8}\b/gi)]
+        .map((m) => m[0].toLowerCase())
+        .filter((h) => !["#000", "#fff", "#000000", "#ffffff"].includes(h));
+      expect(hues, `${sky} holds a colour of its own`).toEqual([]);
+    }
   });
 
-  /* ⚠️ A bespoke world is an IDENTITY: same seed, same world, forever — and it
-     obeys every rule the named ambiences do (tokens in, no hex out). */
-  it("composes a bespoke world deterministically from its seed", () => {
-    expect(bespokeCss(7)).toBe(bespokeCss(7));
-    expect(bespokeCss(7)).not.toBe(bespokeCss(8));
-    expect(bespokeCss(7)).toContain("var(--brand)");
-    expect(bespokeCss(7, "warning")).toContain("var(--warning)");
-    expect(bespokeCss(7)).not.toMatch(/#[0-9a-f]{6}/i);
-    /* The field is always the bottom layer — a bespoke world still owns the screen. */
-    expect(bespokeCss(7)).toMatch(/var\(--lumen, transparent\)\) 52%, transparent 96%\)$/);
+  /*
+    ⚠️ AND THE SAME NAME IS A DIFFERENT WORLD PER SEED, which is the whole gain
+    over the twenty-four. `glow` behind two screens is two grounds of one
+    material rather than the same picture twice — and nobody chose either.
+  */
+  it("gives one family a different world per seed", () => {
+    const a = worldCss(skyWorld("glow", "today"), { night: true, density: "even" });
+    const b = worldCss(skyWorld("glow", "clients"), { night: true, density: "even" });
+    expect(a.css["--world-ground"]).not.toBe(b.css["--world-ground"]);
+    expect(worldCss(skyWorld("glow", "today"), { night: true, density: "even" }).css)
+      .toEqual(a.css);
   });
 
   /**
@@ -409,19 +423,26 @@ describe("a workspace's branding", () => {
    * vocabulary becomes one entry per screen. None of the three fails a render,
    * so none of the three fails a test that only mounts something.
    */
-  it("bounds every ambience that moves", () => {
+  it("bounds every ground that moves", () => {
     const css = ambienceStylesheet();
-    const moving = Object.entries(DRIFT);
-    expect(moving.length).toBeGreaterThan(0);
 
-    /* ⚠️ The overscan rule — see `DRIFT`. A scale under 1.1 is an edge. */
-    for (const [name, d] of moving) {
-      expect(AMBIENCES, `${name} is not an ambience`).toContain(name);
-      expect(Math.min(d.from, d.to), `${name} scales below the overscan floor`)
-        .toBeGreaterThanOrEqual(1.1);
-      expect(css).toContain(`[data-sky="${name}"]::before { animation: none; }`);
-      expect(css).toContain(`[data-reduce-motion="true"] [data-sky="${name}"]::before`);
-    }
+    /*
+      ⚠️ ONE DRIFT FOR EVERY GROUND, AND ONE SET OF NUMBERS. There was a table of
+      per-ambience drift, which is one more thing to tune per world and one more
+      place to forget an opt-out; a scene varies by seed instead.
+    */
+    expect(css).toContain("[data-sky]:not([data-sky=\"plain\"])::before {");
+    expect(css).toContain("animation: quad-drift");
+    expect(css).toContain(
+      "[data-reduce-motion=\"true\"] [data-sky]:not([data-sky=\"plain\"])::before { animation: none; }",
+    );
+
+    /* ⚠️ The overscan rule: translating a layer that exactly covers its box
+       uncovers an edge, so every scale in the drift is past 1.1. */
+    const scales = [...css.matchAll(/@keyframes quad-drift \{[\s\S]*?\n\}/g)]
+      .flatMap((m) => [...m[0].matchAll(/scale\(([\d.]+)\)/g)].map((x) => Number(x[1])));
+    expect(scales.length).toBeGreaterThan(1);
+    for (const at of scales) expect(at).toBeGreaterThanOrEqual(1.1);
 
     /* ⚠️ ONE drift keyframe, and it takes its numbers in — not one per
        ambience. Twenty-four grounds move; there is one rule for all of them. */
@@ -467,14 +488,22 @@ describe("a workspace's branding", () => {
    * a calm field becomes corduroy. Nothing catches it — the CSS is valid, the
    * drawing is correct, and the desktop it was designed on looks right.
    */
-  it("sizes every drawn ground to cover rather than stretching it", () => {
+  /*
+    ⚠️ ONE SIZING RULE FOR EVERY GROUND, WHICH IS WHAT THE ENGINE BOUGHT. This
+    used to name `silk`, `linen` and `wire` and check each had a background-size
+    of its own, because twenty-four hand-written grounds each layered differently
+    and the list of sizes CYCLES — a missing entry tiled the ground at the marks'
+    size and turned a world into wallpaper, silently. A scene brings its ground
+    in as one value, so there is one rule and nothing to keep in step.
+  */
+  it("sizes every ground with one rule rather than one per world", () => {
     const css = ambienceStylesheet();
-    for (const name of ["silk", "linen", "wire"] as const) {
-      const rule = css.split("\n").find((l) => l.startsWith(`[data-sky="${name}"]::before {`));
-      expect(rule, `${name} has no rule`).toBeTruthy();
-      expect(rule).toContain("background-size: auto, auto, cover, auto, auto");
-      expect(rule).not.toContain("100% 100%");
-    }
+    const rule = css.slice(css.indexOf('[data-sky]:not([data-sky="plain"])::before {'));
+    expect(rule).toContain("background-image: var(--world-ground, none)");
+    expect(rule).toContain("background-size: cover");
+    expect(rule).not.toContain("100% 100%");
+    /* ⚠️ And no rule anywhere names one world — the shape the deletion removed. */
+    expect(css).not.toMatch(/\[data-sky="(?!plain|world)[a-z]+"\]/);
   });
 
   it("maps what happened onto the library's colour names in one place", () => {

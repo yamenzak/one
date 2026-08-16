@@ -20,7 +20,7 @@ import { ARRIVE_MARK, ARRIVE_RISE, doorAt } from "../tokens/motion.js";
 import { GUTTER, SPACE, WIDTH } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 import { Page, Spacer, Stack } from "./layout.js";
-import type { Ambience } from "../tokens/ambience.js";
+import type { Sky } from "../tokens/ambience.js";
 import { ONE_FACE, worldFor } from "../parts/face.js";
 
 /* ------------------------------------------------------------------- mark --- */
@@ -154,7 +154,7 @@ export function Arrival({ name, claim, children, aside, sky }: {
   readonly children: React.ReactNode;
   readonly aside?: React.ReactNode;
   /** ⚠️ Absent is the deployment's own world — see above. */
-  readonly sky?: Ambience;
+  readonly sky?: Sky;
 }) {
   return (
     <Page

@@ -35,7 +35,7 @@ import { Band, Page, PageCrown, Spacer, type Slot, type Width } from "./layout.j
 import { Group, NavRow } from "../parts/surfaces.js";
 import { worldFor, type FaceOf } from "../parts/face.js";
 import type { Tone } from "@quad/kernel";
-import type { Ambience } from "../tokens/ambience.js";
+import type { Sky } from "../tokens/ambience.js";
 import type { Density } from "../scene/index.js";
 import { Await, Nothing, RowsWaiting, FigureWaiting, FormWaiting, TextWaiting, TilesWaiting, nothingIn, type Loaded } from "../parts/state.js";
 import { Stack } from "./layout.js";
@@ -170,7 +170,9 @@ export interface LayoutProps {
    * ⚠️ THE MATERIAL, FOR A PAGE THAT IS ABOUT NO ONE THING. Most pages: a list,
    * a form, a console. Ignored where there is a subject — a page has one ground.
    */
-  readonly sky?: Ambience;
+  readonly sky?: Sky;
+  /** ⚠️ Which one of the family — see `PageProps.seedling`. */
+  readonly seedling?: string;
   /**
    * THE ONE THING THIS PAGE IS ABOUT — AND IT DECIDES THREE THINGS AT ONCE.
    *
@@ -215,13 +217,14 @@ export interface LayoutProps {
  * how dense, whose face — three of which are the same fact.
  */
 export function Layout(
-  { sky = "plain", subject, density, tone, frame, nav, children }: LayoutProps,
+  { sky = "plain", seedling, subject, density, tone, frame, nav, children }: LayoutProps,
 ) {
   const world = worldFor(subject) ?? undefined;
   const inside = frame ? <Framed frame={frame}>{children}</Framed> : children;
   return (
     <Page
       sky={sky}
+      seedling={seedling}
       world={world}
       density={density ?? (subject ? "rich" : "even")}
       tone={tone}

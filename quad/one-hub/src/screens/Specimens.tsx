@@ -45,7 +45,7 @@ const glyph = (icon: React.ReactNode) => icon;
 function Workshop() {
   return (
     <Page
-      sky="drape"
+      sky="cloth"
       nav={<Island here="/" onGo={nothing}
         items={[
           { id: "today", label: "Today", icon: glyph(<House />), route: "/" },
@@ -124,7 +124,7 @@ function Settings() {
   const [digest, setDigest] = useState(true);
 
   return (
-    <Page sky="veil">
+    <Page sky="glow">
       <Crown name="Ironworks Studio" width="read" />
       <Band>
         <Stack space="roomy">
@@ -197,7 +197,7 @@ function States() {
           : ready(rows);
 
   return (
-    <Page sky="veil">
+    <Page sky="glow">
       <PageCrown title="States" back={nothing} />
       <Band width="work">
         <Stack space="roomy">
@@ -279,7 +279,7 @@ function Inner() {
   const days = Array.from({ length: 31 }, (_, i) => i);
 
   return (
-    <Page sky="drape">
+    <Page sky="cloth">
       <PageCrown
         title="Analytics"
         back={nothing}
@@ -379,7 +379,7 @@ function Detail() {
 /** Steps, and one unmistakable action. */
 function Flow() {
   return (
-    <Page sky="aurora">
+    <Page sky="glow">
       <Crown name="Greenhouse" under="New grower" width="read" ruled={false} />
       <Band>
         <Stack space="roomy">
@@ -412,7 +412,7 @@ function Flow() {
 function Start() {
   return (
     <Page
-      sky="tide"
+      sky="glow"
       nav={<Island here="/" onGo={nothing}
         items={[
           { id: "round", label: "Round", icon: glyph(<House />), route: "/" },
@@ -489,7 +489,7 @@ function Report() {
   const forecast = days.map((d) => ({ x: d, y: d < 14 ? null : Math.round(340 + d * 15) }));
 
   return (
-    <Page sky="tide">
+    <Page sky="glow">
       <AppCrown
         who={{ name: "Amara Osei" }}
         onOpenAccount={nothing}
@@ -769,7 +769,7 @@ function Enroll() {
   const [ok, setOk] = useState<boolean | undefined>(false);
 
   return (
-    <Page sky="focus">
+    <Page sky="glow">
       <PageCrown title="New client" back={nothing} />
       <Band>
         <Stack space="roomy">
