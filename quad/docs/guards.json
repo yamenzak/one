@@ -1134,7 +1134,7 @@
       "status": "live",
       "impl": "scripts/shape.test.mjs",
       "proves": "primary: every screen has at most one",
-      "fails": "the one thing a screen is for lands somewhere different on every screen \u2014 buried at the foot of a long list on one, pinned on the next \u2014 so somebody has to hunt for it and the product reads as assembled by different people"
+      "fails": "the one thing a screen is for lands somewhere different on every screen \u2014 buried at the foot of a long list on one, pinned on the next \u2014 so somebody has to hunt for it and the product reads as assembled by different people; and a block comment written between two tags ships four lines of design rationale to production as body text"
     }
   ]
 }

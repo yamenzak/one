@@ -178,6 +178,37 @@ for (const file of SCREENS) {
 }
 if (!saves) ok(`settings: none carries a save`);
 
+/* ------------------------------------------------- a comment that renders --- */
+
+/**
+ * ⚠️ A BLOCK COMMENT IN A JSX CHILDREN POSITION IS TEXT ON THE PAGE. `{/* … *\/}`
+ * is a comment; `/* … *\/` between two tags is a paragraph, and it renders —
+ * warning triangle, backticks, the word "⚠️" at body size — right under the
+ * screen's own heading. It compiles, it typechecks, every test passes, and it is
+ * only visible to somebody who LOOKS at the page. The operator's Ground screen
+ * shipped four lines of design rationale to production this way.
+ *
+ * ⚠️ THE TELL IS WHAT PRECEDES IT. In a statement position a comment follows
+ * `;`, `{`, `}`, `)` or `,`; in a children position it follows the `>` that
+ * closed a tag. `=>` is the one `>` that is not a tag, and it is excluded by
+ * name rather than by luck.
+ */
+let leaked = 0;
+for (const file of [...SCREENS, ...filesIn("web/src")]) {
+  const src = readFileSync(file, "utf8");
+  for (const at of [...src.matchAll(/\/\*/g)].map((m) => m.index)) {
+    let i = at - 1;
+    while (i >= 0 && /\s/.test(src[i])) i--;
+    if (src[i] !== ">" || src[i - 1] === "=") continue;
+    leaked++;
+    const line = src.slice(0, at).split("\n").length;
+    fail(`${rel(file)}:${line}: a block comment in a JSX children position.\n`
+      + `       It is not a comment there — it is TEXT, and it renders on the page\n`
+      + `       under the heading. Wrap it: \`{/* … */}\`.`);
+  }
+}
+if (!leaked) ok(`comments: none renders as text`);
+
 /* ------------------------------------------- the shape table is the system --- */
 
 /**

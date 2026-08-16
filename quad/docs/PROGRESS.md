@@ -702,7 +702,7 @@ the library decides FOR us.
 | `an-app-names-a-lane-never-a-model` | D19 | a deployment decision shipped through a product release — wrong the day the provider retires the row, and different in every app, with nothing failing |
 | `an-edited-prompt-is-bounded-at-both-levels` | D19 | a variable nothing offers is sent to a model as a literal brace, and the answer comes back subtly wrong with nobody the wiser |
 | `the-run-and-the-screens-read-one-resolution` | D19 | the bill stops matching what anybody was shown, because the run used a different model or different words than the console reported |
-| `a-screen-names-a-shape-and-the-shape-places-the-action` | D7 | the one thing a screen is for lands somewhere different on every screen — buried at the foot of a long list on one, pinned on the next — so somebody has to hunt for it and the product reads as assembled by different people |
+| `a-screen-names-a-shape-and-the-shape-places-the-action` | D7 | the one thing a screen is for lands somewhere different on every screen — buried at the foot of a long list on one, pinned on the next — so somebody has to hunt for it and the product reads as assembled by different people; and a block comment written between two tags ships four lines of design rationale to production as body text |
 <!-- /generated -->
 
 ## Commands

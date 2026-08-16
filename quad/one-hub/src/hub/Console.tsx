@@ -53,7 +53,7 @@ export function ConsoleHome({ onGo }: { readonly onGo: (to: Where) => void }) {
   if (person && !person.operator) {
     return (
       <Screen
-        shape="board"
+        shape="list"
         refused={{
           says: "The console admits operators only",
           under: "Everything you can reach is under Workspaces",
@@ -63,11 +63,15 @@ export function ConsoleHome({ onGo }: { readonly onGo: (to: Where) => void }) {
   }
 
   return (
-    /* ⚠️ `board` — five destinations, and the shape gives them the wide column
-       so a desktop shows them as a board rather than as five rows down the
-       middle of a 1600px window. No primary: a console is a way IN to five
-       things, not a place where one of them is the point. */
-    <Screen shape="board">
+    /* ⚠️ `list`, NOT `board`, AND THE DIFFERENCE IS WHETHER A TILE HAS ANYTHING
+       IN IT. Every row here is a name and a glyph by design — the sentence that
+       used to sit under each one is what the screen behind it says on arrival
+       (`said` in `Hub.tsx`), where it is useful and not competing with four
+       others. A tile with nothing but a word in it is a large button, and five
+       of them is a menu that takes a whole screen to say what a list says in
+       five rows. No primary: a console is a way IN to five things, not a place
+       where one of them is the point. */
+    <Screen shape="list">
       {/* ⚠️ Unlabelled: the crown already says where this is, and a heading
           repeating it is the same sentence twice — see `Hub.tsx`. */}
       {/*

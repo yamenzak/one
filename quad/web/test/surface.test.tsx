@@ -22,6 +22,8 @@ import { FlagConsole, Shelf, saying, money } from "../src/console.js";
 import { Shell, reachable } from "../src/shell.js";
 import { brandCss, brandCssFor, readable, skyCss, colorFor } from "../src/theme.js";
 import { AMBIENCES, DRIFT, ambienceStylesheet, bespokeCss } from "../src/ambience.js";
+import { Screen, Whichever } from "../src/screen.js";
+import { ready, trouble, waiting } from "../src/state.js";
 import { Documents, SubProcessors } from "../src/legal.js";
 import { Await } from "../src/state.js";
 import type { DocumentDef } from "@quad/kernel";
@@ -537,5 +539,121 @@ describe("the four outcomes", () => {
     );
     expect(out).toContain("NOTHING YET");
     expect(out).not.toContain("CONTENT");
+  });
+});
+
+
+/* ----------------------------------------------------------------- shapes --- */
+
+/**
+ * WHERE THE ONE ACTION GOES, WHICH IS THE ONLY THING A SHAPE IS FOR.
+ *
+ * ⚠️ EVERY ASSERTION HERE IS ABOUT A DECISION NO SCREEN MAKES ANY MORE, so the
+ * thing being tested is that the decision is still being made at all. A preset
+ * system whose preset quietly stops placing the action leaves twenty screens
+ * each looking slightly wrong and no file to blame — which is precisely the
+ * state it was built to end.
+ */
+describe("the screen shapes", () => {
+  const act = { label: "Invite somebody", onDo: () => {} };
+
+  /*
+    ⚠️ TWICE IN THE MARKUP, ONCE ON THE SCREEN. The crown's copy is `hidden
+    md:flex` and the dock's wrapper is `md:hidden`, so exactly one is visible at
+    any width — and both come from ONE declaration, which is what stops the
+    crown saying "Invite" while the bar says "Add somebody".
+  */
+  it("puts the primary action in the crown and in the dock, from one declaration", () => {
+    const out = html(
+      <Screen shape="list" title="People" does={act} of={ready(["a"])} then={() => <p>rows</p>} />,
+    );
+    expect([...out.matchAll(/Invite somebody/g)]).toHaveLength(2);
+    expect(out).toContain("hidden md:flex");
+    expect(out).toContain("md:hidden");
+  });
+
+  /*
+    ⚠️ THE ACTION APPEARS WHEN THERE IS SOMETHING TO ACT ON. A primary floating
+    over a skeleton invites a press against data that has not arrived; over a
+    refusal it competes with the only useful control, which is "try again".
+  */
+  it("offers no action while waiting or on a refusal", () => {
+    expect(html(
+      <Screen shape="list" title="People" does={act} of={waiting()} then={() => null} />,
+    )).not.toContain("Invite somebody");
+
+    expect(html(
+      <Screen
+        shape="list" title="People" does={act} then={() => null}
+        of={trouble({ code: "platform.unavailable", status: 500, title: "It broke", retryable: true, tone: "danger" })}
+      />,
+    )).not.toContain("Invite somebody");
+  });
+
+  /*
+    ⚠️ AND ON AN EMPTY SCREEN IT MOVES INTO THE EMPTY STATE. Twice on a page
+    with nothing else on it — once in the only thing there and once bolted to
+    the bottom — is the exact fault the whole system exists to remove.
+  */
+  it("moves the action into the empty state, and only there", () => {
+    const out = html(
+      <Screen
+        shape="list" title="People" does={act}
+        of={ready([])} nothing={{ says: "Nobody here yet" }} then={() => null}
+      />,
+    );
+    expect(out).toContain("Nobody here yet");
+    expect([...out.matchAll(/Invite somebody/g)]).toHaveLength(1);
+    expect(out).not.toContain("md:hidden");
+  });
+
+  /*
+    ⚠️ A REFUSAL KEEPS ITS CROWN, which five screens did not. Returned early,
+    above the frame, it is a sentence alone on a page — no title, no way back.
+  */
+  it("keeps the page's name when somebody may not see it", () => {
+    const out = html(
+      <Screen shape="settings" title="In your words" refused={{ says: "Only an owner may" }} />,
+    );
+    expect(out).toContain("In your words");
+    expect(out).toContain("Only an owner may");
+  });
+
+  /*
+    ⚠️ A `settings` SCREEN CANNOT CARRY A SAVE. The guard catches it before this
+    runs; this catches the shape chosen at runtime, and it is LOUD rather than
+    silent — dropping the button would leave somebody wondering why it never
+    rendered.
+  */
+  it("refuses a primary action on a settings screen", () => {
+    expect(() => html(<Screen shape="settings" title="Settings" does={act} />)).toThrow(/settings/);
+  });
+
+  /*
+    ⚠️ NOBODY PAYS A TAP FOR A MENU WITH ONE ITEM ON IT — see `Whichever`. Three
+    screens implemented this by hand and each stated the rule in its own words.
+  */
+  it("skips the list where there is only one to choose between", () => {
+    const one = html(
+      <Whichever
+        items={[{ id: "kova", name: "Kova" }]}
+        id={(a) => a.id} name={(a) => a.name}
+        onChoose={() => {}} nothing={{ says: "None" }}
+        then={(a) => <p>inside {a.name}</p>}
+      />,
+    );
+    expect(one).toContain("inside Kova");
+
+    const several = html(
+      <Whichever
+        items={[{ id: "kova", name: "Kova" }, { id: "hello", name: "Hello" }]}
+        id={(a) => a.id} name={(a) => a.name}
+        onChoose={() => {}} nothing={{ says: "None" }}
+        then={(a) => <p>inside {a.name}</p>}
+      />,
+    );
+    expect(several).not.toContain("inside");
+    expect(several).toContain("Kova");
+    expect(several).toContain("Hello");
   });
 });
