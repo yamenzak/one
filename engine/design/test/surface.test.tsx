@@ -804,24 +804,24 @@ describe("the screen shapes", () => {
   it("skips the list where there is only one to choose between", () => {
     const one = html(
       <Whichever
-        items={[{ id: "kova", name: "Kova" }]}
+        items={[{ id: "hello", name: "Hello" }]}
         id={(a) => a.id} name={(a) => a.name}
         onChoose={() => {}} nothing={{ says: "None" }}
         then={(a) => <p>inside {a.name}</p>}
       />,
     );
-    expect(one).toContain("inside Kova");
+    expect(one).toContain("inside Hello");
 
     const several = html(
       <Whichever
-        items={[{ id: "kova", name: "Kova" }, { id: "hello", name: "Hello" }]}
+        items={[{ id: "hello", name: "Hello" }, { id: "atlas", name: "Atlas" }]}
         id={(a) => a.id} name={(a) => a.name}
         onChoose={() => {}} nothing={{ says: "None" }}
         then={(a) => <p>inside {a.name}</p>}
       />,
     );
     expect(several).not.toContain("inside");
-    expect(several).toContain("Kova");
     expect(several).toContain("Hello");
+    expect(several).toContain("Atlas");
   });
 });

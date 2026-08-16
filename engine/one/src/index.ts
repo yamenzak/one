@@ -26,7 +26,6 @@ import {
   type Db, type TenantRow,
 } from "@engine/runtime";
 import { hello } from "@engine/hello";
-import { kova } from "@engine/kova";
 
 /* ------------------------------------------------------------------ what --- */
 
@@ -36,7 +35,7 @@ import { kova } from "@engine/kova";
  * for and no other, so the catalogue can grow without every cold start paying
  * for it.
  */
-const APPS: Readonly<Record<string, () => AppSpec>> = { hello, kova };
+const APPS: Readonly<Record<string, () => AppSpec>> = { hello };
 
 /**
  * ⚠️ THE PLATFORM'S OWN TABLES, IN DEPENDENCY ORDER. A module that alters a
@@ -164,7 +163,7 @@ const handler = (env: Env) => {
     personal: {
       ...personalOps({
         secret: env.AUTH_SECRET,
-        appId: "kova",
+        appId: "hello",
         deliver: async (to, code) => {
           if (env.ENVIRONMENT !== "development") {
             throw new Error("this deployment has no mailer configured");

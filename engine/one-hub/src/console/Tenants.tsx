@@ -78,7 +78,7 @@ export function Tenants({ onGo }: { readonly onGo: (id: string) => void }) {
             {
               id: "plans", label: "On",
               /* ⚠️ AN APP ID IS NOT A NAME, AND `sentence` WAS ONLY THE SECOND
-                 BEST ANSWER. It capitalises a key — right for "kova", wrong for
+                 BEST ANSWER. It capitalises a key — right for "hello", wrong for
                  anything hyphenated or capitalised in its own manifest — and the
                  answer already carries every product's DECLARED name beside the
                  workspaces. Looked up, this column says what the product calls

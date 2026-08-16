@@ -63,6 +63,37 @@ const note = collection({
   },
 });
 
+/**
+ * ⚠️ THE SECOND SCOPE, AND A REFERENCE APP HAS TO CARRY IT. `note` is the
+ * workspace's — everybody who can read notes reads all of them. A check-in is
+ * the PERSON's: `scope.of` is `subject`, so the generated verbs filter by
+ * whoever is asking and somebody's own week is theirs by construction rather
+ * than by a handler remembering a `WHERE`. An app that declared only tenant
+ * scope would leave the other half of the mechanism unexercised, and the half
+ * that is unexercised is the one that erases a person's records.
+ */
+const checkIn = collection({
+  id: "check-in",
+  label: { one: "Check-in", many: "Check-ins" },
+  scope: { of: "subject", column: "person" },
+  permission: "check-in",
+  retention: null,
+  onClose: { then: "purge" },
+  fields: {
+    /* ⚠️ THE SCOPE COLUMN IS A DECLARED FIELD AND IS NEVER WRITTEN BY THE
+       CALLER. It is declared so erasure can find it and the generated schema can
+       create it; the platform fills it from who is asking, and a value sent for
+       it is discarded rather than honoured. */
+    person: field.text({ label: "Whose", holds: "none" }),
+    week: field.day({ label: "Week beginning", required: true, holds: "none" }),
+    went: field.enum({
+      label: "How it went", required: true, holds: "none",
+      values: ["great", "fine", "hard"],
+    }),
+    said: field.long({ label: "Anything to say", holds: "none", max: 4_000 }),
+  },
+});
+
 /* ------------------------------------------------------------- operations --- */
 
 interface Publish { readonly id: string }
@@ -136,6 +167,34 @@ const draft = operation<{ about: string }, { text: string }>({
   },
 });
 
+/**
+ * ⚠️ THE PLATFORM CAN SAY "YOURS"; ONLY A PRODUCT KNOWS WHO ELSE MAY LOOK. The
+ * generated verbs on a subject-scoped collection answer with the caller's own
+ * records and nothing else — which is the safe half and cannot be configured
+ * wrong. Reading somebody ELSE's is a different question, so it is a declared
+ * operation with a permission of its own, and the two are visibly different
+ * things in the route table rather than one verb with a parameter.
+ */
+const teamCheckIns = operation<{ week: string }, { items: readonly unknown[] }>({
+  id: "check-in.team",
+  kind: "read",
+  summary: "Everybody's check-in for a week",
+  input: { week: field.day({ label: "Week beginning", required: true, holds: "none" }) },
+  output: { items: field.json({ label: "Check-ins", holds: "none" }) },
+  permission: "check-in:review",
+  idempotency: { mode: "none" },
+  async handler(ctx, input) {
+    const c = ctx as { db: unknown };
+    const db = c.db as {
+      prepare(q: string): { bind(...v: unknown[]): { all<T>(): Promise<{ results: T[] }> } };
+    };
+    const rows = await db.prepare(
+      `SELECT id, person, week, went, said FROM check_in WHERE week = ? ORDER BY at`)
+      .bind(input.week).all<Record<string, unknown>>();
+    return { items: rows.results };
+  },
+});
+
 /* --------------------------------------------------------------- the rest --- */
 
 export const HELLO: AppSpec = defineApp({
@@ -144,15 +203,24 @@ export const HELLO: AppSpec = defineApp({
   mark: "◇",
 
   access: {
-    permissions: ["note:read", "note:write"],
+    permissions: [
+      "note:read", "note:write",
+      "check-in:read", "check-in:write",
+      /* ⚠️ A THIRD KEY, BECAUSE READING SOMEBODY ELSE'S IS NOT READING. Folding
+         it into `check-in:read` would mean the key somebody needs to write their
+         own week is the key that opens everybody's. */
+      "check-in:review",
+    ],
     /*
       ⚠️ APP ROLES ONLY (D15). Workspace authority — the roster, the settings,
       the bill — is the platform's four offices, and an app naming those keys
       in a bundle is refused at composition.
     */
     roles: {
-      writer: ["note:read", "note:write"],
-      reader: ["note:read"],
+      writer: ["note:read", "note:write", "check-in:read", "check-in:write", "check-in:review"],
+      /* ⚠️ A reader writes their OWN check-in and cannot read the team's, which
+         is the shape every product with customers in it has. */
+      reader: ["note:read", "check-in:read", "check-in:write"],
     },
     founding: "writer",
     /* ⚠️ Seats count PLATFORM staff — a person is on the team or they are not,
@@ -173,8 +241,8 @@ export const HELLO: AppSpec = defineApp({
       trialDays: 14, includes: { seats: 10, notes: -1, publishing: true } },
   ],
 
-  collections: [note],
-  operations: [publish, draft],
+  collections: [note, checkIn],
+  operations: [publish, draft, teamCheckIns],
 
   /*
     ⚠️ THREE OF EIGHT NAME A GROUND, AND THE FIVE THAT DO NOT ARE THE POINT.

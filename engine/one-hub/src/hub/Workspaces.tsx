@@ -89,7 +89,7 @@ export function Workspaces({ onGo }: { readonly onGo: (to: Where) => void }) {
 const said = (apps: readonly string[] | undefined, role: string | null | undefined): string => {
   /* ⚠️ AN APP ID IS NOT A NAME — see `sentence`. `me.who` carries ids because it
      answers before there is a tenancy to read manifests from, so every row read
-     "kova · owner" on a screen where nothing else is lower case. */
+     "hello · owner" on a screen where nothing else is lower case. */
   const products = (apps ?? []).map(sentence).join(" · ");
   if (!role) return products || "Waiting for you to claim it";
   return products ? `${products} · ${role}` : role;

@@ -61,10 +61,10 @@ Read these as tests you can apply to a screenshot without knowing the codebase.
   built the thing.
 - No marketing anywhere inside the product. Somebody already signed in is not
   being sold to.
-- No em-dashed compound headings. "Kova — the documents" is two labels wearing
+- No em-dashed compound headings. "Hello — the documents" is two labels wearing
   one; pick the one that varies.
-- **A wire value is not copy.** `comfortable`, `past_due`, `kova` are keys. Say
-  "Comfortable", "Payment failed", "Kova".
+- **A wire value is not copy.** `comfortable`, `past_due`, `hello` are keys. Say
+  "Comfortable", "Payment failed", "Hello".
 
 ---
 
@@ -482,7 +482,7 @@ resolver.** `<Face of={whoFace(accountId)} />`, `placeFace(slug)`,
 crown, the switcher, the chooser, the bill, every per-product console. Never as a
 bare `{app.mark}`: a glyph dropped into JSX is a character somebody typed, with
 no ground under it and a different optical weight from every face beside it. A
-guard refuses it. In prose — "Kova · owner" under a workspace's name — a product
+guard refuses it. In prose — "Hello · owner" under a workspace's name — a product
 stays a word, because a mark inside a sentence is a second lead in a row that
 already has one.
 

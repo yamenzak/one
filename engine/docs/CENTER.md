@@ -18,7 +18,7 @@ Three questions, asked in one breath, and they are the right three:
 
 1. **Does user management — roles, permissions, the roster — move to the
    centre?** A tenancy now holds every app, and each app's users are under it.
-2. **For B2B2C apps (Kova): should a sellable package BE a role bound to a
+2. **For B2B2C apps: should a sellable package BE a role bound to a
    plan, instead of a second feature-flag system?** And what is the lifecycle
    when the customer stops paying — grace, lapse, deletion?
 3. **What else unifies in the centre?** Vault, legal, personal details and
@@ -98,18 +98,18 @@ A membership resolves to two kinds of authority:
   that product's own vocabulary (`client:write`, `note:read`). Declared by the
   app as today; held per `(membership, app)`; absent means "not a user of this
   app", which is a real and common state — the bookkeeper is in the workspace
-  for Money and is nobody in Kova.
+  for Money and is nobody in Hello.
 
 ```
 membership
   role_platform      "admin" | "staff" | "customer" | custom
-  roles_json         { kova: "trainer", hello: "writer" }   -- per enabled app
+  roles_json         { hello: "writer", atlas: "clerk" }   -- per enabled app
   grants_json        [ { key, app, until?, source? } ]      -- §3 extends this
   revoked_json       [ key ]
 ```
 
 **Why not one flat role across apps:** a role is a name for a bundle in ONE
-vocabulary. "Trainer" names Kova keys; against Hello's registry it names
+vocabulary. "Writer" names Hello keys; against Atlas's registry it names
 nothing, and the failure is silent 403s in the second app for everybody. **Why
 not per-app memberships:** that is the previous platform's disease — two
 rosters, two invitations, two seats for one person — the exact seam D1 exists
@@ -124,8 +124,8 @@ the platform's); the grant-bounding rule is unchanged and now asked per app.
   operation's own app, not `apps[0]` — plus the platform set. One caller, one
   resolution, per request, as now.
 - Seats count **platform staff**, not app roles: `seats.counts` moves up a
-  level. A customer membership (Kova's `client`) costs no seat, exactly as
-  Kova already declares.
+  level. A `customer` membership costs no seat, which is what every app that
+  has customers in it needs and what the platform's own offices already say.
 - The audience test for notifications, the settings `needs`, and the screens'
   `permission` all keep working unchanged — they name keys, and keys now
   resolve per app.
@@ -305,8 +305,8 @@ that already exist:
   ceiling-on-revenue rule already in the credit kernel.
 - **Prompt overrides are two-level like every other text**: the operator may
   override any action's prompt; a TENANT may override only where the app
-  declares the action `brandable` (Kova's plan-draft tone is the tenant's
-  voice; a lab-extraction prompt is not anybody's to edit). Same
+  declares the action `brandable` (a drafting tone is the tenant's voice; an
+  extraction rule is not anybody's to edit). Same
   ceiling-then-narrowing direction as notifications and flags — one
   direction, no widening.
 

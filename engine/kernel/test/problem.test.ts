@@ -46,7 +46,7 @@ describe("a problem", () => {
   it("degrades an unknown code rather than throwing inside the error path", () => {
     /* A thrown error inside the error path turns a refusal somebody could have
        acted on into a stack trace nobody sees. */
-    const p = problem(PLATFORM_PROBLEMS, "kova.nonexistent");
+    const p = problem(PLATFORM_PROBLEMS, "hello.nonexistent");
     expect(p.code).toBe("platform.unavailable");
     expect(p.status).toBe(503);
   });

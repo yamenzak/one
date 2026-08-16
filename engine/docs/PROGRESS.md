@@ -23,7 +23,7 @@ reader can trust this table instead of re-reading the code.
 | 6 | Money — plans, entitlements, credits, jobs | shipped |
 | 7 | Services — ai and notify over RPC | shipped |
 | 8 | Vault + legal | shipped |
-| 9 | Kova on OneEngine | shipped |
+| 9 | A real product on OneEngine, end to end | shipped |
 | 10 | One — the deployment and the Hub | shipped |
 | 11 | The agent surface — every operation an MCP tool, derived | shipped |
 | 12 | Multi-app access — a platform role for the workspace, a role per app inside it | shipped |
@@ -84,7 +84,7 @@ Honestly outstanding, in the order it will bite:
    built for.
 5. **Payment.** The bill is assembled and the ladder walks; nothing takes a card.
    That is a provider integration, and it is deliberately the last thing.
-6. **The template.** A second app is copied from `apps/kova` today. A real
+6. **The template.** A second app is copied from `apps/hello` today. A real
    `apps/_template` with the conformance tests that catch a bad copy is the
    cheapest thing on this list and the one that decides whether app #3 diverges.
 
@@ -297,13 +297,21 @@ refuse — it reads as built and passes every test.
   erasure (which says plainly what it cannot undo), the derived processing
   record, the documents and the sub-processors with their countries.
 
-**`@engine/kova` — the first real product, as a manifest.** Six collections, three
-handlers, and no infrastructure of its own: no router, no schema, no migration,
-no gate call, no audit call, no settings screen, no billing code, no erasure
-cascade. Thirty-eight routes derived, the roster and the inbox among them
-without Kova declaring either. A client's conditions and weight are vault-backed,
-because a health fact in a product table is outside consent, outside the grant
-log and outside crypto-shredding.
+**Stage 9 was proved by a real product, and that product has left the tree.** A
+coaching app — six collections, three handlers, thirty-eight derived routes,
+vault-backed health facts — ran here with no infrastructure of its own, which was
+the stage's whole claim. It is being rewritten as a product on OneEngine under a
+new name, so keeping a stale copy here would mean a manifest nobody maintains
+teaching the next app how to be written.
+
+⚠️ **THE THREE PROPERTIES IT PROVED DID NOT LEAVE WITH IT.** Deleting the app
+would have deleted its guards, which is how a framework quietly stops having a
+property: `apps/hello` carries all three now — the derived surface
+(`test/serve.test.ts`), a person's own records being theirs by construction and
+the seat ceiling counting only roles that cost a seat (`test/identity.test.ts`).
+Hello grew a subject-scoped collection to hold the second of them, because a
+reference app declaring only tenant scope leaves the half of the mechanism that
+erases a person's records unexercised.
 
 **`@engine/worker` (`engine/one/`) — One's whole deployment, and it is one file.** One worker answers every
 door for every product (D3): adding a product is a line in `APPS` and a row in a
@@ -753,8 +761,8 @@ the library decides FOR us.
 | `every-look-is-recorded-including-the-refused-ones` | D11 | the question "did anybody try to look at this" answered with silence, which is the question actually asked after something goes wrong |
 | `erasure-is-not-a-pause` | D11 | a fresh salt after a shredding, making everything written afterwards a second collection nobody agreed to |
 | `a-real-product-needs-no-infrastructure-of-its-own` | D12 | a product that has to write its own router, schema, gates and audit, which is a product that can leave one of them out |
-| `a-persons-own-records-are-theirs-by-construction` | D11 | somebody's logbook readable by anybody in the workspace, because a handler forgot a WHERE |
-| `a-seat-ceiling-only-counts-roles-that-cost-a-seat` | D12 | a studio on the smallest plan unable to add the customers it exists to serve, refused for staff seats it was not asking for |
+| `a-persons-own-records-are-theirs-by-construction` | D11 | somebody's own records readable by anybody in the workspace, because a handler forgot a WHERE |
+| `a-seat-ceiling-only-counts-roles-that-cost-a-seat` | D12 | a workspace on the smallest plan unable to add the customers it exists to serve, refused for staff seats it was not asking for |
 | `the-hub-has-one-door-to-the-api` | D12 | an expired session that does not look expired — every screen showing the empty state its failed load produced, and every save failing into a toast |
 | `the-browser-never-classifies-its-own-door` | D3 | a page offering a control the runtime refuses, answered as a 404 with nothing on it to explain why |
 | `every-screen-the-picker-names-is-drawn` | D10 | a blank page, which is the same picture as a page that failed to load — so somebody reloads for a minute and then gives up |

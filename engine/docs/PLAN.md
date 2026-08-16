@@ -289,7 +289,7 @@ is "shipped" while anything defers to it (STANDARDS.md).
 | 6 | **Money** — plans, entitlements, credits, the shelf | A tenant enables a second app and is billed once |
 | 7 | **Services** — ai and notify over RPC | Both run off the hot path and the seam is typed |
 | 8 | **Vault + legal** — encrypted facts, consent, ROPA, erasure | A person exports and erases themselves, provably |
-| 9 | **Kova** — the first real product on OneEngine | Kova runs with no app-specific infrastructure |
+| 9 | **A real product on OneEngine** | It runs with no app-specific infrastructure |
 | 10 | **One** — the deployment and the Hub: a worker, its doors, and the page a person opens | Somebody signs in with an emailed code, sees their workspaces and makes one, in a browser |
 
 ---

@@ -170,7 +170,7 @@ describe("every family", () => {
     for (const [id, family] of skies()) {
       const lattice = family.tiles?.[0];
       if (!lattice) continue;
-      const field = render({ family, seed: "kova", palette: PALETTE, density: 1 }).field;
+      const field = render({ family, seed: "hello", palette: PALETTE, density: 1 }).field;
       const w = Number(/pattern id="[^"]+" width="([\d.]+)"/.exec(field)?.[1]);
       const cells = [...field.matchAll(/scale\(([\d.]+)\)/g)].map((m) => Number(m[1]));
       expect(cells.length, `${id} laid no tiles`).toBeGreaterThan(0);

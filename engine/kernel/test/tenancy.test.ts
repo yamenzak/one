@@ -14,7 +14,7 @@ import type { AppId, Instant, TenantId } from "../src/primitives.js";
 const AT = "2026-08-14T00:00:00.000Z" as Instant;
 
 const shard = (over: Partial<Shard> = {}): Shard => ({
-  id: "eu-1", where: "eu", apps: ["kova"], tenants: 10, ceiling: 100, ...over,
+  id: "eu-1", where: "eu", apps: ["hello"], tenants: 10, ceiling: 100, ...over,
 });
 
 const on = (appId: AppId, over: Partial<Enablement> = {}): Enablement => ({
@@ -25,7 +25,7 @@ const on = (appId: AppId, over: Partial<Enablement> = {}): Enablement => ({
 
 describe("where a tenant's records may go", () => {
   it("accepts a shard that has the residency and the schemas", () => {
-    expect(refusePlacement(shard(), { where: "eu", apps: ["kova"] })).toBe(null);
+    expect(refusePlacement(shard(), { where: "eu", apps: ["hello"] })).toBe(null);
   });
 
   /*
@@ -35,7 +35,7 @@ describe("where a tenant's records may go", () => {
     table", after a move that reported success.
   */
   it("refuses a shard whose schema does not cover the tenant's apps", () => {
-    expect(refusePlacement(shard(), { where: "eu", apps: ["kova", "scena"] })).toBe("schema_missing");
+    expect(refusePlacement(shard(), { where: "eu", apps: ["hello", "atlas"] })).toBe("schema_missing");
   });
 
   /*
@@ -44,7 +44,7 @@ describe("where a tenant's records may go", () => {
     capacity and broke it would be a compliance failure reported as a success.
   */
   it("refuses a shard in the wrong place, whatever else is true of it", () => {
-    expect(refusePlacement(shard({ where: "global", tenants: 0 }), { where: "eu", apps: ["kova"] }))
+    expect(refusePlacement(shard({ where: "global", tenants: 0 }), { where: "eu", apps: ["hello"] }))
       .toBe("wrong_residency");
   });
 
@@ -54,8 +54,8 @@ describe("where a tenant's records may go", () => {
     whatever hour it happened to be crossed.
   */
   it("stops accepting at the ceiling, and says nothing about who is already there", () => {
-    expect(refusePlacement(shard({ tenants: 100 }), { where: "eu", apps: ["kova"] })).toBe("full");
-    expect(refusePlacement(shard({ tenants: 99 }), { where: "eu", apps: ["kova"] })).toBe(null);
+    expect(refusePlacement(shard({ tenants: 100 }), { where: "eu", apps: ["hello"] })).toBe("full");
+    expect(refusePlacement(shard({ tenants: 99 }), { where: "eu", apps: ["hello"] })).toBe(null);
   });
 });
 
@@ -67,15 +67,15 @@ describe("choosing between the shards there are", () => {
   */
   it("spreads rather than packs", () => {
     const chosen = placeOn([shard({ id: "eu-1", tenants: 80 }), shard({ id: "eu-2", tenants: 3 })],
-      { where: "eu", apps: ["kova"] });
+      { where: "eu", apps: ["hello"] });
     expect(chosen?.id).toBe("eu-2");
   });
 
   /* ⚠️ Null rather than a bad placement: nowhere to put somebody is an operator's
      problem to solve, and answering with an ineligible shard hides it. */
   it("answers with nothing rather than somewhere wrong", () => {
-    expect(placeOn([shard({ where: "global" })], { where: "eu", apps: ["kova"] })).toBe(null);
-    expect(placeOn([], { where: "eu", apps: ["kova"] })).toBe(null);
+    expect(placeOn([shard({ where: "global" })], { where: "eu", apps: ["hello"] })).toBe(null);
+    expect(placeOn([], { where: "eu", apps: ["hello"] })).toBe(null);
   });
 });
 
@@ -83,8 +83,8 @@ describe("choosing between the shards there are", () => {
 
 describe("an app switched on for a tenant", () => {
   it("is live until it is disabled, and never deleted", () => {
-    expect(enabled(on("kova"))).toBe(true);
-    expect(enabled(on("kova", { disabledAt: AT }))).toBe(false);
+    expect(enabled(on("hello"))).toBe(true);
+    expect(enabled(on("hello", { disabledAt: AT }))).toBe(false);
   });
 
   /*
@@ -94,10 +94,10 @@ describe("an app switched on for a tenant", () => {
     is switched back on, by then in a database that cannot read it.
   */
   it("counts a disabled app when deciding what a shard needs", () => {
-    expect(appsOf([on("kova"), on("scena", { disabledAt: AT })])).toEqual(["kova", "scena"]);
+    expect(appsOf([on("hello"), on("atlas", { disabledAt: AT })])).toEqual(["hello", "atlas"]);
   });
 
   it("counts each app once, however many rows say so", () => {
-    expect(appsOf([on("kova"), on("kova")])).toEqual(["kova"]);
+    expect(appsOf([on("hello"), on("hello")])).toEqual(["hello"]);
   });
 });

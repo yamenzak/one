@@ -117,7 +117,9 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   sent.length = 0;
-  for (const t of ["membership", "custom_role", "note", "audit", "replay"]) await shard().exec(`DELETE FROM ${t};`);
+  for (const t of ["membership", "custom_role", "note", "check_in", "audit", "replay"]) {
+    await shard().exec(`DELETE FROM ${t};`);
+  }
   for (const t of ["invited", "belongs", "tenant_app", "tenant", "session", "code", "account"]) {
     await directory().exec(`DELETE FROM ${t};`);
   }
@@ -432,6 +434,63 @@ describe("inviting a colleague", () => {
 });
 
 /* ------------------------------------------------------------------ leaving --- */
+
+/* ------------------------------------------------- somebody's own records --- */
+
+/**
+ * ⚠️ A SUBJECT-SCOPED COLLECTION IS THE CALLER'S OWN, BY CONSTRUCTION. The
+ * generated verbs filter by whoever is asking, so nobody has to remember a
+ * `WHERE` — and the one thing a handler could get wrong is the one thing no
+ * handler does. Reading somebody ELSE's is a declared operation with a key of
+ * its own, because only a product knows who may look.
+ */
+describe("a person's own records", () => {
+  const week = "2026-08-10";
+
+  const workspace = async () => {
+    const boss = await signIn("sam@example.com");
+    await post("setup", "/api/me.tenant.create",
+      { slug: "northwind", name: "Northwind", country: "DE" }, boss);
+    await post("northwind", "/api/member.invite",
+      { email: "alex@example.com", platformRole: "customer", appRoles: { hello: "reader" } }, boss);
+    const theirs = await signIn("alex@example.com");
+    return { boss, theirs };
+  };
+
+  it("keeps one person's check-in out of another's list, without a handler saying so", async () => {
+    const { boss, theirs } = await workspace();
+
+    /* ⚠️ `person` is the scope column. It is sent, and it is discarded: the
+       platform writes who is asking, so a caller cannot file a record as
+       somebody else by naming them. */
+    const wrote = await post("northwind", "/api/check-in.create",
+      { person: "somebody-else", week, went: "fine", said: "Steady." }, theirs);
+    expect(wrote.status).toBe(200);
+
+    const mine = await get("northwind", "/api/check-in.list", theirs)
+      .then((r) => r.json()) as { items: { person: string }[] };
+    expect(mine.items).toHaveLength(1);
+    expect(mine.items[0]?.person).not.toBe("somebody-else");
+
+    /* The founder's own list is the founder's own, and it is empty. */
+    const boss_ = await get("northwind", "/api/check-in.list", boss)
+      .then((r) => r.json()) as { items: unknown[] };
+    expect(boss_.items).toHaveLength(0);
+  });
+
+  it("lets somebody who holds the review key read the team's, and nobody else", async () => {
+    const { boss, theirs } = await workspace();
+    await post("northwind", "/api/check-in.create", { week, went: "hard" }, theirs);
+
+    const seen = await get("northwind", `/api/check-in.team?week=${week}`, boss)
+      .then((r) => r.json()) as { items: unknown[] };
+    expect(seen.items).toHaveLength(1);
+
+    /* ⚠️ Writing your own week does not open everybody's — that is a third key
+       and a different operation. */
+    expect((await get("northwind", `/api/check-in.team?week=${week}`, theirs)).status).toBe(403);
+  });
+});
 
 describe("leaving", () => {
   /*

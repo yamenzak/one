@@ -15,16 +15,16 @@ import { parseStop, pathFor } from "../src/centre/route.js";
 import { HUB_SCREENS } from "../src/hub/Hub.js";
 import { OF_CONSOLE, OF_WORKSPACE, parseWhere, pathOf } from "../src/hub/where.js";
 
-const APPS = ["kova", "hello"];
+const APPS = ["hello", "atlas"];
 
 describe("the product under a workspace's address", () => {
   it("routes a product's screens by its own id", () => {
-    expect(parseStop("/kova", APPS)).toEqual({ kind: "app", app: "kova", route: "/" });
-    expect(parseStop("/kova/plans", APPS)).toEqual({ kind: "app", app: "kova", route: "/plans" });
+    expect(parseStop("/hello", APPS)).toEqual({ kind: "app", app: "hello", route: "/" });
+    expect(parseStop("/hello/plans", APPS)).toEqual({ kind: "app", app: "hello", route: "/plans" });
   });
 
   it("opens the only product rather than offering a choice of one", () => {
-    expect(parseStop("/", ["kova"])).toEqual({ kind: "app", app: "kova", route: "/" });
+    expect(parseStop("/", ["hello"])).toEqual({ kind: "app", app: "hello", route: "/" });
     expect(parseStop("/", APPS)).toEqual({ kind: "choose" });
     /* ⚠️ And nothing switched on is still a screen, never a blank page. */
     expect(parseStop("/", [])).toEqual({ kind: "choose" });
@@ -32,11 +32,11 @@ describe("the product under a workspace's address", () => {
 
   it("lands an unknown address on the choice rather than on nothing", () => {
     expect(parseStop("/no-such-thing", APPS)).toEqual({ kind: "choose" });
-    expect(parseStop("/scena/wall", APPS)).toEqual({ kind: "choose" });
+    expect(parseStop("/nowhere/wall", APPS)).toEqual({ kind: "choose" });
   });
 
   it("writes the path back the way it parses it", () => {
-    for (const path of ["/", "/kova", "/kova/plans", "/hello"]) {
+    for (const path of ["/", "/hello", "/hello/plans", "/atlas"]) {
       expect(pathFor(parseStop(path, APPS))).toBe(path);
     }
   });
