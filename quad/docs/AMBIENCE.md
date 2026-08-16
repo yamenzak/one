@@ -354,6 +354,62 @@ underfoot, the deep surviving only as the blue a sky keeps at its zenith, the
 horizon warmed most of the way to white, and haze instead of stars. That is what
 a family is for.
 
+## The layout binding — one subject, three consequences
+
+**A page names its SUBJECT and everything else follows.** `Layout` is the
+outermost piece a screen sits in, and it is the only thing that may assemble a
+scene:
+
+```tsx
+<Layout sky="linen" subject={placeFace(slug)} frame={{ title, under, back }}>
+```
+
+From that one face:
+
+- **the GROUND** is that subject's own world — `worldFor` reads the two colours
+  out of the picture the face was drawn from,
+- **the CROWN** becomes a title card wearing the same face rather than a display
+  heading with a thumbnail over it,
+- **the DENSITY** becomes an arrival's (`rich`) rather than a working screen's.
+
+⚠️ **This is a fix, not a convenience.** The hub derived all three separately
+from the same slug — `worldOf(where.slug)`, `placeFace(where.slug)`, and a
+ternary on whether the first returned anything. Three expressions that have to
+agree, none of which can tell when they do not: edit one and the crown wears one
+workspace's planet over another workspace's sky, which is invisible in a
+screenshot of either. `scripts/scene.test.mjs` refuses `worldOf`/`worldCss`/
+`worldFor` anywhere outside the vocabulary.
+
+⚠️ **And the subject travels by CONTEXT, which is the enforcement.** It was a
+`face` on `Frame` — a prop, so any router could set one — and a face set there
+gets the title card WITHOUT the sky it is supposed to be standing on: a planet
+floating on linen, which looks deliberate. There is no prop to get wrong now.
+
+⚠️ **A subject with no world is not an error.** A person and a product have faces
+and no sky; the page keeps its material and the crown keeps the face.
+
+### Type on a scene: `ON_SCENE`
+
+**The one place a scene can lose is words laid directly on it.** A name crossing
+the lit limb of a planet has the same value on both sides of every stroke, so no
+single ink is legible over all of it.
+
+The obvious fix was tried and removed: a plate behind the words is wider than the
+subject, so its edges sit on plain sky as two dark patches either side of the
+world. What works is a **halo in the ground's own colour** — invisible as a
+shape, a few pixels out from every edge, dimming nothing.
+
+The family declares that colour (`Family.veil`), because `ground` is a list of
+gradients and nothing downstream can read a value out of it. `worldCss` turns it
+into `--on-scene` at three radii — tight-and-strong for the stroke edges, wide
+for the value underneath, one very wide to seat the block — and the hero sets
+`textShadow: ON_SCENE` on the wrapper, where it inherits.
+
+⚠️ **It is per SKY, not per scene.** A night's veil is near its deep and a day's
+is near paper; the same halo under both would outline the letters on one of them.
+⚠️ **And it is opt-in, never a rule on the page.** Text inside a card is already
+on a surface — `[data-sky] *` would put a shadow under every word in the product.
+
 ## What this is a prototype of
 
 **The next ambience system is this one, generalised** — and the four things
@@ -379,10 +435,9 @@ a family is for.
 
 ⚠️ **What is NOT yet done, and should not be claimed.** ONE family exists —
 `space`, in two skies, on one screen. The twenty-four brand-hued ambiences above
-are still hand-written gradient stacks and none of them has been ported. Four
-things the engine is designed for have no code at all: a family bound to a LAYOUT
-(so the layout knows where the matte goes and what slot the subject fills), type
-that derives its treatment from the scene under it, per-instance settings on top
-of a shared family (the "every wallet is glass, each wallet is its own glass"
-case), and any family that is not space. The engine is the foundation; the rest
-is the work.
+are still hand-written gradient stacks and none of them has been ported. Two of
+the four things the engine was designed for are done — the LAYOUT binding and
+type derived from the scene, both above — and two have no code at all:
+per-instance settings on top of a shared family (the "every wallet is glass, each
+wallet is its own glass" case), and any family that is not space. The engine is
+the foundation; the rest is the work.

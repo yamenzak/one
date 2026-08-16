@@ -31,9 +31,12 @@
 
 import * as React from "react";
 import { Button } from "@heroui/react";
-import { Band, PageCrown, Spacer, type Slot, type Width } from "./layout.js";
+import { Band, Page, PageCrown, Spacer, type Slot, type Width } from "./layout.js";
 import { Group, NavRow } from "../parts/surfaces.js";
-import type { FaceOf } from "../parts/face.js";
+import { worldFor, type FaceOf } from "../parts/face.js";
+import type { Tone } from "@quad/kernel";
+import type { Ambience } from "../tokens/ambience.js";
+import type { Density } from "../scene/index.js";
 import { Await, Nothing, RowsWaiting, FigureWaiting, FormWaiting, TextWaiting, TilesWaiting, nothingIn, type Loaded } from "../parts/state.js";
 import { Stack } from "./layout.js";
 import { PAD, SAFE_BOTTOM, SPACE } from "../tokens/metrics.js";
@@ -135,18 +138,6 @@ export interface Act {
  */
 export interface Frame {
   readonly title: string;
-  /**
-   * ⚠️ WHOSE PAGE THIS IS, WHERE THE ADDRESS KNOWS AND THE SCREEN DOES NOT. A
-   * workspace's own screen is crowned with its name by the router; the planet
-   * that names it in every list belongs above that name, so the row somebody
-   * pressed and the page they arrived on are visibly the same subject.
-   *
-   * ⚠️ AND IT IS NOT `Identity`. That block is CENTRED, and centred means the
-   * subject is the reader — "this is about you". A crown face is left-aligned
-   * under the way back: the subject is something you navigated TO. Two shapes,
-   * two meanings, and a screen uses one or the other, never both.
-   */
-  readonly face?: FaceOf;
   readonly under?: React.ReactNode;
   readonly back?: () => void;
   readonly leave?: "back" | "dismiss";
@@ -160,6 +151,85 @@ export function Framed({ frame, children }: {
   readonly children: React.ReactNode;
 }) {
   return <FrameContext.Provider value={frame}>{children}</FrameContext.Provider>;
+}
+
+/* ----------------------------------------------------------------- layout --- */
+
+/**
+ * ⚠️ THE SUBJECT TRAVELS BY CONTEXT AND `Layout` IS THE ONLY THING THAT PROVIDES
+ * IT, WHICH IS THE ENFORCEMENT. This was a `face` on `Frame` — a prop, so any
+ * router could set one — and a face set there gets the hero title card WITHOUT
+ * the sky it is supposed to be standing on: a planet floating on linen, which
+ * looks deliberate. There is no prop to get wrong now; a page either declares a
+ * subject or has none, and both consequences follow from the one word.
+ */
+const SubjectContext = React.createContext<FaceOf | null>(null);
+
+export interface LayoutProps {
+  /**
+   * ⚠️ THE MATERIAL, FOR A PAGE THAT IS ABOUT NO ONE THING. Most pages: a list,
+   * a form, a console. Ignored where there is a subject — a page has one ground.
+   */
+  readonly sky?: Ambience;
+  /**
+   * THE ONE THING THIS PAGE IS ABOUT — AND IT DECIDES THREE THINGS AT ONCE.
+   *
+   * ⚠️ THAT IS THE WHOLE OF LAYOUTS 2.0, AND IT IS A FIX RATHER THAN A
+   * CONVENIENCE. The hub used to compute the ground, the hero face and the
+   * density in three separate expressions from the same slug, each of which had
+   * to agree with the other two and none of which could tell when it did not.
+   * From one declaration: the ground is this subject's own world (`worldFor`),
+   * the crown is a title card wearing its face, and the density is an arrival's
+   * rather than a working screen's. Nothing to keep in step, because there is
+   * nothing to keep.
+   *
+   * ⚠️ A SUBJECT WITH NO WORLD IS NOT AN ERROR. A person and a product have
+   * faces and no sky; the page keeps its material and the crown keeps the face,
+   * which is the honest half of what was asked for rather than a blank.
+   */
+  readonly subject?: FaceOf;
+  /**
+   * ⚠️ AN INTENT, AND THE DEFAULT IS THE INTERESTING PART. A page with a subject
+   * is somewhere somebody ARRIVED — the world is most of what is on it, so it
+   * runs `rich`. A page wearing a material is a page with work on it. Named here
+   * only where a screen knows better than that.
+   */
+  readonly density?: Density;
+  readonly tone?: Tone;
+  /**
+   * ⚠️ ABSENT WHERE THE SCREEN IS ITS OWN HEADING — the hub's root is a face, an
+   * address and a list, and a display title over it names a screen the face has
+   * already named.
+   */
+  readonly frame?: Frame;
+  readonly nav?: React.ReactNode;
+  readonly children?: React.ReactNode;
+}
+
+/**
+ * A PAGE, ITS WORLD, AND WHAT IS OVER THE DOOR — one declaration.
+ *
+ * ⚠️ IT IS THE OUTERMOST PIECE AND EVERY ADDRESS GOES THROUGH IT. `Page` is
+ * still the frame and `Framed` is still the context; what this removes is the
+ * four-place knowledge that used to sit in a router — which ground, which world,
+ * how dense, whose face — three of which are the same fact.
+ */
+export function Layout(
+  { sky = "plain", subject, density, tone, frame, nav, children }: LayoutProps,
+) {
+  const world = worldFor(subject) ?? undefined;
+  const inside = frame ? <Framed frame={frame}>{children}</Framed> : children;
+  return (
+    <Page
+      sky={sky}
+      world={world}
+      density={density ?? (subject ? "rich" : "even")}
+      tone={tone}
+      nav={nav}
+    >
+      <SubjectContext.Provider value={subject ?? null}>{inside}</SubjectContext.Provider>
+    </Page>
+  );
 }
 
 /* ----------------------------------------------------------------- screen --- */
@@ -234,6 +304,10 @@ export function Screen<T = unknown>({
   /* ⚠️ A refusal offers nothing to act on, so the primary stands down with it. */
   const where = refused ? "no" : shows(of, isNothing);
   const frame = React.useContext(FrameContext);
+  /* ⚠️ THE HERO IS THE PAGE'S SUBJECT, AND ONLY `Layout` CAN HAVE SAID SO. A
+     screen cannot ask for one: the title card and the sky under it are two
+     halves of one declaration, and half of it is a planet floating on linen. */
+  const subject = React.useContext(SubjectContext);
   /* ⚠️ The screen's own value wins where it has one, because a screen CAN know
      something the router does not — a workspace's real name behind a slug. */
   const name = title ?? frame?.title ?? "";
@@ -281,7 +355,7 @@ export function Screen<T = unknown>({
         bleed="hold"
         width={preset.width}
         title={name}
-        face={frame?.face}
+        face={subject ?? undefined}
         under={sub}
         back={out}
         leave={how}

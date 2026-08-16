@@ -145,7 +145,49 @@ const DRAWN = [...filesIn("web/src"), ...filesIn("one-hub/src")];
   if (!bad) ok(`density: ${specks} speck kind(s), every one a rate per area`);
 }
 
+/* ------------------------------------------ a scene is bound, not built --- */
+{
+  /*
+    ⚠️ A SCENE IS THREE CONSEQUENCES OF ONE DECLARATION, AND A SCREEN THAT
+    ASSEMBLES ITS OWN GETS TWO OF THEM. The hub used to derive the ground, the
+    hero face and the density from the same slug in three separate expressions:
+    `worldOf(where.slug)`, `placeFace(where.slug)` and a ternary on whether the
+    first returned anything. All three have to agree and nothing could tell when
+    they did not — edit one and the crown wears one workspace's planet over
+    another workspace's sky, which is invisible in a screenshot of either.
+
+    ⚠️ SO THE COMPOSER IS THE VOCABULARY'S AND A SCREEN NAMES A SUBJECT.
+    `Layout` reads the world from the SAME face it puts in the crown
+    (`worldFor`), so there is no second derivation to keep in step. Everything
+    outside `web/src` is a screen, and a screen naming any of these is building
+    a world by hand.
+
+    ⚠️ AND IT IS NOT ABOUT THESE THREE IDENTIFIERS. It is about the shape: a
+    consequence derived twice from one fact is a pair that drifts. The check is
+    cheap because the seam is narrow, which is the argument for having the seam.
+  */
+  const BUILDING = /\b(worldOf|worldCss|worldFor)\s*\(/;
+  const SCREENS = [...filesIn("one-hub/src"), ...filesIn("apps")];
+  let hits = 0;
+  for (const file of SCREENS) {
+    const src = code(readFileSync(file, "utf8"));
+    const m = src.match(BUILDING);
+    if (m) {
+      hits++;
+      fail(`${rel(file)}: assembles a scene itself — \`${m[1]}\`.\n` +
+           `       A page names its SUBJECT and the layout derives the ground, the hero and ` +
+           `the density from that one face. Derived separately they drift, and the drift is ` +
+           `one workspace's planet over another workspace's sky.`);
+    }
+  }
+  if (!SCREENS.length) {
+    fail("no screens found to check — this guard would pass over an empty list.");
+  } else if (!hits) {
+    ok(`binding: ${SCREENS.length} screen file(s), every world bound rather than built`);
+  }
+}
+
 console.log(bad
   ? `\nscene: ${bad} finding(s) — a world that is not the same world twice.`
-  : `\nscene: seeded, compositor-only, masked rather than washed, sized by area.`);
+  : `\nscene: seeded, compositor-only, masked rather than washed, sized by area, bound not built.`);
 process.exit(bad ? 1 : 0);

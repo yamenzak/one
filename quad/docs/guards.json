@@ -1207,6 +1207,15 @@
       "impl": "scripts/scene.test.mjs",
       "proves": "density: ",
       "fails": "the same world is sparse on a desktop and crowded on a phone, and whichever screen it was tuned on is the only one it looks right on"
+    },
+    {
+      "id": "a-scene-is-bound-to-a-subject-not-built-by-a-screen",
+      "protects": "D7",
+      "stage": "17",
+      "status": "live",
+      "impl": "scripts/scene.test.mjs",
+      "proves": "binding: ",
+      "fails": "a screen derives the ground, the hero face and the density separately from one fact, and the day one of them is edited the crown wears one workspace's planet over another workspace's sky"
     }
   ]
 }

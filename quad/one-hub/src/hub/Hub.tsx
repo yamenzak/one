@@ -24,7 +24,7 @@
  */
 
 import {
-  Band, CROWN, Framed, LeaveChip, Over, Page, Spacer, placeFace, sentence, worldOf,
+  Band, CROWN, Layout, LeaveChip, Over, Spacer, placeFace, sentence,
 } from "@quad/web";
 import type { Ambience } from "@quad/web";
 import type { Belonging, Me } from "../api.js";
@@ -112,26 +112,32 @@ function Screen({ where, onGo, onLeave }: {
     own width, its own skeleton and where to put its action — and twenty screens
     guessed twenty times.
   */
-  /* ⚠️ `null` on every other address, and on a slug whose planet we cannot read
-     a palette from — see `worldOf`. A world nobody can build is a screen that
-     falls back to the material, not a screen with half a sky. */
-  const world = where.at === "workspace" ? worldOf(where.slug) ?? undefined : undefined;
-
   return (
     /*
       ⚠️ ONE ADDRESS IN THE HUB LANDS SOMEWHERE RATHER THAN WEARING A MATERIAL,
-      and it is a workspace's own screen. Its face is a planet; its ground is
-      that planet's sky, from the same two colours (`worldCss`). The row somebody
-      pressed and the page they arrived on are then visibly one place, which is
-      the only thing in this product with an identity a ground can be built from.
+      and it is a workspace's own screen. `subject` is the whole of saying so:
+      the ground becomes that planet's sky, the crown becomes a title card
+      wearing the same planet, and the density becomes an arrival's. Those were
+      three expressions here, each deriving from `where.slug` and each able to
+      disagree with the other two — see `Layout`.
 
-      ⚠️ AND ONLY THAT ONE. People, Money and Settings under the same workspace
-      keep `linen`, because an arrival somebody never leaves is not an arrival —
-      and because those are screens with eight rows of content on them, where a
-      lit colour field is the fault `groundOf` was written to fix. Landing is a
-      moment; working is a material.
+      ⚠️ AND ONLY THAT ONE ADDRESS. People, Money and Settings under the same
+      workspace keep `linen`, because an arrival somebody never leaves is not an
+      arrival — and because those are screens with eight rows of content on them,
+      where a lit colour field is the fault `groundOf` was written to fix.
+      Landing is a moment; working is a material.
     */
-    <Page sky={groundOf(where)} world={world} density={world ? "rich" : "even"}>
+    <Layout
+      sky={groundOf(where)}
+      subject={where.at === "workspace" ? placeFace(where.slug) : undefined}
+      /* ⚠️ THE ROOT HAS NO FRAME, BECAUSE ITS FACE IS ITS HEADING — see below. */
+      frame={root ? undefined : {
+        title: where.at === "workspace" ? held?.name ?? where.slug : nameOf(where),
+        under: said(where, person, held),
+        back: onLeave ?? undefined,
+        leave: "back",
+      }}
+    >
       {root
         ? (
           <>
@@ -143,26 +149,14 @@ function Screen({ where, onGo, onLeave }: {
             <Band width="read">
               <div className="py-2"><HubHome person={person} onGo={onGo} /></div>
             </Band>
+            {/* ⚠️ Only the root needs one — every `Screen` owns its own
+                (`screen.tsx`), and two would split the slack and leave the dock
+                halfway up. */}
+            <Spacer />
           </>
         )
-        : (
-          <Framed
-            frame={{
-              title: where.at === "workspace" ? held?.name ?? where.slug : nameOf(where),
-              /* ⚠️ THE SAME PLANET THE ROW SHOWED, over the name it shows. */
-              face: where.at === "workspace" ? placeFace(where.slug) : undefined,
-              under: said(where, person, held),
-              back: onLeave ?? undefined,
-              leave: "back",
-            }}
-          >
-            <Inside where={where} onGo={onGo} />
-          </Framed>
-        )}
-      {/* ⚠️ Only the root needs one — every `Screen` owns its own (`screen.tsx`),
-          and two would split the slack and leave the dock halfway up. */}
-      {root ? <Spacer /> : null}
-    </Page>
+        : <Inside where={where} onGo={onGo} />}
+    </Layout>
   );
 }
 

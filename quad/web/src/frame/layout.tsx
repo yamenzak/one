@@ -26,7 +26,7 @@ import { Button, Card, Separator } from "@heroui/react";
    moment patterns were added, and a `Page` that could not be given `dots` was a
    vocabulary with a piece nothing could reach. */
 import type { Ambience, World } from "../tokens/ambience.js";
-import { worldCss } from "../tokens/ambience.js";
+import { ON_SCENE, worldCss } from "../tokens/ambience.js";
 import { TYPE } from "../tokens/type.js";
 import {
   BAND_PAD, CODE_SLOT, CROWN, CROWN_CHIP, CROWN_SIZE, GUTTER, HEAD_GAP, HERO_PAD, ICON,
@@ -447,7 +447,13 @@ export function PageCrown({
   bleed = "edge", width = "work",
 }: {
   readonly title: string;
-  /** ⚠️ The subject this page is about, above its name — see `Frame.face`. */
+  /**
+   * ⚠️ THE SUBJECT THIS PAGE IS ABOUT, AND `Layout` IS WHAT SUPPLIES IT. Not a
+   * decoration and not a thumbnail: the picture at the size of the screen with
+   * the name across it is a TITLE CARD, and it is the one composition that says
+   * "here" rather than "about here". The ground under it is the same subject's
+   * own world, from the same declaration — see `Layout`.
+   */
   readonly face?: FaceOf;
   /**
    * ⚠️ A CROWN TAKES THE SHAPE OF WHAT IT CROWNS, AND THE DEFAULT IS ONLY A
@@ -613,9 +619,12 @@ export function PageCrown({
                   to hold its contrast over a lit sphere is the obvious move and
                   it is visible: the plate is wider than the planet, so its edges
                   sit on plain sky as two dark patches either side of the world.
-                  What holds the type instead is WEIGHT — 800 at 44px over a
-                  mid-value body — and the mask, which keeps the brightest part
-                  of the limb away from the edges of the words. */}
+                  What holds the type is WEIGHT — 800 at 44px over a mid-value
+                  body — the mask, which keeps the brightest part of the limb
+                  away from the edges of the words, and `ON_SCENE`: a halo in the
+                  ground's OWN colour, which has no shape and dims nothing. The
+                  scene derives it (`Family.veil`), so it is right in both skies
+                  and under every workspace without anybody choosing it. */}
               <span
                 /* ⚠️ `relative` IS NOT COSMETIC HERE. The orb carries a
                    `mask-image`, and a mask CREATES A STACKING CONTEXT — so the
@@ -625,7 +634,10 @@ export function PageCrown({
                    has to be positioned to sit above it. */
                 className={`relative col-start-1 row-start-1 self-center justify-self-center w-full
                   flex flex-col items-center text-center ${SPACE.tight} px-4 py-6`}
-                style={{ gridArea: "1 / 1" }}
+                /* ⚠️ ON THE WRAPPER, BECAUSE `text-shadow` INHERITS. The name and
+                   whatever sits under it are one block of type on one ground —
+                   setting it twice is two places to forget it once. */
+                style={{ gridArea: "1 / 1", textShadow: ON_SCENE }}
               >
                 <h1 className={TYPE.wordmark}>{title}</h1>
                 {under}

@@ -264,6 +264,24 @@ export function worldOf(slug: string): World | null {
   return world;
 }
 
+/**
+ * THE SAME SUBJECT'S WORLD, FROM THE SAME DECLARATION THAT DREW ITS FACE.
+ *
+ * ⚠️ THIS IS THE SEAM `Layout` IS BUILT ON, and it exists because the two used
+ * to be derived separately from the same slug — `face: placeFace(where.slug)`
+ * beside `world={worldOf(where.slug)}`, two expressions that have to agree and
+ * nothing checking that they do. Editing one is a page whose crown shows one
+ * workspace's planet over another workspace's sky, which no test can see and
+ * nobody can name from a screenshot.
+ *
+ * ⚠️ AND IT ANSWERS `null` FOR EVERYTHING THAT IS NOT A PLACE. A person is not a
+ * world and a product is not a world — their faces are drawn from styles with no
+ * sky in them, so there is nothing to read. That is a real answer, not a gap:
+ * the page falls back to its material.
+ */
+export const worldFor = (of: FaceOf | undefined): World | null =>
+  of?.kind === "workspace" ? worldOf(of.seed) : null;
+
 const worlds = new Map<string, World | null>();
 
 /* ⚠️ THE STYLE'S OWN PALETTES, NOT COPIES OF THEM. A literal list here is a

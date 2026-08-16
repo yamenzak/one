@@ -121,6 +121,27 @@ Everything else is decided: the width, the skeleton, the stack and its gaps, the
 arrival stagger, the crown and its collapse, and where "Invite somebody" lands
 at each size. The screen's author chose a shape and wrote the content.
 
+### The page around it names a SUBJECT, or a material
+
+One level out, `Layout` is what a router renders for an address — the ground, the
+frame and the screen inside it:
+
+```tsx
+<Layout sky="linen" subject={placeFace(slug)} frame={{ title, under, back }}>
+```
+
+**`subject` is the one thing this page is about, and it decides three things at
+once**: the ground becomes that subject's own world, the crown becomes a title
+card wearing its face rather than a heading with a thumbnail over it, and the
+density becomes an arrival's rather than a working screen's. Absent, the page
+wears a named material and its crown is an ordinary display heading.
+
+⚠️ **Three consequences of one fact, and that is the point.** They used to be
+three expressions in the router deriving from the same slug, each of which had to
+agree with the other two and none of which could tell when it did not. See
+[AMBIENCE.md](AMBIENCE.md) for what a world is made of and why the halo over a
+title is derived rather than chosen.
+
 ### The eight shapes
 
 | Shape | The page is about | Primary action |

@@ -83,6 +83,10 @@ export const NIGHT: Family = {
   slots: ["deep", "lit"],
   tile: { w: 1400, h: 1000 },
   specks: [STARS],
+  /* ⚠️ The ground's own middle value, not its deep. The deep is the colour at
+     the zenith; type sits over the band between the horizon glow and the halo,
+     which is where this sky is darkest. */
+  veil: (p) => `color-mix(in oklab, ${p.deep} 74%, #000)`,
   ground: (p) => [
     `radial-gradient(150% 62% at 50% 112%, color-mix(in oklab, ${p.lit} 30%, transparent) 0%, transparent 66%)`,
     `radial-gradient(95% 48% at 74% -14%, color-mix(in oklab, ${p.lit} 12%, transparent) 0%, transparent 70%)`,
@@ -103,17 +107,23 @@ export const DAY: Family = {
   slots: ["deep", "lit"],
   tile: { w: 1400, h: 1000 },
   specks: [HAZE],
+  /* ⚠️ Near paper, and a night's veil would outline the letters here — the halo
+     has to be the value type is sitting ON, whichever that is. */
+  veil: (p) => `color-mix(in oklab, ${p.deep} 14%, #fff)`,
   ground: (p) => [
     /* The sun's quarter, high and soft — the brightest thing on the page. */
     `radial-gradient(110% 55% at 74% -8%, color-mix(in oklab, ${p.lit} 46%, #fff) 0%, transparent 62%)`,
     /* The horizon takes the world's own colour, warmed most of the way to white. */
     `radial-gradient(160% 46% at 50% 108%, color-mix(in oklab, ${p.lit} 30%, #fff) 0%, transparent 70%)`,
-    /* ⚠️ THE ZENITH IS THE ONLY PLACE THE DEEP SURVIVES, and only a fifth of it.
-       A sky is darkest overhead and palest at the horizon; the same gradient the
-       other way round is a swimming pool. */
-    `linear-gradient(180deg, color-mix(in oklab, ${p.deep} 22%, #fff) 0%,`
-      + ` color-mix(in oklab, ${p.deep} 10%, #fff) 46%,`
-      + ` color-mix(in oklab, ${p.lit} 7%, #fff) 100%)`,
+    /* ⚠️ THE ZENITH IS WHERE THE DEEP SURVIVES, and a third of it is the floor
+       rather than the ceiling. A sky is darkest overhead and palest at the
+       horizon; the same gradient the other way round is a swimming pool. At a
+       fifth the world's own colour was present but not legible — the page read
+       as a neutral wash with a warm corner, which is the "washed" complaint this
+       family exists to answer, arriving a step later than it used to. */
+    `linear-gradient(180deg, color-mix(in oklab, ${p.deep} 34%, #fff) 0%,`
+      + ` color-mix(in oklab, ${p.deep} 17%, #fff) 46%,`
+      + ` color-mix(in oklab, ${p.lit} 11%, #fff) 100%)`,
   ],
 };
 

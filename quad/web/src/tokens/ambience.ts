@@ -924,7 +924,35 @@ export interface World {
   the screen it is on, and two hundred marks through `encodeURIComponent` is not
   free at 60fps while somebody scrolls.
 */
-const skies = new Map<string, { readonly art: string; readonly ground: string }>();
+const skies = new Map<string, ReturnType<typeof render>>();
+
+/**
+ * TYPE SITTING DIRECTLY ON A WORLD, AND THE ONE TREATMENT THAT IS NOT A SCRIM.
+ *
+ * ⚠️ THE PROBLEM IS REAL AND THE OBVIOUS FIX IS THE ONE THAT WAS TRIED AND
+ * REMOVED. A name laid across a lit sphere has light on one side of a stroke and
+ * dark on the other, so no single ink is legible over all of it; a plate behind
+ * the words is wider than the subject and sits on plain sky as two dark patches
+ * either side of it, which is precisely what the hero looked like the first time.
+ * A HALO in the ground's own colour has no shape at all — it is the world,
+ * blurred, a few pixels out from every edge — and it doubles the local contrast
+ * without dimming anything.
+ *
+ * ⚠️ THREE RADII, BECAUSE ONE IS EITHER AN OUTLINE OR A SMUDGE. A tight opaque
+ * ring reads as a sticker; a single wide blur is a grey cloud. Tight-and-strong
+ * for the stroke edges, wide-and-weak for the value underneath, and one very
+ * wide at almost nothing to seat the block.
+ *
+ * ⚠️ AND IT IS AN OPT-IN TOKEN, NOT A RULE ON THE PAGE. Text inside a card is
+ * already on a surface, and a halo under it would be a shadow on paper —
+ * `[data-sky] *` would put one under every word in the product.
+ */
+export const ON_SCENE = "var(--on-scene, none)";
+
+const halo = (colour: string): string => {
+  const soft = (pct: number) => `color-mix(in oklab, ${colour} ${pct}%, transparent)`;
+  return `0 1px 2px ${soft(88)}, 0 2px 16px ${soft(66)}, 0 0 40px ${soft(40)}`;
+};
 
 /**
  * THE PROPERTIES `world` READS. Hand the result to `Page` and a workspace's
@@ -951,7 +979,15 @@ export function worldCss(
     });
     skies.set(key, made);
   }
-  return { "--world-art": made.art, "--world-ground": made.ground };
+  return {
+    "--world-art": made.art,
+    "--world-ground": made.ground,
+    /* ⚠️ SET EVEN WHERE THE FAMILY DECLARES NO VEIL, as `none` — because the
+       token is read with a fallback and an absent property would inherit the
+       PARENT scene's halo on a nested page. A world that says nothing about its
+       type must say `none` rather than say nothing. */
+    "--on-scene": made.veil ? halo(made.veil) : "none",
+  };
 }
 
 /**
@@ -1160,18 +1196,6 @@ export function ambienceStylesheet(): string {
     ];
   });
 
-  /*
-    ⚠️ ONE INK AND NO THEME SPLIT, BECAUSE A WORLD CARRIES ITS OWN THEME. `Page`
-    stamps `data-theme="dark"` wherever it is given one (see there for why), so
-    the light branch these rules used to have could only ever fire on a page that
-    no longer exists. Two builds were spent tuning it — first leading with the
-    planet's body colour, then with its deep at a reduced strength — and both
-    were the same mistake in different clothes: asking paper to be a night sky.
-  */
-  const worldInk = [
-    `[data-sky="world"] { --world-ink: var(--world-deep); }`,
-  ];
-
   /* ⚠️ The drawing is baked per theme — see `art`. The var sits on the HOST
      (pseudo-elements inherit it), both selector forms for the same reason as
      the `--sky` rule below. */
@@ -1196,7 +1220,6 @@ export function ambienceStylesheet(): string {
     `  --sky: 0.55; --thread: 0; --etch: 0.5; --lumen: oklch(0.985 0 0); --field: 0.62;`,
     `}`,
     ...artRules,
-    ...worldInk,
     `[data-sky]:not([data-sky="plain"])::before,`,
     `[data-sky]:not([data-sky="plain"])::after {`,
     `  content: ""; position: absolute; top: 0; left: 0; right: 0;`,

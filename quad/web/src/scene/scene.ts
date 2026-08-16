@@ -158,6 +158,22 @@ export interface Family {
   readonly specks?: readonly Speck[];
   /** ⚠️ The canvas the specks are drawn on and TILED at — see `render`. */
   readonly tile?: { readonly w: number; readonly h: number };
+  /**
+   * ⚠️ THE ONE COLOUR TYPE SITS AGAINST, AND IT EXISTS SO NOBODY EVER PUTS A
+   * SCRIM UNDER A HEADING. Words laid directly on a world are the one place a
+   * scene can lose: a title crossing the lit limb of a planet has the same value
+   * on both sides of every stroke, and the honest-looking fix — a dark plate
+   * behind the words — is wider than the subject and reads as two patches of
+   * grime either side of it. What actually works is a HALO in the ground's own
+   * colour, which is invisible as a shape and doubles the contrast at every
+   * edge. The family is the only thing that knows that colour: `ground` is a
+   * list of gradients, and nothing downstream can read a value out of it.
+   *
+   * ⚠️ AND IT IS PER SKY, NOT PER SCENE. A night's veil is near its deep and a
+   * day's is near paper — the same halo under both would outline the letters on
+   * one of them. That is exactly the decision a family variant exists to hold.
+   */
+  readonly veil?: (p: Palette) => string;
 }
 
 export interface Scene {
@@ -200,7 +216,12 @@ export type Density = keyof typeof DENSITY;
  * compositor uploads once. It is also why the motion has to live INSIDE the
  * picture — see `beats`.
  */
-export function render(scene: Scene): { readonly art: string; readonly ground: string } {
+export function render(scene: Scene): {
+  readonly art: string;
+  readonly ground: string;
+  /** ⚠️ Empty where the family declares none — see `Family.veil`. */
+  readonly veil: string;
+} {
   const { family, palette } = scene;
   const moving = scene.motion !== false;
   const density = scene.density ?? 1;
@@ -253,5 +274,9 @@ export function render(scene: Scene): { readonly art: string; readonly ground: s
       + ` viewBox="0 0 ${tile.w} ${tile.h}">${motion}${marks.join("")}</svg>`)}")`
     : "none";
 
-  return { art, ground: family.ground(palette, prng(hash(`${family.id}|ground|${scene.seed}`))).join(", ") };
+  return {
+    art,
+    ground: family.ground(palette, prng(hash(`${family.id}|ground|${scene.seed}`))).join(", "),
+    veil: family.veil?.(palette) ?? "",
+  };
 }
