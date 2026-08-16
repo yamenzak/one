@@ -167,13 +167,17 @@ export function Shell(props: ShellProps) {
       density="quiet"
       /* ⚠️ THE NAV IS THE PAGE'S — see `PageProps.nav`. A sticky island floats
          over whatever precedes it, and only the page can reserve the room. */
-      nav={<div className="md:hidden"><Island
+      /* ⚠️ `only`, NOT A WRAPPER — a `md:hidden` div around a sticky element is
+         its containing block, and it is exactly the nav's own height. See
+         `Island`. */
+      nav={<Island
+        only="phone"
         here={here}
         onGo={onGo}
         items={primary.map((s) => ({
           id: s.id, label: s.label, route: s.route, icon: glyphOf(s.icon ?? s.id),
         }))}
-      /></div>}
+      />}
     >
       {/* ------------------------------------------------------------ crown --- */}
       <header className={`flex items-center ${SPACE.snug} ${GUTTER} ${ROW.pad}`}>

@@ -202,6 +202,55 @@ not per scene — a night's veil is near its deep and a day's near paper, and th
 same halo under both would outline the letters on one of them. ⚠️ And it is
 opt-in, never a rule on the page: text inside a card is already on a surface.
 
+### Chrome on a scene: `data-chrome` and `data-hem`
+
+Two treatments, and they solve different problems. Reaching for the wrong one is
+why the nav shipped as a plate for a while.
+
+**`data-chrome` is for CONTRAST — a control that has to stay legible over a
+moving field.** It fills with the ground's own colour a step denser
+(`--surface-tertiary` for the value, `--scene-veil` for the hue) so it reads as
+the ground thickening rather than a plate laid on top. Not glass: a
+`backdrop-filter` over a live field re-reads and re-blurs on every frame of every
+beat, and it *smears* as the marks move under it.
+
+**`data-hem` is for COLLISION — the page's own content arriving at a docked
+control's edge.** That is a different fault and no fill on the control can reach
+it, because it happens *outside* the control: a face halved down the gutter, a
+heading reappearing in the gaps either side of a capsule. The hem is a fade
+built from `--scene-veil`, opaque at the very bottom of the screen and gone
+about 12rem up, so content dissolves into the ground on its way past.
+
+⚠️ **A fade is not the plate the no-glass pass removed, and the difference is
+the edge.** Every treatment that pass deleted was a band with a *boundary* — a
+line across the screen where it stopped, which is a border by another name. This
+has no boundary anywhere: it is opaque only where the screen ends and there is
+nothing to have an edge against.
+
+⚠️ **It travels with what it hems.** The pseudo belongs to the docked element, so
+when the nav leaves downwards the fade goes with it. A hem left behind by a bar
+that has gone is a dark band with no cause.
+
+⚠️ **Three elements dock at that one address** — the nav island, `StickyAction`,
+and a `Screen`'s docked primary — and a person sees *one* dock. Two of three
+wearing it is exactly the shape `scene.test.mjs`'s `hem:` check exists to catch.
+
+⚠️ **The stops are in `rem`, not percent**, because the element is bottom-anchored
+and absolute stops hold full strength across the bar's own height whatever that
+height is. In percent the falloff starts partway up the bar — measured, and it
+left the ghost of a heading behind the icons.
+
+⚠️ **And the last stop repeats the colour at zero alpha rather than saying
+`transparent`.** `transparent` is transparent *black*, so a gradient
+interpolating toward it darkens as it fades — a grey bloom above the bar on a
+light page, from a rule that never names a grey.
+
+**With the hem under it, the nav needs no fill of its own.** The five items stand
+on the page; the closed four step back to `--muted` and the open one keeps the
+control tier and full ink. Two channels, no bar. The dimming is a *colour* rather
+than an opacity because the unread dot lives inside the button — fading the
+button fades the one mark whose whole job is to be noticed.
+
 ## What the seed reaches, precisely
 
 Because "endless variation" is the kind of claim that drifts.

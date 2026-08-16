@@ -384,10 +384,17 @@ export function Screen<T = unknown>({
         ⚠️ DOCKED ON A PHONE ONLY, because on a desktop the crown is already in
         view and a bar welded across the bottom of a wide window is a mobile
         pattern wearing a desktop's clothes.
+
+        ⚠️ AND IT WEARS THE HEM — the ground thickens under it, so the last card
+        dissolves on its way past rather than being sliced by the button's own
+        edge. The same rule the nav uses; see `ambienceStylesheet`.
       */}
       {where === "act" && does
         ? (
-          <div className={`sticky bottom-0 z-10 w-full md:hidden ${PAD} ${SAFE_BOTTOM}`}>
+          <div
+            data-hem="true"
+            className={`sticky bottom-0 z-10 w-full md:hidden ${PAD} ${SAFE_BOTTOM}`}
+          >
             <Band bleed="hold" width={preset.width}>
               <Button
                 className="w-full"

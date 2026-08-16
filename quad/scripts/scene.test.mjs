@@ -236,6 +236,41 @@ const DRAWN = [...filesIn("web/src"), ...filesIn("one-hub/src")];
   }
 }
 
+/* ------------------------------------ everything docked wears the same hem --- */
+{
+  /*
+    ⚠️ A CONTROL DOCKED AT THE BOTTOM CUTS THE PAGE UNLESS THE GROUND THICKENS
+    UNDER IT. Content does not stop at a floating bar — it arrives at the
+    capsule's rounded end and is SLICED by it, so a face is halved down the
+    gutter and a heading reappears in the gaps either side. That is a collision,
+    not a contrast problem, so no amount of fill on the bar itself fixes it; the
+    hem fades the page into its own ground on the way past (`data-hem`).
+
+    ⚠️ AND THERE ARE THREE OF THEM, WHICH IS THE WHOLE REASON THIS IS A CHECK.
+    The nav island, `StickyAction` and a `Screen`'s docked primary are three
+    separate elements at ONE address — a person sees one dock, and whichever of
+    the three they happened to land on decides whether the page is cut. Two of
+    three getting it is the shape every guard in this file exists for.
+  */
+  let docks = 0;
+  for (const file of filesIn("web/src", /\.tsx$/)) {
+    for (const tag of readFileSync(file, "utf8").matchAll(/<[a-zA-Z][^<>]*?>/gs)) {
+      if (!/sticky\s+bottom-0/.test(tag[0])) continue;
+      docks++;
+      if (!/data-hem/.test(tag[0])) {
+        fail(`${rel(file)}: docks at the bottom and wears no hem.\n` +
+             `       Add \`data-hem="true"\`. Without it the page's next row is cut by this ` +
+             `control's own edge, which reads as two layers fighting because it is.`);
+      }
+    }
+  }
+  if (!docks) {
+    fail("no bottom-docked chrome found — this guard would pass over an empty list.");
+  } else if (!bad) {
+    ok(`hem: ${docks} bottom-docked surface(s), every one dissolving the page under it`);
+  }
+}
+
 console.log(bad
   ? `\nscene: ${bad} finding(s) — a world that is not the same world twice.`
   : `\nscene: seeded, compositor-only, masked rather than washed, sized by area, bound not built.`);

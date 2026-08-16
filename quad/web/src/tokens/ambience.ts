@@ -202,6 +202,11 @@ const skies = new Map<string, ReturnType<typeof render>>();
  */
 export const ON_SCENE = "var(--on-scene, none)";
 
+/** ⚠️ One stop of the hem — see the rule. `0%` is the SAME colour at zero alpha,
+    never `transparent`, which is transparent black and blooms grey as it fades. */
+const hemStop = (pct: number): string =>
+  `color-mix(in oklab, var(--scene-veil, var(--background)) ${pct}%, transparent)`;
+
 const halo = (colour: string): string => {
   const soft = (pct: number) => `color-mix(in oklab, ${colour} ${pct}%, transparent)`;
   return `0 1px 2px ${soft(88)}, 0 2px 16px ${soft(66)}, 0 0 40px ${soft(40)}`;
@@ -460,7 +465,74 @@ export function ambienceStylesheet(): string {
       defect finally becoming visible. An attribute nothing reads is a promise
       the next caller believes.
     */
+    /*
+      ⚠️ THE HEM — THE GROUND THICKENING UNDER WHATEVER IS DOCKED AT THE BOTTOM,
+      SO THE CHROME NEEDS NO PLATE OF ITS OWN.
+
+      ⚠️ THE PROBLEM IT SOLVES IS COLLISION, NOT CONTRAST. A bar with its own
+      fill is legible — and content still runs INTO it: the page's next row
+      arrives at the capsule's rounded end and is sliced by it, so a face is cut
+      in half down the left gutter and a heading reappears in the gaps either
+      side. That reads as two layers fighting, which is exactly what it is.
+      Nothing about the bar's own colour can fix it, because the fault is
+      OUTSIDE the bar.
+
+      ⚠️ A FADE IS NOT A PLATE, AND THE DIFFERENCE IS THE EDGE. Everything the
+      no-glass pass removed was a band with a BOUNDARY — a line across the
+      screen where the treatment stopped, which is a border by another name.
+      This has no boundary anywhere: it is opaque at the very bottom, where the
+      screen ends and there is nothing to have an edge against, and it is gone
+      by the top. Content dissolves into the ground on its way under the
+      controls instead of being cut by them.
+
+      ⚠️ IT IS BUILT FROM `--scene-veil`, so it is the world's own colour — dark
+      on a night ground, paper on a day one, and right under every family and
+      every workspace with no second recipe. A black scrim would be the wash
+      `scene.test.mjs` fails on, and correctly: it dims somebody's brand to fix
+      one screen.
+
+      ⚠️ THE STOPS ARE IN `rem`, NOT PERCENT, AND THAT IS LOAD-BEARING. The
+      element is anchored to the bottom, so absolute stops measure up from the
+      screen edge and hold full strength across the bar's own height whatever
+      that height is. Written in percent the falloff starts partway up the bar —
+      measured, and it left the ghost of a heading behind the icons.
+
+      ⚠️ AND THE LAST STOP REPEATS THE COLOUR AT ZERO RATHER THAN SAYING
+      `transparent`. `transparent` is transparent BLACK, and a gradient
+      interpolating toward it darkens as it fades — a grey bloom above the bar
+      on a light page, from a rule that never names a grey.
+    */
+    /*
+      ⚠️ IT SETS NO `position` OF ITS OWN, AND THE FIRST VERSION DID. A
+      `position: relative` here is the obvious way to give the pseudo something
+      to anchor to — and it OVERRODE the `sticky` every one of these three
+      elements is, so the nav stopped pinning and left the screen entirely. All
+      three hosts are positioned already, because being docked is what they are
+      for; a hem on something static is a hem with nothing to be at the bottom
+      of.
+    */
+    `[data-hem="true"]::before {`,
+    `  content: ""; position: absolute; left: 0; right: 0; bottom: 0; top: -12rem;`,
+    `  pointer-events: none; z-index: -1;`,
+    `  background: linear-gradient(to top,`,
+    `    var(--scene-veil, var(--background)) 0,`,
+    `    ${hemStop(99)} 6rem, ${hemStop(70)} 8rem, ${hemStop(32)} 10rem, ${hemStop(0)} 12rem);`,
+    `}`,
     `[data-capsule="true"] { border-radius: 9999px; }`,
+    /*
+      ⚠️ THE NAV HAS NO FILL OF ITS OWN NOW — THE HEM IS ITS BACKGROUND. With a
+      capsule under them the five items read as one control and the open one
+      lifts off it; with the hem under them they read as five marks on the page,
+      which is only a nav if one of them is obviously the answer. So the closed
+      four step back to `--muted` and the open one keeps the control tier and
+      full ink. Two channels, and the bar itself is gone.
+
+      ⚠️ COLOUR RATHER THAN OPACITY, because the unread dot is INSIDE the
+      button. Fading the button fades the one mark on this bar whose whole job
+      is to be noticed, and the dot carries its own tone token — so it survives
+      a colour change and would not survive an alpha one.
+    */
+    `[data-island="true"] button:not([data-here="true"]) { color: var(--muted); }`,
     `[data-here="true"] { background-color: var(--default); border-radius: 9999px;`,
     `  color: var(--foreground); }`,
     /*

@@ -910,7 +910,13 @@ export function Balance({ eyebrow, figure, identifier, under }: {
  */
 export function StickyAction({ children }: { readonly children: React.ReactNode }) {
   return (
-    <div className={`sticky bottom-0 z-10 flex w-full justify-center ${PAD} ${SAFE_BOTTOM}`}>
+    /* ⚠️ THE SAME HEM THE NAV WEARS, because it is the same fault: content
+       arriving at a docked control's edge and being sliced by it. A docked bar
+       is not a special case of a nav — they are two things at one address. */
+    <div
+      data-hem="true"
+      className={`sticky bottom-0 z-10 flex w-full justify-center ${PAD} ${SAFE_BOTTOM}`}
+    >
       <div className="w-full max-w-md">{children}</div>
     </div>
   );
@@ -953,7 +959,7 @@ export function StickyAction({ children }: { readonly children: React.ReactNode 
  * ⚠️ THE KERNEL REFUSES A SIXTH ITEM, and this slices too: a deployment
  * rendering a manifest it did not compose must not draw one either.
  */
-export function Island({ items, here, onGo }: {
+export function Island({ items, here, onGo, only }: {
   readonly items: readonly {
     readonly id: string; readonly label: string;
     readonly icon: React.ReactNode; readonly route: string;
@@ -963,6 +969,22 @@ export function Island({ items, here, onGo }: {
   }[];
   readonly here: string;
   readonly onGo: (route: string) => void;
+  /**
+   * ⚠️ THE BREAKPOINT IS A PROP BECAUSE A WRAPPER BREAKS `sticky`, AND THAT IS
+   * NOT A STYLE OPINION — it is the bug this parameter exists to remove. A
+   * sticky element can never leave its own PARENT's box, and the `md:hidden`
+   * div the shell used to wrap this in is exactly the nav's own height. Eighty
+   * eight pixels of travel is none: the bar sat at the end of the document and
+   * scrolled away with the content, on every product screen, for as long as
+   * there had been one.
+   *
+   * ⚠️ AND IT LOOKED CORRECT THE WHOLE TIME. Every screen was shorter than a
+   * viewport, so the bar's natural position WAS the bottom of the screen —
+   * there was nothing to pin it against and nothing to give it away. The first
+   * long page is where it would have been reported, by somebody, as the nav
+   * disappearing.
+   */
+  readonly only?: "phone";
 }) {
   const away = useScrollingDown();
   const shown = items.slice(0, PRIMARY_MAX);
@@ -970,7 +992,13 @@ export function Island({ items, here, onGo }: {
   return (
     <nav
       aria-label="Sections"
-      className={`sticky bottom-0 z-10 flex justify-center ${GUTTER} ${PAD} ${SAFE_BOTTOM}`}
+      /* ⚠️ THE HEM IS THE NAV'S BACKGROUND — see `ambienceStylesheet`. It is on
+         the NAV rather than on the bar inside it, because what has to dissolve
+         is the page's own content on its way past, and the bar is only 370px of
+         a 402px screen. */
+      data-hem="true"
+      className={`sticky bottom-0 z-10 flex justify-center ${GUTTER} ${PAD} ${SAFE_BOTTOM}`
+        + (only === "phone" ? " md:hidden" : "")}
       style={{
         /* ⚠️ PAST ITS OWN HEIGHT PLUS THE SAFE AREA, or it rests half off the
            bottom edge on a phone with a home indicator — which reads as a bar
@@ -990,14 +1018,16 @@ export function Island({ items, here, onGo }: {
         needs and the four glyphs divide the rest, so the bar is the same width
         on every screen and the spacing falls out of the arithmetic.
 
-        ⚠️ AND IT IS NOT GLASS. A `backdrop-filter` over a LIVE field re-reads and
-        re-blurs the layer under it on every frame of every beat — see the chrome
-        rule in `ambience.ts`. `data-chrome` fills it with the ground's own
-        colour instead, which is what glass was imitating.
+        ⚠️ AND IT CARRIES NO FILL AT ALL. It was `data-chrome` — the ground's own
+        colour, a capsule — and that is a plate with rounded ends, so the page's
+        next row arrived at those ends and was sliced by them: a face cut in half
+        down the gutter, a heading reappearing in the gaps either side. The hem
+        on the nav around it dissolves the content instead, which fixes the
+        collision rather than out-contrasting it, and leaves the five items
+        standing on the page.
       */}
       <div
         data-island="true"
-        data-chrome="true"
         data-capsule="true"
         className={`flex w-full ${WIDTH.read} flex-row items-center ${SPACE.hair} ${ISLAND_PAD}`}
       >
