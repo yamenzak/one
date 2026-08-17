@@ -122,6 +122,46 @@ export type Where =
 export const OF_WORKSPACE = ["people", "money", "packages", "settings", "brand", "notices", "wording", "trust"] as const;
 
 /**
+ * EVERY SCREEN THAT IS ANSWERED BY `WorkspacePart`, DERIVED.
+ *
+ * ⚠️ THIS EXISTS BECAUSE THE LIST WAS WRITTEN OUT A THIRD TIME AND LOST ONE.
+ * `OF_WORKSPACE` had `brand`, `Part.tsx` had a `case "brand"`, the workspace
+ * screen linked to it and the address parsed — and the switch that chooses
+ * `WorkspacePart` named seven of the eight. So `/space/w/<slug>/brand` matched
+ * no case, the switch returned nothing, and the screen was blank: no error, no
+ * failing test, and a route every guard agreed existed.
+ *
+ * ⚠️ `plan` IS HERE AND NOT IN `OF_WORKSPACE`, and the difference is real: it is
+ * answered by the same component but it is not a ROW on the workspace screen —
+ * it is reached from Money, per product. One list is what a workspace offers;
+ * this is what the dispatcher must handle, and they are not the same question.
+ */
+export const OF_WORKSPACE_SCREEN = [...OF_WORKSPACE, "plan"] as const;
+
+export type WorkspaceScreen = typeof OF_WORKSPACE_SCREEN[number];
+
+/**
+ * ⚠️ A PREDICATE OVER THE WHOLE `Where`, not over `where.at`, so the caller is
+ * narrowed to the variants that carry a `slug`. Narrowing the string alone
+ * leaves the dispatcher reaching for a field TypeScript cannot promise is there.
+ */
+export const atWorkspaceScreen = (
+  where: Where,
+): where is Extract<Where, { readonly at: WorkspaceScreen }> =>
+  (OF_WORKSPACE_SCREEN as readonly string[]).includes(where.at);
+
+/**
+ * ⚠️ THE SAME QUESTION FOR THE OPERATOR'S SIDE, and it had the same hole one
+ * screen over: the dispatch named five console parts and `footing` was the
+ * sixth, so the screen that reports what the deployment stands on was built,
+ * routed, registered — and drew nothing at its own address.
+ */
+export const atConsoleScreen = (
+  where: Where,
+): where is Extract<Where, { readonly at: ConsolePart }> =>
+  (OF_CONSOLE as readonly string[]).includes(where.at);
+
+/**
  * ⚠️ WHAT SOMEBODY COMES BACK TO, AND WHAT THEY SET UP ONCE. Six rows in one
  * card is a menu with no shape: the roster somebody opens weekly sits in the
  * same run as the sub-processor list they will read once, and the frequent one
@@ -132,7 +172,7 @@ export const OFTEN: readonly WorkspacePart[] = ["people", "money"];
 export const OF_CONSOLE = ["tenants", "actions", "switches", "works", "ground", "footing"] as const;
 
 export type WorkspacePart = typeof OF_WORKSPACE[number];
-type ConsolePart = typeof OF_CONSOLE[number];
+export type ConsolePart = typeof OF_CONSOLE[number];
 
 /**
  * WHICH OF A WORKSPACE'S SCREENS THIS ROLE MAY OPEN.

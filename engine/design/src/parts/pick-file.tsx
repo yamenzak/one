@@ -98,12 +98,20 @@ export function PickFile({
           setOver(false);
           void take(e.dataTransfer.files?.[0]);
         }}
-        /* ⚠️ THE STATE IS A DATA ATTRIBUTE AND THE EDGE IS A CLASS, never a
-           style object. `ground.ts` owns what an edge looks like in each theme;
-           a `borderColor` written here is one that stops being the divider the
-           day the divider changes, in this one control, invisibly. */
+        /*
+          ⚠️ A SURFACE, NOT AN OUTLINE — `ground.ts` bans both borders and
+          shadows, and elevation here is a difference of VALUE. The first draft
+          drew a dashed edge in a colour called `--divider`, which this system
+          does not have: the border was invisible, so the drop target read as
+          floating text with a button under it, and nothing failed.
+
+          ⚠️ `data-chrome` IS THE ONE THAT IS GUARANTEED SEPARABLE from both the
+          page and a card, in both themes, over every ambience family — which is
+          exactly what a target somebody aims a file at has to be.
+        */
+        data-chrome="true"
         data-over={over ? "true" : undefined}
-        className={`flex flex-col items-center justify-center rounded-2xl border border-dashed border-divider text-center ${DROP_PAD} ${SPACE.tight} data-[over=true]:border-brand data-[over=true]:bg-brand/10`}
+        className={`flex flex-col items-center justify-center rounded-2xl text-center ${DROP_PAD} ${SPACE.tight} data-[over=true]:scale-[1.01]`}
         style={{ transition: MOTION.enter }}
       >
         <span className={TYPE.note}>{says}</span>

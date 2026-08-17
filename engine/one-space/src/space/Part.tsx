@@ -24,11 +24,16 @@ import { Trust } from "../centre/Trust.js";
 import { Wording } from "../centre/Wording.js";
 import { Notices } from "../centre/Notices.js";
 import { Brand } from "../centre/Brand.js";
-import type { Where } from "./where.js";
+import type { Where, WorkspaceScreen } from "./where.js";
 import { useSession } from "../session.js";
 
-export type Part =
-  | "people" | "money" | "plan" | "packages" | "settings" | "brand" | "notices" | "trust" | "wording";
+/**
+ * ⚠️ THE SAME LIST THE DISPATCHER USES, NEVER A SECOND SPELLING OF IT. This was
+ * written out here and in `OneSpace.tsx`, and the two disagreed by one member —
+ * which is not a type error in either direction, because each is internally
+ * consistent. See `OF_WORKSPACE_SCREEN`.
+ */
+export type Part = WorkspaceScreen;
 
 export function WorkspacePart({ part, slug, app, area, onGo }: {
   readonly part: Part;

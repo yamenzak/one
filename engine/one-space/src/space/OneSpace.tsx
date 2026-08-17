@@ -40,10 +40,23 @@ import { OneTenant } from "../console/OneTenant.js";
 import { InboxScreen } from "../centre/InboxScreen.js";
 import { Data } from "./Data.js";
 import { TellingMe } from "./TellingMe.js";
-import { SPACE, above, isConsole, nameOf, parseWhere, pathOf, type Where } from "./where.js";
+import {
+  SPACE, above, atConsoleScreen, atWorkspaceScreen, isConsole, nameOf, parseWhere, pathOf,
+  type Where,
+} from "./where.js";
 
-/* ⚠️ Every branch this file draws, named — the guard reads it, because an
-   address the parser can produce with no branch renders a blank page. */
+/**
+ * ⚠️ THIS IS NOT WHAT STOPS A BLANK SCREEN, AND IT SAID IT WAS. The old comment
+ * claimed the guard reading this list is why an address always has a branch —
+ * and the guard checks that a name appears HERE, which `brand` and `footing`
+ * both did while the dispatch below drew neither. A list agreeing with a list
+ * proves the two lists agree.
+ *
+ * ⚠️ THE `never` ASSERTION AT THE END OF `Inside` IS WHAT STOPS IT NOW, because
+ * it makes an unanswered address fail the build rather than render nothing. What
+ * this list is still good for is the other direction: a `Where` variant that no
+ * address can produce, which the compiler cannot see.
+ */
 export const SPACE_SCREENS: readonly Where["at"][] = [
   "home", "you", "inbox", "told", "data", "prefs", "workspaces", "workspace",
   "people", "money", "plan", "packages", "settings", "brand", "notices", "wording", "trust",
@@ -244,6 +257,42 @@ function Inside({ where, onGo }: {
   readonly where: Where;
   readonly onGo: (to: Where) => void;
 }) {
+  /*
+    ⚠️ ANSWERED BY MEMBERSHIP OF A LIST, NEVER BY A RUN OF `case`s. Every one of
+    these goes to the same component with the same four props, so writing them
+    out is nine chances to leave one off — and it took the first: `brand` was in
+    the address grammar, in the workspace screen's rows, in `Part.tsx`'s own
+    switch and in the screen registry, and missing HERE. It matched no case, the
+    switch returned nothing, and the screen was blank at an address every other
+    part of the product agreed existed.
+
+    ⚠️ AND IT IS BEFORE THE SWITCH RATHER THAN INSIDE IT, so the narrowing comes
+    from the predicate and the remaining cases stay exhaustive.
+  */
+  if (atWorkspaceScreen(where)) {
+    return (
+      <WorkspacePart
+        part={where.at}
+        slug={where.slug}
+        app={"app" in where ? where.app : undefined}
+        area={"area" in where ? where.area : undefined}
+        onGo={onGo}
+      />
+    );
+  }
+
+  /* ⚠️ AND THE OPERATOR'S SIDE THE SAME WAY, which had the same hole: five of
+     the six console parts were named here and `footing` was the sixth. */
+  if (atConsoleScreen(where)) {
+    return (
+      <ConsolePart
+        part={where.at}
+        app={"app" in where ? where.app : undefined}
+        onGo={onGo}
+      />
+    );
+  }
+
   switch (where.at) {
     case "you": return <You onGo={onGo} />;
     case "inbox": return <InboxScreen onGo={() => undefined} onSeen={() => undefined} />;
@@ -256,30 +305,28 @@ function Inside({ where, onGo }: {
     case "prefs": return <Preferences where={where} onGo={onGo} />;
     case "workspaces": return <Workspaces onGo={onGo} />;
     case "workspace": return <OneWorkspace slug={where.slug} onGo={onGo} />;
-    case "people": case "money": case "plan": case "packages": case "settings": case "notices":
-    case "trust": case "wording":
-      return (
-        <WorkspacePart
-          part={where.at}
-          slug={where.slug}
-          app={"app" in where ? where.app : undefined}
-          area={"area" in where ? where.area : undefined}
-          onGo={onGo}
-        />
-      );
     case "console": return <ConsoleHome onGo={onGo} />;
-    case "tenants": case "actions": case "switches": case "works": case "ground":
-      return (
-        <ConsolePart
-          part={where.at}
-          app={"app" in where ? where.app : undefined}
-          onGo={onGo}
-        />
-      );
     case "tenant": return <OneTenant id={where.id} />;
     /* ⚠️ Home is drawn by the frame above — it is the only screen with no title
        of its own, because the lockup IS its title. */
     case "home": return null;
+    /*
+      ⚠️ THE COMPILER IS THE GUARD, AND WITHOUT THIS IT WAS NOT. A switch that
+      falls through returns `undefined`, which React renders as nothing — so an
+      address with no branch is a BLANK PAGE, not an error, and TypeScript is
+      perfectly happy because every branch that exists returns a valid element.
+      That is precisely how `brand` was lost: present in the address grammar, in
+      the rows that link to it and in the screen registry a test checks, and
+      missing from the one place that draws it.
+
+      ⚠️ ASSIGNING TO `never` IS WHAT MAKES ADDING A `Where` VARIANT A BUILD
+      FAILURE HERE. A test comparing two lists cannot do this: it checks that a
+      name appears somewhere, and this checks that the code handles it.
+    */
+    default: {
+      const unanswered: never = where;
+      throw new Error(`no screen for ${(unanswered as Where).at}`);
+    }
   }
 }
 

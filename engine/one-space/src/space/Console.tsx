@@ -27,13 +27,16 @@ import { Ground } from "../console/Ground.js";
 import { Switches } from "../console/Switches.js";
 import { Tenants } from "../console/Tenants.js";
 import { Works } from "../console/Works.js";
-import { nameOf, type Where } from "./where.js";
+import { OF_CONSOLE, nameOf, type ConsolePart, type Where } from "./where.js";
 
-export type ConsolePartId = "tenants" | "actions" | "switches" | "works" | "ground" | "footing";
-
-/* ⚠️ ONE ORDER, AND IT IS READING ORDER: who is here, what they generate, what
-   we have switched on, what runs unattended, and where it all sits. */
-const OF_CONSOLE: readonly ConsolePartId[] = ["tenants", "actions", "switches", "works", "ground"];
+/**
+ * ⚠️ THE ADDRESS GRAMMAR'S LIST, NEVER A SECOND ONE. This file had its own — six
+ * members in the type, FIVE in the list the rows are drawn from — so `footing`
+ * was built, routed, named and reachable from nothing. The order is the list's,
+ * and it is reading order: who is here, what they generate, what we have
+ * switched on, what runs unattended, where it all sits, and what it stands on.
+ */
+export type ConsolePartId = ConsolePart;
 
 /* ⚠️ A MARK PER ROW, because a menu with unmarked rows reads as a mistake beside
    every other menu in this product. */

@@ -51,8 +51,18 @@ describe("the product under a workspace's address", () => {
 });
 
 describe("every address in OneSpace has a branch", () => {
-  /* ⚠️ The frame's dispatch and the parser must name the same set — an address
-     with no branch renders a blank page with every suite green. */
+  /*
+    ⚠️ THIS TEST DID NOT CATCH THE THING IT WAS WRITTEN FOR, TWICE. It compares
+    what the parser produces against a hand-written list of screen names — and
+    `brand` and `footing` were both on that list while the dispatch drew neither,
+    so `/space/w/<slug>/brand` and `/space/console/footing` rendered a blank page
+    with every suite green. A list agreeing with a list proves the two lists
+    agree; it says nothing about the code.
+
+    ⚠️ WHAT REPLACED IT IS A `never` ASSERTION at the end of `Inside`, so an
+    unanswered address is a BUILD failure. What survives here is the direction a
+    compiler cannot see: an address the parser can never produce.
+  */
   it("draws every screen the parser can produce", () => {
     const reachable = [
       "/space", "/space/you", "/space/inbox", "/space/workspaces", "/space/w/northwind",
@@ -60,6 +70,9 @@ describe("every address in OneSpace has a branch", () => {
       "/space/console",
       ...OF_CONSOLE.map((p) => `/space/console/${p}`),
     ];
+    /* ⚠️ Named so a shrinking list is visible: both misses were a screen
+       QUIETLY absent from a set somebody was counting. */
+    expect(reachable.length).toBe(5 + OF_WORKSPACE.length + 1 + OF_CONSOLE.length);
     for (const path of reachable) {
       expect(SPACE_SCREENS, path).toContain(parseWhere(path).at);
     }

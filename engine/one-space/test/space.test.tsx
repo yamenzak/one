@@ -236,6 +236,25 @@ describe("a workspace's brand", () => {
     icon: null,
   };
 
+  /*
+    ⚠️ A BUSINESS THAT HAS SAVED NOTHING YET, WHICH IS EVERY BUSINESS ON ITS
+    FIRST DAY AND THE ONE COMBINATION NEITHER TEST COVERED. The fixture above
+    always had a theme; the live screen is reached with `branding: null` the
+    moment a workspace becomes commercial, and that is the state it rendered
+    nothing at all in.
+  */
+  it("draws the editor for a business that has saved nothing yet", () => {
+    const out = html(
+      <Editor
+        name="Harbourside" slug="harbourside"
+        answer={{ kind: "commercial", branding: null, surfaces: ["shell", "email"], icon: null }}
+        again={() => {}}
+      />,
+    );
+    expect(out).toContain("On a home screen");
+    expect(out).toContain("Add your own icon");
+  });
+
   it("shows a business what it is set to, and a way to change each of them", () => {
     const out = html(
       <Editor name="Harbourside" slug="harbourside" answer={commercial} again={() => {}} />,
