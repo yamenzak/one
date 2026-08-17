@@ -117,15 +117,32 @@ export const refuseJobs = (book: JobBook, notifications: readonly string[]): rea
  * screen.
  */
 export interface Run {
-  readonly job: string;
+  /* ⚠️ `jobId`, WHICH IS WHAT THE ROW HOLDS. This was `job` while the runtime
+     wrote `jobId` and the operator's screen took `jobId` — two names for one
+     fact, and the cost was that the screen worked staleness out for itself
+     rather than mapping, which put the same comparison in two places with the
+     copy on the screen deciding what an operator is told. */
+  readonly jobId: string;
   readonly startedAt: string;
   readonly endedAt: string | null;
   readonly ok: boolean;
   readonly detail?: string;
 }
 
-export const stalled = (book: JobBook, runs: readonly Run[], now: number, missedMs: number): readonly string[] =>
+/**
+ * ⚠️ IT TAKES WHAT IT READS, WHICH IS WHY IT IS NOT `Run[]`. A run in flight has
+ * no outcome yet and the screen's row carries fields the record does not, so
+ * demanding the whole shape forced the one caller to build a fake one — and a
+ * caller that has to reshape its data to ask a question is a caller that works
+ * the answer out for itself instead. Two fields is the whole question.
+ */
+export const stalled = (
+  book: JobBook,
+  runs: readonly Pick<Run, "jobId" | "startedAt">[],
+  now: number,
+  missedMs: number,
+): readonly string[] =>
   Object.keys(book).filter((id) => {
-    const last = runs.filter((r) => r.job === id).sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))[0];
+    const last = runs.filter((r) => r.jobId === id).sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))[0];
     return !last || now - Date.parse(last.startedAt) > missedMs;
   });

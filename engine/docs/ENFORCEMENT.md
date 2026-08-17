@@ -49,35 +49,53 @@ reached by a test, and every one of them was unenforced in the product.
 <!-- generated: node scripts/inventory.mjs enforcement -->
 | Rule | Declared in | In force through |
 |---|---|---|
+| `claimsPlatform` | `access` | composition |
 | `refuseRole` | `access` | deferred to stage 24 |
+| `undeclared` | `access` | composition |
+| `unholdable` | `access` | composition |
 | `refuseCatalogue` | `ai` | runtime |
 | `refusePrompt` | `ai` | runtime |
+| `unknownInPrompt` | `ai` | composition |
 | `refuseSurfaces` | `brand` | composition |
 | `refuseTheme` | `brand` | runtime |
+| `danglingRefs` | `collection` | composition |
 | `refuseCollection` | `collection` | composition |
 | `refusePacks` | `credit` | composition |
+| `unbounded` | `credit` | composition |
 | `refuseLadder` | `dunning` | composition |
 | `refuseCatalog` | `entitlement` | composition |
+| `unenforced` | `entitlement` | composition |
 | `refuseField` | `field` | composition |
-| `refuseFields` | `field` | composition |
+| `overdue` | `flag` | surface |
 | `refuseFlag` | `flag` | composition |
 | `refuseFlags` | `flag` | composition |
+| `unreadFlags` | `flag` | composition |
+| `orphanHelp` | `guide` | composition |
 | `refuseGuide` | `guide` | composition |
 | `refuseJob` | `job` | composition |
 | `refuseJobs` | `job` | composition |
+| `stalled` | `job` | surface |
+| `missingDocuments` | `legal` | deferred to stage 25 |
 | `refuseLegal` | `legal` | composition |
 | `refuseApp` | `manifest` | composition |
 | `refuseLetter` | `notify` | deferred to stage 23 |
 | `refusePolicy` | `notify` | runtime |
+| `unaddressable` | `notify` | composition |
+| `unknownVariables` | `notify` | deferred to stage 23 |
+| `unraisable` | `notify` | composition |
 | `refuseOperation` | `operation` | composition |
+| `unreachable` | `operation` | composition |
 | `refusePackage` | `package` | runtime |
+| `unknownProblems` | `problem` | composition |
 | `refuseSetting` | `setting` | composition |
 | `refuseSettings` | `setting` | composition |
+| `unread` | `setting` | surface |
 | `refuseCommercial` | `tenancy` | runtime |
 | `refusePlacement` | `tenancy` | runtime |
 | `refuseCopy` | `tone` | guard |
 | `refuseRead` | `vault` | runtime |
 | `refuseVault` | `vault` | composition |
+| `strayFacts` | `vault` | composition |
 <!-- /generated -->
 
 `scripts/rules.test.mjs` fails on any row that would read `—`. The only three

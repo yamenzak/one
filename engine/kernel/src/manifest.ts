@@ -53,7 +53,7 @@ import { refuseSettings } from "./setting.js";
 import { LADDER, refuseLadder } from "./dunning.js";
 import { SURFACES, refuseSurfaces } from "./brand.js";
 import type { PurposeBook, VaultBook } from "./vault.js";
-import { refuseVault } from "./vault.js";
+import { refuseVault, strayFacts } from "./vault.js";
 import type { AppId, Tone } from "./primitives.js";
 
 /* ------------------------------------------------------------------ shape --- */
@@ -330,11 +330,11 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
 
   /* --- what is held, and what is disclosed -------------------------------- */
 
-  const vault = spec.vault ?? {};
-  for (const key of vaultBackedIn(spec)) {
-    if (!(key in vault)) {
-      at("vault", `${key} is vault-backed and no vault field declares it — the column would point at nothing`);
-    }
+  /* ⚠️ ASKED, NOT REPEATED. `strayFacts` is this loop, in the kernel, with the
+     argument for why it matters — and it was written out here instead, so the
+     rule existed twice and the exported one had no caller at all. */
+  for (const key of strayFacts(spec.vault ?? {}, vaultBackedIn(spec))) {
+    at("vault", `${key} is vault-backed and no vault field declares it — the column would point at nothing`);
   }
   for (const p of refuseLegal(
     spec.documents ?? {},

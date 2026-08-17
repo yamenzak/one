@@ -376,10 +376,10 @@ describe("work nobody is waiting for", () => {
     const now = Date.parse(NOW);
     expect(stalled({ dunning: sweep }, [], now, day)).toEqual(["dunning"]);
     expect(stalled({ dunning: sweep },
-      [{ job: "dunning", startedAt: new Date(now - 3 * day).toISOString(), endedAt: null, ok: true }],
+      [{ jobId: "dunning", startedAt: new Date(now - 3 * day).toISOString() }],
       now, day)).toEqual(["dunning"]);
     expect(stalled({ dunning: sweep },
-      [{ job: "dunning", startedAt: new Date(now - 60_000).toISOString(), endedAt: null, ok: true }],
+      [{ jobId: "dunning", startedAt: new Date(now - 60_000).toISOString() }],
       now, day)).toEqual([]);
   });
 });

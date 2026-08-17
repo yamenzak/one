@@ -163,6 +163,12 @@ export type LetterRefusal = "too_long" | "unknown_variable" | "not_theirs" | "em
  * somebody who has no idea what it is — and it is the tenant's own edit, so
  * nothing of ours fails and nobody of ours is told.
  */
+/** The variables a template named that the definition does not offer. */
+export const unknownVariables = (def: NotificationDef, letter: Letter): readonly string[] =>
+  [...new Set([...`${letter.subject}\n${letter.body}`.matchAll(/\{([a-zA-Z0-9_]+)\}/g)]
+    .map((m) => m[1]!)
+    .filter((n) => !def.variables.includes(n)))];
+
 /* DEFER(engine-23) stage:23 — nothing sends a letter yet, so this is a rule for
    a lane that does not exist. It is not dead: the moment mail leaves the
    process, a letter interpolating a variable its notification never declares is
@@ -172,16 +178,12 @@ export function refuseLetter(def: NotificationDef, letter: Letter): readonly Let
   if (!brandable(def)) out.push("not_theirs");
   if (!letter.subject.trim() || !letter.body.trim()) out.push("empty");
   if (letter.body.length + letter.subject.length > MAX_LETTER) out.push("too_long");
-  const named = [...`${letter.subject}\n${letter.body}`.matchAll(/\{([a-zA-Z0-9_]+)\}/g)].map((m) => m[1]!);
-  if (named.some((n) => !def.variables.includes(n))) out.push("unknown_variable");
+  /* ⚠️ ASKED, NOT REPEATED. `unknownVariables` is this line with a name and a
+     reason, and it was written out again here — so the exported one had no
+     caller and the two could have drifted about what counts as a variable. */
+  if (unknownVariables(def, letter).length) out.push("unknown_variable");
   return out;
 }
-
-/** The variables a template named that the definition does not offer. */
-export const unknownVariables = (def: NotificationDef, letter: Letter): readonly string[] =>
-  [...new Set([...`${letter.subject}\n${letter.body}`.matchAll(/\{([a-zA-Z0-9_]+)\}/g)]
-    .map((m) => m[1]!)
-    .filter((n) => !def.variables.includes(n)))];
 
 /* ------------------------------------------------------------------ rules --- */
 

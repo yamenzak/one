@@ -44,6 +44,7 @@ reader can trust this table instead of re-reading the code.
 | 22 | OneSpace — `id`, `admin` and `setup` merge into one address off the workspace root | planned |
 | 23 | Mail that leaves the process — a letter, its variables, and a provider | planned |
 | 24 | A workspace composes its own roles out of one app's keys | planned |
+| 25 | The deployment's own legal documents — a privacy notice, terms, and the acceptance that binds them | planned |
 
 ## What is NOT built, and where to pick it up
 

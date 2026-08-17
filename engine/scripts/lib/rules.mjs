@@ -62,10 +62,64 @@ export const lanes = () => ({
 });
 
 /**
- * ⚠️ `refuse` FOLLOWED BY A CAPITAL. `refusedOn` reads a refusal's field map and
- * is not a rule; matching the prefix alone put it in the inventory as one.
+ * WHAT COUNTS AS A RULE, AND WHY IT IS NOT JUST A NAME.
+ *
+ * ⚠️ `refuse[A-Z]` WAS THE WHOLE PATTERN AND IT HID SIX RULES. The kernel states
+ * rules under two names: `refuseX` returns a list of problems, and the `unX`
+ * family — `unrecordedWrites`, `unenforced`, `unraisable`, `strayFacts` — returns
+ * the ids of the things that are wrong. Both are "here is what this declaration
+ * gets wrong"; only one was being enumerated, so the other six were outside a
+ * check whose entire subject is rules that nothing runs.
+ *
+ * ⚠️ SO THE SIGNAL IS THE RETURN, NOT THE PREFIX. A rule answers with a list of
+ * what is wrong — `readonly XProblem[]`, `readonly XRefusal[]`, or a list of ids.
+ * `refusedOn` reads one field of a refusal and returns a string; matching the
+ * name alone put it in the inventory as a rule.
+ *
+ * ⚠️ AND THE COUNT IS PRINTED WHEREVER THIS IS USED, so a rule that slips out of
+ * the pattern shows up as the number going down rather than as silence.
  */
-const DECLARES = /^export (?:function|const) (refuse[A-Z]\w*)/gm;
+/*
+  ⚠️ AND A RULE MAY ANSWER WITH ONE REFUSAL RATHER THAN A LIST. Matching only
+  `readonly X[]` widened the net in one direction and closed it in another:
+  `refuseRole` and `refuseCommercial` return `XRefusal | null` and vanished from
+  a check whose whole subject is rules nothing runs. Both shapes, or the guard
+  moves its own blind spot around.
+*/
+const DECLARES = new RegExp(
+  "^export (?:function|const) (\\w+)[\\s\\S]{0,400}?\\)\\s*:\\s*"
+  + "(?:readonly ([\\w]*(?:Problem|Refusal|string)\\[\\])|([\\w]*(?:Problem|Refusal)) \\| null)",
+  "gm",
+);
+
+/* ⚠️ A LIST OF STRINGS IS AMBIGUOUS — `settingsOn` returns one and decides
+   nothing. What separates a rule is that its answer is a complaint, and in this
+   kernel those are named for the fault: what is unenforced, unread, stray,
+   dangling, orphaned, missing, stalled, overdue, unbounded. */
+const FAULT = /^(refuse[A-Z]|un[a-z]|stray|dangling|orphan|missing|stalled|overdue|claims|would)/;
+
+/**
+ * ⚠️ A SIBLING'S LANE IS ITS OWN, AND A FILE IS NOT A CALLER. Reading the whole
+ * of `notify.ts` to ask whether `refusePolicy` calls `unknownVariables` answers
+ * yes for every rule that file happens to contain — so `unknownVariables`, which
+ * is reachable only through the deferred `refuseLetter`, was reported as in force
+ * through the runtime. That is the chain-ending-nowhere failure this walk already
+ * refuses, wearing co-location instead of a chain.
+ *
+ * The bodies here are top-level exports separated by top-level exports, so the
+ * next `^export ` is the end of this one. A parser would be more correct and
+ * would also be a dependency in a tree that has none.
+ */
+const bodyOf = (src, name) => {
+  const at = Math.max(
+    src.indexOf(`export function ${name}`),
+    src.indexOf(`export const ${name}`),
+  );
+  if (at < 0) return "";
+  const rest = src.slice(at + 1);
+  const end = rest.search(/^export /m);
+  return end < 0 ? rest : rest.slice(0, end);
+};
 
 /** Every rule the kernel states, with the lane that runs it (or `null`). */
 export function resolveRules() {
@@ -75,7 +129,13 @@ export function resolveRules() {
 
   const rules = [];
   for (const f of files("kernel/src")) {
-    for (const m of read(f).matchAll(DECLARES)) rules.push({ name: m[1], file: f });
+    for (const m of read(f).matchAll(DECLARES)) {
+      const name = m[1];
+      /* A problem list — or one refusal — is a rule whatever it is called; a
+         plain list of strings is one only where the name reports a fault. */
+      const problems = m[3] !== undefined || !(m[2] ?? "").startsWith("string");
+      if (problems || FAULT.test(name)) rules.push({ name, file: f });
+    }
   }
 
   const found = new Map();
@@ -92,23 +152,49 @@ export function resolveRules() {
          extra step in it. */
       const caller = rules.find((other) =>
         other.name !== rule.name && found.has(other.name)
-        && uses(read(other.file), rule.name));
+        && uses(bodyOf(read(other.file), other.name), rule.name));
       if (caller) { found.set(rule.name, found.get(caller.name)); moved = true; }
     }
   }
 
-  return rules.map((rule) => {
+  const markerOn = (rule) => {
     const src = read(rule.file);
     const at = Math.max(
       src.indexOf(`export function ${rule.name}`),
       src.indexOf(`export const ${rule.name}`),
     );
-    const defer = src.slice(Math.max(0, at - 900), at).match(/DEFER\(engine-(\d+)\)/);
-    return {
-      ...rule,
-      where: rule.file.replace("kernel/src/", "").replace(".ts", ""),
-      lane: found.get(rule.name) ?? null,
-      deferredTo: defer ? defer[1] : null,
-    };
-  });
+    return src.slice(Math.max(0, at - 900), at).match(/DEFER\(engine-(\d+)\)/)?.[1] ?? null;
+  };
+
+  /*
+    ⚠️ A DEFERRAL TRAVELS TO WHAT THE DEFERRED RULE CALLS. `unknownVariables` is
+    only reachable through `refuseLetter`, which waits on a lane that sends mail
+    — so it is deferred too, and reporting it as a rule nobody runs would push
+    somebody to wire it into a lane that does not exist. Marking each one by hand
+    would be the same fact written twice, and the second copy is the one that
+    rots.
+  */
+  const deferred = new Map();
+  for (const rule of rules) {
+    const own = markerOn(rule);
+    if (own) deferred.set(rule.name, own);
+  }
+  let spread = true;
+  while (spread) {
+    spread = false;
+    for (const rule of rules) {
+      if (found.has(rule.name) || deferred.has(rule.name)) continue;
+      const caller = rules.find((other) =>
+        other.name !== rule.name && deferred.has(other.name)
+        && uses(bodyOf(read(other.file), other.name), rule.name));
+      if (caller) { deferred.set(rule.name, deferred.get(caller.name)); spread = true; }
+    }
+  }
+
+  return rules.map((rule) => ({
+    ...rule,
+    where: rule.file.replace("kernel/src/", "").replace(".ts", ""),
+    lane: found.get(rule.name) ?? null,
+    deferredTo: deferred.get(rule.name) ?? null,
+  }));
 }

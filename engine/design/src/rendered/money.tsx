@@ -12,6 +12,7 @@
  */
 
 import type { JobBook, PackDef } from "@engine/kernel";
+import { stalled } from "@engine/kernel";
 import { Button, Card, Chip, Meter, ProgressBar } from "@heroui/react";
 import { money } from "./console.js";
 import { Grid, Stack } from "../parts/arrange.js";
@@ -188,6 +189,7 @@ export interface JobsProps {
  * the only thing this screen is for.
  */
 export function Jobs({ book, runs, missedMs, now }: JobsProps) {
+  const quiet_ = stalled(book, runs, now, missedMs);
   return (
     /*
       ⚠️ A JOB IS A ROW, AND ITS STATE IS A SENTENCE. Each was a `Card` with a
@@ -205,7 +207,12 @@ export function Jobs({ book, runs, missedMs, now }: JobsProps) {
       {Object.values(book).map((job) => {
         const last = runs.filter((r) => r.jobId === job.id)
           .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))[0];
-        const quiet = !last || now - Date.parse(last.startedAt) > missedMs;
+        /* ⚠️ ASKED, NOT WORKED OUT. This was the same three lines as `stalled` in
+           the kernel — one comparison, written twice, and the copy on the screen
+           is the one that decides what an operator is told. Two answers to "has
+           this job stopped running" diverge in whichever direction nobody
+           tests. */
+        const quiet = quiet_.includes(job.id);
 
         return (
           <ControlRow key={job.id} label={job.label} under={job.why}>
