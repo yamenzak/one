@@ -25,7 +25,8 @@
  * row is the trace, and it is readable.
  */
 
-import type { AppId, Instant, PlanSpec, TenantId } from "@engine/kernel";
+import type { AppId, Instant, PackDef, PlanSpec, TenantId } from "@engine/kernel";
+import { MEMBERSHIP as MEMBERSHIP_APP } from "./billing.js";
 import { configOf } from "./config.js";
 import type { SchemaModule } from "./schema.js";
 import type { Db } from "./sql.js";
@@ -166,6 +167,12 @@ export async function startCheckout(
     readonly appId: AppId;
     readonly plan: PlanSpec;
     readonly email: string | null;
+    /**
+     * ⚠️ PRESENT ONLY FOR A COMMERCIAL TIER, and it travels so the workspace's
+     * KIND and its plan land from the same signed event. Two events would be a
+     * window in which somebody has paid for a business and does not have one.
+     */
+    readonly legalName?: string;
     readonly successUrl: string;
     readonly cancelUrl: string;
   },
@@ -173,6 +180,11 @@ export async function startCheckout(
   const key = await stripeKey(deps);
   if (!key) return "not_charging";
   if (ask.plan.price <= 0) return "free_plan";
+
+  const meta = {
+    tenant: ask.tenantId, app: ask.appId, plan: ask.plan.id,
+    ...(ask.legalName ? { legalName: ask.legalName } : {}),
+  };
 
   const body = form(new URLSearchParams(), {
     mode: "subscription",
@@ -194,11 +206,73 @@ export async function startCheckout(
        but a customer id — and writing `subscription_data` twice in one literal
        silently keeps the second, which is how the trial once took the metadata
        with it. */
-    metadata: { tenant: ask.tenantId, app: ask.appId, plan: ask.plan.id },
+    metadata: meta,
     subscription_data: {
-      metadata: { tenant: ask.tenantId, app: ask.appId, plan: ask.plan.id },
+      metadata: meta,
       ...(ask.plan.trialDays ? { trial_period_days: ask.plan.trialDays } : {}),
     },
+  });
+
+  const said = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${key}`,
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body,
+  }).catch(() => null);
+
+  if (!said?.ok) return "stripe_refused";
+  const made = await said.json().catch(() => null) as { url?: string } | null;
+  return made?.url ? { url: made.url } : "stripe_refused";
+}
+
+/**
+ * A ONE-OFF PURCHASE: CREDITS, PAID FOR ONCE.
+ *
+ * ⚠️ `mode: "payment"`, NOT `"subscription"`, AND THAT IS THE WHOLE DIFFERENCE.
+ * A pack is bought, not rented — sending it down the subscription lane would
+ * charge for it again every month, which is the sort of mistake that is
+ * discovered by the customer.
+ *
+ * ⚠️ AND THE PACK TRAVELS IN THE METADATA RATHER THAN THE CREDITS. What arrives
+ * back is an id we look up in our own catalogue; a credit COUNT in the metadata
+ * would be a number the round trip could carry, and a round trip through the
+ * customer's browser is a number the customer can edit.
+ */
+export async function startTopUp(
+  deps: StripeDeps,
+  ask: {
+    readonly tenantId: TenantId;
+    readonly pack: PackDef;
+    readonly email: string | null;
+    readonly successUrl: string;
+    readonly cancelUrl: string;
+  },
+): Promise<Checkout | CheckoutRefusal> {
+  const key = await stripeKey(deps);
+  if (!key) return "not_charging";
+  if (ask.pack.price <= 0 || ask.pack.credits <= 0) return "free_plan";
+
+  const meta = { tenant: ask.tenantId, app: MEMBERSHIP_APP, pack: ask.pack.id };
+  const body = form(new URLSearchParams(), {
+    mode: "payment",
+    success_url: ask.successUrl,
+    cancel_url: ask.cancelUrl,
+    ...(ask.email ? { customer_email: ask.email } : {}),
+    line_items: [{
+      quantity: 1,
+      price_data: {
+        currency: ask.pack.currency.toLowerCase(),
+        unit_amount: ask.pack.price,
+        product_data: { name: ask.pack.name },
+      },
+    }],
+    metadata: meta,
+    /* ⚠️ ON THE PAYMENT INTENT TOO. A one-off has no subscription to carry our
+       metadata forward, so a refund or a dispute arriving months later would
+       reach us as a payment nobody can place. */
+    payment_intent_data: { metadata: meta },
   });
 
   const said = await fetch("https://api.stripe.com/v1/checkout/sessions", {
@@ -263,6 +337,14 @@ export interface Ladder {
   paid(tenantId: TenantId, appId: AppId): Promise<void>;
   pastDue(tenantId: TenantId, appId: AppId): Promise<void>;
   cancelled(tenantId: TenantId, appId: AppId): Promise<void>;
+  /**
+   * ⚠️ A ONE-OFF PURCHASE, AND IT CARRIES THE EVENT ID. The credits land in the
+   * ledger against it, so the same money can be traced from a Stripe dashboard
+   * to a balance — and a duplicate delivery is already a no-op above.
+   */
+  bought(tenantId: TenantId, packId: string, ref: string): Promise<void>;
+  /** ⚠️ The one-way door, opened by the payment that bought a commercial tier. */
+  becameBusiness(tenantId: TenantId, legalName: string): Promise<void>;
 }
 
 /**
@@ -318,7 +400,17 @@ export async function applyEvent(
 
   const tenantId = (meta.tenant as TenantId | undefined)
     ?? (customer ? await tenantByCustomer(db, customer) : null);
-  const appId = meta.app as AppId | undefined;
+
+  /*
+    ⚠️ THE APP IS THE MEMBERSHIP, AND THERE IS NOTHING ELSE IT COULD BE. Every
+    row this drives is the workspace's — one subscription, one wallet — so an
+    event that names a tenant is fully attributed. This used to park on a missing
+    app, which the membership migration turned into a trap: `MEMBERSHIP` is the
+    empty string, so every plan checkout arrived carrying `app=""`, was read as
+    absent, and was parked instead of granting the month somebody had just paid
+    for.
+  */
+  const appId = MEMBERSHIP_APP;
 
   /*
     ⚠️ PARKED, NOT DROPPED, AND NOT RETRIED FOREVER EITHER. Stripe cannot fix an
@@ -328,10 +420,6 @@ export async function applyEvent(
   if (!tenantId) {
     await note(db, event, at, { why: "no_tenant" });
     return { did: "parked", why: "no_tenant" };
-  }
-  if (!appId) {
-    await note(db, event, at, { ...(tenantId ? { tenantId } : {}), why: "no_app" });
-    return { did: "parked", why: "no_app" };
   }
 
   await note(db, event, at, { tenantId, appId });
@@ -344,8 +432,29 @@ export async function applyEvent(
         await noteCustomer(db, tenantId, customer,
           typeof o.currency === "string" ? o.currency : "usd", now);
       }
-      const plan = (o.metadata as Record<string, unknown> | undefined)?.plan;
+      const said = (o.metadata ?? {}) as Record<string, unknown>;
+
+      /*
+        ⚠️ A PACK IS A PURCHASE AND NOT A SUBSCRIPTION, so it takes the whole
+        branch and nothing else runs. Falling through to `paid` would mark a
+        lapsed workspace up to date because somebody bought fifty credits.
+      */
+      const pack = said.pack;
+      if (typeof pack === "string" && pack) {
+        await ladder.bought(tenantId, pack, event.id);
+        break;
+      }
+
+      const plan = said.plan;
       if (typeof plan === "string" && plan) await ladder.subscribe(tenantId, appId, plan);
+      /* ⚠️ AND THE LEGAL NAME IS WHAT MAKES THIS THE SAME CHECKOUT. Becoming a
+         business is buying a commercial tier; the name travelled with the
+         session so the workspace's kind and its plan land together, from the
+         one event that says the money moved. */
+      const legalName = said.legalName;
+      if (typeof legalName === "string" && legalName) {
+        await ladder.becameBusiness(tenantId, legalName);
+      }
       await ladder.paid(tenantId, appId);
       break;
     }

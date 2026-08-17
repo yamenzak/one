@@ -13,9 +13,9 @@
 
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { AppId, TenantId } from "@engine/kernel";
+import type { TenantId } from "@engine/kernel";
 import {
-  BILLING_SCHEMA, CONFIG_SCHEMA, STRIPE_SCHEMA, applyEvent, applySchema, noteCustomer,
+  BILLING_SCHEMA, CONFIG_SCHEMA, MEMBERSHIP, STRIPE_SCHEMA, applyEvent, applySchema, noteCustomer,
   parkedEvents, subscriptionFor, verifySignature, type Db, type Ladder,
 } from "../src/index.js";
 
@@ -42,6 +42,8 @@ const spy = () => {
     paid: async (t, a) => { did.push(`paid:${t}:${a}`); },
     pastDue: async (t, a) => { did.push(`pastDue:${t}:${a}`); },
     cancelled: async (t, a) => { did.push(`cancelled:${t}:${a}`); },
+    bought: async (t, pack, ref) => { did.push(`bought:${t}:${pack}:${ref}`); },
+    becameBusiness: async (t, name) => { did.push(`business:${t}:${name}`); },
   };
   return { did, ladder };
 };
@@ -107,17 +109,76 @@ describe("the signature", () => {
 
 describe("an event", () => {
   const TENANT = "ten_1" as TenantId;
-  const APP = "hello" as AppId;
+  /**
+   * ⚠️ THE MEMBERSHIP, AND IT IS WHAT EVERY EVENT DRIVES. The plan, the wallet
+   * and the ladder are the workspace's, so there is nothing else an event could
+   * be about — the `app` an event carries is ignored, deliberately, and the test
+   * below pins that.
+   */
+  const APP = MEMBERSHIP;
 
   it("moves the workspace onto the plan it paid for", async () => {
     const { did, ladder } = spy();
     const out = await applyEvent(db(), event("evt_1", "checkout.session.completed", {
       customer: "cus_1", currency: "usd",
-      metadata: { tenant: TENANT, app: APP, plan: "team" },
+      metadata: { tenant: TENANT, plan: "team" },
     }), ladder, NOW);
 
     expect(out).toMatchObject({ did: "applied" });
     expect(did).toEqual([`subscribe:${TENANT}:${APP}:team`, `paid:${TENANT}:${APP}`]);
+  });
+
+  /*
+    ⚠️ AND AN EVENT THAT NAMES A PRODUCT IS STILL THE WORKSPACE'S. `MEMBERSHIP`
+    is the empty string, so when this parked on a missing `app` every plan
+    checkout arrived carrying `app=""`, was read as absent, and was parked
+    instead of granting the month somebody had just paid for. There is one
+    membership; a product name on an event is noise, not attribution.
+  */
+  it("ignores whatever product an event claims to be about", async () => {
+    const { did, ladder } = spy();
+    const out = await applyEvent(db(), event("evt_app", "invoice.paid", {
+      metadata: { tenant: TENANT, app: "hello", plan: "team" },
+    }), ladder, NOW);
+
+    expect(out).toMatchObject({ did: "applied", appId: MEMBERSHIP });
+    expect(did).toEqual([`paid:${TENANT}:${MEMBERSHIP}`]);
+  });
+
+  /*
+    ⚠️ A PACK TAKES THE WHOLE BRANCH. Falling through to `paid` would mark a
+    lapsed workspace up to date because somebody bought fifty credits — the
+    ladder would clear the arrears and nothing would have been paid.
+  */
+  it("tops up for a pack, and does not call it a payment", async () => {
+    const { did, ladder } = spy();
+    const out = await applyEvent(db(), event("evt_pack", "checkout.session.completed", {
+      customer: "cus_p", currency: "usd",
+      metadata: { tenant: TENANT, pack: "p5" },
+    }), ladder, NOW);
+
+    expect(out).toMatchObject({ did: "applied" });
+    expect(did).toEqual([`bought:${TENANT}:p5:evt_pack`]);
+  });
+
+  /*
+    ⚠️ AND BECOMING A BUSINESS COMES THROUGH THE SAME CHECKOUT. The legal name
+    travelled with the session, so the workspace's kind and its plan land from
+    one signed event — two would be a window in which somebody has paid for a
+    business and does not have one.
+  */
+  it("opens the one-way door on the payment that bought a commercial tier", async () => {
+    const { did, ladder } = spy();
+    await applyEvent(db(), event("evt_biz", "checkout.session.completed", {
+      customer: "cus_b", currency: "usd",
+      metadata: { tenant: TENANT, plan: "studio", legalName: "Eastwind GmbH" },
+    }), ladder, NOW);
+
+    expect(did).toEqual([
+      `subscribe:${TENANT}:${APP}:studio`,
+      `business:${TENANT}:Eastwind GmbH`,
+      `paid:${TENANT}:${APP}`,
+    ]);
   });
 
   /*
@@ -143,7 +204,7 @@ describe("an event", () => {
     await noteCustomer(db(), TENANT, "cus_1", "usd", NOW);
     const { did, ladder } = spy();
     const out = await applyEvent(db(), event("evt_2", "invoice.paid", {
-      customer: "cus_1", metadata: { app: APP },
+      customer: "cus_1", metadata: {},
     }), ladder, NOW);
 
     expect(out).toMatchObject({ did: "applied", tenantId: TENANT });
@@ -202,6 +263,8 @@ describe("an event", () => {
       paid: (t, a) => markPaid(db(), t, a),
       pastDue: (t, a) => markPastDue(db(), t, a, NOW),
       cancelled: (t, a) => markCancelled(db(), t, a),
+      bought: async () => undefined,
+      becameBusiness: async () => undefined,
     };
 
     await applyEvent(db(), event("evt_7", "checkout.session.completed", {
@@ -225,5 +288,49 @@ describe("an event", () => {
     }), real, NOW);
     expect(await subscriptionFor(db(), TENANT, APP))
       .toMatchObject({ status: "cancelled", pastDueAt: null });
+  });
+
+  /*
+    ⚠️ AND THE MONEY REALLY REACHES THE WALLET. Every pack assertion above
+    watches a spy; this one carries a signed event all the way to a balance,
+    because the routing being right and the credits never arriving is exactly
+    the failure a spy cannot see.
+  */
+  it("puts the credits in the wallet, end to end", async () => {
+    const { openAccount, topUp, walletOf } = await import("../src/wallet.js");
+    const PACK = { id: "p5", name: "5,000 credits", credits: 5_000, price: 4500, currency: "USD", order: 1 };
+    await openAccount(db(), TENANT, "USD", NOW);
+
+    const real: Ladder = {
+      subscribe: async () => undefined,
+      paid: async () => undefined,
+      pastDue: async () => undefined,
+      cancelled: async () => undefined,
+      /* ⚠️ THE PACK IS LOOKED UP, NEVER READ OFF THE EVENT — a credit count in
+         the metadata is a number that made a round trip through the browser. */
+      bought: async (t, packId, ref) => {
+        if (packId !== PACK.id) return;
+        await topUp(db(), t, PACK.credits, PACK.name, { ref }, NOW);
+      },
+      becameBusiness: async () => undefined,
+    };
+
+    await applyEvent(db(), event("evt_10", "checkout.session.completed", {
+      customer: "cus_3", currency: "usd",
+      metadata: { tenant: TENANT, pack: "p5" },
+    }), real, NOW);
+
+    /* ⚠️ IN `bought`, NEVER IN `granted`. A pack that landed in the allowance
+       would be swept away by the next renewal — a monthly confiscation of
+       something bought with a card. */
+    expect(await walletOf(db(), TENANT)).toMatchObject({ bought: 5_000, granted: 0 });
+
+    /* ⚠️ AND A SECOND DELIVERY OF THE SAME EVENT BUYS NOTHING. Stripe retries by
+       design, so without the event row this is 5,000 credits per retry. */
+    await applyEvent(db(), event("evt_10", "checkout.session.completed", {
+      customer: "cus_3", currency: "usd",
+      metadata: { tenant: TENANT, pack: "p5" },
+    }), real, NOW);
+    expect(await walletOf(db(), TENANT)).toMatchObject({ bought: 5_000 });
   });
 });

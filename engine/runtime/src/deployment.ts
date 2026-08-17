@@ -22,8 +22,8 @@
  * one spare binding unbootable.
  */
 
-import type { AppSpec, DeploymentLegal, PlanSpec } from "@engine/kernel";
-import { PLATFORM_ENTITLEMENTS, holdingsOf, missingDocuments, refuseCatalog } from "@engine/kernel";
+import type { AppSpec, DeploymentLegal, PackDef, PlanSpec } from "@engine/kernel";
+import { PLATFORM_ENTITLEMENTS, holdingsOf, missingDocuments, refuseCatalog, refusePacks } from "@engine/kernel";
 import { incoherent, unledgered } from "./dossier.js";
 import { unbound, type Env } from "./handles.js";
 import { unreachableByErasure } from "./records.js";
@@ -53,6 +53,12 @@ export interface Deployment {
    * the parking state; present, its faults are reported like any other.
    */
   readonly plans?: readonly PlanSpec[];
+  /**
+   * ⚠️ AND WHAT IT SELLS ONE-OFF. Credit packs are the deployment's for the same
+   * reason the plans are: there is one wallet, so a pack a product declared
+   * would top up a shared balance that only that product could sell.
+   */
+  readonly packs?: readonly PackDef[];
   /**
    * ⚠️ WHAT THIS DEPLOYMENT PROMISES, ASKED ONCE. Terms and a privacy notice
    * bind a legal entity rather than a feature, so the question is the
@@ -91,6 +97,14 @@ export function deploymentFaults(of: Deployment): readonly string[] {
     for (const p of refuseCatalog(of.plans, keys)) {
       out.push(`catalogue: ${p.why} — ${p.detail}`);
     }
+  }
+
+  /* ⚠️ AND THE PACKS, WHICH USED TO BE CHECKED PER APP AND ARE NOW CHECKED
+     NOWHERE ELSE. `free_credits` is the sharp one: a price of zero on something
+     that costs real money to honour is never a promotion, it is a catalogue
+     mistake that anybody can spend without limit. */
+  for (const p of refusePacks(of.packs ?? [])) {
+    out.push(`packs: ${p.why} — ${p.detail}`);
   }
 
   for (const app of of.apps) {

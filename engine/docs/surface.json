@@ -311,6 +311,13 @@
         "permission": "billing:manage"
       },
       {
+        "id": "money.topup",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/money.topup",
+        "permission": "billing:manage"
+      },
+      {
         "id": "centre.view",
         "kind": "read",
         "method": "GET",

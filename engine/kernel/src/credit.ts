@@ -117,6 +117,19 @@ export const charged = (usage: Usage, rate: Rate): number =>
 
 /* ------------------------------------------------------------------ packs --- */
 
+/**
+ * WHAT SOMEBODY BUYS WHEN THE MONTH'S ALLOWANCE RUNS OUT.
+ *
+ * ⚠️ THE PACKS ARE THE DEPLOYMENT'S, LIKE THE PLANS, AND FOR THE SAME REASON.
+ * There is one wallet per workspace; a pack declared by a product would be a
+ * top-up into a shared balance that only one product could sell, and the second
+ * product's customers would be told to buy credits somewhere else.
+ *
+ * ⚠️ AND WHAT IS BOUGHT NEVER EXPIRES, so there is no `expiresDays` here. An
+ * expiring pack is a third balance and a sweep to empty it, and it takes back
+ * something somebody paid cash for on a day they were not looking. The month's
+ * ALLOWANCE is the thing that lapses, and it lapses because it was free.
+ */
 export interface PackDef {
   readonly id: string;
   readonly name: string;
@@ -124,12 +137,10 @@ export interface PackDef {
   /** Minor units. */
   readonly price: number;
   readonly currency: string;
-  /** ⚠️ Absent means it never expires. Present is days from purchase. */
-  readonly expiresDays?: number;
   readonly order: number;
 }
 
-export type PackRefusal = "free_credits" | "empty_pack" | "expires_immediately";
+export type PackRefusal = "free_credits" | "empty_pack" | "pack_ids_clash" | "mixed_currency";
 
 export interface PackProblem { readonly pack: string; readonly why: PackRefusal; readonly detail: string }
 
@@ -140,14 +151,23 @@ export interface PackProblem { readonly pack: string; readonly why: PackRefusal;
  */
 export function refusePacks(packs: readonly PackDef[]): readonly PackProblem[] {
   const out: PackProblem[] = [];
+  const seen = new Set<string>();
   for (const p of packs) {
     if (p.credits <= 0) out.push({ pack: p.id, why: "empty_pack", detail: "sells no credits" });
     if (p.credits > 0 && p.price <= 0) {
       out.push({ pack: p.id, why: "free_credits", detail: `${p.credits} credits for nothing` });
     }
-    if (p.expiresDays !== undefined && p.expiresDays <= 0) {
-      out.push({ pack: p.id, why: "expires_immediately", detail: "bought and gone the same day" });
-    }
+    /* ⚠️ TWO PACKS ON ONE ID IS A CHECKOUT THAT CHARGES FOR ONE AND GRANTS THE
+       OTHER, because every lookup past this point is `find` on the id. */
+    if (seen.has(p.id)) out.push({ pack: p.id, why: "pack_ids_clash", detail: "two packs share an id" });
+    seen.add(p.id);
+  }
+  /* ⚠️ ONE CURRENCY, because a wallet holds credits and not money: two packs
+     priced in different currencies make "what a credit costs" a question with
+     two answers and no exchange rate anywhere to reconcile them. */
+  const currencies = new Set(packs.map((p) => p.currency));
+  if (currencies.size > 1) {
+    out.push({ pack: "", why: "mixed_currency", detail: [...currencies].join(", ") });
   }
   return out;
 }

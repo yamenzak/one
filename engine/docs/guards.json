@@ -651,6 +651,42 @@
       "fails": "two tiers priced in different currencies and a bill that adds them together"
     },
     {
+      "id": "a-pack-is-bought-and-never-rented",
+      "protects": "D1",
+      "stage": "44",
+      "status": "live",
+      "impl": "runtime/test/stripe.test.ts",
+      "proves": "tops up for a pack, and does not call it a payment",
+      "fails": "a lapsed workspace marked up to date because somebody bought fifty credits - the ladder clears the arrears and nothing was paid"
+    },
+    {
+      "id": "the-credits-reach-the-wallet-and-only-once",
+      "protects": "D12",
+      "stage": "44",
+      "status": "live",
+      "impl": "runtime/test/stripe.test.ts",
+      "proves": "puts the credits in the wallet, end to end",
+      "fails": "money captured and no credits granted, or a retried delivery granting the pack again on every retry"
+    },
+    {
+      "id": "an-event-is-the-workspaces-however-it-names-a-product",
+      "protects": "D1",
+      "stage": "44",
+      "status": "live",
+      "impl": "runtime/test/stripe.test.ts",
+      "proves": "ignores whatever product an event claims to be about",
+      "fails": "every plan checkout parked instead of granting the month somebody just paid for, because the membership's app id is the empty string and an absent app was a refusal"
+    },
+    {
+      "id": "becoming-a-business-lands-with-the-payment-that-bought-it",
+      "protects": "D21",
+      "stage": "44",
+      "status": "live",
+      "impl": "runtime/test/stripe.test.ts",
+      "proves": "opens the one-way door on the payment that bought a commercial tier",
+      "fails": "a workspace charged for a business tier and still personal until somebody fills in a form, with the money already taken"
+    },
+    {
       "id": "the-months-allowance-is-set-and-never-added",
       "protects": "D1",
       "stage": "6",

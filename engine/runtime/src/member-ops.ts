@@ -16,7 +16,7 @@
  * context is passed only to them.
  */
 
-import type { Allowance, AppSpec, Channel, PlanSpec, RoleRegistry, TenantId, Theme } from "@engine/kernel";
+import type { Allowance, AppSpec, Channel, PackDef, PlanSpec, RoleRegistry, TenantId, Theme } from "@engine/kernel";
 import { PUBLIC, SURFACES, refusePolicy, seatsUsed, withinQuota } from "@engine/kernel";
 import { brandingOf, setBranding } from "./branding.js";
 import { LEAST_SIDE, MOST_BYTES, MOST_SIDE, forgetIcon, hasIcon, setIcon } from "./icon.js";
@@ -88,6 +88,8 @@ export interface PlatformCtx extends Ctx {
    * that no longer exists.
    */
   readonly plans: readonly PlanSpec[];
+  /** ⚠️ And what it sells one-off. One wallet, so one list — see `PACKS`. */
+  readonly packs: readonly PackDef[];
   /**
    * ⚠️ WHAT A STORED CREDENTIAL IS ENCRYPTED UNDER — see `config.ts`. Absent is a
    * deployment that holds no keys, and every lane behind one refuses rather than

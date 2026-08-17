@@ -573,11 +573,15 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
           return ctx.fail("platform.forbidden");
         }
 
-        /* DEFER(engine-44) stage:44 — THE CARD LANE TAKES SUBSCRIPTIONS, NOT
-           ONE-OFF PURCHASES, so `paid` is false and the only way through is an
-           operator's allowance. The refusal is already the right one, which is
-           the half that matters: a one-off checkout sets this and nothing else
-           here changes. */
+        /*
+          ⚠️ `paid: false` HERE IS NOT A GAP, IT IS THE ALLOWANCE LANE. This
+          route spends what an operator granted; the OTHER way in is buying a
+          commercial tier, which sets the kind from the signed event that says
+          the money moved (`money.checkout` carries the legal name, the webhook
+          calls `becomeCommercial` with `paid: true`). A route that could set
+          `paid` itself would be a route that makes any workspace a business for
+          nothing.
+        */
         const done = await becomeCommercial(
           ctx.directory, tenant.id, ctx.session!.accountId,
           { legalName, paid: false }, ctx.now);

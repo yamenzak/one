@@ -13,9 +13,9 @@
  */
 
 import type { AppId, AppSpec, TenantId } from "@engine/kernel";
-import { PLATFORM_ENTITLEMENTS } from "@engine/kernel";
+import { PLATFORM_ENTITLEMENTS, isBusiness } from "@engine/kernel";
 import { MEMBERSHIP, billFor, mixedCurrencies, subscriptionFor } from "./billing.js";
-import { startCheckout } from "./stripe.js";
+import { startCheckout, startTopUp } from "./stripe.js";
 import { movements, spentByApp, walletOf } from "./wallet.js";
 import type { PlatformCtx } from "./member-ops.js";
 import type { Resolved } from "./compose.js";
@@ -127,6 +127,16 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
          completes and charges nothing. */
       if (plan.parking) return ctx.fail("platform.invalid");
 
+      /*
+        ⚠️ A COMMERCIAL TIER NEEDS THE LEGAL NAME BEFORE THE MONEY, because the
+        name is what goes on the invoice the payment produces. Asking afterwards
+        would mean a workspace that paid for a business tier and is still
+        personal until somebody fills in a form — and the charge is already on
+        the card by then.
+      */
+      const legalName = String(input.legalName ?? "").trim();
+      if (isBusiness(plan.kind) && !legalName) return ctx.fail("platform.invalid");
+
       const made = await startCheckout(
         { directory: ctx.directory, ...(ctx.configSecret ? { configSecret: ctx.configSecret } : {}) },
         {
@@ -134,6 +144,7 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           appId: MEMBERSHIP,
           plan,
           email: ctx.email,
+          ...(isBusiness(plan.kind) ? { legalName } : {}),
           /* ⚠️ THE RETURN ADDRESSES COME FROM THE REQUEST'S OWN ORIGIN, handed
              down by the deployment. A constant here would send an EU workspace
              on a custom domain back to somebody else's hostname. */
@@ -150,5 +161,51 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
     },
   };
 
-  return { "money.view": spec, "money.checkout": checkout };
+  /**
+   * TOPPING THE WALLET UP.
+   *
+   * ⚠️ THE SAME SHAPE AS THE PLAN CHECKOUT, AND FOR THE SAME REASONS: the pack
+   * is resolved from the deployment's own list, the session grants nothing, and
+   * only a signed event moves the balance. What differs is one word — Stripe's
+   * `mode` is `payment`, because a pack is bought rather than rented.
+   *
+   * ⚠️ `billing:manage`, because this spends money. Reading what a wallet holds
+   * is a manager's; charging a card is an owner's.
+   */
+  const topup: Resolved = {
+    id: "money.topup",
+    kind: "write",
+    method: "POST",
+    path: "/api/money.topup",
+    permission: "billing:manage",
+    spec: {
+      id: "money.topup", kind: "write", summary: "Buy credits.",
+      input: {}, output: {},
+      permission: "billing:manage",
+      idempotency: { mode: "none" },
+      async handler() { return {} as never; },
+    } as Resolved["spec"],
+    run: async (bare, input) => {
+      const ctx = bare as PlatformCtx;
+      const pack = ctx.packs.find((p) => p.id === String(input.pack ?? ""));
+      if (!pack) return ctx.fail("platform.invalid");
+
+      const made = await startTopUp(
+        { directory: ctx.directory, ...(ctx.configSecret ? { configSecret: ctx.configSecret } : {}) },
+        {
+          tenantId: ctx.tenantId as TenantId,
+          pack,
+          email: ctx.email,
+          successUrl: `${ctx.origin}/space/w/${ctx.slug ?? ""}/money?topped=1`,
+          cancelUrl: `${ctx.origin}/space/w/${ctx.slug ?? ""}/money`,
+        });
+
+      if (made === "not_charging") return ctx.fail("platform.unavailable");
+      if (made === "free_plan") return ctx.fail("platform.invalid");
+      if (made === "stripe_refused") return ctx.fail("platform.unavailable");
+      return { url: made.url };
+    },
+  };
+
+  return { "money.view": spec, "money.checkout": checkout, "money.topup": topup };
 }

@@ -28,8 +28,8 @@ import type { Lane } from "./ai.js";
 import type { WhitelabelDef } from "./brand.js";
 import type { CollectionSpec } from "./collection.js";
 import { danglingRefs, eventsFor, operationsFor, quotasWithoutCeiling, refuseCollection } from "./collection.js";
-import type { MeterBook, PackDef } from "./credit.js";
-import { refusePacks, unbounded } from "./credit.js";
+import type { MeterBook } from "./credit.js";
+import { unbounded } from "./credit.js";
 import { unknownInPrompt } from "./ai.js";
 import type { EntitlementDef } from "./entitlement.js";
 import { PLATFORM_ENTITLEMENTS, unenforced } from "./entitlement.js";
@@ -124,7 +124,6 @@ export interface AppSpec {
    * `infra.ts`.
    */
   readonly needs?: NeedBook;
-  readonly packs?: readonly PackDef[];
   readonly meters?: MeterBook;
   readonly lanes?: readonly Lane[];
   readonly whitelabel?: WhitelabelDef;
@@ -269,7 +268,6 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
   for (const p of refuseJobs(spec.jobs ?? {}, Object.keys(spec.notifications ?? {}))) {
     at(`job ${p.job}`, `${p.why}: ${p.detail}`);
   }
-  for (const p of refusePacks(spec.packs ?? [])) at(`pack ${p.pack}`, `${p.why}: ${p.detail}`);
 
   /*
     ⚠️ THE LADDER IS THE PLATFORM'S AND IS CHECKED HERE ANYWAY, because there is
@@ -354,6 +352,14 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
     if (key in PLATFORM_ENTITLEMENTS) {
       at("catalogue", `"${key}" is the platform's to sell, not an app's`);
     }
+  }
+  /* ⚠️ AND A PRICE LIST IS THE DEPLOYMENT'S, WHOLE. Plans and credit packs both
+     left this file when the membership became one — there is one wallet, so a
+     pack an app declared would top up a shared balance that only that product
+     could sell. `refuseCatalog` and `refusePacks` run over the deployment's own
+     lists instead, in `deploymentFaults`. */
+  if ("packs" in spec || "plans" in spec) {
+    at("catalogue", "prices belong to the deployment, not to a product");
   }
   /* ⚠️ THE UNION, BECAUSE AN APP MAY COUNT AGAINST A PLATFORM KEY. It may not
      DECLARE one (above), but a collection is entitled to reference `seats` or

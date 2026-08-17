@@ -20,7 +20,7 @@
  */
 
 import type {
-  AppSpec, Caller, Door, Kind, PlanSpec, Problem, Resolved as _Resolved, Roots, Standing,
+  AppSpec, Caller, Door, Kind, PackDef, PlanSpec, Problem, Resolved as _Resolved, Roots, Standing,
 } from "@engine/kernel";
 import {
   IN_GOOD_STANDING, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, check, doorFor, newId, problem,
@@ -155,6 +155,8 @@ export interface Wiring {
    * catalogue is the deployment's rather than any app's — see `PlanSpec`.
    */
   readonly plans?: readonly PlanSpec[];
+  /** ⚠️ And the one-off packs, for the same reason — see `PlatformCtx.packs`. */
+  readonly packs?: readonly PackDef[];
 }
 
 /**
@@ -634,6 +636,7 @@ export async function performOperation(
        the same list the gate resolved against. Empty is a deployment that sells
        nothing, which every reader already handles as the parking state. */
     plans: wiring.plans ?? [],
+    packs: wiring.packs ?? [],
     ...(wiring.configSecret ? { configSecret: wiring.configSecret } : {}),
     /* ⚠️ ONE READ PER REQUEST AT MOST, AND ONLY IF A HANDLER ASKS. Resolved for
        the app the operation belongs to, because a setting is that app's. */

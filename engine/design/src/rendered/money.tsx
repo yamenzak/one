@@ -151,14 +151,12 @@ export function Wallet({ balance, held, spentByApp, appName, packs, onBuy }: Wal
             </Card.Header>
             <Card.Content>
               <strong>{money(pack.price, pack.currency)}</strong>
-              {/* ⚠️ An expiry is on the card, not in the small print. */}
-              {pack.expiresDays
-                ? (
-                  <Chip color="warning" variant="soft">
-                    <Chip.Label>Expires after {pack.expiresDays} days</Chip.Label>
-                  </Chip>
-                )
-                : null}
+              {/* ⚠️ SAID ON THE CARD, NOT IN THE SMALL PRINT. It is the reason
+                  somebody buys a pack instead of waiting for the month to turn,
+                  and it is the one thing the allowance beside it does not do. */}
+              <Chip variant="soft">
+                <Chip.Label>Never expires</Chip.Label>
+              </Chip>
             </Card.Content>
             <Card.Footer>
               <Button variant="primary" onPress={() => onBuy(pack.id)}>Buy</Button>

@@ -671,14 +671,6 @@ export const HELLO: AppSpec = defineApp({
      at all is `mayBrand(kind)`, which is the same answer in every product. */
   whitelabel: { surfaces: ["shell", "email"] },
 
-  /* ⚠️ A pack has a real price. Credits for nothing is always a catalogue
-     mistake rather than a promotion — a promotion is a discount on a price,
-     which stays a price. */
-  packs: [
-    { id: "small", name: "1,000 credits", credits: 1000, price: 900, currency: "EUR", order: 0 },
-    { id: "large", name: "5,000 credits", credits: 5000, price: 3900, currency: "EUR", order: 1 },
-  ],
-
   /* ⚠️ The ceiling the reserve is computed from — never "whatever it returns".
      A meter with no ceiling reserves nothing and settles at whatever arrived. */
   meters: {

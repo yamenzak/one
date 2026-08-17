@@ -289,7 +289,14 @@ export type BecomeRefusal = "no_such_tenant" | "already" | "legal_name" | "unpai
 export async function becomeCommercial(
   db: Db,
   tenantId: TenantId,
-  founder: AccountId,
+  /**
+   * ⚠️ NULL WHEN THE MONEY MOVED. An allowance is what somebody spends INSTEAD
+   * of paying, so the paid lane has no founder to charge it to — the webhook
+   * knows the workspace and the signed event, and nothing else. Making the
+   * argument optional is what keeps one function for both lanes; two would be
+   * two answers to what a business IS.
+   */
+  founder: AccountId | null,
   ask: { readonly legalName: string; readonly paid: boolean },
   now = new Date(),
 ): Promise<TenantRow | BecomeRefusal> {
@@ -297,7 +304,9 @@ export async function becomeCommercial(
   if (!tenant || tenant.closedAt) return "no_such_tenant";
   if (!mayBecome(tenant.kind, "commercial")) return "already";
 
-  const allowance = await commercialAllowance(db, founder);
+  const allowance = founder
+    ? await commercialAllowance(db, founder)
+    : { granted: 0, used: 0 };
   const refusal = refuseCommercial(tenant, { ...ask, allowance });
   if (refusal) return refusal;
 

@@ -17,7 +17,7 @@
  */
 
 import type {
-  AccountId, AppSpec, DeploymentLegal, Door, PlanSpec, Residency, TenantId,
+  AccountId, AppSpec, DeploymentLegal, Door, PackDef, PlanSpec, Residency, TenantId,
 } from "@engine/kernel";
 import { MEDIA_NEED, subProcessor, under } from "@engine/kernel";
 import {
@@ -27,7 +27,8 @@ import {
   deploymentFaults, isPlatformPath, locator,
   accept, bindingKey, liveBindings, memberFor, noteShardApp, observe, owedBy, sweep,
   tenantById, tenantBySlug,
-  applyEvent, markCancelled, markPaid, markPastDue, stripeKey, subscribe, verifySignature, renewAllowance,
+  applyEvent, becomeCommercial, markCancelled, markPaid, markPastDue, renewAllowance, stripeKey,
+  subscribe, topUp, verifySignature,
   webhookSecret,
   operatorOps, permissionsResolver, personalOps, pusherOver, schemaFor, sendMail, serve,
   sessionIdFrom, shardFor, subscriptionFor, whoIs,
@@ -120,6 +121,30 @@ const PLANS: readonly PlanSpec[] = [
     price: 19900, currency: "USD", credits: 40_000,
     includes: { seats: 25, storage: 2048 * GB, domains: 3, notes: -1, publishing: true },
   },
+];
+
+/**
+ * ONEWALLET — WHAT A TOP-UP COSTS WHEN THE MONTH'S ALLOWANCE RUNS OUT.
+ *
+ * ⚠️ THE PACKS ARE THE DEPLOYMENT'S FOR THE SAME REASON THE PLANS ARE. There is
+ * one wallet per workspace, so a pack a product declared would top up a shared
+ * balance that only that product could sell — and the second product's customers
+ * would be told to go and buy credits somewhere else.
+ *
+ * ⚠️ AND WHAT IS BOUGHT NEVER EXPIRES. The month's allowance lapses because it
+ * was free; taking back something somebody paid cash for, on a day they were not
+ * looking, is a different act entirely. It is also what makes a top-up safe to
+ * buy at any point in the month.
+ *
+ * ⚠️ THE RATE IMPROVES WITH SIZE AND NEVER BEATS A TIER. A pack that undercut
+ * the allowance a plan grants would price the plan out of its own catalogue —
+ * somebody would buy the floor and top up for ever, which is the shape of every
+ * failed usage-based upsell.
+ */
+const PACKS: readonly PackDef[] = [
+  { id: "p1", name: "1,000 credits", credits: 1_000, price: 1000, currency: "USD", order: 0 },
+  { id: "p5", name: "5,000 credits", credits: 5_000, price: 4500, currency: "USD", order: 1 },
+  { id: "p20", name: "20,000 credits", credits: 20_000, price: 16000, currency: "USD", order: 2 },
 ];
 
 /**
@@ -405,6 +430,7 @@ const boot = (env: Env): Promise<void> => {
       shards: SHARDS.map((s) => s.id),
       apps: Object.values(APPS).map((make) => make()),
       plans: PLANS,
+      packs: PACKS,
       used: SERVICES_REACHED,
       /* ⚠️ EVERYTHING THIS DEPLOYMENT APPLIES, so "is every table in the erasure
          ledger" is asked of what actually exists here rather than of the
@@ -540,7 +566,7 @@ const handler = (env: Env) => {
       request body. It sits beside the subscriptions it signs for, which are the
       sensitive half and are already there; alone it grants nothing.
     */
-    plans: PLANS,
+    plans: PLANS, packs: PACKS,
     pusher: pusherOver(directory),
 
     ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
@@ -590,6 +616,24 @@ const handler = (env: Env) => {
           },
           pastDue: (tenantId, appId) => markPastDue(directory, tenantId, appId, at),
           cancelled: (tenantId, appId) => markCancelled(directory, tenantId, appId),
+
+          /* ⚠️ THE PACK IS LOOKED UP HERE, NEVER READ OFF THE EVENT. What came
+             back is an id; the credits behind it are ours. A count in the
+             metadata is a number that made a round trip through the customer's
+             browser. */
+          bought: async (tenantId, packId, ref) => {
+            const pack = PACKS.find((p) => p.id === packId);
+            if (!pack) return;
+            await topUp(directory, tenantId, pack.credits, `${pack.name}`, { ref }, at);
+          },
+
+          /* ⚠️ AND THE ONE-WAY DOOR IS OPENED BY THE MONEY, not by the request
+             that started the checkout. `paid` is true here because a signed
+             event says it is — which is the only claim in this file that is not
+             the caller's. */
+          becameBusiness: async (tenantId, legalName) => {
+            await becomeCommercial(directory, tenantId, null, { legalName, paid: true }, at);
+          },
         }, at);
 
         /* ⚠️ 200 EVEN FOR A PARKED EVENT. Stripe cannot fix an attribution
@@ -903,4 +947,4 @@ export default {
   },
 };
 
-export { APPS, LEGAL, PLANS };
+export { APPS, LEGAL, PACKS, PLANS };
