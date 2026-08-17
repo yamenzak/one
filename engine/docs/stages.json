@@ -177,7 +177,7 @@
     {
       "n": 33,
       "title": "A guard refuses a declared setting nothing names — the seam a handler reads one through is live; the completeness check over it is not",
-      "status": "planned"
+      "status": "shipped"
     },
     {
       "n": 34,
@@ -223,6 +223,11 @@
       "n": 42,
       "status": "planned",
       "title": "A screen asks the gate before it draws a control, rather than after it is pressed"
+    },
+    {
+      "n": 43,
+      "status": "planned",
+      "title": "Hello's remaining screens reach the workspace's own records — the report against its target, and writing a note"
     }
   ]
 }

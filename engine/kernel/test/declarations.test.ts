@@ -13,7 +13,7 @@ import {
   channelsFor, inAudience, refusePolicy, refuseLetter, unknownVariables, brandable,
   unraisable, unaddressable, deadLinks, notification, type NotificationDef, type Channel,
 } from "../src/notify.js";
-import { area, refuseSetting, refuseSettings, disclose, valueOf, settingsOn, areasOn, settingsIn, unread, setting } from "../src/setting.js";
+import { area, refuseSetting, refuseSettings, disclose, valueOf, settingsOn, areasOn, settingsIn, setting } from "../src/setting.js";
 import { resolve, settableBy, refuseFlag, overdue, flag } from "../src/flag.js";
 import { remaining, progressOf, reached, refuseGuide } from "../src/guide.js";
 import { field } from "../src/field.js";
@@ -224,7 +224,6 @@ describe("a setting", () => {
     expect(settingsOn(book, "tenant").map((s) => s.id)).toEqual(["retention.days"]);
     expect(areasOn(book, AREAS, "person").map((a) => a.id)).toEqual(["appearance"]);
     expect(settingsIn(book, "person", "appearance").map((s) => s.id)).toEqual(["theme"]);
-    expect(unread(book, ["theme"])).toEqual(["retention.days"]);
   });
 
   /*

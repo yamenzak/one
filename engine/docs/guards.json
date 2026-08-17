@@ -2062,6 +2062,33 @@
       "impl": "one/test/boot.test.ts",
       "proves": "keeps a switched-off product on the console's list, marked off",
       "fails": "a one-way door: the row vanishes the moment the switch is pressed, with nothing left to press again"
+    },
+    {
+      "id": "a-declared-setting-is-read-by-something",
+      "protects": "D12",
+      "stage": "33",
+      "status": "live",
+      "impl": "scripts/settings.test.mjs",
+      "proves": "declared, rendered, saved, and read by nothing",
+      "fails": "a switch somebody turns on, believes, and stops watching for the problem it claimed to solve — with every signal saying it worked: the control saved, the value came back, the screen redrew"
+    },
+    {
+      "id": "a-settings-walk-that-read-nothing-is-a-failure",
+      "protects": "D12",
+      "stage": "33",
+      "status": "live",
+      "impl": "scripts/settings.test.mjs",
+      "proves": "no app declares one — a check that cannot fail",
+      "fails": "a guard that walks a moved or renamed declaration block, finds nothing, and prints a confident green line for months"
+    },
+    {
+      "id": "a-setting-may-wait-on-a-stage-and-only-a-real-one",
+      "protects": "D12",
+      "stage": "33",
+      "status": "live",
+      "impl": "scripts/settings.test.mjs",
+      "proves": "a marker pointing at nothing reads as a plan",
+      "fails": "a waiver list that covers the settings it was written for and everything anybody adds under them afterwards"
     }
   ]
 }

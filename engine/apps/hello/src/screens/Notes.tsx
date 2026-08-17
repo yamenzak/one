@@ -20,11 +20,18 @@ import {
 } from "@engine/design";
 import type { Note } from "./sample.js";
 
-export function Notes({ title, of, again, onNew, onOpen }: {
+export function Notes({ title, of, again, density = "comfortable", onNew, onOpen }: {
   /** ⚠️ The declared label — see `screens/index.tsx`. */
   readonly title?: string;
   readonly of: Loaded<readonly Note[]>;
   readonly again?: () => void;
+  /**
+   * ⚠️ THE PERSON'S OWN `notes.density`, PASSED IN. It is read where it is
+   * DRAWN — no handler could apply it, because what it changes is how much of
+   * each row is shown — and it is a prop rather than a read inside the screen so
+   * the ground can photograph both settings of it.
+   */
+  readonly density?: "comfortable" | "compact";
   readonly onNew: () => void;
   readonly onOpen: (note: Note) => void;
 }) {
@@ -86,7 +93,10 @@ export function Notes({ title, of, again, onNew, onOpen }: {
               says={{ nothing: "Nothing else written" }}
               asRow={(n) => ({
                 name: n.title,
-                under: n.said,
+                /* ⚠️ COMPACT DROPS THE SECOND LINE, which is what density IS —
+                   the same rows, less of each. Dropping a row or a column would
+                   be withholding information and calling it a preference. */
+                under: density === "compact" ? undefined : n.said,
                 aside: n.published
                   ? undefined
                   : <Chip color="default" variant="soft"><Chip.Label>Draft</Chip.Label></Chip>,

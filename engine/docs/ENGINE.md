@@ -349,7 +349,7 @@ and a manifest that does not compose refuses to boot.
 | `package` | a priced bundle of timed grants | 8 | 1 |
 | `tenancy` | workspaces, kinds, shards, placement, standing | 11 | — |
 | `door` | the five doors, and which host is which | 2 | — |
-| `setting` | a switch a workspace owns, and the page it lives on | 10 | 1 |
+| `setting` | a switch a workspace owns, and the page it lives on | 9 | — |
 | `flag` | a switch WE own, with a date it stops being one | 7 | — |
 | `notify` | what somebody is told, through which channel, and who may narrow it | 12 | 1 |
 | `problem` | the one refusal shape, and the platform's own catalogue | 6 | — |
@@ -364,7 +364,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**208 of them**, 200 reached by something today.
+**207 of them**, 200 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -492,7 +492,6 @@ its own header, cited by other files, and doing nothing.
 | `unknownProblems` | `problem` | composition |
 | `refuseSetting` | `setting` | composition |
 | `refuseSettings` | `setting` | composition |
-| `unread` | `setting` | deferred to stage 33 |
 | `refuseCommercial` | `tenancy` | runtime |
 | `refusePlacement` | `tenancy` | runtime |
 | `refuseCopy` | `tone` | guard |
@@ -733,6 +732,9 @@ its own header, cited by other files, and doing nothing.
 | `a-product-switched-off-stops-answering` | D1 | a switch that writes a row and changes nothing else — every route of the product still answering while the console reports it off |
 | `a-product-switched-off-keeps-its-records` | D1 | a downgrade that erases — indistinguishable from a working switch until somebody turns the product back on and finds an empty workspace |
 | `a-switched-off-product-is-still-on-the-console` | D18 | a one-way door: the row vanishes the moment the switch is pressed, with nothing left to press again |
+| `a-declared-setting-is-read-by-something` | D12 | a switch somebody turns on, believes, and stops watching for the problem it claimed to solve — with every signal saying it worked: the control saved, the value came back, the screen redrew |
+| `a-settings-walk-that-read-nothing-is-a-failure` | D12 | a guard that walks a moved or renamed declaration block, finds nothing, and prints a confident green line for months |
+| `a-setting-may-wait-on-a-stage-and-only-a-real-one` | D12 | a waiver list that covers the settings it was written for and everything anybody adds under them afterwards |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -751,7 +753,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 16 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 72 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 75 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -784,13 +786,12 @@ nothing yet.
 | **27** — The AI lane runs — an action reaches a provider and the reserve settles | `kernel/src/ai.ts` | 1 |
 | **27** — The AI lane runs — an action reaches a provider and the reserve settles | `kernel/src/credit.ts` | 1 |
 | **27** — The AI lane runs — an action reaches a provider and the reserve settles | `runtime/src/services.ts` | 1 |
-| **33** — A guard refuses a declared setting nothing names — the seam a handler reads one through is live; the completeness check over it is not | `kernel/src/setting.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `kernel/src/package.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `runtime/src/jobs.ts` | 1 |
 | **41** — A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have | `kernel/src/brand.ts` | 1 |
 | **42** — A screen asks the gate before it draws a control, rather than after it is pressed | `kernel/src/gate.ts` | 1 |
 
-**17 declarations** are built and reached by nothing, each waiting on a
+**16 declarations** are built and reached by nothing, each waiting on a
 stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one
 that names no stage, so this list cannot grow by forgetting.
 <!-- /generated -->
@@ -832,7 +833,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 30 | A workspace's apps are turned on and off, and a workspace can move shard | shipped |
 | 31 | Account security — sign out everywhere, and proving it is you again before something irreversible | shipped |
 | 32 | A manifest changes while the deployment is up, and the composed surface forgets | shipped |
-| 33 | A guard refuses a declared setting nothing names — the seam a handler reads one through is live; the completeness check over it is not | **planned** |
+| 33 | A guard refuses a declared setting nothing names — the seam a handler reads one through is live; the completeness check over it is not | shipped |
 | 34 | The kernel's remaining conveniences are each used by a lane or removed | shipped |
 | 35 | A workspace runs its own retention ladder against its own customers, and ours freezes it | **planned** |
 | 36 | The deployment provisions itself — a product declares what it needs underneath it, and the reconciler makes it exist in the right jurisdiction, binds it, and reaps it after a drain | shipped |
@@ -842,8 +843,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 40 | An app ships a screen — a product's browser half is a chunk of its own, loaded when its workspace opens it, drawing that workspace's own records through the door it is handed | shipped |
 | 41 | A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have | **planned** |
 | 42 | A screen asks the gate before it draws a control, rather than after it is pressed | **planned** |
+| 43 | Hello's remaining screens reach the workspace's own records — the report against its target, and writing a note | **planned** |
 
-**33 shipped, 9 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**34 shipped, 9 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

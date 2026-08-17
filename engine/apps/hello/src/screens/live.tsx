@@ -27,7 +27,7 @@
 
 import * as React from "react";
 import { ready, trouble, waiting, type Loaded } from "@engine/design";
-import { dayOf, type Instant, type Problem } from "@engine/kernel";
+import { dayOf, valueOf, type Instant, type Problem } from "@engine/kernel";
 import { HELLO } from "../index.js";
 import { Notes } from "./Notes.js";
 import type { Note as Shown } from "./sample.js";
@@ -117,9 +117,30 @@ const asShown = (row: Record<string, unknown>): Shown => ({
 
 /* ----------------------------------------------------------------- mounted --- */
 
+/**
+ * ⚠️ A SETTING IS READ WHERE IT IS DRAWN, and this is the half no handler could
+ * do. `notes.density` changes how much of each row is shown, so there is nothing
+ * a route could withhold — and while nothing read it, somebody could set it,
+ * watch it save, and go on seeing the same list.
+ *
+ * ⚠️ AND THE FALLBACK IS THE KERNEL'S, NEVER A `??` HERE. A screen inventing its
+ * own default is how a screen and a handler come to disagree about what somebody
+ * switched on, with the declaration agreeing with neither.
+ */
+function useDensity(api: Door) {
+  const { of } = useAsked<{ person: Record<string, { value?: unknown }> }>(
+    () => api.get("setting.read"));
+  const def = HELLO.settings?.["notes.density"];
+  if (!def || of.status !== "ready") return undefined;
+  const stored = Object.fromEntries(
+    Object.entries(of.data.person ?? {}).map(([id, held]) => [id, held?.value]));
+  return valueOf(def, stored) as "comfortable" | "compact";
+}
+
 const LIST = (api: Door) => function NotesHere() {
   const { of, again } = useAsked<{ items: readonly Record<string, unknown>[] }>(
     () => api.get("note.list"));
+  const density = useDensity(api);
 
   const rows: Loaded<readonly Shown[]> = of.status === "ready"
     ? ready(of.data.items.map(asShown))
@@ -130,6 +151,7 @@ const LIST = (api: Door) => function NotesHere() {
       title={(HELLO.screens ?? []).find((s) => s.route === "/")?.label}
       of={rows}
       again={again}
+      density={density}
       /* ⚠️ NOT WIRED YET, AND SAYING SO IS THE HONEST STATE. Writing a note is
          its own screen with its own container; a button that silently does
          nothing is the defect this whole file exists to avoid. */

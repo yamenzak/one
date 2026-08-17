@@ -230,22 +230,12 @@ export function refuseSettings(
   return out;
 }
 
-/**
- * ⚠️ A SWITCH THAT CHANGES NOTHING IS WORSE THAN AN ABSENT FEATURE. Somebody
- * turns it on, believes the thing it promised, and stops watching for the
- * problem it claimed to solve. This is the "surfaced → enforced" half of the
- * autodiscovery rule, and it is asked of every app.
- *
- * DEFER(engine-33) stage:33 — THE SEAM EXISTS AND THE WALK DOES NOT. `Ctx.setting`
- * resolves a declared setting for a handler, so a rail that was write-only is
- * readable and the reference app reads two. What is still missing is `named` —
- * the ids an app's code actually names — which is a static walk over that app's
- * own source rather than anything this function can ask for itself.
- *
- * ⚠️ AND THE WALK HAS TO ACCEPT A SCREEN AS A READER, not only a handler. A
- * display density and a workspace's colour are read where they are drawn; a
- * check that demanded a handler for every setting would report four correct
- * declarations as defects, which is the shape that gets a guard waived.
- */
-export const unread = (book: SettingBook, named: readonly string[]): readonly string[] =>
-  Object.keys(book).filter((id) => !named.includes(id));
+/*
+  ⚠️ AND WHETHER ANYTHING READS A SETTING IS NOT A QUESTION THIS FILE CAN ASK.
+  A switch that changes nothing is worse than an absent feature — somebody turns
+  it on, believes what it promised, and stops watching for the problem it claimed
+  to solve — but "is this id ever named" is a fact about an app's SOURCE, so the
+  check is `scripts/settings.test.mjs` and lives where the source is. A pure
+  `unread(book, named)` here was the kernel half of a walk the kernel cannot
+  perform, and nothing could hand it the second argument.
+*/

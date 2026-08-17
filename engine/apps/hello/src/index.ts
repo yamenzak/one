@@ -570,6 +570,9 @@ export const HELLO: AppSpec = defineApp({
       fallback: "idea", needs: "tenant:manage",
       help: "Whoever writes it can still change it.",
     },
+    /* DEFER(engine-43) stage:43 — Reports draws against a hardcoded twenty
+       because nothing mounts it over the workspace's own records yet; the day it
+       does, this is the number it reads. */
     "notes.weekly_target": {
       id: "notes.weekly_target", level: "tenant", area: "notes",
       field: field.number({ label: "Notes a week", holds: "none", min: 0, max: 500 }),
@@ -580,11 +583,17 @@ export const HELLO: AppSpec = defineApp({
        THAN A TEXT BOX. It fell through to `text` once, and a workspace's colour
        was a field holding `#2563eb` to be typed correctly by somebody who
        already knew hex. */
+    /* DEFER(engine-41) stage:41 — nothing paints a workspace's own colour yet:
+       the tokens every surface mixes with are set once at boot, and no screen
+       reads a stored accent to override them. */
     "notes.accent": {
       id: "notes.accent", level: "tenant", area: "appearance",
       field: field.colour({ label: "Colour", holds: "none" }),
       fallback: "#3f7d58", needs: "tenant:manage",
     },
+    /* DEFER(engine-23) stage:23 — nothing sends a letter, so there is no reply
+       for an address to go to. Declared with the lane rather than after it, so
+       the field kind is exercised by the ground. */
     "notes.reply_to": {
       id: "notes.reply_to", level: "tenant", area: "email",
       field: field.email({ label: "Where replies go", holds: "contact" }),
@@ -595,11 +604,14 @@ export const HELLO: AppSpec = defineApp({
       field: field.enum({ label: "Density", holds: "none", values: ["comfortable", "compact"] }),
       fallback: "comfortable",
     },
+    /* DEFER(engine-43) stage:43 — hello has no composer: `onNew` is wired to
+       nothing on purpose, and a signature has nothing to sign. */
     "notes.signature": {
       id: "notes.signature", level: "person", area: "appearance",
       field: field.text({ label: "How you sign a note", holds: "none", max: 60 }),
       fallback: "",
     },
+    /* DEFER(engine-23) stage:23 — see `notes.reply_to`. A digest is a letter. */
     "notes.digest": {
       id: "notes.digest", level: "person", area: "email",
       field: field.enum({
