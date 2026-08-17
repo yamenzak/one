@@ -123,10 +123,10 @@ layering failure rather than a shortcut. A guard says so.
 | `installable` | the manifest and the icon a workspace is installed as | 3 | — |
 | `platform-schema` | the platform's own tables, in dependency order, listed once | 2 | — |
 | `dispatch` | an event an operation raises becomes a note in somebody's inbox | 1 | — |
-| `sweep` | the daily clock: erase what is past the ladder's last rung | 2 | — |
+| `sweep` | the daily clock: erase what is past the ladder's last rung | 3 | — |
 | `vault-ops` | consent, grants, who looked, the processing record, export and erasure | 1 | — |
 
-**188 of them**, 171 reached by something today.
+**189 of them**, 172 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

@@ -78,7 +78,11 @@ const checkIn = collection({
   label: { one: "Check-in", many: "Check-ins" },
   scope: { of: "subject", column: "person" },
   permission: "check-in",
-  retention: null,
+  /* ⚠️ THE SAME TWO YEARS THE `wellbeing` PURPOSE PUBLISHES. A collection whose
+     retention outlives the purpose it was collected for is a promise the record
+     of processing makes and the database contradicts — and the record is the
+     half a person reads. */
+  retention: 730,
   onClose: { then: "purge" },
   fields: {
     /* ⚠️ THE SCOPE COLUMN IS A DECLARED FIELD AND IS NEVER WRITTEN BY THE

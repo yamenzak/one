@@ -381,6 +381,9 @@ export default {
             catch { return null; }
           },
           apps: APPS,
+          /* ⚠️ Retention is a rule about rows: one statement per table per
+             database, not one per workspace. */
+          shards: SHARDS.map((id) => shardFor(env as never, id)),
         });
       } catch (why) {
         console.error("[sweep]", why);

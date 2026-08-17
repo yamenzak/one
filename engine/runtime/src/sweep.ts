@@ -14,23 +14,38 @@
  * runs twice the second one finds nothing to delete. A scheduler that must not
  * be run twice is a scheduler nobody dares re-run after a failure.
  *
- * ⚠️ AND IT DERIVES ITS WORK FROM THE DIRECTORY (D5). "Which workspaces are past
+ * ⚠️ fan-out-exempt: retention is a rule about ROWS and this is the one caller
+ * that is not a request. D5 forbids a fan-out because a per-request walk gets
+ * slower with every shard and times out at the size where it matters; a nightly
+ * sweep visiting every database once is the shape that rule exists to make
+ * affordable, and asking it per workspace would be the same answer arrived at
+ * once per customer.
+ *
+ * ⚠️ AND IT DERIVES ITS ERASURE WORK FROM THE DIRECTORY (D5). "Which workspaces are past
  * their date" answered by asking every shard is a walk that gets slower with
  * every shard and times out at the size where it starts to matter.
  */
 
 import type { AppSpec, Instant, TenantId } from "@engine/kernel";
+
 import { erase } from "./records.js";
 import { closeTenant, forgetBelonging, membersOfTenant, tenantById } from "./directory.js";
 import { forgetBranding } from "./branding.js";
 import { dueForErasure, run } from "./jobs.js";
-import type { Db } from "./sql.js";
+import { column, table, type Db } from "./sql.js";
 
 export interface SweepDeps {
   readonly directory: Db;
   /** Where a workspace's records are. Null when its shard is not bound here. */
   readonly shardOf: (tenantId: TenantId) => Promise<Db | null>;
   readonly apps: Readonly<Record<string, () => AppSpec>>;
+  /**
+   * ⚠️ EVERY SHARD, NOT ONE PER TENANT. Retention is a rule about ROWS, not
+   * about workspaces — "older than two years" is one statement per table per
+   * database, and asking it per workspace is the same answer arrived at once
+   * per customer.
+   */
+  readonly shards: readonly Db[];
   readonly now?: () => Date;
 }
 
@@ -82,6 +97,71 @@ export async function sweepErasure(deps: SweepDeps): Promise<{ touched: number; 
 }
 
 /**
+ * Delete what has been kept for as long as it was promised.
+ *
+ * ⚠️ A RETENTION NOBODY ENFORCES IS WORSE THAN NONE, and this is the shape it
+ * had: `retention` is declared on every collection and every purpose, and
+ * `vault.processing` PUBLISHES it to the person it is about. Telling somebody
+ * in writing that a fact is kept for two years and then keeping it forever is
+ * not a gap — it is a documented commitment the system contradicts, discovered
+ * by whoever asks for their data in year three.
+ *
+ * ⚠️ AND IT IS DERIVED, so a collection added today expires today. A list of
+ * tables to sweep is a list that will one day be missing the newest one, which
+ * is exactly the table nobody thinks to check.
+ *
+ * ⚠️ A FACT IS KEPT AS LONG AS ITS LONGEST PURPOSE NEEDS IT. One fact may serve
+ * two, and expiring it on the shorter would delete something the other purpose
+ * is still lawfully — and visibly — holding.
+ */
+export async function sweepRetention(deps: SweepDeps): Promise<{ touched: number; detail: string }> {
+  const now = (deps.now ?? (() => new Date()))();
+  const day = 24 * 60 * 60 * 1000;
+  const before = (days: number) => new Date(now.getTime() - days * day).toISOString();
+
+  let deleted = 0;
+  const said: string[] = [];
+
+  for (const db of deps.shards) {
+    for (const make of Object.values(deps.apps)) {
+      const app = make();
+
+      for (const spec of app.collections) {
+        if (spec.retention === null) continue;
+        /* ⚠️ A missing table is not a failure — a shard legitimately holds only
+           the apps placed on it, and a sweep that threw would stop before the
+           tables that ARE there. */
+        try {
+          const done = await db.prepare(
+            `DELETE FROM ${table(spec.id)} WHERE ${column("at")} < ?`)
+            .bind(before(spec.retention)).run() as { meta?: { changes?: number } };
+          const rows = done?.meta?.changes ?? 0;
+          if (rows) { deleted += rows; said.push(`${spec.id} ${rows}`); }
+        } catch { /* not on this shard */ }
+      }
+
+      /* The vault's own, by the longest purpose that covers each fact. */
+      for (const [key, field] of Object.entries(app.vault ?? {})) {
+        const days = field.purposes
+          .map((id) => app.purposes?.[id]?.retention ?? null)
+          .reduce<number | null>((a, b) => (a === null || b === null ? null : Math.max(a, b)),
+            field.purposes.length ? 0 : null);
+        if (days === null || days === 0) continue;
+        try {
+          const done = await db.prepare(
+            `DELETE FROM vault_fact WHERE field = ? AND at < ?`)
+            .bind(key, before(days)).run() as { meta?: { changes?: number } };
+          const rows = done?.meta?.changes ?? 0;
+          if (rows) { deleted += rows; said.push(`${key} ${rows}`); }
+        } catch { /* not on this shard */ }
+      }
+    }
+  }
+
+  return { touched: deleted, detail: said.length ? said.join(", ") : "nothing was past its date" };
+}
+
+/**
  * ⚠️ EVERY RUN IS RECORDED, SUCCESSES AND FAILURES ALIKE. A job that stops
  * running does not fail — nothing is waiting for its answer, so a throw at 03:00
  * has no user, no request, no 500 and no red test. The console reads the LAST
@@ -90,4 +170,8 @@ export async function sweepErasure(deps: SweepDeps): Promise<{ touched: number; 
 export async function sweep(deps: SweepDeps): Promise<void> {
   const now = (deps.now ?? (() => new Date()))();
   await run(deps.directory, "erasure", () => sweepErasure(deps), now);
+  /* ⚠️ ITS OWN RUN ROW, because "the sweep ran" is not the question anybody
+     asks after something was kept too long. Two jobs, two records, and the
+     console shows which of them stopped. */
+  await run(deps.directory, "retention", () => sweepRetention(deps), now);
 }

@@ -226,6 +226,37 @@ describe("what happens to a workspace nobody is looking at", () => {
     expect(await notesOf(inArrears)).toBe(1);
   });
 
+  /*
+    ⚠️ A RETENTION NOBODY ENFORCES IS WORSE THAN NONE, and that was its state:
+    declared on every collection, PUBLISHED to the person by the processing
+    record, and read by nothing. Telling somebody in writing that a check-in is
+    kept for two years and keeping it for ever is not a gap — it is a commitment
+    the system contradicts, found by whoever asks in year three.
+  */
+  it("deletes what has been kept for longer than it was promised", async () => {
+    const made = await createTenant(directory(), {
+      slug: "lasting", name: "Lasting", country: "DE", where: "eu", apps: ["hello"],
+    });
+    if (typeof made === "string") throw new Error(made);
+
+    const day = 24 * 60 * 60 * 1000;
+    const rows = [["ci_old", new Date(Date.now() - 800 * day).toISOString()],
+      ["ci_new", new Date().toISOString()]] as const;
+    for (const [id, at] of rows) {
+      await shard().prepare(
+        `INSERT INTO check_in (id, person, week, went, at, by) VALUES (?, 'acc_x', '2026-01-01', 'fine', ?, NULL)`)
+        .bind(id, at).run();
+    }
+
+    await fire();
+
+    const left = await shard().prepare(`SELECT id FROM check_in ORDER BY id`)
+      .all<{ id: string }>();
+    /* ⚠️ The fresh one survives. A sweep that took the whole table would pass a
+       test asserting only that the old one is gone. */
+    expect(left.results.map((r) => r.id)).toEqual(["ci_new"]);
+  });
+
   /* ⚠️ RE-RUNNABLE, BECAUSE A SCHEDULER NOBODY DARES RE-RUN AFTER A FAILURE IS
      ONE THAT STAYS FAILED. */
   it("finds nothing to do the second time", async () => {
