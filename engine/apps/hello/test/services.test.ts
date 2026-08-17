@@ -14,9 +14,10 @@ import { PLATFORM_ROLES, type Channel, type ModelRow, type TenantId } from "@eng
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
   BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA, MEMBERSHIP_SCHEMA,
-  addShard, applySchema, audienceFor, balanceOf, createTenant, credit, fileNote, found, inboxOf,
+  addShard, applySchema, audienceFor, createTenant, fileNote, found, inboxOf,
   markSeen, noteShardApp, openAccount, invite, setPolicy, setPreference, unseenCount,
   MOCK_ALLOWED, availableChannels, generate, mockProvider, tell, type Db, type Provider,
+  topUp, walletOf,
   type PushNote,
 } from "@engine/runtime";
 import { HELLO } from "../src/index.js";
@@ -274,7 +275,7 @@ describe("generating something and charging for it", () => {
     than the customer — silently, on every call.
   */
   it("charges what the provider reported, never more than was held", async () => {
-    await credit(directory(), tenantId, 10_000, "pack.bought");
+    await topUp(directory(), tenantId, 10_000);
     const out = await generate(deps({
       async run() { return { text: "here you are", usage: { input: 600, output: 120 } }; },
     }), ask());
@@ -282,13 +283,13 @@ describe("generating something and charging for it", () => {
     if (typeof out === "string") return;
     expect(out.text).toBe("here you are");
     expect(out.charged).toBeGreaterThan(0);
-    expect((await balanceOf(directory(), tenantId)).held).toBe(0);
+    expect((await walletOf(directory(), tenantId)).held).toBe(0);
   });
 
   /* ⚠️ A missing usage report falls back to the reserve — a recount can only
      ever charge less than the truth, because of the cap. */
   it("charges the reserve when the provider reports nothing", async () => {
-    await credit(directory(), tenantId, 10_000, "pack.bought");
+    await topUp(directory(), tenantId, 10_000);
     const out = await generate(deps({
       async run() { return { text: "x", usage: null }; },
     }), ask());
@@ -303,12 +304,12 @@ describe("generating something and charging for it", () => {
     still held is a customer whose balance shrank and who got nothing.
   */
   it("gives the credits back when the provider fails", async () => {
-    await credit(directory(), tenantId, 10_000, "pack.bought");
+    await topUp(directory(), tenantId, 10_000);
     const out = await generate(deps({
       async run() { throw new Error("upstream timeout"); },
     }), ask());
     expect(out).toBe("provider_failed");
-    const wallet = await balanceOf(directory(), tenantId);
+    const wallet = await walletOf(directory(), tenantId);
     expect(wallet).toMatchObject({ balance: 10_000, held: 0 });
   });
 
@@ -322,7 +323,7 @@ describe("generating something and charging for it", () => {
   });
 
   it("refuses a lane no enabled model answers", async () => {
-    await credit(directory(), tenantId, 10_000, "pack.bought");
+    await topUp(directory(), tenantId, 10_000);
     const out = await generate({
       ...deps({ async run() { return { text: "", usage: null }; } }),
       models: async () => [],
@@ -341,11 +342,11 @@ describe("generating something and charging for it", () => {
     expect(MOCK_ALLOWED("development")).toBe(true);
     expect(MOCK_ALLOWED("production")).toBe(false);
 
-    await credit(directory(), tenantId, 10_000, "pack.bought");
+    await topUp(directory(), tenantId, 10_000);
     const inProd = await generate(deps(mockProvider("production"), "production"), ask());
     expect(inProd).toBe("provider_failed");
     /* ⚠️ And nothing was charged for the output it refused to invent. */
-    expect((await balanceOf(directory(), tenantId)).balance).toBe(10_000);
+    expect((await walletOf(directory(), tenantId)).balance).toBe(10_000);
 
     const inDev = await generate(deps(mockProvider("development")), ask());
     expect(typeof inDev).not.toBe("string");

@@ -651,6 +651,42 @@
       "fails": "two tiers priced in different currencies and a bill that adds them together"
     },
     {
+      "id": "the-months-allowance-is-set-and-never-added",
+      "protects": "D1",
+      "stage": "6",
+      "status": "live",
+      "impl": "apps/hello/test/money.test.ts",
+      "proves": "sets the month's allowance rather than adding to it",
+      "fails": "an allowance that compounds, so a quiet quarter buys three months of headroom and the busy month after it costs more than the customer ever paid"
+    },
+    {
+      "id": "credits-somebody-bought-are-never-taken-back",
+      "protects": "D1",
+      "stage": "6",
+      "status": "live",
+      "impl": "apps/hello/test/money.test.ts",
+      "proves": "never touches credits somebody paid for",
+      "fails": "a monthly confiscation of something bought with a card, on the day somebody is least likely to be looking at it"
+    },
+    {
+      "id": "the-allowance-is-spent-before-what-was-bought",
+      "protects": "D1",
+      "stage": "6",
+      "status": "live",
+      "impl": "apps/hello/test/money.test.ts",
+      "proves": "spends the allowance before what was bought",
+      "fails": "a customer paying cash for something they had already been given, and then watching it lapse unused"
+    },
+    {
+      "id": "arrears-take-the-writes-and-never-the-balance",
+      "protects": "D12",
+      "stage": "6",
+      "status": "live",
+      "impl": "apps/hello/test/money.test.ts",
+      "proves": "leaves the balance alone when the workspace is suspended",
+      "fails": "credits bought with a card disappearing the moment a card expires - the entitlement clamp is correct for a permission and theft for a balance"
+    },
+    {
       "id": "a-reserve-is-a-ceiling-on-revenue",
       "protects": "D12",
       "stage": "6",

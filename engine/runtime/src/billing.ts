@@ -28,8 +28,16 @@ import type { Db } from "./sql.js";
 export const BILLING_SCHEMA: SchemaModule = {
   id: "billing",
   statements: [
-    /* ⚠️ ONE PER BUSINESS. The card and the balance are theirs, not a product's. */
-    `CREATE TABLE IF NOT EXISTS billing_account (tenant_id TEXT PRIMARY KEY, customer_ref TEXT, currency TEXT NOT NULL, balance INTEGER NOT NULL, held INTEGER NOT NULL, at TEXT NOT NULL);`,
+    /*
+      ⚠️ ONE PER BUSINESS. The card and the balance are theirs, not a product's.
+
+      ⚠️ AND THE BALANCE IS TWO COLUMNS, BECAUSE THEY OBEY OPPOSITE RULES.
+      `granted` is the month's allowance and is SET on renewal; `bought` was paid
+      for with a card and is never reset. One number would make the renewal
+      either confiscate what somebody bought or carry an allowance forward for
+      ever, and there is no third behaviour a single column can have.
+    */
+    `CREATE TABLE IF NOT EXISTS billing_account (tenant_id TEXT PRIMARY KEY, customer_ref TEXT, currency TEXT NOT NULL, granted INTEGER, bought INTEGER, held INTEGER NOT NULL, at TEXT NOT NULL);`,
     /* ⚠️ AND ONE PER PRODUCT THEY HAVE SWITCHED ON. */
     `CREATE TABLE IF NOT EXISTS subscription (tenant_id TEXT NOT NULL, app_id TEXT NOT NULL, plan_id TEXT NOT NULL, status TEXT NOT NULL, at TEXT NOT NULL, past_due_at TEXT, trial_ends_at TEXT, overrides_json TEXT, adjustments_json TEXT, PRIMARY KEY (tenant_id, app_id));`,
     `CREATE INDEX IF NOT EXISTS ix_subscription_due ON subscription (status, past_due_at);`,

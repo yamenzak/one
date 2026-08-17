@@ -251,8 +251,8 @@ export async function noteCustomer(
   db: Db, tenantId: TenantId, customer: string, currency: string, now = new Date(),
 ): Promise<void> {
   await db.prepare(
-    `INSERT INTO billing_account (tenant_id, customer_ref, currency, balance, held, at)
-     VALUES (?, ?, ?, 0, 0, ?)
+    `INSERT INTO billing_account (tenant_id, customer_ref, currency, granted, bought, held, at)
+     VALUES (?, ?, ?, 0, 0, 0, ?)
      ON CONFLICT(tenant_id) DO UPDATE SET customer_ref = excluded.customer_ref`)
     .bind(tenantId, customer, currency, now.toISOString()).run();
 }

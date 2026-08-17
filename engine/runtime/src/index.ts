@@ -14,7 +14,7 @@ export * from "./branding.js";
 export * from "./icon.js";
 export * from "./raster.js";
 export * from "./billing.js";
-export * from "./credits.js";
+export * from "./wallet.js";
 export * from "./jobs.js";
 export * from "./locate.js";
 export * from "./inbox.js";

@@ -22,6 +22,7 @@ import type {
 import {
   allowanceLeft, mayBecome, newAccountId, newTenantId, placeOn, refuseCommercial, refusePlacement,
 } from "@engine/kernel";
+import { openAccount } from "./wallet.js";
 import type { SchemaModule } from "./schema.js";
 import type { Db } from "./sql.js";
 
@@ -215,6 +216,16 @@ export async function createTenant(
     await db.prepare(`INSERT INTO tenant_app (tenant_id, app_id, at, disabled_at) VALUES (?, ?, ?, NULL)`)
       .bind(id, app, at).run();
   }
+
+  /*
+    ⚠️ THE WALLET EXISTS FROM THE FIRST MINUTE, and it is not a convenience.
+    Every credit path writes through `billing_account` — the hold, the
+    settlement, the allowance — and each of them is an UPDATE, which on a missing
+    row changes nothing and reports success. A workspace without one cannot be
+    topped up, cannot be granted its month, and finds out at the moment somebody
+    tries to spend.
+  */
+  await openAccount(db, id, "USD", now);
 
   return {
     tenant: {

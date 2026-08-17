@@ -16,6 +16,7 @@ import {
   liveAppsOfTenant, mayMove,
   noteBelonging, noteShardApp, shards, tenantBySlug, tenantsOf, upsertAccount,
 } from "../src/directory.js";
+import { BILLING_SCHEMA } from "../src/billing.js";
 import { applySchema, refuseSql, schemaFor, stampOf, statementsFor } from "../src/schema.js";
 import { erase, list, put, readOne, unreachableByErasure } from "../src/records.js";
 import { bindingFor, shardFor, unbound } from "../src/handles.js";
@@ -77,8 +78,13 @@ const wipe = async (db: Db, tables: readonly string[]) => {
 };
 
 beforeEach(async () => {
-  await applySchema(directory(), [DIRECTORY_SCHEMA]);
-  await wipe(directory(), ["belongs", "tenant_app", "tenant", "shard_app", "shard", "account"]);
+  /* ⚠️ THE WALLET TABLE IS PART OF MAKING A WORKSPACE, so the directory this
+     suite runs against has to be the whole directory. `createTenant` opens the
+     billing account in the same breath as the row — a narrower schema here
+     tests a database no deployment has. */
+  await applySchema(directory(), [DIRECTORY_SCHEMA, BILLING_SCHEMA]);
+  await wipe(directory(), ["belongs", "tenant_app", "tenant", "shard_app", "shard", "account",
+    "billing_account"]);
   await wipe(env.SHARD_EU_1 as unknown as Db, ["note", "receipt"]);
   await wipe(env.SHARD_EU_2 as unknown as Db, ["note", "receipt"]);
 });

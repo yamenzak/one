@@ -17,7 +17,7 @@ import type { AppSpec, Door, Instant, TenantId } from "@engine/kernel";
 import { seatsUsed, tableFor } from "@engine/kernel";
 import { heldBy } from "./billing.js";
 import { PLATFORM_ENTITLEMENTS, type PlanSpec } from "@engine/kernel";
-import { balanceOf } from "./credits.js";
+import { walletOf } from "./wallet.js";
 import { tenantBySlug, type TenantRow } from "./directory.js";
 import { membersOf } from "./membership.js";
 import type { Located } from "./serve.js";
@@ -112,7 +112,7 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
       }
       : standing;
 
-    const wallet = await balanceOf(deps.directory, tenant.id);
+    const wallet = await walletOf(deps.directory, tenant.id);
     /* ⚠️ SETTLED BEFORE THE GATE RUNS. The gate asks synchronously and a
        database does not answer synchronously, so the counts are read here and
        served from memory — which also means two gates in one request cannot

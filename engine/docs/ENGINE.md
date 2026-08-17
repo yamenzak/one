@@ -396,7 +396,7 @@ env or a binding.
 | `records` | the generated reads and writes behind a collection | 6 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
 | `billing` | plans, subscriptions, the bill, the ladder | 12 | 1 |
-| `credits` | the balance, and reserve → settle → release | 7 | 3 |
+| `wallet` | OneWallet: the allowance, what was bought, and reserve → settle → release | 11 | — |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
 | `inbox` | notifications: the policy, the audience, the read | 10 | — |
 | `services` | the lane out to a provider — AI and mail | 5 | 1 |
@@ -432,7 +432,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**284 of them**, 278 reached by something today.
+**288 of them**, 285 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -583,6 +583,10 @@ its own header, cited by other files, and doing nothing.
 | `every-key-a-product-declares-is-priced-by-every-tier` | D1 | a feature built, shipped and sold to nobody - an unpriced key resolves to off for every workspace on every tier, and no screen anywhere says why |
 | `the-lobby-is-free-and-cannot-be-bought` | D21 | a workspace charged for the parking state it never chose, or offered it at checkout as though not having a plan were a plan |
 | `one-catalogue-one-currency` | D1 | two tiers priced in different currencies and a bill that adds them together |
+| `the-months-allowance-is-set-and-never-added` | D1 | an allowance that compounds, so a quiet quarter buys three months of headroom and the busy month after it costs more than the customer ever paid |
+| `credits-somebody-bought-are-never-taken-back` | D1 | a monthly confiscation of something bought with a card, on the day somebody is least likely to be looking at it |
+| `the-allowance-is-spent-before-what-was-bought` | D1 | a customer paying cash for something they had already been given, and then watching it lapse unused |
+| `arrears-take-the-writes-and-never-the-balance` | D12 | credits bought with a card disappearing the moment a card expires - the entitlement clamp is correct for a permission and theft for a balance |
 | `a-reserve-is-a-ceiling-on-revenue` | D12 | every unit an estimate fails to anticipate charged to a customer instead of absorbed, or absorbed silently on every call |
 | `a-hold-is-taken-in-the-statement-that-checks-it` | D12 | two concurrent calls both passing the same balance check, and a balance that went negative long after the calls that did it |
 | `arrears-take-writes-and-never-reads` | D12 | a business locked out of its own records over an unpaid invoice, which is holding their data hostage |
@@ -768,7 +772,7 @@ its own header, cited by other files, and doing nothing.
 <!-- generated: node scripts/inventory.mjs decisions -->
 | # | Decision | Guarded by |
 |---|---|---|
-| D1 | The tenant is primary; an app is a capability switched on for it | 9 |
+| D1 | The tenant is primary; an app is a capability switched on for it | 12 |
 | D2 | The framework is OneEngine; the deployment is One; packages are `@engine/*` | 3 |
 | D3 | One worker on the request path; heavy work splits over RPC service bindings | 6 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 3 |
@@ -779,7 +783,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 83 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 84 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -814,10 +818,9 @@ nothing yet.
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `runtime/src/jobs.ts` | 1 |
 | **41** — A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have | `kernel/src/brand.ts` | 1 |
 | **42** — A screen asks the gate before it draws a control, rather than after it is pressed | `kernel/src/gate.ts` | 1 |
-| **44** — A one-off purchase — a credit pack, and becoming a business — through the same checkout | `runtime/src/credits.ts` | 3 |
 | **45** — A plan is edited, and everybody already on it keeps what they were sold | `runtime/src/billing.ts` | 1 |
 
-**13 declarations** are built and reached by nothing, each waiting on a
+**10 declarations** are built and reached by nothing, each waiting on a
 stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one
 that names no stage, so this list cannot grow by forgetting.
 <!-- /generated -->

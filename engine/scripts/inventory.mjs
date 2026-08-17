@@ -199,7 +199,7 @@ if (what === "guards") {
     ["records", "the generated reads and writes behind a collection"],
     ["settings", "reading and writing a workspace's own switches"],
     ["billing", "plans, subscriptions, the bill, the ladder"],
-    ["credits", "the balance, and reserve → settle → release"],
+    ["wallet", "OneWallet: the allowance, what was bought, and reserve → settle → release"],
     ["packages", "granting, revoking and expiring a bought bundle"],
     ["inbox", "notifications: the policy, the audience, the read"],
     ["services", "the lane out to a provider — AI and mail"],

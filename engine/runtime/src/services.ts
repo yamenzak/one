@@ -29,7 +29,7 @@
 
 import type { AppId, Channel, Instant, Lane, ModelRow, TenantId } from "@engine/kernel";
 import { boundModel, plan as planRun, type Planned } from "@engine/kernel";
-import { release, reserve, settle } from "./credits.js";
+import { release, reserve, settle } from "./wallet.js";
 import type { Db } from "./sql.js";
 
 /* ---------------------------------------------------------------- the seam --- */

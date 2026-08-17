@@ -20,9 +20,9 @@ import {
   DIRECTORY_MODULES, SHARD_MODULES,
   BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, JOBS_SCHEMA, MEMBERSHIP_SCHEMA,
   MEMBERSHIP,
-  addShard, adjust, applySchema, balanceOf, billFor, createTenant, credit, grandfather, heldBy,
+  addShard, adjust, applySchema, billFor, createTenant, grandfather, heldBy,
   markPaid, markPastDue, noteShardApp, openAccount, pastDue, release, reserve, run, runsOf,
-  settle, spentByApp, subscribe, type Db,
+  settle, spentByApp, subscribe, topUp, walletOf, renewAllowance, movements, LEDGER as REASONS, type Db,
 } from "@engine/runtime";
 import { HELLO } from "../src/index.js";
 
@@ -139,7 +139,7 @@ describe("a workspace with two of our products", () => {
     buy credits twice.
   */
   it("spends one balance from either product, and says which spent what", async () => {
-    await credit(directory(), tenantId, 1000, "pack.bought");
+    await topUp(directory(), tenantId, 1000);
 
     const one = await reserve(directory(), tenantId, 300, "note.draft");
     expect(one).not.toBe("not_enough");
@@ -150,7 +150,7 @@ describe("a workspace with two of our products", () => {
     if (two === "not_enough") return;
     await settle(directory(), tenantId, two, 400, { appId: "ledger" });
 
-    expect((await balanceOf(directory(), tenantId)).balance).toBe(1000 - 120 - 400);
+    expect((await walletOf(directory(), tenantId)).balance).toBe(1000 - 120 - 400);
     const spent = await spentByApp(directory(), tenantId, daysAgo(1));
     expect(spent).toEqual([{ appId: "ledger", credits: 400 }, { appId: "hello", credits: 120 }]);
   });
@@ -165,17 +165,17 @@ describe("holding and spending credits", () => {
     platform pays for and the customer does not — silently, on every call.
   */
   it("never charges more than was held", async () => {
-    await credit(directory(), tenantId, 500, "pack.bought");
+    await topUp(directory(), tenantId, 500);
     const held = await reserve(directory(), tenantId, 100, "x");
     if (held === "not_enough") throw new Error("reserve refused");
     expect(await settle(directory(), tenantId, held, 400)).toBe(100);
-    expect((await balanceOf(directory(), tenantId)).balance).toBe(400);
+    expect((await walletOf(directory(), tenantId)).balance).toBe(400);
   });
 
   /* ⚠️ A missing usage report falls back to the reserve, never to a recount:
      because of the cap, a recount can only ever charge less than the truth. */
   it("charges the reserve when nothing was reported", async () => {
-    await credit(directory(), tenantId, 500, "pack.bought");
+    await topUp(directory(), tenantId, 500);
     const held = await reserve(directory(), tenantId, 100, "x");
     if (held === "not_enough") throw new Error("reserve refused");
     expect(await settle(directory(), tenantId, held, null)).toBe(100);
@@ -187,22 +187,117 @@ describe("holding and spending credits", () => {
     the symptom is a balance that went negative long after the calls that did it.
   */
   it("refuses a second hold that the balance cannot cover", async () => {
-    await credit(directory(), tenantId, 100, "pack.bought");
+    await topUp(directory(), tenantId, 100);
     expect(await reserve(directory(), tenantId, 80, "a")).not.toBe("not_enough");
     expect(await reserve(directory(), tenantId, 80, "b")).toBe("not_enough");
     /* ⚠️ And what is spendable excludes what is held, or the number disagrees
        with what happens at the moment of a refusal. */
-    expect(await balanceOf(directory(), tenantId)).toMatchObject({ balance: 100, held: 80, spendable: 20 });
+    expect(await walletOf(directory(), tenantId)).toMatchObject({ balance: 100, held: 80, spendable: 20 });
   });
 
   /* ⚠️ A reserve nothing settles would hold somebody's credits for ever — a
      balance they cannot spend with nothing to explain it. */
   it("gives back a hold whose call never finished", async () => {
-    await credit(directory(), tenantId, 100, "pack.bought");
+    await topUp(directory(), tenantId, 100);
     const held = await reserve(directory(), tenantId, 80, "a");
     if (held === "not_enough") throw new Error("reserve refused");
     await release(directory(), tenantId, held);
-    expect((await balanceOf(directory(), tenantId)).spendable).toBe(100);
+    expect((await walletOf(directory(), tenantId)).spendable).toBe(100);
+  });
+});
+
+/* ------------------------------------------------------------ two balances --- */
+
+describe("the month's allowance, and what was bought", () => {
+  /*
+    ⚠️ SET, NOT ADDED, AND THAT IS THE COST MODEL. A plan granting 1,500 a month
+    to somebody who spent none of last month's grants 1,500 — not 3,000. An
+    allowance that compounds prices a quiet quarter as three months of headroom,
+    and the customer who then has a busy month costs more than they ever paid.
+  */
+  it("sets the month's allowance rather than adding to it", async () => {
+    await onPlan("team");
+    await renewAllowance(directory(), tenantId, PLANS);
+    expect((await walletOf(directory(), tenantId)).granted).toBe(1000);
+
+    await renewAllowance(directory(), tenantId, PLANS);
+    expect((await walletOf(directory(), tenantId)).granted).toBe(1000);
+  });
+
+  /*
+    ⚠️ AND WHAT LAPSED IS ON THE STATEMENT. Setting the column silently makes a
+    balance drop between two rows with nothing between them to explain it, and
+    "where did my credits go" is then a question with no answer to show.
+  */
+  it("says on the statement what did not carry over", async () => {
+    await onPlan("team");
+    await renewAllowance(directory(), tenantId, PLANS);
+    const held = await reserve(directory(), tenantId, 400, "x");
+    if (held === "not_enough") throw new Error("reserve refused");
+    await settle(directory(), tenantId, held, 400);
+
+    await renewAllowance(directory(), tenantId, PLANS);
+    const said = await movements(directory(), tenantId);
+    expect(said.some((m) => m.reason === REASONS.expired && m.delta === -600)).toBe(true);
+    expect((await walletOf(directory(), tenantId)).granted).toBe(1000);
+  });
+
+  /*
+    ⚠️ WHAT WAS BOUGHT IS NEVER RESET. A renewal that swept it away would be a
+    monthly confiscation of something paid for with a card, on the day somebody
+    is least likely to be looking at it.
+  */
+  it("never touches credits somebody paid for", async () => {
+    await onPlan("team");
+    await topUp(directory(), tenantId, 2_500);
+    await renewAllowance(directory(), tenantId, PLANS);
+    await renewAllowance(directory(), tenantId, PLANS);
+
+    expect(await walletOf(directory(), tenantId))
+      .toMatchObject({ granted: 1000, bought: 2_500, balance: 3_500 });
+  });
+
+  /*
+    ⚠️ THE ALLOWANCE IS SPENT FIRST, and it is not a preference. Drawing on the
+    bought balance while an allowance sits there means the customer pays cash for
+    something they had already been given, and then watches it lapse.
+  */
+  it("spends the allowance before what was bought", async () => {
+    await onPlan("team");
+    await topUp(directory(), tenantId, 500);
+    await renewAllowance(directory(), tenantId, PLANS);
+
+    const held = await reserve(directory(), tenantId, 1_200, "x");
+    if (held === "not_enough") throw new Error("reserve refused");
+    await settle(directory(), tenantId, held, 1_200);
+
+    /* 1,000 off the allowance, the remaining 200 off what was bought. */
+    expect(await walletOf(directory(), tenantId))
+      .toMatchObject({ granted: 0, bought: 300, balance: 300 });
+  });
+
+  /*
+    ⚠️ AND NEITHER IS CONFISCATED WHEN STANDING STOPS. `walk` ends with a clamp
+    that zeroes everything a workspace holds — correct for a permission, theft
+    for a balance. Credits are a plan FIELD rather than an entitlement precisely
+    so they never go through it: a suspended workspace cannot spend, because the
+    gate refuses the write, and finds its balance intact when it comes back.
+  */
+  it("leaves the balance alone when the workspace is suspended", async () => {
+    await onPlan("team");
+    await topUp(directory(), tenantId, 900);
+    await renewAllowance(directory(), tenantId, PLANS);
+    /* ⚠️ Past the BLOCKED rung, which is where the clamp starts — read-only
+       withholds the writes and leaves every allowance where it was. */
+    await markPastDue(directory(), tenantId, MEMBERSHIP, new Date(Date.parse(daysAgo(35))));
+
+    const held = await heldBy(directory(), tenantId, { plans: PLANS, keys: KEYS }, NOW, true);
+    expect(held.standing.writable).toBe(false);
+    /* ⚠️ Every allowance is clamped to nothing... */
+    expect(held.entitlements.find((e) => e.key === "notes")?.value).toBe(0);
+    /* ...and the money is exactly where they left it. */
+    expect(await walletOf(directory(), tenantId))
+      .toMatchObject({ granted: 1000, bought: 900, balance: 1_900 });
   });
 });
 

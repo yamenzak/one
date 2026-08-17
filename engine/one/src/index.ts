@@ -27,7 +27,7 @@ import {
   deploymentFaults, isPlatformPath, locator,
   accept, bindingKey, liveBindings, memberFor, noteShardApp, observe, owedBy, sweep,
   tenantById, tenantBySlug,
-  applyEvent, markCancelled, markPaid, markPastDue, stripeKey, subscribe, verifySignature,
+  applyEvent, markCancelled, markPaid, markPastDue, stripeKey, subscribe, verifySignature, renewAllowance,
   webhookSecret,
   operatorOps, permissionsResolver, personalOps, pusherOver, schemaFor, sendMail, serve,
   sessionIdFrom, shardFor, subscriptionFor, whoIs,
@@ -581,7 +581,13 @@ const handler = (env: Env) => {
         const did = await applyEvent(directory, event, {
           subscribe: (tenantId, appId, planId) =>
             subscribe(directory, tenantId, appId, planId, "active", at),
-          paid: (tenantId, appId) => markPaid(directory, tenantId, appId),
+          /* ⚠️ A PAID INVOICE IS A PERIOD BEGINNING, so the month's allowance is
+             set here and nowhere else. Granting it at checkout instead would
+             give a workspace one month's credits and never a second. */
+          paid: async (tenantId, appId) => {
+            await markPaid(directory, tenantId, appId);
+            await renewAllowance(directory, tenantId, PLANS, at);
+          },
           pastDue: (tenantId, appId) => markPastDue(directory, tenantId, appId, at),
           cancelled: (tenantId, appId) => markCancelled(directory, tenantId, appId),
         }, at);

@@ -16,7 +16,7 @@ import type { AppId, AppSpec, TenantId } from "@engine/kernel";
 import { PLATFORM_ENTITLEMENTS } from "@engine/kernel";
 import { MEMBERSHIP, billFor, mixedCurrencies, subscriptionFor } from "./billing.js";
 import { startCheckout } from "./stripe.js";
-import { balanceOf } from "./credits.js";
+import { movements, spentByApp, walletOf } from "./wallet.js";
 import type { PlatformCtx } from "./member-ops.js";
 import type { Resolved } from "./compose.js";
 
@@ -51,7 +51,19 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       const plan = ctx.plans.find((p) => p.id === sub?.planId) ?? parking;
 
       const bill = await billFor(ctx.directory, ctx.tenantId as TenantId, ctx.plans);
-      const wallet = await balanceOf(ctx.directory, ctx.tenantId as TenantId);
+      const wallet = await walletOf(ctx.directory, ctx.tenantId as TenantId);
+
+      /*
+        ⚠️ A BALANCE WITH NO HISTORY BEHIND IT IS A NUMBER SOMEBODY HAS TO TAKE
+        ON TRUST. "Where did my credits go" is the first question a shared wallet
+        provokes, and it has two halves: which product spent them, and what
+        happened in what order. Both travel with the balance, because a screen
+        that has to fetch them separately is one that shows the number first and
+        the explanation second, if at all.
+      */
+      const since = new Date(ctx.now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const spent = await spentByApp(ctx.directory, ctx.tenantId as TenantId, since);
+      const statement = await movements(ctx.directory, ctx.tenantId as TenantId);
 
       return {
         /* ⚠️ THE PLAN IS THE WORKSPACE'S; the products are what it reaches. */
@@ -67,6 +79,8 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         apps: apps.map((a) => ({ id: a.id, name: a.name, mark: a.mark })),
         bill,
         wallet,
+        spent,
+        statement,
         mixed: mixedCurrencies(bill.lines),
       };
     },
