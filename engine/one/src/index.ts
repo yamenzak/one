@@ -235,6 +235,8 @@ const boot = (env: Env): Promise<void> => {
         ...DIRECTORY_MODULES, ...SHARD_MODULES,
         ...Object.values(APPS).map((make) => schemaFor(make())),
       ],
+      /* ⚠️ Asked of the DEPLOYMENT, once — see `missingDocuments`. */
+      legal: LEGAL,
     })) console.error(`[boot] ${fault}`);
   })();
   return booted;

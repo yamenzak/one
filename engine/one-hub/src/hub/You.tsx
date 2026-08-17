@@ -54,6 +54,15 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
         {/* ⚠️ YOURS, NOT A WORKSPACE'S. What you prefer follows you into every
             workspace you are in, so it is filed under you rather than under one
             of them — the same reason the inbox and `told` are here. */}
+        {/* ⚠️ UNDER YOU, BECAUSE THE WALK BEHIND IT CROSSES EVERY WORKSPACE.
+            Filed under one of them it would answer for a fraction of what is
+            held and say so in a heading nobody reads. */}
+        <NavRow
+          icon={glyphOf("shield")}
+          label="Your data"
+          under="Take a copy of everything we hold, or delete it"
+          onOpen={() => onGo({ at: "data" })}
+        />
         <NavRow
           icon={glyphOf("cog")}
           label="Your preferences"

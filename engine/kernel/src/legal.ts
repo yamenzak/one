@@ -57,7 +57,6 @@ export interface Acceptance {
  * ⚠️ WHAT SOMEBODY STILL OWES, BY VERSION. An acceptance of an older version is
  * not an acceptance — that is the entire reason the version is on the record.
  */
-/* DEFER(engine-25) stage:25 — nothing is offered for acceptance yet, so nobody can owe an acceptance. */
 export const outstanding = (
   book: DocumentBook,
   accepted: readonly Acceptance[],
@@ -217,13 +216,6 @@ export function refuseLegal(
  * not a gap in a manifest but a product taking somebody's data with nothing
  * saying what happens to it — and the answer is the same for every app on it,
  * which is exactly why it is asked here and not there.
- *
- * DEFER(engine-25) stage:25 — this deployment declares no documents at all, so
- * every lane that could ask this would refuse every boot. The gap is real and
- * the fix is a privacy notice and terms, which is legal text rather than code;
- * satisfying the rule with a stub URL is precisely the outcome the paragraph
- * above rules out, and would leave the rule green and the deployment silent.
- * Wiring it is the last line of the stage that writes them.
  */
 export function missingDocuments(
   book: DocumentBook,

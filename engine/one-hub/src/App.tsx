@@ -32,6 +32,7 @@ import type { Face } from "./door.js";
 import { Product } from "./centre/Product.js";
 import { Hub } from "./hub/Hub.js";
 import { HUB, inHub, pathOf } from "./hub/where.js";
+import { Agreements } from "./screens/Agreements.js";
 import { Elsewhere } from "./screens/Elsewhere.js";
 import { NewWorkspace } from "./screens/NewWorkspace.js";
 import { SignIn } from "./screens/SignIn.js";
@@ -54,7 +55,7 @@ const Ground = import.meta.env.DEV
 
 /** What the page shows, as a name — the thing the guard and the tests read. */
 export type Screen =
-  | "waiting" | "stuck" | "signpost" | "sign-in" | "hub" | "new-workspace"
+  | "waiting" | "stuck" | "signpost" | "sign-in" | "agreements" | "hub" | "new-workspace"
   | "product" | "elsewhere" | "ground";
 
 /**
@@ -64,6 +65,14 @@ export type Screen =
  */
 export function pickScreen(
   face: Face | null, signedIn: boolean | null, stuck: boolean, showcase = false,
+  /**
+   * ⚠️ HOW MANY AGREEMENTS ARE STILL OWED, AND IT IS DECIDED HERE RATHER THAN
+   * INSIDE A SCREEN. The wall holds the whole product, reads included, so it has
+   * to be picked at the same moment the door is — asked later, somebody sees
+   * their workspace for a moment and then loses it, and every write behind it
+   * refuses with a status the screen has no reason to expect.
+   */
+  owed = 0,
 ): Screen {
   /* ⚠️ THE TEST GROUND IS A DEVELOPMENT SURFACE AND NEVER REACHABLE IN
      PRODUCTION. It renders the reference app's screens over a sample world with
@@ -78,6 +87,13 @@ export function pickScreen(
   /* Every remaining door needs somebody. */
   if (signedIn === null) return "waiting";
   if (!signedIn) return "sign-in";
+  /*
+    ⚠️ ABOVE THE PRODUCT AND ABOVE THE HUB, AND NOT ABOVE SIGNING IN. Nobody can
+    agree to anything before we know who they are — and the wall is not a door,
+    so it comes after every door has been decided. The three ways out of it live
+    on the screen itself (`Agreements`): read, take a copy, delete.
+  */
+  if (owed > 0) return "agreements";
   if (face === "centre") return "product";
   if (face === "create") return "new-workspace";
   /* ⚠️ THE ACCOUNT DOOR AND THE OPERATOR DOOR ARE THE SAME PAGE. Both are the
@@ -123,7 +139,21 @@ export function App() {
     ? query.get("screen") ?? (query.has("ground") ? "/" : null)
     : null;
   const showcase = ground !== null;
-  const screen = pickScreen(face, me === null ? null : me !== "nobody", stuck !== null, showcase);
+  const owed = me && me !== "nobody" ? me.owed?.length ?? 0 : 0;
+  const screen = pickScreen(
+    face, me === null ? null : me !== "nobody", stuck !== null, showcase, owed);
+
+  /*
+    ⚠️ THE WALL, AND THE DOORS IN IT ARE ON THE SAME SCREEN. Sending somebody to
+    the hub for their copy would open every other screen in it — a workspace's
+    roster, its bill, its settings — and every operation behind those is behind
+    the wall, so each would refuse with a status the screen has no reason to
+    expect. What stays open is exactly what `beforeAccepting` marks open, and
+    `Agreements` is where it is offered.
+  */
+  if (screen === "agreements" && me && me !== "nobody") {
+    return <><NoticeHost /><Agreements owed={me.owed ?? []} /></>;
+  }
 
   /* ⚠️ The hub is the whole page here: the account door and the operator door
      have nothing underneath, so it is handed no way out. */

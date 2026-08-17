@@ -38,13 +38,14 @@ import { Preferences } from "../centre/Preferences.js";
 import { ConsoleHome, ConsolePart } from "./Console.js";
 import { OneTenant } from "../console/OneTenant.js";
 import { InboxScreen } from "../centre/InboxScreen.js";
+import { Data } from "./Data.js";
 import { TellingMe } from "./TellingMe.js";
 import { HUB, above, isConsole, nameOf, parseWhere, pathOf, type Where } from "./where.js";
 
 /* ⚠️ Every branch this file draws, named — the guard reads it, because an
    address the parser can produce with no branch renders a blank page. */
 export const HUB_SCREENS: readonly Where["at"][] = [
-  "home", "you", "inbox", "told", "prefs", "workspaces", "workspace",
+  "home", "you", "inbox", "told", "data", "prefs", "workspaces", "workspace",
   "people", "money", "plan", "packages", "settings", "brand", "notices", "wording", "trust",
   "console", "tenants", "tenant", "actions", "switches", "works", "ground",
 ];
@@ -247,6 +248,9 @@ function Inside({ where, onGo }: {
     case "you": return <You onGo={onGo} />;
     case "inbox": return <InboxScreen onGo={() => undefined} onSeen={() => undefined} />;
     case "told": return <TellingMe />;
+    /* ⚠️ THE COPY AND THE DELETION — see `Data.tsx`. Reachable from the
+       acceptance wall too, which is what keeps that wall leaveable. */
+    case "data": return <Data />;
     /* ⚠️ YOUR OWN PREFERENCES, ACROSS EVERY PRODUCT — no slug, because they are
        not a workspace's. The same split as `told` against `notices`. */
     case "prefs": return <Preferences where={where} onGo={onGo} />;

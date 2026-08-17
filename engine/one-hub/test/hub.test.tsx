@@ -41,8 +41,8 @@ describe("which screen the Hub is", () => {
       for (const signedIn of [true, false, null]) {
         const screen = pickScreen(faceFor(kind), signedIn, false);
         expect(screen, `${kind} / signedIn=${signedIn}`).not.toBe(undefined);
-        expect(["waiting", "stuck", "signpost", "sign-in", "hub", "new-workspace",
-          "product", "elsewhere"]).toContain(screen satisfies Screen);
+        expect(["waiting", "stuck", "signpost", "sign-in", "agreements", "hub",
+          "new-workspace", "product", "elsewhere"]).toContain(screen satisfies Screen);
       }
     }
   });
@@ -83,6 +83,32 @@ describe("which screen the Hub is", () => {
     for (const signedIn of [true, false, null]) {
       expect(pickScreen("signpost", signedIn, false)).toBe("signpost");
     }
+  });
+
+  /*
+    ⚠️ THE WALL HOLDS THE PRODUCT AND THE HUB ALIKE, and it is decided here so
+    that it cannot be forgotten by one screen. Somebody who has not agreed must
+    not see their workspace for a moment and then lose it — every write behind it
+    refuses with a status the screen has no reason to expect.
+  */
+  it("holds every signed-in surface until the agreements are given", () => {
+    for (const face of ["hub", "console", "centre", "create"] as const) {
+      expect(pickScreen(face, true, false, false, 1), face).toBe("agreements");
+    }
+  });
+
+  /*
+    ⚠️ AND IT IS NOT A DOOR. Nobody can agree to anything before we know who they
+    are, so an unsigned-in caller with documents owed is still asked to sign in —
+    and the signpost, which issues no code, is still the signpost.
+  */
+  it("does not put the wall in front of signing in", () => {
+    expect(pickScreen("hub", false, false, false, 2)).toBe("sign-in");
+    expect(pickScreen("centre", null, false, false, 2)).toBe("waiting");
+    expect(pickScreen("signpost", true, false, false, 2)).toBe("signpost");
+    /* ⚠️ And a failure still outranks it: a deployment we could not read is not
+       a person who has not agreed. */
+    expect(pickScreen("hub", true, true, false, 2)).toBe("stuck");
   });
 
   /*

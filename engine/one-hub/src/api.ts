@@ -128,6 +128,25 @@ export interface Me {
   /** ⚠️ An ACCOUNT fact — an operator stands outside every workspace (D18). */
   readonly operator?: boolean;
   readonly tenants: readonly Belonging[];
+  /**
+   * ⚠️ WHAT THEY STILL OWE AN AGREEMENT TO, CARRIED BY THE BOOT READ. The wall
+   * has to be known before the page is chosen — asked afterwards, somebody sees
+   * the product for a moment and then loses it, and every write behind it
+   * refuses with a status the screen has no reason to expect.
+   */
+  readonly owed?: readonly Owed[];
+}
+
+/** One document somebody has not agreed to yet. */
+export interface Owed {
+  readonly id: string;
+  readonly title: string;
+  readonly kind: string;
+  /** ⚠️ A day, and it is what is being agreed to — see `DocumentDef`. */
+  readonly version: string;
+  readonly url: string | null;
+  readonly binds: "person" | "tenant";
+  readonly appId: string | null;
 }
 
 export interface Belonging {

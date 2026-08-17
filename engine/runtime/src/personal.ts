@@ -367,6 +367,14 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
              outside every workspace, so no roster could answer it. */
           operator: deps.isOperator?.(ctx.email) === true,
           tenants: belongs,
+          /*
+            ⚠️ WHAT THEY STILL OWE AN AGREEMENT TO, CARRIED BY THE ONE READ EVERY
+            DOOR MAKES BEFORE IT DRAWS ANYTHING. The wall has to be known before
+            the page is chosen: asked afterwards, somebody sees the product for
+            a moment and then loses it, and every write behind it refuses with a
+            status the screen has no reason to expect.
+          */
+          owed: deps.owed ? await deps.owed(ctx) : [],
         };
       },
     },

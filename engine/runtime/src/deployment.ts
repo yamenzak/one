@@ -22,7 +22,8 @@
  * one spare binding unbootable.
  */
 
-import type { AppSpec } from "@engine/kernel";
+import type { AppSpec, DeploymentLegal } from "@engine/kernel";
+import { holdingsOf, missingDocuments } from "@engine/kernel";
 import { incoherent, unledgered } from "./dossier.js";
 import { unbound, type Env } from "./handles.js";
 import { unreachableByErasure } from "./records.js";
@@ -46,6 +47,13 @@ export interface Deployment {
    * never reads it and a deletion that never touches it, both reporting success.
    */
   readonly modules: readonly SchemaModule[];
+  /**
+   * ⚠️ WHAT THIS DEPLOYMENT PROMISES, ASKED ONCE. Terms and a privacy notice
+   * bind a legal entity rather than a feature, so the question is the
+   * deployment's and not any app's — which is exactly why `missingDocuments`
+   * had no caller for as long as it was asked of a per-app declaration.
+   */
+  readonly legal?: DeploymentLegal;
 }
 
 /** Everything wrong with a deployment, as sentences a log can carry. */
@@ -61,6 +69,16 @@ export function deploymentFaults(of: Deployment): readonly string[] {
     for (const id of unreachableByErasure(app.collections)) {
       out.push(`${app.id}: collection "${id}" is scoped by nothing erasure can reach, `
         + `so a deletion request will never touch it and nothing will say so`);
+    }
+  }
+
+  /* ⚠️ TAKING SOMEBODY'S DATA WITH NOTHING SAYING WHAT HAPPENS TO IT. Asked of
+     everything the deployment holds across every product, because that is the
+     scope of the promise. */
+  if (of.legal) {
+    const held = of.apps.flatMap((a) => holdingsOf(a));
+    for (const p of missingDocuments(of.legal.documents, held)) {
+      out.push(`${p.why}: ${p.detail}`);
     }
   }
 

@@ -53,6 +53,14 @@ export type Where =
    */
   | { readonly at: "told" }
   /**
+   * ⚠️ YOUR DATA: THE COPY AND THE DELETION, ON ONE SCREEN AND UNDER YOU. Both
+   * are about the person rather than any workspace — the walk behind them
+   * crosses every workspace they are in — and both stay reachable while the
+   * acceptance wall is holding everything else, which is what makes that wall a
+   * wall rather than a hostage.
+   */
+  | { readonly at: "data" }
+  /**
    * ⚠️ YOUR OWN PREFERENCES, ACROSS EVERY PRODUCT — the same split as `told`
    * against `notices`, one screen over. A setting's LEVEL is an authority
    * (DESIGN.md §3's first question): what a workspace is set to is decided by
@@ -181,6 +189,7 @@ export function parseWhere(path: string): Where {
   if (head === "you") return { at: "you" };
   if (head === "inbox") return { at: "inbox" };
   if (head === "told") return { at: "told" };
+  if (head === "data") return { at: "data" };
   if (head === "prefs") {
     const [app, area] = tail;
     return app ? (area ? { at: "prefs", app, area } : { at: "prefs", app }) : { at: "prefs" };
@@ -230,6 +239,7 @@ export function pathOf(where: Where): string {
     case "you": return `${HUB}/you`;
     case "inbox": return `${HUB}/inbox`;
     case "told": return `${HUB}/told`;
+    case "data": return `${HUB}/data`;
     case "prefs":
       return `${HUB}/prefs${where.app ? `/${where.app}` : ""}${where.app && where.area ? `/${where.area}` : ""}`;
     case "workspaces": return `${HUB}/workspaces`;
@@ -268,7 +278,7 @@ export function above(where: Where): Where | null {
     /* ⚠️ How you are told is a detail of YOU, so leaving it goes back there
        rather than to the root — the crown's arrow has to agree with how
        somebody got here. */
-    case "told": return { at: "you" };
+    case "told": case "data": return { at: "you" };
     case "prefs":
       return where.area ? { at: "prefs", app: where.app }
         : where.app ? { at: "prefs" } : { at: "you" };
@@ -295,6 +305,7 @@ export const nameOf = (where: Where): string => {
     case "you": return "You";
     case "inbox": return "Inbox";
     case "told": return "How you are told";
+    case "data": return "Your data";
     case "prefs": return "Your preferences";
     case "workspaces": return "Workspaces";
     case "workspace": return "Workspace";

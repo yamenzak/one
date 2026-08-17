@@ -93,7 +93,7 @@ the whole rail. Stage 33.
 | `refuseJob` | `job` | composition |
 | `refuseJobs` | `job` | composition |
 | `stalled` | `job` | surface |
-| `missingDocuments` | `legal` | deferred to stage 25 |
+| `missingDocuments` | `legal` | runtime |
 | `refuseLegal` | `legal` | composition |
 | `refuseApp` | `manifest` | composition |
 | `refuseLetter` | `notify` | deferred to stage 23 |

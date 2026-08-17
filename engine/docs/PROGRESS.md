@@ -50,7 +50,7 @@ reader can trust this table instead of re-reading the code.
 | 22 | OneSpace — `id`, `admin` and `setup` merge into one address off the workspace root | planned |
 | 23 | Mail that leaves the process — a letter, its variables, and a provider | planned |
 | 24 | A workspace composes its own roles out of one app's keys | planned |
-| 25 | The deployment's own legal documents — a privacy notice, terms, and the acceptance that binds them | planned |
+| 25 | Agreements — versioned documents, an acceptance per person per version, and the wall until there is one | shipped |
 | 26 | The vault is opened — consent, who looked, your data, and an erasure that shreds | shipped |
 | 27 | The AI lane runs — an action reaches a provider and the reserve settles | planned |
 | 28 | Notifications are filed — an event raised becomes a note in somebody's inbox | shipped |
