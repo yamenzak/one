@@ -15,7 +15,7 @@ import { PLATFORM_ROLES } from "@engine/kernel";
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
   AUDIT_SCHEMA, DIRECTORY_SCHEMA, NOBODY, REPLAY_SCHEMA, addShard, applySchema, compose,
-  createTenant, forget, noteShardApp, schemaFor, serve, surfaceOfComposed,
+  createTenant, noteShardApp, schemaFor, serve, surfaceOfComposed,
   type Db, type Located, type Who,
 } from "@engine/runtime";
 import { HELLO, hello } from "../src/index.js";
@@ -90,7 +90,6 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  forget();
   for (const t of ["note", "audit", "replay"]) await shard().exec(`DELETE FROM ${t};`);
   await directory().exec(`DELETE FROM tenant;`);
   const made = await createTenant(directory(), {

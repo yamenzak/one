@@ -33,18 +33,26 @@ import { hello } from "@engine/hello";
 /* ------------------------------------------------------------------ what --- */
 
 /**
- * ⚠️ THE PRODUCTS THIS DEPLOYMENT SERVES, AS THUNKS. A thunk rather than a
- * manifest, because composition is lazy (D4): a request composes the app it is
- * for and no other, so the catalogue can grow without every cold start paying
- * for it.
+ * ⚠️ BUILT AT MOST ONCE, AND NOT UNTIL SOMETHING ASKS. Both halves are the
+ * point. Lazy is D4 — a request composes the app it is for and no other, so the
+ * catalogue can grow without every cold start paying for it. Once is what makes
+ * a manifest a THING rather than a description of one: the composed surface is
+ * memoised against the declaration itself, so a thunk that rebuilt it per call
+ * would rebuild the whole surface behind it on every request.
  */
+const once = (make: () => AppSpec): (() => AppSpec) => {
+  let held: AppSpec | null = null;
+  return () => (held ??= make());
+};
+
+/** The products this deployment serves. */
 const APPS: Readonly<Record<string, () => AppSpec>> = {
   /* ⚠️ `under` IS WHERE EVERY PRODUCT INHERITS THE DEPLOYMENT'S SUB-PROCESSORS.
      The database, the bucket and the runtime are the same vendor behind all of
      them; declared per app it is one chance per product to forget, and the
      recipient nobody disclosed is the disclosure failure that gets found from
      outside. See `under`. */
-  hello: () => under(LEGAL, hello()),
+  hello: once(() => under(LEGAL, hello())),
 };
 
 /**

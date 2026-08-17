@@ -172,7 +172,7 @@
     {
       "n": 32,
       "title": "A manifest changes while the deployment is up, and the composed surface forgets",
-      "status": "planned"
+      "status": "shipped"
     },
     {
       "n": 33,

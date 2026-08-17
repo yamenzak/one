@@ -385,7 +385,7 @@ env or a binding.
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
 | `identity` | sign-in codes, sessions, tokens, proof | 21 | — |
 | `membership` | the roster and what each member may do | 12 | — |
-| `compose` | a manifest becomes a live surface of operations | 3 | 1 |
+| `compose` | a manifest becomes a live surface of operations | 2 | — |
 | `serve` | the one path every request ends in — both doors | 4 | — |
 | `records` | the generated reads and writes behind a collection | 6 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
@@ -423,7 +423,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**266 of them**, 253 reached by something today.
+**265 of them**, 253 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -727,6 +727,8 @@ its own header, cited by other files, and doing nothing.
 | `a-session-can-be-withdrawn-everywhere-at-once` | D12 | the laptop somebody lost staying signed in for thirty days, because a signed claim cannot be withdrawn before it expires — which is the whole reason a session is a row |
 | `the-proof-window-can-be-re-opened-without-a-new-session` | D12 | an irreversible operation reachable for fifteen minutes after signing in and refused for ever after, with the refusal naming a confirmation no control could perform |
 | `proving-it-is-you-goes-to-your-own-address` | D12 | somebody holding a stolen cookie confirming themselves at an inbox they own, which is the entire thing the proof gate is against |
+| `a-composed-surface-belongs-to-one-declaration` | D4 | one product being served another's routes, permissions and quotas — a wrong ANSWER rather than an error, which is why an invalidation call somebody has to remember cannot be the fix |
+| `a-manifest-is-built-once-per-isolate` | D4 | every route, permission and quota of a product rebuilt on every request for ever, because the composer's memo is keyed by the declaration and a thunk that reallocates one never hits it |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -737,7 +739,7 @@ its own header, cited by other files, and doing nothing.
 | D1 | The tenant is primary; an app is a capability switched on for it | 4 |
 | D2 | The framework is OneEngine; the deployment is One; packages are `@engine/*` | 3 |
 | D3 | One worker on the request path; heavy work splits over RPC service bindings | 6 |
-| D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
+| D4 | Composition is lazy: a request composes the app it is for, and no other | 3 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 13 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 5 |
 | D7 | HeroUI v3 is the component layer, and its components are not restyled | 57 |
@@ -780,7 +782,6 @@ nothing yet.
 | **27** — The AI lane runs — an action reaches a provider and the reserve settles | `runtime/src/services.ts` | 1 |
 | **30** — A workspace's apps are turned on and off, and a workspace can move shard | `kernel/src/tenancy.ts` | 2 |
 | **30** — A workspace's apps are turned on and off, and a workspace can move shard | `runtime/src/directory.ts` | 3 |
-| **32** — A manifest changes while the deployment is up, and the composed surface forgets | `runtime/src/compose.ts` | 1 |
 | **33** — A guard refuses a declared setting nothing names — the seam a handler reads one through is live; the completeness check over it is not | `kernel/src/setting.ts` | 1 |
 | **34** — The kernel's remaining conveniences are each used by a lane or removed | `kernel/src/brand.ts` | 1 |
 | **34** — The kernel's remaining conveniences are each used by a lane or removed | `kernel/src/door.ts` | 1 |
@@ -793,7 +794,7 @@ nothing yet.
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `kernel/src/package.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `runtime/src/jobs.ts` | 1 |
 
-**30 declarations** are built and reached by nothing, each waiting on a
+**29 declarations** are built and reached by nothing, each waiting on a
 stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one
 that names no stage, so this list cannot grow by forgetting.
 <!-- /generated -->
@@ -834,7 +835,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 29 | The daily sweep — erasure happens on a clock, and every run is recorded | shipped |
 | 30 | A workspace's apps are turned on and off, and a workspace can move shard | **planned** |
 | 31 | Account security — sign out everywhere, and proving it is you again before something irreversible | shipped |
-| 32 | A manifest changes while the deployment is up, and the composed surface forgets | **planned** |
+| 32 | A manifest changes while the deployment is up, and the composed surface forgets | shipped |
 | 33 | A guard refuses a declared setting nothing names — the seam a handler reads one through is live; the completeness check over it is not | **planned** |
 | 34 | The kernel's remaining conveniences are each used by a lane or removed | **planned** |
 | 35 | A workspace runs its own retention ladder against its own customers, and ours freezes it | **planned** |
@@ -844,7 +845,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 39 | The documentation is two generated pages — what exists, derived from the engine; and how to add to it, which no generator can derive | shipped |
 | 40 | An app ships a screen — a product's browser half is a chunk of its own, loaded when its workspace opens it, drawing that workspace's own records through the door it is handed | shipped |
 
-**30 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**31 shipped, 9 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

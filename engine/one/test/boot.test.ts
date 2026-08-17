@@ -50,6 +50,19 @@ describe("the worker on its own", () => {
     }
   });
 
+  /*
+    ⚠️ A PRODUCT'S MANIFEST IS BUILT AT MOST ONCE PER ISOLATE, and the composed
+    surface behind it depends on that. Composing is memoised against the
+    DECLARATION — the only key that cannot mistake one product for another — so a
+    thunk that rebuilt its manifest per call would miss the memo every time and
+    rebuild every route, permission and quota of every request. Nothing would
+    fail; the product would just be slower for ever, which is the kind of cost
+    nobody finds by reading.
+  */
+  it("holds each product's manifest rather than rebuilding it per request", () => {
+    for (const make of Object.values(APPS)) expect(make()).toBe(make());
+  });
+
   /* ⚠️ And it names which door it is, because the doors ARE the tenancy. */
   it("knows which door each hostname is", async () => {
     const doors: Record<string, string> = {

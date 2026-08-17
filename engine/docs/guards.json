@@ -2017,6 +2017,24 @@
       "impl": "apps/hello/test/identity.test.ts",
       "proves": "the body names Mallory",
       "fails": "somebody holding a stolen cookie confirming themselves at an inbox they own, which is the entire thing the proof gate is against"
+    },
+    {
+      "id": "a-composed-surface-belongs-to-one-declaration",
+      "protects": "D4",
+      "stage": "32",
+      "status": "live",
+      "impl": "apps/hello/test/surface.screens.test.tsx",
+      "proves": "composes two declarations under one id separately",
+      "fails": "one product being served another's routes, permissions and quotas — a wrong ANSWER rather than an error, which is why an invalidation call somebody has to remember cannot be the fix"
+    },
+    {
+      "id": "a-manifest-is-built-once-per-isolate",
+      "protects": "D4",
+      "stage": "32",
+      "status": "live",
+      "impl": "one/test/boot.test.ts",
+      "proves": "holds each product's manifest rather than rebuilding it per request",
+      "fails": "every route, permission and quota of a product rebuilt on every request for ever, because the composer's memo is keyed by the declaration and a thunk that reallocates one never hits it"
     }
   ]
 }

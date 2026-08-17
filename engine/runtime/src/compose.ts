@@ -223,15 +223,22 @@ const verbSummary = (spec: CollectionSpec, verb: CrudVerb): string => {
 
 /* --------------------------------------------------------------- composing --- */
 
-const MEMO = new Map<string, Composed>();
-
 /**
- * ⚠️ MEMOISED BY APP ID AND NOT BY MANIFEST, because a manifest is a constant.
- * If that ever stops being true — a per-tenant surface, a live-edited app — the
- * key is where it changes, and it is one line rather than a rewrite.
+ * ⚠️ KEYED BY THE MANIFEST ITSELF, NOT BY ITS ID. Both are memos of the same
+ * work; only one of them can be wrong. An id key answers "some declaration that
+ * called itself `hello`", which is the right answer for as long as there is
+ * exactly one — and a silently wrong surface the moment there are two. A key
+ * that IS the declaration cannot mistake one for another, so nothing has to
+ * invalidate it and no suite has to remember to.
+ *
+ * ⚠️ WHICH MEANS THE DEPLOYMENT HOLDS ITS MANIFESTS. A thunk that rebuilds the
+ * declaration per call would miss this memo every time — see `once` in the
+ * worker, where a product's manifest is built at most once per isolate.
  */
+const MEMO = new WeakMap<AppSpec, Composed>();
+
 export function compose(app: AppSpec): Composed {
-  const seen = MEMO.get(app.id);
+  const seen = MEMO.get(app);
   if (seen) return seen;
 
   const byId = new Map<string, Resolved>();
@@ -282,19 +289,9 @@ export function compose(app: AppSpec): Composed {
     catalog: { ...PLATFORM_PROBLEMS, ...(app.problems ?? {}) },
     gates: [],
   };
-  MEMO.set(app.id, composed);
+  MEMO.set(app, composed);
   return composed;
 }
-
-/** ⚠️ For a suite that composes the same id twice with different declarations. */
-/* DEFER(engine-32) stage:32 — reached only by a test today, which is not a
-   mount. Nothing invalidates a composed manifest at runtime because nothing
-   changes one at runtime; the day an app is enabled mid-isolate, this is the
-   call that has to happen and forgetting it serves the old surface until the
-   isolate dies. */
-export const forget = (appId?: string): void => {
-  if (appId) MEMO.delete(appId); else MEMO.clear();
-};
 
 /**
  * ⚠️ EVERY ROUTE THE DEPLOYMENT ANSWERS, derived. This is what the OpenAPI

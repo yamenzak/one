@@ -47,10 +47,12 @@ const EMIT = process.env.EMIT === "1";
  * one role for a founder to hold.
  */
 /**
- * ⚠️ EVERY PROBE NEEDS ITS OWN ID, because `compose` is MEMOISED BY APP ID and
- * says so. Four probes sharing one id are one probe: the first answer is cached
- * and returned to the other three, so declaring a collection appears to buy
- * nothing at all — a documented lie rather than a failure.
+ * ⚠️ EACH PROBE IS ITS OWN APP, WHICH IS WHAT IT MEANS. The ids differ because
+ * these are different products, not because the composer needs them to — it is
+ * memoised against the DECLARATION, so two of them sharing a name still compose
+ * separately. That was not always true, and while it was not, four probes
+ * sharing one id were one probe: the first answer was cached and handed to the
+ * other three, so declaring a collection appeared to buy nothing at all.
  */
 let probes = 0;
 const bare = (over: Partial<AppSpec> = {}): AppSpec => ({
@@ -59,6 +61,17 @@ const bare = (over: Partial<AppSpec> = {}): AppSpec => ({
   entitlements: {}, plans: [], collections: [], operations: [], screens: [],
   ...over,
 } as unknown as AppSpec);
+
+/**
+ * ⚠️ THE REAL BUILDER, NOT A HAND-SHAPED OBJECT. A literal that merely typechecks
+ * can be missing whatever `collection()` fills in, and the composer would then
+ * quietly produce nothing — the probe would report that declaring a collection
+ * buys you no operations, which is a documented lie rather than a failure.
+ */
+const thing = (fields: Parameters<typeof collection>[0]["fields"]) => collection({
+  id: "thing", label: { one: "Thing", many: "Things" },
+  scope: { of: "tenant" }, permission: "thing", fields,
+} as Parameters<typeof collection>[0]);
 
 const idsOf = (app: AppSpec) => [...compose(app).byId.values()];
 
@@ -79,18 +92,6 @@ const asOp = (o: Resolved) => ({
 function build() {
   const floorOps = idsOf(bare());
   const floor = new Set(floorOps.map((o) => o.id));
-
-  /*
-    ⚠️ THE REAL BUILDERS, NOT A HAND-SHAPED OBJECT. A literal that merely
-    typechecks can be missing whatever `collection()` fills in, and the composer
-    would then quietly produce nothing — the probe would report that declaring a
-    collection buys you no operations, which is a documented lie rather than a
-    failure.
-  */
-  const thing = (fields: Parameters<typeof collection>[0]["fields"]) => collection({
-    id: "thing", label: { one: "Thing", many: "Things" },
-    scope: { of: "tenant" }, permission: "thing", fields,
-  } as Parameters<typeof collection>[0]);
 
   /* One collection, so the five generated verbs are visible as five. */
   const withCollection = extra(
@@ -202,5 +203,32 @@ describe("what the engine hands an app", () => {
       "money.view", "centre.view"]) {
       expect(floor, `${id} is no longer free`).toContain(id);
     }
+  });
+
+  /*
+    ⚠️ THE COMPOSER'S MEMO CANNOT SERVE ONE DECLARATION'S SURFACE FOR ANOTHER'S,
+    and this file is the reason that matters. Composing is memoised — it is what
+    makes the second request free — and while the key was the app ID, the memo
+    answered "some declaration that called itself this", which is right for as
+    long as there is exactly one and silently wrong the moment there are two. It
+    cost this suite an afternoon: four probes under one id came back identical,
+    so declaring a collection appeared to buy nothing, and the document said so.
+
+    ⚠️ AND THE FIX HAS TO BE STRUCTURAL RATHER THAN REMEMBERED. An invalidation
+    call somebody has to make between composes is a rule with no enforcement —
+    the failure it prevents is a wrong ANSWER, not an error, so forgetting it
+    reads as a finding.
+  */
+  it("composes two declarations under one id separately", () => {
+    const one = { ...bare(), id: "twin" } as AppSpec;
+    const two = { ...bare({ collections: [
+      thing({ title: field.text({ label: "Title", holds: "none" }) }),
+    ] }), id: "twin" } as AppSpec;
+
+    expect(idsOf(one).map((o) => o.id)).not.toContain("thing.create");
+    expect(idsOf(two).map((o) => o.id)).toContain("thing.create");
+    /* ⚠️ AND BACK, because a memo that merely overwrote would pass the first
+       direction and fail every reader who composed them the other way round. */
+    expect(idsOf(one).map((o) => o.id)).not.toContain("thing.create");
   });
 });
