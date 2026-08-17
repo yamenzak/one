@@ -920,6 +920,11 @@ export default {
             try { return shardFor(env as never, id); } catch { return null; }
           },
           residencyOf,
+          /* ⚠️ WHAT A STANDING TOP-UP MAY BUY, and the key it is charged with.
+             A deployment that binds neither simply never charges anybody — see
+             `sweepTopUps`. */
+          packs: PACKS,
+          ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
           /* ⚠️ ONLY WHERE THERE IS A TOKEN. Absent is a deployment that cannot
              provision, which is a state it has to survive rather than an error
              — a self-host, a test run, and this one before the secret is set. */

@@ -16,7 +16,7 @@ import type { AppId, AppSpec, TenantId } from "@engine/kernel";
 import { PLATFORM_ENTITLEMENTS, isBusiness } from "@engine/kernel";
 import { MEMBERSHIP, billFor, mixedCurrencies, subscriptionFor } from "./billing.js";
 import { startCheckout, startTopUp } from "./stripe.js";
-import { movements, spentByApp, walletOf } from "./wallet.js";
+import { armAutoTopUp, autoTopUpOf, movements, spentByApp, walletOf } from "./wallet.js";
 import type { PlatformCtx } from "./member-ops.js";
 import type { Resolved } from "./compose.js";
 
@@ -64,6 +64,11 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       const since = new Date(ctx.now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const spent = await spentByApp(ctx.directory, ctx.tenantId as TenantId, since);
       const statement = await movements(ctx.directory, ctx.tenantId as TenantId);
+      /* ⚠️ AND WHAT THE STANDING INSTRUCTION IS, INCLUDING WHY IT LAST FAILED.
+         A decline is answered by a bank and nobody is present to see it, so this
+         row is the only place a customer can find out that their credits stopped
+         topping up and what to do about it. */
+      const armed = await autoTopUpOf(ctx.directory, ctx.tenantId as TenantId);
 
       return {
         /* ⚠️ THE PLAN IS THE WORKSPACE'S; the products are what it reaches. */
@@ -79,6 +84,8 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         apps: apps.map((a) => ({ id: a.id, name: a.name, mark: a.mark })),
         bill,
         wallet,
+        packs: ctx.packs,
+        armed,
         spent,
         statement,
         mixed: mixedCurrencies(bill.lines),
@@ -207,5 +214,56 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
     },
   };
 
-  return { "money.view": spec, "money.checkout": checkout, "money.topup": topup };
+  /**
+   * ARMING THE STANDING TOP-UP.
+   *
+   * ⚠️ NOTHING TURNS THIS ON BY ITSELF, AND CLEARING THE PACK TURNS IT OFF. It
+   * authorises a charge to a card with nobody present, so the only way it can
+   * exist is that somebody set it — a standing charge a product armed on a
+   * customer's behalf is the shape of every subscription complaint there has
+   * ever been.
+   *
+   * ⚠️ AND A THRESHOLD BELOW WHICH IT WOULD NEVER FIRE IS REFUSED. Zero is not
+   * "off", it is a switch that looks armed and never runs; turning it off is
+   * clearing the pack, which is a different sentence on the screen.
+   */
+  const auto: Resolved = {
+    id: "money.auto",
+    kind: "write",
+    method: "POST",
+    path: "/api/money.auto",
+    permission: "billing:manage",
+    spec: {
+      id: "money.auto", kind: "write", summary: "Buy more credits automatically.",
+      input: {}, output: {},
+      permission: "billing:manage",
+      idempotency: { mode: "none" },
+      async handler() { return {} as never; },
+    } as Resolved["spec"],
+    run: async (bare, input) => {
+      const ctx = bare as PlatformCtx;
+      const wanted = String(input.pack ?? "");
+
+      /* ⚠️ CLEARING IT IS THE OFF SWITCH, and it is allowed unconditionally —
+         somebody turning a standing charge off must never meet a refusal. */
+      if (!wanted) {
+        await armAutoTopUp(ctx.directory, ctx.tenantId as TenantId, null, 0);
+        return { armed: false };
+      }
+
+      const pack = ctx.packs.find((p) => p.id === wanted);
+      if (!pack) return ctx.fail("platform.invalid");
+
+      const below = Math.trunc(Number(input.below ?? 0));
+      if (!(below > 0)) return ctx.fail("platform.invalid");
+
+      await armAutoTopUp(ctx.directory, ctx.tenantId as TenantId, pack.id, below);
+      return { armed: true, pack: pack.id, below };
+    },
+  };
+
+  return {
+    "money.view": spec, "money.checkout": checkout,
+    "money.topup": topup, "money.auto": auto,
+  };
 }

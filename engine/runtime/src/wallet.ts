@@ -176,6 +176,111 @@ export async function topUp(
     .bind(credits, tenantId).run();
 }
 
+/* ------------------------------------------------------- topping up by itself --- */
+
+/**
+ * THE STANDING INSTRUCTION: BUY THIS PACK WHEN THE BALANCE FALLS BELOW THIS.
+ *
+ * ⚠️ IT IS STATE ON THE BILLING ROW, NOT A PREFERENCE. What it authorises is a
+ * charge to a card with nobody present, so it belongs beside the card — and
+ * beside the cooldown and the last failure, which are the two things that decide
+ * whether it may run again and what to tell somebody if it did not.
+ *
+ * ⚠️ AND IT IS ARMED BY A PERSON, EVERY TIME. Nothing turns this on by default,
+ * nothing raises the threshold on somebody's behalf, and clearing the pack turns
+ * it off completely — a standing charge somebody did not set is the shape of
+ * every subscription complaint there has ever been.
+ */
+export interface AutoTopUp {
+  readonly packId: string | null;
+  readonly below: number;
+  readonly at: string | null;
+  readonly error: string | null;
+}
+
+export async function armAutoTopUp(
+  db: Db, tenantId: TenantId, packId: string | null, below: number,
+): Promise<void> {
+  await db.prepare(
+    `UPDATE billing_account SET auto_pack = ?, auto_below = ?, auto_error = NULL WHERE tenant_id = ?`)
+    .bind(packId, Math.max(0, Math.trunc(below)), tenantId).run();
+}
+
+export async function autoTopUpOf(db: Db, tenantId: TenantId): Promise<AutoTopUp> {
+  const row = await db.prepare(
+    `SELECT auto_pack, auto_below, auto_at, auto_error FROM billing_account WHERE tenant_id = ?`)
+    .bind(tenantId).first<{
+      auto_pack: string | null; auto_below: number | null;
+      auto_at: string | null; auto_error: string | null;
+    }>();
+  return {
+    packId: row?.auto_pack ?? null,
+    below: row?.auto_below ?? 0,
+    at: row?.auto_at ?? null,
+    error: row?.auto_error ?? null,
+  };
+}
+
+/** ⚠️ One attempt an hour, whatever asks. See `dueForTopUp`. */
+export const TOPUP_COOLDOWN_MS = 60 * 60 * 1000;
+
+export interface Owing {
+  readonly tenantId: TenantId;
+  readonly packId: string;
+  readonly customerRef: string;
+}
+
+/**
+ * EVERY WORKSPACE WHOSE STANDING INSTRUCTION IS DUE.
+ *
+ * ⚠️ THE COOLDOWN IS IN THE QUERY, AND IT IS THE WHOLE SAFETY. Without it, a
+ * workspace out of credits with a busy afternoon asks for a top-up on every
+ * refusal — so a card is charged as fast as the requests arrive, and the first
+ * anybody knows is the statement. One attempt an hour is slow enough that a
+ * runaway costs a customer one purchase and fast enough to be a feature.
+ *
+ * ⚠️ AND A WORKSPACE WITH NO CUSTOMER RECORD IS NOT DUE. Charging off-session
+ * needs a card Stripe already holds; without one the attempt is a guaranteed
+ * refusal, recorded as an error somebody has to read and cannot act on.
+ */
+export async function dueForTopUp(
+  db: Db, now = new Date(), cooldownMs = TOPUP_COOLDOWN_MS,
+): Promise<readonly Owing[]> {
+  const since = new Date(now.getTime() - cooldownMs).toISOString();
+  const rows = await db.prepare(
+    `SELECT tenant_id, auto_pack, customer_ref FROM billing_account
+     WHERE auto_pack IS NOT NULL AND auto_pack != ''
+       AND customer_ref IS NOT NULL
+       AND COALESCE(granted, 0) + COALESCE(bought, 0) - held < COALESCE(auto_below, 0)
+       AND (auto_at IS NULL OR auto_at < ?)`)
+    .bind(since).all<{ tenant_id: string; auto_pack: string; customer_ref: string }>();
+  return rows.results.map((r) => ({
+    tenantId: r.tenant_id as TenantId, packId: r.auto_pack, customerRef: r.customer_ref,
+  }));
+}
+
+/**
+ * ⚠️ THE ATTEMPT IS STAMPED BEFORE THE CHARGE, NEVER AFTER. A charge that
+ * succeeds and then fails to record its attempt is one the next pass makes
+ * again — and "the card was charged twice and the log says once" is the failure
+ * mode this whole cooldown exists to prevent. Recording first can only ever cost
+ * a customer an hour's delay.
+ */
+export async function noteTopUpAttempt(
+  db: Db, tenantId: TenantId, now = new Date(),
+): Promise<void> {
+  await db.prepare(`UPDATE billing_account SET auto_at = ?, auto_error = NULL WHERE tenant_id = ?`)
+    .bind(now.toISOString(), tenantId).run();
+}
+
+/** ⚠️ Why it did not work, where the customer looks — see `AutoTopUp`. */
+export async function noteTopUpFailed(
+  db: Db, tenantId: TenantId, why: string,
+): Promise<void> {
+  await db.prepare(`UPDATE billing_account SET auto_error = ? WHERE tenant_id = ?`)
+    .bind(why, tenantId).run();
+}
+
 /* -------------------------------------------------------------- spending it --- */
 
 export type ReserveRefusal = "not_enough";

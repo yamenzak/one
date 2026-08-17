@@ -37,7 +37,15 @@ export const BILLING_SCHEMA: SchemaModule = {
       either confiscate what somebody bought or carry an allowance forward for
       ever, and there is no third behaviour a single column can have.
     */
-    `CREATE TABLE IF NOT EXISTS billing_account (tenant_id TEXT PRIMARY KEY, customer_ref TEXT, currency TEXT NOT NULL, granted INTEGER, bought INTEGER, held INTEGER NOT NULL, at TEXT NOT NULL);`,
+    /*
+      ⚠️ AND THE AUTO-TOP-UP IS FOUR COLUMNS ON THE SAME ROW, not a setting. It
+      is an instruction to charge a card without anybody present, so it belongs
+      beside the card — `auto_at` is the cooldown that stops a burst of refusals
+      becoming a burst of charges, and `auto_error` is why the last attempt did
+      not work, which is the one thing a customer needs and a log cannot give
+      them.
+    */
+    `CREATE TABLE IF NOT EXISTS billing_account (tenant_id TEXT PRIMARY KEY, customer_ref TEXT, currency TEXT NOT NULL, granted INTEGER, bought INTEGER, held INTEGER NOT NULL, auto_pack TEXT, auto_below INTEGER, auto_at TEXT, auto_error TEXT, at TEXT NOT NULL);`,
     /* ⚠️ AND ONE PER PRODUCT THEY HAVE SWITCHED ON. */
     `CREATE TABLE IF NOT EXISTS subscription (tenant_id TEXT NOT NULL, app_id TEXT NOT NULL, plan_id TEXT NOT NULL, status TEXT NOT NULL, at TEXT NOT NULL, past_due_at TEXT, trial_ends_at TEXT, overrides_json TEXT, adjustments_json TEXT, PRIMARY KEY (tenant_id, app_id));`,
     `CREATE INDEX IF NOT EXISTS ix_subscription_due ON subscription (status, past_due_at);`,

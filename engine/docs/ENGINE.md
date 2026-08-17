@@ -38,7 +38,7 @@ all of it is refused, gated, audited and erasable on the same terms as everythin
 an app writes itself.
 
 <!-- generated: node scripts/inventory.mjs surface -->
-**26 operations for declaring nothing.** A roster, an inbox and its
+**27 operations for declaring nothing.** A roster, an inbox and its
 two-level policy, the workspace's brand, the package rail it sells with, its
 settings, its bill, and the one bootstrap read every screen stands on.
 
@@ -69,6 +69,7 @@ settings, its bill, and the one bootstrap read every screen stands on.
 | `money.view` | read | `billing:read` |
 | `money.checkout` | write | `billing:manage` |
 | `money.topup` | write | `billing:manage` |
+| `money.auto` | write | `billing:manage` |
 | `centre.view` | read | *the session* |
 
 **+5 per collection**, generated from the declaration —
@@ -397,11 +398,11 @@ env or a binding.
 | `records` | the generated reads and writes behind a collection | 6 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
 | `billing` | plans, subscriptions, the bill, the ladder | 12 | 1 |
-| `wallet` | OneWallet: the allowance, what was bought, and reserve → settle → release | 11 | — |
+| `wallet` | OneWallet: the allowance, what was bought, and reserve → settle → release | 17 | — |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
 | `inbox` | notifications: the policy, the audience, the read | 10 | — |
 | `services` | the lane out to a provider — AI and mail | 5 | 1 |
-| `stripe` | the card lane: a page Stripe owns, a signature that proves an event is theirs, and the ladder one moves | 10 | — |
+| `stripe` | the card lane: a page Stripe owns, a signature that proves an event is theirs, and the ladder one moves | 11 | — |
 | `config` | what the deployment was told — the credentials it holds, encrypted under a key its database has never seen | 5 | — |
 | `mail` | a letter that leaves the process: the message written out, and the refusal to pretend one was sent | 3 | — |
 | `webpush` | the two specifications a notification travels on — VAPID, and the sealed body | 6 | — |
@@ -423,7 +424,7 @@ env or a binding.
 | `installable` | the manifest and the icon a workspace is installed as | 6 | — |
 | `platform-schema` | the platform's own tables, in dependency order, listed once | 2 | — |
 | `dispatch` | an event an operation raises becomes a note in somebody's inbox | 1 | — |
-| `sweep` | the daily clock: erase what is past the ladder's last rung | 4 | — |
+| `sweep` | the daily clock: erase what is past the ladder's last rung | 5 | — |
 | `vault-ops` | consent, grants, who looked, the processing record, export and erasure | 1 | — |
 | `dossier` | everything we hold about one person, and everything of theirs we delete | 8 | — |
 | `legal` | who agreed to what version, and the wall until they have | 6 | — |
@@ -433,7 +434,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**289 of them**, 286 reached by something today.
+**297 of them**, 294 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -584,6 +585,10 @@ its own header, cited by other files, and doing nothing.
 | `every-key-a-product-declares-is-priced-by-every-tier` | D1 | a feature built, shipped and sold to nobody - an unpriced key resolves to off for every workspace on every tier, and no screen anywhere says why |
 | `the-lobby-is-free-and-cannot-be-bought` | D21 | a workspace charged for the parking state it never chose, or offered it at checkout as though not having a plan were a plan |
 | `one-catalogue-one-currency` | D1 | two tiers priced in different currencies and a bill that adds them together |
+| `a-standing-charge-is-armed-by-a-person` | D12 | a card charged on a standing instruction the customer never set - the shape of every subscription complaint there has ever been |
+| `a-standing-charge-runs-at-most-once-an-hour` | D12 | a workspace out of credits on a busy afternoon charged as fast as its requests arrive, with the first sign of it being the statement |
+| `the-threshold-reads-what-can-be-spent` | D12 | a workspace out of usable credits with a standing instruction that never fires, because the balance still looks healthy under a large hold |
+| `a-decline-is-told-to-the-customer` | D12 | credits that silently stopped topping up, with the only record of why in a log the customer cannot see |
 | `a-pack-is-bought-and-never-rented` | D1 | a lapsed workspace marked up to date because somebody bought fifty credits - the ladder clears the arrears and nothing was paid |
 | `the-credits-reach-the-wallet-and-only-once` | D12 | money captured and no credits granted, or a retried delivery granting the pack again on every retry |
 | `an-event-is-the-workspaces-however-it-names-a-product` | D1 | every plan checkout parked instead of granting the month somebody just paid for, because the membership's app id is the empty string and an absent app was a refusal |
@@ -788,7 +793,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 85 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 89 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -880,8 +885,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 43 | Hello's remaining screens reach the workspace's own records — the report against its target, and writing a note | **planned** |
 | 44 | A one-off purchase — a credit pack, and becoming a business — through the same checkout | shipped |
 | 45 | A plan is edited, and everybody already on it keeps what they were sold | **planned** |
+| 46 | The wallet tops itself up — a standing instruction, a cooldown, and a decline the customer can read | shipped |
 
-**36 shipped, 9 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**37 shipped, 9 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

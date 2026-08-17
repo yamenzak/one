@@ -289,6 +289,63 @@ export async function startTopUp(
   return made?.url ? { url: made.url } : "stripe_refused";
 }
 
+/**
+ * THE STANDING INSTRUCTION, CARRIED OUT: A CHARGE WITH NOBODY PRESENT.
+ *
+ * ⚠️ `off_session: true` IS A CLAIM AND STRIPE ACTS ON IT. It tells the card
+ * network that the customer authorised this in advance, which is what lets the
+ * charge go through without a browser to show a 3-D Secure challenge in — and it
+ * is only true because somebody armed it themselves. It is also why a refusal
+ * here is ordinary rather than exceptional: a bank may still demand
+ * authentication, and the answer is to tell the customer, never to retry.
+ *
+ * ⚠️ AND `auto` IN THE METADATA IS LOAD-BEARING. A pack bought through the
+ * hosted checkout ALSO produces a `payment_intent.succeeded`, so without a mark
+ * distinguishing the two, every checkout would grant its credits twice — once
+ * from the session and once from the intent, under different event ids that no
+ * idempotency row can join.
+ */
+export type ChargeRefusal = "not_charging" | "declined";
+
+export async function chargeOffSession(
+  deps: StripeDeps,
+  ask: {
+    readonly tenantId: TenantId;
+    readonly customerRef: string;
+    readonly pack: PackDef;
+  },
+): Promise<{ readonly id: string } | ChargeRefusal> {
+  const key = await stripeKey(deps);
+  if (!key) return "not_charging";
+
+  const body = form(new URLSearchParams(), {
+    amount: ask.pack.price,
+    currency: ask.pack.currency.toLowerCase(),
+    customer: ask.customerRef,
+    confirm: true,
+    off_session: true,
+    description: ask.pack.name,
+    metadata: { tenant: ask.tenantId, pack: ask.pack.id, auto: "1" },
+  });
+
+  const said = await fetch("https://api.stripe.com/v1/payment_intents", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${key}`,
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body,
+  }).catch(() => null);
+
+  if (!said?.ok) return "declined";
+  const made = await said.json().catch(() => null) as { id?: string; status?: string } | null;
+  /* ⚠️ 200 IS NOT SUCCESS. Stripe answers `requires_action` with a perfectly
+     ordinary 200 and a payment that has not happened — reading the HTTP status
+     alone would grant credits for a charge the bank is still waiting on. */
+  if (made?.status !== "succeeded" || !made.id) return "declined";
+  return { id: made.id };
+}
+
 /* ------------------------------------------------------------------ events --- */
 
 export interface Event {
@@ -367,6 +424,11 @@ async function note(
 /** The types this deployment acts on. Anything else is recorded and ignored. */
 const ACTED_ON = new Set([
   "checkout.session.completed",
+  /* ⚠️ AND THE OFF-SESSION CHARGE, WHICH HAS NO SESSION TO REPORT IT. See the
+     `auto` mark below: only an intent this deployment raised itself is acted
+     on here, because a hosted checkout's intent is already answered by its
+     session and acting on both grants the same pack twice. */
+  "payment_intent.succeeded",
   "invoice.paid",
   "invoice.payment_failed",
   "customer.subscription.deleted",
@@ -456,6 +518,20 @@ export async function applyEvent(
         await ladder.becameBusiness(tenantId, legalName);
       }
       await ladder.paid(tenantId, appId);
+      break;
+    }
+    /*
+      ⚠️ ONLY AN INTENT WE RAISED OURSELVES. A hosted checkout produces a payment
+      intent too, and its credits are granted by the session above — acting on
+      both would grant every pack twice, under two event ids that no idempotency
+      row can join, and only for the customers who bought one.
+    */
+    case "payment_intent.succeeded": {
+      const said = (o.metadata ?? {}) as Record<string, unknown>;
+      const pack = said.pack;
+      if (said.auto === "1" && typeof pack === "string" && pack) {
+        await ladder.bought(tenantId, pack, event.id);
+      }
       break;
     }
     case "invoice.paid":

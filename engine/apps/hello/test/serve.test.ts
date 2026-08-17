@@ -157,6 +157,7 @@ describe("what the manifest produced", () => {
       "GET /api/member.list",
       "POST /api/member.remove",
       "POST /api/member.role",
+      "POST /api/money.auto",
       "POST /api/money.checkout",
       "POST /api/money.topup",
       "GET /api/money.view",

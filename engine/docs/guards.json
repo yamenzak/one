@@ -651,6 +651,42 @@
       "fails": "two tiers priced in different currencies and a bill that adds them together"
     },
     {
+      "id": "a-standing-charge-is-armed-by-a-person",
+      "protects": "D12",
+      "stage": "46",
+      "status": "live",
+      "impl": "runtime/test/wallet-auto.test.ts",
+      "proves": "is off until a person turns it on",
+      "fails": "a card charged on a standing instruction the customer never set - the shape of every subscription complaint there has ever been"
+    },
+    {
+      "id": "a-standing-charge-runs-at-most-once-an-hour",
+      "protects": "D12",
+      "stage": "46",
+      "status": "live",
+      "impl": "runtime/test/wallet-auto.test.ts",
+      "proves": "attempts at most once an hour, however often it is asked",
+      "fails": "a workspace out of credits on a busy afternoon charged as fast as its requests arrive, with the first sign of it being the statement"
+    },
+    {
+      "id": "the-threshold-reads-what-can-be-spent",
+      "protects": "D12",
+      "stage": "46",
+      "status": "live",
+      "impl": "runtime/test/wallet-auto.test.ts",
+      "proves": "reads what can be spent, not what is on the row",
+      "fails": "a workspace out of usable credits with a standing instruction that never fires, because the balance still looks healthy under a large hold"
+    },
+    {
+      "id": "a-decline-is-told-to-the-customer",
+      "protects": "D12",
+      "stage": "46",
+      "status": "live",
+      "impl": "runtime/test/wallet-auto.test.ts",
+      "proves": "keeps why the last attempt failed, where the customer reads it",
+      "fails": "credits that silently stopped topping up, with the only record of why in a log the customer cannot see"
+    },
+    {
       "id": "a-pack-is-bought-and-never-rented",
       "protects": "D1",
       "stage": "44",

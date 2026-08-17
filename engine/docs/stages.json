@@ -238,6 +238,11 @@
       "n": 45,
       "status": "planned",
       "title": "A plan is edited, and everybody already on it keeps what they were sold"
+    },
+    {
+      "n": 46,
+      "status": "shipped",
+      "title": "The wallet tops itself up — a standing instruction, a cooldown, and a decline the customer can read"
     }
   ]
 }

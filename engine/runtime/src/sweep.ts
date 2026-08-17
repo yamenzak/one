@@ -26,7 +26,7 @@
  * every shard and times out at the size where it starts to matter.
  */
 
-import type { AppSpec, Instant, TenantId } from "@engine/kernel";
+import type { AppSpec, Instant, PackDef, TenantId } from "@engine/kernel";
 
 import { erase } from "./records.js";
 import { closeTenant, forgetBelonging, membersOfTenant, tenantById } from "./directory.js";
@@ -37,6 +37,8 @@ import { forgetIcon } from "./icon.js";
 import { dueForErasure, run } from "./jobs.js";
 import { apply, type ApplyDeps } from "./resources.js";
 import { carryObjects, carryRows, finishMove, reapMoved } from "./move.js";
+import { chargeOffSession, type StripeDeps } from "./stripe.js";
+import { dueForTopUp, noteTopUpAttempt, noteTopUpFailed } from "./wallet.js";
 import { column, table, type Db } from "./sql.js";
 
 export interface SweepDeps {
@@ -58,6 +60,14 @@ export interface SweepDeps {
    * optional rather than assumed.
    */
   readonly bucketFor?: (where: Where) => Bucket | null;
+  /**
+   * ⚠️ WHAT A STANDING TOP-UP MAY BUY. Absent is a deployment that sells no
+   * packs, and the pass stands down rather than charging anybody — which is what
+   * every test and every `wrangler dev` runs.
+   */
+  readonly packs?: readonly PackDef[];
+  /** ⚠️ What a stored Stripe key is encrypted under — see `config.ts`. */
+  readonly configSecret?: string;
   /**
    * ⚠️ A SHARD BY ITS ID, WHICH A MOVE NEEDS AND A TENANT LOOKUP CANNOT GIVE. The
    * target shard has no workspace on it yet, so `shardOf` — which resolves
@@ -239,6 +249,17 @@ export async function sweep(deps: SweepDeps): Promise<void> {
   await run(deps.directory, "moves", () => sweepMoves(deps), now);
 
   /*
+    ⚠️ AND THE STANDING TOP-UPS, WHICH ARE THE ONLY THING HERE THAT SPENDS
+    SOMEBODY'S MONEY. It runs on the sweep rather than on a request because a
+    Stripe round trip does not belong on the path of a call somebody is waiting
+    for — and because the point is to top up BEFORE the balance reaches zero,
+    which is a question about a threshold rather than about a refusal.
+  */
+  if (deps.packs?.length) {
+    await run(deps.directory, "topups", () => sweepTopUps(deps), now);
+  }
+
+  /*
     ⚠️ AND THE INFRASTRUCTURE, ON THE SAME CLOCK. Reconciling on a schedule
     rather than on a deploy is what makes "this app needs a queue" a line in a
     manifest instead of a ticket: the declaration lands, the next pass makes it
@@ -320,4 +341,69 @@ export async function sweepMoves(deps: SweepDeps): Promise<{ touched: number; de
   if (reaped) said.push(`${reaped} drained source copy(ies) cleared`);
 
   return { touched: touched + reaped, detail: said.join("; ") || "nothing in flight" };
+}
+
+/* --------------------------------------------------------------- top-ups --- */
+
+/**
+ * CARRY OUT EVERY STANDING TOP-UP THAT IS DUE.
+ *
+ * ⚠️ THE ATTEMPT IS RECORDED BEFORE THE CHARGE, and that order is the whole
+ * safety. A charge that succeeded and then failed to write its cooldown is one
+ * the next pass makes again — "the card was charged twice and the record says
+ * once" is the failure this exists to prevent, and recording first can only ever
+ * cost a customer an hour.
+ *
+ * ⚠️ AND THE CREDITS ARE GRANTED BY THE WEBHOOK, NEVER HERE. `chargeOffSession`
+ * answering `succeeded` is us reading a response; `payment_intent.succeeded`
+ * arriving signed is Stripe telling us. Granting on the first would be the one
+ * place in this deployment where money is claimed to have moved on our own say
+ * so, and it would grant twice when the event arrives as well.
+ *
+ * ⚠️ A DECLINE IS NOT AN ERROR, IT IS AN ANSWER. A bank may demand
+ * authentication a browserless charge cannot give it, so the pass records why on
+ * the row the customer's own money screen reads, and does not retry.
+ */
+export async function sweepTopUps(deps: SweepDeps): Promise<{ touched: number; detail: string }> {
+  const now = (deps.now ?? (() => new Date()))();
+  const packs = deps.packs ?? [];
+  const stripe: StripeDeps = {
+    directory: deps.directory,
+    ...(deps.configSecret ? { configSecret: deps.configSecret } : {}),
+  };
+
+  let charged = 0;
+  const said: string[] = [];
+
+  for (const owing of await dueForTopUp(deps.directory, now)) {
+    const pack = packs.find((p) => p.id === owing.packId);
+    if (!pack) {
+      /* ⚠️ A PACK THAT LEFT THE CATALOGUE IS NOT A SILENT NO-OP. The customer
+         armed something that no longer exists, and nothing else would ever tell
+         them why their balance stopped topping up. */
+      await noteTopUpFailed(deps.directory, owing.tenantId, "That pack is no longer sold.");
+      said.push(`${owing.tenantId}: no such pack`);
+      continue;
+    }
+
+    await noteTopUpAttempt(deps.directory, owing.tenantId, now);
+    const out = await chargeOffSession(stripe, {
+      tenantId: owing.tenantId, customerRef: owing.customerRef, pack,
+    });
+
+    if (out === "not_charging") {
+      await noteTopUpFailed(deps.directory, owing.tenantId, "We cannot take payments right now.");
+      said.push(`${owing.tenantId}: not charging`);
+      continue;
+    }
+    if (out === "declined") {
+      await noteTopUpFailed(deps.directory, owing.tenantId, "Your bank did not approve the charge.");
+      said.push(`${owing.tenantId}: declined`);
+      continue;
+    }
+    charged++;
+    said.push(`${owing.tenantId}: ${pack.id}`);
+  }
+
+  return { touched: charged, detail: said.join("; ") || "nothing to do" };
 }
