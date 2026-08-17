@@ -117,6 +117,27 @@ rather than in production six weeks later, and they are why anything here can be
 changed confidently. Any proposal that moves a check from build time to runtime
 is trading the most valuable property this tree has, and must say so out loud.
 
+⚠️ **A TEST IS NOT ENFORCEMENT.** A test proves a rule is CORRECT. Putting it in
+force means something a request goes through calls it. A rule with a passing test
+and no caller is the most dangerous state a rule can be in — it is argued for in
+its own header, cited by other files, and does nothing.
+[ENFORCEMENT.md](ENFORCEMENT.md) is where every kernel rule's lane is recorded,
+and `scripts/rules.test.mjs` fails on one that has none.
+
+⚠️ **A GUARD THAT WALKS A DIRECTORY MUST REPORT WHAT IT WALKED.** "No violations
+found" and "nothing was looked at" are the same sentence without a number, and
+three checks in this tree printed the second for months: a layering check naming
+a package scope the rename retired (eighty imports unexamined), a compositor
+check reading a directory holding none of the keyframes it was about, and a
+settings check over a corpus that had moved. `gate.mjs` fails a walking guard
+that reports no count.
+
+⚠️ **AND A GUARD IS MUTATION-TESTED OR IT IS DECORATION.** Break the thing, watch
+it fire, restore. This has never been ceremony: the rules guard passed two
+mutations that deleted a rule's only caller, because the comment beside the call
+kept the identifier in the file — and a file that argues for a rule at length is
+exactly the file most likely to have stopped calling it.
+
 ---
 
 ## 8. Before writing UI, ask HeroUI
