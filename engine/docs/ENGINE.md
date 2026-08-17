@@ -396,7 +396,7 @@ env or a binding.
 | `identity` | sign-in codes, sessions, tokens, proof | 21 | — |
 | `membership` | the roster and what each member may do | 12 | — |
 | `compose` | a manifest becomes a live surface of operations | 2 | — |
-| `serve` | the one path every request ends in — both doors | 4 | — |
+| `serve` | the one path every request ends in — both doors | 5 | — |
 | `records` | the generated reads and writes behind a collection | 6 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
 | `billing` | plans, subscriptions, the bill, the ladder | 12 | 1 |
@@ -436,7 +436,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**302 of them**, 299 reached by something today.
+**303 of them**, 300 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -587,6 +587,9 @@ its own header, cited by other files, and doing nothing.
 | `every-key-a-product-declares-is-priced-by-every-tier` | D1 | a feature built, shipped and sold to nobody - an unpriced key resolves to off for every workspace on every tier, and no screen anywhere says why |
 | `the-lobby-is-free-and-cannot-be-bought` | D21 | a workspace charged for the parking state it never chose, or offered it at checkout as though not having a plan were a plan |
 | `one-catalogue-one-currency` | D1 | two tiers priced in different currencies and a bill that adds them together |
+| `a-signed-event-actually-reaches-the-ladder` | D12 | every Stripe event answered 405 by the static assets - money captured, no plan stamped, no credits, and no error anywhere because from the worker's side no request was ever refused |
+| `a-deployment-grants-only-packs-it-sells` | D12 | credits granted from a number that made a round trip through the customer's browser |
+| `the-one-way-door-opens-on-the-payment` | D21 | a workspace charged for a business tier and still personal, with the money already taken |
 | `a-comp-survives-the-next-renewal` | D18 | an apology for something we broke expiring on the first of the month, silently - and a balance that moved with nothing on the statement explaining it |
 | `the-operator-can-see-what-a-workspace-holds` | D18 | a console that can change a customer's balance and cannot read it, so every support conversation about credits starts by opening the database |
 | `the-two-balances-say-which-one-lapses` | D1 | one figure that drops on the first of the month with nothing saying why - a support conversation every month for ever |
@@ -807,7 +810,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 96 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 98 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -816,7 +819,7 @@ its own header, cited by other files, and doing nothing.
 | D18 | The operator stands outside every workspace, and the console is a door rather than a role | 6 |
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 3 |
 | D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 3 |
-| D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 8 |
+| D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 9 |
 | D22 | Branding and the installable app belong to the workspace, never to one app inside it | 4 |
 <!-- /generated -->
 

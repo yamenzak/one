@@ -651,6 +651,33 @@
       "fails": "two tiers priced in different currencies and a bill that adds them together"
     },
     {
+      "id": "a-signed-event-actually-reaches-the-ladder",
+      "protects": "D12",
+      "stage": "44",
+      "status": "live",
+      "impl": "one/test/payments.test.ts",
+      "proves": "grants the month's allowance from the plan the workspace holds",
+      "fails": "every Stripe event answered 405 by the static assets - money captured, no plan stamped, no credits, and no error anywhere because from the worker's side no request was ever refused"
+    },
+    {
+      "id": "a-deployment-grants-only-packs-it-sells",
+      "protects": "D12",
+      "stage": "44",
+      "status": "live",
+      "impl": "one/test/payments.test.ts",
+      "proves": "grants nothing for a pack it does not sell",
+      "fails": "credits granted from a number that made a round trip through the customer's browser"
+    },
+    {
+      "id": "the-one-way-door-opens-on-the-payment",
+      "protects": "D21",
+      "stage": "44",
+      "status": "live",
+      "impl": "one/test/payments.test.ts",
+      "proves": "makes the workspace a business on the payment that bought a commercial tier",
+      "fails": "a workspace charged for a business tier and still personal, with the money already taken"
+    },
+    {
       "id": "a-comp-survives-the-next-renewal",
       "protects": "D18",
       "stage": "6",

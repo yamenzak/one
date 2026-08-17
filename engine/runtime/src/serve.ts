@@ -249,7 +249,18 @@ const INSTALLABLE = new Set([
  */
 export const isPlatformPath = (pathname: string): boolean =>
   pathname.startsWith("/api/") || pathname === "/health" || pathname === "/mcp"
+  || pathname === WEBHOOK_PATH
   || INSTALLABLE.has(pathname);
+
+/**
+ * ⚠️ THE WEBHOOK'S PATH, NAMED ONCE, AND IT HAPPENED AGAIN. The paragraph above
+ * is about the manifest and the icon; the webhook was added later, answered a
+ * hundred lines below, and left out of this list — so every event Stripe sent
+ * went to the static assets and came back `405`. Stripe retries a 405, gives up,
+ * and nothing is ever granted: money captured, no plan stamped, no credits, and
+ * no error anywhere, because from the worker's side no request was ever refused.
+ */
+export const WEBHOOK_PATH = "/webhook/stripe";
 
 /**
  * ⚠️ FIVE MINUTES, AND `public` SO A CDN MAY HOLD IT. An icon is fetched on
@@ -407,7 +418,7 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
       renamed; the operator door would put it behind the console's own meaning.
       The signpost is not an app and never was.
     */
-    if (url.pathname === "/webhook/stripe") {
+    if (url.pathname === WEBHOOK_PATH) {
       if (!wiring.payments || door.kind !== "signpost") {
         return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
       }
