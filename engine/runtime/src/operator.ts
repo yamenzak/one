@@ -30,12 +30,13 @@ import { beginMove } from "./move.js";
 import { actionsOf, bind, bindingsOf, running } from "./ai-actions.js";
 import { adjust, subscriptionFor } from "./billing.js";
 import {
-  addShard, appsOfTenant, commercialAllowance, commercialLeft, setCommercialGrant, shards, tenantBySlug,
+  addShard, appsOfTenant, commercialAllowance, commercialLeft, disableApp, enableApp,
+  liveAppsOfTenant, setCommercialGrant, shards, tenantById, tenantBySlug,
 } from "./directory.js";
 import { runsOf } from "./jobs.js";
 import { makePushKeys, vapidOf } from "./push.js";
 import type { PersonalBook, PersonalCtx } from "./personal.js";
-import type { SchemaModule } from "./schema.js";
+import { applySchema, schemaFor, type SchemaModule } from "./schema.js";
 import type { Db } from "./sql.js";
 
 /* ----------------------------------------------------------------- schema --- */
@@ -148,11 +149,17 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
           `SELECT * FROM tenant ORDER BY at DESC LIMIT 200`).all();
         const items = await Promise.all(rows.results.map(async (r) => {
           const id = r.id as TenantId;
-          const enabled = await appsOfTenant(ctx.directory, id);
-          const held = await Promise.all(enabled.map(async (appId) => {
+          /* ⚠️ EVERY PRODUCT IT HAS EVER HAD, AND WHICH OF THEM ARE ON. A
+             switched-off product keeps its records and its tables, so listing
+             only the live ones would make the console's switch a one-way door —
+             the row would vanish the moment it was turned off, with nothing left
+             to turn back on. */
+          const live = new Set(await liveAppsOfTenant(ctx.directory, id));
+          const held = await Promise.all((await appsOfTenant(ctx.directory, id)).map(async (appId) => {
             const sub = await subscriptionFor(ctx.directory, id, appId);
             return {
               id: appId,
+              on: live.has(appId),
               planId: sub?.planId ?? null,
               status: sub?.status ?? null,
               adjustments: sub?.adjustments ?? {},
@@ -200,6 +207,54 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
         if (!app || !(key in app.entitlements)) return ctx.fail("platform.invalid");
         await adjust(ctx.directory, tenantId, appId, key, value, ctx.now);
         return { tenant: tenantId, app: appId, key };
+      },
+    },
+
+    /**
+     * A PRODUCT IS SWITCHED ON, OR OFF, FOR ONE WORKSPACE.
+     *
+     * ⚠️ THIS IS THE WHOLE OF "PROVISIONING BECOMES A FEATURE FLAG" (D1), and
+     * until it had a route the sentence was aspirational: every workspace got
+     * every product this deployment serves, because the enablement row was only
+     * ever written when the workspace was made. Switching one on provisions NO
+     * worker, NO database, NO bucket, NO domain and NO secret — it applies that
+     * product's tables to the shard the workspace is already on, and writes the
+     * row.
+     *
+     * ⚠️ TURNED OFF IS NOT REMOVED. What ends is reachability. The records stay,
+     * the tables stay applied, and the shard still counts the product when
+     * deciding whether it could hold this workspace — because a business that
+     * stops using one of our products has not asked to be forgotten, and erasing
+     * on a downgrade is a decision nobody made.
+     */
+    "op.tenant.app": {
+      kind: "write", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const tenantId = String(input.tenant ?? "") as TenantId;
+        const appId = String(input.app ?? "") as AppId;
+        const on = input.on;
+        if (!tenantId || !appId || typeof on !== "boolean") return ctx.fail("platform.invalid");
+
+        const app = deps.apps[appId]?.();
+        if (!app) return ctx.fail("platform.not_found");
+
+        if (!on) {
+          await disableApp(ctx.directory, tenantId, appId, ctx.now);
+          return { tenant: tenantId, app: appId, on: false };
+        }
+
+        const tenant = await tenantById(ctx.directory, tenantId);
+        if (!tenant) return ctx.fail("platform.not_found");
+        /* ⚠️ THE SCHEMA FIRST, AND THE ROW ONLY IF IT LANDED — see `enableApp`.
+           The other order opens a window in which the product is on and every
+           one of its reads answers "no such table", and that window is the
+           customer's first minute with it. */
+        const why = await enableApp(
+          ctx.directory, ctx.shardOf(tenant), tenantId, appId,
+          schemaFor(app), applySchema, ctx.now);
+        if (why) return ctx.fail("platform.invalid");
+        return { tenant: tenantId, app: appId, on: true };
       },
     },
 

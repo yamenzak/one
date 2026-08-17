@@ -151,8 +151,8 @@
       "protects": "D1",
       "stage": "1",
       "status": "live",
-      "impl": "kernel/test/tenancy.test.ts",
-      "proves": "counts a disabled app when deciding what a shard needs",
+      "impl": "runtime/test/placement.test.ts",
+      "proves": "keeps counting a disabled app when deciding where a tenant may go",
       "fails": "records stranded by a move, readable again the day the product is switched back on — in a database that cannot read them"
     },
     {
@@ -2035,6 +2035,33 @@
       "impl": "one/test/boot.test.ts",
       "proves": "holds each product's manifest rather than rebuilding it per request",
       "fails": "every route, permission and quota of a product rebuilt on every request for ever, because the composer's memo is keyed by the declaration and a thunk that reallocates one never hits it"
+    },
+    {
+      "id": "a-product-switched-off-stops-answering",
+      "protects": "D1",
+      "stage": "30",
+      "status": "live",
+      "impl": "one/test/boot.test.ts",
+      "proves": "stops answering the product's routes, and starts again",
+      "fails": "a switch that writes a row and changes nothing else — every route of the product still answering while the console reports it off"
+    },
+    {
+      "id": "a-product-switched-off-keeps-its-records",
+      "protects": "D1",
+      "stage": "30",
+      "status": "live",
+      "impl": "one/test/boot.test.ts",
+      "proves": "THE RECORDS CAME BACK WITH IT",
+      "fails": "a downgrade that erases — indistinguishable from a working switch until somebody turns the product back on and finds an empty workspace"
+    },
+    {
+      "id": "a-switched-off-product-is-still-on-the-console",
+      "protects": "D18",
+      "stage": "30",
+      "status": "live",
+      "impl": "one/test/boot.test.ts",
+      "proves": "keeps a switched-off product on the console's list, marked off",
+      "fails": "a one-way door: the row vanishes the moment the switch is pressed, with nothing left to press again"
     }
   ]
 }

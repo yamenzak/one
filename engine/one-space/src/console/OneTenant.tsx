@@ -17,7 +17,7 @@
 import { useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import {
-  AmountRow, ControlRow, Group, Identity, NumberInput, RowsWaiting, Screen, Stack, Tray,
+  AmountRow, ControlRow, Group, Identity, NumberInput, Row, RowsWaiting, Screen, Stack, Tray,
   appFace, notice, placeFace, sentence,
 } from "@engine/design";
 import type { Allowance, EntitlementDef, PlanSpec } from "@engine/kernel";
@@ -27,6 +27,8 @@ import { useLoad } from "../centre/data.js";
 
 interface Held {
   readonly id: string;
+  /** ⚠️ Whether it is switched ON — a workspace keeps a product it turned off. */
+  readonly on: boolean;
   readonly planId: string | null;
   readonly status: string | null;
   readonly adjustments: Readonly<Record<string, Allowance>>;
@@ -98,14 +100,20 @@ export function OneTenant({ id }: { readonly id: string }) {
                     face={appFace(held.id, app?.mark)}
                     label={app?.name ?? sentence(held.id)}
                     under={[
-                      held.planId ?? "no plan",
+                      /* ⚠️ OFF IS THE FIRST THING SAID, because everything after
+                         it — the plan, the adjustments — is about a product
+                         nobody in this workspace can currently reach. */
+                      held.on ? held.planId ?? "no plan" : "switched off",
                       held.status === "past_due" ? "payment failed" : "",
                       moved ? `${moved} adjusted` : "",
                     ].filter(Boolean).join(" · ")}
                   >
-                    {app
-                      ? <AdjustTray tenant={tenant} app={app} held={held} onDone={of.again} />
-                      : null}
+                    <Row space="tight">
+                      <AppSwitch tenant={tenant} held={held} onDone={of.again} />
+                      {app && held.on
+                        ? <AdjustTray tenant={tenant} app={app} held={held} onDone={of.again} />
+                        : null}
+                    </Row>
                   </ControlRow>
                 );
               })}
@@ -117,6 +125,39 @@ export function OneTenant({ id }: { readonly id: string }) {
         );
       }}
     />
+  );
+}
+
+/**
+ * TURNING A PRODUCT ON, OR OFF, FOR THIS WORKSPACE.
+ *
+ * ⚠️ OFF IS NOT REMOVED, AND THE COPY HAS TO SAY SO, because the button looks
+ * exactly like one that deletes. The records stay, the tables stay, and turning
+ * it back on is the same press again — so this is `secondary` rather than
+ * `danger`, and the sentence afterwards is what happened rather than a warning
+ * about what might have.
+ */
+function AppSwitch({ tenant, held, onDone }: {
+  readonly tenant: TenantLine;
+  readonly held: Held;
+  readonly onDone: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const set = async (on: boolean) => {
+    setBusy(true);
+    const out = await api.post("op.tenant.app", { tenant: tenant.id, app: held.id, on });
+    setBusy(false);
+    if (!out.ok) { notice.fail(out.problem.title); return; }
+    notice.ok(on
+      ? `${sentence(held.id)} is on for ${tenant.name}.`
+      : `${sentence(held.id)} is off for ${tenant.name}. Nothing was deleted.`);
+    onDone();
+  };
+
+  return (
+    <Button variant="secondary" isPending={busy} onPress={() => void set(!held.on)}>
+      {held.on ? "Turn off" : "Turn on"}
+    </Button>
   );
 }
 

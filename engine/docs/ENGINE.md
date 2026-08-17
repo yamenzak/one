@@ -164,6 +164,7 @@ live inside workspaces and an operator stands outside all of them.
 |---|---|
 | `op.tenants` | read |
 | `op.tenant.adjust` | write |
+| `op.tenant.app` | write |
 | `op.account.commercial` | write |
 | `op.flags` | read |
 | `op.flag.set` | write |
@@ -346,7 +347,7 @@ and a manifest that does not compose refuses to boot.
 | `credit` | metered work: the reserve, the rate, the ceiling | 7 | 1 |
 | `dunning` | the ladder from past due to erased | 5 | — |
 | `package` | a priced bundle of timed grants | 8 | 1 |
-| `tenancy` | workspaces, kinds, shards, placement, standing | 14 | 3 |
+| `tenancy` | workspaces, kinds, shards, placement, standing | 12 | 1 |
 | `door` | the five doors, and which host is which | 3 | 1 |
 | `setting` | a switch a workspace owns, and the page it lives on | 10 | 1 |
 | `flag` | a switch WE own, with a date it stops being one | 7 | — |
@@ -363,7 +364,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**216 of them**, 199 reached by something today.
+**214 of them**, 199 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -380,7 +381,7 @@ env or a binding.
 |---|---|---|---|
 | `schema` | the composed schema runner — declarations become tables | 7 | — |
 | `sql` | the one typed seam onto D1 | 4 | — |
-| `directory` | accounts, workspaces, placement, enablement, allowances | 25 | 3 |
+| `directory` | accounts, workspaces, placement, enablement, allowances | 25 | — |
 | `handles` | which binding holds which shard | 3 | — |
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
 | `identity` | sign-in codes, sessions, tokens, proof | 21 | — |
@@ -423,7 +424,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**265 of them**, 253 reached by something today.
+**265 of them**, 256 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -729,6 +730,9 @@ its own header, cited by other files, and doing nothing.
 | `proving-it-is-you-goes-to-your-own-address` | D12 | somebody holding a stolen cookie confirming themselves at an inbox they own, which is the entire thing the proof gate is against |
 | `a-composed-surface-belongs-to-one-declaration` | D4 | one product being served another's routes, permissions and quotas — a wrong ANSWER rather than an error, which is why an invalidation call somebody has to remember cannot be the fix |
 | `a-manifest-is-built-once-per-isolate` | D4 | every route, permission and quota of a product rebuilt on every request for ever, because the composer's memo is keyed by the declaration and a thunk that reallocates one never hits it |
+| `a-product-switched-off-stops-answering` | D1 | a switch that writes a row and changes nothing else — every route of the product still answering while the console reports it off |
+| `a-product-switched-off-keeps-its-records` | D1 | a downgrade that erases — indistinguishable from a working switch until somebody turns the product back on and finds an empty workspace |
+| `a-switched-off-product-is-still-on-the-console` | D18 | a one-way door: the row vanishes the moment the switch is pressed, with nothing left to press again |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -736,7 +740,7 @@ its own header, cited by other files, and doing nothing.
 <!-- generated: node scripts/inventory.mjs decisions -->
 | # | Decision | Guarded by |
 |---|---|---|
-| D1 | The tenant is primary; an app is a capability switched on for it | 4 |
+| D1 | The tenant is primary; an app is a capability switched on for it | 6 |
 | D2 | The framework is OneEngine; the deployment is One; packages are `@engine/*` | 3 |
 | D3 | One worker on the request path; heavy work splits over RPC service bindings | 6 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 3 |
@@ -753,7 +757,7 @@ its own header, cited by other files, and doing nothing.
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
 | D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 4 |
 | D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 4 |
-| D18 | The operator stands outside every workspace, and the console is a door rather than a role | 2 |
+| D18 | The operator stands outside every workspace, and the console is a door rather than a role | 3 |
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 3 |
 | D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 3 |
 | D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 6 |
@@ -780,8 +784,6 @@ nothing yet.
 | **27** — The AI lane runs — an action reaches a provider and the reserve settles | `kernel/src/ai.ts` | 1 |
 | **27** — The AI lane runs — an action reaches a provider and the reserve settles | `kernel/src/credit.ts` | 1 |
 | **27** — The AI lane runs — an action reaches a provider and the reserve settles | `runtime/src/services.ts` | 1 |
-| **30** — A workspace's apps are turned on and off, and a workspace can move shard | `kernel/src/tenancy.ts` | 2 |
-| **30** — A workspace's apps are turned on and off, and a workspace can move shard | `runtime/src/directory.ts` | 3 |
 | **33** — A guard refuses a declared setting nothing names — the seam a handler reads one through is live; the completeness check over it is not | `kernel/src/setting.ts` | 1 |
 | **34** — The kernel's remaining conveniences are each used by a lane or removed | `kernel/src/brand.ts` | 1 |
 | **34** — The kernel's remaining conveniences are each used by a lane or removed | `kernel/src/door.ts` | 1 |
@@ -794,7 +796,7 @@ nothing yet.
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `kernel/src/package.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `runtime/src/jobs.ts` | 1 |
 
-**29 declarations** are built and reached by nothing, each waiting on a
+**24 declarations** are built and reached by nothing, each waiting on a
 stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one
 that names no stage, so this list cannot grow by forgetting.
 <!-- /generated -->
@@ -833,7 +835,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 27 | The AI lane runs — an action reaches a provider and the reserve settles | **planned** |
 | 28 | Notifications are filed — an event raised becomes a note in somebody's inbox | shipped |
 | 29 | The daily sweep — erasure happens on a clock, and every run is recorded | shipped |
-| 30 | A workspace's apps are turned on and off, and a workspace can move shard | **planned** |
+| 30 | A workspace's apps are turned on and off, and a workspace can move shard | shipped |
 | 31 | Account security — sign out everywhere, and proving it is you again before something irreversible | shipped |
 | 32 | A manifest changes while the deployment is up, and the composed surface forgets | shipped |
 | 33 | A guard refuses a declared setting nothing names — the seam a handler reads one through is live; the completeness check over it is not | **planned** |
@@ -845,7 +847,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 39 | The documentation is two generated pages — what exists, derived from the engine; and how to add to it, which no generator can derive | shipped |
 | 40 | An app ships a screen — a product's browser half is a chunk of its own, loaded when its workspace opens it, drawing that workspace's own records through the door it is handed | shipped |
 
-**31 shipped, 9 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**32 shipped, 8 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

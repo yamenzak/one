@@ -264,8 +264,12 @@ export interface Enablement {
   readonly disabledAt: Instant | null;
 }
 
-/* DEFER(engine-30) stage:30 — see above — the enablement row is only ever written at creation. */
-export const enabled = (row: Enablement): boolean => row.disabledAt === null;
+/* ⚠️ AND BOTH QUESTIONS THIS SHAPE INVITES ARE ANSWERED IN SQL, deliberately —
+   `liveAppsOfTenant` for what is on, `appsOfTenant` for what a shard must still
+   be able to hold. A pure `enabled(row)` and `appsOf(rows)` lived here and were
+   reached by nothing: two smaller answers to questions the store already answers
+   correctly, which is the shape a kernel export goes wrong in. */
+
 
 /* ------------------------------------------------------- the placement rule --- */
 
@@ -351,15 +355,6 @@ export function placeOn(shards: readonly Shard[], wants: Placing): Shard | null 
   return able.reduce((best, s) => (s.tenants < best.tenants ? s : best));
 }
 
-/**
- * ⚠️ WHAT A TENANT NEEDS IS THE UNION OF ITS LIVE APPS, and a disabled one still
- * counts. Its records are still there (see `Enablement`), so a move that dropped
- * its schema would strand data nobody deleted — reachable again the moment the
- * product is switched back on, and by then in a database that cannot read it.
- */
-/* DEFER(engine-30) stage:30 — nothing turns a product on or off for a workspace yet. */
-export const appsOf = (rows: readonly Enablement[]): readonly AppId[] =>
-  [...new Set(rows.map((r) => r.appId))];
 
 /* ------------------------------------------------------------- standing --- */
 

@@ -407,3 +407,99 @@ describe("what somebody who has not agreed can do", () => {
     expect(owed.map((d) => d.id)).toEqual(["terms"]);
   });
 });
+
+/* ---------------------------------------------------------- a product off --- */
+
+/**
+ * A PRODUCT IS SWITCHED ON, AND OFF, FOR ONE WORKSPACE.
+ *
+ * ⚠️ THIS IS "PROVISIONING BECOMES A FEATURE FLAG" (D1) ASKED OF THE REAL
+ * DEPLOYMENT, and the half that matters is the second one. Writing the
+ * enablement row is easy; what makes it mean anything is that the composed
+ * surface is built from the LIVE apps, so a product switched off stops
+ * answering. While every read asked which apps a workspace had EVER had, the
+ * switch would have changed a row and nothing else — every route still there,
+ * the console reporting it off.
+ *
+ * ⚠️ AND OFF IS NOT REMOVED. The records survive it and come back with it, which
+ * is the difference between a downgrade and an erasure — a distinction no
+ * refund conversation should ever have to discover.
+ */
+describe("switching a product off for a workspace", () => {
+  const directory = () => env.DIRECTORY as unknown as Db;
+  const shard = () => env.SHARD_EU_1 as unknown as Db;
+  const asDevEnv = { ...env, ROOT: "localhost", ENVIRONMENT: "development", AUTH_SECRET: "test" };
+
+  const slug = "switchable";
+  let tenantId = "";
+  let cookie = "";
+
+  const at = (host: string, path: string, init: RequestInit = {}) =>
+    worker.fetch(new Request(`http://${host}.localhost:8080${path}`, init), asDevEnv as never);
+
+  const flip = (on: boolean) => at("admin", "/api/op.tenant.app", {
+    method: "POST", headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ tenant: tenantId, app: "hello", on }),
+  });
+
+  beforeAll(async () => {
+    const made = await createTenant(directory(), {
+      slug, name: "Switchable", country: "DE", where: "eu", apps: ["hello"],
+    });
+    if (typeof made === "string") throw new Error(made);
+    tenantId = made.tenant.id;
+
+    /* ⚠️ An operator IS an ordinary signed-in person here: with no
+       `OPERATOR_EMAILS` set, development admits whoever is signed in — and this
+       suite runs in development. */
+    const me = await upsertAccount(directory(), "ops@example.com", null);
+    await found(shard(), made.tenant.id, me as never, "ops@example.com", { hello: "writer" });
+    await noteBelonging(directory(), me as never, made.tenant.id);
+    cookie = `one_session=${(await startSession(directory(), me as never)).id}`;
+    for (const doc of Object.values(LEGAL.documents)) {
+      await at(slug, "/api/me.accept", {
+        method: "POST", headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ document: doc.id, version: doc.version }),
+      });
+    }
+    await shard().prepare(`INSERT INTO note (id, tenant_id, title, at, by) VALUES (?, ?, 'Kept', ?, NULL)`)
+      .bind("note_switchable", made.tenant.id, new Date().toISOString()).run();
+  });
+
+  it("stops answering the product's routes, and starts again", async () => {
+    expect((await at(slug, "/api/note.list", { headers: { cookie } })).status).toBe(200);
+
+    expect((await flip(false)).status).toBe(200);
+    /* ⚠️ 404 rather than 403: the operation is not one this workspace has, so
+       there is nothing to be permitted to do. */
+    expect((await at(slug, "/api/note.list", { headers: { cookie } })).status).toBe(404);
+
+    expect((await flip(true)).status).toBe(200);
+    const back = await at(slug, "/api/note.list", { headers: { cookie } });
+    expect(back.status).toBe(200);
+    /* ⚠️ THE RECORDS CAME BACK WITH IT. Turning a product off keeps them; a
+       switch that quietly erased would be indistinguishable until somebody
+       turned it back on and found an empty workspace. */
+    expect((await back.json() as { items: unknown[] }).items).toHaveLength(1);
+  });
+
+  /* ⚠️ THE CONSOLE STILL LISTS IT, or the switch is a one-way door — the row
+     would vanish the moment it was pressed, with nothing left to press again. */
+  it("keeps a switched-off product on the console's list, marked off", async () => {
+    expect((await flip(false)).status).toBe(200);
+    const seen = await at("admin", "/api/op.tenants", { headers: { cookie } })
+      .then((r) => r.json()) as { items: { id: string; apps: { id: string; on: boolean }[] }[] };
+    const row = seen.items.find((t) => t.id === tenantId)!;
+    expect(row.apps.map((a) => [a.id, a.on])).toEqual([["hello", false]]);
+    await flip(true);
+  });
+
+  /* ⚠️ THE OPERATOR DOOR AND NOWHERE ELSE — a switch reachable at a workspace's
+     own address is a switch any member can try. */
+  it("cannot be pressed from the workspace's own door", async () => {
+    expect((await at(slug, "/api/op.tenant.app", {
+      method: "POST", headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ tenant: tenantId, app: "hello", on: false }),
+    })).status).toBe(404);
+  });
+});

@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  allowanceLeft, appsOf, enabled, mayBecome, mayBrand, mayIsolate, placeOn, refuseCommercial,
+  allowanceLeft, mayBecome, mayBrand, mayIsolate, placeOn, refuseCommercial,
   refusePlacement, type Enablement, type Shard,
 } from "../src/tenancy.js";
 import type { AppId, Instant, TenantId } from "../src/primitives.js";
@@ -82,28 +82,12 @@ describe("choosing between the shards there are", () => {
   });
 });
 
-/* ------------------------------------------------------------ enablement --- */
-
-describe("an app switched on for a tenant", () => {
-  it("is live until it is disabled, and never deleted", () => {
-    expect(enabled(on("hello"))).toBe(true);
-    expect(enabled(on("hello", { disabledAt: AT }))).toBe(false);
-  });
-
-  /*
-    ⚠️ A DISABLED APP STILL COUNTS TOWARDS WHAT A SHARD MUST CARRY. Its records
-    are still there — nobody asked to be forgotten — so a move that dropped its
-    schema would strand data that becomes reachable again the moment the product
-    is switched back on, by then in a database that cannot read it.
-  */
-  it("counts a disabled app when deciding what a shard needs", () => {
-    expect(appsOf([on("hello"), on("atlas", { disabledAt: AT })])).toEqual(["hello", "atlas"]);
-  });
-
-  it("counts each app once, however many rows say so", () => {
-    expect(appsOf([on("hello"), on("hello")])).toEqual(["hello"]);
-  });
-});
+/*
+  ⚠️ ENABLEMENT IS ASKED OF THE STORE, NOT OF A PURE FUNCTION, and its two
+  questions are `runtime/test/placement.test.ts`'s — what a workspace has ON, and
+  what a shard must still be able to HOLD. They differ over a disabled product,
+  which is exactly why neither may be re-derived here from a row.
+*/
 
 /* ------------------------------------------------------ personal or business --- */
 

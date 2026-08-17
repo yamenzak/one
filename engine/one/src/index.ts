@@ -21,6 +21,7 @@ import { MEDIA_NEED, subProcessor, under } from "@engine/kernel";
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
   NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, acceptanceScope,
+  liveAppsOfTenant,
   deploymentFaults, isPlatformPath, locator,
   accept, bindingKey, liveBindings, memberFor, noteShardApp, observe, owedBy, sweep,
   tenantById, tenantBySlug,
@@ -396,7 +397,9 @@ const handler = (env: Env) => {
     const tenant = await tenantById(directory, tenantId);
     if (!tenant) return {};
     const member = await memberFor(shardOf(tenant), tenantId, accountId);
-    const apps = await appsOfTenant(directory, tenantId);
+    /* ⚠️ Only what is ON is asked about: an agreement demanded for a product
+       nobody can reach is a wall with nothing behind it. */
+    const apps = await liveAppsOfTenant(directory, tenantId);
     return {
       tenantId,
       /* ⚠️ Only whoever runs the workspace is asked for the workspace's own
@@ -529,7 +532,13 @@ const handler = (env: Env) => {
       directory,
       shardOf,
       appsOf: async (tenant) => {
-        const ids = await appsOfTenant(directory, tenant.id);
+        /* ⚠️ WHAT IS ON, NOT WHAT WAS EVER ON. This list becomes the composed
+           surface, so a product switched off has to leave it — otherwise the
+           switch changes a row and nothing else, and every one of its routes
+           goes on answering. The placement question is the OTHER one, and it
+           reads every app the workspace has ever had, because the tables and the
+           records are still there. */
+        const ids = await liveAppsOfTenant(directory, tenant.id);
         return ids.map((id) => APPS[id]?.()).filter((a): a is AppSpec => !!a);
       },
       /* ⚠️ Gating "has not paid" on a deployment that cannot take a payment

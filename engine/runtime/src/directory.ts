@@ -327,7 +327,6 @@ export async function appsOfTenant(db: Db, id: TenantId): Promise<readonly AppId
   return rows.results.map((r) => r.app_id as AppId);
 }
 
-/* DEFER(engine-30) stage:30 — see the note above. */
 export async function liveAppsOfTenant(db: Db, id: TenantId): Promise<readonly AppId[]> {
   const rows = await db.prepare(`SELECT app_id FROM tenant_app WHERE tenant_id = ? AND disabled_at IS NULL`)
     .bind(id).all<{ app_id: string }>();
@@ -351,9 +350,6 @@ export type EnableRefusal = "shard_cannot_hold_it" | "no_such_tenant";
  * to a binding is the caller's job and doing it here would make this module know
  * about `env`. `shardFor` is that lookup.
  */
-/* DEFER(engine-30) stage:30 — every workspace gets every app this deployment
-   serves, because turning one on or off has no route. `appsOfTenant` is read all
-   over the platform and the row it reads is only ever written at creation. */
 export async function enableApp(
   directory: Db, shard: Db, tenantId: TenantId, app: AppId, schema: SchemaModule,
   apply: (db: Db, modules: readonly SchemaModule[]) => Promise<unknown>,
@@ -375,7 +371,6 @@ export async function enableApp(
  * schema stays applied, and the shard still counts the app when deciding whether
  * it could hold this tenant.
  */
-/* DEFER(engine-30) stage:30 — see the note above. */
 export async function disableApp(
   directory: Db, tenantId: TenantId, app: AppId, now = new Date(),
 ): Promise<void> {

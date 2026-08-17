@@ -12,7 +12,8 @@ import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { collection, field, operation, type AppSpec, type AnyOperation } from "@engine/kernel";
 import {
-  DIRECTORY_SCHEMA, addShard, appsOfTenant, createTenant, disableApp, enableApp, mayMove,
+  DIRECTORY_SCHEMA, addShard, appsOfTenant, createTenant, disableApp, enableApp,
+  liveAppsOfTenant, mayMove,
   noteBelonging, noteShardApp, shards, tenantBySlug, tenantsOf, upsertAccount,
 } from "../src/directory.js";
 import { applySchema, refuseSql, schemaFor, stampOf, statementsFor } from "../src/schema.js";
@@ -277,6 +278,12 @@ describe("switching a product on", () => {
     await disableApp(directory(), made.tenant.id, "ledger");
     expect(await appsOfTenant(directory(), made.tenant.id)).toContain("ledger");
     expect(await mayMove(directory(), made.tenant.id, "eu-2")).toBe("schema_missing");
+
+    /* ⚠️ AND THE OTHER QUESTION GETS THE OTHER ANSWER. What a shard must be able
+       to hold and what a workspace can currently reach are two different
+       readings of the same rows, and one query answering both is how a switch
+       either strands records or changes nothing. */
+    expect(await liveAppsOfTenant(directory(), made.tenant.id)).toEqual(["notes"]);
   });
 
   it("refuses a move to a shard in the wrong place", async () => {

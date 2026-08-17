@@ -23,7 +23,7 @@ import {
 } from "@engine/kernel";
 import {
   appsOfTenant, becomeCommercial, closeTenant, createTenant, forgetInvitation, invitationsFor,
-  noteBelonging, tenantBySlug, tenantsOf, upsertAccount, type TenantRow,
+  liveAppsOfTenant, noteBelonging, tenantBySlug, tenantsOf, upsertAccount, type TenantRow,
 } from "./directory.js";
 import { subscribeDevice, unsubscribeDevice, vapidOf } from "./push.js";
 import { dossierOf, forgetPerson, forgetWorkspace, type Place } from "./dossier.js";
@@ -444,7 +444,10 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
         const accountId = ctx.session!.accountId;
         const tenants = await tenantsOf(ctx.directory, accountId);
         const belongs = await Promise.all(tenants.map(async (t) => {
-          const apps = await appsOfTenant(ctx.directory, t.id);
+          /* ⚠️ WHAT IS ON, NOT WHAT WAS EVER ON. This is a person's own list of
+             where they can go; a product switched off keeps its records and its
+             tables (see `Enablement`) and must not appear as somewhere to go. */
+          const apps = await liveAppsOfTenant(ctx.directory, t.id);
           const member = await memberFor(ctx.shardOf(t), t.id, accountId);
           /* ⚠️ Only where it is worth saying. A badge on every row is texture;
              one on the workspace that stopped paying is why somebody looked. */

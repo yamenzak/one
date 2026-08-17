@@ -607,6 +607,10 @@
       "kind": "write"
     },
     {
+      "id": "op.tenant.app",
+      "kind": "write"
+    },
+    {
       "id": "op.account.commercial",
       "kind": "write"
     },
