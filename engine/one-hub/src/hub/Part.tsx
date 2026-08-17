@@ -23,11 +23,12 @@ import { SettingsArea } from "../centre/SettingsArea.js";
 import { Trust } from "../centre/Trust.js";
 import { Wording } from "../centre/Wording.js";
 import { Notices } from "../centre/Notices.js";
+import { Brand } from "../centre/Brand.js";
 import type { Where } from "./where.js";
 import { useSession } from "../session.js";
 
 export type Part =
-  | "people" | "money" | "plan" | "packages" | "settings" | "notices" | "trust" | "wording";
+  | "people" | "money" | "plan" | "packages" | "settings" | "brand" | "notices" | "trust" | "wording";
 
 export function WorkspacePart({ part, slug, app, onGo }: {
   readonly part: Part;
@@ -62,6 +63,7 @@ export function WorkspacePart({ part, slug, app, onGo }: {
           onGo={(id) => onGo({ at: "settings", slug, app: id })}
         />
       );
+    case "brand": return <Brand name={view.tenant.name} slug={slug} />;
     case "notices": return <Notices view={view} />;
     case "trust": return <Trust view={view} where={where} />;
     case "wording":

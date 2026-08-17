@@ -74,6 +74,8 @@ export type Where =
    */
   | { readonly at: "settings"; readonly slug: string; readonly app?: string }
   | { readonly at: "trust"; readonly slug: string }
+  /** ⚠️ THE WORKSPACE'S OWN IDENTITY, one brand across every app under it (D22). */
+  | { readonly at: "brand"; readonly slug: string }
   /** What everybody in this workspace may be sent. The ceiling, not a preference. */
   | { readonly at: "notices"; readonly slug: string }
   /** What its AI features say on its behalf, where the product allows editing. */
@@ -94,7 +96,7 @@ export type Where =
   | { readonly at: "ground" };
 
 /** Every screen a workspace has, in the order its own screen lists them. */
-export const OF_WORKSPACE = ["people", "money", "packages", "settings", "notices", "wording", "trust"] as const;
+export const OF_WORKSPACE = ["people", "money", "packages", "settings", "brand", "notices", "wording", "trust"] as const;
 
 /**
  * ⚠️ WHAT SOMEBODY COMES BACK TO, AND WHAT THEY SET UP ONCE. Six rows in one
@@ -127,7 +129,10 @@ export const partsFor = (role: string | null): readonly WorkspacePart[] => {
   const runs = role === "owner" || role === "manager";
   /* ⚠️ People is drawn for everybody: a customer may see who coaches them,
      and the screen itself decides what any of them can change. */
-  const OWNED: readonly WorkspacePart[] = ["money", "packages", "wording", "notices"];
+  /* ⚠️ `brand` is here because it is what a business's own customers see — a
+     staff member changing the colour on every screen in the workspace is not a
+     staff decision. */
+  const OWNED: readonly WorkspacePart[] = ["money", "packages", "wording", "notices", "brand"];
   return OF_WORKSPACE.filter((p) => runs || !OWNED.includes(p));
 };
 
@@ -260,6 +265,7 @@ export const nameOf = (where: Where): string => {
     case "settings": return "Settings";
     case "notices": return "What everybody is told";
     case "trust": return "Data & Trust";
+    case "brand": return "Brand";
     case "wording": return "In your words";
     case "console": return "Operator";
     case "tenants": return "Tenants";

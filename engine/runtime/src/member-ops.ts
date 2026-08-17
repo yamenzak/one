@@ -278,13 +278,26 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
     "brand.read": op("brand.read", "read", "tenant:manage", "This workspace's own identity.",
       async (ctx) => {
         const tenant = await tenantById(ctx.directory, ctx.tenantId as TenantId);
+        /*
+          ⚠️ WHAT THE APPS HERE ACTUALLY HAVE, never the platform's closed set. A
+          surface a workspace can switch on that no app offers is a toggle that
+          changes nothing and says nothing — it stays on, everything reports
+          success, and somebody is waiting for an email that was never branded
+          because this workspace has no product that sends one.
+        */
+        const offered = new Set<string>();
+        for (const id of ctx.enabledApps) {
+          for (const s of ctx.appOf(id)?.whitelabel?.surfaces ?? []) offered.add(s);
+        }
         return {
           /* ⚠️ The kind travels with it, because "you have no brand" and "a
              personal workspace does not have one" are different screens: an
              empty editor, and an offer to become a business. */
           kind: tenant?.kind ?? "personal",
           branding: await brandingOf(ctx.directory, ctx.tenantId as TenantId),
-          surfaces: SURFACES,
+          /* ⚠️ In the platform's own order, so the list does not reshuffle when a
+             product is switched on. */
+          surfaces: SURFACES.filter((s) => offered.has(s)),
         };
       }),
 

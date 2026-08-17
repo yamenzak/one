@@ -21,6 +21,7 @@ import {
   appFace, notice, placeFace, sentence,
 } from "@engine/design";
 import type { Allowance, EntitlementDef, PlanSpec } from "@engine/kernel";
+import { isBusiness } from "@engine/kernel";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
 
@@ -37,6 +38,9 @@ interface TenantLine {
   readonly name: string;
   readonly country: string;
   readonly shardId: string;
+  /** ⚠️ What it IS, beside what it bought (D21). */
+  readonly kind?: "personal" | "commercial";
+  readonly legalName?: string | null;
   readonly closedAt: string | null;
   readonly apps: readonly Held[];
 }
@@ -74,9 +78,14 @@ export function OneTenant({ id }: { readonly id: string }) {
               face={placeFace(tenant.slug)}
               name={tenant.name}
               under={`${tenant.slug} · ${tenant.country} · ${tenant.shardId}`}
+              /* ⚠️ CLOSED WINS THE ONE SLOT. A closed workspace's kind is not
+                 what an operator opened this screen to find out, and two chips
+                 side by side make neither of them the answer. */
               aside={tenant.closedAt
                 ? <Chip color="danger" variant="soft"><Chip.Label>Closed</Chip.Label></Chip>
-                : undefined}
+                : isBusiness(tenant.kind ?? "personal")
+                  ? <Chip variant="soft"><Chip.Label>{tenant.legalName || "A business"}</Chip.Label></Chip>
+                  : undefined}
             />
 
             <Group>

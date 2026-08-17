@@ -44,7 +44,7 @@ import { HUB, above, isConsole, nameOf, parseWhere, pathOf, type Where } from ".
    address the parser can produce with no branch renders a blank page. */
 export const HUB_SCREENS: readonly Where["at"][] = [
   "home", "you", "inbox", "told", "workspaces", "workspace",
-  "people", "money", "plan", "packages", "settings", "notices", "wording", "trust",
+  "people", "money", "plan", "packages", "settings", "brand", "notices", "wording", "trust",
   "console", "tenants", "tenant", "actions", "switches", "works", "ground",
 ];
 

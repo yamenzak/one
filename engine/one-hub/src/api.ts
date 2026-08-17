@@ -140,6 +140,15 @@ export interface Me {
 export interface Belonging {
   readonly slug: string;
   readonly name: string;
+  /**
+   * ⚠️ WHAT THE WORKSPACE IS (D21). Absent reads as `personal`, which is the
+   * safe direction here exactly as it is at the gate: a screen that lost this
+   * offers becoming a business to somebody who already is — mildly wrong — where
+   * the other default would draw a brand editor over a workspace that has no
+   * brand and cannot save one.
+   */
+  readonly kind?: "personal" | "commercial";
+  readonly legalName?: string | null;
   /** One of the platform's four offices, or `null` while a claim is pending. */
   readonly platformRole?: string | null;
   readonly appRoles?: Readonly<Record<string, string>>;

@@ -155,8 +155,22 @@ export const mayBecome = (from: Kind, to: Kind): boolean =>
  * because sharing is right for it, and it wears OUR marks because it is not
  * trading under anybody's. Neither is a withheld feature to be nagged about.
  */
-export const mayBrand = (kind: Kind): boolean => kind === "commercial";
-export const mayIsolate = (kind: Kind): boolean => kind === "commercial";
+export const mayBrand = (kind: Kind): boolean => isBusiness(kind);
+export const mayIsolate = (kind: Kind): boolean => isBusiness(kind);
+
+/**
+ * ⚠️ FOR SAYING WHAT A WORKSPACE IS, NEVER FOR DECIDING WHAT IT MAY DO. A chip
+ * beside a name, a column in the console, a sentence in an email — those are
+ * labels, and a label asking `mayBrand` would be a screen that renamed itself
+ * the day branding moved. Anything that WITHHOLDS asks one of the two above, so
+ * that when what commercial buys changes, the capabilities move and the labels
+ * do not.
+ *
+ * ⚠️ AND IT EXISTS SO THE COMPARISON HAS ONE HOME. Left to each screen, the
+ * string `"commercial"` would be typed in twenty files, and the day the set of
+ * kinds grows the labels would be the ones nobody found.
+ */
+export const isBusiness = (kind: Kind): boolean => kind === "commercial";
 
 /**
  * HOW MANY COMMERCIAL WORKSPACES AN OPERATOR HAS GIVEN SOMEBODY, AND HOW MANY

@@ -208,6 +208,13 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
             : [];
           return {
             slug: t.slug, name: t.name,
+            /* ⚠️ WHAT IT IS TRAVELS WITH THE LIST, because every screen that
+               draws a workspace has to know: a business wears its own tile, has
+               a brand to edit, and offers nothing about becoming one. Asked per
+               workspace after the fact would be one round trip per row on the
+               screen somebody lands on. */
+            kind: t.kind,
+            legalName: t.legalName,
             platformRole: member?.platformRole ?? null,
             appRoles: member?.appRoles ?? {},
             apps,
@@ -278,7 +285,15 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
      */
     "me.tenant.commercial": {
       kind: "write", needs: "session",
-      doors: ["setup", "account"],
+      /*
+        ⚠️ THE WORKSPACE'S OWN DOOR IS ALLOWED HERE AND NOT ON `create`, AND THE
+        DIFFERENCE IS WHAT THE OPERATION IS ABOUT. Creating a workspace from
+        inside somebody else's invites a person who followed a colleague's link
+        to start a second one. This is about the workspace they are standing in —
+        offered anywhere else it would be a decision made at a distance from the
+        thing it changes.
+      */
+      doors: ["setup", "account", "tenant"],
       async run(ctx, input): Promise<unknown> {
         const slug = String(input.slug ?? "");
         const legalName = String(input.legalName ?? "").trim();

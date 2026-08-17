@@ -48,7 +48,17 @@ export function Ground() {
                   FACT THAT IS NOT THE BAR. Which schemas are applied is a list,
                   and a list of two words belongs under the name rather than in
                   a sentence of its own. */}
-              <Group label={s.id} under={`${s.where} · ${s.apps.map(sentence).join(", ") || "no schemas applied"}`}>
+              {/* ⚠️ WHOSE SHARD IT IS BELONGS IN THE HEADING, NOT IN THE BAR. A
+                  dedicated shard reads as an ALARMINGLY EMPTY one otherwise — a
+                  meter at 1 of 500 with nothing saying it is that way on
+                  purpose, which is a capacity problem an operator would then go
+                  and "fix" by placing somebody on it. */}
+              <Group
+                label={s.id}
+                under={s.dedicatedTo
+                  ? `${s.where} · kept for one workspace`
+                  : `${s.where} · ${s.apps.map(sentence).join(", ") || "no schemas applied"}`}
+              >
                 <div className="px-4 py-3">
                   <Meter
                     label="Workspaces"

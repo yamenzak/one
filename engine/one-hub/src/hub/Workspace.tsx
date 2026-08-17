@@ -18,6 +18,7 @@
  */
 
 import { Button, Chip } from "@heroui/react";
+import { isBusiness } from "@engine/kernel";
 import { Group, NavRow, Row, Screen, glyphOf } from "@engine/design";
 import { useSession } from "../session.js";
 import { tenantUrl } from "../door.js";
@@ -35,6 +36,7 @@ const GLYPH: Readonly<Record<WorkspacePart, string>> = {
   money: "money",
   packages: "package",
   settings: "settings",
+  brand: "star",
   notices: "bell",
   trust: "trust",
   wording: "note",
@@ -81,6 +83,19 @@ export function OneWorkspace({ slug, onGo }: {
         onDo: () => { if (where) location.assign(tenantUrl(slug, where, location)); },
       }}
     >
+      {/* ⚠️ WHAT IT IS, WHERE ITS NAME IS. A business's legal name is the fact
+          that distinguishes two workspaces called the same thing on one account,
+          and it is the only place in the hub it appears — a personal workspace
+          says nothing, because "personal" is not news about somebody's own
+          notebook. */}
+      {isBusiness(workspace?.kind ?? "personal") ? (
+        <Row>
+          <Chip variant="soft">
+            <Chip.Label>{workspace?.legalName || "A business"}</Chip.Label>
+          </Chip>
+        </Row>
+      ) : null}
+
       {/* ⚠️ THE PROBLEM COMES BEFORE THE LIST, NOT INSIDE IT. A failed payment
           filed as the first row of a menu is a row; above the menu it is the
           reason the person is looking. */}

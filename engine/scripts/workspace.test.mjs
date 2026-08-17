@@ -75,7 +75,8 @@ ok(`one writer: tenant.kind is written by the transition and nowhere else`);
  */
 const COMPARES = /\bkind\s*(===|!==)\s*["'`]commercial["'`]|["'`]commercial["'`]\s*(===|!==)\s*\w*[Kk]ind\b/;
 const MAY_COMPARE = new Set([
-  /* The definitions themselves — `mayBrand` and `mayIsolate` ARE the comparison. */
+  /* The definitions themselves — `isBusiness`, `mayBrand` and `mayIsolate` ARE
+     the comparison, and having exactly one home is the property being kept. */
   "kernel/src/tenancy.ts",
   /* The gate, whose whole job is this one question, in the one walk. */
   "kernel/src/gate.ts",
