@@ -28,7 +28,7 @@ not narration.
 // DEFER(engine-14) stage:5 — the sky's motion is still a single gradient.
 ```
 
-Found by `scripts/defer.mjs`, not by memory. **A stage cannot be marked shipped
+Found by `scripts/docs.test.mjs`, not by memory. **A stage cannot be marked shipped
 while anything defers to it** — that is the mechanism that makes "shipped" mean
 something, and it is the only reason the stage table in PLAN.md can be trusted.
 

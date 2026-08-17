@@ -326,7 +326,7 @@ refuse — it reads as built and passes every test.
 
 **The vault, and the record.**
 
-- `runtime/vault.ts` — encrypted rows keyed by a per-subject salt, so erasure is
+- `runtime/src/vault.ts` — encrypted rows keyed by a per-subject salt, so erasure is
   ONE write and what it destroys is the only thing that could turn the
   ciphertext back into facts — here and in any backup that already left. Every
   look is recorded, refusals included, with no opt-out anywhere: "who looked at
@@ -687,17 +687,17 @@ The guard registry, its checks, and the standards that bind them.
 | # | Decision | Guarded by |
 |---|---|---|
 | D1 | The tenant is primary; an app is a capability switched on for it | 3 |
-| D2 | The framework is OneEngine; the deployment is One; packages are `@engine/*` | 2 |
+| D2 | The framework is OneEngine; the deployment is One; packages are `@engine/*` | 3 |
 | D3 | One worker on the request path; heavy work splits over RPC service bindings | 6 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 9 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 56 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 57 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 10 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 45 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 46 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -897,6 +897,9 @@ the library decides FOR us.
 | `no-page-imports-a-product` | D17 | one product's whole manifest and every screen shipped to every customer of every other one — measured in the built bundle, behind a dev-only branch that reads as dev-only and is not, because a module graph is decided before a branch is |
 | `the-test-ground-cannot-reach-production` | D17 | a chunk emitted for a screen nobody in production requests, which pins every symbol that chunk could reach as an export of the shared one and stops the design system tree-shaking — measured at +147 KB |
 | `every-provider-call-goes-through-one-lane` | D14 | a generation the gateway never sees, so its real token count and real cost are invisible to the half of metering that pays for them and the reserve settles against a guess |
+| `a-document-points-only-at-files-that-exist` | D12 | an instruction that sends a reader somewhere empty — the standards document told people deferrals were found by a script that does not exist, so anybody who followed it found nothing and could reasonably conclude they are not tracked |
+| `the-layering-check-can-actually-match` | D2 | a green run asserting nothing — the pattern named a package scope the tree stopped using at the rename, so eighty cross-package imports went unexamined while the check printed a confident sentence about all of them |
+| `the-design-system-navigates-nothing` | D7 | the package deciding navigation for every app that uses it — and the hub, which is not one app, having two routers in one page |
 <!-- /generated -->
 
 ## Commands

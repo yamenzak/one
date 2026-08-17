@@ -309,11 +309,11 @@ for (const file of FILES) {
 if (!assembled) ok(`composed: no screen assembles a control the package already ships`);
 
 /**
- * ⚠️ AND AN APP DOES NOT KEEP A DRAWER OF SHARED FURNITURE. `one-hub/src/ui.tsx`
- * was exactly that, and its own header recorded the pattern: two of its three
- * exports had already left for the package, one at a time, each after somebody
- * noticed a second app would want it. The third — a titled card with a stacked
- * body — was the last of a pattern rather than an exception to it.
+ * ⚠️ AND AN APP DOES NOT KEEP A DRAWER OF SHARED FURNITURE. A file of local
+ * components named for being local is a staging area that empties one export at
+ * a time into the package, each time somebody notices a second app would want
+ * it — so what is left in it at any moment is not an exception to the pattern,
+ * it is the part of the pattern nobody has reached yet.
  *
  * ⚠️ THE TEST IS THE NAME, WHICH IS BLUNT AND IS THE POINT. Whether a component
  * is product-specific cannot be decided by a script; whether somebody has

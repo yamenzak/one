@@ -18,6 +18,7 @@
 import { describe, expect, it } from "vitest";
 import { FAMILIES, render, type Family, type Palette } from "../src/scene/index.js";
 import { BEAT } from "../src/tokens/motion.js";
+import { ambienceStylesheet } from "../src/tokens/ambience.js";
 
 /* ⚠️ Two real colours, because `color-mix` with a bad operand is dropped by the
    browser rather than reported, and a slot filled with `undefined` is exactly
@@ -198,5 +199,48 @@ describe("every family", () => {
         }
       }
     }
+  });
+});
+
+/**
+ * WHAT THE AMBIENCE ENGINE ACTUALLY EMITS.
+ *
+ * ⚠️ THE GUARD CANNOT READ THIS AND SAID IT COULD. `scene.test.mjs` scanned
+ * source for `@keyframes` and reported "0 animated properties, all
+ * compositor-only" — over a directory holding none, while every keyframe in the
+ * product was being BUILT IN JS one file away. CSS assembled from template
+ * literals is not readable by a regex over the source; it is readable by running
+ * the generator, which is what a test can do and a guard cannot.
+ *
+ * ⚠️ AND THE RULE IS THE EXPENSIVE ONE. Opacity and transform are the only two a
+ * compositor can animate without touching layout or paint. Anything else on a
+ * full-viewport layer repaints the whole screen every frame, for ever, on a
+ * phone — and looks identical on the laptop it was written on.
+ */
+describe("the ambience engine's own motion", () => {
+  const css = ambienceStylesheet();
+
+  it("animates nothing a compositor cannot", () => {
+    const blocks = [...css.matchAll(/@keyframes\s+[\w-]+\s*\{([\s\S]*?)\n?\s*\}\s*(?=@|\.|\[|$)/g)];
+    /* ⚠️ Finding none is a failure, not a pass — it is what the guard did. */
+    expect(blocks.length).toBeGreaterThan(0);
+
+    const animated = new Set<string>();
+    for (const [, body] of blocks) {
+      for (const [, prop] of (body ?? "").matchAll(/([a-z-]+)\s*:/g)) animated.add(prop as string);
+    }
+    expect(animated.size).toBeGreaterThan(0);
+    expect([...animated].sort()).toEqual(["opacity", "transform"]);
+  });
+
+  /*
+    ⚠️ AND EVERY ONE OF THEM STANDS DOWN WHEN SOMEBODY HAS ASKED IT TO. For some
+    people this is not a preference — a drifting ground that keeps drifting for
+    somebody who turned motion off where they could see the switch is the one
+    failure in this engine that reaches past taste.
+  */
+  it("stops for anybody who asked it to", () => {
+    expect(css).toContain("prefers-reduced-motion");
+    expect(css).toContain('[data-reduce-motion="true"]');
   });
 });

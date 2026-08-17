@@ -4,7 +4,7 @@
  * PROVISIONED.
  *
  * ⚠️ ENGINE DOES NOT USE `apps.json`, AND MUST NOT START. The legacy binder
- * (`scripts/bind-resource-ids.mjs`) resolves its target through that registry,
+ * (`scripts/bind-ids.mjs`) resolves its target through that registry,
  * so reusing it would mean registering One there — and the whole reason
  * `deploy.yml` can never select One is that it is absent from it. This is the
  * same job, forty lines, with the registry replaced by the config's own

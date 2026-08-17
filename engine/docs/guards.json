@@ -1594,6 +1594,33 @@
       "impl": "scripts/bundle.test.mjs",
       "proves": "bundle: every provider call",
       "fails": "a generation the gateway never sees, so its real token count and real cost are invisible to the half of metering that pays for them and the reserve settles against a guess"
+    },
+    {
+      "id": "a-document-points-only-at-files-that-exist",
+      "protects": "D12",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/docs.test.mjs",
+      "proves": "paths:",
+      "fails": "an instruction that sends a reader somewhere empty — the standards document told people deferrals were found by a script that does not exist, so anybody who followed it found nothing and could reasonably conclude they are not tracked"
+    },
+    {
+      "id": "the-layering-check-can-actually-match",
+      "protects": "D2",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/kernel.test.mjs",
+      "proves": "boundary:",
+      "fails": "a green run asserting nothing — the pattern named a package scope the tree stopped using at the rename, so eighty cross-package imports went unexamined while the check printed a confident sentence about all of them"
+    },
+    {
+      "id": "the-design-system-navigates-nothing",
+      "protects": "D7",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/kernel.test.mjs",
+      "proves": "router:",
+      "fails": "the package deciding navigation for every app that uses it — and the hub, which is not one app, having two routers in one page"
     }
   ]
 }

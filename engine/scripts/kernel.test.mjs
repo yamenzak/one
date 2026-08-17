@@ -131,20 +131,49 @@ ok(`reserved: the framework's name is not a symbol inside it (${reservedHits} hi
 
 /**
  * ⚠️ THE ARROW POINTS ONE WAY. A kernel that imports the runtime is a kernel
- * that cannot be tested alone; a runtime that imports the web is a worker that
- * bundles React.
+ * that cannot be tested alone; a runtime that imports the design system is a
+ * worker that bundles React.
+ *
+ * ⚠️ THE SCOPE IS `@engine`, AND THIS MATCHED `@one` FOR AS LONG AS THE PACKAGES
+ * HAVE BEEN CALLED `@engine`. So the check found nothing, reported `ok` in a
+ * confident sentence, and would have gone on doing that through any layering
+ * violation anybody cared to write. A guard whose pattern cannot match is worse
+ * than no guard: the absent one gets noticed.
  */
 const ALLOWED = { kernel: [], runtime: ["kernel"], design: ["kernel"] };
+let checked = 0;
 for (const [pkg, allowed] of Object.entries(ALLOWED)) {
   for (const file of sourcesIn(pkg)) {
-    for (const m of readFileSync(file, "utf8").matchAll(/from\s+["']@one\/([a-z-]+)/g)) {
+    for (const m of readFileSync(file, "utf8").matchAll(/from\s+["']@engine\/([a-z-]+)/g)) {
+      checked++;
       if (!allowed.includes(m[1])) {
         fail(`${file.slice(ENGINE.length + 1)}: @engine/${pkg} imports @engine/${m[1]}, which the layering forbids.`);
       }
     }
   }
 }
-ok(`boundary: kernel imports nothing of ours; runtime and web import only the kernel`);
+/* ⚠️ A COUNT, BECAUSE ZERO IS THE ANSWER A BROKEN PATTERN GIVES. The kernel
+   imports nothing of ours by design, so "no violations" and "nothing looked at"
+   print the same word without one. */
+if (!checked) {
+  fail(`boundary: the import pattern matched nothing at all across ${Object.keys(ALLOWED).length} packages — a check that cannot fail`);
+} else {
+  ok(`boundary: ${checked} cross-package import(s), every one pointing down the arrow`);
+}
+
+/**
+ * ⚠️ AND THE DESIGN SYSTEM IS ROUTER-FREE. STANDARDS §6 states it and nothing
+ * asked: a screen hands back a DESTINATION and the app it is mounted in decides
+ * what that means. A router inside the package would make every app adopt that
+ * router — and the hub, which is not one app, would have two.
+ */
+const ROUTERS = /from\s+["'](react-router[\w-]*|@tanstack\/react-router|wouter|next\/\w+)["']/;
+const routed = sourcesIn("design").filter((f) => ROUTERS.test(readFileSync(f, "utf8")));
+if (routed.length) {
+  fail(`router: ${routed.map((f) => f.slice(ENGINE.length + 1)).join(", ")} imports a router — the package would decide navigation for every app that uses it`);
+} else {
+  ok(`router: the design system hands back destinations and navigates nothing`);
+}
 
 console.log(`\nlayers: the kernel is pure, the shared tree carries no product vocabulary.`);
 process.exit(bad ? 1 : 0);

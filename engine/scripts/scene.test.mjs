@@ -92,7 +92,19 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-hub/src")];
       }
     }
   }
-  if (!bad) ok(`motion: ${props} animated propert(ies), all compositor-only`);
+  /*
+    ⚠️ ZERO IS THE CORRECT ANSWER HERE, AND THE SENTENCE HAS TO SAY WHICH ZERO IT
+    IS. A family does not write its own keyframes — the ambience engine emits
+    every one of them — so this asks whether any family has started, and finding
+    none is the pass. What it does NOT check is whether the engine's own
+    keyframes stay on the compositor: those are built in JS, so no regex over the
+    source can read them, and `design/test/scene.test.ts` runs the generator and
+    reads the CSS instead. This printed `0 animated properties, all
+    compositor-only` for as long as the engine's keyframes existed elsewhere.
+  */
+  if (!bad) {
+    ok(`motion: ${SCENE.length} family file(s), ${props} writing keyframes of their own`);
+  }
 }
 
 /* ------------------------------------- a ground is masked, never washed --- */

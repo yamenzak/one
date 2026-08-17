@@ -11,7 +11,7 @@
  * Run with `--write` to refresh the generated blocks.
  */
 
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -151,6 +151,47 @@ for (const f of files) {
   if (WRITE && after !== before) writeFileSync(join(ENGINE, f), after);
 }
 ok(`generated: ${blocks} verified block(s)`);
+
+/* ------------------------------------------------------------------ paths --- */
+
+/*
+  ⚠️ A DOCUMENT THAT POINTS AT A FILE THAT IS NOT THERE IS WORSE THAN ONE THAT
+  POINTS AT NOTHING. STANDARDS §2 said deferrals are found by a script that does
+  not exist, so anybody following the instruction found nothing and could
+  reasonably conclude deferrals are not tracked at all. The mechanism was fine;
+  the sentence describing it sent people away from it.
+
+  ⚠️ AND A GUARD'S OWN HEADER IS A DOCUMENT TOO. One named a file deleted months
+  earlier as though a reader could open it — the incident rather than the
+  invariant, which is what §1 forbids and the reason it forbids it.
+*/
+{
+  const REF = /`((?:scripts|docs|kernel|runtime|design|one-hub|one|apps)\/[\w./-]+\.(?:mjs|md|ts|tsx|json))`/g;
+  const looked = new Set();
+  let broken = 0;
+  const scan = (dir) => {
+    let entries;
+    try { entries = readdirSync(join(ENGINE, dir), { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const at = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        if (!/node_modules|dist|\.turbo/.test(entry.name)) scan(at);
+        continue;
+      }
+      if (!/\.(ts|tsx|mjs|md)$/.test(entry.name)) continue;
+      for (const m of readFileSync(join(ENGINE, at), "utf8").matchAll(REF)) {
+        looked.add(m[1]);
+        if (!existsSync(join(ENGINE, m[1]))) {
+          fail(`${at}: names \`${m[1]}\`, which is not there — an instruction that sends a reader somewhere empty`);
+          broken++;
+        }
+      }
+    }
+  };
+  for (const dir of ["docs", "scripts", "kernel/src", "runtime/src", "design/src",
+    "one-hub/src", "one/src", "apps"]) scan(dir);
+  if (!broken) ok(`paths: all ${looked.size} file reference(s) in prose and comments resolve`);
+}
 
 console.log(`\ndocumentation: kinds declared, deferrals findable, inventories derived.`);
 process.exit(bad ? 1 : 0);
