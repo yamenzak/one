@@ -587,6 +587,7 @@ its own header, cited by other files, and doing nothing.
 | `every-key-a-product-declares-is-priced-by-every-tier` | D1 | a feature built, shipped and sold to nobody - an unpriced key resolves to off for every workspace on every tier, and no screen anywhere says why |
 | `the-lobby-is-free-and-cannot-be-bought` | D21 | a workspace charged for the parking state it never chose, or offered it at checkout as though not having a plan were a plan |
 | `one-catalogue-one-currency` | D1 | two tiers priced in different currencies and a bill that adds them together |
+| `every-path-the-platform-answers-is-routed-to-it` | D3 | a path answered by the static assets instead of the platform - 200 with the page on it for a GET and 405 for anything else, which is how the manifest and then every Stripe event were lost, both times with nothing failing anywhere |
 | `a-signed-event-actually-reaches-the-ladder` | D12 | every Stripe event answered 405 by the static assets - money captured, no plan stamped, no credits, and no error anywhere because from the worker's side no request was ever refused |
 | `a-deployment-grants-only-packs-it-sells` | D12 | credits granted from a number that made a round trip through the customer's browser |
 | `the-one-way-door-opens-on-the-payment` | D21 | a workspace charged for a business tier and still personal, with the money already taken |
@@ -801,7 +802,7 @@ its own header, cited by other files, and doing nothing.
 |---|---|---|
 | D1 | The tenant is primary; an app is a capability switched on for it | 15 |
 | D2 | The framework is OneEngine; the deployment is One; packages are `@engine/*` | 3 |
-| D3 | One worker on the request path; heavy work splits over RPC service bindings | 6 |
+| D3 | One worker on the request path; heavy work splits over RPC service bindings | 7 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 3 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 13 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 5 |
