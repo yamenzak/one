@@ -15,6 +15,7 @@ import { accountUrl, faceFor, setupUrl, signpostUrl, tenantUrl, type DoorKind, t
 import { COUNTRIES, byName, nameOf } from "../src/countries.js";
 import { Signpost } from "../src/screens/Signpost.js";
 import { Elsewhere } from "../src/screens/Elsewhere.js";
+import { Editor } from "../src/centre/Brand.js";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node);
 
@@ -185,5 +186,61 @@ describe("the country list", () => {
   it("sorts by name and keeps every entry", () => {
     expect(byName().length).toBe(COUNTRIES.length);
     expect(byName()[0]?.name.localeCompare(byName()[1]?.name ?? "")).toBeLessThanOrEqual(0);
+  });
+});
+
+/**
+ * THE WORKSPACE'S OWN IDENTITY, RENDERED.
+ *
+ * ⚠️ THIS SCREEN HAD NO TEST AND NO PHOTOGRAPH. It was rewritten twice — onto the
+ * row grammar, then onto the edit sheet — both times by inference from the
+ * settings screen next to it, which is exactly the way two surfaces come to
+ * disagree about the grammar they are supposed to share.
+ *
+ * ⚠️ AND THE TWO STATES ARE DIFFERENT SCREENS, not one screen with a flag. A
+ * personal workspace is offered the way forward; a business is given the editor.
+ * Rendering the controls and refusing every save is a screen that lies.
+ */
+describe("a workspace's brand", () => {
+  const commercial = {
+    kind: "commercial" as const,
+    branding: { theme: { ground: "#101014", ink: "#f5f5f7", accent: "#7aa2f7", mark: "H" }, surfaces: ["shell"] },
+    surfaces: ["shell", "email"],
+  };
+
+  it("shows a business what it is set to, and a way to change each of them", () => {
+    const out = html(
+      <Editor name="Harbourside" slug="harbourside" answer={commercial} again={() => {}} />,
+    );
+    /* ⚠️ The tile is what is being decided, so it is on the screen. */
+    expect(out).toContain("On a home screen");
+    /* ⚠️ Every colour reads as its value, not as a control — see `edit.tsx`. */
+    for (const hex of ["#101014", "#f5f5f7", "#7aa2f7"]) expect(out).toContain(hex);
+    /* ⚠️ And each is CHANGED rather than typed into: the row carries the way in. */
+    expect(out).toContain("Change behind everything");
+    expect(out).toContain("Change words and marks");
+    /* ⚠️ Only what the apps here offer — never the platform's closed set. */
+    expect(out).toContain("The app itself");
+    expect(out).not.toContain("Public pages");
+  });
+
+  /*
+    ⚠️ A PERSONAL WORKSPACE GETS THE OFFER, AND IT IS ONE WAY. The sentence over
+    the button is what somebody reads; a confirmation afterwards about something
+    already decided is a speed bump.
+  */
+  it("offers a personal workspace the way forward instead of a locked editor", () => {
+    const out = html(
+      <Editor
+        name="Sam's notes" slug="sam"
+        answer={{ kind: "personal", branding: null, surfaces: ["shell"] }}
+        again={() => {}}
+      />,
+    );
+    expect(out).toContain("This is for business workspaces");
+    expect(out).toContain("It cannot be undone");
+    expect(out).toContain("Legal name");
+    /* ⚠️ No editor at all — not a disabled one. */
+    expect(out).not.toContain("On a home screen");
   });
 });

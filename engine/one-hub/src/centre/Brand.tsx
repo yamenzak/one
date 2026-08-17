@@ -93,7 +93,14 @@ export function Brand({ name, slug }: {
   );
 }
 
-function Editor({ name, slug, answer, again }: {
+/**
+ * ⚠️ EXPORTED FOR ONE REASON: SO IT CAN BE LOOKED AT. `Brand` fetches, so a test
+ * of it is a test of `useLoad`; the editor takes its answer as a prop, so it can
+ * be rendered and read. This screen was rewritten twice — onto the row grammar,
+ * then onto the edit sheet — with nothing rendering it either time, which is a
+ * screen changed by inference from a neighbouring one.
+ */
+export function Editor({ name, slug, answer, again }: {
   readonly name: string;
   readonly slug: string;
   readonly answer: BrandAnswer;
