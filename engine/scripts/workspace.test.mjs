@@ -62,7 +62,7 @@ for (const f of writers) {
 if (!writers.length) {
   fail(`nothing writes tenant.kind — the transition is gone, and every workspace is personal for ever`);
 }
-ok(`one writer: tenant.kind is written by the transition and nowhere else`);
+ok(`one writer: ${sources.length} source file(s), tenant.kind written by the transition and nowhere else`);
 
 /* --------------------------------------------------- one place that asks --- */
 

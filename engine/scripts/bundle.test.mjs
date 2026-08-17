@@ -68,7 +68,7 @@ const strays = importers.filter((f) => f !== GROUND);
 if (strays.length) {
   fail(`bundle: ${strays.join(", ")} import a product at module scope — D17's first "therefore never", and it ships that product's whole manifest to every customer of every other one`);
 } else {
-  ok("bundle: no page imports a product");
+  ok(`bundle: ${files("one-hub/src").length} page file(s), none importing a product`);
 }
 
 /*
@@ -103,7 +103,7 @@ const direct = files("runtime/src")
 if (direct.length) {
   fail(`bundle: ${direct.join(", ")} calls a provider directly — past the gateway, so the actual token count and cost of that call are never reported and the reserve is settled against a guess`);
 } else {
-  ok("bundle: every provider call goes through the one lane");
+  ok(`bundle: ${files("runtime/src").length} runtime file(s), every provider call through the one lane`);
 }
 
 console.log(bad ? `\nbundle: ${bad} problem(s).` : "\nbundle: green.");

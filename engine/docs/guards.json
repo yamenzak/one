@@ -809,7 +809,7 @@
       "stage": "20",
       "status": "live",
       "impl": "scripts/workspace.test.mjs",
-      "proves": "one writer: tenant.kind is written by the transition and nowhere else",
+      "proves": "one writer:",
       "fails": "the one-way door opened from the side by a second UPDATE that never asked whether the direction was allowed"
     },
     {
@@ -1574,7 +1574,7 @@
       "stage": "20",
       "status": "live",
       "impl": "scripts/bundle.test.mjs",
-      "proves": "bundle: no page imports a product",
+      "proves": "none importing a product",
       "fails": "one product's whole manifest and every screen shipped to every customer of every other one — measured in the built bundle, behind a dev-only branch that reads as dev-only and is not, because a module graph is decided before a branch is"
     },
     {
@@ -1592,7 +1592,7 @@
       "stage": "20",
       "status": "live",
       "impl": "scripts/bundle.test.mjs",
-      "proves": "bundle: every provider call",
+      "proves": "every provider call through the one lane",
       "fails": "a generation the gateway never sees, so its real token count and real cost are invisible to the half of metering that pays for them and the reserve settles against a guess"
     },
     {
@@ -1621,6 +1621,24 @@
       "impl": "scripts/kernel.test.mjs",
       "proves": "router:",
       "fails": "the package deciding navigation for every app that uses it — and the hub, which is not one app, having two routers in one page"
+    },
+    {
+      "id": "a-guard-that-walks-reports-what-it-walked",
+      "protects": "D12",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/gate.mjs",
+      "proves": "corpus:",
+      "fails": "a green run over an empty corpus reading exactly like a green run over a full one — three checks in this tree printed a confident sentence for months while examining nothing, and each was found by accident rather than by the gate"
+    },
+    {
+      "id": "a-build-edge-names-a-package-that-exists",
+      "protects": "D12",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/inert.test.mjs",
+      "proves": "turbo:",
+      "fails": "a worker's integration suite running against whichever SPA build happened to be lying around — turbo ignores a task key for a package it does not have, in silence, and the edge that connects a suite to its own build is exactly the one nothing else in the graph can express"
     }
   ]
 }

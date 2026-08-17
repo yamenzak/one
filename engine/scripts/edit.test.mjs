@@ -46,7 +46,7 @@ const strays = readdirSync(join(ENGINE, RENDERED))
 if (strays.length) {
   fail(`inline: ${strays.join(", ")} render a control in a row. Show the value and an edit — see rendered/edit.tsx.`);
 } else {
-  ok("inline: no generic surface renders a bare control");
+  ok(`inline: ${readdirSync(join(ENGINE, RENDERED)).filter((f) => f.endsWith(".tsx")).length} generic surface(s), none rendering a bare control`);
 }
 
 /*
@@ -57,11 +57,17 @@ if (strays.length) {
   app is where forms live.
 */
 const hubStrays = [];
+/* ⚠️ COUNTED, BECAUSE A WALK THAT FINDS NOTHING AND A WALK THAT LOOKED AT
+   NOTHING PRINT THE SAME SENTENCE — see `guards.test.mjs`. */
+let walked = 0;
 const walk = (dir) => {
   for (const entry of readdirSync(join(ENGINE, dir), { withFileTypes: true })) {
     const at = `${dir}/${entry.name}`;
     if (entry.isDirectory()) walk(at);
-    else if (entry.name.endsWith(".tsx") && /<Field\b/.test(read(at))) hubStrays.push(at);
+    else if (entry.name.endsWith(".tsx")) {
+      walked++;
+      if (/<Field\b/.test(read(at))) hubStrays.push(at);
+    }
   }
 };
 walk("one-hub/src");
@@ -69,7 +75,7 @@ walk("one-hub/src");
 if (hubStrays.length) {
   fail(`hub: ${hubStrays.join(", ")} render a control in a row rather than a value and an edit.`);
 } else {
-  ok("hub: every changeable fact is a value and an edit");
+  ok(`hub: ${walked} file(s) in the hub, every changeable fact a value and an edit`);
 }
 
 /* ------------------------------------------------------------------- sheet --- */

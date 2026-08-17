@@ -16,7 +16,7 @@
  * gains a new app and this check is what says so.
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { databases } from "./bind-ids.mjs";
@@ -122,6 +122,69 @@ if (!root) {
          `       tenant's own address and route precedence would decide who answers.`);
   } else {
     ok(`doors: *.${root} overlaps none of ${[...legacyRoots].join(", ") || "(no declared routes)"}`);
+  }
+}
+
+/* ------------------------------------------------------------------ turbo --- */
+
+/*
+  ⚠️ A TURBO TASK KEY NAMING A PACKAGE THAT DOES NOT EXIST IS IGNORED IN SILENCE,
+  and the keys that matter most are exactly the ones nothing else can express: a
+  worker's test suite depends on its SPA's BUILD, and turbo cannot infer it
+  because an `assets.directory` is a filesystem path rather than a package
+  dependency. Without the edge the suite boots Miniflare against a missing
+  directory and aborts reporting "no tests" — a PASS-shaped result.
+
+  ⚠️ AND THE ENGINE'S OWN EDGE NAMED A SCOPE THE RENAME RETIRED. It stayed
+  invisible because a `dist` from some earlier build was always lying around, so
+  the suite ran against whatever SPA had last been built — on a stale checkout, a
+  different product than the one under test.
+*/
+{
+  /*
+    ⚠️ turbo.json IS JSONC AND ITS COMMENTS ARE LINE-ANCHORED, WHICH IS WHAT
+    MAKES THIS SAFE. Stripping `/* … *\/` anywhere ate the `dist/**` in an
+    `outputs` glob — a comment opener inside a string, which is the classic way a
+    naive JSONC strip corrupts the document it is trying to read. Only whole
+    lines are dropped.
+  */
+  const jsonc = readFileSync(join(ROOT, "turbo.json"), "utf8")
+    .split("\n")
+    .filter((line, i, all) => {
+      if (/^\s*\/\//.test(line)) return false;
+      const opened = all.slice(0, i + 1).filter((l) => /^\s*\/\*/.test(l)).length;
+      const closed = all.slice(0, i).filter((l) => /\*\/\s*$/.test(l) && /^\s*(\/\*|\*|\/\/)/.test(l)).length;
+      return opened <= closed;
+    })
+    .join("\n");
+  const turbo = JSON.parse(jsonc);
+  const names = new Set();
+  const scan = (dir, depth = 0) => {
+    if (depth > 3) return;
+    for (const e of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+      if (!e.isDirectory() || e.name === "node_modules") continue;
+      const at = `${dir}/${e.name}`;
+      const pkg = join(ROOT, at, "package.json");
+      if (existsSync(pkg)) names.add(JSON.parse(readFileSync(pkg, "utf8")).name);
+      scan(at, depth + 1);
+    }
+  };
+  for (const root of ["apps", "packages", "engine"]) scan(root);
+
+  const keys = Object.keys(turbo.tasks ?? turbo.pipeline ?? {}).filter((k) => k.includes("#"));
+  const ghosts = [];
+  for (const key of keys) {
+    const owner = key.slice(0, key.indexOf("#"));
+    const needs = (turbo.tasks ?? turbo.pipeline)[key]?.dependsOn ?? [];
+    for (const named of [owner, ...needs.filter((d) => d.includes("#")).map((d) => d.slice(0, d.indexOf("#")))]) {
+      if (!names.has(named)) ghosts.push(`${key} names ${named}`);
+    }
+  }
+
+  if (ghosts.length) {
+    fail(`turbo: ${ghosts.join("; ")} — turbo ignores a key for a package it does not have, so the edge is not there and nothing says so`);
+  } else {
+    ok(`turbo: all ${keys.length} package-scoped task key(s) name a package that exists`);
   }
 }
 
