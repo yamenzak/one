@@ -44,6 +44,15 @@ interface Withheld {
   readonly why: string;
 }
 
+interface Move {
+  readonly tenant_id: string;
+  readonly from_shard: string;
+  readonly to_shard: string;
+  readonly state: string;
+  readonly detail: string | null;
+  readonly drain_after: string | null;
+}
+
 interface Answer {
   readonly configured: boolean;
   readonly serves: readonly string[];
@@ -64,6 +73,11 @@ const TONE: Readonly<Record<string, "default" | "success" | "warning" | "danger"
 
 export function Footing() {
   const of = useLoad<Answer>("op.infra");
+  /* ⚠️ A MOVE IN FLIGHT HOLDS A WORKSPACE READ-ONLY, so it is not something to
+     learn about from its owner. It sits here rather than on its own screen
+     because it is the same question as everything above — what this deployment
+     is standing on, and what is currently moving underneath it. */
+  const moves = useLoad<{ items: readonly Move[] }>("op.moves");
 
   /*
     ⚠️ A REFUSAL IS SAID, NOT SWALLOWED. This is the one control on the screen
@@ -163,6 +177,32 @@ export function Footing() {
               )
               : null}
           </Section>
+
+          {/*
+            ⚠️ IN FLIGHT, AND `copying` IS THE ONE TO READ. A workspace in that
+            state cannot be written to until the pass finishes and verifies — so
+            one that has been copying for two nights is a workspace somebody is
+            unable to use, and nothing else would ever say so.
+          */}
+          {moves.of.status === "ready" && moves.of.data.items.some((m) => m.state !== "gone")
+            ? (
+              <Section label="Moving" under="A workspace is read-only until its copy is verified">
+                <Group>
+                  {moves.of.data.items.filter((m) => m.state !== "gone").map((m) => (
+                    <ControlRow
+                      key={`${m.tenant_id}-${m.to_shard}`}
+                      label={`${m.from_shard} → ${m.to_shard}`}
+                      under={m.detail ?? m.tenant_id}
+                    >
+                      <Chip color={m.state === "copying" ? "warning" : "default"} variant="soft">
+                        <Chip.Label>{m.state}</Chip.Label>
+                      </Chip>
+                    </ControlRow>
+                  ))}
+                </Group>
+              </Section>
+            )
+            : null}
 
           {/*
             ⚠️ WHAT THIS DEPLOYMENT CANNOT PROMISE, NAMED. A store with no
