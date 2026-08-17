@@ -105,6 +105,43 @@ is what tells you whether the next thing you write is covered.
 
 ---
 
+## 3a. Two failure modes, and only one of them is derived
+
+The guards answer two different questions, and it is worth knowing which one you
+are protected by, because they are not equally strong.
+
+**"Is this thing wired to anything?"** — DERIVED, and effectively complete. The
+checks walk the declarations themselves: every declaration reaches a screen
+(`surface`), every kernel rule reaches a caller (`rules`), every capability
+reaches a route (`access`, `services`, `agent`, `hub`), every destination
+resolves. Nothing is listed by hand, so a declaration added tomorrow is covered
+the day it is added, by nobody.
+
+**"Does this already exist?"** — CURATED, and it is the weaker half. It rests on
+three things and none of them is a walk over the code:
+
+1. **A current index of what exists.** `design/README.md`'s export list is
+   generated and the docs guard keeps it honest, so "does the package already
+   ship this" has an answer that is right today rather than right when somebody
+   last edited it. This is the mechanism that actually prevents reinvention, and
+   it works by being read.
+2. **Named traps for the duplications that have cost something** — `CodeEntry`,
+   `TextInput`, `Lookup`, `Choice` in `heroui`; `refuseTheme` in `rules`. Each is
+   a pair somebody actually wrote twice.
+3. **Judgement**, for everything else.
+
+⚠️ **AND TWO DERIVED VERSIONS OF (2) WERE TRIED AND MEASURED AS WRONG, so nobody
+spends an afternoon rediscovering them.** "The design system imports a HeroUI
+component, so a screen using it directly is a bypass" flagged 3 of 81 and all
+three were correct code — D7 deliberately says use the library's components,
+themed through tokens, so most of those imports are the pattern rather than a
+breach of it. "A surface defines a component the design system exports" flagged
+3, all false: a *screen* called `Money` is not the `Money` component. Reinvention
+is a semantic fact, and the shapes that would catch it also catch the code that
+is right.
+
+---
+
 ## 4. How to add a rule so it stays in force
 
 1. **Write it in the kernel as a `refuse*`** returning what is wrong, never
