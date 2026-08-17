@@ -1567,6 +1567,33 @@
       "impl": "scripts/rules.test.mjs",
       "proves": "no lane works out for itself",
       "fails": "two answers to one question — a runtime that works out for itself whether two colours can be read, and diverges from the kernel in whichever direction nobody tests"
+    },
+    {
+      "id": "no-page-imports-a-product",
+      "protects": "D17",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/bundle.test.mjs",
+      "proves": "bundle: no page imports a product",
+      "fails": "one product's whole manifest and every screen shipped to every customer of every other one — measured in the built bundle, behind a dev-only branch that reads as dev-only and is not, because a module graph is decided before a branch is"
+    },
+    {
+      "id": "the-test-ground-cannot-reach-production",
+      "protects": "D17",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/bundle.test.mjs",
+      "proves": "bundle: the ground is unreachable",
+      "fails": "a chunk emitted for a screen nobody in production requests, which pins every symbol that chunk could reach as an export of the shared one and stops the design system tree-shaking — measured at +147 KB"
+    },
+    {
+      "id": "every-provider-call-goes-through-one-lane",
+      "protects": "D14",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/bundle.test.mjs",
+      "proves": "bundle: every provider call",
+      "fails": "a generation the gateway never sees, so its real token count and real cost are invisible to the half of metering that pays for them and the reserve settles against a guess"
     }
   ]
 }

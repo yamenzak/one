@@ -20,12 +20,11 @@
  * page, which is the same picture as a page that failed to load.
  */
 
+import * as React from "react";
 import {
   Band, Center, Crown, Layout, NoticeHost, ONE_FACE, Shell, Spacer, Trouble, Working,
   whoFace,
 } from "@engine/design";
-import { HELLO } from "@engine/hello";
-import { HELLO_ROUTES, HelloScreen } from "@engine/hello/screens";
 
 import { useSession } from "./session.js";
 import { useTravel } from "./nav.js";
@@ -37,6 +36,21 @@ import { Elsewhere } from "./screens/Elsewhere.js";
 import { NewWorkspace } from "./screens/NewWorkspace.js";
 import { SignIn } from "./screens/SignIn.js";
 import { Signpost } from "./screens/Signpost.js";
+
+/* ⚠️ DYNAMIC, SO THE REFERENCE APP IS NOT IN THE PRODUCTION BUNDLE. A static
+   import behind `import.meta.env.DEV` reads as dev-only and is not — the module
+   graph is decided before the branch is, and hello's whole manifest was measured
+   in the built `index-*.js`. See `Ground.tsx`. */
+/* ⚠️ THE TERNARY IS LOAD-BEARING AND `null` IS THE PRODUCTION VALUE. A bare
+   `React.lazy(() => import(...))` still puts the module in the graph: the chunk
+   is emitted, index has to keep every symbol that chunk could reach EXPORTED,
+   and the design system stops being tree-shakeable — measured at +147 KB in
+   index while the app itself moved into a 45 KB chunk nothing requests. Behind
+   `import.meta.env.DEV`, Vite folds the branch away in production and the import
+   is unreachable, so no chunk is emitted at all. */
+const Ground = import.meta.env.DEV
+  ? React.lazy(() => import("./Ground.js").then((m) => ({ default: m.Ground })))
+  : null;
 
 /** What the page shows, as a name — the thing the guard and the tests read. */
 export type Screen =
@@ -101,9 +115,12 @@ export function App() {
      used to fall through to the deployment's own frame with a screen dropped in
      it — the hub's crown over a product's page, which is a layout no deployment
      serves and therefore a layout nobody was testing. */
+  /* ⚠️ THE ROUTE IS NOT VALIDATED AGAINST THE APP HERE, because knowing the
+     app's routes would mean importing it. `Ground` renders an honest notice for
+     a route its app does not have — which is the same thing `AppSurface` does
+     for a screen nobody registered. */
   const ground = import.meta.env.DEV
-    ? HELLO_ROUTES.find((r) => r === (query.get("screen") ?? ""))
-      ?? (query.has("ground") ? HELLO_ROUTES[0] ?? null : null)
+    ? query.get("screen") ?? (query.has("ground") ? "/" : null)
     : null;
   const showcase = ground !== null;
   const screen = pickScreen(face, me === null ? null : me !== "nobody", stuck !== null, showcase);
@@ -155,45 +172,17 @@ export function App() {
     `centre/Product.tsx` makes for a real product, with the same manifest. An app
     that brought its own chrome would be an app that could get it wrong.
   */
-  if (screen === "ground" && ground) {
-    const go = (next: string) => {
-      const to = new URL(location.href);
-      to.searchParams.set("screen", next);
-      location.assign(to.toString());
-    };
+  /*
+    ⚠️ LAZY, AND THAT IS THE WHOLE OF WHY THIS IS NOT INLINE. The ground needs
+    the reference app; a static import ships it to every customer, which is what
+    was happening — measured in the built bundle. `React.lazy` puts it in a chunk
+    production never requests. See `Ground.tsx`.
+  */
+  if (screen === "ground" && ground && Ground) {
     return (
       <>
         <NoticeHost />
-        <Shell
-          screens={HELLO.screens}
-          here={ground}
-          /* ⚠️ Everything, because the ground is for looking at every screen —
-             what a permission HIDES is `reachable`'s job and it has its own
-             test. A ground that held two of four would be a ground where two
-             screens are unreachable and nothing says which. */
-          held={new Set(["note:read", "note:write", "member:read", "tenant:manage"])}
-          /* ⚠️ On, or the screen behind the flag is undrawable here — which is
-             the one screen whose whole point is that a flag decides. */
-          flags={{ "note-search": true }}
-          /* ⚠️ COMMERCIAL, FOR THE SAME REASON THE FLAG IS ON: a business-only
-             screen is undrawable on a personal ground, and the ground exists to
-             draw every screen. What the kind WITHHOLDS is `reachable`'s job and
-             has its own test — a ground that hid one would be a ground where a
-             screen is unreachable and nothing says which. */
-          kind="commercial"
-          crown={{
-            appId: HELLO.id,
-            appName: HELLO.name,
-            appMark: HELLO.mark,
-            tenantName: "The test ground",
-            unread: 2,
-            personEmail: "somebody@example.com",
-            personFace: whoFace("ground"),
-          }}
-          onGo={go}
-        >
-          <HelloScreen route={ground} onGo={go} />
-        </Shell>
+        <React.Suspense fallback={null}><Ground route={ground} /></React.Suspense>
       </>
     );
   }

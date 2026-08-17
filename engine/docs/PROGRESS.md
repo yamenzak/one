@@ -699,10 +699,10 @@ The guard registry, its checks, and the standards that bind them.
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 10 |
 | D12 | Every cross-cutting concern is a field on a declaration, never a call site | 45 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
-| D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 0 |
+| D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
 | D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 4 |
-| D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 0 |
+| D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 2 |
 | D18 | The operator stands outside every workspace, and the console is a door rather than a role | 2 |
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 3 |
 | D20 | The hub is one surface presented over the product, reachable from every door, and it is a route | 3 |
@@ -894,6 +894,9 @@ the library decides FOR us.
 | `every-glyph-a-declaration-names-exists` | D7 | a neutral circle sitting in a list where every other row has a shape — an icon is a STRING in a manifest so no compiler sees the typo, and this map has now been out of step with its callers twice, both times described in full by its own header |
 | `every-rule-the-kernel-states-is-one-something-runs` | D12 | a rule written down, argued for in its own header, unit-tested and cited elsewhere as though it were in force, with no caller anywhere — which is how an API came to silence a notification whose whole point is that it cannot be silenced |
 | `no-lane-re-derives-what-the-kernel-decides` | D12 | two answers to one question — a runtime that works out for itself whether two colours can be read, and diverges from the kernel in whichever direction nobody tests |
+| `no-page-imports-a-product` | D17 | one product's whole manifest and every screen shipped to every customer of every other one — measured in the built bundle, behind a dev-only branch that reads as dev-only and is not, because a module graph is decided before a branch is |
+| `the-test-ground-cannot-reach-production` | D17 | a chunk emitted for a screen nobody in production requests, which pins every symbol that chunk could reach as an export of the shared one and stops the design system tree-shaking — measured at +147 KB |
+| `every-provider-call-goes-through-one-lane` | D14 | a generation the gateway never sees, so its real token count and real cost are invisible to the half of metering that pays for them and the reserve settles against a guess |
 <!-- /generated -->
 
 ## Commands
