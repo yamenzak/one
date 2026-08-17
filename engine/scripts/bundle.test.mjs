@@ -56,6 +56,11 @@ const read = (p) => readFileSync(join(ENGINE, p), "utf8");
   that production's module graph includes is the whole finding.
 */
 const GROUND = "one-space/src/Ground.tsx";
+/* ⚠️ AND THE APP REGISTRY, WHICH IS THE LANE A PRODUCT'S SCREENS TRAVEL. It is
+   exempt from the static rule below only because it uses none — every entry is
+   a dynamic `import()`, which is what emits a chunk per product instead of
+   folding all of them into the one everybody downloads. */
+const REGISTRY = "one-space/src/apps.ts";
 const APP_IMPORT = /^import[\s\S]*?from "@engine\/(hello|[a-z-]+)\/?[\w./]*";$/gm;
 
 const importers = files("one-space/src").filter((f) => {
@@ -64,11 +69,42 @@ const importers = files("one-space/src").filter((f) => {
     .some((m) => !["design", "kernel", "runtime"].includes(m[1]));
 });
 
-const strays = importers.filter((f) => f !== GROUND);
+const strays = importers.filter((f) => f !== GROUND && f !== REGISTRY);
 if (strays.length) {
   fail(`bundle: ${strays.join(", ")} import a product at module scope — D17's first "therefore never", and it ships that product's whole manifest to every customer of every other one`);
 } else {
   ok(`bundle: ${files("one-space/src").length} page file(s), none importing a product`);
+}
+
+/*
+  ⚠️ AND THE REGISTRY'S ENTRIES ARE DYNAMIC, EVERY ONE. A static import here is
+  the same failure the rule above refuses, one file over and easier to miss: the
+  file is already the one place an app is named, so a reader sees a name in a
+  list it belongs in and nothing looks wrong. What ships is every product's
+  screens to every customer of every other one.
+
+  ⚠️ AND IT IS THE PRODUCT ENTRY, NEVER THE GROUND. `@engine/<app>/screens` is a
+  sample world for photographing screens; loading it here would draw somebody
+  else's records in a real workspace, convincingly.
+*/
+{
+  const src = read(REGISTRY);
+  const stat = [...src.matchAll(/^import[\s\S]*?from "@engine\/([a-z-]+)(\/[\w./]*)?";$/gm)]
+    .filter((m) => !["design", "kernel", "runtime"].includes(m[1]));
+  const lazy = [...src.matchAll(/import\("@engine\/([a-z-]+)(\/[\w./]*)?"\)/g)];
+
+  if (stat.length) {
+    fail(`bundle: ${REGISTRY} imports ${stat.map((m) => m[1]).join(", ")} statically — the registry is the one file that may name a product, and a static import there ships every product's screens to every customer of every other one`);
+  } else if (!lazy.length) {
+    fail(`bundle: ${REGISTRY} loads no product at all — an app registry nothing can be reached through is a seam with no lane, and every declared screen renders the notice for ever`);
+  } else {
+    const ground = lazy.filter((m) => (m[2] ?? "") === "/screens");
+    if (ground.length) {
+      fail(`bundle: ${REGISTRY} loads ${ground.map((m) => `@engine/${m[1]}/screens`).join(", ")} — that is the test ground over a sample world, so a real workspace would be shown somebody else's records, convincingly`);
+    } else {
+      ok(`bundle: ${lazy.length} product entr(y/ies), each a chunk of its own that only its own workspaces fetch`);
+    }
+  }
 }
 
 /*

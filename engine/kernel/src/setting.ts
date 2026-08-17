@@ -236,14 +236,16 @@ export function refuseSettings(
  * problem it claimed to solve. This is the "surfaced → enforced" half of the
  * autodiscovery rule, and it is asked of every app.
  *
- * DEFER(engine-33) stage:33 — AND IT CANNOT BE ASKED YET, BECAUSE EVERY SETTING
- * IS UNREAD. `named` is the ids an app's code actually reads, and there is no
- * way for it to read one: `storedSettings` is reached only by the settings
- * screen's own operations, and an operation's context carries `allowance` for
- * entitlements and nothing for settings. So the rail is write-only — a person
- * changes a switch, it persists, it is drawn back to them, and no handler can
- * act on it. Stage 33 is the seam and the guard that walks its call sites; a
- * rule that would name every setting today is a rule with nothing to say.
+ * DEFER(engine-33) stage:33 — THE SEAM EXISTS AND THE WALK DOES NOT. `Ctx.setting`
+ * resolves a declared setting for a handler, so a rail that was write-only is
+ * readable and the reference app reads two. What is still missing is `named` —
+ * the ids an app's code actually names — which is a static walk over that app's
+ * own source rather than anything this function can ask for itself.
+ *
+ * ⚠️ AND THE WALK HAS TO ACCEPT A SCREEN AS A READER, not only a handler. A
+ * display density and a workspace's colour are read where they are drawn; a
+ * check that demanded a handler for every setting would report four correct
+ * declarations as defects, which is the shape that gets a guard waived.
  */
 export const unread = (book: SettingBook, named: readonly string[]): readonly string[] =>
   Object.keys(book).filter((id) => !named.includes(id));

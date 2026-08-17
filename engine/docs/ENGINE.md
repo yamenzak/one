@@ -385,7 +385,7 @@ env or a binding.
 | `compose` | a manifest becomes a live surface of operations | 3 | 1 |
 | `serve` | the one path every request ends in — both doors | 4 | — |
 | `records` | the generated reads and writes behind a collection | 6 | — |
-| `settings` | reading and writing a workspace's own switches | 4 | — |
+| `settings` | reading and writing a workspace's own switches | 5 | — |
 | `billing` | plans, subscriptions, the bill, the ladder | 10 | 4 |
 | `credits` | the balance, and reserve → settle → release | 7 | 3 |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
@@ -420,7 +420,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**265 of them**, 250 reached by something today.
+**266 of them**, 251 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -718,6 +718,9 @@ its own header, cited by other files, and doing nothing.
 | `what-the-engine-offers-is-emitted-by-the-engine` | D12 | an index of what an app gets for free, typed by hand and wrong within a week — so the same capability is written twice by somebody who read that it did not exist |
 | `an-app-that-declares-nothing-still-has-a-roster-and-a-bill` | D1 | an operation quietly leaving the set every app gets without asking, so the next product writes its own roster, its own inbox and its own two doors bounding an invitation |
 | `a-stage-is-read-from-one-registry` | D12 | four checks parsing one markdown table four ways, so a reformatted row is a stage nothing can be deferred against and a guard that can be owed for ever — silently, because each check reports green about a row it never saw |
+| `a-product-reaches-the-page-through-one-dynamic-lane` | D17 | one product's whole browser half in the bundle every other product's customers download — invisible, because the registry is the one file where naming an app looks right |
+| `the-product-entry-is-never-the-test-ground` | D17 | a real workspace shown a sample world's records under its own name, convincingly, with every suite green because both files export the same shape |
+| `a-setting-a-handler-reads-is-the-declared-one` | D12 | a switch that persists, is drawn back, and changes nothing — or a handler inventing its own default, so a screen and the code disagree about what a workspace switched on |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -736,12 +739,12 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 16 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 68 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 69 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
 | D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 4 |
-| D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 2 |
+| D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 4 |
 | D18 | The operator stands outside every workspace, and the console is a door rather than a role | 2 |
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 3 |
 | D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 3 |
@@ -773,7 +776,7 @@ nothing yet.
 | **30** — A workspace's apps are turned on and off, and a workspace can move shard | `runtime/src/directory.ts` | 3 |
 | **31** — Account security — sign out everywhere, and proving it is you again before something irreversible | `runtime/src/identity.ts` | 2 |
 | **32** — A manifest changes while the deployment is up, and the composed surface forgets | `runtime/src/compose.ts` | 1 |
-| **33** — A setting reaches the code — a handler reads one, and a guard refuses a switch that changes nothing | `kernel/src/setting.ts` | 1 |
+| **33** — A guard refuses a declared setting nothing names — the seam a handler reads one through is live; the completeness check over it is not | `kernel/src/setting.ts` | 1 |
 | **34** — The kernel's remaining conveniences are each used by a lane or removed | `kernel/src/brand.ts` | 1 |
 | **34** — The kernel's remaining conveniences are each used by a lane or removed | `kernel/src/door.ts` | 1 |
 | **34** — The kernel's remaining conveniences are each used by a lane or removed | `kernel/src/entitlement.ts` | 1 |
@@ -827,15 +830,16 @@ that names no stage, so this list cannot grow by forgetting.
 | 30 | A workspace's apps are turned on and off, and a workspace can move shard | **planned** |
 | 31 | Account security — sign out everywhere, and proving it is you again before something irreversible | **planned** |
 | 32 | A manifest changes while the deployment is up, and the composed surface forgets | **planned** |
-| 33 | A setting reaches the code — a handler reads one, and a guard refuses a switch that changes nothing | **planned** |
+| 33 | A guard refuses a declared setting nothing names — the seam a handler reads one through is live; the completeness check over it is not | **planned** |
 | 34 | The kernel's remaining conveniences are each used by a lane or removed | **planned** |
 | 35 | A workspace runs its own retention ladder against its own customers, and ours freezes it | **planned** |
 | 36 | The deployment provisions itself — a product declares what it needs underneath it, and the reconciler makes it exist in the right jurisdiction, binds it, and reaps it after a drain | shipped |
 | 37 | A workspace's records change shard, which is the only way its jurisdiction can — read-only while it copies, verified before it flips, and the source drained rather than emptied | shipped |
 | 38 | A notification leaves the process — Web Push written out rather than depended on, a subscription filed under the door it was made at so it wears that workspace's own icon, and a keypair the console generates and never accepts | shipped |
 | 39 | The documentation is two generated pages — what exists, derived from the engine; and how to add to it, which no generator can derive | shipped |
+| 40 | An app ships a screen — a product's browser half is a chunk of its own, loaded when its workspace opens it, drawing that workspace's own records through the door it is handed | shipped |
 
-**28 shipped, 11 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**29 shipped, 11 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

@@ -18,7 +18,7 @@
  */
 
 import type { AppSpec, TenantId } from "@engine/kernel";
-import { PUBLIC, checkSome, disclose, refusePrompt } from "@engine/kernel";
+import { PUBLIC, checkSome, disclose, refusePrompt, valueOf } from "@engine/kernel";
 import { actionsOf, word, wordingOf } from "./ai-actions.js";
 import type { PlatformCtx } from "./member-ops.js";
 import type { Resolved } from "./compose.js";
@@ -195,4 +195,45 @@ export function settingOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         return { id };
       }),
   };
+}
+
+/* ----------------------------------------------------------------- reading --- */
+
+/**
+ * WHAT A HANDLER SEES WHEN IT ASKS FOR A SETTING.
+ *
+ * ⚠️ A SETTING NO CODE CAN READ IS A SWITCH THAT CHANGES NOTHING, and that is
+ * worse than an absent feature: somebody presses it, it saves, it is drawn back
+ * to them, and they stop looking for the thing it promised. For as long as this
+ * seam did not exist, the whole settings rail was that — the surface half of the
+ * platform's own bidirectional rule with no enforced half under it.
+ *
+ * ⚠️ THE LEVEL DECIDES WHOSE ROW IS READ, and getting it wrong is invisible. A
+ * `tenant` setting is the workspace's, stored under the empty account; a
+ * `person` setting is the caller's own. Reading the workspace's row for a
+ * personal switch gives every member whatever the last one set.
+ *
+ * ⚠️ AND A MISSING ROW IS THE DECLARED FALLBACK, NEVER `undefined` — through
+ * `valueOf`, the one resolution the screen already uses. Two resolutions is how
+ * a screen and a handler come to disagree about what a workspace switched on.
+ */
+export async function settingsFor(
+  db: Db, tenantId: TenantId, app: AppSpec, accountId: string | null,
+): Promise<Readonly<Record<string, unknown>>> {
+  const book = app.settings ?? {};
+  if (!Object.keys(book).length) return {};
+
+  const tenantRows = await storedSettings(db, tenantId, app.id, "");
+  /* ⚠️ A caller with no account has no personal rows, and asking for them with
+     an empty id would read the WORKSPACE's — the one confusion this whole
+     function exists to make impossible. */
+  const personRows = accountId
+    ? await storedSettings(db, tenantId, app.id, accountId)
+    : {};
+
+  const out: Record<string, unknown> = {};
+  for (const def of Object.values(book)) {
+    out[def.id] = valueOf(def, def.level === "tenant" ? tenantRows : personRows);
+  }
+  return out;
 }

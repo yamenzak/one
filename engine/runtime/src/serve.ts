@@ -39,6 +39,7 @@ import { keep } from "./vault.js";
 import { iconPng, iconSvg, webManifest, type Installable, type Installer } from "./installable.js";
 import { iconOf } from "./icon.js";
 import { availableChannels, type Pusher } from "./services.js";
+import { settingsFor } from "./settings.js";
 import type { Db } from "./sql.js";
 
 /* ------------------------------------------------------------------ seams --- */
@@ -513,6 +514,13 @@ export async function performOperation(
   /* ⚠️ THE PLATFORM'S OWN OPERATIONS SEE MORE THAN A HANDLER DOES — the
      directory, the caller's keys, the allowances — and an app handler is
      typed against `Ctx`, which carries none of it. See `member-ops.ts`. */
+  /* ⚠️ MEMOISED, NOT PRELOADED — see `Ctx.setting`. The promise is the memo, so
+     two handlers asking in the same request share one query rather than racing
+     to run two. */
+  let asked: Promise<Readonly<Record<string, unknown>>> | null = null;
+  const settings = () => (asked ??= settingsFor(
+    located.db, located.tenantId as never, composed.app, who.accountId));
+
   const ctx: PlatformCtx = {
     db: located.db,
     tenantId: located.tenantId,
@@ -548,6 +556,9 @@ export async function performOperation(
     /* ⚠️ THE SAME ANSWER THE DISPATCH USES — one call, so the switch a person is
        offered and the channel a note is sent on cannot disagree. */
     channels: await availableChannels(wiring),
+    /* ⚠️ ONE READ PER REQUEST AT MOST, AND ONLY IF A HANDLER ASKS. Resolved for
+       the app the operation belongs to, because a setting is that app's. */
+    setting: async (id: string) => (await settings())[id],
     fail: (code, values, extra) => { throw new Refused(problem(catalog, code, values, extra)); },
   };
 

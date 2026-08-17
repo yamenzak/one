@@ -6,7 +6,8 @@
   "description": "The smallest complete app on OneEngine: one collection, one operation, and every cross-cutting declaration wired. It exists to be proved \u2014 every stage's exit criterion is asserted against it.",
   "exports": {
     ".": "./src/index.ts",
-    "./screens": "./src/screens/index.tsx"
+    "./screens": "./src/screens/index.tsx",
+    "./live": "./src/screens/live.tsx"
   },
   "types": "./src/index.ts",
   "scripts": {

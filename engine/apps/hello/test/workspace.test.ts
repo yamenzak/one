@@ -459,3 +459,73 @@ describe("what a person may not switch off", () => {
     expect(out.status).toBe(400);
   });
 });
+
+/* ------------------------------------------------------------- a setting --- */
+
+/**
+ * A SETTING REACHES CODE.
+ *
+ * ⚠️ THE WHOLE SETTINGS RAIL WAS THE SURFACED HALF WITH NOTHING UNDER IT. A
+ * declaration rendered a control, the control saved, the value was drawn back —
+ * and no handler could read one, because a handler's context carried an
+ * entitlement allowance and nothing else. A switch that changes nothing is worse
+ * than an absent feature: somebody presses it and stops looking for the thing it
+ * promised.
+ *
+ * ⚠️ AND THE LEVEL IS THE HALF THAT FAILS IN SILENCE. A `tenant` setting is
+ * stored under the empty account and a `person` setting under the caller's;
+ * reading the wrong row gives every member whatever the last one set, with the
+ * value looking perfectly plausible.
+ */
+describe("a setting a handler can read", () => {
+  it("answers the declared fallback before anybody has chosen", async () => {
+    const cookie = await workspace();
+    const said = await get(SLUG, "/api/note.start", cookie).then((r) => r.json()) as
+      { kind: string; pinned: boolean };
+    expect(said).toEqual({ kind: "idea", pinned: false });
+  });
+
+  it("answers what the workspace switched to, on the very next call", async () => {
+    const cookie = await workspace();
+    expect((await post(SLUG, "/api/setting.write",
+      { app: "hello", id: "notes.default_kind", value: "decision" }, cookie)).status).toBe(200);
+    expect((await post(SLUG, "/api/setting.write",
+      { app: "hello", id: "notes.default_pinned", value: true }, cookie)).status).toBe(200);
+
+    const said = await get(SLUG, "/api/note.start", cookie).then((r) => r.json()) as
+      { kind: string; pinned: boolean };
+    expect(said).toEqual({ kind: "decision", pinned: true });
+  });
+
+  /*
+    ⚠️ AND SOMEBODY WHO CANNOT SEE THE SETTING STILL GETS ITS CONSEQUENCE, which
+    is the reason this is an operation rather than the form reading the settings
+    for itself. Both are `tenant` level behind `tenant:manage`; a writer holds
+    `note:write` and not that.
+  */
+  it("gives its consequence to somebody who may not read it", async () => {
+    const cookie = await workspace();
+    await post(SLUG, "/api/setting.write",
+      { app: "hello", id: "notes.default_kind", value: "question" }, cookie);
+    /* ⚠️ A `customer` WITH THE APP'S WRITER ROLE, and both halves are the point.
+       The platform office is what costs a seat and what carries `tenant:manage`;
+       the app role is what carries `note:write`. Somebody who can write a note
+       and cannot manage the workspace is exactly the caller this is about — and
+       inviting a second `staff` here would meet the free plan's one seat and
+       fail several lines from the assertion. */
+    expect((await post(SLUG, "/api/member.invite",
+      { email: "writer@example.com", platformRole: "customer", appRoles: { hello: "writer" } },
+      cookie)).status).toBe(200);
+    const theirs = await signIn("writer@example.com");
+
+    const seen = await get(SLUG, "/api/setting.read?app=hello", theirs).then((r) => r.json()) as
+      { tenant: Record<string, unknown> };
+    expect(seen.tenant["notes.default_kind"], "a writer can read a setting they may not manage")
+      .toBeUndefined();
+
+    const answered = await get(SLUG, "/api/note.start", theirs);
+    expect(answered.status, JSON.stringify(await answered.clone().json())).toBe(200);
+    const said = await answered.json() as { kind: string };
+    expect(said.kind).toBe("question");
+  });
+});

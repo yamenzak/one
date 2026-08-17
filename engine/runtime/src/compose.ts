@@ -65,6 +65,24 @@ export interface Ctx {
    * to prevent.
    */
   readonly vault?: VaultSeam;
+  /**
+   * ⚠️ WHAT THIS WORKSPACE HAS SWITCHED ON, RESOLVED THROUGH THE ONE RESOLVER.
+   * A setting no handler can read is a switch that changes nothing — somebody
+   * presses it, it saves, it is drawn back to them, and they stop looking for
+   * the thing it promised. That is the enforced half of the platform's own
+   * bidirectional rule, and for as long as this was absent the whole settings
+   * rail was the surfaced half with nothing under it.
+   *
+   * ⚠️ ASYNC AND MEMOISED PER REQUEST, not preloaded. Most operations read no
+   * setting at all, and a query in front of every one of them to answer a
+   * question almost nobody asks is a cost paid on the hot path for nothing.
+   *
+   * ⚠️ AND A MISSING ROW IS THE DECLARED FALLBACK, never `undefined` — the level
+   * decides whose row is read, and the kernel's `valueOf` decides the value. A
+   * handler inventing its own default is how a screen and a handler come to
+   * disagree about what a workspace switched on.
+   */
+  readonly setting: (id: string) => Promise<unknown>;
   readonly fail: (
     code: string,
     values?: Record<string, string | number>,

@@ -1963,6 +1963,33 @@
       "impl": "scripts/guards.test.mjs",
       "proves": "appears twice, so one of the two is a row nothing can see",
       "fails": "four checks parsing one markdown table four ways, so a reformatted row is a stage nothing can be deferred against and a guard that can be owed for ever \u2014 silently, because each check reports green about a row it never saw"
+    },
+    {
+      "id": "a-product-reaches-the-page-through-one-dynamic-lane",
+      "protects": "D17",
+      "stage": "40",
+      "status": "live",
+      "impl": "scripts/bundle.test.mjs",
+      "proves": "the registry is the one file that may name a product",
+      "fails": "one product's whole browser half in the bundle every other product's customers download \u2014 invisible, because the registry is the one file where naming an app looks right"
+    },
+    {
+      "id": "the-product-entry-is-never-the-test-ground",
+      "protects": "D17",
+      "stage": "40",
+      "status": "live",
+      "impl": "scripts/bundle.test.mjs",
+      "proves": "that is the test ground over a sample world",
+      "fails": "a real workspace shown a sample world's records under its own name, convincingly, with every suite green because both files export the same shape"
+    },
+    {
+      "id": "a-setting-a-handler-reads-is-the-declared-one",
+      "protects": "D12",
+      "stage": "40",
+      "status": "live",
+      "impl": "apps/hello/test/workspace.test.ts",
+      "proves": "answers the declared fallback before anybody has chosen",
+      "fails": "a switch that persists, is drawn back, and changes nothing \u2014 or a handler inventing its own default, so a screen and the code disagree about what a workspace switched on"
     }
   ]
 }

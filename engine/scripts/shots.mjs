@@ -153,6 +153,18 @@ console.log("  became a business:", business.status, JSON.stringify(business.jso
 const push = await call("admin.localhost", "/api/op.push.generate", {}, cookie);
 console.log("  push keypair:", push.status, JSON.stringify(push.json).slice(0, 80));
 
+/* ⚠️ TWO REAL NOTES, THROUGH THE REAL OPERATION. The product screen draws the
+   workspace's own records now, so an empty workspace photographs the empty state
+   — which is worth seeing once and is not what "the screen works" looks like. */
+for (const [title, body, kind] of [
+  ["Pricing for the second tier", "Three seats felt low. Worth revisiting before the launch.", "decision"],
+  ["Why the sweep runs at 03:00", "Far from any month boundary somebody watches.", "record"],
+]) {
+  const made = await call(`${SLUG}.localhost`, "/api/note.create",
+    { title, body, kind, happened: "2026-08-17" }, cookie);
+  console.log("  note:", made.status, JSON.stringify(made.json).slice(0, 80));
+}
+
 const SHOTS = [
   { id: "door-signin", host: "id.localhost", path: "/", auth: false },
   { id: "told", host: `${SLUG}.localhost`, path: "/space/told", auth: true },

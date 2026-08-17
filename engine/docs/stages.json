@@ -176,7 +176,7 @@
     },
     {
       "n": 33,
-      "title": "A setting reaches the code — a handler reads one, and a guard refuses a switch that changes nothing",
+      "title": "A guard refuses a declared setting nothing names — the seam a handler reads one through is live; the completeness check over it is not",
       "status": "planned"
     },
     {
@@ -207,6 +207,11 @@
     {
       "n": 39,
       "title": "The documentation is two generated pages — what exists, derived from the engine; and how to add to it, which no generator can derive",
+      "status": "shipped"
+    },
+    {
+      "n": 40,
+      "title": "An app ships a screen — a product's browser half is a chunk of its own, loaded when its workspace opens it, drawing that workspace's own records through the door it is handed",
       "status": "shipped"
     }
   ]

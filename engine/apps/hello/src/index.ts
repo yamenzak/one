@@ -219,6 +219,49 @@ const draft = operation<{ about: string }, { text: string }>({
   },
 });
 
+
+/**
+ * WHAT A NEW NOTE STARTS AS — the workspace's own answer, not the form's.
+ *
+ * ⚠️ THIS IS THE INSTANCE THAT PROVES A SETTING REACHES CODE. Two settings say
+ * in their own help text what a new note starts as; without a handler that reads
+ * one, they were a switch somebody presses that persists, is drawn back to them,
+ * and changes nothing anywhere.
+ *
+ * ⚠️ AND IT HAS TO BE AN OPERATION RATHER THAN THE FORM READING `setting.read`,
+ * because both settings are `tenant` level and `needs: "tenant:manage"`. A staff
+ * member writing a note holds `note:write` and not that — so the screen cannot
+ * see them, and must still honour them. The platform resolves the value; the
+ * caller is told only the consequence.
+ */
+const start = operation<Record<string, never>, { kind: string; pinned: boolean }>({
+  id: "note.start",
+  kind: "read",
+  summary: "What a new note starts as here",
+  input: {},
+  output: {
+    kind: field.text({ label: "Kind", holds: "none" }),
+    pinned: field.bool({ label: "Pinned", holds: "none" }),
+  },
+  permission: "note:write",
+  idempotency: { mode: "none" },
+  async handler(ctx) {
+    /* ⚠️ THE DECLARED HANDLER'S CONTEXT IS `unknown` IN THE KERNEL, deliberately
+       — the kernel may not name a runtime type. The narrowing is the app's, and
+       it is the same one every written handler here does. */
+    const c = ctx as { setting: (id: string) => Promise<unknown> };
+    /* ⚠️ NO DEFAULT OF ITS OWN, DELIBERATELY. The declaration carries the
+       fallback and the platform resolves it, so a handler adding `?? "idea"`
+       here would be a second answer to what a new note starts as — and it would
+       MASK the platform failing to apply the declared one, which is how a screen
+       and a handler come to disagree about what a workspace switched on. */
+    return {
+      kind: String(await c.setting("notes.default_kind")),
+      pinned: (await c.setting("notes.default_pinned")) === true,
+    };
+  },
+});
+
 /**
  * ⚠️ THE PLATFORM CAN SAY "YOURS"; ONLY A PRODUCT KNOWS WHO ELSE MAY LOOK. The
  * generated verbs on a subject-scoped collection answer with the caller's own
@@ -321,7 +364,7 @@ export const HELLO: AppSpec = defineApp({
   ],
 
   collections: [note, checkIn],
-  operations: [publish, ask, draft, teamCheckIns, share],
+  operations: [publish, ask, draft, start, teamCheckIns, share],
 
   /*
     ⚠️ THREE OF EIGHT NAME A GROUND, AND THE FIVE THAT DO NOT ARE THE POINT.

@@ -167,6 +167,7 @@ describe("what the manifest produced", () => {
       "POST /api/note.publish",
       "GET /api/note.read",
       "POST /api/note.share",
+      "GET /api/note.start",
       "POST /api/note.update",
       "POST /api/package.archive",
       "POST /api/package.create",
