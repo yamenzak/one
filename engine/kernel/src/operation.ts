@@ -27,9 +27,15 @@ import type { Tone } from "./primitives.js";
 /**
  * ⚠️ THE ORDER IS FIXED AND IT IS A DESIGN, NOT A PREFERENCE.
  *
- *   standing → permission → kind → proof → entitlement → flag → quota → credits
+ *   accepted → standing → permission → kind → proof → entitlement → flag → quota
+ *   → credits
  *
- * Standing first, because a workspace in arrears must not be told which of its
+ * Acceptance first, and above the bill: until somebody has agreed to the terms
+ * and the privacy notice there is no basis to process anything about them, which
+ * includes telling them what their workspace owes. A new version is a new
+ * agreement — an acceptance of last month\'s wording is not an acceptance of
+ * this month\'s, and that is the entire reason the version is on the record.
+ * Standing next, because a workspace in arrears must not be told which of its
  * powers it lacks — that is a conversation about the bill, not about roles.
  * Permission before proof, because asking somebody to confirm their identity for
  * something they may not do anyway is a code sent for nothing. Kind sits between
@@ -42,7 +48,7 @@ import type { Tone } from "./primitives.js";
  * buttons. Credits last, because they are the only gate that SPENDS something.
  */
 export const GATE_ORDER = [
-  "standing", "permission", "kind", "proof", "entitlement", "flag", "quota", "credits",
+  "accepted", "standing", "permission", "kind", "proof", "entitlement", "flag", "quota", "credits",
 ] as const;
 
 export type Gate = (typeof GATE_ORDER)[number];
@@ -125,6 +131,19 @@ export interface OperationSpec<I = unknown, O = unknown> {
    */
   readonly commercial?: true;
   readonly proof?: Proof;
+  /**
+   * ⚠️ REACHABLE BY SOMEBODY WHO HAS NOT ACCEPTED, AND THE LIST IS SHORT ON
+   * PURPOSE. Holding the documents over somebody is fair; holding their DATA
+   * over them is not. Reading what is being asked, agreeing to it, taking their
+   * records with them, deleting them, ending what they pay for and signing out
+   * all stay open — a wall somebody cannot leave through is not a wall, it is a
+   * hostage.
+   *
+   * ⚠️ AND IT IS DECLARED HERE RATHER THAN LISTED IN THE GATE. A list in the
+   * gate is a list an app cannot add to and nobody reviewing an operation can
+   * see.
+   */
+  readonly beforeAccepting?: true;
   /** The entitlement a plan must include. */
   readonly entitlement?: string;
   /** The flag that must be on. */

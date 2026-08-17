@@ -218,6 +218,7 @@ if (what === "guards") {
     ["dispatch", "an event an operation raises becomes a note in somebody's inbox"],
     ["sweep", "the daily clock: erase what is past the ladder's last rung"],
     ["vault-ops", "consent, grants, who looked, the processing record, export and erasure"],
+    ["legal", "who agreed to what version, and the wall until they have"],
   ];
 
   const pkg = what === "declares" ? "kernel" : "runtime";

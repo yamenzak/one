@@ -126,6 +126,18 @@ export const PLATFORM_PROBLEMS: ProblemCatalog = {
     title: "Confirm it is you",
     detail: "We will send a code to your email.",
   },
+  /*
+    ⚠️ 451, WHICH IS THE ONE STATUS THAT MEANS THIS. "Unavailable for legal
+    reasons" is exactly what this is — not a permission (403 invites somebody to
+    find another route), not a payment (402 says the fix is money), and not a
+    conflict. A client that sees 451 has one correct response, which is to show
+    what needs agreeing to.
+  */
+  "platform.must_accept": {
+    status: 451, retryable: false, tone: "warning",
+    title: "There is something to agree to first",
+    detail: "{document} has changed. Read it and accept to carry on.",
+  },
   "platform.read_only": {
     status: 402, retryable: false, tone: "warning",
     title: "This workspace is read-only",

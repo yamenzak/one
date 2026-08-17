@@ -23,6 +23,7 @@ export * from "./handles.js";
 export * from "./compose.js";
 export * from "./deployment.js";
 export * from "./dispatch.js";
+export * from "./legal.js";
 export * from "./platform-schema.js";
 export * from "./sweep.js";
 export * from "./audit.js";

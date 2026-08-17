@@ -93,6 +93,16 @@ export interface Wiring {
    */
   readonly vaultSecret?: string;
   /**
+   * ⚠️ WHAT THIS CALLER STILL OWES AN AGREEMENT TO. Absent means this deployment
+   * asks for none, which is the honest state of one that declares no documents —
+   * and `deploymentFaults` tests that against what it actually collects, so
+   * "nobody was asked" cannot quietly be the answer on a product holding
+   * somebody's health record.
+   */
+  readonly owed?: (
+    who: Who, located: Located,
+  ) => Promise<readonly { readonly id: string; readonly title: string }[]>;
+  /**
    * ⚠️ WHO THIS DEPLOYMENT IS, FOR THE TILES THAT WEAR OUR MARK. A personal
    * workspace installs as ours; nothing about a hostname can supply a name and a
    * glyph, so a deployment that has not said serves no manifest rather than a
@@ -296,6 +306,20 @@ export async function performOperation(
   const catalog = composed.catalog;
 
   /*
+    ⚠️ ASKED PER REQUEST, LIKE STANDING, AND FOR THE SAME REASON. A person may
+    agree in one tab while another is open, and a version may change under
+    somebody mid-session; a value resolved once at sign-in would let them work
+    for hours against wording they never saw.
+
+    ⚠️ AND AN OPERATION MARKED `beforeAccepting` DOES NOT PAY FOR THE QUERY. The
+    escape hatches are exactly the routes somebody behind the wall uses, and
+    making them the slowest ones is the wrong way round.
+  */
+  const owed = op.spec.beforeAccepting || !wiring.owed
+    ? []
+    : await wiring.owed(who, located);
+
+  /*
     ⚠️ MAINTENANCE IS ASKED HERE AND NOWHERE ELSE, so the agent door cannot
     forget it (D12). `readonly` refuses the writes and serves the reads;
     `full` withholds everything this path serves. The operator door, `/health`
@@ -340,6 +364,11 @@ export async function performOperation(
     entitlements: located.entitlements ?? [],
     flags: located.flags ?? {},
     used: located.used ?? (() => 0),
+    /* ⚠️ SUPPLIED BY THE LOCATOR, so a deployment that cannot answer refuses
+       rather than waving everybody through — an absent list here means "this
+       deployment asks for no agreements", which the boot check tests against
+       what it actually holds. */
+    ...(owed.length ? { unaccepted: owed } : {}),
     ledger: { balance: located.balance ?? 0 },
     now: now.toISOString(),
     catalog,

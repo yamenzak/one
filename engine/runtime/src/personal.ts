@@ -17,7 +17,7 @@
  * out rather than the only one.
  */
 
-import type { AccountId, AppSpec, Door, TenantId } from "@engine/kernel";
+import type { AccountId, AppSpec, DocumentBook, Door, TenantId } from "@engine/kernel";
 import {
   foundingAppRole, permissionsFor, residencyFor, slugOk, slugTaken, wouldStrand,
 } from "@engine/kernel";
@@ -66,6 +66,13 @@ export interface PersonalOp {
   readonly needs: "session" | "nobody";
   /** Which doors it answers on. A workspace is not where a workspace is made. */
   readonly doors?: readonly Door["kind"][];
+  /**
+   * ⚠️ REACHABLE BY SOMEBODY WHO HAS NOT AGREED TO THE TERMS. Holding the
+   * documents over somebody is fair; holding their DATA over them is not — so
+   * reading what is being asked, agreeing, leaving with a copy, deleting and
+   * signing out all stay open. A wall nobody can leave through is a hostage.
+   */
+  readonly beforeAccepting?: true;
   readonly run: (ctx: PersonalCtx, input: Record<string, unknown>) => Promise<unknown>;
 }
 
@@ -76,6 +83,31 @@ export type PersonalBook = Readonly<Record<string, PersonalOp>>;
 export interface IdentityDeps {
   /** The secret codes are hashed with. Never the code itself. */
   readonly secret: string;
+  /**
+   * ⚠️ THE DEPLOYMENT'S OWN DOCUMENTS — terms, the privacy notice, the DPA. They
+   * bind a legal entity rather than a feature, so there is one set for every app
+   * here and it is injected rather than declared per product.
+   */
+  readonly documents?: DocumentBook;
+  /**
+   * ⚠️ WHAT THIS CALLER STILL OWES AN AGREEMENT TO. Absent means this deployment
+   * asks for none — which is the honest state of one that has declared no
+   * documents, and is checked at boot rather than typed at every call site: a
+   * required parameter here would be satisfied with `async () => []` by whoever
+   * was in a hurry, and that reads exactly like "everybody has agreed".
+   */
+  readonly owed?: (ctx: PersonalCtx) => Promise<readonly unknown[]>;
+  /**
+   * ⚠️ IT MAY REFUSE, AND THE REFUSAL HAS TO COME BACK. Where an acceptance is
+   * recorded is derived from what the document binds (`bindingFor`), so the two
+   * honest failures are structural: the business's agreement asked at a door
+   * with no business behind it, and asked of somebody who cannot bind it.
+   * Returning `void` would answer both with a cheerful 200 and no row — a
+   * screen that says "agreed" over a wall that is still up.
+   */
+  readonly accept?: (
+    ctx: PersonalCtx, document: string, version: string,
+  ) => Promise<void | "needs_a_workspace" | "not_yours_to_give">;
   /**
    * ⚠️ SENDING IS INJECTED, AND A DEPLOYMENT THAT CANNOT SEND MUST NOT PRETEND.
    * A sign-in that answers "check your email" with nothing sent is a product
@@ -116,6 +148,62 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
  */
 export function personalOps(deps: IdentityDeps): PersonalBook {
   return {
+    /* --------------------------------------------------------- agreements --- */
+
+    /*
+      ⚠️ READABLE BY SOMEBODY WHO HAS NOT AGREED, WHICH IS THE WHOLE POINT. A
+      wall that will not show what is behind it is a wall nobody can get past —
+      this is the read the acceptance gate must never refuse, because it is how
+      its own refusal is answered.
+    */
+    "me.agreements": {
+      kind: "read", needs: "session", beforeAccepting: true,
+      async run(ctx): Promise<unknown> {
+        if (!ctx.session) return ctx.fail("platform.unauthorized");
+        return {
+          documents: Object.values(deps.documents ?? {}).map((d) => ({
+            id: d.id, kind: d.kind, title: d.title, version: d.version,
+            url: d.url ?? null, mustAccept: d.mustAccept, binds: d.binds,
+          })),
+          owed: deps.owed ? await deps.owed(ctx) : [],
+        };
+      },
+    },
+
+    /*
+      ⚠️ ACCEPTING IS OF A VERSION, AND THE VERSION IS SENT BACK. A press meaning
+      "whatever is current" would record an agreement to text the person may
+      never have seen — the screen showed one wording and the server stored
+      another, which is exactly the confusion the version exists to prevent.
+    */
+    "me.accept": {
+      kind: "write", needs: "session", beforeAccepting: true,
+      async run(ctx, input): Promise<unknown> {
+        if (!ctx.session) return ctx.fail("platform.unauthorized");
+        const id = String(input.document ?? "");
+        const version = String(input.version ?? "");
+        const def = (deps.documents ?? {})[id];
+        if (!def) return ctx.fail("platform.not_found");
+        if (def.version !== version) {
+          return ctx.fail("platform.invalid", {}, {
+            fields: { version: "this changed since it was shown to you — read it again" },
+          });
+        }
+        if (!deps.accept) return ctx.fail('platform.unavailable');
+        const refused = await deps.accept(ctx, id, version);
+        if (refused === "needs_a_workspace") {
+          return ctx.fail("platform.not_found");
+        }
+        if (refused === "not_yours_to_give") {
+          /* ⚠️ A permission, and it is the right shape: whoever runs the
+             workspace can give this and they cannot. Recording it anyway would
+             put a guest's name on a business's agreement. */
+          return ctx.fail("platform.forbidden");
+        }
+        return { document: id, version };
+      },
+    },
+
     /* ------------------------------------------------------------ sign in --- */
 
     "me.code": {
@@ -181,7 +269,7 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
     },
 
     "me.signout": {
-      kind: "write", needs: "session",
+      kind: "write", needs: "session", beforeAccepting: true,
       async run(ctx): Promise<unknown> {
         if (ctx.session) await endSession(ctx.directory, ctx.session.id, ctx.now);
         ctx.issue(null);
@@ -205,7 +293,7 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
       read them (D5).
     */
     "me.who": {
-      kind: "read", needs: "session",
+      kind: "read", needs: "session", beforeAccepting: true,
       async run(ctx): Promise<unknown> {
         const accountId = ctx.session!.accountId;
         const tenants = await tenantsOf(ctx.directory, accountId);
@@ -347,7 +435,7 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
     /* ------------------------------------------------------------ leaving --- */
 
     "me.leave": {
-      kind: "write", needs: "session",
+      kind: "write", needs: "session", beforeAccepting: true,
       async run(ctx, input): Promise<unknown> {
         const slug = String(input.slug ?? "");
         const tenants = await tenantsOf(ctx.directory, ctx.session!.accountId);

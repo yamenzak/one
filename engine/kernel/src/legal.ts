@@ -82,6 +82,35 @@ export interface SubProcessorDef {
 
 export type SubProcessorBook = Readonly<Record<string, SubProcessorDef>>;
 
+/**
+ * WHAT THE DEPLOYMENT PROMISES, AS OPPOSED TO WHAT A PRODUCT DOES.
+ *
+ * ⚠️ TERMS AND A PRIVACY NOTICE BIND A LEGAL ENTITY, NOT A FEATURE. There is one
+ * company behind every app here, one contract with the customer, and one
+ * description of what happens to their data — so four products with four privacy
+ * notices is either four copies of one document or four that contradict each
+ * other, and somebody opening the second product does not sign a second
+ * contract. `missingDocuments` has said this in its own header since it was
+ * written, which is exactly why nothing could call it: it asked a
+ * deployment-level question of a per-app declaration.
+ *
+ * ⚠️ AND THE SUB-PROCESSOR BASE IS HERE FOR THE SAME REASON. The database, the
+ * object store and the compute are the same vendor for every product on this
+ * deployment; declaring them per app is three chances to forget one, and an
+ * undisclosed recipient is the disclosure failure regulators actually find.
+ * An app adds the ones that are genuinely its own — a payment gateway one
+ * product uses, a model provider only one product calls.
+ *
+ * ⚠️ WHAT STAYS WITH THE APP: purposes and vault fields. A purpose is why THIS
+ * product needs THIS fact, it is what the consent sheet shows and what bounds a
+ * grant — merged, it would ask somebody to agree to reasons belonging to
+ * products they do not use.
+ */
+export interface DeploymentLegal {
+  readonly documents: DocumentBook;
+  readonly processors: SubProcessorBook;
+}
+
 export const subProcessor = (def: SubProcessorDef): SubProcessorDef => def;
 
 /* -------------------------------------------------------------- the record --- */

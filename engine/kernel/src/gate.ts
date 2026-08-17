@@ -58,6 +58,13 @@ export interface Ask {
   readonly caller: Caller;
   readonly standing: Standing;
   /**
+   * ⚠️ WHAT THIS PERSON STILL OWES AN AGREEMENT TO. Empty is the ordinary case
+   * and the expensive one to get wrong: a deployment that could not answer would
+   * wave everybody through, so the locator supplies it and an absent list is a
+   * deployment with no documents rather than a person who has accepted them.
+   */
+  readonly unaccepted?: readonly { readonly id: string; readonly title: string }[];
+  /**
    * ⚠️ WHAT THIS WORKSPACE IS. Absent means the question has no answer here —
    * the operations about YOURSELF run outside every workspace — and a
    * commercial-only operation on that lane is refused rather than waved
@@ -97,6 +104,26 @@ export function check(ask: Ask): Refused | null {
 
   for (const gate of GATE_ORDER) {
     switch (gate) {
+      /*
+        ⚠️ FIRST, AND ABOVE THE BILL. Until somebody has agreed to the terms and
+        the privacy notice there is no basis to process anything about them —
+        which includes telling them what their workspace owes.
+
+        ⚠️ AND READS ARE NOT EXEMPT HERE, UNLIKE STANDING. A workspace in arrears
+        keeps its records readable because withholding them is leverage over a
+        bill; somebody who has not agreed to how their data is handled is a
+        different question, and serving them their data anyway is the processing
+        they have not agreed to. What stays open is `beforeAccepting` — reading
+        the documents, agreeing, leaving with a copy, deleting, and signing out.
+      */
+      case "accepted": {
+        if (op.beforeAccepting) break;
+        const owed = ask.unaccepted ?? [];
+        if (owed.length) {
+          return no("accepted", "platform.must_accept", { document: owed[0]!.title });
+        }
+        break;
+      }
       case "standing": {
         /* ⚠️ Reads pass every rung — see `Standing`. */
         if (op.kind === "write" && !ask.standing.writable) {

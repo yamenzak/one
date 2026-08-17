@@ -214,6 +214,9 @@ export function vaultOps(app: AppSpec): Readonly<Record<string, Resolved>> {
 
     /* ------------------------------------------------------------ export --- */
 
+    /* ⚠️ REACHABLE BEHIND THE ACCEPTANCE WALL. Holding the documents over
+       somebody is fair; holding their data over them is not — leaving with a
+       copy and deleting are the two things a wall must never close. */
     "vault.export": op("vault.export", "read",
       "Everything held about you, in the clear.",
       async (ctx) => {
@@ -221,7 +224,7 @@ export function vaultOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         const out = await exportFor(ctx.db, ctx.vault.secret, book, me(ctx));
         if (out === "erased") return ctx.fail("platform.not_found");
         return { facts: out };
-      }),
+      }, { beforeAccepting: true }),
 
     /* ----------------------------------------------------------- erasure --- */
 
@@ -248,6 +251,6 @@ export function vaultOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       },
       /* ⚠️ A code to an inbox, because the threat is a borrowed laptop with an
          open tab rather than a stolen password — and this is irreversible. */
-      { proof: "recent" }),
+      { proof: "recent", beforeAccepting: true }),
   };
 }

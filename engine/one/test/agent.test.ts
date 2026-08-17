@@ -14,11 +14,11 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { residencyFor } from "@engine/kernel";
 import { PLATFORM_ROLES } from "@engine/kernel";
 import {
-  addShard, createTenant, found, invite, noteBelonging, noteShardApp, startSession, upsertAccount,
-  type Db,
+  accept, addShard, createTenant, found, invite, noteBelonging, noteShardApp, startSession,
+  upsertAccount, type Db,
 } from "@engine/runtime";
 import { HELLO } from "@engine/hello";
-import worker from "../src/index.js";
+import worker, { LEGAL } from "../src/index.js";
 
 const asDev = { ...env, ROOT: "localhost", ENVIRONMENT: "development", AUTH_SECRET: "test" };
 const call = (host: string, path: string, init: RequestInit = {}) =>
@@ -68,6 +68,28 @@ beforeAll(async () => {
     .bind(reader, new Date().toISOString(), made.tenant.id, "sam@example.com").run();
   await noteBelonging(directory(), reader, made.tenant.id);
   readerCookie = `one_session=${(await startSession(directory(), reader)).id}`;
+
+  /*
+    ⚠️ AND BOTH AGREE TO THE TERMS, BECAUSE THE WALL IS REAL. Every one of these
+    tests went red the moment the acceptance gate landed, which is the gate
+    working: an account that has agreed to nothing may read the documents,
+    accept them, take its data and leave — and nothing else. A fixture that
+    skipped this would be testing a deployment nobody can have.
+  */
+  for (const who of [owner, reader]) {
+    for (const doc of Object.values(LEGAL.documents)) {
+      if (doc.binds !== "person") continue;
+      await accept(directory(), who, doc.id, doc.version);
+    }
+  }
+  /* ⚠️ AND THE WORKSPACE'S OWN, GIVEN ONCE BY WHOEVER CAN BIND IT. The reader
+     is not asked for it and must not be: a colleague invited into a business
+     did not sign its data-processing agreement, and stopping them over one they
+     cannot give is a wall with no door in it for them. */
+  for (const doc of Object.values(LEGAL.documents)) {
+    if (doc.binds !== "tenant") continue;
+    await accept(directory(), owner, doc.id, doc.version, { tenantId: made.tenant.id as never });
+  }
 });
 
 describe("the door itself", () => {

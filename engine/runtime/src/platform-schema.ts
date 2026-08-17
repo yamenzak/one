@@ -27,6 +27,7 @@ import { DIRECTORY_SCHEMA } from "./directory.js";
 import { IDENTITY_SCHEMA } from "./identity.js";
 import { INBOX_SCHEMA } from "./inbox.js";
 import { JOBS_SCHEMA } from "./jobs.js";
+import { LEGAL_SCHEMA } from "./legal.js";
 import { MEMBERSHIP_SCHEMA } from "./membership.js";
 import { OPERATOR_SCHEMA } from "./operator.js";
 import { PACKAGE_SCHEMA } from "./packages.js";
@@ -38,6 +39,10 @@ import { VAULT_SCHEMA } from "./vault.js";
 export const DIRECTORY_MODULES: readonly SchemaModule[] = [
   DIRECTORY_SCHEMA, IDENTITY_SCHEMA, BILLING_SCHEMA, BRANDING_SCHEMA,
   JOBS_SCHEMA, OPERATOR_SCHEMA, AI_ACTION_SCHEMA,
+  /* ⚠️ IN THE DIRECTORY, NOT ON A SHARD. One person accepts the terms once for
+     the whole deployment; an acceptance beside a workspace's records would be
+     asked again per workspace and lost when that workspace closed. */
+  LEGAL_SCHEMA,
 ];
 
 /** What a SHARD holds: everything scoped to one workspace, beside its records. */

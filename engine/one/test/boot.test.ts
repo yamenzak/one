@@ -14,8 +14,11 @@
 
 import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
-import { addShard, createTenant, noteShardApp, type Db } from "@engine/runtime";
-import worker, { APPS } from "../src/index.js";
+import {
+  addShard, createTenant, found, noteBelonging, noteShardApp, owedBy, startSession, upsertAccount,
+  type Db,
+} from "@engine/runtime";
+import worker, { APPS, LEGAL } from "../src/index.js";
 
 const call = (host: string, path: string, init: RequestInit = {}) =>
   worker.fetch(new Request(`http://${host}:8080${path}`, init), env as never);
@@ -272,5 +275,122 @@ describe("what happens to a workspace nobody is looking at", () => {
     expect(runs.results.length).toBeGreaterThanOrEqual(2);
     expect(runs.results.every((r) => r.ok === 1)).toBe(true);
     expect(runs.results.at(-1)?.touched).toBe(0);
+  });
+});
+
+/* ------------------------------------------------------------- agreements --- */
+
+/**
+ * ⚠️ A WALL SOMEBODY CANNOT LEAVE THROUGH IS NOT A WALL, IT IS A HOSTAGE. The
+ * acceptance gate is the only one in this framework that holds the WHOLE
+ * product, reads included — so the four things that stay open behind it are the
+ * point of it, not an exception to it: read what is being asked, agree, take a
+ * copy, delete.
+ */
+describe("what somebody who has not agreed can do", () => {
+  const directory = () => env.DIRECTORY as unknown as Db;
+  const asDevEnv = { ...env, ROOT: "localhost", ENVIRONMENT: "development", AUTH_SECRET: "test" };
+  /* ⚠️ THE WORKSPACE'S OWN DOOR. The wall is asked of somebody INSIDE a
+     workspace — `owed` resolves the workspace's documents from the roster — so
+     driving the signpost would answer 404 and prove nothing. */
+  const at = (path: string, init: RequestInit = {}) =>
+    worker.fetch(new Request(`http://${slug}.localhost:8080${path}`, init), asDevEnv as never);
+
+  const slug = "unread";
+  /** Whoever created the workspace: bound by the terms AND by the DPA. */
+  let owner = "";
+  /** A colleague invited afterwards: bound by the terms, and by no DPA. */
+  let guest = "";
+  let ownerId = "";
+
+  const agreeTo = async (cookie: string, binds: "person" | "tenant") => {
+    for (const doc of Object.values(LEGAL.documents)) {
+      if (doc.binds !== binds) continue;
+      const done = await at("/api/me.accept", {
+        method: "POST", headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ document: doc.id, version: doc.version }),
+      });
+      expect(done.status, doc.id).toBe(200);
+    }
+  };
+
+  beforeAll(async () => {
+    const made = await createTenant(directory(), {
+      slug, name: "Unread", country: "DE", where: "eu", apps: ["hello"],
+    });
+    if (typeof made === "string") throw new Error(made);
+    const shard = env.SHARD_EU_1 as unknown as Db;
+
+    ownerId = await upsertAccount(directory(), "founder@example.com", null);
+    await found(shard, made.tenant.id, ownerId as never, "founder@example.com", { hello: "writer" });
+    await noteBelonging(directory(), ownerId as never, made.tenant.id);
+    owner = `one_session=${(await startSession(directory(), ownerId as never)).id}`;
+
+    const second = await upsertAccount(directory(), "colleague@example.com", null);
+    await shard.prepare(
+      `INSERT INTO membership (id, tenant_id, account_id, email, platform_role, app_roles_json, grants_json, revoked_json, at, accepted_at, removed_at)
+       VALUES ('mem_guest', ?, ?, 'colleague@example.com', 'member', '{"hello":"writer"}', '[]', '[]', ?, ?, NULL)`)
+      .bind(made.tenant.id, second, new Date().toISOString(), new Date().toISOString()).run();
+    await noteBelonging(directory(), second as never, made.tenant.id);
+    guest = `one_session=${(await startSession(directory(), second as never)).id}`;
+  });
+
+  it("is stopped from the product until it has agreed", async () => {
+    const out = await at("/api/note.list", { headers: { cookie: owner } });
+    /* ⚠️ 451, which is the one status that means this: not a permission (403
+       invites somebody to look for another route) and not a payment. */
+    expect(out.status).toBe(451);
+    expect(JSON.stringify(await out.json())).toContain("agree");
+  });
+
+  it("can still read what it is being asked to agree to", async () => {
+    const out = await at("/api/me.agreements", { headers: { cookie: owner } });
+    expect(out.status).toBe(200);
+    const said = await out.json() as { owed: { id: string }[] };
+    expect(said.owed.map((d) => d.id).sort()).toEqual(["dpa", "privacy", "terms"]);
+  });
+
+  /*
+    ⚠️ AND THE COLLEAGUE IS NOT ASKED TO SIGN THE BUSINESS'S AGREEMENT. They
+    agreed to the terms as a person; the data-processing agreement binds a
+    company they do not run, so asking them for it is a wall with no door in it —
+    they cannot give it, and nobody else can give it FOR them from where they are
+    standing.
+  */
+  it("does not ask a colleague to bind a business they do not run", async () => {
+    const out = await at("/api/me.agreements", { headers: { cookie: guest } });
+    const said = await out.json() as { owed: { id: string }[] };
+    expect(said.owed.map((d) => d.id).sort()).toEqual(["privacy", "terms"]);
+
+    /* And if they try anyway, it is refused rather than recorded — a guest's
+       name on a business's signature is worse than no signature. */
+    const forced = await at("/api/me.accept", {
+      method: "POST", headers: { cookie: guest, "content-type": "application/json" },
+      body: JSON.stringify({ document: "dpa", version: LEGAL.documents.dpa!.version }),
+    });
+    expect(forced.status).toBe(403);
+  });
+
+  it("can take its data and delete itself without agreeing to anything", async () => {
+    expect((await at("/api/vault.export", { headers: { cookie: owner } })).status).not.toBe(451);
+    expect((await at("/api/me.who", { headers: { cookie: owner } })).status).toBe(200);
+  });
+
+  /*
+    ⚠️ AND A NEW VERSION ASKS AGAIN. An acceptance of last month's wording is not
+    an acceptance of this month's — that is the entire reason the version is on
+    the record, and the reason editing text without moving the version is the one
+    change that makes the record confidently wrong.
+  */
+  it("opens once it agrees, and closes again when the wording changes", async () => {
+    await agreeTo(owner, "person");
+    await agreeTo(owner, "tenant");
+    expect((await at("/api/note.list", { headers: { cookie: owner } })).status).toBe(200);
+
+    /* The wording moves on. Nothing about the stored acceptance changes, and it
+       stops being an acceptance of what is being asked. */
+    const owed = await owedBy(directory(), ownerId as never,
+      { terms: { ...LEGAL.documents.terms!, version: "2027-01-01" as never } });
+    expect(owed.map((d) => d.id)).toEqual(["terms"]);
   });
 });

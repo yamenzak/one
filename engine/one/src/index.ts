@@ -16,11 +16,12 @@
  * than six lookups each caller does for itself.
  */
 
-import type { AppSpec } from "@engine/kernel";
+import type { AccountId, AppSpec, DeploymentLegal, Door, TenantId } from "@engine/kernel";
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
-  NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, deploymentFaults, locator,
-  memberFor, noteShardApp, sweep, tenantById,
+  NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, acceptanceScope,
+  deploymentFaults, locator,
+  accept, memberFor, noteShardApp, owedBy, sweep, tenantById, tenantBySlug,
   operatorOps, permissionsResolver, personalOps, schemaFor, serve, sessionIdFrom, shardFor,
   subscriptionFor, whoIs,
   type Db, type TenantRow,
@@ -56,6 +57,60 @@ const SERVICES_REACHED: readonly string[] = [];
 
 /* ⚠️ THE PLATFORM'S OWN TABLES ARE `@engine/runtime`'S TO LIST, NOT THIS FILE'S.
    Nine copies of that list had drifted — see `platform-schema.ts`. */
+
+/**
+ * ⚠️ WHAT THIS DEPLOYMENT PROMISES, AND IT IS THE DEPLOYMENT'S RATHER THAN A
+ * PRODUCT'S. One company, one contract, one description of what happens to
+ * somebody's data — a person opening the second product here does not sign a
+ * second agreement, and four products with four privacy notices is either four
+ * copies of one or four that disagree.
+ *
+ * ⚠️ THE VERSION IS A DAY, AND MOVING IT ASKS EVERYBODY AGAIN. That is the
+ * feature: editing the wording without moving it records everybody who agreed
+ * to the old text as having agreed to the new, which is a record that is
+ * confidently wrong rather than merely absent.
+ *
+ * ⚠️ AND `binds` IS WHEN IT IS ASKED. `person` is every human at their first
+ * sign-in; `tenant` is whoever creates a workspace, on its behalf. An app may
+ * add its own, and those bind where that app is enabled.
+ */
+const LEGAL: DeploymentLegal = {
+  documents: {
+    terms: {
+      id: "terms", kind: "terms", title: "Terms of use",
+      version: "2026-08-17" as never, mustAccept: true, binds: "person",
+      url: "/legal/terms",
+    },
+    privacy: {
+      id: "privacy", kind: "privacy", title: "Privacy notice",
+      version: "2026-08-17" as never, mustAccept: true, binds: "person",
+      url: "/legal/privacy",
+    },
+    /* ⚠️ THE BUSINESS ONE IS BOUND BY WHOEVER CREATES THE WORKSPACE, not by
+       everybody in it. A colleague invited into a workspace agreed to the terms
+       as a person; they did not sign the data-processing agreement, and asking
+       them to would be asking somebody to bind a company they do not run. */
+    dpa: {
+      id: "dpa", kind: "dpa", title: "Data processing agreement",
+      version: "2026-08-17" as never, mustAccept: true, binds: "tenant",
+      url: "/legal/dpa",
+    },
+  },
+  /*
+    ⚠️ THE BASE EVERY PRODUCT HERE INHERITS. The records are in D1, the objects
+    in R2 and the code in Workers — all one vendor, true of every app on this
+    deployment whether or not anybody writes it down. An app adds only what is
+    genuinely its own.
+  */
+  processors: {
+    cloudflare: {
+      id: "cloudflare", name: "Cloudflare, Inc.", country: "US",
+      role: "Runs the application and stores its records and files.",
+      receives: ["none", "sensitive"],
+      url: "https://www.cloudflare.com/trust-hub/gdpr/",
+    },
+  },
+};
 
 export interface Env {
   readonly DIRECTORY: D1Database;
@@ -192,6 +247,41 @@ const handler = (env: Env) => {
     return env.ENVIRONMENT === "development";
   };
 
+  /**
+   * ⚠️ WHICH WORKSPACE THE PERSON IS STANDING IN FRONT OF, FROM THE HOST AND
+   * NOTHING ELSE. The account centre and the setup door have none, and an
+   * agreement asked there is the person's own.
+   */
+  const tenantAtDoor = async (door: Door): Promise<TenantId | null> =>
+    door.kind === "tenant" && door.slug
+      ? ((await tenantBySlug(directory, door.slug))?.id as TenantId | undefined) ?? null
+      : null;
+
+  /**
+   * WHERE SOMEBODY IS, FOR THE PURPOSE OF AN AGREEMENT — resolved ONCE, and read
+   * by both the wall and the screen in front of it.
+   *
+   * ⚠️ TWO RESOLUTIONS IS A WALL THAT REFUSES WHAT THE SCREEN NEVER OFFERED.
+   * The gate asks "what is still owed" per request and the agreements screen
+   * asks the same question to draw itself; if they disagree by one document,
+   * the person presses everything they are shown and stays shut out with
+   * nothing left to press.
+   */
+  const placeOf = async (accountId: AccountId, tenantId: TenantId | null) => {
+    if (!tenantId) return {};
+    const tenant = await tenantById(directory, tenantId);
+    if (!tenant) return {};
+    const member = await memberFor(shardOf(tenant), tenantId, accountId);
+    const apps = await appsOfTenant(directory, tenantId);
+    return {
+      tenantId,
+      /* ⚠️ Only whoever runs the workspace is asked for the workspace's own
+         agreement — see `owedBy`. */
+      canBind: member?.platformRole === "owner",
+      apps: Object.fromEntries(apps.map((id) => [id, APPS[id]?.().documents ?? {}] as const)),
+    };
+  };
+
   return serve({
     roots: { root: env.ROOT },
     apps: APPS,
@@ -216,6 +306,27 @@ const handler = (env: Env) => {
       ...personalOps({
         secret: env.AUTH_SECRET,
         appId: "hello",
+        documents: LEGAL.documents,
+        /* ⚠️ ASKED AT THE DOOR THE PERSON IS STANDING AT. On the account centre
+           only what binds the PERSON is owed; at a workspace's own door the
+           workspace's agreement and its apps' come with it — and it is the same
+           resolution the gate uses, because two would be a wall that refuses
+           what the screen never offered. */
+        owed: async (ctx) => ctx.session
+          ? owedBy(directory, ctx.session.accountId as never, LEGAL.documents,
+            await placeOf(ctx.session.accountId as never, await tenantAtDoor(ctx.door)))
+          : [],
+        accept: async (ctx, document, version) => {
+          if (!ctx.session) return;
+          const def = LEGAL.documents[document];
+          if (!def) return;
+          /* ⚠️ THE SCOPE IS DERIVED, NEVER SENT. See `acceptanceScope`. */
+          const where = acceptanceScope(def,
+            await placeOf(ctx.session.accountId as never, await tenantAtDoor(ctx.door)));
+          if (typeof where === "string") return where;
+          await accept(directory, ctx.session.accountId as never, document, version,
+            where, ctx.now);
+        },
         deliver: async (to, code) => {
           if (env.ENVIRONMENT !== "development") {
             throw new Error("this deployment has no mailer configured");
@@ -268,6 +379,16 @@ const handler = (env: Env) => {
     ...(String(env.VAULT_SECRET ?? "").trim()
       ? { vaultSecret: String(env.VAULT_SECRET) }
       : {}),
+    /*
+      ⚠️ THE WALL, AND IT IS ASKED PER REQUEST. A person may agree in one tab
+      while another is open, and a version may move under somebody mid-session —
+      a value resolved at sign-in would let them work for hours against wording
+      they never saw.
+    */
+    owed: async (who, located) => who.accountId
+      ? owedBy(directory, who.accountId as never, LEGAL.documents,
+        await placeOf(who.accountId as never, located.tenantId as never))
+      : [],
     identify: async (request, located) => {
       /*
         ⚠️ TWO WAYS TO SAY WHO YOU ARE, ONE ANSWER TO WHAT YOU MAY DO. A person
@@ -394,4 +515,4 @@ export default {
   },
 };
 
-export { APPS };
+export { APPS, LEGAL };

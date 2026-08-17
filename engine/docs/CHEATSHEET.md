@@ -61,7 +61,7 @@ a call site over in a product.
 | `problem` | the one refusal shape, and the platform's own catalogue | 6 | — |
 | `tone` | the voice — the rules a written string has to pass | 2 | 1 |
 | `vault` | the facts that are not an app's to keep (D11) | 8 | — |
-| `legal` | documents, purposes, sub-processors, the record of processing | 5 | 2 |
+| `legal` | documents, purposes, sub-processors, the record of processing | 5 | 1 |
 | `guide` | help, onboarding, the milestones a workspace passes | 5 | — |
 | `job` | scheduled work, and the record that it ran | 5 | — |
 | `brand` | which surfaces a workspace may put its own mark on | 10 | 1 |
@@ -69,7 +69,7 @@ a call site over in a product.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**197 of them**, 178 reached by something today.
+**197 of them**, 179 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -125,8 +125,9 @@ layering failure rather than a shortcut. A guard says so.
 | `dispatch` | an event an operation raises becomes a note in somebody's inbox | 1 | — |
 | `sweep` | the daily clock: erase what is past the ladder's last rung | 3 | — |
 | `vault-ops` | consent, grants, who looked, the processing record, export and erasure | 1 | — |
+| `legal` | who agreed to what version, and the wall until they have | 6 | — |
 
-**189 of them**, 172 reached by something today.
+**195 of them**, 178 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
