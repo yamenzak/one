@@ -17,7 +17,7 @@
  */
 
 import type { Allowance, AppSpec, RoleRegistry, TenantId, Theme } from "@engine/kernel";
-import { PUBLIC, SURFACES, seatsUsed, withinQuota } from "@engine/kernel";
+import { PUBLIC, SURFACES, refusePolicy, seatsUsed, withinQuota } from "@engine/kernel";
 import { brandingOf, setBranding } from "./branding.js";
 import { noteInvitation, tenantById } from "./directory.js";
 import { inboxOf, markSeen, policyOf, preferenceOf, setPolicy, setPreference, unseenCount } from "./inbox.js";
@@ -234,16 +234,29 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       "Choose how you are told.",
       async (ctx, input) => {
         if (!ctx.accountId) return ctx.fail("platform.unauthorized");
-        await setPreference(ctx.db, ctx.tenantId as TenantId, ctx.accountId,
-          String(input.type ?? ""), asChannels(input.channels));
+        const type = String(input.type ?? "");
+        const channels = asChannels(input.channels);
+        /* ⚠️ CHECKED HERE, NOT IN THE SCREEN — see `refusePolicy`, whose own
+           comment states this and which nothing called. The policy screen
+           disables the switch on an `action` type; a screen that merely does not
+           render a control is a rule that lasts until the second screen, the
+           API, or a bulk import. */
+        if (refusePolicy(app.notifications ?? {}, { [type]: channels }).length) {
+          return ctx.fail("platform.invalid");
+        }
+        await setPreference(ctx.db, ctx.tenantId as TenantId, ctx.accountId, type, channels);
         return { saved: true };
       }),
 
     "inbox.policy": op("inbox.policy", "write", "tenant:manage",
       "Choose what this workspace may be told about.",
       async (ctx, input) => {
-        await setPolicy(ctx.db, ctx.tenantId as TenantId,
-          String(input.type ?? ""), asChannels(input.channels));
+        const type = String(input.type ?? "");
+        const channels = asChannels(input.channels);
+        if (refusePolicy(app.notifications ?? {}, { [type]: channels }).length) {
+          return ctx.fail("platform.invalid");
+        }
+        await setPolicy(ctx.db, ctx.tenantId as TenantId, type, channels);
         return { saved: true };
       }),
 

@@ -135,6 +135,31 @@ const publish = operation<Publish, { id: string; published: boolean }>({
 });
 
 /**
+ * ⚠️ THE `action` CATEGORY NEEDS AN INSTANCE OR ITS RULE HAS NONE. A reference
+ * app is copied, so anything absent here is absent from every app after it — and
+ * what was absent was the one notification kind that may not be silenced.
+ * `refusePolicy` refuses muting an `action`, and with nothing in this manifest
+ * raising one, the rule had nothing to be applied to and no test could reach it.
+ */
+const ask = operation<{ id: string; who: string }, { asked: boolean }>({
+  id: "note.ask",
+  kind: "write",
+  summary: "Ask somebody to look at a note",
+  input: {
+    id: field.text({ label: "Note", required: true, holds: "none" }),
+    who: field.text({ label: "Who", required: true, holds: "none" }),
+  },
+  output: { asked: field.bool({ label: "Asked", holds: "none" }) },
+  permission: "note:write",
+  idempotency: { mode: "none" },
+  emits: ["note.review_asked"],
+  outcome: { message: "Asked.", tone: "success" },
+  async handler(_ctx, input) {
+    return { asked: Boolean(input.id) };
+  },
+});
+
+/**
  * ⚠️ A GENERATING OPERATION NAMES A LANE AND A PROMPT, NEVER A MODEL (D19).
  * Which row it runs on is the operator's binding; the prompt is a letterhead
  * whose variables are declared, and `brandable` says a workspace may put it in
@@ -269,7 +294,7 @@ export const HELLO: AppSpec = defineApp({
   ],
 
   collections: [note, checkIn],
-  operations: [publish, draft, teamCheckIns, share],
+  operations: [publish, ask, draft, teamCheckIns, share],
 
   /*
     ⚠️ THREE OF EIGHT NAME A GROUND, AND THE FIVE THAT DO NOT ARE THE POINT.
@@ -353,6 +378,27 @@ export const HELLO: AppSpec = defineApp({
          these too, and matching on a name is how it silently stops. */
       needs: "note:read",
       on: "note.published",
+      link: "/",
+      variables: ["who", "title"],
+      /* ⚠️ NO PUSH, AND THE NARROWING IS THE POINT. A note going up is worth
+         knowing and is not worth a phone lighting up — and a type that offers
+         fewer channels than the platform has is what makes `channel_not_offered`
+         reachable at all. With every type offering all three, that refusal had
+         no instance in the app the next one is copied from. */
+      channels: ["inbox", "email"],
+    },
+    /*
+      ⚠️ AN `action` ASKS THE READER TO DO SOMETHING, AND MAY NOT BE SILENCED.
+      That is not a screen's rule — `refusePolicy` refuses a policy or a
+      preference that leaves it with no interrupting channel, on the write, so
+      the API and a bulk import are held to it too.
+    */
+    "note.review_asked": {
+      id: "note.review_asked", label: "Somebody asked you to look",
+      summary: "{who} asked you to look at {title}",
+      category: "action", author: "theirs", tone: "info", icon: "note",
+      needs: "note:read",
+      on: "note.review_asked",
       link: "/",
       variables: ["who", "title"],
       channels: ["inbox", "email", "push"],

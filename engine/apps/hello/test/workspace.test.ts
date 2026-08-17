@@ -16,7 +16,7 @@ import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   AUDIT_SCHEMA, BILLING_SCHEMA, BRANDING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA,
-  MEMBERSHIP_SCHEMA, NOBODY,
+  INBOX_SCHEMA, MEMBERSHIP_SCHEMA, NOBODY,
   REPLAY_SCHEMA, addShard, applySchema, brandingOf, locator, memberFor, noteShardApp,
   permissionsResolver, personalOps, operatorOps, schemaFor, serve, sessionIdFrom, tenantBySlug,
   whoIs, type Db,
@@ -116,14 +116,16 @@ const READABLE = { ground: "#101014", ink: "#f5f5f7", accent: "#7aa2f7", mark: "
 beforeAll(async () => {
   await applySchema(directory(),
     [DIRECTORY_SCHEMA, IDENTITY_SCHEMA, BILLING_SCHEMA, BRANDING_SCHEMA]);
-  await applySchema(shard(), [schemaFor(HELLO), MEMBERSHIP_SCHEMA, AUDIT_SCHEMA, REPLAY_SCHEMA]);
+  await applySchema(shard(),
+    [schemaFor(HELLO), MEMBERSHIP_SCHEMA, INBOX_SCHEMA, AUDIT_SCHEMA, REPLAY_SCHEMA]);
   await addShard(directory(), "eu-1", "eu", 100);
   await noteShardApp(directory(), "eu-1", "hello");
 });
 
 beforeEach(async () => {
   sent.length = 0;
-  for (const t of ["membership", "custom_role", "note", "check_in", "audit", "replay"]) {
+  for (const t of ["membership", "custom_role", "note", "check_in", "audit", "replay",
+    "notify_policy", "notify_preference"]) {
     await shard().exec(`DELETE FROM ${t};`);
   }
   for (const t of ["tenant_branding", "invited", "belongs", "tenant_app", "tenant",
@@ -375,5 +377,66 @@ describe("a database of one workspace's own", () => {
       { items: { id: string; dedicatedTo?: string }[] };
     const tenant = (await tenantBySlug(directory(), SLUG))!;
     expect(seen.items.find((s) => s.id === "eu-1")?.dedicatedTo).toBe(tenant.id);
+  });
+});
+
+/**
+ * A NOTIFICATION THAT ASKS SOMEBODY TO DO SOMETHING MAY NOT BE SILENCED.
+ *
+ * ⚠️ THE RULE WAS WRITTEN AND NOT IN FORCE, WHICH IS THE WHOLE POINT OF THIS
+ * FILE'S NEIGHBOUR. `refusePolicy`'s own header says the `action` rule lives
+ * there "rather than hidden in a screen … a screen that simply does not render
+ * the switch is a rule that lasts until the second screen, or the API, or the
+ * import that sets preferences in bulk" — and nothing called it. The policy
+ * screen disabled the control; the route took whatever it was sent.
+ *
+ * ⚠️ DRIVEN THROUGH THE DOOR, because the point is the API rather than the
+ * function. A unit test on `refusePolicy` passed the whole time it was unwired.
+ */
+describe("what a person may not switch off", () => {
+  it("refuses to silence a notification that asks them to act", async () => {
+    const cookie = await workspace();
+
+    /* ⚠️ The activity one narrows freely — that is the control working. */
+    const narrowed = await post(SLUG, "/api/inbox.preference",
+      { type: "note.published", channels: ["inbox"] }, cookie);
+    expect(narrowed.status).toBe(200);
+
+    /* ⚠️ The action one may be narrowed to an interruption, never below it. */
+    const kept = await post(SLUG, "/api/inbox.preference",
+      { type: "note.review_asked", channels: ["inbox", "email"] }, cookie);
+    expect(kept.status).toBe(200);
+
+    const muted = await post(SLUG, "/api/inbox.preference",
+      { type: "note.review_asked", channels: ["inbox"] }, cookie);
+    expect(muted.status).toBe(400);
+
+    /* ⚠️ AND THE WORKSPACE'S CEILING IS HELD TO IT TOO. An owner silencing an
+       action for everybody is the same refusal one authority up. */
+    const ceiling = await post(SLUG, "/api/inbox.policy",
+      { type: "note.review_asked", channels: ["inbox"] }, cookie);
+    expect(ceiling.status).toBe(400);
+  });
+
+  /*
+    ⚠️ AND A CHANNEL THE TYPE DOES NOT OFFER IS NOT STORABLE. Without the check
+    the row is written and read back by the dispatcher, which then tries to reach
+    somebody by a route the notification never declared.
+  */
+  it("refuses a channel the notification does not offer", async () => {
+    const cookie = await workspace();
+    /* ⚠️ `note.published` offers inbox and email; push is not on offer for it. */
+    const out = await post(SLUG, "/api/inbox.preference",
+      { type: "note.published", channels: ["inbox", "push"] }, cookie);
+    expect(out.status).toBe(400);
+  });
+
+  /* ⚠️ AND A TYPE THE APP DOES NOT HAVE IS NOT STORABLE EITHER — a row keyed on
+     a name nothing dispatches, read back forever by the settings screen. */
+  it("refuses a notification type this app never declared", async () => {
+    const cookie = await workspace();
+    const out = await post(SLUG, "/api/inbox.preference",
+      { type: "note.invented", channels: ["inbox"] }, cookie);
+    expect(out.status).toBe(400);
   });
 });

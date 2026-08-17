@@ -5,6 +5,12 @@ kind: progress
 **What exists today. Read this after [PLAN.md](PLAN.md) §1–§3 and
 [DECISIONS.md](DECISIONS.md), and nothing else is required to resume the work.**
 
+⚠️ **Before adding a rule of any kind, read
+[ENFORCEMENT.md](ENFORCEMENT.md)** — which rules are structural, which are
+guarded, which are only written down, and where every kernel rule is actually
+applied. A rule that is written down and not in force is the most dangerous
+state a rule can be in, and this tree has shipped several.
+
 ⚠️ **THE STAGE TABLE IS THE CONTRACT AND `shipped` IS LOAD-BEARING.** A stage may
 not be marked shipped while any `DEFER(engine-N)` marker in the tree names it —
 `scripts/docs.test.mjs` fails the build if one does. That is the only reason a
@@ -36,6 +42,8 @@ reader can trust this table instead of re-reading the code.
 | 20 | Workspaces — personal or commercial, one brand, one installable, a shard of their own | shipped |
 | 21 | Payment — something takes a card | planned |
 | 22 | OneSpace — `id`, `admin` and `setup` merge into one address off the workspace root | planned |
+| 23 | Mail that leaves the process — a letter, its variables, and a provider | planned |
+| 24 | A workspace composes its own roles out of one app's keys | planned |
 
 ## What is NOT built, and where to pick it up
 
@@ -689,7 +697,7 @@ The guard registry, its checks, and the standards that bind them.
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 10 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 43 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 45 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 0 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -884,6 +892,8 @@ the library decides FOR us.
 | `settings-descend-rather-than-stack` | D12 | one scroll holding a switch, a colour and an email address — three kinds of consequence on one screen, which is the filing cabinet DESIGN.md §3 exists to refuse |
 | `an-authority-is-a-screen-not-a-tab` | D12 | a person's own preferences living inside the workspace's administration surface, so they sit behind whatever permission guards that screen and a member without it cannot reach their own |
 | `every-glyph-a-declaration-names-exists` | D7 | a neutral circle sitting in a list where every other row has a shape — an icon is a STRING in a manifest so no compiler sees the typo, and this map has now been out of step with its callers twice, both times described in full by its own header |
+| `every-rule-the-kernel-states-is-one-something-runs` | D12 | a rule written down, argued for in its own header, unit-tested and cited elsewhere as though it were in force, with no caller anywhere — which is how an API came to silence a notification whose whole point is that it cannot be silenced |
+| `no-lane-re-derives-what-the-kernel-decides` | D12 | two answers to one question — a runtime that works out for itself whether two colours can be read, and diverges from the kernel in whichever direction nobody tests |
 <!-- /generated -->
 
 ## Commands

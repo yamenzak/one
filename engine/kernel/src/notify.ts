@@ -163,6 +163,10 @@ export type LetterRefusal = "too_long" | "unknown_variable" | "not_theirs" | "em
  * somebody who has no idea what it is — and it is the tenant's own edit, so
  * nothing of ours fails and nobody of ours is told.
  */
+/* DEFER(engine-23) stage:23 — nothing sends a letter yet, so this is a rule for
+   a lane that does not exist. It is not dead: the moment mail leaves the
+   process, a letter interpolating a variable its notification never declares is
+   an email with `{coach}` in it, sent to a customer. */
 export function refuseLetter(def: NotificationDef, letter: Letter): readonly LetterRefusal[] {
   const out: LetterRefusal[] = [];
   if (!brandable(def)) out.push("not_theirs");

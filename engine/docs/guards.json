@@ -1549,6 +1549,24 @@
       "impl": "scripts/face.test.mjs",
       "proves": "glyph:",
       "fails": "a neutral circle sitting in a list where every other row has a shape — an icon is a STRING in a manifest so no compiler sees the typo, and this map has now been out of step with its callers twice, both times described in full by its own header"
+    },
+    {
+      "id": "every-rule-the-kernel-states-is-one-something-runs",
+      "protects": "D12",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/rules.test.mjs",
+      "proves": "rules:",
+      "fails": "a rule written down, argued for in its own header, unit-tested and cited elsewhere as though it were in force, with no caller anywhere — which is how an API came to silence a notification whose whole point is that it cannot be silenced"
+    },
+    {
+      "id": "no-lane-re-derives-what-the-kernel-decides",
+      "protects": "D12",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/rules.test.mjs",
+      "proves": "no lane works out for itself",
+      "fails": "two answers to one question — a runtime that works out for itself whether two colours can be read, and diverges from the kernel in whichever direction nobody tests"
     }
   ]
 }

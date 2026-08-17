@@ -50,6 +50,8 @@ import type { ProblemCatalog } from "./problem.js";
 import { PLATFORM_PROBLEMS, redefined, unknownProblems } from "./problem.js";
 import type { AreaBook, SettingBook } from "./setting.js";
 import { refuseSettings } from "./setting.js";
+import { LADDER, refuseLadder } from "./dunning.js";
+import { SURFACES, refuseSurfaces } from "./brand.js";
 import type { PurposeBook, VaultBook } from "./vault.js";
 import { refuseVault } from "./vault.js";
 import type { AppId, Tone } from "./primitives.js";
@@ -201,6 +203,30 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
     at(`job ${p.job}`, `${p.why}: ${p.detail}`);
   }
   for (const p of refusePacks(spec.packs ?? [])) at(`pack ${p.pack}`, `${p.why}: ${p.detail}`);
+
+  /*
+    ⚠️ THE LADDER IS THE PLATFORM'S AND IS CHECKED HERE ANYWAY, because there is
+    nowhere else it ever gets asked. Its rungs must climb — read-only, then
+    blocked, then purged — and an edit that puts them out of order does not
+    fail: it produces a workspace that is blocked before it is read-only, or
+    purged before either. Nothing in the product called `refuseLadder`, so the
+    only thing standing between a transposed pair and a deleted workspace was
+    that nobody had transposed one.
+  */
+  for (const why of refuseLadder(LADDER)) at("standing", `the ladder ${why}`);
+
+  /*
+    ⚠️ AND WHAT AN APP OFFERS FOR BRANDING IS CHECKED AGAINST THE CLOSED SET.
+    `whitelabel.surfaces` is a list of strings in a manifest, so a typo is a
+    surface a workspace can never switch on and nothing anywhere says why — and
+    a name from `OURS` would be an app offering to rebrand the operator console
+    or a document we are bound by.
+  */
+  if (spec.whitelabel) {
+    for (const p of refuseSurfaces({ surfaces: SURFACES }, spec.whitelabel.surfaces)) {
+      at("whitelabel", `"${p.of}" ${p.detail}`);
+    }
+  }
 
   const ids = [...spec.collections.map((c) => c.id), ...spec.operations.map((o) => o.id)];
   for (const id of ids.filter((v, i) => ids.indexOf(v) !== i)) at("id", `"${id}" is declared twice`);

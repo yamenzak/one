@@ -186,7 +186,15 @@ export function refuseTheme(theme: Theme): readonly BrandProblem[] {
   return out;
 }
 
-/** ⚠️ A surface asked for that the app does not offer, or that is never theirs. */
+/**
+ * A surface asked for that is not on offer, or that is never theirs.
+ *
+ * ⚠️ TWO CALLERS AND ONE RULE. Composition asks it of an APP's declaration
+ * against the platform's closed set — is this a surface at all, and is it one we
+ * keep? A workspace's own ask is checked against what its enabled apps offer.
+ * Both are "you asked for a surface that is not available to you", which is why
+ * the detail says what is missing rather than who is asking.
+ */
 export function refuseSurfaces(
   def: WhitelabelDef,
   asked: readonly string[],
@@ -196,7 +204,7 @@ export function refuseSurfaces(
     if (OURS.includes(s)) {
       out.push({ of: s, why: "ours_to_keep", detail: "carries our voice and stays in our letterhead" });
     } else if (!def.surfaces.includes(s as Surface)) {
-      out.push({ of: s, why: "surface_not_offered", detail: "this app does not offer it for branding" });
+      out.push({ of: s, why: "surface_not_offered", detail: "is not offered for branding here" });
     }
   }
   return out;

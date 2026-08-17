@@ -10,6 +10,8 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
+import { resolveRules } from "./lib/rules.mjs";
+
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), "..");
 const guards = JSON.parse(readFileSync(join(ENGINE, "docs/guards.json"), "utf8")).guards;
 const what = process.argv[2];
@@ -31,6 +33,22 @@ if (what === "guards") {
   console.log("| # | Decision | Guarded by |");
   console.log("|---|---|---|");
   for (const [, id, title] of rows) console.log(`| ${id} | ${title} | ${counts[id] ?? 0} |`);
+} else if (what === "enforcement") {
+  /**
+   * ⚠️ THE SAME WALK THE GUARD RUNS, IMPORTED RATHER THAN REPEATED. This printed
+   * four rules with no lane while `rules.test.mjs` reported every one in force,
+   * because each had written its own resolution and one followed a rule's
+   * kernel-side caller while the other did not. A document and the guard it
+   * describes disagreeing is the failure the guard exists to refuse.
+   */
+  const rows = resolveRules()
+    .sort((a, b) => a.where.localeCompare(b.where) || a.name.localeCompare(b.name));
+  console.log("| Rule | Declared in | In force through |");
+  console.log("|---|---|---|");
+  for (const r of rows) {
+    const force = r.deferredTo ? `deferred to stage ${r.deferredTo}` : r.lane ?? "**nothing**";
+    console.log(`| \`${r.name}\` | \`${r.where}\` | ${force} |`);
+  }
 } else if (what === "vocabulary") {
   /**
    * ⚠️ WHAT THE PACKAGE SHIPS, DERIVED FROM WHAT IT EXPORTS. A person about to
@@ -126,6 +144,6 @@ if (what === "guards") {
     }
   }
 } else {
-  console.error("usage: inventory.mjs guards|decisions|vocabulary");
+  console.error("usage: inventory.mjs guards|decisions|enforcement|vocabulary");
   process.exit(2);
 }

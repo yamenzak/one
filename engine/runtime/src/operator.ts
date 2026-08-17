@@ -21,7 +21,7 @@
  */
 
 import type { AccountId, AppId, Allowance, AppSpec, FlagBook, ModelRow, TenantId } from "@engine/kernel";
-import { inLane, mayIsolate, refusePrompt } from "@engine/kernel";
+import { inLane, mayIsolate, refuseCatalogue, refusePrompt } from "@engine/kernel";
 import { actionsOf, bind, bindingsOf, running } from "./ai-actions.js";
 import { adjust, subscriptionFor } from "./billing.js";
 import {
@@ -276,7 +276,25 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
             }),
           };
         }));
-        return { apps };
+        /*
+          ⚠️ WHAT IS WRONG WITH THE CATALOGUE ITSELF, ON THE ONE SCREEN THAT CAN
+          FIX IT. `refuseCatalogue` states three faults that no other check can
+          see — a row whose task maps to no lane (nothing will ever select it),
+          two rows claiming the default in one lane (which one runs depends on
+          row order), and, worst, a row that is ENABLED and priced at zero, which
+          settles free on every call so usage looks healthy and the provider's
+          invoice is the first anybody hears of it. The rule was written, argued
+          for and called by nothing.
+
+          ⚠️ REPORTED, NEVER CORRECTED. Which rows are enabled and what they cost
+          is an operator's decision; a console that silently disabled a row to
+          make its own check pass would be changing the catalogue to hide a
+          finding.
+        */
+        const needed = [...new Set(every().flatMap((a) => actionsOf(a).map((x) => x.ai.lane)))];
+        const faults = refuseCatalogue(models, needed)
+          .map((f) => ({ of: f.of, why: f.why, detail: f.detail }));
+        return { apps, faults };
       },
     },
 

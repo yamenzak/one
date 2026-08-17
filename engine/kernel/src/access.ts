@@ -192,6 +192,11 @@ export type RoleRefusal = "id" | "declared" | "undeclared_permission" | "beyond_
  * would grant nothing; `beyond_you` is the escalation. Collapsed into
  * "invalid", the last one reads as a bug in the form.
  */
+/* DEFER(engine-24) stage:24 — `custom_role` is read by `permissionsFor` and
+   written by nothing, so no request reaches this yet. The rule matters the day
+   one does: `beyond_you` is the escalation check, and a workspace composing a
+   role out of keys its author does not hold is how somebody grants themselves
+   more than they have. */
 export function refuseRole(
   role: CustomRole, declared: RoleRegistry, known: ReadonlySet<string>, author: ReadonlySet<string>,
 ): RoleRefusal | null {
