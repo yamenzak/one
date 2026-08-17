@@ -628,6 +628,14 @@
       "kind": "write"
     },
     {
+      "id": "op.tenant.money",
+      "kind": "read"
+    },
+    {
+      "id": "op.tenant.comp",
+      "kind": "write"
+    },
+    {
       "id": "op.tenant.app",
       "kind": "write"
     },

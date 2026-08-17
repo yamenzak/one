@@ -17,21 +17,21 @@
 import { useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import {
-  AmountRow, ControlRow, Group, Identity, NumberInput, Row, RowsWaiting, Screen, Stack, Tray,
-  appFace, notice, placeFace, sentence,
+  AmountRow, ControlRow, Credits, Group, Identity, NumberInput, Row, RowsWaiting, Screen,
+  Stack, TextInput, Tray, appFace, notice, placeFace, sentence,
 } from "@engine/design";
 import type { Allowance, EntitlementDef, PlanSpec } from "@engine/kernel";
 import { isBusiness } from "@engine/kernel";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
 
+/** ⚠️ A product, and whether it is switched ON — a workspace keeps one it
+    turned off. Nothing about money hangs here any more: the plan, the standing
+    and the adjustments are the WORKSPACE's, and reading them per product was N
+    copies of one answer with the console drawing whichever came first. */
 interface Held {
   readonly id: string;
-  /** ⚠️ Whether it is switched ON — a workspace keeps a product it turned off. */
   readonly on: boolean;
-  readonly planId: string | null;
-  readonly status: string | null;
-  readonly adjustments: Readonly<Record<string, Allowance>>;
 }
 
 interface TenantLine {
@@ -44,6 +44,10 @@ interface TenantLine {
   readonly kind?: "personal" | "commercial";
   readonly legalName?: string | null;
   readonly closedAt: string | null;
+  /** ⚠️ One membership, at the workspace. */
+  readonly planId: string | null;
+  readonly status: string | null;
+  readonly adjustments: Readonly<Record<string, Allowance>>;
   readonly apps: readonly Held[];
 }
 
@@ -52,11 +56,26 @@ interface AppLine {
   readonly name: string;
   readonly mark: string;
   readonly entitlements: Readonly<Record<string, EntitlementDef>>;
-  readonly plans: readonly PlanSpec[];
+}
+
+/** ⚠️ What one workspace holds, read separately — see `op.tenant.money`. */
+interface MoneyLine {
+  readonly wallet: {
+    readonly granted: number; readonly bought: number; readonly held: number;
+    readonly spendable: number; readonly owedMilli: number; readonly owing: boolean;
+  };
+  readonly auto: { readonly packId: string | null; readonly below: number; readonly error: string | null };
+  readonly statement: readonly {
+    readonly at: string; readonly delta: number; readonly reason: string;
+  }[];
 }
 
 export function OneTenant({ id }: { readonly id: string }) {
-  const of = useLoad<{ items: readonly TenantLine[]; apps: readonly AppLine[] }>("op.tenants");
+  const of = useLoad<{
+    items: readonly TenantLine[];
+    apps: readonly AppLine[];
+    plans: readonly PlanSpec[];
+  }>("op.tenants");
 
   return (
     /* ⚠️ `detail` — one subject and its facts, with no primary: an operator
@@ -90,29 +109,38 @@ export function OneTenant({ id }: { readonly id: string }) {
                   : undefined}
             />
 
-            <Group>
+            {/* ⚠️ THE MEMBERSHIP IS ONE ROW ABOVE THE PRODUCTS, because it is
+                one row of truth. Drawn per product it was the same plan four
+                times, and the adjustment tray beside each of them wrote to the
+                same place. */}
+            <Group label="Membership">
+              <ControlRow
+                label={data.plans.find((p) => p.id === tenant.planId)?.name ?? "No plan"}
+                under={[
+                  tenant.status === "past_due" ? "payment failed" : tenant.status ?? "",
+                  Object.keys(tenant.adjustments).length
+                    ? `${Object.keys(tenant.adjustments).length} adjusted`
+                    : "",
+                ].filter(Boolean).join(" · ")}
+              >
+                <AdjustTray tenant={tenant} apps={data.apps} onDone={of.again} />
+              </ControlRow>
+            </Group>
+
+            <Money tenant={tenant} />
+
+            <Group label="Products">
               {tenant.apps.map((held) => {
                 const app = data.apps.find((a) => a.id === held.id);
-                const moved = Object.keys(held.adjustments).length;
                 return (
                   <ControlRow
                     key={held.id}
                     face={appFace(held.id, app?.mark)}
                     label={app?.name ?? sentence(held.id)}
-                    under={[
-                      /* ⚠️ OFF IS THE FIRST THING SAID, because everything after
-                         it — the plan, the adjustments — is about a product
-                         nobody in this workspace can currently reach. */
-                      held.on ? held.planId ?? "no plan" : "switched off",
-                      held.status === "past_due" ? "payment failed" : "",
-                      moved ? `${moved} adjusted` : "",
-                    ].filter(Boolean).join(" · ")}
+                    under={held.on ? undefined : "switched off"}
                   >
                     <Row space="tight">
                       <AppSwitch tenant={tenant} held={held} onDone={of.again} />
-                      {app && held.on
-                        ? <AdjustTray tenant={tenant} app={app} held={held} onDone={of.again} />
-                        : null}
                     </Row>
                   </ControlRow>
                 );
@@ -162,22 +190,25 @@ function AppSwitch({ tenant, held, onDone }: {
 }
 
 /**
- * ⚠️ THE SHEET IS PER PRODUCT NOW, so the product picker is gone — the row it
- * opened from already said which one. One less decision in a place somebody is
- * typing a number under pressure.
+ * ⚠️ THE SHEET IS THE WORKSPACE'S, over every key its membership could hold.
+ * It was per product, which was the shape while plans were — and under one
+ * membership that meant four trays writing to the same row, each showing a
+ * quarter of what was on it.
  */
-function AdjustTray({ tenant, app, held, onDone }: {
+function AdjustTray({ tenant, apps, onDone }: {
   readonly tenant: TenantLine;
-  readonly app: AppLine;
-  readonly held: Held;
+  readonly apps: readonly AppLine[];
   readonly onDone: () => void;
 }) {
-  const keys = Object.entries(app.entitlements).filter(([, d]) => !d.reserved);
+  const keys = Object.entries(
+    Object.fromEntries(apps.flatMap((a) => Object.entries(a.entitlements))),
+  ).filter(([, d]) => !d.reserved);
   const [key, setKey] = useState(keys[0]?.[0] ?? "");
   const [value, setValue] = useState<number | undefined>(undefined);
+  const label = keys.find(([id]) => id === key)?.[1]?.label ?? key;
 
   const write = async (next: number | null, which = key) => {
-    const out = await api.post("op.tenant.adjust", { tenant: tenant.id, app: app.id, key: which, value: next });
+    const out = await api.post("op.tenant.adjust", { tenant: tenant.id, key: which, value: next });
     if (!out.ok) { notice.fail(out.problem.title); return; }
     notice.ok(next === null ? "Back to the plan's own number." : `${which} is ${next} for ${tenant.name}.`);
     onDone();
@@ -186,7 +217,7 @@ function AdjustTray({ tenant, app, held, onDone }: {
   return (
     <Tray
       trigger={<Button variant="ghost">Adjust</Button>}
-      title={`${app.name} for ${tenant.name}`}
+      title={`What ${tenant.name} gets`}
       actions={
         <Button
           slot="close"
@@ -208,18 +239,157 @@ function AdjustTray({ tenant, app, held, onDone }: {
               key={id}
               label={def.label}
               under={id === key ? "changing this one" : undefined}
-              amount={held.adjustments[id] === undefined ? "—" : String(held.adjustments[id])}
-              aside={held.adjustments[id] === undefined
+              amount={tenant.adjustments[id] === undefined ? "—" : String(tenant.adjustments[id])}
+              aside={tenant.adjustments[id] === undefined
                 ? <Button variant="ghost" onPress={() => setKey(id)}>Change</Button>
                 : <Button variant="ghost" onPress={() => void write(null, id)}>Clear</Button>}
             />
           ))}
         </Group>
         <NumberInput
-          label={`New number for ${app.entitlements[key]?.label ?? key}`}
+          label={`New number for ${label}`}
           value={value}
           onChange={setValue}
           help="Absolute, either direction. -1 is unlimited."
+        />
+      </Stack>
+    </Tray>
+  );
+}
+
+/**
+ * WHAT THIS WORKSPACE HOLDS, AND WHAT WE CAN PUT INTO IT.
+ *
+ * ⚠️ THE OPERATOR COULD ADJUST WHAT A WORKSPACE MAY DO AND COULD NOT SEE WHAT IT
+ * HAD. Every support conversation about credits starts with "how many do they
+ * have and where did they go", and answering it meant reading the database by
+ * hand — so the console's one billing power changed a number nobody on this side
+ * could look at.
+ *
+ * ⚠️ IT IS LOADED SEPARATELY FROM THE LIST, deliberately. `op.tenants` draws
+ * every workspace on the deployment; putting a wallet, a statement and a
+ * standing instruction on each of those rows is three more queries per workspace
+ * for a screen that shows none of them.
+ */
+function Money({ tenant }: { readonly tenant: TenantLine }) {
+  const of = useLoad<MoneyLine>("op.tenant.money", { tenant: tenant.id });
+
+  if (of.of.status !== "ready") {
+    return (
+      <Group label="Wallet">
+        <RowsWaiting rows={2} />
+      </Group>
+    );
+  }
+  const { wallet, auto, statement } = of.of.data;
+
+  return (
+    <>
+      <Group label="Wallet">
+        {/* ⚠️ THE TWO BALANCES, because one figure that drops on the first of
+            the month is a support conversation every month for ever. */}
+        <AmountRow
+          label="This month's allowance"
+          under="Ends when the month does"
+          amount={<Credits value={wallet.granted} as="inline" />}
+        />
+        <AmountRow
+          label="Credits they bought"
+          under="Never expires"
+          amount={<Credits value={wallet.bought} as="inline" />}
+        />
+        {wallet.owedMilli > 0 ? (
+          <AmountRow
+            tone="warning"
+            label="Owed"
+            under={wallet.owing
+              ? "The workspace is read-only until this clears"
+              : "Collected on the next sweep"}
+            amount={<Credits value={Math.ceil(wallet.owedMilli / 1000)} as="inline" />}
+          />
+        ) : null}
+        {/* ⚠️ AND WHY A STANDING CHARGE LAST FAILED. It is the answer to the
+            question the customer is about to ask, and nobody was present when
+            the bank gave it. */}
+        {auto.error ? (
+          <AmountRow
+            tone="warning"
+            label={auto.error}
+            under="Their standing top-up did not go through"
+            amount={<Credits value={auto.below} as="inline" />}
+          />
+        ) : null}
+        <ControlRow label="Give them credits" under="Lands where a purchase does, and never expires">
+          <CompTray tenant={tenant} onDone={of.again} />
+        </ControlRow>
+      </Group>
+
+      {statement.length > 0 ? (
+        <Group label="Recent movements">
+          {statement.slice(0, 10).map((m, i) => (
+            <AmountRow
+              key={`${m.at}-${i}`}
+              label={m.reason}
+              under={new Date(m.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              amount={<Credits value={m.delta} as="inline" signed />}
+            />
+          ))}
+        </Group>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * CREDITS PUT IN BY US.
+ *
+ * ⚠️ THE REASON IS REQUIRED, AND IT GOES ON THE STATEMENT THE CUSTOMER READS.
+ * This is the only write in the system that adds money with no payment behind
+ * it, and a balance that moved with nothing explaining it is the one thing
+ * nobody can reconstruct.
+ *
+ * ⚠️ AND IT ONLY EVER ADDS. Taking credits back is a refund decision with a
+ * payment behind it, not an operator's edit — a control that could do both is
+ * one where a mistyped sign empties somebody's wallet.
+ */
+function CompTray({ tenant, onDone }: {
+  readonly tenant: TenantLine;
+  readonly onDone: () => void;
+}) {
+  const [credits, setCredits] = useState<number | undefined>(undefined);
+  const [why, setWhy] = useState("");
+
+  const give = async () => {
+    const out = await api.post("op.tenant.comp", { tenant: tenant.id, credits, why });
+    if (!out.ok) { notice.fail(out.problem.title); return; }
+    notice.ok(`${credits} credits added for ${tenant.name}.`);
+    setCredits(undefined);
+    setWhy("");
+    onDone();
+  };
+
+  return (
+    <Tray
+      trigger={<Button variant="ghost">Give credits</Button>}
+      title={`Give credits to ${tenant.name}`}
+      actions={
+        <Button
+          slot="close"
+          variant="primary"
+          isDisabled={!(credits && credits > 0) || !why.trim()}
+          onPress={() => void give()}
+        >
+          Give them
+        </Button>
+      }
+    >
+      <Stack space="roomy">
+        <NumberInput label="Credits" value={credits} min={1} onChange={setCredits} />
+        <TextInput
+          label="Why"
+          value={why}
+          onChange={setWhy}
+          help="This is what they will read on their own statement."
         />
       </Stack>
     </Tray>

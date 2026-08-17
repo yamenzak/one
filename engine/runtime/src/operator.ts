@@ -33,6 +33,7 @@ import { apply, plan, resources, wanted } from "./resources.js";
 import { beginMove } from "./move.js";
 import { actionsOf, bind, bindingsOf, running } from "./ai-actions.js";
 import { MEMBERSHIP, adjust, subscriptionFor } from "./billing.js";
+import { autoTopUpOf, movements, spentByApp, topUp, walletOf } from "./wallet.js";
 import {
   addShard, appsOfTenant, commercialAllowance, commercialLeft, disableApp, enableApp,
   liveAppsOfTenant, setCommercialGrant, shards, tenantById, tenantBySlug,
@@ -235,6 +236,70 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
            no product — see `MEMBERSHIP`. */
         await adjust(ctx.directory, tenantId, MEMBERSHIP, key, value, ctx.now);
         return { tenant: tenantId, key };
+      },
+    },
+
+    /**
+     * WHAT ONE WORKSPACE HOLDS AND HOW IT SPENT IT.
+     *
+     * ⚠️ THE OPERATOR COULD ADJUST WHAT A WORKSPACE MAY DO AND COULD NOT SEE
+     * WHAT IT HAD. Every support conversation about credits starts with "how
+     * many do they have and where did they go", and answering it meant reading
+     * the database by hand — so the console's one billing power was to change a
+     * number nobody on this side could look at.
+     *
+     * ⚠️ AND IT IS A READ. Moving the balance is `op.tenant.comp`, deliberately
+     * separate: looking at somebody's account and putting money into it are
+     * different acts, and the second one leaves a row.
+     */
+    "op.tenant.money": {
+      kind: "read", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const tenantId = String(input.tenant ?? "") as TenantId;
+        if (!tenantId) return ctx.fail("platform.invalid");
+
+        return {
+          wallet: await walletOf(ctx.directory, tenantId),
+          auto: await autoTopUpOf(ctx.directory, tenantId),
+          /* ⚠️ THE STATEMENT, because "where did my credits go" is the question
+             this screen exists to answer and a balance alone cannot. */
+          statement: await movements(ctx.directory, tenantId),
+          spent: await spentByApp(
+            ctx.directory, tenantId,
+            new Date(ctx.now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+        };
+      },
+    },
+
+    /**
+     * CREDITS PUT INTO A WORKSPACE'S WALLET BY US.
+     *
+     * ⚠️ IT LANDS IN `bought`, NEVER IN THE ALLOWANCE. A comp that landed in the
+     * month's grant would be swept away by the next renewal — so an apology for
+     * something we broke would expire on the first of the month, silently, which
+     * is worse than not having made it.
+     *
+     * ⚠️ AND THE REASON IS REQUIRED AND GOES ON THE STATEMENT. A balance that
+     * moved with nothing explaining it is the one thing nobody can reconstruct,
+     * and this is the only write in the system that adds money without a payment
+     * behind it.
+     *
+     * ⚠️ IT ONLY EVER ADDS. Taking credits back is a refund decision with a
+     * payment behind it, not an operator's edit — and a route that could do both
+     * is one where a mistyped sign empties somebody's wallet.
+     */
+    "op.tenant.comp": {
+      kind: "write", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const tenantId = String(input.tenant ?? "") as TenantId;
+        const credits = Math.trunc(Number(input.credits ?? 0));
+        const why = String(input.why ?? "").trim();
+        if (!tenantId || !(credits > 0) || !why) return ctx.fail("platform.invalid");
+
+        await topUp(ctx.directory, tenantId, credits, why, {}, ctx.now);
+        return { tenant: tenantId, credits };
       },
     },
 

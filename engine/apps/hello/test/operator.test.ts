@@ -193,6 +193,56 @@ describe("what the console can change", () => {
     expect(cleared.items.find((t) => t.slug === "eastgate")!.adjustments).toEqual({});
   });
 
+  /*
+    ⚠️ THE CONSOLE COULD ADJUST WHAT A WORKSPACE MAY DO AND COULD NOT SEE WHAT IT
+    HAD. Every support conversation about credits starts with "how many do they
+    have and where did they go", and answering it meant reading the database by
+    hand.
+  */
+  it("shows what a workspace holds, and what it spent", async () => {
+    const tenant = (await tenantBySlug(directory(), "eastgate"))!;
+    const said = await (await get(
+      "admin", `/api/op.tenant.money?tenant=${tenant.id}`, ops)).json() as {
+        wallet: { granted: number; bought: number };
+        statement: { reason: string; delta: number }[];
+      };
+    expect(said.wallet).toMatchObject({ granted: 0, bought: 0 });
+    expect(said.statement).toEqual([]);
+  });
+
+  /*
+    ⚠️ A COMP LANDS WHERE A PURCHASE DOES, NEVER IN THE ALLOWANCE. In the
+    allowance it would be swept away by the next renewal — so an apology for
+    something we broke would expire on the first of the month, silently, which
+    is worse than not having made it.
+
+    ⚠️ AND THE REASON IS REQUIRED, because this is the only write in the system
+    that adds money with no payment behind it. A balance that moved with nothing
+    explaining it is the one thing nobody can reconstruct.
+  */
+  it("gives credits that survive a renewal, and refuses a comp with no reason", async () => {
+    const tenant = (await tenantBySlug(directory(), "eastgate"))!;
+
+    expect((await post("admin", "/api/op.tenant.comp",
+      { tenant: tenant.id, credits: 500 }, ops)).status).toBe(400);
+    expect((await post("admin", "/api/op.tenant.comp",
+      { tenant: tenant.id, credits: 0, why: "sorry" }, ops)).status).toBe(400);
+
+    expect((await post("admin", "/api/op.tenant.comp",
+      { tenant: tenant.id, credits: 500, why: "The outage on the 14th" }, ops)).status).toBe(200);
+
+    const said = await (await get(
+      "admin", `/api/op.tenant.money?tenant=${tenant.id}`, ops)).json() as {
+        wallet: { granted: number; bought: number };
+        statement: { reason: string; delta: number }[];
+      };
+    /* ⚠️ In `bought`, never in `granted`. */
+    expect(said.wallet).toMatchObject({ granted: 0, bought: 500 });
+    /* ⚠️ And on the statement the CUSTOMER reads, in the operator's own words. */
+    expect(said.statement.some((m) => m.reason === "The outage on the 14th" && m.delta === 500))
+      .toBe(true);
+  });
+
   /* ⚠️ A switch nothing declares is a switch that does nothing — refused, or
      the console fills with rows that lie. */
   it("switches a declared flag and refuses one nothing declares", async () => {

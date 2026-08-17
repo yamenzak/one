@@ -167,6 +167,8 @@ live inside workspaces and an operator stands outside all of them.
 |---|---|
 | `op.tenants` | read |
 | `op.tenant.adjust` | write |
+| `op.tenant.money` | read |
+| `op.tenant.comp` | write |
 | `op.tenant.app` | write |
 | `op.account.commercial` | write |
 | `op.config` | read |
@@ -585,6 +587,8 @@ its own header, cited by other files, and doing nothing.
 | `every-key-a-product-declares-is-priced-by-every-tier` | D1 | a feature built, shipped and sold to nobody - an unpriced key resolves to off for every workspace on every tier, and no screen anywhere says why |
 | `the-lobby-is-free-and-cannot-be-bought` | D21 | a workspace charged for the parking state it never chose, or offered it at checkout as though not having a plan were a plan |
 | `one-catalogue-one-currency` | D1 | two tiers priced in different currencies and a bill that adds them together |
+| `a-comp-survives-the-next-renewal` | D18 | an apology for something we broke expiring on the first of the month, silently - and a balance that moved with nothing on the statement explaining it |
+| `the-operator-can-see-what-a-workspace-holds` | D18 | a console that can change a customer's balance and cannot read it, so every support conversation about credits starts by opening the database |
 | `the-two-balances-say-which-one-lapses` | D1 | one figure that drops on the first of the month with nothing saying why - a support conversation every month for ever |
 | `a-hold-is-shown-rather-than-quietly-subtracted` | D12 | a balance that disagrees with what can actually be spent, discovered at the moment of a refusal |
 | `a-standing-charge-can-be-turned-off-where-it-is-armed` | D12 | an operation that charges a card on a schedule and no surface that reaches it - the failure this framework is built around, on the one feature where it costs money |
@@ -809,7 +813,7 @@ its own header, cited by other files, and doing nothing.
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
 | D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 4 |
 | D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 4 |
-| D18 | The operator stands outside every workspace, and the console is a door rather than a role | 4 |
+| D18 | The operator stands outside every workspace, and the console is a door rather than a role | 6 |
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 3 |
 | D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 3 |
 | D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 8 |

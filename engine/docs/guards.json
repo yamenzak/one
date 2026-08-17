@@ -651,6 +651,24 @@
       "fails": "two tiers priced in different currencies and a bill that adds them together"
     },
     {
+      "id": "a-comp-survives-the-next-renewal",
+      "protects": "D18",
+      "stage": "6",
+      "status": "live",
+      "impl": "apps/hello/test/operator.test.ts",
+      "proves": "gives credits that survive a renewal, and refuses a comp with no reason",
+      "fails": "an apology for something we broke expiring on the first of the month, silently - and a balance that moved with nothing on the statement explaining it"
+    },
+    {
+      "id": "the-operator-can-see-what-a-workspace-holds",
+      "protects": "D18",
+      "stage": "6",
+      "status": "live",
+      "impl": "apps/hello/test/operator.test.ts",
+      "proves": "shows what a workspace holds, and what it spent",
+      "fails": "a console that can change a customer's balance and cannot read it, so every support conversation about credits starts by opening the database"
+    },
+    {
       "id": "the-two-balances-say-which-one-lapses",
       "protects": "D1",
       "stage": "6",
