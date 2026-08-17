@@ -14,7 +14,9 @@ import { DRAIN_DAYS, type AppSpec } from "@engine/kernel";
 import { applySchema } from "../src/schema.js";
 import type { Db } from "../src/sql.js";
 import type { Account } from "../src/cloudflare.js";
-import { RESOURCE_SCHEMA, apply, observe, resources } from "../src/resources.js";
+import {
+  RESOURCE_SCHEMA, apply, bindingKey, liveBindings, observe, resources,
+} from "../src/resources.js";
 
 const db = () => env.DIRECTORY as unknown as Db;
 
@@ -242,5 +244,40 @@ describe("what the deployment makes for itself", () => {
     await apply(on);
     expect(cf.made).toHaveLength(1);
     expect((await resources(db()))[0]?.state).toBe("bound");
+  });
+});
+
+/*
+  ⚠️ TWO JURISDICTIONS, TWO BUCKETS, AND THE LOOKUP HAS TO TELL THEM APART. This
+  is the failure the whole residency design exists against, and it is invisible:
+  both buckets work, both uploads succeed, and one workspace's files are simply
+  in the wrong regime — discovered by a regulator or by nobody.
+*/
+describe("resolving a binding when the deployment serves more than one", () => {
+  beforeEach(async () => { await applySchema(db(), [RESOURCE_SCHEMA]); });
+
+  it("keeps one residency's resource distinct from another's", async () => {
+    const cf = cloudflare();
+    const covers = {
+      media: { id: "media", kind: "r2" as const, holds: "none" as const,
+        why: "files", perResidency: true },
+    };
+    await apply({
+      directory: db(), at: cf.at, deployment: "one",
+      apps: [app(covers)], serves: ["eu", "global"],
+    });
+    expect(cf.made.map((m) => m.name).sort())
+      .toEqual(["one-hello-r2-media-eu", "one-hello-r2-media-global"]);
+
+    /* Both are bound and, on the next boot, both are live. */
+    const seen = { HELLO_MEDIA_EU: { it: "eu" }, HELLO_MEDIA_GLOBAL: { it: "global" } };
+    await observe(db(), seen);
+
+    const live = await liveBindings(db(), seen);
+    /* ⚠️ TWO ENTRIES, NOT ONE. Keyed without the residency both rows collapse
+       onto `hello:media` and whichever is read last wins for everybody. */
+    expect(live.size).toBe(2);
+    expect(live.get(bindingKey("hello", "media", "eu"))).toEqual({ it: "eu" });
+    expect(live.get(bindingKey("hello", "media", "global"))).toEqual({ it: "global" });
   });
 });

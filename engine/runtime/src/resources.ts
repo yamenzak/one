@@ -388,10 +388,24 @@ export async function liveBindings(
   for (const row of await resources(db)) {
     if (row.state !== "live") continue;
     const held = env[row.binding];
-    if (held !== undefined) out.set(`${row.appId}:${row.needId}`, held);
+    if (held !== undefined) out.set(bindingKey(row.appId, row.needId, row.residency), held);
   }
   return out;
 }
 
-/** ⚠️ Residency is in the ADDRESSING: the EU workspace resolves the EU bucket. */
-export const bindingKey = (appId: string, needId: string): string => `${appId}:${needId}`;
+/**
+ * ⚠️ THE RESIDENCY IS PART OF THE KEY, AND LEAVING IT OUT WAS A REAL BUG. A
+ * `perResidency` need is one row per jurisdiction and every one of them carries
+ * the SAME need id — so keyed on `app:need` alone, two rows collapse onto one
+ * entry and whichever is read last wins for everybody. An EU workspace then
+ * resolves the global bucket: both work, both uploads succeed, and one
+ * workspace's files are simply in the wrong regime, discovered by a regulator or
+ * by nobody.
+ *
+ * ⚠️ IT WAS INVISIBLE WITH ONE JURISDICTION, which is exactly why it had to be
+ * found before a second one exists rather than after. A deployment serving only
+ * `eu` has one row, the collision cannot happen, and every test passes.
+ */
+export const bindingKey = (
+  appId: string, needId: string, residency: string | null = null,
+): string => `${appId}:${needId}:${residency ?? "any"}`;

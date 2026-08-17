@@ -184,6 +184,28 @@ if (/destroy\([^)]*listRemote/.test(res) || !/for \(const row of await resources
   ok("infra: only what the deployment recorded making is ever destroyed");
 }
 
+/*
+  ⚠️ THE RESIDENCY IS PART OF A BINDING'S KEY, AND IT WAS NOT. A `perResidency`
+  need is one row per jurisdiction and every one carries the SAME need id — so
+  keyed on `app:need` alone, two rows collapse onto one entry and whichever is
+  read last wins for everybody. An EU workspace then resolves the global bucket:
+  both work, both uploads succeed, and one workspace's files are in the wrong
+  regime, found by a regulator or by nobody.
+
+  ⚠️ IT WAS INVISIBLE WITH ONE JURISDICTION, which is why it is checked
+  structurally rather than left to the day a second one is added.
+*/
+if (!/bindingKey = \(\s*appId: string, needId: string, residency/.test(res)) {
+  fail("infra: bindingKey does not take a residency — two `perResidency` rows "
+    + "then collapse onto one entry and a workspace resolves another "
+    + "jurisdiction's store, with both working and nothing reporting it");
+} else if (!/out\.set\(bindingKey\(row\.appId, row\.needId, row\.residency\)/.test(res)) {
+  fail("infra: liveBindings does not key by residency — the map is built without "
+    + "the one field that tells two jurisdictions' resources apart");
+} else {
+  ok("infra: a binding is keyed by its jurisdiction, so two cannot collapse into one");
+}
+
 console.log(bad
   ? `\ninfra: ${bad} bound on the account token is missing.`
   : "\ninfra: the deployment provisions itself, and the token cannot repoint what exists.");

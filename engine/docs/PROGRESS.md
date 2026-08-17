@@ -726,7 +726,7 @@ The guard registry, its checks, and the standards that bind them.
 | D3 | One worker on the request path; heavy work splits over RPC service bindings | 6 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 13 |
-| D6 | Jurisdiction is a workspace fact, derived from the business's country | 4 |
+| D6 | Jurisdiction is a workspace fact, derived from the business's country | 5 |
 | D7 | HeroUI v3 is the component layer, and its components are not restyled | 57 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
@@ -962,6 +962,7 @@ the library decides FOR us.
 | `a-move-verifies-both-sides-before-it-flips` | D5 | flipping onto a copy with rows missing, after which the intact source is never consulted again |
 | `a-moved-source-drains-before-it-is-cleared` | D5 | a move emptying its source, unrecoverable the moment the copy turns out to have been wrong |
 | `what-moves-is-what-erasure-takes` | D12 | a second list of a workspace's tables, so a moved workspace arrives without its roster while every row that did copy is reported successfully |
+| `a-binding-is-keyed-by-its-jurisdiction` | D6 | two per-residency resources collapsing onto one key, so a workspace resolves another jurisdiction's store — both working, and nothing reporting it |
 <!-- /generated -->
 
 ## Commands

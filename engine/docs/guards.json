@@ -1864,6 +1864,15 @@
       "impl": "runtime/src/move.ts",
       "proves": "carried",
       "fails": "a second list of a workspace's tables, so a moved workspace arrives without its roster while every row that did copy is reported successfully"
+    },
+    {
+      "id": "a-binding-is-keyed-by-its-jurisdiction",
+      "protects": "D6",
+      "stage": "36",
+      "status": "live",
+      "impl": "runtime/src/resources.ts",
+      "proves": "bindingKey(row.appId, row.needId, row.residency)",
+      "fails": "two per-residency resources collapsing onto one key, so a workspace resolves another jurisdiction's store — both working, and nothing reporting it"
     }
   ]
 }

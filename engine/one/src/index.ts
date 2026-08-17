@@ -17,7 +17,7 @@
  */
 
 import type { AccountId, AppSpec, DeploymentLegal, Door, Residency, TenantId } from "@engine/kernel";
-import { subProcessor, under } from "@engine/kernel";
+import { MEDIA_NEED, subProcessor, under } from "@engine/kernel";
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
   NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, acceptanceScope,
@@ -53,15 +53,21 @@ const APPS: Readonly<Record<string, () => AppSpec>> = {
  * would let a shard be registered and unchecked — which is precisely the state
  * whoever signed in first would discover.
  */
-const SHARDS = ["eu-1"] as const;
+const SHARDS = [{ id: "eu-1", where: "eu" }] as const satisfies
+  readonly { id: string; where: Residency }[];
 
 /**
- * ⚠️ WHICH JURISDICTIONS THIS DEPLOYMENT ACTUALLY PROMISES, derived from the
- * shards it binds. It is what decides whether a queue carrying somebody's name
- * is a broken promise or an ordinary queue — see `refuseNeeds`. Written beside
- * `SHARDS` because the two are one fact: a shard IS a jurisdiction.
+ * ⚠️ DERIVED, BECAUSE A SHARD *IS* A JURISDICTION. This was a second list beside
+ * `SHARDS` — and two parallel lists is the pattern this repository keeps having
+ * to fix: a shard added to one and forgotten in the other reports the wrong
+ * residency for every workspace on it, which decides whether a queue carrying
+ * somebody's name is a broken promise or an ordinary queue.
  */
-const SHARD_RESIDENCY: readonly Residency[] = ["eu"];
+const SHARD_RESIDENCY: readonly Residency[] = [...new Set(SHARDS.map((s) => s.where))];
+
+/** Which jurisdiction one shard is in. One lookup, one source. */
+const residencyOf = (shardId: string): Residency | undefined =>
+  SHARDS.find((s) => s.id === shardId)?.where;
 
 /**
  * ⚠️ THE SERVICE BINDINGS SOMETHING ACTUALLY REACHES. Empty is the honest answer
@@ -217,8 +223,11 @@ let live: ReadonlyMap<string, unknown> = new Map();
  */
 const bucketIn = (residency: string | undefined): Bucket | null => {
   for (const appId of Object.keys(APPS)) {
-    const held = live.get(bindingKey(appId, `media-${residency ?? "global"}`))
-      ?? live.get(bindingKey(appId, "media"));
+    /* ⚠️ THE EXACT KEY, WITH NO FALLBACK ACROSS JURISDICTIONS. A fallback is
+       what turns "we have no bucket here" into "here is one from somewhere
+       else" — and the second is a file in the wrong regime that nothing
+       reports. A miss is the honest answer, and every caller refuses on it. */
+    const held = live.get(bindingKey(appId, MEDIA_NEED, residency ?? null));
     if (held) return held as Bucket;
   }
   return null;
@@ -260,7 +269,7 @@ const boot = (env: Env): Promise<void> => {
       the FIRST new workspace lands on it and every request it makes answers
       "no such table". One list, walked.
     */
-    for (const id of SHARDS) {
+    for (const { id } of SHARDS) {
       await applySchema(shardFor(env as never, id), [
         ...Object.values(APPS).map((make) => schemaFor(make())),
         ...SHARD_MODULES,
@@ -273,8 +282,8 @@ const boot = (env: Env): Promise<void> => {
       is RIGHT THERE, bound and migrated. Both writes are upserts, so a
       thousand cold starts write what one did.
     */
-    for (const id of SHARDS) await addShard(directory, id, "eu", 10_000);
-    for (const shard of SHARDS) {
+    for (const { id, where } of SHARDS) await addShard(directory, id, where, 10_000);
+    for (const { id: shard } of SHARDS) {
       for (const id of Object.keys(APPS)) await noteShardApp(directory, shard, id as never);
     }
 
@@ -302,7 +311,7 @@ const boot = (env: Env): Promise<void> => {
 
     for (const fault of deploymentFaults({
       env,
-      shards: [...SHARDS],
+      shards: SHARDS.map((s) => s.id),
       apps: Object.values(APPS).map((make) => make()),
       used: SERVICES_REACHED,
       /* ⚠️ EVERYTHING THIS DEPLOYMENT APPLIES, so "is every table in the erasure
@@ -631,7 +640,7 @@ export default {
           apps: APPS,
           /* ⚠️ Retention is a rule about rows: one statement per table per
              database, not one per workspace. */
-          shards: SHARDS.map((id) => shardFor(env as never, id)),
+          shards: SHARDS.map((s) => shardFor(env as never, s.id)),
           /* ⚠️ So the last rung takes the OBJECTS and not only the rows. */
           bucketFor: (where) => bucketIn(where.residency),
           /* ⚠️ BY ID, because a move's TARGET shard has no workspace on it yet
@@ -639,8 +648,7 @@ export default {
           shardById: (id) => {
             try { return shardFor(env as never, id); } catch { return null; }
           },
-          residencyOf: (id) => (SHARDS as readonly string[]).includes(id)
-            ? SHARD_RESIDENCY[0] : undefined,
+          residencyOf,
           /* ⚠️ ONLY WHERE THERE IS A TOKEN. Absent is a deployment that cannot
              provision, which is a state it has to survive rather than an error
              — a self-host, a test run, and this one before the secret is set. */
