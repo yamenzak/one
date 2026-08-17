@@ -161,12 +161,12 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 |---|---|---|
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 56 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | internal |
-| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 49 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 114 |
+| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 48 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 116 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 51 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**309 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**310 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -180,7 +180,7 @@ there is no deep import, and a guard says so.
 
 ### `frame/`
 
-- `frame/arrival.tsx` — `Arrival`, `AsideRoute`, `Mark`, `MarkOf`, `MarkSize`
+- `frame/arrival.tsx` — `Arrival`, `AsideRoute`, `Mark`, `MarkSize`
 - `frame/chrome.tsx` — `Docked`, `Island`
 - `frame/crown.tsx` — `Crown`, `CrownClaim`, `crownFor`, `CrownProps`, `CrownSocketProvider`, `LeaveChip`, `PageCrown`, `Slot`, `useCrownSocket`
 - `frame/overlay.tsx` — `Confirm`, `Dialog`, `Menu`, `MenuItem`, `notice`, `NoticeHost`, `Over`, `Peek`, `Tray`
@@ -198,6 +198,7 @@ there is no deep import, and a guard says so.
 - `parts/heads.tsx` — `Balance`, `distinguishing`, `Figure`, `Prose`, `Section`, `SectionTitle`, `Title`
 - `parts/listing.tsx` — `Col`, `Listing`, `ListingProps`, `Paged`
 - `parts/logo.tsx` — `Lockup`, `LockupProps`
+- `parts/pick-file.tsx` — `PickFile`, `PickFileProps`
 - `parts/state.tsx` — `Await`, `AwaitProps`, `ChartWaiting`, `FigureWaiting`, `FormWaiting`, `Loaded`, `Nothing`, `nothingIn`, `ready`, `RowsWaiting`, `TableWaiting`, `TextWaiting`, `TilesWaiting`, `trouble`, `Trouble`, `waiting`, `Working`
 - `parts/surfaces.tsx` — `ActionRow`, `AmountRow`, `BrandTile`, `ControlRow`, `CopyRow`, `FieldRow`, `Group`, `GroupProps`, `Identity`, `Money`, `NavRow`, `NavRowProps`, `NoteRow`, `OfferRow`, `PersonRow`, `Place`, `QuickActions`, `SeeAll`, `Sheet`, `StepRow`, `Swatch`, `TileGrid`, `ToggleRow`
 - `parts/tally.tsx` — `Tally`, `TallyProps`

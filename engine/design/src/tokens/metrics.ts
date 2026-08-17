@@ -336,6 +336,14 @@ export const GUTTER = "px-4 md:px-6" as const;
 export const SCROLL_GUTTER = "scroll-pl-4 md:scroll-pl-6" as const;
 
 /** Above and below a band's content. */
+/**
+ * ⚠️ A DROP TARGET IS TALLER THAN A CARD, AND THAT IS THE POINT OF IT. It has to
+ * read as somewhere to aim at from across the page while a file is under the
+ * cursor — a control padded like a row is one a person misses and drops onto the
+ * document behind, which navigates away to the file.
+ */
+export const DROP_PAD = "px-6 py-8" as const;
+
 export const BAND_PAD = "py-6" as const;
 
 /**

@@ -131,8 +131,25 @@ for (const doc of owed.json?.documents ?? []) {
 
 /* -------------------------------------------------------------- the shots --- */
 
+/* ⚠️ A BUSINESS, BECAUSE THE BRAND SCREEN IS COMMERCIAL-ONLY. A personal
+   workspace is photographed as the offer to become one, which is the other half
+   of the same screen and worth seeing. */
+/* ⚠️ THROUGH THE OPERATOR DOOR, WHICH IS THE ONLY ROUTE WITHOUT A PAYMENT — and
+   in development an empty operator allow-list means the signed-in developer.
+   Comping it here is what the gate is FOR: a business is a plan or an operator's
+   decision, and a screenshot tool must not be a third way. */
+const comped = await call("admin.localhost", "/api/op.account.commercial", {
+  email: EMAIL, granted: 1,
+}, cookie);
+console.log("  commercial allowance:", comped.status);
+const business = await call("id.localhost", "/api/me.tenant.commercial", {
+  slug: SLUG, legalName: "Northwind Strength GmbH",
+}, cookie);
+console.log("  became a business:", business.status, JSON.stringify(business.json).slice(0, 160));
+
 const SHOTS = [
   { id: "door-signin", host: "id.localhost", path: "/", auth: false },
+  { id: "brand", host: `${SLUG}.localhost`, path: `/space/w/${SLUG}/brand`, auth: true },
   { id: "door-setup", host: "setup.localhost", path: "/", auth: false },
   { id: "elsewhere-crown", host: "nowhere.localhost", path: "/", auth: true },
   { id: "space-home", host: "id.localhost", path: "/space", auth: true },
@@ -158,8 +175,17 @@ for (const scheme of ["dark", "light"]) {
       reducedMotion: "reduce",
     });
     if (shot.auth) {
+      /* ⚠️ THE COOKIE IS CARRIED TO EVERY DOOR BY HAND, and that is a real
+         difference from production rather than a shortcut. A `Domain=localhost`
+         cookie is refused by browsers, so each `*.localhost` has its own jar —
+         production issues one for the whole root and one sign-in covers every
+         door. Without this, following a link from the account door to a
+         workspace lands on that workspace's sign-in page. */
       const [name, value] = cookie.split("=");
-      await c.addCookies([{ name, value, domain: shot.host, path: "/" }]);
+      await c.addCookies([
+        { name, value, domain: shot.host, path: "/" },
+        { name, value, domain: `${SLUG}.localhost`, path: "/" },
+      ]);
     }
     const p = await c.newPage();
     p.on("console", (m) => { if (m.type() === "error") console.log(` [page:${shot.id}]`, m.text().slice(0, 160)); });

@@ -153,6 +153,11 @@ export const HOLDINGS: readonly HeldBy[] = [
       why: "closing leaves a tombstone so the address stays taken rather than becoming somebody else's" } },
   { table: "tenant_app", person: [], why: "which products a workspace enabled", workspace: its() },
   { table: "tenant_branding", person: [], why: "a workspace's own theme", workspace: its() },
+  /* ⚠️ THE PICTURE, AND IT IS THE WORKSPACE'S RATHER THAN THE UPLOADER'S. Whose
+     logo it is does not change when the person who uploaded it leaves — so it is
+     not a personal holding, and erasing them must not take a business's mark off
+     its own staff's home screens. It goes when the workspace does. */
+  { table: "tenant_icon", person: [], why: "a workspace's own logo", workspace: its() },
   { table: "billing_account", person: [], why: "a workspace's own account with us", workspace: its() },
   { table: "subscription", person: [], why: "a workspace's own plan", workspace: its() },
   /* ⚠️ Ours is a working copy; the money's own record is at the payment

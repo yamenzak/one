@@ -16,7 +16,7 @@ import * as React from "react";
 import { Button } from "@heroui/react";
 import { field, mayBrand, type Kind, type Problem, type Theme } from "@engine/kernel";
 import {
-  BrandTile, Center, EditRow, Group, Row, Screen, Stack, TextInput, ToggleRow,
+  BrandTile, Center, EditRow, Group, PickFile, Row, Screen, Stack, TextInput, ToggleRow,
   notice, ready,
 } from "@engine/design";
 import { api } from "../api.js";
@@ -51,6 +51,9 @@ interface BrandAnswer {
     readonly ourMark?: boolean;
   } | null;
   readonly surfaces: readonly string[];
+  /** ⚠️ Whether there is one and how big — never the bytes, which the browser
+      is already caching from `/icon.png`. */
+  readonly icon: { readonly width: number; readonly bytes: number } | null;
 }
 
 /**
@@ -115,6 +118,45 @@ export function Editor({ name, slug, answer, again }: {
   const [surfaces, setSurfaces] = React.useState<readonly string[]>(
     answer.branding?.surfaces ?? [],
   );
+  const [icon, setIcon] = React.useState(answer.icon ?? null);
+  const [sending, setSending] = React.useState(false);
+
+  /*
+    ⚠️ THE BYTES GO AS THE BODY, NOT INSIDE JSON. Base64 in a field would be a
+    third larger and would have to be decoded before anything could look at the
+    file's own header — and the header is what says whether this is a PNG at all,
+    which is the one thing a `content-type` from a browser cannot be trusted for.
+
+    ⚠️ AND THE PREVIEW IS CACHE-BUSTED BY THE NEW SIZE. `/icon.png` is served
+    with five minutes of caching, which is right for every visitor and wrong for
+    the one person who has just changed it — they would upload a logo and watch
+    the old one stay.
+  */
+  const upload = async (bytes: ArrayBuffer): Promise<void> => {
+    setSending(true);
+    const out = await api.post<{ icon: { width: number; bytes: number } }>(
+      "brand.icon", bytes, { contentType: "image/png" });
+    setSending(false);
+    if (!out.ok) {
+      /* ⚠️ THE FIELD SENTENCE IF THERE IS ONE — `setIcon` answers six different
+         refusals and each is a different thing to do next. */
+      notice.fail(out.problem.fields?.icon ?? out.problem.title);
+      return;
+    }
+    setIcon(out.value.icon);
+    notice.ok("Saved.");
+    again();
+  };
+
+  const clear = async (): Promise<void> => {
+    setSending(true);
+    const out = await api.post("brand.icon", { clear: true });
+    setSending(false);
+    if (!out.ok) return notice.fail(out.problem.title);
+    setIcon(null);
+    notice.ok("Removed.");
+    again();
+  };
 
   /*
     ⚠️ ONE ROW AT A TIME, AND THE SCREEN'S SAVE BUTTON IS GONE WITH IT. It was
@@ -178,13 +220,46 @@ export function Editor({ name, slug, answer, again }: {
           and a hand-written `py-6` inside a `Group` does not. */}
       <Group label="On a home screen" under="What your staff will look for">
         <Center space="roomy">
-          <BrandTile
-            name={name}
-            ground={theme.ground || "#111113"}
-            ink={theme.ink || "#f4f4f5"}
-            glyph={theme.mark}
-          />
+          {/* ⚠️ THE UPLOAD IS SHOWN AS THE TILE, NOT BESIDE IT. A preview that
+              kept drawing the letter while a logo was stored would be a screen
+              disagreeing with the phone it is describing. */}
+          {icon ? (
+            <img
+              src={`/icon.png?v=${icon.bytes}`}
+              alt=""
+              width={96}
+              height={96}
+              className="size-24 rounded-2xl"
+            />
+          ) : (
+            <BrandTile
+              name={name}
+              ground={theme.ground || "#111113"}
+              ink={theme.ink || "#f4f4f5"}
+              glyph={theme.mark}
+            />
+          )}
         </Center>
+
+        {/*
+          ⚠️ THE PICKER IS THE LIBRARY'S — see `PickFile`. It checks the type and
+          the size before a byte is sent, which is the difference between being
+          told your logo is a JPEG now and being told it after an upload; the
+          server checks both again, because a client check is a courtesy.
+        */}
+        <PickFile
+          accept={["image/png"]}
+          most={128 * 1024}
+          says={icon ? "Replace your icon" : "Add your own icon"}
+          under={`A square PNG, ${256}–${1024} pixels a side. PNG only — an SVG can carry script, and this is served from your own address.`}
+          busy={sending}
+          onPick={upload}
+          onClear={icon ? clear : undefined}
+        />
+
+        {/* ⚠️ THE LETTER STAYS, AND IS NOT HIDDEN BEHIND THE UPLOAD. It is what
+            a browser tab shows (the SVG sets it — a Worker has no font), so it
+            is still the mark somebody sees most often. */}
         <EditRow
           spec={MARK}
           name="mark"

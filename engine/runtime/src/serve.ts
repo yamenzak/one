@@ -36,7 +36,8 @@ import type { TenantRow } from "./directory.js";
 import { tenantBySlug } from "./directory.js";
 import { brandingOf } from "./branding.js";
 import { keep } from "./vault.js";
-import { iconSvg, webManifest, type Installable, type Installer } from "./installable.js";
+import { iconPng, iconSvg, webManifest, type Installable, type Installer } from "./installable.js";
+import { iconOf } from "./icon.js";
 import type { Db } from "./sql.js";
 
 /* ------------------------------------------------------------------ seams --- */
@@ -126,8 +127,30 @@ export interface Wiring {
  * a shard, a standing, a plan and a balance that nothing here reads. Asking for
  * all of it would put the whole request path behind an icon.
  */
+/**
+ * WHOSE TILE THIS DOOR WEARS.
+ *
+ * ⚠️ EVERY DOOR HAS ONE, AND THAT IS THE CHANGE. This answered for a workspace
+ * and 404'd everywhere else, so the identity door, the setup door and the
+ * signpost — the first three screens anybody sees — had no favicon and no
+ * manifest at all. A deployment with no icon on its own sign-in page is not a
+ * neutral default; it is a browser drawing a blank page symbol next to our name.
+ *
+ * ⚠️ AND THE DEPLOYMENT'S OWN IS A WORKSPACE-SHAPED ANSWER ON PURPOSE, so the
+ * routes below have one shape to serve rather than two. `personal` is the kind
+ * that wears our mark (`mayBrand`), which is exactly what a door of ours is.
+ */
 async function installableFor(wiring: Wiring, door: Door): Promise<Installable | null> {
-  if (door.kind !== "tenant" || !door.slug || !wiring.installable) return null;
+  if (!wiring.installable) return null;
+
+  if (door.kind !== "tenant" || !door.slug) {
+    /* ⚠️ Not a workspace: ours, with no brand and no upload to consider. */
+    return {
+      name: wiring.installable.name, kind: "personal", branding: null,
+      us: wiring.installable, icon: null,
+    };
+  }
+
   const tenant = await tenantBySlug(wiring.directory, door.slug);
   if (!tenant || tenant.closedAt) return null;
   return {
@@ -135,8 +158,57 @@ async function installableFor(wiring: Wiring, door: Door): Promise<Installable |
     kind: tenant.kind,
     branding: await brandingOf(wiring.directory, tenant.id),
     us: wiring.installable,
+    /* ⚠️ `iconOf` REFUSES A PERSONAL WORKSPACE ITSELF, so a kind that changed
+       after an upload cannot leave a business's mark on a workspace that is no
+       longer that business. */
+    icon: await iconOf(wiring.directory, tenant.id, tenant.kind),
   };
 }
+
+/**
+ * ⚠️ FOUR PATHS, AND THREE OF THEM ARE ASKED FOR BY SOMETHING THAT NEVER READ
+ * OUR HTML. A browser requests `/favicon.ico` on its own when a page declares no
+ * icon, and iOS requests `/apple-touch-icon.png` on its own when a page is added
+ * to a home screen — both before any markup of ours has a say. Serving the PNG
+ * at the names they already ask for is what makes this work on a page we did not
+ * get to edit, which includes every error page and the manifest's own scope.
+ *
+ * ⚠️ `.ico` SERVED AS A PNG IS DELIBERATE AND IS FINE: every browser that asks
+ * for that path sniffs the content type, and none has required the ICO container
+ * for over a decade. The alternative is a second encoder for a format whose only
+ * remaining consumer is a filename.
+ */
+const INSTALLABLE = new Set([
+  "/manifest.webmanifest", "/icon.svg", "/icon.png",
+  "/apple-touch-icon.png", "/favicon.ico",
+]);
+
+/**
+ * IS THIS PATH THE PLATFORM'S, OR THE PAGE'S?
+ *
+ * ⚠️ THE DEPLOYMENT ASKS THIS ONE QUESTION, AND IT EXISTS BECAUSE THE ANSWER WAS
+ * WRITTEN OUT SOMEWHERE ELSE. The worker routed `/api/*`, `/health` and `/mcp`
+ * here and handed everything else to the static assets — so the manifest and the
+ * icon, which are answered a few lines below, were never reached by a single
+ * request. The route was there, the code was there, and a phone asking for the
+ * manifest got `index.html` with a 200 on it.
+ *
+ * ⚠️ THAT IS THE FAILURE SHAPE THIS REPOSITORY IS A CATALOGUE OF: a capability
+ * built, wired and mounted nowhere, with nothing failing anywhere. Deriving the
+ * list from the one place that serves it is what makes adding a path here enough.
+ */
+export const isPlatformPath = (pathname: string): boolean =>
+  pathname.startsWith("/api/") || pathname === "/health" || pathname === "/mcp"
+  || INSTALLABLE.has(pathname);
+
+/**
+ * ⚠️ FIVE MINUTES, AND `public` SO A CDN MAY HOLD IT. An icon is fetched on
+ * every cold start of every tab; it is also the thing somebody changes and then
+ * immediately looks at, so a day would make an upload appear not to have worked.
+ */
+const picture = (type: string): Record<string, string> => ({
+  "content-type": type, "cache-control": "public, max-age=300",
+});
 
 export interface Located {
   readonly tenantId: string;
@@ -232,17 +304,41 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
       personal workspace wears is OURS, and there is no honest way to draw it
       from a hostname — so the absence is a 404 rather than a guess.
     */
-    if (url.pathname === "/manifest.webmanifest" || url.pathname === "/icon.svg") {
-      if (door.kind !== "tenant" || !wiring.installable) {
-        return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
-      }
+    if (INSTALLABLE.has(url.pathname)) {
       const of = await installableFor(wiring, door);
       if (!of) return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
-      return url.pathname === "/icon.svg"
-        ? new Response(iconSvg(of), {
-          headers: { "content-type": "image/svg+xml; charset=utf-8", "cache-control": "public, max-age=300" },
-        })
-        : json(webManifest(of), 200, { "content-type": "application/manifest+json; charset=utf-8" });
+
+      if (url.pathname === "/manifest.webmanifest") {
+        /*
+          ⚠️ THE INSTALLABLE THING IS A WORKSPACE, AND ONLY A WORKSPACE — which
+          is the whole argument of `installable.ts`. A manifest on the setup door
+          would let somebody install a tile that opens the sign-up wizard for
+          ever; on the operator door it would offer a home-screen icon for the
+          console. Both are `start_url: "/"` on a door that is not a place to
+          come back to.
+
+          ⚠️ AN ICON IS THE OPPOSITE QUESTION, WHICH IS WHY IT IS NOT REFUSED
+          HERE. Every door is a page in a browser tab, and the tab draws
+          something whether or not we supply it.
+        */
+        if (door.kind !== "tenant") {
+          return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
+        }
+        return json(webManifest(of), 200,
+          { "content-type": "application/manifest+json; charset=utf-8" });
+      }
+      if (url.pathname === "/icon.svg") {
+        return new Response(iconSvg(of), { headers: picture("image/svg+xml; charset=utf-8") });
+      }
+      /*
+        ⚠️ THE RASTER MAY HONESTLY BE ABSENT — see `rasterOf`. A commercial
+        workspace that has turned our mark off and uploaded nothing gets a 404
+        here rather than our logo on their staff's home screens, and the SVG
+        above still carries their own initial.
+      */
+      const png = await iconPng(of);
+      if (!png) return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
+      return new Response(png, { headers: picture("image/png") });
     }
 
     if (url.pathname === "/mcp") return answerMcp(wiring, request, door, now);

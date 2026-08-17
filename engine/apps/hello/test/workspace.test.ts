@@ -320,13 +320,33 @@ describe("a business's own identity", () => {
     expect((await get(SLUG, "/icon.svg")).status).toBe(200);
   });
 
-  /* ⚠️ AND NOWHERE BUT A WORKSPACE'S OWN DOOR. The setup and operator doors are
-     not places anybody installs from, and a tile served there would be one
-     workspace's brand on the deployment's own address. */
-  it("is not served at the other doors", async () => {
+  /*
+    ⚠️ INSTALLABLE NOWHERE BUT A WORKSPACE'S OWN DOOR. The setup and operator
+    doors are not places anybody comes back to: a manifest there is a tile whose
+    `start_url` opens the sign-up wizard, or the console, for ever.
+  */
+  it("cannot be installed from the setup or operator doors", async () => {
     await asBusiness();
     expect((await get("setup", "/manifest.webmanifest")).status).toBe(404);
-    expect((await get("admin", "/icon.svg")).status).toBe(404);
+    expect((await get("admin", "/manifest.webmanifest")).status).toBe(404);
+  });
+
+  /*
+    ⚠️ AN ICON IS THE OPPOSITE QUESTION, AND THOSE DOORS HAD NONE. Every door is
+    a page in a browser tab and the tab draws something whether or not we supply
+    it — so the first three screens anybody sees carried a blank page symbol
+    beside our name. What must never happen is one workspace's brand on the
+    deployment's own address, and that is what is asserted: the doors wear OURS.
+  */
+  it("gives every other door the deployment's own icon, never a workspace's", async () => {
+    await asBusiness();
+    for (const door of ["setup", "admin", "id"]) {
+      const got = await get(door, "/icon.svg");
+      expect(got.status, `${door}: /icon.svg`).toBe(200);
+      const svg = await got.text();
+      expect(svg, `${door} is wearing a workspace's colour`).not.toContain("#101014");
+      expect(svg, `${door} is wearing a workspace's letter`).not.toContain(">H<");
+    }
   });
 });
 

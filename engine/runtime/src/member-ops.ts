@@ -19,6 +19,7 @@
 import type { Allowance, AppSpec, RoleRegistry, TenantId, Theme } from "@engine/kernel";
 import { PUBLIC, SURFACES, refusePolicy, seatsUsed, withinQuota } from "@engine/kernel";
 import { brandingOf, setBranding } from "./branding.js";
+import { LEAST_SIDE, MOST_BYTES, MOST_SIDE, forgetIcon, hasIcon, setIcon } from "./icon.js";
 import { noteInvitation, tenantById } from "./directory.js";
 import { inboxOf, markSeen, policyOf, preferenceOf, setPolicy, setPreference, unseenCount } from "./inbox.js";
 import { invite, membersOf, remove, rolesFor, setAppRole, setPlatformRole } from "./membership.js";
@@ -320,6 +321,11 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
              empty editor, and an offer to become a business. */
           kind: tenant?.kind ?? "personal",
           branding: await brandingOf(ctx.directory, ctx.tenantId as TenantId),
+          /* ⚠️ WHETHER THERE IS ONE AND HOW BIG, NEVER THE BYTES. The editor
+             shows the icon by fetching `/icon.png`, which the browser is caching
+             anyway; putting a hundred kilobytes of base64 in this answer would
+             put it on the wire again every time somebody opens the screen. */
+          icon: await hasIcon(ctx.directory, ctx.tenantId as TenantId),
           /* ⚠️ In the platform's own order, so the list does not reshuffle when a
              product is switched on. */
           surfaces: SURFACES.filter((s) => offered.has(s)),
@@ -344,8 +350,67 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         return done;
       },
       { why: "It changes what a business's own customers see, which is theirs to weigh." }),
+
+    /*
+      ⚠️ THE ICON IS ITS OWN OPERATION, NOT A FIELD ON `brand.write`. It is bytes
+      rather than JSON, so it arrives through the raw-body lane; folding it into
+      the theme write would mean every colour change re-uploading the picture, and
+      a failed picture losing the colours.
+
+      ⚠️ AND IT IS COMMERCIAL-ONLY IN `setIcon`, not merely absent from the
+      screen. A hidden control is not a refused write, and this row is read by the
+      PUBLIC manifest route — so a write that got past a hidden button would put
+      somebody's logo on a workspace that is not trading under it.
+    */
+    "brand.icon": op("brand.icon", "write", "tenant:manage",
+      "Set the icon this workspace installs and shows in a browser tab.",
+      async (ctx, input) => {
+        const tenant = await tenantById(ctx.directory, ctx.tenantId as TenantId);
+        if (!tenant) return ctx.fail("platform.not_found");
+
+        /* ⚠️ CLEARING IS THE SAME OPERATION, because "remove my logo" is the
+           other half of "set my logo" and a second operation would be a second
+           permission to keep in step with this one. */
+        if (input.clear === true) {
+          await forgetIcon(ctx.directory, tenant.id);
+          return { icon: null };
+        }
+
+        const body = input.body;
+        if (!(body instanceof ArrayBuffer)) return ctx.fail("platform.invalid");
+        const done = await setIcon(
+          ctx.directory, tenant.id, tenant.kind, new Uint8Array(body),
+          ctx.accountId ?? null, ctx.now);
+
+        /* ⚠️ SIX REFUSALS AND SIX DIFFERENT THINGS TO DO NEXT — become a
+           business, export a smaller file, export a PNG, crop it square, export
+           it larger. One "invalid" is a screen somebody has to guess at, with
+           their own logo in front of them and no idea what is wrong with it. */
+        if (done === "not_commercial") {
+          return ctx.fail("platform.commercial_required", { workspace: tenant.name });
+        }
+        if (done === "too_big") {
+          return ctx.fail("platform.too_big", { most: Math.floor(MOST_BYTES / 1024) });
+        }
+        if (typeof done === "string") {
+          /* ⚠️ A refusal with no sentence is a field error somebody sees as an
+             empty red line, so an unmapped one says what it is rather than
+             nothing. It cannot happen; it is one edit away from happening. */
+          return ctx.fail("platform.invalid", {}, { fields: { icon: SAYS[done] ?? done } });
+        }
+        return { icon: { width: done.width, bytes: done.bytes } };
+      },
+      { why: "It changes the mark on a business's own staff's home screens." }),
   };
 }
+
+/** ⚠️ What is wrong with the file, in the words somebody can act on. */
+const SAYS: Readonly<Record<string, string>> = {
+  empty: "that file is empty",
+  not_a_png: "it has to be a PNG — an SVG can carry script, and this is served from your own address",
+  not_square: "it has to be square, so it is not cropped on a home screen",
+  wrong_size: `between ${LEAST_SIDE} and ${MOST_SIDE} pixels a side`,
+};
 
 /** ⚠️ A channel list from a request is untrusted; the kernel's policy rules
     refuse anything the type does not offer, and this only keeps the shape. */

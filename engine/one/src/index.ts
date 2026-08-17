@@ -21,7 +21,7 @@ import { MEDIA_NEED, subProcessor, under } from "@engine/kernel";
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
   NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, acceptanceScope,
-  deploymentFaults, locator,
+  deploymentFaults, isPlatformPath, locator,
   accept, bindingKey, liveBindings, memberFor, noteShardApp, observe, owedBy, sweep,
   tenantById, tenantBySlug,
   operatorOps, permissionsResolver, personalOps, schemaFor, serve, sessionIdFrom, shardFor,
@@ -130,7 +130,7 @@ const LEGAL: DeploymentLegal = {
       id: "cloudflare", name: "Cloudflare, Inc.", country: "US",
       role: "Runs the application and stores its records and files.",
       receives: ["none", "sensitive"],
-      url: "https://www.cloudflare.com/trust-OneSpace/gdpr/",
+      url: "https://www.cloudflare.com/trust-hub/gdpr/",
     }),
   },
 };
@@ -603,9 +603,11 @@ export default {
       than a 404 from here — and `/api/*` is the one prefix that is ours, which
       is why every operation answers under it and nothing else does.
     */
-    if (url.pathname.startsWith("/api/") || url.pathname === "/health" || url.pathname === "/mcp") {
-      return handler(env)(request);
-    }
+    /* ⚠️ ONE QUESTION, ASKED WHERE THE ANSWER LIVES. This list was written out
+       here and the platform's own grew past it: the manifest and the icon are
+       served by `serve.ts` and were never routed to it, so a phone asking for
+       the manifest got the page with a 200 on it. See `isPlatformPath`. */
+    if (isPlatformPath(url.pathname)) return handler(env)(request);
     return env.ASSETS.fetch(request);
   },
 

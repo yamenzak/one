@@ -5,6 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>One</title>
     <meta name="description" content="Your workspaces." />
+
+    <!-- ⚠️ EVERY ONE OF THESE IS SERVED BY THE WORKER, NOT SHIPPED IN `dist`,
+         and that is what makes one page correct on every door. The icon a
+         workspace shows is ITS icon — its colours, or the logo it uploaded — and
+         a file baked into the bundle is one picture for every workspace on the
+         deployment. `serve.ts` answers all five paths per host.
+
+         ⚠️ AND THEY ARE DECLARED EVEN THOUGH A BROWSER ASKS FOR MOST OF THEM
+         ANYWAY. `/favicon.ico` and `/apple-touch-icon.png` are guessed at only
+         when nothing is declared, and the guess costs a round trip on every cold
+         start; declaring them is also what lets the SVG be preferred where it
+         works, which is everywhere except the home screen. -->
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icon.png" type="image/png" sizes="512x512" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
     <!-- ⚠️ The ground is painted before a single component mounts. Without it a
          cold start on a dark device is a white flash, which reads as a fault. -->
     <meta name="color-scheme" content="light dark" />

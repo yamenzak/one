@@ -16,6 +16,9 @@
 
 import * as React from "react";
 import { Link } from "@heroui/react";
+import {
+  MARK_BEAK, MARK_INK, MARK_STEM, beakOpacity, partsOf, type MarkOf,
+} from "@engine/kernel";
 import { ARRIVE_MARK, ARRIVE_RISE, doorAt } from "../tokens/motion.js";
 import {
   DOOR_PAD, GUTTER, SPACE, WIDTH,
@@ -72,7 +75,7 @@ const MARK_H: Readonly<Record<MarkSize, number>> = {
 
 /**
  * ⚠️ THE VIEWBOX IS THE DRAWING, NOT THE CANVAS IT WAS DRAWN ON. The numeral
- * occupies x 28–66 and y 18–82 of the 100-unit square it came from, so a square
+ * fills neither dimension of the 100-unit square it came from, so a square
  * `0 0 100 100` box renders it 36% shorter than its declared height and floats
  * it in a gutter more than half as wide as the box. Both were invisible as
  * numbers and obvious the moment the stacked lockup was photographed: a mark
@@ -82,18 +85,20 @@ const MARK_H: Readonly<Record<MarkSize, number>> = {
  * ⚠️ SO THE SIZES ABOVE MEAN WHAT THEY SAY, and the mark's own left edge is the
  * column's. Cropping to the ink is what makes both true at once — a scale
  * correction alone would have fixed the height and left the gutter.
+ *
+ * ⚠️ AND THE BOX IS THE KERNEL'S, LIKE EVERY OTHER NUMBER IN THIS DRAWING. The
+ * Worker rasterises the same mark to a PNG for tabs and home screens; two copies
+ * of the geometry is two logos with one name, and the one nobody looks at is the
+ * one sitting on somebody's home screen for a year (`kernel/src/mark.ts`).
  */
-const INK = { x: 28, y: 18, w: 38, h: 64 } as const;
+const INK = MARK_INK;
 
 /**
- * WHOSE MARK — the deployment's, or a product's.
- *
- * ⚠️ THE SAME STEM, WITH SOMETHING ADDED. A product does not get a mark of its
- * own shape: it gets ONE's, carrying two rings on the stem. That is what makes a
- * shelf of products read as one family rather than as a folder of logos, and it
- * is why there is one component here rather than one per name.
+ * ⚠️ WHOSE MARK — the deployment's, or a product's — and it is the KERNEL'S type
+ * re-exported rather than a second one spelled the same. Two unions with one
+ * name compile happily right up until a third member is added to one of them.
  */
-export type MarkOf = "one" | "space";
+export type { MarkOf };
 
 export function Mark({ size = "crown", of = "one", label }: {
   readonly size?: MarkSize;
@@ -102,6 +107,8 @@ export function Mark({ size = "crown", of = "one", label }: {
   readonly label?: string;
 }) {
   const h = MARK_H[size];
+  const parts = partsOf(of);
+  const beak = MARK_BEAK;
   /*
     ⚠️ ONE MASK ID PER INSTANCE. An SVG `id` is DOCUMENT-global, so two marks on
     one page — the crown and a sign-in card, which is the ordinary case —
@@ -139,26 +146,20 @@ export function Mark({ size = "crown", of = "one", label }: {
               artwork and cut most of the stem away — a mark that renders as a
               beak and two dots, with nothing failing. */}
           <rect x="0" y="0" width="100" height="100" fill="#fff" />
-          {of === "one"
-            ? (
-              <>
-                <line x1="53" y1="18" x2="53" y2="82" stroke="#000" strokeWidth="3" />
-                <line x1="60" y1="18" x2="60" y2="82" stroke="#000" strokeWidth="2.5" />
-              </>
-            )
-            : (
-              <>
-                <line x1="52" y1="18" x2="52" y2="82" stroke="#000" strokeWidth="2" />
-                <line x1="60" y1="18" x2="60" y2="82" stroke="#000" strokeWidth="2" />
-                {/* ⚠️ Two rings on the stem, offset up and down — a body on an
-                    orbit rather than a pair of dots, which is what keeps the
-                    counters from reading as a barcode. */}
-                <circle cx="52" cy="36" r="4.5" fill="#000" />
-                <circle cx="52" cy="36" r="2" fill="#fff" />
-                <circle cx="60" cy="62" r="4.5" fill="#000" />
-                <circle cx="60" cy="62" r="2" fill="#fff" />
-              </>
-            )}
+          {/* ⚠️ CUT, THEN KEEP — the ring is a disc taken out of the stem with a
+              dot put back inside it, so the fills alternate and the order is
+              load-bearing. Same order as `inkAt`, which is what the rasteriser
+              samples. */}
+          {parts.slots.map((slot, i) => (
+            <line key={`slot${i}`} x1={slot.x} y1={slot.y1} x2={slot.x} y2={slot.y2}
+              stroke="#000" strokeWidth={slot.width} />
+          ))}
+          {parts.rings.map((ring, i) => (
+            <React.Fragment key={`ring${i}`}>
+              <circle cx={ring.x} cy={ring.y} r={ring.cut} fill="#000" />
+              <circle cx={ring.x} cy={ring.y} r={ring.keep} fill="#fff" />
+            </React.Fragment>
+          ))}
         </mask>
       </defs>
 
@@ -166,8 +167,11 @@ export function Mark({ size = "crown", of = "one", label }: {
           blue, which is a hue in a system that decided to be monochrome — the
           same ink at lower opacity says the same thing on any ground and needs
           no second token. */}
-      <path d="M 28 36 L 46 18 L 46 36 Z" opacity={of === "space" ? 0.55 : 1} />
-      <path d="M 46 18 L 66 18 L 66 82 L 46 82 Z" mask={`url(#${mask})`} />
+      <path d={`M ${beak[0].x} ${beak[0].y} L ${beak[1].x} ${beak[1].y} L ${beak[2].x} ${beak[2].y} Z`}
+        opacity={beakOpacity(of)} />
+      <path d={`M ${MARK_STEM.x} ${MARK_STEM.y} H ${MARK_STEM.x + MARK_STEM.w}`
+        + ` V ${MARK_STEM.y + MARK_STEM.h} H ${MARK_STEM.x} Z`}
+        mask={`url(#${mask})`} />
     </svg>
   );
 }

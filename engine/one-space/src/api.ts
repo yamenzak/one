@@ -56,10 +56,25 @@ const readProblem = async (res: Response): Promise<Problem> => {
   return problem(PROBLEMS, "space.unexpected", {}, { ref: newId("ref") });
 };
 
-async function call<T>(id: string, method: "GET" | "POST", body?: unknown): Promise<Answer<T>> {
+/**
+ * ⚠️ AN UPLOAD IS BYTES, AND THE DOOR HAS TO KNOW THAT OR A SCREEN WILL. This
+ * sent everything as JSON, so the one screen that had a file to send would have
+ * written its own `fetch` — and `api-door` exists precisely because 167 of those
+ * is what an app written before the platform looks like. The runtime's own read
+ * side already takes a raw body on an allow-list of types (`serve.ts`).
+ *
+ * ⚠️ AND IT IS NOT BASE64 IN A FIELD. That is a third larger on the wire, and it
+ * has to be decoded before anything can read the file's own header — which is
+ * the only trustworthy statement of what the file actually is.
+ */
+async function call<T>(
+  id: string, method: "GET" | "POST", body?: unknown, contentType?: string,
+): Promise<Answer<T>> {
   const query = method === "GET" && body
     ? `?${new URLSearchParams(Object.entries(body as Record<string, string>)).toString()}`
     : "";
+
+  const raw = body instanceof ArrayBuffer || ArrayBuffer.isView(body);
 
   let res: Response;
   try {
@@ -69,7 +84,12 @@ async function call<T>(id: string, method: "GET" | "POST", body?: unknown): Prom
          it back, and its absence is a sign-in that appears to work once. */
       credentials: "same-origin",
       ...(method === "POST"
-        ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body ?? {}) }
+        ? {
+          headers: {
+            "content-type": raw ? contentType ?? "application/octet-stream" : "application/json",
+          },
+          body: raw ? body as BodyInit : JSON.stringify(body ?? {}),
+        }
         : {}),
     });
   } catch {
@@ -86,8 +106,9 @@ async function call<T>(id: string, method: "GET" | "POST", body?: unknown): Prom
 export const api = {
   get: <T>(id: string, input?: Record<string, string>): Promise<Answer<T>> =>
     call<T>(id, "GET", input),
-  post: <T>(id: string, input?: unknown): Promise<Answer<T>> =>
-    call<T>(id, "POST", input),
+  /** ⚠️ `contentType` only for BYTES — see `call`. JSON needs none. */
+  post: <T>(id: string, input?: unknown, as?: { readonly contentType: string }): Promise<Answer<T>> =>
+    call<T>(id, "POST", input, as?.contentType),
 
   /**
    * ⚠️ THE ONE REQUEST THAT IS NOT AN OPERATION. `/health` is outside `/api/`

@@ -34,6 +34,7 @@ export * from "./legal.js";
 export * from "./job.js";
 export * from "./credit.js";
 export * from "./brand.js";
+export * from "./mark.js";
 export * from "./guide.js";
 export * from "./ai.js";
 export * from "./mcp.js";

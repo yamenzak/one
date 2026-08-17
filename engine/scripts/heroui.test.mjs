@@ -256,10 +256,30 @@ const HAND_ROLLED = [
   [/<input\b/, "a raw <input> — use TextField or Input"],
   [/<dialog\b/, "a raw <dialog> — use Modal"],
 ];
+
+/**
+ * ⚠️ ONE CONTROL THE LIBRARY DOES NOT SHIP AND THE PLATFORM CANNOT AVOID.
+ * `<input type="file">` is the only way to open a file dialog: there is no API
+ * that opens one without it, and it is deliberately unstylable, which is exactly
+ * why every product hides one behind a button. The rule above is right — a
+ * hand-rolled control misses the focus, pressed and keyboard behaviour — and it
+ * does not apply to a control nobody could roll differently.
+ *
+ * ⚠️ NARROW ON PURPOSE: `type="file"` and nothing else. An exemption for
+ * `<input>` as such would let the next text field in, which is the whole thing
+ * this guard is for. The button beside it is still HeroUI's, and the file input
+ * itself is `sr-only`, so what a person sees and operates is a real control.
+ */
+const IRREDUCIBLE = /<input[^>]*type="file"/;
+
 let raw = 0;
 for (const file of FILES) {
   const src = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
   for (const [re, why] of HAND_ROLLED) {
+    if (re === HAND_ROLLED[2][0] && IRREDUCIBLE.test(src)) {
+      /* ⚠️ Still checked for every OTHER `<input>` in the same file. */
+      if (!/<input(?![^>]*type="file")/.test(src)) continue;
+    }
     if (re.test(src)) {
       raw++;
       fail(`${rel(file)}: ${why} (D7).\n` +

@@ -66,11 +66,12 @@ a call site over in a product.
 | `guide` | help, onboarding, the milestones a workspace passes | 5 | — |
 | `job` | scheduled work, and the record that it ran | 5 | — |
 | `brand` | which surfaces a workspace may put its own mark on | 10 | 1 |
+| `mark` | the logo as geometry, so the browser and the Worker draw one shape | 6 | — |
 | `ai` | a generating action: its lane, its prompt, its ceiling | 11 | 1 |
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**209 of them**, 192 reached by something today.
+**215 of them**, 198 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -101,7 +102,7 @@ layering failure rather than a shortcut. A guard says so.
 | `identity` | sign-in codes, sessions, tokens, proof | 21 | 2 |
 | `membership` | the roster and what each member may do | 12 | — |
 | `compose` | a manifest becomes a live surface of operations | 3 | 1 |
-| `serve` | the one path every request ends in — both doors | 3 | — |
+| `serve` | the one path every request ends in — both doors | 4 | — |
 | `records` | the generated reads and writes behind a collection | 6 | — |
 | `settings` | reading and writing a workspace's own switches | 4 | — |
 | `billing` | plans, subscriptions, the bill, the ladder | 10 | 4 |
@@ -113,6 +114,8 @@ layering failure rather than a shortcut. A guard says so.
 | `audit` | what happened, and the replay that stops it happening twice | 7 | — |
 | `jobs` | the scheduler and the record that it ran | 6 | 1 |
 | `branding` | a workspace's own theme and marks | 4 | — |
+| `icon` | the picture a business uploads, and where a public route can read it | 8 | — |
+| `raster` | a PNG drawn in a Worker, for the tabs and home screens an SVG cannot reach | 3 | — |
 | `ai-actions` | which model an action runs on, and in whose words | 7 | — |
 | `operator` | the deployment looking at itself | 6 | — |
 | `deployment` | what is wrong with this deployment, asked at boot | 1 | — |
@@ -121,7 +124,7 @@ layering failure rather than a shortcut. A guard says so.
 | `money-ops` | the bill and the balance, as a read | 1 | — |
 | `centre-ops` | the one bootstrap read the tenant door stands on | 1 | — |
 | `personal` | the operations about yourself, on every door | 2 | — |
-| `installable` | the manifest and the icon a workspace is installed as | 3 | — |
+| `installable` | the manifest and the icon a workspace is installed as | 6 | — |
 | `platform-schema` | the platform's own tables, in dependency order, listed once | 2 | — |
 | `dispatch` | an event an operation raises becomes a note in somebody's inbox | 1 | — |
 | `sweep` | the daily clock: erase what is past the ladder's last rung | 4 | — |
@@ -134,7 +137,7 @@ layering failure rather than a shortcut. A guard says so.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**236 of them**, 220 reached by something today.
+**251 of them**, 235 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

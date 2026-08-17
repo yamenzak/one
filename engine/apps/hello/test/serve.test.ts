@@ -128,6 +128,10 @@ describe("what the manifest produced", () => {
       "GET /api/ai.wording",
       /* ⚠️ The workspace's OWN identity, mounted in every product — one brand
          across the apps under one roof, edited from wherever somebody is. */
+      /* ⚠️ The icon is its own operation, not a field on `brand.write` — it is
+         bytes rather than JSON, and folding it in would mean every colour change
+         re-uploading the picture. */
+      "POST /api/brand.icon",
       "GET /api/brand.read",
       "POST /api/brand.write",
       "GET /api/centre.view",

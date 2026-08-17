@@ -33,6 +33,7 @@ import { closeTenant, forgetBelonging, membersOfTenant, tenantById } from "./dir
 import { forgetWorkspace } from "./dossier.js";
 import { eraseObjects, type Bucket, type Where } from "./storage.js";
 import { forgetBranding } from "./branding.js";
+import { forgetIcon } from "./icon.js";
 import { dueForErasure, run } from "./jobs.js";
 import { apply, type ApplyDeps } from "./resources.js";
 import { carryObjects, carryRows, finishMove, reapMoved } from "./move.js";
@@ -135,6 +136,11 @@ export async function sweepErasure(deps: SweepDeps): Promise<{ touched: number; 
       await forgetBelonging(deps.directory, accountId, one.tenantId);
     }
     await forgetBranding(deps.directory, one.tenantId);
+    /* ⚠️ AND THE ICON, WHICH IS THE SAME OMISSION ONE TABLE OVER. Both live in
+       the directory, so the cascade derived from every app's collections cannot
+       see either — a logo left behind after a business closed is their mark
+       still on our infrastructure. */
+    await forgetIcon(deps.directory, one.tenantId);
     await closeTenant(deps.directory, one.tenantId, now);
     erased++;
   }

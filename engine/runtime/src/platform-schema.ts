@@ -35,12 +35,17 @@ import { MOVE_SCHEMA } from "./move.js";
 import { RESOURCE_SCHEMA } from "./resources.js";
 import type { SchemaModule } from "./schema.js";
 import { MEDIA_SCHEMA } from "./storage.js";
+import { ICON_SCHEMA } from "./icon.js";
 import { SETTING_SCHEMA } from "./settings.js";
 import { VAULT_SCHEMA } from "./vault.js";
 
 /** What the DIRECTORY holds: one row per account, workspace, subscription, run. */
 export const DIRECTORY_MODULES: readonly SchemaModule[] = [
   DIRECTORY_SCHEMA, IDENTITY_SCHEMA, BILLING_SCHEMA, BRANDING_SCHEMA,
+  /* ⚠️ BESIDE THE BRAND AND FOR THE SAME REASON: the manifest and the favicon
+     are read with no session and before any workspace has been located, so an
+     icon on a shard would mean finding a database to answer a picture. */
+  ICON_SCHEMA,
   JOBS_SCHEMA, OPERATOR_SCHEMA, AI_ACTION_SCHEMA,
   /* ⚠️ WHAT THE DEPLOYMENT HAS MADE FOR ITSELF, in the directory because it is
      about the deployment rather than about any workspace — and because the
