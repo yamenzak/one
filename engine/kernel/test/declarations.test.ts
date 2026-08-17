@@ -13,7 +13,7 @@ import {
   channelsFor, inAudience, refusePolicy, refuseLetter, unknownVariables, brandable,
   unraisable, unaddressable, deadLinks, notification, type NotificationDef, type Channel,
 } from "../src/notify.js";
-import { refuseSetting, disclose, valueOf, settingsOn, groupsOn, unread, setting } from "../src/setting.js";
+import { area, refuseSetting, refuseSettings, disclose, valueOf, settingsOn, areasOn, settingsIn, unread, setting } from "../src/setting.js";
 import { resolve, settableBy, refuseFlag, overdue, flag } from "../src/flag.js";
 import { remaining, progressOf, reached, refuseGuide } from "../src/guide.js";
 import { field } from "../src/field.js";
@@ -153,14 +153,22 @@ describe("a workspace rewriting a message", () => {
 
 /* -------------------------------------------------------------- settings --- */
 
+/* ⚠️ THE PAGES THESE ROWS LIVE ON. A setting naming an area nothing declares is
+   a refusal now — see `unknown_area`. */
+const AREAS = {
+  data: area({ id: "data", label: "Data", icon: "database", said: "What is kept, and for how long", order: 0 }),
+  appearance: area({ id: "appearance", label: "Appearance", icon: "star", said: "How it looks", order: 1 }),
+  payments: area({ id: "payments", label: "Payments", icon: "money", said: "Who takes the money", order: 2 }),
+};
+
 const retention = setting({
-  id: "retention.days", level: "tenant", group: "Data",
+  id: "retention.days", level: "tenant", area: "data",
   field: field.number({ label: "Keep records for", holds: "none", min: 1 }),
   fallback: 365, needs: "tenant:manage",
 });
 
 const theme = setting({
-  id: "theme", level: "person", group: "Appearance",
+  id: "theme", level: "person", area: "appearance",
   field: field.enum({ label: "Theme", holds: "none", values: ["light", "dark", "system"] }),
   fallback: "system",
 });
@@ -172,13 +180,13 @@ describe("a setting", () => {
     and nothing about the screen says so.
   */
   it("refuses a workspace setting with nobody named to change it", () => {
-    expect(refuseSetting({ ...retention, needs: undefined }).map((p) => p.why))
+    expect(refuseSetting({ ...retention, needs: undefined }, AREAS).map((p) => p.why))
       .toEqual(["tenant_without_permission"]);
-    expect(refuseSetting(retention)).toEqual([]);
+    expect(refuseSetting(retention, AREAS)).toEqual([]);
   });
 
   it("refuses a workspace permission on somebody's own preference", () => {
-    expect(refuseSetting({ ...theme, needs: "tenant:manage" }).map((p) => p.why))
+    expect(refuseSetting({ ...theme, needs: "tenant:manage" }, AREAS).map((p) => p.why))
       .toEqual(["person_with_permission"]);
   });
 
@@ -189,7 +197,7 @@ describe("a setting", () => {
   */
   it("reports a secret as set or unset, never as itself", () => {
     const key = setting({
-      id: "provider.key", level: "tenant", group: "Payments", secret: true,
+      id: "provider.key", level: "tenant", area: "payments", secret: true,
       field: field.text({ label: "Secret key", holds: "none" }), fallback: "", needs: "tenant:manage",
     });
     expect(disclose(key, { "provider.key": "sk_live_abcd" })).toEqual({ set: true });
@@ -198,7 +206,7 @@ describe("a setting", () => {
   });
 
   it("refuses a credential that belongs to one person", () => {
-    expect(refuseSetting({ ...theme, secret: true }).map((p) => p.why))
+    expect(refuseSetting({ ...theme, secret: true }, AREAS).map((p) => p.why))
       .toContain("secret_at_person_level");
   });
 
@@ -210,12 +218,36 @@ describe("a setting", () => {
     expect(valueOf(retention, { "retention.days": 30 })).toBe(30);
   });
 
-  /* ⚠️ The screens are derived, in declaration order, and no app writes one. */
-  it("sorts itself onto the right screen and section", () => {
+  /* ⚠️ The screens are derived, in declared order, and no app writes one. */
+  it("sorts itself onto the right screen and page", () => {
     const book = { "retention.days": retention, theme };
     expect(settingsOn(book, "tenant").map((s) => s.id)).toEqual(["retention.days"]);
-    expect(groupsOn(book, "person")).toEqual(["Appearance"]);
+    expect(areasOn(book, AREAS, "person").map((a) => a.id)).toEqual(["appearance"]);
+    expect(settingsIn(book, "person", "appearance").map((s) => s.id)).toEqual(["theme"]);
     expect(unread(book, ["theme"])).toEqual(["retention.days"]);
+  });
+
+  /*
+    ⚠️ AN AREA A LEVEL DOES NOT USE IS NOT A PAGE FOR IT. Areas are declared once
+    for the whole app, so listing all of them per level would offer a destination
+    that opens onto nothing.
+  */
+  it("does not offer a page a level has nothing on", () => {
+    const book = { "retention.days": retention, theme };
+    expect(areasOn(book, AREAS, "tenant").map((a) => a.id)).toEqual(["data"]);
+  });
+
+  /*
+    ⚠️ AND THE TWO WAYS AN AREA CAN BE WRONG ARE BOTH SILENT. A setting naming an
+    area nothing declares would have rendered under a heading somebody typed by
+    mistake; a declared area nothing uses is a nav row opening onto an empty page,
+    and the first person to find out is whoever taps it.
+  */
+  it("refuses a setting on a page that does not exist, and a page with nothing on it", () => {
+    const stray = setting({ ...retention, id: "stray", area: "nowhere" });
+    expect(refuseSetting(stray, AREAS).map((p) => p.why)).toEqual(["unknown_area"]);
+    expect(refuseSettings({ "retention.days": retention, theme }, AREAS).map((p) => p.why))
+      .toEqual(["area_without_settings"]);
   });
 });
 

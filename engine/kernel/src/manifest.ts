@@ -48,7 +48,7 @@ import type { AnyOperation } from "./operation.js";
 import { refuseOperation, unreachable } from "./operation.js";
 import type { ProblemCatalog } from "./problem.js";
 import { PLATFORM_PROBLEMS, redefined, unknownProblems } from "./problem.js";
-import type { SettingBook } from "./setting.js";
+import type { AreaBook, SettingBook } from "./setting.js";
 import { refuseSettings } from "./setting.js";
 import type { PurposeBook, VaultBook } from "./vault.js";
 import { refuseVault } from "./vault.js";
@@ -94,6 +94,13 @@ export interface AppSpec {
 
   readonly notifications?: NotificationBook;
   readonly settings?: SettingBook;
+  /**
+   * ⚠️ THE PAGES ITS SETTINGS LIVE ON. Every declared setting names one, and an
+   * area nothing names is refused — so a settings surface is a list of
+   * destinations that each open onto something, rather than one column of every
+   * row the app happens to declare (DESIGN.md §3).
+   */
+  readonly settingAreas?: AreaBook;
   readonly flags?: FlagBook;
   readonly vault?: VaultBook;
   readonly purposes?: PurposeBook;
@@ -185,7 +192,7 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
     for (const p of refuseOperation(o)) at(`operation ${p.operation}`, `${p.why}: ${p.detail}`);
   }
   for (const bad of danglingRefs(spec.collections)) at("reference", `${bad} points at no collection`);
-  for (const p of refuseSettings(spec.settings ?? {})) at(`setting ${p.setting}`, `${p.why}: ${p.detail}`);
+  for (const p of refuseSettings(spec.settings ?? {}, spec.settingAreas ?? {})) at(`setting ${p.setting}`, `${p.why}: ${p.detail}`);
   for (const p of refuseFlags(spec.flags ?? {})) at(`flag ${p.flag}`, `${p.why}: ${p.detail}`);
   for (const p of refuseVault(spec.vault ?? {}, spec.purposes ?? {})) {
     at(`vault ${p.of}`, `${p.why}: ${p.detail}`);

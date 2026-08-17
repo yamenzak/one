@@ -588,13 +588,26 @@ export function Tile({ wide, tall, children }: {
  * nobody files and everybody feels.
  */
 export function Whichever<T>({
-  items, id, name, icon, face, chosen, onChoose, then, nothing,
+  items, id, name, said, icon, face, chosen, onChoose, then, nothing,
 }: {
   readonly items: readonly T[];
   readonly id: (item: T) => string;
   readonly name: (item: T) => string;
-  /** ⚠️ The same glyph for every item — a CATEGORY, not an identity. */
-  readonly icon?: React.ReactNode;
+  /**
+   * ⚠️ WHAT IS BEHIND THE ROW, IN A LINE. A list of destinations named by one
+   * word each is a list somebody has to open to understand; this is what tells
+   * them whether to. Settings areas carry one by declaration, which is why the
+   * area is a declaration rather than a heading somebody typed.
+   */
+  readonly said?: (item: T) => string;
+  /**
+   * ⚠️ PER ITEM, AND IT WAS NOT — it was one glyph for the whole list, and
+   * nothing ever passed it, because a list of identical marks is worse than a
+   * list of none. What a per-item glyph is for is a CATEGORY list, where the
+   * items are subjects rather than identities: a settings area is not a person
+   * or a product and has no face to generate.
+   */
+  readonly icon?: (item: T) => React.ReactNode;
   /**
    * ⚠️ PER ITEM, AND IT IS WHAT THIS LIST ACTUALLY WANTS. Every caller here is
    * choosing between PRODUCTS, and every one of them passed one glyph for the
@@ -622,9 +635,10 @@ export function Whichever<T>({
         {items.map((item) => (
           <NavRow
             key={id(item)}
-            icon={icon}
+            icon={icon?.(item)}
             face={face?.(item)}
             label={name(item)}
+            under={said?.(item)}
             onOpen={() => onChoose(id(item))}
           />
         ))}

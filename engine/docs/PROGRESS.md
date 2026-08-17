@@ -684,12 +684,12 @@ The guard registry, its checks, and the standards that bind them.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 9 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 55 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 56 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 10 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 40 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 43 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 0 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -880,6 +880,10 @@ the library decides FOR us.
 | `every-refusal-comes-from-a-catalogue` | D5 | one code meaning three things — three screens stamping platform.invalid on three sentences they wrote themselves, so a client switching on the code cannot, and the wording of a refusal lives wherever it was last edited |
 | `a-refusal-naming-an-input-is-shown-on-that-input` | D5 | every refusal about one value rendered as a banner over the whole form, so somebody with six inputs is told that something does not look right and has to re-read all six to find which |
 | `a-refusals-values-are-supplied-where-it-is-raised` | D5 | a person hitting a seat limit reading "your plan includes {limit}" — the sentence survives because leaving an unknown token visible is deliberately correct, which is exactly what lets an unsupplied one reach a screen |
+| `a-settings-page-is-a-declared-destination` | D12 | a settings screen carded by a free-text heading again — a page nobody can link to, with no mark to find it by, no line saying what is behind it, and an order that shifts every time a setting is added |
+| `settings-descend-rather-than-stack` | D12 | one scroll holding a switch, a colour and an email address — three kinds of consequence on one screen, which is the filing cabinet DESIGN.md §3 exists to refuse |
+| `an-authority-is-a-screen-not-a-tab` | D12 | a person's own preferences living inside the workspace's administration surface, so they sit behind whatever permission guards that screen and a member without it cannot reach their own |
+| `every-glyph-a-declaration-names-exists` | D7 | a neutral circle sitting in a list where every other row has a shape — an icon is a STRING in a manifest so no compiler sees the typo, and this map has now been out of step with its callers twice, both times described in full by its own header |
 <!-- /generated -->
 
 ## Commands

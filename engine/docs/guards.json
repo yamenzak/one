@@ -1513,6 +1513,42 @@
       "impl": "scripts/problem.test.mjs",
       "proves": "values:",
       "fails": "a person hitting a seat limit reading \"your plan includes {limit}\" — the sentence survives because leaving an unknown token visible is deliberately correct, which is exactly what lets an unsupplied one reach a screen"
+    },
+    {
+      "id": "a-settings-page-is-a-declared-destination",
+      "protects": "D12",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/descend.test.mjs",
+      "proves": "declared:",
+      "fails": "a settings screen carded by a free-text heading again — a page nobody can link to, with no mark to find it by, no line saying what is behind it, and an order that shifts every time a setting is added"
+    },
+    {
+      "id": "settings-descend-rather-than-stack",
+      "protects": "D12",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/descend.test.mjs",
+      "proves": "descend:",
+      "fails": "one scroll holding a switch, a colour and an email address — three kinds of consequence on one screen, which is the filing cabinet DESIGN.md §3 exists to refuse"
+    },
+    {
+      "id": "an-authority-is-a-screen-not-a-tab",
+      "protects": "D12",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/descend.test.mjs",
+      "proves": "levels:",
+      "fails": "a person's own preferences living inside the workspace's administration surface, so they sit behind whatever permission guards that screen and a member without it cannot reach their own"
+    },
+    {
+      "id": "every-glyph-a-declaration-names-exists",
+      "protects": "D7",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/face.test.mjs",
+      "proves": "glyph:",
+      "fails": "a neutral circle sitting in a list where every other row has a shape — an icon is a STRING in a manifest so no compiler sees the typo, and this map has now been out of step with its callers twice, both times described in full by its own header"
     }
   ]
 }

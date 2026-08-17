@@ -216,6 +216,47 @@ const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "");
   if (!hits) ok("origin: every face generated here, none fetched");
 }
 
+/* ------------------------------------------------------------------ glyph --- */
+
+/*
+  ⚠️ AN ICON IS A STRING IN A MANIFEST, SO NO COMPILER WILL EVER CATCH A TYPO —
+  and a name the map does not have draws the NEUTRAL MARK rather than nothing,
+  which is a circle sitting quietly in a list where every other row has a shape.
+  This has now happened twice to the same map: three of a reference app's own
+  screens drew circles, and after that was fixed a settings area named `mail` and
+  drew another. The file's header describes the failure in full both times; what
+  was missing was anything able to see the two lists disagree.
+*/
+{
+  const shell = readFileSync(join(ENGINE, "design/src/frame/shell.tsx"), "utf8");
+  const known = new Set();
+  for (const m of shell.matchAll(/([\w-]+):\s*<\w+ ?\/>/g)) known.add(m[1]);
+
+  const used = new Map();
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const at = join(dir, entry.name);
+      if (entry.isDirectory()) { walk(at); continue; }
+      if (!/\.(ts|tsx)$/.test(entry.name)) continue;
+      const src = readFileSync(at, "utf8");
+      for (const m of src.matchAll(/\bicon:\s*"([\w-]+)"/g)) used.set(m[1], rel(at));
+      for (const m of src.matchAll(/glyphOf\("([\w-]+)"\)/g)) used.set(m[1], rel(at));
+    }
+  };
+  for (const root of ["apps/hello/src", "one-hub/src", "design/src"]) {
+    walk(join(ENGINE, root));
+  }
+
+  const strays = [...used].filter(([name]) => !known.has(name));
+  if (strays.length) {
+    for (const [name, where] of strays) {
+      fail(`glyph: ${where} names "${name}", which the shell's map does not have — it draws a neutral circle in a list where every other row has a shape`);
+    }
+  } else {
+    ok(`glyph: all ${used.size} name(s) in use are mapped to a mark`);
+  }
+}
+
 console.log(bad
   ? `\nface: ${bad} finding(s) — one subject, more than one face.`
   : `\nface: one resolver, one seed per subject, one face everywhere.`);

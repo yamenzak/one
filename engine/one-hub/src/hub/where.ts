@@ -52,6 +52,20 @@ export type Where =
    * administration.
    */
   | { readonly at: "told" }
+  /**
+   * ⚠️ YOUR OWN PREFERENCES, ACROSS EVERY PRODUCT — the same split as `told`
+   * against `notices`, one screen over. A setting's LEVEL is an authority
+   * (DESIGN.md §3's first question): what a workspace is set to is decided by
+   * whoever runs it and applies to everybody, and what you prefer is yours and
+   * follows you into every workspace you are in. Those were rendered one under
+   * the other on the workspace's own settings screen, which put a preference
+   * inside an administration surface and hid it from anybody without
+   * `tenant:manage`.
+   *
+   * ⚠️ AND IT CARRIES NO SLUG, WHICH IS THE POINT. A person's own settings are
+   * not a workspace's, so they are not filed under one.
+   */
+  | { readonly at: "prefs"; readonly app?: string; readonly area?: string }
   | { readonly at: "workspaces" }
   /** One workspace: what it includes, and the way into everything about it. */
   | { readonly at: "workspace"; readonly slug: string }
@@ -72,7 +86,7 @@ export type Where =
    * (DESIGN.md §3). With one product there is nothing to choose between, so the
    * list stands down and its settings are the screen.
    */
-  | { readonly at: "settings"; readonly slug: string; readonly app?: string }
+  | { readonly at: "settings"; readonly slug: string; readonly app?: string; readonly area?: string }
   | { readonly at: "trust"; readonly slug: string }
   /** ⚠️ THE WORKSPACE'S OWN IDENTITY, one brand across every app under it (D22). */
   | { readonly at: "brand"; readonly slug: string }
@@ -167,6 +181,10 @@ export function parseWhere(path: string): Where {
   if (head === "you") return { at: "you" };
   if (head === "inbox") return { at: "inbox" };
   if (head === "told") return { at: "told" };
+  if (head === "prefs") {
+    const [app, area] = tail;
+    return app ? (area ? { at: "prefs", app, area } : { at: "prefs", app }) : { at: "prefs" };
+  }
   if (head === "workspaces") return { at: "workspaces" };
 
   if (head === "w") {
@@ -183,9 +201,15 @@ export function parseWhere(path: string): Where {
     /* ⚠️ A THIRD SEGMENT IS THE PRODUCT, on the two screens that have one per
        product. Anywhere else it is noise and the screen is the answer. */
     const app = tail[2];
-    return app && (part === "settings" || part === "wording")
-      ? { at: part, slug, app }
-      : { at: part, slug };
+    if (app && part === "wording") return { at: part, slug, app };
+    /* ⚠️ A FOURTH SEGMENT IS THE PAGE. Settings descend — a product has areas
+       and an area is a page — and the area has to be in the address or going
+       back from one lands outside the whole surface. */
+    if (app && part === "settings") {
+      const area = tail[3];
+      return area ? { at: part, slug, app, area } : { at: part, slug, app };
+    }
+    return { at: part, slug };
   }
 
   if (head === "console") {
@@ -206,6 +230,8 @@ export function pathOf(where: Where): string {
     case "you": return `${HUB}/you`;
     case "inbox": return `${HUB}/inbox`;
     case "told": return `${HUB}/told`;
+    case "prefs":
+      return `${HUB}/prefs${where.app ? `/${where.app}` : ""}${where.app && where.area ? `/${where.area}` : ""}`;
     case "workspaces": return `${HUB}/workspaces`;
     case "workspace": return `${HUB}/w/${where.slug}`;
     case "console": return `${HUB}/console`;
@@ -214,8 +240,14 @@ export function pathOf(where: Where): string {
     case "tenants": case "switches": case "works": case "ground":
       return `${HUB}/console/${where.at}`;
     case "plan": return `${HUB}/w/${where.slug}/plan/${where.app}`;
-    case "settings": case "wording":
-      return `${HUB}/w/${where.slug}/${where.at}${where.app ? `/${where.app}` : ""}`;
+    /* ⚠️ THE PAGE IS IN THE ADDRESS TOO. Settings descend, and an area that only
+       lived in the parser is one somebody can reach and never link to — and
+       going back from it would leave the whole surface. */
+    case "settings":
+      return `${HUB}/w/${where.slug}/settings${where.app ? `/${where.app}` : ""}${
+        where.app && where.area ? `/${where.area}` : ""}`;
+    case "wording":
+      return `${HUB}/w/${where.slug}/wording${where.app ? `/${where.app}` : ""}`;
     default: return `${HUB}/w/${where.slug}/${where.at}`;
   }
 }
@@ -237,13 +269,20 @@ export function above(where: Where): Where | null {
        rather than to the root — the crown's arrow has to agree with how
        somebody got here. */
     case "told": return { at: "you" };
+    case "prefs":
+      return where.area ? { at: "prefs", app: where.app }
+        : where.app ? { at: "prefs" } : { at: "you" };
     case "workspace": return { at: "workspaces" };
     case "actions": return where.app ? { at: "actions" } : { at: "console" };
     case "tenant": return { at: "tenants" };
     case "tenants": case "switches": case "works": case "ground":
       return { at: "console" };
     case "plan": return { at: "money", slug: where.slug };
-    case "settings": case "wording":
+    case "settings":
+      return where.area ? { at: "settings", slug: where.slug, app: where.app }
+        : where.app ? { at: "settings", slug: where.slug }
+          : { at: "workspace", slug: where.slug };
+    case "wording":
       return where.app ? { at: where.at, slug: where.slug } : { at: "workspace", slug: where.slug };
     default: return { at: "workspace", slug: where.slug };
   }
@@ -256,6 +295,7 @@ export const nameOf = (where: Where): string => {
     case "you": return "You";
     case "inbox": return "Inbox";
     case "told": return "How you are told";
+    case "prefs": return "Your preferences";
     case "workspaces": return "Workspaces";
     case "workspace": return "Workspace";
     case "people": return "People";

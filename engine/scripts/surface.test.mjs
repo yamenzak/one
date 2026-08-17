@@ -50,6 +50,9 @@ const ok = (m) => console.log(`ok   ${m}`);
 const SURFACES = {
   screens: { file: "design/src/frame/shell.tsx", renders: "export function Shell" },
   settings: { file: "design/src/rendered/settings.tsx", renders: "export function Settings" },
+  /* ⚠️ The PAGES its settings live on. Rendered by the same surface, as the list
+     it descends from — see `Settings`. */
+  settingAreas: { file: "design/src/rendered/settings.tsx", renders: "areasOn(book, areas, level)" },
   notifications: { file: "design/src/rendered/policy.tsx", renders: "export function NotificationPolicy" },
   flags: { file: "design/src/rendered/console.tsx", renders: "export function FlagConsole" },
   plans: { file: "design/src/rendered/console.tsx", renders: "export function Shelf" },

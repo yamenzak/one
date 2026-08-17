@@ -13,7 +13,7 @@
  */
 
 import {
-  collection, defineApp, field, flag, notification, operation, setting,
+  area, collection, defineApp, field, flag, notification, operation, setting,
   type AppSpec,
 } from "@engine/kernel";
 
@@ -290,8 +290,19 @@ export const HELLO: AppSpec = defineApp({
       permission: "note:read", tone: "neutral" },
     { id: "people", route: "/people", label: "People", nav: "primary", icon: "people",
       permission: "member:read" },
+    /*
+      ⚠️ TWO DESTINATIONS, NOT TWO TABS, AND THE SPLIT IS `Level`'S OWN. What the
+      whole workspace is set to and what one person prefers are two operations
+      with different authorities, different consequences and different readers —
+      DESIGN.md §3's first question, which is first because it is the one that
+      decides. They were tabs on one screen, and the permission then had to guard
+      the screen rather than the half of it that needed guarding: a member with no
+      `tenant:manage` could not reach their OWN preferences.
+    */
     { id: "settings", route: "/settings", label: "Settings", nav: "secondary", icon: "cog",
       permission: "tenant:manage" },
+    { id: "preferences", route: "/preferences", label: "Your preferences",
+      nav: "secondary", icon: "person", permission: "note:read" },
     /* ⚠️ DECLARED `commercial`, AND IT IS THE APP'S OWN. Sharing a note puts the
        workspace's brand on a page people outside it read, so the list of what is
        out there exists only for a business — and `reachable` does not offer it
@@ -348,15 +359,39 @@ export const HELLO: AppSpec = defineApp({
     },
   },
 
+  /*
+    ⚠️ THE PAGES ITS SETTINGS LIVE ON, DECLARED. `group` was a free string that
+    made a card heading, so eight settings became one screen of three cards
+    holding a switch, a colour and an email address — three kinds of consequence
+    in one scroll, which DESIGN.md §3 answers by making them three screens. An
+    area is a DESTINATION: it has a mark so a list of them is scannable, and a
+    line saying what changing something here affects, because that is what tells
+    somebody whether to open it.
+  */
+  settingAreas: {
+    notes: area({
+      id: "notes", label: "Notes", icon: "note", order: 0,
+      said: "What a new note starts as, and what a week is measured against",
+    }),
+    appearance: area({
+      id: "appearance", label: "Appearance", icon: "star", order: 1,
+      said: "How notes look here, and how yours are signed",
+    }),
+    email: area({
+      id: "email", label: "Email", icon: "mail", order: 2,
+      said: "Where replies go, and how often you are written to",
+    }),
+  },
+
   settings: {
     "notes.default_pinned": {
-      id: "notes.default_pinned", level: "tenant", group: "Notes",
+      id: "notes.default_pinned", level: "tenant", area: "notes",
       field: field.bool({ label: "Pin new notes", holds: "none" }),
       fallback: false, needs: "tenant:manage",
       help: "New notes start at the top of the list.",
     },
     "notes.default_kind": {
-      id: "notes.default_kind", level: "tenant", group: "Notes",
+      id: "notes.default_kind", level: "tenant", area: "notes",
       field: field.enum({
         label: "What a new note is", holds: "none",
         values: ["idea", "decision", "question", "record"],
@@ -365,7 +400,7 @@ export const HELLO: AppSpec = defineApp({
       help: "Whoever writes it can still change it.",
     },
     "notes.weekly_target": {
-      id: "notes.weekly_target", level: "tenant", group: "Notes",
+      id: "notes.weekly_target", level: "tenant", area: "notes",
       field: field.number({ label: "Notes a week", holds: "none", min: 0, max: 500 }),
       fallback: 20, needs: "tenant:manage",
       help: "What Reports measures a week against.",
@@ -375,27 +410,27 @@ export const HELLO: AppSpec = defineApp({
        was a field holding `#2563eb` to be typed correctly by somebody who
        already knew hex. */
     "notes.accent": {
-      id: "notes.accent", level: "tenant", group: "Appearance",
+      id: "notes.accent", level: "tenant", area: "appearance",
       field: field.colour({ label: "Colour", holds: "none" }),
       fallback: "#3f7d58", needs: "tenant:manage",
     },
     "notes.reply_to": {
-      id: "notes.reply_to", level: "tenant", group: "Email",
+      id: "notes.reply_to", level: "tenant", area: "email",
       field: field.email({ label: "Where replies go", holds: "contact" }),
       fallback: "", needs: "tenant:manage",
     },
     "notes.density": {
-      id: "notes.density", level: "person", group: "Appearance",
+      id: "notes.density", level: "person", area: "appearance",
       field: field.enum({ label: "Density", holds: "none", values: ["comfortable", "compact"] }),
       fallback: "comfortable",
     },
     "notes.signature": {
-      id: "notes.signature", level: "person", group: "Appearance",
+      id: "notes.signature", level: "person", area: "appearance",
       field: field.text({ label: "How you sign a note", holds: "none", max: 60 }),
       fallback: "",
     },
     "notes.digest": {
-      id: "notes.digest", level: "person", group: "Email",
+      id: "notes.digest", level: "person", area: "email",
       field: field.enum({
         label: "Digest", holds: "none",
         values: ["off", "daily", "weekly"],

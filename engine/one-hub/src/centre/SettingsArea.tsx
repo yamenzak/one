@@ -24,14 +24,25 @@ import { settingsOn } from "@engine/kernel";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView } from "./data.js";
 
-export function SettingsArea({ view, app, onGo }: {
+export function SettingsArea({ view, level, app, area, onGo, onArea }: {
   readonly view: CentreView;
+  /**
+   * ⚠️ WHICH AUTHORITY THIS SCREEN IS, AND IT IS ONE PER SCREEN. The workspace's
+   * settings and a person's own preferences rendered one under the other here —
+   * an administration surface with a preference inside it, which also hid the
+   * preference from anybody without `tenant:manage`. They are two destinations
+   * now (`settings` and `prefs`), the same split the hub already draws between
+   * `notices` and `told`.
+   */
+  readonly level: "tenant" | "person";
   /** Which product's settings, when the workspace holds more than one. */
   readonly app?: string;
+  /** Which page of that product's, when it declares more than one. */
+  readonly area?: string;
   readonly onGo: (appId: string) => void;
+  readonly onArea: (areaId: string) => void;
 }) {
-  const has = (a: CentreApp) =>
-    settingsOn(a.settings, "tenant").length > 0 || settingsOn(a.settings, "person").length > 0;
+  const has = (a: CentreApp) => settingsOn(a.settings, level).length > 0;
   const settable = view.apps.filter(has);
 
   /* ⚠️ ONE PRODUCT IS THE SCREEN; SEVERAL ARE A LIST — and the four branches
@@ -49,7 +60,7 @@ export function SettingsArea({ view, app, onGo }: {
         says: "Nothing to change here",
         under: "No product in this workspace declares a setting",
       }}
-      then={(a) => <AppSettings app={a} />}
+      then={(a) => <AppSettings app={a} level={level} area={area} onArea={onArea} />}
     />
   );
 }
@@ -59,12 +70,14 @@ interface StoredAnswer {
   readonly person: Readonly<Record<string, { value?: unknown }>>;
 }
 
-function AppSettings({ app }: { readonly app: CentreApp }) {
+function AppSettings({ app, level, area, onArea }: {
+  readonly app: CentreApp;
+  readonly level: "tenant" | "person";
+  readonly area?: string;
+  readonly onArea: (areaId: string) => void;
+}) {
   const stored = useLoad<StoredAnswer>("setting.read", { app: app.id });
   const held = new Set([...app.permissions]);
-
-  const hasTenant = settingsOn(app.settings, "tenant").length > 0;
-  const hasPerson = settingsOn(app.settings, "person").length > 0;
 
   /*
     ⚠️ THE REFUSAL IS RETURNED, NOT ANNOUNCED. `Settings` puts it in the sheet
@@ -91,32 +104,21 @@ function AppSettings({ app }: { readonly app: CentreApp }) {
       shape="settings"
       of={stored.of}
       again={stored.again}
+      /* ⚠️ WHOSE SETTING IT IS RIDES ON THE PAGE, not on a heading of its own.
+         An area is already a card with a name on it, and a line under that name
+         is where "everyone" against "only you" belongs. */
       then={(data) => (
-        /* ⚠️ WHOSE SETTING IT IS RIDES ON THE GROUP, not on a heading of its
-           own. Each declared group is already a card with a name on it, and a
-           line under that name is where "everyone" against "only you" belongs. */
-        <>
-          {hasTenant ? (
-            <Settings
-              book={app.settings}
-              level="tenant"
-              under="Everyone in this workspace"
-              stored={flat(data.tenant)}
-              held={held}
-              onChange={write}
-            />
-          ) : null}
-          {hasPerson ? (
-            <Settings
-              book={app.settings}
-              level="person"
-              under="Only you"
-              stored={flat(data.person)}
-              held={held}
-              onChange={write}
-            />
-          ) : null}
-        </>
+        <Settings
+          book={app.settings}
+          areas={app.settingAreas}
+          level={level}
+          area={area}
+          onArea={onArea}
+          under={level === "tenant" ? "Everyone in this workspace" : "Only you"}
+          stored={flat(level === "tenant" ? data.tenant : data.person)}
+          held={held}
+          onChange={write}
+        />
       )}
     />
   );

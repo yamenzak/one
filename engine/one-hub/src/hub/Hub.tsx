@@ -34,6 +34,7 @@ import { You } from "./You.js";
 import { Workspaces } from "./Workspaces.js";
 import { OneWorkspace } from "./Workspace.js";
 import { WorkspacePart } from "./Part.js";
+import { Preferences } from "../centre/Preferences.js";
 import { ConsoleHome, ConsolePart } from "./Console.js";
 import { OneTenant } from "../console/OneTenant.js";
 import { InboxScreen } from "../centre/InboxScreen.js";
@@ -43,7 +44,7 @@ import { HUB, above, isConsole, nameOf, parseWhere, pathOf, type Where } from ".
 /* ⚠️ Every branch this file draws, named — the guard reads it, because an
    address the parser can produce with no branch renders a blank page. */
 export const HUB_SCREENS: readonly Where["at"][] = [
-  "home", "you", "inbox", "told", "workspaces", "workspace",
+  "home", "you", "inbox", "told", "prefs", "workspaces", "workspace",
   "people", "money", "plan", "packages", "settings", "brand", "notices", "wording", "trust",
   "console", "tenants", "tenant", "actions", "switches", "works", "ground",
 ];
@@ -246,6 +247,9 @@ function Inside({ where, onGo }: {
     case "you": return <You onGo={onGo} />;
     case "inbox": return <InboxScreen onGo={() => undefined} onSeen={() => undefined} />;
     case "told": return <TellingMe />;
+    /* ⚠️ YOUR OWN PREFERENCES, ACROSS EVERY PRODUCT — no slug, because they are
+       not a workspace's. The same split as `told` against `notices`. */
+    case "prefs": return <Preferences where={where} onGo={onGo} />;
     case "workspaces": return <Workspaces onGo={onGo} />;
     case "workspace": return <OneWorkspace slug={where.slug} onGo={onGo} />;
     case "people": case "money": case "plan": case "packages": case "settings": case "notices":
@@ -255,6 +259,7 @@ function Inside({ where, onGo }: {
           part={where.at}
           slug={where.slug}
           app={"app" in where ? where.app : undefined}
+          area={"area" in where ? where.area : undefined}
           onGo={onGo}
         />
       );

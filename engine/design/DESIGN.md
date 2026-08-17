@@ -580,9 +580,27 @@ Some of this is guarded and some is judgement. What is checked today:
 - `surface` — every declaration reaches a screen; every field kind a control.
 - `shape` — no screen draws its own crown or pins its own action; at most one
   primary per screen; a `settings` screen carries none.
-- `face` — one resolver draws every face; a seed is an identity, not a label.
+- `face` — one resolver draws every face; a seed is an identity, not a label;
+  and every glyph a declaration names exists, because an icon is a STRING in a
+  manifest and a name nobody mapped draws a neutral circle.
+- `edit` — outside a form, a generic surface shows a value and a way to change
+  it, never the control itself; the sheet keeps the draft on a refusal.
+- `problem` — every refusal comes from a catalogue; a refusal naming an input is
+  rendered on that input; interpolated values are supplied where it is raised.
+- `descend` — **§3, for the one surface nobody writes**. A settings page is a
+  declared destination (a mark, a line saying what is behind it, an explicit
+  order); a level lists its pages rather than stacking them; and an authority is
+  a screen rather than a tab.
 
 What is **not** checked, and is therefore on the person writing the screen:
 placement, density, whether a screen is doing two jobs, and whether the reader
 would have looked here. Those are §3 and §7, and they are the ones that make the
 difference between a product and a filing cabinet.
+
+⚠️ **§3 was prose for months and the generated settings screen broke it** — one
+column of every declared row, carded by a free-text heading, holding a switch, a
+colour and an email address. A rule nothing can check is a rule that survives
+only where somebody happened to remember it, so the parts of §3 that ARE
+mechanical now have a guard, and `descend` is that guard. The parts that are
+judgement stay judgement; the difference is that the judgement is now about
+screens somebody wrote, not about the ones the platform generates.

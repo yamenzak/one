@@ -161,12 +161,12 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 |---|---|---|
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 56 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | internal |
-| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 47 |
+| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 48 |
 | `parts/` | rows, cards, lists, controls, the four outcomes | 112 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 50 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**304 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**305 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -186,7 +186,7 @@ there is no deep import, and a guard says so.
 - `frame/overlay.tsx` — `Confirm`, `Dialog`, `Menu`, `MenuItem`, `notice`, `NoticeHost`, `Over`, `Peek`, `Tray`
 - `frame/page.tsx` — `Band`, `BandProps`, `Bleed`, `Page`, `PageProps`, `useNight`, `useScenery`
 - `frame/screen.tsx` — `Act`, `Board`, `Frame`, `Framed`, `Layout`, `LayoutProps`, `Screen`, `ScreenProps`, `Shape`, `Tile`, `Whichever`
-- `frame/shell.tsx` — `CrownInfo`, `glyphOf`, `reachable`, `Shell`, `ShellProps`
+- `frame/shell.tsx` — `CrownInfo`, `GLYPH_NAMES`, `glyphOf`, `reachable`, `Shell`, `ShellProps`
 
 ### `parts/`
 

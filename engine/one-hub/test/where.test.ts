@@ -23,10 +23,43 @@ describe("what belongs to the hub", () => {
   });
 });
 
+/*
+  ⚠️ A PREFERENCE AND AN ADMINISTRATION ARE TWO DESTINATIONS. The level of a
+  setting is an AUTHORITY (DESIGN.md §3's first question), so what a workspace is
+  set to and what one person prefers are not two halves of one screen — they were
+  stacked on the workspace's settings surface, which also put the preference
+  behind `tenant:manage` and hid it from everybody else.
+*/
+describe("a preference is not a workspace's setting", () => {
+  it("files your own preferences under you, and steps back there", () => {
+    expect(pathOf({ at: "prefs" })).toBe(`${HUB}/prefs`);
+    expect(above({ at: "prefs" })).toEqual({ at: "you" });
+    /* ⚠️ And it descends the same two levels, so back goes up one at a time. */
+    expect(above({ at: "prefs", app: "hello", area: "notes" }))
+      .toEqual({ at: "prefs", app: "hello" });
+    expect(above({ at: "prefs", app: "hello" })).toEqual({ at: "prefs" });
+  });
+
+  it("steps back through a workspace's settings one page at a time", () => {
+    expect(above({ at: "settings", slug: "atlas", app: "hello", area: "notes" }))
+      .toEqual({ at: "settings", slug: "atlas", app: "hello" });
+    expect(above({ at: "settings", slug: "atlas", app: "hello" }))
+      .toEqual({ at: "settings", slug: "atlas" });
+    expect(above({ at: "settings", slug: "atlas" }))
+      .toEqual({ at: "workspace", slug: "atlas" });
+  });
+});
+
 describe("every screen has an address", () => {
   it("reads and writes each one back", () => {
     const every = [
-      { at: "home" }, { at: "you" }, { at: "inbox" }, { at: "workspaces" },
+      { at: "home" }, { at: "you" }, { at: "inbox" }, { at: "told" }, { at: "workspaces" },
+      /* ⚠️ YOURS, NOT A WORKSPACE'S — so it carries no slug, and it descends by
+         product and then by page exactly as the workspace's own settings do. */
+      { at: "prefs" }, { at: "prefs", app: "hello" },
+      { at: "prefs", app: "hello", area: "appearance" },
+      { at: "settings", slug: "atlas", app: "hello" },
+      { at: "settings", slug: "atlas", app: "hello", area: "notes" },
       { at: "workspace", slug: "atlas" },
       ...OF_WORKSPACE.map((part) => ({ at: part, slug: "atlas" })),
       { at: "console" },

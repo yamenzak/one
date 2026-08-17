@@ -14,7 +14,7 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { PLATFORM_ROLES, eventsOf, primaryOf, type Channel } from "@engine/kernel";
+import { PLATFORM_ROLES, areasOn, eventsOf, primaryOf, type Channel } from "@engine/kernel";
 import {
   FlagConsole, Guide, NotificationPolicy, Settings, Shelf, Shell, settingsShown, policyShown,
 } from "@engine/design";
@@ -28,28 +28,61 @@ const OWNER = new Set([...(PLATFORM_ROLES.owner ?? []), ...(HELLO.access.roles.w
 const EVERY: readonly Channel[] = ["inbox", "email", "push"];
 
 describe("everything hello declares reaches a screen", () => {
-  it("renders every workspace setting it declared", () => {
-    const tenant = Object.values(HELLO.settings ?? {}).filter((s) => s.level === "tenant");
-    expect(tenant.length).toBeGreaterThan(0);
-    expect(settingsShown(HELLO.settings ?? {}, "tenant", OWNER)).toEqual(tenant.map((s) => s.id));
+  /*
+    ⚠️ EVERY SETTING REACHES A PAGE SOMEBODY CAN OPEN, which is a stricter claim
+    than the one this made before. Settings DESCEND now, so a level renders a
+    LIST of areas and one render can no longer contain every row — and asserting
+    against a single render would have quietly become an assertion that the three
+    area names are present. This walks the pages the surface would offer and
+    checks each row is on one of them, so a setting declared into an area the
+    level never lists fails here rather than being unreachable in silence.
+  */
+  const reaches = (level: "tenant" | "person", held: ReadonlySet<string>) => {
+    const declared = Object.values(HELLO.settings ?? {}).filter((s) => s.level === level);
+    expect(declared.length).toBeGreaterThan(0);
 
-    const out = html(
+    const pages = areasOn(HELLO.settings ?? {}, HELLO.settingAreas ?? {}, level);
+    expect(pages.length).toBeGreaterThan(0);
+
+    const drawn = pages.map((page) => html(
       <Settings
-        book={HELLO.settings ?? {}} level="tenant" stored={{}} held={OWNER} onChange={() => {}}
+        book={HELLO.settings ?? {}} areas={HELLO.settingAreas ?? {}}
+        level={level} area={page.id} onArea={() => {}}
+        stored={{}} held={held} onChange={() => {}}
       />,
-    );
-    for (const s of tenant) expect(out).toContain(s.field.label);
+    )).join("\n");
+
+    for (const s of declared) expect(drawn).toContain(s.field.label);
+    return declared;
+  };
+
+  it("renders every workspace setting it declared, on a page", () => {
+    const tenant = reaches("tenant", OWNER);
+    expect(settingsShown(HELLO.settings ?? {}, "tenant", OWNER)).toEqual(tenant.map((s) => s.id));
   });
 
-  it("renders every personal setting it declared", () => {
-    const person = Object.values(HELLO.settings ?? {}).filter((s) => s.level === "person");
-    expect(person.length).toBeGreaterThan(0);
-    const out = html(
-      <Settings
-        book={HELLO.settings ?? {}} level="person" stored={{}} held={new Set()} onChange={() => {}}
-      />,
-    );
-    for (const s of person) expect(out).toContain(s.field.label);
+  it("renders every personal setting it declared, on a page", () => {
+    reaches("person", new Set());
+  });
+
+  /*
+    ⚠️ AND THE LIST OFFERS EVERY PAGE, which is the other half: a page reachable
+    only by typing its address is a page nobody opens.
+  */
+  it("offers every page a level has", () => {
+    for (const level of ["tenant", "person"] as const) {
+      const out = html(
+        <Settings
+          book={HELLO.settings ?? {}} areas={HELLO.settingAreas ?? {}}
+          level={level} onArea={() => {}}
+          stored={{}} held={OWNER} onChange={() => {}}
+        />,
+      );
+      for (const page of areasOn(HELLO.settings ?? {}, HELLO.settingAreas ?? {}, level)) {
+        expect(out).toContain(page.label);
+        expect(out).toContain(page.said);
+      }
+    }
   });
 
   it("renders every notification it declared, to somebody in its audience", () => {

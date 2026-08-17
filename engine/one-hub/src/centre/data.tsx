@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type {
-  DocumentBook, NotificationBook, ScreenSpec, SettingBook, SubProcessorBook,
+  AreaBook, DocumentBook, NotificationBook, ScreenSpec, SettingBook, SubProcessorBook,
 } from "@engine/kernel";
 import { ready, trouble, waiting, type Loaded } from "@engine/design";
 import { api } from "../api.js";
@@ -24,6 +24,8 @@ export interface CentreApp {
   readonly mark: string;
   readonly screens: readonly ScreenSpec[];
   readonly settings: SettingBook;
+  /** ⚠️ The pages those rows live on — see `AreaDef`. */
+  readonly settingAreas: AreaBook;
   readonly notifications: NotificationBook;
   readonly documents: DocumentBook;
   readonly processors: SubProcessorBook;

@@ -15,7 +15,7 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { field, flag, notification, setting, type Channel, type FieldSpec } from "@engine/kernel";
+import { area, field, flag, notification, setting, type Channel, type FieldSpec } from "@engine/kernel";
 import { Settings, settingsShown } from "../src/rendered/settings.js";
 import { Shown } from "../src/rendered/edit.js";
 import { NotificationPolicy, policyShown } from "../src/rendered/policy.js";
@@ -38,24 +38,35 @@ const html = (node: React.ReactNode): string => renderToStaticMarkup(node);
 
 /* -------------------------------------------------------------- settings --- */
 
+/*
+  ⚠️ THE PAGES, DECLARED. Settings DESCEND now — a level is a list of areas and
+  an area is a page — so a fixture with no areas renders nothing at all, which is
+  the shape these assertions are about.
+*/
+const AREAS = {
+  data: area({ id: "data", label: "Data", icon: "database", said: "What is kept", order: 0 }),
+  payments: area({ id: "payments", label: "Payments", icon: "money", said: "Who takes the money", order: 1 }),
+  appearance: area({ id: "appearance", label: "Appearance", icon: "star", said: "How it looks", order: 2 }),
+};
+
 const SETTINGS = {
   "retention.days": setting({
-    id: "retention.days", level: "tenant", group: "Data",
+    id: "retention.days", level: "tenant", area: "data",
     field: field.number({ label: "Keep records for", holds: "none", min: 1 }),
     fallback: 365, needs: "tenant:manage",
   }),
   "provider.key": setting({
-    id: "provider.key", level: "tenant", group: "Payments", secret: true,
+    id: "provider.key", level: "tenant", area: "payments", secret: true,
     field: field.text({ label: "Secret key", holds: "none" }),
     fallback: "", needs: "tenant:manage",
   }),
   "exports.nightly": setting({
-    id: "exports.nightly", level: "tenant", group: "Data",
+    id: "exports.nightly", level: "tenant", area: "data",
     field: field.bool({ label: "Nightly export", holds: "none" }),
     fallback: false, needs: "tenant:manage", entitlement: "exports",
   }),
   theme: setting({
-    id: "theme", level: "person", group: "Appearance",
+    id: "theme", level: "person", area: "appearance",
     field: field.enum({ label: "Theme", holds: "none", values: ["light", "dark", "system"] }),
     fallback: "system",
   }),
@@ -70,11 +81,61 @@ describe("the settings screens nobody wrote", () => {
     expect(settingsShown(SETTINGS, "person", owner)).toEqual(["theme"]);
 
     const out = html(
-      <Settings book={SETTINGS} level="tenant" stored={{}} held={owner} onChange={() => {}} />,
+      <Settings
+        book={SETTINGS} areas={AREAS} level="tenant" area="data" onArea={() => {}}
+        stored={{}} held={owner} onChange={() => {}}
+      />,
     );
     expect(out).toContain("Keep records for");
+  });
+
+  /*
+    ⚠️ IT DESCENDS, WHICH IS THE WHOLE SHAPE. Without a page named, a level is a
+    LIST of its pages — not one column holding every row it has. This asserts
+    both halves: the list offers each page with the line that says what is behind
+    it, and it does NOT put the rows themselves on the list.
+  */
+  it("offers the pages rather than every row at once", () => {
+    const out = html(
+      <Settings
+        book={SETTINGS} areas={AREAS} level="tenant" onArea={() => {}}
+        stored={{}} held={owner} onChange={() => {}}
+      />,
+    );
     expect(out).toContain("Data");
+    expect(out).toContain("What is kept");
     expect(out).toContain("Payments");
+    expect(out).not.toContain("Keep records for");
+  });
+
+  /*
+    ⚠️ AND A PAGE THE LEVEL HAS NOTHING ON IS NOT OFFERED. `AREAS` declares
+    Appearance, which only the person level uses.
+  */
+  it("does not offer a page this level has nothing on", () => {
+    const out = html(
+      <Settings
+        book={SETTINGS} areas={AREAS} level="tenant" onArea={() => {}}
+        stored={{}} held={owner} onChange={() => {}}
+      />,
+    );
+    expect(out).not.toContain("Appearance");
+  });
+
+  /*
+    ⚠️ NOR ONE WHOSE EVERY ROW THIS READER MAY NOT CHANGE. `areasOn` answers what
+    the LEVEL has; a reader without the permission behind those rows would still
+    be offered the page and find it empty.
+  */
+  it("does not offer a page whose every row is hidden from this reader", () => {
+    const out = html(
+      <Settings
+        book={SETTINGS} areas={AREAS} level="tenant" onArea={() => {}}
+        stored={{}} held={new Set()} onChange={() => {}}
+      />,
+    );
+    expect(out).not.toContain("Payments");
+    expect(out).toContain("Nothing to change here");
   });
 
   /*
@@ -85,7 +146,7 @@ describe("the settings screens nobody wrote", () => {
   it("does not draw a workspace setting for somebody who cannot change it", () => {
     expect(settingsShown(SETTINGS, "tenant", new Set())).toEqual([]);
     const out = html(
-      <Settings book={SETTINGS} level="tenant" stored={{}} held={new Set()} onChange={() => {}} />,
+      <Settings book={SETTINGS} areas={AREAS} onArea={() => {}} level="tenant" stored={{}} held={new Set()} onChange={() => {}} />,
     );
     expect(out).not.toContain("Keep records for");
     expect(out).toContain("Nothing to change here");
@@ -98,7 +159,8 @@ describe("the settings screens nobody wrote", () => {
   it("never puts a stored secret into the page", () => {
     const out = html(
       <Settings
-        book={SETTINGS} level="tenant" held={owner} onChange={() => {}}
+        book={SETTINGS} areas={AREAS} level="tenant" area="payments" onArea={() => {}}
+        held={owner} onChange={() => {}}
         stored={{ "provider.key": "sk_live_do_not_leak" }}
       />,
     );
@@ -118,7 +180,8 @@ describe("the settings screens nobody wrote", () => {
   it("shows what the plan does not include rather than hiding it", () => {
     const out = html(
       <Settings
-        book={SETTINGS} level="tenant" stored={{}} held={owner} onChange={() => {}}
+        book={SETTINGS} areas={AREAS} level="tenant" area="data" onArea={() => {}}
+        stored={{}} held={owner} onChange={() => {}}
         includes={(key) => key !== "exports"}
       />,
     );

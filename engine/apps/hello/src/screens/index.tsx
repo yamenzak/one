@@ -67,6 +67,10 @@ export function HelloScreen({ route, onGo }: {
   const [q, setQ] = React.useState("");
   const [recent, setRecent] = React.useState<readonly string[]>(["pricing", "onboarding"]);
   const [period, setPeriod] = React.useState<PeriodId>("30d");
+  /* ⚠️ THE AREA IS AN ADDRESS IN THE REAL APP AND A STATE HERE, because this
+     file is the ground rather than a router — see `Whichever` for why the real
+     one must come from the address. */
+  const [area, setArea] = React.useState<string | undefined>(undefined);
   const go = onGo ?? nothing;
 
   /* ⚠️ THE NAME COMES FROM THE MANIFEST, NOT FROM A STRING HERE. A screen titled
@@ -84,10 +88,25 @@ export function HelloScreen({ route, onGo }: {
 
   switch (route) {
     case "/people": return <People title={title} of={ready(PEOPLE)} onInvite={nothing} onOpen={nothing} />;
+    /* ⚠️ TWO ROUTES, ONE COMPONENT, AND THE LEVEL IS THE ONLY DIFFERENCE —
+       which is what makes them two destinations rather than two tabs. */
     case "/settings": return (
       <Settings
         title={title}
         level="tenant"
+        area={area}
+        onArea={setArea}
+        held={HELD}
+        stored={{}}
+        onChange={nothing}
+      />
+    );
+    case "/preferences": return (
+      <Settings
+        title={title}
+        level="person"
+        area={area}
+        onArea={setArea}
         held={HELD}
         stored={{}}
         onChange={nothing}

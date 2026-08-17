@@ -30,11 +30,13 @@ import { useSession } from "../session.js";
 export type Part =
   | "people" | "money" | "plan" | "packages" | "settings" | "brand" | "notices" | "trust" | "wording";
 
-export function WorkspacePart({ part, slug, app, onGo }: {
+export function WorkspacePart({ part, slug, app, area, onGo }: {
   readonly part: Part;
   readonly slug: string;
   /** Which product, on the two screens that have one per product. */
   readonly app?: string;
+  /** Which page of a product's settings — they descend (DESIGN.md §3). */
+  readonly area?: string;
   readonly onGo: (to: Where) => void;
 }) {
   const { where } = useSession();
@@ -55,12 +57,17 @@ export function WorkspacePart({ part, slug, app, onGo }: {
       return <Money view={view} onGo={(id) => onGo({ at: "plan", slug, app: id })} />;
     case "plan": return <Plan app={app ?? ""} />;
     case "packages": return <Packages view={view} />;
+    /* ⚠️ THE WORKSPACE'S SETTINGS ONLY. A person's own preferences are `prefs`,
+       under YOU — see `where.ts`. */
     case "settings":
       return (
         <SettingsArea
           view={view}
+          level="tenant"
           app={app}
+          area={area}
           onGo={(id) => onGo({ at: "settings", slug, app: id })}
+          onArea={(id) => onGo({ at: "settings", slug, app, area: id })}
         />
       );
     case "brand": return <Brand name={view.tenant.name} slug={slug} />;

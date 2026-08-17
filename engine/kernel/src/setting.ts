@@ -23,6 +23,48 @@
 import type { FieldSpec } from "./field.js";
 import { refuseField } from "./field.js";
 
+/* ------------------------------------------------------------------ areas --- */
+
+/**
+ * ONE PAGE, ONE SUBJECT.
+ *
+ * ⚠️ A SETTINGS SCREEN THAT IS ONE COLUMN OF EVERY DECLARED ROW IS A FILING
+ * CABINET. DESIGN.md §3 asks what a control CHANGES, and answers that a screen
+ * where one control changes a price, one changes a person's access and one
+ * changes a colour is three screens. `group` was a free string that made the
+ * card's heading and nothing else — so every declaration went into one column
+ * under a word somebody typed, and the screen grew a card per word.
+ *
+ * ⚠️ SO AN AREA IS DECLARED, AND WHAT MAKES IT ONE IS THAT IT CAN BE NAVIGATED
+ * TO. It needs a glyph, because a list of destinations with no marks is a menu
+ * of words; it needs a line saying what changing something here affects,
+ * because that is what tells somebody whether to open it; and it needs an
+ * order, because first-appearance order means adding a setting can move a
+ * page.
+ *
+ * ⚠️ AND THE ICON IS A NAME THE SHELL ALREADY KNOWS. The same vocabulary a
+ * screen's `icon` uses, so a settings area and a nav destination cannot be
+ * marked in two different alphabets.
+ */
+export interface AreaDef {
+  readonly id: string;
+  readonly label: string;
+  /** ⚠️ A glyph the shell knows — see `screen.icon`. */
+  readonly icon: string;
+  /**
+   * ⚠️ WHAT CHANGING SOMETHING HERE AFFECTS, in one line. It is what a person
+   * reads to decide whether to open the page, so "Notes" alone is a word they
+   * have to guess at.
+   */
+  readonly said: string;
+  /** ⚠️ Explicit, or adding a setting reorders the pages. */
+  readonly order: number;
+}
+
+export type AreaBook = Readonly<Record<string, AreaDef>>;
+
+export const area = (def: AreaDef): AreaDef => def;
+
 /* ------------------------------------------------------------------ shape --- */
 
 /**
@@ -42,8 +84,12 @@ export interface SettingDef {
   /** ⚠️ Required. A setting with no default has no value until somebody visits
       a screen, and every reader then has to invent one — differently. */
   readonly fallback: unknown;
-  /** The section it renders under. Sections are ordered by first appearance. */
-  readonly group: string;
+  /**
+   * ⚠️ WHICH AREA'S PAGE IT IS ON, and it must be one the app declared. This
+   * was a free string used as a card heading, so a typo made a second section
+   * with one row in it and nothing anywhere said so.
+   */
+  readonly area: string;
   /**
    * ⚠️ WHO MAY CHANGE IT. Absent on a `person` setting (it is theirs); required
    * on a `tenant` one, because "any member may edit the workspace" is not a
@@ -69,9 +115,27 @@ export const setting = (def: SettingDef): SettingDef => def;
 export const settingsOn = (book: SettingBook, level: Level): readonly SettingDef[] =>
   Object.values(book).filter((s) => s.level === level);
 
-/** ⚠️ Sections in first-appearance order, so a declaration's order is the screen's. */
-export const groupsOn = (book: SettingBook, level: Level): readonly string[] =>
-  [...new Set(settingsOn(book, level).map((s) => s.group))];
+/**
+ * THE PAGES A LEVEL HAS, IN THE ORDER THEY WERE GIVEN.
+ *
+ * ⚠️ AN AREA WITH NOTHING IN IT AT THIS LEVEL IS NOT A PAGE. Areas are declared
+ * once for the app and a level uses some of them, so listing all of them would
+ * offer a destination that opens onto nothing — which is the same class of
+ * failure as a mechanism with no surface, one layer up.
+ */
+export const areasOn = (
+  book: SettingBook, areas: AreaBook, level: Level,
+): readonly AreaDef[] => {
+  const used = new Set(settingsOn(book, level).map((s) => s.area));
+  return Object.values(areas)
+    .filter((a) => used.has(a.id))
+    .sort((a, b) => a.order - b.order);
+};
+
+/** The rows on one page. */
+export const settingsIn = (
+  book: SettingBook, level: Level, areaId: string,
+): readonly SettingDef[] => settingsOn(book, level).filter((s) => s.area === areaId);
 
 /**
  * What a reader gets.
@@ -101,7 +165,8 @@ export const disclose = (
 
 export type SettingRefusal =
   | "field_invalid" | "tenant_without_permission" | "person_with_permission"
-  | "secret_at_person_level" | "operator_with_entitlement" | "no_fallback";
+  | "secret_at_person_level" | "operator_with_entitlement" | "no_fallback"
+  | "unknown_area" | "area_without_settings";
 
 export interface SettingProblem {
   readonly setting: string;
@@ -117,7 +182,7 @@ export interface SettingProblem {
  * their retention, their branding, their payment provider — and nothing about
  * the screen says so.
  */
-export function refuseSetting(def: SettingDef): readonly SettingProblem[] {
+export function refuseSetting(def: SettingDef, areas: AreaBook = {}): readonly SettingProblem[] {
   const out: SettingProblem[] = [];
   const at = (why: SettingRefusal, detail: string) => out.push({ setting: def.id, why, detail });
 
@@ -136,11 +201,34 @@ export function refuseSetting(def: SettingDef): readonly SettingProblem[] {
   if (def.level === "operator" && def.entitlement) {
     at("operator_with_entitlement", "the deployment's own setting, sold to a tenant");
   }
+  /* ⚠️ CHECKED AT COMPOSITION, because a typo here is a page with one row on it
+     and a heading nobody meant to create — visible only to whoever opens it. */
+  if (!areas[def.area]) {
+    at("unknown_area", `no area called ${def.area || "(none)"} is declared`);
+  }
   return out;
 }
 
-export const refuseSettings = (book: SettingBook): readonly SettingProblem[] =>
-  Object.values(book).flatMap(refuseSetting);
+export function refuseSettings(
+  book: SettingBook, areas: AreaBook = {},
+): readonly SettingProblem[] {
+  const out = Object.values(book).flatMap((def) => refuseSetting(def, areas));
+  /*
+    ⚠️ AND AN AREA NOTHING USES IS A DESTINATION THAT OPENS ONTO NOTHING. It
+    survives every other check — the declaration is well formed, it just has no
+    rows — and the first person to find out is whoever taps it.
+  */
+  const used = new Set(Object.values(book).map((s) => s.area));
+  for (const a of Object.values(areas)) {
+    if (!used.has(a.id)) {
+      out.push({
+        setting: a.id, why: "area_without_settings",
+        detail: "a settings page with nothing on it",
+      });
+    }
+  }
+  return out;
+}
 
 /**
  * ⚠️ A SWITCH THAT CHANGES NOTHING IS WORSE THAN AN ABSENT FEATURE. Somebody

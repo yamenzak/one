@@ -51,6 +51,15 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
           label="How you are told"
           onOpen={() => onGo({ at: "told" })}
         />
+        {/* ⚠️ YOURS, NOT A WORKSPACE'S. What you prefer follows you into every
+            workspace you are in, so it is filed under you rather than under one
+            of them — the same reason the inbox and `told` are here. */}
+        <NavRow
+          icon={glyphOf("cog")}
+          label="Your preferences"
+          under="How products behave for you, wherever you are"
+          onOpen={() => onGo({ at: "prefs" })}
+        />
       </Group>
 
       {/*

@@ -26,7 +26,7 @@ import { PRIMARY_MAX, isBusiness, primaryOf } from "@engine/kernel";
 import { Button, Separator } from "@heroui/react";
 import {
   Banknote, Bell, Building2, Calendar, Circle, ClipboardList, Clock, Cog, Coins, Database,
-  Boxes, ChartColumn, FileText, House, Inbox as InboxGlyph, NotebookPen, Package, Plus, Search,
+  Boxes, ChartColumn, FileText, House, Inbox as InboxGlyph, Mail, NotebookPen, Package, Plus, Search,
   Shield, Sparkles, Star, Sun, UserRound, Users,
 } from "lucide-react";
 import { Page } from "./page.js";
@@ -55,7 +55,7 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
   money: <Coins />, coins: <Coins />, bank: <Banknote />,
   settings: <Cog />, cog: <Cog />,
   trust: <Shield />, shield: <Shield />,
-  inbox: <InboxGlyph />, bell: <Bell />,
+  inbox: <InboxGlyph />, bell: <Bell />, mail: <Mail />,
   note: <NotebookPen />, file: <FileText />, list: <ClipboardList />,
   calendar: <Calendar />, package: <Package />,
   /* ⚠️ Making a new one of something is a row like any other, and it needs a
@@ -74,6 +74,15 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
      rendered nav. */
   chart: <ChartColumn />, search: <Search />, star: <Star />,
 };
+
+/**
+ * ⚠️ WHICH NAMES EXIST, AS DATA, so a check can ask. Twice now a declaration has
+ * named a glyph this map does not have and drawn a neutral circle for it — the
+ * failure this file's own header describes, reached by the app it was written
+ * for, because nothing could see the two lists disagreeing. A manifest's icon is
+ * a STRING, so no compiler will ever catch it.
+ */
+export const GLYPH_NAMES: readonly string[] = Object.keys(GLYPHS);
 
 export const glyphOf = (name?: string): React.ReactNode =>
   (name && GLYPHS[name]) ?? <Circle />;
