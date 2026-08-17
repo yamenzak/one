@@ -252,8 +252,13 @@ export function Field({ name, spec, value, onChange, disabled, set, bare }: Fiel
           value={typeof value === "string" ? value : ""}
           isDisabled={disabled || pending}
           onChange={(next) => onChange(next)}
+          aria-label={bare ? label : undefined}
         >
-          <Label>{label}</Label>
+          {/* ⚠️ `bare` REACHES HERE TOO. It did not, so a textarea in a sheet
+              whose title is already the field's name printed that name again
+              directly under it — the one thing `bare` exists to prevent, missed
+              because a textarea is the one kind that never sat in a row. */}
+          {bare ? null : <Label>{label}</Label>}
           <TextArea />
           {help ? <Description>{help}</Description> : null}
         </TextField>

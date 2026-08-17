@@ -16,7 +16,7 @@ import * as React from "react";
 import { Button } from "@heroui/react";
 import { field, mayBrand, type Kind, type Theme } from "@engine/kernel";
 import {
-  BrandTile, Center, ControlRow, Field, Group, Row, Screen, Stack, TextInput, ToggleRow,
+  BrandTile, Center, EditRow, Group, Row, Screen, Stack, TextInput, ToggleRow,
   notice, ready,
 } from "@engine/design";
 import { api } from "../api.js";
@@ -67,6 +67,17 @@ const SAID: Readonly<Record<string, { readonly label: string; readonly under: st
   "app-icons": { label: "The installed app", under: "The tile on a home screen" },
 };
 
+/**
+ * ⚠️ A REFUSED SWITCH HAS NOWHERE ELSE TO SAY SO, which is `settings.tsx`'s
+ * argument one screen over. Every other row opens a sheet and the refusal
+ * renders in it; a toggle applied instantly, so the sentence goes where instant
+ * failures go rather than nowhere.
+ */
+const flip = async (said: Promise<string | null>): Promise<void> => {
+  const why = await said;
+  if (why) notice.fail(why);
+};
+
 export function Brand({ name, slug }: {
   readonly name: string;
   readonly slug: string;
@@ -99,16 +110,31 @@ function Editor({ name, slug, answer, again }: {
   );
 
   /*
-    ⚠️ A SAVE BUTTON, BECAUSE THE SERVER MAY REFUSE. An unreadable pair is
-    refused rather than warned about (`refuseTheme`), so a control applying on
-    every keystroke would roll back while somebody was still typing the second
-    colour of the pair.
+    ⚠️ ONE ROW AT A TIME, AND THE SCREEN'S SAVE BUTTON IS GONE WITH IT. It was
+    there because the server refuses an unreadable ground/ink pair rather than
+    warning about it, and a control applying on every keystroke would have rolled
+    back while somebody was still typing the second colour of the pair. A sheet
+    answers that better than a page-level Save did: the change is deliberate, it
+    lands whole, and the refusal appears against the colour that caused it
+    instead of over a card of four controls with no way to tell which.
+
+    ⚠️ NOTHING IS COMMITTED LOCALLY UNTIL THE SERVER TAKES IT. Optimism here
+    would leave the row showing a colour the workspace does not have, and the
+    sheet is still open holding the draft, so there is nothing to preserve by
+    guessing.
   */
-  const save = async () => {
-    const out = await api.post("brand.write", { theme, surfaces });
-    if (!out.ok) { notice.fail(out.problem.title); return; }
+  const write = async (next: {
+    readonly theme?: Theme;
+    readonly surfaces?: readonly string[];
+  }): Promise<string | null> => {
+    const body = { theme: next.theme ?? theme, surfaces: next.surfaces ?? surfaces };
+    const out = await api.post("brand.write", body);
+    if (!out.ok) return out.problem.title;
+    setTheme(body.theme);
+    setSurfaces(body.surfaces);
     notice.ok("Saved.");
     again();
+    return null;
   };
 
   /*
@@ -149,33 +175,28 @@ function Editor({ name, slug, answer, again }: {
             glyph={theme.mark}
           />
         </Center>
-        <ControlRow label={MARK.label} under={MARK.help}>
-          <Field
-            bare
-            name="mark"
-            spec={MARK}
-            value={theme.mark ?? ""}
-            onChange={(value) => setTheme((was) => ({ ...was, mark: String(value ?? "") }))}
-          />
-        </ControlRow>
+        <EditRow
+          spec={MARK}
+          name="mark"
+          value={theme.mark ?? ""}
+          onSave={(value) => write({ theme: { ...theme, mark: String(value ?? "") } })}
+        />
       </Group>
 
-      {/* ⚠️ `ControlRow` PER TOKEN, WHICH IS WHAT THE SHAPE IS FOR — its own
-          header names a colour as the case it exists to carry. Raw `Field`s in a
-          `Stack` gave three inline triggers and one stacked text field in one
-          card: four controls, two grammars, no row height in common and no
-          column the labels shared. */}
+      {/* ⚠️ THE SWATCH AND THE HEX ARE WHAT THE ROW SAYS; THE PICKER IS BEHIND
+          THE PENCIL. Three inline colour triggers and a stacked text field in
+          one card was four controls, two grammars, no row height in common and
+          no column the labels shared — and every one of them applied on a
+          keystroke, against a server that refuses a pair it cannot read. */}
       <Group label="Colour" under="Refused if the pair is too close to read">
         {(Object.keys(COLOURS) as (keyof typeof COLOURS)[]).map((key) => (
-          <ControlRow key={key} label={COLOURS[key].label}>
-            <Field
-              bare
-              name={key}
-              spec={COLOURS[key]}
-              value={theme[key] ?? ""}
-              onChange={(value) => setTheme((was) => ({ ...was, [key]: String(value ?? "") }))}
-            />
-          </ControlRow>
+          <EditRow
+            key={key}
+            spec={COLOURS[key]}
+            name={key}
+            value={theme[key] ?? ""}
+            onSave={(value) => write({ theme: { ...theme, [key]: String(value ?? "") } })}
+          />
         ))}
       </Group>
 
@@ -192,15 +213,15 @@ function Editor({ name, slug, answer, again }: {
             label={SAID[id]?.label ?? id}
             under={SAID[id]?.under}
             value={surfaces.includes(id)}
-            onChange={(on) => setSurfaces((was) =>
-              on ? [...was, id] : was.filter((s) => s !== id))}
+            /* ⚠️ A SWITCH SAVES ITSELF — see `edit.tsx`. It is its own value and
+               one press undoes it, so a sheet around it would be two presses to
+               say a thing the row already says. */
+            onChange={(on) => void flip(write({
+              surfaces: on ? [...surfaces, id] : surfaces.filter((s) => s !== id),
+            }))}
           />
         ))}
       </Group>
-
-      <Row>
-        <Button variant="primary" onPress={() => void save()}>Save</Button>
-      </Row>
     </Stack>
   );
 }

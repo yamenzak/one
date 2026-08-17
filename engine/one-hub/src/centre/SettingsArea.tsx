@@ -66,16 +66,27 @@ function AppSettings({ app }: { readonly app: CentreApp }) {
   const hasTenant = settingsOn(app.settings, "tenant").length > 0;
   const hasPerson = settingsOn(app.settings, "person").length > 0;
 
+  /*
+    ⚠️ THE REFUSAL IS RETURNED, NOT ANNOUNCED. `Settings` puts it in the sheet
+    that is still open holding what somebody typed; a toast from here would be a
+    sentence beside a row that has already gone back to the old value, and there
+    would then be two places a failure is reported depending on the field's kind.
+
+    ⚠️ AND A REFUSED WRITE RE-READS. The row renders from `stored`, so leaving it
+    alone leaves the screen showing a value the server declined.
+  */
   const write = async (id: string, value: unknown) => {
     const out = await api.post("setting.write", { app: app.id, id, value });
-    if (!out.ok) { notice.fail(out.problem.title); stored.again(); return; }
+    if (!out.ok) { stored.again(); return out.problem.title; }
     notice.ok("Saved.");
+    return null;
   };
 
   return (
-    /* ⚠️ `settings` — every control writes on change (see `write`), so the shape
-       refuses a primary action. A Save button here would be a screen where half
-       the controls save themselves and half do not. */
+    /* ⚠️ `settings` — every row here saves itself, a switch the moment it moves
+       and everything else when its own sheet is saved, so the shape refuses a
+       primary action. A Save button over rows that have already saved says
+       there is something outstanding when there is not. */
     <Screen
       shape="settings"
       of={stored.of}
@@ -92,7 +103,7 @@ function AppSettings({ app }: { readonly app: CentreApp }) {
               under="Everyone in this workspace"
               stored={flat(data.tenant)}
               held={held}
-              onChange={(id, value) => void write(id, value)}
+              onChange={write}
             />
           ) : null}
           {hasPerson ? (
@@ -102,7 +113,7 @@ function AppSettings({ app }: { readonly app: CentreApp }) {
               under="Only you"
               stored={flat(data.person)}
               held={held}
-              onChange={(id, value) => void write(id, value)}
+              onChange={write}
             />
           ) : null}
         </>

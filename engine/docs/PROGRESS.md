@@ -684,7 +684,7 @@ The guard registry, its checks, and the standards that bind them.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 6 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 53 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 55 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
@@ -875,6 +875,8 @@ the library decides FOR us.
 | `the-page-reserves-room-for-its-nav` | D7 | a sticky island floating over the last card on every screen — the island cannot fix it, since by the time it lays out the content above is already sized |
 | `every-component-shipped-is-drawn-somewhere` | D7 | a component exported, tested, documented and rendered by nobody — an absence, which typechecks and has no failing test, and whose first caller is the one who finds out it nests a button, draws its arc in a monochrome accent, or prints "min120" |
 | `the-test-ground-draws-most-of-the-package` | D7 | apps/hello quietly ceasing to be where this package is tried, which would leave the excuse list as the only thing keeping the check green |
+| `a-changeable-fact-is-a-value-and-an-edit` | D7 | a settings card that is a column of live inputs — nothing saying which row is dirty, a stray tap on a phone editing a setting somebody was scrolling past, and a failure reported in a toast beside a control already showing the value the server threw away |
+| `a-refused-change-keeps-what-was-typed` | D7 | the sheet closing on a refusal, so somebody who spent a minute on a value watches it disappear and reads why in a toast that is gone before they look back |
 <!-- /generated -->
 
 ## Commands

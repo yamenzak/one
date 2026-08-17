@@ -26,6 +26,7 @@
 
 import * as React from "react";
 import { Button, Card, Chip, Label, Skeleton, Switch } from "@heroui/react";
+import { Pencil } from "lucide-react";
 import type { Tone } from "@engine/kernel";
 import { TYPE } from "../tokens/type.js";
 import {
@@ -40,6 +41,7 @@ import { ARRIVE, arriveAt } from "../tokens/motion.js";
 import { useScenery } from "../frame/page.js";
 import type { Sky } from "../scene/index.js";
 import { Face, type FaceOf } from "./face.js";
+import { Hint } from "./beside.js";
 import { Tally } from "./tally.js";
 
 /* ------------------------------------------------------------------ group --- */
@@ -210,6 +212,38 @@ export function BrandTile({ name, ground, ink, glyph, size = "panel" }: {
         {glyph || name.trim().charAt(0).toUpperCase() || "·"}
       </span>
     </span>
+  );
+}
+
+/**
+ * ONE CHOSEN COLOUR, AT READING SIZE.
+ *
+ * ⚠️ THE SECOND COMPONENT THAT TAKES A COLOUR, AND FOR `BrandTile`'S REASON. A
+ * row saying what a colour is set to has to draw that colour; taking it from the
+ * theme would draw the colour the workspace has now, which is the one thing
+ * somebody reading the row is not asking about.
+ *
+ * ⚠️ AND IT IS NEVER THE WHOLE ANSWER. A disc alone cannot say "not set", and a
+ * near-black disc on a dark card is a hole rather than a value — so the hex is
+ * written beside it wherever this is used.
+ */
+export function Swatch({ colour, label }: {
+  readonly colour: string;
+  /** What it sets, for anybody not looking at it. */
+  readonly label: string;
+}) {
+  return (
+    <span
+      role="img"
+      aria-label={`${label} — ${colour}`}
+      /* ⚠️ A RING IN `currentColor`, BECAUSE THIS DESIGN HAS NO BORDER TOKEN —
+         `--border` is `transparent` on purpose (see `ground.ts`). Without one, a
+         white swatch on a light card and a near-black one on a dark card are
+         invisible, which reads as a rendering fault rather than as a value. The
+         row's own ink is themed, so this needs no second definition per theme. */
+      className={`inline-block shrink-0 ring-1 ring-current/20 ${TILE.chip}`}
+      style={{ background: colour }}
+    />
   );
 }
 
@@ -556,9 +590,15 @@ export function ControlRow({ icon, face, label, under, wide, children }: RowBase
  * somebody came to read; a layout that gives the two equal weight makes them
  * scan every row twice.
  */
-export function FieldRow({ label, value, onEdit }: {
+export function FieldRow({ label, value, under, onEdit }: {
   readonly label: string;
   readonly value: React.ReactNode;
+  /**
+   * ⚠️ WHY IT IS THE WAY IT IS, UNDER THE VALUE RATHER THAN OVER IT. A row
+   * that cannot be changed has a reason — a plan that does not cover it — and
+   * that reason is read after the fact it explains, not before.
+   */
+  readonly under?: React.ReactNode;
   /** ⚠️ Absent means genuinely not editable — never a disabled pencil, which
       invites somebody to go looking for how to enable it. */
   readonly onEdit?: () => void;
@@ -567,13 +607,28 @@ export function FieldRow({ label, value, onEdit }: {
     <div className={`flex items-center ${ROW.gap} ${ROW.pad} ${ROW.still}`}>
       <span className={`flex min-w-0 grow flex-col items-start text-left ${SPACE.hair}`}>
         <span className={TYPE.note}>{label}</span>
-        <span className={TYPE.body}>{value}</span>
+        <span className={`flex min-w-0 items-center ${SPACE.tight} ${TYPE.body}`}>{value}</span>
+        {under ? <span className={TYPE.note}>{under}</span> : null}
       </span>
       {onEdit ? (
+        /*
+          ⚠️ AN ICON, NOT THE WORD "CHANGE". Every row on a settings card carries
+          one, so the word is the same six characters repeated down the whole
+          column — a rail of noise that the eye has to read past to reach the
+          values, which are the reason the screen exists. The name is on the
+          control for anybody not looking at it.
+        */
         <span className="shrink-0">
-          <Button variant="ghost" aria-label={`Change ${label.toLowerCase()}`} onPress={onEdit}>
-            Change
-          </Button>
+          <Hint says={`Change ${label.toLowerCase()}`}>
+            <Button
+              variant="ghost"
+              isIconOnly
+              aria-label={`Change ${label.toLowerCase()}`}
+              onPress={onEdit}
+            >
+              <Pencil aria-hidden="true" />
+            </Button>
+          </Hint>
         </span>
       ) : null}
     </div>

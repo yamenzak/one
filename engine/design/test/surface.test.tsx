@@ -15,8 +15,9 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { field, flag, notification, setting, type Channel } from "@engine/kernel";
+import { field, flag, notification, setting, type Channel, type FieldSpec } from "@engine/kernel";
 import { Settings, settingsShown } from "../src/rendered/settings.js";
+import { Shown } from "../src/rendered/edit.js";
 import { NotificationPolicy, policyShown } from "../src/rendered/policy.js";
 import { FlagConsole, Shelf, saying, money } from "../src/rendered/console.js";
 import { Shell, reachable } from "../src/frame/shell.js";
@@ -102,7 +103,11 @@ describe("the settings screens nobody wrote", () => {
       />,
     );
     expect(out).not.toContain("sk_live_do_not_leak");
-    expect(out).toContain("Stored. Type to replace it.");
+    /* ⚠️ THE ROW SAYS WHETHER ONE IS STORED, AND THAT IS THE WHOLE ANSWER. It
+       used to assert the input's placeholder; the input is behind the edit
+       sheet now and is not in the page at all until somebody opens it, which is
+       strictly less of a credential surface rather than a weaker check. */
+    expect(out).toContain("Stored");
   });
 
   /*
@@ -302,6 +307,46 @@ describe("a row with a control at the end", () => {
     );
     expect(out).not.toContain(CONTROL_SHARE);
     expect(out).toContain("w-full");
+  });
+});
+
+/*
+  ⚠️ THE ROW IS THE ANSWER, SO IT HAS TO BE READABLE. Every one of these
+  rendered as a wire value or as nothing at some point in the drafting, and each
+  is the same defect: the row saying something that is not what is stored.
+*/
+describe("a stored value, in words", () => {
+  const said = (spec: FieldSpec, value: unknown, set?: boolean) =>
+    html(<Shown spec={spec} value={value} set={set} />);
+
+  it("says an option's name, never its id", () => {
+    const spec = field.enum({
+      label: "State", holds: "none",
+      values: ["not_started", "kg"], labels: { kg: "kg" },
+    });
+    expect(said(spec, "not_started")).toContain("Not started");
+    /* ⚠️ And the declaration's own naming wins, or `kg` comes out as "Kg". */
+    expect(said(spec, "kg")).toContain("kg");
+  });
+
+  it("says a colour in hex beside its disc, and says when there is none", () => {
+    const spec = field.colour({ label: "Accent", holds: "none" });
+    expect(said(spec, "#3f7d58")).toContain("#3f7d58");
+    expect(said(spec, "")).toContain("Not set");
+  });
+
+  /* ⚠️ A SECRET NEVER COMES BACK — the row says whether one is there. */
+  it("says whether a secret is stored, and never what it is", () => {
+    const spec = field.text({ label: "Key", holds: "none" });
+    expect(said(spec, undefined, true)).toContain("Stored");
+    expect(said(spec, undefined, false)).toContain("Not set");
+  });
+
+  /* ⚠️ AND `undefined` IS NOT EMPTY. "Not set" over a value still in flight is
+     a wrong answer somebody will act on by setting it again. */
+  it("says nothing at all while the value is still coming", () => {
+    const spec = field.text({ label: "Reply-to", holds: "contact" });
+    expect(said(spec, undefined)).not.toContain("Not set");
   });
 });
 

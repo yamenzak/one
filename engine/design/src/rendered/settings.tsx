@@ -18,9 +18,10 @@
 
 import type { SettingBook, SettingDef, Level } from "@engine/kernel";
 import { disclose, groupsOn, settingsOn } from "@engine/kernel";
-import { Field } from "./field.js";
-import { ControlRow, Group, ToggleRow } from "../parts/surfaces.js";
+import { EditRow, type Refusal } from "./edit.js";
+import { Group, ToggleRow } from "../parts/surfaces.js";
 import { Nothing } from "../parts/state.js";
+import { notice } from "../frame/overlay.js";
 import { SPACE } from "../tokens/metrics.js";
 
 export interface SettingsProps {
@@ -37,12 +38,30 @@ export interface SettingsProps {
   readonly held: ReadonlySet<string>;
   /** Whether the workspace's plan includes a given key. */
   readonly includes?: (entitlement: string) => boolean;
-  readonly onChange: (id: string, value: unknown) => void;
+  /**
+   * ⚠️ IT ANSWERS WITH THE REFUSAL, WHICH IS WHAT MAKES THE SHEET HONEST.
+   * Fire-and-forget, a failed save is a toast beside a row that has already
+   * repainted itself with the value the server threw away. Returning the
+   * sentence lets the sheet stay open holding what was typed. Nothing back
+   * means it landed.
+   */
+  readonly onChange: (id: string, value: unknown) => Refusal | Promise<Refusal>;
 }
 
 /** ⚠️ Absent, not disabled — see the header. */
 const visible = (def: SettingDef, held: ReadonlySet<string>): boolean =>
   !def.needs || held.has(def.needs);
+
+/**
+ * ⚠️ A SWITCH THAT WAS REFUSED HAS NOWHERE ELSE TO SAY SO. Every other kind
+ * opens a sheet and the refusal renders in it; this one applied instantly, so
+ * the sentence goes where instant failures go. Dropping it would leave a row
+ * showing "On" over a server that said no.
+ */
+const flip = async (said: Refusal | Promise<Refusal>): Promise<void> => {
+  const why = await said;
+  if (why) notice.fail(why);
+};
 
 export function Settings({ book, level, under, stored, held, includes, onChange }: SettingsProps) {
   const groups = groupsOn(book, level);
@@ -79,6 +98,10 @@ export function Settings({ book, level, under, stored, held, includes, onChange 
                  the reason rides on the row rather than as a chip under it. */
               const help = locked ? "Your plan does not include this" : def.field.help;
 
+              /* ⚠️ A SWITCH STAYS INLINE, AND IT IS THE ONLY KIND THAT DOES —
+                 see `edit.tsx`. It is its own value, and undoing it is one
+                 press. A refusal has no sheet to land in, so it says so where
+                 every other instant failure does. */
               if (def.field.kind === "bool") {
                 return (
                   <ToggleRow
@@ -87,30 +110,22 @@ export function Settings({ book, level, under, stored, held, includes, onChange 
                     under={help}
                     value={value === true}
                     isDisabled={locked || value === undefined}
-                    onChange={(next) => onChange(def.id, next)}
+                    onChange={(next) => void flip(onChange(def.id, next))}
                   />
                 );
               }
 
               return (
-                <ControlRow
+                <EditRow
                   key={def.id}
-                  label={def.field.label}
+                  spec={def.field}
+                  name={def.id}
+                  value={value}
+                  set={set}
                   under={help}
-                  /* ⚠️ A textarea takes the width whatever the screen is; every
-                     other control sits at the end of the row. */
-                  wide={def.field.kind === "long"}
-                >
-                  <Field
-                    bare
-                    name={def.id}
-                    spec={def.field}
-                    value={value}
-                    set={set}
-                    disabled={locked}
-                    onChange={(next) => onChange(def.id, next)}
-                  />
-                </ControlRow>
+                  locked={locked}
+                  onSave={(next) => onChange(def.id, next)}
+                />
               );
             })}
           </Group>

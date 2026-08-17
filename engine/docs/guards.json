@@ -1468,6 +1468,24 @@
       "impl": "scripts/showcase.test.mjs",
       "proves": "ground:",
       "fails": "apps/hello quietly ceasing to be where this package is tried, which would leave the excuse list as the only thing keeping the check green"
+    },
+    {
+      "id": "a-changeable-fact-is-a-value-and-an-edit",
+      "protects": "D7",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/edit.test.mjs",
+      "proves": "inline:",
+      "fails": "a settings card that is a column of live inputs — nothing saying which row is dirty, a stray tap on a phone editing a setting somebody was scrolling past, and a failure reported in a toast beside a control already showing the value the server threw away"
+    },
+    {
+      "id": "a-refused-change-keeps-what-was-typed",
+      "protects": "D7",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/edit.test.mjs",
+      "proves": "sheet:",
+      "fails": "the sheet closing on a refusal, so somebody who spent a minute on a value watches it disappear and reads why in a toast that is gone before they look back"
     }
   ]
 }

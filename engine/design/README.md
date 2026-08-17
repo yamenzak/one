@@ -54,6 +54,8 @@ found, in one pass:
 | `Shell` / `Band` / `.tabs__panel` | three of them padded the page, so measured at 390px a card sat 40px from the edge on the settings screen and 16px on the list beside it — nothing failed, the screens simply did not line up |
 | `Rail` | snapped past its own gutter: `snap-start` aligns to the scroller's BORDER edge, so the browser scrolled the first card left by exactly the padding (`scrollLeft: 16`) and it landed flush against the screen. Hidden for as long as the double gutter existed, because the card ate one of the two |
 | `ControlRow` | left the control uncapped, so a text or number field took the whole row, pushed the label under its floor and wrapped — measured as heights of 64, 100, 67 and 100 in ONE settings card at 390px, and 64, 64, 67, 64 at 900px, which is why it read as correct on the screen it was built on |
+| a settings card | was a column of LIVE controls — every row a select, a number field or a colour trigger writing on change. Nothing said which row was dirty, a stray tap on a phone edited a setting somebody was scrolling past, and a refusal arrived as a toast beside a control already showing the value the server threw away. Rows show the value and a pencil now; the control is in `Edit`'s sheet |
+| `Field` (`long`) | ignored `bare`, so a textarea in a sheet printed the field's name directly under the sheet's own title — the one doubling `bare` exists to prevent, missed because a textarea is the one kind that never sat in a row |
 | `Field` (colour, `bare`) | dropped the value along with the label, so a settings row's entire answer was a coloured disc |
 | `--field-background` | was on the `surface` tier, which is a CARD's tier, so an empty text field inside a card was exactly its colour in both themes |
 | `BrandTile` | new, and the reason it is here rather than in a screen: an installed tile was always going to be drawn twice — a swatch beside a colour picker and the real thing in a web manifest — and two drawings of one artwork is how somebody picks a colour, installs the app, and finds a different tile on the phone |
@@ -160,11 +162,11 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 56 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | internal |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 47 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 110 |
-| `rendered/` | whole surfaces drawn from a kernel declaration | 44 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 111 |
+| `rendered/` | whole surfaces drawn from a kernel declaration | 49 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**296 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**302 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -196,13 +198,14 @@ there is no deep import, and a guard says so.
 - `parts/heads.tsx` — `Balance`, `distinguishing`, `Figure`, `Prose`, `Section`, `SectionTitle`, `Title`
 - `parts/listing.tsx` — `Col`, `Listing`, `ListingProps`, `Paged`
 - `parts/state.tsx` — `Await`, `AwaitProps`, `ChartWaiting`, `FigureWaiting`, `FormWaiting`, `Loaded`, `Nothing`, `nothingIn`, `ready`, `RowsWaiting`, `TableWaiting`, `TextWaiting`, `TilesWaiting`, `trouble`, `Trouble`, `waiting`, `Working`
-- `parts/surfaces.tsx` — `ActionRow`, `AmountRow`, `BrandTile`, `ControlRow`, `CopyRow`, `FieldRow`, `Group`, `GroupProps`, `Identity`, `Money`, `NavRow`, `NavRowProps`, `NoteRow`, `OfferRow`, `PersonRow`, `Place`, `QuickActions`, `SeeAll`, `Sheet`, `StepRow`, `TileGrid`, `ToggleRow`
+- `parts/surfaces.tsx` — `ActionRow`, `AmountRow`, `BrandTile`, `ControlRow`, `CopyRow`, `FieldRow`, `Group`, `GroupProps`, `Identity`, `Money`, `NavRow`, `NavRowProps`, `NoteRow`, `OfferRow`, `PersonRow`, `Place`, `QuickActions`, `SeeAll`, `Sheet`, `StepRow`, `Swatch`, `TileGrid`, `ToggleRow`
 - `parts/tally.tsx` — `Tally`, `TallyProps`
 
 ### `rendered/`
 
 - `rendered/ai.tsx` — `AiLanes`, `LanesProps`
 - `rendered/console.tsx` — `FlagConsole`, `FlagConsoleProps`, `money`, `saying`, `Shelf`, `ShelfProps`
+- `rendered/edit.tsx` — `Edit`, `EditProps`, `EditRow`, `Refusal`, `Shown`
 - `rendered/field.tsx` — `Field`, `FieldProps`
 - `rendered/guide.tsx` — `Guide`, `GuideProps`, `Help`, `HelpProps`, `Milestones`, `MilestonesProps`
 - `rendered/inbox.tsx` — `Bell`, `BellProps`, `Inbox`, `InboxProps`, `Note`
