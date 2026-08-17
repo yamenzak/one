@@ -60,8 +60,8 @@ a call site over in a product.
 | `notify` | what somebody is told, through which channel, and who may narrow it | 12 | 1 |
 | `problem` | the one refusal shape, and the platform's own catalogue | 6 | — |
 | `tone` | the voice — the rules a written string has to pass | 2 | 1 |
-| `vault` | the facts that are not an app's to keep (D11) | 8 | 1 |
-| `legal` | documents, purposes, sub-processors, the record of processing | 5 | 3 |
+| `vault` | the facts that are not an app's to keep (D11) | 8 | — |
+| `legal` | documents, purposes, sub-processors, the record of processing | 5 | 2 |
 | `guide` | help, onboarding, the milestones a workspace passes | 5 | — |
 | `job` | scheduled work, and the record that it ran | 5 | — |
 | `brand` | which surfaces a workspace may put its own mark on | 10 | 1 |
@@ -69,7 +69,7 @@ a call site over in a product.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**197 of them**, 176 reached by something today.
+**197 of them**, 178 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -108,7 +108,7 @@ layering failure rather than a shortcut. A guard says so.
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
 | `inbox` | notifications: the policy, the audience, the read | 10 | — |
 | `services` | the lane out to a provider — AI and mail | 5 | 2 |
-| `vault` | encrypted facts, consent, grants, and who looked | 13 | 8 |
+| `vault` | encrypted facts, consent, grants, and who looked | 13 | — |
 | `audit` | what happened, and the replay that stops it happening twice | 7 | — |
 | `jobs` | the scheduler and the record that it ran | 6 | 1 |
 | `branding` | a workspace's own theme and marks | 4 | — |
@@ -124,8 +124,9 @@ layering failure rather than a shortcut. A guard says so.
 | `platform-schema` | the platform's own tables, in dependency order, listed once | 2 | — |
 | `dispatch` | an event an operation raises becomes a note in somebody's inbox | 1 | — |
 | `sweep` | the daily clock: erase what is past the ladder's last rung | 2 | — |
+| `vault-ops` | consent, grants, who looked, the processing record, export and erasure | 1 | — |
 
-**187 of them**, 162 reached by something today.
+**188 of them**, 171 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

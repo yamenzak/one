@@ -24,10 +24,11 @@ import type {
 import { PLATFORM_PROBLEMS, eraseBy, eventFor, operationsFor, permissionFor, routeFor } from "@engine/kernel";
 import { tableFor } from "@engine/kernel";
 import type { Db } from "./sql.js";
-import { list, patch, put, readOne, type WriteRefusal } from "./records.js";
+import { list, patch, put, readOne, type VaultSeam, type WriteRefusal } from "./records.js";
 import { memberOps } from "./member-ops.js";
 import { packageOps } from "./packages.js";
 import { settingOps } from "./settings.js";
+import { vaultOps } from "./vault-ops.js";
 import { moneyOps } from "./money-ops.js";
 import { centreOps } from "./centre-ops.js";
 
@@ -56,6 +57,13 @@ export interface Ctx {
    * was a token the copy did not contain. `Problem.fields` is what the edit
    * sheet reads (`refusedOn`), so a refusal that names a field lands on it.
    */
+  /**
+   * ⚠️ WHERE A SPECIAL CATEGORY GOES (D11). Absent means this deployment has not
+   * bound a vault, and a write carrying one is REFUSED rather than written to
+   * the column that exists — which is the whole failure the declaration exists
+   * to prevent.
+   */
+  readonly vault?: VaultSeam;
   readonly fail: (
     code: string,
     values?: Record<string, string | number>,
@@ -152,7 +160,7 @@ function refuse(ctx: Pick<Ctx, "fail">, done: WriteRefusal, spec: CollectionSpec
         return row;
       }
       case "create": {
-        const done = await put(ctx.db, spec, scope, input, ctx.accountId, ctx.now);
+        const done = await put(ctx.db, spec, scope, input, ctx.accountId, ctx.now, ctx.vault);
         if ("why" in done) refuse(ctx, done, spec);
         return done;
       }
@@ -162,7 +170,7 @@ function refuse(ctx: Pick<Ctx, "fail">, done: WriteRefusal, spec: CollectionSpec
            this operation used to be the read WITHOUT the write: it answered 200
            with the id and changed nothing. */
         const done = await patch(ctx.db, spec, scope, String(input.id ?? ""),
-          input, ctx.accountId, ctx.now);
+          input, ctx.accountId, ctx.now, ctx.vault);
         if ("why" in done) refuse(ctx, done, spec);
         return done;
       }
@@ -224,6 +232,13 @@ export function compose(app: AppSpec): Composed {
   for (const [id, resolved] of Object.entries(settingOps(app))) byId.set(id, resolved);
   for (const [id, resolved] of Object.entries(moneyOps(app))) byId.set(id, resolved);
   for (const [id, resolved] of Object.entries(centreOps(app))) byId.set(id, resolved);
+  /* ⚠️ ONLY WHERE THERE IS SOMETHING TO CONSENT TO. An app that declares no
+     purposes and no vault fields would otherwise answer eight routes about
+     facts it does not hold, and a consent sheet with nothing on it reads as a
+     product that asked and was told yes. */
+  if (Object.keys(app.purposes ?? {}).length || Object.keys(app.vault ?? {}).length) {
+    for (const [id, resolved] of Object.entries(vaultOps(app))) byId.set(id, resolved);
+  }
 
   for (const spec of app.operations) {
     byId.set(spec.id, {

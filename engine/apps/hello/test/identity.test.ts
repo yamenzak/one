@@ -32,10 +32,21 @@ const SECRET = "test-secret";
 /** ⚠️ What a deployment's mailer would do. A failure here is a refusal, not a shrug. */
 const sent: { to: string; code: string }[] = [];
 
-const app = () => serve({
+/**
+ * ⚠️ THE VAULT SECRET IS A PARAMETER SO THE ABSENT CASE CAN BE DRIVEN. A
+ * deployment that has not bound one must REFUSE a special category rather than
+ * fall back to the column that exists, and a harness that always binds one
+ * cannot tell the difference.
+ *
+ * ⚠️ AND IT IS ITS OWN SECRET, NEVER THE SESSION ONE. Rotating `AUTH_SECRET` is
+ * ordinary hygiene; rotating this is the silent loss of every fact stored under
+ * it, with no error until somebody reads one.
+ */
+const app = (vaultSecret: string | null = "test-vault-secret") => serve({
   roots: ROOTS,
   apps: { hello },
   directory: directory(),
+  ...(vaultSecret ? { vaultSecret } : {}),
   shardOf: () => shard(),
   personal: personalOps({
     secret: SECRET,
@@ -491,18 +502,18 @@ describe("a person's own records", () => {
     ⚠️ AND IT IS REFUSED, NOT DROPPED. Discarding it silently would answer 200 to
     somebody who typed something private and believed it was saved.
   */
-  it("refuses a vault-backed value rather than writing it to a column", async () => {
+  it("refuses a vault-backed value on a deployment with no vault wired", async () => {
     const { theirs } = await workspace();
 
-    const wrote = await post("northwind", "/api/check-in.create",
-      { week, went: "hard", struggling: "Not sleeping." }, theirs);
+    /* ⚠️ NO SECRET IS A REFUSAL, NOT A FALLBACK. The wrong answer is to write it
+       to the column that exists — which is the whole failure the declaration
+       exists to prevent, and would look like an ordinary successful save. */
+    const wrote = await app(null)(new Request("https://northwind.one.test/api/check-in.create", {
+      method: "POST", headers: { cookie: theirs, "content-type": "application/json" },
+      body: JSON.stringify({ week, went: "hard", struggling: "Not sleeping." }),
+    }));
     expect(wrote.status).toBe(400);
     expect(JSON.stringify(await wrote.json())).toContain("struggling");
-
-    /* And nothing was written — a refusal that half-applied would be worse. */
-    const mine = await get("northwind", "/api/check-in.list", theirs)
-      .then((r) => r.json()) as { items: unknown[] };
-    expect(mine.items).toHaveLength(0);
   });
 
   /*
@@ -530,6 +541,86 @@ describe("a person's own records", () => {
     const own = await get("northwind", "/api/inbox.list", boss)
       .then((r) => r.json()) as { items: unknown[] };
     expect(own.items).toHaveLength(0);
+  });
+
+  /*
+    ⚠️ THE WHOLE VAULT, THROUGH THE REAL WORKER. The value never reaches the
+    column that bears its name; it is encrypted under a key derived from a
+    secret this database does not hold and a salt destroying which erases the
+    person. What the row keeps is nothing.
+  */
+  it("keeps a special category out of its own column and in the vault", async () => {
+    const { theirs } = await workspace();
+
+    const wrote = await post("northwind", "/api/check-in.create",
+      { week, went: "hard", struggling: "Not sleeping." }, theirs);
+    expect(wrote.status).toBe(200);
+
+    /* ⚠️ THE COLUMN IS EMPTY AND THE CIPHERTEXT IS NOT THE PLAINTEXT. Asserting
+       only the first would pass on a write that dropped the value entirely. */
+    const row = await shard().prepare(`SELECT struggling FROM check_in`)
+      .first<{ struggling: string | null }>();
+    expect(row?.struggling ?? null).toBeNull();
+
+    const fact = await shard().prepare(`SELECT cipher FROM vault_fact WHERE field = ?`)
+      .bind("check-in.struggling").first<{ cipher: string }>();
+    expect(fact?.cipher).toBeTruthy();
+    expect(fact?.cipher).not.toContain("Not sleeping");
+
+    /* ⚠️ AND THE PERSON CAN READ THEIR OWN, which is Article 15 and is the one
+       read that needs no grant: a subject does not ask themselves for consent. */
+    const mine = await get("northwind", "/api/vault.export", theirs)
+      .then((r) => r.json()) as { facts: Record<string, string> };
+    /* ⚠️ Keyed `collection.field`, which is what the declaration says and what
+       the export, the grant and the look all read. */
+    expect(mine.facts["check-in.struggling"]).toBe("Not sleeping.");
+  });
+
+  /*
+    ⚠️ ERASURE IS THE KEY, NOT THE ROWS. After it the ciphertext is still there —
+    deliberately, so the count of what was held stays verifiable — and nothing
+    can read it, including us.
+  */
+  it("makes every fact about somebody noise, and cannot be done twice", async () => {
+    const { theirs } = await workspace();
+    await post("northwind", "/api/check-in.create",
+      { week, went: "hard", struggling: "Not sleeping." }, theirs);
+
+    expect((await post("northwind", "/api/vault.forget", {}, theirs)).status).toBe(200);
+
+    const still = await shard().prepare(`SELECT cipher FROM vault_fact WHERE field = ?`)
+      .bind("check-in.struggling").first<{ cipher: string }>();
+    expect(still?.cipher).toBeTruthy();
+
+    /* The export can no longer produce it, and neither can anything else. */
+    expect((await get("northwind", "/api/vault.export", theirs)).status).toBe(404);
+    /* ⚠️ And erasure is not a pause: a second one is refused rather than
+       re-opening the subject with a new salt. */
+    expect((await post("northwind", "/api/vault.forget", {}, theirs)).status).toBe(404);
+  });
+
+  /*
+    ⚠️ CONSENT IS THE PART THAT MEETS ARTICLE 9, AND IT IS WITHDRAWABLE. A
+    purpose the product depends on is no exception — what changes is what the
+    app can do afterwards, never whether the answer may be no.
+  */
+  it("records an agreement and a withdrawal, and keeps both", async () => {
+    const { theirs } = await workspace();
+
+    const shown = await get("northwind", "/api/vault.consents", theirs)
+      .then((r) => r.json()) as { purposes: { id: string; givenAt: string | null }[] };
+    expect(shown.purposes.map((p) => p.id)).toContain("wellbeing");
+    expect(shown.purposes[0]?.givenAt).toBeNull();
+
+    await post("northwind", "/api/vault.consent", { purpose: "wellbeing", given: true }, theirs);
+    await post("northwind", "/api/vault.consent", { purpose: "wellbeing", given: false }, theirs);
+
+    const after = await get("northwind", "/api/vault.consents", theirs)
+      .then((r) => r.json()) as { purposes: { givenAt: string | null; withdrawnAt: string | null }[] };
+    /* ⚠️ "They agreed on Tuesday and withdrew on Friday" is the record. Deleting
+       the row would leave no evidence the reads before Friday were lawful. */
+    expect(after.purposes[0]?.givenAt).toBeTruthy();
+    expect(after.purposes[0]?.withdrawnAt).toBeTruthy();
   });
 
   it("lets somebody who holds the review key read the team's, and nobody else", async () => {

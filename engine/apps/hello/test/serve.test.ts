@@ -164,6 +164,18 @@ describe("what the manifest produced", () => {
       "POST /api/package.revoke",
       "GET /api/setting.read",
       "POST /api/setting.write",
+      /* ⚠️ AND THE VAULT'S EIGHT, BECAUSE THIS APP DECLARES A SPECIAL CATEGORY.
+         An app that declares none gets none of them — a consent sheet with
+         nothing on it reads as a product that asked and was told yes. */
+      "POST /api/vault.consent",
+      "GET /api/vault.consents",
+      "GET /api/vault.export",
+      "POST /api/vault.forget",
+      "POST /api/vault.grant",
+      "GET /api/vault.grants",
+      "GET /api/vault.looks",
+      "GET /api/vault.processing",
+      "POST /api/vault.revoke",
     ]);
   });
 

@@ -73,6 +73,19 @@ export interface Env {
   readonly OPERATOR_EMAILS?: string;
   /** ⚠️ Absent means this deployment cannot charge — see `standingFor`. */
   readonly STRIPE_KEY?: string;
+  /**
+   * ⚠️ THE VAULT'S OWN SECRET, AND ROTATING IT IS DATA LOSS. Every vault fact's
+   * key is derived from this and the subject's salt, so a new value does not
+   * re-encrypt anything — it makes every fact already stored undecryptable, with
+   * no error until somebody reads one. It is deliberately NOT `AUTH_SECRET`,
+   * which is rotated as ordinary hygiene: one name for both would have turned a
+   * routine security action into the silent loss of every health record on the
+   * deployment.
+   *
+   * ⚠️ ABSENT IS A REFUSAL, NOT A FALLBACK. With no secret an app declaring a
+   * special category cannot write one, and the write says so — see `VaultSeam`.
+   */
+  readonly VAULT_SECRET?: string;
   readonly [binding: string]: unknown;
 }
 
@@ -252,6 +265,9 @@ const handler = (env: Env) => {
       a role taken away stops working immediately rather than at the next sign-in
       — which is exactly when it matters that it does.
     */
+    ...(String(env.VAULT_SECRET ?? "").trim()
+      ? { vaultSecret: String(env.VAULT_SECRET) }
+      : {}),
     identify: async (request, located) => {
       /*
         ⚠️ TWO WAYS TO SAY WHO YOU ARE, ONE ANSWER TO WHAT YOU MAY DO. A person

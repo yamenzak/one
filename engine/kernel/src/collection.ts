@@ -128,7 +128,7 @@ export const eraseBy = (spec: CollectionSpec): { readonly column: string; readon
 export type CollectionRefusal =
   | "field_invalid" | "global_holds_data" | "kept_without_reason"
   | "subject_column_missing" | "quota_without_ceiling" | "no_operations_at_all"
-  | "not_a_name";
+  | "not_a_name" | "vault_without_a_subject";
 
 /**
  * ⚠️ AN ID AND A FIELD NAME BECOME A TABLE AND A COLUMN, AND AN IDENTIFIER
@@ -160,6 +160,27 @@ export function refuseCollection(spec: CollectionSpec): readonly CollectionProbl
 
   for (const bad of refuseFields(spec.fields)) {
     at("field_invalid", `${bad.field}: ${bad.why}`);
+  }
+
+  /*
+    ⚠️ A VAULT FACT IS ABOUT A PERSON, SO THE ROW HAS TO NAME ONE. The vault is
+    keyed by SUBJECT — one salt per person, destroying it erases them, and every
+    consent and grant is theirs to give. A tenant-scoped row has no person in it,
+    so a vault-backed field there has no subject to be about: the write would
+    have to invent one, and whatever it invented would be who the consent, the
+    grant log and the erasure belonged to.
+
+    ⚠️ AND IT IS REFUSED AT COMPOSITION RATHER THAN HANDLED AT THE WRITE, because
+    the honest handling is a guess. This is the declaration being wrong, and the
+    fix is either a subject scope or an ordinary column.
+  */
+  if (spec.scope.of !== "subject") {
+    for (const [name, f] of Object.entries(spec.fields)) {
+      if (f.vault) {
+        at("vault_without_a_subject",
+          `${name} is vault-backed and this collection is scoped by ${spec.scope.of} — a vault fact is about a person, and this row names none`);
+      }
+    }
   }
 
   if (!NAME.test(spec.id)) at("not_a_name", `"${spec.id}" cannot be a table name`);

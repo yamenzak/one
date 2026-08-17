@@ -51,7 +51,7 @@ reader can trust this table instead of re-reading the code.
 | 23 | Mail that leaves the process — a letter, its variables, and a provider | planned |
 | 24 | A workspace composes its own roles out of one app's keys | planned |
 | 25 | The deployment's own legal documents — a privacy notice, terms, and the acceptance that binds them | planned |
-| 26 | The vault is opened — consent, who looked, your data, and an erasure that shreds | planned |
+| 26 | The vault is opened — consent, who looked, your data, and an erasure that shreds | shipped |
 | 27 | The AI lane runs — an action reaches a provider and the reserve settles | planned |
 | 28 | Notifications are filed — an event raised becomes a note in somebody's inbox | shipped |
 | 29 | The daily sweep — erasure happens on a clock, and every run is recorded | shipped |
@@ -729,7 +729,7 @@ The guard registry, its checks, and the standards that bind them.
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
-| D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 10 |
+| D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 12 |
 | D12 | Every cross-cutting concern is a field on a declaration, never a call site | 52 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
@@ -939,6 +939,8 @@ the library decides FOR us.
 | `a-deferral-names-a-stage-that-exists` | D12 | a marker that reads as a plan and points at nothing, so the gap is neither enumerable nor scheduled |
 | `the-index-of-what-exists-cannot-be-silently-incomplete` | D12 | a generated index missing a module — the one page whose job is answering “does this already exist” telling a reader, in a table, that it does not |
 | `a-scheduled-handler-has-a-trigger` | D12 | a sweep that compiles, typechecks, passes its own tests and is called by Cloudflare exactly never — so nothing is ever erased, behind a green run |
+| `a-special-category-never-reaches-a-product-column` | D11 | health data in plaintext beside the ordinary fields, outside consent, outside the record of who looked and outside erasure — with the manifest's refusal satisfied and every other test green |
+| `a-vault-field-names-a-person` | D11 | a vault fact on a row that names nobody — the write would invent a subject, and whatever it invented is who the consent, the grants and the erasure belonged to |
 <!-- /generated -->
 
 ## Commands

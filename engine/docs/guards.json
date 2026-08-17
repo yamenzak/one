@@ -1675,6 +1675,24 @@
       "impl": "scripts/inert.test.mjs",
       "proves": "declares no triggers.crons and the worker has a scheduled handler",
       "fails": "a sweep that compiles, typechecks, passes its own tests and is called by Cloudflare exactly never — so nothing is ever erased, behind a green run"
+    },
+    {
+      "id": "a-special-category-never-reaches-a-product-column",
+      "protects": "D11",
+      "stage": "26",
+      "status": "live",
+      "impl": "apps/hello/test/identity.test.ts",
+      "proves": "keeps a special category out of its own column and in the vault",
+      "fails": "health data in plaintext beside the ordinary fields, outside consent, outside the record of who looked and outside erasure — with the manifest's refusal satisfied and every other test green"
+    },
+    {
+      "id": "a-vault-field-names-a-person",
+      "protects": "D11",
+      "stage": "26",
+      "status": "live",
+      "impl": "kernel/src/collection.ts",
+      "proves": "vault_without_a_subject",
+      "fails": "a vault fact on a row that names nobody — the write would invent a subject, and whatever it invented is who the consent, the grants and the erasure belonged to"
     }
   ]
 }

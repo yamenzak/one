@@ -116,7 +116,6 @@ export interface RopaSource {
  * sub-processor that receives a category nothing collects is reported by
  * `refuseLegal` rather than silently listed against nothing.
  */
-/* DEFER(engine-26) stage:26 — the record of processing has no screen to be printed on. */
 export const ropa = (
   sources: readonly RopaSource[],
   processors: SubProcessorBook,

@@ -32,6 +32,7 @@ import { whoIs, type PersonalBook, type PersonalCtx } from "./personal.js";
 import type { TenantRow } from "./directory.js";
 import { tenantBySlug } from "./directory.js";
 import { brandingOf } from "./branding.js";
+import { keep } from "./vault.js";
 import { iconSvg, webManifest, type Installable, type Installer } from "./installable.js";
 import type { Db } from "./sql.js";
 
@@ -82,6 +83,15 @@ export interface Wiring {
    */
   readonly personal?: PersonalBook;
   readonly shardOf?: (tenant: TenantRow) => Db;
+  /**
+   * ⚠️ ITS OWN SECRET, AND NEVER THE SESSION ONE. The key for every vault fact
+   * is derived from this and the subject's salt, so rotating it does not
+   * invalidate anything — it makes every fact already stored undecryptable, with
+   * no error until somebody reads one. `AUTH_SECRET` is rotated as ordinary
+   * hygiene; this must never be, and giving them one name would have made a
+   * routine security action into silent, total data loss.
+   */
+  readonly vaultSecret?: string;
   /**
    * ⚠️ WHO THIS DEPLOYMENT IS, FOR THE TILES THAT WEAR OUR MARK. A personal
    * workspace installs as ours; nothing about a hostname can supply a name and a
@@ -355,6 +365,22 @@ export async function performOperation(
     appOf: (appId) => wiring.apps[appId]?.() ?? null,
     enabledApps: located.apps,
     email: who.email ?? null,
+    /*
+      ⚠️ THE SEAM TO THE VAULT, AND IT IS ABSENT WHEN NO SECRET IS BOUND. A
+      deployment that has not chosen a vault secret cannot keep a special
+      category, and the generated write refuses rather than falling back to the
+      column — falling back is the failure.
+    */
+    ...(wiring.vaultSecret
+      ? {
+        vault: {
+          secret: wiring.vaultSecret,
+          keep: (subject: string, field: string, value: string) => keep(
+            located.db, wiring.vaultSecret!, located.tenantId as never,
+            subject as never, field, value, now),
+        },
+      }
+      : {}),
     allowance: (key: string) =>
       (located.entitlements ?? []).find((e) => e.key === key)?.value ?? false,
     fail: (code, values, extra) => { throw new Refused(problem(catalog, code, values, extra)); },

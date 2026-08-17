@@ -15,7 +15,7 @@
  */
 
 import type { CollectionSpec } from "@engine/kernel";
-import { checkAll, checkSome, eraseBy, newId } from "@engine/kernel";
+import { checkAll, checkSome, eraseBy, newId, vaultKeyFor } from "@engine/kernel";
 import { column, table, type Db } from "./sql.js";
 
 export interface Written {
@@ -43,13 +43,25 @@ export type WriteRefusal =
  * consent, outside the record of who looked, and outside crypto-shredding, with
  * every guard and every test green.
  *
- * ⚠️ IT IS REFUSED RATHER THAN DROPPED. Silently discarding it would answer 200
- * to somebody who typed something private and believed it was saved, which is
- * the worse of the two failures — and after stage 26 this is where the value is
- * handed to `keep` instead, so a refusal now is the same seam as the write then.
+ * ⚠️ IT GOES TO THE VAULT INSTEAD, AND THE SUBJECT IS THE ROW'S OWN SCOPE. A
+ * vault fact is about a person, so a collection carrying one is refused at
+ * composition unless it is scoped by subject — which means the row already says
+ * whose it is, and the write never has to guess.
  */
 const vaultBacked = (spec: CollectionSpec, values: Record<string, unknown>): readonly string[] =>
   Object.keys(values).filter((name) => spec.fields[name]?.vault);
+
+/**
+ * ⚠️ NO VAULT WIRED IS A REFUSAL, NOT A PASS-THROUGH. A deployment that has not
+ * bound `VAULT_SECRET` cannot keep a special category anywhere — and the wrong
+ * answer is to write it to the column that exists, which is exactly the failure
+ * the whole declaration exists to prevent.
+ */
+export interface VaultSeam {
+  readonly keep: (subject: string, field: string, value: string) => Promise<void>;
+  /** ⚠️ For the reads that decrypt — the export, and a granted look. */
+  readonly secret: string;
+}
 
 /**
  * ⚠️ VALIDATED AT THE ONE PLACE THAT VALIDATES. The declaration is a literal a
@@ -63,23 +75,26 @@ export async function put(
   values: Record<string, unknown>,
   by: string | null = null,
   now = new Date(),
+  vault?: VaultSeam,
 ): Promise<Written | WriteRefusal> {
   const checked = checkAll(spec.fields, values);
   if (!checked.ok) return { why: "invalid", detail: checked.why };
 
+  const erase = eraseBy(spec);
   const held = vaultBacked(spec, checked.values);
-  if (held.length) {
+  if (held.length && !vault) {
     return { why: "vault_only",
-      detail: `${held.join(", ")} belongs in the vault and there is no route to it yet (stage 26)` };
+      detail: `${held.join(", ")} belongs in the vault and this deployment has none wired` };
   }
 
-  const erase = eraseBy(spec);
   const id = newId(spec.id.replace(/-/g, "_"), now);
   const columns = ["id", ...(erase ? [erase.column] : []), "at", "by"];
   const bound: unknown[] = [id, ...(erase ? [scope] : []), now.toISOString(), by];
 
   for (const [name, value] of Object.entries(checked.values)) {
     if (name === erase?.column) continue;
+    /* ⚠️ THE COLUMN IS NEVER WRITTEN for a vault-backed field — see below. */
+    if (spec.fields[name]?.vault) continue;
     columns.push(name);
     bound.push(normalise(value));
   }
@@ -87,6 +102,20 @@ export async function put(
   await db.prepare(
     `INSERT INTO ${table(spec.id)} (${columns.map(column).join(", ")})
      VALUES (${columns.map(() => "?").join(", ")})`).bind(...bound).run();
+
+  /*
+    ⚠️ THE FACT GOES TO THE VAULT AFTER THE ROW EXISTS, and the subject is the
+    row's own scope — which a collection carrying a vault field is guaranteed to
+    have, because composition refuses one that is not scoped by subject.
+  */
+  for (const name of held) {
+    /* ⚠️ `vaultKeyFor`, NEVER THE BARE FIELD NAME. The vault book is keyed
+       `collection.field` because two collections may both have a `notes`, and a
+       write that stored the short name put the fact somewhere the declaration
+       does not describe — so the export skipped it and every look answered
+       "nothing kept" about a fact that was right there. */
+    await vault!.keep(scope, vaultKeyFor(spec.id, name), String(checked.values[name] ?? ""));
+  }
   return { id };
 }
 
@@ -116,6 +145,7 @@ export async function patch(
   values: Record<string, unknown>,
   by: string | null = null,
   now = new Date(),
+  vault?: VaultSeam,
 ): Promise<Written | WriteRefusal> {
   const erase = eraseBy(spec);
   const { id: _ignored, ...rest } = values;
@@ -127,12 +157,21 @@ export async function patch(
   if (!checked.ok) return { why: "invalid", detail: checked.why };
 
   const held = vaultBacked(spec, checked.values);
-  if (held.length) {
+  if (held.length && !vault) {
     return { why: "vault_only",
-      detail: `${held.join(", ")} belongs in the vault and there is no route to it yet (stage 26)` };
+      detail: `${held.join(", ")} belongs in the vault and this deployment has none wired` };
+  }
+  for (const name of held) {
+    /* ⚠️ `vaultKeyFor`, NEVER THE BARE FIELD NAME. The vault book is keyed
+       `collection.field` because two collections may both have a `notes`, and a
+       write that stored the short name put the fact somewhere the declaration
+       does not describe — so the export skipped it and every look answered
+       "nothing kept" about a fact that was right there. */
+    await vault!.keep(scope, vaultKeyFor(spec.id, name), String(checked.values[name] ?? ""));
   }
 
-  const names = Object.keys(checked.values);
+  /* ⚠️ A vault-backed value is kept above and never becomes a column here. */
+  const names = Object.keys(checked.values).filter((n) => !spec.fields[n]?.vault);
   /* ⚠️ An edit that changes nothing still stamps the provenance: somebody
      reviewed this record and left it as it was, which is a fact worth keeping —
      and answering "nothing to do" would make a no-op indistinguishable from a

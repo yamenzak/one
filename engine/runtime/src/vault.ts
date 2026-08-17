@@ -3,9 +3,17 @@
  *
  * ⚠️ ERASURE IS CRYPTO-SHREDDING, AND THAT IS WHY THE SALT IS PER SUBJECT. One
  * write destroys somebody's salt and every ciphertext about them becomes noise —
- * everywhere, including in whatever backup already left the building. Deleting
- * rows cannot make that claim, and "we deleted your data" is a claim somebody
- * may one day have to stand behind in front of a regulator.
+ * to a reader, to a copy of the fact table, and to us. Deleting rows cannot make
+ * that claim, and "we deleted your data" is a claim somebody may one day have to
+ * stand behind in front of a regulator.
+ *
+ * ⚠️ AND THE LIMIT OF THAT CLAIM, BECAUSE SOMEBODY WILL RELY ON IT. What is
+ * destroyed is a ROW IN THIS DATABASE. A restore from before the shred brings
+ * the salt back and the ciphertext with it, so a point-in-time restore has to
+ * re-run the erasure — this is protection against a leaked copy of the facts,
+ * not against a full restore. Crypto-shredding is also a defensible reading of
+ * Article 17 rather than a settled one: it is standard practice, no supervisory
+ * authority has ruled it out, and none has blessed it either.
  *
  * ⚠️ ENCRYPTED ROWS IN THE SHARD, NOT A DURABLE OBJECT. The deciding property is
  * that erasure and export must be PROVABLE FROM DECLARATIONS: a guard has to be
@@ -16,15 +24,6 @@
  * ⚠️ AND EVERY READ IS RECORDED, UNCONDITIONALLY. This is the one place in the
  * framework with no opt-out: "who looked at my health record, and when" is the
  * question the whole design exists to be able to answer.
- *
- * DEFER(engine-26) stage:26 — NONE OF IT IS MOUNTED. `VAULT_SCHEMA` is in the
- * deployment's shard modules, so the tables exist on every database, and no
- * operation reaches a single function in this file. The manifest already refuses
- * an app that would keep a special category in its own table, so the effect
- * today is that such a field has nowhere to go rather than that it goes
- * somewhere unsafe — but every sentence above describes a promise no route can
- * currently keep, and that is the more dangerous half. Stage 26 is the
- * operations and the surfaces: consent, who looked, your data, and erasure.
  */
 
 import type { AccountId, TenantId, VaultBook } from "@engine/kernel";

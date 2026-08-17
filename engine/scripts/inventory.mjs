@@ -217,6 +217,7 @@ if (what === "guards") {
     ["platform-schema", "the platform's own tables, in dependency order, listed once"],
     ["dispatch", "an event an operation raises becomes a note in somebody's inbox"],
     ["sweep", "the daily clock: erase what is past the ladder's last rung"],
+    ["vault-ops", "consent, grants, who looked, the processing record, export and erasure"],
   ];
 
   const pkg = what === "declares" ? "kernel" : "runtime";
