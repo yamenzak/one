@@ -38,6 +38,10 @@ export async function balanceOf(db: Db, tenantId: TenantId): Promise<Balance> {
   return { balance, held, spendable: Math.max(0, balance - held) };
 }
 
+/* DEFER(engine-21) stage:21 — a balance can be read, reserved against and
+   settled, and there is no way to put a credit INTO one: nothing takes a card
+   and no operator route grants. Every workspace therefore holds zero forever,
+   which is why nothing metered has ever been refused for lack of funds. */
 export async function openAccount(
   db: Db, tenantId: TenantId, currency = "EUR", now = new Date(),
 ): Promise<void> {
@@ -53,6 +57,7 @@ export async function openAccount(
  * balance without the row leaves money that appeared from nowhere, and that is
  * the one thing nobody can reconstruct afterwards.
  */
+/* DEFER(engine-21) stage:21 — see the note above. */
 export async function credit(
   db: Db, tenantId: TenantId, amount: number, reason: string,
   opts: { readonly appId?: AppId; readonly ref?: string } = {}, now = new Date(),
@@ -133,6 +138,7 @@ export interface Spent {
  * business paying for three of our products has to be able to see which one is
  * spending, or the shared balance becomes the reason they cannot tell.
  */
+/* DEFER(engine-21) stage:21 — see the note above. */
 export async function spentByApp(
   db: Db, tenantId: TenantId, since: string,
 ): Promise<readonly Spent[]> {

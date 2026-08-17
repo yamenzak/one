@@ -1639,6 +1639,24 @@
       "impl": "scripts/inert.test.mjs",
       "proves": "turbo:",
       "fails": "a worker's integration suite running against whichever SPA build happened to be lying around — turbo ignores a task key for a package it does not have, in silence, and the edge that connects a suite to its own build is exactly the one nothing else in the graph can express"
+    },
+    {
+      "id": "a-runtime-capability-is-mounted-or-is-waiting-on-a-named-stage",
+      "protects": "D12",
+      "stage": "10",
+      "status": "live",
+      "impl": "scripts/capability.test.mjs",
+      "proves": "and nothing imports it",
+      "fails": "a capability with tables, tests and a document describing it, that no route reaches — the whole vault, the AI lane and the inbox's one write were all in that state at once, and every signal a reader has said they were there"
+    },
+    {
+      "id": "a-deferral-names-a-stage-that-exists",
+      "protects": "D12",
+      "stage": "10",
+      "status": "live",
+      "impl": "scripts/capability.test.mjs",
+      "proves": "PROGRESS.md has no row for them",
+      "fails": "a marker that reads as a plan and points at nothing, so the gap is neither enumerable nor scheduled"
     }
   ]
 }

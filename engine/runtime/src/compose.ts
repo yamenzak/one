@@ -215,6 +215,11 @@ export function compose(app: AppSpec): Composed {
 }
 
 /** ⚠️ For a suite that composes the same id twice with different declarations. */
+/* DEFER(engine-32) stage:32 — reached only by a test today, which is not a
+   mount. Nothing invalidates a composed manifest at runtime because nothing
+   changes one at runtime; the day an app is enabled mid-isolate, this is the
+   call that has to happen and forgetting it serves the old surface until the
+   isolate dies. */
 export const forget = (appId?: string): void => {
   if (appId) MEMO.delete(appId); else MEMO.clear();
 };

@@ -25,7 +25,7 @@ import { inLane, mayIsolate, refuseCatalogue, refusePrompt } from "@engine/kerne
 import { actionsOf, bind, bindingsOf, running } from "./ai-actions.js";
 import { adjust, subscriptionFor } from "./billing.js";
 import {
-  addShard, appsOfTenant, commercialAllowance, setCommercialGrant, shards, tenantBySlug,
+  addShard, appsOfTenant, commercialAllowance, commercialLeft, setCommercialGrant, shards, tenantBySlug,
 } from "./directory.js";
 import { runsOf } from "./jobs.js";
 import type { PersonalBook, PersonalCtx } from "./personal.js";
@@ -207,7 +207,13 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
            differ the moment somebody has already spent one, and the number an
            operator needs to see is the one the person will meet. */
         const allowance = await commercialAllowance(ctx.directory, accountId);
-        return { email, granted: allowance.granted, used: allowance.used };
+        /* ⚠️ AND `left` IS ASKED, NOT SUBTRACTED. An unlimited grant is not a
+           number, and `granted - used` on one produces a figure a screen would
+           print — which is how "unlimited, 3 used" becomes a countdown. */
+        return {
+          email, granted: allowance.granted, used: allowance.used,
+          left: commercialLeft(allowance),
+        };
       },
     },
 

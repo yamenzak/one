@@ -104,6 +104,42 @@ so it is in the deferral list rather than in the silence, or **delete it**.
 
 ---
 
+## 2a. And the same question, one layer down
+
+⚠️ **A RULE NOBODY CALLS REFUSES NOTHING; A CAPABILITY NOBODY MOUNTS IS WORSE.**
+The rule is a paragraph that is not true. The capability is a table created on
+every deploy, a store with tests over it, a document describing the feature, and
+no address anybody could reach it at — so every signal a reader has says it is
+there. `scripts/capability.test.mjs` asks it of every value `@engine/runtime`
+exports, and the evidence is an import rather than a mention: half the runtime's
+verbs are ordinary English (`keep`, `look`, `grant`, `credit`, `forget`) and a
+name-anywhere search reports the vault as mounted from eleven screens that have
+never heard of it.
+
+**What it found the first time it ran, and none of it was suspected:**
+
+| Waiting on | What is not mounted |
+|---|---|
+| stage 26 | the whole vault — consent, the record of who looked, export, and crypto-shredding. `VAULT_SCHEMA` is applied on every shard. |
+| stage 27 | `generate`, the one call that reaches a provider. An operator can bind a model and a workspace can reword the prompt; nothing runs. The metering chain hangs off it, so no reserve is ever taken. |
+| stage 28 | `fileNote` — the write that puts a note in an inbox. The inbox reads, marks seen and configures; nothing has ever filed one. |
+| stage 29 | the clock. No `scheduled` handler exists, so `pastDue` and `dueForErasure` are asked by nobody and the ladder does not climb. |
+| stage 21 | every write that would put credit into an account or move a subscription's standing. |
+| stage 30, 31, 32 | app enablement, sign-out-everywhere and step-up, and forgetting a composed manifest. |
+
+⚠️ **PROGRESS.md SAID OTHERWISE IN TWO PLACES**, and both have been corrected —
+that the service workers "are called in-process today", and that the ladder
+"walks". Neither was true, both read as settled, and a guard found them in a
+second where three careful readings had not.
+
+The excuse is a `DEFER(engine-N)` marker and nothing else, so an unmounted
+capability lands in the same deferral list `docs.test.mjs` already enumerates —
+its stage cannot be flipped to shipped over it, and a marker naming a stage
+PROGRESS.md does not carry is itself a failure. A list inside the guard would be
+a waiver; this is a schedule.
+
+---
+
 ## 3. What the guards actually cover
 
 The registry (`docs/guards.json`) is the list; PROGRESS.md holds the generated
@@ -114,6 +150,7 @@ is what tells you whether the next thing you write is covered.
 |---|---|---|
 | A declaration reaching nobody | `surface` | a mechanism built, wired, tested, with nowhere anybody could look |
 | A rule reaching nothing | `rules` | a refusal argued for in its own header and called by nothing |
+| A capability reaching nothing | `capability` | tables applied on every deploy, a store with tests over it, a document describing the feature, and no address anybody could reach it at |
 | A capability reaching no route | `access`, `services` | tables applied, a DO bound, dispatch sites writing rows, no route to reach any of it |
 | Two answers to one question | `rules`, `edit`, `problem` | a lane working out for itself what the kernel already decides |
 | A grammar breaking quietly | `heroui`, `metrics`, `states`, `shape`, `descend`, `edit` | a screen that typechecks, renders, looks finished and reads as a filing cabinet |

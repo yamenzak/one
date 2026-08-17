@@ -74,6 +74,10 @@ export async function subscriptionFor(
   return row ? asSub(row) : null;
 }
 
+/* DEFER(engine-21) stage:21 — the four writes below are the ladder, and nothing
+   drives them: no card is taken, so no webhook confirms a payment and no clock
+   marks a workspace past due. `standingFor` reads the row they would write, so
+   every workspace is permanently in whatever state it was created in. */
 export async function subscribe(
   db: Db, tenantId: TenantId, appId: AppId, planId: string, status: SubStatus, now = new Date(),
 ): Promise<void> {
@@ -85,6 +89,7 @@ export async function subscribe(
 }
 
 /** ⚠️ The anchor every rung of the ladder is measured from. Set once, cleared on payment. */
+/* DEFER(engine-21) stage:21 — see the note above. */
 export async function markPastDue(
   db: Db, tenantId: TenantId, appId: AppId, now = new Date(),
 ): Promise<void> {
@@ -93,6 +98,7 @@ export async function markPastDue(
      WHERE tenant_id = ? AND app_id = ?`).bind(now.toISOString(), tenantId, appId).run();
 }
 
+/* DEFER(engine-21) stage:21 — see the note above. */
 export async function markPaid(db: Db, tenantId: TenantId, appId: AppId): Promise<void> {
   await db.prepare(
     `UPDATE subscription SET status = 'active', past_due_at = NULL WHERE tenant_id = ? AND app_id = ?`)
@@ -140,6 +146,7 @@ export async function heldBy(
  * one-way door — the only way back discarded the grandfathering with it. Two
  * columns, because they want opposite rules.
  */
+/* DEFER(engine-21) stage:21 — see the note above. */
 export async function grandfather(
   db: Db, tenantId: TenantId, appId: AppId, was: Readonly<Record<string, Allowance>>,
 ): Promise<void> {

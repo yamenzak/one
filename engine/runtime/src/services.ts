@@ -1,6 +1,14 @@
 /**
  * THE WORK THAT LEAVES THE REQUEST PATH (D3).
  *
+ * DEFER(engine-27) stage:27 — `generate` IS THE ONLY CALL THAT REACHES A
+ * PROVIDER, AND NOTHING CALLS IT. The operator can bind a model to an action and
+ * a workspace can reword its prompt — `ai-actions.ts` is mounted and both are
+ * live — but the run itself has no route, so an AI action resolves everything it
+ * needs and then generates nothing. The metering chain hangs off this call too:
+ * `reserve`, `settle` and `release` are reached from here and nowhere else, so
+ * no reserve is ever taken and no credit ever spent. Stage 27 is the route.
+ *
  * ⚠️ ONE WORKER ANSWERS REQUESTS; THE HEAVY THINGS ARE BOUND TO IT. Generation
  * and delivery both bring weight the request path should not pay for — a model
  * catalogue, provider clients, MIME, push encryption — and none of it belongs in

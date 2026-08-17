@@ -45,6 +45,13 @@ reader can trust this table instead of re-reading the code.
 | 23 | Mail that leaves the process — a letter, its variables, and a provider | planned |
 | 24 | A workspace composes its own roles out of one app's keys | planned |
 | 25 | The deployment's own legal documents — a privacy notice, terms, and the acceptance that binds them | planned |
+| 26 | The vault is opened — consent, who looked, your data, and an erasure that shreds | planned |
+| 27 | The AI lane runs — an action reaches a provider and the reserve settles | planned |
+| 28 | Notifications are filed — an event raised becomes a note in somebody's inbox | planned |
+| 29 | The daily sweep — the ladder climbs, standing changes, erasure happens on a clock | planned |
+| 30 | A workspace's apps are turned on and off, and a workspace can move shard | planned |
+| 31 | Account security — sign out everywhere, and proving it is you again before something irreversible | planned |
+| 32 | A manifest changes while the deployment is up, and the composed surface forgets | planned |
 
 ## What is NOT built, and where to pick it up
 
@@ -89,13 +96,29 @@ Honestly outstanding, in the order it will bite:
      `(tenant, account)` and the vault lives on a shard. They belong to a
      workspace's own surface today. An account-WIDE version of any of them is a
      new account-scoped operation, not a screen somebody forgot to add.
+   - ⚠️ **AND THE CONSENT SHEET AND "WHO LOOKED" ARE NOT ON A WORKSPACE'S
+     SURFACE EITHER — the sentence above implied they were, and they are not.**
+     `VAULT_SCHEMA` is applied on every shard and not one function in
+     `runtime/src/vault.ts` is reached by an operation: no consent is recorded,
+     no read is audited, nothing is shredded and nothing is exported. That is
+     stage 26, and it was found by `scripts/capability.test.mjs` rather than by
+     reading, which is the whole argument for that guard existing.
 4. **The service workers are contracts, not deployments.** `AiService` and
-   `NotifyService` are the typed seam, and the runtime implements both — but they
-   are called in-process today. Splitting them into bound workers is a
-   `wrangler.jsonc` change and no code change, which is the property the seam was
-   built for.
-5. **Payment.** The bill is assembled and the ladder walks; nothing takes a card.
+   `NotifyService` are the typed seam, and the runtime implements both. Splitting
+   them into bound workers is a `wrangler.jsonc` change and no code change, which
+   is the property the seam was built for.
+   - ⚠️ **THEY ARE NOT "CALLED IN-PROCESS TODAY", WHICH IS WHAT THIS SAID.**
+     Neither is called at all: `generate` is the one call that reaches a provider
+     and `fileNote` the one that puts a note in an inbox, and nothing imports
+     either. So no AI action generates, no reserve is taken, no credit is spent,
+     and an event an app raises is raised into nothing. Stages 27 and 28.
+5. **Payment.** The bill is assembled; nothing takes a card.
    That is a provider integration, and it is deliberately the last thing.
+   - ⚠️ **AND THE LADDER DOES NOT WALK — that clause was wrong too.** There is no
+     `scheduled` handler in the deployment, so `pastDue` and `dueForErasure` are
+     asked by nobody: a workspace is never marked past due, never suspended and
+     never erased. Stage 29 is the clock; the writes it would drive
+     (`markPastDue`, `markPaid`, `subscribe`, `credit`) are stage 21's.
 6. **The template.** A second app is copied from `apps/hello` today. A real
    `apps/_template` with the conformance tests that catch a bad copy is the
    cheapest thing on this list and the one that decides whether app #3 diverges.
@@ -698,7 +721,7 @@ The guard registry, its checks, and the standards that bind them.
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 10 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 48 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 50 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -903,6 +926,8 @@ the library decides FOR us.
 | `the-design-system-navigates-nothing` | D7 | the package deciding navigation for every app that uses it — and the hub, which is not one app, having two routers in one page |
 | `a-guard-that-walks-reports-what-it-walked` | D12 | a green run over an empty corpus reading exactly like a green run over a full one — three checks in this tree printed a confident sentence for months while examining nothing, and each was found by accident rather than by the gate |
 | `a-build-edge-names-a-package-that-exists` | D12 | a worker's integration suite running against whichever SPA build happened to be lying around — turbo ignores a task key for a package it does not have, in silence, and the edge that connects a suite to its own build is exactly the one nothing else in the graph can express |
+| `a-runtime-capability-is-mounted-or-is-waiting-on-a-named-stage` | D12 | a capability with tables, tests and a document describing it, that no route reaches — the whole vault, the AI lane and the inbox's one write were all in that state at once, and every signal a reader has said they were there |
+| `a-deferral-names-a-stage-that-exists` | D12 | a marker that reads as a plan and points at nothing, so the gap is neither enumerable nor scheduled |
 <!-- /generated -->
 
 ## Commands

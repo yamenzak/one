@@ -13,7 +13,7 @@
  */
 
 import type { AppId, AppSpec, TenantId } from "@engine/kernel";
-import { billFor, subscriptionFor } from "./billing.js";
+import { billFor, mixedCurrencies, subscriptionFor } from "./billing.js";
 import { balanceOf } from "./credits.js";
 import type { PlatformCtx } from "./member-ops.js";
 import type { Resolved } from "./compose.js";
@@ -59,7 +59,14 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         apps.map((a) => ({ id: a.id as AppId, plans: a.plans })));
       const balance = await balanceOf(ctx.directory, ctx.tenantId as TenantId);
 
-      return { apps: held, bill, balance };
+      /*
+        ⚠️ A MIXED-CURRENCY BILL SAYS SO. `billFor` leaves the offending lines
+        out of the total rather than adding euros to dirhams, which is right —
+        and on its own it produces a bill whose lines do not add up to its own
+        total, with nothing on the screen explaining why. The refusal has to
+        travel with the number it changed.
+      */
+      return { apps: held, bill, balance, mixed: mixedCurrencies(bill.lines) };
     },
   };
   return { "money.view": spec };

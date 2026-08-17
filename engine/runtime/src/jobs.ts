@@ -1,6 +1,14 @@
 /**
  * THE SCHEDULER, AND THE RECORD THAT IT RAN.
  *
+ * DEFER(engine-29) stage:29 — THERE IS NO CLOCK. The deployment declares no
+ * `scheduled` handler, so `run` is only ever reached by something asking for it
+ * — and the two questions the sweep exists to ask, `pastDue` and
+ * `dueForErasure`, are asked by nobody. The dunning ladder does not climb and a
+ * workspace past its erasure date is not erased. The paragraph below about a job
+ * going quiet rather than failing is exactly right and describes every job here.
+ * Stage 29 is the cron trigger and the sweep it drives.
+ *
  * ⚠️ A JOB THAT STOPS RUNNING DOES NOT FAIL — IT GOES QUIET. Nothing is waiting
  * for its answer, so a throw at 03:00 has no user, no request, no 500 and no red
  * test. The dunning ladder simply stops climbing, or the sweep stops sweeping,

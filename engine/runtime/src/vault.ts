@@ -16,6 +16,15 @@
  * ⚠️ AND EVERY READ IS RECORDED, UNCONDITIONALLY. This is the one place in the
  * framework with no opt-out: "who looked at my health record, and when" is the
  * question the whole design exists to be able to answer.
+ *
+ * DEFER(engine-26) stage:26 — NONE OF IT IS MOUNTED. `VAULT_SCHEMA` is in the
+ * deployment's shard modules, so the tables exist on every database, and no
+ * operation reaches a single function in this file. The manifest already refuses
+ * an app that would keep a special category in its own table, so the effect
+ * today is that such a field has nowhere to go rather than that it goes
+ * somewhere unsafe — but every sentence above describes a promise no route can
+ * currently keep, and that is the more dangerous half. Stage 26 is the
+ * operations and the surfaces: consent, who looked, your data, and erasure.
  */
 
 import type { AccountId, TenantId, VaultBook } from "@engine/kernel";

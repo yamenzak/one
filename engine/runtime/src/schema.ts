@@ -162,6 +162,19 @@ export async function applySchema(db: Db, modules: SchemaModules): Promise<reado
       .bind(module.id).first<{ stamp: string }>();
     if (seen?.stamp === stamp) { out.push({ module: module.id, ran: false, added: [] }); continue; }
 
+    /*
+      ⚠️ REFUSED BEFORE ANY OF IT RUNS, AND THROWN RATHER THAN REPORTED. Every
+      fault `refuseSql` names is one that half-applies: the batch stops at the
+      bad statement with the earlier ones already committed and the stamp not
+      written, so the next boot starts again from a database that is neither the
+      old shape nor the new one. A `DROP` is worse — it succeeds.
+    */
+    const wrong = refuseSql(module);
+    if (wrong.length) {
+      throw new Error(`schema module "${module.id}" is malformed: `
+        + wrong.map((w) => `${w.why} in ${JSON.stringify(w.statement.slice(0, 60))}`).join("; "));
+    }
+
     for (const statement of module.statements) await db.exec(oneLine(statement));
 
     /* ⚠️ AND THEN THE COLUMNS THE TABLE DOES NOT HAVE YET. This is the whole

@@ -26,7 +26,7 @@
 
 import type { Door, McpTool, Problem } from "@engine/kernel";
 import { PLATFORM_PROBLEMS, PUBLIC, isTool, problem, toolFor } from "@engine/kernel";
-import { compose, type Composed, type Resolved } from "./compose.js";
+import { compose, surfaceOfComposed, type Composed, type Resolved } from "./compose.js";
 import { NOBODY, performOperation, type Located, type Who, type Wiring } from "./serve.js";
 
 /* --------------------------------------------------------------- envelope --- */
@@ -130,7 +130,11 @@ async function listTools(wiring: Wiring, located: Located, who: Who): Promise<re
     /* ⚠️ Per app (D15): the same caller may reach different tools in different
        products, and one flat set would list the union — tools the gate refuses. */
     const permissions = await who.permissionsIn(composed.app.id);
-    for (const resolved of composed.byId.values()) {
+    /* ⚠️ ONE SOURCE, NOT A SECOND WALK. `surfaceOfComposed` is what the
+       OpenAPI document and the typed client are written from; a catalogue that
+       enumerated the map itself would be a second answer to "what does this
+       deployment answer", and the two drift in the direction nobody tests. */
+    for (const resolved of surfaceOfComposed(composed)) {
       if (seen.has(resolved.id)) continue;
       seen.add(resolved.id);
       if (!maySee(resolved, who, permissions)) continue;

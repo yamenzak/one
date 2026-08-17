@@ -21,7 +21,8 @@ import {
   AI_ACTION_SCHEMA, AUDIT_SCHEMA, BILLING_SCHEMA, BRANDING_SCHEMA, DIRECTORY_SCHEMA,
   IDENTITY_SCHEMA, INBOX_SCHEMA,
   JOBS_SCHEMA, MEMBERSHIP_SCHEMA, OPERATOR_SCHEMA, PACKAGE_SCHEMA, REPLAY_SCHEMA, SETTING_SCHEMA, VAULT_SCHEMA,
-  NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, locator, memberFor, noteShardApp,
+  NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, deploymentFaults, locator,
+  memberFor, noteShardApp,
   operatorOps, permissionsResolver, personalOps, schemaFor, serve, sessionIdFrom, shardFor,
   subscriptionFor, whoIs,
   type Db, type TenantRow,
@@ -37,6 +38,23 @@ import { hello } from "@engine/hello";
  * for it.
  */
 const APPS: Readonly<Record<string, () => AppSpec>> = { hello };
+
+/**
+ * ⚠️ THE SHARDS THIS DEPLOYMENT PLACES ON, NAMED ONCE. `addShard` registers them
+ * and `deploymentFaults` checks each has a binding behind it, and two lists
+ * would let a shard be registered and unchecked — which is precisely the state
+ * whoever signed in first would discover.
+ */
+const SHARDS = ["eu-1"] as const;
+
+/**
+ * ⚠️ THE SERVICE BINDINGS SOMETHING ACTUALLY REACHES. Empty is the honest answer
+ * today: the AI lane and the notify lane are built and mounted nowhere (stages
+ * 27 and 28), so a deployment that binds `AI` is paying for a provider no route
+ * can call. Saying so at boot is the difference between finding that in a
+ * fifteen-minute read and finding it on an invoice.
+ */
+const SERVICES_REACHED: readonly string[] = [];
 
 /**
  * ⚠️ THE PLATFORM'S OWN TABLES, IN DEPENDENCY ORDER. A module that alters a
@@ -120,8 +138,29 @@ const boot = (env: Env): Promise<void> => {
       is RIGHT THERE, bound and migrated. Both writes are upserts, so a
       thousand cold starts write what one did.
     */
-    await addShard(directory, "eu-1", "eu", 10_000);
-    for (const id of Object.keys(APPS)) await noteShardApp(directory, "eu-1", id as never);
+    for (const id of SHARDS) await addShard(directory, id, "eu", 10_000);
+    for (const shard of SHARDS) {
+      for (const id of Object.keys(APPS)) await noteShardApp(directory, shard, id as never);
+    }
+
+    /*
+      ⚠️ AND THEN WHAT IS WRONG WITH THE DEPLOYMENT, SAID ONCE PER ISOLATE. Every
+      fault `deploymentFaults` reports is one a customer would otherwise find:
+      a shard placed on and not bound, a collection erasure cannot reach, a
+      provider bound and never called.
+
+      ⚠️ LOGGED RATHER THAN REFUSED, AND THAT IS THE DECISION. None of them is
+      wrong for EVERY request — a spare binding costs money and breaks nothing,
+      and an unbound shard is fatal only for workspaces placed there. Refusing to
+      boot over any of them would take a serving deployment down to report a
+      cost. What must not happen is silence, and that is what this ends.
+    */
+    for (const fault of deploymentFaults({
+      env,
+      shards: [...SHARDS],
+      apps: Object.values(APPS).map((make) => make()),
+      used: SERVICES_REACHED,
+    })) console.error(`[boot] ${fault}`);
   })();
   return booted;
 };
