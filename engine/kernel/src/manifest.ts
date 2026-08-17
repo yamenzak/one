@@ -64,6 +64,8 @@ export interface ScreenSpec {
   readonly nav?: "primary" | "secondary" | "none";
   readonly icon?: string;
   readonly permission: string;
+  /** ⚠️ A screen only a business has. Same rule as an operation's — see there. */
+  readonly commercial?: true;
   /** A screen behind one of our switches. */
   readonly flag?: string;
   /** The ambience. Derived from theme tokens, so branding reaches it (D7). */
@@ -247,7 +249,6 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
     ...spec.collections.map((c) => c.quota).filter(Boolean) as string[],
     ...Object.values(spec.settings ?? {}).map((s) => s.entitlement).filter(Boolean) as string[],
     spec.access.seats.entitlement,
-    ...(spec.whitelabel ? [spec.whitelabel.entitlement] : []),
   ];
   for (const key of unenforced(spec.entitlements, named)) {
     at("entitlement", `"${key}" is sold and nothing withholds it`);

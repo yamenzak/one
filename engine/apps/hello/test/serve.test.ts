@@ -125,6 +125,10 @@ describe("what the manifest produced", () => {
     expect(surfaceOfComposed(compose(HELLO)).map((r) => `${r.method} ${r.path}`)).toEqual([
       "POST /api/ai.word",
       "GET /api/ai.wording",
+      /* ⚠️ The workspace's OWN identity, mounted in every product — one brand
+         across the apps under one roof, edited from wherever somebody is. */
+      "GET /api/brand.read",
+      "POST /api/brand.write",
       "GET /api/centre.view",
       "POST /api/check-in.create",
       "POST /api/check-in.delete",
@@ -148,6 +152,7 @@ describe("what the manifest produced", () => {
       "GET /api/note.list",
       "POST /api/note.publish",
       "GET /api/note.read",
+      "POST /api/note.share",
       "POST /api/note.update",
       "POST /api/package.archive",
       "POST /api/package.create",

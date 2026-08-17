@@ -20,11 +20,11 @@
  * row would be an outage the feature caused.
  */
 
-import type { AppId, Allowance, AppSpec, FlagBook, ModelRow, TenantId } from "@engine/kernel";
+import type { AccountId, AppId, Allowance, AppSpec, FlagBook, ModelRow, TenantId } from "@engine/kernel";
 import { inLane, refusePrompt } from "@engine/kernel";
 import { actionsOf, bind, bindingsOf, running } from "./ai-actions.js";
 import { adjust, subscriptionFor } from "./billing.js";
-import { appsOfTenant, shards } from "./directory.js";
+import { appsOfTenant, commercialAllowance, setCommercialGrant, shards } from "./directory.js";
 import { runsOf } from "./jobs.js";
 import type { PersonalBook, PersonalCtx } from "./personal.js";
 import type { SchemaModule } from "./schema.js";
@@ -134,6 +134,12 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
           }));
           return {
             id, slug: r.slug, name: r.name, country: r.country,
+            /* ⚠️ WHAT IT IS, BESIDE WHAT IT BOUGHT. The console's whole job is
+               telling one workspace from another, and personal and commercial
+               are the two that differ in what they may do rather than in what
+               they are paying. */
+            kind: (r.kind as string | null) ?? "personal",
+            legalName: r.legal_name ?? null,
             shardId: r.shard_id, closedAt: r.closed_at ?? null, apps: held,
           };
         }));
@@ -168,6 +174,38 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
         if (!app || !(key in app.entitlements)) return ctx.fail("platform.invalid");
         await adjust(ctx.directory, tenantId, appId, key, value, ctx.now);
         return { tenant: tenantId, app: appId, key };
+      },
+    },
+
+    /**
+     * ⚠️ HOW MANY BUSINESSES THIS PERSON MAY OPEN WITHOUT PAYING — a partner, a
+     * pilot, somebody we owe a favour. A COUNT rather than a switch, because
+     * "may make commercial workspaces" cannot be taken back without taking back
+     * the ones already made; a number simply runs out.
+     *
+     * ⚠️ AND IT IS SET, NEVER INCREMENTED. An operator pressing a button twice
+     * on a slow connection would otherwise hand out two, and the record of what
+     * was agreed is a number rather than a history of presses.
+     */
+    "op.account.commercial": {
+      kind: "write", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const email = String(input.email ?? "").trim().toLowerCase();
+        const granted = Number(input.granted);
+        if (!email || !Number.isFinite(granted) || granted < 0) return ctx.fail("platform.invalid");
+
+        const found = await ctx.directory.prepare(`SELECT id FROM account WHERE email = ?`)
+          .bind(email).first<{ id: string }>();
+        if (!found) return ctx.fail("platform.not_found");
+
+        const accountId = found.id as AccountId;
+        await setCommercialGrant(ctx.directory, accountId, granted);
+        /* ⚠️ Answered with what they have LEFT, not with what was set. The two
+           differ the moment somebody has already spent one, and the number an
+           operator needs to see is the one the person will meet. */
+        const allowance = await commercialAllowance(ctx.directory, accountId);
+        return { email, granted: allowance.granted, used: allowance.used };
       },
     },
 

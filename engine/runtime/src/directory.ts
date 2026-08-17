@@ -16,8 +16,12 @@
  * from granting it everywhere.
  */
 
-import type { AccountId, AppId, Residency, Shard, TenantId } from "@engine/kernel";
-import { newAccountId, newTenantId, placeOn, refusePlacement } from "@engine/kernel";
+import type {
+  AccountId, AppId, CommercialAllowance, Kind, Residency, Shard, TenantId,
+} from "@engine/kernel";
+import {
+  allowanceLeft, mayBecome, newAccountId, newTenantId, placeOn, refuseCommercial, refusePlacement,
+} from "@engine/kernel";
 import type { SchemaModule } from "./schema.js";
 import type { Db } from "./sql.js";
 
@@ -26,10 +30,20 @@ import type { Db } from "./sql.js";
 export const DIRECTORY_SCHEMA: SchemaModule = {
   id: "directory",
   statements: [
-    `CREATE TABLE IF NOT EXISTS account (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT, at TEXT NOT NULL);`,
-    `CREATE TABLE IF NOT EXISTS shard (id TEXT PRIMARY KEY, residency TEXT NOT NULL, ceiling INTEGER NOT NULL, at TEXT NOT NULL);`,
+    /* ⚠️ `commercial_granted` IS A COUNT AN OPERATOR SETS, and the count of
+       commercial workspaces this account has FOUNDED is what it is measured
+       against — derived rather than stored, so the two can never disagree. */
+    `CREATE TABLE IF NOT EXISTS account (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT, commercial_granted INTEGER NOT NULL DEFAULT 0, at TEXT NOT NULL);`,
+    /* ⚠️ `dedicated_to` IS THE ISOLATION PROMISE, and it lives on the SHARD
+       because every placement asks "may this workspace go here" — a fact held
+       only on the arriving tenant cannot answer that about the database. */
+    `CREATE TABLE IF NOT EXISTS shard (id TEXT PRIMARY KEY, residency TEXT NOT NULL, ceiling INTEGER NOT NULL, dedicated_to TEXT, at TEXT NOT NULL);`,
     `CREATE TABLE IF NOT EXISTS shard_app (shard_id TEXT NOT NULL, app_id TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (shard_id, app_id));`,
-    `CREATE TABLE IF NOT EXISTS tenant (id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL, country TEXT NOT NULL, shard_id TEXT NOT NULL, residency TEXT NOT NULL, at TEXT NOT NULL, closed_at TEXT);`,
+    /* ⚠️ `kind` AND `legal_name` ARE WHAT THE WORKSPACE IS, not what it bought —
+       see `Kind`. `became_commercial_at` is the one-way door's timestamp, and
+       its presence is the evidence that the transition happened rather than a
+       column somebody could flip back without a trace. */
+    `CREATE TABLE IF NOT EXISTS tenant (id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL, country TEXT NOT NULL, shard_id TEXT NOT NULL, residency TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'personal', legal_name TEXT, became_commercial_at TEXT, at TEXT NOT NULL, closed_at TEXT);`,
     `CREATE INDEX IF NOT EXISTS ix_tenant_shard ON tenant (shard_id);`,
     `CREATE TABLE IF NOT EXISTS tenant_app (tenant_id TEXT NOT NULL, app_id TEXT NOT NULL, at TEXT NOT NULL, disabled_at TEXT, PRIMARY KEY (tenant_id, app_id));`,
     /* ⚠️ An index, never a grant — see the header. */
@@ -52,6 +66,8 @@ export interface TenantRow {
   readonly country: string;
   readonly shardId: string;
   readonly residency: Residency;
+  readonly kind: Kind;
+  readonly legalName: string | null;
   readonly closedAt: string | null;
 }
 
@@ -62,6 +78,11 @@ const asTenant = (r: Record<string, unknown>): TenantRow => ({
   country: r.country as string,
   shardId: r.shard_id as string,
   residency: r.residency as Residency,
+  /* ⚠️ A row written before the column existed reads null, and null is
+     `personal` — the safe direction. Defaulting the other way would hand a brand
+     and a dedicated shard to every workspace on the deployment at once. */
+  kind: (r.kind as Kind | null) ?? "personal",
+  legalName: (r.legal_name as string | null) ?? null,
   closedAt: (r.closed_at as string | null) ?? null,
 });
 
@@ -82,11 +103,13 @@ export async function upsertAccount(
 /* ----------------------------------------------------------------- shards --- */
 
 export async function addShard(
-  db: Db, id: string, where: Residency, ceiling: number, now = new Date(),
+  db: Db, id: string, where: Residency, ceiling: number,
+  dedicatedTo: TenantId | null = null, now = new Date(),
 ): Promise<void> {
-  await db.prepare(`INSERT INTO shard (id, residency, ceiling, at) VALUES (?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET residency = excluded.residency, ceiling = excluded.ceiling`)
-    .bind(id, where, ceiling, now.toISOString()).run();
+  await db.prepare(`INSERT INTO shard (id, residency, ceiling, dedicated_to, at) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET residency = excluded.residency, ceiling = excluded.ceiling,
+      dedicated_to = excluded.dedicated_to`)
+    .bind(id, where, ceiling, dedicatedTo, now.toISOString()).run();
 }
 
 /**
@@ -99,11 +122,12 @@ export async function addShard(
  */
 export async function shards(db: Db): Promise<readonly Shard[]> {
   const rows = await db.prepare(`
-    SELECT s.id, s.residency, s.ceiling,
+    SELECT s.id, s.residency, s.ceiling, s.dedicated_to,
            (SELECT COUNT(*) FROM tenant t WHERE t.shard_id = s.id AND t.closed_at IS NULL) AS tenants,
            (SELECT GROUP_CONCAT(a.app_id) FROM shard_app a WHERE a.shard_id = s.id) AS apps
     FROM shard s ORDER BY s.id`).all<{
-      id: string; residency: string; ceiling: number; tenants: number; apps: string | null;
+      id: string; residency: string; ceiling: number; dedicated_to: string | null;
+      tenants: number; apps: string | null;
     }>();
   return rows.results.map((r) => ({
     id: r.id,
@@ -111,6 +135,9 @@ export async function shards(db: Db): Promise<readonly Shard[]> {
     ceiling: r.ceiling,
     tenants: r.tenants,
     apps: (r.apps ?? "").split(",").filter(Boolean) as AppId[],
+    /* ⚠️ Absent rather than null: `refusePlacement` asks whether the shard is
+       somebody's, and `undefined` is the only value that means "nobody's". */
+    ...(r.dedicated_to ? { dedicatedTo: r.dedicated_to as TenantId } : {}),
   }));
 }
 
@@ -165,8 +192,16 @@ export async function createTenant(
 
   const id = newTenantId(now);
   const at = now.toISOString();
-  await db.prepare(`INSERT INTO tenant (id, slug, name, country, shard_id, residency, at, closed_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`)
+  /*
+    ⚠️ EVERY WORKSPACE IS BORN PERSONAL, AND THAT IS NOT A DEFAULT TO ARGUE WITH.
+    Becoming a business takes a legal name and a payment, and neither exists at
+    the moment somebody picks an address — offering the choice here would mean
+    either taking money inside a wizard or writing `commercial` on a row that has
+    met neither condition, and the second is a one-way door opened by accident.
+  */
+  await db.prepare(`INSERT INTO tenant
+      (id, slug, name, country, shard_id, residency, kind, legal_name, became_commercial_at, at, closed_at)
+    VALUES (?, ?, ?, ?, ?, ?, 'personal', NULL, NULL, ?, NULL)`)
     .bind(id, wants.slug, wants.name, wants.country.toUpperCase(), shard.id, wants.where, at).run();
   for (const app of wants.apps) {
     await db.prepare(`INSERT INTO tenant_app (tenant_id, app_id, at, disabled_at) VALUES (?, ?, ?, NULL)`)
@@ -176,11 +211,90 @@ export async function createTenant(
   return {
     tenant: {
       id, slug: wants.slug, name: wants.name, country: wants.country.toUpperCase(),
-      shardId: shard.id, residency: wants.where, closedAt: null,
+      shardId: shard.id, residency: wants.where,
+      kind: "personal", legalName: null, closedAt: null,
     },
     shard,
   };
 }
+
+/* ------------------------------------------------------ becoming a business --- */
+
+/**
+ * HOW MANY COMMERCIAL WORKSPACES THIS ACCOUNT MAY STILL MAKE.
+ *
+ * ⚠️ `used` IS COUNTED, NEVER DECREMENTED. A stored counter and a table of
+ * workspaces are two records of one fact, and the day they disagree the
+ * disagreement is silent — somebody is refused a workspace they were given, or
+ * hands out one more than they were. The count here is a `SELECT`, so there is
+ * only ever one fact.
+ *
+ * ⚠️ AND A CLOSED WORKSPACE STILL COUNTS. An allowance that came back on closing
+ * would let somebody cycle one grant through any number of businesses, and the
+ * records of each are still ours to hold until erasure.
+ */
+export async function commercialAllowance(
+  db: Db, accountId: AccountId,
+): Promise<CommercialAllowance> {
+  const granted = await db.prepare(`SELECT commercial_granted AS n FROM account WHERE id = ?`)
+    .bind(accountId).first<{ n: number }>();
+  const used = await db.prepare(
+    `SELECT COUNT(*) AS n FROM tenant t JOIN belongs b ON b.tenant_id = t.id
+     WHERE b.account_id = ? AND t.kind = 'commercial'`).bind(accountId).first<{ n: number }>();
+  return { granted: granted?.n ?? 0, used: used?.n ?? 0 };
+}
+
+/** ⚠️ An operator's write, and the only one. Absolute, never an increment. */
+export async function setCommercialGrant(
+  db: Db, accountId: AccountId, granted: number,
+): Promise<void> {
+  await db.prepare(`UPDATE account SET commercial_granted = ? WHERE id = ?`)
+    .bind(Math.max(0, Math.trunc(granted)), accountId).run();
+}
+
+export type BecomeRefusal = "no_such_tenant" | "already" | "legal_name" | "unpaid";
+
+/**
+ * Make a workspace a business.
+ *
+ * ⚠️ ONE WAY, AND `mayBecome` IS ASKED RATHER THAN ASSUMED. The statement below
+ * could only ever write `commercial`, so the check looks redundant — which is
+ * exactly the reasoning that would let the next person add the other direction
+ * beside it. The rule lives in the kernel and is asked here, so both halves are
+ * one edit away from a failing test rather than one edit away from working.
+ *
+ * ⚠️ AND THE `WHERE` CARRIES THE KIND. Two people pressing the button at once
+ * would otherwise both pass the read, both write, and both spend an allowance
+ * for one workspace. Only the first statement matches.
+ */
+export async function becomeCommercial(
+  db: Db,
+  tenantId: TenantId,
+  founder: AccountId,
+  ask: { readonly legalName: string; readonly paid: boolean },
+  now = new Date(),
+): Promise<TenantRow | BecomeRefusal> {
+  const tenant = await tenantById(db, tenantId);
+  if (!tenant || tenant.closedAt) return "no_such_tenant";
+  if (!mayBecome(tenant.kind, "commercial")) return "already";
+
+  const allowance = await commercialAllowance(db, founder);
+  const refusal = refuseCommercial(tenant, { ...ask, allowance });
+  if (refusal) return refusal;
+
+  const done = await db.prepare(
+    `UPDATE tenant SET kind = 'commercial', legal_name = ?, became_commercial_at = ?
+     WHERE id = ? AND kind = 'personal'`)
+    .bind(ask.legalName.trim(), now.toISOString(), tenantId).run();
+  /* ⚠️ A statement that matched nothing lost the race, and saying so is the
+     difference between one business and one business billed twice. */
+  if (done.meta?.changes === 0) return "already";
+
+  return { ...tenant, kind: "commercial", legalName: ask.legalName.trim() };
+}
+
+/** What an account has left to spend, as a number a screen can print. */
+export const commercialLeft = (a: CommercialAllowance): number => allowanceLeft(a);
 
 export async function tenantBySlug(db: Db, slug: string): Promise<TenantRow | null> {
   const row = await db.prepare(`SELECT * FROM tenant WHERE slug = ?`).bind(slug).first();

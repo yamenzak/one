@@ -10,6 +10,7 @@
 export * from "./sql.js";
 export * from "./schema.js";
 export * from "./directory.js";
+export * from "./branding.js";
 export * from "./billing.js";
 export * from "./credits.js";
 export * from "./jobs.js";

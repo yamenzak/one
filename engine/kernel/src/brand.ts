@@ -1,6 +1,20 @@
 /**
  * A WORKSPACE MAKING THE PRODUCT LOOK LIKE THEIRS.
  *
+ * ⚠️ THE BRAND IS THE WORKSPACE'S AND NEVER ONE APP'S, and that is what makes it
+ * worth having. A business running three of our products under one roof has ONE
+ * identity — one logo on the sign-in page its staff use, one colour behind every
+ * screen, one icon on the phone — and a brand declared per app would give it
+ * three of everything and three places to change them, with two of them stale.
+ * Every app under the workspace draws from the same theme; which SURFACES exist
+ * is still the app's to say, because only the app knows whether it has emails or
+ * documents at all.
+ *
+ * ⚠️ AND ONLY A COMMERCIAL WORKSPACE HAS ONE (`mayBrand`). A personal workspace
+ * is not trading under anybody's name, so it wears ours — that is the honest
+ * default rather than a withheld feature, and it is why the PWA a person
+ * installs from a personal workspace carries our mark and not a blank.
+ *
  * ⚠️ A TENANT EDITS TOKENS, NEVER STYLES (D7). Every component takes its colour,
  * radius and type from the theme, so changing the theme changes everything and
  * changing nothing else has to happen. The alternative — letting a workspace
@@ -40,13 +54,35 @@ export const SURFACES: readonly Surface[] = [
  */
 export const OURS: readonly string[] = ["operator-console", "platform-mail", "legal-documents"];
 
+/**
+ * ⚠️ AN APP DECLARES WHICH SURFACES IT HAS, AND NOTHING ELSE ABOUT BRANDING.
+ * Only the app knows whether it sends email or produces documents at all. Who is
+ * ALLOWED to brand is the platform's answer and the same in every product
+ * (`mayBrand`) — an app naming an entitlement for it, as this once did, made
+ * "may this business use its own logo" a question with a different answer per
+ * product on one workspace's screens.
+ */
 export interface WhitelabelDef {
-  /** Which surfaces this app offers at all. A tenant's plan narrows it further. */
   readonly surfaces: readonly Surface[];
-  /** The entitlement that unlocks it. Named so the gate is the ordinary one. */
-  readonly entitlement: string;
-  /** ⚠️ Whether a tenant may remove our mark entirely, or only add theirs. */
-  readonly removeOurMark?: boolean;
+}
+
+/**
+ * WHAT ONE WORKSPACE LOOKS LIKE, ACROSS EVERY APP IT HAS SWITCHED ON.
+ *
+ * ⚠️ ONE RECORD PER WORKSPACE, WHICH IS THE WHOLE POINT — see the header. The
+ * surfaces named here are the workspace's ASK; what actually applies is the
+ * intersection with what each app offers, resolved once in `brandedSurfaces`.
+ */
+export interface Branding {
+  readonly theme: Theme;
+  readonly surfaces: readonly Surface[];
+  /**
+   * ⚠️ WHETHER OUR MARK COMES OFF, AND IT IS OURS TO ANSWER RATHER THAN AN
+   * APP'S. Adding your logo and removing ours are different transactions, and
+   * an app that could decide the second would be deciding how the deployment is
+   * credited on a page it does not own.
+   */
+  readonly ourMark?: boolean;
 }
 
 /**
@@ -65,8 +101,27 @@ export interface Theme {
   readonly mark?: string;
 }
 
+/**
+ * ⚠️ `allowed` IS `mayBrand(kind)` AND NOTHING ELSE, passed in rather than read,
+ * so this file needs to know nothing about workspaces to answer a question about
+ * paint. One caller resolves it; every surface here agrees by construction.
+ */
 export const brandableOn = (def: WhitelabelDef, allowed: boolean): readonly Surface[] =>
   allowed ? def.surfaces : [];
+
+/**
+ * What a workspace's brand actually reaches, in one app.
+ *
+ * ⚠️ THE INTERSECTION, AND BOTH HALVES MATTER. A surface the workspace asked for
+ * that this app does not have is a promise it cannot keep; a surface the app
+ * offers that the workspace never asked to brand keeps our letterhead. Resolving
+ * this per screen is how one product ends up branded and the next one beside it
+ * is not, on the same workspace, with nobody able to say why.
+ */
+export const brandedSurfaces = (
+  def: WhitelabelDef, branding: Branding | null, allowed: boolean,
+): readonly Surface[] =>
+  branding ? brandableOn(def, allowed).filter((s) => branding.surfaces.includes(s)) : [];
 
 /* -------------------------------------------------------------- contrast --- */
 

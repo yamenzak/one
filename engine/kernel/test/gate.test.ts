@@ -89,6 +89,76 @@ describe("a workspace that owes money", () => {
 
 /* ------------------------------------------------------------- permission --- */
 
+/* ------------------------------------------------------------------ kind --- */
+
+/**
+ * ⚠️ NO PLAN A PERSONAL WORKSPACE CAN BUY UNLOCKS A COMMERCIAL-ONLY CAPABILITY,
+ * which is the whole reason this is not an entitlement. Every failure here is a
+ * customer sent to a price list where nothing they can buy would help, or — the
+ * other direction — a business capability handed to somebody who never became a
+ * business, silently, on a deployment where nothing looks wrong.
+ */
+describe("what kind of workspace this is", () => {
+  const only = op({ commercial: true });
+
+  it("lets a business through and refuses a personal workspace by name", () => {
+    expect(check(ask({ op: only, kind: "commercial" }))).toBe(null);
+
+    const no = check(ask({ op: only, kind: "personal", workspace: "Northwind" }));
+    expect(no?.at).toBe("kind");
+    expect(no?.problem.code).toBe("platform.commercial_required");
+    /* ⚠️ The name is IN the sentence, and a refusal missing its values renders
+       the token — which is what "Make {workspace} a business" would print. */
+    expect(no?.problem.detail).toContain("Northwind");
+    expect(no?.problem.detail).not.toContain("{");
+  });
+
+  /* ⚠️ ABSENT IS NOT PERMISSIVE. The operations about yourself run outside every
+     workspace, and treating the missing answer as a pass is how a gate stops
+     gating on exactly the lane nobody tested. */
+  it("refuses when there is no workspace to be a business", () => {
+    expect(check(ask({ op: only }))?.at).toBe("kind");
+  });
+
+  it("leaves an ordinary operation alone in either kind", () => {
+    expect(check(ask({ kind: "personal" }))).toBe(null);
+    expect(check(ask({ kind: "commercial" }))).toBe(null);
+  });
+
+  /*
+    ⚠️ ABOVE ENTITLEMENT, AND THIS IS THE ASSERTION THAT MAKES THE ORDER REAL.
+    Reversed, a personal workspace is told to change its plan for something no
+    plan will ever give it — the same defect as offering to sell what we have
+    switched off, one gate over.
+  */
+  it("is asked before the plan, so nobody is offered an upgrade that cannot help", () => {
+    const both = op({ commercial: true, entitlement: "publishing" });
+    const no = check(ask({ op: both, kind: "personal", entitlements: held("publishing", false) }));
+    expect(no?.at).toBe("kind");
+  });
+
+  /* ⚠️ And below permission, for the same reason proof is: a refusal about the
+     workspace tells somebody it exists, and somebody with no key should be told
+     nothing about it. */
+  it("is asked after the key, so a stranger learns nothing about the workspace", () => {
+    const no = check(ask({
+      op: only, kind: "personal",
+      caller: { signedIn: true, permissions: has(), provenAt: NOW },
+    }));
+    expect(no?.at).toBe("permission");
+  });
+
+  /* ⚠️ And after standing, because a workspace in arrears is having a
+     conversation about its bill rather than about what it is. */
+  it("is asked after standing, so arrears is still the first thing said", () => {
+    const no = check(ask({
+      op: only, kind: "personal",
+      standing: { writable: false, serving: true, reason: "an invoice" },
+    }));
+    expect(no?.at).toBe("standing");
+  });
+});
+
 describe("who is asking", () => {
   it("asks somebody signed out to sign in, before anything else", () => {
     const out = check(ask({ caller: { signedIn: false, permissions: has(), provenAt: null } }));

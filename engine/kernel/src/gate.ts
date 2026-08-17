@@ -1,14 +1,19 @@
 /**
  * THE ONE PLACE A REQUEST IS REFUSED.
  *
- * ⚠️ THE ORDER IS THE DESIGN. Standing → permission → proof → entitlement → flag
- * → quota → credits, and each position is a decision about what somebody should
- * be told first:
+ * ⚠️ THE ORDER IS THE DESIGN. Standing → permission → kind → proof → entitlement
+ * → flag → quota → credits, and each position is a decision about what somebody
+ * should be told first:
  *
  *   standing    a workspace in arrears is not told which of its powers it lacks
  *               — that is a conversation about the bill, not about roles.
  *   permission  before proof, because asking somebody to confirm their identity
  *               for something they may not do anyway is a code sent for nothing.
+ *   kind        above entitlement, because no plan a PERSONAL workspace can buy
+ *               unlocks a commercial-only capability — offering an upgrade would
+ *               be selling something that does not exist — and above proof for
+ *               the same reason permission is: a code sent for a door that
+ *               cannot open.
  *   proof       before anything that costs, so nothing is spent on a request
  *               that is about to ask for a code.
  *   entitlement before quota: "your plan does not include this" and "you have
@@ -35,7 +40,7 @@ import type { Problem, ProblemCatalog } from "./problem.js";
 import { problem } from "./problem.js";
 /* ⚠️ `Standing` has ONE home, in tenancy. Two shapes for it is how the gate and
    the entitlement walk come to disagree about whether a tenant is being served. */
-import type { Standing } from "./tenancy.js";
+import type { Kind, Standing } from "./tenancy.js";
 
 export interface Caller {
   readonly signedIn: boolean;
@@ -52,6 +57,15 @@ export interface Ask {
   readonly op: AnyOperation;
   readonly caller: Caller;
   readonly standing: Standing;
+  /**
+   * ⚠️ WHAT THIS WORKSPACE IS. Absent means the question has no answer here —
+   * the operations about YOURSELF run outside every workspace — and a
+   * commercial-only operation on that lane is refused rather than waved
+   * through, because "no workspace" is not "a business".
+   */
+  readonly kind?: Kind;
+  /** ⚠️ Its name, because the refusal is a sentence with the name in it. */
+  readonly workspace?: string;
   readonly entitlements: readonly Resolved[];
   readonly flags: Readonly<Record<string, boolean>>;
   /** How many of the quota's thing already exist. */
@@ -94,6 +108,18 @@ export function check(ask: Ask): Refused | null {
         if (!caller.signedIn) return no("permission", "platform.unauthorized");
         if (op.permission !== PUBLIC && !caller.permissions.has(op.permission as string)) {
           return no("permission", "platform.forbidden");
+        }
+        break;
+      }
+      case "kind": {
+        /* ⚠️ ABSENT IS NOT PERMISSIVE. An operation running outside every
+           workspace has no kind to be commercial, and treating the missing
+           answer as a pass is how a gate stops gating on exactly the lane
+           nobody tested. */
+        if (!op.commercial) break;
+        if (ask.kind !== "commercial") {
+          return no("kind", "platform.commercial_required",
+            { workspace: ask.workspace ?? "this workspace" });
         }
         break;
       }

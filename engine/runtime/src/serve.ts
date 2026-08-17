@@ -19,7 +19,7 @@
  * Audit after the outcome, including when the outcome is a refusal.
  */
 
-import type { AppSpec, Caller, Door, Problem, Resolved as _Resolved, Roots, Standing } from "@engine/kernel";
+import type { AppSpec, Caller, Door, Kind, Problem, Resolved as _Resolved, Roots, Standing } from "@engine/kernel";
 import { IN_GOOD_STANDING, PLATFORM_PROBLEMS, check, doorFor, newId, problem } from "@engine/kernel";
 import { compose, type Composed, type Resolved as ResolvedOp } from "./compose.js";
 import { answerMcp } from "./mcp.js";
@@ -29,6 +29,9 @@ import { clearCookie, sessionIdFrom, setCookie, type Session } from "./identity.
 import { maintenanceMode } from "./operator.js";
 import { whoIs, type PersonalBook, type PersonalCtx } from "./personal.js";
 import type { TenantRow } from "./directory.js";
+import { tenantBySlug } from "./directory.js";
+import { brandingOf } from "./branding.js";
+import { iconSvg, webManifest, type Installable, type Installer } from "./installable.js";
 import type { Db } from "./sql.js";
 
 /* ------------------------------------------------------------------ seams --- */
@@ -78,6 +81,31 @@ export interface Wiring {
    */
   readonly personal?: PersonalBook;
   readonly shardOf?: (tenant: TenantRow) => Db;
+  /**
+   * ⚠️ WHO THIS DEPLOYMENT IS, FOR THE TILES THAT WEAR OUR MARK. A personal
+   * workspace installs as ours; nothing about a hostname can supply a name and a
+   * glyph, so a deployment that has not said serves no manifest rather than a
+   * plausible-looking wrong one.
+   */
+  readonly installable?: Installer;
+}
+
+/**
+ * ⚠️ RESOLVED FROM THE DIRECTORY RATHER THAN THROUGH `locate`, and the reason is
+ * the caller: a phone fetching a manifest has no session, and `locate` resolves
+ * a shard, a standing, a plan and a balance that nothing here reads. Asking for
+ * all of it would put the whole request path behind an icon.
+ */
+async function installableFor(wiring: Wiring, door: Door): Promise<Installable | null> {
+  if (door.kind !== "tenant" || !door.slug || !wiring.installable) return null;
+  const tenant = await tenantBySlug(wiring.directory, door.slug);
+  if (!tenant || tenant.closedAt) return null;
+  return {
+    name: tenant.name,
+    kind: tenant.kind,
+    branding: await brandingOf(wiring.directory, tenant.id),
+    us: wiring.installable,
+  };
 }
 
 export interface Located {
@@ -85,6 +113,15 @@ export interface Located {
   readonly db: Db;
   /** Which products this workspace has switched on, in the order to search. */
   readonly apps: readonly string[];
+  /**
+   * ⚠️ WHAT THIS WORKSPACE IS, CARRIED SO THE GATE CAN ASK (`Kind`). Absent
+   * reads as `personal` at the gate, which is the safe direction: a locator that
+   * forgot to report it withholds commercial-only capabilities rather than
+   * handing them to every workspace on the deployment.
+   */
+  readonly kind?: Kind;
+  /** ⚠️ Its name, because the commercial refusal is a sentence with it in. */
+  readonly name?: string;
   readonly standing?: Standing;
   readonly entitlements?: Parameters<typeof check>[0]["entitlements"];
   readonly flags?: Readonly<Record<string, boolean>>;
@@ -147,6 +184,30 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
       identically. A separate agent deployment would be a second copy of all of
       them.
     */
+    /*
+      ⚠️ THE INSTALLABLE IDENTITY, ON THE WORKSPACE'S OWN DOOR AND NOWHERE ELSE.
+      One tile per workspace, not per product — see `installable.ts`. Both routes
+      are PUBLIC by construction: a phone fetches a manifest and an icon with no
+      session and often with no cookie jar at all, so anything behind a login
+      here installs as a browser default.
+
+      ⚠️ AND A DEPLOYMENT THAT HAS NOT SAID WHO IT IS SERVES NEITHER. The tile a
+      personal workspace wears is OURS, and there is no honest way to draw it
+      from a hostname — so the absence is a 404 rather than a guess.
+    */
+    if (url.pathname === "/manifest.webmanifest" || url.pathname === "/icon.svg") {
+      if (door.kind !== "tenant" || !wiring.installable) {
+        return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
+      }
+      const of = await installableFor(wiring, door);
+      if (!of) return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
+      return url.pathname === "/icon.svg"
+        ? new Response(iconSvg(of), {
+          headers: { "content-type": "image/svg+xml; charset=utf-8", "cache-control": "public, max-age=300" },
+        })
+        : json(webManifest(of), 200, { "content-type": "application/manifest+json; charset=utf-8" });
+    }
+
     if (url.pathname === "/mcp") return answerMcp(wiring, request, door, now);
     if (!url.pathname.startsWith("/api/")) return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
 
@@ -263,6 +324,8 @@ export async function performOperation(
     op: op.spec,
     caller,
     standing: located.standing ?? IN_GOOD_STANDING,
+    kind: located.kind ?? "personal",
+    ...(located.name ? { workspace: located.name } : {}),
     entitlements: located.entitlements ?? [],
     flags: located.flags ?? {},
     used: located.used ?? (() => 0),

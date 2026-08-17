@@ -27,18 +27,22 @@ import type { Tone } from "./primitives.js";
 /**
  * ⚠️ THE ORDER IS FIXED AND IT IS A DESIGN, NOT A PREFERENCE.
  *
- *   standing → permission → proof → entitlement → flag → quota → credits
+ *   standing → permission → kind → proof → entitlement → flag → quota → credits
  *
  * Standing first, because a workspace in arrears must not be told which of its
  * powers it lacks — that is a conversation about the bill, not about roles.
  * Permission before proof, because asking somebody to confirm their identity for
- * something they may not do anyway is a code sent for nothing. Entitlement
- * before quota, because "your plan does not include this" and "you have used all
- * of yours" are different sentences with different buttons. Credits last,
- * because they are the only gate that SPENDS something.
+ * something they may not do anyway is a code sent for nothing. Kind sits between
+ * them and above entitlement for the same two reasons at once: no plan a
+ * PERSONAL workspace can buy will ever unlock a commercial-only capability, so
+ * "your plan does not include this" would be selling something that does not
+ * exist — and asking for a code first would be a code sent for a door that
+ * cannot open. Entitlement before quota, because "your plan does not include
+ * this" and "you have used all of yours" are different sentences with different
+ * buttons. Credits last, because they are the only gate that SPENDS something.
  */
 export const GATE_ORDER = [
-  "standing", "permission", "proof", "entitlement", "flag", "quota", "credits",
+  "standing", "permission", "kind", "proof", "entitlement", "flag", "quota", "credits",
 ] as const;
 
 export type Gate = (typeof GATE_ORDER)[number];
@@ -112,6 +116,14 @@ export interface OperationSpec<I = unknown, O = unknown> {
   readonly output: Fields;
 
   readonly permission: Permission;
+  /**
+   * ⚠️ ONLY IN A COMMERCIAL WORKSPACE, AND IT IS NOT AN ENTITLEMENT. An
+   * entitlement is a line on a price list a workspace can buy its way to; this
+   * is a fact about what the workspace IS, and a personal one cannot buy its way
+   * past it — which is exactly why it is a separate declaration with a refusal
+   * that says "make this a business" rather than "change your plan".
+   */
+  readonly commercial?: true;
   readonly proof?: Proof;
   /** The entitlement a plan must include. */
   readonly entitlement?: string;

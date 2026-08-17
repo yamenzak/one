@@ -16,9 +16,10 @@
  * context is passed only to them.
  */
 
-import type { Allowance, AppSpec, RoleRegistry, TenantId } from "@engine/kernel";
-import { PUBLIC, seatsUsed, withinQuota } from "@engine/kernel";
-import { noteInvitation } from "./directory.js";
+import type { Allowance, AppSpec, RoleRegistry, TenantId, Theme } from "@engine/kernel";
+import { PUBLIC, SURFACES, seatsUsed, withinQuota } from "@engine/kernel";
+import { brandingOf, setBranding } from "./branding.js";
+import { noteInvitation, tenantById } from "./directory.js";
 import { inboxOf, markSeen, policyOf, preferenceOf, setPolicy, setPreference, unseenCount } from "./inbox.js";
 import { invite, membersOf, remove, rolesFor, setAppRole, setPlatformRole } from "./membership.js";
 import type { Ctx, Resolved } from "./compose.js";
@@ -267,6 +268,44 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         return { id: String(input.id) };
       },
       { why: "It takes access away, which only a person weighs." }),
+
+    /*
+      ⚠️ THE WORKSPACE'S BRAND, NOT THIS APP'S — see `branding.ts`. The operation
+      is mounted in every product because a business editing its identity does it
+      from wherever it happens to be standing, and it writes ONE row: the next
+      product it opens is already wearing it.
+    */
+    "brand.read": op("brand.read", "read", "tenant:manage", "This workspace's own identity.",
+      async (ctx) => {
+        const tenant = await tenantById(ctx.directory, ctx.tenantId as TenantId);
+        return {
+          /* ⚠️ The kind travels with it, because "you have no brand" and "a
+             personal workspace does not have one" are different screens: an
+             empty editor, and an offer to become a business. */
+          kind: tenant?.kind ?? "personal",
+          branding: await brandingOf(ctx.directory, ctx.tenantId as TenantId),
+          surfaces: SURFACES,
+        };
+      }),
+
+    "brand.write": op("brand.write", "write", "tenant:manage", "Change this workspace's identity.",
+      async (ctx, input) => {
+        const tenant = await tenantById(ctx.directory, ctx.tenantId as TenantId);
+        if (!tenant) return ctx.fail("platform.not_found");
+        const done = await setBranding(ctx.directory, tenant.id, tenant.kind, {
+          theme: (input.theme ?? {}) as Theme,
+          surfaces: Array.isArray(input.surfaces) ? input.surfaces.map(String) : [],
+          ...(typeof input.ourMark === "boolean" ? { ourMark: input.ourMark } : {}),
+        }, ctx.now);
+        /* ⚠️ Three refusals and three different things to do next: become a
+           business, pick a readable pair, or ask for a surface that exists. */
+        if (done === "not_commercial") {
+          return ctx.fail("platform.commercial_required", { workspace: tenant.name });
+        }
+        if (done === "unreadable" || done === "not_a_surface") return ctx.fail("platform.invalid");
+        return done;
+      },
+      { why: "It changes what a business's own customers see, which is theirs to weigh." }),
   };
 }
 

@@ -109,6 +109,18 @@ export const PLATFORM_PROBLEMS: ProblemCatalog = {
     status: 402, retryable: false, tone: "warning",
     title: "This needs a plan that includes it",
   },
+  /*
+    ⚠️ A DIFFERENT SENTENCE FROM `payment_required`, AND THE DIFFERENCE IS THE
+    BUTTON. A plan is something this workspace can change today; being a business
+    is a one-time step with a legal name attached, and offering "upgrade your
+    plan" for it sends somebody to a price list where nothing they can buy will
+    ever help.
+  */
+  "platform.commercial_required": {
+    status: 402, retryable: false, tone: "warning",
+    title: "This is for business workspaces",
+    detail: "Make {workspace} a business to use it.",
+  },
   "platform.proof_required": {
     status: 401, retryable: true, tone: "info",
     title: "Confirm it is you",

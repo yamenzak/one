@@ -18,7 +18,8 @@
 
 import type { AppSpec } from "@engine/kernel";
 import {
-  AI_ACTION_SCHEMA, AUDIT_SCHEMA, BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA,
+  AI_ACTION_SCHEMA, AUDIT_SCHEMA, BILLING_SCHEMA, BRANDING_SCHEMA, DIRECTORY_SCHEMA,
+  IDENTITY_SCHEMA, INBOX_SCHEMA,
   JOBS_SCHEMA, MEMBERSHIP_SCHEMA, OPERATOR_SCHEMA, PACKAGE_SCHEMA, REPLAY_SCHEMA, SETTING_SCHEMA, VAULT_SCHEMA,
   NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, locator, memberFor, noteShardApp,
   operatorOps, permissionsResolver, personalOps, schemaFor, serve, sessionIdFrom, shardFor,
@@ -43,7 +44,7 @@ const APPS: Readonly<Record<string, () => AppSpec>> = { hello };
  * it, everything reports success, and a column that was supposed to exist
  * silently never does.
  */
-const DIRECTORY_MODULES = [DIRECTORY_SCHEMA, IDENTITY_SCHEMA, BILLING_SCHEMA, JOBS_SCHEMA, OPERATOR_SCHEMA, AI_ACTION_SCHEMA];
+const DIRECTORY_MODULES = [DIRECTORY_SCHEMA, IDENTITY_SCHEMA, BILLING_SCHEMA, BRANDING_SCHEMA, JOBS_SCHEMA, OPERATOR_SCHEMA, AI_ACTION_SCHEMA];
 const SHARD_MODULES = [MEMBERSHIP_SCHEMA, PACKAGE_SCHEMA, SETTING_SCHEMA, AI_ACTION_SCHEMA, AUDIT_SCHEMA, REPLAY_SCHEMA, INBOX_SCHEMA, VAULT_SCHEMA];
 
 export interface Env {
@@ -150,6 +151,13 @@ const handler = (env: Env) => {
   return serve({
     roots: { root: env.ROOT },
     apps: APPS,
+    /*
+      ⚠️ WHO WE ARE, FOR THE TILES THAT WEAR OUR MARK. A personal workspace is
+      not trading under anybody's name, so it installs as ours — and there is no
+      honest way to draw that from a hostname, which is why a deployment that
+      has not said serves no manifest at all rather than a plausible wrong one.
+    */
+    installable: { name: "One", mark: "◇" },
     directory,
     shardOf,
 

@@ -8,7 +8,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { appsOf, enabled, placeOn, refusePlacement, type Enablement, type Shard } from "../src/tenancy.js";
+import {
+  allowanceLeft, appsOf, enabled, mayBecome, mayBrand, mayIsolate, placeOn, refuseCommercial,
+  refusePlacement, type Enablement, type Shard,
+} from "../src/tenancy.js";
 import type { AppId, Instant, TenantId } from "../src/primitives.js";
 
 const AT = "2026-08-14T00:00:00.000Z" as Instant;
@@ -99,5 +102,106 @@ describe("an app switched on for a tenant", () => {
 
   it("counts each app once, however many rows say so", () => {
     expect(appsOf([on("hello"), on("hello")])).toEqual(["hello"]);
+  });
+});
+
+/* ------------------------------------------------------ personal or business --- */
+
+/**
+ * ⚠️ WHAT A WORKSPACE IS, NOT WHAT IT BOUGHT. A plan moves both ways every
+ * month; this is who is trading, whose name is over the door, and whether its
+ * records may sit on a database of their own. Every failure below is silent:
+ * nothing throws when a personal workspace gets a brand, and nobody complains
+ * when a business is quietly rolled back to personal — they simply find their
+ * logo gone one morning with no event that removed it.
+ */
+describe("a workspace's kind", () => {
+  const personal = { kind: "personal" as const };
+  const commercial = { kind: "commercial" as const };
+  const none = { granted: 0, used: 0 };
+
+  it("is one way, and the other direction is refused rather than unimplemented", () => {
+    expect(mayBecome("personal", "commercial")).toBe(true);
+    /* ⚠️ THE ONE THAT MATTERS. Rolling back would withdraw a brand a business's
+       own customers have seen and move records off a shard they were promised. */
+    expect(mayBecome("commercial", "personal")).toBe(false);
+    expect(mayBecome("commercial", "commercial")).toBe(false);
+    expect(mayBecome("personal", "personal")).toBe(false);
+  });
+
+  it("decides branding and isolation, in one place rather than at each call site", () => {
+    expect(mayBrand("commercial")).toBe(true);
+    expect(mayBrand("personal")).toBe(false);
+    expect(mayIsolate("commercial")).toBe(true);
+    expect(mayIsolate("personal")).toBe(false);
+  });
+
+  /* ⚠️ EVERYTHING FREE TO FIX IS ASKED BEFORE ANYTHING THAT COSTS. Taking a
+     payment and then refusing over an empty field is a refund and an apology. */
+  it("asks for the legal name before it asks for money", () => {
+    expect(refuseCommercial(personal, { legalName: "  ", paid: true, allowance: none }))
+      .toBe("legal_name");
+    expect(refuseCommercial(personal, { legalName: "Northwind GmbH", paid: false, allowance: none }))
+      .toBe("unpaid");
+    expect(refuseCommercial(personal, { legalName: "Northwind GmbH", paid: true, allowance: none }))
+      .toBe(null);
+  });
+
+  /* ⚠️ AN ALLOWANCE IS AS GOOD AS A PAYMENT, and what comes out is identical: a
+     comped business is still a business. */
+  it("lets an operator's allowance stand in for the payment", () => {
+    expect(refuseCommercial(personal,
+      { legalName: "Northwind GmbH", paid: false, allowance: { granted: 2, used: 1 } })).toBe(null);
+    expect(refuseCommercial(personal,
+      { legalName: "Northwind GmbH", paid: false, allowance: { granted: 2, used: 2 } })).toBe("unpaid");
+  });
+
+  it("counts an allowance down and never below nothing", () => {
+    expect(allowanceLeft({ granted: 3, used: 1 })).toBe(2);
+    /* ⚠️ A grant lowered under what somebody has already spent is a negative
+       number everywhere it is printed, and a `> 0` check that still passes. */
+    expect(allowanceLeft({ granted: 1, used: 4 })).toBe(0);
+  });
+
+  it("has nothing to do for a workspace that is already one", () => {
+    expect(refuseCommercial(commercial, { legalName: "X", paid: true, allowance: none }))
+      .toBe("already");
+  });
+});
+
+/* --------------------------------------------------------- a shard of its own --- */
+
+/**
+ * ⚠️ A DEDICATED SHARD IS A PROMISE IN BOTH DIRECTIONS, and both halves fail
+ * silently. A stranger placed on one breaks the isolation somebody paid for and
+ * nothing downstream notices, because both workspaces work perfectly; a
+ * workspace that asked to be alone landing on a shared shard is the same broken
+ * promise from the other end.
+ */
+describe("a shard somebody paid to have to themselves", () => {
+  const mine = "ten_a" as TenantId;
+  const theirs = "ten_b" as TenantId;
+
+  it("takes nobody but the workspace it belongs to", () => {
+    const alone = shard({ dedicatedTo: mine });
+    expect(refusePlacement(alone, { where: "eu", apps: ["hello"], tenantId: theirs }))
+      .toBe("someone_elses");
+    expect(refusePlacement(alone, { where: "eu", apps: ["hello"], tenantId: mine })).toBe(null);
+    /* ⚠️ And a placement checked in the abstract carries no tenant, so it is a
+       stranger too — the safe reading of "we do not know who this is". */
+    expect(refusePlacement(alone, { where: "eu", apps: ["hello"] })).toBe("someone_elses");
+  });
+
+  it("refuses a shared shard to a workspace that asked to be alone", () => {
+    expect(refusePlacement(shard(), { where: "eu", apps: ["hello"], tenantId: mine, alone: true }))
+      .toBe("shared");
+  });
+
+  it("is never chosen for anybody else, however empty it is", () => {
+    const chosen = placeOn(
+      [shard({ id: "dedicated", tenants: 0, dedicatedTo: theirs }), shard({ id: "shared", tenants: 40 })],
+      { where: "eu", apps: ["hello"], tenantId: mine });
+    /* ⚠️ The emptiest eligible shard — and the empty one is not eligible. */
+    expect(chosen?.id).toBe("shared");
   });
 });

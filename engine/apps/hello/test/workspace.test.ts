@@ -1,0 +1,322 @@
+/**
+ * A WORKSPACE IS PERSONAL OR IT IS A BUSINESS, AND EVERYTHING ELSE FOLLOWS.
+ *
+ * ⚠️ THIS IS THE STAGE'S EXIT CRITERION, DRIVEN THROUGH THE REAL DOORS. Somebody
+ * signs in, makes a workspace, meets the refusal, is given an allowance by an
+ * operator, becomes a business, brands it, and installs it — and the tile their
+ * phone would fetch is the one they chose.
+ *
+ * ⚠️ AND HALF OF IT IS THINGS THAT MUST NOT WORK. A personal workspace branding
+ * itself, a commercial-only operation answering on one, a second workspace
+ * spending an allowance that is gone, and — the one nothing else would catch —
+ * a business being quietly rolled back to personal.
+ */
+
+import { env } from "cloudflare:test";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  AUDIT_SCHEMA, BILLING_SCHEMA, BRANDING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA,
+  MEMBERSHIP_SCHEMA, NOBODY,
+  REPLAY_SCHEMA, addShard, applySchema, brandingOf, locator, memberFor, noteShardApp,
+  permissionsResolver, personalOps, operatorOps, schemaFor, serve, sessionIdFrom, tenantBySlug,
+  whoIs, type Db,
+} from "@engine/runtime";
+import { HELLO, hello } from "../src/index.js";
+
+const directory = () => env.DIRECTORY as unknown as Db;
+const shard = () => env.SHARD_EU_1 as unknown as Db;
+
+const ROOTS = { root: "one.test" };
+const OPERATOR = "ops@example.com";
+const sent: { to: string; code: string }[] = [];
+
+const app = () => serve({
+  roots: ROOTS,
+  apps: { hello },
+  directory: directory(),
+  shardOf: () => shard(),
+  /* ⚠️ WHO WE ARE, so a personal workspace has a mark to wear. A deployment
+     that has not said serves no manifest at all — see `installableFor`. */
+  installable: { name: "One", mark: "◇" },
+  personal: {
+    ...personalOps({
+      secret: "test-secret", appId: "hello",
+      deliver: async (to, code) => { sent.push({ to, code }); },
+      isOperator: (email) => email === OPERATOR,
+    }),
+    ...operatorOps({ apps: { hello }, isOperator: (email) => email === OPERATOR }),
+  },
+  /* ⚠️ THE REAL LOCATOR, because the whole point is that it reports the kind.
+     A hand-written one in the test would prove the gate reads a value the test
+     supplied, which is not the claim. */
+  locate: locator({
+    directory: directory(),
+    shardOf: () => shard(),
+    appsOf: async () => [HELLO],
+    charging: false,
+  }),
+  identify: async (request, located) => {
+    const { session, email, accountId } = await whoIs(directory(), sessionIdFrom(request), new Date());
+    if (!session || !accountId) return NOBODY;
+    const member = await memberFor(located.db, located.tenantId as never, accountId);
+    return {
+      accountId, email, signedIn: true, provenAt: session.provenAt,
+      permissionsIn: permissionsResolver(located.db, located.tenantId as never, member,
+        (appId) => (appId === "hello" ? HELLO.access.roles : null)),
+    };
+  },
+});
+
+const at = (host: string, path: string, init: RequestInit = {}) =>
+  app()(new Request(`https://${host}.one.test${path}`, init));
+const post = (host: string, path: string, body: unknown, cookie?: string) =>
+  at(host, path, { method: "POST", body: JSON.stringify(body), headers: cookie ? { cookie } : {} });
+const get = (host: string, path: string, cookie?: string) =>
+  at(host, path, { headers: cookie ? { cookie } : {} });
+
+const codeFor = (email: string) => sent.filter((s) => s.to === email).at(-1)!.code;
+const cookieOf = (r: Response) => (r.headers.get("set-cookie") ?? "").split(";")[0]!;
+
+async function signIn(email: string): Promise<string> {
+  expect((await post("setup", "/api/me.code", { email })).status).toBe(200);
+  const done = await post("setup", "/api/me.session", { email, code: codeFor(email) });
+  expect(done.status).toBe(200);
+  return cookieOf(done);
+}
+
+/** ⚠️ One slug per test file — two files racing on a unique index fail far away. */
+const SLUG = "harbourside";
+
+async function workspace(): Promise<string> {
+  const cookie = await signIn("sam@example.com");
+  const made = await post("setup", "/api/me.tenant.create",
+    { slug: SLUG, name: "Harbourside", country: "DE" }, cookie);
+  expect(made.status).toBe(200);
+  return cookie;
+}
+
+/** An operator hands out N, which is the lane that exists before anything takes a card. */
+async function comp(n: number): Promise<void> {
+  const ops = await signIn(OPERATOR);
+  const done = await post("admin", "/api/op.account.commercial",
+    { email: "sam@example.com", granted: n }, ops);
+  expect(done.status).toBe(200);
+}
+
+const READABLE = { ground: "#101014", ink: "#f5f5f7", accent: "#7aa2f7", mark: "H" };
+
+beforeAll(async () => {
+  await applySchema(directory(),
+    [DIRECTORY_SCHEMA, IDENTITY_SCHEMA, BILLING_SCHEMA, BRANDING_SCHEMA]);
+  await applySchema(shard(), [schemaFor(HELLO), MEMBERSHIP_SCHEMA, AUDIT_SCHEMA, REPLAY_SCHEMA]);
+  await addShard(directory(), "eu-1", "eu", 100);
+  await noteShardApp(directory(), "eu-1", "hello");
+});
+
+beforeEach(async () => {
+  sent.length = 0;
+  for (const t of ["membership", "custom_role", "note", "check_in", "audit", "replay"]) {
+    await shard().exec(`DELETE FROM ${t};`);
+  }
+  for (const t of ["tenant_branding", "invited", "belongs", "tenant_app", "tenant",
+    "session", "code", "account"]) {
+    await directory().exec(`DELETE FROM ${t};`);
+  }
+});
+
+/* ------------------------------------------------------------ born personal --- */
+
+describe("a new workspace", () => {
+  /*
+    ⚠️ NOBODY IS ASKED WHETHER THEY ARE A BUSINESS WHILE PICKING AN ADDRESS.
+    Becoming one takes a legal name and a payment, and neither exists in a
+    wizard — so offering the choice there would mean writing `commercial` on a
+    row that has met neither condition, which is a one-way door opened by
+    accident.
+  */
+  it("is personal, whatever the body says", async () => {
+    const cookie = await signIn("sam@example.com");
+    await post("setup", "/api/me.tenant.create",
+      { slug: SLUG, name: "Harbourside", country: "DE", kind: "commercial" }, cookie);
+    expect((await tenantBySlug(directory(), SLUG))?.kind).toBe("personal");
+  });
+
+  it("cannot use a commercial-only operation, and is told what to do about it", async () => {
+    const cookie = await workspace();
+    const made = await post(SLUG, "/api/note.create", { title: "A note" }, cookie);
+    const { id } = await made.json() as { id: string };
+
+    const no = await post(SLUG, "/api/note.share", { id }, cookie);
+    expect(no.status).toBe(402);
+    const body = await no.json() as { problem: { code: string; detail?: string } };
+    /* ⚠️ NOT `payment_required`. A plan is something this workspace can change
+       today; no plan it can buy makes it a business. */
+    expect(body.problem.code).toBe("platform.commercial_required");
+    /* ⚠️ The name is in the sentence, and a missing value renders its token. */
+    expect(body.problem.detail).toContain("Harbourside");
+    expect(body.problem.detail).not.toContain("{");
+  });
+
+  it("cannot brand itself, and the refusal comes from the write rather than the screen", async () => {
+    const cookie = await workspace();
+    const no = await post(SLUG, "/api/brand.write",
+      { theme: READABLE, surfaces: ["shell"] }, cookie);
+    expect(no.status).toBe(402);
+    expect((await no.json() as { problem: { code: string } }).problem.code)
+      .toBe("platform.commercial_required");
+    expect(await brandingOf(directory(), (await tenantBySlug(directory(), SLUG))!.id)).toBe(null);
+  });
+
+  /* ⚠️ AND ITS TILE IS OURS, WHICH IS THE HONEST DEFAULT RATHER THAN A BLANK. */
+  it("installs under our mark", async () => {
+    await workspace();
+    const manifest = await (await get(SLUG, "/manifest.webmanifest")).json() as
+      { name: string; short_name: string; start_url: string; scope: string };
+    expect(manifest.short_name).toBe("Harbourside");
+    expect(manifest.name).toContain("One");
+    /* ⚠️ The origin's root and the whole origin — a scope narrowed to one
+       product sends every app switch out of the installed window. */
+    expect(manifest.start_url).toBe("/");
+    expect(manifest.scope).toBe("/");
+
+    const icon = await get(SLUG, "/icon.svg");
+    expect(icon.headers.get("content-type")).toContain("image/svg+xml");
+    expect(await icon.text()).toContain("◇");
+  });
+});
+
+/* --------------------------------------------------------- becoming one --- */
+
+describe("becoming a business", () => {
+  it("refuses without a legal name, and without a payment or an allowance", async () => {
+    const cookie = await workspace();
+    expect((await post("setup", "/api/me.tenant.commercial",
+      { slug: SLUG, legalName: "   " }, cookie)).status).toBe(400);
+    expect((await post("setup", "/api/me.tenant.commercial",
+      { slug: SLUG, legalName: "Harbourside GmbH" }, cookie)).status).toBe(402);
+    expect((await tenantBySlug(directory(), SLUG))?.kind).toBe("personal");
+  });
+
+  it("goes through on an operator's allowance, and everything follows from it", async () => {
+    const cookie = await workspace();
+    await comp(1);
+
+    const done = await post("setup", "/api/me.tenant.commercial",
+      { slug: SLUG, legalName: "Harbourside GmbH" }, cookie);
+    expect(done.status).toBe(200);
+    const row = (await tenantBySlug(directory(), SLUG))!;
+    expect(row.kind).toBe("commercial");
+    expect(row.legalName).toBe("Harbourside GmbH");
+
+    /* The commercial-only operation now answers. */
+    const made = await post(SLUG, "/api/note.create", { title: "A note" }, cookie);
+    const { id } = await made.json() as { id: string };
+    expect((await post(SLUG, "/api/note.share", { id }, cookie)).status).toBe(200);
+
+    /* And the brand takes, on the workspace rather than on the app. */
+    expect((await post(SLUG, "/api/brand.write",
+      { theme: READABLE, surfaces: ["shell", "email"] }, cookie)).status).toBe(200);
+    expect((await brandingOf(directory(), row.id))?.theme.ground).toBe("#101014");
+  });
+
+  /* ⚠️ ONE WAY, AND THERE IS NO OPERATION FOR THE OTHER DIRECTION. Asserted by
+     asking for one: a route that appeared later would answer instead of 404. */
+  it("cannot be undone", async () => {
+    const cookie = await workspace();
+    await comp(1);
+    await post("setup", "/api/me.tenant.commercial", { slug: SLUG, legalName: "H GmbH" }, cookie);
+
+    expect((await post("setup", "/api/me.tenant.personal", { slug: SLUG }, cookie)).status).toBe(404);
+    /* ...and asking again is a conflict rather than a second charge. */
+    expect((await post("setup", "/api/me.tenant.commercial",
+      { slug: SLUG, legalName: "H GmbH" }, cookie)).status).toBe(409);
+    expect((await tenantBySlug(directory(), SLUG))?.kind).toBe("commercial");
+  });
+
+  /* ⚠️ AN ALLOWANCE RUNS OUT, WHICH IS WHY IT IS A COUNT RATHER THAN A SWITCH. */
+  it("spends the allowance, and the next workspace is refused", async () => {
+    const cookie = await workspace();
+    await comp(1);
+    expect((await post("setup", "/api/me.tenant.commercial",
+      { slug: SLUG, legalName: "H GmbH" }, cookie)).status).toBe(200);
+
+    await post("setup", "/api/me.tenant.create",
+      { slug: "harbourside-two", name: "Harbourside Two", country: "DE" }, cookie);
+    expect((await post("setup", "/api/me.tenant.commercial",
+      { slug: "harbourside-two", legalName: "H Two GmbH" }, cookie)).status).toBe(402);
+  });
+
+  /* ⚠️ AND ONLY SOMEBODY WHO CAN RUN THE PLACE, because it puts a legal name on
+     invoices in their name. */
+  it("is refused to somebody who cannot run the workspace", async () => {
+    const cookie = await workspace();
+    await comp(2);
+    /* ⚠️ `customer`, and not to dodge the seat ceiling: it is the role with no
+       workspace authority at all, which is what this is asking about. */
+    expect((await post(SLUG, "/api/member.invite",
+      { email: "alex@example.com", platformRole: "customer", appRoles: { hello: "reader" } },
+      cookie)).status).toBe(200);
+    const theirs = await signIn("alex@example.com");
+
+    expect((await post("setup", "/api/me.tenant.commercial",
+      { slug: SLUG, legalName: "Sneaky GmbH" }, theirs)).status).toBe(403);
+  });
+});
+
+/* -------------------------------------------------------------- the brand --- */
+
+describe("a business's own identity", () => {
+  const asBusiness = async () => {
+    const cookie = await workspace();
+    await comp(1);
+    await post("setup", "/api/me.tenant.commercial", { slug: SLUG, legalName: "H GmbH" }, cookie);
+    return cookie;
+  };
+
+  /*
+    ⚠️ AN UNREADABLE PAIR IS REFUSED RATHER THAN WARNED ABOUT. The person
+    choosing is not the person who has to read it, and they will never see the
+    problem: they are on their own screen, at their own brightness, having
+    already decided.
+  */
+  it("refuses a pair its own customers could not read", async () => {
+    const cookie = await asBusiness();
+    const no = await post(SLUG, "/api/brand.write",
+      { theme: { ground: "#ffffff", ink: "#f4f4f5" }, surfaces: ["shell"] }, cookie);
+    expect(no.status).toBe(400);
+  });
+
+  it("reaches the installed tile, which is where somebody looks for it", async () => {
+    const cookie = await asBusiness();
+    await post(SLUG, "/api/brand.write", { theme: READABLE, surfaces: ["shell"] }, cookie);
+
+    const manifest = await (await get(SLUG, "/manifest.webmanifest")).json() as
+      { name: string; theme_color: string };
+    /* ⚠️ Their name alone — ours is not appended to a business's own tile. */
+    expect(manifest.name).toBe("Harbourside");
+    expect(manifest.name).not.toContain("One");
+    expect(manifest.theme_color).toBe("#101014");
+
+    const icon = await (await get(SLUG, "/icon.svg")).text();
+    expect(icon).toContain("#101014");
+    expect(icon).toContain(">H<");
+  });
+
+  /* ⚠️ PUBLIC BY CONSTRUCTION, because a phone fetches a manifest with no
+     session and often no cookie jar — anything behind a login installs as a
+     browser default. */
+  it("is served with no session at all", async () => {
+    await asBusiness();
+    expect((await get(SLUG, "/manifest.webmanifest")).status).toBe(200);
+    expect((await get(SLUG, "/icon.svg")).status).toBe(200);
+  });
+
+  /* ⚠️ AND NOWHERE BUT A WORKSPACE'S OWN DOOR. The setup and operator doors are
+     not places anybody installs from, and a tile served there would be one
+     workspace's brand on the deployment's own address. */
+  it("is not served at the other doors", async () => {
+    await asBusiness();
+    expect((await get("setup", "/manifest.webmanifest")).status).toBe(404);
+    expect((await get("admin", "/icon.svg")).status).toBe(404);
+  });
+});

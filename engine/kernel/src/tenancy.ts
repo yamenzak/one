@@ -102,7 +102,116 @@ export interface Tenant {
   /** ISO 3166-1 alpha-2, as the business declared it at signup. */
   readonly country: string;
   readonly placement: Placement;
+  readonly kind: Kind;
+  /**
+   * ⚠️ REQUIRED OF A COMMERCIAL WORKSPACE AND MEANINGLESS TO A PERSONAL ONE.
+   * `name` is what the product calls it and may be anything; this is who is
+   * trading, and it is what an invoice, a contract and a processing record have
+   * to carry. Null on a personal workspace, because asking a person for their
+   * company's legal name is asking for something that does not exist.
+   */
+  readonly legalName: string | null;
   readonly at: Instant;
+}
+
+/* ------------------------------------------------------------------ kind --- */
+
+/**
+ * WHETHER THIS WORKSPACE IS SOMEBODY'S OR A BUSINESS'S.
+ *
+ * ⚠️ IT IS THE WORKSPACE'S KIND AND NOT THE PLAN'S, and that is the whole point.
+ * A plan is what a workspace bought this month and it moves both ways; this is
+ * what the workspace IS — who is trading, whose name is over the door, which law
+ * applies, and whether its records may sit on a database of their own. Modelling
+ * it as a tier would make "are we a business" a thing that lapses with a card.
+ *
+ * ⚠️ AND IT IS ONE-WAY, DELIBERATELY. Going commercial takes a legal name and a
+ * payment, and rolling it back would mean withdrawing a brand a business's own
+ * customers have seen, moving records off a shard they were promised, and
+ * un-selling capabilities that were paid for once. There is no operation for it
+ * — see `mayBecome`.
+ */
+export type Kind = "personal" | "commercial";
+
+export const KINDS: readonly Kind[] = ["personal", "commercial"];
+
+/**
+ * ⚠️ ONE WAY, AND ASKED RATHER THAN REMEMBERED. Every write of `kind` goes
+ * through this, so "commercial is permanent" is a property of the code instead
+ * of a sentence in a document — an UPDATE somebody adds later is a test failure
+ * rather than a workspace that quietly became personal again with a brand still
+ * on its sign-in page.
+ */
+export const mayBecome = (from: Kind, to: Kind): boolean =>
+  from === "personal" && to === "commercial";
+
+/**
+ * ⚠️ WHAT COMMERCIAL BUYS, IN ONE PLACE AND AS QUESTIONS RATHER THAN A LIST. A
+ * capability that asked `kind === "commercial"` at its own call site is a
+ * capability that can be added without anybody deciding it is a commercial one,
+ * and the answer would then differ per screen.
+ *
+ * ⚠️ AND A PERSONAL WORKSPACE IS NOT A CRIPPLED ONE. It shares a database
+ * because sharing is right for it, and it wears OUR marks because it is not
+ * trading under anybody's. Neither is a withheld feature to be nagged about.
+ */
+export const mayBrand = (kind: Kind): boolean => kind === "commercial";
+export const mayIsolate = (kind: Kind): boolean => kind === "commercial";
+
+/**
+ * HOW MANY COMMERCIAL WORKSPACES AN OPERATOR HAS GIVEN SOMEBODY, AND HOW MANY
+ * THEY HAVE SPENT.
+ *
+ * ⚠️ COUNTED, NEVER A BOOLEAN. "This account may make commercial workspaces" is
+ * a switch nobody can revoke without taking away the ones already made; a count
+ * is a number that runs out, which is what a comp, a pilot and a partner deal
+ * all actually are.
+ */
+export interface CommercialAllowance {
+  readonly granted: number;
+  readonly used: number;
+}
+
+export const allowanceLeft = (a: CommercialAllowance): number =>
+  Math.max(0, a.granted - a.used);
+
+/* ------------------------------------------------------ becoming commercial --- */
+
+/**
+ *   already      it is commercial, and there is nothing to do.
+ *   legal_name   nobody may trade under a blank.
+ *   unpaid       no payment landed and no allowance was left to spend.
+ */
+export type CommercialRefusal = "already" | "legal_name" | "unpaid";
+
+export interface BecomeCommercial {
+  readonly legalName: string;
+  /** Whether a one-time payment for this workspace has settled. */
+  readonly paid: boolean;
+  readonly allowance: CommercialAllowance;
+}
+
+/**
+ * Whether this workspace may become commercial.
+ *
+ * ⚠️ THE ORDER IS WHAT SOMEBODY SHOULD FIX FIRST, and money is last on purpose:
+ * taking a payment and then refusing over an empty field is a refund and an
+ * apology. Everything a person can correct for free is asked before anything
+ * that costs.
+ *
+ * ⚠️ AND AN ALLOWANCE IS AS GOOD AS A PAYMENT HERE — it is what an operator
+ * hands a partner, a pilot or somebody we owe a favour. What it is NOT is a
+ * second kind of commercial workspace: what comes out the other side is
+ * identical, because a comped business is still a business.
+ */
+export function refuseCommercial(
+  tenant: { readonly kind: Kind },
+  ask: BecomeCommercial,
+): CommercialRefusal | null {
+  if (tenant.kind === "commercial") return "already";
+  if (!ask.legalName.trim()) return "legal_name";
+  if (!ask.paid && allowanceLeft(ask.allowance) < 1) return "unpaid";
+  return null;
 }
 
 /**
@@ -138,7 +247,8 @@ export const enabled = (row: Enablement): boolean => row.disabledAt === null;
  * every request for the moved tenant answering "no such table" — so it is a rule
  * with a name, asked before a move and before an app is enabled.
  */
-export type PlacementRefusal = "schema_missing" | "wrong_residency" | "full";
+export type PlacementRefusal =
+  | "schema_missing" | "wrong_residency" | "full" | "someone_elses" | "shared";
 
 export interface Shard {
   readonly id: string;
@@ -148,6 +258,29 @@ export interface Shard {
   readonly tenants: number;
   /** What the operator set as this shard's ceiling. Never a hard limit — see below. */
   readonly ceiling: number;
+  /**
+   * ⚠️ WHOSE SHARD THIS IS, WHERE IT IS SOMEBODY'S. A commercial workspace may
+   * have its records on a database and a bucket of their own; this is the row
+   * that says so, and it is on the SHARD rather than on the tenant because the
+   * question every placement asks is "may this workspace go here", and a fact
+   * living only on the arriving tenant cannot answer it about the shard.
+   */
+  readonly dedicatedTo?: TenantId;
+}
+
+/** What a workspace needs of wherever its records land. */
+export interface Placing {
+  readonly where: Residency;
+  readonly apps: readonly AppId[];
+  /** ⚠️ Who is arriving. Absent means a placement being checked in the abstract. */
+  readonly tenantId?: TenantId;
+  /**
+   * ⚠️ ASKED, NEVER INFERRED FROM THE KIND. `mayIsolate` says who is ALLOWED to
+   * ask; a commercial workspace that has not asked belongs on a shared shard
+   * like everybody else, and reading the kind here would silently give every
+   * business a database of its own on the day it upgraded.
+   */
+  readonly alone?: boolean;
 }
 
 /**
@@ -156,13 +289,18 @@ export interface Shard {
  * working exactly as before. The other reading — a ceiling that forces a move —
  * turns a capacity setting into an outage trigger, at whatever hour it happens
  * to be crossed.
+ *
+ * ⚠️ AND A DEDICATED SHARD IS A PROMISE IN BOTH DIRECTIONS. A stranger placed on
+ * one breaks the isolation somebody paid for, silently and permanently — nothing
+ * downstream would notice, because both workspaces work perfectly. A workspace
+ * that asked to be alone landing on a shared shard is the same broken promise
+ * from the other end, so it is refused rather than quietly downgraded.
  */
-export function refusePlacement(
-  shard: Shard,
-  wants: { readonly where: Residency; readonly apps: readonly AppId[] },
-): PlacementRefusal | null {
+export function refusePlacement(shard: Shard, wants: Placing): PlacementRefusal | null {
   if (shard.where !== wants.where) return "wrong_residency";
   if (wants.apps.some((app) => !shard.apps.includes(app))) return "schema_missing";
+  if (shard.dedicatedTo !== undefined && shard.dedicatedTo !== wants.tenantId) return "someone_elses";
+  if (wants.alone && shard.dedicatedTo === undefined) return "shared";
   if (shard.tenants >= shard.ceiling) return "full";
   return null;
 }
@@ -176,10 +314,7 @@ export function refusePlacement(
  * the busiest store we have. Spreading costs a little and means a new customer's
  * first week is on quiet infrastructure.
  */
-export function placeOn(
-  shards: readonly Shard[],
-  wants: { readonly where: Residency; readonly apps: readonly AppId[] },
-): Shard | null {
+export function placeOn(shards: readonly Shard[], wants: Placing): Shard | null {
   const able = shards.filter((s) => refusePlacement(s, wants) === null);
   if (able.length === 0) return null;
   return able.reduce((best, s) => (s.tenants < best.tenants ? s : best));

@@ -79,6 +79,18 @@ export const LEAD =
   "flex size-10 shrink-0 items-center justify-center rounded-full" as const;
 
 /**
+ * ⚠️ AN INSTALLED TILE IS A SQUIRCLE, AND THE RADIUS IS A PLATFORM CONVENTION
+ * RATHER THAN OUR TASTE. iOS and Android both mask an app icon to roughly a
+ * quarter of its side; drawing anything else in a preview shows somebody a shape
+ * their phone will not give them. Two sizes and no third: the thing being chosen
+ * (`panel`) and the thing beside a workspace's name in a list (`chip`).
+ */
+export const TILE = {
+  panel: "size-20 rounded-[1.25rem] text-4xl font-semibold",
+  chip: "size-8 rounded-[0.5rem] text-sm font-semibold",
+} as const;
+
+/**
  * ⚠️ THE ICON SIZE IS LOCKED HERE AND NOWHERE ELSE. Every glyph in the product
  * is drawn at these, so a list has one optical weight — the thing that was most
  * obviously missing while the icons were text characters at whatever size the

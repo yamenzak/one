@@ -18,10 +18,12 @@
  */
 
 import type { AccountId, AppSpec, Door, TenantId } from "@engine/kernel";
-import { RESERVED_SLUGS, foundingAppRole, residencyFor, slugOk, wouldStrand } from "@engine/kernel";
 import {
-  appsOfTenant, createTenant, forgetInvitation, invitationsFor, noteBelonging, tenantsOf,
-  upsertAccount, type TenantRow,
+  RESERVED_SLUGS, foundingAppRole, permissionsFor, residencyFor, slugOk, wouldStrand,
+} from "@engine/kernel";
+import {
+  appsOfTenant, becomeCommercial, createTenant, forgetInvitation, invitationsFor, noteBelonging,
+  tenantsOf, upsertAccount, type TenantRow,
 } from "./directory.js";
 import {
   endSession, forgetCode, issueCode, mintToken, readSession, revokeToken, spendCode,
@@ -259,6 +261,55 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
           ctx.email ?? "", { [deps.appId]: role }, ctx.now);
         await noteBelonging(ctx.directory, accountId, made.tenant.id, ctx.now);
         return { slug: made.tenant.slug, id: made.tenant.id };
+      },
+    },
+
+    /* ------------------------------------------------- becoming a business --- */
+
+    /**
+     * ⚠️ THE PERSONAL LANE, BECAUSE THE WORKSPACE'S OWN DOOR IS THE WRONG PLACE
+     * TO STAND. This is a decision about what the workspace IS, made by whoever
+     * founded it, and it is reached from the hub beside the list of workspaces
+     * rather than from inside one — the same reason creating one lives here.
+     *
+     * ⚠️ AND IT IS ONE WAY. There is no `me.tenant.personal`, deliberately: see
+     * `mayBecome`. Rolling back would mean withdrawing a brand a business's own
+     * customers have seen and moving records off a shard they were promised.
+     */
+    "me.tenant.commercial": {
+      kind: "write", needs: "session",
+      doors: ["setup", "account"],
+      async run(ctx, input): Promise<unknown> {
+        const slug = String(input.slug ?? "");
+        const legalName = String(input.legalName ?? "").trim();
+
+        /* ⚠️ Only from the list of workspaces this account is actually in — a
+           slug in a body is otherwise a way to name somebody else's. */
+        const tenants = await tenantsOf(ctx.directory, ctx.session!.accountId);
+        const tenant = tenants.find((t) => t.slug === slug);
+        if (!tenant) return ctx.fail("platform.not_found");
+
+        const mine = await memberFor(ctx.shardOf(tenant), tenant.id, ctx.session!.accountId);
+        /* ⚠️ The workspace's own authority, asked through the one resolver.
+           Nobody but somebody who can run the place may decide it is a
+           business — it puts a legal name on invoices in their name. */
+        if (!mine || !permissionsFor(mine, null).has("tenant:manage")) {
+          return ctx.fail("platform.forbidden");
+        }
+
+        /* DEFER(engine-21) stage:21 — nothing takes a card yet, so `paid` is
+           false and the only lane through is an operator's allowance. The
+           refusal is already the right one, which is the half that matters:
+           when payment lands it sets this and nothing else here changes. */
+        const done = await becomeCommercial(
+          ctx.directory, tenant.id, ctx.session!.accountId,
+          { legalName, paid: false }, ctx.now);
+
+        if (done === "no_such_tenant") return ctx.fail("platform.not_found");
+        if (done === "already") return ctx.fail("platform.conflict");
+        if (done === "legal_name") return ctx.fail("platform.invalid");
+        if (done === "unpaid") return ctx.fail("platform.payment_required");
+        return { slug: done.slug, kind: done.kind, legalName: done.legalName };
       },
     },
 

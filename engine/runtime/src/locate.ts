@@ -75,6 +75,13 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
       tenantId: tenant.id,
       db,
       apps: apps.map((a) => a.id),
+      /* ⚠️ RESOLVED HERE BECAUSE EVERY GATE READS IT AND ONE FUNCTION ANSWERS
+         IT (see the header). A deployment wiring its own `locate` and omitting
+         the kind gets `personal` at the gate — commercial-only capabilities
+         withheld, never handed out — which is the direction a mistake here has
+         to fail in. */
+      kind: tenant.kind,
+      name: tenant.name,
       standing,
       entitlements: held.flatMap((h) => h.entitlements),
       flags: (await deps.flags?.(tenant)) ?? {},

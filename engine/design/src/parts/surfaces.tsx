@@ -29,7 +29,7 @@ import { Button, Card, Chip, Label, Skeleton, Switch } from "@heroui/react";
 import type { Tone } from "@engine/kernel";
 import { TYPE } from "../tokens/type.js";
 import {
-  CARD_ROWS, CROWN_SIZE, HEAD_GAP, ICON, INSET, LEAD, NUDGE, PAD, ROW, SPACE,
+  CARD_ROWS, CROWN_SIZE, HEAD_GAP, ICON, INSET, LEAD, NUDGE, PAD, ROW, SPACE, TILE,
 } from "../tokens/metrics.js";
 import type { Inset } from "../tokens/metrics.js";
 import { ARRIVE, arriveAt } from "../tokens/motion.js";
@@ -171,6 +171,47 @@ export function Group({ label, under, face, at, sky, seedling, children }: Group
  * "this is about you" the way a left-aligned one cannot — it is the one place
  * on any screen where the subject is the reader.
  */
+/**
+ * WHAT A WORKSPACE LOOKS LIKE ON A HOME SCREEN.
+ *
+ * ⚠️ THE ONE PLACE THAT DRAWS AN INSTALLED TILE, so the preview in an editor and
+ * the icon a worker serves cannot disagree. They were always going to be built
+ * twice — a swatch beside a colour picker, and the real thing in a manifest —
+ * and two drawings of one artwork is how somebody picks a colour, installs the
+ * app, and finds a different tile on the phone.
+ *
+ * ⚠️ AND IT IS THE ONLY COMPONENT HERE THAT TAKES COLOURS, WHICH IS NOT A BREACH
+ * OF THE FILE'S RULE BUT ITS EXCEPTION STATED. Everything else takes its paint
+ * from the theme so a workspace's branding reaches it; this one IS the branding,
+ * being chosen, before it has been applied to anything. A tile that read the
+ * current theme would show what the workspace looks like now, which is exactly
+ * what somebody editing it is not asking about.
+ */
+export function BrandTile({ name, ground, ink, glyph, size = "panel" }: {
+  readonly name: string;
+  readonly ground: string;
+  readonly ink: string;
+  /** One or two characters. Falls back to the name's initial. */
+  readonly glyph?: string;
+  readonly size?: "chip" | "panel";
+}) {
+  const box = size === "panel" ? TILE.panel : TILE.chip;
+  return (
+    <span
+      /* ⚠️ A LABEL RATHER THAN THE GLYPH, because a screen reader announcing "N"
+         tells nobody anything. The name is what the tile means. */
+      role="img"
+      aria-label={name}
+      className={`flex shrink-0 items-center justify-center ${box}`}
+      style={{ background: ground, color: ink }}
+    >
+      <span aria-hidden="true" className="leading-none">
+        {glyph || name.trim().charAt(0).toUpperCase() || "·"}
+      </span>
+    </span>
+  );
+}
+
 export function Identity({ name, under, aside, face }: {
   readonly name: string;
   readonly under?: string;

@@ -26,6 +26,7 @@ import * as React from "react";
 import { ready, type Loaded, type PeriodId } from "@engine/design";
 import { HELLO } from "../index.js";
 import { NOTES, PEOPLE, READ, WRITTEN, type Note as OneNote } from "./sample.js";
+import { Brand, type BrandTheme } from "./Brand.js";
 import { Note } from "./Note.js";
 import { Notes } from "./Notes.js";
 import { People } from "./People.js";
@@ -35,10 +36,18 @@ import { Settings } from "./Settings.js";
 import { Start } from "./Start.js";
 import { Write } from "./Write.js";
 
-export { Note, Notes, People, Reports, Search, Settings, Start, Write };
+export { Brand, Note, Notes, People, Reports, Search, Settings, Start, Write };
 export * from "./sample.js";
 
 const nothing = () => undefined;
+
+/* ⚠️ WHAT THE APPS HERE ACTUALLY HAVE, not the platform's closed set — a surface
+   a workspace can switch on that no app offers is a toggle that changes nothing
+   and says nothing. Hello declares `shell` and `email`. */
+const SURFACES_HERE = [
+  { id: "shell", label: "The app itself", under: "Colour, and your mark in the corner" },
+  { id: "email", label: "Email", under: "Anything sent from here" },
+];
 
 /**
  * ⚠️ THE ROUTES COME FROM THE MANIFEST, NOT FROM A LIST HERE. A second list is a
@@ -66,6 +75,12 @@ export function HelloScreen({ route, onGo }: {
   const [q, setQ] = React.useState("");
   const [recent, setRecent] = React.useState<readonly string[]>(["pricing", "onboarding"]);
   const [period, setPeriod] = React.useState<PeriodId>("30d");
+  /* ⚠️ THE GROUND CAN BE EITHER KIND, because both are real screens and only one
+     of them was ever going to get looked at. Pressing the offer switches it,
+     which is the closest a router-free ground gets to the real transition. */
+  const [kind, setKind] = React.useState<"personal" | "commercial">("personal");
+  const [theme, setTheme] = React.useState<BrandTheme>({});
+  const [surfaces, setSurfaces] = React.useState<readonly string[]>(["shell"]);
   const go = onGo ?? nothing;
 
   /* ⚠️ THE NAME COMES FROM THE MANIFEST, NOT FROM A STRING HERE. A screen titled
@@ -118,6 +133,23 @@ export function HelloScreen({ route, onGo }: {
       <Note title={title} note={NOTES[0] as OneNote} onBack={() => go("/")} onPublish={nothing} onOpen={nothing} />
     );
     case "/write": return <Write title={title} onBack={() => go("/")} onSave={nothing} />;
+    /* ⚠️ PERSONAL ON THE GROUND, WHICH IS THE HARDER HALF TO GET RIGHT. The
+       ground photographs what somebody actually meets, and what most workspaces
+       meet here is the offer rather than the editor. */
+    case "/brand": return (
+      <Brand
+        title={title}
+        name="The test ground"
+        kind={kind}
+        theme={theme}
+        surfaces={new Set(surfaces)}
+        offered={SURFACES_HERE}
+        onTheme={(key, value) => setTheme((was) => ({ ...was, [key]: String(value ?? "") }))}
+        onSurface={(id, on) => setSurfaces((was) =>
+          on ? [...was, id] : was.filter((s) => s !== id))}
+        onBecome={() => setKind("commercial")}
+      />
+    );
     case "/start": return (
       <Start title={title} done={DONE} counts={COUNTS} held={HELD} onGo={go} />
     );

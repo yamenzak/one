@@ -195,6 +195,33 @@ const teamCheckIns = operation<{ week: string }, { items: readonly unknown[] }>(
   },
 });
 
+/**
+ * ⚠️ COMMERCIAL-ONLY, AND IT IS NOT AN ENTITLEMENT. A shared note carries the
+ * workspace's own brand on a page people outside it read — so a PERSONAL
+ * workspace cannot do it at any price, because it has no brand and is trading
+ * under nobody's name. The refusal says "make this a business", which is the
+ * only sentence that leads anywhere; "change your plan" would send somebody to a
+ * price list where nothing they can buy would help.
+ */
+const share = operation<{ id: string }, { id: string; url: string }>({
+  id: "note.share",
+  kind: "write",
+  summary: "Put a note on a page anybody can read",
+  input: { id: field.text({ label: "Note", required: true, holds: "none" }) },
+  output: {
+    id: field.text({ label: "Note", holds: "none" }),
+    url: field.url({ label: "Where it is", holds: "none" }),
+  },
+  permission: "note:write",
+  commercial: true,
+  idempotency: { mode: "natural", key: "id" },
+  emits: ["note.shared"],
+  outcome: { message: "Shared.", tone: "success", invalidates: ["note.list"] },
+  async handler(_ctx, input) {
+    return { id: input.id, url: `/read/${input.id}` };
+  },
+});
+
 /* --------------------------------------------------------------- the rest --- */
 
 export const HELLO: AppSpec = defineApp({
@@ -242,7 +269,7 @@ export const HELLO: AppSpec = defineApp({
   ],
 
   collections: [note, checkIn],
-  operations: [publish, draft, teamCheckIns],
+  operations: [publish, draft, teamCheckIns, share],
 
   /*
     ⚠️ THREE OF EIGHT NAME A GROUND, AND THE FIVE THAT DO NOT ARE THE POINT.
@@ -265,6 +292,12 @@ export const HELLO: AppSpec = defineApp({
       permission: "member:read" },
     { id: "settings", route: "/settings", label: "Settings", nav: "secondary", icon: "cog",
       permission: "tenant:manage" },
+    /* ⚠️ DECLARED `commercial`, AND STILL REACHABLE. A screen a personal
+       workspace cannot use is hidden nowhere: it renders the offer instead, so
+       the thing that unlocks it is findable from the place it applies. Hiding it
+       would leave "become a business" as a fact somebody has to be told. */
+    { id: "brand", route: "/brand", label: "Brand", nav: "secondary", icon: "star",
+      permission: "tenant:manage", commercial: true },
     /* ⚠️ Behind one of our switches, which is what makes the flag mean anything:
        a flag no screen and no operation is behind changes nothing when pressed. */
     { id: "search", route: "/search", label: "Search", nav: "secondary", icon: "search",
@@ -411,7 +444,10 @@ export const HELLO: AppSpec = defineApp({
       terms: ["invite", "seat"] },
   },
 
-  whitelabel: { surfaces: ["shell", "email"], entitlement: "publishing" },
+  /* ⚠️ WHICH SURFACES THIS APP HAS, AND NOT WHO MAY PAINT THEM. The brand is
+     the WORKSPACE's and it reaches every app under it; whether it may have one
+     at all is `mayBrand(kind)`, which is the same answer in every product. */
+  whitelabel: { surfaces: ["shell", "email"] },
 
   /* ⚠️ A pack has a real price. Credits for nothing is always a catalogue
      mistake rather than a promotion — a promotion is a discount on a price,
