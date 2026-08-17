@@ -114,7 +114,6 @@ const drawnBy = (name) => {
  */
 const ELSEWHERE = {
   /* --- the account and the operator console, which are OneSpace's --- */
-  Wallet: "the credit balance is OneSpace's Money area; nothing there mounts it yet",
   MyData: "export and erase your account — OneSpace's You area, unmounted",
   WhoLooked: "who read a vault field — OneSpace's Trust area, unmounted",
   ConsentSheet: "a purpose grant — spawned by an app that holds a sensitive field, and none does",

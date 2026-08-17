@@ -366,12 +366,12 @@ and a manifest that does not compose refuses to boot.
 | `guide` | help, onboarding, the milestones a workspace passes | 5 | — |
 | `job` | scheduled work, and the record that it ran | 5 | — |
 | `brand` | which surfaces a workspace may put its own mark on | 10 | 1 |
-| `mark` | the logo as geometry, so the browser and the Worker draw one shape | 6 | — |
+| `mark` | the logo as geometry, so the browser and the Worker draw one shape | 7 | — |
 | `ai` | a generating action: its lane, its prompt, its ceiling | 11 | 1 |
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**208 of them**, 201 reached by something today.
+**209 of them**, 202 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -585,6 +585,8 @@ its own header, cited by other files, and doing nothing.
 | `every-key-a-product-declares-is-priced-by-every-tier` | D1 | a feature built, shipped and sold to nobody - an unpriced key resolves to off for every workspace on every tier, and no screen anywhere says why |
 | `the-lobby-is-free-and-cannot-be-bought` | D21 | a workspace charged for the parking state it never chose, or offered it at checkout as though not having a plan were a plan |
 | `one-catalogue-one-currency` | D1 | two tiers priced in different currencies and a bill that adds them together |
+| `the-currency-marks-bars-are-not-clipped` | D7 | a plain numeral beside every credit figure - the platform's own logo standing in for a unit, which reads as a mistake rather than as a currency |
+| `a-currency-mark-takes-the-size-of-its-number` | D7 | a mark the right size in one of the six places a credit figure appears and visibly wrong in the other five |
 | `storage-is-measured-from-the-ledger` | D12 | a bill built by listing every object in a bucket - a request per thousand files, slower with every upload, and unanswerable at the size where it starts to matter |
 | `a-fraction-of-a-credit-is-neither-free-nor-rounded-up` | D12 | storage that is free for ever because a day of it rounds down, or costs thirty times the price because it rounds up |
 | `a-metered-charge-takes-what-there-is` | D12 | a wallet with money in it beside an uncollected debt, which reads to everybody as a bug |
@@ -792,7 +794,7 @@ its own header, cited by other files, and doing nothing.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 3 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 13 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 5 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 57 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 59 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |

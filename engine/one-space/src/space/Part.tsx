@@ -59,8 +59,9 @@ export function WorkspacePart({ part, slug, app, area, onGo }: {
   switch (part) {
     case "people": return <People view={view} />;
     case "money":
-      return <Money view={view} onGo={(id) => onGo({ at: "plan", slug, app: id })} />;
-    case "plan": return <Plan app={app ?? ""} />;
+      return <Money view={view} onGo={() => onGo({ at: "plan", slug })} />;
+    /* ⚠️ NO APP ID: THERE IS ONE MEMBERSHIP, so there is one catalogue. */
+    case "plan": return <Plan />;
     case "packages": return <Packages view={view} />;
     /* ⚠️ THE WORKSPACE'S SETTINGS ONLY. A person's own preferences are `prefs`,
        under YOU — see `where.ts`. */

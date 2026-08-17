@@ -284,6 +284,20 @@ export const SPACE = {
 export type Space = keyof typeof SPACE;
 
 /**
+ * ⚠️ THE ONE GAP MEASURED IN `em` RATHER THAN PIXELS, and it is a different
+ * scale on purpose. Everything above is the rhythm BETWEEN things, which is a
+ * property of the page and should not change with a font size. This is the space
+ * inside a single set piece of type — a currency mark and the digits it belongs
+ * to — where a fixed number is wrong everywhere except the one size it was
+ * chosen at: too tight on a hero balance, too loose in a table cell.
+ *
+ * ⚠️ IT LIVES HERE ANYWAY. A component picking its own is how a balance in the
+ * crown and a balance on the money screen come to sit differently, which is the
+ * exact drift the rest of this file exists to prevent.
+ */
+export const GLYPH_GAP = "gap-[0.3em]" as const;
+
+/**
  * ⚠️ A BLOCK'S OWN INSET. Absent from the first version of this file, which is
  * precisely why nine components invented one — and one of them chose `gap-4`, a
  * step that is not in the scale at all. A missing metric is not a smaller

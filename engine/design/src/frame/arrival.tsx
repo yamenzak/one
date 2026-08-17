@@ -17,7 +17,7 @@
 import * as React from "react";
 import { Link } from "@heroui/react";
 import {
-  MARK_BEAK, MARK_INK, MARK_STEM, beakOpacity, partsOf, type MarkOf,
+  MARK_BEAK, MARK_STEM, beakOpacity, inkOf, partsOf, type MarkOf,
 } from "@engine/kernel";
 import { ARRIVE_MARK, ARRIVE_RISE, doorAt } from "../tokens/motion.js";
 import {
@@ -57,7 +57,7 @@ import { Lockup } from "../parts/logo.js";
  * machine decides, which is how a mark comes to look bold on one screen and thin
  * on the next.
  */
-export type MarkSize = "nav" | "row" | "crown" | "door";
+export type MarkSize = "inline" | "nav" | "row" | "crown" | "door";
 
 /**
  * ⚠️ HEIGHT OF THE INK, NOT OF A BOX AROUND IT — see `INK`. Every number here is
@@ -70,7 +70,11 @@ export type MarkSize = "nav" | "row" | "crown" | "door";
  * name rather than as a bracket beside the first line.
  */
 const MARK_H: Readonly<Record<MarkSize, number>> = {
-  nav: 14, row: 16, crown: 20, door: 65,
+  /* ⚠️ `inline` IS THE ONE MEASURED IN `em`, and it has to be. A currency mark
+     beside a number has to grow and shrink with the number — pinned to a pixel
+     height it is the right size in exactly one of the six places a credit
+     figure appears, and visibly wrong in the other five. */
+  inline: 1, nav: 14, row: 16, crown: 20, door: 65,
 };
 
 /**
@@ -91,7 +95,9 @@ const MARK_H: Readonly<Record<MarkSize, number>> = {
  * of the geometry is two logos with one name, and the one nobody looks at is the
  * one sitting on somebody's home screen for a year (`kernel/src/mark.ts`).
  */
-const INK = MARK_INK;
+/* ⚠️ ASKED PER MARK, because the wallet's bars leave the numeral — see
+   `inkOf`. A single box was correct while every mark had one silhouette, and
+   clipped the wallet silently the moment one did not. */
 
 /**
  * ⚠️ WHOSE MARK — the deployment's, or a product's — and it is the KERNEL'S type
@@ -107,6 +113,9 @@ export function Mark({ size = "crown", of = "one", label }: {
   readonly label?: string;
 }) {
   const h = MARK_H[size];
+  /* ⚠️ `em` FOR THE INLINE SIZE, pixels for the rest — see `MARK_H`. */
+  const unit = size === "inline" ? "em" : "";
+  const INK = inkOf(of);
   const parts = partsOf(of);
   const beak = MARK_BEAK;
   /*
@@ -120,13 +129,13 @@ export function Mark({ size = "crown", of = "one", label }: {
 
   return (
     <svg
-      height={h}
+      height={`${h}${unit}`}
       /* ⚠️ DERIVED FROM THE DRAWING'S OWN PROPORTION, AND NOT ROUNDED. Written
          out, the two drift the first time the numeral is redrawn; rounded, the
          drift is the same and arrives immediately — at 14px a whole-pixel width
          is 5% off the drawing's ratio, which is a mark subtly stretched in the
          one place it is smallest and least forgiving. SVG takes a fraction. */
-      width={(h * INK.w) / INK.h}
+      width={`${(h * INK.w) / INK.h}${unit}`}
       viewBox={`${INK.x} ${INK.y} ${INK.w} ${INK.h}`}
       /* ⚠️ `currentColor`, because the source drawings filled #ffffff — a logo
          that is invisible on every light surface, and one that fails as an empty
@@ -172,6 +181,15 @@ export function Mark({ size = "crown", of = "one", label }: {
       <path d={`M ${MARK_STEM.x} ${MARK_STEM.y} H ${MARK_STEM.x + MARK_STEM.w}`
         + ` V ${MARK_STEM.y + MARK_STEM.h} H ${MARK_STEM.x} Z`}
         mask={`url(#${mask})`} />
+      {/* ⚠️ THE BARS ARE DRAWN AFTER THE STEM AND OUTSIDE THE MASK, because they
+          are ADDED rather than cut — same order as `inkAt`, which is what the
+          rasteriser samples. Inside the mask they would be counters; over the
+          stem they are cards crossing it. */}
+      {parts.bars.map((bar, i) => (
+        <path key={`bar${i}`}
+          d={`M ${bar.x1} ${bar.y1} L ${bar.x2} ${bar.y2}`
+            + ` L ${bar.x2} ${bar.y2 + bar.thickness} L ${bar.x1} ${bar.y1 + bar.thickness} Z`} />
+      ))}
     </svg>
   );
 }

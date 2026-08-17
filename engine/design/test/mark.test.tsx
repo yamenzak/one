@@ -132,3 +132,48 @@ describe("the lockup", () => {
     expect(stacked.height).toBeGreaterThan(row.height);
   });
 });
+
+/* -------------------------------------------------------------- the wallet --- */
+
+/**
+ * THE CURRENCY MARK, AND THE ONE THING THAT MAKES IT ONE.
+ *
+ * ⚠️ ITS BARS LEAVE THE NUMERAL, and that overhang IS the mark. Cropped to the
+ * numeral's box it renders as a plain `1` beside every credit figure in the
+ * product — which is worse than no currency mark at all, because it reads as the
+ * platform's own logo standing in for a unit.
+ */
+describe("the wallet's mark", () => {
+  it("is drawn wider than the numeral, so its bars are not clipped", () => {
+    const one = box(svgOf(<Mark of="one" size="crown" />));
+    const wallet = box(svgOf(<Mark of="wallet" size="crown" />));
+    expect(wallet.w).toBeGreaterThan(one.w);
+    /* ⚠️ Same height: it is the same numeral with something added, never a
+       different shape — see `partsOf`. */
+    expect(wallet.h).toBe(one.h);
+  });
+
+  /*
+    ⚠️ AND THE BARS ARE DRAWN OUTSIDE THE MASK. Inside it they would be COUNTERS
+    — light cut out of the stem — rather than cards crossing it, which is the
+    same picture only while the wallet's stem has no counters of its own.
+  */
+  it("adds the bars rather than cutting them out", () => {
+    const svg = svgOf(<Mark of="wallet" size="crown" />);
+    const masked = svg.slice(svg.indexOf("<mask"), svg.indexOf("</mask>"));
+    /* Two bar paths in the drawing, none of them inside the stencil. */
+    expect(svg.match(/<path/g)?.length).toBe(4);
+    expect(masked).not.toContain("<path");
+  });
+
+  /*
+    ⚠️ AND THE INLINE SIZE IS MEASURED IN `em`. A currency mark pinned to a pixel
+    height is the right size in exactly one of the six places a credit figure
+    appears and visibly wrong in the other five.
+  */
+  it("takes its size from the text it sits beside", () => {
+    const svg = svgOf(<Mark of="wallet" size="inline" />);
+    expect(svg).toContain('height="1em"');
+    expect(svg).toMatch(/width="[\d.]+em"/);
+  });
+});

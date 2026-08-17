@@ -167,11 +167,11 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 56 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | internal |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 48 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 119 |
-| `rendered/` | whole surfaces drawn from a kernel declaration | 51 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 121 |
+| `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**313 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**317 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -198,6 +198,7 @@ there is no deep import, and a guard says so.
 - `parts/arrange.tsx` — `Center`, `Cluster`, `Columns`, `Grid`, `Rail`, `Row`, `Spacer`, `Stack`
 - `parts/beside.tsx` — `Hint`, `Pip`
 - `parts/blocks.tsx` — `Crumbs`, `Faq`, `Gauge`, `Hotkey`, `Moment`, `PageTabs`, `Reveal`, `Step`, `Steps`, `TabSpec`, `Timeline`
+- `parts/credits.tsx` — `Credits`, `CreditsProps`
 - `parts/face.tsx` — `appFace`, `Face`, `FaceKind`, `FaceOf`, `FaceProps`, `FaceSize`, `ONE_FACE`, `Orb`, `placeFace`, `whoFace`, `worldFor`
 - `parts/forms.tsx` — `Agree`, `Choice`, `CodeEntry`, `DateInput`, `Dates`, `Dial`, `LongText`, `Lookup`, `MoneyInput`, `NumberInput`, `NumberInputProps`, `OneOf`, `Option`, `PeriodId`, `PeriodInput`, `PERIODS`, `Picks`, `Said`, `SearchInput`, `SecretInput`, `Segmented`, `spanOf`, `Tags`, `Tail`, `TextInput`, `TextInputProps`, `TimeInput`
 - `parts/heads.tsx` — `Balance`, `distinguishing`, `Figure`, `Prose`, `Section`, `SectionTitle`, `Title`
@@ -218,7 +219,7 @@ there is no deep import, and a guard says so.
 - `rendered/guide.tsx` — `Guide`, `GuideProps`, `Help`, `HelpProps`, `Milestones`, `MilestonesProps`
 - `rendered/inbox.tsx` — `Bell`, `BellProps`, `Inbox`, `InboxProps`, `Note`
 - `rendered/legal.tsx` — `Documents`, `DocumentsProps`, `Ropa`, `SubProcessors`, `WhereItLives`
-- `rendered/money.tsx` — `Bill`, `BillProps`, `Jobs`, `JobsProps`, `Wallet`, `WalletProps`
+- `rendered/money.tsx` — `Bill`, `BillProps`, `Jobs`, `JobsProps`, `Storage`, `StorageProps`, `Wallet`, `WalletProps`
 - `rendered/policy.tsx` — `NotificationPolicy`, `Offered`, `PolicyProps`, `policyShown`
 - `rendered/settings.tsx` — `Settings`, `SettingsProps`, `settingsShown`
 - `rendered/vault.tsx` — `ConsentProps`, `ConsentSheet`, `Look`, `MineProps`, `MyData`, `WhoLooked`

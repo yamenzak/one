@@ -47,4 +47,5 @@ export * from "./rendered/inbox.js";
 export * from "./rendered/ai.js";
 export * from "./rendered/vault.js";
 export * from "./rendered/legal.js";
+export * from "./parts/credits.js";
 export * from "./parts/logo.js";

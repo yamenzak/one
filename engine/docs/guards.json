@@ -651,6 +651,24 @@
       "fails": "two tiers priced in different currencies and a bill that adds them together"
     },
     {
+      "id": "the-currency-marks-bars-are-not-clipped",
+      "protects": "D7",
+      "stage": "6",
+      "status": "live",
+      "impl": "design/test/mark.test.tsx",
+      "proves": "is drawn wider than the numeral, so its bars are not clipped",
+      "fails": "a plain numeral beside every credit figure - the platform's own logo standing in for a unit, which reads as a mistake rather than as a currency"
+    },
+    {
+      "id": "a-currency-mark-takes-the-size-of-its-number",
+      "protects": "D7",
+      "stage": "6",
+      "status": "live",
+      "impl": "design/test/mark.test.tsx",
+      "proves": "takes its size from the text it sits beside",
+      "fails": "a mark the right size in one of the six places a credit figure appears and visibly wrong in the other five"
+    },
+    {
       "id": "storage-is-measured-from-the-ledger",
       "protects": "D12",
       "stage": "47",

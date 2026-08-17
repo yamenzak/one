@@ -28,8 +28,27 @@
  */
 export const MARK_INK = { x: 28, y: 18, w: 38, h: 64 } as const;
 
-/** Whose mark: the deployment's, or a product's. */
-export type MarkOf = "one" | "space";
+/** Whose mark: the deployment's, a product's, or the wallet's. */
+export type MarkOf = "one" | "space" | "wallet";
+
+/**
+ * ⚠️ THE WALLET'S INK IS WIDER, BECAUSE ITS BARS LEAVE THE NUMERAL. They cross
+ * the stem and stick out both sides — that overhang IS the mark — so cropping to
+ * the numeral's box would clip the only part that distinguishes it and leave a
+ * plain `1` beside every credit figure.
+ */
+const WALLET_INK = { x: 28, y: 18, w: 46, h: 64 } as const;
+
+/**
+ * WHERE THE INK IS, FOR ONE MARK.
+ *
+ * ⚠️ ASKED RATHER THAN ASSUMED, and that is what the wallet forced. Every
+ * consumer crops to this box to make a declared size mean the height of the ink;
+ * a single constant was correct while every mark was the same silhouette, and
+ * wrong the moment one was not — silently, by clipping.
+ */
+export const inkOf = (of: MarkOf): { x: number; y: number; w: number; h: number } =>
+  (of === "wallet" ? WALLET_INK : MARK_INK);
 
 /* ------------------------------------------------------------------ parts --- */
 
@@ -79,9 +98,35 @@ export interface Ring {
   readonly keep: number;
 }
 
+/**
+ * THE BARS — the wallet's, and only the wallet's.
+ *
+ * ⚠️ THEY ARE ADDED, NOT CUT, AND THEY LEAVE THE STEM. Two slanted bars crossing
+ * the numeral and overhanging both sides: cards in a wallet, held at the angle a
+ * hand holds them. Every other difference in this family is INSIDE the counters,
+ * which is the rule that keeps a shelf of products from reading as a folder of
+ * logos — the wallet breaks it deliberately, because it is not a product. It is
+ * a currency mark, and it has to be recognisable at twelve pixels next to a
+ * number.
+ *
+ * ⚠️ A PARALLELOGRAM BY ITS TOP EDGE AND A THICKNESS, so the inside test is one
+ * interpolation. Given as corners it would be a path, and a path is the one
+ * thing this file may not contain.
+ */
+export interface Bar {
+  readonly x1: number;
+  readonly x2: number;
+  /** The top edge's y at `x1` and at `x2`. */
+  readonly y1: number;
+  readonly y2: number;
+  /** Vertical thickness, constant along the bar. */
+  readonly thickness: number;
+}
+
 export interface MarkParts {
   readonly slots: readonly Slot[];
   readonly rings: readonly Ring[];
+  readonly bars: readonly Bar[];
 }
 
 /**
@@ -93,15 +138,18 @@ export interface MarkParts {
  * two counters read as a pair of rails; uneven, the mark has a direction.
  */
 export function partsOf(of: MarkOf): MarkParts {
-  return of === "one"
-    ? {
+  if (of === "one") {
+    return {
       slots: [
         { x: 53, y1: 18, y2: 82, width: 3 },
         { x: 60, y1: 18, y2: 82, width: 2.5 },
       ],
       rings: [],
-    }
-    : {
+      bars: [],
+    };
+  }
+  if (of === "space") {
+    return {
       slots: [
         { x: 52, y1: 18, y2: 82, width: 2 },
         { x: 60, y1: 18, y2: 82, width: 2 },
@@ -110,7 +158,24 @@ export function partsOf(of: MarkOf): MarkParts {
         { x: 52, y: 36, cut: 4.5, keep: 2 },
         { x: 60, y: 62, cut: 4.5, keep: 2 },
       ],
+      bars: [],
     };
+  }
+  /*
+    ⚠️ THE WALLET'S STEM IS SOLID, AND THAT IS THE ONE PLACE IT LEAVES THE
+    FAMILY. It is a currency mark: it sits at twelve pixels beside a credit
+    figure, where a three-unit counter closes up into a smudge and a two-unit one
+    is already gone. What survives at that size is the silhouette, so the wallet
+    puts everything into the silhouette and nothing into the counters.
+  */
+  return {
+    slots: [],
+    rings: [],
+    bars: [
+      { x1: 38, x2: 74, y1: 44, y2: 38, thickness: 4.5 },
+      { x1: 38, x2: 74, y1: 56, y2: 50, thickness: 4.5 },
+    ],
+  };
 }
 
 /**
@@ -139,7 +204,16 @@ export const beakOpacity = (of: MarkOf): number => (of === "space" ? 0.55 : 1);
  * beak's own value in the beak.
  */
 export function inkAt(of: MarkOf, x: number, y: number): number {
-  const { slots, rings } = partsOf(of);
+  const { slots, rings, bars } = partsOf(of);
+
+  /* ⚠️ THE BARS ARE TESTED FIRST BECAUSE THEY ARE ADDED RATHER THAN CUT. Asked
+     after the stem, the half of each bar that overhangs would be ink and the half
+     crossing the stem would be whatever the stem said — which is the same shape
+     only while the stem has no counters, and would silently stop being true the
+     day the wallet grew one. */
+  for (const bar of bars) {
+    if (inBar(bar, x, y)) return 1;
+  }
 
   if (inStem(x, y)) {
     for (const ring of rings) {
@@ -155,6 +229,18 @@ export function inkAt(of: MarkOf, x: number, y: number): number {
   }
 
   return inBeak(x, y) ? beakOpacity(of) : 0;
+}
+
+/**
+ * ⚠️ ONE INTERPOLATION AND TWO COMPARISONS. The top edge's height at `x` is the
+ * line between its two ends; the bar is everything from there down by its
+ * thickness. A bounding box would take the two triangles the slant cuts away,
+ * which on a bar this shallow is most of what makes it look slanted.
+ */
+function inBar(bar: Bar, x: number, y: number): boolean {
+  if (x < bar.x1 || x > bar.x2) return false;
+  const top = bar.y1 + ((bar.y2 - bar.y1) * (x - bar.x1)) / (bar.x2 - bar.x1);
+  return y >= top && y <= top + bar.thickness;
 }
 
 const inStem = (x: number, y: number): boolean =>

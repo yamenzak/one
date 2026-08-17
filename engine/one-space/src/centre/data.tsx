@@ -87,19 +87,45 @@ export interface HoldingLine {
   readonly paidUntil: string | null;
 }
 
+/**
+ * ⚠️ ONE MEMBERSHIP, SO ONE PLAN AND ONE WALLET. The products are a list beside
+ * the bill rather than N bills stacked — a per-product answer is three emails on
+ * three days from what looks like three companies.
+ */
 export interface MoneyView {
+  readonly plan: { readonly id: string; readonly name: string; readonly kind: string } | null;
+  readonly status: string | null;
+  readonly plans: readonly import("@engine/kernel").PlanSpec[];
+  readonly packs: readonly import("@engine/kernel").PackDef[];
+  readonly entitlements: Readonly<Record<string, import("@engine/kernel").EntitlementDef>>;
   readonly apps: readonly {
     readonly id: string; readonly name: string; readonly mark: string;
-    readonly planId: string | null; readonly status: string | null;
-    readonly plans: readonly import("@engine/kernel").PlanSpec[];
-    readonly entitlements: Readonly<Record<string, import("@engine/kernel").EntitlementDef>>;
   }[];
   readonly bill: {
     readonly lines: readonly { readonly appId: string; readonly planId: string; readonly price: number; readonly currency: string }[];
     readonly total: number;
     readonly currency: string;
   };
-  readonly balance: { readonly spendable: number };
+  /** ⚠️ Two balances that obey opposite rules — see `Wallet`. */
+  readonly wallet: {
+    readonly granted: number; readonly bought: number; readonly held: number;
+    readonly spendable: number; readonly owedMilli: number; readonly owing: boolean;
+  };
+  readonly storage: {
+    readonly used: number; readonly included: number;
+    readonly creditsPerGbMonth: number; readonly owedMilli: number;
+  };
+  /** ⚠️ The standing top-up, including why it last failed — see `AutoTopUp`. */
+  readonly armed: {
+    readonly packId: string | null; readonly below: number;
+    readonly at: string | null; readonly error: string | null;
+  };
+  readonly spent: readonly { readonly appId: string | null; readonly credits: number }[];
+  readonly statement: readonly {
+    readonly at: string; readonly delta: number; readonly reason: string;
+    readonly appId: string | null;
+  }[];
+  readonly mixed: boolean;
 }
 
 export interface InboxView {

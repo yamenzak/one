@@ -704,7 +704,14 @@ export function PersonRow({ name, under, when, unread, aside, goes, face, onOpen
  * the ripple rather than on the values.
  */
 export function AmountRow({ icon, face, label, under, amount, aside, tone = "neutral", onOpen }: RowBase & {
-  readonly amount: string;
+  /**
+   * ⚠️ A NODE, BECAUSE AN AMOUNT IS NOT ALWAYS A STRING. A credit figure wears a
+   * currency mark that is drawn rather than typed (`Credits`), and a row that
+   * only took text would force every such balance to be assembled beside this
+   * component instead of inside it — which is how one list ends up with two
+   * grammars for the same column.
+   */
+  readonly amount: React.ReactNode;
   /**
    * ⚠️ AFTER THE AMOUNT, AND IT IS A CONTROL RATHER THAN A SECOND FACT. A price
    * list somebody maintains needs a way to take a row off the shelf, and the

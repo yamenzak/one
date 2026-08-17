@@ -15,7 +15,7 @@
 
 import { inflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { MARK_INK, inkAt } from "@engine/kernel";
+import { inkAt, inkOf } from "@engine/kernel";
 import { drawTile, encodePng, tilePng } from "../src/raster.js";
 
 /* --------------------------------------------------------------- decoding --- */
@@ -156,7 +156,29 @@ describe("the tile", () => {
   it("draws a product's mark differently from the platform's", async () => {
     const one = drawTile({ of: "one", ground: BLACK, ink: WHITE, size: 64 });
     const space = drawTile({ of: "space", ground: BLACK, ink: WHITE, size: 64 });
+    const wallet = drawTile({ of: "wallet", ground: BLACK, ink: WHITE, size: 64 });
     expect(Buffer.from(one).equals(Buffer.from(space))).toBe(false);
+    expect(Buffer.from(one).equals(Buffer.from(wallet))).toBe(false);
+    expect(Buffer.from(space).equals(Buffer.from(wallet))).toBe(false);
+  });
+
+  /*
+    ⚠️ THE WALLET'S BARS ARE ADDED, NOT CUT, AND THEY LEAVE THE STEM. That
+    overhang IS the mark — a currency sign that read as a plain numeral beside
+    every credit figure would be worse than no sign at all — so both halves are
+    asserted: ink to the right of the stem, and ink where a bar crosses it.
+  */
+  it("crosses the wallet's numeral with bars that overhang it", () => {
+    /* Past the stem's right edge, on the upper bar. */
+    expect(inkAt("wallet", 70, 40)).toBe(1);
+    /* Left of the stem, on the same bar, below the beak. */
+    expect(inkAt("wallet", 40, 46)).toBe(1);
+    /* Between the two bars, outside the stem: nothing. */
+    expect(inkAt("wallet", 70, 47)).toBe(0);
+    /* ⚠️ And the numeral is still under them — a wallet is the mark with
+       something added, never a different shape. */
+    expect(inkAt("wallet", 56, 70)).toBe(1);
+    expect(inkAt("wallet", 34, 30)).toBeGreaterThan(0);
   });
 
   /* ⚠️ A MALFORMED COLOUR COSTS A TILE, NEVER THE ROUTE. This is read on the
@@ -175,7 +197,8 @@ describe("the geometry the two renderers share", () => {
     there.
   */
   it("bounds every part of the mark, tightly", () => {
-    for (const of of ["one", "space"] as const) {
+    for (const of of ["one", "space", "wallet"] as const) {
+      const MARK_INK = inkOf(of);
       let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
       for (let y = 0; y <= 100; y += 0.25) {
         for (let x = 0; x <= 100; x += 0.25) {

@@ -16,6 +16,7 @@ import { stalled } from "@engine/kernel";
 import { Button, Card, Chip, Meter, ProgressBar } from "@heroui/react";
 import { money } from "./console.js";
 import { Grid, Stack } from "../parts/arrange.js";
+import { Credits } from "../parts/credits.js";
 import { Balance } from "../parts/heads.js";
 import { AmountRow, ControlRow, Group } from "../parts/surfaces.js";
 import { TYPE } from "../tokens/type.js";
@@ -87,58 +88,110 @@ export function Bill({ lines, total, currency, appName, mixed }: BillProps) {
 /* ----------------------------------------------------------------- wallet --- */
 
 export interface WalletProps {
-  readonly balance: number;
+  /** ⚠️ This month's allowance, and it does not carry over. */
+  readonly granted: number;
+  /** ⚠️ Bought with a card, and it never expires. */
+  readonly bought: number;
   readonly held: number;
   readonly spentByApp: readonly { readonly appId: string | null; readonly credits: number }[];
   readonly appName: (appId: string) => string;
   readonly packs: readonly PackDef[];
   readonly onBuy: (packId: string) => void;
+  /** ⚠️ What is owed and could not be collected — see `owedMilli`. */
+  readonly owed?: number;
 }
 
-export function Wallet({ balance, held, spentByApp, appName, packs, onBuy }: WalletProps) {
-  const spendable = Math.max(0, balance - held);
+/**
+ * ONE BALANCE, MADE OF TWO NUMBERS THAT OBEY OPPOSITE RULES.
+ *
+ * ⚠️ THE SPLIT IS SHOWN BECAUSE IT IS THE ONLY WAY THE MONTH MAKES SENSE. One
+ * figure of 5,500 that drops to 4,000 on the first of the month, with nothing
+ * saying why, is a support conversation every month for ever. Two lines — what
+ * lapses and what does not — answer it before it is asked.
+ *
+ * ⚠️ AND THE HERO IS WHAT CAN BE SPENT, not what is on the row. A balance that
+ * silently includes a hold disagrees with the product at the moment of a
+ * refusal, which is the worst possible moment to be discovered.
+ */
+export function Wallet({
+  granted, bought, held, spentByApp, appName, packs, onBuy, owed = 0,
+}: WalletProps) {
+  const spendable = Math.max(0, granted + bought - held);
   const spent = spentByApp.reduce((n, s) => n + s.credits, 0);
 
   return (
-    <div className={`flex flex-col ${SPACE.snug}`}>
-      <Card>
-        <Card.Header>
-          <Card.Title>Credits</Card.Title>
-          <Card.Description>{spendable} to spend</Card.Description>
-        </Card.Header>
-        <Card.Content>
-          <div className={`flex flex-col ${SPACE.snug}`}>
-            {/*
-              ⚠️ HELD IS SHOWN SEPARATELY, because a balance that silently
-              excludes it is a number that disagrees with what the person can
-              actually spend — and they will notice at the moment of a refusal.
-            */}
-            {held > 0
-              ? (
-                <Chip color="default" variant="soft">
-                  <Chip.Label>{held} held for calls that are still running</Chip.Label>
-                </Chip>
-              )
-              : null}
+    <Stack space="snug">
+      <Balance
+        eyebrow="To spend"
+        figure={<Credits value={spendable} as="display" label="credits" />}
+        identifier={granted > 0 ? `${granted.toLocaleString("en-US")} of it this month's allowance` : undefined}
+      />
 
-            {spent > 0 ? (
-              <div className={`flex flex-col ${SPACE.tight}`}>
-                {spentByApp.map((s) => (
-                  <div key={s.appId ?? "platform"} className={`flex flex-col ${SPACE.hair}`}>
-                    <div className={`flex justify-between ${SPACE.snug}`}>
-                      <span>{s.appId ? appName(s.appId) : "The platform"}</span>
-                      <span>{s.credits}</span>
-                    </div>
-                    <Meter value={s.credits} maxValue={Math.max(1, spent)}>
-                      <Meter.Track><Meter.Fill /></Meter.Track>
-                    </Meter>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </Card.Content>
-      </Card>
+      {/*
+        ⚠️ THE TWO BALANCES ARE ROWS, and the copy on each says its RULE rather
+        than its name. "Allowance" and "Bought" are labels somebody has to be
+        taught; "ends when the month does" and "never expires" are the two facts
+        that decide what to do next.
+      */}
+      <Group>
+        <AmountRow
+          label="This month's allowance"
+          under="Ends when the month does"
+          amount={<Credits value={granted} as="inline" />}
+        />
+        <AmountRow
+          label="Credits you bought"
+          under="Never expires"
+          amount={<Credits value={bought} as="inline" />}
+        />
+        {/*
+          ⚠️ HELD IS ITS OWN ROW, because a balance that silently excludes it is
+          a number that disagrees with what can actually be spent — and the
+          person finds out at the moment of a refusal.
+        */}
+        {held > 0 ? (
+          <AmountRow
+            label="Held"
+            under="For calls that are still running"
+            amount={<Credits value={held} as="inline" />}
+          />
+        ) : null}
+        {/*
+          ⚠️ AND A DEBT IS SAID PLAINLY. Storage over the included amount is
+          metered rather than refused, so this is the only place somebody learns
+          the meter could not collect — and it is what stopped their writes.
+        */}
+        {owed > 0 ? (
+          <AmountRow
+            tone="warning"
+            label="Owed"
+            under="Add credits to make this workspace writable again — nothing has been deleted"
+            amount={<Credits value={owed} as="inline" />}
+          />
+        ) : null}
+      </Group>
+
+      {/*
+        ⚠️ WHERE IT WENT, PER PRODUCT. One wallet is only an improvement if a
+        business can still tell which product is spending it; otherwise "one
+        wallet" is just "we stopped telling you".
+      */}
+      {spent > 0 ? (
+        <Group label="Where the credits went">
+          {spentByApp.map((s) => (
+            <AmountRow
+              key={s.appId ?? "platform"}
+              label={s.appId ? appName(s.appId) : "The platform"}
+              amount={<Credits value={s.credits} as="inline" />}
+              aside={(
+                <Meter value={s.credits} maxValue={Math.max(1, spent)} className="w-16">
+                  <Meter.Track><Meter.Fill /></Meter.Track>
+                </Meter>
+              )}
+            />
+          ))}
+        </Group>
+      ) : null}
 
       {/* ⚠️ Auto-fit for the same reason the plan shelf is — a catalogue has
           however many packs somebody priced. See `Shelf`. */}
@@ -147,7 +200,9 @@ export function Wallet({ balance, held, spentByApp, appName, packs, onBuy }: Wal
           <Card key={pack.id}>
             <Card.Header>
               <Card.Title>{pack.name}</Card.Title>
-              <Card.Description>{pack.credits} credits</Card.Description>
+              <Card.Description>
+                <Credits value={pack.credits} as="inline" />
+              </Card.Description>
             </Card.Header>
             <Card.Content>
               <strong>{money(pack.price, pack.currency)}</strong>
@@ -164,7 +219,53 @@ export function Wallet({ balance, held, spentByApp, appName, packs, onBuy }: Wal
           </Card>
         ))}
       </Grid>
-    </div>
+    </Stack>
+  );
+}
+
+/* ---------------------------------------------------------------- storage --- */
+
+export interface StorageProps {
+  readonly used: number;
+  readonly included: number;
+  readonly creditsPerGbMonth: number;
+}
+
+const GB = 1024 * 1024 * 1024;
+const inGb = (bytes: number): string =>
+  `${(Math.round((bytes / GB) * 10) / 10).toLocaleString("en-US")} GB`;
+
+/**
+ * WHERE THE STORAGE STANDS, BEFORE THE METER IS THE FIRST ANYBODY HEARS OF IT.
+ *
+ * ⚠️ THE INCLUDED AMOUNT IS WHERE THE METER STARTS, NOT WHERE THE PRODUCT STOPS,
+ * and that is only kind if somebody can see the line coming. A charge that
+ * arrives without a screen that predicted it is the same surprise as a refusal,
+ * arriving later — so the rate is on the screen whether or not it is being paid.
+ */
+export function Storage({ used, included, creditsPerGbMonth }: StorageProps) {
+  const over = Math.max(0, used - included);
+  return (
+    <Group label="Storage">
+      <AmountRow
+        label={over > 0 ? `${inGb(over)} over what your plan includes` : "Within your plan"}
+        under={`${inGb(used)} of ${inGb(included)} included`}
+        tone={over > 0 ? "warning" : "neutral"}
+        amount={<Credits value={Math.round((over / GB) * creditsPerGbMonth)} as="inline" />}
+        aside={(
+          <ProgressBar value={Math.min(100, included > 0 ? (used / included) * 100 : 0)} className="w-16">
+            <ProgressBar.Track><ProgressBar.Fill /></ProgressBar.Track>
+          </ProgressBar>
+        )}
+      />
+      {/* ⚠️ THE PRICE, ALWAYS. It is the difference between a limit and a meter,
+          and somebody reading this row is deciding whether to tidy up or to pay. */}
+      <ControlRow label="Over the included amount" under="Charged monthly, to the nearest day">
+        <span className={TYPE.note}>
+          <Credits value={creditsPerGbMonth} as="inline" /> per GB
+        </span>
+      </ControlRow>
+    </Group>
   );
 }
 

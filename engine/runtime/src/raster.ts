@@ -24,7 +24,7 @@
  * each other rather than trusted.
  */
 
-import { MARK_INK, inkAt, type MarkOf } from "@engine/kernel";
+import { inkAt, inkOf, type MarkOf } from "@engine/kernel";
 
 /* ------------------------------------------------------------------- png --- */
 
@@ -161,9 +161,11 @@ export function drawTile(tile: Tile): Uint8Array<ArrayBuffer> {
 
   /* Fit the ink box into the safe area, keeping its proportion. */
   const safe = size * (1 - MARGIN * 2);
-  const scale = Math.min(safe / MARK_INK.w, safe / MARK_INK.h);
-  const drawnW = MARK_INK.w * scale;
-  const drawnH = MARK_INK.h * scale;
+  /* ⚠️ PER MARK, because the wallet's bars leave the numeral — see `inkOf`. */
+  const box = inkOf(tile.of);
+  const scale = Math.min(safe / box.w, safe / box.h);
+  const drawnW = box.w * scale;
+  const drawnH = box.h * scale;
   const left = (size - drawnW) / 2;
   const top = (size - drawnH) / 2;
 
@@ -178,8 +180,8 @@ export function drawTile(tile: Tile): Uint8Array<ArrayBuffer> {
           /* Back into the drawing's own coordinates. */
           const px = x + (sx + 0.5) * step;
           const py = y + (sy + 0.5) * step;
-          const dx = MARK_INK.x + ((px - left) / scale);
-          const dy = MARK_INK.y + ((py - top) / scale);
+          const dx = box.x + ((px - left) / scale);
+          const dy = box.y + ((py - top) / scale);
           sum += inkAt(tile.of, dx, dy);
         }
       }

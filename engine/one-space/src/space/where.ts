@@ -86,7 +86,10 @@ export type Where =
    * once a year, so the catalogue is a screen the bill's own row opens rather
    * than four catalogues stacked under a total (DESIGN.md §3).
    */
-  | { readonly at: "plan"; readonly slug: string; readonly app: string }
+  /* ⚠️ NO APP: ONE MEMBERSHIP, SO ONE CATALOGUE. The address carried a product
+     while plans belonged to products; a link with one in it now names a
+     dimension the screen no longer has. */
+  | { readonly at: "plan"; readonly slug: string }
   /**
    * ⚠️ PER PRODUCT, AND `app` IS HOW SOMEBODY DESCENDS INTO ONE. Without it the
    * screen listed EVERY product's settings in one column with the product's name
@@ -259,7 +262,10 @@ export function parseWhere(path: string): Where {
     /* ⚠️ Not in `OF_WORKSPACE`: it is reached from Money's rows, never from the
        workspace's own menu, so it is an address without being a destination. */
     if (part === "plan") {
-      return tail[2] ? { at: "plan", slug, app: tail[2] } : { at: "money", slug };
+      /* ⚠️ AND A TRAILING PRODUCT IS IGNORED RATHER THAN 404ING. Every link
+         anybody bookmarked before the membership became one carries one, and
+         the screen it wants is exactly this one. */
+      return { at: "plan", slug };
     }
     if (!isWorkspacePart(part)) return { at: "workspace", slug };
     /* ⚠️ A THIRD SEGMENT IS THE PRODUCT, on the two screens that have one per
@@ -305,7 +311,7 @@ export function pathOf(where: Where): string {
     case "tenants": case "keys": case "switches": case "telling": case "works": case "ground":
     case "footing":
       return `${SPACE}/console/${where.at}`;
-    case "plan": return `${SPACE}/w/${where.slug}/plan/${where.app}`;
+    case "plan": return `${SPACE}/w/${where.slug}/plan`;
     /* ⚠️ THE PAGE IS IN THE ADDRESS TOO. Settings descend, and an area that only
        lived in the parser is one somebody can reach and never link to — and
        going back from it would leave the whole surface. */
