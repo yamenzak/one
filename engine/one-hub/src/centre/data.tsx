@@ -36,7 +36,14 @@ export interface CentreApp {
 }
 
 export interface CentreView {
-  readonly tenant: { readonly name: string; readonly slug: string };
+  /* ⚠️ The KIND travels with the name, because the chrome decides what to offer
+     from it (`reachable`) — asked separately it would be a second round trip on
+     the one read every screen in a workspace stands on. */
+  readonly tenant: {
+    readonly name: string;
+    readonly slug: string;
+    readonly kind?: "personal" | "commercial";
+  };
   readonly you: {
     readonly accountId: string;
     readonly email: string | null;

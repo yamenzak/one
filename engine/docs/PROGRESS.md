@@ -698,7 +698,7 @@ The guard registry, its checks, and the standards that bind them.
 | D18 | The operator stands outside every workspace, and the console is a door rather than a role | 2 |
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 3 |
 | D20 | The hub is one surface presented over the product, reachable from every door, and it is a route | 3 |
-| D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 5 |
+| D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 6 |
 | D22 | Branding and the installable app belong to the workspace, never to one app inside it | 3 |
 <!-- /generated -->
 
@@ -808,6 +808,7 @@ the library decides FOR us.
 | `one-installable-tile-per-workspace-served-without-a-session` | D22 | every workspace installing as a browser default, silently, on every phone that ever adds it |
 | `isolation-is-never-sold-over-somebody-elses-records` | D5 | a database of one's own sold over a shard full of strangers, with every workspace on it working perfectly and nothing downstream noticing |
 | `a-field-is-never-the-colour-of-the-card-it-sits-on` | D7 | a control that exists, is focusable, and cannot be seen until somebody types into it — in both themes, with no border anywhere to draw its edge |
+| `a-business-only-screen-is-not-offered-to-a-workspace-that-is-not-one` | D21 | a destination drawn in the nav, navigable and reachable by URL, whose every action refuses — the declaration correct, the manifest composing, and no mechanism behind it |
 | `the-hub-has-one-door-to-the-api` | D12 | an expired session that does not look expired — every screen showing the empty state its failed load produced, and every save failing into a toast |
 | `the-browser-never-classifies-its-own-door` | D3 | a page offering a control the runtime refuses, answered as a 404 with nothing on it to explain why |
 | `every-screen-the-picker-names-is-drawn` | D10 | a blank page, which is the same picture as a page that failed to load — so somebody reloads for a minute and then gives up |

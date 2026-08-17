@@ -867,6 +867,15 @@
       "fails": "a control that exists, is focusable, and cannot be seen until somebody types into it — in both themes, with no border anywhere to draw its edge"
     },
     {
+      "id": "a-business-only-screen-is-not-offered-to-a-workspace-that-is-not-one",
+      "protects": "D21",
+      "stage": "20",
+      "status": "live",
+      "impl": "design/test/surface.test.tsx",
+      "proves": "hides a business-only screen from a personal workspace",
+      "fails": "a destination drawn in the nav, navigable and reachable by URL, whose every action refuses — the declaration correct, the manifest composing, and no mechanism behind it"
+    },
+    {
       "id": "the-hub-has-one-door-to-the-api",
       "protects": "D12",
       "stage": "10",

@@ -88,6 +88,10 @@ export function Product({ path, onGo, onOpenHub, onOpenInbox }: {
             screens={screens}
             here={path}
             held={new Set(app.permissions)}
+            /* ⚠️ WHAT THE WORKSPACE IS, so a business-only screen is not offered
+               to one that is not — the same question the gate asks, in the same
+               order (D21). */
+            kind={view.tenant.kind ?? "personal"}
             crown={{
               appId: app.id,
               appName: app.name,

@@ -75,7 +75,14 @@ export function centreOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         )));
 
       return {
-        tenant: { name: tenant?.name ?? "", slug: tenant?.slug ?? "" },
+        /* ⚠️ THE KIND TRAVELS WITH THE NAME. The chrome decides what to offer
+           from it, and asking separately would be a second round trip on the one
+           read every screen in a workspace already stands on. */
+        tenant: {
+          name: tenant?.name ?? "",
+          slug: tenant?.slug ?? "",
+          kind: tenant?.kind ?? "personal",
+        },
         you: {
           accountId: ctx.accountId,
           email: ctx.email,

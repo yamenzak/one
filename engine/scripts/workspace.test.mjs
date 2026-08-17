@@ -112,6 +112,33 @@ if (!/op\.commercial/.test(gate)) {
   fail(`kernel/src/gate.ts: the kind branch never reads \`op.commercial\`, so no declaration reaches it`);
 }
 
+/**
+ * ⚠️ AND A SCREEN MAY BE COMMERCIAL-ONLY TOO, WHICH THIS GUARD DID NOT ASK. The
+ * field was on `ScreenSpec` from the day the gate landed and NOTHING READ IT: a
+ * screen marked business-only was drawn in the nav, navigable and reachable by
+ * URL in a personal workspace. The declaration was right, the manifest composed,
+ * every test passed, and the mechanism was not there — which is the exact shape
+ * the rest of this file exists to catch, one declaration over.
+ *
+ * ⚠️ THE OFFER AND THE REFUSAL ARE SEPARATE, AND BOTH ARE REQUIRED. `reachable`
+ * decides what the chrome OFFERS; the gate decides what a route ALLOWS. Hiding
+ * alone is not enforcement — anybody can type the address — and refusing alone
+ * advertises a destination that answers 402.
+ */
+const shell = code(join(ENGINE, "design/src/frame/shell.tsx"));
+if (!/s\.commercial/.test(shell)) {
+  fail(`design/src/frame/shell.tsx: \`reachable\` never reads a screen's \`commercial\`, so a\n` +
+       `       business-only screen is offered in a personal workspace — declared and unread.`);
+}
+/* ⚠️ In the gate's order, so the two walks cannot come to disagree about which
+   refusal somebody meets first. */
+const order3 = /held\.has[\s\S]{0,200}?commercial[\s\S]{0,200}?s\.flag/.test(shell);
+if (!order3) {
+  fail(`design/src/frame/shell.tsx: \`reachable\` asks permission → kind → flag or it asks them\n` +
+       `       in some other order than the gate does, and a nav that disagrees with the gate\n` +
+       `       advertises a destination the route refuses.`);
+}
+
 /*
   ⚠️ AND THE ORDER IS THE DESIGN, NOT A PREFERENCE. Above entitlement because no
   plan a personal workspace can buy unlocks this; below permission because a

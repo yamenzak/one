@@ -494,7 +494,15 @@ generated from a colour and a glyph rather than an upload, because waiting for a
 upload pipeline means every workspace installs as a browser default until
 somebody builds one.
 
-**Therefore never:** a theme read from an app manifest; a brand row in a shard
+⚠️ **AND AN APP MAY NOT DECLARE A BRAND SCREEN EITHER**, which is the half that
+was got wrong within a day of writing this: the reference app grew a `/brand`
+route of its own, and it was the same mistake one level up. Where a workspace's
+identity is EDITED is as much a workspace question as what it contains. An app's
+commercial-only screens are about the app's own capabilities — a list of what it
+has published under that brand, not the brand.
+
+**Therefore never:** a theme read from an app manifest; a brand screen in an app;
+a brand row in a shard
 (the sign-in page and the manifest are read before a workspace is located); a
 surface a workspace can switch on that no app offers; an installable per product;
 a manifest or icon behind a session; a personal workspace's tile left blank

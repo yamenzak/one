@@ -292,12 +292,17 @@ export const HELLO: AppSpec = defineApp({
       permission: "member:read" },
     { id: "settings", route: "/settings", label: "Settings", nav: "secondary", icon: "cog",
       permission: "tenant:manage" },
-    /* ⚠️ DECLARED `commercial`, AND STILL REACHABLE. A screen a personal
-       workspace cannot use is hidden nowhere: it renders the offer instead, so
-       the thing that unlocks it is findable from the place it applies. Hiding it
-       would leave "become a business" as a fact somebody has to be told. */
-    { id: "brand", route: "/brand", label: "Brand", nav: "secondary", icon: "star",
-      permission: "tenant:manage", commercial: true },
+    /* ⚠️ DECLARED `commercial`, AND IT IS THE APP'S OWN. Sharing a note puts the
+       workspace's brand on a page people outside it read, so the list of what is
+       out there exists only for a business — and `reachable` does not offer it
+       to one that is not, in the gate's own order.
+
+       ⚠️ NOT A BRAND EDITOR. That was here for a day and contradicted D22 on the
+       morning it was written: a brand belongs to the WORKSPACE and is edited in
+       the hub, once, for every app under it. An app declaring one is how a
+       business with three products gets three of them. */
+    { id: "shared", route: "/shared", label: "Shared", nav: "secondary", icon: "star",
+      permission: "note:read", commercial: true },
     /* ⚠️ Behind one of our switches, which is what makes the flag mean anything:
        a flag no screen and no operation is behind changes nothing when pressed. */
     { id: "search", route: "/search", label: "Search", nav: "secondary", icon: "search",

@@ -175,6 +175,12 @@ export function App() {
           /* ⚠️ On, or the screen behind the flag is undrawable here — which is
              the one screen whose whole point is that a flag decides. */
           flags={{ "note-search": true }}
+          /* ⚠️ COMMERCIAL, FOR THE SAME REASON THE FLAG IS ON: a business-only
+             screen is undrawable on a personal ground, and the ground exists to
+             draw every screen. What the kind WITHHOLDS is `reachable`'s job and
+             has its own test — a ground that hid one would be a ground where a
+             screen is unreachable and nothing says which. */
+          kind="commercial"
           crown={{
             appId: HELLO.id,
             appName: HELLO.name,

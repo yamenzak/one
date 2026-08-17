@@ -21,8 +21,8 @@
  */
 
 import * as React from "react";
-import type { ScreenSpec } from "@engine/kernel";
-import { PRIMARY_MAX, primaryOf } from "@engine/kernel";
+import type { Kind, ScreenSpec } from "@engine/kernel";
+import { PRIMARY_MAX, isBusiness, primaryOf } from "@engine/kernel";
 import { Button, Separator } from "@heroui/react";
 import {
   Banknote, Bell, Building2, Calendar, Circle, ClipboardList, Clock, Cog, Coins, Database,
@@ -107,6 +107,12 @@ export interface ShellProps {
   readonly held: ReadonlySet<string>;
   /** Our own switches. A screen behind an unset one is not drawn. */
   readonly flags?: Readonly<Record<string, boolean>>;
+  /**
+   * ⚠️ WHAT THIS WORKSPACE IS (D21), so a business-only screen is not offered to
+   * one that is not. Absent reads as `personal` — the direction that withholds,
+   * matching the gate, so a shell wired without it hides rather than promises.
+   */
+  readonly kind?: Kind;
   readonly crown: CrownInfo;
   readonly onGo: (route: string) => void;
   readonly onSwitchApp?: (appId: string) => void;
@@ -121,18 +127,37 @@ export interface ShellProps {
   readonly children?: React.ReactNode;
 }
 
-/** ⚠️ Permission first, then our switch — the same order the gate uses. */
+/**
+ * ⚠️ PERMISSION, THEN WHAT THE WORKSPACE IS, THEN OUR SWITCH — THE GATE'S OWN
+ * ORDER. A screen offered here and refused by the gate is a promise the product
+ * does not keep, so the two walks have to ask the same questions in the same
+ * sequence; the day they diverge, the nav advertises a destination that answers
+ * 402 and nothing says which of the two is wrong.
+ *
+ * ⚠️ AND `commercial` WAS DECLARED AND READ BY NOTHING. `ScreenSpec` has carried
+ * the field since the kind gate landed and only OPERATIONS were ever checked, so
+ * a screen marked business-only was drawn, navigable and reachable by URL in a
+ * personal workspace — every declaration correct, every test green, the
+ * mechanism absent. Absent kind reads as `personal`, which withholds rather than
+ * offers.
+ */
 export const reachable = (
   screens: readonly ScreenSpec[],
   held: ReadonlySet<string>,
   flags: Readonly<Record<string, boolean>> = {},
+  kind: Kind = "personal",
 ): readonly ScreenSpec[] =>
-  screens.filter((s) => held.has(s.permission) && (!s.flag || flags[s.flag] === true));
+  screens.filter((s) =>
+    held.has(s.permission)
+    && (!s.commercial || isBusiness(kind))
+    && (!s.flag || flags[s.flag] === true));
 
 export function Shell(props: ShellProps) {
-  const { screens, here, held, flags, crown, onGo, onSwitchApp, onOpenInbox, onOpenHub, children } = props;
+  const {
+    screens, here, held, flags, kind, crown, onGo, onSwitchApp, onOpenInbox, onOpenHub, children,
+  } = props;
 
-  const mine = reachable(screens, held, flags);
+  const mine = reachable(screens, held, flags, kind);
   /* ⚠️ Sliced as well as refused at composition: a deployment reading a manifest
      it did not compose must not draw a sixth either. */
   const primary = primaryOf(mine).slice(0, PRIMARY_MAX);

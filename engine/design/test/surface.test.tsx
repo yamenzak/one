@@ -264,6 +264,8 @@ const SCREENS = [
   { id: "people", route: "/people", label: "People", nav: "primary" as const, permission: "member:read" },
   { id: "search", route: "/search", label: "Search", nav: "secondary" as const,
     permission: "note:read", flag: "note-search" },
+  { id: "shared", route: "/shared", label: "Shared", nav: "secondary" as const,
+    permission: "note:read", commercial: true as const },
 ];
 
 describe("the shell", () => {
@@ -287,6 +289,28 @@ describe("the shell", () => {
   /* ⚠️ And a screen behind one of our switches is not drawn while it is off. */
   it("hides a screen behind a flag we have not turned on", () => {
     expect(reachable(SCREENS, new Set(["note:read"]), {}).map((s) => s.id)).toEqual(["notes"]);
+  });
+
+  /*
+    ⚠️ A BUSINESS-ONLY SCREEN IS NOT OFFERED TO A WORKSPACE THAT IS NOT ONE, and
+    this is the half that was declared and read by nothing: `ScreenSpec` carried
+    `commercial` from the day the gate landed while only OPERATIONS were checked,
+    so the screen was drawn, navigable and reachable by URL. Every declaration
+    correct, every test green, no mechanism.
+  */
+  it("hides a business-only screen from a personal workspace", () => {
+    const held = new Set(["note:read"]);
+    expect(reachable(SCREENS, held, {}, "commercial").map((s) => s.id))
+      .toEqual(["notes", "shared"]);
+    expect(reachable(SCREENS, held, {}, "personal").map((s) => s.id)).toEqual(["notes"]);
+    /* ⚠️ Absent is `personal` — a shell wired without the kind withholds rather
+       than promises, which is the direction the gate fails in too. */
+    expect(reachable(SCREENS, held, {}).map((s) => s.id)).toEqual(["notes"]);
+
+    const out = html(
+      <Shell screens={SCREENS} here="/" held={held} crown={crown} onGo={() => {}} />,
+    );
+    expect(out).not.toContain("Shared");
   });
 
   /*
