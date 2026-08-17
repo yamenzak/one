@@ -16,7 +16,8 @@ import {
   BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA, MEMBERSHIP_SCHEMA,
   addShard, applySchema, audienceFor, balanceOf, createTenant, credit, fileNote, found, inboxOf,
   markSeen, noteShardApp, openAccount, invite, setPolicy, setPreference, unseenCount,
-  MOCK_ALLOWED, availableChannels, generate, mockProvider, type Db, type Provider,
+  MOCK_ALLOWED, availableChannels, generate, mockProvider, tell, type Db, type Provider,
+  type PushNote,
 } from "@engine/runtime";
 import { HELLO } from "../src/index.js";
 
@@ -137,9 +138,26 @@ describe("being told something", () => {
       { ...dispatch, tenantId }, ["inbox", "email"]);
     expect(told[0]!.channels).not.toContain("push");
 
-    expect(availableChannels({ available: EVERY })).toEqual(["inbox"]);
-    expect(availableChannels({ available: EVERY, mailer: { async send() {} } }))
-      .toEqual(["inbox", "email"]);
+    expect(await availableChannels({})).toEqual(["inbox"]);
+    expect(await availableChannels({ mailer: { async send() {} } })).toEqual(["inbox", "email"]);
+
+    /* ⚠️ AND THE PUSH HALF, because the literal `["inbox"]` this replaced sat in
+       `serve.ts` under a note calling it temporary, and survived the stage that
+       made it wrong — every device subscribed, stored, and never sent to. */
+    expect(await availableChannels({
+      pusher: { async live() { return true; }, async push() {} },
+    })).toEqual(["inbox", "push"]);
+
+    /*
+      ⚠️ AND A BOUND LANE WITH NO KEYPAIR IS NOT A CHANNEL. The deployment binds
+      the pusher unconditionally — the keypair is made from the console while the
+      worker runs — so "is it wired" and "can it send" are different questions,
+      and offering the switch on the first is a person waiting for a notification
+      nothing attempted.
+    */
+    expect(await availableChannels({
+      pusher: { async live() { return false; }, async push() {} },
+    })).toEqual(["inbox"]);
   });
 
   it("marks one as read, and then all of them", async () => {
@@ -166,6 +184,75 @@ describe("being told something", () => {
     await fileNote(shard(), HELLO.notifications ?? {}, { ...dispatch, tenantId }, told);
     expect(await inboxOf(shard(), tenantId, "acc_alex")).toHaveLength(0);
     expect(await inboxOf(shard(), tenantId, "acc_owner")).toHaveLength(1);
+  });
+});
+
+/* ------------------------------------------------------------ leaving here --- */
+
+/**
+ * ⚠️ THE INBOX IS THE RECORD AND PUSH IS THE INTERRUPTION, AND THE SECOND ONE
+ * HAD NO CALLER. `tell` filed rows and dispatched nothing further for as long as
+ * `serve.ts` passed a literal `["inbox"]` — so a device could be subscribed,
+ * stored, counted on the console screen and never sent to, with every suite
+ * green. That is what this describe exists to make impossible.
+ */
+describe("a note that leaves the process", () => {
+  const sent: PushNote[] = [];
+  const pusher = {
+    async live() { return true; },
+    async push(_accountId: string, note: PushNote) { sent.push(note); },
+  };
+
+  const raise = (type: string) => ({
+    app: HELLO, tenantId, events: [type],
+    input: {}, answer: { title: "Q3 plan" },
+    actor: null, actorName: "Sam",
+    channels: EVERY,
+  });
+
+  beforeEach(() => { sent.length = 0; });
+
+  /*
+    ⚠️ `note.published` DECLARES `["inbox", "email"]` AND `note.review_asked`
+    DECLARES PUSH, so the type's own narrowing is the thing being read. A test
+    against a book where every type offers everything proves the wiring and not
+    the rule.
+  */
+  it("sends only what the notification type offers a channel for", async () => {
+    await roster();
+    await tell(shard(), { ...raise("note.published"), pusher });
+    expect(sent, "a type that does not offer push was pushed anyway").toHaveLength(0);
+
+    await tell(shard(), { ...raise("note.review_asked"), pusher });
+    expect(sent.map((n) => n.title)).toEqual([
+      "Sam asked you to look at Q3 plan", "Sam asked you to look at Q3 plan",
+    ]);
+    /* ⚠️ THE WORKSPACE TRAVELS WITH IT, because it decides which devices may
+       carry the note — see `push.ts`. Without it a business's notification lands
+       on a device wearing another business's logo. */
+    expect(sent[0]!.tenantId).toBe(tenantId);
+    expect(sent[0]!.link).toBe("/");
+  });
+
+  /* ⚠️ A PERSON WHO SWITCHED PUSH OFF IS NOT PUSHED, and the row is still filed.
+     `channelsFor` has already decided; this reads that decision rather than
+     making a second one. */
+  it("respects somebody who turned push off for themselves", async () => {
+    await roster();
+    await setPreference(shard(), tenantId, "acc_alex", "note.review_asked", ["inbox", "email"]);
+
+    await tell(shard(), { ...raise("note.review_asked"), pusher });
+    expect(sent).toHaveLength(1);
+    expect(await unseenCount(shard(), tenantId, "acc_alex")).toBe(1);
+  });
+
+  /* ⚠️ AND WITH NO PUSHER WIRED NOTHING IS ATTEMPTED. A deployment without one is
+     ordinary, and it must lose the interruption rather than the record. */
+  it("still files the record on a deployment that cannot push", async () => {
+    await roster();
+    expect(await tell(shard(), raise("note.review_asked"))).toBe(2);
+    expect(sent).toHaveLength(0);
+    expect(await unseenCount(shard(), tenantId, "acc_alex")).toBe(1);
   });
 });
 

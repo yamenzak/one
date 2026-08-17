@@ -18,6 +18,8 @@ export * from "./credits.js";
 export * from "./jobs.js";
 export * from "./locate.js";
 export * from "./inbox.js";
+export * from "./webpush.js";
+export * from "./push.js";
 export * from "./services.js";
 export * from "./vault.js";
 export * from "./records.js";

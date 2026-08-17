@@ -16,7 +16,7 @@
  * context is passed only to them.
  */
 
-import type { Allowance, AppSpec, RoleRegistry, TenantId, Theme } from "@engine/kernel";
+import type { Allowance, AppSpec, Channel, RoleRegistry, TenantId, Theme } from "@engine/kernel";
 import { PUBLIC, SURFACES, refusePolicy, seatsUsed, withinQuota } from "@engine/kernel";
 import { brandingOf, setBranding } from "./branding.js";
 import { LEAST_SIDE, MOST_BYTES, MOST_SIDE, forgetIcon, hasIcon, setIcon } from "./icon.js";
@@ -64,6 +64,15 @@ export interface PlatformCtx extends Ctx {
    * live yet stores no files, which every caller refuses on rather than throws.
    */
   readonly bucket?: Bucket | null;
+  /**
+   * ⚠️ WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER A NOTIFICATION ON. Only the
+   * deployment knows — a mailer and a push keypair are bindings, not
+   * declarations — and both notification settings screens draw their switches
+   * from it. The two of them had `["inbox", "email", "push"]` written out in the
+   * page, so a workspace could switch on a channel nothing could send, and the
+   * only symptom is somebody waiting for an email that was never attempted.
+   */
+  readonly channels: readonly Channel[];
 }
 
 const asPlatform = (ctx: Ctx): PlatformCtx => ctx as PlatformCtx;
@@ -280,6 +289,9 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         preference: ctx.accountId
           ? await preferenceOf(ctx.db, ctx.tenantId as TenantId, ctx.accountId)
           : {},
+        /* ⚠️ THE CHANNELS COME WITH THE POLICY, because a switch is only worth
+           drawing for a channel something can send on — see `PlatformCtx`. */
+        available: ctx.channels,
       })),
 
     "member.remove": op("member.remove", "write", "member:manage", "Remove somebody.",

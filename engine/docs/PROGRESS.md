@@ -63,6 +63,7 @@ reader can trust this table instead of re-reading the code.
 | 35 | A workspace runs its own retention ladder against its own customers, and ours freezes it | planned |
 | 36 | The deployment provisions itself — a product declares what it needs underneath it, and the reconciler makes it exist in the right jurisdiction, binds it, and reaps it after a drain | shipped |
 | 37 | A workspace's records change shard, which is the only way its jurisdiction can — read-only while it copies, verified before it flips, and the source drained rather than emptied | shipped |
+| 38 | A notification leaves the process — Web Push written out rather than depended on, a subscription filed under the door it was made at so it wears that workspace's own icon, and a keypair the console generates and never accepts | shipped |
 
 ## What is NOT built, and where to pick it up
 
@@ -118,11 +119,16 @@ Honestly outstanding, in the order it will bite:
    `NotifyService` are the typed seam, and the runtime implements both. Splitting
    them into bound workers is a `wrangler.jsonc` change and no code change, which
    is the property the seam was built for.
-   - ⚠️ **THEY ARE NOT "CALLED IN-PROCESS TODAY", WHICH IS WHAT THIS SAID.**
-     Neither is called at all: `generate` is the one call that reaches a provider
-     and `fileNote` the one that puts a note in an inbox, and nothing imports
-     either. So no AI action generates, no reserve is taken, no credit is spent,
-     and an event an app raises is raised into nothing. Stages 27 and 28.
+   - ⚠️ **THE NOTIFY HALF IS WIRED NOW AND THE AI HALF IS NOT, and they used to
+     be described as one.** An event an app raises reaches `tell` from the one
+     operation path, so a note is filed for everybody it concerns and pushed to
+     whichever of their devices asked for it (stages 28 and 38). `generate` is
+     still reached by nothing: no AI action generates, no reserve is taken and no
+     credit is spent. Stage 27.
+   - ⚠️ **AND EMAIL IS THE CHANNEL THAT STILL GOES NOWHERE.** `Mailer` is the
+     typed seam and no deployment binds one, so `availableChannels` leaves
+     `email` out and both settings screens correctly draw its switch as
+     unavailable rather than as off. Stage 23.
 5. **Payment.** The bill is assembled; nothing takes a card.
    That is a provider integration, and it is deliberately the last thing.
    - ⚠️ **AND THE LADDER DOES NOT WALK — that clause was wrong too.** There is no
@@ -732,7 +738,7 @@ The guard registry, its checks, and the standards that bind them.
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 16 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 60 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 66 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -742,7 +748,7 @@ The guard registry, its checks, and the standards that bind them.
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 3 |
 | D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 3 |
 | D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 6 |
-| D22 | Branding and the installable app belong to the workspace, never to one app inside it | 3 |
+| D22 | Branding and the installable app belong to the workspace, never to one app inside it | 4 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -963,6 +969,13 @@ the library decides FOR us.
 | `a-moved-source-drains-before-it-is-cleared` | D5 | a move emptying its source, unrecoverable the moment the copy turns out to have been wrong |
 | `what-moves-is-what-erasure-takes` | D12 | a second list of a workspace's tables, so a moved workspace arrives without its roster while every row that did copy is reported successfully |
 | `a-binding-is-keyed-by-its-jurisdiction` | D6 | two per-residency resources collapsing onto one key, so a workspace resolves another jurisdiction's store — both working, and nothing reporting it |
+| `a-sealed-push-body-comes-back-out-as-what-went-in` | D12 | a swapped HKDF salt or a padding byte of 0x00 — bytes every push service accepts, forwards and 201s on, that no browser can decrypt and nobody ever sees |
+| `a-vapid-header-is-raw-r-s-scoped-to-an-origin` | D12 | a DER-wrapped signature or an audience scoped to the endpoint, which every push service rejects at once |
+| `a-push-subscription-belongs-to-the-door-it-was-made-at` | D22 | one business's notification arriving on a device wearing another business's logo and opening a link into the wrong workspace — with the send reporting success |
+| `a-gone-device-is-pruned-where-the-answer-is` | D12 | a table of uninstalled browsers retried for ever, because sending is the only moment the platform learns a subscription is dead |
+| `replacing-the-keypair-takes-every-subscription-with-it` | D12 | a fleet of devices counted as reachable that answer 403 for ever, because a browser subscribed to the public key that was replaced |
+| `a-channel-is-what-is-bound-not-what-is-claimed` | D12 | a switch offered for a channel the deployment cannot send on, so somebody waits for a notification nothing attempted |
+| `an-interruption-goes-only-to-whoever-asked-for-one` | D12 | a phone lighting up for a type that declared inbox and email, and for a person who switched push off — the setting saved, read by nothing |
 <!-- /generated -->
 
 ## Commands

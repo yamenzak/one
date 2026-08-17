@@ -33,6 +33,7 @@ import {
   addShard, appsOfTenant, commercialAllowance, commercialLeft, setCommercialGrant, shards, tenantBySlug,
 } from "./directory.js";
 import { runsOf } from "./jobs.js";
+import { makePushKeys, vapidOf } from "./push.js";
 import type { PersonalBook, PersonalCtx } from "./personal.js";
 import type { SchemaModule } from "./schema.js";
 import type { Db } from "./sql.js";
@@ -111,6 +112,13 @@ export interface OperatorDeps {
   readonly serves?: readonly Residency[];
   /** Its own name, which is what the resource names are built from. */
   readonly deployment?: string;
+  /**
+   * ⚠️ THE HOSTNAME EVERY DOOR HANGS OFF, which is a different thing from
+   * `deployment` — one is an internal name and the other is an address that
+   * resolves. The push keypair's VAPID subject is built from it, and a push
+   * service is entitled to expect somebody at the other end.
+   */
+  readonly root?: string;
 }
 
 export function operatorOps(input: OperatorDeps): PersonalBook {
@@ -554,6 +562,59 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
         if (mode !== "off" && mode !== "readonly" && mode !== "full") return ctx.fail("platform.invalid");
         await setMaintenance(ctx.directory, mode, ctx.now);
         return { mode };
+      },
+    },
+
+    /* ---------------------------------------------------------------- push --- */
+
+    /**
+     * ⚠️ THE PUBLIC HALF AND A COUNT, AND NEVER THE PRIVATE KEY. There is no
+     * screen anywhere that has a reason to show it, and a value a screen can
+     * show is one that ends up in a screenshot in a support thread.
+     */
+    "op.push": {
+      kind: "read", needs: "session", doors: ["operator"],
+      async run(ctx): Promise<unknown> {
+        operator(ctx);
+        const vapid = await vapidOf(ctx.directory);
+        /* ⚠️ HOW MANY DEVICES ARE ACTUALLY SUBSCRIBED, because "push is
+           configured" and "push reaches anybody" are different facts and only
+           the second one is the feature. */
+        let devices = 0;
+        try {
+          const row = await ctx.directory.prepare(
+            `SELECT COUNT(*) AS n FROM push_subscription`).first<{ n: number }>();
+          devices = row?.n ?? 0;
+        } catch { devices = 0; }
+        return { live: !!vapid, publicKey: vapid?.publicKey ?? null, devices };
+      },
+    },
+
+    /**
+     * ⚠️ GENERATED HERE, NEVER PASTED IN — see `makePushKeys`. The question the
+     * console asks is "does this deployment have a keypair", not "what is
+     * yours": there is nothing an operator could obtain elsewhere that would
+     * work here, and a form that accepted one would be a field a private key
+     * travels through a clipboard and a request log to reach.
+     *
+     * ⚠️ AND REPLACING IS A SEPARATE ANSWER, not a re-press. It unsubscribes
+     * every device on the deployment, permanently — so the refusal is what the
+     * screen turns into a second, differently-worded button.
+     */
+    "op.push.generate": {
+      kind: "write", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        /* ⚠️ RFC 8292 WANTS A `mailto:` OR AN `https:` — it is who a push service
+           contacts about a misbehaving sender, so it has to be an address that
+           reaches somebody. The deployment's own root is the one this code can
+           answer for; `deployment` is an internal name and would be a URL that
+           resolves nowhere. */
+        const subject = `https://${deps.root ?? deps.deployment ?? "example.invalid"}`;
+        const made = await makePushKeys(
+          ctx.directory, subject, input.replace === true, ctx.now);
+        if (made === "already_have_one") return ctx.fail("platform.conflict");
+        return made;
       },
     },
   };

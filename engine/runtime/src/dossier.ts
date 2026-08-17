@@ -158,6 +158,21 @@ export const HOLDINGS: readonly HeldBy[] = [
      not a personal holding, and erasing them must not take a business's mark off
      its own staff's home screens. It goes when the workspace does. */
   { table: "tenant_icon", person: [], why: "a workspace's own logo", workspace: its() },
+  /*
+    ⚠️ A DEVICE IS THEIRS AND GOES WITH THEM, and the `workspace` half is
+    deliberately absent rather than `delete`. A subscription is filed under the
+    door it was made at, but the device belongs to the person: erasing a
+    workspace must not silently unsubscribe a phone from every OTHER workspace
+    it is subscribed to — the rows are separate, so a `delete` here would take
+    only the right ones, and the reason it is still absent is that the row is a
+    credential for reaching a person rather than a record of a workspace.
+  */
+  { table: "push_subscription", person: [theirs("account_id")],
+    label: "The devices you asked to be notified on" },
+  /* ⚠️ THE DEPLOYMENT'S IDENTITY TO EVERY PUSH SERVICE — one row, no name in
+     it, and replacing it is an operator's decision rather than anybody's
+     erasure. */
+  { table: "push_key", person: [], why: "the deployment's own sending identity" },
   { table: "billing_account", person: [], why: "a workspace's own account with us", workspace: its() },
   { table: "subscription", person: [], why: "a workspace's own plan", workspace: its() },
   /* ⚠️ Ours is a working copy; the money's own record is at the payment

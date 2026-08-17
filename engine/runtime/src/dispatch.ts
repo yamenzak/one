@@ -26,7 +26,8 @@
 
 import type { AppSpec, Channel } from "@engine/kernel";
 import { PLATFORM_ROLES } from "@engine/kernel";
-import { audienceFor, fileNote } from "./inbox.js";
+import { audienceFor, fileNote, interpolate } from "./inbox.js";
+import type { Pusher } from "./services.js";
 import type { Db } from "./sql.js";
 
 /**
@@ -67,6 +68,12 @@ export interface Raised {
   readonly actor: string | null;
   readonly actorName: string | null;
   readonly channels: readonly Channel[];
+  /**
+   * ⚠️ ABSENT MEANS THIS DEPLOYMENT CANNOT PUSH, and that is a state rather than
+   * a fault — no keypair, no service worker, a test. `channels` will not carry
+   * `push` either, so nothing here has to check twice.
+   */
+  readonly pusher?: Pusher;
 }
 
 /** File a note for everybody an event concerns. Answers how many were told. */
@@ -90,6 +97,27 @@ export async function tell(db: Db, raised: Raised, now = new Date()): Promise<nu
       const audience = await audienceFor(
         db, book, raised.app.id, roles, dispatch, raised.channels);
       told += await fileNote(db, book, dispatch, audience, now);
+
+      /*
+        ⚠️ THE INTERRUPTION IS SENT AFTER THE RECORD IS WRITTEN, and the order is
+        the promise the inbox makes. A push that arrived first and a file that
+        then failed would be a notification pointing at a record that does not
+        exist — somebody taps it and lands on an empty inbox.
+
+        ⚠️ AND ONLY TO WHOEVER ASKED FOR IT. `channelsFor` has already resolved
+        the workspace's ceiling against this person's own preference against what
+        the deployment can actually deliver, so this reads a decision rather than
+        making one.
+      */
+      if (!raised.pusher) continue;
+      const wants = audience.filter((one) => one.channels.includes("push"));
+      if (!wants.length) continue;
+      const note = {
+        tenantId: raised.tenantId,
+        title: interpolate(def.summary, dispatch.values),
+        link: def.link ?? null,
+      };
+      await Promise.all(wants.map((one) => raised.pusher!.push(one.accountId, note)));
     }
   }
   return told;

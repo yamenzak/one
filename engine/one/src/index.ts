@@ -24,7 +24,7 @@ import {
   deploymentFaults, isPlatformPath, locator,
   accept, bindingKey, liveBindings, memberFor, noteShardApp, observe, owedBy, sweep,
   tenantById, tenantBySlug,
-  operatorOps, permissionsResolver, personalOps, schemaFor, serve, sessionIdFrom, shardFor,
+  operatorOps, permissionsResolver, personalOps, pusherOver, schemaFor, serve, sessionIdFrom, shardFor,
   subscriptionFor, whoIs,
   type Bucket, type Db, type TenantRow,
 } from "@engine/runtime";
@@ -413,6 +413,26 @@ const handler = (env: Env) => {
     bucketOf,
 
     /*
+      ⚠️ PUSH IS WIRED ONLY WHERE THERE IS A KEYPAIR, AND THAT IS THE WHOLE
+      SWITCH. `availableChannels` reads this binding, so an unconfigured
+      deployment never OFFERS the channel — the switch is absent rather than
+      present and inert, and a note is never dispatched to a lane that would
+      throw into a swallowed catch and read as delivered.
+
+      ⚠️ IT IS RESOLVED PER REQUEST RATHER THAN AT BOOT, because the keypair is
+      made from the console while the worker is running. Memoised at boot, the
+      operator would generate one, see the console report push as live, and find
+      every isolate still answering "no push" until the next deploy.
+
+      ⚠️ AND THE KEY LIVES IN THE DIRECTORY RATHER THAN IN A SECRET. A worker
+      cannot write its own secrets, so the alternative is a private key an
+      operator pastes into a form — through a clipboard, an autofill store and a
+      request body. It sits beside the subscriptions it signs for, which are the
+      sensitive half and are already there; alone it grants nothing.
+    */
+    pusher: pusherOver(directory),
+
+    /*
       ⚠️ SENDING IS THE ONE THING A DEPLOYMENT MUST NOT FAKE. In development the
       code goes to the log, which is how the suites and a person on a laptop read
       it; anywhere else, a deployment with no mailer REFUSES to pretend it sent
@@ -473,6 +493,9 @@ const handler = (env: Env) => {
       ...operatorOps({
         apps: APPS, isOperator,
         deployment: "one",
+        /* ⚠️ The address the VAPID subject is built from — a push service is
+           entitled to reach somebody at it. */
+        root: env.ROOT,
         serves: [...new Set(SHARD_RESIDENCY)],
         /*
           ⚠️ THE TOKEN COMES FROM `env` AND NEVER FROM A ROW, and this closure is

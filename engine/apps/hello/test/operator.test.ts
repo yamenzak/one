@@ -117,10 +117,36 @@ beforeEach(async () => {
 /* --------------------------------------------------------------- the door --- */
 
 describe("the console's two doors", () => {
+  /*
+    ⚠️ EVERY OPERATOR OPERATION, DERIVED — never one of them as a sample. A
+    console reachable at a workspace's own address is the deployment's own
+    surface offered to that workspace's members, and one operation asserted by
+    name says nothing about the next one added beside it.
+
+    ⚠️ THIS IS THE BEHAVIOURAL HALF OF A RULE `scripts/operator.test.mjs` ALSO
+    CHECKS STATICALLY, and both are worth having: the static one reads the
+    declaration, this one drives the door. A declaration that is right and a
+    filter that stopped reading it would pass the first and fail here.
+
+    ⚠️ AND DRIVING A WRITE AT THE WRONG DOOR IS SAFE, which is what makes the
+    sweep possible. The door filter runs before the handler, so a refusal is the
+    only thing that happens.
+  */
+  const EVERY_OP = Object.entries(operatorOps({
+    apps: { hello }, isOperator: () => true,
+  })).filter(([id]) => id.startsWith("op."));
+
   it("answers on the operator door and nowhere else", async () => {
+    expect(EVERY_OP.length, "no operator operations were found at all").toBeGreaterThan(10);
     expect((await get("admin", "/api/op.tenants", ops)).status).toBe(200);
-    for (const host of ["setup", "id", "eastgate"]) {
-      expect((await get(host, "/api/op.tenants", ops)).status, host).toBe(404);
+
+    for (const [id, op] of EVERY_OP) {
+      for (const host of ["setup", "id", "eastgate"]) {
+        const said = op.kind === "read"
+          ? await get(host, `/api/${id}`, ops)
+          : await post(host, `/api/${id}`, {}, ops);
+        expect(said.status, `${id} at ${host}`).toBe(404);
+      }
     }
   });
 

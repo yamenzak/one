@@ -41,6 +41,7 @@ import { InboxScreen } from "../centre/InboxScreen.js";
 import { Data } from "./Data.js";
 import { TellingMe } from "./TellingMe.js";
 import {
+  OF_CONSOLE, OF_WORKSPACE_SCREEN,
   SPACE, above, atConsoleScreen, atWorkspaceScreen, isConsole, nameOf, parseWhere, pathOf,
   type Where,
 } from "./where.js";
@@ -56,11 +57,18 @@ import {
  * it makes an unanswered address fail the build rather than render nothing. What
  * this list is still good for is the other direction: a `Where` variant that no
  * address can produce, which the compiler cannot see.
+ *
+ * ⚠️ AND THE TWO HALVES IT SHARES WITH THE ADDRESS GRAMMAR ARE DERIVED RATHER
+ * THAN RETYPED. They were written out here a third time, so adding a console
+ * screen meant editing three lists — and the one nobody thought of failed a test
+ * rather than the build. The only names spelled out are the account centre's
+ * own, which no other list holds.
  */
 export const SPACE_SCREENS: readonly Where["at"][] = [
   "home", "you", "inbox", "told", "data", "prefs", "workspaces", "workspace",
-  "people", "money", "plan", "packages", "settings", "brand", "notices", "wording", "trust",
-  "console", "tenants", "tenant", "actions", "switches", "works", "ground", "footing",
+  ...OF_WORKSPACE_SCREEN,
+  "console", "tenant",
+  ...OF_CONSOLE,
 ];
 
 export function OneSpace({ path, onGo, onClose }: {

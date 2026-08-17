@@ -76,3 +76,25 @@ createRoot(root).render(
     </SessionProvider>
   </StrictMode>,
 );
+
+/*
+  ⚠️ THE SERVICE WORKER IS REGISTERED AT BOOT AND ASKS NOBODY ANYTHING.
+  Registering is silent; only `Notification.requestPermission` prompts, and that
+  is behind the switch on the notification screen — a prompt on arrival is
+  refused by some browsers and PENALISED by others, which costs the ability to
+  ask at all.
+
+  ⚠️ AND IT HAS TO BE HERE RATHER THAN ONLY WHERE THE SWITCH IS.
+  `pushsubscriptionchange` is delivered to a REGISTERED worker and nowhere else,
+  so a browser that rotated its keys while nobody was on the settings screen —
+  which is every time — would leave the person subscribed in our table and
+  unreachable in fact, with nothing anywhere reporting it.
+
+  ⚠️ IT FAILS QUIETLY, ON PURPOSE. A private window, an unsupported browser and
+  a blocked worker are all ordinary, and none of them is a reason to put a
+  message in front of somebody who did not ask for notifications.
+*/
+if ("serviceWorker" in navigator) {
+  void navigator.serviceWorker.register("/sw.js", { scope: "/" })
+    .catch(() => undefined);
+}

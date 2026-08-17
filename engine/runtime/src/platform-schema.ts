@@ -31,6 +31,7 @@ import { LEGAL_SCHEMA } from "./legal.js";
 import { MEMBERSHIP_SCHEMA } from "./membership.js";
 import { OPERATOR_SCHEMA } from "./operator.js";
 import { PACKAGE_SCHEMA } from "./packages.js";
+import { PUSH_SCHEMA } from "./push.js";
 import { MOVE_SCHEMA } from "./move.js";
 import { RESOURCE_SCHEMA } from "./resources.js";
 import type { SchemaModule } from "./schema.js";
@@ -46,6 +47,10 @@ export const DIRECTORY_MODULES: readonly SchemaModule[] = [
      are read with no session and before any workspace has been located, so an
      icon on a shard would mean finding a database to answer a picture. */
   ICON_SCHEMA,
+  /* ⚠️ IN THE DIRECTORY BECAUSE A DEVICE IS THE ACCOUNT'S, and because it is
+     read while a note is being dispatched about a workspace that may be on
+     another shard entirely — see `push.ts`. */
+  PUSH_SCHEMA,
   JOBS_SCHEMA, OPERATOR_SCHEMA, AI_ACTION_SCHEMA,
   /* ⚠️ WHAT THE DEPLOYMENT HAS MADE FOR ITSELF, in the directory because it is
      about the deployment rather than about any workspace — and because the

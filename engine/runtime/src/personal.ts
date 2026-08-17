@@ -23,8 +23,9 @@ import {
 } from "@engine/kernel";
 import {
   appsOfTenant, becomeCommercial, closeTenant, createTenant, forgetInvitation, invitationsFor,
-  noteBelonging, tenantsOf, upsertAccount, type TenantRow,
+  noteBelonging, tenantBySlug, tenantsOf, upsertAccount, type TenantRow,
 } from "./directory.js";
+import { subscribeDevice, unsubscribeDevice, vapidOf } from "./push.js";
 import { dossierOf, forgetPerson, forgetWorkspace, type Place } from "./dossier.js";
 import { erase } from "./records.js";
 import {
@@ -184,6 +185,20 @@ async function everywhere(ctx: PersonalCtx): Promise<readonly Place[]> {
     ...[...byDb.values()].map((at) => ({ db: at.db, of: at.of, apps: [...at.apps.values()] })),
   ];
 }
+
+/**
+ * WHICH WORKSPACE'S DOOR THIS IS, OR NONE.
+ *
+ * ⚠️ FROM THE HOST AND NOTHING THE CALLER SAID. A slug in a body would let
+ * somebody file their device under a workspace they are not in — and the
+ * consequence is not a leak but something stranger: their phone would start
+ * showing a business's logo on notifications they are not entitled to receive,
+ * and receive none of them, because the audience is resolved from the roster.
+ */
+const tenantAtDoor = async (ctx: PersonalCtx): Promise<TenantId | null> =>
+  ctx.door.kind === "tenant" && ctx.door.slug
+    ? ((await tenantBySlug(ctx.directory, ctx.door.slug))?.id as TenantId | undefined) ?? null
+    : null;
 
 /**
  * The operations every deployment has, whatever apps it serves.
@@ -645,6 +660,72 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
           ctx.directory, ctx.session!.accountId, String(input.id ?? ""), ctx.now);
         if (!done) return ctx.fail("platform.not_found");
         return { id: String(input.id) };
+      },
+    },
+
+    /* --------------------------------------------------------------- push --- */
+
+    /*
+      ⚠️ THE PERSONAL LANE, AND ON EVERY DOOR THAT IS A PLACE. A push
+      subscription belongs to the ORIGIN it was made at — a service worker cannot
+      belong to two — so this has to be answerable wherever somebody is standing
+      when they turn notifications on, which is usually the workspace they use
+      rather than the account centre. It is the same screen either way: OneSpace
+      is reserved on every door.
+
+      ⚠️ AND IT IS PERSONAL RATHER THAN A WORKSPACE OPERATION, because a device is
+      the account's. Filed per workspace it would be a permission somebody could
+      lose, which would then unsubscribe their phone.
+    */
+
+    /**
+     * ⚠️ WHAT THE BROWSER NEEDS BEFORE IT CAN ASK. `applicationServerKey` is the
+     * deployment's VAPID public key, and a subscription made with the wrong one
+     * is undeliverable for ever — so it comes from the server rather than from a
+     * constant compiled into the page.
+     *
+     * ⚠️ `null` IS THE HONEST ANSWER ON A DEPLOYMENT WITH NO KEYPAIR, and the
+     * screen turns it into an absent control rather than a switch that fails.
+     */
+    "me.push.key": {
+      kind: "read", needs: "session", doors: ["account", "tenant", "setup"],
+      async run(ctx): Promise<unknown> {
+        return { key: (await vapidOf(ctx.directory))?.publicKey ?? null };
+      },
+    },
+
+    "me.push.subscribe": {
+      kind: "write", needs: "session", doors: ["account", "tenant", "setup"],
+      async run(ctx, input): Promise<unknown> {
+        /* ⚠️ REFUSED BEFORE THE ROW, on a deployment that cannot send. A stored
+           subscription against no keypair is a device that reports itself as
+           subscribed and is never reachable. */
+        if (!await vapidOf(ctx.directory)) return ctx.fail("platform.unavailable");
+
+        const done = await subscribeDevice(ctx.directory, ctx.session!.accountId,
+          await tenantAtDoor(ctx), {
+            endpoint: String(input.endpoint ?? ""),
+            p256dh: String(input.p256dh ?? ""),
+            auth: String(input.auth ?? ""),
+          }, ctx.now);
+        if (done === "incomplete") return ctx.fail("platform.invalid");
+        return done;
+      },
+    },
+
+    /**
+     * ⚠️ BY ENDPOINT AND SCOPED TO THE CALLER, so turning notifications off on
+     * this laptop cannot turn them off on somebody else's phone. The browser
+     * hands its own endpoint back from `getSubscription`, so nothing here has to
+     * be remembered by the screen.
+     */
+    "me.push.forget": {
+      kind: "write", needs: "session", doors: ["account", "tenant", "setup"],
+      async run(ctx, input): Promise<unknown> {
+        const endpoint = String(input.endpoint ?? "");
+        if (!endpoint) return ctx.fail("platform.invalid");
+        await unsubscribeDevice(ctx.directory, ctx.session!.accountId, endpoint);
+        return { endpoint };
       },
     },
   };

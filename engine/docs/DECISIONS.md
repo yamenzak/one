@@ -490,9 +490,19 @@ each product separately, which is a question about the workspace.
 
 An icon per PRODUCT is the same mistake one level out: three tiles on a phone for
 one place to work, and every app switch leaving the installed window. The tile is
-generated from a colour and a glyph rather than an upload, because waiting for an
-upload pipeline means every workspace installs as a browser default until
-somebody builds one.
+DRAWN from a colour and a glyph by default — waiting for an upload pipeline would
+mean every workspace installing as a browser default until somebody built one —
+and a commercial workspace may upload its own over it. A personal one may not:
+its tile is ours, because it is not trading under anybody's name.
+
+⚠️ **AND A PUSH NOTIFICATION WEARS THE SAME TILE, WHICH IS WHY A SUBSCRIPTION IS
+FILED UNDER A DOOR.** A service worker belongs to one origin and every workspace
+here has its own, so the worker asks its own origin for `/icon.png` and gets
+exactly that workspace's icon — uploaded or drawn — with nothing having to send a
+picture. The alternative is an icon URL in the payload, which is a second answer
+to "whose logo is this" and disagrees with the first the day somebody uploads a
+new one. So `push_subscription` carries the workspace whose door it was made at,
+and a note travels only on devices subscribed there or at ours.
 
 ⚠️ **AND AN APP MAY NOT DECLARE A BRAND SCREEN EITHER**, which is the half that
 was got wrong within a day of writing this: the reference app grew a `/brand`
@@ -506,4 +516,5 @@ a brand row in a shard
 (the sign-in page and the manifest are read before a workspace is located); a
 surface a workspace can switch on that no app offers; an installable per product;
 a manifest or icon behind a session; a personal workspace's tile left blank
-rather than wearing ours.
+rather than wearing ours; a push subscription reused across workspaces, or an
+icon URL sent in a notification payload.

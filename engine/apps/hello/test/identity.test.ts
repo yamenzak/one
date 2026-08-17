@@ -20,6 +20,7 @@ import {
   AUDIT_SCHEMA, CODE_TRIES, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, MEMBERSHIP_SCHEMA, NOBODY,
   REPLAY_SCHEMA, addShard, applySchema, memberFor, membersOf, noteShardApp, permissionsResolver,
   personalOps, schemaFor, serve, sessionIdFrom, tenantBySlug, whoIs, type Db,
+  b64urlOf, makePushKeys, subscriptionsOf,
 } from "@engine/runtime";
 import { HELLO, hello } from "../src/index.js";
 
@@ -663,4 +664,129 @@ describe("leaving", () => {
     expect((await post("setup", "/api/me.leave", { slug: "northwind" }, theirs)).status).toBe(200);
     expect((await membersOf(shard(), tenant.id)).map((m) => m.email)).toEqual(["sam@example.com"]);
   });
+});
+
+/* --------------------------------------------------------------------- push --- */
+
+/**
+ * A DEVICE IS SUBSCRIBED THROUGH THE REAL DOORS.
+ *
+ * ⚠️ WHICH WORKSPACE A SUBSCRIPTION BELONGS TO COMES FROM THE HOST, and that is
+ * the whole reason this is an integration test rather than a unit one. A slug in
+ * a body would let somebody file their phone under a workspace they are not in —
+ * and the consequence is not a leak but something stranger: notifications
+ * arriving with a business's logo on them that the person is not entitled to
+ * receive, and none of the ones they are.
+ *
+ * ⚠️ AND THE LANE IS PERSONAL, so it answers on the account door as well as a
+ * workspace's. Somebody turns notifications on where they are standing, which is
+ * usually the workspace they use — OneSpace is reserved on every door, so it is
+ * the same screen either way.
+ */
+describe("turning push on", () => {
+  beforeEach(async () => {
+    for (const t of ["push_subscription", "push_key"]) {
+      await directory().exec(`DELETE FROM ${t};`);
+    }
+  });
+
+  const aDevice = async (at: string) => {
+    const pair = await crypto.subtle.generateKey(
+      { name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+    const raw = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
+    return {
+      endpoint: `https://push.example.com/x/${at}`,
+      p256dh: b64urlOf(raw),
+      auth: b64urlOf(crypto.getRandomValues(new Uint8Array(new ArrayBuffer(16)))),
+    };
+  };
+
+  /*
+    ⚠️ REFUSED BEFORE THE ROW ON A DEPLOYMENT WITH NO KEYPAIR. A subscription
+    stored against no sender is a device that reports itself as reachable and
+    never is — the switch saves, the console counts it, and nothing arrives.
+  */
+  it("refuses until the deployment has a keypair, and says nothing is there", async () => {
+    const cookie = await signIn("sam@example.com");
+    expect((await get("setup", "/api/me.push.key", cookie).then((r) => r.json())))
+      .toEqual({ key: null });
+
+    const out = await post("setup", "/api/me.push.subscribe", await aDevice("phone"), cookie);
+    expect(out.status).toBe(503);
+  });
+
+  it("hands the browser the key it has to subscribe with", async () => {
+    const made = await makePushKeys(directory(), "https://one.test", false);
+    const cookie = await signIn("sam@example.com");
+    const said = await get("setup", "/api/me.push.key", cookie).then((r) => r.json()) as
+      { key: string | null };
+    expect(said.key).toBe((made as { publicKey: string }).publicKey);
+  });
+
+  /* ⚠️ THE DOOR DECIDES THE WORKSPACE — see the header. */
+  it("files a device under the workspace whose door it arrived at", async () => {
+    await makePushKeys(directory(), "https://one.test", false);
+    const cookie = await signIn("sam@example.com");
+    await post("setup", "/api/me.tenant.create",
+      { slug: "northwind", name: "Northwind", country: "DE" }, cookie);
+    const tenant = (await tenantBySlug(directory(), "northwind"))!;
+    const me = (await directory().prepare(`SELECT id FROM account WHERE email = ?`)
+      .bind("sam@example.com").first<{ id: string }>())!;
+
+    const inWorkspace = await aDevice("in-workspace");
+    expect((await post("northwind", "/api/me.push.subscribe", inWorkspace, cookie)).status).toBe(200);
+    const atAccount = await aDevice("at-account");
+    expect((await post("setup", "/api/me.push.subscribe", atAccount, cookie)).status).toBe(200);
+
+    const rows = await directory().prepare(
+      `SELECT endpoint, tenant_id FROM push_subscription WHERE account_id = ? ORDER BY endpoint`)
+      .bind(me.id).all<{ endpoint: string; tenant_id: string | null }>();
+    expect(rows.results.map((r) => [r.endpoint.split("/").at(-1), r.tenant_id])).toEqual([
+      ["at-account", null],
+      ["in-workspace", tenant.id],
+    ]);
+
+    /* ⚠️ AND A NOTE ABOUT NORTHWIND REACHES BOTH — the workspace's own door and
+       ours — while a subscription made at another workspace's would reach
+       neither. */
+    expect(await subscriptionsOf(directory(), me.id as never, tenant.id as never))
+      .toHaveLength(2);
+  });
+
+  it("refuses a device that arrives without its keys", async () => {
+    await makePushKeys(directory(), "https://one.test", false);
+    const cookie = await signIn("sam@example.com");
+    const device = await aDevice("phone");
+    expect((await post("setup", "/api/me.push.subscribe", { ...device, auth: "" }, cookie)).status)
+      .toBe(400);
+  });
+
+  /* ⚠️ TURNING IT OFF IS SCOPED TO THE CALLER, so somebody offering another
+     person's endpoint takes away nothing. */
+  it("forgets one device without touching anybody else's", async () => {
+    await makePushKeys(directory(), "https://one.test", false);
+    const mine = await signIn("sam@example.com");
+    const theirs = await signIn("alex@example.com");
+    const myPhone = await aDevice("my-phone");
+    const theirPhone = await aDevice("their-phone");
+    await post("setup", "/api/me.push.subscribe", myPhone, mine);
+    await post("setup", "/api/me.push.subscribe", theirPhone, theirs);
+
+    expect((await post("setup", "/api/me.push.forget",
+      { endpoint: theirPhone.endpoint }, mine)).status).toBe(200);
+    const left = await directory().prepare(`SELECT endpoint FROM push_subscription`)
+      .all<{ endpoint: string }>();
+    expect(left.results.map((r) => r.endpoint).sort())
+      .toEqual([myPhone.endpoint, theirPhone.endpoint].sort());
+
+    await post("setup", "/api/me.push.forget", { endpoint: myPhone.endpoint }, mine);
+    expect((await directory().prepare(`SELECT endpoint FROM push_subscription`).all())
+      .results.map((r) => (r as { endpoint: string }).endpoint)).toEqual([theirPhone.endpoint]);
+  });
+
+  /* ⚠️ THE OPERATOR HALF IS NOT ASSERTED HERE, DELIBERATELY. This harness does
+     not mount `operatorOps` at all, so `op.push` 404s because the operation does
+     not exist rather than because of the door filter — a check that cannot fail.
+     `operator.test.ts` sweeps every operator operation against every other door,
+     which is where that assertion belongs. */
 });

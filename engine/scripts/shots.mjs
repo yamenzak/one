@@ -147,8 +147,16 @@ const business = await call("id.localhost", "/api/me.tenant.commercial", {
 }, cookie);
 console.log("  became a business:", business.status, JSON.stringify(business.json).slice(0, 160));
 
+/* ⚠️ PUSH IS OFF UNTIL A KEYPAIR EXISTS, and the switch is correctly absent
+   without one — so photographing the notification screen means generating one
+   first, through the same operator route the console presses. */
+const push = await call("admin.localhost", "/api/op.push.generate", {}, cookie);
+console.log("  push keypair:", push.status, JSON.stringify(push.json).slice(0, 80));
+
 const SHOTS = [
   { id: "door-signin", host: "id.localhost", path: "/", auth: false },
+  { id: "told", host: `${SLUG}.localhost`, path: "/space/told", auth: true },
+  { id: "console-telling", host: "admin.localhost", path: "/space/console/telling", auth: true },
   { id: "brand", host: `${SLUG}.localhost`, path: `/space/w/${SLUG}/brand`, auth: true },
   { id: "door-setup", host: "setup.localhost", path: "/", auth: false },
   { id: "elsewhere-crown", host: "nowhere.localhost", path: "/", auth: true },

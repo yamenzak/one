@@ -38,6 +38,7 @@ import { brandingOf } from "./branding.js";
 import { keep } from "./vault.js";
 import { iconPng, iconSvg, webManifest, type Installable, type Installer } from "./installable.js";
 import { iconOf } from "./icon.js";
+import { availableChannels, type Pusher } from "./services.js";
 import type { Db } from "./sql.js";
 
 /* ------------------------------------------------------------------ seams --- */
@@ -119,6 +120,16 @@ export interface Wiring {
    * plausible-looking wrong one.
    */
   readonly installable?: Installer;
+  /**
+   * ⚠️ HOW A NOTIFICATION LEAVES THE PROCESS. Absent is honest and is the state
+   * of a deployment with no push keypair: `availableChannels` then leaves `push`
+   * out, so the switch is never offered rather than offered and inert.
+   *
+   * ⚠️ AND `mailer` IS ITS SIBLING AND IS DELIBERATELY NOT HERE YET. Wiring one
+   * without the other would make `availableChannels` answer for a channel this
+   * deployment cannot send on — which is the exact thing it exists to prevent.
+   */
+  readonly pusher?: Pusher;
 }
 
 /**
@@ -534,6 +545,9 @@ export async function performOperation(
     /* ⚠️ RESOLVED FROM THE WORKSPACE, so the residency is in the addressing —
        see `bucketOf`. Absent is a deployment that stores no files. */
     bucket: wiring.bucketOf?.(located) ?? null,
+    /* ⚠️ THE SAME ANSWER THE DISPATCH USES — one call, so the switch a person is
+       offered and the channel a note is sent on cannot disagree. */
+    channels: await availableChannels(wiring),
     fail: (code, values, extra) => { throw new Refused(problem(catalog, code, values, extra)); },
   };
 
@@ -561,7 +575,7 @@ export async function performOperation(
       record, because a note about a change that did not land is worse than no
       note. Only on the way out of a SUCCESS: a refusal raises nothing.
     */
-    await told(located, composed.app, who, op, input, answer, now);
+    await told(wiring, located, composed.app, who, op, input, answer, now);
     return { kind: "ok", answer };
   } catch (thrown) {
     if (thrown instanceof Refused) {
@@ -662,7 +676,7 @@ async function answerPersonal(
  * stops filling, which is the exact shape this whole path exists to end.
  */
 const told = async (
-  located: Located, app: AppSpec, who: Who, op: _Op,
+  wiring: Wiring, located: Located, app: AppSpec, who: Who, op: _Op,
   input: Record<string, unknown>, answer: unknown, now: Date,
 ): Promise<void> => {
   const events = op.spec.emits ?? [];
@@ -672,8 +686,16 @@ const told = async (
       app, tenantId: located.tenantId, events, input,
       answer: (answer ?? {}) as Record<string, unknown>,
       actor: who.accountId ?? null, actorName: who.email ?? null,
-      /* ⚠️ The inbox always; a channel that leaves the process is stage 23. */
-      channels: ["inbox"],
+      /*
+        ⚠️ WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER, ASKED RATHER THAN ASSUMED.
+        This was the literal `["inbox"]` under a note saying a channel leaving
+        the process was a later stage — and it stayed that literal after push
+        was wired, so every device would have been subscribed, stored and never
+        sent to. `availableChannels` is the one answer, and it is also what the
+        two settings screens draw their switches from.
+      */
+      channels: await availableChannels(wiring),
+      ...(wiring.pusher ? { pusher: wiring.pusher } : {}),
     }, now);
   } catch (why) {
     console.error(`[notify] ${op.id} raised ${events.join(", ")} and nobody was told`, why);

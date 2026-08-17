@@ -184,12 +184,43 @@ export interface Mailer {
   send(mail: MailInput): Promise<void>;
 }
 
-export interface Pusher {
-  push(accountId: string, note: { title: string; link: string | null }): Promise<void>;
+/**
+ * ⚠️ THE NOTE CARRIES THE WORKSPACE, AND IT IS NOT BOOKKEEPING. A push
+ * subscription belongs to the ORIGIN it was made at, and every workspace here
+ * has its own — so which workspace a note is about decides which devices may
+ * carry it, and a sender handed only an account would deliver one business's
+ * notification wearing another's logo. See `push.ts`.
+ */
+export interface PushNote {
+  readonly tenantId: string | null;
+  readonly title: string;
+  readonly link: string | null;
 }
 
+export interface Pusher {
+  /**
+   * ⚠️ WHETHER IT CAN SEND RIGHT NOW, ASKED RATHER THAN INFERRED FROM THE
+   * BINDING. Push needs a keypair, the keypair is made from the operator console
+   * while the worker is running, and a deployment that binds this lane before
+   * one exists must not OFFER the channel — a switch that saves and delivers
+   * nothing is worse than an absent one, because somebody then waits.
+   *
+   * ⚠️ AND ASKING IS WHY IT IS ASYNC. Answered from a constant it would be true
+   * from boot, and the operator who generates a keypair would watch the console
+   * report push as live while every isolate went on refusing it until the next
+   * deploy.
+   */
+  live(): Promise<boolean>;
+  push(accountId: string, note: PushNote): Promise<void>;
+}
+
+/**
+ * ⚠️ WHAT IS WIRED IS THE WHOLE INPUT. This carried an `available` list beside
+ * the two services and nothing read it — so a deployment could name a channel it
+ * had nothing to send on, which is what the function below exists to make
+ * impossible. A capability is what is BOUND, never what is claimed.
+ */
 export interface NotifyDeps {
-  readonly available: readonly Channel[];
   readonly mailer?: Mailer;
   readonly pusher?: Pusher;
 }
@@ -200,10 +231,10 @@ export interface NotifyDeps {
  * nothing, and a send that throws into a swallowed catch is worse — it looks
  * delivered.
  */
-export const availableChannels = (deps: NotifyDeps): readonly Channel[] => {
+export const availableChannels = async (deps: NotifyDeps): Promise<readonly Channel[]> => {
   const out: Channel[] = ["inbox"];
   if (deps.mailer) out.push("email");
-  if (deps.pusher) out.push("push");
+  if (deps.pusher && await deps.pusher.live()) out.push("push");
   return out;
 };
 

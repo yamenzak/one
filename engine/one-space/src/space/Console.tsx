@@ -25,6 +25,7 @@ import { Actions } from "../console/Actions.js";
 import { Footing } from "../console/Footing.js";
 import { Ground } from "../console/Ground.js";
 import { Switches } from "../console/Switches.js";
+import { Telling } from "../console/Telling.js";
 import { Tenants } from "../console/Tenants.js";
 import { Works } from "../console/Works.js";
 import { OF_CONSOLE, nameOf, type ConsolePart, type Where } from "./where.js";
@@ -44,6 +45,7 @@ const GLYPH: Readonly<Record<ConsolePartId, string>> = {
   tenants: "workspace",
   actions: "sparkle",
   switches: "settings",
+  telling: "bell",
   works: "clock",
   ground: "database",
   footing: "layers",
@@ -113,6 +115,7 @@ export function ConsolePart({ part, app, onGo }: {
     case "actions":
       return <Actions app={app} onGo={(id) => onGo({ at: "actions", app: id })} />;
     case "switches": return <Switches />;
+    case "telling": return <Telling />;
     case "works": return <Works />;
     case "ground": return <Ground />;
     case "footing": return <Footing />;

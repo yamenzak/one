@@ -203,6 +203,8 @@ if (what === "guards") {
     ["packages", "granting, revoking and expiring a bought bundle"],
     ["inbox", "notifications: the policy, the audience, the read"],
     ["services", "the lane out to a provider — AI and mail"],
+    ["webpush", "the two specifications a notification travels on — VAPID, and the sealed body"],
+    ["push", "who has turned notifications on, on which device, at which door"],
     ["vault", "encrypted facts, consent, grants, and who looked"],
     ["audit", "what happened, and the replay that stops it happening twice"],
     ["jobs", "the scheduler and the record that it ran"],

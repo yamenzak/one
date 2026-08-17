@@ -1873,6 +1873,69 @@
       "impl": "runtime/src/resources.ts",
       "proves": "bindingKey(row.appId, row.needId, row.residency)",
       "fails": "two per-residency resources collapsing onto one key, so a workspace resolves another jurisdiction's store — both working, and nothing reporting it"
+    },
+    {
+      "id": "a-sealed-push-body-comes-back-out-as-what-went-in",
+      "protects": "D12",
+      "stage": "38",
+      "status": "live",
+      "impl": "runtime/test/webpush.test.ts",
+      "proves": "comes back out as what went in",
+      "fails": "a swapped HKDF salt or a padding byte of 0x00 \u2014 bytes every push service accepts, forwards and 201s on, that no browser can decrypt and nobody ever sees"
+    },
+    {
+      "id": "a-vapid-header-is-raw-r-s-scoped-to-an-origin",
+      "protects": "D12",
+      "stage": "38",
+      "status": "live",
+      "impl": "runtime/test/webpush.test.ts",
+      "proves": "is a JWS somebody can verify with the public key we send",
+      "fails": "a DER-wrapped signature or an audience scoped to the endpoint, which every push service rejects at once"
+    },
+    {
+      "id": "a-push-subscription-belongs-to-the-door-it-was-made-at",
+      "protects": "D22",
+      "stage": "38",
+      "status": "live",
+      "impl": "runtime/test/push.test.ts",
+      "proves": "never carries another workspace's door",
+      "fails": "one business's notification arriving on a device wearing another business's logo and opening a link into the wrong workspace \u2014 with the send reporting success"
+    },
+    {
+      "id": "a-gone-device-is-pruned-where-the-answer-is",
+      "protects": "D12",
+      "stage": "38",
+      "status": "live",
+      "impl": "runtime/test/push.test.ts",
+      "proves": "prunes a device the push service says is gone",
+      "fails": "a table of uninstalled browsers retried for ever, because sending is the only moment the platform learns a subscription is dead"
+    },
+    {
+      "id": "replacing-the-keypair-takes-every-subscription-with-it",
+      "protects": "D12",
+      "stage": "38",
+      "status": "live",
+      "impl": "runtime/test/push.test.ts",
+      "proves": "takes every subscription with it when it is replaced",
+      "fails": "a fleet of devices counted as reachable that answer 403 for ever, because a browser subscribed to the public key that was replaced"
+    },
+    {
+      "id": "a-channel-is-what-is-bound-not-what-is-claimed",
+      "protects": "D12",
+      "stage": "38",
+      "status": "live",
+      "impl": "apps/hello/test/services.test.ts",
+      "proves": "offers only what the deployment can actually deliver",
+      "fails": "a switch offered for a channel the deployment cannot send on, so somebody waits for a notification nothing attempted"
+    },
+    {
+      "id": "an-interruption-goes-only-to-whoever-asked-for-one",
+      "protects": "D12",
+      "stage": "38",
+      "status": "live",
+      "impl": "apps/hello/test/services.test.ts",
+      "proves": "sends only what the notification type offers a channel for",
+      "fails": "a phone lighting up for a type that declared inbox and email, and for a person who switched push off \u2014 the setting saved, read by nothing"
     }
   ]
 }

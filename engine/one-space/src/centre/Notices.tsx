@@ -47,7 +47,8 @@ export function Notices({ view }: { readonly view: CentreView }) {
               policy={told.policy}
               preference={{}}
               held={new Set(app.permissions)}
-              available={["inbox", "email", "push"]}
+              /* ⚠️ THE SERVER'S ANSWER, NEVER A LITERAL — see `PolicyAnswer`. */
+              available={told.available}
               onChange={(id, channels) => void ceiling(id, channels)}
             />
           ))}

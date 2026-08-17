@@ -109,7 +109,9 @@ layering failure rather than a shortcut. A guard says so.
 | `credits` | the balance, and reserve → settle → release | 7 | 3 |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
 | `inbox` | notifications: the policy, the audience, the read | 10 | — |
-| `services` | the lane out to a provider — AI and mail | 5 | 2 |
+| `services` | the lane out to a provider — AI and mail | 5 | 1 |
+| `webpush` | the two specifications a notification travels on — VAPID, and the sealed body | 6 | — |
+| `push` | who has turned notifications on, on which device, at which door | 8 | — |
 | `vault` | encrypted facts, consent, grants, and who looked | 13 | — |
 | `audit` | what happened, and the replay that stops it happening twice | 7 | — |
 | `jobs` | the scheduler and the record that it ran | 6 | 1 |
@@ -137,7 +139,7 @@ layering failure rather than a shortcut. A guard says so.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**251 of them**, 235 reached by something today.
+**265 of them**, 250 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
