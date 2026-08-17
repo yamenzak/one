@@ -292,6 +292,9 @@ is "shipped" while anything defers to it (STANDARDS.md).
 | 8 | **Vault + legal** — encrypted facts, consent, ROPA, erasure | A person exports and erases themselves, provably |
 | 9 | **A real product on OneEngine** | It runs with no app-specific infrastructure |
 | 10 | **One** — the deployment and the Hub: a worker, its doors, and the page a person opens | Somebody signs in with an emailed code, sees their workspaces and makes one, in a browser |
+| 20 | **Workspaces** — personal or commercial (D21), one brand and one installable per workspace (D22) | A business declares itself, brands every app under it at once, and installs from its own address |
+| 21 | **Payment** — something takes a card | Becoming a business, and a plan, are paid for rather than comped |
+| 22 | **OneSpace** — the deployment's own doors leave the workspace root | `id`, `admin` and `setup` answer at one address, and `t.` holds nothing but workspaces |
 
 ---
 

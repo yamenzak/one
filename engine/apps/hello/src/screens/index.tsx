@@ -24,6 +24,7 @@
 
 import * as React from "react";
 import { ready, type Loaded, type PeriodId } from "@engine/design";
+import type { Kind } from "@engine/kernel";
 import { HELLO } from "../index.js";
 import { NOTES, PEOPLE, READ, WRITTEN, type Note as OneNote } from "./sample.js";
 import { Brand, type BrandTheme } from "./Brand.js";
@@ -78,7 +79,7 @@ export function HelloScreen({ route, onGo }: {
   /* ⚠️ THE GROUND CAN BE EITHER KIND, because both are real screens and only one
      of them was ever going to get looked at. Pressing the offer switches it,
      which is the closest a router-free ground gets to the real transition. */
-  const [kind, setKind] = React.useState<"personal" | "commercial">("personal");
+  const [kind, setKind] = React.useState<Kind>("personal");
   const [theme, setTheme] = React.useState<BrandTheme>({});
   const [surfaces, setSurfaces] = React.useState<readonly string[]>(["shell"]);
   const go = onGo ?? nothing;

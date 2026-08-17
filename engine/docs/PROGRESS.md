@@ -33,6 +33,9 @@ reader can trust this table instead of re-reading the code.
 | 16 | AI actions — a lane per action, a model the operator binds, words that narrow | shipped |
 | 17 | The hub — one surface over the product, reachable from every door, addressed | shipped |
 | 19 | OneDesign — the design system named, packaged, documented and fenced | shipped |
+| 20 | Workspaces — personal or commercial, one brand, one installable, a shard of their own | shipped |
+| 21 | Payment — something takes a card | planned |
+| 22 | OneSpace — `id`, `admin` and `setup` merge into one address off the workspace root | planned |
 
 ## What is NOT built, and where to pick it up
 
@@ -89,6 +92,36 @@ Honestly outstanding, in the order it will bite:
    cheapest thing on this list and the one that decides whether app #3 diverges.
 
 ## What is built
+
+**A workspace is personal or it is a business (D21, D22), and the premise that
+started this was already true.** A workspace has held MANY apps since D1 —
+`tenant_app`, one address, one roster, one bill, and a role per app on one
+membership (D15). What was missing is what a workspace IS.
+
+- `Kind` is on the tenant, not on a plan. A plan is what a workspace bought this
+  month and moves both ways with a card; whether a business trades under its own
+  name does not lapse when an invoice fails.
+- **One way.** `mayBecome` is asked at the write even though the statement could
+  only go one way, and there is no operation for the other direction — a test
+  asks for one to prove it 404s. Rolling back means withdrawing a brand a
+  business's customers have seen and moving records off a promised shard.
+- **The gate gained a position:** standing → permission → **kind** → proof →
+  entitlement. Above entitlement because no plan a personal workspace can buy
+  unlocks a commercial-only capability; below permission because a refusal about
+  the workspace tells a stranger it exists. A missing kind is refused, not waved
+  through.
+- **Branding is the workspace's**, one row in the DIRECTORY (the sign-in page and
+  the manifest are read with no session, before a workspace is located). An app
+  declares only which surfaces it HAS.
+- **One installable per workspace**, not per product: `/manifest.webmanifest` and
+  `/icon.svg` on its own door, public, `scope` at the root so app switching stays
+  inside the installed window. `BrandTile` draws the preview and the served icon
+  from one resolver.
+- **A shard may belong to one workspace.** Reserving is a placement rule and is
+  cheap; carrying the records across two databases is a migration and is not this.
+- An operator hands out commercial workspaces as a COUNT, with `used` derived
+  from the tenant rows rather than stored. That is also the only lane through
+  today — nothing takes a card, marked `DEFER(engine-21)`.
 
 **`@engine/kernel` — the whole declaration surface, and it is pure.** Twenty-one
 files, no I/O, no bindings, no React; every rule in it is provable with no
@@ -649,7 +682,7 @@ The guard registry, its checks, and the standards that bind them.
 | D2 | The framework is OneEngine; the deployment is One; packages are `@engine/*` | 2 |
 | D3 | One worker on the request path; heavy work splits over RPC service bindings | 6 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
-| D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 5 |
+| D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 6 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
 | D7 | HeroUI v3 is the component layer, and its components are not restyled | 52 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
@@ -665,6 +698,8 @@ The guard registry, its checks, and the standards that bind them.
 | D18 | The operator stands outside every workspace, and the console is a door rather than a role | 2 |
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 3 |
 | D20 | The hub is one surface presented over the product, reachable from every door, and it is a route | 3 |
+| D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 5 |
+| D22 | Branding and the installable app belong to the workspace, never to one app inside it | 3 |
 <!-- /generated -->
 
 ⚠️ **A DECISION WITH NO GUARD IS A PREFERENCE**, and every one of the twelve now
@@ -763,6 +798,15 @@ the library decides FOR us.
 | `a-real-product-needs-no-infrastructure-of-its-own` | D12 | a product that has to write its own router, schema, gates and audit, which is a product that can leave one of them out |
 | `a-persons-own-records-are-theirs-by-construction` | D11 | somebody's own records readable by anybody in the workspace, because a handler forgot a WHERE |
 | `a-seat-ceiling-only-counts-roles-that-cost-a-seat` | D12 | a workspace on the smallest plan unable to add the customers it exists to serve, refused for staff seats it was not asking for |
+| `a-workspace-becomes-a-business-once-and-never-back` | D21 | a business quietly rolled back to personal — its brand gone one morning with no event that removed it, and its records due to move off a shard it was promised |
+| `no-plan-a-personal-workspace-buys-unlocks-a-business-capability` | D21 | a customer sent to a price list where nothing they can buy would help, which is selling something that does not exist |
+| `the-kind-gate-is-declared-read-and-in-the-right-place` | D21 | a gate position that refuses nothing for ever, reading on every screen as a limit that is working |
+| `one-statement-writes-what-a-workspace-is` | D21 | the one-way door opened from the side by a second UPDATE that never asked whether the direction was allowed |
+| `what-commercial-buys-is-asked-rather-than-compared` | D21 | two screens in one product disagreeing about what a business may do, because one asked and the other compared |
+| `a-brand-belongs-to-the-workspace-and-not-to-one-app` | D22 | a business with three products holding three branding switches, three places to change them, and two of them stale |
+| `a-personal-workspace-cannot-brand-itself` | D22 | somebody else's logo on an installable icon, written past a control that was only hidden |
+| `one-installable-tile-per-workspace-served-without-a-session` | D22 | every workspace installing as a browser default, silently, on every phone that ever adds it |
+| `isolation-is-never-sold-over-somebody-elses-records` | D5 | a database of one's own sold over a shard full of strangers, with every workspace on it working perfectly and nothing downstream noticing |
 | `the-hub-has-one-door-to-the-api` | D12 | an expired session that does not look expired — every screen showing the empty state its failed load produced, and every save failing into a toast |
 | `the-browser-never-classifies-its-own-door` | D3 | a page offering a control the runtime refuses, answered as a 404 with nothing on it to explain why |
 | `every-screen-the-picker-names-is-drawn` | D10 | a blank page, which is the same picture as a page that failed to load — so somebody reloads for a minute and then gives up |

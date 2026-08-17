@@ -34,7 +34,20 @@ export type Door =
   | { readonly kind: "tenant"; readonly slug: string | null; readonly host: string };
 
 export interface Roots {
-  /** `one.4dl.app`. Everything under it is ours. */
+  /**
+   * `t.4dl.app`. Everything under it is ours, and it is the WORKSPACE zone: one
+   * label per workspace, and one certificate covering all of them.
+   *
+   * ⚠️ THE ROOT IS NOT THE APEX, AND THAT IS DELIBERATE. A wildcard at the apex
+   * would sit over every other product on the zone, with route precedence rather
+   * than intent deciding who answers a hostname.
+   *
+   * DEFER(engine-22) stage:22 — `id`, `admin` and `setup` are labels under this
+   * root today, sharing a namespace with workspace slugs and reserved out of it
+   * by `LABELS`. They are one surface presented over the product (D20), so they
+   * are going to one address of their own; when they do, this root holds nothing
+   * but workspaces and the reserved-label collision class goes with them.
+   */
   readonly root: string;
   /** Hosts that belong to one workspace and are not under the root. */
   readonly custom?: (host: string) => boolean;

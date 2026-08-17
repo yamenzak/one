@@ -777,6 +777,87 @@
       "fails": "a workspace on the smallest plan unable to add the customers it exists to serve, refused for staff seats it was not asking for"
     },
     {
+      "id": "a-workspace-becomes-a-business-once-and-never-back",
+      "protects": "D21",
+      "stage": "20",
+      "status": "live",
+      "impl": "apps/hello/test/workspace.test.ts",
+      "proves": "cannot be undone",
+      "fails": "a business quietly rolled back to personal — its brand gone one morning with no event that removed it, and its records due to move off a shard it was promised"
+    },
+    {
+      "id": "no-plan-a-personal-workspace-buys-unlocks-a-business-capability",
+      "protects": "D21",
+      "stage": "20",
+      "status": "live",
+      "impl": "apps/hello/test/workspace.test.ts",
+      "proves": "cannot use a commercial-only operation, and is told what to do about it",
+      "fails": "a customer sent to a price list where nothing they can buy would help, which is selling something that does not exist"
+    },
+    {
+      "id": "the-kind-gate-is-declared-read-and-in-the-right-place",
+      "protects": "D21",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/workspace.test.mjs",
+      "proves": "the gate: kind is a position, it is read, and it sits where the refusals make sense",
+      "fails": "a gate position that refuses nothing for ever, reading on every screen as a limit that is working"
+    },
+    {
+      "id": "one-statement-writes-what-a-workspace-is",
+      "protects": "D21",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/workspace.test.mjs",
+      "proves": "one writer: tenant.kind is written by the transition and nowhere else",
+      "fails": "the one-way door opened from the side by a second UPDATE that never asked whether the direction was allowed"
+    },
+    {
+      "id": "what-commercial-buys-is-asked-rather-than-compared",
+      "protects": "D21",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/workspace.test.mjs",
+      "proves": "one asker: what commercial buys is asked through the kernel, not compared at a call site",
+      "fails": "two screens in one product disagreeing about what a business may do, because one asked and the other compared"
+    },
+    {
+      "id": "a-brand-belongs-to-the-workspace-and-not-to-one-app",
+      "protects": "D22",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/workspace.test.mjs",
+      "proves": "the brand: declared per app as surfaces only, stored once per workspace, in the directory",
+      "fails": "a business with three products holding three branding switches, three places to change them, and two of them stale"
+    },
+    {
+      "id": "a-personal-workspace-cannot-brand-itself",
+      "protects": "D22",
+      "stage": "20",
+      "status": "live",
+      "impl": "apps/hello/test/workspace.test.ts",
+      "proves": "cannot brand itself, and the refusal comes from the write rather than the screen",
+      "fails": "somebody else's logo on an installable icon, written past a control that was only hidden"
+    },
+    {
+      "id": "one-installable-tile-per-workspace-served-without-a-session",
+      "protects": "D22",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/workspace.test.mjs",
+      "proves": "the tile: one installable per workspace, answered with no session",
+      "fails": "every workspace installing as a browser default, silently, on every phone that ever adds it"
+    },
+    {
+      "id": "isolation-is-never-sold-over-somebody-elses-records",
+      "protects": "D5",
+      "stage": "20",
+      "status": "live",
+      "impl": "apps/hello/test/workspace.test.ts",
+      "proves": "is refused on a shard that already holds somebody else",
+      "fails": "a database of one's own sold over a shard full of strangers, with every workspace on it working perfectly and nothing downstream noticing"
+    },
+    {
       "id": "the-hub-has-one-door-to-the-api",
       "protects": "D12",
       "stage": "10",

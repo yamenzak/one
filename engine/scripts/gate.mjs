@@ -28,7 +28,7 @@ const GUARDS = [
   "inert", "docs", "guards", "kernel", "declarations", "shards", "apps",
   "heroui", "ground", "motion", "metrics", "showcase", "states", "shape", "face", "scene",
   "provenance", "surface", "hub", "services", "agent", "access", "package",
-  "operator", "ai-action", "vault",
+  "operator", "ai-action", "vault", "workspace",
 ];
 
 /* ⚠️ `tone` carries TypeScript inline and needs the stripper. Every other guard

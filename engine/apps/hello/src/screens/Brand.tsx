@@ -15,7 +15,7 @@
  */
 
 import * as React from "react";
-import { field } from "@engine/kernel";
+import { field, mayBrand, type Kind } from "@engine/kernel";
 import { BrandTile, Field, Group, Nothing, Screen, Stack, ToggleRow } from "@engine/design";
 
 /** ⚠️ The tokens a workspace edits, declared — so each gets its own control. */
@@ -48,7 +48,7 @@ const tile = (theme: BrandTheme, name: string) => ({
 export function Brand({ title, name, kind, theme, surfaces, offered, onTheme, onSurface, onBecome }: {
   readonly title?: string;
   readonly name: string;
-  readonly kind: "personal" | "commercial";
+  readonly kind: Kind;
   readonly theme: BrandTheme;
   /** Which surfaces this workspace has asked to brand. */
   readonly surfaces: ReadonlySet<string>;
@@ -58,7 +58,11 @@ export function Brand({ title, name, kind, theme, surfaces, offered, onTheme, on
   readonly onSurface: (id: string, on: boolean) => void;
   readonly onBecome: () => void;
 }) {
-  if (kind !== "commercial") {
+  /* ⚠️ ASKED, NEVER COMPARED. The screen and the gate read the same function, so
+     a screen cannot come to offer what a route refuses — and the day what
+     commercial buys changes, it changes here too without this file being
+     touched. A `kind === "commercial"` here is one product's private opinion. */
+  if (!mayBrand(kind)) {
     return (
       <Screen shape="detail" title={title}>
         <Nothing

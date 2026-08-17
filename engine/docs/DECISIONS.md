@@ -430,3 +430,72 @@ second shell for the operator; a hub screen held in component state rather than
 at an address; a workspace's records answered from another door; a product path
 under `/hub`; a `Title` under a `PageCrown` that repeats it; a dismiss control on
 a door with nothing underneath.
+
+---
+
+## D21 — A workspace is personal or commercial, and that is what it IS rather than what it bought
+
+Every workspace carries a `kind`. A PERSONAL one is somebody's — it shares a
+database with others, it wears our mark, and it has no brand. A COMMERCIAL one is
+a business: it declares a legal name, it may put its own identity on every app
+under it, and its records may be placed on a shard of its own. The transition
+costs a one-time payment or an operator's allowance, it demands the legal name
+before it demands the money, and it is ONE WAY. Decided 2026-08-16.
+
+**Why.** Pricing, legal exposure, data isolation and branding are four questions
+with one answer, and it is not "which tier". A plan is what a workspace bought
+this month and it moves both ways with a card; whether a business is trading
+under its own name does not lapse when an invoice fails. Modelling it as an
+entitlement would also make it purchasable — and a personal workspace that could
+buy branding is one that installs on somebody's phone under a name nobody is
+accountable for.
+
+The one-way rule is the part that would otherwise be argued down. Rolling back
+means withdrawing a brand a business's own customers have seen, moving records
+off a shard they were promised, and un-selling a capability that was paid for
+once. `mayBecome` is asked at the write even though the statement could only ever
+go one way, because "it can only write commercial" is exactly the reasoning that
+would let somebody add the other direction beside it.
+
+The gate gained a position of its own — standing → permission → **kind** → proof
+→ entitlement — above entitlement because no plan a personal workspace can buy
+unlocks a commercial-only capability, so an upgrade offer would send somebody to
+a price list where nothing helps; and below permission because a refusal about
+the workspace tells a stranger it exists.
+
+**Therefore never:** `commercial` written by anything but the one transition; an
+operation that reads `kind === "commercial"` at its own call site instead of
+asking `mayBrand`/`mayIsolate`; a commercial-only capability sold as an
+entitlement or refused with `payment_required`; a missing `kind` treated as a
+pass at the gate; a workspace created commercial in a wizard; a branding row on a
+personal workspace; a dedicated shard holding a second workspace; an allowance
+stored as a decrementing counter rather than counted from the rows.
+
+---
+
+## D22 — Branding and the installable app belong to the workspace, never to one app inside it
+
+One workspace, one identity: one theme, one logo, one icon, one installed tile,
+carried across every app it has switched on. An app declares only which SURFACES
+it has — a shell, email, documents — because only it knows whether it sends mail
+at all. The manifest and the icon are served from the workspace's own origin with
+`start_url` and `scope` at the root, and both answer with no session.
+Decided 2026-08-16.
+
+**Why.** `whitelabel` was a field on the app manifest with an entitlement of its
+own, so a business running three of our products would have had three branding
+switches, three places to change them, and two of them stale the week after the
+first edit. It also put the answer to "may this business use its own logo" in
+each product separately, which is a question about the workspace.
+
+An icon per PRODUCT is the same mistake one level out: three tiles on a phone for
+one place to work, and every app switch leaving the installed window. The tile is
+generated from a colour and a glyph rather than an upload, because waiting for an
+upload pipeline means every workspace installs as a browser default until
+somebody builds one.
+
+**Therefore never:** a theme read from an app manifest; a brand row in a shard
+(the sign-in page and the manifest are read before a workspace is located); a
+surface a workspace can switch on that no app offers; an installable per product;
+a manifest or icon behind a session; a personal workspace's tile left blank
+rather than wearing ours.

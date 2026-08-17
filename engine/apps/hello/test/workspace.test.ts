@@ -95,12 +95,20 @@ async function workspace(): Promise<string> {
   return cookie;
 }
 
-/** An operator hands out N, which is the lane that exists before anything takes a card. */
-async function comp(n: number): Promise<void> {
+/**
+ * An operator hands out N, which is the lane that exists before anything takes
+ * a card.
+ *
+ * ⚠️ IT RETURNS THE OPERATOR'S COOKIE, AND CALLERS REUSE IT. Signing the same
+ * address in twice inside one test meets the code cooldown — correctly — and
+ * fails as a 429 several lines from the line that caused it.
+ */
+async function comp(n: number): Promise<string> {
   const ops = await signIn(OPERATOR);
   const done = await post("admin", "/api/op.account.commercial",
     { email: "sam@example.com", granted: n }, ops);
   expect(done.status).toBe(200);
+  return ops;
 }
 
 const READABLE = { ground: "#101014", ink: "#f5f5f7", accent: "#7aa2f7", mark: "H" };
@@ -318,5 +326,54 @@ describe("a business's own identity", () => {
     await asBusiness();
     expect((await get("setup", "/manifest.webmanifest")).status).toBe(404);
     expect((await get("admin", "/icon.svg")).status).toBe(404);
+  });
+});
+
+/* ------------------------------------------------------- a shard of its own --- */
+
+/**
+ * ⚠️ RESERVING IS NOT MOVING, AND THE SPLIT IS DELIBERATE. This writes the
+ * placement RULE — from here on the shard takes one workspace and nobody else —
+ * which is cheap and reversible. Carrying the records across two databases is a
+ * migration and belongs where a migration belongs.
+ */
+describe("a database of one workspace's own", () => {
+  it("is refused to a personal workspace", async () => {
+    await workspace();
+    const ops = await signIn(OPERATOR);
+    const no = await post("admin", "/api/op.shard.dedicate", { shard: "eu-1", slug: SLUG }, ops);
+    expect(no.status).toBe(402);
+    expect((await no.json() as { problem: { code: string } }).problem.code)
+      .toBe("platform.commercial_required");
+  });
+
+  /* ⚠️ AND NEVER OVER A DATABASE FULL OF OTHER PEOPLE'S RECORDS. Selling
+     isolation on a shard that already holds strangers is a promise nothing
+     downstream would catch: every workspace on it keeps working. */
+  it("is refused on a shard that already holds somebody else", async () => {
+    const cookie = await workspace();
+    const ops = await comp(1);
+    await post("setup", "/api/me.tenant.commercial", { slug: SLUG, legalName: "H GmbH" }, cookie);
+
+    const other = await signIn("kim@example.com");
+    await post("setup", "/api/me.tenant.create",
+      { slug: "harbourside-three", name: "Third", country: "DE" }, other);
+
+    expect((await post("admin", "/api/op.shard.dedicate",
+      { shard: "eu-1", slug: SLUG }, ops)).status).toBe(409);
+  });
+
+  it("takes, and then the shard reports whose it is", async () => {
+    const cookie = await workspace();
+    const ops = await comp(1);
+    await post("setup", "/api/me.tenant.commercial", { slug: SLUG, legalName: "H GmbH" }, cookie);
+
+    expect((await post("admin", "/api/op.shard.dedicate",
+      { shard: "eu-1", slug: SLUG }, ops)).status).toBe(200);
+
+    const seen = await (await get("admin", "/api/op.shards", ops)).json() as
+      { items: { id: string; dedicatedTo?: string }[] };
+    const tenant = (await tenantBySlug(directory(), SLUG))!;
+    expect(seen.items.find((s) => s.id === "eu-1")?.dedicatedTo).toBe(tenant.id);
   });
 });

@@ -21,10 +21,12 @@
  */
 
 import type { AccountId, AppId, Allowance, AppSpec, FlagBook, ModelRow, TenantId } from "@engine/kernel";
-import { inLane, refusePrompt } from "@engine/kernel";
+import { inLane, mayIsolate, refusePrompt } from "@engine/kernel";
 import { actionsOf, bind, bindingsOf, running } from "./ai-actions.js";
 import { adjust, subscriptionFor } from "./billing.js";
-import { appsOfTenant, commercialAllowance, setCommercialGrant, shards } from "./directory.js";
+import {
+  addShard, appsOfTenant, commercialAllowance, setCommercialGrant, shards, tenantBySlug,
+} from "./directory.js";
 import { runsOf } from "./jobs.js";
 import type { PersonalBook, PersonalCtx } from "./personal.js";
 import type { SchemaModule } from "./schema.js";
@@ -327,6 +329,49 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
       async run(ctx): Promise<unknown> {
         operator(ctx);
         return { items: await shards(ctx.directory) };
+      },
+    },
+
+    /**
+     * ⚠️ RESERVE A SHARD FOR ONE WORKSPACE, WHICH IS NOT THE SAME AS MOVING IT
+     * THERE. This writes the placement RULE: from here on the shard takes that
+     * workspace and nobody else, and that workspace is refused a shared one.
+     * Reserving is cheap and reversible; the move is a data migration between
+     * two databases and belongs where a migration belongs.
+     *
+     * ⚠️ AND ONLY A BUSINESS MAY HAVE ONE (`mayIsolate`). A personal workspace
+     * shares because sharing is right for it — a database per person is a cost
+     * with no promise behind it.
+     *
+     * ⚠️ THE SHARD MUST BE EMPTY. Dedicating one that already holds strangers
+     * would sell isolation over a database full of other people's records, and
+     * nothing downstream would notice: every workspace on it keeps working.
+     */
+    "op.shard.dedicate": {
+      kind: "write", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const shardId = String(input.shard ?? "");
+        const slug = String(input.slug ?? "");
+        if (!shardId || !slug) return ctx.fail("platform.invalid");
+
+        const tenant = await tenantBySlug(ctx.directory, slug);
+        if (!tenant) return ctx.fail("platform.not_found");
+        if (!mayIsolate(tenant.kind)) {
+          return ctx.fail("platform.commercial_required", { workspace: tenant.name });
+        }
+
+        const found = (await shards(ctx.directory)).find((s) => s.id === shardId);
+        if (!found) return ctx.fail("platform.not_found");
+        /* ⚠️ Its own tenant does not count against emptiness — re-running this
+           for a workspace already moved there must not refuse. */
+        const strangers = await ctx.directory.prepare(
+          `SELECT COUNT(*) AS n FROM tenant WHERE shard_id = ? AND id <> ? AND closed_at IS NULL`)
+          .bind(shardId, tenant.id).first<{ n: number }>();
+        if ((strangers?.n ?? 0) > 0) return ctx.fail("platform.conflict");
+
+        await addShard(ctx.directory, found.id, found.where, found.ceiling, tenant.id, ctx.now);
+        return { shard: found.id, slug: tenant.slug };
       },
     },
 
