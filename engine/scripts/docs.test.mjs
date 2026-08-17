@@ -180,7 +180,7 @@ ok(`generated: ${blocks} verified block(s)`);
   invariant, which is what §1 forbids and the reason it forbids it.
 */
 {
-  const REF = /`((?:scripts|docs|kernel|runtime|design|one-hub|one|apps)\/[\w./-]+\.(?:mjs|md|ts|tsx|json))`/g;
+  const REF = /`((?:scripts|docs|kernel|runtime|design|one-space|one|apps)\/[\w./-]+\.(?:mjs|md|ts|tsx|json))`/g;
   const looked = new Set();
   let broken = 0;
   const scan = (dir) => {
@@ -203,7 +203,7 @@ ok(`generated: ${blocks} verified block(s)`);
     }
   };
   for (const dir of ["docs", "scripts", "kernel/src", "runtime/src", "design/src",
-    "one-hub/src", "one/src", "apps"]) scan(dir);
+    "one-space/src", "one/src", "apps"]) scan(dir);
   if (!broken) ok(`paths: all ${looked.size} file reference(s) in prose and comments resolve`);
 }
 

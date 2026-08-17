@@ -6,7 +6,7 @@
      which is a thing you want beside the package. -->
 
 **One worker answers every door for every product** (D3). `src/index.ts` is the
-whole of it, and `../one-hub` is the page it serves.
+whole of it, and `../one-space` is the page it serves.
 
 Adding a product is a line in `APPS` and a row in a database — no worker, no
 domain binding, no provisioning workflow, no secret.

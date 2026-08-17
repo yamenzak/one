@@ -92,6 +92,8 @@ export function SignIn({ lead }: { readonly lead?: string }) {
   if (sent) {
     return (
       <Arrival
+      /* ⚠️ THE DOOR IS WHERE THE LOGO IS THE SUBJECT — see `Arrival.brand`. */
+      brand={{ of: "space", name: ["One", "Space"] }}
         name="Check your email"
         claim={`Code sent to ${email}`}
         aside={(
@@ -140,6 +142,8 @@ export function SignIn({ lead }: { readonly lead?: string }) {
 
   return (
     <Arrival
+      /* ⚠️ THE DOOR IS WHERE THE LOGO IS THE SUBJECT — see `Arrival.brand`. */
+      brand={{ of: "space", name: ["One", "Space"] }}
       name="Sign in"
       claim={lead}
       aside={start

@@ -47,7 +47,7 @@ const filesIn = (dir) => {
 };
 
 /**
- * ⚠️ EVERY DIRECTORY IN THIS TREE THAT DRAWS SOMETHING, and `one-hub` is named
+ * ⚠️ EVERY DIRECTORY IN THIS TREE THAT DRAWS SOMETHING, and `one-space` is named
  * here because it is the largest of them: the Hub is the first surface anybody
  * sees, and a guard that covered the shared package and the reference app while
  * leaving the real screens out would be a guard that reports green about the
@@ -55,7 +55,7 @@ const filesIn = (dir) => {
  */
 const FILES = [
   ...filesIn("design/src"),
-  ...filesIn("one-hub/src"),
+  ...filesIn("one-space/src"),
   ...readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .flatMap((e) => filesIn(`apps/${e.name}/src`)),
@@ -324,7 +324,7 @@ if (!assembled) ok(`composed: no screen assembles a control the package already 
  */
 const DRAWERS = /^(ui|components?|shared|common|widgets|primitives|design)\.(tsx?|ts)$/;
 let drawers = 0;
-for (const dir of ["one-hub/src", ...readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
+for (const dir of ["one-space/src", ...readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
   .filter((e) => e.isDirectory()).map((e) => `apps/${e.name}/src`)]) {
   const at = join(ENGINE, dir);
   if (!existsSync(at)) continue;
@@ -346,7 +346,7 @@ if (!drawers) ok(`furniture: no app keeps a drawer of shared components`);
  * and for a while after it was not, so **185 utility classes it alone used were
  * never generated**: `.hidden`, `.md:hidden`, `.absolute`, `.bottom-0`,
  * `.basis-0`, `.flex-1`, half the grid. Everything still mounted, typechecked
- * and passed, because `one-hub/src` happened to use most of the same utilities —
+ * and passed, because `one-space/src` happened to use most of the same utilities —
  * the ones it did not are the ones that silently stopped working.
  *
  * ⚠️ SO THE CHECK IS THAT THE DIRECTORY IS THERE, which is the whole of it. No
@@ -355,7 +355,7 @@ if (!drawers) ok(`furniture: no app keeps a drawer of shared components`);
  */
 let unpointed = 0;
 let pointed = 0;
-for (const sheet of ["one-hub/src/styles.css"]) {
+for (const sheet of ["one-space/src/styles.css"]) {
   const at = join(ENGINE, sheet);
   if (!existsSync(at)) { fail(`${sheet}: named here but not in the tree.`); unpointed++; continue; }
   for (const m of readFileSync(at, "utf8").matchAll(/@source\s+"([^"]+)"/g)) {
@@ -696,7 +696,7 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
 {
   const DEEP = /from\s+["'](?:@one\/design\/[^"']+|[./][^"']*\/design\/src\/[^"']+)["']/;
   let deep = 0;
-  for (const file of [...filesIn("one-hub/src"), ...filesIn("apps")]) {
+  for (const file of [...filesIn("one-space/src"), ...filesIn("apps")]) {
     const m = readFileSync(file, "utf8").match(DEEP);
     if (!m) continue;
     deep++;
@@ -733,7 +733,7 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
   const DOCK = /\bDocked\b/;
   const FRAME = "design/src/frame/";
   let hand = 0;
-  for (const file of [...filesIn("one-hub/src"), ...filesIn("apps")]) {
+  for (const file of [...filesIn("one-space/src"), ...filesIn("apps")]) {
     const src = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
     if (!DOCK.test(src)) continue;
     hand++;

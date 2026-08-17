@@ -55,10 +55,10 @@ const read = (p) => readFileSync(join(ENGINE, p), "utf8");
   IN PRODUCTION CAN REACH IT. A file naming an app is fine; a file naming an app
   that production's module graph includes is the whole finding.
 */
-const GROUND = "one-hub/src/Ground.tsx";
+const GROUND = "one-space/src/Ground.tsx";
 const APP_IMPORT = /^import[\s\S]*?from "@engine\/(hello|[a-z-]+)\/?[\w./]*";$/gm;
 
-const importers = files("one-hub/src").filter((f) => {
+const importers = files("one-space/src").filter((f) => {
   const src = read(f);
   return [...src.matchAll(APP_IMPORT)]
     .some((m) => !["design", "kernel", "runtime"].includes(m[1]));
@@ -68,7 +68,7 @@ const strays = importers.filter((f) => f !== GROUND);
 if (strays.length) {
   fail(`bundle: ${strays.join(", ")} import a product at module scope — D17's first "therefore never", and it ships that product's whole manifest to every customer of every other one`);
 } else {
-  ok(`bundle: ${files("one-hub/src").length} page file(s), none importing a product`);
+  ok(`bundle: ${files("one-space/src").length} page file(s), none importing a product`);
 }
 
 /*
@@ -77,7 +77,7 @@ if (strays.length) {
   — and the difference is not subtle, it is whether a chunk is emitted and the
   shared bundle stops shaking.
 */
-const app = read("one-hub/src/App.tsx");
+const app = read("one-space/src/App.tsx");
 const gated = /import\.meta\.env\.DEV[\s\S]{0,120}?import\("\.\/Ground\.js"\)/.test(app);
 
 if (gated) {

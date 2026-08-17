@@ -33,7 +33,7 @@ folder above it.
 
 ⚠️ **AND THE TEST GROUND IS `apps/hello`.** Its eight screens are built from
 nothing but this package, take their data as props, and render with no session,
-no worker and no database — `pnpm --filter @engine/hub dev`, then
+no worker and no database — `pnpm --filter @engine/space dev`, then
 `?screen=/reports`. That last property is the one that matters: every defect
 listed below was invisible to every suite and obvious in a photograph, and none
 of them would have been reachable behind a sign-in.
@@ -161,12 +161,12 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 |---|---|---|
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 56 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | internal |
-| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 48 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 112 |
+| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 49 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 114 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 51 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**306 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**309 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -180,7 +180,7 @@ there is no deep import, and a guard says so.
 
 ### `frame/`
 
-- `frame/arrival.tsx` — `Arrival`, `AsideRoute`, `Mark`, `MarkSize`
+- `frame/arrival.tsx` — `Arrival`, `AsideRoute`, `Mark`, `MarkOf`, `MarkSize`
 - `frame/chrome.tsx` — `Docked`, `Island`
 - `frame/crown.tsx` — `Crown`, `CrownClaim`, `crownFor`, `CrownProps`, `CrownSocketProvider`, `LeaveChip`, `PageCrown`, `Slot`, `useCrownSocket`
 - `frame/overlay.tsx` — `Confirm`, `Dialog`, `Menu`, `MenuItem`, `notice`, `NoticeHost`, `Over`, `Peek`, `Tray`
@@ -197,6 +197,7 @@ there is no deep import, and a guard says so.
 - `parts/forms.tsx` — `Agree`, `Choice`, `CodeEntry`, `DateInput`, `Dates`, `Dial`, `LongText`, `Lookup`, `MoneyInput`, `NumberInput`, `NumberInputProps`, `OneOf`, `Option`, `PeriodId`, `PeriodInput`, `PERIODS`, `Picks`, `Said`, `SearchInput`, `SecretInput`, `Segmented`, `spanOf`, `Tags`, `Tail`, `TextInput`, `TextInputProps`, `TimeInput`
 - `parts/heads.tsx` — `Balance`, `distinguishing`, `Figure`, `Prose`, `Section`, `SectionTitle`, `Title`
 - `parts/listing.tsx` — `Col`, `Listing`, `ListingProps`, `Paged`
+- `parts/logo.tsx` — `Lockup`, `LockupProps`
 - `parts/state.tsx` — `Await`, `AwaitProps`, `ChartWaiting`, `FigureWaiting`, `FormWaiting`, `Loaded`, `Nothing`, `nothingIn`, `ready`, `RowsWaiting`, `TableWaiting`, `TextWaiting`, `TilesWaiting`, `trouble`, `Trouble`, `waiting`, `Working`
 - `parts/surfaces.tsx` — `ActionRow`, `AmountRow`, `BrandTile`, `ControlRow`, `CopyRow`, `FieldRow`, `Group`, `GroupProps`, `Identity`, `Money`, `NavRow`, `NavRowProps`, `NoteRow`, `OfferRow`, `PersonRow`, `Place`, `QuickActions`, `SeeAll`, `Sheet`, `StepRow`, `Swatch`, `TileGrid`, `ToggleRow`
 - `parts/tally.tsx` — `Tally`, `TallyProps`

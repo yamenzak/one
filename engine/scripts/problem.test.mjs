@@ -51,7 +51,7 @@ const ENGINE_ITSELF = "kernel/src/problem.ts";
 const isCatalogue = (src) => /:\s*ProblemCatalog\b/.test(src);
 
 const ROOTS = [
-  "kernel/src", "runtime/src", "design/src", "one-hub/src", "one/src",
+  "kernel/src", "runtime/src", "design/src", "one-space/src", "one/src",
   "apps/hello/src",
 ];
 

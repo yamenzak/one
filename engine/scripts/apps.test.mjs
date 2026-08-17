@@ -158,7 +158,7 @@ const findConfigs = (dir) => {
     if (e.isFile() && /^vitest\..*config\.[cm]?ts$/.test(e.name)) CONFIGS.push(join(at, e.name));
   }
 };
-for (const dir of ["one", "one-hub", "runtime", "design", "kernel", ...appDirs.map((a) => `apps/${a}`)]) {
+for (const dir of ["one", "one-space", "runtime", "design", "kernel", ...appDirs.map((a) => `apps/${a}`)]) {
   findConfigs(dir);
 }
 

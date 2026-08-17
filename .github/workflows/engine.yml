@@ -250,13 +250,13 @@ jobs:
             echo "::notice::One is not provisioned — skipping its deploy. Run this workflow with 'provision' ticked."
           fi
 
-      # The worker serves `engine/one-hub/dist` through its `assets` binding, and
+      # The worker serves `engine/one-space/dist` through its `assets` binding, and
       # an `assets.directory` is a filesystem path rather than a package
       # dependency. `turbo.json` declares the edge for the TEST task; the deploy
       # needs it built here too.
       - name: Build the Hub
         if: steps.ready.outputs.go == 'true'
-        run: pnpm turbo run build --filter=@engine/hub
+        run: pnpm turbo run build --filter=@engine/space
 
       - name: Deploy
         if: steps.ready.outputs.go == 'true'

@@ -54,7 +54,7 @@ const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$
 
 const FILES = [
   ...filesIn("design/src"),
-  ...filesIn("one-hub/src"),
+  ...filesIn("one-space/src"),
 ];
 
 /**
@@ -197,7 +197,7 @@ for (const file of filesIn("design/src", /\.tsx?$/)) {
 }
 
 let unmounted = 0;
-for (const entry of filesIn("one-hub/src", /^main\.tsx$/)) {
+for (const entry of filesIn("one-space/src", /^main\.tsx$/)) {
   const src = readFileSync(entry, "utf8");
   /* ⚠️ In the JOIN, not in the import — the import is what looked right. */
   const join_ = /\.join\(["'`]\\n["'`]\)/.test(src)

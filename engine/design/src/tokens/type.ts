@@ -53,6 +53,19 @@ export const TYPE = {
    * line is the single thing that makes a large name look unset.
    */
   wordmark: "font-mark text-[2.75rem] md:text-6xl font-extrabold tracking-[-0.05em] leading-[0.95] text-balance",
+  /**
+   * THE TWO HALVES OF A LOCKUP, AND THE WEIGHT SPLIT IS THE WHOLE WORDMARK.
+   *
+   * ⚠️ `One` LIGHT AND THE PRODUCT BOLD says the two things a lockup has to say
+   * at a glance: which family this belongs to, and which member it is. Set at
+   * one weight, every product name becomes a slightly different long word.
+   *
+   * ⚠️ NO SIZE IN EITHER, DELIBERATELY. `wordmark` above bakes one in because it
+   * is always the same thing at the same scale; a lockup is drawn at four sizes
+   * from a nav row to a door, so the caller sets the scale and these set the fit.
+   */
+  lockupFamily: "font-mark font-light tracking-[-0.04em]",
+  lockupMember: "font-mark font-bold tracking-[-0.04em]",
   /** What this screen is. One per screen, at the top. */
   title: "font-mark text-[1.75rem] font-semibold tracking-[-0.025em] leading-tight text-balance",
   /** What this part of the screen is. */

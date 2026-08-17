@@ -1168,7 +1168,7 @@
       "protects": "D10",
       "stage": "14",
       "status": "live",
-      "impl": "one-hub/test/centre.test.ts",
+      "impl": "one-space/test/centre.test.ts",
       "proves": "draws every screen the parser can produce",
       "fails": "a path the parser can produce renders a blank page, which is the same picture as a page that failed to load"
     },
@@ -1177,7 +1177,7 @@
       "protects": "D15",
       "stage": "14",
       "status": "live",
-      "impl": "one-hub/test/where.test.ts",
+      "impl": "one-space/test/where.test.ts",
       "proves": "offers a customer nothing their role cannot open",
       "fails": "a customer opens Money and every call on the screen is a 403 dressed as a broken page"
     },
@@ -1186,7 +1186,7 @@
       "protects": "D20",
       "stage": "17",
       "status": "live",
-      "impl": "one-hub/test/where.test.ts",
+      "impl": "one-space/test/where.test.ts",
       "proves": "reads and writes each one back",
       "fails": "a screen held in component state cannot be linked to, landed on or reloaded, and a refusal saying \"read this first\" has nowhere to send anybody"
     },
@@ -1195,7 +1195,7 @@
       "protects": "D20",
       "stage": "17",
       "status": "live",
-      "impl": "one-hub/test/where.test.ts",
+      "impl": "one-space/test/where.test.ts",
       "proves": "dismisses at the root and steps up everywhere else",
       "fails": "two screens get the way out right by hand and the third goes home from three levels in, or a cycle makes the back button never leave"
     },
@@ -1204,7 +1204,7 @@
       "protects": "D20",
       "stage": "17",
       "status": "live",
-      "impl": "one-hub/test/centre.test.ts",
+      "impl": "one-space/test/centre.test.ts",
       "proves": "never claims a hub address as a product's",
       "fails": "an app ships a screen under /hub, it is unreachable, and its author finds out from somebody who could not open it"
     },

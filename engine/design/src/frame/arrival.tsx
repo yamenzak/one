@@ -25,6 +25,7 @@ import { Page } from "./page.js";
 import { Spacer, Stack } from "../parts/arrange.js";
 import type { Sky } from "../tokens/ambience.js";
 import { ONE_FACE, worldFor } from "../parts/face.js";
+import { Lockup } from "../parts/logo.js";
 
 /* ------------------------------------------------------------------- mark --- */
 
@@ -57,51 +58,86 @@ import { ONE_FACE, worldFor } from "../parts/face.js";
  */
 export type MarkSize = "nav" | "row" | "crown" | "door";
 
-/* ⚠️ HEIGHT, NOT SIZE. The word is 2.68 wide for every 1 tall, so anything that
-   set a square box would letterbox it — the caller says how tall, the aspect
-   does the rest. */
+/* ⚠️ HEIGHT, AND THE BOX IS SQUARE. The mark is a numeral on a 100-unit square,
+   so height and width are the same number — what used to be here was 2.68 wide
+   per 1 tall, because it drew a word. */
 const MARK_H: Readonly<Record<MarkSize, number>> = {
   nav: 14, row: 16, crown: 18, door: 44,
 };
 
 /*
-  ⚠️ THE LETTERS, ON A 100-UNIT GRID. Stem 26, outer radius 30, counters sharp,
-  8 units between letters — tight, because the three are one word rather than
-  three shapes. Written as constants so the proportions are readable and a
-  change is a number rather than a re-drawing.
+  ⚠️ THE MARK IS THE STENCIL NUMERAL, AND IT REPLACED A DRAWING OF THE WORD.
+  What used to be here spelled O-N-E out of three constructed letterforms — a
+  wordmark pretending to be a mark, which meant the brand had no shape that
+  survived being sixteen pixels wide or square. A numeral with a beak and two
+  cut counters does, and a product's mark is the same stem with something added
+  to it (see `MarkOf`), so the family reads as a family at any size.
 */
-const LETTER_O =
-  "M34,0 H54 A30,30 0 0 1 84,30 V70 A30,30 0 0 1 54,100 H30 A30,30 0 0 1 0,70 V34 Z"
-  + "M26,26 H58 V74 H26 Z";
-const LETTER_N =
-  "M0,30 A30,30 0 0 1 30,0 H54 A30,30 0 0 1 84,30 V100 H0 Z"
-  + "M26,30 H58 V100 H26 Z";
-const LETTER_E =
-  "M30,0 H54 A30,30 0 0 1 84,30 V100 H30 A30,30 0 0 1 0,70 V30 A30,30 0 0 1 30,0 Z"
-  + "M26,26 H58 V46 H26 Z"
-  + "M26,58 H84 V78 H26 Z";
+export type MarkOf = "one" | "space";
 
-export function Mark({ size = "crown", label }: {
+export function Mark({ size = "crown", of = "one", label }: {
   readonly size?: MarkSize;
+  readonly of?: MarkOf;
   /** An accessible name. Absent means decorative, beside text that already says it. */
   readonly label?: string;
 }) {
   const h = MARK_H[size];
+  /*
+    ⚠️ ONE MASK ID PER INSTANCE. An SVG `id` is DOCUMENT-global, so two marks on
+    one page — the crown and a sign-in card, which is the ordinary case —
+    resolve the same `url(#…)` to whichever rendered last. The drawings this came
+    from both hardcoded the same id, so the platform mark would have taken the
+    product's counters, or the reverse, depending on order.
+  */
+  const mask = React.useId();
+
   return (
     <svg
       height={h}
-      width={h * 2.68}
-      viewBox="0 0 268 100"
+      width={h}
+      viewBox="0 0 100 100"
+      /* ⚠️ `currentColor`, because the source drawings filled #ffffff — a logo
+         that is invisible on every light surface, and one that fails as an empty
+         space where the brand was rather than as an error. */
       fill="currentColor"
-      fillRule="evenodd"
       role={label ? "img" : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
       className="shrink-0"
     >
-      <path d={LETTER_O} />
-      <g transform="translate(92 0)"><path d={LETTER_N} /></g>
-      <g transform="translate(184 0)"><path d={LETTER_E} /></g>
+      <defs>
+        {/* White keeps, black cuts — the stencil lines ARE the counters. */}
+        <mask id={mask}>
+          <rect width="100%" height="100%" fill="#fff" />
+          {of === "one"
+            ? (
+              <>
+                <line x1="53" y1="18" x2="53" y2="82" stroke="#000" strokeWidth="3" />
+                <line x1="60" y1="18" x2="60" y2="82" stroke="#000" strokeWidth="2.5" />
+              </>
+            )
+            : (
+              <>
+                <line x1="52" y1="18" x2="52" y2="82" stroke="#000" strokeWidth="2" />
+                <line x1="60" y1="18" x2="60" y2="82" stroke="#000" strokeWidth="2" />
+                {/* ⚠️ Two rings on the stem, offset up and down — a body on an
+                    orbit rather than a pair of dots, which is what keeps the
+                    counters from reading as a barcode. */}
+                <circle cx="52" cy="36" r="4.5" fill="#000" />
+                <circle cx="52" cy="36" r="2" fill="#fff" />
+                <circle cx="60" cy="62" r="4.5" fill="#000" />
+                <circle cx="60" cy="62" r="2" fill="#fff" />
+              </>
+            )}
+        </mask>
+      </defs>
+
+      {/* ⚠️ THE BEAK IS DIMMED, NOT COLOURED. The product drawing tinted it slate
+          blue, which is a hue in a system that decided to be monochrome — the
+          same ink at lower opacity says the same thing on any ground and needs
+          no second token. */}
+      <path d="M 28 36 L 46 18 L 46 36 Z" opacity={of === "space" ? 0.55 : 1} />
+      <path d="M 46 18 L 66 18 L 66 82 L 46 82 Z" mask={`url(#${mask})`} />
     </svg>
   );
 }
@@ -150,7 +186,7 @@ export function Mark({ size = "crown", label }: {
  * particular mood is a real thing to want; what is wrong is that mood being the
  * only option.
  */
-export function Arrival({ name, claim, children, aside, sky }: {
+export function Arrival({ name, claim, children, aside, sky, brand }: {
   readonly name: string;
   /** One line. What this is, or what is about to happen. */
   readonly claim?: string;
@@ -158,6 +194,13 @@ export function Arrival({ name, claim, children, aside, sky }: {
   readonly aside?: React.ReactNode;
   /** ⚠️ Absent is the deployment's own world — see above. */
   readonly sky?: Sky;
+  /**
+   * ⚠️ WHOSE DOOR THIS IS. Absent draws the bare mark, which is the platform's
+   * own and what every product's door wore before there was a wordmark. Given a
+   * name it draws the full lockup, STACKED — a door is the one surface with room
+   * for the mark to be the subject rather than the furniture.
+   */
+  readonly brand?: { readonly of?: MarkOf; readonly name?: readonly [string, string] };
 }) {
   return (
     <Page
@@ -182,7 +225,9 @@ export function Arrival({ name, claim, children, aside, sky }: {
                 are a `roomy` apart rather than `tight`: set close together they
                 read as one lockup, and "one Check your email" is not a lockup. */}
             <div {...ARRIVE_MARK} style={doorAt(0)}>
-              <Mark size="door" label="One" />
+              {brand?.name
+                ? <Lockup of={brand.of} name={brand.name} stack size="door" />
+                : <Mark size="door" of={brand?.of} label="One" />}
             </div>
             <div {...ARRIVE_RISE} style={doorAt(1)}>
               {/*

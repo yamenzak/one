@@ -72,7 +72,7 @@ for (const file of filesIn("design/src")) {
 
 const CONSUMERS = [
   ...filesIn("design/src"),
-  ...filesIn("one-hub/src"),
+  ...filesIn("one-space/src"),
   ...filesIn("one/src"),
   ...readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
     .filter((e) => e.isDirectory())

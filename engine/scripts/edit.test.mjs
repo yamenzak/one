@@ -70,7 +70,7 @@ const walk = (dir) => {
     }
   }
 };
-walk("one-hub/src");
+walk("one-space/src");
 
 if (hubStrays.length) {
   fail(`hub: ${hubStrays.join(", ")} render a control in a row rather than a value and an edit.`);

@@ -24,7 +24,7 @@ import { dirname, join } from "node:path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
-const HUB = join(ENGINE, "one-hub", "src");
+const HUB = join(ENGINE, "one-space", "src");
 
 let bad = 0;
 const fail = (m) => { console.error(`BAD  ${m}`); bad++; };
@@ -32,7 +32,7 @@ const ok = (m) => console.log(`ok   ${m}`);
 const rel = (p) => p.slice(ENGINE.length + 1);
 
 if (!existsSync(HUB)) {
-  console.error("BAD  engine/one-hub/src is missing — the Hub is what this checks.");
+  console.error("BAD  engine/one-space/src is missing — the Hub is what this checks.");
   process.exit(1);
 }
 
@@ -58,7 +58,7 @@ const MAY_FETCH = new Map([
 
 let bare = 0;
 for (const file of FILES) {
-  const name = rel(file).slice("one-hub/src/".length);
+  const name = rel(file).slice("one-space/src/".length);
   if (MAY_FETCH.has(name)) continue;
   const src = strip(readFileSync(file, "utf8"));
   if (/(?<![.\w])fetch\s*\(/.test(src)) {
@@ -94,12 +94,12 @@ if (!classified) ok(`doors: the Hub never classifies its own hostname`);
 const app = readFileSync(join(HUB, "App.tsx"), "utf8");
 const declared = app.match(/export type Screen\s*=([^;]+);/);
 if (!declared) {
-  fail(`one-hub/src/App.tsx: no \`Screen\` union — the picker's answers are what this checks.`);
+  fail(`one-space/src/App.tsx: no \`Screen\` union — the picker's answers are what this checks.`);
 } else {
   const names = [...declared[1].matchAll(/"([a-z-]+)"/g)].map((m) => m[1]);
   const missing = names.filter((n) => !new RegExp(`screen === "${n}"`).test(app));
   if (missing.length) {
-    fail(`one-hub/src/App.tsx: ${missing.map((n) => `"${n}"`).join(", ")} can be picked and is\n` +
+    fail(`one-space/src/App.tsx: ${missing.map((n) => `"${n}"`).join(", ")} can be picked and is\n` +
          `       never drawn. React renders nothing, which looks exactly like a page\n` +
          `       that failed to load.`);
   } else {

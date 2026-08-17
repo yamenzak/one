@@ -46,7 +46,7 @@ const filesIn = (dir, re) => {
 
 const SOURCES = [
   ...filesIn("design/src", /\.(tsx?|css)$/),
-  ...filesIn("one-hub/src", /\.(tsx?|css)$/),
+  ...filesIn("one-space/src", /\.(tsx?|css)$/),
   ...readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .flatMap((e) => filesIn(`apps/${e.name}/src`, /\.(tsx?|css)$/)),

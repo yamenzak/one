@@ -155,7 +155,7 @@ const walk = (dir, out = []) => {
 let hidden = 0;
 let read = 0;
 for (const rel of [...walk("scripts"), ...walk("kernel/src"), ...walk("runtime/src"),
-                   ...walk("design/src"), ...walk("one-hub/src"), ...walk("apps")]) {
+                   ...walk("design/src"), ...walk("one-space/src"), ...walk("apps")]) {
   read++;
   const lines = readFileSync(join(ENGINE, rel), "utf8").split("\n");
   lines.forEach((line, i) => {

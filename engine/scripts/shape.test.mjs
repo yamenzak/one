@@ -72,21 +72,21 @@ const DEFINES_CHROME = new Set([
  * screen inside a routed surface, which is what the rules below are about.
  */
 const NOT_A_SCREEN = new Set([
-  "one-hub/src/screens/SignIn.tsx",
-  "one-hub/src/screens/Signpost.tsx",
-  "one-hub/src/screens/NewWorkspace.tsx",
-  "one-hub/src/screens/Elsewhere.tsx",
-  "one-hub/src/screens/Gallery.tsx",
-  "one-hub/src/screens/Specimens.tsx",
-  "one-hub/src/App.tsx",
-  "one-hub/src/hub/Hub.tsx",
-  "one-hub/src/centre/AppSurface.tsx",
-  "one-hub/src/centre/Product.tsx",
-  "one-hub/src/centre/Choose.tsx",
+  "one-space/src/screens/SignIn.tsx",
+  "one-space/src/screens/Signpost.tsx",
+  "one-space/src/screens/NewWorkspace.tsx",
+  "one-space/src/screens/Elsewhere.tsx",
+  "one-space/src/screens/Gallery.tsx",
+  "one-space/src/screens/Specimens.tsx",
+  "one-space/src/App.tsx",
+  "one-space/src/hub/Hub.tsx",
+  "one-space/src/centre/AppSurface.tsx",
+  "one-space/src/centre/Product.tsx",
+  "one-space/src/centre/Choose.tsx",
 ]);
 
 const SCREENS = [
-  ...filesIn("one-hub/src"),
+  ...filesIn("one-space/src"),
   ...readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .flatMap((e) => filesIn(`apps/${e.name}/src`)),

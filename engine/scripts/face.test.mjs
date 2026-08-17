@@ -46,7 +46,7 @@ const filesIn = (dir) => {
 
 const FILES = [
   ...filesIn("design/src"),
-  ...filesIn("one-hub/src"),
+  ...filesIn("one-space/src"),
   ...readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .flatMap((e) => filesIn(join("apps", e.name, "src"))),
@@ -243,7 +243,7 @@ const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "");
       for (const m of src.matchAll(/glyphOf\("([\w-]+)"\)/g)) used.set(m[1], rel(at));
     }
   };
-  for (const root of ["apps/hello/src", "one-hub/src", "design/src"]) {
+  for (const root of ["apps/hello/src", "one-space/src", "design/src"]) {
     walk(join(ENGINE, root));
   }
 

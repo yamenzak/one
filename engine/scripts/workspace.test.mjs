@@ -32,7 +32,7 @@ const walk = (dir) => {
     else if (/\.tsx?$/.test(e.name)) sources.push(at);
   }
 };
-for (const tree of ["kernel/src", "runtime/src", "design/src", "one/src", "one-hub/src", "apps"]) {
+for (const tree of ["kernel/src", "runtime/src", "design/src", "one/src", "one-space/src", "apps"]) {
   walk(join(ENGINE, tree));
 }
 const rel = (f) => f.slice(ENGINE.length + 1);

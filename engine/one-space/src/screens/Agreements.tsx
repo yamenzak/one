@@ -59,6 +59,8 @@ export function Agreements({ owed }: { readonly owed: readonly Owed[] }) {
   if (leaving) {
     return (
       <Arrival
+      /* ⚠️ THE DOOR IS WHERE THE LOGO IS THE SUBJECT — see `Arrival.brand`. */
+      brand={{ of: "space", name: ["One", "Space"] }}
         name="Your data"
         claim="Take a copy, or delete everything. Neither needs you to agree to anything."
         aside={<AsideRoute says="Changed your mind?" label="Back to the agreements"
@@ -71,6 +73,8 @@ export function Agreements({ owed }: { readonly owed: readonly Owed[] }) {
 
   return (
     <Arrival
+      /* ⚠️ THE DOOR IS WHERE THE LOGO IS THE SUBJECT — see `Arrival.brand`. */
+      brand={{ of: "space", name: ["One", "Space"] }}
       name={one ? "One thing to agree to" : "A few things to agree to"}
       claim={owed.some((d) => d.binds === "tenant")
         ? "Some of these are agreed on behalf of your workspace."

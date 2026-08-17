@@ -89,7 +89,7 @@ if (/<Whichever/.test(surface) && /areasOn\(book, areas, level\)/.test(surface))
 */
 const settingsSurfaces = [
   "design/src/rendered/settings.tsx",
-  "one-hub/src/centre/SettingsArea.tsx",
+  "one-space/src/centre/SettingsArea.tsx",
   "apps/hello/src/screens/Settings.tsx",
 ];
 const crammed = settingsSurfaces.filter((f) => {
@@ -108,8 +108,8 @@ if (crammed.length) {
   workspace's leaves the preferences at an address nobody can find — which is the
   same failure as not splitting them, with more code.
 */
-const hubScreens = readdirSync(join(ENGINE, "one-hub/src/hub")).filter((f) => f.endsWith(".tsx"));
-const reachable = hubScreens.some((f) => /at: "prefs"/.test(read(`one-hub/src/hub/${f}`)));
+const hubScreens = readdirSync(join(ENGINE, "one-space/src/hub")).filter((f) => f.endsWith(".tsx"));
+const reachable = hubScreens.some((f) => /at: "prefs"/.test(read(`one-space/src/hub/${f}`)));
 
 if (reachable) {
   /* ⚠️ THE COUNT IS PART OF THE CLAIM — a walk that found nothing and a walk

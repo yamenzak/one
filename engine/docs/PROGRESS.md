@@ -696,7 +696,7 @@ proves the components exist, which nobody doubted.
   seven defects in the design system in one pass, every one of them invisible to
   a diff and obvious in a photograph; `design/README.md` lists them.
 
-**`@engine/hub` (`engine/one-hub/`) — the page a person opens.** The signpost, sign-in with an
+**`@engine/space` (`engine/one-space/`) — the page a person opens.** The signpost, sign-in with an
 emailed code, the doors, and the wizard that makes a workspace — HeroUI v3 as it
 ships, themed through tokens, nothing restyled.
 

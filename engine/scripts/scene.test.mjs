@@ -49,7 +49,7 @@ if (!SCENE.length) {
        "       Every check below would pass over an empty list, which is a green run " +
        "asserting nothing.");
 }
-const DRAWN = [...filesIn("design/src"), ...filesIn("one-hub/src")];
+const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
 
 /* ---------------------------------------------- a world is never random --- */
 {
@@ -185,7 +185,7 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-hub/src")];
     cheap because the seam is narrow, which is the argument for having the seam.
   */
   const BUILDING = /\b(worldOf|worldCss|worldFor)\s*\(/;
-  const SCREENS = [...filesIn("one-hub/src"), ...filesIn("apps")];
+  const SCREENS = [...filesIn("one-space/src"), ...filesIn("apps")];
   let hits = 0;
   for (const file of SCREENS) {
     const src = code(readFileSync(file, "utf8"));
@@ -228,7 +228,7 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-hub/src")];
   */
   const PAINTS = /\bworldCss\s*\(|data-field/;
   const MOUNTERS = new Set(["design/src/frame/page.tsx", "design/src/tokens/ambience.ts"]);
-  const ALL = [...filesIn("design/src", /\.tsx?$/), ...filesIn("one-hub/src")];
+  const ALL = [...filesIn("design/src", /\.tsx?$/), ...filesIn("one-space/src")];
   let painters = 0;
   for (const file of ALL) {
     if (MOUNTERS.has(rel(file).split("\\").join("/"))) continue;
