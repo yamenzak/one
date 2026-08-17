@@ -45,7 +45,19 @@ export interface PersonalCtx {
   readonly app: (id: string) => AppSpec | null;
   /** ⚠️ Set on the response by the runtime, so no handler writes a header. */
   readonly issue: (session: Session | null) => void;
-  readonly fail: (code: string, values?: Record<string, string | number>) => never;
+  /**
+   * ⚠️ `values` FILLS THE SENTENCE'S TOKENS; `fields` SAYS WHICH INPUT IS WRONG.
+   * They are different things and conflating them loses the second: a refusal
+   * about one field arrived as the catalogue's generic "check the highlighted
+   * fields", with nothing highlighted, because the only channel for saying WHICH
+   * was a token the copy did not contain. `Problem.fields` is what the edit
+   * sheet reads (`refusedOn`), so a refusal that names a field lands on it.
+   */
+  readonly fail: (
+    code: string,
+    values?: Record<string, string | number>,
+    extra?: { readonly fields?: Readonly<Record<string, string>>; readonly ref?: string },
+  ) => never;
 }
 
 export interface PersonalOp {

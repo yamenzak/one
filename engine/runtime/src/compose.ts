@@ -24,7 +24,7 @@ import type {
 import { PLATFORM_PROBLEMS, eraseBy, eventFor, operationsFor, permissionFor, routeFor } from "@engine/kernel";
 import { tableFor } from "@engine/kernel";
 import type { Db } from "./sql.js";
-import { list, patch, put, readOne } from "./records.js";
+import { list, patch, put, readOne, type WriteRefusal } from "./records.js";
 import { memberOps } from "./member-ops.js";
 import { packageOps } from "./packages.js";
 import { settingOps } from "./settings.js";
@@ -48,7 +48,19 @@ export interface Ctx {
   readonly accountId: string | null;
   readonly now: Date;
   /** ⚠️ Refuse from inside a handler with a catalogue code, never a bare throw. */
-  readonly fail: (code: string, values?: Record<string, string | number>) => never;
+  /**
+   * ⚠️ `values` FILLS THE SENTENCE'S TOKENS; `fields` SAYS WHICH INPUT IS WRONG.
+   * They are different things and conflating them loses the second: a refusal
+   * about one field arrived as the catalogue's generic "check the highlighted
+   * fields", with nothing highlighted, because the only channel for saying WHICH
+   * was a token the copy did not contain. `Problem.fields` is what the edit
+   * sheet reads (`refusedOn`), so a refusal that names a field lands on it.
+   */
+  readonly fail: (
+    code: string,
+    values?: Record<string, string | number>,
+    extra?: { readonly fields?: Readonly<Record<string, string>>; readonly ref?: string },
+  ) => never;
 }
 
 export interface Resolved {
@@ -107,6 +119,29 @@ function crudFor(spec: CollectionSpec, verb: CrudVerb): Resolved {
     async handler() { return {} as never; },
   } as AnyOperation;
 
+/**
+ * ⚠️ ONE PLACE TURNS A WRITE REFUSAL INTO A PROBLEM. `create` and `update` each
+ * had their own mapping, and they had already drifted: `update` answered
+ * `not_found` where `create` could not, and both passed a `detail` into the
+ * VALUES slot — which fills tokens in the catalogue's sentence and is not a
+ * detail at all, so every one of them was discarded. Somebody was told to
+ * "check the highlighted fields" with nothing highlighted.
+ *
+ * ⚠️ AND A REFUSAL ABOUT A FIELD LANDS ON THE FIELD. `Problem.fields` is what
+ * the edit sheet reads, so the sentence appears under the input that caused it
+ * rather than over the whole form.
+ */
+function refuse(ctx: Pick<Ctx, "fail">, done: WriteRefusal, spec: CollectionSpec): never {
+  if (done.why === "not_found") ctx.fail("platform.not_found");
+  const named = done.why === "vault_only"
+    ? Object.keys(spec.fields).filter((f) => spec.fields[f]?.vault)
+    : [];
+  return ctx.fail("platform.invalid", {}, named.length
+    ? { fields: Object.fromEntries(named.map((f) => [f, done.detail ?? ""])) }
+    : {});
+}
+
+
   const run = async (ctx: Ctx, input: Record<string, unknown>): Promise<unknown> => {
     const scope = scopeOf(spec, ctx);
     switch (verb) {
@@ -118,7 +153,7 @@ function crudFor(spec: CollectionSpec, verb: CrudVerb): Resolved {
       }
       case "create": {
         const done = await put(ctx.db, spec, scope, input, ctx.accountId, ctx.now);
-        if ("why" in done) ctx.fail("platform.invalid", { detail: done.detail ?? "" });
+        if ("why" in done) refuse(ctx, done, spec);
         return done;
       }
       case "update": {
@@ -128,10 +163,7 @@ function crudFor(spec: CollectionSpec, verb: CrudVerb): Resolved {
            with the id and changed nothing. */
         const done = await patch(ctx.db, spec, scope, String(input.id ?? ""),
           input, ctx.accountId, ctx.now);
-        if ("why" in done) {
-          if (done.why === "not_found") return ctx.fail("platform.not_found");
-          return ctx.fail("platform.invalid", { detail: done.detail ?? "" });
-        }
+        if ("why" in done) refuse(ctx, done, spec);
         return done;
       }
       case "delete": {

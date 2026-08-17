@@ -30,7 +30,26 @@ export interface Written {
  */
 export type WriteRefusal =
   | { readonly why: "invalid"; readonly detail: string }
-  | { readonly why: "not_found"; readonly detail?: string };
+  | { readonly why: "not_found"; readonly detail?: string }
+  | { readonly why: "vault_only"; readonly detail: string };
+
+/**
+ * ⚠️ A VAULT-BACKED VALUE NEVER REACHES A PRODUCT COLUMN, AND THIS IS THE ONLY
+ * THING THAT SAYS SO. The kernel refuses a manifest that keeps a special
+ * category outside the vault, so the DECLARATION is safe — and the declaration
+ * was the whole of the protection: the generated write bound every checked value
+ * to a column of the same name, `vault: true` included. A field marked as the
+ * one thing an app may not keep would have been kept, in plaintext, outside
+ * consent, outside the record of who looked, and outside crypto-shredding, with
+ * every guard and every test green.
+ *
+ * ⚠️ IT IS REFUSED RATHER THAN DROPPED. Silently discarding it would answer 200
+ * to somebody who typed something private and believed it was saved, which is
+ * the worse of the two failures — and after stage 26 this is where the value is
+ * handed to `keep` instead, so a refusal now is the same seam as the write then.
+ */
+const vaultBacked = (spec: CollectionSpec, values: Record<string, unknown>): readonly string[] =>
+  Object.keys(values).filter((name) => spec.fields[name]?.vault);
 
 /**
  * ⚠️ VALIDATED AT THE ONE PLACE THAT VALIDATES. The declaration is a literal a
@@ -47,6 +66,12 @@ export async function put(
 ): Promise<Written | WriteRefusal> {
   const checked = checkAll(spec.fields, values);
   if (!checked.ok) return { why: "invalid", detail: checked.why };
+
+  const held = vaultBacked(spec, checked.values);
+  if (held.length) {
+    return { why: "vault_only",
+      detail: `${held.join(", ")} belongs in the vault and there is no route to it yet (stage 26)` };
+  }
 
   const erase = eraseBy(spec);
   const id = newId(spec.id.replace(/-/g, "_"), now);
@@ -100,6 +125,12 @@ export async function patch(
 
   const checked = checkSome(spec.fields, wanted);
   if (!checked.ok) return { why: "invalid", detail: checked.why };
+
+  const held = vaultBacked(spec, checked.values);
+  if (held.length) {
+    return { why: "vault_only",
+      detail: `${held.join(", ")} belongs in the vault and there is no route to it yet (stage 26)` };
+  }
 
   const names = Object.keys(checked.values);
   /* ⚠️ An edit that changes nothing still stamps the provenance: somebody

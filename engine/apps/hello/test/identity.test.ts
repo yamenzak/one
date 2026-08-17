@@ -478,6 +478,32 @@ describe("a person's own records", () => {
     expect(boss_.items).toHaveLength(0);
   });
 
+  /*
+    ⚠️ A VAULT-BACKED VALUE NEVER REACHES A PRODUCT COLUMN, PROVEN THROUGH THE
+    REAL WRITE. The kernel refuses a MANIFEST that keeps a special category
+    outside the vault, and that refusal was the whole of the protection: the
+    generated write bound every checked value to a column of the same name,
+    `vault: true` included. So the one field an app may not keep would have been
+    kept — in plaintext, outside consent, outside the record of who looked, and
+    outside crypto-shredding — with every guard and every test green.
+
+    ⚠️ AND IT IS REFUSED, NOT DROPPED. Discarding it silently would answer 200 to
+    somebody who typed something private and believed it was saved.
+  */
+  it("refuses a vault-backed value rather than writing it to a column", async () => {
+    const { theirs } = await workspace();
+
+    const wrote = await post("northwind", "/api/check-in.create",
+      { week, went: "hard", struggling: "Not sleeping." }, theirs);
+    expect(wrote.status).toBe(400);
+    expect(JSON.stringify(await wrote.json())).toContain("struggling");
+
+    /* And nothing was written — a refusal that half-applied would be worse. */
+    const mine = await get("northwind", "/api/check-in.list", theirs)
+      .then((r) => r.json()) as { items: unknown[] };
+    expect(mine.items).toHaveLength(0);
+  });
+
   it("lets somebody who holds the review key read the team's, and nobody else", async () => {
     const { boss, theirs } = await workspace();
     await post("northwind", "/api/check-in.create", { week, went: "hard" }, theirs);

@@ -356,7 +356,7 @@ export async function performOperation(
     email: who.email ?? null,
     allowance: (key: string) =>
       (located.entitlements ?? []).find((e) => e.key === key)?.value ?? false,
-    fail: (code, values) => { throw new Refused(problem(catalog, code, values)); },
+    fail: (code, values, extra) => { throw new Refused(problem(catalog, code, values, extra)); },
   };
 
   try {
@@ -424,7 +424,7 @@ async function answerPersonal(
     issue: (next: Session | null) => {
       cookie = next ? setCookie(next.id, wiring.roots.root) : clearCookie(wiring.roots.root);
     },
-    fail: (code, values) => { throw new Refused(problem(catalog, code, values)); },
+    fail: (code, values, extra) => { throw new Refused(problem(catalog, code, values, extra)); },
   };
 
   try {
