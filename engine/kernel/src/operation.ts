@@ -285,8 +285,4 @@ export function unreachable(
     .map((o) => `${o.id} needs "${String(o.permission)}", which no role and no personal set holds`);
 }
 
-/** Fields an app must declare on its input for the platform to fill them. */
-/* DEFER(engine-34) stage:34 — the platform fills declared inputs by walking the fields directly. */
-export const inputNames = (fields: Fields): readonly string[] => Object.keys(fields);
-
 export type { FieldSpec };

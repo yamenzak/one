@@ -148,9 +148,6 @@ export interface Tenant {
  */
 export type Kind = "personal" | "commercial";
 
-/* DEFER(engine-34) stage:34 — the kind union is used as a type; nothing iterates the list. */
-export const KINDS: readonly Kind[] = ["personal", "commercial"];
-
 /**
  * ⚠️ ONE WAY, AND ASKED RATHER THAN REMEMBERED. Every write of `kind` goes
  * through this, so "commercial is permanent" is a property of the code instead

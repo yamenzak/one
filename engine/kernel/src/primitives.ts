@@ -36,7 +36,13 @@ export type Day = string & { readonly [BRAND]: "day" };
 export const instant = (at: Date | string = new Date()): Instant =>
   (typeof at === "string" ? new Date(at) : at).toISOString() as Instant;
 
-/* DEFER(engine-34) stage:34 — days are carried from the device already formatted. */
+/**
+ * ⚠️ THE DAY OUT OF AN INSTANT, AND IT IS A FUNCTION SO IT IS NOT WRITTEN TWICE.
+ * `at.slice(0, 10)` is correct and looks like a typo, so it gets copied into
+ * screens with a different length by somebody who assumed it was arbitrary — and
+ * a column headed "Written" showing milliseconds is four times the width of the
+ * thing beside it.
+ */
 export const dayOf = (at: Instant): Day => at.slice(0, 10) as Day;
 
 /**
@@ -73,9 +79,6 @@ export const newSessionId = (at?: Date): SessionId => newId("ses", at) as string
  * error, a warning or a brand accent.
  */
 export type Tone = "neutral" | "info" | "success" | "warning" | "danger";
-
-/* DEFER(engine-34) stage:34 — the tone union is used as a type; nothing iterates the list. */
-export const TONES: readonly Tone[] = ["neutral", "info", "success", "warning", "danger"];
 
 /* ------------------------------------------------------------------ text --- */
 

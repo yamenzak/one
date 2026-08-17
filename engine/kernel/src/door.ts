@@ -107,6 +107,4 @@ export function doorFor(host: string, roots: Roots): Door {
   return { kind: "none" };
 }
 
-/** ⚠️ Where a request that resolves no tenancy may still be answered. */
-/* DEFER(engine-34) stage:34 — the doors are matched by kind at each site; nothing asks this question by name. */
-export const needsTenant = (door: Door): boolean => door.kind === "tenant";
+

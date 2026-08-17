@@ -182,7 +182,7 @@
     {
       "n": 34,
       "title": "The kernel's remaining conveniences are each used by a lane or removed",
-      "status": "planned"
+      "status": "shipped"
     },
     {
       "n": 35,
@@ -213,6 +213,16 @@
       "n": 40,
       "title": "An app ships a screen — a product's browser half is a chunk of its own, loaded when its workspace opens it, drawing that workspace's own records through the door it is handed",
       "status": "shipped"
+    },
+    {
+      "n": 41,
+      "status": "planned",
+      "title": "A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have"
+    },
+    {
+      "n": 42,
+      "status": "planned",
+      "title": "A screen asks the gate before it draws a control, rather than after it is pressed"
     }
   ]
 }

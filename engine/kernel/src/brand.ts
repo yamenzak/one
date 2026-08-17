@@ -118,7 +118,11 @@ export const brandableOn = (def: WhitelabelDef, allowed: boolean): readonly Surf
  * this per screen is how one product ends up branded and the next one beside it
  * is not, on the same workspace, with nobody able to say why.
  */
-/* DEFER(engine-34) stage:34 — the intersection is answered per workspace by `brand.read`, which reads the stored list; this narrows it by what an APP has, and no caller passes an app yet. */
+/* DEFER(engine-41) stage:41 — NOTHING PAINTS A SURFACE YET. The editor stores
+   which surfaces a workspace picked and `brand.read` answers what its products
+   offer, but no screen, letter or sign-in page reads the picks to decide whether
+   to wear the brand — so the switches save and change nothing. This is the
+   intersection that decision needs. */
 export const brandedSurfaces = (
   def: WhitelabelDef, branding: Branding | null, allowed: boolean,
 ): readonly Surface[] =>

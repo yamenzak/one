@@ -335,25 +335,25 @@ and a manifest that does not compose refuses to boot.
 <!-- generated: node scripts/inventory.mjs declares -->
 | Module | What it is for | Ships | Waiting |
 |---|---|---|---|
-| `primitives` | ids, days, instants, slugs — the words everything else is spelled in | 10 | 2 |
+| `primitives` | ids, days, instants, slugs — the words everything else is spelled in | 9 | — |
 | `infra` | what a product needs underneath it, and what each kind can promise | 10 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 8 | — |
 | `collection` | what a thing an app keeps is — and the six operations it gets for free | 13 | — |
-| `operation` | one declaration carrying every cross-cutting concern (D12) | 10 | 1 |
+| `operation` | one declaration carrying every cross-cutting concern (D12) | 9 | — |
 | `access` | permissions, roles, and what an app may never claim | 15 | 1 |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
 | `manifest` | the whole app, and the composition that refuses a broken one | 9 | — |
-| `entitlement` | what a plan includes, and the allowance algebra over it | 7 | 1 |
+| `entitlement` | what a plan includes, and the allowance algebra over it | 6 | — |
 | `credit` | metered work: the reserve, the rate, the ceiling | 7 | 1 |
 | `dunning` | the ladder from past due to erased | 5 | — |
 | `package` | a priced bundle of timed grants | 8 | 1 |
-| `tenancy` | workspaces, kinds, shards, placement, standing | 12 | 1 |
-| `door` | the five doors, and which host is which | 3 | 1 |
+| `tenancy` | workspaces, kinds, shards, placement, standing | 11 | — |
+| `door` | the five doors, and which host is which | 2 | — |
 | `setting` | a switch a workspace owns, and the page it lives on | 10 | 1 |
 | `flag` | a switch WE own, with a date it stops being one | 7 | — |
 | `notify` | what somebody is told, through which channel, and who may narrow it | 12 | 1 |
 | `problem` | the one refusal shape, and the platform's own catalogue | 6 | — |
-| `tone` | the voice — the rules a written string has to pass | 2 | 1 |
+| `tone` | the voice — the rules a written string has to pass | 1 | — |
 | `vault` | the facts that are not an app's to keep (D11) | 8 | — |
 | `legal` | documents, purposes, sub-processors, the record of processing | 5 | — |
 | `guide` | help, onboarding, the milestones a workspace passes | 5 | — |
@@ -364,7 +364,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**214 of them**, 199 reached by something today.
+**208 of them**, 200 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -785,18 +785,12 @@ nothing yet.
 | **27** — The AI lane runs — an action reaches a provider and the reserve settles | `kernel/src/credit.ts` | 1 |
 | **27** — The AI lane runs — an action reaches a provider and the reserve settles | `runtime/src/services.ts` | 1 |
 | **33** — A guard refuses a declared setting nothing names — the seam a handler reads one through is live; the completeness check over it is not | `kernel/src/setting.ts` | 1 |
-| **34** — The kernel's remaining conveniences are each used by a lane or removed | `kernel/src/brand.ts` | 1 |
-| **34** — The kernel's remaining conveniences are each used by a lane or removed | `kernel/src/door.ts` | 1 |
-| **34** — The kernel's remaining conveniences are each used by a lane or removed | `kernel/src/entitlement.ts` | 1 |
-| **34** — The kernel's remaining conveniences are each used by a lane or removed | `kernel/src/gate.ts` | 1 |
-| **34** — The kernel's remaining conveniences are each used by a lane or removed | `kernel/src/operation.ts` | 1 |
-| **34** — The kernel's remaining conveniences are each used by a lane or removed | `kernel/src/primitives.ts` | 2 |
-| **34** — The kernel's remaining conveniences are each used by a lane or removed | `kernel/src/tenancy.ts` | 1 |
-| **34** — The kernel's remaining conveniences are each used by a lane or removed | `kernel/src/tone.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `kernel/src/package.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `runtime/src/jobs.ts` | 1 |
+| **41** — A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have | `kernel/src/brand.ts` | 1 |
+| **42** — A screen asks the gate before it draws a control, rather than after it is pressed | `kernel/src/gate.ts` | 1 |
 
-**24 declarations** are built and reached by nothing, each waiting on a
+**17 declarations** are built and reached by nothing, each waiting on a
 stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one
 that names no stage, so this list cannot grow by forgetting.
 <!-- /generated -->
@@ -839,15 +833,17 @@ that names no stage, so this list cannot grow by forgetting.
 | 31 | Account security — sign out everywhere, and proving it is you again before something irreversible | shipped |
 | 32 | A manifest changes while the deployment is up, and the composed surface forgets | shipped |
 | 33 | A guard refuses a declared setting nothing names — the seam a handler reads one through is live; the completeness check over it is not | **planned** |
-| 34 | The kernel's remaining conveniences are each used by a lane or removed | **planned** |
+| 34 | The kernel's remaining conveniences are each used by a lane or removed | shipped |
 | 35 | A workspace runs its own retention ladder against its own customers, and ours freezes it | **planned** |
 | 36 | The deployment provisions itself — a product declares what it needs underneath it, and the reconciler makes it exist in the right jurisdiction, binds it, and reaps it after a drain | shipped |
 | 37 | A workspace's records change shard, which is the only way its jurisdiction can — read-only while it copies, verified before it flips, and the source drained rather than emptied | shipped |
 | 38 | A notification leaves the process — Web Push written out rather than depended on, a subscription filed under the door it was made at so it wears that workspace's own icon, and a keypair the console generates and never accepts | shipped |
 | 39 | The documentation is two generated pages — what exists, derived from the engine; and how to add to it, which no generator can derive | shipped |
 | 40 | An app ships a screen — a product's browser half is a chunk of its own, loaded when its workspace opens it, drawing that workspace's own records through the door it is handed | shipped |
+| 41 | A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have | **planned** |
+| 42 | A screen asks the gate before it draws a control, rather than after it is pressed | **planned** |
 
-**32 shipped, 8 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**33 shipped, 9 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

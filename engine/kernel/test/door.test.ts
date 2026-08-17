@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { doorFor, needsTenant } from "../src/door.js";
+import { doorFor } from "../src/door.js";
 
 const ROOTS = { root: "one.4dl.app" };
 
@@ -88,10 +88,5 @@ describe("everything else", () => {
 
   it("ignores a port", () => {
     expect(doorFor("northwind.one.4dl.app:8787", ROOTS).kind).toBe("tenant");
-  });
-
-  it("says which doors resolve a workspace at all", () => {
-    expect(needsTenant(doorFor("northwind.one.4dl.app", ROOTS))).toBe(true);
-    expect(needsTenant(doorFor("admin.one.4dl.app", ROOTS))).toBe(false);
   });
 });

@@ -160,6 +160,4 @@ export function refuseCopy(voice: Voice, text: string): readonly CopyRefusal[] {
   return out;
 }
 
-/** ⚠️ For the places that only need a yes or no — the rules stay in one place. */
-/* DEFER(engine-34) stage:34 — the guard wants the refusals, not the boolean. */
-export const copyOk = (voice: Voice, text: string): boolean => refuseCopy(voice, text).length === 0;
+

@@ -27,7 +27,7 @@
 
 import * as React from "react";
 import { ready, trouble, waiting, type Loaded } from "@engine/design";
-import type { Problem } from "@engine/kernel";
+import { dayOf, type Instant, type Problem } from "@engine/kernel";
 import { HELLO } from "../index.js";
 import { Notes } from "./Notes.js";
 import type { Note as Shown } from "./sample.js";
@@ -98,8 +98,11 @@ const asShown = (row: Record<string, unknown>): Shown => ({
      foot reads "12 min · <this>", so a full ISO timestamp with milliseconds on
      it is four times the width of the thing beside it and answers a question
      nobody asked. Caught in a photograph — every suite passed it, because a
-     string is a string. */
-  at: String(row.at ?? "").slice(0, 10),
+     string is a string.
+
+     ⚠️ AND IT IS THE KERNEL'S `dayOf`, NOT A SLICE. `slice(0, 10)` is correct
+     and looks arbitrary, which is how it gets copied with a different length. */
+  at: row.at ? dayOf(String(row.at) as Instant) : "",
   published: row.pinned === 1 || row.pinned === true,
   pinned: row.pinned === 1 || row.pinned === true,
   kind: (["idea", "decision", "question", "record"].includes(String(row.kind))
