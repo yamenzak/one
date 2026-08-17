@@ -2,7 +2,7 @@
  * A SCREEN IS A DECLARATION, NOT A LAYOUT.
  *
  * ⚠️ THE FAULT THIS EXISTS TO REMOVE IS NOT UGLINESS, IT IS DRIFT. Every screen
- * in the hub hand-assembled the same five decisions — which column width, which
+ * in OneSpace hand-assembled the same five decisions — which column width, which
  * skeleton, what "nothing here" says, where the one action goes, how the content
  * arrives — and each got most of them right and one of them wrong. Nobody can
  * point at the file that is wrong, because none of them is: the product is
@@ -184,7 +184,7 @@ export interface LayoutProps {
    * THE ONE THING THIS PAGE IS ABOUT — AND IT DECIDES THREE THINGS AT ONCE.
    *
    * ⚠️ THAT IS THE WHOLE OF LAYOUTS 2.0, AND IT IS A FIX RATHER THAN A
-   * CONVENIENCE. The hub used to compute the ground, the hero face and the
+   * CONVENIENCE. The OneSpace used to compute the ground, the hero face and the
    * density in three separate expressions from the same slug, each of which had
    * to agree with the other two and none of which could tell when it did not.
    * From one declaration: the ground is this subject's own world (`worldFor`),
@@ -206,7 +206,7 @@ export interface LayoutProps {
   readonly density?: Density;
   readonly tone?: Tone;
   /**
-   * ⚠️ ABSENT WHERE THE SCREEN IS ITS OWN HEADING — the hub's root is a face, an
+   * ⚠️ ABSENT WHERE THE SCREEN IS ITS OWN HEADING — OneSpace's root is a face, an
    * address and a list, and a display title over it names a screen the face has
    * already named.
    */

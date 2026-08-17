@@ -276,7 +276,7 @@ export interface Scene {
 export const DENSITY = {
   /** A screen with rows, tables, a form. The world is present, not busy. */
   quiet: 0.45,
-  /** The default: a detail page, a hub, a settings surface. */
+  /** The default: a detail page, a OneSpace, a settings surface. */
   even: 1,
   /** An arrival, an empty state, a door — nothing competing. */
   rich: 1.8,

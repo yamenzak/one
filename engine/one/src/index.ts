@@ -130,7 +130,7 @@ const LEGAL: DeploymentLegal = {
       id: "cloudflare", name: "Cloudflare, Inc.", country: "US",
       role: "Runs the application and stores its records and files.",
       receives: ["none", "sensitive"],
-      url: "https://www.cloudflare.com/trust-hub/gdpr/",
+      url: "https://www.cloudflare.com/trust-OneSpace/gdpr/",
     }),
   },
 };
@@ -349,7 +349,7 @@ const handler = (env: Env) => {
 
   /*
     ⚠️ WHO RUNS THE DEPLOYMENT, DECIDED ONCE. The console is behind it and the
-    hub draws the operator's place from it, and two copies of this rule is how
+    OneSpace draws the operator's place from it, and two copies of this rule is how
     a place gets drawn over a console that then refuses every call. The
     development fallback admits the signed-in developer and NOBODY in
     production — an empty allow-list on a live deployment is unconfigured, not
@@ -454,7 +454,7 @@ const handler = (env: Env) => {
              log is a session anybody with dashboard access can take. */
           console.log(`[sign-in] ${to} → ${code}`);
         },
-        /* ⚠️ The same allow-list the console is behind (D18) — the hub draws
+        /* ⚠️ The same allow-list the console is behind (D18) — OneSpace draws
            the operator's place from this, and a place drawn over nothing is a
            promise the next screen takes back. */
         isOperator,

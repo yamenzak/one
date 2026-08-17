@@ -1,5 +1,5 @@
 /**
- * THE HUB'S HOME — who you are, then everywhere you can go.
+ * THE SPACE'S HOME — who you are, then everywhere you can go.
  *
  * ⚠️ IT WAS THREE ENORMOUS CARDS AND THAT WAS THE WRONG DENSITY FOR A DAILY
  * SURFACE. Each place carried a name, a sentence describing it and a fact —
@@ -28,10 +28,10 @@ import { Group, Identity, NavRow, Stack, glyphOf, whoFace } from "@engine/design
 import type { Me } from "../api.js";
 import { useLoad, type InboxView } from "../centre/data.js";
 import { useSession } from "../session.js";
-import { hubAt, operatorUrl } from "../door.js";
+import { spaceAt, operatorUrl } from "../door.js";
 import { nameOf, pathOf, type Where } from "./where.js";
 
-export function HubHome({ person, onGo }: {
+export function SpaceHome({ person, onGo }: {
   readonly person: Me | null;
   readonly onGo: (to: Where) => void;
 }) {
@@ -39,10 +39,10 @@ export function HubHome({ person, onGo }: {
   const inbox = useLoad<InboxView>("inbox.list");
 
   /* ⚠️ The console answers on the operator door and nowhere else (D18), so
-     from anywhere else this travels — see `hubAt`. */
+     from anywhere else this travels — see `spaceAt`. */
   const console_ = () => {
     if (where?.kind === "operator") { onGo({ at: "console" }); return; }
-    if (where) location.assign(hubAt(operatorUrl(where, location), pathOf({ at: "console" })));
+    if (where) location.assign(spaceAt(operatorUrl(where, location), pathOf({ at: "console" })));
   };
 
   /* ⚠️ `null` until the answer arrives, and nothing is claimed in the meantime —

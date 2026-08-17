@@ -72,7 +72,7 @@ of the machinery exists and the failure to avoid is building it twice.
 3. **There is no per-action AI binding.** The catalogue and lanes exist; an
    operation that uses AI names credits, but which model answers which
    operation — and what the prompt says — is not declared or operable.
-4. **The tenant centre does not exist.** The Hub is the signpost/sign-in/
+4. **The tenant centre does not exist.** The OneSpace is the signpost/sign-in/
    workspace-list; the surface BEHIND a workspace's door — the shell with the
    router, the app switcher, People, Money, Settings, Data — is the missing
    application (PROGRESS outstanding #3).
@@ -251,7 +251,7 @@ you belong to, leaving one, closing your account, account-wide export. It
 STAYS thin on purpose — preferences, consent and inboxes are per-workspace
 facts and live behind the workspace's own door (PROGRESS explains why).
 
-### 4.2 `<slug>.` — the tenant centre (NEW: this is the Hub rebuilt)
+### 4.2 `<slug>.` — the tenant centre (NEW: this is the OneSpace rebuilt)
 
 One shell behind a workspace's own address, and the first OneEngine surface that
 needs a real router. Five fixed areas (D10), then the apps:
@@ -333,7 +333,7 @@ doing its job.
 |---|---|---|
 | 12 | **Access, multi-app** | a platform role + a role per app on one membership; `identify` resolves against the operation's own app; seats count platform staff; custom roles per app. The `apps[0]` bug dies here. |
 | 13 | **The package rail** | package = priced bundle of timed grants; purchase ledger; one resolver (role ∪ live grants − revoked); the lifecycle ladder with a destructive floor; guards: a package cannot sell what cannot be delivered, a lapsed grant cannot count, a repeat purchase extends and never stacks. |
-| 14 | **The tenant centre** | the shell with the router: five areas + app screens inside; the app switcher; Home/People/Money/Settings/Data & Trust assembled from the existing surface components. The Hub's sign-in/workspace-list becomes the door INTO it. |
+| 14 | **The tenant centre** | the shell with the router: five areas + app screens inside; the app switcher; Home/People/Money/Settings/Data & Trust assembled from the existing surface components. The OneSpace's sign-in/workspace-list becomes the door INTO it. |
 | 15 | **The operator console** | the same shell on `admin.`: tenants, catalogue, adjustments, flags, jobs, shards, maintenance. |
 | 16 | **AI actions** | `ai:` on operations; model bindings per action; prompt letterheads with the two-level override; reserve from the bound model. |
 

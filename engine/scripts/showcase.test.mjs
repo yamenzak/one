@@ -113,12 +113,12 @@ const drawnBy = (name) => {
  * remembered.
  */
 const ELSEWHERE = {
-  /* --- the account and the operator console, which are the hub's --- */
-  Wallet: "the credit balance is the hub's Money area; nothing there mounts it yet",
-  MyData: "export and erase your account — the hub's You area, unmounted",
-  WhoLooked: "who read a vault field — the hub's Trust area, unmounted",
+  /* --- the account and the operator console, which are OneSpace's --- */
+  Wallet: "the credit balance is OneSpace's Money area; nothing there mounts it yet",
+  MyData: "export and erase your account — OneSpace's You area, unmounted",
+  WhoLooked: "who read a vault field — OneSpace's Trust area, unmounted",
   ConsentSheet: "a purpose grant — spawned by an app that holds a sensitive field, and none does",
-  Ropa: "the processing record — the hub's Trust area, unmounted",
+  Ropa: "the processing record — OneSpace's Trust area, unmounted",
   AiLanes: "which model runs which lane — the operator console, unmounted",
 
   /* --- arguments, not gaps --- */
@@ -129,7 +129,7 @@ const ELSEWHERE = {
     "has one ancestor, and the crown's back button is what says so — inventing a " +
     "middle level to give a component somewhere to live is how chrome accumulates",
   SecretInput: "nothing an APP stores is a credential — the kernel has no `secret` " +
-    "field kind, and the keys an operator pastes are the console's, which is the hub's",
+    "field kind, and the keys an operator pastes are the console's, which is OneSpace's",
 
 };
 

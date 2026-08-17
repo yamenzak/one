@@ -92,7 +92,7 @@ export function Section(
  * THE NAME OF ONE OF SEVERAL — or nothing, when it is the only one.
  *
  * ⚠️ A HEADING EXISTS TO SEPARATE, SO ONE THING NEEDS NONE. Every screen in the
- * hub loops the workspace's products and heads each block with the product's
+ * OneSpace loops the workspace's products and heads each block with the product's
  * name; on a workspace with ONE product that name distinguishes it from nothing
  * and is read before every screen, under two headings that already scoped it.
  * The same block with two products needs it badly, which is why this is a

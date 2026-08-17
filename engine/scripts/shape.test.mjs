@@ -79,7 +79,7 @@ const NOT_A_SCREEN = new Set([
   "one-space/src/screens/Gallery.tsx",
   "one-space/src/screens/Specimens.tsx",
   "one-space/src/App.tsx",
-  "one-space/src/hub/Hub.tsx",
+  "one-space/src/space/OneSpace.tsx",
   "one-space/src/centre/AppSurface.tsx",
   "one-space/src/centre/Product.tsx",
   "one-space/src/centre/Choose.tsx",

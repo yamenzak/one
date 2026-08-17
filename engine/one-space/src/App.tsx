@@ -1,7 +1,7 @@
 /**
- * WHAT THIS PAGE IS — the door decides, and the hub is over all of it.
+ * WHAT THIS PAGE IS — the door decides, and OneSpace is over all of it.
  *
- * ⚠️ THE HUB IS NOT A DOOR. It is a surface presented over whatever somebody
+ * ⚠️ THE SPACE IS NOT A DOOR. It is a surface presented over whatever somebody
  * was doing, reachable from every one of them: who you are, everywhere you
  * belong, and — for the few who hold it — the deployment itself. It used to be
  * an app per door with a nav bar of its own, so a person's account lived on one
@@ -9,10 +9,10 @@
  * third, each with a permanent bar over it announcing four places they visit
  * twice a year.
  *
- * ⚠️ SO EVERY DOOR ANSWERS `/hub`, AND WHAT IS UNDERNEATH DIFFERS. On a
- * workspace's own address the product is underneath and the hub dismisses back
+ * ⚠️ SO EVERY DOOR ANSWERS `/space`, AND WHAT IS UNDERNEATH DIFFERS. On a
+ * workspace's own address the product is underneath and OneSpace dismisses back
  * onto it; on the account and operator doors there is nothing underneath and
- * the hub IS the page, which is why it is handed no way out there.
+ * OneSpace IS the page, which is why it is handed no way out there.
  *
  * ⚠️ AND THE PICK IS A PURE FUNCTION, so it is a test rather than a click
  * through five hostnames. The bug it exists to catch is a state that resolves to
@@ -30,8 +30,8 @@ import { useSession } from "./session.js";
 import { useTravel } from "./nav.js";
 import type { Face } from "./door.js";
 import { Product } from "./centre/Product.js";
-import { Hub } from "./hub/Hub.js";
-import { HUB, inHub, pathOf } from "./hub/where.js";
+import { OneSpace } from "./space/OneSpace.js";
+import { SPACE, inSpace, pathOf } from "./space/where.js";
 import { Agreements } from "./screens/Agreements.js";
 import { Elsewhere } from "./screens/Elsewhere.js";
 import { NewWorkspace } from "./screens/NewWorkspace.js";
@@ -55,7 +55,7 @@ const Ground = import.meta.env.DEV
 
 /** What the page shows, as a name — the thing the guard and the tests read. */
 export type Screen =
-  | "waiting" | "stuck" | "signpost" | "sign-in" | "agreements" | "hub" | "new-workspace"
+  | "waiting" | "stuck" | "signpost" | "sign-in" | "agreements" | "space" | "new-workspace"
   | "product" | "elsewhere" | "ground";
 
 /**
@@ -88,7 +88,7 @@ export function pickScreen(
   if (signedIn === null) return "waiting";
   if (!signedIn) return "sign-in";
   /*
-    ⚠️ ABOVE THE PRODUCT AND ABOVE THE HUB, AND NOT ABOVE SIGNING IN. Nobody can
+    ⚠️ ABOVE THE PRODUCT AND ABOVE THE SPACE, AND NOT ABOVE SIGNING IN. Nobody can
     agree to anything before we know who they are — and the wall is not a door,
     so it comes after every door has been decided. The three ways out of it live
     on the screen itself (`Agreements`): read, take a copy, delete.
@@ -97,9 +97,9 @@ export function pickScreen(
   if (face === "centre") return "product";
   if (face === "create") return "new-workspace";
   /* ⚠️ THE ACCOUNT DOOR AND THE OPERATOR DOOR ARE THE SAME PAGE. Both are the
-     hub with nothing underneath; what an operator holds is a place ON it, not a
-     product of its own — see `hub/Console.tsx`. */
-  return "hub";
+     OneSpace with nothing underneath; what an operator holds is a place ON it, not a
+     product of its own — see `space/Console.tsx`. */
+  return "space";
 }
 
 /*
@@ -129,7 +129,7 @@ export function App() {
      proves one WAS, which is a different claim and the only one worth making. */
   /* ⚠️ `?ground` ALONE LANDS ON THE APP'S FIRST SCREEN, never on a bare one. It
      used to fall through to the deployment's own frame with a screen dropped in
-     it — the hub's crown over a product's page, which is a layout no deployment
+     it — OneSpace's crown over a product's page, which is a layout no deployment
      serves and therefore a layout nobody was testing. */
   /* ⚠️ THE ROUTE IS NOT VALIDATED AGAINST THE APP HERE, because knowing the
      app's routes would mean importing it. `Ground` renders an honest notice for
@@ -145,7 +145,7 @@ export function App() {
 
   /*
     ⚠️ THE WALL, AND THE DOORS IN IT ARE ON THE SAME SCREEN. Sending somebody to
-    the hub for their copy would open every other screen in it — a workspace's
+    OneSpace for their copy would open every other screen in it — a workspace's
     roster, its bill, its settings — and every operation behind those is behind
     the wall, so each would refuse with a status the screen has no reason to
     expect. What stays open is exactly what `beforeAccepting` marks open, and
@@ -155,13 +155,13 @@ export function App() {
     return <><NoticeHost /><Agreements owed={me.owed ?? []} /></>;
   }
 
-  /* ⚠️ The hub is the whole page here: the account door and the operator door
+  /* ⚠️ The OneSpace is the whole page here: the account door and the operator door
      have nothing underneath, so it is handed no way out. */
-  if (screen === "hub") {
-    return <><NoticeHost /><Hub path={path} onGo={go} onClose={null} /></>;
+  if (screen === "space") {
+    return <><NoticeHost /><OneSpace path={path} onGo={go} onClose={null} /></>;
   }
 
-  /* ⚠️ A workspace's own address is the PRODUCT, with the hub pulled over it —
+  /* ⚠️ A workspace's own address is the PRODUCT, with OneSpace pulled over it —
      and the product does not move while it is open (`beneath`). */
   if (screen === "product") {
     return (
@@ -170,11 +170,11 @@ export function App() {
         <Product
           path={beneath}
           onGo={go}
-          onOpenHub={() => go(HUB)}
+          onOpenSpace={() => go(SPACE)}
           onOpenInbox={() => go(pathOf({ at: "inbox" }))}
         />
-        {inHub(path)
-          ? <Hub path={path} onGo={go} onClose={() => go(beneath)} />
+        {inSpace(path)
+          ? <OneSpace path={path} onGo={go} onClose={() => go(beneath)} />
           : null}
       </>
     );
@@ -198,7 +198,7 @@ export function App() {
     own heading. It reads as a vignette for a chrome that is not there, which is
     what it was.
 
-    ⚠️ IT IS THE HUB THAT MOUNTS THE SHELL, NOT THE APP — the same call
+    ⚠️ IT IS THE SPACE THAT MOUNTS THE SHELL, NOT THE APP — the same call
     `centre/Product.tsx` makes for a real product, with the same manifest. An app
     that brought its own chrome would be an app that could get it wrong.
   */
@@ -220,7 +220,7 @@ export function App() {
   /*
     ⚠️ A DOOR IS THE PAGE, AND THAT IS WHY IT IS NOT IN THE FRAME BELOW. These
     three screens brought their own `Arrival` — mark, name, one claim, one
-    action, the ambience full-bleed. Sitting them inside the Hub's crown put the
+    action, the ambience full-bleed. Sitting them inside OneSpace's crown put the
     product's name on the screen twice and the raw hostname under it, which is
     the first thing anybody ever sees of this product.
   */
@@ -248,7 +248,7 @@ export function App() {
     <Layout subject={ONE_FACE}>
       <NoticeHost />
       {/* ⚠️ THE LEAD IS THE ACCOUNT AND THERE IS NOWHERE FOR IT TO GO — this
-          IS the hub, so the face is a face rather than a button (`who` with no
+          IS OneSpace, so the face is a face rather than a button (`who` with no
           `onOpen`). The email it used to carry as an `aside` is what the face
           says now; the address under the name is the deployment's. */}
       <Crown
@@ -256,6 +256,11 @@ export function App() {
           ? { name: me.email ?? "You", face: whoFace(me.accountId) }
           : undefined}
         name="One"
+        /* ⚠️ THE ONLY CROWN THAT WEARS THE LOGO, and the mark rather than the
+           lockup — the name is already beside it. Every other crown in the
+           product names a workspace, where our mark would sit over somebody
+           else's brand. */
+        mark="one"
         width="read"
       />
       <Band width="read">

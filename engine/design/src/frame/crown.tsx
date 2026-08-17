@@ -26,6 +26,7 @@ import type { Width } from "../tokens/metrics.js";
 export { CROWN };
 import { MOTION, transition, useStill } from "../tokens/motion.js";
 import { Face, type FaceOf } from "../parts/face.js";
+import { Mark, type MarkOf } from "./arrival.js";
 import { Hint, Pip } from "../parts/beside.js";
 import { Band, type Bleed } from "./page.js";
 import { Spacer } from "../parts/arrange.js";
@@ -135,7 +136,7 @@ const Back = () => (
 export interface CrownProps {
   /* ------------------------------------------------------------- the lead --- */
   /**
-   * WHOSE SCREEN THIS IS — the account, and it opens the hub.
+   * WHOSE SCREEN THIS IS — the account, and it opens OneSpace.
    *
    * ⚠️ IDENTITY OR A WAY OUT, NEVER BOTH, and the refusal is loud. A crown with
    * a face AND a back arrow has two leading controls of equal weight and no
@@ -170,6 +171,18 @@ export interface CrownProps {
    * field has neither of them wide enough to be either.
    */
   readonly name?: string;
+  /**
+   * THE LOGO, BEFORE THE NAME — the deployment's, or a product's.
+   *
+   * ⚠️ THE MARK ALONE, NEVER THE LOCKUP. A crown row is 44px and the name is
+   * already set beside it, so a wordmark here would be the same word twice at
+   * two sizes. The lockup is for a door, where the logo is the subject.
+   *
+   * ⚠️ AND ONLY WHERE THE SURFACE IS OURS. A workspace's crown says the
+   * workspace's name; stamping our mark on it would put our brand over
+   * somebody's own.
+   */
+  readonly mark?: MarkOf;
   /**
    * ⚠️ ONE LINE, AND ONLY WHERE IT SAYS SOMETHING THE NAME DOES NOT. A second
    * line in a 64px row is what turned the shell's crown into a block of text
@@ -249,7 +262,7 @@ export interface Slot {
 
 export function Crown({
   who, back, leave = "back", backLabel,
-  name, under, collapses = false, find,
+  name, mark, under, collapses = false, find,
   also = [], does, bleed = "hold", width = "read",
 }: CrownProps) {
   const past = useScrolledPast();
@@ -332,6 +345,11 @@ export function Crown({
                 transition: showName ? MOTION.enter : MOTION.exit,
               }}
             >
+              {/* ⚠️ `nav`, WHICH IS THE SMALLEST STEP, because the mark sits
+                  beside a 14px label rather than carrying the row. Sized up it
+                  becomes the subject of a header whose subject is where you
+                  are. It is decorative here — the name says it in words. */}
+              {mark ? <Mark of={mark} size="nav" /> : null}
               <span className="flex min-w-0 flex-col">
                 <strong className={`truncate ${TYPE.label}`}>{name}</strong>
                 {under ? <span className={`truncate ${TYPE.note}`}>{under}</span> : null}
@@ -500,7 +518,7 @@ export function crownFor(claim: CrownClaim | null, product: {
 }
 
 /**
- * ⚠️ A SOCKET IS OFFERED, NEVER REQUIRED. A `Screen` outside one — the hub, a
+ * ⚠️ A SOCKET IS OFFERED, NEVER REQUIRED. A `Screen` outside one — OneSpace, a
  * door, a presented surface — draws its own crown exactly as before, and this
  * whole mechanism is invisible to it.
  */
@@ -595,7 +613,7 @@ export function PageCrown({
    * ⚠️ A CROWN TAKES THE SHAPE OF WHAT IT CROWNS, AND THE DEFAULT IS ONLY A
    * DEFAULT. Edge-bled, the heading sits against the page's own gutter, which is
    * right over content that is also edge-bled. Over a HELD column it is wrong by
-   * however wide the screen is: the hub's crown put "Money" 240px to the left of
+   * however wide the screen is: OneSpace's crown put "Money" 240px to the left of
    * the bill it names, which reads as two pages sharing one scroll.
    */
   readonly bleed?: Bleed;

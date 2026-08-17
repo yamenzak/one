@@ -93,7 +93,7 @@ layering failure rather than a shortcut. A guard says so.
 <!-- generated: node scripts/inventory.mjs does -->
 | Module | What it is for | Ships | Waiting |
 |---|---|---|---|
-| `schema` | the composed schema runner — declarations become tables | 6 | — |
+| `schema` | the composed schema runner — declarations become tables | 7 | — |
 | `sql` | the one typed seam onto D1 | 4 | — |
 | `directory` | accounts, workspaces, placement, enablement, allowances | 25 | 3 |
 | `handles` | which binding holds which shard | 3 | — |
@@ -134,7 +134,7 @@ layering failure rather than a shortcut. A guard says so.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**235 of them**, 219 reached by something today.
+**236 of them**, 220 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

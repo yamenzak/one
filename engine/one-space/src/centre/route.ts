@@ -5,18 +5,18 @@
  * five fixed areas in a permanent bottom bar — people, money, settings, trust —
  * with the products filed underneath them, so the thing somebody came here to
  * use was one level down from four things they visit twice a year. Those four
- * are the hub's now (`hub/where.ts`), reached from anywhere, over anything.
+ * are OneSpace's now (`OneSpace/where.ts`), reached from anywhere, over anything.
  *
  * ⚠️ EVERY PATH RESOLVES TO SOMETHING. A path that resolves to nothing renders
  * a blank page, which is the same picture as a page that failed to load — so an
  * address nobody recognises lands where the person can see where they are.
  *
- * ⚠️ AND `/hub` IS NOT PARSED HERE. It is reserved on every door, decided one
+ * ⚠️ AND `/space` IS NOT PARSED HERE. It is reserved on every door, decided one
  * level up, so a product can never discover that one of its screens is
  * unreachable because the platform took the name.
  */
 
-import { inHub } from "../hub/where.js";
+import { inSpace } from "../space/where.js";
 
 export type Stop =
   /** No product open: the choice of which, or the reason there is none. */
@@ -32,9 +32,9 @@ export function parseStop(path: string, apps: readonly string[]): Stop {
   const [, head, ...rest] = clean.split("/");
 
   /* ⚠️ Refused here as well as decided one level up. An app id that collided
-     with the hub's prefix would make one of its screens unreachable, and its
+     with OneSpace's prefix would make one of its screens unreachable, and its
      author would find out from somebody who could not open it. */
-  if (head && !inHub(clean) && apps.includes(head)) {
+  if (head && !inSpace(clean) && apps.includes(head)) {
     return { kind: "app", app: head, route: `/${rest.join("/")}` };
   }
   if (clean === "/" && apps.length === 1 && apps[0]) {

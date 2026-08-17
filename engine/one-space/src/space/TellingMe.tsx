@@ -1,7 +1,7 @@
 /**
  * ⚠️ THE SEAM FOR "HOW YOU ARE TOLD", which needs a workspace's view to know
  * which products declare notifications — so it waits for the centre the same way
- * a workspace's own screens do, rather than the hub's frame knowing about it.
+ * a workspace's own screens do, rather than OneSpace's frame knowing about it.
  */
 
 import { Screen } from "@engine/design";

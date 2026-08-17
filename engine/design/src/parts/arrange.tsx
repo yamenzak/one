@@ -166,7 +166,7 @@ export function Center({ space = "roomy", children }: {
  * THE WAY OUT, AS A CHIP.
  *
  * ⚠️ EXTRACTED BECAUSE A SURFACE CAN NEED THE CONTROL WITHOUT THE HEADING. The
- * hub's root is an identity block — a face, an address, a list — and a display
+ * OneSpace's root is an identity block — a face, an address, a list — and a display
  * heading over it would be a second name for a screen the face already names.
  * It still needs the same × in the same place at the same size, and a second
  * copy of it drifts the day one of them gets a new size.

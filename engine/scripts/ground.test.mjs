@@ -338,8 +338,8 @@ if (!/`\.separator \{ background-color: color-mix\(in oklab, var\(--foreground\)
  * leaving that padding alone. Its own `.modal__container--full` zeroes padding
  * for exactly this reason; the dialog inside it was missed.
  *
- * ⚠️ THE HUB IS PRESENTED OVER A PRODUCT, so the same card was NARROWER inside
- * the hub than outside it on the same phone: 24 of dialog + 16 of gutter + 16 of
+ * ⚠️ THE SPACE IS PRESENTED OVER A PRODUCT, so the same card was NARROWER inside
+ * OneSpace than outside it on the same phone: 24 of dialog + 16 of gutter + 16 of
  * card, against the product's 16 + 16. A 390px screen gave 112px to nesting.
  */
 if (!/`\.modal__dialog--full \{ padding: 0; \}`/.test(GROUND_SRC)) {

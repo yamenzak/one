@@ -152,6 +152,58 @@ export interface Applied {
  * `pragma_table_info` for every table on every cold start would put a dozen
  * queries in front of every first request for no possible finding.
  */
+/**
+ * WHAT A MODULE'S OWN `CREATE TABLE` SAYS ITS TABLES HAVE.
+ *
+ * ⚠️ DERIVED, BECAUSE THE HAND-MAINTAINED MAP WAS EMPTY AND THE CONSEQUENCE WAS
+ * A DEAD DEPLOYMENT. `columns` is the list of columns to ADD to a table that
+ * already exists, and not one platform module declared it — so every column ever
+ * added to a hand-written `CREATE TABLE IF NOT EXISTS` reached fresh databases
+ * and no existing one. The create is a no-op where the table is there; there was
+ * no alter; and the first INSERT naming the new column threw
+ * `no such column`, out of `boot`, which answers every route 503.
+ *
+ * ⚠️ IT IS NOT "WHAT CHANGED", IT IS "WHAT THE TABLE HAS". An incremental list
+ * is one somebody has to remember to append to, and forgetting is silent until
+ * a database that predates the column meets a statement that names it. Reading
+ * the declaration means the two can never disagree.
+ *
+ * ⚠️ NOT-NULL AND PRIMARY-KEY COLUMNS ARE SKIPPED. SQLite refuses to ALTER one
+ * in without a default — existing rows have no value for it — and the refusal
+ * takes the whole batch with it. A column added later is nullable, always.
+ */
+export function columnsIn(module: SchemaModule): Record<string, Record<string, string>> {
+  const out: Record<string, Record<string, string>> = {};
+  for (const statement of module.statements) {
+    const made = /CREATE TABLE IF NOT EXISTS (\w+)\s*\(([\s\S]*)\)\s*;?\s*$/i.exec(statement.trim());
+    if (!made) continue;
+    const [, name, body] = made;
+
+    /* ⚠️ Split on top-level commas only: `PRIMARY KEY (a, b)` is one clause. */
+    const parts: string[] = [];
+    let depth = 0, at = 0;
+    for (let i = 0; i < body!.length; i++) {
+      const c = body![i];
+      if (c === "(") depth++;
+      else if (c === ")") depth--;
+      else if (c === "," && depth === 0) { parts.push(body!.slice(at, i)); at = i + 1; }
+    }
+    parts.push(body!.slice(at));
+
+    const cols: Record<string, string> = {};
+    for (const raw of parts) {
+      const part = raw.trim();
+      if (!part || /^(PRIMARY|UNIQUE|FOREIGN|CHECK|CONSTRAINT)\b/i.test(part)) continue;
+      const col = /^(\w+)\s+(TEXT|INTEGER|REAL|BLOB|NUMERIC)\b/i.exec(part);
+      if (!col) continue;
+      if (/\bNOT NULL\b/i.test(part) || /\bPRIMARY KEY\b/i.test(part)) continue;
+      cols[col[1]!] = col[2]!.toUpperCase();
+    }
+    if (Object.keys(cols).length) out[name!] = { ...out[name!], ...cols };
+  }
+  return out;
+}
+
 export async function applySchema(db: Db, modules: SchemaModules): Promise<readonly Applied[]> {
   await db.exec(MARKER.replace(/\n/g, " "));
   const out: Applied[] = [];
@@ -181,7 +233,7 @@ export async function applySchema(db: Db, modules: SchemaModules): Promise<reado
        migration story for a field added to a collection: declare it, and the
        next boot on every database finds it missing and adds it. */
     const added: string[] = [];
-    for (const [name, columns] of Object.entries(module.columns ?? {})) {
+    for (const [name, columns] of Object.entries({ ...columnsIn(module), ...(module.columns ?? {}) })) {
       const live = await liveTable(db, name);
       if (!live) continue;
       for (const [col, type] of Object.entries(columns)) {

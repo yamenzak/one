@@ -1,5 +1,5 @@
 /**
- * ONE WORKSPACE'S OWN SCREENS, inside the hub.
+ * ONE WORKSPACE'S OWN SCREENS, inside OneSpace.
  *
  * ⚠️ THEY ANSWER AT THE WORKSPACE'S OWN ADDRESS AND NOWHERE ELSE. A workspace's
  * roster, its bill and its settings are its records; they live where its records

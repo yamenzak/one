@@ -1,5 +1,5 @@
 /**
- * THE OPERATOR CONSOLE, AS A PLACE INSIDE THE HUB.
+ * THE OPERATOR CONSOLE, AS A PLACE INSIDE THE SPACE.
  *
  * ⚠️ IT IS NOT A SECOND PRODUCT. It had its own shell, its own nav and its own
  * crown — an operator surface built out of its own chrome, which is a second
@@ -7,7 +7,7 @@
  * one row now, reached the same way a workspace is reached, from the same
  * surface, by the same gesture.
  *
- * ⚠️ AND IT ANSWERS ON THE OPERATOR DOOR AND NOWHERE ELSE (D18). The hub's home
+ * ⚠️ AND IT ANSWERS ON THE OPERATOR DOOR AND NOWHERE ELSE (D18). The OneSpace's home
  * TRAVELS to `admin.` rather than pushing a path here, because every operation
  * behind these rows is refused anywhere else — a console that rendered on a
  * workspace's address would draw five screens and 403 on all of them, which is
@@ -68,21 +68,21 @@ export function ConsoleHome({ onGo }: { readonly onGo: (to: Where) => void }) {
     /* ⚠️ `list`, NOT `board`, AND THE DIFFERENCE IS WHETHER A TILE HAS ANYTHING
        IN IT. Every row here is a name and a glyph by design — the sentence that
        used to sit under each one is what the screen behind it says on arrival
-       (`said` in `Hub.tsx`), where it is useful and not competing with four
+       (`said` in `OneSpace.tsx`), where it is useful and not competing with four
        others. A tile with nothing but a word in it is a large button, and five
        of them is a menu that takes a whole screen to say what a list says in
        five rows. No primary: a console is a way IN to five things, not a place
        where one of them is the point. */
     <Screen shape="list">
       {/* ⚠️ Unlabelled: the crown already says where this is, and a heading
-          repeating it is the same sentence twice — see `Hub.tsx`. */}
+          repeating it is the same sentence twice — see `OneSpace.tsx`. */}
       {/*
         ⚠️ A GLYPH PER ROW AND NO DESCRIPTION, WHICH IS THE WORKSPACE SCREEN'S
         GRAMMAR — see `Workspace.tsx`, where the same fault was fixed. Every row
         here carried a sentence, so five destinations came out as ten lines of
         text: a wall to read where the menu beside it is a list to scan. The
         sentence is what each screen says when somebody arrives on it (`said` in
-        `Hub.tsx`), which is where it is useful and where it is not competing
+        `OneSpace.tsx`), which is where it is useful and where it is not competing
         with four others.
       */}
       <Group>

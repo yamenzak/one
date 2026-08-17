@@ -22,7 +22,7 @@ export function Ground() {
 
   return (
     /*
-      ⚠️ `board` — THE ONE SCREEN IN THE HUB WHOSE ITEMS ARE MEASURES RATHER THAN
+      ⚠️ `board` — THE ONE SCREEN IN THE SPACE WHOSE ITEMS ARE MEASURES RATHER THAN
       DESTINATIONS. A shard is a name, a place and a fullness; three of those
       down a column on a wide screen is three bars using a tenth of the room they
       exist to be compared in. Side by side they are one glance.

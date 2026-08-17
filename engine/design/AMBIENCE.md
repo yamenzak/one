@@ -70,7 +70,7 @@ The world falls out of what the subject IS — nothing picks it per screen
 | **etch** | ruled geometry — a lattice whose tile draws some subset of its own edges and diagonals | technical: a console, a deployment, monitoring, planning |
 
 ```tsx
-<Layout sky="cloth" seedling={`hub|${where.at}`}>
+<Layout sky="cloth" seedling={`space|${where.at}`}>
 ```
 
 ⚠️ **`plain` is still the default, and that did not change with the engine.**
@@ -230,7 +230,7 @@ scene:
 From that one face: **the GROUND** is that subject's own world, **the CROWN**
 becomes a title card wearing its face, and **the DENSITY** becomes an arrival's.
 
-⚠️ **This is a fix, not a convenience.** The hub derived all three separately
+⚠️ **This is a fix, not a convenience.** OneSpace derived all three separately
 from the same slug — three expressions that have to agree, none of which can tell
 when they do not: edit one and the crown wears one workspace's planet over
 another workspace's sky, invisible in a screenshot of either.

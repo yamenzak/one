@@ -108,13 +108,13 @@ if (crammed.length) {
   workspace's leaves the preferences at an address nobody can find — which is the
   same failure as not splitting them, with more code.
 */
-const hubScreens = readdirSync(join(ENGINE, "one-space/src/hub")).filter((f) => f.endsWith(".tsx"));
-const reachable = hubScreens.some((f) => /at: "prefs"/.test(read(`one-space/src/hub/${f}`)));
+const spaceScreens = readdirSync(join(ENGINE, "one-space/src/space")).filter((f) => f.endsWith(".tsx"));
+const reachable = spaceScreens.some((f) => /at: "prefs"/.test(read(`one-space/src/space/${f}`)));
 
 if (reachable) {
   /* ⚠️ THE COUNT IS PART OF THE CLAIM — a walk that found nothing and a walk
      that looked at nothing print the same sentence without it. */
-  ok(`levels: your own preferences are offered in one of ${hubScreens.length} hub screen(s)`);
+  ok(`levels: your own preferences are offered in one of ${spaceScreens.length} OneSpace screen(s)`);
 } else {
   fail("levels: nothing links to your own preferences, so splitting them off left them at an address only somebody who knew it could reach");
 }

@@ -48,7 +48,7 @@ const filesIn = (dir) => {
 
 /**
  * ⚠️ EVERY DIRECTORY IN THIS TREE THAT DRAWS SOMETHING, and `one-space` is named
- * here because it is the largest of them: the Hub is the first surface anybody
+ * here because it is the largest of them: the OneSpace is the first surface anybody
  * sees, and a guard that covered the shared package and the reference app while
  * leaving the real screens out would be a guard that reports green about the
  * files nobody checked.

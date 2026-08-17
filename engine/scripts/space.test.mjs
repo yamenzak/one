@@ -1,5 +1,5 @@
 /**
- * THE HUB'S THREE RULES, EACH GUARDING A FAILURE THAT LOOKS LIKE SUCCESS.
+ * THE SPACE'S THREE RULES, EACH GUARDING A FAILURE THAT LOOKS LIKE SUCCESS.
  *
  * ⚠️ ONE DOOR TO THE API. A previous product had 167 bare `fetch` calls and no
  * hook for an expired session, so a dead cookie did not LOOK dead: the shell
@@ -24,15 +24,15 @@ import { dirname, join } from "node:path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
-const HUB = join(ENGINE, "one-space", "src");
+const SPACE = join(ENGINE, "one-space", "src");
 
 let bad = 0;
 const fail = (m) => { console.error(`BAD  ${m}`); bad++; };
 const ok = (m) => console.log(`ok   ${m}`);
 const rel = (p) => p.slice(ENGINE.length + 1);
 
-if (!existsSync(HUB)) {
-  console.error("BAD  engine/one-space/src is missing — the Hub is what this checks.");
+if (!existsSync(SPACE)) {
+  console.error("BAD  engine/one-space/src is missing — the OneSpace is what this checks.");
   process.exit(1);
 }
 
@@ -40,7 +40,7 @@ const walk = (at) => readdirSync(at, { withFileTypes: true }).flatMap((e) =>
   e.isDirectory() ? walk(join(at, e.name))
     : /\.tsx?$/.test(e.name) ? [join(at, e.name)] : []);
 
-const FILES = walk(HUB);
+const FILES = walk(SPACE);
 /** ⚠️ Comments describe the rule; matching them would report the rule as a
     breach of itself. */
 const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
@@ -87,11 +87,11 @@ for (const file of FILES) {
          `       runtime refuses.`);
   }
 }
-if (!classified) ok(`doors: the Hub never classifies its own hostname`);
+if (!classified) ok(`doors: the OneSpace never classifies its own hostname`);
 
 /* --------------------------------------------------- every screen is drawn --- */
 
-const app = readFileSync(join(HUB, "App.tsx"), "utf8");
+const app = readFileSync(join(SPACE, "App.tsx"), "utf8");
 const declared = app.match(/export type Screen\s*=([^;]+);/);
 if (!declared) {
   fail(`one-space/src/App.tsx: no \`Screen\` union — the picker's answers are what this checks.`);
@@ -108,6 +108,6 @@ if (!declared) {
 }
 
 console.log(bad
-  ? `\nhub: ${bad} finding(s) — each one fails as something other than itself.`
-  : `\nhub: one API door, one door classifier, no screen that is never drawn.`);
+  ? `\nspace: ${bad} finding(s) — each one fails as something other than itself.`
+  : `\nspace: one API door, one door classifier, no screen that is never drawn.`);
 process.exit(bad ? 1 : 0);

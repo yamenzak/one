@@ -16,8 +16,8 @@ import { signpostUrl, type DoorKind, type Where } from "../door.js";
 import { Sheet } from "@engine/design";
 
 const WHAT: Readonly<Record<string, string>> = {
-  operator: "This is the operator console's door. Its screens are not part of the Hub.",
-  tenant: "This is a workspace's own address. Its product draws these screens, not the Hub.",
+  operator: "This is the operator console's door. Its screens are not part of OneSpace.",
+  tenant: "This is a workspace's own address. Its product draws these screens, not OneSpace.",
   device: "This address belongs to a paired device. There is nothing here for a browser.",
   none: "Nothing is served at this address.",
 };

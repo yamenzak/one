@@ -9,7 +9,7 @@
  * `tenant:manage` could not reach their own.
  *
  * ⚠️ AND IT CARRIES NO WORKSPACE, WHICH IS THE POINT. This is the same split the
- * hub already draws between `told` (how YOU are told) and `notices` (what
+ * OneSpace already draws between `told` (how YOU are told) and `notices` (what
  * everybody here may be sent). It reuses the workspace centre's own view for the
  * manifests, because that is where the deployment keeps them — the level is what
  * makes this a different screen, not a different source.
@@ -18,7 +18,7 @@
 import { SettingsArea } from "./SettingsArea.js";
 import { useCentre } from "./data.js";
 import { Screen } from "@engine/design";
-import type { Where } from "../hub/where.js";
+import type { Where } from "../space/where.js";
 
 export function Preferences({ where, onGo }: {
   readonly where: Extract<Where, { at: "prefs" }>;

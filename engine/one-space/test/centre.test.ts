@@ -12,8 +12,8 @@
 
 import { describe, expect, it } from "vitest";
 import { parseStop, pathFor } from "../src/centre/route.js";
-import { HUB_SCREENS } from "../src/hub/Hub.js";
-import { OF_CONSOLE, OF_WORKSPACE, parseWhere, pathOf } from "../src/hub/where.js";
+import { SPACE_SCREENS } from "../src/space/OneSpace.js";
+import { OF_CONSOLE, OF_WORKSPACE, parseWhere, pathOf } from "../src/space/where.js";
 
 const APPS = ["hello", "atlas"];
 
@@ -41,35 +41,35 @@ describe("the product under a workspace's address", () => {
     }
   });
 
-  /* ⚠️ THE HUB'S PREFIX IS RESERVED ON EVERY DOOR, and this is the half that
-     bites here: a product screen at `/hub/anything` would be unreachable, and
+  /* ⚠️ THE SPACE'S PREFIX IS RESERVED ON EVERY DOOR, and this is the half that
+     bites here: a product screen at `/space/anything` would be unreachable, and
      the app's author would find out from a person who could not open it. */
-  it("never claims a hub address as a product's", () => {
-    expect(parseStop("/hub", [...APPS, "hub"])).toEqual({ kind: "choose" });
-    expect(parseStop("/hub/w/northwind/people", APPS)).toEqual({ kind: "choose" });
+  it("never claims a OneSpace address as a product's", () => {
+    expect(parseStop("/space", [...APPS, "space"])).toEqual({ kind: "choose" });
+    expect(parseStop("/space/w/northwind/people", APPS)).toEqual({ kind: "choose" });
   });
 });
 
-describe("every address in the hub has a branch", () => {
+describe("every address in OneSpace has a branch", () => {
   /* ⚠️ The frame's dispatch and the parser must name the same set — an address
      with no branch renders a blank page with every suite green. */
   it("draws every screen the parser can produce", () => {
     const reachable = [
-      "/hub", "/hub/you", "/hub/inbox", "/hub/workspaces", "/hub/w/northwind",
-      ...OF_WORKSPACE.map((p) => `/hub/w/northwind/${p}`),
-      "/hub/console",
-      ...OF_CONSOLE.map((p) => `/hub/console/${p}`),
+      "/space", "/space/you", "/space/inbox", "/space/workspaces", "/space/w/northwind",
+      ...OF_WORKSPACE.map((p) => `/space/w/northwind/${p}`),
+      "/space/console",
+      ...OF_CONSOLE.map((p) => `/space/console/${p}`),
     ];
     for (const path of reachable) {
-      expect(HUB_SCREENS, path).toContain(parseWhere(path).at);
+      expect(SPACE_SCREENS, path).toContain(parseWhere(path).at);
     }
   });
 
   it("names no screen the parser can never produce", () => {
-    const produced = new Set(HUB_SCREENS.map((at) =>
+    const produced = new Set(SPACE_SCREENS.map((at) =>
       at === "workspace" || (OF_WORKSPACE as readonly string[]).includes(at)
         ? parseWhere(pathOf({ at, slug: "northwind" } as never)).at
         : parseWhere(pathOf({ at } as never)).at));
-    for (const at of HUB_SCREENS) expect(produced, at).toContain(at);
+    for (const at of SPACE_SCREENS) expect(produced, at).toContain(at);
   });
 });

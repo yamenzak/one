@@ -22,7 +22,7 @@ row.
 
 **Why.** A customer using two products had two workspaces, two addresses, two
 rosters and two bills. That is a worse product, and it is the reason the previous
-attempt needed a hub to paper over the seam. One tenancy, many apps, one place is
+attempt needed a switcher to paper over the seam. One tenancy, many apps, one place is
 the thing being built — the infrastructure savings follow from it and are not the
 reason for it.
 
@@ -403,16 +403,16 @@ brandable; a generating action with no output ceiling (the reserve is a
 ceiling on revenue); a run that resolves a different model or different words
 than the screens report; a read that generates.
 
-## D20 — The hub is one surface presented over the product, reachable from every door, and it is a route
+## D20 — OneSpace is one surface presented over the product, reachable from every door, and it is a route
 
 Who you are, everywhere you belong, and — for the few who hold it — the
 deployment itself are ONE surface, opened over whatever somebody was doing and
 dismissed back onto it. It is not an app: no nav bar, no tabs, no shell of its
-own. Its screens are ADDRESSES under a `/hub` prefix reserved on every door, so
+own. Its screens are ADDRESSES under a `/space` prefix reserved on every door, so
 a person can link to one, land on one and reload one; `where.ts` parses the
 location and decides what is above each screen, and leaving is never a choice a
 screen's author makes. A workspace is managed at its OWN origin — opening one
-from anywhere else is a full page load that arrives with the hub already open on
+from anywhere else is a full page load that arrives with OneSpace already open on
 it. A workspace's own address is the PRODUCT and nothing else. Decided
 2026-08-15.
 
@@ -426,9 +426,9 @@ product is chaos. Those five are things you go and do once and then leave, which
 is a presented surface, not a bar that never goes away.
 
 **Therefore never:** a nav bar over the account, the workspace or the console; a
-second shell for the operator; a hub screen held in component state rather than
+second shell for the operator; a OneSpace screen held in component state rather than
 at an address; a workspace's records answered from another door; a product path
-under `/hub`; a `Title` under a `PageCrown` that repeats it; a dismiss control on
+under `/space`; a `Title` under a `PageCrown` that repeats it; a dismiss control on
 a door with nothing underneath.
 
 ---

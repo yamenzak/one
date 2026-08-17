@@ -5,7 +5,7 @@
  * ⚠️ IT IS NOT A DASHBOARD, AND THAT IS THE CORRECTION. There was a Home here
  * once: unread counts, cards into People and Money, a chip saying who you are —
  * a summary of four surfaces, none of which it could act on, standing between
- * somebody and the product they came to open. All four are the hub's now, one
+ * somebody and the product they came to open. All four are OneSpace's now, one
  * gesture from every screen, so what is left is the choice this address cannot
  * make for you.
  *

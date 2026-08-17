@@ -18,7 +18,7 @@ import {
   Group, Nothing, PersonRow, Screen, placeFace, sentence,
 } from "@engine/design";
 import { useSession } from "../session.js";
-import { here, hubAt, isHere, setupUrl, tenantUrl } from "../door.js";
+import { here, spaceAt, isHere, setupUrl, tenantUrl } from "../door.js";
 import { pathOf, type Where } from "./where.js";
 
 export function Workspaces({ onGo }: { readonly onGo: (to: Where) => void }) {
@@ -28,14 +28,14 @@ export function Workspaces({ onGo }: { readonly onGo: (to: Where) => void }) {
 
   /*
     ⚠️ A WORKSPACE IS MANAGED AT ITS OWN ADDRESS, so opening one from anywhere
-    else TRAVELS — and arrives with the hub already open on it. The alternative
+    else TRAVELS — and arrives with OneSpace already open on it. The alternative
     is a screen that loads here and refuses every call it makes, because its
     records and its operations are at the other origin.
   */
   const open = (slug: string) => {
     if (!where) return;
     if (isHere(slug, where)) { onGo({ at: "workspace", slug }); return; }
-    location.assign(hubAt(tenantUrl(slug, where, location), pathOf({ at: "workspace", slug })));
+    location.assign(spaceAt(tenantUrl(slug, where, location), pathOf({ at: "workspace", slug })));
   };
 
   /* ⚠️ STARTING ONE IS ALWAYS OFFERED, AND THIS IS THE ONLY PLACE IT LIVES FOR
@@ -63,7 +63,7 @@ export function Workspaces({ onGo }: { readonly onGo: (to: Where) => void }) {
         : (
           /* ⚠️ A FACE PER ROW, LIKE THE ROSTER AND LIKE THE HOME. A workspace is
              a thing with a name somebody recognises; a list of them with no mark
-             is a list of strings, and it was the one list in the hub with no
+             is a list of strings, and it was the one list in OneSpace with no
              lead at all. */
           <Group>
             {belongs.map((w) => (

@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 /**
- * THE HUB'S BUILD.
+ * THE SPACE'S BUILD.
  *
  * ⚠️ `dist/` IS WHAT THE WORKER SERVES, and the worker's `assets.directory`
  * points at it by filesystem path — which is not a package dependency, so

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "One \u2014 THE deployment. The single worker that answers every door for every product, and serves the Hub. OneEngine is what it is built on; One is what people open.",
+  "description": "One \u2014 THE deployment. The single worker that answers every door for every product, and serves OneSpace. OneEngine is what it is built on; One is what people open.",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",

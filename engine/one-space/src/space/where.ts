@@ -1,10 +1,10 @@
 /**
- * WHERE YOU ARE IN THE HUB, AS AN ADDRESS.
+ * WHERE YOU ARE IN THE SPACE, AS AN ADDRESS.
  *
- * ⚠️ EVERY SCREEN HAS ONE, AND THAT IS NOT A CONVENIENCE. The hub is a ROUTE
+ * ⚠️ EVERY SCREEN HAS ONE, AND THAT IS NOT A CONVENIENCE. The OneSpace is a ROUTE
  * rather than a popup — a person can link to it, land on it and reload it — and
  * the moment the screens inside it are component state, somebody can link to
- * the hub and never to their own workspace, a refusal saying "read this first"
+ * OneSpace and never to their own workspace, a refusal saying "read this first"
  * has nowhere to send anybody, support cannot say "open this address", and the
  * back button leaves the whole surface instead of going up one level.
  *
@@ -17,13 +17,13 @@
  * somebody can type, an old link can carry and a redirect can mangle, so
  * parsing has to be TOTAL — and the safe answer is the surface's own root.
  *
- * ⚠️ AND `/hub` IS RESERVED ON EVERY DOOR. Under a workspace's own address the
- * paths belong to the product; this one prefix does not, so the hub can be
+ * ⚠️ AND `/space` IS RESERVED ON EVERY DOOR. Under a workspace's own address the
+ * paths belong to the product; this one prefix does not, so OneSpace can be
  * opened from anywhere without an app ever discovering that one of its screens
  * is unreachable.
  */
 
-export const HUB = "/hub";
+export const SPACE = "/space";
 
 export type Where =
   | { readonly at: "home" }
@@ -174,16 +174,16 @@ export const isConsole = (where: Where): boolean =>
   where.at === "console" || where.at === "tenant"
   || (OF_CONSOLE as readonly string[]).includes(where.at);
 
-/** Whether a path is the hub's at all — the page under it renders otherwise. */
-export const inHub = (path: string): boolean =>
-  path === HUB || path.startsWith(`${HUB}/`);
+/** Whether a path is OneSpace's at all — the page under it renders otherwise. */
+export const inSpace = (path: string): boolean =>
+  path === SPACE || path.startsWith(`${SPACE}/`);
 
 /**
  * ⚠️ TOTAL, AND THE SAFE ANSWER IS HOME. Anything this cannot read is the root
  * rather than nothing — see the header.
  */
 export function parseWhere(path: string): Where {
-  const rest = path.replace(/\/+$/, "").slice(HUB.length).replace(/^\//, "");
+  const rest = path.replace(/\/+$/, "").slice(SPACE.length).replace(/^\//, "");
   if (!rest) return { at: "home" };
   const [head, ...tail] = rest.split("/");
 
@@ -236,30 +236,30 @@ export function parseWhere(path: string): Where {
 
 export function pathOf(where: Where): string {
   switch (where.at) {
-    case "home": return HUB;
-    case "you": return `${HUB}/you`;
-    case "inbox": return `${HUB}/inbox`;
-    case "told": return `${HUB}/told`;
-    case "data": return `${HUB}/data`;
+    case "home": return SPACE;
+    case "you": return `${SPACE}/you`;
+    case "inbox": return `${SPACE}/inbox`;
+    case "told": return `${SPACE}/told`;
+    case "data": return `${SPACE}/data`;
     case "prefs":
-      return `${HUB}/prefs${where.app ? `/${where.app}` : ""}${where.app && where.area ? `/${where.area}` : ""}`;
-    case "workspaces": return `${HUB}/workspaces`;
-    case "workspace": return `${HUB}/w/${where.slug}`;
-    case "console": return `${HUB}/console`;
-    case "actions": return `${HUB}/console/actions${where.app ? `/${where.app}` : ""}`;
-    case "tenant": return `${HUB}/console/tenants/${where.id}`;
+      return `${SPACE}/prefs${where.app ? `/${where.app}` : ""}${where.app && where.area ? `/${where.area}` : ""}`;
+    case "workspaces": return `${SPACE}/workspaces`;
+    case "workspace": return `${SPACE}/w/${where.slug}`;
+    case "console": return `${SPACE}/console`;
+    case "actions": return `${SPACE}/console/actions${where.app ? `/${where.app}` : ""}`;
+    case "tenant": return `${SPACE}/console/tenants/${where.id}`;
     case "tenants": case "switches": case "works": case "ground": case "footing":
-      return `${HUB}/console/${where.at}`;
-    case "plan": return `${HUB}/w/${where.slug}/plan/${where.app}`;
+      return `${SPACE}/console/${where.at}`;
+    case "plan": return `${SPACE}/w/${where.slug}/plan/${where.app}`;
     /* ⚠️ THE PAGE IS IN THE ADDRESS TOO. Settings descend, and an area that only
        lived in the parser is one somebody can reach and never link to — and
        going back from it would leave the whole surface. */
     case "settings":
-      return `${HUB}/w/${where.slug}/settings${where.app ? `/${where.app}` : ""}${
+      return `${SPACE}/w/${where.slug}/settings${where.app ? `/${where.app}` : ""}${
         where.app && where.area ? `/${where.area}` : ""}`;
     case "wording":
-      return `${HUB}/w/${where.slug}/wording${where.app ? `/${where.app}` : ""}`;
-    default: return `${HUB}/w/${where.slug}/${where.at}`;
+      return `${SPACE}/w/${where.slug}/wording${where.app ? `/${where.app}` : ""}`;
+    default: return `${SPACE}/w/${where.slug}/${where.at}`;
   }
 }
 
@@ -268,7 +268,7 @@ export function pathOf(where: Where): string {
  *
  * ⚠️ THE WAY OUT IS A PROPERTY OF THE SCREEN'S PLACE, NOT A CHOICE ITS AUTHOR
  * MAKES. `null` means this is the root of the surface and is DISMISSED — the
- * hub closes and returns somebody to what they were doing. Anything else is one
+ * OneSpace closes and returns somebody to what they were doing. Anything else is one
  * level up. Left to each screen, two get it right and the third goes home from
  * three levels in.
  */
@@ -302,7 +302,7 @@ export function above(where: Where): Where | null {
 /** What the screen calls itself. One name, so the crown and the title agree. */
 export const nameOf = (where: Where): string => {
   switch (where.at) {
-    case "home": return "Hub";
+    case "home": return "OneSpace";
     case "you": return "You";
     case "inbox": return "Inbox";
     case "told": return "How you are told";

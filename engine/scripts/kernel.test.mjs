@@ -165,7 +165,7 @@ if (!checked) {
  * ⚠️ AND THE DESIGN SYSTEM IS ROUTER-FREE. STANDARDS §6 states it and nothing
  * asked: a screen hands back a DESTINATION and the app it is mounted in decides
  * what that means. A router inside the package would make every app adopt that
- * router — and the hub, which is not one app, would have two.
+ * router — and OneSpace, which is not one app, would have two.
  */
 const ROUTERS = /from\s+["'](react-router[\w-]*|@tanstack\/react-router|wouter|next\/\w+)["']/;
 const routed = sourcesIn("design").filter((f) => ROUTERS.test(readFileSync(f, "utf8")));

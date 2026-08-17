@@ -1,5 +1,5 @@
 /**
- * THE HUB'S TWO DECISIONS, AND THE ADDRESSES IT SENDS PEOPLE TO.
+ * THE SPACE'S TWO DECISIONS, AND THE ADDRESSES IT SENDS PEOPLE TO.
  *
  * ⚠️ THE SCREEN IS PICKED BY A PURE FUNCTION SO THAT THIS IS A TEST RATHER THAN
  * A WALK THROUGH FIVE HOSTNAMES IN A BROWSER. The failure it exists to catch is
@@ -30,10 +30,10 @@ const KINDS: readonly DoorKind[] = [
 
 /* ------------------------------------------------------------ which screen --- */
 
-describe("which screen the Hub is", () => {
+describe("which screen the OneSpace is", () => {
   /*
     ⚠️ EVERY DOOR THE WORKER SERVES RESOLVES TO A SCREEN, INCLUDING THE ONES THE
-    HUB IS NOT. "That cannot happen" is how a blank page ships: the state that
+    SPACE IS NOT. "That cannot happen" is how a blank page ships: the state that
     could not occur occurs, nothing matches, and React renders nothing at all.
   */
   it("has a screen for every door, signed in or not", () => {
@@ -41,7 +41,7 @@ describe("which screen the Hub is", () => {
       for (const signedIn of [true, false, null]) {
         const screen = pickScreen(faceFor(kind), signedIn, false);
         expect(screen, `${kind} / signedIn=${signedIn}`).not.toBe(undefined);
-        expect(["waiting", "stuck", "signpost", "sign-in", "agreements", "hub",
+        expect(["waiting", "stuck", "signpost", "sign-in", "agreements", "space",
           "new-workspace", "product", "elsewhere"]).toContain(screen satisfies Screen);
       }
     }
@@ -51,13 +51,13 @@ describe("which screen the Hub is", () => {
      the sign-in screen while `me.who` is still in flight flashes a sign-in page
      at somebody who is already signed in, on every single load. */
   it("waits rather than assuming nobody is here", () => {
-    expect(pickScreen("hub", null, false)).toBe("waiting");
+    expect(pickScreen("space", null, false)).toBe("waiting");
     expect(pickScreen("create", null, false)).toBe("waiting");
     expect(pickScreen(null, true, false)).toBe("waiting");
   });
 
   it("asks for a sign-in on every door that needs one", () => {
-    expect(pickScreen("hub", false, false)).toBe("sign-in");
+    expect(pickScreen("space", false, false)).toBe("sign-in");
     expect(pickScreen("create", false, false)).toBe("sign-in");
     /* ⚠️ A workspace's own address included: the product is behind a session. */
     expect(pickScreen("centre", false, false)).toBe("sign-in");
@@ -68,12 +68,12 @@ describe("which screen the Hub is", () => {
     expect(pickScreen("console", false, false)).toBe("sign-in");
   });
 
-  /* ⚠️ THE ACCOUNT DOOR AND THE OPERATOR DOOR ARE ONE PAGE. Both are the hub
+  /* ⚠️ THE ACCOUNT DOOR AND THE OPERATOR DOOR ARE ONE PAGE. Both are OneSpace
      with nothing underneath; what an operator holds is a place on it, so a
      second shell for the console would be a second design nobody maintains. */
-  it("opens the hub on the account door and on the operator door", () => {
-    expect(pickScreen("hub", true, false)).toBe("hub");
-    expect(pickScreen("console", true, false)).toBe("hub");
+  it("opens OneSpace on the account door and on the operator door", () => {
+    expect(pickScreen("space", true, false)).toBe("space");
+    expect(pickScreen("console", true, false)).toBe("space");
     expect(pickScreen("create", true, false)).toBe("new-workspace");
   });
 
@@ -86,13 +86,13 @@ describe("which screen the Hub is", () => {
   });
 
   /*
-    ⚠️ THE WALL HOLDS THE PRODUCT AND THE HUB ALIKE, and it is decided here so
+    ⚠️ THE WALL HOLDS THE PRODUCT AND THE SPACE ALIKE, and it is decided here so
     that it cannot be forgotten by one screen. Somebody who has not agreed must
     not see their workspace for a moment and then lose it — every write behind it
     refuses with a status the screen has no reason to expect.
   */
   it("holds every signed-in surface until the agreements are given", () => {
-    for (const face of ["hub", "console", "centre", "create"] as const) {
+    for (const face of ["space", "console", "centre", "create"] as const) {
       expect(pickScreen(face, true, false, false, 1), face).toBe("agreements");
     }
   });
@@ -103,12 +103,12 @@ describe("which screen the Hub is", () => {
     and the signpost, which issues no code, is still the signpost.
   */
   it("does not put the wall in front of signing in", () => {
-    expect(pickScreen("hub", false, false, false, 2)).toBe("sign-in");
+    expect(pickScreen("space", false, false, false, 2)).toBe("sign-in");
     expect(pickScreen("centre", null, false, false, 2)).toBe("waiting");
     expect(pickScreen("signpost", true, false, false, 2)).toBe("signpost");
     /* ⚠️ And a failure still outranks it: a deployment we could not read is not
        a person who has not agreed. */
-    expect(pickScreen("hub", true, true, false, 2)).toBe("stuck");
+    expect(pickScreen("space", true, true, false, 2)).toBe("stuck");
   });
 
   /*
@@ -117,7 +117,7 @@ describe("which screen the Hub is", () => {
     broken deployment would otherwise look like to every person who visits it.
   */
   it("says what went wrong rather than offering a sign-in", () => {
-    for (const face of ["hub", "create", "signpost", "elsewhere"] as const) {
+    for (const face of ["space", "create", "signpost", "elsewhere"] as const) {
       expect(pickScreen(face, false, true)).toBe("stuck");
     }
   });
@@ -159,7 +159,7 @@ describe("what the screens actually put on the page", () => {
     expect(out).not.toContain("Start a workspace");
   });
 
-  /* ⚠️ Every door the Hub is not gets a sentence of its own. A shared "not
+  /* ⚠️ Every door the OneSpace is not gets a sentence of its own. A shared "not
      found" tells a person nothing about whether they are in the wrong place or
      the product is broken. */
   it("says something specific for every door it is not", () => {

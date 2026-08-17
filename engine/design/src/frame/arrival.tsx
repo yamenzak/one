@@ -30,26 +30,24 @@ import { Lockup } from "../parts/logo.js";
 /* ------------------------------------------------------------------- mark --- */
 
 /**
- * THE MARK IS THE WORD, DRAWN.
+ * THE MARK IS A NUMERAL, AND THE NAME IS SET BESIDE IT.
  *
- * ⚠️ IT IS A WORDMARK RATHER THAN A SYMBOL, AND THAT SETTLES WHAT GOES BESIDE
- * IT. A symbol needs the name written next to it to be worth anything on a
- * product nobody has heard of yet; a wordmark IS the name, so the heading beside
- * it is free to say what the SCREEN is — "Sign in", "Check your email" — instead
- * of repeating the product for the second time on the same page.
+ * ⚠️ A SYMBOL, NOT A WORDMARK, WHICH IS WHAT LETS IT BE SQUARE AND SMALL. What
+ * was here spelled O-N-E out of three constructed letterforms — a wordmark
+ * pretending to be a mark — so the brand had no shape that survived being
+ * sixteen pixels wide, and every avatar, tab icon and crown fell back to
+ * something else. A stencil numeral does survive it, and `Lockup` is where the
+ * name is written when the name is wanted.
  *
- * ⚠️ ONE GEOMETRY, ONE WEIGHT, RECTANGULAR COUNTERS. Heavy lowercase on a square
- * grid: the outer corners carry a large radius and every counter is a sharp
- * rectangle, which is the whole character of it — soft outside, hard inside. The
- * `o` is cut at the top-left, and that chamfer is the one asymmetry in the word;
- * without it three round letters in a row read as a font rather than as a mark.
+ * ⚠️ THE COUNTERS ARE CUT WITH A MASK, WHICH IS WHY THE STENCIL LINES ARE
+ * STROKES. They are the character of it — a solid stem with the light let
+ * through in two straight slots — and a product's mark is that same stem with
+ * something added (see `MarkOf`), so the family reads as a family.
  *
- * ⚠️ FILLED, IN `currentColor`, WITH `evenodd` DOING THE COUNTERS. The interface
- * is values and the data is hues (`ground.ts`), so it inherits ink and never
- * takes the accent — a mark tinted with the brand is the one piece of chrome
- * that stops working the moment a workspace picks a colour near its ground.
- * Cutting the counters with a fill rule rather than a second shape means the
- * whole word is one path per letter and cannot come apart at small sizes.
+ * ⚠️ FILLED IN `currentColor`. The interface is values and the data is hues
+ * (`ground.ts`), so it inherits ink and never takes the accent — a mark tinted
+ * with the brand is the one piece of chrome that stops working the moment a
+ * workspace picks a colour near its ground.
  *
  * ⚠️ AND IT IS DRAWN, NOT SET. `◇` stood in for this, and text set in a font
  * would be no better: weight, width and baseline would be whatever the reader's
@@ -58,21 +56,43 @@ import { Lockup } from "../parts/logo.js";
  */
 export type MarkSize = "nav" | "row" | "crown" | "door";
 
-/* ⚠️ HEIGHT, AND THE BOX IS SQUARE. The mark is a numeral on a 100-unit square,
-   so height and width are the same number — what used to be here was 2.68 wide
-   per 1 tall, because it drew a word. */
+/**
+ * ⚠️ HEIGHT OF THE INK, NOT OF A BOX AROUND IT — see `INK`. Every number here is
+ * what the numeral actually measures on the screen, so a mark set to sit beside
+ * 18px text can be written as 18.
+ *
+ * ⚠️ `door` IS TWO LINES OF `text-4xl` AT `leading-[0.9]`, which is what the
+ * stacked lockup puts beside it (36 × 0.9 × 2 ≈ 65). The mark spanning both
+ * lines is the whole reason the stacked arrangement reads as a numeral and a
+ * name rather than as a bracket beside the first line.
+ */
 const MARK_H: Readonly<Record<MarkSize, number>> = {
-  nav: 14, row: 16, crown: 18, door: 44,
+  nav: 14, row: 16, crown: 20, door: 65,
 };
 
-/*
-  ⚠️ THE MARK IS THE STENCIL NUMERAL, AND IT REPLACED A DRAWING OF THE WORD.
-  What used to be here spelled O-N-E out of three constructed letterforms — a
-  wordmark pretending to be a mark, which meant the brand had no shape that
-  survived being sixteen pixels wide or square. A numeral with a beak and two
-  cut counters does, and a product's mark is the same stem with something added
-  to it (see `MarkOf`), so the family reads as a family at any size.
-*/
+/**
+ * ⚠️ THE VIEWBOX IS THE DRAWING, NOT THE CANVAS IT WAS DRAWN ON. The numeral
+ * occupies x 28–66 and y 18–82 of the 100-unit square it came from, so a square
+ * `0 0 100 100` box renders it 36% shorter than its declared height and floats
+ * it in a gutter more than half as wide as the box. Both were invisible as
+ * numbers and obvious the moment the stacked lockup was photographed: a mark
+ * asked to span two lines came out one line tall, sitting away from a left edge
+ * every other element in the column shared.
+ *
+ * ⚠️ SO THE SIZES ABOVE MEAN WHAT THEY SAY, and the mark's own left edge is the
+ * column's. Cropping to the ink is what makes both true at once — a scale
+ * correction alone would have fixed the height and left the gutter.
+ */
+const INK = { x: 28, y: 18, w: 38, h: 64 } as const;
+
+/**
+ * WHOSE MARK — the deployment's, or a product's.
+ *
+ * ⚠️ THE SAME STEM, WITH SOMETHING ADDED. A product does not get a mark of its
+ * own shape: it gets ONE's, carrying two rings on the stem. That is what makes a
+ * shelf of products read as one family rather than as a folder of logos, and it
+ * is why there is one component here rather than one per name.
+ */
 export type MarkOf = "one" | "space";
 
 export function Mark({ size = "crown", of = "one", label }: {
@@ -94,8 +114,13 @@ export function Mark({ size = "crown", of = "one", label }: {
   return (
     <svg
       height={h}
-      width={h}
-      viewBox="0 0 100 100"
+      /* ⚠️ DERIVED FROM THE DRAWING'S OWN PROPORTION, AND NOT ROUNDED. Written
+         out, the two drift the first time the numeral is redrawn; rounded, the
+         drift is the same and arrives immediately — at 14px a whole-pixel width
+         is 5% off the drawing's ratio, which is a mark subtly stretched in the
+         one place it is smallest and least forgiving. SVG takes a fraction. */
+      width={(h * INK.w) / INK.h}
+      viewBox={`${INK.x} ${INK.y} ${INK.w} ${INK.h}`}
       /* ⚠️ `currentColor`, because the source drawings filled #ffffff — a logo
          that is invisible on every light surface, and one that fails as an empty
          space where the brand was rather than as an error. */
@@ -108,7 +133,12 @@ export function Mark({ size = "crown", of = "one", label }: {
       <defs>
         {/* White keeps, black cuts — the stencil lines ARE the counters. */}
         <mask id={mask}>
-          <rect width="100%" height="100%" fill="#fff" />
+          {/* ⚠️ THE DRAWING'S OWN COORDINATES, NEVER `100%`. A percentage in a
+              mask resolves against the VIEWPORT while the shapes under it are in
+              user space, so cropping the viewBox moved the keep-rect off the
+              artwork and cut most of the stem away — a mark that renders as a
+              beak and two dots, with nothing failing. */}
+          <rect x="0" y="0" width="100" height="100" fill="#fff" />
           {of === "one"
             ? (
               <>

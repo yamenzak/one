@@ -313,9 +313,9 @@ export const GROUND_CSS = [
 
     ⚠️ THE COST IS MEASURED IN A PHONE'S WIDTH. 24px of dialog, then 16px of the
     band's gutter, then 16px of the card's own — 56px each side before a word, so
-    a 390px screen gave 278px to text and 112px to nesting. The hub is presented
+    a 390px screen gave 278px to text and 112px to nesting. The OneSpace is presented
     OVER a product whose own screens run at 16 + 16, so the same card came out
-    narrower inside the hub than outside it, on the same phone, for no reason
+    narrower inside OneSpace than outside it, on the same phone, for no reason
     anybody could see.
 
     ⚠️ AND IT IS THE `--full` VARIANT ONLY. A `Confirm` is a centred dialog and

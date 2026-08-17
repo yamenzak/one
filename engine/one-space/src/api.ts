@@ -27,7 +27,7 @@ export type Answer<T> = Ok<T> | No;
  * worded differently in the two places that raise it. `problems.ts` says what
  * it is; this says when.
  */
-const unreachable = (): Problem => problem(PROBLEMS, "hub.unreachable");
+const unreachable = (): Problem => problem(PROBLEMS, "space.unreachable");
 
 /**
  * ⚠️ WHAT HAPPENS WHEN THE SESSION IS GONE IS ONE DECISION, MADE HERE. Left to
@@ -52,8 +52,8 @@ const readProblem = async (res: Response): Promise<Problem> => {
   } catch { /* not JSON — fall through to the shape below */ }
   /* ⚠️ A REFERENCE, BECAUSE THIS IS THE ONE NOBODY CAN EXPLAIN. A response
      that is not ours has no sentence in it; what makes it reportable is
-     something to quote, and `hub.unexpected` asks for exactly that. */
-  return problem(PROBLEMS, "hub.unexpected", {}, { ref: newId("ref") });
+     something to quote, and `space.unexpected` asks for exactly that. */
+  return problem(PROBLEMS, "space.unexpected", {}, { ref: newId("ref") });
 };
 
 async function call<T>(id: string, method: "GET" | "POST", body?: unknown): Promise<Answer<T>> {
@@ -93,7 +93,7 @@ export const api = {
    * ⚠️ THE ONE REQUEST THAT IS NOT AN OPERATION. `/health` is outside `/api/`
    * because it is what a deploy probes before anything is signed in — and it is
    * here rather than in a screen so that this file remains the only place in the
-   * Hub that calls `fetch`.
+   * OneSpace that calls `fetch`.
    */
   async health(): Promise<Answer<Health>> {
     try {
@@ -118,8 +118,8 @@ export interface Health {
 }
 
 /**
- * ⚠️ WHO YOU ARE EVERYWHERE, which is what the hub is built from. None of this
- * is a fact about one workspace, which is exactly why the hub can be opened
+ * ⚠️ WHO YOU ARE EVERYWHERE, which is what OneSpace is built from. None of this
+ * is a fact about one workspace, which is exactly why OneSpace can be opened
  * from any door and show the same thing.
  */
 export interface Me {

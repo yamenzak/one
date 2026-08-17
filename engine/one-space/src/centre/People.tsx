@@ -77,7 +77,7 @@ export function People({ view }: { readonly view: CentreView }) {
             /* ⚠️ A ROSTER IS A LIST OF PEOPLE BEFORE IT IS A TABLE. On a phone
                the three columns were a scroll box with two of them cut off
                mid-word; the same rows carry the same facts in the shape the
-               rest of the hub already uses. Columns survive on a desktop, where
+               rest of OneSpace already uses. Columns survive on a desktop, where
                comparing a hundred members down a page is what they are for. */
             onOpen={manage ? (m) => setOpened(m) : undefined}
             asRow={(m) => ({

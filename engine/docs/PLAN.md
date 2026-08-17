@@ -54,7 +54,7 @@ exists *only* because resources are per-app. It is a checklist where it should b
 a function.
 
 **A tenant was per-app.** A business using two products had two workspaces, two
-addresses, two custom domains, two rosters, two bills. The hub was built to paper
+addresses, two custom domains, two rosters, two bills. OneSpace was built to paper
 over that — one account, memberships across products, one credit balance — which
 made the seam visible rather than closing it.
 
@@ -291,7 +291,7 @@ is "shipped" while anything defers to it (STANDARDS.md).
 | 7 | **Services** — ai and notify over RPC | Both run off the hot path and the seam is typed |
 | 8 | **Vault + legal** — encrypted facts, consent, ROPA, erasure | A person exports and erases themselves, provably |
 | 9 | **A real product on OneEngine** | It runs with no app-specific infrastructure |
-| 10 | **One** — the deployment and the Hub: a worker, its doors, and the page a person opens | Somebody signs in with an emailed code, sees their workspaces and makes one, in a browser |
+| 10 | **One** — the deployment and the OneSpace: a worker, its doors, and the page a person opens | Somebody signs in with an emailed code, sees their workspaces and makes one, in a browser |
 | 20 | **Workspaces** — personal or commercial (D21), one brand and one installable per workspace (D22) | A business declares itself, brands every app under it at once, and installs from its own address |
 | 21 | **Payment** — something takes a card | Becoming a business, and a plan, are paid for rather than comped |
 | 22 | **OneSpace** — the deployment's own doors leave the workspace root | `id`, `admin` and `setup` answer at one address, and `t.` holds nothing but workspaces |

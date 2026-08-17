@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The Hub \u2014 the page a person opens at the signpost, the account door and the setup door. Sign in with an emailed code, see your workspaces, make one, leave one.",
+  "description": "The OneSpace \u2014 the page a person opens at the signpost, the account door and the setup door. Sign in with an emailed code, see your workspaces, make one, leave one.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

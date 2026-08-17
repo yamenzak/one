@@ -167,7 +167,7 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
 {
   /*
     ⚠️ A SCENE IS THREE CONSEQUENCES OF ONE DECLARATION, AND A SCREEN THAT
-    ASSEMBLES ITS OWN GETS TWO OF THEM. The hub used to derive the ground, the
+    ASSEMBLES ITS OWN GETS TWO OF THEM. The OneSpace used to derive the ground, the
     hero face and the density from the same slug in three separate expressions:
     `worldOf(where.slug)`, `placeFace(where.slug)` and a ternary on whether the
     first returned anything. All three have to agree and nothing could tell when

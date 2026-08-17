@@ -38,7 +38,7 @@ export function AppSurface({ app, route }: {
   return (
     /* ⚠️ THE PRODUCT WEARS ITS PLATE HERE TOO. The mark was a bare glyph set
        inline in the title, so it read as a character somebody had typed rather
-       than as the product's mark — and it was the one place in the hub where a
+       than as the product's mark — and it was the one place in OneSpace where a
        product appeared with no ground under it. */
     <Section label={declared?.label ?? app.name}>
       <Stack space="snug">
@@ -50,7 +50,7 @@ export function AppSurface({ app, route }: {
         <Group face={appFace(app.id, app.mark)} label={app.name}>
           <NoteRow>
             This screen ships with {app.name}. The workspace itself — its people, its money,
-            its settings — is already live, in the hub.
+            its settings — is already live, in OneSpace.
           </NoteRow>
         </Group>
       </Stack>

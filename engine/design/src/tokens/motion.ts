@@ -243,7 +243,7 @@ export const arriveAt = (index: number): React.CSSProperties =>
 
 /**
  * ⚠️ INJECTED BESIDE THE REST OF THE SHARED CHROME, and it has to BE injected —
- * `CHART_MOTION` was imported by the Hub's entry point and left out of the join,
+ * `CHART_MOTION` was imported by OneSpace's entry point and left out of the join,
  * so the chart reveal never ran once, in any build, with everything green.
  */
 export const ARRIVE_MOTION = [

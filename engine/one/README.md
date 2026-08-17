@@ -18,7 +18,7 @@ pnpm engine:dev
 ```
 
 Two processes: `wrangler dev` on **:8080** (the worker, its D1s simulated by
-Miniflare) and vite on **:5173** (the Hub, proxying `/api` and `/health` to the
+Miniflare) and vite on **:5173** (OneSpace, proxying `/api` and `/health` to the
 worker). Open the door you want:
 
 | Door | Address |
@@ -47,7 +47,7 @@ something.
   `*.localhost` gets its own jar — signing in on `setup.` leaves you signed out
   on `id.`. Production issues one cookie for the whole root, so one sign-in
   covers every door.
-- **The port is part of every address.** The Hub carries `location.port` into
+- **The port is part of every address.** OneSpace carries `location.port` into
   every cross-door link for exactly this reason; without it each hop lands on
   port 80 and 404s, which reads as "the door is broken" rather than "the link
   is".

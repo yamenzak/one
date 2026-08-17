@@ -167,7 +167,7 @@ act to go.
 
 | slot | what goes in it |
 |---|---|
-| **lead** | `who` — the account, which opens the hub · **or** `back` / `dismiss`. Never both. |
+| **lead** | `who` — the account, which opens OneSpace · **or** `back` / `dismiss`. Never both. |
 | **middle** | one-line `name` (optionally `collapses`) · **or** `find`, the wide search slot. Never both. |
 | **trail** | up to two `also` (bare ink, optionally carrying a `dot`) and one `does` (the only fill up there) |
 
@@ -218,7 +218,7 @@ wrong place.
 shell's crown drew a face, then a product mark, then a workspace name stacked
 over a product name — two circles and a paragraph in a 64px row. What a crown
 owes is *whose* data this is; which product is the nav underneath, and choosing
-between them is the hub.
+between them is OneSpace.
 
 ⚠️ **There is no `kind` prop, and that is the point.** What a crown *is* falls
 out of what it was handed. A variant enum would be a fifth way of saying the
@@ -245,7 +245,7 @@ modal?" — **yes, every address gets a Page, and there are exactly two ways to
 dress one:**
 
 - **`Layout`** — a Page with a SUBJECT (or a material) and a frame. Used where an
-  address stands on its own: the hub, a full-screen surface, a sheet promoted to
+  address stands on its own: OneSpace, a full-screen surface, a sheet promoted to
   a page, a door. **It has no nav, because most addresses are not destinations.**
 - **`Shell`** — a Page with a product's chrome: the crown, the desktop sidebar,
   and the island over five destinations. Used where an address is one of a
@@ -510,7 +510,7 @@ a thumbnail; that is a caption over an icon. The picture at the size of the
 screen with the name on it is a title card, and it is the composition that says
 "here" rather than "about here".
 
-Only the arrival: its People, Money and Settings keep the hub's working material,
+Only the arrival: its People, Money and Settings keep OneSpace's working material,
 because an arrival nobody leaves is not an arrival. See
 [`AMBIENCE.md`](AMBIENCE.md) — the four subject families.
 

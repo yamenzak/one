@@ -74,7 +74,7 @@ export function OneWorkspace({ slug, onGo }: {
       drawn: it was a full-width button at the top of the content, which is
       right on a short screen and wrong the moment the list of parts is longer
       than the fold. Declared, it docks under the thumb and sits in the crown,
-      and every other screen in the hub places its own action the same way.
+      and every other screen in OneSpace places its own action the same way.
     */
     <Screen
       shape="detail"
@@ -85,7 +85,7 @@ export function OneWorkspace({ slug, onGo }: {
     >
       {/* ⚠️ WHAT IT IS, WHERE ITS NAME IS. A business's legal name is the fact
           that distinguishes two workspaces called the same thing on one account,
-          and it is the only place in the hub it appears — a personal workspace
+          and it is the only place in OneSpace it appears — a personal workspace
           says nothing, because "personal" is not news about somebody's own
           notebook. */}
       {isBusiness(workspace?.kind ?? "personal") ? (

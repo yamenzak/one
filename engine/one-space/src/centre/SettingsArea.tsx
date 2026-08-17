@@ -31,7 +31,7 @@ export function SettingsArea({ view, level, app, area, onGo, onArea }: {
    * settings and a person's own preferences rendered one under the other here —
    * an administration surface with a preference inside it, which also hid the
    * preference from anybody without `tenant:manage`. They are two destinations
-   * now (`settings` and `prefs`), the same split the hub already draws between
+   * now (`settings` and `prefs`), the same split OneSpace already draws between
    * `notices` and `told`.
    */
   readonly level: "tenant" | "person";

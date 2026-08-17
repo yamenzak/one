@@ -168,7 +168,7 @@ export function Group({ label, under, face, at, sky, seedling, children }: Group
  * given a display heading has two things naming it: the word "Account" and the
  * person's own face, one of which somebody recognises instantly and the other
  * of which they have to read. Every product that shows a person a screen about
- * themselves needs this, which is why it is here and not in the hub.
+ * themselves needs this, which is why it is here and not in OneSpace.
  *
  * ⚠️ AND IT IS CENTRED, WHICH ALMOST NOTHING ELSE HERE IS. A centred block says
  * "this is about you" the way a left-aligned one cannot — it is the one place

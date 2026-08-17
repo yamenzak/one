@@ -127,12 +127,12 @@ export interface ShellProps {
   readonly onSwitchApp?: (appId: string) => void;
   readonly onOpenInbox?: () => void;
   /**
-   * ⚠️ THE WAY INTO THE HUB, AND IT IS THE ONLY ONE A PRODUCT NEEDS. Who you
+   * ⚠️ THE WAY INTO THE SPACE, AND IT IS THE ONLY ONE A PRODUCT NEEDS. Who you
    * are, everywhere you belong and everything about this workspace are one
    * surface pulled OVER the product — so the chrome spends one control on it
    * rather than a nav slot on each. Absent leaves the face as a face.
    */
-  readonly onOpenHub?: () => void;
+  readonly onOpenSpace?: () => void;
   readonly children?: React.ReactNode;
 }
 
@@ -163,7 +163,7 @@ export const reachable = (
 
 export function Shell(props: ShellProps) {
   const {
-    screens, here, held, flags, kind, crown, onGo, onSwitchApp, onOpenInbox, onOpenHub, children,
+    screens, here, held, flags, kind, crown, onGo, onSwitchApp, onOpenInbox, onOpenSpace, children,
   } = props;
 
   const mine = reachable(screens, held, flags, kind);
@@ -186,7 +186,7 @@ export function Shell(props: ShellProps) {
     fills is the DEFAULT, which was `plain`: nothing at all, on most screens of
     every product.
 
-    ⚠️ AND `quiet`, BECAUSE THIS IS WHERE PEOPLE WORK. The hub's arrivals run
+    ⚠️ AND `quiet`, BECAUSE THIS IS WHERE PEOPLE WORK. The OneSpace's arrivals run
     `rich`; a screen with a table on it gets the same world with a third of the
     marks, which is the whole reason density is an intent rather than a number.
   */
@@ -258,21 +258,21 @@ export function Shell(props: ShellProps) {
         whose controls were three different heights.
 
         ⚠️ AND ITS SLOTS MAP WITHOUT INVENTING ANYTHING. The account leads (it
-        opens the hub), the product's mark and the two names are the middle, and
+        opens OneSpace), the product's mark and the two names are the middle, and
         the trail is the switcher and the inbox.
 
         ⚠️ THE PER-APP SWITCHER BUTTONS ARE GONE AND THAT IS A FIX. There was one
         button per other product, gated on `apps.length > 1` — but `apps` is
         already the OTHERS, so with exactly two products the list had one entry,
         `1 > 1` was false, and the switcher never appeared at all. It is one
-        control to the hub now, which is the surface that lists them.
+        control to OneSpace now, which is the surface that lists them.
 
         ⚠️ AND THE MARK AND THE SECOND LINE ARE GONE WITH THEM. This drew a face,
         then a product mark, then a workspace name stacked over a product name —
         two circles and a paragraph in a 64px row, which is the clutter that made
         it the crown nobody wanted. What a crown owes here is WHOSE data this is;
         which product is the nav underneath, and choosing between them is the
-        hub. One face, one name.
+        OneSpace. One face, one name.
       */}
       <Crown
         bleed="edge"
@@ -281,12 +281,12 @@ export function Shell(props: ShellProps) {
           who: {
             name: crown.personEmail ?? "You",
             face: crown.personFace,
-            onOpen: onOpenHub,
+            onOpen: onOpenSpace,
           },
           name: crown.tenantName,
           also: [
-            ...((crown.apps ?? []).length && onSwitchApp && onOpenHub
-              ? [{ id: "apps", label: "Your products", icon: <Boxes />, onDo: onOpenHub }]
+            ...((crown.apps ?? []).length && onSwitchApp && onOpenSpace
+              ? [{ id: "apps", label: "Your products", icon: <Boxes />, onDo: onOpenSpace }]
               : []),
             ...(onOpenInbox
               ? [{ id: "inbox", label: "Notifications", icon: <InboxGlyph />, onDo: onOpenInbox,

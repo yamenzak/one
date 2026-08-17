@@ -41,7 +41,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 /*
   ⚠️ A FIELD'S OWN MESSAGE RIDES IN `fields`, WHICH IS WHAT IT IS FOR. Both of
   these were object literals stamped `platform.invalid` and carrying their own
-  title — so one code meant three different sentences across the hub, and the
+  title — so one code meant three different sentences across OneSpace, and the
   sentence appeared in a banner above the form rather than against the input it
   was about. The code says WHAT KIND of refusal it is; `fields` says which input,
   in words, where somebody is already looking.
@@ -138,7 +138,7 @@ export function SignIn({ lead }: { readonly lead?: string }) {
      offered on the account door only: from the setup door you are already
      there, and from a workspace's own address starting a second one is the
      invitation a previous platform shipped by accident. */
-  const start = face === "hub" && where ? setupUrl(where, here()) : null;
+  const start = face === "space" && where ? setupUrl(where, here()) : null;
 
   return (
     <Arrival

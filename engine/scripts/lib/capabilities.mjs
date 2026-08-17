@@ -22,9 +22,9 @@ import { files, read } from "./rules.mjs";
  */
 const PACKAGES = [
   { pkg: "runtime", barrel: "@engine/runtime",
-    consumers: ["one/src", "one-hub/src", "apps/hello/src"] },
+    consumers: ["one/src", "one-space/src", "apps/hello/src"] },
   { pkg: "kernel", barrel: "@engine/kernel",
-    consumers: ["runtime/src", "design/src", "one/src", "one-hub/src", "apps/hello/src"] },
+    consumers: ["runtime/src", "design/src", "one/src", "one-space/src", "apps/hello/src"] },
 ];
 
 /**

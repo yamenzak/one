@@ -5,7 +5,7 @@
  * `[data-theme="dark"]`, stamped on the document by the application — so an app
  * that never stamps it is an app that is permanently light, on every device, for
  * everybody. Nothing errors, nothing warns, every test passes, and the only way
- * to find out is to look at it on a dark screen. The Hub shipped exactly that
+ * to find out is to look at it on a dark screen. The OneSpace shipped exactly that
  * and a screenshot caught it.
  *
  * ⚠️ THREE STATES, NOT TWO. "Follow the device" is the default and it is a state

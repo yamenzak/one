@@ -18,7 +18,7 @@
  * island. A ground without it tests the components and none of the frame, which
  * is exactly the part a product cannot opt out of.
  *
- * ⚠️ AND IT IS THE HUB THAT MOUNTS THE SHELL, NOT THE APP — the same call
+ * ⚠️ AND IT IS THE SPACE THAT MOUNTS THE SHELL, NOT THE APP — the same call
  * `centre/Product.tsx` makes for a real product, with the same manifest. An app
  * that brought its own chrome would be an app that could get it wrong.
  */

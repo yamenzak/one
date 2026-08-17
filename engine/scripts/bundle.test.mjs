@@ -2,7 +2,7 @@
  * ONE BUNDLE FOR EVERY PRODUCT (D17), AND ONE LANE TO EVERY PROVIDER (D14).
  *
  * ⚠️ BOTH DECISIONS SAY "THEREFORE NEVER" AND NEITHER HAD A CHECK. D17's list
- * opens with *a page importing `@engine/<app>`* — which the hub did, at module
+ * opens with *a page importing `@engine/<app>`* — which OneSpace did, at module
  * scope, behind an `import.meta.env.DEV` branch that reads as dev-only and is
  * not: a module graph is decided before a branch is. The reference app's whole
  * manifest and every screen shipped to every customer, and the marker string was

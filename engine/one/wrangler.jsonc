@@ -46,7 +46,7 @@
   "assets": {
     // ⚠️ A FILESYSTEM PATH, NOT A PACKAGE DEPENDENCY — which is why `turbo.json`
     // declares the build edge by hand. Nothing in the dependency graph connects
-    // this worker to the Hub's build, and a missing one does not fail: the
+    // this worker to OneSpace's build, and a missing one does not fail: the
     // worker boots and serves nothing, which reads as a broken deploy rather
     // than a missing step.
     "directory": "../one-space/dist",

@@ -1,5 +1,5 @@
 /**
- * THE HUB — one surface, presented over whatever somebody was doing.
+ * THE SPACE — one surface, presented over whatever somebody was doing.
  *
  * ⚠️ IT IS NOT AN APP AND IT HAS NO NAV. A workspace's people, its bill, its
  * settings and its records are not five places somebody moves between all day —
@@ -9,7 +9,7 @@
  * else entirely.
  *
  * ⚠️ SO IT IS ONE SURFACE, REACHABLE FROM EVERY DOOR, AND IT DISMISSES. The
- * product's own screens keep their shell underneath; the hub is pulled over
+ * product's own screens keep their shell underneath; OneSpace is pulled over
  * them and returns you where you were. That is why the way out at the root is
  * an × rather than a back arrow.
  *
@@ -18,7 +18,7 @@
  * author makes — see the header there.
  *
  * ⚠️ SOME DOORS HAVE NOTHING UNDERNEATH, AND THEY GET NO WAY OUT. On the
- * account door and the operator door the hub IS the page: an × there closes
+ * account door and the operator door OneSpace IS the page: an × there closes
  * onto a backdrop, which is a control that appears to do nothing. `onClose` is
  * `null` and the root's crown says so by having no leave control at all.
  */
@@ -29,7 +29,7 @@ import {
 import type { FaceOf, Sky } from "@engine/design";
 import type { Belonging, Me } from "../api.js";
 import { useSession } from "../session.js";
-import { HubHome } from "./Home.js";
+import { SpaceHome } from "./Home.js";
 import { You } from "./You.js";
 import { Workspaces } from "./Workspaces.js";
 import { OneWorkspace } from "./Workspace.js";
@@ -40,20 +40,20 @@ import { OneTenant } from "../console/OneTenant.js";
 import { InboxScreen } from "../centre/InboxScreen.js";
 import { Data } from "./Data.js";
 import { TellingMe } from "./TellingMe.js";
-import { HUB, above, isConsole, nameOf, parseWhere, pathOf, type Where } from "./where.js";
+import { SPACE, above, isConsole, nameOf, parseWhere, pathOf, type Where } from "./where.js";
 
 /* ⚠️ Every branch this file draws, named — the guard reads it, because an
    address the parser can produce with no branch renders a blank page. */
-export const HUB_SCREENS: readonly Where["at"][] = [
+export const SPACE_SCREENS: readonly Where["at"][] = [
   "home", "you", "inbox", "told", "data", "prefs", "workspaces", "workspace",
   "people", "money", "plan", "packages", "settings", "brand", "notices", "wording", "trust",
   "console", "tenants", "tenant", "actions", "switches", "works", "ground", "footing",
 ];
 
-export function Hub({ path, onGo, onClose }: {
+export function OneSpace({ path, onGo, onClose }: {
   readonly path: string;
   readonly onGo: (path: string) => void;
-  /** `null` where the hub is the page itself — see the header. */
+  /** `null` where OneSpace is the page itself — see the header. */
   readonly onClose: (() => void) | null;
 }) {
   const where = parseWhere(path);
@@ -95,7 +95,7 @@ function Screen({ where, onGo, onLeave }: {
     : null;
 
   /*
-    ⚠️ ONE MATERIAL ACROSS THE WHOLE HUB, AT THREE STRENGTHS — see `groundOf`.
+    ⚠️ ONE MATERIAL ACROSS THE WHOLE SPACE, AT THREE STRENGTHS — see `groundOf`.
     ⚠️ AND NOT `aurora`, EVER, HERE: it carries a second hue by design, which a
     monochrome product renders as a green cast nobody chose.
   */
@@ -138,7 +138,7 @@ function Screen({ where, onGo, onLeave }: {
               </div>
             </Band>
             <Band width="read">
-              <div className="py-2"><HubHome person={person} onGo={onGo} /></div>
+              <div className="py-2"><SpaceHome person={person} onGo={onGo} /></div>
             </Band>
             {/* ⚠️ Only the root needs one — every `Screen` owns its own
                 (`screen.tsx`), and two would split the slack and leave the dock
@@ -153,9 +153,9 @@ function Screen({ where, onGo, onLeave }: {
 
 /**
  * WHAT THIS SCREEN IS ABOUT, WHERE IT IS ABOUT ANYTHING — and two addresses in
- * the hub are.
+ * OneSpace are.
  *
- * ⚠️ THE HUB HAS EXACTLY TWO ARRIVALS AND THEY ARE THE TWO IDENTITIES IN THE
+ * ⚠️ THE SPACE HAS EXACTLY TWO ARRIVALS AND THEY ARE THE TWO IDENTITIES IN THE
  * PRODUCT. A workspace's own screen is that workspace's world; the root is
  * YOURS. Everything else is a screen you work on — People, Money, Settings, the
  * console — and those wear a material, because an arrival somebody never leaves
@@ -183,9 +183,9 @@ const subjectOf = (where: Where, person: Me | null): FaceOf | undefined => {
 };
 
 /**
- * WHICH GROUND, FROM THE ADDRESS — one decision for every screen in the hub.
+ * WHICH GROUND, FROM THE ADDRESS — one decision for every screen in OneSpace.
  *
- * ⚠️ THE HUB WEARS ONE MATERIAL AND VARIES ITS STRENGTH, NOT ITS FAMILY. It
+ * ⚠️ THE SPACE WEARS ONE MATERIAL AND VARIES ITS STRENGTH, NOT ITS FAMILY. It
  * carried a drawn line field on its arrival and a soft grey wash one step in,
  * so walking into a workspace changed what the product appeared to be made of
  * — and the wash, being a lit colour behind eight rows of content, read as a
@@ -195,7 +195,7 @@ const subjectOf = (where: Where, person: Me | null): FaceOf | undefined => {
  *
  * ⚠️ AND IT IS READ FROM THE ADDRESS, so no screen picks its own. A screen
  * that chose would be a screen somebody has to remember to update, and the
- * hub has twenty of them.
+ * OneSpace has twenty of them.
  */
 const groundOf = (where: Where): Sky => {
   /* ⚠️ The operator's side is about a deployment rather than a business, and
@@ -206,10 +206,10 @@ const groundOf = (where: Where): Sky => {
 /**
  * ⚠️ AND WHICH ONE OF THE FAMILY, FROM THE ADDRESS. `silk`, `linen` and `wire`
  * were three hand-tuned settings of one generator, which is what a seed is —
- * so the hub's materials are two families now and every address inside them
+ * so OneSpace's materials are two families now and every address inside them
  * has a ground of its own. Nobody tunes a fourth.
  */
-const seedOf = (where: Where): string => `hub|${where.at}`;
+const seedOf = (where: Where): string => `space|${where.at}`;
 
 /**
  * ⚠️ A FACT, OR NOTHING AT ALL. Every screen used to carry a sentence under its
@@ -283,4 +283,4 @@ function Inside({ where, onGo }: {
   }
 }
 
-export { HUB, parseWhere, pathOf };
+export { SPACE, parseWhere, pathOf };

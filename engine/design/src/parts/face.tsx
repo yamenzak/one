@@ -59,6 +59,8 @@ import { Avatar as Plate } from "@heroui/react";
 import MOODS from "@dicebear/styles/moods.json" with { type: "json" };
 import PLANETS from "@dicebear/styles/planets.json" with { type: "json" };
 import { FACE_PX } from "../tokens/metrics.js";
+/* ⚠️ The one mark, borrowed — never redrawn here. See `OnePlate`. */
+import { Mark } from "../frame/arrival.js";
 import type { SceneFamily, World } from "../tokens/ambience.js";
 import { useStill } from "../tokens/motion.js";
 
@@ -353,35 +355,25 @@ const palette = (of: "person" | "workspace", name: string): ReadonlySet<string> 
 
 /* ------------------------------------------------------------- the plates --- */
 
-/*
-  ⚠️ FOUR CELLS, IN INK, AND IT IS THE FRAMEWORK'S OWN MARK RATHER THAN A
-  GENERATED ONE. Four is what OneEngine is named after, so the deployment's plate is
-  the shape of the thing rather than a hash of the word — and because it is
-  fixed, it is the same plate on every door, which is what a mark is for. Drawn
-  in `currentColor` so it inherits ink and can never fight a workspace's ground
-  the way a tinted one would (`ground.ts` — the interface is values, the data is
-  hues), and drawn rather than SET, because a glyph from a font is whatever
-  weight and baseline the reader's machine decides.
-*/
-const CELLS = [
-  { x: 2, y: 2 }, { x: 13, y: 2 }, { x: 2, y: 13 }, { x: 13, y: 13 },
-] as const;
-
-/** ⚠️ Descending, so one cell leads and the plate has a reading order. */
-const WEIGHTS = [1, 0.62, 0.38, 0.22] as const;
-
+/**
+ * THE DEPLOYMENT'S OWN FACE IS THE MARK.
+ *
+ * ⚠️ IT IS THE `Mark`, NOT A COPY OF IT. Drawing the logo a second time here is
+ * how a crown and a door come to disagree about a curve — and this file is the
+ * one nobody would think to open when the mark changed. A generated plate is
+ * wrong for the same reason it is wrong for a product: the deployment has an
+ * identity somebody drew, so it wears it rather than a hash of its name.
+ *
+ * ⚠️ AND IT IS THE MARK ALONE, NEVER THE LOCKUP. This slot is a 32–48px circle;
+ * a wordmark inside one is unreadable at every size it is used at, and the name
+ * is already in the row beside it.
+ *
+ * ⚠️ IN `currentColor`, so it inherits ink and can never fight a workspace's
+ * ground the way a tinted mark would (`ground.ts` — the interface is values, the
+ * data is hues).
+ */
 function OnePlate() {
-  return (
-    <svg viewBox="0 0 24 24" className="size-3/5" fill="currentColor" aria-hidden="true">
-      {CELLS.map((c, i) => (
-        <rect
-          key={`${c.x}-${c.y}`}
-          x={c.x} y={c.y} width={9} height={9} rx={2.5}
-          opacity={WEIGHTS[i]}
-        />
-      ))}
-    </svg>
-  );
+  return <Mark size="row" />;
 }
 
 /* ------------------------------------------------------------------- orb --- */
@@ -506,10 +498,10 @@ export function Face({ of, name, size = "row", hero }: FaceProps) {
     <Plate ref={at} size={VARIANT[size]} className="shrink-0">
       {src ? <Plate.Image src={src} alt="" /> : null}
       <Plate.Fallback>
-        {/* ⚠️ THREE ANSWERS, IN ORDER OF HOW MUCH IS KNOWN: the framework's own
-            plate, the glyph a manifest declared, or the initial. An app with no
-            mark falls to its initial rather than to the plate — the four-cell
-            plate is ONE's mark, and lending it to a product would say the product is the
+        {/* ⚠️ THREE ANSWERS, IN ORDER OF HOW MUCH IS KNOWN: the deployment's own
+            mark, the glyph a manifest declared, or the initial. An app with no
+            mark falls to its initial rather than to the mark — that logo is
+            ONE's, and lending it to a product would say the product is the
             platform. */}
         {kind === "one"
           ? <OnePlate />

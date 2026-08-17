@@ -23,7 +23,7 @@ import {
   Arrival, AsideRoute, Group, NavRow, SPACE, Trouble, glyphOf, notice,
 } from "@engine/design";
 import { api, type Owed } from "../api.js";
-import { Data } from "../hub/Data.js";
+import { Data } from "../space/Data.js";
 import { useSession } from "../session.js";
 
 export function Agreements({ owed }: { readonly owed: readonly Owed[] }) {
@@ -32,7 +32,7 @@ export function Agreements({ owed }: { readonly owed: readonly Owed[] }) {
   const [problem, setProblem] = useState<Problem | null>(null);
   /**
    * ⚠️ THE WAY OUT IS ON THIS SCREEN RATHER THAN A ROUTE AWAY. Sending somebody
-   * into the hub for their copy opens every other screen in it, and every
+   * into OneSpace for their copy opens every other screen in it, and every
    * operation behind those is behind this wall — so each refuses with a status
    * the screen has no reason to expect. One flag, two faces, nothing gated in
    * between.

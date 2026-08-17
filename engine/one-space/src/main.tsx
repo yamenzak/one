@@ -23,7 +23,7 @@ import { SessionProvider } from "./session.js";
 /**
  * ⚠️ NOTHING ELSE SELECTS DARK. HeroUI has no `prefers-color-scheme` rule at
  * all — dark is `[data-theme="dark"]` on the document, stamped by the
- * application — so without this the Hub is permanently light on every device,
+ * application — so without this OneSpace is permanently light on every device,
  * silently, with every test green. `index.html` stamps it before the first
  * paint; this keeps it stamped when the device changes at sunset.
  */
@@ -67,7 +67,7 @@ document.head.append(sky);
 const root = document.getElementById("root");
 /* ⚠️ A missing mount point is a build that shipped wrong, not a runtime
    condition to degrade around — say so where somebody will see it. */
-if (!root) throw new Error("no #root to mount the Hub into");
+if (!root) throw new Error("no #root to mount OneSpace into");
 
 createRoot(root).render(
   <StrictMode>

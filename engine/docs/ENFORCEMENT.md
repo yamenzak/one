@@ -174,7 +174,7 @@ is what tells you whether the next thing you write is covered.
 | A capability reaching no route | `access`, `services` | tables applied, a DO bound, dispatch sites writing rows, no route to reach any of it |
 | Two answers to one question | `rules`, `edit`, `problem` | a lane working out for itself what the kernel already decides |
 | A grammar breaking quietly | `heroui`, `metrics`, `states`, `shape`, `descend`, `edit` | a screen that typechecks, renders, looks finished and reads as a filing cabinet |
-| A name nobody mapped | `face` (`glyph:`), `hub` | a neutral circle in a list where every other row has a shape |
+| A name nobody mapped | `face` (`glyph:`), `space` | a neutral circle in a list where every other row has a shape |
 | Words drifting | `tone`, `problem` | the product speaking in two voices, or one code meaning three things |
 | A document going stale | `docs` | a count typed by hand, wrong within a week, taking the rest of the page's credibility with it |
 
@@ -188,7 +188,7 @@ are protected by, because they are not equally strong.
 **"Is this thing wired to anything?"** — DERIVED, and effectively complete. The
 checks walk the declarations themselves: every declaration reaches a screen
 (`surface`), every kernel rule reaches a caller (`rules`), every capability
-reaches a route (`access`, `services`, `agent`, `hub`), every destination
+reaches a route (`access`, `services`, `agent`, `space`), every destination
 resolves. Nothing is listed by hand, so a declaration added tomorrow is covered
 the day it is added, by nobody.
 

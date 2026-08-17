@@ -15,18 +15,33 @@ import { dirname, join } from "node:path";
 
 export const ENGINE = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
+/**
+ * EVERY FILE UNDER A DIRECTORY THE GUARDS NAME.
+ *
+ * ⚠️ A DIRECTORY THAT IS NOT THERE THROWS, AND THAT IS THE WHOLE POINT. This
+ * swallowed the error and returned `[]`, so renaming a package left three guard
+ * lanes pointing at a path that no longer existed — and every one of them went on
+ * reporting green over a tree it was no longer reading. A guard that checks
+ * nothing is worse than no guard, because the absence is the thing nobody looks
+ * for. Deeper failures are still ignored: a subdirectory that vanishes
+ * mid-walk is a race, not a rename.
+ */
 export const files = (dir, match = /\.(ts|tsx)$/) => {
   const out = [];
-  const walk = (at) => {
+  const walk = (at, top) => {
     let entries;
-    try { entries = readdirSync(join(ENGINE, at), { withFileTypes: true }); } catch { return; }
+    try { entries = readdirSync(join(ENGINE, at), { withFileTypes: true }); } catch (e) {
+      if (top) throw new Error(`guards name "${dir}", which is not there — `
+        + `a lane over a path that moved reports green over nothing (${e.message})`);
+      return;
+    }
     for (const entry of entries) {
       const p = `${at}/${entry.name}`;
-      if (entry.isDirectory()) walk(p);
+      if (entry.isDirectory()) walk(p, false);
       else if (match.test(entry.name)) out.push(p);
     }
   };
-  walk(dir);
+  walk(dir, true);
   return out;
 };
 
@@ -85,7 +100,7 @@ export const reaches = (_file, src, name) => IMPORTS(src, name);
 export const lanes = () => ({
   composition: ["kernel/src/manifest.ts"],
   runtime: files("runtime/src"),
-  surface: [...files("design/src"), ...files("one-hub/src"), ...files("one/src")],
+  surface: [...files("design/src"), ...files("one-space/src"), ...files("one/src")],
   app: files("apps/hello/src"),
   guard: files("scripts", /\.test\.mjs$/),
 });

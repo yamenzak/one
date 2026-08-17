@@ -876,11 +876,11 @@
       "fails": "a destination drawn in the nav, navigable and reachable by URL, whose every action refuses — the declaration correct, the manifest composing, and no mechanism behind it"
     },
     {
-      "id": "the-hub-has-one-door-to-the-api",
+      "id": "the-space-has-one-door-to-the-api",
       "protects": "D12",
       "stage": "10",
       "status": "live",
-      "impl": "scripts/hub.test.mjs",
+      "impl": "scripts/space.test.mjs",
       "proves": "one API door:",
       "fails": "an expired session that does not look expired — every screen showing the empty state its failed load produced, and every save failing into a toast"
     },
@@ -889,8 +889,8 @@
       "protects": "D3",
       "stage": "10",
       "status": "live",
-      "impl": "scripts/hub.test.mjs",
-      "proves": "doors: the Hub never classifies its own hostname",
+      "impl": "scripts/space.test.mjs",
+      "proves": "doors: the OneSpace never classifies its own hostname",
       "fails": "a page offering a control the runtime refuses, answered as a 404 with nothing on it to explain why"
     },
     {
@@ -898,7 +898,7 @@
       "protects": "D10",
       "stage": "10",
       "status": "live",
-      "impl": "scripts/hub.test.mjs",
+      "impl": "scripts/space.test.mjs",
       "proves": "screens: every one the picker can name has a branch",
       "fails": "a blank page, which is the same picture as a page that failed to load — so somebody reloads for a minute and then gives up"
     },
@@ -1182,7 +1182,7 @@
       "fails": "a customer opens Money and every call on the screen is a 403 dressed as a broken page"
     },
     {
-      "id": "every-hub-screen-has-an-address",
+      "id": "every-space-screen-has-an-address",
       "protects": "D20",
       "stage": "17",
       "status": "live",
@@ -1200,13 +1200,13 @@
       "fails": "two screens get the way out right by hand and the third goes home from three levels in, or a cycle makes the back button never leave"
     },
     {
-      "id": "the-hub-prefix-is-never-a-products-path",
+      "id": "the-space-prefix-is-never-a-products-path",
       "protects": "D20",
       "stage": "17",
       "status": "live",
       "impl": "one-space/test/centre.test.ts",
-      "proves": "never claims a hub address as a product's",
-      "fails": "an app ships a screen under /hub, it is unreachable, and its author finds out from somebody who could not open it"
+      "proves": "never claims a OneSpace address as a product's",
+      "fails": "an app ships a screen under /space, it is unreachable, and its author finds out from somebody who could not open it"
     },
     {
       "id": "a-cross-app-operation-names-its-target",
@@ -1620,7 +1620,7 @@
       "status": "live",
       "impl": "scripts/kernel.test.mjs",
       "proves": "router:",
-      "fails": "the package deciding navigation for every app that uses it — and the hub, which is not one app, having two routers in one page"
+      "fails": "the package deciding navigation for every app that uses it — and OneSpace, which is not one app, having two routers in one page"
     },
     {
       "id": "a-guard-that-walks-reports-what-it-walked",

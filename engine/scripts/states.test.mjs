@@ -180,7 +180,7 @@ if (!loose) ok(`kinds: nothing animates outside the three named ways`);
 
 /**
  * ⚠️ A STYLESHEET THE SHARED LAYER EXPORTS AND NOBODY INJECTS IS A FEATURE THAT
- * DOES NOT EXIST, AND NOTHING SAYS SO. `CHART_MOTION` was imported by the Hub's
+ * DOES NOT EXIST, AND NOTHING SAYS SO. `CHART_MOTION` was imported by the OneSpace's
  * entry point and left out of the join — so the chart reveal never ran once, in
  * any build, with every test green. A missing stylesheet does not throw; it
  * simply does not animate, which is indistinguishable from a design decision.
@@ -223,7 +223,7 @@ if (!unmounted) ok(`mounted: all ${exported.size} shared stylesheet(s) reach the
  * out by hand they are indistinguishable from the named ones on any single
  * screen — and across twenty screens they are `gap-2`, `gap-3`, `gap-4` and
  * `gap-10`, each defensible, with nobody able to point at which is wrong. The
- * Hub had twenty-three of them.
+ * OneSpace had twenty-three of them.
  *
  * ⚠️ THE CHECK IS THE PAIRING, NOT THE UTILITY. `flex items-center` with no gap
  * is aligning two things, which is not a frame and is fine; a gap is what makes

@@ -36,14 +36,14 @@ reader can trust this table instead of re-reading the code.
 | 7 | Services — ai and notify over RPC | shipped |
 | 8 | Vault + legal | shipped |
 | 9 | A real product on OneEngine, end to end | shipped |
-| 10 | One — the deployment and the Hub | shipped |
+| 10 | One — the deployment and the OneSpace | shipped |
 | 11 | The agent surface — every operation an MCP tool, derived | shipped |
 | 12 | Multi-app access — a platform role for the workspace, a role per app inside it | shipped |
 | 13 | The package rail — a priced bundle of timed grants, one ledger, one clock | shipped |
 | 14 | The tenant centre — the shell with the router: five areas + app screens inside | shipped |
 | 15 | The operator console — the same shell on `admin.`, and the maintenance switch | shipped |
 | 16 | AI actions — a lane per action, a model the operator binds, words that narrow | shipped |
-| 17 | The hub — one surface over the product, reachable from every door, addressed | shipped |
+| 17 | OneSpace — one surface over the product, reachable from every door, addressed | shipped |
 | 19 | OneDesign — the design system named, packaged, documented and fenced | shipped |
 | 20 | Workspaces — personal or commercial, one brand, one installable, a shard of their own | shipped |
 | 21 | Payment — something takes a card | planned |
@@ -296,7 +296,7 @@ refuse — it reads as built and passes every test.
   would not otherwise have happened.
 - `layout.tsx`'s frames — `Stack`, `Row`, `Grid`, `Columns`, `Rail`, `Cluster`,
   `Center`. A container that picks its own gap is a layout nobody designed: the
-  Hub had twenty-three of them at four different values, each defensible, with
+  OneSpace had twenty-three of them at four different values, each defensible, with
   nobody able to point at which was wrong.
 - **[DESIGN.md](../design/DESIGN.md) IS THE DESIGN LANGUAGE, and it governs every screen
   in this tree.** Who the reader is, what a screen is allowed to be for, where a
@@ -584,14 +584,14 @@ that generates declares `ai: { lane, prompt, variables, maxOutput, brandable? }`
   and the fallback; `apps/hello/test/ai-actions.test.ts` drives the binding
   and both wording levels through the real doors.
 
-**Stage 17 — THE HUB (D20).** One surface: who you are, everywhere you belong,
+**Stage 17 — THE SPACE (D20).** One surface: who you are, everywhere you belong,
 and the deployment itself, presented OVER whatever somebody was doing and
 dismissed back onto it. It replaces two five-tab shells — the tenant centre and
 the operator console — that each sat permanently over the product somebody
 actually signed in to use.
 
-- **It is a route, not a popup.** Every screen has an address under `/hub`, a
-  prefix reserved on every door; `hub/where.ts` is a parser and a printer, so
+- **It is a route, not a popup.** Every screen has an address under `/space`, a
+  prefix reserved on every door; `space/where.ts` is a parser and a printer, so
   the whole information architecture is a table of tests with no DOM in it, and
   `above()` decides the way out from where a screen SITS rather than from what
   its author remembered. An unreadable path is the root, never a blank page.
@@ -600,11 +600,11 @@ actually signed in to use.
   account door, the operator door) is handed no way out at all, because an ×
   that closes onto a backdrop is a control that appears to do nothing.
 - **A workspace is managed at its own origin.** Opening one from anywhere else
-  is a full page load that arrives with the hub already open on it (`hubAt`) —
+  is a full page load that arrives with OneSpace already open on it (`spaceAt`) —
   the alternative is a screen that loads here and refuses every call it makes.
   `/health` reports the slug for the same reason it reports the door.
 - **A workspace's own address is the PRODUCT.** Its declared screens, its
-  switcher, its inbox and one control into the hub; the five areas are gone from
+  switcher, its inbox and one control into OneSpace; the five areas are gone from
   the bar. One product opens directly — a chooser with one card is a screen whose
   entire content is a button.
 - **A row somebody cannot open is not drawn** — `partsFor` in `where.ts`, a pure
@@ -665,7 +665,7 @@ proves the components exist, which nobody doubted.
   list is a second answer to "what screens does this app have", and they drift
   in the direction nobody notices: a screen declared and never drawn renders an
   honest notice, which reads as unfinished rather than as a mistake.
-- **And it wears the product's own frame** — the hub mounts `Shell` around it
+- **And it wears the product's own frame** — OneSpace mounts `Shell` around it
   with hello's manifest, exactly as `centre/Product.tsx` does for a real product.
   Without that the ground tested the components and none of the frame, which is
   the half a product cannot opt out of: `Shell` picks the world, `Page` mounts it
@@ -689,7 +689,7 @@ proves the components exist, which nobody doubted.
   chart is never asked to draw.
 - **And the ground is a guard**, not a habit: `scripts/showcase.test.mjs` fails
   on any component `@engine/design` exports and nothing renders. Nine are excused
-  in writing and the list can only shrink — seven are surfaces the HUB owes
+  in writing and the list can only shrink — seven are surfaces the SPACE owes
   (the wallet, the processing record, who looked at a vault field, the consent
   sheet, the AI lanes), and two are arguments that the component should not be
   drawn here at all. Writing the eight screens against the full vocabulary found
@@ -704,7 +704,7 @@ ships, themed through tokens, nothing restyled.
   anybody is signed in — neither is in the path. `pickScreen` is a test rather
   than a walk through five hostnames; a state that resolves to nothing renders a
   blank page, which is the same picture as a page that failed to load. One
-  router on the page (`nav.ts`), because the hub is a route over a product and
+  router on the page (`nav.ts`), because OneSpace is a route over a product and
   two owners of history means the back gesture means two things.
 - **The page never classifies its own hostname.** `/health` reports the door,
   because the runtime already decided it with the reserved labels, the one-label
@@ -740,7 +740,7 @@ The guard registry, its checks, and the standards that bind them.
 | D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 2 |
 | D18 | The operator stands outside every workspace, and the console is a door rather than a role | 2 |
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 3 |
-| D20 | The hub is one surface presented over the product, reachable from every door, and it is a route | 3 |
+| D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 3 |
 | D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 6 |
 | D22 | Branding and the installable app belong to the workspace, never to one app inside it | 3 |
 <!-- /generated -->
@@ -852,7 +852,7 @@ the library decides FOR us.
 | `isolation-is-never-sold-over-somebody-elses-records` | D5 | a database of one's own sold over a shard full of strangers, with every workspace on it working perfectly and nothing downstream noticing |
 | `a-field-is-never-the-colour-of-the-card-it-sits-on` | D7 | a control that exists, is focusable, and cannot be seen until somebody types into it — in both themes, with no border anywhere to draw its edge |
 | `a-business-only-screen-is-not-offered-to-a-workspace-that-is-not-one` | D21 | a destination drawn in the nav, navigable and reachable by URL, whose every action refuses — the declaration correct, the manifest composing, and no mechanism behind it |
-| `the-hub-has-one-door-to-the-api` | D12 | an expired session that does not look expired — every screen showing the empty state its failed load produced, and every save failing into a toast |
+| `the-space-has-one-door-to-the-api` | D12 | an expired session that does not look expired — every screen showing the empty state its failed load produced, and every save failing into a toast |
 | `the-browser-never-classifies-its-own-door` | D3 | a page offering a control the runtime refuses, answered as a 404 with nothing on it to explain why |
 | `every-screen-the-picker-names-is-drawn` | D10 | a blank page, which is the same picture as a page that failed to load — so somebody reloads for a minute and then gives up |
 | `a-code-that-could-not-be-sent-holds-no-cooldown` | D12 | somebody locked out for a minute waiting on a code that was never delivered, told they are asking too often |
@@ -886,9 +886,9 @@ the library decides FOR us.
 | `the-rails-granting-operations-are-not-tools` | D16 | a model composes or applies what a payment buys from a sentence in a document |
 | `every-centre-stop-has-a-branch` | D10 | a path the parser can produce renders a blank page, which is the same picture as a page that failed to load |
 | `an-unreachable-area-resolves-away-before-it-renders` | D15 | a customer opens Money and every call on the screen is a 403 dressed as a broken page |
-| `every-hub-screen-has-an-address` | D20 | a screen held in component state cannot be linked to, landed on or reloaded, and a refusal saying "read this first" has nowhere to send anybody |
+| `every-space-screen-has-an-address` | D20 | a screen held in component state cannot be linked to, landed on or reloaded, and a refusal saying "read this first" has nowhere to send anybody |
 | `leaving-is-decided-by-where-a-screen-sits` | D20 | two screens get the way out right by hand and the third goes home from three levels in, or a cycle makes the back button never leave |
-| `the-hub-prefix-is-never-a-products-path` | D20 | an app ships a screen under /hub, it is unreachable, and its author finds out from somebody who could not open it |
+| `the-space-prefix-is-never-a-products-path` | D20 | an app ships a screen under /space, it is unreachable, and its author finds out from somebody who could not open it |
 | `a-cross-app-operation-names-its-target` | D15 | the second product's packages and settings are unreachable for ever, because the route resolves whichever app is first on the tenant's list |
 | `the-console-is-on-the-operator-door-and-asks-who-is-there` | D18 | the deployment's own console answers at a workspace's address, or admits anybody holding a session, and looks exactly like working software |
 | `maintenance-is-asked-in-the-one-operation-path` | D18 | a closed deployment serves right through the agent door, or an unprovisioned switch refuses every request over our own missing row |
@@ -934,7 +934,7 @@ the library decides FOR us.
 | `every-provider-call-goes-through-one-lane` | D14 | a generation the gateway never sees, so its real token count and real cost are invisible to the half of metering that pays for them and the reserve settles against a guess |
 | `a-document-points-only-at-files-that-exist` | D12 | an instruction that sends a reader somewhere empty — the standards document told people deferrals were found by a script that does not exist, so anybody who followed it found nothing and could reasonably conclude they are not tracked |
 | `the-layering-check-can-actually-match` | D2 | a green run asserting nothing — the pattern named a package scope the tree stopped using at the rename, so eighty cross-package imports went unexamined while the check printed a confident sentence about all of them |
-| `the-design-system-navigates-nothing` | D7 | the package deciding navigation for every app that uses it — and the hub, which is not one app, having two routers in one page |
+| `the-design-system-navigates-nothing` | D7 | the package deciding navigation for every app that uses it — and OneSpace, which is not one app, having two routers in one page |
 | `a-guard-that-walks-reports-what-it-walked` | D12 | a green run over an empty corpus reading exactly like a green run over a full one — three checks in this tree printed a confident sentence for months while examining nothing, and each was found by accident rather than by the gate |
 | `a-build-edge-names-a-package-that-exists` | D12 | a worker's integration suite running against whichever SPA build happened to be lying around — turbo ignores a task key for a package it does not have, in silence, and the edge that connects a suite to its own build is exactly the one nothing else in the graph can express |
 | `a-runtime-capability-is-mounted-or-is-waiting-on-a-named-stage` | D12 | a capability with tables, tests and a document describing it, that no route reaches — the whole vault, the AI lane and the inbox's one write were all in that state at once, and every signal a reader has said they were there |

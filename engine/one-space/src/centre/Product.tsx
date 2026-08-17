@@ -5,15 +5,15 @@
  * cross-app home used to be the permanent nav here, with each product filed
  * underneath them — so the thing somebody signed in to use was one level below
  * four things they visit twice a year, and every one of those four was
- * unreachable from any other door. They are the hub's now, over every screen,
+ * unreachable from any other door. They are OneSpace's now, over every screen,
  * from every door; what is left in the nav is what the product declared.
  *
  * ⚠️ THE SHELL IS THE PLATFORM'S; THE SCREEN'S CONTENT IS THE APP'S. Routing,
  * chrome, reachability and the switcher are decided out here — see
  * `AppSurface`.
  *
- * ⚠️ AND THE ROUTE THE HUB IS AT NEVER REACHES THIS FILE. `beneath` in
- * `nav.ts` holds the last address that was not the hub's, so opening the hub
+ * ⚠️ AND THE ROUTE THE SPACE IS AT NEVER REACHES THIS FILE. `beneath` in
+ * `nav.ts` holds the last address that was not OneSpace's, so opening OneSpace
  * does not quietly change the product underneath it.
  */
 
@@ -28,10 +28,10 @@ import { Choose } from "./Choose.js";
 import { useCentre, useLoad, type InboxView } from "./data.js";
 import { parseStop } from "./route.js";
 
-export function Product({ path, onGo, onOpenHub, onOpenInbox }: {
+export function Product({ path, onGo, onOpenSpace, onOpenInbox }: {
   readonly path: string;
   readonly onGo: (path: string) => void;
-  readonly onOpenHub: () => void;
+  readonly onOpenSpace: () => void;
   readonly onOpenInbox: () => void;
 }) {
   const { me } = useSession();
@@ -68,7 +68,7 @@ export function Product({ path, onGo, onOpenHub, onOpenInbox }: {
                 who={{
                   name: email ?? "You",
                   face: person ? whoFace(person.accountId) : undefined,
-                  onOpen: onOpenHub,
+                  onOpen: onOpenSpace,
                 }}
                 name={view.tenant.name}
                 under="One"
@@ -108,7 +108,7 @@ export function Product({ path, onGo, onOpenHub, onOpenInbox }: {
             onGo={onGo}
             onSwitchApp={(id) => onGo(`/${id}`)}
             onOpenInbox={onOpenInbox}
-            onOpenHub={onOpenHub}
+            onOpenSpace={onOpenSpace}
           >
             <AppSurface app={app} route={route} />
           </Shell>

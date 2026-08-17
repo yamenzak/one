@@ -1,7 +1,7 @@
 /**
- * THE HUB'S ADDRESSES — the whole information architecture, as a table.
+ * THE SPACE'S ADDRESSES — the whole information architecture, as a table.
  *
- * ⚠️ THIS IS WHAT MAKES THE HUB A ROUTE RATHER THAN A POPUP. Every screen has
+ * ⚠️ THIS IS WHAT MAKES THE SPACE A ROUTE RATHER THAN A POPUP. Every screen has
  * an address somebody can link to, land on and reload; parsing is total, so a
  * mangled path is the root rather than a blank page; and leaving is decided by
  * where a screen SITS rather than by what its author remembered.
@@ -9,17 +9,17 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  HUB, OF_CONSOLE, OF_WORKSPACE, above, inHub, nameOf, parseWhere, partsFor, pathOf,
-} from "../src/hub/where.js";
+  SPACE, OF_CONSOLE, OF_WORKSPACE, above, inSpace, nameOf, parseWhere, partsFor, pathOf,
+} from "../src/space/where.js";
 
-describe("what belongs to the hub", () => {
+describe("what belongs to OneSpace", () => {
   it("claims its own prefix and nothing else", () => {
-    expect(inHub("/hub")).toBe(true);
-    expect(inHub("/hub/you")).toBe(true);
+    expect(inSpace("/space")).toBe(true);
+    expect(inSpace("/space/you")).toBe(true);
     /* ⚠️ A workspace's own paths belong to the product — see the header. */
-    expect(inHub("/")).toBe(false);
-    expect(inHub("/clients")).toBe(false);
-    expect(inHub("/hubbub")).toBe(false);
+    expect(inSpace("/")).toBe(false);
+    expect(inSpace("/clients")).toBe(false);
+    expect(inSpace("/spacebar")).toBe(false);
   });
 });
 
@@ -32,7 +32,7 @@ describe("what belongs to the hub", () => {
 */
 describe("a preference is not a workspace's setting", () => {
   it("files your own preferences under you, and steps back there", () => {
-    expect(pathOf({ at: "prefs" })).toBe(`${HUB}/prefs`);
+    expect(pathOf({ at: "prefs" })).toBe(`${SPACE}/prefs`);
     expect(above({ at: "prefs" })).toEqual({ at: "you" });
     /* ⚠️ And it descends the same two levels, so back goes up one at a time. */
     expect(above({ at: "prefs", app: "hello", area: "notes" }))
@@ -68,7 +68,7 @@ describe("every screen has an address", () => {
 
     for (const where of every) {
       const path = pathOf(where);
-      expect(path.startsWith(HUB), path).toBe(true);
+      expect(path.startsWith(SPACE), path).toBe(true);
       expect(parseWhere(path), path).toEqual(where);
       /* ⚠️ Every screen says what it is, so the crown and the title agree. */
       expect(nameOf(where), path).toBeTruthy();
@@ -78,19 +78,19 @@ describe("every screen has an address", () => {
   /* ⚠️ TOTAL, AND THE SAFE ANSWER IS HOME. A route is a string somebody can
      type, an old link can carry and a redirect can mangle. */
   it("lands anything it cannot read on the root", () => {
-    for (const path of ["/hub/nowhere", "/hub/w", "/hub/console/nothing", "/hub/w/atlas/nope", "/hub/"]) {
+    for (const path of ["/space/nowhere", "/space/w", "/space/console/nothing", "/space/w/atlas/nope", "/space/"]) {
       const where = parseWhere(path);
       expect(["home", "workspaces", "workspace", "console"], path).toContain(where.at);
     }
-    expect(parseWhere("/hub/nowhere")).toEqual({ at: "home" });
+    expect(parseWhere("/space/nowhere")).toEqual({ at: "home" });
     /* A workspace with no part named is the workspace itself. */
-    expect(parseWhere("/hub/w/atlas/nope")).toEqual({ at: "workspace", slug: "atlas" });
-    expect(parseWhere("/hub/w")).toEqual({ at: "workspaces" });
+    expect(parseWhere("/space/w/atlas/nope")).toEqual({ at: "workspace", slug: "atlas" });
+    expect(parseWhere("/space/w")).toEqual({ at: "workspaces" });
   });
 
   it("ignores a trailing slash", () => {
-    expect(parseWhere("/hub/")).toEqual({ at: "home" });
-    expect(parseWhere("/hub/w/atlas/")).toEqual({ at: "workspace", slug: "atlas" });
+    expect(parseWhere("/space/")).toEqual({ at: "home" });
+    expect(parseWhere("/space/w/atlas/")).toEqual({ at: "workspace", slug: "atlas" });
   });
 });
 
@@ -116,7 +116,7 @@ describe("what a workspace offers each role", () => {
   });
 
   /* ⚠️ Every part it offers is one the parser can produce — a row into an
-     address nothing reads is a row that lands on the hub's root. */
+     address nothing reads is a row that lands on OneSpace's root. */
   it("names only real addresses", () => {
     for (const role of ["owner", "manager", "staff", "customer", null]) {
       for (const part of partsFor(role)) {
@@ -127,7 +127,7 @@ describe("what a workspace offers each role", () => {
 });
 
 describe("leaving", () => {
-  /* ⚠️ `null` is the root of the surface and is DISMISSED — the hub closes and
+  /* ⚠️ `null` is the root of the surface and is DISMISSED — OneSpace closes and
      returns somebody to whatever it was drawn over. */
   it("dismisses at the root and steps up everywhere else", () => {
     expect(above({ at: "home" })).toBe(null);

@@ -50,13 +50,13 @@ if (strays.length) {
 }
 
 /*
-  ⚠️ AND THE HUB IS HELD TO IT TOO, because it is the surface every workspace
+  ⚠️ AND THE SPACE IS HELD TO IT TOO, because it is the surface every workspace
   shares — its brand editor was four inline controls in one card, in two
   grammars, saving on a keystroke against a server that refuses a colour pair it
   cannot read. An APP may render a control: a form is the stated exception and an
   app is where forms live.
 */
-const hubStrays = [];
+const inRows = [];
 /* ⚠️ COUNTED, BECAUSE A WALK THAT FINDS NOTHING AND A WALK THAT LOOKED AT
    NOTHING PRINT THE SAME SENTENCE — see `guards.test.mjs`. */
 let walked = 0;
@@ -66,16 +66,16 @@ const walk = (dir) => {
     if (entry.isDirectory()) walk(at);
     else if (entry.name.endsWith(".tsx")) {
       walked++;
-      if (/<Field\b/.test(read(at))) hubStrays.push(at);
+      if (/<Field\b/.test(read(at))) inRows.push(at);
     }
   }
 };
 walk("one-space/src");
 
-if (hubStrays.length) {
-  fail(`hub: ${hubStrays.join(", ")} render a control in a row rather than a value and an edit.`);
+if (inRows.length) {
+  fail(`OneSpace: ${inRows.join(", ")} render a control in a row rather than a value and an edit.`);
 } else {
-  ok(`hub: ${walked} file(s) in the hub, every changeable fact a value and an edit`);
+  ok(`OneSpace: ${walked} file(s) in OneSpace, every changeable fact a value and an edit`);
 }
 
 /* ------------------------------------------------------------------- sheet --- */
