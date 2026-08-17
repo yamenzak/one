@@ -1486,6 +1486,33 @@
       "impl": "scripts/edit.test.mjs",
       "proves": "sheet:",
       "fails": "the sheet closing on a refusal, so somebody who spent a minute on a value watches it disappear and reads why in a toast that is gone before they look back"
+    },
+    {
+      "id": "every-refusal-comes-from-a-catalogue",
+      "protects": "D5",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/problem.test.mjs",
+      "proves": "catalogue:",
+      "fails": "one code meaning three things — three screens stamping platform.invalid on three sentences they wrote themselves, so a client switching on the code cannot, and the wording of a refusal lives wherever it was last edited"
+    },
+    {
+      "id": "a-refusal-naming-an-input-is-shown-on-that-input",
+      "protects": "D5",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/problem.test.mjs",
+      "proves": "fields:",
+      "fails": "every refusal about one value rendered as a banner over the whole form, so somebody with six inputs is told that something does not look right and has to re-read all six to find which"
+    },
+    {
+      "id": "a-refusals-values-are-supplied-where-it-is-raised",
+      "protects": "D5",
+      "stage": "20",
+      "status": "live",
+      "impl": "scripts/problem.test.mjs",
+      "proves": "values:",
+      "fails": "a person hitting a seat limit reading \"your plan includes {limit}\" — the sentence survives because leaving an unknown token visible is deliberately correct, which is exactly what lets an unsupplied one reach a screen"
     }
   ]
 }

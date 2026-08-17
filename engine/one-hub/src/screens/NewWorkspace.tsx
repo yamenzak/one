@@ -19,7 +19,9 @@
 import { useMemo, useState } from "react";
 import { Button, Form } from "@heroui/react";
 import type { Problem } from "@engine/kernel";
-import { EEA, slugOk } from "@engine/kernel";
+/* ⚠️ Aliased — this screen's state is called `problem` too. See SignIn. */
+import { EEA, slugOk, problem as raise, refusedOn } from "@engine/kernel";
+import { PROBLEMS } from "../problems.js";
 import { api } from "../api.js";
 import { byName } from "../countries.js";
 import { accountUrl, here, tenantUrl, type Where } from "../door.js";
@@ -43,18 +45,20 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
   const addressOk = address.length > 0 && slugOk(address);
 
   const create = async () => {
-    const missing = !name.trim()
-      ? "Give the workspace a name"
-      : !addressOk
-        ? "The address can only hold letters, numbers and hyphens"
-        : !country
-          ? "Say where the business is"
-          : null;
-    if (missing) {
-      setProblem({
-        code: "platform.invalid", status: 400, title: missing,
-        retryable: false, tone: "warning",
-      });
+    /*
+      ⚠️ EVERY MISSING FIELD AT ONCE, EACH AGAINST ITS OWN INPUT. This was a
+      chain that stopped at the first one and put its sentence in a banner over
+      the form — so somebody with three empty fields fixed one, pressed the
+      button, and was told about the next. `Problem.fields` is the channel for
+      exactly this, and `platform.invalid` is what it is: the values are wrong,
+      and which ones is in `fields`.
+    */
+    const fields: Record<string, string> = {};
+    if (!name.trim()) fields["name"] = "Give the workspace a name";
+    if (!addressOk) fields["slug"] = "Letters, numbers and hyphens only";
+    if (!country) fields["country"] = "Say where the business is";
+    if (Object.keys(fields).length) {
+      setProblem(raise(PROBLEMS, "platform.invalid", {}, { fields }));
       return;
     }
     setBusy(true);
@@ -97,6 +101,7 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
           disabled={busy}
           autoFocus
           placeholder="Northwind Fitness"
+          error={refusedOn(problem, "name")}
         />
 
         <TextInput
@@ -106,9 +111,12 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
           onChange={(next) => { setChosen(true); setSlug(next); }}
           disabled={busy}
           placeholder="northwind"
+          /* ⚠️ WHILE TYPING IT IS THE LIVE CHECK; AFTER A PRESS IT IS THE
+             REFUSAL. Both are the same sentence about the same input, so they
+             share one slot rather than stacking two messages under it. */
           error={address.length > 0 && !addressOk
             ? "Letters, numbers and hyphens only — it is a web address, so it has to be one."
-            : undefined}
+            : refusedOn(problem, "slug")}
           /* ⚠️ THE PREVIEW IS AN ADDRESS OR IT IS NOTHING. With the field empty
              it rendered `….localhost`, which is not a URL, is not a hint, and is
              the first thing on the screen that looks broken. Nothing is said
@@ -125,6 +133,7 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
           disabled={busy}
           placeholder="Search countries…"
           options={countries.map((c) => ({ id: c.code, label: c.name }))}
+          error={refusedOn(problem, "country")}
           help={country && EEA.includes(country)
             ? "Records for this workspace stay in the EU."
             : "This decides where the workspace's records are kept."}

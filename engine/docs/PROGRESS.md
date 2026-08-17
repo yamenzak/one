@@ -682,7 +682,7 @@ The guard registry, its checks, and the standards that bind them.
 | D2 | The framework is OneEngine; the deployment is One; packages are `@engine/*` | 2 |
 | D3 | One worker on the request path; heavy work splits over RPC service bindings | 6 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
-| D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 6 |
+| D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 9 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
 | D7 | HeroUI v3 is the component layer, and its components are not restyled | 55 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
@@ -877,6 +877,9 @@ the library decides FOR us.
 | `the-test-ground-draws-most-of-the-package` | D7 | apps/hello quietly ceasing to be where this package is tried, which would leave the excuse list as the only thing keeping the check green |
 | `a-changeable-fact-is-a-value-and-an-edit` | D7 | a settings card that is a column of live inputs — nothing saying which row is dirty, a stray tap on a phone editing a setting somebody was scrolling past, and a failure reported in a toast beside a control already showing the value the server threw away |
 | `a-refused-change-keeps-what-was-typed` | D7 | the sheet closing on a refusal, so somebody who spent a minute on a value watches it disappear and reads why in a toast that is gone before they look back |
+| `every-refusal-comes-from-a-catalogue` | D5 | one code meaning three things — three screens stamping platform.invalid on three sentences they wrote themselves, so a client switching on the code cannot, and the wording of a refusal lives wherever it was last edited |
+| `a-refusal-naming-an-input-is-shown-on-that-input` | D5 | every refusal about one value rendered as a banner over the whole form, so somebody with six inputs is told that something does not look right and has to re-read all six to find which |
+| `a-refusals-values-are-supplied-where-it-is-raised` | D5 | a person hitting a seat limit reading "your plan includes {limit}" — the sentence survives because leaving an unknown token visible is deliberately correct, which is exactly what lets an unsupplied one reach a screen |
 <!-- /generated -->
 
 ## Commands

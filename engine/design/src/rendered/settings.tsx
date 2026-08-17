@@ -60,7 +60,10 @@ const visible = (def: SettingDef, held: ReadonlySet<string>): boolean =>
  */
 const flip = async (said: Refusal | Promise<Refusal>): Promise<void> => {
   const why = await said;
-  if (why) notice.fail(why);
+  /* ⚠️ THE TITLE, BECAUSE A TOAST IS ONE LINE. The rest of the refusal — the
+     detail, the reference — has nowhere to go here, which is the honest cost of
+     a control that applies without a sheet, and the reason only a switch does. */
+  if (why) notice.fail(why.title);
 };
 
 export function Settings({ book, level, under, stored, held, includes, onChange }: SettingsProps) {

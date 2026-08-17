@@ -82,7 +82,7 @@ const edit = read("design/src/rendered/edit.tsx");
   passes any test of "does it save"; what it loses is the draft, and only when
   the server says no.
 */
-if (/if \(said\) \{ setProblem\(said\); return; \}/.test(edit)
+if (/if \(said\) \{ setRefused\(said\); return; \}/.test(edit)
   && /onOpen\(false\)/.test(edit)) {
   ok("sheet: a refusal keeps the sheet and its draft; a save closes it");
 } else {
@@ -104,7 +104,7 @@ if (/<Trouble/.test(edit)) {
   after a save shows the value from before it — a stale draft that overwrites a
   good value the moment somebody presses Save without looking.
 */
-if (/if \(open\) \{ setDraft\(value\); setProblem\(null\); \}/.test(edit)) {
+if (/if \(open\) \{ setDraft\(value\); setRefused\(null\); \}/.test(edit)) {
   ok("sheet: the draft is what is stored, every time it opens");
 } else {
   fail("sheet: edit.tsx no longer reseeds its draft on open — a reopened sheet offers to save a stale value");
@@ -117,7 +117,16 @@ if (/if \(open\) \{ setDraft\(value\); setProblem\(null\); \}/.test(edit)) {
   was refused, so the sheet would close on a failure and the row would repaint
   with a value the server threw away.
 */
-if (/onSave: \(next: unknown\) => Refusal \| Promise<Refusal>/.test(edit)) {
+/*
+  ⚠️ AND WHAT IT ANSWERS WITH IS A `Problem`, NOT A SENTENCE. A string is the
+  server's refusal with everything but one line thrown away — the code, the
+  detail, the tone, the retryability, the reference — and a sheet handed one then
+  has to invent a `Problem` back to render it, which is how a code no catalogue
+  has came to exist. `problem.test.mjs` refuses the invention; this refuses the
+  narrowing that made it necessary.
+*/
+if (/export type Refusal = Problem \| null \| undefined \| void;/.test(edit)
+  && /onSave: \(next: unknown\) => Refusal \| Promise<Refusal>/.test(edit)) {
   ok("refusals: a save answers with the refusal or with nothing");
 } else {
   fail("refusals: edit.tsx's save no longer returns a refusal, so a failed change closes the sheet looking successful");

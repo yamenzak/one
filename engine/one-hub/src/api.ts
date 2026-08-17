@@ -13,25 +13,21 @@
  * one from a status code.
  */
 
-import type { Problem } from "@engine/kernel";
+import { newId, problem, type Problem } from "@engine/kernel";
+import { PROBLEMS } from "./problems.js";
 
 export interface Ok<T> { readonly ok: true; readonly value: T }
 export interface No { readonly ok: false; readonly problem: Problem }
 export type Answer<T> = Ok<T> | No;
 
 /**
- * ⚠️ THE PROBLEM WE INVENT WHEN THERE WAS NO ANSWER AT ALL, and it is the only
- * one this file writes. A network that dropped is not a status code, and
- * dressing it as one ("500") would put words in the platform's mouth.
+ * ⚠️ RAISED FROM THE CATALOGUE, LIKE EVERY OTHER REFUSAL IN THE PRODUCT. This
+ * was an object literal here — the whole sentence, the tone and the
+ * retryability decided in this file — which is how a refusal comes to be
+ * worded differently in the two places that raise it. `problems.ts` says what
+ * it is; this says when.
  */
-const UNREACHABLE: Problem = {
-  code: "hub.unreachable",
-  status: 0,
-  title: "We could not reach One",
-  detail: "Check your connection and try again.",
-  retryable: true,
-  tone: "warning",
-};
+const unreachable = (): Problem => problem(PROBLEMS, "hub.unreachable");
 
 /**
  * ⚠️ WHAT HAPPENS WHEN THE SESSION IS GONE IS ONE DECISION, MADE HERE. Left to
@@ -54,13 +50,10 @@ const readProblem = async (res: Response): Promise<Problem> => {
     const body = await res.json() as { problem?: Problem };
     if (body.problem?.code) return body.problem;
   } catch { /* not JSON — fall through to the shape below */ }
-  return {
-    code: "hub.unexpected",
-    status: res.status,
-    title: "Something went wrong",
-    retryable: res.status >= 500,
-    tone: "danger",
-  };
+  /* ⚠️ A REFERENCE, BECAUSE THIS IS THE ONE NOBODY CAN EXPLAIN. A response
+     that is not ours has no sentence in it; what makes it reportable is
+     something to quote, and `hub.unexpected` asks for exactly that. */
+  return problem(PROBLEMS, "hub.unexpected", {}, { ref: newId("ref") });
 };
 
 async function call<T>(id: string, method: "GET" | "POST", body?: unknown): Promise<Answer<T>> {
@@ -80,7 +73,7 @@ async function call<T>(id: string, method: "GET" | "POST", body?: unknown): Prom
         : {}),
     });
   } catch {
-    return { ok: false, problem: UNREACHABLE };
+    return { ok: false, problem: unreachable() };
   }
 
   if (res.ok) return { ok: true, value: await res.json() as T };
@@ -108,7 +101,7 @@ export const api = {
       if (!res.ok) return { ok: false, problem: await readProblem(res) };
       return { ok: true, value: await res.json() as Health };
     } catch {
-      return { ok: false, problem: UNREACHABLE };
+      return { ok: false, problem: unreachable() };
     }
   },
 };

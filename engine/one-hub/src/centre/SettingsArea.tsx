@@ -77,7 +77,7 @@ function AppSettings({ app }: { readonly app: CentreApp }) {
   */
   const write = async (id: string, value: unknown) => {
     const out = await api.post("setting.write", { app: app.id, id, value });
-    if (!out.ok) { stored.again(); return out.problem.title; }
+    if (!out.ok) { stored.again(); return out.problem; }
     notice.ok("Saved.");
     return null;
   };

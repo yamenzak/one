@@ -186,6 +186,20 @@ export function problem(
 }
 
 /**
+ * THE MESSAGE FOR ONE INPUT.
+ *
+ * ⚠️ A REFUSAL ABOUT A VALUE BELONGS BESIDE THE VALUE. `fields` exists so a form
+ * can do that, and a screen that renders only the title puts "that does not look
+ * right" over a form of six inputs without saying which — which is what makes
+ * somebody re-read every one of them. This is the read half of that channel, so
+ * a form does not reach into `problem.fields?.[name]` and get the optional chain
+ * wrong in one of the six places it writes it.
+ */
+export const refusedOn = (
+  refusal: Problem | null | undefined, field: string,
+): string | undefined => refusal?.fields?.[field];
+
+/**
  * ⚠️ EVERY CODE AN OPERATION SAYS IT CAN RAISE MUST EXIST. A `fails` naming a
  * code no catalogue has is a refusal that renders as "something went wrong" on
  * the one path the author thought hardest about.

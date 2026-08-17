@@ -14,7 +14,7 @@
 
 import * as React from "react";
 import { Button } from "@heroui/react";
-import { field, mayBrand, type Kind, type Theme } from "@engine/kernel";
+import { field, mayBrand, type Kind, type Problem, type Theme } from "@engine/kernel";
 import {
   BrandTile, Center, EditRow, Group, Row, Screen, Stack, TextInput, ToggleRow,
   notice, ready,
@@ -73,9 +73,9 @@ const SAID: Readonly<Record<string, { readonly label: string; readonly under: st
  * renders in it; a toggle applied instantly, so the sentence goes where instant
  * failures go rather than nowhere.
  */
-const flip = async (said: Promise<string | null>): Promise<void> => {
+const flip = async (said: Promise<Problem | null>): Promise<void> => {
   const why = await said;
-  if (why) notice.fail(why);
+  if (why) notice.fail(why.title);
 };
 
 export function Brand({ name, slug }: {
@@ -126,10 +126,13 @@ function Editor({ name, slug, answer, again }: {
   const write = async (next: {
     readonly theme?: Theme;
     readonly surfaces?: readonly string[];
-  }): Promise<string | null> => {
+  }): Promise<Problem | null> => {
     const body = { theme: next.theme ?? theme, surfaces: next.surfaces ?? surfaces };
     const out = await api.post("brand.write", body);
-    if (!out.ok) return out.problem.title;
+    /* ⚠️ THE WHOLE REFUSAL, NOT ITS TITLE. `refuseTheme` answers "that pair is
+       too close to read" with a detail saying which two — narrowing it to one
+       line here would throw away the half that says what to do. */
+    if (!out.ok) return out.problem;
     setTheme(body.theme);
     setSurfaces(body.surfaces);
     notice.ok("Saved.");

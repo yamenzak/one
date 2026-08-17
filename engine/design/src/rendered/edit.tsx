@@ -27,7 +27,7 @@
 
 import * as React from "react";
 import { Button } from "@heroui/react";
-import type { FieldSpec } from "@engine/kernel";
+import { PLATFORM_PROBLEMS, problem, refusedOn, type FieldSpec, type Problem } from "@engine/kernel";
 import { sentence, TYPE } from "../tokens/type.js";
 import { Field } from "./field.js";
 import { Tray } from "../frame/overlay.js";
@@ -36,11 +36,25 @@ import { Trouble } from "../parts/state.js";
 import { FieldRow, Swatch } from "../parts/surfaces.js";
 
 /**
- * ⚠️ WHAT A SAVE ANSWERS WITH: nothing when it landed, a sentence when it did
- * not. A boolean would leave the screen to invent the words, and the server's
- * own refusal — "that pair is too close to read" — is the only one worth showing.
+ * WHAT A SAVE ANSWERS WITH: nothing when it landed, the refusal when it did not.
+ *
+ * ⚠️ A `Problem`, NEVER A STRING. This was a string, and a string is the server's
+ * refusal with everything but one line thrown away — the code a client could
+ * switch on, the detail saying what to do about it, the tone, whether trying
+ * again could work, and the reference somebody quotes when they report it. The
+ * caller already HAS the whole thing; narrowing it to a sentence at the seam
+ * meant the sheet then had to invent a `Problem` back again to render it, and
+ * what it invented was a code no catalogue has.
+ *
+ * ⚠️ AND `refuse` IS FOR A CALLER WITH NO SERVER IN THE LOOP — a value this
+ * screen can reject before anything is sent. It goes through the catalogue like
+ * everything else.
  */
-export type Refusal = string | null | undefined | void;
+export type Refusal = Problem | null | undefined | void;
+
+/** ⚠️ The local refusal, from the catalogue — see `Refusal`. */
+export const refuse = (says: string, field = "value"): Problem =>
+  problem(PLATFORM_PROBLEMS, "platform.invalid", {}, { fields: { [field]: says } });
 
 /* ------------------------------------------------------------------ shown --- */
 
@@ -137,23 +151,26 @@ export function Edit({ spec, name, value, set, open, onOpen, onSave }: EditProps
   */
   const [draft, setDraft] = React.useState<unknown>(value);
   const [working, setWorking] = React.useState(false);
-  const [problem, setProblem] = React.useState<string | null>(null);
+  const [refused, setRefused] = React.useState<Problem | null>(null);
 
   React.useEffect(() => {
-    if (open) { setDraft(value); setProblem(null); }
+    if (open) { setDraft(value); setRefused(null); }
   }, [open, value]);
 
   const save = async () => {
     setWorking(true);
-    setProblem(null);
+    setRefused(null);
     try {
       const said = await onSave(draft);
       /* ⚠️ OPEN ON A REFUSAL, CLOSED ON A SAVE. A sheet that closes either way
          throws away what somebody typed at the moment they most need it back. */
-      if (said) { setProblem(said); return; }
+      if (said) { setRefused(said); return; }
       onOpen(false);
     } catch {
-      setProblem("That did not save. Try again.");
+      /* ⚠️ A THROW IS THE PLATFORM'S OWN FAILURE, AND IT SAYS SO FROM THE
+         CATALOGUE. Nothing here knows what went wrong, which is precisely what
+         `platform.unavailable` is worded for. */
+      setRefused(problem(PLATFORM_PROBLEMS, "platform.unavailable"));
     } finally {
       setWorking(false);
     }
@@ -187,19 +204,17 @@ export function Edit({ spec, name, value, set, open, onOpen, onSave }: EditProps
           set={set}
           disabled={working}
           onChange={setDraft}
+          /* ⚠️ THE REFUSAL ABOUT THIS VALUE GOES UNDER THIS CONTROL. A server
+             that names the field — `refuseTheme` naming `ink` — would otherwise
+             have that half of its answer dropped, and the sheet would show only
+             the generic title over a control with nothing wrong marked on it. */
+          error={refusedOn(refused, name)}
         />
         {/* ⚠️ AGAINST THE FIELD, NOT IN A TOAST. A refusal about what somebody
             just typed belongs where they can read it while they fix it; a toast
             is gone by the time they look back at the control. `Trouble` is the
             one shape a refusal takes, so this reads like every other one. */}
-        {problem ? (
-          <Trouble
-            problem={{
-              code: "field.refused", status: 422, title: problem,
-              retryable: false, tone: "warning",
-            }}
-          />
-        ) : null}
+        {refused ? <Trouble problem={refused} /> : null}
       </Stack>
     </Tray>
   );

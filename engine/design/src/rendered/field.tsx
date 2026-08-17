@@ -25,6 +25,7 @@ import {
 import { parseDate, parseDateTime } from "@internationalized/date";
 import type { DateValue } from "@internationalized/date";
 import { TYPE, sentence } from "../tokens/type.js";
+import { Tail } from "../parts/forms.js";
 
 export interface FieldProps {
   readonly name: string;
@@ -44,12 +45,24 @@ export interface FieldProps {
    * a row is nameless to anybody not looking at it.
    */
   readonly bare?: boolean;
+  /**
+   * ⚠️ WHY THIS VALUE WAS REFUSED, UNDER THIS CONTROL. `Problem.fields` carries
+   * a message per input for exactly this, and a screen that renders only the
+   * title puts "that does not look right" over a form without saying which
+   * input it is about. Read it with `refusedOn` rather than reaching into the
+   * optional chain per caller.
+   */
+  readonly error?: string;
 }
 
-export function Field({ name, spec, value, onChange, disabled, set, bare }: FieldProps) {
+export function Field({ name, spec, value, onChange, disabled, set, bare, error }: FieldProps) {
   const label = spec.label;
   const help = bare ? undefined : spec.help;
   const pending = value === undefined;
+  /* ⚠️ ONE TAIL FOR EVERY KIND, so a refusal looks the same under a select as
+     under a text box — and so a kind added later cannot forget to render one. */
+  const tail = <Tail help={help} error={error} />;
+  const invalid = error !== undefined;
 
   switch (spec.kind) {
     case "bool":
@@ -57,12 +70,13 @@ export function Field({ name, spec, value, onChange, disabled, set, bare }: Fiel
         <Switch
           isSelected={value === true}
           isDisabled={disabled || pending}
+          isInvalid={invalid}
           onChange={(next) => onChange(next)}
         >
           <Switch.Control><Switch.Thumb /></Switch.Control>
           <Switch.Content>
             <Label>{label}</Label>
-            {help ? <Description>{help}</Description> : null}
+            {tail}
           </Switch.Content>
         </Switch>
       );
@@ -73,6 +87,7 @@ export function Field({ name, spec, value, onChange, disabled, set, bare }: Fiel
           selectedKey={value === undefined ? null : String(value)}
           isDisabled={disabled || pending}
           onSelectionChange={(key) => onChange(key)}
+          isInvalid={invalid}
           placeholder="Choose one"
           aria-label={bare ? label : undefined}
         >
@@ -103,7 +118,7 @@ export function Field({ name, spec, value, onChange, disabled, set, bare }: Fiel
               })}
             </ListBox>
           </Select.Popover>
-          {help ? <Description>{help}</Description> : null}
+          {tail}
         </Select>
       );
 
@@ -115,12 +130,13 @@ export function Field({ name, spec, value, onChange, disabled, set, bare }: Fiel
           isDisabled={disabled || pending}
           minValue={spec.min}
           maxValue={spec.max}
+          isInvalid={invalid}
           onChange={(next) => onChange(next)}
           aria-label={bare ? label : undefined}
         >
           {bare ? null : <Label>{label}</Label>}
           <Input />
-          {help ? <Description>{help}</Description> : null}
+          {tail}
         </NumberField>
       );
 
@@ -187,6 +203,9 @@ export function Field({ name, spec, value, onChange, disabled, set, bare }: Fiel
               </ColorField.Group>
             </ColorField>
           </ColorPicker.Popover>
+          {/* ⚠️ THE ONE KIND WHOSE TAIL IS OUTSIDE ITS TRIGGER, because the
+              trigger is a swatch and a sentence does not belong inside it. */}
+          {tail}
         </ColorPicker>
       );
 
@@ -209,6 +228,7 @@ export function Field({ name, spec, value, onChange, disabled, set, bare }: Fiel
           value={asDate(value, spec.kind)}
           granularity={spec.kind === "day" ? "day" : "minute"}
           isDisabled={disabled || pending}
+          isInvalid={invalid}
           onChange={(next) => onChange(next ? next.toString() : null)}
           aria-label={bare ? label : undefined}
         >
@@ -219,7 +239,7 @@ export function Field({ name, spec, value, onChange, disabled, set, bare }: Fiel
               <DatePicker.Trigger><DatePicker.TriggerIndicator /></DatePicker.Trigger>
             </DateField.Suffix>
           </DateField.Group>
-          {help ? <Description>{help}</Description> : null}
+          {tail}
           <DatePicker.Popover>
             <Calendar aria-label={label}>
               <Calendar.Header>
@@ -251,6 +271,7 @@ export function Field({ name, spec, value, onChange, disabled, set, bare }: Fiel
         <TextField
           value={typeof value === "string" ? value : ""}
           isDisabled={disabled || pending}
+          isInvalid={invalid}
           onChange={(next) => onChange(next)}
           aria-label={bare ? label : undefined}
         >
@@ -260,7 +281,7 @@ export function Field({ name, spec, value, onChange, disabled, set, bare }: Fiel
               because a textarea is the one kind that never sat in a row. */}
           {bare ? null : <Label>{label}</Label>}
           <TextArea />
-          {help ? <Description>{help}</Description> : null}
+          {tail}
         </TextField>
       );
 
@@ -271,12 +292,13 @@ export function Field({ name, spec, value, onChange, disabled, set, bare }: Fiel
           value={typeof value === "string" ? value : ""}
           isDisabled={disabled || pending}
           type={spec.kind === "email" ? "email" : spec.kind === "url" ? "url" : "text"}
+          isInvalid={invalid}
           onChange={(next) => onChange(next)}
           aria-label={bare ? label : undefined}
         >
           {bare ? null : <Label>{label}</Label>}
           <Input placeholder={set ? "Stored. Type to replace it." : undefined} />
-          {help ? <Description>{help}</Description> : null}
+          {tail}
         </TextField>
       );
   }

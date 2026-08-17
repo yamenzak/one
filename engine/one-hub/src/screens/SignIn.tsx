@@ -23,7 +23,12 @@
 import { useState } from "react";
 import { Button, Form } from "@heroui/react";
 import type { Problem } from "@engine/kernel";
-import { CODE_DIGITS } from "@engine/kernel";
+/* ⚠️ ALIASED, because these screens hold their current refusal in a state
+   called `problem` — the constructor and the value want the same word, and the
+   shadow would make a module-scope call and an in-component call mean different
+   things while reading identically. */
+import { CODE_DIGITS, problem as raise, refusedOn } from "@engine/kernel";
+import { PROBLEMS } from "../problems.js";
 import { useSession } from "../session.js";
 import { here, setupUrl } from "../door.js";
 import { Arrival, AsideRoute, CodeEntry, SPACE, TextInput, Trouble } from "@engine/design";
@@ -33,21 +38,21 @@ import { Arrival, AsideRoute, CodeEntry, SPACE, TextInput, Trouble } from "@engi
    fill in is noise that teaches somebody to stop reading markers. */
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-const NOT_AN_ADDRESS: Problem = {
-  code: "platform.invalid",
-  status: 400,
-  title: "That does not look like an email address",
-  retryable: false,
-  tone: "warning",
-};
+/*
+  ⚠️ A FIELD'S OWN MESSAGE RIDES IN `fields`, WHICH IS WHAT IT IS FOR. Both of
+  these were object literals stamped `platform.invalid` and carrying their own
+  title — so one code meant three different sentences across the hub, and the
+  sentence appeared in a banner above the form rather than against the input it
+  was about. The code says WHAT KIND of refusal it is; `fields` says which input,
+  in words, where somebody is already looking.
+*/
+const notAnAddress = (): Problem => raise(PROBLEMS, "platform.invalid", {}, {
+  fields: { email: "That does not look like an email address" },
+});
 
-const SHORT_CODE: Problem = {
-  code: "platform.invalid",
-  status: 400,
-  title: `The code is ${CODE_DIGITS} digits`,
-  retryable: false,
-  tone: "warning",
-};
+const shortCode = (): Problem => raise(PROBLEMS, "platform.invalid", {}, {
+  fields: { code: `The code is ${CODE_DIGITS} digits` },
+});
 
 export function SignIn({ lead }: { readonly lead?: string }) {
   const { askForCode, enter, where, face } = useSession();
@@ -63,7 +68,7 @@ export function SignIn({ lead }: { readonly lead?: string }) {
 
   const send = async () => {
     const address = email.trim().toLowerCase();
-    if (!EMAIL.test(address)) { setProblem(NOT_AN_ADDRESS); return; }
+    if (!EMAIL.test(address)) { setProblem(notAnAddress()); return; }
     setBusy(true);
     setProblem(null);
     const out = await askForCode(address);
@@ -73,7 +78,7 @@ export function SignIn({ lead }: { readonly lead?: string }) {
   };
 
   const finish = async () => {
-    if (code.length !== CODE_DIGITS) { setProblem(SHORT_CODE); return; }
+    if (code.length !== CODE_DIGITS) { setProblem(shortCode()); return; }
     setBusy(true);
     setProblem(null);
     const out = await enter(email.trim().toLowerCase(), code);
@@ -113,6 +118,7 @@ export function SignIn({ lead }: { readonly lead?: string }) {
             onChange={setCode}
             onDone={() => { void finish(); }}
             disabled={busy}
+            error={refusedOn(problem, "code")}
           />
 
           {/* ⚠️ Live at rest here too. `onComplete` submits the moment the
@@ -155,6 +161,7 @@ export function SignIn({ lead }: { readonly lead?: string }) {
           autoFocus
           autoComplete="email"
           placeholder="you@example.com"
+          error={refusedOn(problem, "email")}
         />
         <Button type="submit" variant="primary" size="lg" fullWidth isPending={busy}>
           Send me a code

@@ -60,8 +60,17 @@ const said = (p: Said) => ({
   isInvalid: p.error !== undefined,
 });
 
-/** The help line and the refusal, in that order, wherever the control puts its tail. */
-const Tail = ({ help, error }: Pick<Said, "help" | "error">) => (
+/**
+ * The help line and the refusal, in that order, wherever the control puts its tail.
+ *
+ * ⚠️ EXPORTED, BECAUSE THE DECLARED-FIELD RENDERER NEEDS THE SAME TWO LINES.
+ * `rendered/field.tsx` draws a control from a `FieldSpec` rather than from these
+ * props, and it had no refusal slot at all — so a `Problem` naming a field was
+ * rendered as a title over the form and the sentence about the value never
+ * appeared under the value. A second copy of this would be a second answer to
+ * "where does a refusal go".
+ */
+export const Tail = ({ help, error }: Pick<Said, "help" | "error">) => (
   <>
     {help ? <Description>{help}</Description> : null}
     {error ? <FieldError>{error}</FieldError> : null}
