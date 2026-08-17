@@ -49,6 +49,35 @@ export const uses = (src, name) => {
 };
 
 /**
+ * ⚠️ A MENTION IS NOT A USE, AND THIS GUARD WAS MAKING THAT MISTAKE ABOUT ITS
+ * OWN SUBJECT. `unread` is a kernel rule — which settings nobody has read — and
+ * it is also the name of the notification count on the shell's crown. The walk
+ * matched the prop and reported the rule as in force through a surface, which is
+ * the precise failure the whole check exists to catch, one level up.
+ *
+ * ⚠️ SO A LANE MUST IMPORT IT. That is the actual wiring, and it cannot collide
+ * with an ordinary English word the way a bare identifier can.
+ *
+ * ⚠️ AND A GUARD IS NOT AN EXCEPTION, WHICH WAS THE SECOND MISTAKE. Allowing an
+ * `.mjs` script to name a rule as text moved `unread`'s false credit from a
+ * surface to a guard rather than removing it — `ground.test.mjs` has a local
+ * variable called `unread`. The one guard that genuinely applies a kernel rule,
+ * `tone.test.mjs`, imports `refuseCopy` from `kernel/src/tone.ts` and calls it,
+ * because that is what applying a rule means. There is nothing to exempt.
+ */
+const IMPORTS = (src, name) => {
+  const at = /import\s+(?:type\s+)?\{([^}]*)\}\s*from\s*"[^"]*"/g;
+  for (const m of src.matchAll(at)) {
+    for (const part of m[1].split(",")) {
+      if (part.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0].trim() === name) return true;
+    }
+  }
+  return false;
+};
+
+export const reaches = (_file, src, name) => IMPORTS(src, name);
+
+/**
  * ⚠️ FOUR LANES, AND A TEST IS NOT ONE OF THEM. A test proves a rule is correct;
  * it does not put it in force. Every lane below is something a request passes
  * through, or a check the build runs.
@@ -145,7 +174,13 @@ export function resolveRules() {
     for (const rule of rules) {
       if (found.has(rule.name)) continue;
       const lane = Object.keys(LANES)
-        .find((l) => LANES[l].some((f) => uses(bodies.get(f) ?? "", rule.name)));
+        /* ⚠️ THE COMPOSITION LANE IS `manifest.ts`, WHICH ALSO DECLARES A RULE.
+           `refuseApp` is called by `defineApp` beside it, so there is no import
+           to find — a same-file caller is the one place a bare identifier is
+           unambiguous, because the declaration is right there. */
+        .find((l) => LANES[l].some((f) => (f === rule.file
+          ? uses(bodies.get(f) ?? "", rule.name)
+          : reaches(f, bodies.get(f) ?? "", rule.name))));
       if (lane) { found.set(rule.name, lane); moved = true; continue; }
       /* ⚠️ A kernel sibling counts only if the sibling itself runs — otherwise a
          chain of rules ending nowhere passes, which is the same failure with an

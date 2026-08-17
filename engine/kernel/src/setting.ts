@@ -235,6 +235,15 @@ export function refuseSettings(
  * turns it on, believes the thing it promised, and stops watching for the
  * problem it claimed to solve. This is the "surfaced → enforced" half of the
  * autodiscovery rule, and it is asked of every app.
+ *
+ * DEFER(engine-33) stage:33 — AND IT CANNOT BE ASKED YET, BECAUSE EVERY SETTING
+ * IS UNREAD. `named` is the ids an app's code actually reads, and there is no
+ * way for it to read one: `storedSettings` is reached only by the settings
+ * screen's own operations, and an operation's context carries `allowance` for
+ * entitlements and nothing for settings. So the rail is write-only — a person
+ * changes a switch, it persists, it is drawn back to them, and no handler can
+ * act on it. Stage 33 is the seam and the guard that walks its call sites; a
+ * rule that would name every setting today is a rule with nothing to say.
  */
 export const unread = (book: SettingBook, named: readonly string[]): readonly string[] =>
   Object.keys(book).filter((id) => !named.includes(id));

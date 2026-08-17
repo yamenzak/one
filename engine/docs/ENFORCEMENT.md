@@ -46,6 +46,24 @@ app boots), the runtime (while somebody is making the write), a surface (before
 it is sent), or a guard (at build time). Four of the rules below were only ever
 reached by a test, and every one of them was unenforced in the product.
 
+⚠️ **And a mention is not a use — the lane must IMPORT the rule.** This walk
+matched a bare identifier for a while, and credited `unread` — the rule about a
+setting nobody reads — to a surface, because the shell's crown has a
+notification count called `unread`. Tightening it to "a mention anywhere in an
+`.mjs` guard" simply moved the false credit to `ground.test.mjs`, which has a
+local variable of the same name. The one guard that genuinely applies a kernel
+rule imports it and calls it, so there is nothing to exempt: the evidence is an
+import everywhere, and the only special case is the composition lane, whose file
+also declares `refuseApp` and calls it from `defineApp` beside it.
+
+Removing that credit is what found the thing under it. **`unread` has no lane
+because no setting can be read at all** — `storedSettings` is reached only by
+the settings screen's own operations, and an operation's context carries
+`allowance` for entitlements and nothing for settings. A person changes a
+switch, it persists, it is drawn back to them, and no handler can act on it.
+That is the rule's own sentence about a switch that changes nothing, describing
+the whole rail. Stage 33.
+
 <!-- generated: node scripts/inventory.mjs enforcement -->
 | Rule | Declared in | In force through |
 |---|---|---|
@@ -89,7 +107,7 @@ reached by a test, and every one of them was unenforced in the product.
 | `unknownProblems` | `problem` | composition |
 | `refuseSetting` | `setting` | composition |
 | `refuseSettings` | `setting` | composition |
-| `unread` | `setting` | surface |
+| `unread` | `setting` | deferred to stage 33 |
 | `refuseCommercial` | `tenancy` | runtime |
 | `refusePlacement` | `tenancy` | runtime |
 | `refuseCopy` | `tone` | guard |

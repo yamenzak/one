@@ -52,6 +52,7 @@ reader can trust this table instead of re-reading the code.
 | 30 | A workspace's apps are turned on and off, and a workspace can move shard | planned |
 | 31 | Account security — sign out everywhere, and proving it is you again before something irreversible | planned |
 | 32 | A manifest changes while the deployment is up, and the composed surface forgets | planned |
+| 33 | A setting reaches the code — a handler reads one, and a guard refuses a switch that changes nothing | planned |
 
 ## What is NOT built, and where to pick it up
 
