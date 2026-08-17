@@ -20,6 +20,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { knownStages, shippedStages, stages } from "./lib/stages.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -107,19 +108,52 @@ for (const g of owed) if (!g.stage) fail(`${g.id}: owed against no stage, so not
 /*
   ⚠️ AND A SHIPPED STAGE MAY OWE NOTHING. Without this the stage table is a mood:
   a stage gets marked shipped, its outstanding guards keep their entry, and the
-  word stops meaning that the thing is actually defended. `PROGRESS.md` is read
-  rather than a second list kept here, because two lists disagree.
+  word stops meaning that the thing is actually defended. The stage REGISTRY is
+  read rather than a second list kept here, because two lists disagree.
 */
-const progress = readFileSync(join(ENGINE, "docs/PROGRESS.md"), "utf8");
-const shipped = new Set([...progress.matchAll(/^\|\s*(\d+)\s*\|[^|]*\|\s*shipped\s*\|/gm)].map((m) => m[1]));
+const shipped = shippedStages();
 for (const g of owed) {
   if (shipped.has(String(g.stage))) {
-    fail(`${g.id}: owed against stage ${g.stage}, which PROGRESS.md calls shipped.\n` +
+    fail(`${g.id}: owed against stage ${g.stage}, which the stage registry calls shipped.\n` +
          `       Either the guard is due now, or "shipped" has stopped meaning defended.`);
   }
 }
 const byStage = {};
 for (const g of owed) byStage[g.stage] = (byStage[g.stage] ?? 0) + 1;
+
+/* --------------------------------------------------------------- staged --- */
+
+/**
+ * ⚠️ THE STAGE REGISTRY IS READ BY FOUR CHECKS AND NOTHING CHECKED THE REGISTRY.
+ * Two rows carrying the same number is a table where one of them is invisible —
+ * whichever a reader's eye or a `Map` drops — so a stage can be shipped, deferred
+ * against and owed at the same time, with every check reporting green about the
+ * row it happened to see. The document renders both, which is the only place it
+ * shows at all, and by then it reads as a formatting mistake rather than a
+ * registry that has stopped meaning one thing per number.
+ */
+{
+  const rows = stages();
+  const seen = new Set();
+  for (const s of rows) {
+    if (seen.has(s.n)) fail(`docs/stages.json: stage ${s.n} appears twice, so one of the two is a row nothing can see`);
+    seen.add(s.n);
+    if (s.status !== "shipped" && s.status !== "planned") {
+      fail(`docs/stages.json: stage ${s.n} is "${s.status}", which is neither shipped nor planned`);
+    }
+    if (!String(s.title ?? "").trim()) fail(`docs/stages.json: stage ${s.n} has no title`);
+  }
+
+  /* ⚠️ AND A GUARD MAY NOT PROTECT WORK THAT IS NOT ON THE MAP. */
+  const known = knownStages();
+  for (const g of guards) {
+    if (g.stage && !known.has(String(g.stage))) {
+      fail(`${g.id}: names stage ${g.stage}, which the registry has no row for — `
+        + `a guard protecting work nobody has planned`);
+    }
+  }
+  ok(`staged: ${rows.length} stage(s), each numbered once, and every guard on the map`);
+}
 ok(`owed: ${owed.length} guard(s) outstanding — ${Object.entries(byStage).map(([s, n]) => `stage ${s}: ${n}`).join(", ") || "none"}`);
 
 /* --------------------------------------------------------------- legible --- */

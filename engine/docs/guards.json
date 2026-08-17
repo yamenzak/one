@@ -14,7 +14,7 @@
     "     recorded is one whose reason is forgotten and which is then deleted as",
     "     noise by somebody who cannot see what it was for.",
     "  4. An `owed` guard names a stage, and a SHIPPED stage may owe nothing —",
-    "     which is what makes the stage table in PLAN.md mean anything.",
+    "     which is what makes `docs/stages.json` mean anything.",
     "",
     "`fails` is a consequence in the world, never a restatement of the assertion:",
     "\"a tenant's records unreachable after a move\", not \"the key is wrong\"."
@@ -1655,7 +1655,7 @@
       "stage": "10",
       "status": "live",
       "impl": "scripts/capability.test.mjs",
-      "proves": "PROGRESS.md has no row for them",
+      "proves": "the stage registry has no row for them",
       "fails": "a marker that reads as a plan and points at nothing, so the gap is neither enumerable nor scheduled"
     },
     {
@@ -1936,6 +1936,33 @@
       "impl": "apps/hello/test/services.test.ts",
       "proves": "sends only what the notification type offers a channel for",
       "fails": "a phone lighting up for a type that declared inbox and email, and for a person who switched push off \u2014 the setting saved, read by nothing"
+    },
+    {
+      "id": "what-the-engine-offers-is-emitted-by-the-engine",
+      "protects": "D12",
+      "stage": "39",
+      "status": "live",
+      "impl": "apps/hello/test/surface.screens.test.tsx",
+      "proves": "no longer describes what the engine composes",
+      "fails": "an index of what an app gets for free, typed by hand and wrong within a week \u2014 so the same capability is written twice by somebody who read that it did not exist"
+    },
+    {
+      "id": "an-app-that-declares-nothing-still-has-a-roster-and-a-bill",
+      "protects": "D1",
+      "stage": "39",
+      "status": "live",
+      "impl": "apps/hello/test/surface.screens.test.tsx",
+      "proves": "is no longer free",
+      "fails": "an operation quietly leaving the set every app gets without asking, so the next product writes its own roster, its own inbox and its own two doors bounding an invitation"
+    },
+    {
+      "id": "a-stage-is-read-from-one-registry",
+      "protects": "D12",
+      "stage": "39",
+      "status": "live",
+      "impl": "scripts/guards.test.mjs",
+      "proves": "appears twice, so one of the two is a row nothing can see",
+      "fails": "four checks parsing one markdown table four ways, so a reformatted row is a stage nothing can be deferred against and a guard that can be owed for ever \u2014 silently, because each check reports green about a row it never saw"
     }
   ]
 }

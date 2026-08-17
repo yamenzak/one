@@ -31,6 +31,11 @@ folder above it.
 | [DESIGN.md](DESIGN.md) | the design language — the rules, the screen shapes, where the one action goes, the checks a screen has to pass | read once |
 | [AMBIENCE.md](AMBIENCE.md) | the world behind the screen — the families, the three ways to make a field, the hem, what a seed reaches | read when a screen needs a ground |
 
+And two above it, for the half a screen stands on:
+[../docs/ENGINE.md](../docs/ENGINE.md) is what the platform already gives an app —
+the operations, the doors, the gates, the tables — and
+[../docs/BUILDING.md](../docs/BUILDING.md) is how to add to any of it.
+
 ⚠️ **AND THE TEST GROUND IS `apps/hello`.** Its eight screens are built from
 nothing but this package, take their data as props, and render with no session,
 no worker and no database — `pnpm --filter @engine/space dev`, then

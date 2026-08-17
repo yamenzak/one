@@ -55,12 +55,21 @@ export interface Roots {
   readonly device?: boolean;
 }
 
-const LABELS: Readonly<Record<string, DoorKind>> = {
+/**
+ * ⚠️ EXPORTED, BECAUSE THE INDEX THAT TELLS SOMEBODY WHICH DOORS EXIST HAS TO
+ * READ THE MAP THAT DECIDES IT. A list of doors typed into a document is a
+ * second answer to the question this constant IS, and the copy is the one that
+ * goes stale — a new door would be reachable and undocumented, or documented and
+ * absent, with nothing failing either way.
+ */
+export const DOOR_LABELS: Readonly<Record<string, DoorKind>> = {
   id: "account",
   admin: "operator",
   setup: "setup",
   play: "device",
 };
+
+const LABELS = DOOR_LABELS;
 
 /**
  * Which door this is.

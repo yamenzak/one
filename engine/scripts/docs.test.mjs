@@ -1,5 +1,5 @@
 /**
- * THE DOCUMENTS, HELD TO STANDARDS.md.
+ * THE DOCUMENTS, HELD TO `docs/BUILDING.md` §5.
  *
  * ⚠️ THE PLAN IS THE ONLY THING THAT SURVIVES A COMPRESSED CONTEXT, so a plan
  * that has quietly stopped being true is worse than no plan — it is re-read and
@@ -15,6 +15,7 @@ import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { shippedStages } from "./lib/stages.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
@@ -57,9 +58,9 @@ ok(`kind: ${files.length} document(s) declared`);
 
 /**
  * ⚠️ A DOCUMENT NOTHING LINKS TO IS ONE NOBODY OPENS, and it goes on being true
- * of a codebase that has moved. Two roots: `docs/PLAN.md`, because §0 tells a
- * cold reader to start there, and `design/README.md`, because a package's README
- * is the file anybody opening the directory already sees.
+ * of a codebase that has moved. Two roots: `docs/ENGINE.md`, because it is where
+ * a cold reader is told to start, and `design/README.md`, because a package's
+ * README is the file anybody opening the directory already sees.
  *
  * ⚠️ AND A LINK IS RESOLVED AGAINST THE DOCUMENT THAT MAKES IT. While every
  * document was in one directory a bare filename was the whole answer; across two
@@ -69,7 +70,7 @@ ok(`kind: ${files.length} document(s) declared`);
  */
 const resolve = (from, href) =>
   join(dirname(from), href).replace(/\\/g, "/");
-const linked = new Set(["docs/PLAN.md", "design/README.md"]);
+const linked = new Set(["docs/ENGINE.md", "design/README.md"]);
 for (const f of files) {
   for (const m of read(f).matchAll(/\]\(([./A-Za-z-]*[A-Z][A-Za-z-]*\.md)\)/g)) {
     linked.add(resolve(f, m[1]));
@@ -106,12 +107,10 @@ for (const file of source) {
   }
 }
 
-const shipped = new Set(
-  [...read("docs/PROGRESS.md").matchAll(/^\|\s*(\d+)\s*\|[^|]*\|\s*shipped\s*\|/gim)].map((m) => m[1]),
-);
+const shipped = shippedStages();
 for (const d of markers) {
   if (shipped.has(d.stage)) {
-    fail(`${d.file}: ${d.id} defers to stage ${d.stage}, which PROGRESS.md calls shipped.\n` +
+    fail(`${d.file}: ${d.id} defers to stage ${d.stage}, which the stage registry calls shipped.\n` +
          `       A stage cannot be shipped while something still waits on it.`);
   }
 }
@@ -126,7 +125,7 @@ ok(`defer: ${markers.length} marker(s) open, ${shipped.size} stage(s) shipped`);
 const BLOCK = /<!--\s*generated:\s*(.+?)\s*-->\n([\s\S]*?)<!--\s*\/generated\s*-->/g;
 
 /**
- * ⚠️ A BLOCK INSIDE A CODE FENCE IS AN EXAMPLE, NOT A BLOCK. STANDARDS.md shows
+ * ⚠️ A BLOCK INSIDE A CODE FENCE IS AN EXAMPLE, NOT A BLOCK. `BUILDING.md` shows
  * the shape of a generated block in order to explain it; running that is running
  * a command chosen for how it reads rather than for what it does — which is what
  * happened the first time this file was written.

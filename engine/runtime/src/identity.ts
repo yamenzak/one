@@ -2,7 +2,7 @@
  * WHO IS ASKING, AND HOW THEY PROVED IT.
  *
  * ⚠️ EMAIL CODES TODAY, AND NOT PASSKEYS — that is not built, and nothing here
- * pretends otherwise. See PROGRESS.md.
+ * pretends otherwise.
  *
  * ⚠️ PASSWORDLESS, AND NOT AS A FEATURE. There is no password column, so there
  * is nothing to leak, nothing to reuse from another breach, nothing to phish

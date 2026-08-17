@@ -23,20 +23,13 @@
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { shippedStages } from "./lib/stages.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
 
-/** ⚠️ Read from the one table, so "shipped" means the same thing to every check. */
-let stages = null;
-const shippedStages = () => {
-  if (!stages) {
-    const progress = readFileSync(join(ENGINE, "docs/PROGRESS.md"), "utf8");
-    stages = new Set(
-      [...progress.matchAll(/^\|\s*(\d+)\s*\|[^|]*\|\s*shipped\s*\|/gm)].map((m) => m[1]));
-  }
-  return stages;
-};
+/* ⚠️ Read from the one registry, so "shipped" means the same thing to every
+   check — see `lib/stages.mjs`. */
 
 let bad = 0;
 const fail = (m) => { console.error(`BAD  ${m}`); bad++; };
@@ -179,7 +172,7 @@ if (!unhandled) {
    list has, so it is the same question asked of the same table. */
 for (const [kind, stage] of Object.entries(NO_CONTROL_YET)) {
   if (!shippedStages().has(stage)) continue;
-  fail(`field kind "${kind}" owes a control at stage ${stage}, which PROGRESS.md calls shipped.`);
+  fail(`field kind "${kind}" owes a control at stage ${stage}, which the stage registry calls shipped.`);
 }
 
 /* ------------------------------------------------------- shipped owes none --- */
@@ -190,7 +183,7 @@ let early = 0;
 for (const [field, entry] of Object.entries(SURFACES)) {
   if (entry.owed && shipped.has(entry.owed)) {
     early++;
-    fail(`AppSpec.${field} owes a surface at stage ${entry.owed}, which PROGRESS.md calls shipped.\n` +
+    fail(`AppSpec.${field} owes a surface at stage ${entry.owed}, which the stage registry calls shipped.\n` +
          `       Either the screen is due now, or "shipped" has stopped meaning reachable.`);
   }
 }

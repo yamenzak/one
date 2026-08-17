@@ -28,6 +28,7 @@
 
 import { read } from "./lib/rules.mjs";
 import { PACKAGES, load, deferralFor } from "./lib/capabilities.mjs";
+import { knownStages } from "./lib/stages.mjs";
 
 let bad = 0;
 const fail = (m) => { console.error(`BAD  ${m}`); bad++; };
@@ -66,14 +67,12 @@ for (const of_ of PACKAGES) {
   the other direction — a stage nobody has written down at all, so the marker
   looks like a plan and points at nothing.
 */
-const staged = new Set(
-  [...read("docs/PROGRESS.md").matchAll(/^\|\s*(\d+)\s*\|/gm)].map((m) => m[1]),
-);
+const staged = knownStages();
 const unstaged = [...waiting.keys()].filter((s) => !staged.has(s));
 if (unstaged.length) {
-  fail(`capability: stage(s) ${unstaged.join(", ")} are deferred to and PROGRESS.md has no row for them — a marker pointing at nothing reads as a plan`);
+  fail(`capability: stage(s) ${unstaged.join(", ")} are deferred to and the stage registry has no row for them — a marker pointing at nothing reads as a plan`);
 } else if (waiting.size) {
-  ok(`capability: every waiting capability names a stage PROGRESS.md carries`);
+  ok(`capability: every waiting capability names a stage the registry carries`);
 }
 
 console.log(bad

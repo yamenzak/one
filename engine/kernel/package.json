@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "OneEngine's contract layer: entities, declarations and the rules over them. Pure — no I/O, no bindings, no React. See docs/PLAN.md §2.4.",
+  "description": "OneEngine's contract layer: entities, declarations and the rules over them. Pure — no I/O, no bindings, no React. See engine/docs/BUILDING.md §1.4.",
   "exports": {
     ".": "./src/index.ts"
   },

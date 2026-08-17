@@ -1,0 +1,1004 @@
+{
+  "from": "apps/hello/test/surface.screens.test.tsx",
+  "doors": [
+    {
+      "label": "(the root)",
+      "kind": "signpost"
+    },
+    {
+      "label": "id",
+      "kind": "account"
+    },
+    {
+      "label": "admin",
+      "kind": "operator"
+    },
+    {
+      "label": "setup",
+      "kind": "setup"
+    },
+    {
+      "label": "play",
+      "kind": "device"
+    },
+    {
+      "label": "<slug>",
+      "kind": "tenant"
+    },
+    {
+      "label": "(a custom domain)",
+      "kind": "tenant"
+    }
+  ],
+  "gates": [
+    "accepted",
+    "standing",
+    "permission",
+    "kind",
+    "proof",
+    "entitlement",
+    "flag",
+    "quota",
+    "credits"
+  ],
+  "problems": [
+    {
+      "code": "platform.invalid",
+      "status": 400,
+      "title": "That does not look right",
+      "tone": "warning",
+      "retryable": false
+    },
+    {
+      "code": "platform.unauthorized",
+      "status": 401,
+      "title": "Sign in to continue",
+      "tone": "warning",
+      "retryable": false
+    },
+    {
+      "code": "platform.forbidden",
+      "status": 403,
+      "title": "You do not have access to that",
+      "tone": "danger",
+      "retryable": false
+    },
+    {
+      "code": "platform.not_found",
+      "status": 404,
+      "title": "That is not here",
+      "tone": "neutral",
+      "retryable": false
+    },
+    {
+      "code": "platform.conflict",
+      "status": 409,
+      "title": "Something else changed first",
+      "tone": "warning",
+      "retryable": false
+    },
+    {
+      "code": "platform.maintenance",
+      "status": 503,
+      "title": "One is being looked after",
+      "tone": "warning",
+      "retryable": true
+    },
+    {
+      "code": "platform.too_many",
+      "status": 429,
+      "title": "Too quickly",
+      "tone": "warning",
+      "retryable": true
+    },
+    {
+      "code": "platform.quota_reached",
+      "status": 402,
+      "title": "Your plan includes {limit}, and {used} are in use",
+      "tone": "warning",
+      "retryable": false
+    },
+    {
+      "code": "platform.payment_required",
+      "status": 402,
+      "title": "This needs a plan that includes it",
+      "tone": "warning",
+      "retryable": false
+    },
+    {
+      "code": "platform.commercial_required",
+      "status": 402,
+      "title": "This is for business workspaces",
+      "tone": "warning",
+      "retryable": false
+    },
+    {
+      "code": "platform.proof_required",
+      "status": 401,
+      "title": "Confirm it is you",
+      "tone": "info",
+      "retryable": true
+    },
+    {
+      "code": "platform.must_accept",
+      "status": 451,
+      "title": "There is something to agree to first",
+      "tone": "warning",
+      "retryable": false
+    },
+    {
+      "code": "platform.read_only",
+      "status": 402,
+      "title": "This workspace is read-only",
+      "tone": "warning",
+      "retryable": false
+    },
+    {
+      "code": "platform.no_credits",
+      "status": 402,
+      "title": "Not enough credits",
+      "tone": "warning",
+      "retryable": false
+    },
+    {
+      "code": "platform.unavailable",
+      "status": 503,
+      "title": "Something went wrong on our side",
+      "tone": "danger",
+      "retryable": true
+    }
+  ],
+  "operations": {
+    "always": [
+      {
+        "id": "member.list",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/member.list",
+        "permission": "member:read"
+      },
+      {
+        "id": "member.invite",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/member.invite",
+        "permission": "member:manage"
+      },
+      {
+        "id": "member.role",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/member.role",
+        "permission": "member:manage"
+      },
+      {
+        "id": "inbox.list",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/inbox.list"
+      },
+      {
+        "id": "inbox.seen",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/inbox.seen"
+      },
+      {
+        "id": "inbox.preference",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/inbox.preference"
+      },
+      {
+        "id": "inbox.policy",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/inbox.policy",
+        "permission": "tenant:manage"
+      },
+      {
+        "id": "inbox.settings",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/inbox.settings"
+      },
+      {
+        "id": "member.remove",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/member.remove",
+        "permission": "member:manage"
+      },
+      {
+        "id": "brand.read",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/brand.read",
+        "permission": "tenant:manage"
+      },
+      {
+        "id": "brand.write",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/brand.write",
+        "permission": "tenant:manage"
+      },
+      {
+        "id": "brand.icon",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/brand.icon",
+        "permission": "tenant:manage"
+      },
+      {
+        "id": "package.list",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/package.list",
+        "permission": "member:read"
+      },
+      {
+        "id": "package.create",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/package.create",
+        "permission": "tenant:manage"
+      },
+      {
+        "id": "package.archive",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/package.archive",
+        "permission": "tenant:manage"
+      },
+      {
+        "id": "package.held",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/package.held",
+        "permission": "member:read"
+      },
+      {
+        "id": "package.grant",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/package.grant",
+        "permission": "member:manage"
+      },
+      {
+        "id": "package.revoke",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/package.revoke",
+        "permission": "member:manage"
+      },
+      {
+        "id": "setting.read",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/setting.read"
+      },
+      {
+        "id": "ai.wording",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/ai.wording"
+      },
+      {
+        "id": "ai.word",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/ai.word"
+      },
+      {
+        "id": "setting.write",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/setting.write"
+      },
+      {
+        "id": "money.view",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/money.view",
+        "permission": "billing:read"
+      },
+      {
+        "id": "centre.view",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/centre.view"
+      }
+    ],
+    "perCollection": [
+      {
+        "id": "thing.list",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/thing.list",
+        "permission": "thing:read"
+      },
+      {
+        "id": "thing.read",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/thing.read",
+        "permission": "thing:read"
+      },
+      {
+        "id": "thing.create",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/thing.create",
+        "permission": "thing:write"
+      },
+      {
+        "id": "thing.update",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/thing.update",
+        "permission": "thing:write"
+      },
+      {
+        "id": "thing.delete",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/thing.delete",
+        "permission": "thing:write"
+      }
+    ],
+    "withMediaField": [
+      {
+        "id": "media.upload",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/media.upload"
+      },
+      {
+        "id": "media.list",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/media.list"
+      },
+      {
+        "id": "media.read",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/media.read"
+      },
+      {
+        "id": "media.delete",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/media.delete"
+      }
+    ],
+    "withVaultField": [
+      {
+        "id": "vault.consents",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/vault.consents"
+      },
+      {
+        "id": "vault.processing",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/vault.processing"
+      },
+      {
+        "id": "vault.consent",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/vault.consent"
+      },
+      {
+        "id": "vault.grants",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/vault.grants"
+      },
+      {
+        "id": "vault.grant",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/vault.grant"
+      },
+      {
+        "id": "vault.revoke",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/vault.revoke"
+      },
+      {
+        "id": "vault.looks",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/vault.looks"
+      },
+      {
+        "id": "vault.export",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/vault.export"
+      },
+      {
+        "id": "vault.forget",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/vault.forget"
+      }
+    ]
+  },
+  "personal": [
+    {
+      "id": "me.agreements",
+      "kind": "read",
+      "needs": "session",
+      "doors": null,
+      "proof": null
+    },
+    {
+      "id": "me.accept",
+      "kind": "write",
+      "needs": "session",
+      "doors": null,
+      "proof": null
+    },
+    {
+      "id": "me.code",
+      "kind": "write",
+      "needs": "nobody",
+      "doors": null,
+      "proof": null
+    },
+    {
+      "id": "me.session",
+      "kind": "write",
+      "needs": "nobody",
+      "doors": null,
+      "proof": null
+    },
+    {
+      "id": "me.signout",
+      "kind": "write",
+      "needs": "session",
+      "doors": null,
+      "proof": null
+    },
+    {
+      "id": "me.who",
+      "kind": "read",
+      "needs": "session",
+      "doors": null,
+      "proof": null
+    },
+    {
+      "id": "me.tenant.create",
+      "kind": "write",
+      "needs": "session",
+      "doors": [
+        "setup",
+        "account"
+      ],
+      "proof": null
+    },
+    {
+      "id": "me.tenant.commercial",
+      "kind": "write",
+      "needs": "session",
+      "doors": [
+        "setup",
+        "account",
+        "tenant"
+      ],
+      "proof": null
+    },
+    {
+      "id": "me.leave",
+      "kind": "write",
+      "needs": "session",
+      "doors": null,
+      "proof": null
+    },
+    {
+      "id": "me.export",
+      "kind": "read",
+      "needs": "session",
+      "doors": null,
+      "proof": null
+    },
+    {
+      "id": "me.forget",
+      "kind": "write",
+      "needs": "session",
+      "doors": null,
+      "proof": "recent"
+    },
+    {
+      "id": "me.token.create",
+      "kind": "write",
+      "needs": "session",
+      "doors": [
+        "account"
+      ],
+      "proof": null
+    },
+    {
+      "id": "me.token.list",
+      "kind": "read",
+      "needs": "session",
+      "doors": [
+        "account"
+      ],
+      "proof": null
+    },
+    {
+      "id": "me.token.revoke",
+      "kind": "write",
+      "needs": "session",
+      "doors": [
+        "account"
+      ],
+      "proof": null
+    },
+    {
+      "id": "me.push.key",
+      "kind": "read",
+      "needs": "session",
+      "doors": [
+        "account",
+        "tenant",
+        "setup"
+      ],
+      "proof": null
+    },
+    {
+      "id": "me.push.subscribe",
+      "kind": "write",
+      "needs": "session",
+      "doors": [
+        "account",
+        "tenant",
+        "setup"
+      ],
+      "proof": null
+    },
+    {
+      "id": "me.push.forget",
+      "kind": "write",
+      "needs": "session",
+      "doors": [
+        "account",
+        "tenant",
+        "setup"
+      ],
+      "proof": null
+    }
+  ],
+  "operator": [
+    {
+      "id": "op.tenants",
+      "kind": "read"
+    },
+    {
+      "id": "op.tenant.adjust",
+      "kind": "write"
+    },
+    {
+      "id": "op.account.commercial",
+      "kind": "write"
+    },
+    {
+      "id": "op.flags",
+      "kind": "read"
+    },
+    {
+      "id": "op.flag.set",
+      "kind": "write"
+    },
+    {
+      "id": "op.ai",
+      "kind": "read"
+    },
+    {
+      "id": "op.ai.bind",
+      "kind": "write"
+    },
+    {
+      "id": "op.jobs",
+      "kind": "read"
+    },
+    {
+      "id": "op.shards",
+      "kind": "read"
+    },
+    {
+      "id": "op.shard.dedicate",
+      "kind": "write"
+    },
+    {
+      "id": "op.infra",
+      "kind": "read"
+    },
+    {
+      "id": "op.infra.apply",
+      "kind": "write"
+    },
+    {
+      "id": "op.infra.verify",
+      "kind": "read"
+    },
+    {
+      "id": "op.tenant.move",
+      "kind": "write"
+    },
+    {
+      "id": "op.moves",
+      "kind": "read"
+    },
+    {
+      "id": "op.maintenance",
+      "kind": "read"
+    },
+    {
+      "id": "op.maintenance.set",
+      "kind": "write"
+    },
+    {
+      "id": "op.push",
+      "kind": "read"
+    },
+    {
+      "id": "op.push.generate",
+      "kind": "write"
+    }
+  ],
+  "stores": {
+    "directory": [
+      {
+        "table": "account",
+        "export": "Your account",
+        "why": null,
+        "onForget": [
+          "id: delete"
+        ],
+        "onClose": null
+      },
+      {
+        "table": "shard",
+        "export": null,
+        "why": "the deployment's placement map",
+        "onForget": [],
+        "onClose": null
+      },
+      {
+        "table": "shard_app",
+        "export": null,
+        "why": "the deployment's placement map",
+        "onForget": [],
+        "onClose": null
+      },
+      {
+        "table": "tenant",
+        "export": null,
+        "why": "a workspace is a business's record, not a member's",
+        "onForget": [],
+        "onClose": "id: keep"
+      },
+      {
+        "table": "tenant_app",
+        "export": null,
+        "why": "which products a workspace enabled",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "belongs",
+        "export": "The workspaces you are in",
+        "why": null,
+        "onForget": [
+          "account_id: delete"
+        ],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "invited",
+        "export": "Invitations sent to you",
+        "why": null,
+        "onForget": [
+          "email: delete"
+        ],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "session",
+        "export": "Where you have been signed in",
+        "why": null,
+        "onForget": [
+          "account_id: delete"
+        ],
+        "onClose": null
+      },
+      {
+        "table": "code",
+        "export": "Sign-in codes sent to you",
+        "why": null,
+        "onForget": [
+          "email: delete"
+        ],
+        "onClose": null
+      },
+      {
+        "table": "api_token",
+        "export": "The access tokens you minted",
+        "why": null,
+        "onForget": [
+          "account_id: delete"
+        ],
+        "onClose": null
+      },
+      {
+        "table": "billing_account",
+        "export": null,
+        "why": "a workspace's own account with us",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "subscription",
+        "export": null,
+        "why": "a workspace's own plan",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "credit_ledger",
+        "export": null,
+        "why": "a workspace's own spending",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "tenant_branding",
+        "export": null,
+        "why": "a workspace's own theme",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "tenant_icon",
+        "export": null,
+        "why": "a workspace's own logo",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "push_subscription",
+        "export": "The devices you asked to be notified on",
+        "why": null,
+        "onForget": [
+          "account_id: delete"
+        ],
+        "onClose": null
+      },
+      {
+        "table": "push_key",
+        "export": null,
+        "why": "the deployment's own sending identity",
+        "onForget": [],
+        "onClose": null
+      },
+      {
+        "table": "job_run",
+        "export": null,
+        "why": "the deployment's own clock",
+        "onForget": [],
+        "onClose": null
+      },
+      {
+        "table": "deployment_flag",
+        "export": null,
+        "why": "the deployment's own switches",
+        "onForget": [],
+        "onClose": null
+      },
+      {
+        "table": "maintenance",
+        "export": null,
+        "why": "the deployment's own switches",
+        "onForget": [],
+        "onClose": null
+      },
+      {
+        "table": "ai_binding",
+        "export": null,
+        "why": "which model an action runs on",
+        "onForget": [],
+        "onClose": null
+      },
+      {
+        "table": "ai_wording",
+        "export": null,
+        "why": "a workspace's own prompt letterheads",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "resource",
+        "export": null,
+        "why": "the databases and buckets the deployment made for itself",
+        "onForget": [],
+        "onClose": null
+      },
+      {
+        "table": "move",
+        "export": null,
+        "why": "where a workspace's records were carried from, and what is left to clear",
+        "onForget": [],
+        "onClose": null
+      },
+      {
+        "table": "acceptance",
+        "export": "What you agreed to, and when",
+        "why": null,
+        "onForget": [
+          "account_id: delete"
+        ],
+        "onClose": "tenant_id: delete"
+      }
+    ],
+    "shard": [
+      {
+        "table": "membership",
+        "export": "Your place in each workspace",
+        "why": null,
+        "onForget": [
+          "account_id: delete"
+        ],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "custom_role",
+        "export": null,
+        "why": "a workspace's own roles",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "package",
+        "export": null,
+        "why": "a workspace's own catalogue",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "purchase",
+        "export": null,
+        "why": "a workspace's own sale, named by membership rather than by account",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "setting",
+        "export": "Your own preferences",
+        "why": null,
+        "onForget": [
+          "account_id: delete"
+        ],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "ai_binding",
+        "export": null,
+        "why": "which model an action runs on",
+        "onForget": [],
+        "onClose": null
+      },
+      {
+        "table": "ai_wording",
+        "export": null,
+        "why": "a workspace's own prompt letterheads",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "audit",
+        "export": "What you did here",
+        "why": null,
+        "onForget": [
+          "actor: anonymise"
+        ],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "replay",
+        "export": null,
+        "why": "an idempotency key, not a record about anybody",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "inbox",
+        "export": "Your notifications",
+        "why": null,
+        "onForget": [
+          "account_id: delete"
+        ],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "notify_policy",
+        "export": null,
+        "why": "a workspace's own routing",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "notify_preference",
+        "export": "What you asked to be told about",
+        "why": null,
+        "onForget": [
+          "account_id: delete"
+        ],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "vault_subject",
+        "export": "Your vault",
+        "why": null,
+        "onForget": [
+          "subject_id: delete"
+        ],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "vault_fact",
+        "export": "The facts held encrypted for you",
+        "why": null,
+        "onForget": [
+          "subject_id: delete"
+        ],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "vault_consent",
+        "export": "What you consented to",
+        "why": null,
+        "onForget": [
+          "subject_id: delete"
+        ],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "vault_grant",
+        "export": "Who you let read them",
+        "why": null,
+        "onForget": [
+          "subject_id: delete",
+          "grantee: anonymise"
+        ],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "vault_look",
+        "export": "Who looked, and when",
+        "why": null,
+        "onForget": [
+          "subject_id: delete",
+          "grantee: anonymise"
+        ],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "media",
+        "export": "The files you uploaded",
+        "why": null,
+        "onForget": [
+          "subject_id: delete"
+        ],
+        "onClose": "tenant_id: delete"
+      }
+    ]
+  }
+}

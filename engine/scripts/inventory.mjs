@@ -268,7 +268,296 @@ if (what === "guards") {
   console.log("");
   console.log(`**${all} of them**, ${all - held} reached by something today.`);
   console.log(`Read the file for why each exists; every one is \`import { … } from "@engine/${pkg}"\`.`);
+} else if (what === "stages") {
+  /**
+   * ⚠️ THE STAGE TABLE IS A REGISTRY NOW, NOT PROSE. It was a markdown table
+   * three checks parsed with a regex — the deferral guard, the guard registry's
+   * own stage check, and any reader — so a row somebody reformatted became a
+   * stage that had never shipped, silently, in a document nobody re-reads.
+   */
+  const stages = JSON.parse(readFileSync(join(ENGINE, "docs/stages.json"), "utf8")).stages;
+  const owed = {};
+  for (const g of guards) if (g.status === "owed") owed[g.stage] = (owed[g.stage] ?? 0) + 1;
+
+  console.log("| # | Stage | |");
+  console.log("|---|---|---|");
+  for (const s of stages) {
+    const mark = s.status === "shipped" ? "shipped" : "**planned**";
+    const debt = owed[String(s.n)] ? ` · ${owed[String(s.n)]} guard(s) owed` : "";
+    console.log(`| ${s.n} | ${s.title} | ${mark}${debt} |`);
+  }
+  const done = stages.filter((s) => s.status === "shipped").length;
+  console.log("");
+  console.log(`**${done} shipped, ${stages.length - done} planned.** A stage cannot be `
+    + "shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` "
+    + "fails the build if one does, which is the only reason this table can be read "
+    + "instead of the code.");
+
+} else if (what === "surface" || what === "personal" || what === "operator"
+  || what === "doors" || what === "problems" || what === "stores") {
+  /**
+   * WHAT AN APP GETS WITHOUT ASKING — read from what the composer actually did.
+   *
+   * ⚠️ `docs/surface.json` IS EMITTED BY THE REAL COMPOSER, never parsed out of
+   * the source (see `apps/hello/test/surface.screens.test.tsx`). A script that
+   * grepped `*-ops.ts` for operation ids would be a second, worse composer, and
+   * the copy is the one that goes stale — it would miss the two lanes that mount
+   * conditionally and would not know a route's method or permission at all.
+   */
+  const at = join(ENGINE, "docs/surface.json");
+  if (!existsSync(at)) {
+    console.error("docs/surface.json is missing — run `EMIT=1 pnpm --filter @engine/hello test`, "
+      + "because an index of what the engine offers cannot be written by hand");
+    process.exit(2);
+  }
+  const of_ = JSON.parse(readFileSync(at, "utf8"));
+
+  /* ⚠️ `null` printed as a word. A blank cell reads as a value nobody filled in;
+     "anybody signed in" is a decision somebody made. */
+  const perm = (p) => (p ? `\`${p}\`` : "*the session*");
+  const table = (rows) => {
+    console.log("| Operation | | Permission |");
+    console.log("|---|---|---|");
+    for (const o of rows) console.log(`| \`${o.id}\` | ${o.kind} | ${perm(o.permission)} |`);
+  };
+
+  if (what === "surface") {
+    const { always, perCollection, withMediaField, withVaultField } = of_.operations;
+    console.log(`**${always.length} operations for declaring nothing.** A roster, an inbox and its`);
+    console.log("two-level policy, the workspace's brand, the package rail it sells with, its");
+    console.log("settings, its bill, and the one bootstrap read every screen stands on.");
+    console.log("");
+    table(always);
+    console.log("");
+    console.log(`**+${perCollection.length} per collection**, generated from the declaration —`);
+    console.log("the scope column is written by the platform, so a subject-scoped collection is");
+    console.log("the caller's own records by construction rather than by a `WHERE` somebody");
+    console.log("remembered.");
+    console.log("");
+    table(perCollection);
+    console.log("");
+    console.log(`**+${withMediaField.length} the moment one field is a file.** Not before: three`);
+    console.log("routes about files on a product that holds none answer \"no bucket\" for ever,");
+    console.log("which reads as broken rather than absent.");
+    console.log("");
+    table(withMediaField);
+    console.log("");
+    console.log(`**+${withVaultField.length} the moment one fact is not the app's to keep** (D11) —`);
+    console.log("consent, grants, who looked, the processing record, export and erasure.");
+    console.log("");
+    table(withVaultField);
+
+  } else if (what === "personal") {
+    console.log("| Operation | | Needs | Doors |");
+    console.log("|---|---|---|---|");
+    for (const o of of_.personal) {
+      const doors = o.doors ? o.doors.map((d) => `\`${d}\``).join(" ") : "*every door*";
+      const needs = o.needs === "nobody" ? "**nobody**" : o.proof ? `session + ${o.proof} proof` : "session";
+      console.log(`| \`${o.id}\` | ${o.kind} | ${needs} | ${doors} |`);
+    }
+  } else if (what === "operator") {
+    console.log("| Operation | |");
+    console.log("|---|---|");
+    for (const o of of_.operator) console.log(`| \`${o.id}\` | ${o.kind} |`);
+  } else if (what === "doors") {
+    console.log("| Host | Door | What answers there |");
+    console.log("|---|---|---|");
+    const SAYS = {
+      signpost: "the root itself — a signpost, and no product",
+      account: "who you are: your details, your inbox, your data, your tokens",
+      operator: "the deployment looking at itself — and `op.*` answers nowhere else",
+      setup: "the one place a workspace is created",
+      device: "a screen with no session — opt-in per deployment, because `play` is a slug",
+      tenant: "the product, and OneSpace over it",
+    };
+    for (const d of of_.doors) {
+      const host = d.label.startsWith("(") ? `*${d.label.slice(1, -1)}*` : `\`${d.label}.\``;
+      console.log(`| ${host} | \`${d.kind}\` | ${SAYS[d.kind]} |`);
+    }
+  } else if (what === "problems") {
+    console.log("| Code | HTTP | What somebody reads | Retry |");
+    console.log("|---|---|---|---|");
+    for (const p of of_.problems) {
+      console.log(`| \`${p.code}\` | ${p.status} | ${p.title} | ${p.retryable ? "yes" : "—"} |`);
+    }
+  } else {
+    /**
+     * ⚠️ TWO STORES, AND WHICH ONE A TABLE IS IN IS A JURISDICTION DECISION. The
+     * directory is global; a shard is where one workspace's records live and is
+     * the thing a residency promise is about.
+     */
+    for (const [store, says] of [
+      ["directory", "One global database: who exists, where they belong, what the deployment has made for itself."],
+      ["shard", "One per region. A workspace's own records, and everything scoped to it."],
+    ]) {
+      console.log(`**\`${store}\`** — ${says}`);
+      console.log("");
+      console.log("| Table | In a person's export | When they are forgotten | When the workspace closes |");
+      console.log("|---|---|---|---|");
+      for (const t of of_.stores[store]) {
+        const label = t.export ? t.export : `— *${t.why ?? "nobody is in it"}*`;
+        const forget = t.onForget.length ? t.onForget.map((f) => `\`${f}\``).join("<br>") : "—";
+        console.log(`| \`${t.table}\` | ${label} | ${forget} | ${t.onClose ? `\`${t.onClose}\`` : "kept"} |`);
+      }
+      console.log("");
+    }
+    console.log("Both walks read one ledger (`HOLDINGS` in `runtime/src/dossier.ts`), and a table");
+    console.log("declared by a schema module with no row in it fails `pnpm engine:gate` — which is");
+    console.log("the only version of \"provably complete\" that stays true after the person who");
+    console.log("wrote it has moved on.");
+  }
+
+} else if (what === "waiting") {
+  /**
+   * ⚠️ WHAT IS BUILT AND REACHED BY NOTHING — the failure this whole framework is
+   * a catalogue of, printed rather than remembered. A capability with tables,
+   * tests and no address is invisible: no error, no failing test, and every
+   * suite green.
+   */
+  const { resolveCapabilities } = await import("./lib/capabilities.mjs");
+  const stages = JSON.parse(readFileSync(join(ENGINE, "docs/stages.json"), "utf8")).stages;
+  const titleOf = Object.fromEntries(stages.map((s) => [String(s.n), s.title]));
+
+  const rows = [];
+  for (const pkg of ["kernel", "runtime"]) {
+    const byStage = new Map();
+    for (const c of resolveCapabilities(pkg).filter((c) => c.stage)) {
+      const key = `${c.stage}|${c.module}`;
+      byStage.set(key, (byStage.get(key) ?? 0) + 1);
+    }
+    for (const [key, n] of byStage) {
+      const [stage, module] = key.split("|");
+      rows.push({ pkg, module, stage: Number(stage), n });
+    }
+  }
+  rows.sort((a, b) => a.stage - b.stage || a.pkg.localeCompare(b.pkg) || a.module.localeCompare(b.module));
+
+  if (!rows.length) {
+    console.log("Nothing. Every capability either package ships is reached by something.");
+  } else {
+    console.log("| Waiting on | Where | How many |");
+    console.log("|---|---|---|");
+    for (const r of rows) {
+      console.log(`| **${r.stage}** — ${titleOf[String(r.stage)] ?? "*no such stage*"} `
+        + `| \`${r.pkg}/src/${r.module}.ts\` | ${r.n} |`);
+    }
+    const total = rows.reduce((n, r) => n + r.n, 0);
+    console.log("");
+    console.log(`**${total} declarations** are built and reached by nothing, each waiting on a`);
+    console.log("stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one");
+    console.log("that names no stage, so this list cannot grow by forgetting.");
+  }
+
+} else if (what === "gates") {
+  /**
+   * ⚠️ THE ORDER IS THE WHOLE SUBJECT, AND IT IS DERIVED. Which gate refuses
+   * first decides which sentence somebody reads — "sign in" before "your plan
+   * does not include this" before "you are out of credits" — and a list retyped
+   * in a document is a second answer to a question `GATE_ORDER` already settles.
+   *
+   * ⚠️ THE GLOSS IS WRITTEN AND A MISSING ONE STOPS THE PAGE. A gate added to
+   * the kernel and absent from this table would read as a gate that does not
+   * exist, which is worse than no table: somebody would write the check again.
+   */
+  const of_ = JSON.parse(readFileSync(join(ENGINE, "docs/surface.json"), "utf8"));
+  const SAYS = {
+    accepted: ["Has this person agreed to the terms and the privacy notice",
+      "First, and above the bill: until somebody has agreed there is no basis to process anything about them. `beforeAccepting` is the way out — read, agree, export, delete, sign out."],
+    standing: ["Is this workspace paid up",
+      "Reads pass every rung. Withholding a workspace's own records is leverage over an invoice, and leaving is never something an unpaid bill can prevent."],
+    permission: ["May this caller do this here",
+      "Resolved against the roster for the app the operation belongs to — never a flat set, or a role in the second product grants nothing."],
+    kind: ["Is this workspace a business",
+      "Above entitlement, because no plan a personal workspace can buy unlocks a commercial-only capability. Below permission, because a refusal about the workspace tells a stranger it exists."],
+    proof: ["Was it proved recently that this is really them",
+      "Fifteen minutes, for what cannot be undone. A machine token never satisfies it, by design."],
+    entitlement: ["Does the plan include this at all",
+      "A yes/no capability, before any counting."],
+    flag: ["Is this switched on for this deployment",
+      "Ours to turn off, with a date it stops being a switch."],
+    quota: ["Is there room left under the plan's number",
+      "Counted against what is in use, so the sentence says the limit and the count."],
+    credits: ["Is there a balance to reserve against",
+      "The reserve is a ceiling on revenue rather than an estimate — every token an estimate misses is one the platform pays for."],
+  };
+  const missing = of_.gates.filter((g) => !SAYS[g]);
+  if (missing.length) {
+    console.error(`no line for gate(s) ${missing.join(", ")} — add one to inventory.mjs, `
+      + "because a gate missing from this table reads as a gate that does not exist");
+    process.exit(2);
+  }
+  console.log("| | Gate | Asks | |");
+  console.log("|---|---|---|---|");
+  of_.gates.forEach((g, i) => {
+    console.log(`| ${i + 1} | \`${g}\` | ${SAYS[g][0]}? | ${SAYS[g][1]} |`);
+  });
+
+} else if (what === "commands") {
+  /** ⚠️ From the root `package.json`, so a renamed script is a changed table. */
+  const root = JSON.parse(readFileSync(join(ENGINE, "../package.json"), "utf8")).scripts;
+  const SAYS = {
+    "engine:dev": "the worker on :8080 and OneSpace on :5173, every door on `*.localhost`",
+    "engine:typecheck": "every package",
+    "engine:test": "every suite — kernel, runtime, design, OneSpace, the reference app",
+    "engine:gate": "every guard in `docs/guards.json`",
+  };
+  console.log("| Command | What it runs |");
+  console.log("|---|---|");
+  for (const [name, says] of Object.entries(SAYS)) {
+    if (!root[name]) {
+      console.error(`\`${name}\` is not a script in the root package.json — a command in a `
+        + "document that does not run is an instruction that sends a reader nowhere");
+      process.exit(2);
+    }
+    console.log(`| \`pnpm ${name}\` | ${says} |`);
+  }
+
+} else if (what === "deployment") {
+  /**
+   * ⚠️ "IS IT DEPLOYED" IS THE FIRST QUESTION AND IT IS CHECKABLE, so it is not a
+   * sentence somebody keeps up to date. A resource id left as a placeholder is a
+   * worker bound to a database that does not exist — and the state a document
+   * asserts about a deployment is exactly the kind that is true for a week.
+   */
+  /* ⚠️ PARSED, NOT MATCHED. A window around a key is a window a comment can
+     push a value out of — which it did, so the first draft reported one binding
+     of two and called the deployment half-provisioned. */
+  const config = JSON.parse(readFileSync(join(ENGINE, "one/wrangler.jsonc"), "utf8")
+    .replace(/^\s*\/\/.*$/gm, ""));
+  const rows = [
+    ...(config.d1_databases ?? []).map((d) => [d.binding, d.database_id]),
+    ...(config.r2_buckets ?? []).map((b) => [b.binding, b.bucket_name]),
+    ...(config.kv_namespaces ?? []).map((k) => [k.binding, k.id]),
+  ];
+  if (!rows.length) {
+    console.error("no resource bindings found in one/wrangler.jsonc — a check over nothing "
+      + "reports green about a deployment it never looked at");
+    process.exit(2);
+  }
+  console.log("| Binding | Resource | |");
+  console.log("|---|---|---|");
+  let waiting = 0;
+  for (const [binding, value] of rows) {
+    const real = !/^PLACEHOLDER/i.test(String(value));
+    if (!real) waiting++;
+    console.log(`| \`${binding}\` | ${real ? `\`${value}\`` : "*not made yet*"} `
+      + `| ${real ? "live" : "**placeholder**"} |`);
+  }
+  console.log("");
+  console.log(waiting
+    ? `**${waiting} of ${rows.length} are placeholders, so nothing is deployed.** A deploy `
+      + "with them in place binds a worker to databases that do not exist, which is why the "
+      + "workflow SKIPS rather than shipping: Actions → **OneEngine** → Run workflow with "
+      + "`provision` ticked creates them, writes their ids back and mints the signing secret."
+    : "**Every binding names a resource that exists.**");
+  console.log("");
+  console.log("Two steps a workflow cannot take: the DNS records for the root and its");
+  console.log("wildcard, and the Worker routes. `wrangler.jsonc` declares no `routes`");
+  console.log("deliberately — declaring them makes `wrangler dev` rewrite the incoming Host,");
+  console.log("which collapses every door onto one.");
+
 } else {
-  console.error("usage: inventory.mjs guards|decisions|enforcement|vocabulary|declares|does");
+  console.error("usage: inventory.mjs guards|decisions|enforcement|vocabulary|declares|does|"
+    + "stages|surface|personal|operator|doors|problems|stores|waiting|gates|commands|deployment");
   process.exit(2);
 }

@@ -844,7 +844,7 @@ carried, whose own README asked to be deleted once it stopped being consulted.
 `git log` is where both are read now.
 
 **Its rules survived it, which is why deleting it was cheap.** They govern
-`engine/` today, in [engine/docs/STANDARDS.md](engine/docs/STANDARDS.md): **a
+`engine/` today, in [engine/docs/BUILDING.md](engine/docs/BUILDING.md) §5: **a
 deferral is a marker in a comment, never a sentence** — `DEFER(engine-N)`, FOUND
 by a script rather than remembered, and a stage cannot be flipped to `shipped`
 while anything still defers to it; an inventory lives in a verified generated
@@ -857,11 +857,23 @@ past defect is worth preventing, that is a test, not a paragraph.
 ## OneEngine — the framework, and One — the deployment
 
 ⚠️ **`engine/` IS THE SUCCESSOR TO EVERYTHING ABOVE, AND IT IS
-WHERE NEW STRUCTURAL WORK GOES.** Start at
-[engine/docs/PROGRESS.md](engine/docs/PROGRESS.md) — it is what exists today, with a
-stage table a script keeps honest — then [engine/docs/PLAN.md](engine/docs/PLAN.md)
-§1–§3 and [engine/docs/DECISIONS.md](engine/docs/DECISIONS.md). Nothing else is
+WHERE NEW STRUCTURAL WORK GOES. THERE ARE TWO DOCUMENTS AND YOU START AT THE
+FIRST.** [engine/docs/ENGINE.md](engine/docs/ENGINE.md) is **what exists** — every
+operation an app gets without declaring it, the doors, the gates, the refusals,
+every table and what erasure does to it, and the list of what is built and
+reached by nothing. It is generated end to end, from the real composer and the
+real registries, so it cannot go stale.
+[engine/docs/BUILDING.md](engine/docs/BUILDING.md) is **why it is shaped that way
+and how to add to it**, and [engine/docs/DECISIONS.md](engine/docs/DECISIONS.md)
+is the append-only ledger both cite by number. Nothing else is
 required to resume the work; **start there rather than from recall.**
+
+⚠️ **AND THE DOCUMENTS ARE NOT WHERE THE WORK IS RECORDED.** A new module needs a
+line in `engine/scripts/inventory.mjs`; a new table needs a row in `HOLDINGS`; a
+new operation, door, gate or problem appears by itself from
+`EMIT=1 pnpm --filter @engine/hello test`. Each generator REFUSES rather than
+skipping, so a capability cannot be added and quietly left out of the index —
+which is the mechanism that makes reinvention hard. BUILDING.md §7 is the list.
 
 ⚠️ **BUILDING A SCREEN IS A DIFFERENT STARTING POINT, AND IT IS
 [engine/design/README.md](engine/design/README.md).** The design language and the
@@ -875,7 +887,7 @@ FRAMEWORK — `@engine/kernel` (pure contracts), `@engine/runtime` (the only cod
 touches a binding), **`@engine/design`** — the browser half and the design system
 every app draws with, named **OneDesign**, router-free — and the reference apps.
 **One** is the DEPLOYMENT built on it: `engine/one` is the worker
-that answers every door for every product, `engine/one-hub` is the page a person
+that answers every door for every product, `engine/one-space` is the page a person
 opens at the root, `id.` and `setup.`. A product is a manifest inside
 it, and `hello` is the only one — the coaching app that proved stage 9 left the
 tree on 2026-08-16 to be rewritten under a new name. So "One" is what a customer types and "OneEngine" is what a contributor imports,

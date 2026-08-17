@@ -281,7 +281,7 @@ authority: the granter's platform keys bound the platform role, their keys IN
 EACH APP bound that app's role. Custom roles compose ONE app's declared keys;
 the platform's offices are not composable, and an app that declares or bundles
 a platform key does not boot. Decided 2026-08-14, with the tenant centre
-(CENTER.md) as the driving surface.
+as the driving surface.
 
 **Why.** A single flat role cannot serve two products: "trainer" names one
 product's keys and names nothing in the next app, and the failure is silent 403s in the
