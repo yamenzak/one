@@ -118,6 +118,13 @@ export type Where =
   | { readonly at: "ground" }
   | { readonly at: "footing" }
   /**
+   * ⚠️ WHAT THE DEPLOYMENT WAS TOLD — the sender it mails from, the account it
+   * charges through. Without a screen these are values only a deploy can change,
+   * which makes rotating a key a code push and a key that waits for a code push
+   * a key that stays live after it should have stopped.
+   */
+  | { readonly at: "keys" }
+  /**
    * ⚠️ WHETHER THIS DEPLOYMENT CAN REACH A PHONE. Push needs a keypair, the
    * keypair is generated rather than pasted, and without a screen the whole
    * capability is one nothing on the deployment can switch on — the shape this
@@ -176,7 +183,7 @@ export const atConsoleScreen = (
  * between them is the whole of the explanation.
  */
 export const OFTEN: readonly WorkspacePart[] = ["people", "money"];
-export const OF_CONSOLE = ["tenants", "actions", "switches", "telling", "works", "ground", "footing"] as const;
+export const OF_CONSOLE = ["tenants", "actions", "keys", "switches", "telling", "works", "ground", "footing"] as const;
 
 export type WorkspacePart = typeof OF_WORKSPACE[number];
 export type ConsolePart = typeof OF_CONSOLE[number];
@@ -295,7 +302,8 @@ export function pathOf(where: Where): string {
     case "console": return `${SPACE}/console`;
     case "actions": return `${SPACE}/console/actions${where.app ? `/${where.app}` : ""}`;
     case "tenant": return `${SPACE}/console/tenants/${where.id}`;
-    case "tenants": case "switches": case "telling": case "works": case "ground": case "footing":
+    case "tenants": case "keys": case "switches": case "telling": case "works": case "ground":
+    case "footing":
       return `${SPACE}/console/${where.at}`;
     case "plan": return `${SPACE}/w/${where.slug}/plan/${where.app}`;
     /* ⚠️ THE PAGE IS IN THE ADDRESS TOO. Settings descend, and an area that only
@@ -333,7 +341,8 @@ export function above(where: Where): Where | null {
     case "workspace": return { at: "workspaces" };
     case "actions": return where.app ? { at: "actions" } : { at: "console" };
     case "tenant": return { at: "tenants" };
-    case "tenants": case "switches": case "telling": case "works": case "ground": case "footing":
+    case "tenants": case "keys": case "switches": case "telling": case "works": case "ground":
+    case "footing":
       return { at: "console" };
     case "plan": return { at: "money", slug: where.slug };
     case "settings":
@@ -375,5 +384,6 @@ export const nameOf = (where: Where): string => {
     case "ground": return "Ground";
     case "telling": return "Telling people";
     case "footing": return "Footing";
+    case "keys": return "Keys";
   }
 };

@@ -39,6 +39,8 @@ export * from "./money-ops.js";
 export * from "./centre-ops.js";
 export * from "./ai-actions.js";
 export * from "./operator.js";
+export * from "./config.js";
+export * from "./mail.js";
 export * from "./member-ops.js";
 export * from "./personal.js";
 export * from "./serve.js";

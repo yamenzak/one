@@ -615,6 +615,14 @@
       "kind": "write"
     },
     {
+      "id": "op.config",
+      "kind": "read"
+    },
+    {
+      "id": "op.config.set",
+      "kind": "write"
+    },
+    {
       "id": "op.flags",
       "kind": "read"
     },
@@ -848,6 +856,13 @@
         "why": "a workspace's own prompt letterheads",
         "onForget": [],
         "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "deployment_config",
+        "export": null,
+        "why": "what the deployment was told: its sender, and the account it charges through",
+        "onForget": [],
+        "onClose": null
       },
       {
         "table": "resource",

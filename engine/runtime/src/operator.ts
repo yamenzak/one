@@ -33,6 +33,7 @@ import {
   addShard, appsOfTenant, commercialAllowance, commercialLeft, disableApp, enableApp,
   liveAppsOfTenant, setCommercialGrant, shards, tenantById, tenantBySlug,
 } from "./directory.js";
+import { CREDENTIALS, configState, setConfig } from "./config.js";
 import { runsOf } from "./jobs.js";
 import { makePushKeys, vapidOf } from "./push.js";
 import type { PersonalBook, PersonalCtx } from "./personal.js";
@@ -120,6 +121,12 @@ export interface OperatorDeps {
    * service is entitled to expect somebody at the other end.
    */
   readonly root?: string;
+  /**
+   * ⚠️ WHAT A STORED CREDENTIAL IS ENCRYPTED UNDER, and its absence is a
+   * refusal rather than a fallback — see `config.ts`. A deployment that has
+   * bound none can still set an address; it cannot store a key.
+   */
+  readonly configSecret?: string;
 }
 
 export function operatorOps(input: OperatorDeps): PersonalBook {
@@ -293,6 +300,46 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
           email, granted: allowance.granted, used: allowance.used,
           left: commercialLeft(allowance),
         };
+      },
+    },
+
+    /*
+      ⚠️ WHAT THE DEPLOYMENT WAS TOLD, AND WHAT IT IS STILL MISSING. The
+      definitions travel with the values for the reason `op.flags` does: a
+      console that had only keys and values would head each row with an id, and
+      nothing on the screen could say what stops working without it.
+
+      ⚠️ AND NO SECRET IS EVER ANSWERED. `set` and `readable` are the whole of
+      what a screen is told — there is no path here that returns a live key,
+      which is what stops the console being a way to take one out.
+    */
+    "op.config": {
+      kind: "read", needs: "session", doors: ["operator"],
+      async run(ctx): Promise<unknown> {
+        operator(ctx);
+        return {
+          items: await configState(ctx.directory, deps.configSecret),
+          /* ⚠️ Said once, here, rather than inferred per row by a screen: with
+             no secret bound, every secret row is unwritable and the reason is
+             the deployment's rather than the operator's. */
+          canKeepSecrets: !!deps.configSecret,
+        };
+      },
+    },
+
+    "op.config.set": {
+      kind: "write", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const key = String(input.key ?? "");
+        if (!CREDENTIALS[key]) return ctx.fail("platform.invalid");
+        /* ⚠️ An empty value CLEARS. Turning a lane off has to be as reachable as
+           turning it on, or the only way back is a database. */
+        const why = await setConfig(
+          ctx.directory, deps.configSecret, key, String(input.value ?? ""), ctx.now);
+        if (why === "no_secret_bound") return ctx.fail("platform.unavailable");
+        if (why) return ctx.fail("platform.invalid");
+        return { key, set: !!String(input.value ?? "").trim() };
       },
     },
 

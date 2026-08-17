@@ -203,6 +203,8 @@ if (what === "guards") {
     ["packages", "granting, revoking and expiring a bought bundle"],
     ["inbox", "notifications: the policy, the audience, the read"],
     ["services", "the lane out to a provider — AI and mail"],
+    ["config", "what the deployment was told — the credentials it holds, encrypted under a key its database has never seen"],
+    ["mail", "a letter that leaves the process: the message written out, and the refusal to pretend one was sent"],
     ["webpush", "the two specifications a notification travels on — VAPID, and the sealed body"],
     ["push", "who has turned notifications on, on which device, at which door"],
     ["vault", "encrypted facts, consent, grants, and who looked"],

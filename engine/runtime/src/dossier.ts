@@ -190,6 +190,11 @@ export const HOLDINGS: readonly HeldBy[] = [
   { table: "move", person: [],
     why: "where a workspace's records were carried from, and what is left to clear" },
   { table: "deployment_flag", person: [], why: "the deployment's own switches" },
+  /* ⚠️ NOBODY IS IN IT, AND THAT IS WORTH SAYING RATHER THAN ASSUMING. The
+     sender address is ours, and every secret in the table is ciphertext under a
+     key this database has never held — see `config.ts`. */
+  { table: "deployment_config", person: [],
+    why: "what the deployment was told: its sender, and the account it charges through" },
   { table: "maintenance", person: [], why: "the deployment's own switches" },
   { table: "_schema", person: [], why: "the migration marker" },
 

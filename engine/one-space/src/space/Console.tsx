@@ -24,6 +24,7 @@ import { useSession } from "../session.js";
 import { Actions } from "../console/Actions.js";
 import { Footing } from "../console/Footing.js";
 import { Ground } from "../console/Ground.js";
+import { Keys } from "../console/Keys.js";
 import { Switches } from "../console/Switches.js";
 import { Telling } from "../console/Telling.js";
 import { Tenants } from "../console/Tenants.js";
@@ -44,6 +45,7 @@ export type ConsolePartId = ConsolePart;
 const GLYPH: Readonly<Record<ConsolePartId, string>> = {
   tenants: "workspace",
   actions: "sparkle",
+  keys: "key",
   switches: "settings",
   telling: "bell",
   works: "clock",
@@ -118,6 +120,7 @@ export function ConsolePart({ part, app, onGo }: {
     case "telling": return <Telling />;
     case "works": return <Works />;
     case "ground": return <Ground />;
+    case "keys": return <Keys />;
     case "footing": return <Footing />;
   }
 }

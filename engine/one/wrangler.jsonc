@@ -55,6 +55,17 @@
     "not_found_handling": "single-page-application"
   },
 
+  // ⚠️ MAIL LEAVES THROUGH THIS AND NOWHERE ELSE. `destination_address` is what
+  // Cloudflare requires on a `send_email` binding that is not restricted to one
+  // address; the SENDER is `email.from` in the operator console, because that is
+  // the value somebody rotates. A deployment without this binding refuses to send
+  // rather than answering "check your email" over nothing — see `mail.ts`.
+  //
+  // ⚠️ AND THE ZONE HAS TO HAVE THE SENDER VERIFIED. That is a dashboard step per
+  // zone and there is no way around it: a plausible-looking address that bounces
+  // is worse than a refusal, because the refusal is visible.
+  "send_email": [{ "name": "SEND_EMAIL" }],
+
   "d1_databases": [
     {
       "binding": "DIRECTORY",

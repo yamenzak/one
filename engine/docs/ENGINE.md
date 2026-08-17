@@ -166,6 +166,8 @@ live inside workspaces and an operator stands outside all of them.
 | `op.tenant.adjust` | write |
 | `op.tenant.app` | write |
 | `op.account.commercial` | write |
+| `op.config` | read |
+| `op.config.set` | write |
 | `op.flags` | read |
 | `op.flag.set` | write |
 | `op.ai` | read |
@@ -291,6 +293,7 @@ before an app is resolved draws on them.
 | `maintenance` | — *the deployment's own switches* | — | kept |
 | `ai_binding` | — *which model an action runs on* | — | kept |
 | `ai_wording` | — *a workspace's own prompt letterheads* | — | `tenant_id: delete` |
+| `deployment_config` | — *what the deployment was told: its sender, and the account it charges through* | — | kept |
 | `resource` | — *the databases and buckets the deployment made for itself* | — | kept |
 | `move` | — *where a workspace's records were carried from, and what is left to clear* | — | kept |
 | `acceptance` | What you agreed to, and when | `account_id: delete` | `tenant_id: delete` |
@@ -395,6 +398,8 @@ env or a binding.
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
 | `inbox` | notifications: the policy, the audience, the read | 10 | — |
 | `services` | the lane out to a provider — AI and mail | 5 | 1 |
+| `config` | what the deployment was told — the credentials it holds, encrypted under a key its database has never seen | 5 | — |
+| `mail` | a letter that leaves the process: the message written out, and the refusal to pretend one was sent | 3 | — |
 | `webpush` | the two specifications a notification travels on — VAPID, and the sealed body | 6 | — |
 | `push` | who has turned notifications on, on which device, at which door | 8 | — |
 | `vault` | encrypted facts, consent, grants, and who looked | 13 | — |
@@ -424,7 +429,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**265 of them**, 256 reached by something today.
+**273 of them**, 264 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -735,6 +740,13 @@ its own header, cited by other files, and doing nothing.
 | `a-declared-setting-is-read-by-something` | D12 | a switch somebody turns on, believes, and stops watching for the problem it claimed to solve — with every signal saying it worked: the control saved, the value came back, the screen redrew |
 | `a-settings-walk-that-read-nothing-is-a-failure` | D12 | a guard that walks a moved or renamed declaration block, finds nothing, and prints a confident green line for months |
 | `a-setting-may-wait-on-a-stage-and-only-a-real-one` | D12 | a waiver list that covers the settings it was written for and everything anybody adds under them afterwards |
+| `a-copy-of-the-database-is-not-a-copy-of-the-keys` | D11 | a backup, an export or a query somebody should not have been able to run handing out a live Stripe key — which no amount of access control on the console can take back |
+| `a-credential-under-an-old-secret-is-not-reported-absent` | D11 | somebody re-entering a key while the lane goes on failing for a reason the screen denied, with nothing anywhere telling them that is what happened |
+| `a-key-is-never-stored-where-nothing-can-encrypt-it` | D11 | a Stripe secret key written to D1 in the clear because the deployment forgot to bind a secret — indistinguishable from an ordinary successful save |
+| `a-console-cannot-read-a-secret-back` | D18 | the operator console becoming the way a live key leaves the deployment |
+| `the-mail-mock-cannot-run-outside-development` | D12 | a sign-in that answers "check your email" with nothing sent, and a code written into a retained log — the shape a previous platform shipped three times, because every suite runs where mocking is correct |
+| `a-letter-survives-not-being-english` | D9 | every sign-in mail outside English arriving as bytes, with nothing in the send path failing |
+| `the-envelope-sender-is-an-address` | D9 | `One <noreply@4dl.app>` offered to a mail server as an address, which it is not |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -750,16 +762,16 @@ its own header, cited by other files, and doing nothing.
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 5 |
 | D7 | HeroUI v3 is the component layer, and its components are not restyled | 57 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
-| D9 | Libraries encode decisions; we write invariants | 1 |
+| D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
-| D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 16 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 75 |
+| D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 76 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
 | D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 4 |
 | D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 4 |
-| D18 | The operator stands outside every workspace, and the console is a door rather than a role | 3 |
+| D18 | The operator stands outside every workspace, and the console is a door rather than a role | 4 |
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 3 |
 | D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 3 |
 | D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 6 |

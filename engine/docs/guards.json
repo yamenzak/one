@@ -2089,6 +2089,69 @@
       "impl": "scripts/settings.test.mjs",
       "proves": "a marker pointing at nothing reads as a plan",
       "fails": "a waiver list that covers the settings it was written for and everything anybody adds under them afterwards"
+    },
+    {
+      "id": "a-copy-of-the-database-is-not-a-copy-of-the-keys",
+      "protects": "D11",
+      "stage": "23",
+      "status": "live",
+      "impl": "runtime/test/config.test.ts",
+      "proves": "is not in the database, and comes back anyway",
+      "fails": "a backup, an export or a query somebody should not have been able to run handing out a live Stripe key — which no amount of access control on the console can take back"
+    },
+    {
+      "id": "a-credential-under-an-old-secret-is-not-reported-absent",
+      "protects": "D11",
+      "stage": "23",
+      "status": "live",
+      "impl": "runtime/test/config.test.ts",
+      "proves": "reads as set and unreadable under a different secret",
+      "fails": "somebody re-entering a key while the lane goes on failing for a reason the screen denied, with nothing anywhere telling them that is what happened"
+    },
+    {
+      "id": "a-key-is-never-stored-where-nothing-can-encrypt-it",
+      "protects": "D11",
+      "stage": "23",
+      "status": "live",
+      "impl": "runtime/test/config.test.ts",
+      "proves": "refuses to store a key on a deployment with nothing to encrypt it with",
+      "fails": "a Stripe secret key written to D1 in the clear because the deployment forgot to bind a secret — indistinguishable from an ordinary successful save"
+    },
+    {
+      "id": "a-console-cannot-read-a-secret-back",
+      "protects": "D18",
+      "stage": "23",
+      "status": "live",
+      "impl": "runtime/test/config.test.ts",
+      "proves": "is never in what the console is told",
+      "fails": "the operator console becoming the way a live key leaves the deployment"
+    },
+    {
+      "id": "the-mail-mock-cannot-run-outside-development",
+      "protects": "D12",
+      "stage": "23",
+      "status": "live",
+      "impl": "runtime/test/mail.test.ts",
+      "proves": "refuses rather than pretending when nothing is configured",
+      "fails": "a sign-in that answers \"check your email\" with nothing sent, and a code written into a retained log — the shape a previous platform shipped three times, because every suite runs where mocking is correct"
+    },
+    {
+      "id": "a-letter-survives-not-being-english",
+      "protects": "D9",
+      "stage": "23",
+      "status": "live",
+      "impl": "runtime/test/mail.test.ts",
+      "proves": "survives a body and a subject that are not ASCII",
+      "fails": "every sign-in mail outside English arriving as bytes, with nothing in the send path failing"
+    },
+    {
+      "id": "the-envelope-sender-is-an-address",
+      "protects": "D9",
+      "stage": "23",
+      "status": "live",
+      "impl": "runtime/test/mail.test.ts",
+      "proves": "sends through the binding, with the envelope sender bare",
+      "fails": "`One <noreply@4dl.app>` offered to a mail server as an address, which it is not"
     }
   ]
 }

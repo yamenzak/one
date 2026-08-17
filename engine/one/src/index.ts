@@ -25,8 +25,8 @@ import {
   deploymentFaults, isPlatformPath, locator,
   accept, bindingKey, liveBindings, memberFor, noteShardApp, observe, owedBy, sweep,
   tenantById, tenantBySlug,
-  operatorOps, permissionsResolver, personalOps, pusherOver, schemaFor, serve, sessionIdFrom, shardFor,
-  subscriptionFor, whoIs,
+  operatorOps, permissionsResolver, personalOps, pusherOver, schemaFor, sendMail, serve,
+  sessionIdFrom, shardFor, subscriptionFor, whoIs,
   type Bucket, type Db, type TenantRow,
 } from "@engine/runtime";
 import { hello } from "@engine/hello";
@@ -173,6 +173,24 @@ export interface Env {
    * special category cannot write one, and the write says so — see `VaultSeam`.
    */
   readonly VAULT_SECRET?: string;
+  /**
+   * ⚠️ WHAT A STORED CREDENTIAL IS ENCRYPTED UNDER — see `config.ts`. Absent is
+   * a deployment that can hold an address and cannot hold a key: the console
+   * says so, and every lane behind one stays off rather than running on a value
+   * this database would have held in the clear.
+   *
+   * ⚠️ AND IT IS NOT `VAULT_SECRET`. Rotating this one costs a re-paste of the
+   * credentials; rotating that one is the silent loss of every health record on
+   * the deployment. One name for both would make an ordinary security action a
+   * catastrophe — which is the same argument that split it from `AUTH_SECRET`.
+   */
+  readonly CONFIG_SECRET?: string;
+  /**
+   * ⚠️ CLOUDFLARE'S OWN SEND BINDING, AND ITS ABSENCE IS A REFUSAL. A deployment
+   * without it cannot send, so it says so rather than answering "check your
+   * email" over nothing — see `mail.ts`.
+   */
+  readonly SEND_EMAIL?: { send(message: unknown): Promise<void> };
   /**
    * ⚠️ THE ACCOUNT TOKEN, AND IT IS A WORKER SECRET RATHER THAN A ROW ON
    * PURPOSE. It can create and destroy this deployment's databases and edit the
@@ -344,6 +362,22 @@ const handler = (env: Env) => {
   const shardOf = (tenant: TenantRow) => shardFor(env as never, tenant.shardId);
 
   /**
+   * ⚠️ THE ONE PLACE `cloudflare:email` IS NAMED, and it is here because this is
+   * where the binding is. `@engine/runtime` builds the message and hands over
+   * three strings; constructing the platform's own envelope type inside the
+   * package would make it unbuildable anywhere that sends nothing — which is
+   * every unit test and every self-host.
+   */
+  const mailBinding = env.SEND_EMAIL
+    ? {
+      send: async (from: string, to: string, raw: string): Promise<void> => {
+        const { EmailMessage } = await import("cloudflare:email");
+        await env.SEND_EMAIL!.send(new EmailMessage(from, to, raw));
+      },
+    }
+    : undefined;
+
+  /**
    * ⚠️ THE BUCKET FOR THIS WORKSPACE'S JURISDICTION, AND THE RESIDENCY IS IN THE
    * ADDRESSING. An EU workspace resolves the EU bucket because its own residency
    * is part of the binding's name — there is no check to forget, and a workspace
@@ -476,14 +510,25 @@ const handler = (env: Env) => {
             where, ctx.now);
         },
         deliver: async (to, code) => {
-          if (env.ENVIRONMENT !== "development") {
-            throw new Error("this deployment has no mailer configured");
-          }
-          /* logs-exempt: the branch above throws outside development, so this
-             cannot run on a deployment whose logs anybody keeps — and in
-             development the console IS the mailer. A sign-in code in a retained
-             log is a session anybody with dashboard access can take. */
-          console.log(`[sign-in] ${to} → ${code}`);
+          const why = await sendMail({
+            directory,
+            ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
+            ...(mailBinding ? { binding: mailBinding } : {}),
+            environment: env.ENVIRONMENT,
+          }, {
+            to,
+            subject: `${code} is your sign-in code`,
+            /* ⚠️ THE CODE IS IN THE SUBJECT AS WELL AS THE BODY, because that is
+               what a phone shows on the lock screen — and typing it from there
+               is the whole journey for most people. */
+            text: `${code}\n\nIt is good for a few minutes. If you did not ask to sign in, ignore this — nothing happens until the code is used.`,
+          });
+          /* ⚠️ A REFUSAL IS A THROW HERE, and the caller withdraws the code row
+             it had already written. Answering "check your email" over a send
+             that did not happen is the failure `mail.ts` exists to refuse, and
+             leaving the row behind refuses the next attempt as "too often"
+             while nothing was ever delivered. */
+          if (why) throw new Error(`mail refused: ${why}`);
         },
         /* ⚠️ The same allow-list the console is behind (D18) — OneSpace draws
            the operator's place from this, and a place drawn over nothing is a
@@ -503,6 +548,9 @@ const handler = (env: Env) => {
       */
       ...operatorOps({
         apps: APPS, isOperator,
+      /* ⚠️ Absent is a deployment that can hold an address and not a key — the
+         console says so, rather than offering a field that saves nothing. */
+      ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
         deployment: "one",
         /* ⚠️ The address the VAPID subject is built from — a push service is
            entitled to reach somebody at it. */

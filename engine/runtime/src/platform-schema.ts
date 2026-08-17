@@ -30,6 +30,7 @@ import { JOBS_SCHEMA } from "./jobs.js";
 import { LEGAL_SCHEMA } from "./legal.js";
 import { MEMBERSHIP_SCHEMA } from "./membership.js";
 import { OPERATOR_SCHEMA } from "./operator.js";
+import { CONFIG_SCHEMA } from "./config.js";
 import { PACKAGE_SCHEMA } from "./packages.js";
 import { PUSH_SCHEMA } from "./push.js";
 import { MOVE_SCHEMA } from "./move.js";
@@ -52,6 +53,11 @@ export const DIRECTORY_MODULES: readonly SchemaModule[] = [
      another shard entirely — see `push.ts`. */
   PUSH_SCHEMA,
   JOBS_SCHEMA, OPERATOR_SCHEMA, AI_ACTION_SCHEMA,
+  /* ⚠️ IN THE DIRECTORY, BECAUSE A CREDENTIAL IS THE DEPLOYMENT'S. One Stripe
+     account and one sender stand behind every workspace on every shard, so a
+     copy per shard would be one rotation that has to reach N databases and does
+     not. See `config.ts` for why it is here rather than in a Worker secret. */
+  CONFIG_SCHEMA,
   /* ⚠️ WHAT THE DEPLOYMENT HAS MADE FOR ITSELF, in the directory because it is
      about the deployment rather than about any workspace — and because the
      reaper reads it to decide what it may destroy. */
