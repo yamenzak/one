@@ -1881,7 +1881,7 @@
       "status": "live",
       "impl": "runtime/test/webpush.test.ts",
       "proves": "comes back out as what went in",
-      "fails": "a swapped HKDF salt or a padding byte of 0x00 \u2014 bytes every push service accepts, forwards and 201s on, that no browser can decrypt and nobody ever sees"
+      "fails": "a swapped HKDF salt or a padding byte of 0x00 — bytes every push service accepts, forwards and 201s on, that no browser can decrypt and nobody ever sees"
     },
     {
       "id": "a-vapid-header-is-raw-r-s-scoped-to-an-origin",
@@ -1899,7 +1899,7 @@
       "status": "live",
       "impl": "runtime/test/push.test.ts",
       "proves": "never carries another workspace's door",
-      "fails": "one business's notification arriving on a device wearing another business's logo and opening a link into the wrong workspace \u2014 with the send reporting success"
+      "fails": "one business's notification arriving on a device wearing another business's logo and opening a link into the wrong workspace — with the send reporting success"
     },
     {
       "id": "a-gone-device-is-pruned-where-the-answer-is",
@@ -1935,7 +1935,7 @@
       "status": "live",
       "impl": "apps/hello/test/services.test.ts",
       "proves": "sends only what the notification type offers a channel for",
-      "fails": "a phone lighting up for a type that declared inbox and email, and for a person who switched push off \u2014 the setting saved, read by nothing"
+      "fails": "a phone lighting up for a type that declared inbox and email, and for a person who switched push off — the setting saved, read by nothing"
     },
     {
       "id": "what-the-engine-offers-is-emitted-by-the-engine",
@@ -1944,7 +1944,7 @@
       "status": "live",
       "impl": "apps/hello/test/surface.screens.test.tsx",
       "proves": "no longer describes what the engine composes",
-      "fails": "an index of what an app gets for free, typed by hand and wrong within a week \u2014 so the same capability is written twice by somebody who read that it did not exist"
+      "fails": "an index of what an app gets for free, typed by hand and wrong within a week — so the same capability is written twice by somebody who read that it did not exist"
     },
     {
       "id": "an-app-that-declares-nothing-still-has-a-roster-and-a-bill",
@@ -1962,7 +1962,7 @@
       "status": "live",
       "impl": "scripts/guards.test.mjs",
       "proves": "appears twice, so one of the two is a row nothing can see",
-      "fails": "four checks parsing one markdown table four ways, so a reformatted row is a stage nothing can be deferred against and a guard that can be owed for ever \u2014 silently, because each check reports green about a row it never saw"
+      "fails": "four checks parsing one markdown table four ways, so a reformatted row is a stage nothing can be deferred against and a guard that can be owed for ever — silently, because each check reports green about a row it never saw"
     },
     {
       "id": "a-product-reaches-the-page-through-one-dynamic-lane",
@@ -1971,7 +1971,7 @@
       "status": "live",
       "impl": "scripts/bundle.test.mjs",
       "proves": "the registry is the one file that may name a product",
-      "fails": "one product's whole browser half in the bundle every other product's customers download \u2014 invisible, because the registry is the one file where naming an app looks right"
+      "fails": "one product's whole browser half in the bundle every other product's customers download — invisible, because the registry is the one file where naming an app looks right"
     },
     {
       "id": "the-product-entry-is-never-the-test-ground",
@@ -1989,7 +1989,34 @@
       "status": "live",
       "impl": "apps/hello/test/workspace.test.ts",
       "proves": "answers the declared fallback before anybody has chosen",
-      "fails": "a switch that persists, is drawn back, and changes nothing \u2014 or a handler inventing its own default, so a screen and the code disagree about what a workspace switched on"
+      "fails": "a switch that persists, is drawn back, and changes nothing — or a handler inventing its own default, so a screen and the code disagree about what a workspace switched on"
+    },
+    {
+      "id": "a-session-can-be-withdrawn-everywhere-at-once",
+      "protects": "D12",
+      "stage": "31",
+      "status": "live",
+      "impl": "apps/hello/test/identity.test.ts",
+      "proves": "ends every session, including the one that asked",
+      "fails": "the laptop somebody lost staying signed in for thirty days, because a signed claim cannot be withdrawn before it expires — which is the whole reason a session is a row"
+    },
+    {
+      "id": "the-proof-window-can-be-re-opened-without-a-new-session",
+      "protects": "D12",
+      "stage": "31",
+      "status": "live",
+      "impl": "apps/hello/test/identity.test.ts",
+      "proves": "re-opens the proof window without replacing the session",
+      "fails": "an irreversible operation reachable for fifteen minutes after signing in and refused for ever after, with the refusal naming a confirmation no control could perform"
+    },
+    {
+      "id": "proving-it-is-you-goes-to-your-own-address",
+      "protects": "D12",
+      "stage": "31",
+      "status": "live",
+      "impl": "apps/hello/test/identity.test.ts",
+      "proves": "the body names Mallory",
+      "fails": "somebody holding a stolen cookie confirming themselves at an inbox they own, which is the entire thing the proof gate is against"
     }
   ]
 }

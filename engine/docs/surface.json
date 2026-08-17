@@ -467,6 +467,27 @@
       "proof": null
     },
     {
+      "id": "me.signout.everywhere",
+      "kind": "write",
+      "needs": "session",
+      "doors": null,
+      "proof": null
+    },
+    {
+      "id": "me.prove.code",
+      "kind": "write",
+      "needs": "session",
+      "doors": null,
+      "proof": null
+    },
+    {
+      "id": "me.prove",
+      "kind": "write",
+      "needs": "session",
+      "doors": null,
+      "proof": null
+    },
+    {
       "id": "me.who",
       "kind": "read",
       "needs": "session",

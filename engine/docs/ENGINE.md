@@ -130,6 +130,9 @@ they are in, leaving one, taking a copy, deleting themselves.
 | `me.code` | write | **nobody** | *every door* |
 | `me.session` | write | **nobody** | *every door* |
 | `me.signout` | write | session | *every door* |
+| `me.signout.everywhere` | write | session | *every door* |
+| `me.prove.code` | write | session | *every door* |
+| `me.prove` | write | session | *every door* |
 | `me.who` | read | session | *every door* |
 | `me.tenant.create` | write | session | `setup` `account` |
 | `me.tenant.commercial` | write | session | `setup` `account` `tenant` |
@@ -380,7 +383,7 @@ env or a binding.
 | `directory` | accounts, workspaces, placement, enablement, allowances | 25 | 3 |
 | `handles` | which binding holds which shard | 3 | — |
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
-| `identity` | sign-in codes, sessions, tokens, proof | 21 | 2 |
+| `identity` | sign-in codes, sessions, tokens, proof | 21 | — |
 | `membership` | the roster and what each member may do | 12 | — |
 | `compose` | a manifest becomes a live surface of operations | 3 | 1 |
 | `serve` | the one path every request ends in — both doors | 4 | — |
@@ -420,7 +423,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**266 of them**, 251 reached by something today.
+**266 of them**, 253 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -721,6 +724,9 @@ its own header, cited by other files, and doing nothing.
 | `a-product-reaches-the-page-through-one-dynamic-lane` | D17 | one product's whole browser half in the bundle every other product's customers download — invisible, because the registry is the one file where naming an app looks right |
 | `the-product-entry-is-never-the-test-ground` | D17 | a real workspace shown a sample world's records under its own name, convincingly, with every suite green because both files export the same shape |
 | `a-setting-a-handler-reads-is-the-declared-one` | D12 | a switch that persists, is drawn back, and changes nothing — or a handler inventing its own default, so a screen and the code disagree about what a workspace switched on |
+| `a-session-can-be-withdrawn-everywhere-at-once` | D12 | the laptop somebody lost staying signed in for thirty days, because a signed claim cannot be withdrawn before it expires — which is the whole reason a session is a row |
+| `the-proof-window-can-be-re-opened-without-a-new-session` | D12 | an irreversible operation reachable for fifteen minutes after signing in and refused for ever after, with the refusal naming a confirmation no control could perform |
+| `proving-it-is-you-goes-to-your-own-address` | D12 | somebody holding a stolen cookie confirming themselves at an inbox they own, which is the entire thing the proof gate is against |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -739,7 +745,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 16 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 69 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 72 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -774,7 +780,6 @@ nothing yet.
 | **27** — The AI lane runs — an action reaches a provider and the reserve settles | `runtime/src/services.ts` | 1 |
 | **30** — A workspace's apps are turned on and off, and a workspace can move shard | `kernel/src/tenancy.ts` | 2 |
 | **30** — A workspace's apps are turned on and off, and a workspace can move shard | `runtime/src/directory.ts` | 3 |
-| **31** — Account security — sign out everywhere, and proving it is you again before something irreversible | `runtime/src/identity.ts` | 2 |
 | **32** — A manifest changes while the deployment is up, and the composed surface forgets | `runtime/src/compose.ts` | 1 |
 | **33** — A guard refuses a declared setting nothing names — the seam a handler reads one through is live; the completeness check over it is not | `kernel/src/setting.ts` | 1 |
 | **34** — The kernel's remaining conveniences are each used by a lane or removed | `kernel/src/brand.ts` | 1 |
@@ -788,7 +793,7 @@ nothing yet.
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `kernel/src/package.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `runtime/src/jobs.ts` | 1 |
 
-**32 declarations** are built and reached by nothing, each waiting on a
+**30 declarations** are built and reached by nothing, each waiting on a
 stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one
 that names no stage, so this list cannot grow by forgetting.
 <!-- /generated -->
@@ -828,7 +833,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 28 | Notifications are filed — an event raised becomes a note in somebody's inbox | shipped |
 | 29 | The daily sweep — erasure happens on a clock, and every run is recorded | shipped |
 | 30 | A workspace's apps are turned on and off, and a workspace can move shard | **planned** |
-| 31 | Account security — sign out everywhere, and proving it is you again before something irreversible | **planned** |
+| 31 | Account security — sign out everywhere, and proving it is you again before something irreversible | shipped |
 | 32 | A manifest changes while the deployment is up, and the composed surface forgets | **planned** |
 | 33 | A guard refuses a declared setting nothing names — the seam a handler reads one through is live; the completeness check over it is not | **planned** |
 | 34 | The kernel's remaining conveniences are each used by a lane or removed | **planned** |
@@ -839,7 +844,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 39 | The documentation is two generated pages — what exists, derived from the engine; and how to add to it, which no generator can derive | shipped |
 | 40 | An app ships a screen — a product's browser half is a chunk of its own, loaded when its workspace opens it, drawing that workspace's own records through the door it is handed | shipped |
 
-**29 shipped, 11 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**30 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

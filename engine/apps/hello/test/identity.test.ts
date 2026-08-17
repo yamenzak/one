@@ -19,7 +19,7 @@ import {
   DIRECTORY_MODULES, SHARD_MODULES,
   AUDIT_SCHEMA, CODE_TRIES, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, MEMBERSHIP_SCHEMA, NOBODY,
   REPLAY_SCHEMA, addShard, applySchema, memberFor, membersOf, noteShardApp, permissionsResolver,
-  personalOps, schemaFor, serve, sessionIdFrom, tenantBySlug, whoIs, type Db,
+  personalOps, schemaFor, serve, sessionIdFrom, startSession, tenantBySlug, whoIs, type Db,
   b64urlOf, makePushKeys, subscriptionsOf,
 } from "@engine/runtime";
 import { HELLO, hello } from "../src/index.js";
@@ -223,6 +223,69 @@ describe("signing in", () => {
     const cookie = await signIn("sam@example.com");
     expect((await post("setup", "/api/me.signout", {}, cookie)).status).toBe(200);
     expect((await get("setup", "/api/me.who", cookie)).status).toBe(401);
+  });
+
+  /*
+    ⚠️ THE REASON A SESSION IS A ROW RATHER THAN A SIGNED CLAIM. A signed token
+    cannot be withdrawn before it expires, so the laptop somebody lost stays
+    signed in for thirty days — and this is the one control a person reaches for
+    the moment they know it has happened.
+
+    ⚠️ THE SECOND SESSION IS STARTED DIRECTLY, because the code cooldown
+    correctly refuses a second sign-in a second later. What is under test is the
+    withdrawal, not how the other device got its cookie.
+  */
+  it("ends every session, including the one that asked", async () => {
+    const here = await signIn("sam@example.com");
+    const me = (await directory().prepare(`SELECT id FROM account WHERE email = ?`)
+      .bind("sam@example.com").first<{ id: string }>())!;
+    const other = await startSession(directory(), me.id as never);
+    const there = `one_session=${other.id}`;
+
+    expect((await get("setup", "/api/me.who", there)).status).toBe(200);
+    expect((await post("setup", "/api/me.signout.everywhere", {}, here)).status).toBe(200);
+
+    /* ⚠️ BOTH, and the one that pressed it is not an exception — a control that
+       signs out every device except this one has to explain itself, and the
+       explanation is always worse than saying it signs you out here too. */
+    expect((await get("setup", "/api/me.who", there)).status).toBe(401);
+    expect((await get("setup", "/api/me.who", here)).status).toBe(401);
+  });
+
+  /*
+    ⚠️ THE PROOF GATE HAD NO WAY TO SATISFY IT ONCE THE WINDOW CLOSED. `proof:
+    "recent"` is fifteen minutes from the sign-in, so erasing your own account
+    was reachable for a quarter of an hour and refused for ever after — the
+    refusal telling somebody to do a thing no control could do.
+  */
+  it("re-opens the proof window without replacing the session", async () => {
+    const cookie = await signIn("sam@example.com");
+    /* ⚠️ An hour passes — the session's proof goes stale, and the sign-in code's
+       own cooldown goes with it, because both are ages rather than flags. */
+    const stale = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    await directory().prepare(`UPDATE session SET proven_at = ?`).bind(stale).run();
+    await directory().prepare(`UPDATE code SET at = ?`).bind(stale).run();
+
+    expect((await post("setup", "/api/me.forget", {}, cookie)).status).toBe(401);
+
+    /* ⚠️ AN ADDRESS IS OFFERED AND IGNORED. Taking one here would let somebody
+       holding a stolen cookie prove themselves at an inbox they own, which is
+       the entire thing this gate is against — so the body names Mallory and the
+       code goes to Sam. */
+    expect((await post("setup", "/api/me.prove.code",
+      { email: "mallory@example.com" }, cookie)).status).toBe(200);
+    expect(sent.at(-1)?.to).toBe("sam@example.com");
+    expect((await post("setup", "/api/me.prove", { code: "000000" }, cookie)).status).toBe(401);
+
+    const proven = await post("setup", "/api/me.prove",
+      { code: codeFor("sam@example.com") }, cookie);
+    expect(proven.status).toBe(200);
+    /* ⚠️ NO NEW COOKIE. What moved is a column on the row the gate already reads,
+       so every other device of theirs is untouched and this is a confirmation
+       rather than a sign-in. */
+    expect(proven.headers.get("set-cookie")).toBe(null);
+
+    expect((await post("setup", "/api/me.forget", {}, cookie)).status).toBe(200);
   });
 });
 

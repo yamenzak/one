@@ -188,9 +188,6 @@ export async function endSession(db: Db, id: string, now = new Date()): Promise<
 
 /** ⚠️ Every session, because "sign out everywhere" is the reason a session is a
     row rather than a signed claim. */
-/* DEFER(engine-31) stage:31 — "sign out everywhere" is the reason a session is a
-   row rather than a signed claim, and there is no operation that ends them all.
-   Proving it is you again has the same shape and the same gap. */
 export async function endEverySession(db: Db, accountId: AccountId, now = new Date()): Promise<void> {
   await db.prepare(`UPDATE session SET ended_at = ? WHERE account_id = ? AND ended_at IS NULL`)
     .bind(now.toISOString(), accountId).run();
@@ -201,7 +198,6 @@ export async function endEverySession(db: Db, accountId: AccountId, now = new Da
  * The threat this answers is a borrowed laptop with an open tab, so what has to
  * be recent is the confirmation rather than the sign-in.
  */
-/* DEFER(engine-31) stage:31 — see the note above. */
 export async function noteProof(db: Db, id: string, now = new Date()): Promise<void> {
   await db.prepare(`UPDATE session SET proven_at = ? WHERE id = ?`).bind(now.toISOString(), id).run();
 }

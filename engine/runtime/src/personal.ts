@@ -29,8 +29,8 @@ import { subscribeDevice, unsubscribeDevice, vapidOf } from "./push.js";
 import { dossierOf, forgetPerson, forgetWorkspace, type Place } from "./dossier.js";
 import { erase } from "./records.js";
 import {
-  endSession, forgetCode, issueCode, mintToken, readSession, revokeToken, spendCode,
-  startSession, tokensOf, type Session,
+  endEverySession, endSession, forgetCode, issueCode, mintToken, noteProof, readSession,
+  revokeToken, spendCode, startSession, tokensOf, type Session,
 } from "./identity.js";
 import { claimInvitations, found, memberFor, membersOf } from "./membership.js";
 import { eraseObjects, type Bucket, type Where } from "./storage.js";
@@ -336,6 +336,90 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
         if (ctx.session) await endSession(ctx.directory, ctx.session.id, ctx.now);
         ctx.issue(null);
         return { signedOut: true };
+      },
+    },
+
+
+    /**
+     * EVERY SESSION, EVERYWHERE.
+     *
+     * ⚠️ THIS IS THE REASON A SESSION IS A ROW RATHER THAN A SIGNED CLAIM, and
+     * for as long as no operation ended them all, that reason was a design note
+     * paying no rent. A signed token cannot be withdrawn before it expires, so a
+     * laptop somebody lost stays signed in — and "sign out everywhere" is the one
+     * thing a person reaches for when they know it has happened.
+     *
+     * ⚠️ IT ENDS THIS ONE TOO, AND SAYING SO IS THE DESIGN. A control that signs
+     * out every device except the one pressing it has to explain itself, and the
+     * explanation is always worse than the sentence "you will be signed out
+     * here as well".
+     *
+     * ⚠️ AND IT IS REACHABLE BEFORE THE TERMS, like the rest of leaving. Somebody
+     * who has just realised a device is compromised must not meet an agreement
+     * wall first.
+     */
+    "me.signout.everywhere": {
+      kind: "write", needs: "session", beforeAccepting: true,
+      async run(ctx): Promise<unknown> {
+        await endEverySession(ctx.directory, ctx.session!.accountId, ctx.now);
+        ctx.issue(null);
+        return { signedOut: true };
+      },
+    },
+
+    /* ------------------------------------------------------- proving again --- */
+
+    /*
+      ⚠️ THE PROOF GATE HAD NO WAY TO SATISFY IT ONCE THE WINDOW CLOSED. `proof:
+      "recent"` is fifteen minutes from the SIGN-IN, so an operation behind it —
+      erasing your account — was reachable for a quarter of an hour after signing
+      in and refused for ever after, with the refusal telling somebody to do
+      something they had no control that could do.
+
+      ⚠️ AND IT IS A STAMP ON THIS SESSION, NEVER A SECOND ONE. The threat is a
+      borrowed laptop with an open tab, so what has to be recent is the
+      CONFIRMATION rather than the sign-in — a new session would answer a
+      different question and leave the old one open.
+    */
+    "me.prove.code": {
+      kind: "write", needs: "session",
+      async run(ctx): Promise<unknown> {
+        /* ⚠️ THE CALLER'S OWN ADDRESS, NEVER ONE IN THE BODY. Taking an address
+           here would let somebody with a stolen cookie prove themselves at an
+           inbox they own — which is the whole of what this gate is against. */
+        const email = ctx.email;
+        if (!email) return ctx.fail("platform.unauthorized");
+
+        const issued = await issueCode(ctx.directory, email, deps.secret, ctx.now);
+        if (issued === "too_soon") return ctx.fail("platform.too_many", { retryAfter: 60 });
+        try {
+          await deps.deliver(email, issued.code);
+        } catch {
+          await forgetCode(ctx.directory, issued.id);
+          return ctx.fail("platform.unavailable");
+        }
+        return { sent: true };
+      },
+    },
+
+    "me.prove": {
+      kind: "write", needs: "session",
+      async run(ctx, input): Promise<unknown> {
+        const email = ctx.email;
+        if (!email) return ctx.fail("platform.unauthorized");
+        const wrong = await spendCode(
+          ctx.directory, email, String(input.code ?? "").trim(), deps.secret, ctx.now);
+        if (wrong) return ctx.fail("platform.unauthorized");
+
+        await noteProof(ctx.directory, ctx.session!.id, ctx.now);
+        /*
+          ⚠️ THE COOKIE IS NOT REISSUED AND THE SESSION IS NOT REPLACED. What
+          moved is a column on the row the gate already reads per request, so the
+          very next call is inside the window — and every OTHER device of theirs
+          is untouched, which is what makes this a confirmation rather than a
+          sign-in.
+        */
+        return { provenAt: ctx.now.toISOString() };
       },
     },
 
