@@ -1792,6 +1792,42 @@
       "impl": "runtime/src/resources.ts",
       "proves": "DRAIN_DAYS * 24 * 60 * 60 * 1000",
       "fails": "an app removed by a typo taking its database with it in the same minute, behind a green log line"
+    },
+    {
+      "id": "no-person-in-a-log-line",
+      "protects": "D6",
+      "stage": "36",
+      "status": "live",
+      "impl": "scripts/logs.test.mjs",
+      "proves": "logs-exempt",
+      "fails": "somebody's address or account id disclosed to a store that leaves the jurisdiction, is retained on a vendor's schedule, and survives every erasure this platform performs"
+    },
+    {
+      "id": "the-residency-promise-excludes-logs",
+      "protects": "D6",
+      "stage": "36",
+      "status": "live",
+      "impl": "kernel/src/tenancy.ts",
+      "proves": "storage, backups and every",
+      "fails": "promising a jurisdiction for logs the vendor offers no residency control over — broken by the first request"
+    },
+    {
+      "id": "a-file-goes-when-its-row-does",
+      "protects": "D11",
+      "stage": "36",
+      "status": "live",
+      "impl": "runtime/src/storage.ts",
+      "proves": "eraseObjects",
+      "fails": "somebody's uploads left in a bucket after their account was erased, invisible to every check and visible only on a bill"
+    },
+    {
+      "id": "an-object-key-is-derived-never-supplied",
+      "protects": "D5",
+      "stage": "36",
+      "status": "live",
+      "impl": "runtime/src/storage.ts",
+      "proves": "objectKey",
+      "fails": "a caller choosing a key outside their own workspace's prefix, one string from reading somebody else's file, with an ordinary-looking ledger row"
     }
   ]
 }

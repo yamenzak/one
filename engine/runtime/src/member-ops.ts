@@ -24,6 +24,7 @@ import { inboxOf, markSeen, policyOf, preferenceOf, setPolicy, setPreference, un
 import { invite, membersOf, remove, rolesFor, setAppRole, setPlatformRole } from "./membership.js";
 import type { Ctx, Resolved } from "./compose.js";
 import type { Db } from "./sql.js";
+import type { Bucket } from "./storage.js";
 
 /**
  * ⚠️ WHAT A PLATFORM OPERATION SEES THAT AN APP'S DOES NOT. Widening `Ctx`
@@ -51,6 +52,17 @@ export interface PlatformCtx extends Ctx {
   readonly enabledApps: readonly string[];
   readonly email: string | null;
   readonly allowance: (key: string) => Allowance;
+  /**
+   * ⚠️ THE BUCKET FOR THIS WORKSPACE'S JURISDICTION, AND THE RESIDENCY IS IN THE
+   * ADDRESSING. An EU workspace resolves the EU bucket because the binding's
+   * name carries its residency — so there is no check anybody can forget, and a
+   * lookup that lands in the wrong regime misses entirely rather than serving
+   * quietly from the wrong one.
+   *
+   * ⚠️ NULL IS AN ANSWER. A deployment whose bucket the reconciler has not made
+   * live yet stores no files, which every caller refuses on rather than throws.
+   */
+  readonly bucket?: Bucket | null;
 }
 
 const asPlatform = (ctx: Ctx): PlatformCtx => ctx as PlatformCtx;

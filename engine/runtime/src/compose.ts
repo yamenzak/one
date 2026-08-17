@@ -29,6 +29,7 @@ import { memberOps } from "./member-ops.js";
 import { packageOps } from "./packages.js";
 import { settingOps } from "./settings.js";
 import { vaultOps } from "./vault-ops.js";
+import { mediaOps } from "./media-ops.js";
 import { moneyOps } from "./money-ops.js";
 import { centreOps } from "./centre-ops.js";
 
@@ -238,6 +239,12 @@ export function compose(app: AppSpec): Composed {
      product that asked and was told yes. */
   if (Object.keys(app.purposes ?? {}).length || Object.keys(app.vault ?? {}).length) {
     for (const [id, resolved] of Object.entries(vaultOps(app))) byId.set(id, resolved);
+  }
+  /* ⚠️ AND ONLY WHERE THERE IS SOMEWHERE TO PUT A FILE. Three routes about files
+     on a product that holds none answer "no bucket" for ever, which reads as a
+     broken feature rather than an absent one. */
+  if (app.collections.some((c) => Object.values(c.fields).some((f) => f.kind === "media"))) {
+    for (const [id, resolved] of Object.entries(mediaOps(app))) byId.set(id, resolved);
   }
 
   for (const spec of app.operations) {

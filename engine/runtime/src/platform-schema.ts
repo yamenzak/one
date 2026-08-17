@@ -33,6 +33,7 @@ import { OPERATOR_SCHEMA } from "./operator.js";
 import { PACKAGE_SCHEMA } from "./packages.js";
 import { RESOURCE_SCHEMA } from "./resources.js";
 import type { SchemaModule } from "./schema.js";
+import { MEDIA_SCHEMA } from "./storage.js";
 import { SETTING_SCHEMA } from "./settings.js";
 import { VAULT_SCHEMA } from "./vault.js";
 
@@ -54,4 +55,8 @@ export const DIRECTORY_MODULES: readonly SchemaModule[] = [
 export const SHARD_MODULES: readonly SchemaModule[] = [
   MEMBERSHIP_SCHEMA, PACKAGE_SCHEMA, SETTING_SCHEMA, AI_ACTION_SCHEMA,
   AUDIT_SCHEMA, REPLAY_SCHEMA, INBOX_SCHEMA, VAULT_SCHEMA,
+  /* ⚠️ BESIDE THE RECORDS THE FILES BELONG TO. A workspace's media ledger on the
+     shard is what makes its erasure one pass over one database — and what keeps
+     an EU workspace's file index in the EU with everything else of theirs. */
+  MEDIA_SCHEMA,
 ];

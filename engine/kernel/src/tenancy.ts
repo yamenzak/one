@@ -40,9 +40,24 @@ export interface Placement {
 
 /**
  * ⚠️ A CLOSED SET, DELIBERATELY. Every value here is a promise the deployment
- * has to be able to keep end to end — storage, backups, logs and every
- * sub-processor. Adding one is a commitment to build that chain, which is why it
- * is not a free-form string an app could invent.
+ * has to be able to keep end to end — storage, backups and every sub-processor.
+ * Adding one is a commitment to build that chain, which is why it is not a
+ * free-form string an app could invent.
+ *
+ * ⚠️ AND THE PROMISE IS ABOUT STORED RECORDS, NOT ABOUT OPERATIONAL LOGS, which
+ * is a narrowing rather than a nicety. This sentence used to say "logs" as well,
+ * and it was not true: the platform runs on Workers Logs, which have no
+ * residency control and none is on offer. A promise a vendor gives you no way to
+ * keep is one broken by the first request, so it is not made — and what is done
+ * instead is the thing that actually protects anybody, which is keeping people
+ * OUT of log lines. `scripts/logs.test.mjs` enforces that, because a rule about
+ * what may be logged is exactly the kind that decays into a paragraph nobody
+ * reads.
+ *
+ * ⚠️ THE AUDIT TRAIL IS NOT A LOG AND IS NOT AFFECTED. It is a table on the
+ * workspace's own shard, in the workspace's own jurisdiction, and it is where
+ * "who did what" is answered — deliberately, so that the question has an answer
+ * that does not depend on a vendor's log retention.
  */
 export type Residency = "eu" | "global";
 

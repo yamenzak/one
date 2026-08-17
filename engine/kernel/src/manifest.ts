@@ -41,7 +41,7 @@ import { refuseGuide } from "./guide.js";
 import type { JobBook } from "./job.js";
 import { refuseJobs } from "./job.js";
 import type { NeedBook } from "./infra.js";
-import { refuseNeeds } from "./infra.js";
+import { mediaNeedFor, refuseNeeds } from "./infra.js";
 import type { DeploymentLegal, DocumentBook, SubProcessorBook, SubProcessorDef } from "./legal.js";
 import { refuseLegal } from "./legal.js";
 import type { NotificationBook } from "./notify.js";
@@ -171,6 +171,23 @@ export const holdingsOf = (spec: AppSpec): readonly Holding[] => [...new Set([
   ...spec.collections.flatMap((c) => holdingsIn(c.fields)),
   ...Object.values(spec.vault ?? {}).map((f) => f.holding),
 ])];
+
+/**
+ * EVERY NEED THIS APP HAS — the ones it declared, and the one its own fields
+ * imply.
+ *
+ * ⚠️ READ THIS RATHER THAN `spec.needs`, EVERYWHERE. A caller reading the raw
+ * declaration sees an app with a media field and no bucket, provisions nothing,
+ * and the first upload fails against a binding that was never asked for. There
+ * is one derived need today and the shape matters more than the count: a
+ * concern the platform can work out for itself is never an app's to remember.
+ */
+export const needsOf = (spec: AppSpec): NeedBook => {
+  const files = spec.collections.some((c) =>
+    Object.values(c.fields).some((f) => f.kind === "media"));
+  const derived = mediaNeedFor(files);
+  return { ...(derived ? { [derived.id]: derived } : {}), ...(spec.needs ?? {}) };
+};
 
 /* ------------------------------------------------------------ inheritance --- */
 

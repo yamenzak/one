@@ -30,7 +30,7 @@
 import type { AppSpec, NeedDef, Residency, ResourceKind, ResourceState } from "@engine/kernel";
 import {
   DRAIN_DAYS, IS_CREATED, KEEPS_RESIDENCY, LIVE_STATES,
-  bindingName, newId, resourceName,
+  bindingName, needsOf, newId, resourceName,
 } from "@engine/kernel";
 import type { Account, WireBinding } from "./cloudflare.js";
 import { create, destroy, listRemote, patchBindings } from "./cloudflare.js";
@@ -116,7 +116,9 @@ export function wanted(
 ): readonly Want[] {
   const out: Want[] = [];
   for (const app of apps) {
-    for (const need of Object.values(app.needs ?? {})) {
+    /* ⚠️ `needsOf`, NOT `app.needs` — a media field implies a bucket nobody
+       declared, and reading the raw declaration provisions nothing for it. */
+    for (const need of Object.values(needsOf(app))) {
       if (!IS_CREATED[need.kind]) continue;
       const wheres: (Residency | null)[] = need.perResidency ? [...serves] : [null];
       for (const where of wheres) {
@@ -363,3 +365,33 @@ export async function observe(
   }
   return said;
 }
+
+/**
+ * THE LIVE BINDINGS, BY APP AND NEED, RESOLVED ONCE PER ISOLATE.
+ *
+ * ⚠️ CACHING THIS IS NOT AN OPTIMISATION, IT IS CORRECT BY CONSTRUCTION. A
+ * binding cannot appear or change without a new version of the worker, and a new
+ * version is a new isolate — so a map built at boot is exactly as fresh as `env`
+ * itself, for the whole life of the isolate. Re-reading it per request would put
+ * a directory round trip in front of every upload to learn something that cannot
+ * have changed.
+ *
+ * ⚠️ AND `live` IS THE ONLY STATE THAT COUNTS. A resource that is merely `bound`
+ * has been asked for and not yet confirmed; handing its binding out would hand
+ * out `undefined`, which reads as "this deployment has no bucket" rather than as
+ * an error — the honest answer while it is on its way.
+ */
+export async function liveBindings(
+  db: Db, env: Readonly<Record<string, unknown>>,
+): Promise<ReadonlyMap<string, unknown>> {
+  const out = new Map<string, unknown>();
+  for (const row of await resources(db)) {
+    if (row.state !== "live") continue;
+    const held = env[row.binding];
+    if (held !== undefined) out.set(`${row.appId}:${row.needId}`, held);
+  }
+  return out;
+}
+
+/** ⚠️ Residency is in the ADDRESSING: the EU workspace resolves the EU bucket. */
+export const bindingKey = (appId: string, needId: string): string => `${appId}:${needId}`;

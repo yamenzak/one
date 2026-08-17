@@ -32,6 +32,7 @@ import {
   startSession, tokensOf, type Session,
 } from "./identity.js";
 import { claimInvitations, found, memberFor, membersOf } from "./membership.js";
+import { eraseObjects, type Bucket, type Where } from "./storage.js";
 import type { Db } from "./sql.js";
 
 /* ------------------------------------------------------------------ shape --- */
@@ -44,6 +45,12 @@ export interface PersonalCtx {
   readonly now: Date;
   /** The database a workspace's records are on. */
   readonly shardOf: (tenant: TenantRow) => Db;
+  /**
+   * ⚠️ WHERE ITS FILES ARE — the bucket the reconciler made for that workspace's
+   * jurisdiction. Absent means this deployment stores no files, which is the
+   * honest state of one whose bucket is not live yet.
+   */
+  readonly bucketOf?: (where: Where) => Bucket | null;
   readonly app: (id: string) => AppSpec | null;
   /** ⚠️ Set on the response by the runtime, so no handler writes a header. */
   readonly issue: (session: Session | null) => void;
@@ -562,6 +569,10 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
         for (const tenant of await tenantsOf(ctx.directory, me)) {
           const db = ctx.shardOf(tenant);
           if (!wouldStrand(await membersOf(db, tenant.id), me)) continue;
+          /* ⚠️ THE OBJECTS BEFORE THE ROWS — the row is the only thing that
+             knows an object's key, so doing this afterwards leaves every file
+             in the bucket for ever, after a workspace was reported erased. */
+          await eraseObjects(db, ctx.bucketOf?.({ tenantId: tenant.id, residency: tenant.residency }) ?? null, { tenantId: tenant.id });
           for (const appId of await appsOfTenant(ctx.directory, tenant.id)) {
             const app = ctx.app(appId);
             if (app) await erase(db, app.collections, "tenant", tenant.id);
@@ -576,6 +587,14 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
             tenant.id));
           await closeTenant(ctx.directory, tenant.id, ctx.now);
           closed.push(tenant.slug);
+        }
+
+        /* ⚠️ AND THEIR OWN FILES IN THE WORKSPACES THEY ARE MERELY LEAVING. A
+           workspace that survives their departure keeps its own records; the
+           files that were THEIRS go with them, and only the ledger's
+           `subject_id` can tell the two apart. */
+        for (const tenant of await tenantsOf(ctx.directory, me)) {
+          await eraseObjects(ctx.shardOf(tenant), ctx.bucketOf?.({ tenantId: tenant.id, residency: tenant.residency }) ?? null, { subjectId: me });
         }
 
         gone.push(...await forgetPerson(places, me, ctx.email, ctx.now));

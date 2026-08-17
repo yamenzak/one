@@ -30,6 +30,7 @@ import type { PlatformCtx } from "./member-ops.js";
 import { keyFor, record, remember, seen, entryFor } from "./audit.js";
 import { clearCookie, sessionIdFrom, setCookie, type Session } from "./identity.js";
 import { maintenanceMode } from "./operator.js";
+import type { Bucket, Where } from "./storage.js";
 import { whoIs, type PersonalBook, type PersonalCtx } from "./personal.js";
 import type { TenantRow } from "./directory.js";
 import { tenantBySlug } from "./directory.js";
@@ -74,6 +75,12 @@ export interface Wiring {
   /** ⚠️ A thunk per app, so composing one does not compose the others (D4). */
   readonly apps: Readonly<Record<string, () => AppSpec>>;
   readonly directory: Db;
+  /**
+   * ⚠️ THE BUCKET A WORKSPACE'S FILES ARE IN — the one the reconciler made for
+   * that workspace's jurisdiction. Residency is in the ADDRESSING here: an EU
+   * workspace resolves the EU bucket, so there is no check anybody can forget.
+   */
+  readonly bucketOf?: (where: Where) => Bucket | null;
   /** Resolve a tenant's slug (or custom host) to where its records are. */
   readonly locate: (door: Door) => Promise<Located | null>;
   readonly identify?: (request: Request, located: Located) => Promise<Who>;
@@ -146,6 +153,13 @@ export interface Located {
   /** ⚠️ Its name, because the commercial refusal is a sentence with it in. */
   readonly name?: string;
   readonly standing?: Standing;
+  /**
+   * ⚠️ WHICH JURISDICTION THIS WORKSPACE WAS PROMISED, carried so the file
+   * lookup can resolve the bucket in it. Absent reads as the deployment's
+   * default region, which is the direction whose mistake is a missing bucket
+   * rather than a file in the wrong regime.
+   */
+  readonly residency?: string;
   readonly entitlements?: Parameters<typeof check>[0]["entitlements"];
   readonly flags?: Readonly<Record<string, boolean>>;
   readonly balance?: number;
@@ -279,6 +293,9 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
     switch (outcome.kind) {
       case "replay": return json(outcome.answer, 200, { "idempotent-replay": "true" });
       case "ok": return json(outcome.answer ?? {});
+      /* ⚠️ Handed back untouched — it is a file, and it has already been
+         audited like every other answer. */
+      case "raw": return outcome.answer;
       case "refused": return asProblem(outcome.problem);
     }
   };
@@ -289,6 +306,10 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
 export type Performed =
   | { readonly kind: "replay"; readonly answer: unknown }
   | { readonly kind: "ok"; readonly answer: unknown }
+  /* ⚠️ A FILE. Answered as a Response because base64 in a JSON field is not
+     something a browser can put in an `<img>` — and named as its own outcome so
+     no caller can mistake it for an ordinary answer and serialise it. */
+  | { readonly kind: "raw"; readonly answer: Response }
   | { readonly kind: "refused"; readonly problem: Problem };
 
 /**
@@ -414,15 +435,31 @@ export async function performOperation(
       : {}),
     allowance: (key: string) =>
       (located.entitlements ?? []).find((e) => e.key === key)?.value ?? false,
+    /* ⚠️ RESOLVED FROM THE WORKSPACE, so the residency is in the addressing —
+       see `bucketOf`. Absent is a deployment that stores no files. */
+    bucket: wiring.bucketOf?.(located) ?? null,
     fail: (code, values, extra) => { throw new Refused(problem(catalog, code, values, extra)); },
   };
 
   try {
     const answer = await op.run(ctx, input);
-    if (replayKey) await remember(located.db, located.tenantId, op.id, replayKey, answer, now);
+    /*
+      ⚠️ AN OPERATION MAY ANSWER WITH A RESPONSE, and exactly one kind does: one
+      handing back a FILE. Base64 in a JSON field is not something a browser can
+      put in an `<img>`.
+
+      ⚠️ AND IT STILL GOES THROUGH THE BOOKKEEPING BELOW. Returning here would
+      make a file read the one operation on the deployment that leaves no audit
+      row — invisible in exactly the record somebody asks for when they want to
+      know who looked at a document.
+    */
+    if (!(answer instanceof Response) && replayKey) {
+      await remember(located.db, located.tenantId, op.id, replayKey, answer, now);
+    }
     await recordOutcome(located, who, op, input, {
       ok: true, id: (answer as { id?: string } | null)?.id,
     }, now);
+    if (answer instanceof Response) return { kind: "raw", answer };
     /*
       ⚠️ AND THEN WHOEVER THIS CONCERNS IS TOLD — after the write and after the
       record, because a note about a change that did not land is worse than no
@@ -491,6 +528,10 @@ async function answerPersonal(
       return wiring.shardOf(tenant);
     },
     app: (appId) => wiring.apps[appId]?.() ?? null,
+    /* ⚠️ WHERE A WORKSPACE'S FILES ARE, so erasure can take the objects rather
+       than only the rows. Absent is a deployment with no bucket live yet, which
+       is a state it has to survive rather than an error. */
+    ...(wiring.bucketOf ? { bucketOf: wiring.bucketOf } : {}),
     /* ⚠️ THE RUNTIME WRITES THE COOKIE, NOT THE HANDLER. Its flags — HttpOnly,
        SameSite, Secure, the domain — are a security decision, and one handler
        setting them slightly differently is one door with a weaker session. */
@@ -502,6 +543,10 @@ async function answerPersonal(
 
   try {
     const answer = await op.run(ctx, input);
+    /* ⚠️ AN OPERATION MAY ANSWER WITH A RESPONSE, and exactly one kind does:
+       one handing back a FILE. Wrapping bytes in JSON would base64 them into a
+       string a browser cannot put in an `<img>`. */
+    if (answer instanceof Response) return answer;
     return json(answer ?? {}, 200, cookie ? { "set-cookie": cookie } : {});
   } catch (thrown) {
     if (thrown instanceof Refused) return asProblem(thrown.problem);
@@ -562,6 +607,30 @@ async function readInput(request: Request, url: URL): Promise<Record<string, unk
     url.searchParams.forEach((value, key) => { out[key] = value; });
     return out;
   }
+  /*
+    ⚠️ A BODY IS BYTES ONLY WHEN IT SAYS SO IN SO MANY WORDS. An upload is a raw
+    body — base64 in a JSON field is a third more bytes on the wire and holds the
+    whole file twice in a 128 MB isolate — so an operation may receive
+    `input.body` as an ArrayBuffer, with the query string carrying the rest.
+
+    ⚠️ AND IT IS AN ALLOW-LIST, NOT "ANYTHING THAT IS NOT JSON", because that
+    reading broke EIGHTY-EIGHT TESTS at once. `new Request(url, { body:
+    JSON.stringify(x) })` sets `content-type: text/plain;charset=UTF-8` all by
+    itself — the platform infers it from a string body — so every ordinary POST
+    in this repository arrived as a content type that is not JSON, was read as
+    bytes, and reached its operation with none of the fields it declared. The
+    first draft's comment said an absent header would stay JSON; the header was
+    never absent.
+  */
+  const type = (request.headers.get("content-type") ?? "").toLowerCase();
+  const BYTES = /^(image|video|audio|font)\/|^application\/(octet-stream|pdf|zip|gzip)|^multipart\//;
+  if (BYTES.test(type)) {
+    const out: Record<string, unknown> = {};
+    url.searchParams.forEach((value, key) => { out[key] = value; });
+    const bytes = await request.arrayBuffer();
+    return bytes.byteLength ? { ...out, body: bytes, contentType: type } : out;
+  }
+
   const text = await request.text();
   if (!text.trim()) return {};
   try {

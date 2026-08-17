@@ -96,6 +96,37 @@ export type NeedBook = Readonly<Record<string, NeedDef>>;
 
 export const need = (def: NeedDef): NeedDef => def;
 
+/* ---------------------------------------------------------------- derived --- */
+
+/**
+ * ⚠️ THE ONE NEED NO APP DECLARES, BECAUSE THE FIELD ALREADY DID. A collection
+ * with a `media` field holds files; files live in a bucket; there is exactly one
+ * right answer to which bucket, and asking every app to write it out is asking
+ * every app to get it wrong once — a missing declaration is a media field with
+ * nowhere to put anything, and it fails at the first upload rather than at
+ * composition.
+ *
+ * ⚠️ AND IT IS `perResidency`, NECESSARILY. An uploaded file is whatever
+ * somebody put in it, so its holding is unknowable and has to be assumed to be
+ * the worst — which means one bucket per jurisdiction, in that jurisdiction. A
+ * single shared bucket would be a single jurisdiction for everybody.
+ */
+export const MEDIA_NEED = "media";
+
+export const mediaNeedFor = (holdsAnyFiles: boolean): NeedDef | null =>
+  holdsAnyFiles
+    ? {
+      id: MEDIA_NEED, kind: "r2", perResidency: true,
+      /* ⚠️ `sensitive`, and not because anybody said so. Nobody can know what is
+         in an uploaded file — a photograph of a prescription is a special
+         category and looks exactly like a photograph of a cat to every check
+         this framework has. Assuming the worst is the only assumption that is
+         not a guess about somebody else's upload. */
+      holds: "sensitive",
+      why: "Holds the files people upload here.",
+    }
+    : null;
+
 /* ------------------------------------------------------------------ names --- */
 
 const SAFE = /^[a-z][a-z0-9-]*$/;

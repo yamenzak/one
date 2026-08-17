@@ -43,13 +43,13 @@ a call site over in a product.
 | Module | What it is for | Ships | Waiting |
 |---|---|---|---|
 | `primitives` | ids, days, instants, slugs — the words everything else is spelled in | 10 | 2 |
-| `infra` | what a product needs underneath it, and what each kind can promise | 8 | — |
+| `infra` | what a product needs underneath it, and what each kind can promise | 10 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 8 | — |
 | `collection` | what a thing an app keeps is — and the six operations it gets for free | 13 | — |
 | `operation` | one declaration carrying every cross-cutting concern (D12) | 10 | 1 |
 | `access` | permissions, roles, and what an app may never claim | 15 | 1 |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
-| `manifest` | the whole app, and the composition that refuses a broken one | 8 | — |
+| `manifest` | the whole app, and the composition that refuses a broken one | 9 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 7 | 1 |
 | `credit` | metered work: the reserve, the rate, the ceiling | 7 | 1 |
 | `dunning` | the ladder from past due to erased | 5 | — |
@@ -70,7 +70,7 @@ a call site over in a product.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**206 of them**, 189 reached by something today.
+**209 of them**, 192 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -129,9 +129,11 @@ layering failure rather than a shortcut. A guard says so.
 | `dossier` | everything we hold about one person, and everything of theirs we delete | 8 | — |
 | `legal` | who agreed to what version, and the wall until they have | 6 | — |
 | `cloudflare` | the one door out to the account — create, destroy, and add a binding | 7 | — |
-| `resources` | wanted → created → bound → live → draining → gone, and the reaper | 6 | — |
+| `storage` | files: the object, the row that knows its key, and the erasure of both | 6 | — |
+| `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
+| `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**216 of them**, 199 reached by something today.
+**226 of them**, 209 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

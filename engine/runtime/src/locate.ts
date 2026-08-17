@@ -82,6 +82,10 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
          to fail in. */
       kind: tenant.kind,
       name: tenant.name,
+      /* ⚠️ CARRIED SO THE FILE LOOKUP CAN RESOLVE THE BUCKET IN THE RIGHT
+         JURISDICTION. Residency is in the addressing rather than in a check —
+         see `bucketOf`. */
+      residency: tenant.residency,
       standing,
       entitlements: held.flatMap((h) => h.entitlements),
       flags: (await deps.flags?.(tenant)) ?? {},

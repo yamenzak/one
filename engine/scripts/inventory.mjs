@@ -222,6 +222,8 @@ if (what === "guards") {
     ["dossier", "everything we hold about one person, and everything of theirs we delete"],
     ["legal", "who agreed to what version, and the wall until they have"],
     ["cloudflare", "the one door out to the account — create, destroy, and add a binding"],
+    ["storage", "files: the object, the row that knows its key, and the erasure of both"],
+    ["media-ops", "upload, list, fetch and delete — generated for any app with a media field"],
     ["resources", "wanted → created → bound → live → draining → gone, and the reaper"],
   ];
 

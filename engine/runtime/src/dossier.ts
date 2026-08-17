@@ -168,6 +168,15 @@ export const HOLDINGS: readonly HeldBy[] = [
   { table: "_schema", person: [], why: "the migration marker" },
 
   /* --- a shard: the workspace's roster, its inbox, its record of what happened --- */
+  /*
+    ⚠️ THE OBJECT IS NOT IN THIS TABLE, AND THAT IS WHY BOTH ERASURES CALL
+    `eraseObjects` FIRST. This row is the only thing that knows a file's key, so
+    a walk that deleted it before the bucket would leave the file there for
+    ever — after a workspace was reported erased, with nothing anywhere that
+    would ever look.
+  */
+  { table: "media", person: [theirs("subject_id")], workspace: its(),
+    label: "The files you uploaded" },
   { table: "membership", person: [theirs("account_id")], workspace: its(),
     label: "Your place in each workspace" },
   { table: "setting", person: [theirs("account_id")], workspace: its(),

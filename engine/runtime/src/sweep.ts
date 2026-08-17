@@ -31,6 +31,7 @@ import type { AppSpec, Instant, TenantId } from "@engine/kernel";
 import { erase } from "./records.js";
 import { closeTenant, forgetBelonging, membersOfTenant, tenantById } from "./directory.js";
 import { forgetWorkspace } from "./dossier.js";
+import { eraseObjects, type Bucket, type Where } from "./storage.js";
 import { forgetBranding } from "./branding.js";
 import { dueForErasure, run } from "./jobs.js";
 import { apply, type ApplyDeps } from "./resources.js";
@@ -48,6 +49,13 @@ export interface SweepDeps {
    * per customer.
    */
   readonly shards: readonly Db[];
+  /**
+   * ⚠️ WHERE THIS WORKSPACE'S FILES ARE, so erasure can take the objects and not
+   * only the rows. Absent means this deployment stores no files — which is true
+   * of one whose bucket the reconciler has not made live yet, and is why it is
+   * optional rather than assumed.
+   */
+  readonly bucketFor?: (where: Where) => Bucket | null;
   /**
    * ⚠️ THE INFRASTRUCTURE RECONCILER, AND IT IS OPTIONAL BECAUSE A DEPLOYMENT
    * WITH NO TOKEN IS A LEGITIMATE DEPLOYMENT. Absent means every resource a
@@ -101,6 +109,16 @@ export async function sweepErasure(deps: SweepDeps): Promise<{ touched: number; 
       walks the same declaration the export walks, which is what stops the two
       halves of "erased" from meaning different things.
     */
+    /*
+      ⚠️ THE OBJECTS BEFORE THE ROWS, AND THE ORDER IS THE WHOLE POINT. The row
+      is the only thing that knows an object's key; once it is deleted the file
+      is unreachable by anything except a bucket listing nobody runs, so it stays
+      in the bucket for ever — after a workspace was reported erased, with every
+      photograph anybody uploaded still in it, and nothing anywhere that would
+      look. Doing this second is indistinguishable from not doing it at all.
+    */
+    await eraseObjects(db, deps.bucketFor?.({ tenantId: one.tenantId, residency: tenant.residency }) ?? null, { tenantId: one.tenantId });
+
     await forgetWorkspace(
       [{ db, of: "shard", apps: [] }, { db: deps.directory, of: "directory", apps: [] }],
       one.tenantId);

@@ -142,6 +142,14 @@ describe("what the manifest produced", () => {
       "POST /api/inbox.preference",
       "POST /api/inbox.seen",
       "GET /api/inbox.settings",
+      /* ⚠️ FOUR ROUTES NO APP DECLARED. `note.cover` is a `media` field, so the
+         composer mounts uploading, listing, fetching and deleting — and
+         `needsOf` derives the bucket they write to. A product declares a field
+         and gets storage, in the right jurisdiction, with an erasure. */
+      "POST /api/media.delete",
+      "GET /api/media.list",
+      "GET /api/media.read",
+      "POST /api/media.upload",
       "POST /api/member.invite",
       "GET /api/member.list",
       "POST /api/member.remove",

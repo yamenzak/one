@@ -724,13 +724,13 @@ The guard registry, its checks, and the standards that bind them.
 | D2 | The framework is OneEngine; the deployment is One; packages are `@engine/*` | 3 |
 | D3 | One worker on the request path; heavy work splits over RPC service bindings | 6 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
-| D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 9 |
-| D6 | Jurisdiction is a workspace fact, derived from the business's country | 2 |
+| D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 10 |
+| D6 | Jurisdiction is a workspace fact, derived from the business's country | 4 |
 | D7 | HeroUI v3 is the component layer, and its components are not restyled | 57 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
-| D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 15 |
+| D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 16 |
 | D12 | Every cross-cutting concern is a field on a declaration, never a call site | 59 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
@@ -953,6 +953,10 @@ the library decides FOR us.
 | `a-residency-verdict-per-resource-kind` | D6 | a queue or a KV namespace carrying somebody's name under an EU promise the vendor offers no way to keep |
 | `live-is-written-only-where-the-binding-is-seen` | D12 | a resource reported usable while its binding still reads undefined, which is an empty answer rather than an error |
 | `a-resource-drains-before-it-is-destroyed` | D12 | an app removed by a typo taking its database with it in the same minute, behind a green log line |
+| `no-person-in-a-log-line` | D6 | somebody's address or account id disclosed to a store that leaves the jurisdiction, is retained on a vendor's schedule, and survives every erasure this platform performs |
+| `the-residency-promise-excludes-logs` | D6 | promising a jurisdiction for logs the vendor offers no residency control over — broken by the first request |
+| `a-file-goes-when-its-row-does` | D11 | somebody's uploads left in a bucket after their account was erased, invisible to every check and visible only on a bill |
+| `an-object-key-is-derived-never-supplied` | D5 | a caller choosing a key outside their own workspace's prefix, one string from reading somebody else's file, with an ordinary-looking ledger row |
 <!-- /generated -->
 
 ## Commands

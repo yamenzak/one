@@ -22,10 +22,11 @@ import {
   DIRECTORY_MODULES, SHARD_MODULES,
   NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, acceptanceScope,
   deploymentFaults, locator,
-  accept, memberFor, noteShardApp, observe, owedBy, sweep, tenantById, tenantBySlug,
+  accept, bindingKey, liveBindings, memberFor, noteShardApp, observe, owedBy, sweep,
+  tenantById, tenantBySlug,
   operatorOps, permissionsResolver, personalOps, schemaFor, serve, sessionIdFrom, shardFor,
   subscriptionFor, whoIs,
-  type Db, type TenantRow,
+  type Bucket, type Db, type TenantRow,
 } from "@engine/runtime";
 import { hello } from "@engine/hello";
 
@@ -191,6 +192,39 @@ export interface Env {
 let booted: Promise<void> | null = null;
 
 /**
+ * ⚠️ THE LIVE BINDINGS, RESOLVED ONCE PER ISOLATE — and that is correct rather
+ * than merely quick. A binding cannot appear or change without a new version of
+ * the worker, and a new version is a new isolate, so this map is exactly as
+ * fresh as `env` for as long as it exists. Re-reading it per request would put a
+ * directory round trip in front of every upload to learn something that cannot
+ * have changed.
+ */
+let live: ReadonlyMap<string, unknown> = new Map();
+
+/**
+ * THE BUCKET FOR A WORKSPACE'S JURISDICTION.
+ *
+ * ⚠️ THE RESIDENCY IS IN THE ADDRESSING, WHICH IS THE WHOLE SAFETY PROPERTY. An
+ * EU workspace resolves the EU bucket because its residency is part of the
+ * binding's name — so there is no comparison anybody can forget, and a lookup
+ * that would land in the wrong regime MISSES rather than serving quietly from
+ * it. A miss reads as "this deployment stores no files", which every caller
+ * already refuses on.
+ *
+ * ⚠️ AND IT IS MODULE-LEVEL BECAUSE BOTH LANES NEED IT. The request handler
+ * resolves a workspace's bucket; the nightly sweep resolves one to erase its
+ * objects. Two copies is two chances for one of them to drop the residency.
+ */
+const bucketIn = (residency: string | undefined): Bucket | null => {
+  for (const appId of Object.keys(APPS)) {
+    const held = live.get(bindingKey(appId, `media-${residency ?? "global"}`))
+      ?? live.get(bindingKey(appId, "media"));
+    if (held) return held as Bucket;
+  }
+  return null;
+};
+
+/**
  * ⚠️ A DEPLOYMENT WITH NO SIGNING SECRET MUST NOT SERVE. Without it every
  * sign-in code is signed with `undefined` — which is a constant, and a constant
  * anybody reading this repository already has, so the codes are forgeable and
@@ -264,6 +298,7 @@ const boot = (env: Env): Promise<void> => {
       difference between "we asked for it" and "it is there".
     */
     for (const said of await observe(directory, env)) console.log(`[boot] ${said}`);
+    live = await liveBindings(directory, env);
 
     for (const fault of deploymentFaults({
       env,
@@ -289,6 +324,19 @@ const boot = (env: Env): Promise<void> => {
 const handler = (env: Env) => {
   const directory = env.DIRECTORY as unknown as Db;
   const shardOf = (tenant: TenantRow) => shardFor(env as never, tenant.shardId);
+
+  /**
+   * ⚠️ THE BUCKET FOR THIS WORKSPACE'S JURISDICTION, AND THE RESIDENCY IS IN THE
+   * ADDRESSING. An EU workspace resolves the EU bucket because its own residency
+   * is part of the binding's name — there is no check to forget, and a workspace
+   * cannot be served by a bucket in the wrong regime without the lookup missing
+   * entirely, which reads as "no bucket" rather than as the wrong one.
+   *
+   * ⚠️ NULL IS AN ANSWER. A deployment whose bucket the reconciler has not made
+   * live yet stores no files, and every caller already treats that as a refusal
+   * rather than a crash.
+   */
+  const bucketOf = (where: { readonly residency?: string }) => bucketIn(where.residency);
 
   /*
     ⚠️ WHO RUNS THE DEPLOYMENT, DECIDED ONCE. The console is behind it and the
@@ -353,6 +401,7 @@ const handler = (env: Env) => {
     installable: { name: "One", mark: "◇" },
     directory,
     shardOf,
+    bucketOf,
 
     /*
       ⚠️ SENDING IS THE ONE THING A DEPLOYMENT MUST NOT FAKE. In development the
@@ -390,6 +439,10 @@ const handler = (env: Env) => {
           if (env.ENVIRONMENT !== "development") {
             throw new Error("this deployment has no mailer configured");
           }
+          /* logs-exempt: the branch above throws outside development, so this
+             cannot run on a deployment whose logs anybody keeps — and in
+             development the console IS the mailer. A sign-in code in a retained
+             log is a session anybody with dashboard access can take. */
           console.log(`[sign-in] ${to} → ${code}`);
         },
         /* ⚠️ The same allow-list the console is behind (D18) — the hub draws
@@ -579,6 +632,8 @@ export default {
           /* ⚠️ Retention is a rule about rows: one statement per table per
              database, not one per workspace. */
           shards: SHARDS.map((id) => shardFor(env as never, id)),
+          /* ⚠️ So the last rung takes the OBJECTS and not only the rows. */
+          bucketFor: (where) => bucketIn(where.residency),
           /* ⚠️ ONLY WHERE THERE IS A TOKEN. Absent is a deployment that cannot
              provision, which is a state it has to survive rather than an error
              — a self-host, a test run, and this one before the secret is set. */

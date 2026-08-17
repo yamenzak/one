@@ -14,7 +14,7 @@
 
 import {
   area, collection, defineApp, field, flag, notification, operation, purpose, setting,
-  need, vaultField, vaultKeyFor,
+  vaultField, vaultKeyFor,
   type AppSpec,
 } from "@engine/kernel";
 
@@ -486,25 +486,16 @@ export const HELLO: AppSpec = defineApp({
   */
 
   /*
-    ⚠️ WHAT IT NEEDS UNDERNEATH, DECLARED RATHER THAN CONFIGURED. Nobody edits a
-    config file, nobody runs wrangler, nobody remembers to do it again on the
-    next deployment: the reconciler reads this, makes the bucket exist in the
-    right jurisdiction, adds the binding, and the boot after that confirms the
-    binding is really there.
+    ⚠️ THIS APP DECLARES NO `needs` AND STILL GETS A BUCKET, which is the claim
+    the whole framework makes. `note.cover` is a `media` field; a media field
+    holds files; files live in a bucket — so `needsOf` derives it, the reconciler
+    creates it in each jurisdiction, binds it, and the next boot confirms it.
+    Nobody edits a config file and nobody runs wrangler.
 
-    ⚠️ AND `holds` IS THE HALF THAT BITES. A bucket keeps a residency promise and
-    a queue does not, so the same declaration that provisions the first one
-    REFUSES the second wherever an EU promise has been made — the feature does
-    not exist there, which is a shape a product can explain, rather than a
-    sentence in a privacy notice that is not true.
+    ⚠️ A need worth DECLARING here would be one the platform cannot work out: a
+    queue this product alone wants, a vector index only it searches. It has
+    none.
   */
-  needs: {
-    covers: need({
-      id: "covers", kind: "r2", holds: "none", perResidency: true,
-      why: "Holds the cover image on a note.",
-    }),
-  },
-
   settingAreas: {
     notes: area({
       id: "notes", label: "Notes", icon: "note", order: 0,

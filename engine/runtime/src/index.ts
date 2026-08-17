@@ -42,3 +42,4 @@ export * from "./mcp.js";
 export * from "./dossier.js";
 export * from "./cloudflare.js";
 export * from "./resources.js";
+export * from "./storage.js";
