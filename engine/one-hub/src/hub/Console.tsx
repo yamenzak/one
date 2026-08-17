@@ -22,13 +22,14 @@
 import { Group, NavRow, Screen, glyphOf } from "@engine/design";
 import { useSession } from "../session.js";
 import { Actions } from "../console/Actions.js";
+import { Footing } from "../console/Footing.js";
 import { Ground } from "../console/Ground.js";
 import { Switches } from "../console/Switches.js";
 import { Tenants } from "../console/Tenants.js";
 import { Works } from "../console/Works.js";
 import { nameOf, type Where } from "./where.js";
 
-export type ConsolePartId = "tenants" | "actions" | "switches" | "works" | "ground";
+export type ConsolePartId = "tenants" | "actions" | "switches" | "works" | "ground" | "footing";
 
 /* ⚠️ ONE ORDER, AND IT IS READING ORDER: who is here, what they generate, what
    we have switched on, what runs unattended, and where it all sits. */
@@ -42,6 +43,7 @@ const GLYPH: Readonly<Record<ConsolePartId, string>> = {
   switches: "settings",
   works: "clock",
   ground: "database",
+  footing: "layers",
 };
 
 export function ConsoleHome({ onGo }: { readonly onGo: (to: Where) => void }) {
@@ -110,5 +112,6 @@ export function ConsolePart({ part, app, onGo }: {
     case "switches": return <Switches />;
     case "works": return <Works />;
     case "ground": return <Ground />;
+    case "footing": return <Footing />;
   }
 }

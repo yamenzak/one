@@ -115,7 +115,8 @@ export type Where =
   | { readonly at: "actions"; readonly app?: string }
   | { readonly at: "switches" }
   | { readonly at: "works" }
-  | { readonly at: "ground" };
+  | { readonly at: "ground" }
+  | { readonly at: "footing" };
 
 /** Every screen a workspace has, in the order its own screen lists them. */
 export const OF_WORKSPACE = ["people", "money", "packages", "settings", "brand", "notices", "wording", "trust"] as const;
@@ -128,7 +129,7 @@ export const OF_WORKSPACE = ["people", "money", "packages", "settings", "brand",
  * between them is the whole of the explanation.
  */
 export const OFTEN: readonly WorkspacePart[] = ["people", "money"];
-export const OF_CONSOLE = ["tenants", "actions", "switches", "works", "ground"] as const;
+export const OF_CONSOLE = ["tenants", "actions", "switches", "works", "ground", "footing"] as const;
 
 export type WorkspacePart = typeof OF_WORKSPACE[number];
 type ConsolePart = typeof OF_CONSOLE[number];
@@ -247,7 +248,7 @@ export function pathOf(where: Where): string {
     case "console": return `${HUB}/console`;
     case "actions": return `${HUB}/console/actions${where.app ? `/${where.app}` : ""}`;
     case "tenant": return `${HUB}/console/tenants/${where.id}`;
-    case "tenants": case "switches": case "works": case "ground":
+    case "tenants": case "switches": case "works": case "ground": case "footing":
       return `${HUB}/console/${where.at}`;
     case "plan": return `${HUB}/w/${where.slug}/plan/${where.app}`;
     /* ⚠️ THE PAGE IS IN THE ADDRESS TOO. Settings descend, and an area that only
@@ -285,7 +286,7 @@ export function above(where: Where): Where | null {
     case "workspace": return { at: "workspaces" };
     case "actions": return where.app ? { at: "actions" } : { at: "console" };
     case "tenant": return { at: "tenants" };
-    case "tenants": case "switches": case "works": case "ground":
+    case "tenants": case "switches": case "works": case "ground": case "footing":
       return { at: "console" };
     case "plan": return { at: "money", slug: where.slug };
     case "settings":
@@ -325,5 +326,6 @@ export const nameOf = (where: Where): string => {
     case "switches": return "Switches";
     case "works": return "Works";
     case "ground": return "Ground";
+    case "footing": return "Footing";
   }
 };

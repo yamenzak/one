@@ -47,7 +47,7 @@ import { HUB, above, isConsole, nameOf, parseWhere, pathOf, type Where } from ".
 export const HUB_SCREENS: readonly Where["at"][] = [
   "home", "you", "inbox", "told", "data", "prefs", "workspaces", "workspace",
   "people", "money", "plan", "packages", "settings", "brand", "notices", "wording", "trust",
-  "console", "tenants", "tenant", "actions", "switches", "works", "ground",
+  "console", "tenants", "tenant", "actions", "switches", "works", "ground", "footing",
 ];
 
 export function Hub({ path, onGo, onClose }: {
