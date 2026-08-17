@@ -634,6 +634,13 @@ export default {
           shards: SHARDS.map((id) => shardFor(env as never, id)),
           /* ⚠️ So the last rung takes the OBJECTS and not only the rows. */
           bucketFor: (where) => bucketIn(where.residency),
+          /* ⚠️ BY ID, because a move's TARGET shard has no workspace on it yet
+             and `shardOf` resolves through the tenant. */
+          shardById: (id) => {
+            try { return shardFor(env as never, id); } catch { return null; }
+          },
+          residencyOf: (id) => (SHARDS as readonly string[]).includes(id)
+            ? SHARD_RESIDENCY[0] : undefined,
           /* ⚠️ ONLY WHERE THERE IS A TOKEN. Absent is a deployment that cannot
              provision, which is a state it has to survive rather than an error
              — a self-host, a test run, and this one before the secret is set. */

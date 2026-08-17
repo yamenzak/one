@@ -223,6 +223,7 @@ if (what === "guards") {
     ["legal", "who agreed to what version, and the wall until they have"],
     ["cloudflare", "the one door out to the account — create, destroy, and add a binding"],
     ["storage", "files: the object, the row that knows its key, and the erasure of both"],
+    ["move", "a workspace's records change shard — the only way its jurisdiction can"],
     ["media-ops", "upload, list, fetch and delete — generated for any app with a media field"],
     ["resources", "wanted → created → bound → live → draining → gone, and the reaper"],
   ];

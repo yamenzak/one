@@ -62,6 +62,7 @@ reader can trust this table instead of re-reading the code.
 | 34 | The kernel's remaining conveniences are each used by a lane or removed | planned |
 | 35 | A workspace runs its own retention ladder against its own customers, and ours freezes it | planned |
 | 36 | The deployment provisions itself — a product declares what it needs underneath it, and the reconciler makes it exist in the right jurisdiction, binds it, and reaps it after a drain | shipped |
+| 37 | A workspace's records change shard, which is the only way its jurisdiction can — read-only while it copies, verified before it flips, and the source drained rather than emptied | shipped |
 
 ## What is NOT built, and where to pick it up
 
@@ -724,14 +725,14 @@ The guard registry, its checks, and the standards that bind them.
 | D2 | The framework is OneEngine; the deployment is One; packages are `@engine/*` | 3 |
 | D3 | One worker on the request path; heavy work splits over RPC service bindings | 6 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
-| D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 10 |
+| D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 13 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 4 |
 | D7 | HeroUI v3 is the component layer, and its components are not restyled | 57 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 16 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 59 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 60 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -957,6 +958,10 @@ the library decides FOR us.
 | `the-residency-promise-excludes-logs` | D6 | promising a jurisdiction for logs the vendor offers no residency control over — broken by the first request |
 | `a-file-goes-when-its-row-does` | D11 | somebody's uploads left in a bucket after their account was erased, invisible to every check and visible only on a bill |
 | `an-object-key-is-derived-never-supplied` | D5 | a caller choosing a key outside their own workspace's prefix, one string from reading somebody else's file, with an ordinary-looking ledger row |
+| `a-workspace-is-read-only-while-it-moves` | D5 | a copy taken from a live database losing every row written after the table was read — silently, and only for whoever happened to be working |
+| `a-move-verifies-both-sides-before-it-flips` | D5 | flipping onto a copy with rows missing, after which the intact source is never consulted again |
+| `a-moved-source-drains-before-it-is-cleared` | D5 | a move emptying its source, unrecoverable the moment the copy turns out to have been wrong |
+| `what-moves-is-what-erasure-takes` | D12 | a second list of a workspace's tables, so a moved workspace arrives without its roster while every row that did copy is reported successfully |
 <!-- /generated -->
 
 ## Commands

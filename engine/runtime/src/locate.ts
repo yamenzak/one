@@ -64,6 +64,32 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
       }),
       { writable: true, serving: true, reason: "" });
 
+    /*
+      ⚠️ A WORKSPACE BEING COPIED IS READ-ONLY, AND THIS IS WHERE THAT IS TRUE.
+      A copy taken from a live database loses every row written after the table
+      was read — silently, with no error, discovered by the customer weeks later
+      as records that went missing. Clamping it here rather than in the move
+      means the window is closed by the same gate every write already passes,
+      including the agent door, rather than by anything remembering to check.
+
+      ⚠️ AND READS ARE NEVER WITHHELD FOR THIS. Somebody whose workspace is
+      being moved still sees everything they have — the difference between a few
+      minutes of "you cannot change this right now" and an outage.
+
+      ⚠️ AND IT NARROWS THE STANDING RATHER THAN REPLACING IT. Replacing would
+      hand a SUSPENDED workspace `serving: true` for the length of its move —
+      restoring, for minutes, a product we had stopped providing. The strictest
+      wins here as it does everywhere above.
+    */
+    const settled = tenant.movingTo
+      ? {
+        writable: false,
+        serving: standing.serving,
+        reason: standing.reason
+          || "This workspace is being moved. It will be writable again shortly.",
+      }
+      : standing;
+
     const wallet = await balanceOf(deps.directory, tenant.id);
     /* ⚠️ SETTLED BEFORE THE GATE RUNS. The gate asks synchronously and a
        database does not answer synchronously, so the counts are read here and
@@ -86,7 +112,7 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
          JURISDICTION. Residency is in the addressing rather than in a check —
          see `bucketOf`. */
       residency: tenant.residency,
-      standing,
+      standing: settled,
       entitlements: held.flatMap((h) => h.entitlements),
       flags: (await deps.flags?.(tenant)) ?? {},
       balance: wallet.spendable,

@@ -35,6 +35,7 @@ import { eraseObjects, type Bucket, type Where } from "./storage.js";
 import { forgetBranding } from "./branding.js";
 import { dueForErasure, run } from "./jobs.js";
 import { apply, type ApplyDeps } from "./resources.js";
+import { carryObjects, carryRows, finishMove, reapMoved } from "./move.js";
 import { column, table, type Db } from "./sql.js";
 
 export interface SweepDeps {
@@ -56,6 +57,14 @@ export interface SweepDeps {
    * optional rather than assumed.
    */
   readonly bucketFor?: (where: Where) => Bucket | null;
+  /**
+   * ⚠️ A SHARD BY ITS ID, WHICH A MOVE NEEDS AND A TENANT LOOKUP CANNOT GIVE. The
+   * target shard has no workspace on it yet, so `shardOf` — which resolves
+   * through the tenant — cannot reach it.
+   */
+  readonly shardById?: (shardId: string) => Db | null;
+  /** Which jurisdiction a shard is in, so a move can find the target's bucket. */
+  readonly residencyOf?: (shardId: string) => string | undefined;
   /**
    * ⚠️ THE INFRASTRUCTURE RECONCILER, AND IT IS OPTIONAL BECAUSE A DEPLOYMENT
    * WITH NO TOKEN IS A LEGITIMATE DEPLOYMENT. Absent means every resource a
@@ -216,6 +225,14 @@ export async function sweep(deps: SweepDeps): Promise<void> {
   await run(deps.directory, "retention", () => sweepRetention(deps), now);
 
   /*
+    ⚠️ AND A MOVE IN FLIGHT IS ADVANCED, because nothing else will. The operator
+    starts one and the workspace goes read-only immediately; if the copy only
+    ever ran from a request, a move begun and not finished would leave somebody
+    unable to write with no path forward except a support conversation.
+  */
+  await run(deps.directory, "moves", () => sweepMoves(deps), now);
+
+  /*
     ⚠️ AND THE INFRASTRUCTURE, ON THE SAME CLOCK. Reconciling on a schedule
     rather than on a deploy is what makes "this app needs a queue" a line in a
     manifest instead of a ticket: the declaration lands, the next pass makes it
@@ -242,4 +259,59 @@ export async function sweep(deps: SweepDeps): Promise<void> {
       return { touched: out.did.length, detail: out.did.join("; ") || "nothing to do" };
     }, now);
   }
+}
+
+/**
+ * CARRY EVERY MOVE THAT IS IN FLIGHT, AND CLEAR EVERY SOURCE THAT HAS DRAINED.
+ *
+ * ⚠️ THE COPY IS RE-RUNNABLE, SO A PASS THAT DIED HALF WAY IS SIMPLY RUN AGAIN.
+ * `carryRows` replaces by primary key and `finishMove` refuses on any count that
+ * does not match — so the worst a failed pass costs is another night, and never
+ * a workspace flipped onto a database with holes in it.
+ *
+ * ⚠️ AND THE FLIP IS REFUSED RATHER THAN FORCED. A mismatch leaves the workspace
+ * read-only and in flight, which is visible in the console and recoverable —
+ * the alternative is a customer reading a workspace that is quietly missing
+ * rows, which is not.
+ */
+export async function sweepMoves(deps: SweepDeps): Promise<{ touched: number; detail: string }> {
+  const now = (deps.now ?? (() => new Date()))();
+  const apps = Object.values(deps.apps).map((make) => make());
+  const said: string[] = [];
+  let touched = 0;
+
+  const inFlight = await deps.directory.prepare(
+    `SELECT tenant_id, from_shard, to_shard FROM move WHERE state = 'copying'`)
+    .all<{ tenant_id: string; from_shard: string; to_shard: string }>();
+
+  for (const row of inFlight.results) {
+    const from = await deps.shardOf(row.tenant_id as never);
+    const to = deps.shardById?.(row.to_shard) ?? null;
+    if (!from || !to) {
+      said.push(`${row.tenant_id}: a shard this deployment does not bind`);
+      continue;
+    }
+
+    await carryRows(from, to, row.tenant_id as never, apps);
+    /* ⚠️ THE OBJECTS TOO, and they are read and re-written one at a time —
+       there is no server-side copy across a jurisdiction, which is the whole
+       reason the bucket is different. */
+    const tenant = await tenantById(deps.directory, row.tenant_id as never);
+    await carryObjects(
+      from,
+      deps.bucketFor?.({ tenantId: row.tenant_id, residency: tenant?.residency }) ?? null,
+      deps.bucketFor?.({ tenantId: row.tenant_id, residency: deps.residencyOf?.(row.to_shard) }) ?? null,
+      row.tenant_id as never,
+    );
+
+    const wrong = await finishMove(deps.directory, from, to, row.tenant_id as never, apps, now);
+    if (wrong) said.push(`${row.tenant_id}: ${wrong.join("; ")}`);
+    else { touched++; said.push(`${row.tenant_id} moved to ${row.to_shard}`); }
+  }
+
+  const reaped = await reapMoved(
+    deps.directory, (id) => deps.shardById?.(id) ?? null, apps, now);
+  if (reaped) said.push(`${reaped} drained source copy(ies) cleared`);
+
+  return { touched: touched + reaped, detail: said.join("; ") || "nothing in flight" };
 }

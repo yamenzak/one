@@ -163,6 +163,12 @@ export const HOLDINGS: readonly HeldBy[] = [
   { table: "job_run", person: [], why: "the deployment's own clock" },
   { table: "resource", person: [],
     why: "the databases and buckets the deployment made for itself" },
+  /* ⚠️ NOT THE WORKSPACE'S TO ERASE, AND DELIBERATELY. The row says a copy of
+     its records is still on the shard it left, and it is what the reaper reads
+     to clear that copy. Deleting it with the workspace would strand the copy on
+     the old shard for ever, with nothing anywhere that knows it is there. */
+  { table: "move", person: [],
+    why: "where a workspace's records were carried from, and what is left to clear" },
   { table: "deployment_flag", person: [], why: "the deployment's own switches" },
   { table: "maintenance", person: [], why: "the deployment's own switches" },
   { table: "_schema", person: [], why: "the migration marker" },

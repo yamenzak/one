@@ -43,7 +43,12 @@ export const DIRECTORY_SCHEMA: SchemaModule = {
        see `Kind`. `became_commercial_at` is the one-way door's timestamp, and
        its presence is the evidence that the transition happened rather than a
        column somebody could flip back without a trace. */
-    `CREATE TABLE IF NOT EXISTS tenant (id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL, country TEXT NOT NULL, shard_id TEXT NOT NULL, residency TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'personal', legal_name TEXT, became_commercial_at TEXT, at TEXT NOT NULL, closed_at TEXT);`,
+    /* ⚠️ `moving_to` IS WHY A MOVE IS SAFE. It is set before a single row is read
+       and `locate` clamps `writable` from it, so the workspace cannot be written
+       to while it is being copied — a copy taken from a live database loses
+       every row written after the table was read, silently, and only for the
+       customers unlucky enough to be working at the time. */
+    `CREATE TABLE IF NOT EXISTS tenant (id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL, country TEXT NOT NULL, shard_id TEXT NOT NULL, residency TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'personal', legal_name TEXT, became_commercial_at TEXT, moving_to TEXT, at TEXT NOT NULL, closed_at TEXT);`,
     `CREATE INDEX IF NOT EXISTS ix_tenant_shard ON tenant (shard_id);`,
     `CREATE TABLE IF NOT EXISTS tenant_app (tenant_id TEXT NOT NULL, app_id TEXT NOT NULL, at TEXT NOT NULL, disabled_at TEXT, PRIMARY KEY (tenant_id, app_id));`,
     /* ⚠️ An index, never a grant — see the header. */
@@ -68,6 +73,8 @@ export interface TenantRow {
   readonly residency: Residency;
   readonly kind: Kind;
   readonly legalName: string | null;
+  /** ⚠️ The shard it is being copied to, while it is. Read-only until it clears. */
+  readonly movingTo: string | null;
   readonly closedAt: string | null;
 }
 
@@ -83,6 +90,7 @@ const asTenant = (r: Record<string, unknown>): TenantRow => ({
      and a dedicated shard to every workspace on the deployment at once. */
   kind: (r.kind as Kind | null) ?? "personal",
   legalName: (r.legal_name as string | null) ?? null,
+  movingTo: (r.moving_to as string | null) ?? null,
   closedAt: (r.closed_at as string | null) ?? null,
 });
 
@@ -212,7 +220,7 @@ export async function createTenant(
     tenant: {
       id, slug: wants.slug, name: wants.name, country: wants.country.toUpperCase(),
       shardId: shard.id, residency: wants.where,
-      kind: "personal", legalName: null, closedAt: null,
+      kind: "personal", legalName: null, movingTo: null, closedAt: null,
     },
     shard,
   };
@@ -441,8 +449,10 @@ export type MoveRefusal = "no_such_tenant" | "no_such_shard" | ReturnType<typeof
  * is its own path with its own failure modes, and conflating "may this go there"
  * with "put it there" is how the check ends up skipped in the hurry.
  */
-/* DEFER(engine-30) stage:30 — this decides whether a workspace may move shard
-   and nothing moves one, so the deployment's one shard is also its only one. */
+/* ⚠️ AND IT IS THE ONLY GATE ON A MOVE. `beginMove` asks this before it stamps
+   a workspace read-only, so a shard whose schema does not cover the workspace's
+   apps is refused here rather than discovered as "no such table" on every
+   request after a move that reported success. */
 export async function mayMove(
   db: Db, tenantId: TenantId, toShard: string,
 ): Promise<MoveRefusal | null> {

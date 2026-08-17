@@ -26,6 +26,7 @@ import type { Residency } from "@engine/kernel";
 import type { Account } from "./cloudflare.js";
 import { verify } from "./cloudflare.js";
 import { apply, plan, resources, wanted } from "./resources.js";
+import { beginMove } from "./move.js";
 import { actionsOf, bind, bindingsOf, running } from "./ai-actions.js";
 import { adjust, subscriptionFor } from "./billing.js";
 import {
@@ -489,6 +490,51 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
         if (!at) return { configured: false, can: [] };
         const out = await verify(at);
         return out.ok ? { configured: true, can: out.value.can } : { configured: true, can: [], why: out.why };
+      },
+    },
+
+    /* --------------------------------------------------------------- move --- */
+
+    /*
+      ⚠️ MOVING A WORKSPACE IS THE ONLY WAY ITS JURISDICTION EVER CHANGES —
+      Cloudflare fixes a database's and a bucket's at creation and offers no
+      edit. So this is not "a setting with a slow implementation", it is the
+      implementation, permanently.
+
+      ⚠️ AND IT ONLY STARTS THE MOVE. The workspace goes read-only here and the
+      nightly pass carries the rows, verifies both sides and flips — because a
+      copy is minutes of work and a request is not, and a move that timed out
+      half way through a request would leave a workspace read-only with nobody
+      advancing it.
+    */
+    "op.tenant.move": {
+      kind: "write", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const tenant = await tenantBySlug(ctx.directory, String(input.slug ?? ""));
+        if (!tenant) return ctx.fail("platform.not_found");
+
+        const refused = await beginMove(
+          ctx.directory, tenant.id, String(input.shard ?? ""), ctx.now);
+        if (refused) {
+          /* ⚠️ THE REASON REACHES THE OPERATOR. "Cannot move" over a shard whose
+             schema is missing the app is a sentence somebody can act on; a bare
+             409 is one they open a ticket about. */
+          return ctx.fail("platform.conflict", { why: refused });
+        }
+        return { slug: tenant.slug, to: String(input.shard), state: "copying" };
+      },
+    },
+
+    /* ⚠️ WHAT IS IN FLIGHT, so a workspace stuck read-only is visible rather
+       than reported by its owner. */
+    "op.moves": {
+      kind: "read", needs: "session", doors: ["operator"],
+      async run(ctx): Promise<unknown> {
+        operator(ctx);
+        const rows = await ctx.directory.prepare(
+          `SELECT * FROM move ORDER BY at DESC LIMIT 100`).all();
+        return { items: rows.results };
       },
     },
 

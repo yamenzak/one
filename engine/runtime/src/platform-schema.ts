@@ -31,6 +31,7 @@ import { LEGAL_SCHEMA } from "./legal.js";
 import { MEMBERSHIP_SCHEMA } from "./membership.js";
 import { OPERATOR_SCHEMA } from "./operator.js";
 import { PACKAGE_SCHEMA } from "./packages.js";
+import { MOVE_SCHEMA } from "./move.js";
 import { RESOURCE_SCHEMA } from "./resources.js";
 import type { SchemaModule } from "./schema.js";
 import { MEDIA_SCHEMA } from "./storage.js";
@@ -45,6 +46,9 @@ export const DIRECTORY_MODULES: readonly SchemaModule[] = [
      about the deployment rather than about any workspace — and because the
      reaper reads it to decide what it may destroy. */
   RESOURCE_SCHEMA,
+  /* ⚠️ In the directory, because a move is ABOUT two shards and can be read
+     from neither once the flip has happened. */
+  MOVE_SCHEMA,
   /* ⚠️ IN THE DIRECTORY, NOT ON A SHARD. One person accepts the terms once for
      the whole deployment; an acceptance beside a workspace's records would be
      asked again per workspace and lost when that workspace closed. */

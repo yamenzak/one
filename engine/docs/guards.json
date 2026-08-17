@@ -1828,6 +1828,42 @@
       "impl": "runtime/src/storage.ts",
       "proves": "objectKey",
       "fails": "a caller choosing a key outside their own workspace's prefix, one string from reading somebody else's file, with an ordinary-looking ledger row"
+    },
+    {
+      "id": "a-workspace-is-read-only-while-it-moves",
+      "protects": "D5",
+      "stage": "37",
+      "status": "live",
+      "impl": "runtime/src/locate.ts",
+      "proves": "tenant.movingTo",
+      "fails": "a copy taken from a live database losing every row written after the table was read — silently, and only for whoever happened to be working"
+    },
+    {
+      "id": "a-move-verifies-both-sides-before-it-flips",
+      "protects": "D5",
+      "stage": "37",
+      "status": "live",
+      "impl": "runtime/src/move.ts",
+      "proves": "unmatched",
+      "fails": "flipping onto a copy with rows missing, after which the intact source is never consulted again"
+    },
+    {
+      "id": "a-moved-source-drains-before-it-is-cleared",
+      "protects": "D5",
+      "stage": "37",
+      "status": "live",
+      "impl": "runtime/src/move.ts",
+      "proves": "drain_after",
+      "fails": "a move emptying its source, unrecoverable the moment the copy turns out to have been wrong"
+    },
+    {
+      "id": "what-moves-is-what-erasure-takes",
+      "protects": "D12",
+      "stage": "37",
+      "status": "live",
+      "impl": "runtime/src/move.ts",
+      "proves": "carried",
+      "fails": "a second list of a workspace's tables, so a moved workspace arrives without its roster while every row that did copy is reported successfully"
     }
   ]
 }

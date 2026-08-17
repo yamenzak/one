@@ -95,7 +95,7 @@ layering failure rather than a shortcut. A guard says so.
 |---|---|---|---|
 | `schema` | the composed schema runner — declarations become tables | 6 | — |
 | `sql` | the one typed seam onto D1 | 4 | — |
-| `directory` | accounts, workspaces, placement, enablement, allowances | 25 | 4 |
+| `directory` | accounts, workspaces, placement, enablement, allowances | 25 | 3 |
 | `handles` | which binding holds which shard | 3 | — |
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
 | `identity` | sign-in codes, sessions, tokens, proof | 21 | 2 |
@@ -124,16 +124,17 @@ layering failure rather than a shortcut. A guard says so.
 | `installable` | the manifest and the icon a workspace is installed as | 3 | — |
 | `platform-schema` | the platform's own tables, in dependency order, listed once | 2 | — |
 | `dispatch` | an event an operation raises becomes a note in somebody's inbox | 1 | — |
-| `sweep` | the daily clock: erase what is past the ladder's last rung | 3 | — |
+| `sweep` | the daily clock: erase what is past the ladder's last rung | 4 | — |
 | `vault-ops` | consent, grants, who looked, the processing record, export and erasure | 1 | — |
 | `dossier` | everything we hold about one person, and everything of theirs we delete | 8 | — |
 | `legal` | who agreed to what version, and the wall until they have | 6 | — |
 | `cloudflare` | the one door out to the account — create, destroy, and add a binding | 7 | — |
 | `storage` | files: the object, the row that knows its key, and the erasure of both | 6 | — |
+| `move` | a workspace's records change shard — the only way its jurisdiction can | 8 | — |
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**226 of them**, 209 reached by something today.
+**235 of them**, 219 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
