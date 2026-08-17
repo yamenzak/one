@@ -178,4 +178,5 @@ export function check(ask: Ask): Refused | null {
  * plan does not include this" want different controls: one is disabled, the
  * other is an upsell.
  */
+/* DEFER(engine-34) stage:34 — the ask-before-drawing pattern is not used by any screen: a control the gate would refuse is drawn and fails on press, rather than standing down with a reason. */
 export const blockedBy = (ask: Ask): Gate | null => check(ask)?.at ?? null;

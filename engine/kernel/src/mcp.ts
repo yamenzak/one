@@ -115,7 +115,3 @@ export const toolFor = (op: AnyOperation): McpTool | null =>
   isTool(op)
     ? { name: op.id, description: op.summary, inputSchema: schemaForFields(op.input) }
     : null;
-
-/** The whole catalogue for a set of operations, opt-outs already gone. */
-export const toolsOf = (ops: readonly AnyOperation[]): readonly McpTool[] =>
-  ops.map(toolFor).filter((t): t is McpTool => t !== null);

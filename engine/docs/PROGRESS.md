@@ -5,6 +5,12 @@ kind: progress
 **What exists today. Read this after [PLAN.md](PLAN.md) §1–§3 and
 [DECISIONS.md](DECISIONS.md), and nothing else is required to resume the work.**
 
+⚠️ **Before building anything, read [CHEATSHEET.md](CHEATSHEET.md)** — every
+capability the engine already has, on one page, generated. It is the answer to
+"does this already exist", and it is the only thing that has been measured to
+prevent reinvention: the derived alternatives were tried and every one of them
+flagged correct code (ENFORCEMENT.md §3a).
+
 ⚠️ **Before adding a rule of any kind, read
 [ENFORCEMENT.md](ENFORCEMENT.md)** — which rules are structural, which are
 guarded, which are only written down, and where every kernel rule is actually
@@ -53,6 +59,7 @@ reader can trust this table instead of re-reading the code.
 | 31 | Account security — sign out everywhere, and proving it is you again before something irreversible | planned |
 | 32 | A manifest changes while the deployment is up, and the composed surface forgets | planned |
 | 33 | A setting reaches the code — a handler reads one, and a guard refuses a switch that changes nothing | planned |
+| 34 | The kernel's remaining conveniences are each used by a lane or removed | planned |
 
 ## What is NOT built, and where to pick it up
 
@@ -722,7 +729,7 @@ The guard registry, its checks, and the standards that bind them.
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 10 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 50 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 51 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -929,6 +936,7 @@ the library decides FOR us.
 | `a-build-edge-names-a-package-that-exists` | D12 | a worker's integration suite running against whichever SPA build happened to be lying around — turbo ignores a task key for a package it does not have, in silence, and the edge that connects a suite to its own build is exactly the one nothing else in the graph can express |
 | `a-runtime-capability-is-mounted-or-is-waiting-on-a-named-stage` | D12 | a capability with tables, tests and a document describing it, that no route reaches — the whole vault, the AI lane and the inbox's one write were all in that state at once, and every signal a reader has said they were there |
 | `a-deferral-names-a-stage-that-exists` | D12 | a marker that reads as a plan and points at nothing, so the gap is neither enumerable nor scheduled |
+| `the-index-of-what-exists-cannot-be-silently-incomplete` | D12 | a generated index missing a module — the one page whose job is answering “does this already exist” telling a reader, in a table, that it does not |
 <!-- /generated -->
 
 ## Commands

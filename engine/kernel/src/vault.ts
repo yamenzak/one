@@ -143,6 +143,7 @@ export interface Disclosure {
   readonly required: boolean;
 }
 
+/* DEFER(engine-26) stage:26 — the consent sheet this assembles has no surface — see the runtime's vault. */
 export const discloseVault = (book: VaultBook, purposes: PurposeBook): readonly Disclosure[] =>
   Object.values(purposes).map((p) => ({
     purpose: p,

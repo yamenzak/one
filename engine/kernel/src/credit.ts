@@ -111,6 +111,7 @@ export function plan(
 }
 
 /** Credits from a real usage report, at the same rate the reserve used. */
+/* DEFER(engine-27) stage:27 — the settle half of a reserve nothing takes. */
 export const charged = (usage: Usage, rate: Rate): number =>
   Math.ceil(((usage.input / 1000) * rate.input + (usage.output / 1000) * rate.output) * (1 + rate.markup));
 

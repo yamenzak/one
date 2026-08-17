@@ -1657,6 +1657,15 @@
       "impl": "scripts/capability.test.mjs",
       "proves": "PROGRESS.md has no row for them",
       "fails": "a marker that reads as a plan and points at nothing, so the gap is neither enumerable nor scheduled"
+    },
+    {
+      "id": "the-index-of-what-exists-cannot-be-silently-incomplete",
+      "protects": "D12",
+      "stage": "10",
+      "status": "live",
+      "impl": "scripts/docs.test.mjs",
+      "proves": "refused to generate",
+      "fails": "a generated index missing a module — the one page whose job is answering “does this already exist” telling a reader, in a table, that it does not"
     }
   ]
 }

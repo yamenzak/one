@@ -136,6 +136,7 @@ export function withinQuota(allowed: Allowance, used: number): boolean {
   return used < allowed;
 }
 
+/* DEFER(engine-34) stage:34 — an allowance is read as a number everywhere; nothing yet asks the yes-or-no form. */
 export const included = (allowed: Allowance): boolean =>
   allowed === true || (typeof allowed === "number" && allowed !== 0);
 

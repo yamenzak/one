@@ -45,7 +45,7 @@ import { refuseLegal } from "./legal.js";
 import type { NotificationBook } from "./notify.js";
 import { deadLinks, unaddressable, unraisable } from "./notify.js";
 import type { AnyOperation } from "./operation.js";
-import { refuseOperation, unreachable } from "./operation.js";
+import { refuseOperation, unreachable, unrecordedWrites } from "./operation.js";
 import type { ProblemCatalog } from "./problem.js";
 import { PLATFORM_PROBLEMS, redefined, unknownProblems } from "./problem.js";
 import type { AreaBook, SettingBook } from "./setting.js";
@@ -249,6 +249,15 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
     at("operation", why);
   }
 
+  /* ⚠️ ASKED, NOT ASSUMED. `unrecordedWrites` states that every write says what
+     to record or why not, and nothing called it — so the one class of operation
+     that leaves no trace was refused nowhere. A write with neither an `audit`
+     nor a reason is a change somebody made that the audit cannot show, which is
+     discovered when somebody asks who did it. */
+  for (const id of unrecordedWrites(spec.operations)) {
+    at(`operation ${id}`, "a write that records nothing and says no reason — the change happens and the audit cannot show who made it");
+  }
+
   /*
     ⚠️ SOMEBODY MUST BE ABLE TO USE A NEW TENANT'S APP. The platform makes the
     creator an `owner` (workspace authority is the platform's); this is the APP
@@ -426,7 +435,3 @@ export function defineApp(spec: AppSpec): AppSpec {
   }
   return spec;
 }
-
-/** Everything an app answers on, derived. Nothing is registered by hand. */
-export const surfaceOf = (spec: AppSpec): readonly string[] =>
-  [...spec.collections.flatMap(operationsFor), ...spec.operations.map((o) => o.id)].sort();

@@ -13,7 +13,8 @@
  */
 
 import {
-  area, collection, defineApp, field, flag, notification, operation, setting,
+  area, collection, defineApp, field, flag, notification, operation, purpose, setting,
+  subProcessor, vaultField, vaultKeyFor,
   type AppSpec,
 } from "@engine/kernel";
 
@@ -91,6 +92,23 @@ const checkIn = collection({
       values: ["great", "fine", "hard"],
     }),
     said: field.long({ label: "Anything to say", holds: "none", max: 4_000 }),
+    /*
+      ⚠️ THE ONE FIELD IN THIS APP THAT IS NOT THE APP'S TO KEEP (D11). How
+      somebody is actually doing is health data, and the manifest refuses it in a
+      product table — so it is a POINTER here and the value lives encrypted in
+      the vault, behind a purpose, behind a recorded grant, erasable by
+      destroying one salt.
+
+      ⚠️ AND IT IS HERE BECAUSE THE REFERENCE APP IS THE TEMPLATE. Every app on
+      this platform is copied out of this one, and for a long time this manifest
+      declared no vault field, no purpose and no sub-processor at all — so the
+      whole custody half of the framework had no instance anywhere, and nothing
+      that used it could be exercised by any test.
+    */
+    struggling: field.long({
+      label: "Anything you are struggling with", holds: "sensitive", vault: true,
+      max: 4_000, help: "Only you and whoever you grant it to can read this.",
+    }),
   },
 });
 
@@ -414,6 +432,58 @@ export const HELLO: AppSpec = defineApp({
     line saying what changing something here affects, because that is what tells
     somebody whether to open it.
   */
+  /*
+    ⚠️ THE PURPOSE IS THE LEGAL BASIS, AND IT IS WHAT THE CONSENT SHEET SHOWS.
+    Declaring it once is what makes the disclosure, the record of processing and
+    the bound on every grant the same sentence rather than three.
+  */
+  purposes: {
+    wellbeing: purpose({
+      id: "wellbeing",
+      label: "Checking in on how you are",
+      why: "So the person you report to can see when a week has been hard, and offer something.",
+      holdings: ["sensitive"],
+      /* Two years, then it goes — a check-in is about a week, not a career. */
+      retention: 730,
+      /* ⚠️ Refusable: the check-in still works without it, and a purpose the
+         product does not depend on must never claim it does. */
+    }),
+  },
+
+  /*
+    ⚠️ THE KEY IS DERIVED FROM WHERE THE FIELD IS — `vaultKeyFor`, never a second
+    name written by hand. Two names for one fact is how a column ends up pointing
+    at a vault entry that does not exist, which reads on a screen as a value
+    somebody never filled in.
+  */
+  vault: {
+    [vaultKeyFor("check-in", "struggling")]: vaultField({
+      id: vaultKeyFor("check-in", "struggling"),
+      label: "Anything you are struggling with",
+      holding: "sensitive",
+      purposes: ["wellbeing"],
+      help: "Held encrypted. Erased by destroying the key, not by deleting a row.",
+    }),
+  },
+
+  /*
+    ⚠️ WHO ELSE TOUCHES IT, AND THIS ONE IS TRUE OF EVERY APP HERE. The records
+    are in D1, the objects in R2 and the code in Workers — all Cloudflare, all a
+    sub-processor, whether or not anybody writes it down. `refuseLegal` refuses a
+    processor that receives a category nothing collects, so this cannot drift
+    into a list of vendors somebody once considered.
+  */
+  processors: {
+    cloudflare: subProcessor({
+      id: "cloudflare",
+      name: "Cloudflare, Inc.",
+      country: "US",
+      role: "Runs the application and stores its records and files.",
+      receives: ["sensitive"],
+      url: "https://www.cloudflare.com/trust-hub/gdpr/",
+    }),
+  },
+
   settingAreas: {
     notes: area({
       id: "notes", label: "Notes", icon: "note", order: 0,

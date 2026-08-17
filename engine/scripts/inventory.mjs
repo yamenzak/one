@@ -143,7 +143,115 @@ if (what === "guards") {
       console.log(`- \`${rel}\` — ${byFile[rel].map((n) => `\`${n}\``).join(", ")}`);
     }
   }
+} else if (what === "declares" || what === "does") {
+  /**
+   * ⚠️ WHAT AN APP DECLARES AND WHAT THE PLATFORM DOES, DERIVED — the two halves
+   * of the question everybody asks first and nobody could answer without reading
+   * six directories: does this already exist. `design/README.md` answers it for
+   * the drawing half and has done since it was generated; these answer it for
+   * the other two, from the same source the guards read.
+   *
+   * ⚠️ THE GLOSS IS THE FIRST LINE OF THE DECLARATION'S OWN COMMENT, never a
+   * second description written here. A gloss maintained beside the code is a
+   * second copy of the reasoning, and the copy is the one that goes stale — so
+   * this says WHAT exists and WHERE to read why, and the file says why.
+   */
+  const KERNEL = [
+    ["primitives", "ids, days, instants, slugs — the words everything else is spelled in"],
+    ["field", "what a value is: its kind, its bounds, what it holds, whether it is the app's to keep"],
+    ["collection", "what a thing an app keeps is — and the six operations it gets for free"],
+    ["operation", "one declaration carrying every cross-cutting concern (D12)"],
+    ["access", "permissions, roles, and what an app may never claim"],
+    ["gate", "the eight gates, in the order that decides which sentence somebody reads first"],
+    ["manifest", "the whole app, and the composition that refuses a broken one"],
+    ["entitlement", "what a plan includes, and the allowance algebra over it"],
+    ["credit", "metered work: the reserve, the rate, the ceiling"],
+    ["dunning", "the ladder from past due to erased"],
+    ["package", "a priced bundle of timed grants"],
+    ["tenancy", "workspaces, kinds, shards, placement, standing"],
+    ["door", "the five doors, and which host is which"],
+    ["setting", "a switch a workspace owns, and the page it lives on"],
+    ["flag", "a switch WE own, with a date it stops being one"],
+    ["notify", "what somebody is told, through which channel, and who may narrow it"],
+    ["problem", "the one refusal shape, and the platform's own catalogue"],
+    ["tone", "the voice — the rules a written string has to pass"],
+    ["vault", "the facts that are not an app's to keep (D11)"],
+    ["legal", "documents, purposes, sub-processors, the record of processing"],
+    ["guide", "help, onboarding, the milestones a workspace passes"],
+    ["job", "scheduled work, and the record that it ran"],
+    ["brand", "which surfaces a workspace may put its own mark on"],
+    ["ai", "a generating action: its lane, its prompt, its ceiling"],
+    ["mcp", "an operation projected as a tool an agent may call"],
+    ["signin", "the shape of a sign-in code — the four facts the server and the page must agree on"],
+  ];
+  const RUNTIME = [
+    ["schema", "the composed schema runner — declarations become tables"],
+    ["sql", "the one typed seam onto D1"],
+    ["directory", "accounts, workspaces, placement, enablement, allowances"],
+    ["handles", "which binding holds which shard"],
+    ["locate", "who is asking, where they are, and what they hold"],
+    ["identity", "sign-in codes, sessions, tokens, proof"],
+    ["membership", "the roster and what each member may do"],
+    ["compose", "a manifest becomes a live surface of operations"],
+    ["serve", "the one path every request ends in — both doors"],
+    ["records", "the generated reads and writes behind a collection"],
+    ["settings", "reading and writing a workspace's own switches"],
+    ["billing", "plans, subscriptions, the bill, the ladder"],
+    ["credits", "the balance, and reserve → settle → release"],
+    ["packages", "granting, revoking and expiring a bought bundle"],
+    ["inbox", "notifications: the policy, the audience, the read"],
+    ["services", "the lane out to a provider — AI and mail"],
+    ["vault", "encrypted facts, consent, grants, and who looked"],
+    ["audit", "what happened, and the replay that stops it happening twice"],
+    ["jobs", "the scheduler and the record that it ran"],
+    ["branding", "a workspace's own theme and marks"],
+    ["ai-actions", "which model an action runs on, and in whose words"],
+    ["operator", "the deployment looking at itself"],
+    ["deployment", "what is wrong with this deployment, asked at boot"],
+    ["mcp", "the agent door"],
+    ["member-ops", "the roster's own operations"],
+    ["money-ops", "the bill and the balance, as a read"],
+    ["centre-ops", "the one bootstrap read the tenant door stands on"],
+    ["personal", "the operations about yourself, on every door"],
+    ["installable", "the manifest and the icon a workspace is installed as"],
+  ];
+
+  const pkg = what === "declares" ? "kernel" : "runtime";
+  const HOMES = what === "declares" ? KERNEL : RUNTIME;
+  const { resolveCapabilities } = await import("./lib/capabilities.mjs");
+  const found = resolveCapabilities(pkg);
+
+  /*
+    ⚠️ A MODULE WITH NO GLOSS STOPS THE WHOLE PAGE, and that is the point. The
+    first draft simply skipped one, so a new kernel module would have been
+    absent from the index whose entire job is answering "does this already
+    exist" — the reader would have been told, in a generated table, that it does
+    not. An index that is silently incomplete is worse than no index.
+  */
+  const glossed = new Set(HOMES.map(([m]) => m));
+  const unglossed = [...new Set(found.map((c) => c.module))].filter((m) => !glossed.has(m));
+  if (unglossed.length) {
+    console.error(`${pkg}: no line for ${unglossed.join(", ")} — add one to inventory.mjs, `
+      + `because a module missing from this table reads as a module that does not exist`);
+    process.exit(2);
+  }
+
+  console.log("| Module | What it is for | Ships | Waiting |");
+  console.log("|---|---|---|---|");
+  let all = 0;
+  let held = 0;
+  for (const [mod, why] of HOMES) {
+    const rows = found.filter((c) => c.module === mod);
+    if (!rows.length) continue;
+    const waiting = rows.filter((c) => c.stage);
+    all += rows.length;
+    held += waiting.length;
+    console.log(`| \`${mod}\` | ${why} | ${rows.length} | ${waiting.length || "—"} |`);
+  }
+  console.log("");
+  console.log(`**${all} of them**, ${all - held} reached by something today.`);
+  console.log(`Read the file for why each exists; every one is \`import { … } from "@engine/${pkg}"\`.`);
 } else {
-  console.error("usage: inventory.mjs guards|decisions|enforcement|vocabulary");
+  console.error("usage: inventory.mjs guards|decisions|enforcement|vocabulary|declares|does");
   process.exit(2);
 }

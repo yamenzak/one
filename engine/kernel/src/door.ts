@@ -14,7 +14,7 @@
  * Layer 1. Imports primitives.
  */
 
-import { RESERVED_SLUGS, slugOk } from "./primitives.js";
+import { slugOk, slugTaken } from "./primitives.js";
 
 /**
  *   signpost  the bare root. Not an application: it says what this is and sends
@@ -90,7 +90,7 @@ export function doorFor(host: string, roots: Roots): Door {
     /* ⚠️ A RESERVED LABEL IS NOT A WORKSPACE, and this is a takeover check
        rather than tidiness: a workspace at `admin` or `autodiscover` answers on
        a door it does not own. */
-    if (!slugOk(label) || RESERVED_SLUGS.includes(label)) return { kind: "none" };
+    if (!slugOk(label) || slugTaken(label)) return { kind: "none" };
     return { kind: "tenant", slug: label, host: name };
   }
 
@@ -99,4 +99,5 @@ export function doorFor(host: string, roots: Roots): Door {
 }
 
 /** ⚠️ Where a request that resolves no tenancy may still be answered. */
+/* DEFER(engine-34) stage:34 — the doors are matched by kind at each site; nothing asks this question by name. */
 export const needsTenant = (door: Door): boolean => door.kind === "tenant";

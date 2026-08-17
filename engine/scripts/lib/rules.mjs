@@ -115,11 +115,24 @@ export const lanes = () => ({
   a check whose whole subject is rules nothing runs. Both shapes, or the guard
   moves its own blind spot around.
 */
-const DECLARES = new RegExp(
+/*
+  ⚠️ AND ONE DECLARATION'S WINDOW MUST NOT CROSS THE NEXT ONE. This ran as a
+  single `matchAll` over the whole file, so a 400-character look-ahead could
+  swallow the declaration after it and `matchAll` would resume PAST it —
+  `verbOf` is not a rule, its window reached into `unrecordedWrites`, and a rule
+  about every write saying what to record was invisible to a check whose subject
+  is rules nothing runs. Each declaration is now read on its own.
+*/
+const SIGNATURE = new RegExp(
   "^export (?:function|const) (\\w+)[\\s\\S]{0,400}?\\)\\s*:\\s*"
   + "(?:readonly ([\\w]*(?:Problem|Refusal|string)\\[\\])|([\\w]*(?:Problem|Refusal)) \\| null)",
-  "gm",
 );
+
+/** Every top-level export in a file, as its own slice. */
+const declarations = (src) => {
+  const at = [...src.matchAll(/^export (?:function|const) \w+/gm)];
+  return at.map((m, i) => src.slice(m.index, at[i + 1]?.index ?? src.length));
+};
 
 /* ⚠️ A LIST OF STRINGS IS AMBIGUOUS — `settingsOn` returns one and decides
    nothing. What separates a rule is that its answer is a complaint, and in this
@@ -158,7 +171,9 @@ export function resolveRules() {
 
   const rules = [];
   for (const f of files("kernel/src")) {
-    for (const m of read(f).matchAll(DECLARES)) {
+    for (const chunk of declarations(read(f))) {
+      const m = SIGNATURE.exec(chunk);
+      if (!m) continue;
       const name = m[1];
       /* A problem list — or one refusal — is a rule whatever it is called; a
          plain list of strings is one only where the name reports a fault. */

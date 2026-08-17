@@ -141,7 +141,21 @@ for (const f of files) {
   const after = before.replace(BLOCK, (whole, command, body, at) => {
     if (fenced.some(([from, to]) => at >= from && at < to)) return whole;
     blocks++;
-    const fresh = execSync(command, { cwd: ENGINE, encoding: "utf8" }).trim();
+    /*
+      ⚠️ A GENERATOR THAT REFUSES IS A FAILED DOCUMENT, NOT A CRASH. `execSync`
+      throws on a non-zero exit, and the one thing a generator here refuses is
+      being asked to produce a list it knows is incomplete — an index missing a
+      module reads as a module that does not exist, which is worse than no index
+      at all. Reported as this document's failure, because that is whose failure
+      it is.
+    */
+    let fresh;
+    try {
+      fresh = execSync(command, { cwd: ENGINE, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+    } catch (why) {
+      fail(`${f}: \`${command}\` refused to generate — ${String(why.stderr ?? why).trim()}`);
+      return whole;
+    }
     if (!WRITE && body.trim() !== fresh) {
       fail(`${f}: generated block is stale — \`${command}\` produces different output.\n` +
            `       Run \`node engine/scripts/docs.test.mjs --write\`.`);

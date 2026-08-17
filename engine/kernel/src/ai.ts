@@ -181,6 +181,7 @@ export const unknownInPrompt = (def: AiActionSpec, text: string): readonly strin
  * variable resolves to something — the empty string where a caller had nothing
  * — rather than to a literal brace in the instructions.
  */
+/* DEFER(engine-27) stage:27 — reached only from a run, and no run reaches a provider. */
 export const sayPrompt = (
   text: string, values: Readonly<Record<string, string>>,
 ): string => text.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, name: string) => values[name] ?? "");

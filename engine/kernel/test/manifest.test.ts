@@ -9,7 +9,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { defineApp, refuseApp, surfaceOf, type AppSpec } from "../src/manifest.js";
+import { defineApp, refuseApp, type AppSpec } from "../src/manifest.js";
+import { operationsFor } from "../src/collection.js";
 import { collection } from "../src/collection.js";
 import { field } from "../src/field.js";
 import { operation, PUBLIC, type AnyOperation } from "../src/operation.js";
@@ -365,11 +366,18 @@ describe("a declaration that reaches no surface", () => {
 
 /* ---------------------------------------------------------------- surface --- */
 
+/*
+  ⚠️ ASSERTED THROUGH `operationsFor`, WHICH IS WHAT COMPOSES THE SURFACE. There
+  was a `surfaceOf` here that answered the same question from the manifest alone
+  — and answered it WRONGLY, because an app also answers on the roster, the
+  package rail, its settings and its bill, none of which it declares. A second
+  answer that is smaller than the real one is the shape this tree refuses.
+*/
 describe("what an app answers on", () => {
-  /* ⚠️ Derived, never registered. A surface assembled by hand is one where an
-     operation exists and no route reaches it. */
   it("derives every route from the declarations alone", () => {
-    expect(surfaceOf(app())).toEqual([
+    const spec = app();
+    const on = [...spec.collections.flatMap(operationsFor), ...spec.operations.map((o) => o.id)];
+    expect(on.sort()).toEqual([
       "note.create", "note.delete", "note.list", "note.publish", "note.read", "note.update",
     ]);
   });
@@ -381,7 +389,8 @@ describe("what an app answers on", () => {
   */
   it("drops only the verbs a collection opts out of", () => {
     const roster = app({ collections: [{ ...note, quota: "notes", without: ["create"] }] });
-    expect(surfaceOf(roster)).not.toContain("note.create");
-    expect(surfaceOf(roster)).toContain("note.update");
+    const on = roster.collections.flatMap(operationsFor);
+    expect(on).not.toContain("note.create");
+    expect(on).toContain("note.update");
   });
 });

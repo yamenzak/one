@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  field, operation, schemaForField, schemaForFields, toolFor, toolsOf,
+  field, operation, schemaForField, schemaForFields, toolFor,
   type AnyOperation,
 } from "../src/index.js";
 
@@ -71,11 +71,17 @@ describe("what an operation projects to", () => {
     expect(toolFor(op({ tool: { why: "It spends credits." } } as never))).toBeNull();
   });
 
+  /*
+    ⚠️ THE FILTER THE RUNTIME RUNS, NOT A SECOND ONE. `toolsOf` used to map and
+    filter this list here, and the catalogue the agent door actually serves
+    cannot use it — that one is filtered per caller by the permission gate, so a
+    whole-list helper is an answer to a question nobody asks.
+  */
   it("drops the opt-outs from a catalogue without leaving a gap to count", () => {
-    const tools = toolsOf([
+    const tools = [
       op({}),
       op({ id: "credit.spend", tool: { why: "It spends." } } as never),
-    ]);
+    ].map(toolFor).filter((t) => t !== null);
     expect(tools.map((t) => t.name)).toEqual(["note.publish"]);
   });
 });

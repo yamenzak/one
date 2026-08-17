@@ -19,7 +19,7 @@
 
 import type { AccountId, AppSpec, Door, TenantId } from "@engine/kernel";
 import {
-  RESERVED_SLUGS, foundingAppRole, permissionsFor, residencyFor, slugOk, wouldStrand,
+  foundingAppRole, permissionsFor, residencyFor, slugOk, slugTaken, wouldStrand,
 } from "@engine/kernel";
 import {
   appsOfTenant, becomeCommercial, createTenant, forgetInvitation, invitationsFor, noteBelonging,
@@ -244,7 +244,11 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
         const slug = String(input.slug ?? "").trim().toLowerCase();
         const name = String(input.name ?? "").trim();
         const country = String(input.country ?? "").trim().toUpperCase();
-        if (!name || !slugOk(slug) || RESERVED_SLUGS.includes(slug)) {
+        /* ⚠️ ASKED, NOT REPEATED. A workspace at `admin.` or `id.` is a takeover,
+           so which labels are ours is a security control — and it was written out
+           here AND in `door.ts` while `slugTaken`, which answers exactly this, was
+           called by neither. Two copies of a control agree until one is edited. */
+        if (!name || !slugOk(slug) || slugTaken(slug)) {
           return ctx.fail("platform.invalid");
         }
         if (!/^[A-Z]{2}$/.test(country)) return ctx.fail("platform.invalid");

@@ -133,6 +133,7 @@ export interface Tenant {
  */
 export type Kind = "personal" | "commercial";
 
+/* DEFER(engine-34) stage:34 — the kind union is used as a type; nothing iterates the list. */
 export const KINDS: readonly Kind[] = ["personal", "commercial"];
 
 /**
@@ -248,6 +249,7 @@ export interface Enablement {
   readonly disabledAt: Instant | null;
 }
 
+/* DEFER(engine-30) stage:30 — see above — the enablement row is only ever written at creation. */
 export const enabled = (row: Enablement): boolean => row.disabledAt === null;
 
 /* ------------------------------------------------------- the placement rule --- */
@@ -340,6 +342,7 @@ export function placeOn(shards: readonly Shard[], wants: Placing): Shard | null 
  * its schema would strand data nobody deleted — reachable again the moment the
  * product is switched back on, and by then in a database that cannot read it.
  */
+/* DEFER(engine-30) stage:30 — nothing turns a product on or off for a workspace yet. */
 export const appsOf = (rows: readonly Enablement[]): readonly AppId[] =>
   [...new Set(rows.map((r) => r.appId))];
 

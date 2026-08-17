@@ -103,6 +103,7 @@ the whole rail. Stage 33.
 | `unraisable` | `notify` | composition |
 | `refuseOperation` | `operation` | composition |
 | `unreachable` | `operation` | composition |
+| `unrecordedWrites` | `operation` | composition |
 | `refusePackage` | `package` | runtime |
 | `unknownProblems` | `problem` | composition |
 | `refuseSetting` | `setting` | composition |

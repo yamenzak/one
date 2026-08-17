@@ -36,6 +36,7 @@ export type Day = string & { readonly [BRAND]: "day" };
 export const instant = (at: Date | string = new Date()): Instant =>
   (typeof at === "string" ? new Date(at) : at).toISOString() as Instant;
 
+/* DEFER(engine-34) stage:34 — days are carried from the device already formatted. */
 export const dayOf = (at: Instant): Day => at.slice(0, 10) as Day;
 
 /**
@@ -73,6 +74,7 @@ export const newSessionId = (at?: Date): SessionId => newId("ses", at) as string
  */
 export type Tone = "neutral" | "info" | "success" | "warning" | "danger";
 
+/* DEFER(engine-34) stage:34 — the tone union is used as a type; nothing iterates the list. */
 export const TONES: readonly Tone[] = ["neutral", "info", "success", "warning", "danger"];
 
 /* ------------------------------------------------------------------ text --- */
