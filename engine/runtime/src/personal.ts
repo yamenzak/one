@@ -22,9 +22,11 @@ import {
   foundingAppRole, permissionsFor, residencyFor, slugOk, slugTaken, wouldStrand,
 } from "@engine/kernel";
 import {
-  appsOfTenant, becomeCommercial, createTenant, forgetInvitation, invitationsFor, noteBelonging,
-  tenantsOf, upsertAccount, type TenantRow,
+  appsOfTenant, becomeCommercial, closeTenant, createTenant, forgetInvitation, invitationsFor,
+  noteBelonging, tenantsOf, upsertAccount, type TenantRow,
 } from "./directory.js";
+import { dossierOf, forgetPerson, forgetWorkspace, type Place } from "./dossier.js";
+import { erase } from "./records.js";
 import {
   endSession, forgetCode, issueCode, mintToken, readSession, revokeToken, spendCode,
   startSession, tokensOf, type Session,
@@ -73,6 +75,14 @@ export interface PersonalOp {
    * signing out all stay open. A wall nobody can leave through is a hostage.
    */
   readonly beforeAccepting?: true;
+  /**
+   * ⚠️ THE SAME FIFTEEN MINUTES THE KERNEL'S PROOF GATE USES, and the same
+   * argument: destroying somebody's records cannot be undone and must not be
+   * doable from a borrowed laptop with a tab left open. It is enforced in the
+   * runtime rather than in a handler, because a handler that could forget it is
+   * a handler that eventually will.
+   */
+  readonly proof?: "recent";
   readonly run: (ctx: PersonalCtx, input: Record<string, unknown>) => Promise<unknown>;
 }
 
@@ -99,7 +109,7 @@ export interface IdentityDeps {
   readonly owed?: (ctx: PersonalCtx) => Promise<readonly unknown[]>;
   /**
    * ⚠️ IT MAY REFUSE, AND THE REFUSAL HAS TO COME BACK. Where an acceptance is
-   * recorded is derived from what the document binds (`bindingFor`), so the two
+   * recorded is derived from what the document binds (`acceptanceScope`), so the two
    * honest failures are structural: the business's agreement asked at a door
    * with no business behind it, and asked of somebody who cannot bind it.
    * Returning `void` would answer both with a cheerful 200 and no row — a
@@ -137,6 +147,36 @@ export interface IdentityDeps {
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/**
+ * EVERY DATABASE THIS PERSON COULD BE IN — the directory, and each shard holding
+ * a workspace they belong to.
+ *
+ * ⚠️ ONE ENTRY PER DATABASE, NOT PER WORKSPACE. Two workspaces on one shard
+ * share its tables, so a place per workspace reads the same rows twice: an
+ * export that lists somebody's notifications twice, and a deletion whose second
+ * pass reports zero and reads exactly like a shard that was missed.
+ *
+ * ⚠️ AND THE APPS ARE THE UNION OF WHAT IS ENABLED THERE, because a
+ * subject-scoped collection is walked per database rather than per workspace for
+ * the same reason.
+ */
+async function everywhere(ctx: PersonalCtx): Promise<readonly Place[]> {
+  const byDb = new Map<string, { db: Db; of: string; apps: Map<string, AppSpec> }>();
+  for (const tenant of await tenantsOf(ctx.directory, ctx.session!.accountId)) {
+    const at = byDb.get(tenant.shardId)
+      ?? { db: ctx.shardOf(tenant), of: tenant.shardId, apps: new Map<string, AppSpec>() };
+    for (const appId of await appsOfTenant(ctx.directory, tenant.id)) {
+      const app = ctx.app(appId);
+      if (app) at.apps.set(appId, app);
+    }
+    byDb.set(tenant.shardId, at);
+  }
+  return [
+    { db: ctx.directory, of: "directory", apps: [] },
+    ...[...byDb.values()].map((at) => ({ db: at.db, of: at.of, apps: [...at.apps.values()] })),
+  ];
+}
 
 /**
  * The operations every deployment has, whatever apps it serves.
@@ -462,6 +502,86 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
         await ctx.directory.prepare(`DELETE FROM belongs WHERE account_id = ? AND tenant_id = ?`)
           .bind(ctx.session!.accountId, tenant.id).run();
         return { left: slug };
+      },
+    },
+
+    /* --------------------------------------------------- taking and going --- */
+
+    /*
+      ⚠️ EVERY PLACE THEY COULD BE, NOT THE PLACES SOMEBODY REMEMBERED. The walk
+      is `dossierOf` over the directory and every shard holding a workspace they
+      belong to, driven by a ledger a guard checks against the schema — so a
+      table added next year is a red gate rather than a row quietly missing from
+      an answer that says "everything we hold".
+
+      ⚠️ AND IT IS OPEN BEFORE THEY HAVE AGREED TO ANYTHING. Holding the terms
+      over somebody is fair; holding their data over them is not, and a wall
+      nobody can leave through is a hostage.
+
+      ⚠️ THE VAULT'S CIPHERTEXT IS IN THE COPY AND IS NOT THE ANSWER. Handing
+      somebody the encrypted bytes of their own health record satisfies a walk
+      and not a person — `vault.export` decrypts, at the workspace that holds it.
+    */
+    "me.export": {
+      kind: "read", needs: "session", beforeAccepting: true,
+      async run(ctx): Promise<unknown> {
+        return dossierOf(await everywhere(ctx), ctx.session!.accountId, ctx.email, ctx.now);
+      },
+    },
+
+    /*
+      ⚠️ AND THE SAME WALK DELETES. Two lists is how an export and an erasure
+      come to disagree about what is held — one says a table exists and the other
+      never touches it, and both report success.
+
+      ⚠️ IT ASKS FOR PROOF, because destroying somebody's records cannot be
+      undone and must not be doable from a borrowed laptop with an open tab.
+
+      ⚠️ A WORKSPACE ONLY THEY CAN RUN GOES WITH THEM. Leaving it behind makes it
+      unreachable rather than closed — nobody left who can invite anybody in, the
+      bill still running — and refusing over it would be a deletion request with
+      no way to satisfy it. One they merely belong to is untouched: a colleague
+      leaving is not a business closing.
+    */
+    "me.forget": {
+      kind: "write", needs: "session", proof: "recent", beforeAccepting: true,
+      async run(ctx): Promise<unknown> {
+        const me = ctx.session!.accountId;
+        const places = await everywhere(ctx);
+
+        const closed: string[] = [];
+        const gone = [];
+        for (const tenant of await tenantsOf(ctx.directory, me)) {
+          const db = ctx.shardOf(tenant);
+          if (!wouldStrand(await membersOf(db, tenant.id), me)) continue;
+          for (const appId of await appsOfTenant(ctx.directory, tenant.id)) {
+            const app = ctx.app(appId);
+            if (app) await erase(db, app.collections, "tenant", tenant.id);
+          }
+          /* ⚠️ REPORTED IN THE SAME LIST AS THE REST. The workspace's erasure
+             takes most of this person's rows with it — their roster line, their
+             notifications, their vault — so a report of only the second walk
+             says "account, session" over a deletion that emptied six tables,
+             which reads exactly like a walk that missed them. */
+          gone.push(...await forgetWorkspace(
+            [{ db, of: tenant.shardId, apps: [] }, { db: ctx.directory, of: "directory", apps: [] }],
+            tenant.id));
+          await closeTenant(ctx.directory, tenant.id, ctx.now);
+          closed.push(tenant.slug);
+        }
+
+        gone.push(...await forgetPerson(places, me, ctx.email, ctx.now));
+        /* ⚠️ The session is ended last: it is what the walk above needed to know
+           who was asking, and it is deleted by the walk itself. */
+        ctx.issue(null);
+        return {
+          closed,
+          deleted: gone.filter((g) => g.rows > 0),
+          /* ⚠️ WHAT WAS LOOKED IN AND FOUND EMPTY IS PART OF THE ANSWER. A
+             report of only what was deleted cannot be told apart from one whose
+             walk skipped half the deployment. */
+          lookedIn: gone.length,
+        };
       },
     },
 

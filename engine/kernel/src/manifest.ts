@@ -40,7 +40,7 @@ import type { GuideBook, HelpBook, MilestoneBook } from "./guide.js";
 import { refuseGuide } from "./guide.js";
 import type { JobBook } from "./job.js";
 import { refuseJobs } from "./job.js";
-import type { DocumentBook, SubProcessorBook } from "./legal.js";
+import type { DeploymentLegal, DocumentBook, SubProcessorBook, SubProcessorDef } from "./legal.js";
 import { refuseLegal } from "./legal.js";
 import type { NotificationBook } from "./notify.js";
 import { deadLinks, unaddressable, unraisable } from "./notify.js";
@@ -162,6 +162,41 @@ export const holdingsOf = (spec: AppSpec): readonly Holding[] => [...new Set([
   ...spec.collections.flatMap((c) => holdingsIn(c.fields)),
   ...Object.values(spec.vault ?? {}).map((f) => f.holding),
 ])];
+
+/* ------------------------------------------------------------ inheritance --- */
+
+/**
+ * WHAT EVERY PRODUCT ON A DEPLOYMENT INHERITS, APPLIED IN ONE PLACE.
+ *
+ * ⚠️ THE INFRASTRUCTURE SUB-PROCESSORS ARE THE DEPLOYMENT'S, NOT A PRODUCT'S.
+ * The records are in one database, the objects in one bucket and the code on one
+ * runtime — the same vendor behind every app here, whether or not each app's
+ * author remembers to write it down. Declared per app it is one chance per
+ * product to forget, and an undisclosed recipient is the disclosure failure
+ * regulators actually find. An app adds only what is genuinely its own: a
+ * payment gateway one product uses, a model provider only one product calls.
+ *
+ * ⚠️ AND WHAT IT RECEIVES IS NARROWED TO WHAT THIS APP ACTUALLY HOLDS. The
+ * deployment says "our infrastructure holds everything we hold"; per product,
+ * that is only the categories that product collects. Listing a special category
+ * against an app that has never held one is a processing record describing
+ * something that does not happen — and `refuseLegal` would rightly refuse it.
+ *
+ * ⚠️ DOCUMENTS DO NOT MERGE, DELIBERATELY. The deployment's terms are asked of
+ * the person once, by `owedBy`, against acceptances with no app in them; folded
+ * into an app's book they would be asked AGAIN per app and recorded per app —
+ * the same agreement, demanded once per product somebody opens.
+ */
+export function under(deployment: DeploymentLegal, spec: AppSpec): AppSpec {
+  const held = holdingsOf(spec);
+  const base: Record<string, SubProcessorDef> = {};
+  for (const p of Object.values(deployment.processors)) {
+    const receives = p.receives.filter((h) => held.includes(h));
+    if (!receives.length) continue;
+    base[p.id] = { ...p, receives };
+  }
+  return { ...spec, processors: { ...base, ...(spec.processors ?? {}) } };
+}
 
 /* --------------------------------------------------------------- refusals --- */
 

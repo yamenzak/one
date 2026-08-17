@@ -14,7 +14,7 @@
 
 import {
   area, collection, defineApp, field, flag, notification, operation, purpose, setting,
-  subProcessor, vaultField, vaultKeyFor,
+  vaultField, vaultKeyFor,
   type AppSpec,
 } from "@engine/kernel";
 
@@ -476,22 +476,14 @@ export const HELLO: AppSpec = defineApp({
   },
 
   /*
-    ⚠️ WHO ELSE TOUCHES IT, AND THIS ONE IS TRUE OF EVERY APP HERE. The records
-    are in D1, the objects in R2 and the code in Workers — all Cloudflare, all a
-    sub-processor, whether or not anybody writes it down. `refuseLegal` refuses a
-    processor that receives a category nothing collects, so this cannot drift
-    into a list of vendors somebody once considered.
+    ⚠️ NO INFRASTRUCTURE SUB-PROCESSOR IS DECLARED HERE, AND THAT IS THE POINT.
+    The database, the bucket and the runtime are the deployment's and every
+    product on it inherits them through `under` — this app declared Cloudflare
+    itself and the deployment declared it too, which is one list per product to
+    keep in step and one chance per product to forget. What belongs here is a
+    recipient that is genuinely THIS app's: a gateway only it charges through, a
+    model provider only it calls. It has none.
   */
-  processors: {
-    cloudflare: subProcessor({
-      id: "cloudflare",
-      name: "Cloudflare, Inc.",
-      country: "US",
-      role: "Runs the application and stores its records and files.",
-      receives: ["sensitive"],
-      url: "https://www.cloudflare.com/trust-hub/gdpr/",
-    }),
-  },
 
   settingAreas: {
     notes: area({

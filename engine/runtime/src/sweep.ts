@@ -30,6 +30,7 @@ import type { AppSpec, Instant, TenantId } from "@engine/kernel";
 
 import { erase } from "./records.js";
 import { closeTenant, forgetBelonging, membersOfTenant, tenantById } from "./directory.js";
+import { forgetWorkspace } from "./dossier.js";
 import { forgetBranding } from "./branding.js";
 import { dueForErasure, run } from "./jobs.js";
 import { column, table, type Db } from "./sql.js";
@@ -82,6 +83,18 @@ export async function sweepErasure(deps: SweepDeps): Promise<{ touched: number; 
     for (const make of Object.values(deps.apps)) {
       await erase(db, make().collections, "tenant", one.tenantId);
     }
+    /*
+      ⚠️ AND THE PLATFORM'S OWN TABLES, FROM THE LEDGER RATHER THAN FROM MEMORY.
+      This step used to be the two lines below it — the belonging rows and the
+      branding — so a workspace reported as erased kept its roster, every
+      notification, its audit trail, its settings, its packages, its purchases
+      and the whole vault, encrypted health facts included. `forgetWorkspace`
+      walks the same declaration the export walks, which is what stops the two
+      halves of "erased" from meaning different things.
+    */
+    await forgetWorkspace(
+      [{ db, of: "shard", apps: [] }, { db: deps.directory, of: "directory", apps: [] }],
+      one.tenantId);
     for (const accountId of await membersOfTenant(deps.directory, one.tenantId)) {
       await forgetBelonging(deps.directory, accountId, one.tenantId);
     }

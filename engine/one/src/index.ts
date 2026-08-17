@@ -17,6 +17,7 @@
  */
 
 import type { AccountId, AppSpec, DeploymentLegal, Door, TenantId } from "@engine/kernel";
+import { subProcessor, under } from "@engine/kernel";
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
   NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, acceptanceScope,
@@ -36,7 +37,14 @@ import { hello } from "@engine/hello";
  * for and no other, so the catalogue can grow without every cold start paying
  * for it.
  */
-const APPS: Readonly<Record<string, () => AppSpec>> = { hello };
+const APPS: Readonly<Record<string, () => AppSpec>> = {
+  /* ⚠️ `under` IS WHERE EVERY PRODUCT INHERITS THE DEPLOYMENT'S SUB-PROCESSORS.
+     The database, the bucket and the runtime are the same vendor behind all of
+     them; declared per app it is one chance per product to forget, and the
+     recipient nobody disclosed is the disclosure failure that gets found from
+     outside. See `under`. */
+  hello: () => under(LEGAL, hello()),
+};
 
 /**
  * ⚠️ THE SHARDS THIS DEPLOYMENT PLACES ON, NAMED ONCE. `addShard` registers them
@@ -103,12 +111,12 @@ const LEGAL: DeploymentLegal = {
     genuinely its own.
   */
   processors: {
-    cloudflare: {
+    cloudflare: subProcessor({
       id: "cloudflare", name: "Cloudflare, Inc.", country: "US",
       role: "Runs the application and stores its records and files.",
       receives: ["none", "sensitive"],
       url: "https://www.cloudflare.com/trust-hub/gdpr/",
-    },
+    }),
   },
 };
 
@@ -220,6 +228,13 @@ const boot = (env: Env): Promise<void> => {
       shards: [...SHARDS],
       apps: Object.values(APPS).map((make) => make()),
       used: SERVICES_REACHED,
+      /* ⚠️ EVERYTHING THIS DEPLOYMENT APPLIES, so "is every table in the erasure
+         ledger" is asked of what actually exists here rather than of the
+         runtime's own modules alone. */
+      modules: [
+        ...DIRECTORY_MODULES, ...SHARD_MODULES,
+        ...Object.values(APPS).map((make) => schemaFor(make())),
+      ],
     })) console.error(`[boot] ${fault}`);
   })();
   return booted;

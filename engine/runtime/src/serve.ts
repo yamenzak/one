@@ -20,7 +20,9 @@
  */
 
 import type { AppSpec, Caller, Door, Kind, Problem, Resolved as _Resolved, Roots, Standing } from "@engine/kernel";
-import { IN_GOOD_STANDING, PLATFORM_PROBLEMS, check, doorFor, newId, problem } from "@engine/kernel";
+import {
+  IN_GOOD_STANDING, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, check, doorFor, newId, problem,
+} from "@engine/kernel";
 import { compose, type Composed, type Resolved as ResolvedOp } from "./compose.js";
 import { tell } from "./dispatch.js";
 import { answerMcp } from "./mcp.js";
@@ -470,6 +472,15 @@ async function answerPersonal(
 
   const { session, email } = await whoIs(wiring.directory, sessionIdFrom(request), now);
   if (op.needs === "session" && !session) return no("platform.unauthorized");
+
+  /* ⚠️ THE PROOF WINDOW, ON THIS LANE TOO. It is the kernel's constant rather
+     than a number typed here — two windows is one of them being the wrong one
+     for as long as nobody compares them. */
+  if (op.proof === "recent") {
+    const fresh = session?.provenAt
+      && now.getTime() - Date.parse(session.provenAt) < PROOF_WINDOW_MS;
+    if (!fresh) return no("platform.proof_required");
+  }
 
   let cookie: string | null = null;
   const ctx: PersonalCtx = {

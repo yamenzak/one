@@ -48,7 +48,7 @@ a call site over in a product.
 | `operation` | one declaration carrying every cross-cutting concern (D12) | 10 | 1 |
 | `access` | permissions, roles, and what an app may never claim | 15 | 1 |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
-| `manifest` | the whole app, and the composition that refuses a broken one | 7 | — |
+| `manifest` | the whole app, and the composition that refuses a broken one | 8 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 7 | 1 |
 | `credit` | metered work: the reserve, the rate, the ceiling | 7 | 1 |
 | `dunning` | the ladder from past due to erased | 5 | — |
@@ -69,7 +69,7 @@ a call site over in a product.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**197 of them**, 179 reached by something today.
+**198 of them**, 180 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -125,9 +125,10 @@ layering failure rather than a shortcut. A guard says so.
 | `dispatch` | an event an operation raises becomes a note in somebody's inbox | 1 | — |
 | `sweep` | the daily clock: erase what is past the ladder's last rung | 3 | — |
 | `vault-ops` | consent, grants, who looked, the processing record, export and erasure | 1 | — |
+| `dossier` | everything we hold about one person, and everything of theirs we delete | 8 | — |
 | `legal` | who agreed to what version, and the wall until they have | 6 | — |
 
-**195 of them**, 178 reached by something today.
+**203 of them**, 186 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

@@ -23,9 +23,12 @@
  */
 
 import type { AppSpec } from "@engine/kernel";
+import { incoherent, unledgered } from "./dossier.js";
 import { unbound, type Env } from "./handles.js";
 import { unreachableByErasure } from "./records.js";
+import type { SchemaModule } from "./schema.js";
 import { boundButUnused } from "./services.js";
+import { table } from "./sql.js";
 
 export interface Deployment {
   readonly env: Env;
@@ -35,6 +38,14 @@ export interface Deployment {
   readonly apps: readonly AppSpec[];
   /** The service bindings something actually reaches. */
   readonly used: readonly string[];
+  /**
+   * ⚠️ EVERY SCHEMA MODULE THIS DEPLOYMENT APPLIES, so the erasure ledger can be
+   * checked against what actually exists HERE. The gate checks the runtime's own
+   * modules; a deployment may apply more — another package's, an app's — and a
+   * table this one creates that the ledger has never heard of is an export that
+   * never reads it and a deletion that never touches it, both reporting success.
+   */
+  readonly modules: readonly SchemaModule[];
 }
 
 /** Everything wrong with a deployment, as sentences a log can carry. */
@@ -51,6 +62,16 @@ export function deploymentFaults(of: Deployment): readonly string[] {
       out.push(`${app.id}: collection "${id}" is scoped by nothing erasure can reach, `
         + `so a deletion request will never touch it and nothing will say so`);
     }
+  }
+
+  /* ⚠️ THE TWO ANSWERS NOBODY CAN CHECK FROM OUTSIDE — see `dossier.ts`. */
+  const derived = of.apps.flatMap((a) => a.collections.map((c) => table(c.id)));
+  for (const one of unledgered(of.modules, derived)) {
+    out.push(`table "${one}" is created here and is in no erasure ledger — `
+      + `an export that never reads it and a deletion that never touches it, both saying they were complete`);
+  }
+  for (const said of incoherent()) {
+    out.push(`the erasure ledger contradicts itself: ${said}`);
   }
 
   for (const name of boundButUnused(of.env as Readonly<Record<string, unknown>>, of.used)) {
