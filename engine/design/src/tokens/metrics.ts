@@ -87,6 +87,26 @@ export const LEAD =
 export const WHOLE = "flex grow flex-col justify-center" as const;
 
 /**
+ * ⚠️ HOW MUCH OF A ROW THE CONTROL MAY TAKE, AND IT IS A RATIO BECAUSE THE ROW
+ * IS NOT A FIXED WIDTH. A `Select` sizes itself to its longest option and stays
+ * inline; a text or number field ships `w-full` and takes everything, so it
+ * pushed the label under the floor and the row wrapped. Measured in one card at
+ * 390px: heights of 64, 100, 67 and 100 — two shapes, four rows, no rhythm at
+ * all. At 900px the same card was 64, 64, 67, 64, which is why it read as
+ * correct on the screen it was built on.
+ *
+ * ⚠️ 45% IS WHAT LEAVES THE LABEL ITS FLOOR AT THE NARROWEST WIDTH WE DRAW. A
+ * phone's row is 278px inside the card: the control takes 125 and the words keep
+ * 141, clear of the 128 floor, so nothing wraps. A fixed pixel cap would be
+ * generous on a phone and mean than one line of a desktop's roomy row.
+ *
+ * ⚠️ AND A CONTROL THAT GENUINELY NEEDS THE WIDTH SAYS SO — `ControlRow`'s
+ * `wide`, which a textarea already used. The cap is the default because the
+ * default should be the shape a card of settings has.
+ */
+export const CONTROL_SHARE = "max-w-[45%]" as const;
+
+/**
  * ⚠️ AN INSTALLED TILE IS A SQUIRCLE, AND THE RADIUS IS A PLATFORM CONVENTION
  * RATHER THAN OUR TASTE. iOS and Android both mask an app icon to roughly a
  * quarter of its side; drawing anything else in a preview shows somebody a shape

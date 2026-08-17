@@ -155,12 +155,15 @@ export function Field({ name, spec, value, onChange, disabled, set, bare }: Fiel
                 picker needs one — and a black disc is indistinguishable from a
                 black somebody chose. On a dark card it is not even a disc: it
                 is a hole. So the hex is written beside it, and when there is
-                nothing it says so. */}
-            {bare ? null : (
-              <span className={`${TYPE.note} ms-auto`}>
-                {typeof value === "string" && value ? value : "Not set"}
-              </span>
-            )}
+                nothing it says so.
+
+                ⚠️ AND IT STAYS IN `bare`, WHERE THE LABEL DOES NOT. `bare` drops
+                the NAME because the row beside it already said that; the VALUE
+                is the one thing a trailing control is for. Dropping both left a
+                settings row whose entire answer was a coloured disc. */}
+            <span className={TYPE.note}>
+              {typeof value === "string" && value ? value : "Not set"}
+            </span>
           </ColorPicker.Trigger>
           <ColorPicker.Popover>
             <ColorArea

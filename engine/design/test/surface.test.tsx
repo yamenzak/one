@@ -20,6 +20,8 @@ import { Settings, settingsShown } from "../src/rendered/settings.js";
 import { NotificationPolicy, policyShown } from "../src/rendered/policy.js";
 import { FlagConsole, Shelf, saying, money } from "../src/rendered/console.js";
 import { Shell, reachable } from "../src/frame/shell.js";
+import { ControlRow } from "../src/parts/surfaces.js";
+import { CONTROL_SHARE } from "../src/tokens/metrics.js";
 import { crownFor } from "../src/frame/crown.js";
 import { brandCss, brandCssFor, readable, colorFor } from "../src/tokens/theme.js";
 import { ambienceStylesheet, skyWorld, worldCss } from "../src/tokens/ambience.js";
@@ -267,6 +269,41 @@ const SCREENS = [
   { id: "shared", route: "/shared", label: "Shared", nav: "secondary" as const,
     permission: "note:read", commercial: true as const },
 ];
+
+/**
+ * ⚠️ A CARD'S ROWS SHARE A SHAPE, AND ONE UNCAPPED CONTROL BREAKS IT FOR THE
+ * WHOLE CARD. A `Select` sizes itself to its options and stays inline; a text or
+ * number field ships `w-full`, takes the row, pushes the label under its floor
+ * and wraps. Measured in one settings card at 390px: heights of 64, 100, 67 and
+ * 100 — and at 900px the same card was 64, 64, 67, 64, which is why it read as
+ * correct on the screen it was built on and as crammed on a phone.
+ *
+ * ⚠️ THE HEIGHTS THEMSELVES CANNOT BE ASSERTED HERE — this renders to a string
+ * and nothing lays it out. What CAN be asserted is the cap, which is the cause,
+ * and a rendered page is where the consequence was found (`README.md`).
+ */
+describe("a row with a control at the end", () => {
+  it("caps the control so the words keep their floor and the row stays one line", () => {
+    const out = html(
+      <ControlRow label="Notes a week"><input aria-label="n" /></ControlRow>,
+    );
+    expect(out).toContain(CONTROL_SHARE);
+    /* ⚠️ And the label keeps a floor, or the cap alone would let two words wrap
+       down a narrow column instead of the control moving. */
+    expect(out).toContain("min-w-32");
+  });
+
+  /* ⚠️ AND A CONTROL THAT GENUINELY NEEDS THE WIDTH SAYS SO. A textarea capped
+     at 45% is a text box nobody can write in — the opt-out is the reason the cap
+     can be the default. */
+  it("hands the whole row to a control that asked for it", () => {
+    const out = html(
+      <ControlRow label="Instructions" wide><textarea aria-label="t" /></ControlRow>,
+    );
+    expect(out).not.toContain(CONTROL_SHARE);
+    expect(out).toContain("w-full");
+  });
+});
 
 describe("the shell", () => {
   const crown = { appId: "hello", appName: "Hello", appMark: "◇", tenantName: "Northwind" };

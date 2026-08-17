@@ -29,7 +29,8 @@ import { Button, Card, Chip, Label, Skeleton, Switch } from "@heroui/react";
 import type { Tone } from "@engine/kernel";
 import { TYPE } from "../tokens/type.js";
 import {
-  CARD_ROWS, CROWN_SIZE, HEAD_GAP, ICON, INSET, LEAD, NUDGE, PAD, ROW, SPACE, TILE,
+  CARD_ROWS, CONTROL_SHARE, CROWN_SIZE, HEAD_GAP, ICON, INSET, LEAD, NUDGE, PAD, ROW, SPACE,
+  TILE,
 } from "../tokens/metrics.js";
 import type { Inset } from "../tokens/metrics.js";
 import { ARRIVE, arriveAt } from "../tokens/motion.js";
@@ -538,7 +539,12 @@ export function ControlRow({ icon, face, label, under, wide, children }: RowBase
           before the control moves; the control moves only when even that will
           not fit. */}
       <span className="flex min-w-32 grow"><Body label={label} under={under} /></span>
-      <span className={wide ? "w-full" : "shrink-0"}>{children}</span>
+      {/* ⚠️ CAPPED, OR THE ROW WRAPS AND THE CARD LOSES ITS RHYTHM. A text or
+          number field ships `w-full` and takes the whole row, pushing the label
+          under its floor — measured as heights of 64, 100, 67 and 100 in one
+          card on a phone, and 64, 64, 67, 64 on the desktop it was built on. See
+          `CONTROL_SHARE`. */}
+      <span className={wide ? "w-full" : `shrink-0 ${CONTROL_SHARE}`}>{children}</span>
     </div>
   );
 }

@@ -16,18 +16,31 @@ import * as React from "react";
 import { Button } from "@heroui/react";
 import { field, mayBrand, type Kind, type Theme } from "@engine/kernel";
 import {
-  BrandTile, Field, Group, Row, Screen, Stack, TextInput, ToggleRow, notice, ready,
+  BrandTile, Center, ControlRow, Field, Group, Row, Screen, Stack, TextInput, ToggleRow,
+  notice, ready,
 } from "@engine/design";
 import { api } from "../api.js";
 import { useLoad } from "./data.js";
 
-/** ⚠️ The tokens a workspace edits, declared — so each gets its own control. */
-const TOKENS = {
+/**
+ * ⚠️ THE TOKENS A WORKSPACE EDITS, DECLARED — so each gets the control its kind
+ * implies, from the one renderer every settings screen uses.
+ *
+ * ⚠️ AND THE MARK IS NOT A COLOUR, SO IT IS NOT UNDER "COLOUR". It was, and that
+ * one misfiling is most of what made the card read as crammed: a group named for
+ * one kind of thing, holding three of them and a text field. The mark is what
+ * the TILE says, so it belongs beside the tile.
+ */
+const COLOURS = {
   ground: field.colour({ label: "Behind everything", holds: "none" }),
   ink: field.colour({ label: "Words and marks", holds: "none" }),
   accent: field.colour({ label: "What draws the eye", holds: "none" }),
-  mark: field.text({ label: "One character for the icon", holds: "none", max: 2 }),
 } as const;
+
+const MARK = field.text({
+  label: "Letter", holds: "none", max: 2,
+  help: "One or two characters. Your initial if you leave it",
+});
 
 /** What `brand.read` answers. */
 interface BrandAnswer {
@@ -124,47 +137,65 @@ function Editor({ name, slug, answer, again }: {
     <Stack space="roomy">
       {/* ⚠️ THE TILE FIRST, BECAUSE IT IS WHAT IS BEING DECIDED. Controls above a
           preview make somebody change a value and go looking for the result. */}
+      {/* ⚠️ THE TILE IS NOT A ROW, SO IT IS NOT IN A CARD OF ROWS. It is one
+          object being decided, centred, with air around it — `Center` owns that
+          and a hand-written `py-6` inside a `Group` does not. */}
       <Group label="On a home screen" under="What your staff will look for">
-        <div className="flex justify-center py-6">
+        <Center space="roomy">
           <BrandTile
             name={name}
             ground={theme.ground || "#111113"}
             ink={theme.ink || "#f4f4f5"}
             glyph={theme.mark}
           />
-        </div>
+        </Center>
+        <ControlRow label={MARK.label} under={MARK.help}>
+          <Field
+            bare
+            name="mark"
+            spec={MARK}
+            value={theme.mark ?? ""}
+            onChange={(value) => setTheme((was) => ({ ...was, mark: String(value ?? "") }))}
+          />
+        </ControlRow>
       </Group>
 
+      {/* ⚠️ `ControlRow` PER TOKEN, WHICH IS WHAT THE SHAPE IS FOR — its own
+          header names a colour as the case it exists to carry. Raw `Field`s in a
+          `Stack` gave three inline triggers and one stacked text field in one
+          card: four controls, two grammars, no row height in common and no
+          column the labels shared. */}
       <Group label="Colour" under="Refused if the pair is too close to read">
-        <Stack space="snug">
-          {(Object.keys(TOKENS) as (keyof typeof TOKENS)[]).map((key) => (
+        {(Object.keys(COLOURS) as (keyof typeof COLOURS)[]).map((key) => (
+          <ControlRow key={key} label={COLOURS[key].label}>
             <Field
-              key={key}
+              bare
               name={key}
-              spec={TOKENS[key]}
+              spec={COLOURS[key]}
               value={theme[key] ?? ""}
               onChange={(value) => setTheme((was) => ({ ...was, [key]: String(value ?? "") }))}
             />
-          ))}
-        </Stack>
+          </ControlRow>
+        ))}
       </Group>
 
       {/* ⚠️ THE PLATFORM'S SET, NARROWED BY WHAT THE APPS HERE ACTUALLY HAVE —
           the server answers that intersection, so a workspace is never offered a
           surface that would change nothing anywhere. */}
+      {/* ⚠️ ROWS GO STRAIGHT INTO THE CARD. A `Stack` around them adds a gap
+          between things a card already separates by rhythm, so the run reads as
+          three cards' worth of spacing inside one card. */}
       <Group label="Where it shows" under="Only what the apps here have">
-        <Stack space="snug">
-          {answer.surfaces.map((id) => (
-            <ToggleRow
-              key={id}
-              label={SAID[id]?.label ?? id}
-              under={SAID[id]?.under}
-              value={surfaces.includes(id)}
-              onChange={(on) => setSurfaces((was) =>
-                on ? [...was, id] : was.filter((s) => s !== id))}
-            />
-          ))}
-        </Stack>
+        {answer.surfaces.map((id) => (
+          <ToggleRow
+            key={id}
+            label={SAID[id]?.label ?? id}
+            under={SAID[id]?.under}
+            value={surfaces.includes(id)}
+            onChange={(on) => setSurfaces((was) =>
+              on ? [...was, id] : was.filter((s) => s !== id))}
+          />
+        ))}
       </Group>
 
       <Row>
