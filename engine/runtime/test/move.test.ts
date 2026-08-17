@@ -79,7 +79,7 @@ describe("moving a workspace's records", () => {
   it("makes the workspace read-only the moment it begins", async () => {
     const locate = locator({
       directory: directory(), shardOf: () => one(),
-      appsOf: async () => [app()], charging: false,
+      appsOf: async () => [app()], charging: async () => false,
     });
     const before = await locate({ kind: "tenant", slug: "carry", host: "carry.localhost" });
     expect(before?.standing?.writable).toBe(true);

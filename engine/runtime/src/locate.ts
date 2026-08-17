@@ -28,8 +28,19 @@ export interface LocateDeps {
   readonly shardOf: (tenant: TenantRow) => Db;
   /** Which products a workspace has switched on, and their manifests. */
   readonly appsOf: (tenant: TenantRow) => Promise<readonly AppSpec[]>;
-  /** ⚠️ Whether this deployment can take a payment at all — see `standingFor`. */
-  readonly charging: boolean;
+  /**
+   * ⚠️ WHETHER THIS DEPLOYMENT CAN TAKE A PAYMENT AT ALL — see `standingFor`.
+   * Gating "has not paid" on a deployment that cannot charge strands every
+   * workspace over OUR misconfiguration, so it fails closed on their
+   * non-payment and open on ours.
+   *
+   * ⚠️ ASKED PER REQUEST RATHER THAN READ AT BOOT, because the key is pasted
+   * into the console while the worker is running. Resolved once at startup, an
+   * operator would set it, watch the screen say so, and find every isolate
+   * still refusing to charge until the next deploy — the same fault the push
+   * keypair has a paragraph about.
+   */
+  readonly charging: () => Promise<boolean>;
   /** Flags resolved for this workspace. Absent is the declaration's fallback. */
   readonly flags?: (tenant: TenantRow) => Promise<Readonly<Record<string, boolean>>>;
   readonly now?: () => Date;
@@ -52,8 +63,9 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
     const db = deps.shardOf(tenant);
     const apps = await deps.appsOf(tenant);
 
+    const charging = await deps.charging();
     const held = await Promise.all(
-      apps.map((app) => heldBy(deps.directory, tenant.id, app, now, deps.charging)));
+      apps.map((app) => heldBy(deps.directory, tenant.id, app, now, charging)));
 
     /* ⚠️ The strictest standing wins — see the header. */
     const standing = held.reduce(

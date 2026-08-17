@@ -23,10 +23,16 @@ name: OneEngine
 #   CLOUDFLARE_API_TOKEN   — the same account token deploy.yml uses
 #   CLOUDFLARE_ACCOUNT_ID  — the account id
 #
-# ⚠️ AND THE WORKER GETS NEITHER. `AUTH_SECRET` is a WORKER secret, set once by
-# the provision path below and never re-put — nothing else is. One makes no
-# Cloudflare API call at runtime and has no code path that could use a token, so
-# putting one in `env` would be handing every request handler the account.
+# ⚠️ AND THE WORKER GETS NEITHER. The three WORKER secrets — `AUTH_SECRET`,
+# `CONFIG_SECRET`, `VAULT_SECRET` — are minted once by the provision path below
+# and never re-put; nothing else is set. One makes no Cloudflare API call at
+# runtime and has no code path that could use a token, so putting one in `env`
+# would be handing every request handler the account.
+#
+# ⚠️ EVERY OTHER CREDENTIAL IS PASTED INTO THE CONSOLE, NOT SET HERE. The Stripe
+# keys live encrypted in the directory under `CONFIG_SECRET`, which this workflow
+# has no way to read — so a repository compromise yields no live merchant
+# credential, and rotating one is a form rather than a code push.
 on:
   push:
     branches: [main, claude/quad]
@@ -187,20 +193,35 @@ jobs:
           # A GITHUB_TOKEN push starts no new workflow run, so this cannot loop.
           git push origin HEAD:${{ github.ref_name }}
 
-      # ⚠️ SET ONCE, NEVER RE-PUT. Rewriting it invalidates every sign-in code in
-      # flight, and the reason this is a WORKER secret rather than a repo one is
-      # that a repo secret is readable by every workflow run in the repository.
-      - name: Mint AUTH_SECRET if the worker has none
+      # ── The three secrets, each minted once and never re-put. ─────────────
+      #
+      # ⚠️ RE-PUTTING ANY OF THEM IS DESTRUCTIVE, AND DIFFERENTLY SO FOR EACH.
+      # A new AUTH_SECRET invalidates every sign-in code in flight. A new
+      # CONFIG_SECRET makes every stored credential unreadable — recoverable by
+      # re-pasting them, which is why it is deliberately NOT the vault's. A new
+      # VAULT_SECRET is the silent loss of every special-category fact on the
+      # deployment, with no error until somebody reads one.
+      #
+      # ⚠️ AND THEY ARE WORKER SECRETS RATHER THAN REPO ONES, because a repo
+      # secret is readable by every workflow run in the repository — including
+      # one somebody adds later for something unrelated.
+      #
+      # ⚠️ MINTED RATHER THAN PASTED, because a value a person chooses is a value
+      # a person can retype from memory, and all three are key material.
+      - name: Mint the secrets the worker has none of
         working-directory: engine/one
         run: |
           set -uo pipefail
-          if pnpm exec wrangler secret list 2>/dev/null | grep -q AUTH_SECRET; then
-            echo "::notice::AUTH_SECRET already set — leaving it alone."
-            exit 0
-          fi
-          node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))" \
-            | pnpm exec wrangler secret put AUTH_SECRET
-          echo "::notice::Minted AUTH_SECRET."
+          held=$(pnpm exec wrangler secret list 2>/dev/null || echo "")
+          for name in AUTH_SECRET CONFIG_SECRET VAULT_SECRET; do
+            if printf '%s' "$held" | grep -q "$name"; then
+              echo "::notice::$name already set — leaving it alone."
+              continue
+            fi
+            node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))" \
+              | pnpm exec wrangler secret put "$name"
+            echo "::notice::Minted $name."
+          done
 
   # ── Deploy. ───────────────────────────────────────────────────────────────
   #
@@ -275,3 +296,40 @@ jobs:
       - name: Verify it can actually boot
         if: steps.ready.outputs.go == 'true'
         run: node engine/scripts/boot-check.mjs
+
+      # ── Break the bootstrap deadlock. ─────────────────────────────────────
+      #
+      # ⚠️ NO SCREEN CAN DO THIS, AND THAT IS THE POINT. Setting the sender needs
+      # the operator console; reaching the console needs a session; a session
+      # needs a sign-in code; a code needs mail; mail needs the sender. A fresh
+      # deployment cannot be signed into at all, and the console it is waiting
+      # for is behind the lock it is holding. A workflow with database access can
+      # do what a page behind a login cannot.
+      #
+      # ⚠️ `ON CONFLICT DO NOTHING`, NEVER AN UPSERT. This runs on every deploy,
+      # and an upsert would reset whatever an operator had configured — silently,
+      # every time anybody shipped anything.
+      #
+      # ⚠️ AND THE TABLE EXISTS BY NOW BECAUSE THE BOOT CHECK ABOVE MADE A
+      # REQUEST. The worker applies its schema on the first one, so the order of
+      # these two steps is load-bearing rather than cosmetic.
+      #
+      # Neither value is a secret, so neither is encrypted: an address and the
+      # word `cloudflare`. The keys that ARE secret cannot be seeded from here
+      # and are not — they are pasted into the console, encrypted under
+      # CONFIG_SECRET, which this workflow has no way to read.
+      - name: Seed the sender, so the first person can sign in
+        if: steps.ready.outputs.go == 'true'
+        working-directory: engine/one
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -uo pipefail
+          pnpm exec wrangler d1 execute one-directory --remote --command \
+            "INSERT INTO deployment_config (key, value, salt, iv, at)
+             VALUES ('email.provider', 'cloudflare', NULL, NULL, datetime('now')),
+                    ('email.from', 'One <noreply@4dl.app>', NULL, NULL, datetime('now'))
+             ON CONFLICT(key) DO NOTHING;" \
+            || echo "::warning::Could not seed the sender. Set it in the console: Keys → Email."
+

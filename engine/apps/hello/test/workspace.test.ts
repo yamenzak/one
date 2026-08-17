@@ -54,7 +54,7 @@ const app = () => serve({
     directory: directory(),
     shardOf: () => shard(),
     appsOf: async () => [HELLO],
-    charging: false,
+    charging: async () => false,
   }),
   identify: async (request, located) => {
     const { session, email, accountId } = await whoIs(directory(), sessionIdFrom(request), new Date());

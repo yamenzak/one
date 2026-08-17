@@ -25,7 +25,8 @@ import {
   deploymentFaults, isPlatformPath, locator,
   accept, bindingKey, liveBindings, memberFor, noteShardApp, observe, owedBy, sweep,
   tenantById, tenantBySlug,
-  applyEvent, markCancelled, markPaid, markPastDue, subscribe, verifySignature, webhookSecret,
+  applyEvent, markCancelled, markPaid, markPastDue, stripeKey, subscribe, verifySignature,
+  webhookSecret,
   operatorOps, permissionsResolver, personalOps, pusherOver, schemaFor, sendMail, serve,
   sessionIdFrom, shardFor, subscriptionFor, whoIs,
   type Bucket, type Db, type TenantRow,
@@ -159,8 +160,6 @@ export interface Env {
    * console admits NOBODY, which is the honest reading of "unconfigured".
    */
   readonly OPERATOR_EMAILS?: string;
-  /** ⚠️ Absent means this deployment cannot charge — see `standingFor`. */
-  readonly STRIPE_KEY?: string;
   /**
    * ⚠️ THE VAULT'S OWN SECRET, AND ROTATING IT IS DATA LOSS. Every vault fact's
    * key is derived from this and the subject's salt, so a new value does not
@@ -642,9 +641,21 @@ const handler = (env: Env) => {
         const ids = await liveAppsOfTenant(directory, tenant.id);
         return ids.map((id) => APPS[id]?.()).filter((a): a is AppSpec => !!a);
       },
-      /* ⚠️ Gating "has not paid" on a deployment that cannot take a payment
-         strands every workspace over OUR misconfiguration. */
-      charging: !!env.STRIPE_KEY,
+      /*
+        ⚠️ THE KEY IN THE STORE, NOT AN ENV VAR, AND IT IS THE SAME KEY THE
+        CHECKOUT USES. Two answers to "can this deployment charge" is a gate that
+        holds a workspace read-only over an unpaid bill while nothing on the
+        deployment could ever have taken the payment — or the reverse, which is
+        worse: a live key and a gate that never fires.
+
+        ⚠️ AND GATING "HAS NOT PAID" ON A DEPLOYMENT THAT CANNOT CHARGE strands
+        every workspace over OUR misconfiguration. Fail closed on their
+        non-payment, open on ours.
+      */
+      charging: async () => !!await stripeKey({
+        directory,
+        ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
+      }),
     }),
 
     /*
