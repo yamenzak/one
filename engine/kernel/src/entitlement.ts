@@ -16,7 +16,7 @@
  * Layer 3. Imports primitives and tenancy.
  */
 
-import type { Standing } from "./tenancy.js";
+import type { Kind, Standing } from "./tenancy.js";
 
 /* ------------------------------------------------------------------ shape --- */
 
@@ -45,19 +45,77 @@ export interface EntitlementDef {
   readonly reserved?: boolean;
 }
 
+/**
+ * ONE MEMBERSHIP, AND IT BELONGS TO THE DEPLOYMENT RATHER THAN TO A PRODUCT.
+ *
+ * ⚠️ A PLAN IS THE WORKSPACE'S, NOT AN APP'S, AND THE LIMITS ARE THE ARGUMENT.
+ * Seats, storage and the wallet are one roster, one bucket and one balance — so
+ * a per-app plan has to answer "which product does this 50 GB belong to", and
+ * there is no honest answer. Apps declare entitlement KEYS; the deployment's
+ * plans set their VALUES.
+ *
+ * ⚠️ AND THE STRICTEST STANDING ALREADY CLOSED THE WHOLE WORKSPACE. Arrears on
+ * any product stop every product, which is only defensible if the customer sees
+ * one relationship — under per-app plans, losing your notes because you did not
+ * pay for signage is outrageous.
+ */
 export interface PlanSpec {
   readonly id: string;
   readonly name: string;
   readonly said: string;
+  /**
+   * ⚠️ WHICH FAMILY, AND SUBSCRIBING TO A COMMERCIAL PLAN IS WHAT MAKES A
+   * WORKSPACE ONE. `mayBrand` and `mayIsolate` already gate on the kind, so
+   * pricing on it means the gate and the price agree by construction — an
+   * entitlement for "may brand" would be a second answer that can disagree.
+   */
+  readonly kind: Kind;
   /** Minor units, per month. An integer, always — see `field.money`. */
   readonly price: number;
   readonly currency: string;
+  /**
+   * ⚠️ WALLET CREDITS GRANTED EACH MONTH, AND IT IS A FIELD RATHER THAN AN
+   * ENTITLEMENT. `walk` ends with a clamp that zeroes everything when standing
+   * stops — correct for a permission, confiscation for a BALANCE. A suspended
+   * workspace must not lose credits it paid cash for.
+   *
+   * ⚠️ AND RENEWAL SETS IT RATHER THAN ADDING. Unused allowance that compounds
+   * is a cost model that stops holding after three quiet months.
+   */
+  readonly credits: number;
   readonly includes: Readonly<Record<string, Allowance>>;
   readonly trialDays?: number;
-  /** ⚠️ Where a tenant that never chose lands. Exactly one plan may be it. */
+  /**
+   * ⚠️ THE LOBBY, NOT A FREE TIER. Exactly one plan parks, and it is where a
+   * workspace lands before it ever paid, after a trial ends, and after it
+   * cancels. With no free tier it matters MORE, not less: it is the difference
+   * between "your trial ended, here is your data and here is how to pay" and a
+   * locked door. It is not on the pricing page and cannot be bought.
+   */
   readonly parking?: boolean;
   readonly order: number;
 }
+
+/**
+ * WHAT THE ENGINE ITSELF SELLS, DECLARED ONCE.
+ *
+ * ⚠️ THESE ARE THE WORKSPACE'S, SO NO APP MAY DECLARE THEM. The roster is the
+ * platform's and `member.invite` is its gate; the bucket is the platform's; a
+ * custom hostname is the platform's. Two apps each declaring `seats` is two
+ * answers to how many people a workspace may have, and `refuseManifest` refuses
+ * an app that names one.
+ *
+ * ⚠️ AND `storage` IS A QUOTA THAT IS NOT ENFORCED BY REFUSING. It is the
+ * included amount before the meter starts drawing on the wallet — a seat and a
+ * client are things somebody ADDS deliberately, so refusing is fair, while
+ * storage accumulates as a side effect of ordinary work and refusing it punishes
+ * somebody for using the product.
+ */
+export const PLATFORM_ENTITLEMENTS: Readonly<Record<string, EntitlementDef>> = {
+  seats: { label: "People", help: "An unanswered invitation counts.", withheld: "quota" },
+  storage: { label: "Storage", help: "Included before the meter starts.", withheld: "quota" },
+  domains: { label: "Custom domains", withheld: "quota" },
+};
 
 /* ------------------------------------------------------------------- walk --- */
 
@@ -140,7 +198,8 @@ export function withinQuota(allowed: Allowance, used: number): boolean {
 
 export type CatalogRefusal =
   | "no_parking_plan" | "two_parking_plans" | "sells_undeclared" | "plan_ids_clash"
-  | "parking_above_floor" | "unenforced";
+  | "parking_above_floor" | "unenforced" | "unpriced" | "parking_costs_money"
+  | "sellable_parking";
 
 export interface CatalogProblem { readonly why: CatalogRefusal; readonly detail: string }
 
@@ -171,16 +230,51 @@ export function refuseCatalog(
     for (const key of Object.keys(plan.includes)) {
       if (!(key in keys)) at("sells_undeclared", `${plan.id} sells "${key}", which is not an entitlement`);
     }
+
+    /*
+      ⚠️ AND THE OTHER DIRECTION, WHICH IS THE ONE THAT SHIPS. A key an app
+      declares and no plan mentions resolves to `false` for everybody — the
+      feature is built, gated, and sold to nobody, silently, on every tier. This
+      is what makes the catalogue SELF-DISCOVERING: declaring `clients` in an app
+      is a build failure until every plan names a number for it.
+    */
+    for (const [key, def] of Object.entries(keys)) {
+      if (def.reserved) continue;
+      if (plan.includes[key] === undefined) {
+        at("unpriced", `${plan.id} says nothing about "${key}", so it sells none of it by accident`);
+      }
+    }
   }
 
-  const floor = plans.filter((p) => !p.parking && p.price > 0).sort((a, b) => a.price - b.price)[0];
+  /* ⚠️ THE LOBBY IS FREE AND UNSELLABLE, and both halves are load-bearing. A
+     parking plan with a price is one a lapsed workspace is charged for without
+     ever choosing it; one on the pricing page is a free tier by another name. */
   const park = parking[0];
+  if (park && park.price !== 0) {
+    at("parking_costs_money", `${park.id} parks and costs ${park.price}`);
+  }
+  if (park && park.trialDays) {
+    at("sellable_parking", `${park.id} parks and offers a trial, which is a plan somebody chooses`);
+  }
+
+  /*
+    ⚠️ COMPARED WITHIN THE FAMILY. The lobby is personal, so measuring it against
+    the cheapest paid plan of ANY kind compares it with a business tier and the
+    check says nothing. What it must not be is better than the cheapest thing
+    somebody can buy at its own level.
+  */
+  const floor = plans
+    .filter((p) => !p.parking && p.price > 0 && (!park || p.kind === park.kind))
+    .sort((a, b) => a.price - b.price)[0];
   if (floor && park) {
     for (const key of Object.keys(keys)) {
       if (above(park.includes[key] ?? false, floor.includes[key] ?? false)) {
         at("parking_above_floor",
           `not paying gives more "${key}" than ${floor.id} does`);
       }
+    }
+    if (park.credits > floor.credits) {
+      at("parking_above_floor", `not paying grants more credits than ${floor.id} does`);
     }
   }
   return out;

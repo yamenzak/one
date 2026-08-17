@@ -22,8 +22,8 @@
  * one spare binding unbootable.
  */
 
-import type { AppSpec, DeploymentLegal } from "@engine/kernel";
-import { holdingsOf, missingDocuments } from "@engine/kernel";
+import type { AppSpec, DeploymentLegal, PlanSpec } from "@engine/kernel";
+import { PLATFORM_ENTITLEMENTS, holdingsOf, missingDocuments, refuseCatalog } from "@engine/kernel";
 import { incoherent, unledgered } from "./dossier.js";
 import { unbound, type Env } from "./handles.js";
 import { unreachableByErasure } from "./records.js";
@@ -48,6 +48,12 @@ export interface Deployment {
    */
   readonly modules: readonly SchemaModule[];
   /**
+   * ⚠️ WHAT THIS DEPLOYMENT SELLS — one membership, one list. Absent is a
+   * deployment that charges for nothing, which every reader already handles as
+   * the parking state; present, its faults are reported like any other.
+   */
+  readonly plans?: readonly PlanSpec[];
+  /**
    * ⚠️ WHAT THIS DEPLOYMENT PROMISES, ASKED ONCE. Terms and a privacy notice
    * bind a legal entity rather than a feature, so the question is the
    * deployment's and not any app's — which is exactly why `missingDocuments`
@@ -63,6 +69,28 @@ export function deploymentFaults(of: Deployment): readonly string[] {
   for (const id of unbound(of.env, of.shards)) {
     out.push(`the directory places workspaces on shard "${id}" and nothing is bound for it — `
       + `every workspace placed there answers "no such table" on its first request`);
+  }
+
+  /*
+    ⚠️ THE CATALOGUE IS THE DEPLOYMENT'S, SO ITS FAULTS ARE TOO. Since the
+    membership became one, plans left every app manifest — and the check that
+    used to run per app has to run HERE or run nowhere. What it catches is the
+    quiet half: a key an app declares and no plan mentions resolves to `false`
+    for every workspace on every tier, so the feature is built, gated, and sold
+    to nobody, with nothing anywhere going red.
+
+    ⚠️ AND THE KEYS ARE THE UNION. The platform sells `seats`, `storage` and
+    `domains`; each product sells its own. A plan silent about any of them is
+    the same fault whichever half declared it.
+  */
+  if (of.plans) {
+    const keys = {
+      ...PLATFORM_ENTITLEMENTS,
+      ...Object.fromEntries(of.apps.flatMap((a) => Object.entries(a.entitlements))),
+    };
+    for (const p of refuseCatalog(of.plans, keys)) {
+      out.push(`catalogue: ${p.why} — ${p.detail}`);
+    }
   }
 
   for (const app of of.apps) {

@@ -306,10 +306,10 @@ describe("the plan shelf", () => {
       <Shelf
         current="free"
         plans={[
-          { id: "free", name: "Free", said: "A look", price: 0, currency: "EUR", order: 0,
-            parking: true, includes: { seats: 1 } },
-          { id: "team", name: "Team", said: "For work", price: 900, currency: "EUR", order: 1,
-            trialDays: 14, includes: { seats: 10 } },
+          { id: "free", name: "Free", said: "A look", kind: "personal", price: 0,
+            currency: "USD", credits: 0, order: 0, parking: true, includes: { seats: 1 } },
+          { id: "team", name: "Team", said: "For work", kind: "personal", price: 900,
+            currency: "USD", credits: 1000, order: 1, trialDays: 14, includes: { seats: 10 } },
         ]}
         entitlements={{
           seats: { label: "People", withheld: "quota" },

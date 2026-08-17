@@ -606,13 +606,49 @@
       "fails": "a workspace able to break its own customers' screens on our infrastructure, and to make a page look like something it is not"
     },
     {
-      "id": "one-workspace-with-two-products-pays-one-bill",
+      "id": "one-workspace-with-two-products-pays-one-membership",
       "protects": "D1",
       "stage": "6",
       "status": "live",
       "impl": "apps/hello/test/money.test.ts",
-      "proves": "holds a plan in each and pays one bill",
+      "proves": "pays for one membership rather than one bill per product",
       "fails": "a customer of two products becoming two customers - two cards, two renewal dates, two companies as far as they can tell"
+    },
+    {
+      "id": "one-membership-resolves-every-products-keys",
+      "protects": "D1",
+      "stage": "6",
+      "status": "live",
+      "impl": "apps/hello/test/money.test.ts",
+      "proves": "resolves every product's keys from the one plan",
+      "fails": "a workspace paying for two products being told it holds neither, because each app's keys were resolved against a catalogue that only knew the other's"
+    },
+    {
+      "id": "every-key-a-product-declares-is-priced-by-every-tier",
+      "protects": "D1",
+      "stage": "6",
+      "status": "live",
+      "impl": "one/test/boot.test.ts",
+      "proves": "prices every key every product declares",
+      "fails": "a feature built, shipped and sold to nobody - an unpriced key resolves to off for every workspace on every tier, and no screen anywhere says why"
+    },
+    {
+      "id": "the-lobby-is-free-and-cannot-be-bought",
+      "protects": "D21",
+      "stage": "6",
+      "status": "live",
+      "impl": "one/test/boot.test.ts",
+      "proves": "sells both families, and parks in the personal one",
+      "fails": "a workspace charged for the parking state it never chose, or offered it at checkout as though not having a plan were a plan"
+    },
+    {
+      "id": "one-catalogue-one-currency",
+      "protects": "D1",
+      "stage": "6",
+      "status": "live",
+      "impl": "one/test/boot.test.ts",
+      "proves": "prices everything in one currency",
+      "fails": "two tiers priced in different currencies and a bill that adds them together"
     },
     {
       "id": "a-reserve-is-a-ceiling-on-revenue",

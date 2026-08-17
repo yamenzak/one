@@ -18,7 +18,8 @@ import {
   addShard, createTenant, found, noteBelonging, noteShardApp, owedBy, startSession, upsertAccount,
   type Db,
 } from "@engine/runtime";
-import worker, { APPS, LEGAL } from "../src/index.js";
+import { PLATFORM_ENTITLEMENTS, refuseCatalog } from "@engine/kernel";
+import worker, { APPS, LEGAL, PLANS } from "../src/index.js";
 
 const call = (host: string, path: string, init: RequestInit = {}) =>
   worker.fetch(new Request(`http://${host}:8080${path}`, init), env as never);
@@ -501,5 +502,71 @@ describe("switching a product off for a workspace", () => {
       method: "POST", headers: { cookie, "content-type": "application/json" },
       body: JSON.stringify({ tenant: tenantId, app: "hello", on: false }),
     })).status).toBe(404);
+  });
+});
+
+/* ------------------------------------------------------- one membership --- */
+
+/**
+ * THE CATALOGUE THIS DEPLOYMENT SELLS.
+ *
+ * ⚠️ ONE MEMBERSHIP, AND EVERY PLAN PRICES EVERY KEY. Since plans left the app
+ * manifests, `refuseCatalog` runs here or nowhere — and what it catches is the
+ * quiet half: a key an app declares and no plan mentions resolves to `false` for
+ * every workspace on every tier, so the feature is built, gated, and sold to
+ * nobody with nothing going red. This is the build failure that makes declaring
+ * a sellable key self-discovering: add one, and every plan fails until it names
+ * a number.
+ */
+describe("what this deployment sells", () => {
+  const keysOf = () => ({
+    ...PLATFORM_ENTITLEMENTS,
+    ...Object.fromEntries(
+      Object.values(APPS).flatMap((make) => Object.entries(make().entitlements))),
+  });
+
+  it("prices every key every product declares", () => {
+    expect(refuseCatalog(PLANS, keysOf())).toEqual([]);
+  });
+
+  /*
+    ⚠️ AND THE CHECK BITES. A catalogue guard that reported nothing because it
+    was reading an empty key set would pass this file for ever — so one key is
+    added that no plan mentions, and the refusal has to name it.
+  */
+  it("says so when a key no plan mentions is declared", () => {
+    const why = refuseCatalog(PLANS, { ...keysOf(), exports: { label: "Exports", withheld: "gate" } });
+    expect(why.map((p) => p.why)).toContain("unpriced");
+    expect(why.some((p) => p.detail.includes("exports"))).toBe(true);
+  });
+
+  /*
+    ⚠️ TWO FAMILIES, AND THE LOBBY IS PERSONAL. Business is a TIER rather than an
+    add-on — `mayBrand` and `mayIsolate` gate on the workspace's kind, so pricing
+    on the kind is what keeps the gate and the price from disagreeing.
+  */
+  it("sells both families, and parks in the personal one", () => {
+    expect(new Set(PLANS.map((p) => p.kind))).toEqual(new Set(["personal", "commercial"]));
+    const park = PLANS.find((p) => p.parking)!;
+    expect(park.kind).toBe("personal");
+    /* ⚠️ Free and unsellable: a lobby with a price is one a lapsed workspace is
+       charged for without ever choosing it, and one offering a trial is a free
+       tier by another name. */
+    expect(park.price).toBe(0);
+    expect(park.trialDays).toBeUndefined();
+
+    /* ⚠️ AND THE RULE IS IN FORCE, not merely obeyed by today's numbers. Pricing
+       the lobby has to be REFUSED, or the two lines above are a description of
+       the catalogue rather than a constraint on it. */
+    const priced = PLANS.map((p) => (p.parking ? { ...p, price: 500, trialDays: 7 } : p));
+    const why = refuseCatalog(priced, keysOf()).map((p) => p.why);
+    expect(why).toContain("parking_costs_money");
+    expect(why).toContain("sellable_parking");
+  });
+
+  /* ⚠️ ONE CURRENCY. `billFor` refuses to add two, correctly — so a catalogue
+     carrying both produces a bill whose lines do not sum to its own total. */
+  it("prices everything in one currency", () => {
+    expect(new Set(PLANS.map((p) => p.currency)).size).toBe(1);
   });
 });

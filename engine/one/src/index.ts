@@ -16,7 +16,9 @@
  * than six lookups each caller does for itself.
  */
 
-import type { AccountId, AppSpec, DeploymentLegal, Door, Residency, TenantId } from "@engine/kernel";
+import type {
+  AccountId, AppSpec, DeploymentLegal, Door, PlanSpec, Residency, TenantId,
+} from "@engine/kernel";
 import { MEDIA_NEED, subProcessor, under } from "@engine/kernel";
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
@@ -57,6 +59,68 @@ const APPS: Readonly<Record<string, () => AppSpec>> = {
      outside. See `under`. */
   hello: once(() => under(LEGAL, hello())),
 };
+
+/**
+ * ONE MEMBERSHIP — WHAT THIS DEPLOYMENT SELLS, IN ONE LIST.
+ *
+ * ⚠️ THE PLANS ARE THE DEPLOYMENT'S, NOT A PRODUCT'S, and the limits are the
+ * argument. Seats, storage and the wallet are one roster, one bucket and one
+ * balance — a per-product plan has to answer "which app does this gigabyte
+ * belong to" and there is no honest answer. Apps declare entitlement KEYS; this
+ * list sets their VALUES, and `refuseCatalog` fails the build if any plan is
+ * silent about a key any app declares.
+ *
+ * ⚠️ AND BUSINESS IS A TIER RATHER THAN AN ADD-ON. `mayBrand` and `mayIsolate`
+ * already gate on the workspace's KIND, so pricing on the kind means the gate
+ * and the price agree by construction. A "commercial" entitlement beside them
+ * would be a second answer that can disagree with the first — and the kind is
+ * one-way (D21), so the two could never be reconciled after they did.
+ *
+ * ⚠️ THE LOBBY IS NOT A FREE TIER. `none` is where a workspace sits before it
+ * ever paid, after a trial ends and after it cancels. It is unsellable, costs
+ * nothing, and exists so that "your trial ended" means "read and export your
+ * records, and here is how to pay" rather than a locked door. With no free tier
+ * it matters MORE, not less.
+ *
+ * ⚠️ AND STORAGE IS WHERE THE INCLUDED AMOUNT ENDS, NOT A CEILING. Above it the
+ * meter draws on the wallet, so there is no cliff between tiers and no "contact
+ * us" — a seat and a client are things somebody adds deliberately, so refusing
+ * is fair, while storage accumulates as a side effect of ordinary work.
+ */
+const GB = 1024 * 1024 * 1024;
+
+const PLANS: readonly PlanSpec[] = [
+  {
+    id: "none", name: "No plan", kind: "personal", order: 0, parking: true,
+    said: "Read and export what is here. Nothing new can be added.",
+    price: 0, currency: "USD", credits: 0,
+    includes: { seats: 1, storage: GB, domains: 0, notes: 0, publishing: false },
+  },
+  {
+    id: "solo", name: "Solo", kind: "personal", order: 1, trialDays: 14,
+    said: "One person, everything we make.",
+    price: 1200, currency: "USD", credits: 1_500,
+    includes: { seats: 1, storage: 10 * GB, domains: 0, notes: -1, publishing: true },
+  },
+  {
+    id: "plus", name: "Plus", kind: "personal", order: 2, trialDays: 14,
+    said: "Room to work, and somebody beside you.",
+    price: 2500, currency: "USD", credits: 4_000,
+    includes: { seats: 2, storage: 50 * GB, domains: 0, notes: -1, publishing: true },
+  },
+  {
+    id: "studio", name: "Studio", kind: "commercial", order: 3, trialDays: 14,
+    said: "A business: your own name on it, your own address, your own database.",
+    price: 4900, currency: "USD", credits: 7_500,
+    includes: { seats: 5, storage: 250 * GB, domains: 1, notes: -1, publishing: true },
+  },
+  {
+    id: "company", name: "Company", kind: "commercial", order: 4, trialDays: 14,
+    said: "A team, and the room a team needs.",
+    price: 19900, currency: "USD", credits: 40_000,
+    includes: { seats: 25, storage: 2048 * GB, domains: 3, notes: -1, publishing: true },
+  },
+];
 
 /**
  * ⚠️ THE SHARDS THIS DEPLOYMENT PLACES ON, NAMED ONCE. `addShard` registers them
@@ -340,6 +404,7 @@ const boot = (env: Env): Promise<void> => {
       env,
       shards: SHARDS.map((s) => s.id),
       apps: Object.values(APPS).map((make) => make()),
+      plans: PLANS,
       used: SERVICES_REACHED,
       /* ⚠️ EVERYTHING THIS DEPLOYMENT APPLIES, so "is every table in the erasure
          ledger" is asked of what actually exists here rather than of the
@@ -475,6 +540,7 @@ const handler = (env: Env) => {
       request body. It sits beside the subscriptions it signs for, which are the
       sensitive half and are already there; alone it grants nothing.
     */
+    plans: PLANS,
     pusher: pusherOver(directory),
 
     ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
@@ -599,7 +665,7 @@ const handler = (env: Env) => {
         allow-list on a live deployment is unconfigured, not open.
       */
       ...operatorOps({
-        apps: APPS, isOperator,
+        apps: APPS, isOperator, plans: PLANS,
       /* ⚠️ Absent is a deployment that can hold an address and not a key — the
          console says so, rather than offering a field that saves nothing. */
       ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
@@ -631,6 +697,7 @@ const handler = (env: Env) => {
     locate: locator({
       directory,
       shardOf,
+      plans: PLANS,
       appsOf: async (tenant) => {
         /* ⚠️ WHAT IS ON, NOT WHAT WAS EVER ON. This list becomes the composed
            surface, so a product switched off has to leave it — otherwise the
@@ -830,4 +897,4 @@ export default {
   },
 };
 
-export { APPS, LEGAL };
+export { APPS, LEGAL, PLANS };

@@ -127,7 +127,22 @@ export interface Held {
   readonly standing: Standing;
   readonly entitlements: readonly Resolved[];
   readonly planId: string;
+  /** ⚠️ Granted each month, and SET rather than added — see `PlanSpec.credits`. */
+  readonly credits: number;
 }
+
+/**
+ * ⚠️ THE MEMBERSHIP IS THE WORKSPACE'S, SO ITS ROW IS FILED UNDER NO APP. One
+ * plan covers every product a workspace has switched on, because the seats, the
+ * storage and the wallet are one roster, one bucket and one balance — a row per
+ * product would be N answers to one question, and the strictest-standing rule
+ * already closes the whole workspace over any one of them.
+ *
+ * ⚠️ THE COLUMN STAYS. A workspace can hold a product it stopped using, the
+ * enablement row is where that lives, and dropping a column from a billing table
+ * later is not free.
+ */
+export const MEMBERSHIP = "" as AppId;
 
 /**
  * What a workspace has, for one product, right now.
@@ -140,19 +155,26 @@ export interface Held {
 export async function heldBy(
   db: Db,
   tenantId: TenantId,
-  app: { readonly id: AppId; readonly plans: readonly PlanSpec[]; readonly entitlements: Readonly<Record<string, EntitlementDef>> },
+  of: {
+    readonly plans: readonly PlanSpec[];
+    readonly keys: Readonly<Record<string, EntitlementDef>>;
+  },
   now: Instant,
   charging: boolean,
 ): Promise<Held> {
-  const sub = await subscriptionFor(db, tenantId, app.id);
-  const parking = app.plans.find((p) => p.parking) ?? null;
-  const plan = app.plans.find((p) => p.id === sub?.planId) ?? parking;
+  const sub = await subscriptionFor(db, tenantId, MEMBERSHIP);
+  const parking = of.plans.find((p) => p.parking) ?? null;
+  const plan = of.plans.find((p) => p.id === sub?.planId) ?? parking;
   const standing = standingFor(sub, now, { charging });
 
   return {
     standing,
     planId: plan?.id ?? "",
-    entitlements: walk(plan, app.entitlements, sub?.overrides ?? {}, sub?.adjustments ?? {}, standing),
+    /* ⚠️ WHAT THE MONTH GRANTS, BESIDE WHAT THE PLAN ALLOWS. Every reader that
+       asks what a workspace HAS also has to say what it may spend, and two
+       lookups is two answers. */
+    credits: plan?.credits ?? 0,
+    entitlements: walk(plan, of.keys, sub?.overrides ?? {}, sub?.adjustments ?? {}, standing),
   };
 }
 
@@ -215,9 +237,10 @@ export interface Line {
 }
 
 /**
- * ⚠️ ONE INVOICE, ONE LINE PER PRODUCT — the thing the whole inversion is for. A
- * business with three of our products should see three lines and pay once, not
- * receive three emails on three days from what looks like three companies.
+ * ⚠️ ONE INVOICE, ONE MEMBERSHIP LINE — the thing the whole inversion is for. A
+ * business with three of our products pays once and reads one document, rather
+ * than receiving three emails on three days from what looks like three
+ * companies. What varies per period is metered and arrives as its own lines.
  *
  * ⚠️ AND A PARKING PLAN IS NOT A LINE. Charging nothing is not a line item; it
  * is the absence of one, and printing "Free — €0.00" on an invoice is noise on
@@ -226,17 +249,18 @@ export interface Line {
 export async function billFor(
   db: Db,
   tenantId: TenantId,
-  apps: readonly { readonly id: AppId; readonly plans: readonly PlanSpec[] }[],
+  plans: readonly PlanSpec[],
+  /** ⚠️ What the meters drew this period, already priced — see `metered.ts`. */
+  metered: readonly Line[] = [],
 ): Promise<{ readonly lines: readonly Line[]; readonly total: number; readonly currency: string }> {
   const lines: Line[] = [];
-  for (const app of apps) {
-    const sub = await subscriptionFor(db, tenantId, app.id);
-    if (!sub) continue;
-    const plan = app.plans.find((p) => p.id === sub.planId);
-    if (!plan || plan.price <= 0) continue;
-    lines.push({ appId: app.id, planId: plan.id, price: plan.price, currency: plan.currency });
+  const sub = await subscriptionFor(db, tenantId, MEMBERSHIP);
+  const plan = sub ? plans.find((p) => p.id === sub.planId) : undefined;
+  if (plan && plan.price > 0) {
+    lines.push({ appId: MEMBERSHIP, planId: plan.id, price: plan.price, currency: plan.currency });
   }
-  const currency = lines[0]?.currency ?? "EUR";
+  lines.push(...metered);
+  const currency = lines[0]?.currency ?? "USD";
   /*
     ⚠️ A MIXED-CURRENCY BILL IS NOT SUMMED, IT IS REFUSED — by leaving the
     offending lines out of the total rather than adding euros to dirhams and

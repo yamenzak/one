@@ -65,8 +65,6 @@ const app = (id: string, collections = [note]): AppSpec => ({
     seats: { counts: ["owner", "manager", "staff"], entitlement: "seats" },
   },
   entitlements: { seats: { label: "Seats", withheld: "quota" } },
-  plans: [{ id: "free", name: "Free", said: "", price: 0, currency: "EUR", order: 0, parking: true,
-    includes: { seats: 1 } }],
   collections, operations: [stub], screens: [],
 });
 

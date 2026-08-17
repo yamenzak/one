@@ -31,8 +31,8 @@ import { danglingRefs, eventsFor, operationsFor, quotasWithoutCeiling, refuseCol
 import type { MeterBook, PackDef } from "./credit.js";
 import { refusePacks, unbounded } from "./credit.js";
 import { unknownInPrompt } from "./ai.js";
-import type { EntitlementDef, PlanSpec } from "./entitlement.js";
-import { refuseCatalog, unenforced } from "./entitlement.js";
+import type { EntitlementDef } from "./entitlement.js";
+import { PLATFORM_ENTITLEMENTS, unenforced } from "./entitlement.js";
 import { holdingsIn, type Holding } from "./field.js";
 import type { FlagBook } from "./flag.js";
 import { refuseFlags, unreadFlags } from "./flag.js";
@@ -89,8 +89,14 @@ export interface AppSpec {
   readonly mark: string;
 
   readonly access: AccessSpec;
+  /**
+   * ⚠️ KEYS ONLY. An app declares what it SELLS — `notes`, `clients` — and the
+   * deployment's plans say how many of each every tier gets. Plans left this
+   * file when the membership became one: seats, storage and the wallet are one
+   * roster, one bucket and one balance, so a per-app plan cannot say which
+   * product a gigabyte belongs to.
+   */
   readonly entitlements: Readonly<Record<string, EntitlementDef>>;
-  readonly plans: readonly PlanSpec[];
   readonly collections: readonly CollectionSpec[];
   readonly operations: readonly AnyOperation[];
   readonly screens: readonly ScreenSpec[];
@@ -337,8 +343,23 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
 
   /* --- what is sold and not kept ----------------------------------------- */
 
-  for (const p of refuseCatalog(spec.plans, spec.entitlements)) at("catalogue", `${p.why}: ${p.detail}`);
-  for (const why of quotasWithoutCeiling(spec.collections, Object.keys(spec.entitlements))) {
+  /*
+    ⚠️ AN APP MAY NOT DECLARE WHAT THE PLATFORM SELLS. The roster is the
+    platform's and `member.invite` is its gate; the bucket and the custom
+    hostname are the platform's too. Two apps each declaring `seats` is two
+    answers to how many people a workspace may have, and whichever composed
+    first would win.
+  */
+  for (const key of Object.keys(spec.entitlements)) {
+    if (key in PLATFORM_ENTITLEMENTS) {
+      at("catalogue", `"${key}" is the platform's to sell, not an app's`);
+    }
+  }
+  /* ⚠️ THE UNION, BECAUSE AN APP MAY COUNT AGAINST A PLATFORM KEY. It may not
+     DECLARE one (above), but a collection is entitled to reference `seats` or
+     `storage` — those are the workspace's, and referencing is not owning. */
+  const holdable = { ...PLATFORM_ENTITLEMENTS, ...spec.entitlements };
+  for (const why of quotasWithoutCeiling(spec.collections, Object.keys(holdable))) {
     at("quota", why);
   }
 
@@ -357,7 +378,7 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
     at("entitlement", `"${key}" is sold and nothing withholds it`);
   }
   for (const key of named) {
-    if (key && !(key in spec.entitlements)) at("entitlement", `"${key}" is enforced and nothing sells it`);
+    if (key && !(key in holdable)) at("entitlement", `"${key}" is enforced and nothing sells it`);
   }
 
   /* --- what a person is told --------------------------------------------- */

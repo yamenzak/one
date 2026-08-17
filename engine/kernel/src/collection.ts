@@ -219,7 +219,7 @@ export const quotasWithoutCeiling = (
 ): readonly string[] =>
   collections
     .filter((c) => c.quota && !entitlements.includes(c.quota))
-    .map((c) => `${c.id} counts against "${c.quota}", which no plan sells`);
+    .map((c) => `${c.id} counts against "${c.quota}", which nothing declares`);
 
 /**
  * ⚠️ A `ref` POINTING NOWHERE IS A JOIN THAT RETURNS NOTHING, for ever, and it

@@ -54,6 +54,7 @@ const app = () => serve({
     directory: directory(),
     shardOf: () => shard(),
     appsOf: async () => [HELLO],
+    plans: [],
     charging: async () => false,
   }),
   identify: async (request, located) => {

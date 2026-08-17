@@ -14,6 +14,7 @@ import {
   DIRECTORY_MODULES, SHARD_MODULES,
   AUDIT_SCHEMA, BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, MEMBERSHIP_SCHEMA, NOBODY,
   REPLAY_SCHEMA, SETTING_SCHEMA, addShard, applySchema, memberFor, noteShardApp, openAccount,
+  MEMBERSHIP,
   permissionsResolver, personalOps, schemaFor, serve, sessionIdFrom, subscribe, tenantBySlug,
   whoIs, type Db,
 } from "@engine/runtime";
@@ -34,6 +35,13 @@ const app = () => serve({
     secret: "test-secret", appId: "hello",
     deliver: async (to, code) => { sent.push({ to, code }); },
   }),
+  /* ⚠️ The deployment's catalogue — one membership, one list. */
+  plans: [
+    { id: "none", name: "No plan", said: "", kind: "personal", price: 0, currency: "USD",
+      credits: 0, order: 0, parking: true, includes: { seats: 1 } },
+    { id: "team", name: "Team", said: "", kind: "personal", price: 900, currency: "USD",
+      credits: 1000, order: 1, includes: { seats: 10 } },
+  ],
   locate: async (door) => {
     if (door.kind !== "tenant" || !door.slug) return null;
     const tenant = await tenantBySlug(directory(), door.slug);
@@ -156,23 +164,27 @@ describe("the settings surface", () => {
 describe("the money view", () => {
   it("answers the whole workspace in one call, to billing authority only", async () => {
     const { owner, customer, tenantId } = await studio();
-    await subscribe(directory(), tenantId as never, "hello" as never, "team", "active");
+    await subscribe(directory(), tenantId as never, MEMBERSHIP, "team", "active");
     await openAccount(directory(), tenantId as never);
 
     /* ⚠️ `billing:read` — a customer never sees what the workspace pays. */
     expect((await get("westgate", "/api/money.view", customer)).status).toBe(403);
 
     const seen = await (await get("westgate", "/api/money.view", owner)).json() as {
-      apps: { id: string; planId: string | null; plans: unknown[] }[];
+      plan: { id: string; kind: string } | null;
+      plans: unknown[];
+      apps: { id: string }[];
       bill: { total: number; lines: unknown[] };
-      balance: { spendable: number };
+      wallet: { spendable: number };
     };
+    /* ⚠️ ONE MEMBERSHIP, AND THE PRODUCTS BESIDE IT RATHER THAN UNDER IT. The
+       plan is the workspace's; what it reaches is a list. */
+    expect(seen.plan?.id).toBe("team");
     expect(seen.apps.map((a) => a.id)).toEqual(["hello"]);
-    expect(seen.apps[0]!.planId).toBe("team");
-    expect(seen.apps[0]!.plans.length).toBeGreaterThan(0);
+    expect(seen.plans.length).toBeGreaterThan(0);
     /* ⚠️ The same rows a charge would collect — the paid plan is a line. */
     expect(seen.bill.lines).toHaveLength(1);
     expect(seen.bill.total).toBeGreaterThan(0);
-    expect(seen.balance.spendable).toBe(0);
+    expect(seen.wallet.spendable).toBe(0);
   });
 });

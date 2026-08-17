@@ -116,6 +116,59 @@ rather than in the design system precisely because the Worker draws it too.
 `@engine/design` holds no product vocabulary — no clients, no invoices, no
 workspaces — and the vocabulary guard refuses product nouns in shared code.
 
+### 1.5 What a manifest declares about money — and what it must not
+
+⚠️ **AN APP DECLARES KEYS. THE DEPLOYMENT SETS THEIR VALUES.** There is one
+membership per workspace, however many products are switched on, so `AppSpec`
+carries no `plans` at all — the catalogue is `PLANS` in `engine/one/src/index.ts`
+and `refuseManifest` refuses an app that tries to price anything.
+
+The argument is the limits. Seats, storage and the wallet are one roster, one
+bucket and one balance; a per-app plan has to answer *which product does this
+50 GB belong to*, and there is no honest answer. It is also what makes the
+strictest-standing rule defensible: arrears on any product stop every product,
+which a customer can only accept if they see one relationship.
+
+So a manifest declares, under `entitlements`, the keys its own product sells:
+
+```ts
+entitlements: {
+  notes:      { label: "Notes",   withheld: "quota" },
+  publishing: { label: "Publish", withheld: "gate"  },
+}
+```
+
+Four rules govern that block, and each is a build failure rather than a review
+comment:
+
+- **`withheld` names the mechanism** — `gate` refuses the operation, `quota`
+  counts and refuses past a number, `shape` narrows the answer instead of
+  refusing it. An app that names none has sold something with nothing behind it.
+- **Every live key must be named by a gate or counted by a collection**
+  (`unenforced`). A key sold and never checked fails in the *generous*
+  direction, so nobody reports it and nothing goes red.
+- **Every live key must be priced by every tier** (`refuseCatalog` →
+  `unpriced`). A key no plan mentions resolves to `false` for everybody: the
+  feature is built, gated, and sold to nobody, on every tier, silently. Adding
+  `clients` to a manifest is a red build until each plan names a number for it —
+  which is what "the catalogue discovers itself" means in practice.
+- **`reserved: true` is the one exemption**, and it means *sold by nobody,
+  enforced by nothing, on purpose* — a key kept so a future plan can use it
+  without a migration. It is written down rather than inferred from a plan's
+  silence.
+
+⚠️ **AND THREE KEYS ARE THE PLATFORM'S: `seats`, `storage`, `domains`**
+(`PLATFORM_ENTITLEMENTS`). The roster, the bucket and a custom hostname belong to
+the workspace, not to a product inside it; two apps each declaring `seats` is two
+answers to how many people a workspace may have. An app that names one is
+refused.
+
+**Credits are a field on the plan, not an entitlement**, and that is deliberate:
+the entitlement walk ends with a clamp that zeroes everything when standing
+stops — correct for a permission, confiscation for a balance. A suspended
+workspace must not lose credits it paid cash for. Renewal *sets* the monthly
+grant rather than adding to it.
+
 ---
 
 ## 2. The rule the whole framework is built around

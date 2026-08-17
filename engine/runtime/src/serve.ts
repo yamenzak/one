@@ -19,7 +19,9 @@
  * Audit after the outcome, including when the outcome is a refusal.
  */
 
-import type { AppSpec, Caller, Door, Kind, Problem, Resolved as _Resolved, Roots, Standing } from "@engine/kernel";
+import type {
+  AppSpec, Caller, Door, Kind, PlanSpec, Problem, Resolved as _Resolved, Roots, Standing,
+} from "@engine/kernel";
 import {
   IN_GOOD_STANDING, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, check, doorFor, newId, problem,
 } from "@engine/kernel";
@@ -148,6 +150,11 @@ export interface Wiring {
    * nothing else here may read one.
    */
   readonly configSecret?: string;
+  /**
+   * ⚠️ WHAT THIS DEPLOYMENT SELLS. One membership covers every product, so the
+   * catalogue is the deployment's rather than any app's — see `PlanSpec`.
+   */
+  readonly plans?: readonly PlanSpec[];
 }
 
 /**
@@ -623,6 +630,10 @@ export async function performOperation(
     channels: await availableChannels(wiring),
     origin: at.origin,
     slug: at.slug,
+    /* ⚠️ THE DEPLOYMENT'S CATALOGUE, so a handler about to price something reads
+       the same list the gate resolved against. Empty is a deployment that sells
+       nothing, which every reader already handles as the parking state. */
+    plans: wiring.plans ?? [],
     ...(wiring.configSecret ? { configSecret: wiring.configSecret } : {}),
     /* ⚠️ ONE READ PER REQUEST AT MOST, AND ONLY IF A HANDLER ASKS. Resolved for
        the app the operation belongs to, because a setting is that app's. */

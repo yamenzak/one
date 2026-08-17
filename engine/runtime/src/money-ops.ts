@@ -13,7 +13,8 @@
  */
 
 import type { AppId, AppSpec, TenantId } from "@engine/kernel";
-import { billFor, mixedCurrencies, subscriptionFor } from "./billing.js";
+import { PLATFORM_ENTITLEMENTS } from "@engine/kernel";
+import { MEMBERSHIP, billFor, mixedCurrencies, subscriptionFor } from "./billing.js";
 import { startCheckout } from "./stripe.js";
 import { balanceOf } from "./credits.js";
 import type { PlatformCtx } from "./member-ops.js";
@@ -35,40 +36,42 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
     } as Resolved["spec"],
     run: async (bare) => {
       const ctx = bare as PlatformCtx;
-      /* ⚠️ EVERY enabled app, not the one this operation composed under — the
-         bill is the workspace's, and a per-product answer is three emails from
-         what looks like three companies. */
+      /*
+        ⚠️ ONE MEMBERSHIP, SO ONE ANSWER. The bill is the workspace's — its plan,
+        its balance, what its meters drew — and the products it has switched on
+        are a list beside it rather than N bills stacked. A per-product answer is
+        three emails from what looks like three companies.
+      */
       const apps = ctx.enabledApps
         .map((id) => ctx.appOf(id))
         .filter((a): a is AppSpec => !!a);
 
-      const held = await Promise.all(apps.map(async (a) => {
-        const sub = await subscriptionFor(ctx.directory, ctx.tenantId as TenantId, a.id as AppId);
-        const parking = a.plans.find((p) => p.parking) ?? null;
-        const plan = a.plans.find((p) => p.id === sub?.planId) ?? parking;
-        return {
-          id: a.id, name: a.name, mark: a.mark,
-          planId: plan?.id ?? null,
-          status: sub?.status ?? null,
-          plans: a.plans,
-          entitlements: a.entitlements,
-        };
-      }));
+      const sub = await subscriptionFor(ctx.directory, ctx.tenantId as TenantId, MEMBERSHIP);
+      const parking = ctx.plans.find((p) => p.parking) ?? null;
+      const plan = ctx.plans.find((p) => p.id === sub?.planId) ?? parking;
 
-      const bill = await billFor(ctx.directory, ctx.tenantId as TenantId,
-        apps.map((a) => ({ id: a.id as AppId, plans: a.plans })));
-      const balance = await balanceOf(ctx.directory, ctx.tenantId as TenantId);
+      const bill = await billFor(ctx.directory, ctx.tenantId as TenantId, ctx.plans);
+      const wallet = await balanceOf(ctx.directory, ctx.tenantId as TenantId);
 
-      /*
-        ⚠️ A MIXED-CURRENCY BILL SAYS SO. `billFor` leaves the offending lines
-        out of the total rather than adding euros to dirhams, which is right —
-        and on its own it produces a bill whose lines do not add up to its own
-        total, with nothing on the screen explaining why. The refusal has to
-        travel with the number it changed.
-      */
-      return { apps: held, bill, balance, mixed: mixedCurrencies(bill.lines) };
+      return {
+        /* ⚠️ THE PLAN IS THE WORKSPACE'S; the products are what it reaches. */
+        plan: plan ? { id: plan.id, name: plan.name, kind: plan.kind } : null,
+        status: sub?.status ?? null,
+        plans: ctx.plans,
+        /* ⚠️ Every key the workspace could hold — the platform's and every
+           enabled product's — so the shelf can say what a tier changes. */
+        entitlements: {
+          ...PLATFORM_ENTITLEMENTS,
+          ...Object.fromEntries(apps.flatMap((a) => Object.entries(a.entitlements))),
+        },
+        apps: apps.map((a) => ({ id: a.id, name: a.name, mark: a.mark })),
+        bill,
+        wallet,
+        mixed: mixedCurrencies(bill.lines),
+      };
     },
   };
+
   /**
    * WHERE SOMEBODY GOES TO PAY.
    *
@@ -100,18 +103,21 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
     } as Resolved["spec"],
     run: async (bare, input) => {
       const ctx = bare as PlatformCtx;
-      const appId = String(input.app ?? app.id) as AppId;
-      const of = ctx.appOf(appId);
-      if (!of) return ctx.fail("platform.not_found");
-
-      const plan = of.plans.find((p) => p.id === String(input.plan ?? ""));
+      /* ⚠️ THE DEPLOYMENT'S CATALOGUE, NEVER THE BODY. A price in a request is a
+         price the caller chose — the oldest checkout bug there is — and an id
+         naming no declared plan is refused rather than defaulted. */
+      const plan = ctx.plans.find((p) => p.id === String(input.plan ?? ""));
       if (!plan) return ctx.fail("platform.invalid");
+      /* ⚠️ THE LOBBY CANNOT BE BOUGHT. It is where a workspace lands, not
+         something anybody chooses, and a checkout for it would be a session that
+         completes and charges nothing. */
+      if (plan.parking) return ctx.fail("platform.invalid");
 
       const made = await startCheckout(
         { directory: ctx.directory, ...(ctx.configSecret ? { configSecret: ctx.configSecret } : {}) },
         {
           tenantId: ctx.tenantId as TenantId,
-          appId,
+          appId: MEMBERSHIP,
           plan,
           email: ctx.email,
           /* ⚠️ THE RETURN ADDRESSES COME FROM THE REQUEST'S OWN ORIGIN, handed

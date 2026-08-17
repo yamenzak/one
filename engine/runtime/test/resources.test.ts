@@ -24,7 +24,7 @@ const db = () => env.DIRECTORY as unknown as Db;
 const app = (needs: AppSpec["needs"]): AppSpec => ({
   id: "hello" as never, name: "Hello", mark: "H",
   access: { roles: {}, permissions: {}, founding: "owner" } as never,
-  entitlements: {}, plans: [], collections: [], operations: [], screens: [],
+  entitlements: {}, collections: [], operations: [], screens: [],
   needs,
 });
 

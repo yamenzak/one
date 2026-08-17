@@ -16,6 +16,7 @@
 import type { AppSpec, Door, Instant, TenantId } from "@engine/kernel";
 import { seatsUsed, tableFor } from "@engine/kernel";
 import { heldBy } from "./billing.js";
+import { PLATFORM_ENTITLEMENTS, type PlanSpec } from "@engine/kernel";
 import { balanceOf } from "./credits.js";
 import { tenantBySlug, type TenantRow } from "./directory.js";
 import { membersOf } from "./membership.js";
@@ -28,6 +29,12 @@ export interface LocateDeps {
   readonly shardOf: (tenant: TenantRow) => Db;
   /** Which products a workspace has switched on, and their manifests. */
   readonly appsOf: (tenant: TenantRow) => Promise<readonly AppSpec[]>;
+  /**
+   * ⚠️ THE DEPLOYMENT'S CATALOGUE. One membership covers every product a
+   * workspace has switched on, so the plans are the deployment's rather than any
+   * app's — see `PlanSpec`.
+   */
+  readonly plans: readonly PlanSpec[];
   /**
    * ⚠️ WHETHER THIS DEPLOYMENT CAN TAKE A PAYMENT AT ALL — see `standingFor`.
    * Gating "has not paid" on a deployment that cannot charge strands every
@@ -64,17 +71,20 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
     const apps = await deps.appsOf(tenant);
 
     const charging = await deps.charging();
-    const held = await Promise.all(
-      apps.map((app) => heldBy(deps.directory, tenant.id, app, now, charging)));
-
-    /* ⚠️ The strictest standing wins — see the header. */
-    const standing = held.reduce(
-      (worst, one) => ({
-        writable: worst.writable && one.standing.writable,
-        serving: worst.serving && one.standing.serving,
-        reason: worst.reason || one.standing.reason,
-      }),
-      { writable: true, serving: true, reason: "" });
+    /*
+      ⚠️ ONE RESOLUTION FOR THE WHOLE WORKSPACE, over the UNION of what the
+      platform sells and what every enabled product declares. Resolving per app
+      answered `false` for another app's keys the moment two products were on —
+      and it also meant "the strictest standing wins" was reducing over rows that
+      were always going to agree, because there is one membership behind them.
+    */
+    const keys = {
+      ...PLATFORM_ENTITLEMENTS,
+      ...Object.fromEntries(apps.flatMap((a) => Object.entries(a.entitlements))),
+    };
+    const held = await heldBy(
+      deps.directory, tenant.id, { plans: deps.plans, keys }, now, charging);
+    const standing = held.standing;
 
     /*
       ⚠️ A WORKSPACE BEING COPIED IS READ-ONLY, AND THIS IS WHERE THAT IS TRUE.
@@ -125,7 +135,7 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
          see `bucketOf`. */
       residency: tenant.residency,
       standing: settled,
-      entitlements: held.flatMap((h) => h.entitlements),
+      entitlements: held.entitlements,
       flags: (await deps.flags?.(tenant)) ?? {},
       balance: wallet.spendable,
       used,

@@ -136,13 +136,19 @@ export function sellableKeys(spec: {
   readonly collections: readonly CollectionSpec[];
   readonly operations: readonly AnyOperation[];
   readonly screens: readonly { readonly permission: string }[];
-  readonly plans: readonly PlanSpec[];
   readonly entitlements: Readonly<Record<string, EntitlementDef>>;
-}): ReadonlySet<string> {
+},
+  /**
+   * ⚠️ THE DEPLOYMENT'S PLANS, PASSED IN. A key no tier includes is one this
+   * workspace could never have, so a package may not sell it — and since the
+   * membership became one, only the deployment knows what the tiers are.
+   */
+  plans: readonly PlanSpec[] = [],
+): ReadonlySet<string> {
   const everSold = (key: string | undefined): boolean => {
     if (!key) return true;
     if (spec.entitlements[key]?.reserved) return false;
-    return spec.plans.some((p) => !!p.includes[key]);
+    return plans.some((p) => !!p.includes[key]);
   };
 
   const out = new Set<string>();

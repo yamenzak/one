@@ -350,18 +350,17 @@ export const HELLO: AppSpec = defineApp({
     seats: { counts: ["owner", "manager", "staff"], entitlement: "seats" },
   },
 
+  /*
+    ⚠️ KEYS ONLY, AND NONE OF THEM THE PLATFORM'S. An app declares what IT sells;
+    the deployment's plans say how many of each every tier gets. `seats` was
+    declared here and is gone: the roster is the workspace's, `member.invite` is
+    the engine's gate, and two products each naming it is two answers to how many
+    people a workspace may have — `refuseManifest` refuses one now.
+  */
   entitlements: {
-    seats: { label: "People", withheld: "quota" },
     notes: { label: "Notes", withheld: "quota" },
     publishing: { label: "Publishing", withheld: "gate" },
   },
-
-  plans: [
-    { id: "free", name: "Free", said: "A look around", price: 0, currency: "EUR", order: 0,
-      parking: true, includes: { seats: 1, notes: 20, publishing: false } },
-    { id: "team", name: "Team", said: "For a working group", price: 900, currency: "EUR", order: 1,
-      trialDays: 14, includes: { seats: 10, notes: -1, publishing: true } },
-  ],
 
   collections: [note, checkIn],
   operations: [publish, ask, draft, start, teamCheckIns, share],

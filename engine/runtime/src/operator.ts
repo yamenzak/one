@@ -20,15 +20,19 @@
  * row would be an outage the feature caused.
  */
 
-import type { AccountId, AppId, Allowance, AppSpec, FlagBook, ModelRow, TenantId } from "@engine/kernel";
-import { KEEPS_RESIDENCY, inLane, mayIsolate, refuseCatalogue, refusePrompt } from "@engine/kernel";
+import type {
+  AccountId, AppId, Allowance, AppSpec, FlagBook, ModelRow, PlanSpec, TenantId,
+} from "@engine/kernel";
+import {
+  KEEPS_RESIDENCY, PLATFORM_ENTITLEMENTS, inLane, mayIsolate, refuseCatalogue, refusePrompt,
+} from "@engine/kernel";
 import type { Residency } from "@engine/kernel";
 import type { Account } from "./cloudflare.js";
 import { verify } from "./cloudflare.js";
 import { apply, plan, resources, wanted } from "./resources.js";
 import { beginMove } from "./move.js";
 import { actionsOf, bind, bindingsOf, running } from "./ai-actions.js";
-import { adjust, subscriptionFor } from "./billing.js";
+import { MEMBERSHIP, adjust, subscriptionFor } from "./billing.js";
 import {
   addShard, appsOfTenant, commercialAllowance, commercialLeft, disableApp, enableApp,
   liveAppsOfTenant, setCommercialGrant, shards, tenantById, tenantBySlug,
@@ -128,6 +132,8 @@ export interface OperatorDeps {
    * bound none can still set an address; it cannot store a key.
    */
   readonly configSecret?: string;
+  /** ⚠️ The deployment's catalogue — one membership, one list. */
+  readonly plans?: readonly PlanSpec[];
 }
 
 export function operatorOps(input: OperatorDeps): PersonalBook {
@@ -163,18 +169,19 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
              the row would vanish the moment it was turned off, with nothing left
              to turn back on. */
           const live = new Set(await liveAppsOfTenant(ctx.directory, id));
-          const held = await Promise.all((await appsOfTenant(ctx.directory, id)).map(async (appId) => {
-            const sub = await subscriptionFor(ctx.directory, id, appId);
-            return {
-              id: appId,
-              on: live.has(appId),
-              planId: sub?.planId ?? null,
-              status: sub?.status ?? null,
-              adjustments: sub?.adjustments ?? {},
-            };
+          const held = (await appsOfTenant(ctx.directory, id)).map((appId) => ({
+            id: appId, on: live.has(appId),
           }));
+          /* ⚠️ ONE MEMBERSHIP, REPORTED AT THE WORKSPACE RATHER THAN PER PRODUCT.
+             The plan, the standing and the operator's adjustments are the
+             workspace's — reading them per app was N copies of one answer, and
+             the console drew whichever came first. */
+          const sub = await subscriptionFor(ctx.directory, id, MEMBERSHIP);
           return {
             id, slug: r.slug, name: r.name, country: r.country,
+            planId: sub?.planId ?? null,
+            status: sub?.status ?? null,
+            adjustments: sub?.adjustments ?? {},
             /* ⚠️ WHAT IT IS, BESIDE WHAT IT BOUGHT. The console's whole job is
                telling one workspace from another, and personal and commercial
                are the two that differ in what they may do rather than in what
@@ -184,12 +191,13 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
             shardId: r.shard_id, closedAt: r.closed_at ?? null, apps: held,
           };
         }));
-        /* The catalogue each product sells, once — the adjust sheet's choices. */
+        /* ⚠️ WHAT EACH PRODUCT DECLARES, not what it sells — the membership is
+           the deployment's and its plans travel separately. */
         const apps = every().map((a) => ({
           id: a.id, name: a.name, mark: a.mark,
-          entitlements: a.entitlements, plans: a.plans,
+          entitlements: a.entitlements,
         }));
-        return { items, apps };
+        return { items, apps, plans: deps.plans ?? [] };
       },
     },
 
@@ -203,18 +211,30 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
       async run(ctx, input): Promise<unknown> {
         operator(ctx);
         const tenantId = String(input.tenant ?? "") as TenantId;
-        const appId = String(input.app ?? "") as AppId;
         const key = String(input.key ?? "");
         const given = input.value;
         const value: Allowance | null =
           given === null ? null
             : typeof given === "number" || typeof given === "boolean" ? given
               : undefined as never;
-        if (!tenantId || !appId || !key || value === undefined) return ctx.fail("platform.invalid");
-        const app = deps.apps[appId]?.();
-        if (!app || !(key in app.entitlements)) return ctx.fail("platform.invalid");
-        await adjust(ctx.directory, tenantId, appId, key, value, ctx.now);
-        return { tenant: tenantId, app: appId, key };
+        if (!tenantId || !key || value === undefined) return ctx.fail("platform.invalid");
+
+        /*
+          ⚠️ THE UNION, BECAUSE ONE MEMBERSHIP HOLDS BOTH KINDS OF KEY. `seats`
+          and `storage` are the platform's and no app declares them; `notes` is
+          a product's. An operator adjusting a workspace is adjusting its
+          membership, so a lookup in one app's book would refuse half of what is
+          on the screen in front of them.
+        */
+        const holdable = {
+          ...PLATFORM_ENTITLEMENTS,
+          ...Object.fromEntries(every().flatMap((a) => Object.entries(a.entitlements))),
+        };
+        if (!(key in holdable)) return ctx.fail("platform.invalid");
+        /* ⚠️ Against the MEMBERSHIP row, which is the workspace's and belongs to
+           no product — see `MEMBERSHIP`. */
+        await adjust(ctx.directory, tenantId, MEMBERSHIP, key, value, ctx.now);
+        return { tenant: tenantId, key };
       },
     },
 

@@ -25,7 +25,7 @@ const two = () => env.SHARD_EU_2 as unknown as Db;
 const app = (): AppSpec => ({
   id: "hello" as never, name: "Hello", mark: "H",
   access: { roles: {}, permissions: {}, founding: "owner" } as never,
-  entitlements: {}, plans: [], collections: [], operations: [], screens: [],
+  entitlements: {}, collections: [], operations: [], screens: [],
 });
 
 describe("moving a workspace's records", () => {
@@ -79,7 +79,7 @@ describe("moving a workspace's records", () => {
   it("makes the workspace read-only the moment it begins", async () => {
     const locate = locator({
       directory: directory(), shardOf: () => one(),
-      appsOf: async () => [app()], charging: async () => false,
+      appsOf: async () => [app()], plans: [], charging: async () => false,
     });
     const before = await locate({ kind: "tenant", slug: "carry", host: "carry.localhost" });
     expect(before?.standing?.writable).toBe(true);

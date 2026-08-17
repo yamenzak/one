@@ -50,16 +50,11 @@ const app = (over: Partial<AppSpec> = {}): AppSpec => ({
     founding: "editor",
     seats: { counts: ["owner", "manager", "staff"], entitlement: "seats" },
   },
+  /* ⚠️ `seats` IS THE PLATFORM'S AND IS NOT DECLARED HERE. An app references it
+     (`access.seats.entitlement`) without owning it — see `PLATFORM_ENTITLEMENTS`. */
   entitlements: {
-    seats: { label: "Seats", withheld: "quota" },
     notes: { label: "Notes", withheld: "quota" },
   },
-  plans: [
-    { id: "free", name: "Free", said: "For a look", price: 0, currency: "EUR", order: 0, parking: true,
-      includes: { seats: 1, notes: 10 } },
-    { id: "paid", name: "Paid", said: "For work", price: 900, currency: "EUR", order: 1,
-      includes: { seats: 5, notes: 500 } },
-  ],
   collections: [{ ...note, quota: "notes" }],
   operations: [stub],
   screens: [{ id: "notes", route: "/notes", label: "Notes", nav: "primary", permission: "note:read" }],
@@ -81,12 +76,10 @@ describe("an app that composes", () => {
       /* Three unrelated faults: an unholdable key, no catalogue at all, and a
          screen asking for a permission nothing declares. */
       access: { ...app().access, permissions: [...app().access.permissions, "ghost:read"] },
-      plans: [],
       screens: [{ id: "x", route: "/x", label: "X", permission: "phantom:read" }],
     });
     const why = refuseApp(broken).map((r) => r.why);
     expect(why.some((w) => w.includes("ghost:read"))).toBe(true);
-    expect(why.some((w) => w.includes("never chose"))).toBe(true);
     expect(why.some((w) => w.includes("phantom:read"))).toBe(true);
   });
 });
@@ -173,8 +166,7 @@ describe("what nobody could ever reach", () => {
       },
       collections: [note],
       operations: [],
-      entitlements: { seats: { label: "Seats", withheld: "quota", reserved: true } },
-      plans: [{ id: "free", name: "Free", said: "", price: 0, currency: "EUR", order: 0, parking: true, includes: {} }],
+      entitlements: {},
       screens: [],
     });
     expect(whyOf(broken)).toContain("nobody in it");
@@ -199,9 +191,21 @@ describe("what is sold and what is kept", () => {
   it("refuses an entitlement no gate and no quota names", () => {
     const broken = app({
       entitlements: { ...app().entitlements, exports: { label: "Exports", withheld: "gate" } },
-      plans: app().plans.map((p) => ({ ...p, includes: { ...p.includes, exports: true } })),
     });
     expect(whyOf(broken)).toContain("nothing withholds it");
+  });
+
+  /*
+    ⚠️ AN APP MAY NOT DECLARE WHAT THE PLATFORM SELLS. The roster is the
+    workspace's and `member.invite` is the engine's gate — two products each
+    declaring `seats` is two answers to how many people a workspace may have,
+    and whichever composed first would win.
+  */
+  it("refuses an app that declares a key the platform sells", () => {
+    const broken = app({
+      entitlements: { ...app().entitlements, seats: { label: "Seats", withheld: "quota" } },
+    });
+    expect(whyOf(broken)).toContain("the platform's to sell");
   });
 
   /* ⚠️ `reserved` is the one exemption, and it is written down rather than
@@ -213,30 +217,11 @@ describe("what is sold and what is kept", () => {
     expect(refuseApp(ok)).toEqual([]);
   });
 
-  /*
-    ⚠️ NOT PAYING MUST NOT BUY MORE THAN PAYING. A previous platform shipped a
-    parking plan carrying three of something its cheapest paid tier gave one of.
-  */
-  it("refuses a parking plan more generous than the cheapest paid one", () => {
-    const broken = app({
-      plans: [
-        { id: "free", name: "Free", said: "", price: 0, currency: "EUR", order: 0, parking: true, includes: { seats: 9, notes: 10 } },
-        { id: "paid", name: "Paid", said: "", price: 900, currency: "EUR", order: 1, includes: { seats: 5, notes: 500 } },
-      ],
-    });
-    expect(whyOf(broken)).toContain("not paying gives more");
-  });
-
-  it("refuses a catalogue with nowhere for a tenant that never chose", () => {
-    const broken = app({ plans: app().plans.map((p) => ({ ...p, parking: false })) });
-    expect(whyOf(broken)).toContain("never chose");
-  });
-
   /* ⚠️ A quota naming no entitlement is a ceiling nothing counts — it reports the
      obligation on every write and discharges it as "fine". */
   it("refuses a collection counting against a key no plan sells", () => {
     const broken = app({ collections: [{ ...note, quota: "ghosts" }] });
-    expect(whyOf(broken)).toContain("which no plan sells");
+    expect(whyOf(broken)).toContain("which nothing declares");
   });
 });
 

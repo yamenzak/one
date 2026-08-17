@@ -348,7 +348,7 @@ and a manifest that does not compose refuses to boot.
 | `access` | permissions, roles, and what an app may never claim | 15 | 1 |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
 | `manifest` | the whole app, and the composition that refuses a broken one | 9 | — |
-| `entitlement` | what a plan includes, and the allowance algebra over it | 6 | — |
+| `entitlement` | what a plan includes, and the allowance algebra over it | 7 | — |
 | `credit` | metered work: the reserve, the rate, the ceiling | 7 | 1 |
 | `dunning` | the ladder from past due to erased | 5 | — |
 | `package` | a priced bundle of timed grants | 8 | 1 |
@@ -369,7 +369,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**207 of them**, 200 reached by something today.
+**208 of them**, 201 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -395,7 +395,7 @@ env or a binding.
 | `serve` | the one path every request ends in — both doors | 4 | — |
 | `records` | the generated reads and writes behind a collection | 6 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
-| `billing` | plans, subscriptions, the bill, the ladder | 11 | 1 |
+| `billing` | plans, subscriptions, the bill, the ladder | 12 | 1 |
 | `credits` | the balance, and reserve → settle → release | 7 | 3 |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
 | `inbox` | notifications: the policy, the audience, the read | 10 | — |
@@ -432,7 +432,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**283 of them**, 277 reached by something today.
+**284 of them**, 278 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -472,7 +472,7 @@ its own header, cited by other files, and doing nothing.
 | `refusePacks` | `credit` | composition |
 | `unbounded` | `credit` | composition |
 | `refuseLadder` | `dunning` | composition |
-| `refuseCatalog` | `entitlement` | composition |
+| `refuseCatalog` | `entitlement` | runtime |
 | `unenforced` | `entitlement` | composition |
 | `refuseField` | `field` | composition |
 | `overdue` | `flag` | surface |
@@ -578,7 +578,11 @@ its own header, cited by other files, and doing nothing.
 | `a-stored-secret-is-never-rendered-back` | D11 | a live credential handed to every script in the page and to whatever the browser saved |
 | `a-destination-nobody-can-reach-is-never-drawn` | D10 | a nav item that leads to a 403, which the person cannot tell from something simply broken |
 | `branding-is-tokens-and-never-a-stylesheet` | D7 | a workspace able to break its own customers' screens on our infrastructure, and to make a page look like something it is not |
-| `one-workspace-with-two-products-pays-one-bill` | D1 | a customer of two products becoming two customers - two cards, two renewal dates, two companies as far as they can tell |
+| `one-workspace-with-two-products-pays-one-membership` | D1 | a customer of two products becoming two customers - two cards, two renewal dates, two companies as far as they can tell |
+| `one-membership-resolves-every-products-keys` | D1 | a workspace paying for two products being told it holds neither, because each app's keys were resolved against a catalogue that only knew the other's |
+| `every-key-a-product-declares-is-priced-by-every-tier` | D1 | a feature built, shipped and sold to nobody - an unpriced key resolves to off for every workspace on every tier, and no screen anywhere says why |
+| `the-lobby-is-free-and-cannot-be-bought` | D21 | a workspace charged for the parking state it never chose, or offered it at checkout as though not having a plan were a plan |
+| `one-catalogue-one-currency` | D1 | two tiers priced in different currencies and a bill that adds them together |
 | `a-reserve-is-a-ceiling-on-revenue` | D12 | every unit an estimate fails to anticipate charged to a customer instead of absorbed, or absorbed silently on every call |
 | `a-hold-is-taken-in-the-statement-that-checks-it` | D12 | two concurrent calls both passing the same balance check, and a balance that went negative long after the calls that did it |
 | `arrears-take-writes-and-never-reads` | D12 | a business locked out of its own records over an unpaid invoice, which is holding their data hostage |
@@ -764,7 +768,7 @@ its own header, cited by other files, and doing nothing.
 <!-- generated: node scripts/inventory.mjs decisions -->
 | # | Decision | Guarded by |
 |---|---|---|
-| D1 | The tenant is primary; an app is a capability switched on for it | 6 |
+| D1 | The tenant is primary; an app is a capability switched on for it | 9 |
 | D2 | The framework is OneEngine; the deployment is One; packages are `@engine/*` | 3 |
 | D3 | One worker on the request path; heavy work splits over RPC service bindings | 6 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 3 |
@@ -784,7 +788,7 @@ its own header, cited by other files, and doing nothing.
 | D18 | The operator stands outside every workspace, and the console is a door rather than a role | 4 |
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 3 |
 | D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 3 |
-| D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 6 |
+| D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 7 |
 | D22 | Branding and the installable app belong to the workspace, never to one app inside it | 4 |
 <!-- /generated -->
 

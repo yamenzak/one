@@ -176,19 +176,21 @@ describe("what the console can change", () => {
   */
   it("adjusts a tenant's entitlement, and clears one key back to the plan", async () => {
     const tenant = (await tenantBySlug(directory(), "eastgate"))!;
+    /* ⚠️ NO APP IN THE BODY. An adjustment is against the WORKSPACE's membership,
+       and `seats` is the platform's key — a per-app lookup refused half of what
+       the console draws. */
     expect((await post("admin", "/api/op.tenant.adjust",
-      { tenant: tenant.id, app: "hello", key: "seats", value: 25 }, ops)).status).toBe(200);
+      { tenant: tenant.id, key: "seats", value: 25 }, ops)).status).toBe(200);
 
     const after = await (await get("admin", "/api/op.tenants", ops)).json() as
-      { items: { slug: string; apps: { adjustments: Record<string, unknown> }[] }[] };
-    const row = after.items.find((t) => t.slug === "eastgate")!;
-    expect(row.apps[0]!.adjustments.seats).toBe(25);
+      { items: { slug: string; adjustments: Record<string, unknown> }[] };
+    expect(after.items.find((t) => t.slug === "eastgate")!.adjustments.seats).toBe(25);
 
     expect((await post("admin", "/api/op.tenant.adjust",
-      { tenant: tenant.id, app: "hello", key: "seats", value: null }, ops)).status).toBe(200);
+      { tenant: tenant.id, key: "seats", value: null }, ops)).status).toBe(200);
     const cleared = await (await get("admin", "/api/op.tenants", ops)).json() as
-      { items: { slug: string; apps: { adjustments: Record<string, unknown> }[] }[] };
-    expect(cleared.items.find((t) => t.slug === "eastgate")!.apps[0]!.adjustments).toEqual({});
+      { items: { slug: string; adjustments: Record<string, unknown> }[] };
+    expect(cleared.items.find((t) => t.slug === "eastgate")!.adjustments).toEqual({});
   });
 
   /* ⚠️ A switch nothing declares is a switch that does nothing — refused, or

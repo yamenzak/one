@@ -14,7 +14,9 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { residencyFor } from "@engine/kernel";
 import { PLATFORM_ROLES } from "@engine/kernel";
 import {
+  MEMBERSHIP,
   accept, addShard, createTenant, found, invite, noteBelonging, noteShardApp, startSession,
+  subscribe,
   upsertAccount, type Db,
 } from "@engine/runtime";
 import { HELLO } from "@engine/hello";
@@ -50,6 +52,11 @@ beforeAll(async () => {
   });
   if (typeof made === "string" || !("tenant" in made)) throw new Error(String(made));
   tenantId = made.tenant.id;
+
+  /* ⚠️ ON A PLAN, BECAUSE THE LOBBY CANNOT WRITE. A workspace that never chose
+     parks on `none`, which includes no notes at all — so this would refuse at
+     the quota, correctly, and read as a broken agent door. */
+  await subscribe(directory(), tenantId as never, MEMBERSHIP, "solo", "active");
 
   const owner = await upsertAccount(directory(), "amara@example.com", null);
   await found(shard(), made.tenant.id, owner, "amara@example.com", { hello: "writer" });
@@ -203,12 +210,38 @@ describe("what a call does", () => {
     expect(out.result?.structuredContent).toHaveProperty("problem");
   });
 
-  it("holds the entitlement gate on the parking plan", async () => {
-    const made = await callTool("note.create", { title: "To publish" }, ownerCookie);
-    const id = String((made.result?.structuredContent as { id?: string })?.id ?? "");
-    const out = await callTool("note.publish", { id }, ownerCookie);
-    /* The free plan sells `publishing: false`, and the agent door must say so. */
-    expect(out.result?.isError).toBe(true);
+  /*
+    ⚠️ THE AGENT DOOR READS THE SAME RESOLUTION THE HTTP DOOR DOES, and it reads
+    it LIVE. An operator withdrawing a capability has to reach a model mid-session
+    — the tool catalogue was resolved once, and a gate that answered from it
+    would go on letting an agent do what the workspace no longer may.
+  */
+  it("holds the entitlement gate, and reads it as it stands now", async () => {
+    /* ⚠️ TWO NOTES, AND THE SECOND IS THE ONE THAT PROVES IT. `note.publish`
+       declares natural idempotency on `id`, and a replay is answered BEFORE the
+       gates — correctly, because a retry must return the same answer. Publishing
+       the same note twice would therefore pass this test on a platform with no
+       entitlement gate at all. */
+    const ids = await Promise.all(["To publish", "And another"].map(async (title) => {
+      const made = await callTool("note.create", { title }, ownerCookie);
+      return String((made.result?.structuredContent as { id?: string })?.id ?? "");
+    }));
+    expect((await callTool("note.publish", { id: ids[0] }, ownerCookie)).result?.isError)
+      .toBe(false);
+
+    /*
+      ⚠️ THE MEMBERSHIP CHANGES UNDER A LIVE SESSION, and the agent door has to
+      notice. The lobby sells no publishing, so the same call that just worked
+      must now refuse — a catalogue resolved once at connect would go on letting
+      a model do what the workspace no longer may.
+    */
+    try {
+      await subscribe(directory(), tenantId as never, MEMBERSHIP, "none", "active");
+      expect((await callTool("note.publish", { id: ids[1] }, ownerCookie)).result?.isError)
+        .toBe(true);
+    } finally {
+      await subscribe(directory(), tenantId as never, MEMBERSHIP, "solo", "active");
+    }
   });
 
   it("refuses malformed arguments before anything runs", async () => {

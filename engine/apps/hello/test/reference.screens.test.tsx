@@ -14,7 +14,10 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { PLATFORM_ROLES, areasOn, eventsOf, primaryOf, type Channel } from "@engine/kernel";
+import {
+  PLATFORM_ENTITLEMENTS, PLATFORM_ROLES, areasOn, eventsOf, primaryOf,
+  type Channel, type PlanSpec,
+} from "@engine/kernel";
 import {
   FlagConsole, Guide, NotificationPolicy, Settings, Shelf, Shell, settingsShown, policyShown,
 } from "@engine/design";
@@ -112,14 +115,25 @@ describe("everything hello declares reaches a screen", () => {
     for (const f of flags) expect(out).toContain(f.label);
   });
 
+  /* ⚠️ THE CATALOGUE IS THE DEPLOYMENT'S, so the shelf is fed one rather than
+     reading an app's — a product has no plans of its own since the membership
+     became one. What it still draws is every KEY the workspace could hold. */
   it("renders every plan and every entitlement it sells", () => {
+    /* ⚠️ ITS OWN CATALOGUE, NOT THE DEPLOYMENT'S. An app importing One's plans
+       would point the dependency arrow backwards — and what is under test is
+       that the shelf draws a catalogue, not which one this deployment sells. */
+    const plans: PlanSpec[] = [
+      { id: "none", name: "No plan", said: "", kind: "personal", price: 0, currency: "USD",
+        credits: 0, order: 0, parking: true, includes: {} },
+      { id: "solo", name: "Solo", said: "", kind: "personal", price: 1200, currency: "USD",
+        credits: 1500, order: 1, includes: {} },
+    ];
+    const keys = { ...PLATFORM_ENTITLEMENTS, ...HELLO.entitlements };
     const out = html(
-      <Shelf
-        plans={HELLO.plans} entitlements={HELLO.entitlements} current="free" onChoose={() => {}}
-      />,
+      <Shelf plans={plans} entitlements={keys} current="none" onChoose={() => {}} />,
     );
-    for (const plan of HELLO.plans) expect(out).toContain(plan.name);
-    for (const [, def] of Object.entries(HELLO.entitlements)) {
+    for (const plan of plans) expect(out).toContain(plan.name);
+    for (const [, def] of Object.entries(keys)) {
       if (!def.reserved) expect(out).toContain(def.label);
     }
   });
