@@ -94,7 +94,7 @@ layering failure rather than a shortcut. A guard says so.
 |---|---|---|---|
 | `schema` | the composed schema runner — declarations become tables | 6 | — |
 | `sql` | the one typed seam onto D1 | 4 | — |
-| `directory` | accounts, workspaces, placement, enablement, allowances | 23 | 5 |
+| `directory` | accounts, workspaces, placement, enablement, allowances | 25 | 4 |
 | `handles` | which binding holds which shard | 3 | — |
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
 | `identity` | sign-in codes, sessions, tokens, proof | 21 | 2 |
@@ -106,12 +106,12 @@ layering failure rather than a shortcut. A guard says so.
 | `billing` | plans, subscriptions, the bill, the ladder | 10 | 4 |
 | `credits` | the balance, and reserve → settle → release | 7 | 3 |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
-| `inbox` | notifications: the policy, the audience, the read | 10 | 2 |
+| `inbox` | notifications: the policy, the audience, the read | 10 | — |
 | `services` | the lane out to a provider — AI and mail | 5 | 2 |
 | `vault` | encrypted facts, consent, grants, and who looked | 13 | 8 |
 | `audit` | what happened, and the replay that stops it happening twice | 7 | — |
-| `jobs` | the scheduler and the record that it ran | 6 | 2 |
-| `branding` | a workspace's own theme and marks | 4 | 1 |
+| `jobs` | the scheduler and the record that it ran | 6 | 1 |
+| `branding` | a workspace's own theme and marks | 4 | — |
 | `ai-actions` | which model an action runs on, and in whose words | 7 | — |
 | `operator` | the deployment looking at itself | 6 | — |
 | `deployment` | what is wrong with this deployment, asked at boot | 1 | — |
@@ -121,8 +121,11 @@ layering failure rather than a shortcut. A guard says so.
 | `centre-ops` | the one bootstrap read the tenant door stands on | 1 | — |
 | `personal` | the operations about yourself, on every door | 2 | — |
 | `installable` | the manifest and the icon a workspace is installed as | 3 | — |
+| `platform-schema` | the platform's own tables, in dependency order, listed once | 2 | — |
+| `dispatch` | an event an operation raises becomes a note in somebody's inbox | 1 | — |
+| `sweep` | the daily clock: erase what is past the ladder's last rung | 2 | — |
 
-**180 of them**, 150 reached by something today.
+**187 of them**, 162 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

@@ -18,11 +18,9 @@
 
 import type { AppSpec } from "@engine/kernel";
 import {
-  AI_ACTION_SCHEMA, AUDIT_SCHEMA, BILLING_SCHEMA, BRANDING_SCHEMA, DIRECTORY_SCHEMA,
-  IDENTITY_SCHEMA, INBOX_SCHEMA,
-  JOBS_SCHEMA, MEMBERSHIP_SCHEMA, OPERATOR_SCHEMA, PACKAGE_SCHEMA, REPLAY_SCHEMA, SETTING_SCHEMA, VAULT_SCHEMA,
+  DIRECTORY_MODULES, SHARD_MODULES,
   NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, deploymentFaults, locator,
-  memberFor, noteShardApp,
+  memberFor, noteShardApp, sweep, tenantById,
   operatorOps, permissionsResolver, personalOps, schemaFor, serve, sessionIdFrom, shardFor,
   subscriptionFor, whoIs,
   type Db, type TenantRow,
@@ -56,14 +54,8 @@ const SHARDS = ["eu-1"] as const;
  */
 const SERVICES_REACHED: readonly string[] = [];
 
-/**
- * ⚠️ THE PLATFORM'S OWN TABLES, IN DEPENDENCY ORDER. A module that alters a
- * table another module creates simply finds nothing there — the runner swallows
- * it, everything reports success, and a column that was supposed to exist
- * silently never does.
- */
-const DIRECTORY_MODULES = [DIRECTORY_SCHEMA, IDENTITY_SCHEMA, BILLING_SCHEMA, BRANDING_SCHEMA, JOBS_SCHEMA, OPERATOR_SCHEMA, AI_ACTION_SCHEMA];
-const SHARD_MODULES = [MEMBERSHIP_SCHEMA, PACKAGE_SCHEMA, SETTING_SCHEMA, AI_ACTION_SCHEMA, AUDIT_SCHEMA, REPLAY_SCHEMA, INBOX_SCHEMA, VAULT_SCHEMA];
+/* ⚠️ THE PLATFORM'S OWN TABLES ARE `@engine/runtime`'S TO LIST, NOT THIS FILE'S.
+   Nine copies of that list had drifted — see `platform-schema.ts`. */
 
 export interface Env {
   readonly DIRECTORY: D1Database;
@@ -343,6 +335,44 @@ export default {
     }
     return env.ASSETS.fetch(request);
   },
+
+  /*
+    ⚠️ THE CLOCK. Standing climbs the ladder by itself — it is derived from
+    `past_due_at` on every read — so the rung that needs a scheduler is the last
+    one, and it is the irreversible one: at day 37 the records go. A deletion
+    that only happens when somebody visits is a deletion that never happens for
+    exactly the workspaces nobody visits.
+
+    ⚠️ AND IT BOOTS FIRST, LIKE A REQUEST. A sweep against a database whose
+    tables are half-applied deletes from the ones that exist and reports success.
+
+    ⚠️ THE THROW IS CAUGHT AND LOGGED BECAUSE NOTHING IS LISTENING. A scheduled
+    handler has no user, no response and no red test; an uncaught throw here is a
+    sweep that stopped months ago and a bill nobody is chasing. `run` records
+    every attempt, so the console can show the LAST one rather than the next.
+  */
+  async scheduled(_event: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<void> {
+    const work = (async () => {
+      try {
+        await boot(env);
+        await sweep({
+          directory: env.DIRECTORY as unknown as Db,
+          shardOf: async (tenantId) => {
+            const tenant = await tenantById(env.DIRECTORY as unknown as Db, tenantId);
+            /* ⚠️ Null rather than a throw: a workspace on a shard this
+               deployment does not bind is reported by the sweep, not fatal. */
+            try { return tenant ? shardFor(env as never, tenant.shardId) : null; }
+            catch { return null; }
+          },
+          apps: APPS,
+        });
+      } catch (why) {
+        console.error("[sweep]", why);
+      }
+    })();
+    ctx.waitUntil(work);
+    await work;
+  },
 };
 
-export { APPS, DIRECTORY_MODULES, SHARD_MODULES };
+export { APPS };

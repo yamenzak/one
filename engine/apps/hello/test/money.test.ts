@@ -17,6 +17,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { AppSpec, Instant, TenantId } from "@engine/kernel";
 import { LADDER, refuseLadder, standingFor } from "@engine/kernel";
 import {
+  DIRECTORY_MODULES, SHARD_MODULES,
   BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, JOBS_SCHEMA, MEMBERSHIP_SCHEMA,
   addShard, adjust, applySchema, balanceOf, billFor, createTenant, credit, grandfather, heldBy,
   markPaid, markPastDue, noteShardApp, openAccount, pastDue, release, reserve, run, runsOf,
@@ -48,8 +49,7 @@ const LEDGER: AppSpec = {
 let tenantId = "" as TenantId;
 
 beforeAll(async () => {
-  await applySchema(directory(),
-    [DIRECTORY_SCHEMA, IDENTITY_SCHEMA, BILLING_SCHEMA, JOBS_SCHEMA]);
+  await applySchema(directory(), DIRECTORY_MODULES);
   await applySchema(env.SHARD_EU_1 as unknown as Db, [MEMBERSHIP_SCHEMA]);
   await addShard(directory(), "eu-1", "eu", 100);
   for (const app of ["hello", "ledger"]) await noteShardApp(directory(), "eu-1", app);

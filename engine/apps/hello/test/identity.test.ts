@@ -16,6 +16,7 @@
 import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
+  DIRECTORY_MODULES, SHARD_MODULES,
   AUDIT_SCHEMA, CODE_TRIES, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, MEMBERSHIP_SCHEMA, NOBODY,
   REPLAY_SCHEMA, addShard, applySchema, memberFor, membersOf, noteShardApp, permissionsResolver,
   personalOps, schemaFor, serve, sessionIdFrom, tenantBySlug, whoIs, type Db,
@@ -109,8 +110,8 @@ async function signIn(email: string): Promise<string> {
 }
 
 beforeAll(async () => {
-  await applySchema(directory(), [DIRECTORY_SCHEMA, IDENTITY_SCHEMA]);
-  await applySchema(shard(), [schemaFor(HELLO), MEMBERSHIP_SCHEMA, AUDIT_SCHEMA, REPLAY_SCHEMA]);
+  await applySchema(directory(), DIRECTORY_MODULES);
+  await applySchema(shard(), [schemaFor(HELLO), ...SHARD_MODULES]);
   await addShard(directory(), "eu-1", "eu", 100);
   await noteShardApp(directory(), "eu-1", "hello");
 });
@@ -502,6 +503,33 @@ describe("a person's own records", () => {
     const mine = await get("northwind", "/api/check-in.list", theirs)
       .then((r) => r.json()) as { items: unknown[] };
     expect(mine.items).toHaveLength(0);
+  });
+
+  /*
+    ⚠️ AN EVENT AN OPERATION RAISES REACHES AN INBOX, PROVEN THROUGH THE REAL
+    WORKER. Everything but this was built: the inbox read, the policy, the
+    per-person preference, the bell's count. `fileNote` had no caller, so an app
+    raising an event raised it into nothing — and an empty inbox is
+    indistinguishable from a quiet week, which is why it survived three stages.
+
+    ⚠️ AND NOBODY IS TOLD ABOUT THEIR OWN ACTION. The founder publishes; the
+    founder's own inbox stays empty and the colleague's does not.
+  */
+  it("files a note for the audience when an operation raises its event", async () => {
+    const { boss, theirs } = await workspace();
+
+    const made = await post("northwind", "/api/note.create", { title: "Ledger" }, boss)
+      .then((r) => r.json()) as { id: string };
+    expect((await post("northwind", "/api/note.publish", { id: made.id }, boss)).status).toBe(200);
+
+    const mine = await get("northwind", "/api/inbox.list", theirs)
+      .then((r) => r.json()) as { items: { title: string }[] };
+    expect(mine.items).toHaveLength(1);
+    expect(mine.items[0]?.title).toContain("Ledger");
+
+    const own = await get("northwind", "/api/inbox.list", boss)
+      .then((r) => r.json()) as { items: unknown[] };
+    expect(own.items).toHaveLength(0);
   });
 
   it("lets somebody who holds the review key read the team's, and nobody else", async () => {

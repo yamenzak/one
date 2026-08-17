@@ -384,8 +384,32 @@ export async function noteBelonging(
     ON CONFLICT(account_id, tenant_id) DO NOTHING`).bind(accountId, tenantId, now.toISOString()).run();
 }
 
-/* DEFER(engine-29) stage:29 — erasure has no clock (see `jobs.ts`), so the two
-   `forget*` writes that would run under it are reached by nothing. */
+/**
+ * ⚠️ EVERYBODY IN ONE WORKSPACE, FOR THE ONE CALLER THAT NEEDS ALL OF THEM. The
+ * sweep removes each membership through `forgetBelonging`, the same write a
+ * person leaving goes through — a `DELETE … WHERE tenant_id` here would be a
+ * second way to stop being a member, and the two would drift the first time one
+ * of them learned to do something else as well.
+ */
+/**
+ * ⚠️ THE STAMP THAT ENDS A WORKSPACE, AND IT IS WHAT MAKES THE SWEEP FINITE.
+ * Erasure deletes rows; without a mark saying it happened, the same workspace is
+ * past its date tomorrow and every day after, so it is swept forever and every
+ * run reports "1 erased" — a job whose record says it did something useful every
+ * night while doing nothing at all. Every read that lists workspaces already
+ * excludes a closed one, so this is the state the rest of the platform expects.
+ */
+export async function closeTenant(db: Db, tenantId: TenantId, now = new Date()): Promise<void> {
+  await db.prepare(`UPDATE tenant SET closed_at = ? WHERE id = ? AND closed_at IS NULL`)
+    .bind(now.toISOString(), tenantId).run();
+}
+
+export async function membersOfTenant(db: Db, tenantId: TenantId): Promise<readonly AccountId[]> {
+  const rows = await db.prepare(`SELECT account_id FROM belongs WHERE tenant_id = ?`)
+    .bind(tenantId).all<{ account_id: string }>();
+  return rows.results.map((r) => r.account_id as AccountId);
+}
+
 export async function forgetBelonging(db: Db, accountId: AccountId, tenantId: TenantId): Promise<void> {
   await db.prepare(`DELETE FROM belongs WHERE account_id = ? AND tenant_id = ?`)
     .bind(accountId, tenantId).run();

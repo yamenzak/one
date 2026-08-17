@@ -1666,6 +1666,15 @@
       "impl": "scripts/docs.test.mjs",
       "proves": "refused to generate",
       "fails": "a generated index missing a module — the one page whose job is answering “does this already exist” telling a reader, in a table, that it does not"
+    },
+    {
+      "id": "a-scheduled-handler-has-a-trigger",
+      "protects": "D12",
+      "stage": "29",
+      "status": "live",
+      "impl": "scripts/inert.test.mjs",
+      "proves": "declares no triggers.crons and the worker has a scheduled handler",
+      "fails": "a sweep that compiles, typechecks, passes its own tests and is called by Cloudflare exactly never — so nothing is ever erased, behind a green run"
     }
   ]
 }

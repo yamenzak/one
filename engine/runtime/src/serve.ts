@@ -22,6 +22,7 @@
 import type { AppSpec, Caller, Door, Kind, Problem, Resolved as _Resolved, Roots, Standing } from "@engine/kernel";
 import { IN_GOOD_STANDING, PLATFORM_PROBLEMS, check, doorFor, newId, problem } from "@engine/kernel";
 import { compose, type Composed, type Resolved as ResolvedOp } from "./compose.js";
+import { tell } from "./dispatch.js";
 import { answerMcp } from "./mcp.js";
 import type { PlatformCtx } from "./member-ops.js";
 import { keyFor, record, remember, seen, entryFor } from "./audit.js";
@@ -365,6 +366,12 @@ export async function performOperation(
     await recordOutcome(located, who, op, input, {
       ok: true, id: (answer as { id?: string } | null)?.id,
     }, now);
+    /*
+      ⚠️ AND THEN WHOEVER THIS CONCERNS IS TOLD — after the write and after the
+      record, because a note about a change that did not land is worse than no
+      note. Only on the way out of a SUCCESS: a refusal raises nothing.
+    */
+    await told(located, composed.app, who, op, input, answer, now);
     return { kind: "ok", answer };
   } catch (thrown) {
     if (thrown instanceof Refused) {
@@ -437,6 +444,34 @@ async function answerPersonal(
     return asProblem(problem(catalog, "platform.unavailable", { ref }, { ref }));
   }
 }
+
+/**
+ * ⚠️ A NOTE IS A CONSEQUENCE OF THE CHANGE, NOT PART OF IT. The write has
+ * already landed and been recorded by the time this runs, so nothing here may
+ * turn a successful operation into a failure — a full table or a malformed
+ * template would otherwise answer 500 to somebody whose change went through.
+ *
+ * ⚠️ AND THE CATCH SAYS SO. A swallowed failure here is an inbox that quietly
+ * stops filling, which is the exact shape this whole path exists to end.
+ */
+const told = async (
+  located: Located, app: AppSpec, who: Who, op: _Op,
+  input: Record<string, unknown>, answer: unknown, now: Date,
+): Promise<void> => {
+  const events = op.spec.emits ?? [];
+  if (!events.length) return;
+  try {
+    await tell(located.db, {
+      app, tenantId: located.tenantId, events, input,
+      answer: (answer ?? {}) as Record<string, unknown>,
+      actor: who.accountId ?? null, actorName: who.email ?? null,
+      /* ⚠️ The inbox always; a channel that leaves the process is stage 23. */
+      channels: ["inbox"],
+    }, now);
+  } catch (why) {
+    console.error(`[notify] ${op.id} raised ${events.join(", ")} and nobody was told`, why);
+  }
+};
 
 const recordOutcome = async (
   located: Located, who: Who, op: _Op, input: Record<string, unknown>,

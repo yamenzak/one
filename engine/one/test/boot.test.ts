@@ -14,7 +14,7 @@
 
 import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
-import { addShard, noteShardApp, type Db } from "@engine/runtime";
+import { addShard, createTenant, noteShardApp, type Db } from "@engine/runtime";
 import worker, { APPS } from "../src/index.js";
 
 const call = (host: string, path: string, init: RequestInit = {}) =>
@@ -163,5 +163,83 @@ describe("signing in through the deployment", () => {
       .prepare(`SELECT id FROM code WHERE email = ? ORDER BY at DESC LIMIT 1`)
       .bind("sam@example.com").first<{ id: string }>();
     expect(code).toBeTruthy();
+  });
+});
+
+/* ---------------------------------------------------------------- the clock --- */
+
+/**
+ * ⚠️ THE SWEEP IS THE ONE THING NOBODY IS WAITING FOR, WHICH IS WHY IT NEEDS A
+ * TEST MORE THAN A ROUTE DOES. A route that stops working is a person on the
+ * phone; a scheduled handler that stops working is silence, and the thing it
+ * does — destroying the records of a workspace 37 days past due — is the one
+ * step nothing else in the platform will ever take.
+ *
+ * ⚠️ AND IT IS DRIVEN THROUGH `worker.scheduled`, not through the sweep it
+ * calls. The handler compiling, typechecking and being unit-tested is exactly
+ * the state this deployment was in an hour ago, with nothing calling it.
+ */
+describe("what happens to a workspace nobody is looking at", () => {
+  const directory = () => env.DIRECTORY as unknown as Db;
+  const shard = () => env.SHARD_EU_1 as unknown as Db;
+  const asDevEnv = { ...env, ROOT: "localhost", ENVIRONMENT: "development", AUTH_SECRET: "test" };
+
+  const fire = async () => {
+    const waited: Promise<unknown>[] = [];
+    await worker.scheduled!({}, asDevEnv as never, { waitUntil: (p) => { waited.push(p); } });
+    await Promise.all(waited);
+  };
+
+  /** Past due by `days`, with one record on its shard. */
+  const overdue = async (slug: string, days: number) => {
+    const made = await createTenant(directory(), {
+      slug, name: slug, country: "DE", where: "eu", apps: ["hello"],
+    });
+    if (typeof made === "string") throw new Error(made);
+    const at = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    await directory().prepare(
+      `INSERT INTO subscription (tenant_id, app_id, plan_id, status, past_due_at, at)
+       VALUES (?, 'hello', 'free', 'past_due', ?, ?)`)
+      .bind(made.tenant.id, at, at).run();
+    await shard().prepare(
+      `INSERT INTO note (id, tenant_id, title, at, by) VALUES (?, ?, 'Kept', ?, NULL)`)
+      .bind(`note_${slug}`, made.tenant.id, at).run();
+    return made.tenant.id;
+  };
+
+  const notesOf = async (tenantId: string) => {
+    const rows = await shard().prepare(`SELECT id FROM note WHERE tenant_id = ?`)
+      .bind(tenantId).all<{ id: string }>();
+    return rows.results.length;
+  };
+
+  it("erases what is past the last rung and leaves what is not", async () => {
+    const doomed = await overdue("faded", 40);
+    const inArrears = await overdue("lately", 10);
+
+    await fire();
+
+    expect(await notesOf(doomed)).toBe(0);
+    /* ⚠️ READ-ONLY IS NOT ERASED. Ten days past due is a conversation about a
+       bill; the ladder's destructive rung is 37, and a sweep that took the
+       whole list would delete the records of everybody who was merely late. */
+    expect(await notesOf(inArrears)).toBe(1);
+  });
+
+  /* ⚠️ RE-RUNNABLE, BECAUSE A SCHEDULER NOBODY DARES RE-RUN AFTER A FAILURE IS
+     ONE THAT STAYS FAILED. */
+  it("finds nothing to do the second time", async () => {
+    /* ⚠️ BOTH RUNS HERE, because the pool gives each test its own storage — a
+       second test that leaned on the first one's rows would be asserting the
+       pool's behaviour rather than the sweep's. */
+    await overdue("gone", 40);
+    await fire();
+    await fire();
+    const runs = await directory().prepare(
+      `SELECT ok, touched FROM job_run WHERE job_id = 'erasure' ORDER BY started_at`)
+      .all<{ ok: number; touched: number }>();
+    expect(runs.results.length).toBeGreaterThanOrEqual(2);
+    expect(runs.results.every((r) => r.ok === 1)).toBe(true);
+    expect(runs.results.at(-1)?.touched).toBe(0);
   });
 });

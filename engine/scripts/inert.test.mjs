@@ -65,6 +65,26 @@ for (const a of apps) {
   if (name) legacyWorkers.add(name);
 }
 
+/*
+  ⚠️ A `scheduled` HANDLER WITH NO TRIGGER NEVER RUNS, AND NOTHING ANYWHERE
+  SAYS SO. It compiles, it typechecks, its tests drive it directly and pass —
+  and Cloudflare calls it exactly never, because the two halves live in
+  different files and only one of them is code. The one thing this deployment's
+  sweep does is destroy the records of a workspace past the ladder's last rung,
+  so the failure is a legal obligation quietly not being met behind a green run.
+*/
+const declared = readFileSync(CONFIG, "utf8");
+const handles = /async scheduled\s*\(/.test(readFileSync(join(HERE, "..", "one", "src", "index.ts"), "utf8"));
+const triggered = /"crons"\s*:\s*\[\s*"/.test(declared);
+if (handles && !triggered) {
+  fail(`engine/one/wrangler.jsonc declares no triggers.crons and the worker has a scheduled handler.\n` +
+       `       It compiles, it is tested, and Cloudflare calls it never — so nothing is ever erased.`);
+} else if (triggered && !handles) {
+  fail(`engine/one/wrangler.jsonc schedules a run and the worker has no scheduled handler.`);
+} else if (handles) {
+  ok(`clock: the sweep has a handler and a trigger`);
+}
+
 if (!worker) {
   fail(`engine/one/wrangler.jsonc declares no worker name.`);
 } else if (legacyWorkers.has(worker)) {

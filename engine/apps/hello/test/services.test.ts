@@ -12,6 +12,7 @@ import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PLATFORM_ROLES, type Channel, type ModelRow, type TenantId } from "@engine/kernel";
 import {
+  DIRECTORY_MODULES, SHARD_MODULES,
   BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA, MEMBERSHIP_SCHEMA,
   addShard, applySchema, audienceFor, balanceOf, createTenant, credit, fileNote, found, inboxOf,
   markSeen, noteShardApp, openAccount, invite, setPolicy, setPreference, unseenCount,
@@ -31,7 +32,7 @@ const MODELS: ModelRow[] = [
 ];
 
 beforeAll(async () => {
-  await applySchema(directory(), [DIRECTORY_SCHEMA, IDENTITY_SCHEMA, BILLING_SCHEMA]);
+  await applySchema(directory(), DIRECTORY_MODULES);
   await applySchema(shard(), [MEMBERSHIP_SCHEMA, INBOX_SCHEMA]);
   await addShard(directory(), "eu-2", "eu", 100);
   await noteShardApp(directory(), "eu-2", "hello");

@@ -214,6 +214,9 @@ if (what === "guards") {
     ["centre-ops", "the one bootstrap read the tenant door stands on"],
     ["personal", "the operations about yourself, on every door"],
     ["installable", "the manifest and the icon a workspace is installed as"],
+    ["platform-schema", "the platform's own tables, in dependency order, listed once"],
+    ["dispatch", "an event an operation raises becomes a note in somebody's inbox"],
+    ["sweep", "the daily clock: erase what is past the ladder's last rung"],
   ];
 
   const pkg = what === "declares" ? "kernel" : "runtime";

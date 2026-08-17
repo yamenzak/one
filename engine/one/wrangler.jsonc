@@ -71,5 +71,16 @@
     }
   ],
 
+  // ⚠️ THE CLOCK, AND ONCE A DAY IS THE RIGHT RATE. The only thing the sweep
+  // does is destroy the records of a workspace 37 days past due, and that date
+  // is a day — running it hourly would be twenty-three passes that find nothing
+  // and one that finds the same thing a daily pass would. 03:00 UTC is quiet
+  // everywhere it matters and far from any month boundary a person watches.
+  //
+  // ⚠️ AND A HANDLER WITHOUT THIS DECLARATION NEVER RUNS. `scheduled` in the
+  // worker compiles, typechecks, is unit-tested and is called by nothing — the
+  // exact shape this deployment is a catalogue of, one config file over.
+  "triggers": { "crons": ["0 3 * * *"] },
+
   "observability": { "enabled": true }
 }

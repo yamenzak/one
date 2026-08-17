@@ -13,6 +13,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { running } from "@engine/runtime";
 import type { ModelRow } from "@engine/kernel";
 import {
+  DIRECTORY_MODULES, SHARD_MODULES,
   AI_ACTION_SCHEMA, AUDIT_SCHEMA, BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA,
   MEMBERSHIP_SCHEMA, NOBODY, OPERATOR_SCHEMA, REPLAY_SCHEMA, SETTING_SCHEMA,
   addShard, applySchema, memberFor, noteShardApp, operatorOps, permissionsResolver,
@@ -91,10 +92,8 @@ let ops = "";
 let owner = "";
 
 beforeAll(async () => {
-  await applySchema(directory(),
-    [DIRECTORY_SCHEMA, IDENTITY_SCHEMA, BILLING_SCHEMA, OPERATOR_SCHEMA, AI_ACTION_SCHEMA]);
-  await applySchema(shard(),
-    [schemaFor(HELLO), MEMBERSHIP_SCHEMA, SETTING_SCHEMA, AI_ACTION_SCHEMA, AUDIT_SCHEMA, REPLAY_SCHEMA]);
+  await applySchema(directory(), DIRECTORY_MODULES);
+  await applySchema(shard(), [schemaFor(HELLO), ...SHARD_MODULES]);
   await addShard(directory(), "eu-1", "eu", 100);
   await noteShardApp(directory(), "eu-1", "hello");
 });

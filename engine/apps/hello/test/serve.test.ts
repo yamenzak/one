@@ -13,6 +13,7 @@ import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PLATFORM_ROLES } from "@engine/kernel";
 import {
+  DIRECTORY_MODULES, SHARD_MODULES,
   AUDIT_SCHEMA, DIRECTORY_SCHEMA, NOBODY, REPLAY_SCHEMA, addShard, applySchema, compose,
   createTenant, forget, noteShardApp, schemaFor, serve, surfaceOfComposed,
   type Db, type Located, type Who,
@@ -82,8 +83,8 @@ const post = (path: string, body: unknown, headers: Record<string, string> = {})
   call(path, { method: "POST", body: JSON.stringify(body), headers });
 
 beforeAll(async () => {
-  await applySchema(directory(), [DIRECTORY_SCHEMA]);
-  await applySchema(shard(), [schemaFor(HELLO), AUDIT_SCHEMA, REPLAY_SCHEMA]);
+  await applySchema(directory(), DIRECTORY_MODULES);
+  await applySchema(shard(), [schemaFor(HELLO), ...SHARD_MODULES]);
   await addShard(directory(), "eu-1", "eu", 100);
   await noteShardApp(directory(), "eu-1", "hello");
 });
@@ -282,7 +283,10 @@ describe("a declared operation, all the way through", () => {
   it("runs a hand-written handler through the same path", async () => {
     const { id } = await (await post("/api/note.create", { title: "Draft" })).json() as { id: string };
     const out = await post("/api/note.publish", { id });
-    expect(await out.json()).toEqual({ id, published: true });
+    /* ⚠️ The title is answered because the notification reads it — see the
+       operation's own output. A variable the platform cannot see reaches an
+       inbox as a literal brace. */
+    expect(await out.json()).toEqual({ id, title: "Draft", published: true });
   });
 
   /* ⚠️ A handler refuses with a catalogue code, never a bare throw — so the

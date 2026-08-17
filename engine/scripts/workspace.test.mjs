@@ -177,9 +177,15 @@ const branding = code(join(ENGINE, "runtime/src/branding.ts"));
 if (!/tenant_branding/.test(branding)) {
   fail(`runtime/src/branding.ts: no tenant_branding table — the brand has nowhere to live`);
 }
+/* ⚠️ ASKED OF THE LIST, NOT OF THE DEPLOYMENT. This read `one/src/index.ts`,
+   which held the platform's module list until nine hand-written copies of it
+   were found to have drifted. The list is `runtime/src/platform-schema.ts` now
+   and every deployment and every harness reads it, so that is the one place the
+   question has an answer. */
 const directory = code(join(ENGINE, "runtime/src/directory.ts"));
-if (/tenant_branding/.test(directory) === false && !/BRANDING_SCHEMA/.test(code(join(ENGINE, "one/src/index.ts")))) {
-  fail(`one/src/index.ts: BRANDING_SCHEMA is not applied to the directory, so every brand write hits a missing table`);
+const modules = code(join(ENGINE, "runtime/src/platform-schema.ts"));
+if (/tenant_branding/.test(directory) === false && !/BRANDING_SCHEMA/.test(modules)) {
+  fail(`runtime/src/platform-schema.ts: BRANDING_SCHEMA is not in DIRECTORY_MODULES, so every brand write hits a missing table`);
 }
 ok(`the brand: declared per app as surfaces only, stored once per workspace, in the directory`);
 

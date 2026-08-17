@@ -15,6 +15,7 @@
 import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
+  DIRECTORY_MODULES, SHARD_MODULES,
   AUDIT_SCHEMA, BILLING_SCHEMA, BRANDING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA,
   INBOX_SCHEMA, MEMBERSHIP_SCHEMA, NOBODY,
   REPLAY_SCHEMA, addShard, applySchema, brandingOf, locator, memberFor, noteShardApp,
@@ -114,10 +115,8 @@ async function comp(n: number): Promise<string> {
 const READABLE = { ground: "#101014", ink: "#f5f5f7", accent: "#7aa2f7", mark: "H" };
 
 beforeAll(async () => {
-  await applySchema(directory(),
-    [DIRECTORY_SCHEMA, IDENTITY_SCHEMA, BILLING_SCHEMA, BRANDING_SCHEMA]);
-  await applySchema(shard(),
-    [schemaFor(HELLO), MEMBERSHIP_SCHEMA, INBOX_SCHEMA, AUDIT_SCHEMA, REPLAY_SCHEMA]);
+  await applySchema(directory(), DIRECTORY_MODULES);
+  await applySchema(shard(), [schemaFor(HELLO), ...SHARD_MODULES]);
   await addShard(directory(), "eu-1", "eu", 100);
   await noteShardApp(directory(), "eu-1", "hello");
 });

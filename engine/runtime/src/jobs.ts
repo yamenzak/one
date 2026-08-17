@@ -1,13 +1,12 @@
 /**
  * THE SCHEDULER, AND THE RECORD THAT IT RAN.
  *
- * DEFER(engine-29) stage:29 — THERE IS NO CLOCK. The deployment declares no
- * `scheduled` handler, so `run` is only ever reached by something asking for it
- * — and the two questions the sweep exists to ask, `pastDue` and
- * `dueForErasure`, are asked by nobody. The dunning ladder does not climb and a
- * workspace past its erasure date is not erased. The paragraph below about a job
- * going quiet rather than failing is exactly right and describes every job here.
- * Stage 29 is the cron trigger and the sweep it drives.
+ * ⚠️ THE CLOCK IS THE DEPLOYMENT'S `scheduled` HANDLER, AND THE TRIGGER THAT
+ * CALLS IT IS IN `wrangler.jsonc`. Both halves are needed and only one of them
+ * is code: a handler with no `triggers.crons` compiles, typechecks, passes its
+ * tests and never runs — which is what this file described for three stages,
+ * while `dueForErasure` was asked by nobody and a workspace past its date was
+ * never erased.
  *
  * ⚠️ A JOB THAT STOPS RUNNING DOES NOT FAIL — IT GOES QUIET. Nothing is waiting
  * for its answer, so a throw at 03:00 has no user, no request, no 500 and no red
@@ -142,4 +141,8 @@ const anchor = (o: Overdue, now: Instant): Instant =>
  * frozen while the tenant is not in good standing — a business we have stopped
  * serving is not one that should be deleting a roster it can no longer see.
  */
+/* DEFER(engine-35) stage:35 — OURS, NOT THEIRS. This freezes a ladder a
+   WORKSPACE runs against its own customers while we have stopped serving that
+   workspace, and no product here sells to customers of its own yet. The sweep
+   above runs our ladder against workspaces, which is the other direction. */
 export const frozen = (standing: { readonly serving: boolean }): boolean => !standing.serving;

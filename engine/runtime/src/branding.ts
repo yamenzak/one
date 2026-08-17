@@ -110,8 +110,6 @@ export async function setBranding(
  * every app's collections cannot see it, and a logo left behind after a business
  * closed is their mark still on our infrastructure.
  */
-/* DEFER(engine-29) stage:29 — erasure has no clock (see `jobs.ts`), so a closed
-   workspace keeps its brand along with everything else. */
 export async function forgetBranding(db: Db, tenantId: TenantId): Promise<void> {
   await db.prepare(`DELETE FROM tenant_branding WHERE tenant_id = ?`).bind(tenantId).run();
 }

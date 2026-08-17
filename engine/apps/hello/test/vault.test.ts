@@ -15,6 +15,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { AccountId, TenantId, VaultBook } from "@engine/kernel";
 import { discloseVault, missingDocuments, outstanding, refuseVault, ropa } from "@engine/kernel";
 import {
+  DIRECTORY_MODULES, SHARD_MODULES,
   DIRECTORY_SCHEMA, VAULT_SCHEMA, addShard, applySchema, consent, createTenant, exportFor, grant,
   keep, look, looksAt, noteShardApp, openSubject, revoke, shred, shredded, type Db,
 } from "@engine/runtime";
@@ -46,7 +47,7 @@ const PURPOSES = {
 const soon = () => new Date(Date.now() + 60 * 60 * 1000);
 
 beforeAll(async () => {
-  await applySchema(directory(), [DIRECTORY_SCHEMA]);
+  await applySchema(directory(), DIRECTORY_MODULES);
   await applySchema(shard(), [VAULT_SCHEMA]);
   await addShard(directory(), "eu-2", "eu", 100);
   await noteShardApp(directory(), "eu-2", "hello");

@@ -109,7 +109,8 @@ export const extendedUntil = (
  * ⚠️ COUNTED FROM LAPSE, NOT FROM EXPIRY — grace is still a paid-for
  * relationship, and the floor is a floor on top of that.
  */
-/* DEFER(engine-29) stage:29 — a retention step with no clock to run it on. */
+/* DEFER(engine-35) stage:35 — a workspace's own retention step against its own
+   customers, which is a ladder no product here runs yet. */
 export function mayDestroy(
   paidUntil: Instant | null, graceDays: number, retentionDays: number | null | undefined,
   now: Instant,

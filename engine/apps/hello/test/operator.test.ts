@@ -16,6 +16,7 @@
 import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
+  DIRECTORY_MODULES, SHARD_MODULES,
   AUDIT_SCHEMA, BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, JOBS_SCHEMA,
   MEMBERSHIP_SCHEMA, NOBODY, OPERATOR_SCHEMA, REPLAY_SCHEMA,
   addShard, applySchema, memberFor, noteShardApp, operatorOps,
@@ -94,9 +95,8 @@ let ops = "";
 let owner = "";
 
 beforeAll(async () => {
-  await applySchema(directory(),
-    [DIRECTORY_SCHEMA, IDENTITY_SCHEMA, BILLING_SCHEMA, JOBS_SCHEMA, OPERATOR_SCHEMA]);
-  await applySchema(shard(), [schemaFor(HELLO), MEMBERSHIP_SCHEMA, AUDIT_SCHEMA, REPLAY_SCHEMA]);
+  await applySchema(directory(), DIRECTORY_MODULES);
+  await applySchema(shard(), [schemaFor(HELLO), ...SHARD_MODULES]);
   await addShard(directory(), "eu-1", "eu", 100);
   await noteShardApp(directory(), "eu-1", "hello");
 });

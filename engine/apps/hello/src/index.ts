@@ -122,13 +122,18 @@ interface Publish { readonly id: string }
  * refusal looks like — those happen once, to every operation, in the runtime
  * (D12). If this handler could forget one of them, every handler could.
  */
-const publish = operation<Publish, { id: string; published: boolean }>({
+const publish = operation<Publish, { id: string; title: string; published: boolean }>({
   id: "note.publish",
   kind: "write",
   summary: "Make a note visible to everybody here",
   input: { id: field.text({ label: "Note", required: true, holds: "none" }) },
   output: {
     id: field.text({ label: "Note", holds: "none" }),
+    /* ⚠️ ANSWERED BECAUSE THE NOTIFICATION READS IT. `note.published` says
+       "{who} published {title}", and the platform fills a variable from what the
+       operation DECLARED — input or output. A title that stayed on the record
+       and out of the answer would reach an inbox as the literal `{title}`. */
+    title: field.text({ label: "Title", holds: "none" }),
     published: field.bool({ label: "Published", holds: "none" }),
   },
   permission: "note:write",
@@ -143,12 +148,12 @@ const publish = operation<Publish, { id: string; published: boolean }>({
     const db = c.db as {
       prepare(q: string): { bind(...v: unknown[]): { run(): Promise<unknown>; first(): Promise<unknown> } };
     };
-    const found = await db.prepare(`SELECT id FROM note WHERE id = ? AND tenant_id = ?`)
-      .bind(input.id, c.tenantId).first();
+    const found = await db.prepare(`SELECT id, title FROM note WHERE id = ? AND tenant_id = ?`)
+      .bind(input.id, c.tenantId).first() as { title?: string } | null;
     if (!found) c.fail("platform.not_found");
     await db.prepare(`UPDATE note SET pinned = 1 WHERE id = ? AND tenant_id = ?`)
       .bind(input.id, c.tenantId).run();
-    return { id: input.id, published: true };
+    return { id: input.id, title: found?.title ?? "", published: true };
   },
 });
 

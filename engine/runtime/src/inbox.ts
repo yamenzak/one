@@ -1,12 +1,12 @@
 /**
  * THE INBOX — where somebody finds what they were told.
  *
- * DEFER(engine-28) stage:28 — AND NOTHING TELLS THEM ANYTHING YET. The inbox can
- * be read, marked seen and configured, so every notification surface in the hub
- * works; `fileNote` is the write that puts a note in it and `audienceFor` is who
- * would receive one, and neither is called from anywhere. An app raising an
- * event today raises it into nothing. This is worse than an empty inbox, because
- * an empty inbox is indistinguishable from a quiet week.
+ * ⚠️ AND WHAT FILLS IT IS `dispatch.ts`, HANGING OFF `emits`. An operation names
+ * the events it raises and a notification names the event that raises it, so
+ * telling somebody is a consequence of two declarations rather than a call a
+ * handler could forget. For three stages the write below had no caller at all,
+ * and nothing looked wrong: an inbox nothing files into is indistinguishable
+ * from a quiet week.
  *
  * ⚠️ A NOTIFICATION SYSTEM WITH NO INBOX IS THE FAILURE THIS FRAMEWORK IS ABOUT.
  * A previous platform had the schema, the Durable Object, four routes, a
