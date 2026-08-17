@@ -38,7 +38,7 @@ all of it is refused, gated, audited and erasable on the same terms as everythin
 an app writes itself.
 
 <!-- generated: node scripts/inventory.mjs surface -->
-**24 operations for declaring nothing.** A roster, an inbox and its
+**25 operations for declaring nothing.** A roster, an inbox and its
 two-level policy, the workspace's brand, the package rail it sells with, its
 settings, its bill, and the one bootstrap read every screen stands on.
 
@@ -67,6 +67,7 @@ settings, its bill, and the one bootstrap read every screen stands on.
 | `ai.word` | write | *the session* |
 | `setting.write` | write | *the session* |
 | `money.view` | read | `billing:read` |
+| `money.checkout` | write | `billing:manage` |
 | `centre.view` | read | *the session* |
 
 **+5 per collection**, generated from the declaration —
@@ -294,6 +295,7 @@ before an app is resolved draws on them.
 | `ai_binding` | — *which model an action runs on* | — | kept |
 | `ai_wording` | — *a workspace's own prompt letterheads* | — | `tenant_id: delete` |
 | `deployment_config` | — *what the deployment was told: its sender, and the account it charges through* | — | kept |
+| `stripe_event` | — *which payments arrived, and what each one was applied to* | — | kept |
 | `resource` | — *the databases and buckets the deployment made for itself* | — | kept |
 | `move` | — *where a workspace's records were carried from, and what is left to clear* | — | kept |
 | `acceptance` | What you agreed to, and when | `account_id: delete` | `tenant_id: delete` |
@@ -393,11 +395,12 @@ env or a binding.
 | `serve` | the one path every request ends in — both doors | 4 | — |
 | `records` | the generated reads and writes behind a collection | 6 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
-| `billing` | plans, subscriptions, the bill, the ladder | 10 | 4 |
+| `billing` | plans, subscriptions, the bill, the ladder | 11 | 1 |
 | `credits` | the balance, and reserve → settle → release | 7 | 3 |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
 | `inbox` | notifications: the policy, the audience, the read | 10 | — |
 | `services` | the lane out to a provider — AI and mail | 5 | 1 |
+| `stripe` | the card lane: a page Stripe owns, a signature that proves an event is theirs, and the ladder one moves | 9 | — |
 | `config` | what the deployment was told — the credentials it holds, encrypted under a key its database has never seen | 5 | — |
 | `mail` | a letter that leaves the process: the message written out, and the refusal to pretend one was sent | 3 | — |
 | `webpush` | the two specifications a notification travels on — VAPID, and the sealed body | 6 | — |
@@ -429,7 +432,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**273 of them**, 264 reached by something today.
+**283 of them**, 277 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -747,6 +750,13 @@ its own header, cited by other files, and doing nothing.
 | `the-mail-mock-cannot-run-outside-development` | D12 | a sign-in that answers "check your email" with nothing sent, and a code written into a retained log — the shape a previous platform shipped three times, because every suite runs where mocking is correct |
 | `a-letter-survives-not-being-english` | D9 | every sign-in mail outside English arriving as bytes, with nothing in the send path failing |
 | `the-envelope-sender-is-an-address` | D9 | `One <noreply@4dl.app>` offered to a mail server as an address, which it is not |
+| `a-webhook-nobody-signed-is-refused` | D12 | a public endpoint anybody can POST to marking any workspace paid — the whole of the payment design turned inside out by a row somebody had not filled in |
+| `a-signature-covers-the-body` | D12 | one intercepted webhook replayed with a different amount, a different customer, or a different workspace in it |
+| `a-captured-webhook-expires` | D12 | an intercepted request staying valid for as long as the signing secret does |
+| `a-payment-is-applied-once` | D12 | a month granted twice every time a delivery is slow, because retrying is what makes Stripe's delivery reliable |
+| `a-renewal-is-attributed-by-its-customer` | D12 | every month after the first going unplaced — the workspace pays and goes past due anyway, because a renewal invoice carries no metadata of ours |
+| `a-payment-that-cannot-be-placed-is-recorded` | D12 | money captured, nothing granted, and no trace anywhere — the event answered 200 with its id already claimed, so Stripe never sends it again |
+| `cancelling-is-not-arrears` | D12 | a 37-day countdown to erasure started over a decision nobody disputed, because `past_due_at` is what every rung of the ladder is measured from |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -765,7 +775,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 76 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 83 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -791,8 +801,6 @@ nothing yet.
 <!-- generated: node scripts/inventory.mjs waiting -->
 | Waiting on | Where | How many |
 |---|---|---|
-| **21** — Payment — something takes a card | `runtime/src/billing.ts` | 4 |
-| **21** — Payment — something takes a card | `runtime/src/credits.ts` | 3 |
 | **23** — Mail that leaves the process — a letter, its variables, and a provider | `kernel/src/notify.ts` | 1 |
 | **24** — A workspace composes its own roles out of one app's keys | `kernel/src/access.ts` | 1 |
 | **27** — The AI lane runs — an action reaches a provider and the reserve settles | `kernel/src/ai.ts` | 1 |
@@ -802,8 +810,10 @@ nothing yet.
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `runtime/src/jobs.ts` | 1 |
 | **41** — A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have | `kernel/src/brand.ts` | 1 |
 | **42** — A screen asks the gate before it draws a control, rather than after it is pressed | `kernel/src/gate.ts` | 1 |
+| **44** — A one-off purchase — a credit pack, and becoming a business — through the same checkout | `runtime/src/credits.ts` | 3 |
+| **45** — A plan is edited, and everybody already on it keeps what they were sold | `runtime/src/billing.ts` | 1 |
 
-**16 declarations** are built and reached by nothing, each waiting on a
+**13 declarations** are built and reached by nothing, each waiting on a
 stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one
 that names no stage, so this list cannot grow by forgetting.
 <!-- /generated -->
@@ -833,7 +843,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 17 | OneSpace — one surface over the product, reachable from every door, addressed | shipped |
 | 19 | OneDesign — the design system named, packaged, documented and fenced | shipped |
 | 20 | Workspaces — personal or commercial, one brand, one installable, a shard of their own | shipped |
-| 21 | Payment — something takes a card | **planned** |
+| 21 | Payment — a workspace subscribes, and only a signed event stamps the plan | shipped |
 | 22 | OneSpace — `id`, `admin` and `setup` merge into one address off the workspace root | **planned** |
 | 23 | Mail that leaves the process — a letter, its variables, and a provider | **planned** |
 | 24 | A workspace composes its own roles out of one app's keys | **planned** |
@@ -856,8 +866,10 @@ that names no stage, so this list cannot grow by forgetting.
 | 41 | A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have | **planned** |
 | 42 | A screen asks the gate before it draws a control, rather than after it is pressed | **planned** |
 | 43 | Hello's remaining screens reach the workspace's own records — the report against its target, and writing a note | **planned** |
+| 44 | A one-off purchase — a credit pack, and becoming a business — through the same checkout | **planned** |
+| 45 | A plan is edited, and everybody already on it keeps what they were sold | **planned** |
 
-**34 shipped, 9 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**35 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

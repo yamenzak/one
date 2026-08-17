@@ -25,6 +25,7 @@ import {
   deploymentFaults, isPlatformPath, locator,
   accept, bindingKey, liveBindings, memberFor, noteShardApp, observe, owedBy, sweep,
   tenantById, tenantBySlug,
+  applyEvent, markCancelled, markPaid, markPastDue, subscribe, verifySignature, webhookSecret,
   operatorOps, permissionsResolver, personalOps, pusherOver, schemaFor, sendMail, serve,
   sessionIdFrom, shardFor, subscriptionFor, whoIs,
   type Bucket, type Db, type TenantRow,
@@ -476,6 +477,58 @@ const handler = (env: Env) => {
       sensitive half and are already there; alone it grants nothing.
     */
     pusher: pusherOver(directory),
+
+    ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
+
+    /*
+      ⚠️ THE ONLY THING THAT STAMPS A PLAN. Nothing a caller can press writes a
+      subscription row — a workspace that could would be one that grants itself
+      what it has not paid for — so the ladder hangs off a SIGNED event and
+      nothing else.
+
+      ⚠️ AND THE REFUSALS ARE DIFFERENT STATUSES ON PURPOSE. A bad signature is
+      400 and final: Stripe must not retry a forgery, and retrying would turn one
+      bad request into hours of them. An unverifiable deployment — no secret
+      stored — is 503, because that IS temporary and ours to fix, and a retry
+      after we fix it is exactly what we want.
+    */
+    payments: {
+      answer: async (raw, signature, at) => {
+        const deps = {
+          directory,
+          ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
+        };
+        const secret = await webhookSecret(deps);
+        const why = await verifySignature(secret, signature, raw, at);
+        if (why === "no_secret") {
+          return new Response(JSON.stringify({ refused: why }), {
+            status: 503, headers: { "content-type": "application/json" },
+          });
+        }
+        if (why) {
+          return new Response(JSON.stringify({ refused: why }), {
+            status: 400, headers: { "content-type": "application/json" },
+          });
+        }
+
+        /* ⚠️ Parsed only AFTER the signature — see `verifySignature`. */
+        const event = JSON.parse(raw) as Parameters<typeof applyEvent>[1];
+        const did = await applyEvent(directory, event, {
+          subscribe: (tenantId, appId, planId) =>
+            subscribe(directory, tenantId, appId, planId, "active", at),
+          paid: (tenantId, appId) => markPaid(directory, tenantId, appId),
+          pastDue: (tenantId, appId) => markPastDue(directory, tenantId, appId, at),
+          cancelled: (tenantId, appId) => markCancelled(directory, tenantId, appId),
+        }, at);
+
+        /* ⚠️ 200 EVEN FOR A PARKED EVENT. Stripe cannot fix an attribution
+           problem by sending the same bytes again, so a retry loop would be days
+           of noise over a row somebody has to read either way. */
+        return new Response(JSON.stringify(did), {
+          status: 200, headers: { "content-type": "application/json" },
+        });
+      },
+    },
 
     /*
       ⚠️ SENDING IS THE ONE THING A DEPLOYMENT MUST NOT FAKE. In development the

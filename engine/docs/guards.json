@@ -2152,6 +2152,69 @@
       "impl": "runtime/test/mail.test.ts",
       "proves": "sends through the binding, with the envelope sender bare",
       "fails": "`One <noreply@4dl.app>` offered to a mail server as an address, which it is not"
+    },
+    {
+      "id": "a-webhook-nobody-signed-is-refused",
+      "protects": "D12",
+      "stage": "21",
+      "status": "live",
+      "impl": "runtime/test/stripe.test.ts",
+      "proves": "refuses everything where no secret is stored",
+      "fails": "a public endpoint anybody can POST to marking any workspace paid — the whole of the payment design turned inside out by a row somebody had not filled in"
+    },
+    {
+      "id": "a-signature-covers-the-body",
+      "protects": "D12",
+      "stage": "21",
+      "status": "live",
+      "impl": "runtime/test/stripe.test.ts",
+      "proves": "refuses a body that was edited after signing",
+      "fails": "one intercepted webhook replayed with a different amount, a different customer, or a different workspace in it"
+    },
+    {
+      "id": "a-captured-webhook-expires",
+      "protects": "D12",
+      "stage": "21",
+      "status": "live",
+      "impl": "runtime/test/stripe.test.ts",
+      "proves": "refuses one signed an hour ago",
+      "fails": "an intercepted request staying valid for as long as the signing secret does"
+    },
+    {
+      "id": "a-payment-is-applied-once",
+      "protects": "D12",
+      "stage": "21",
+      "status": "live",
+      "impl": "runtime/test/stripe.test.ts",
+      "proves": "is applied once, however many times it arrives",
+      "fails": "a month granted twice every time a delivery is slow, because retrying is what makes Stripe's delivery reliable"
+    },
+    {
+      "id": "a-renewal-is-attributed-by-its-customer",
+      "protects": "D12",
+      "stage": "21",
+      "status": "live",
+      "impl": "runtime/test/stripe.test.ts",
+      "proves": "is attributed by its customer when it carries nothing else",
+      "fails": "every month after the first going unplaced — the workspace pays and goes past due anyway, because a renewal invoice carries no metadata of ours"
+    },
+    {
+      "id": "a-payment-that-cannot-be-placed-is-recorded",
+      "protects": "D12",
+      "stage": "21",
+      "status": "live",
+      "impl": "runtime/test/stripe.test.ts",
+      "proves": "parks what it cannot place, where somebody can read it",
+      "fails": "money captured, nothing granted, and no trace anywhere — the event answered 200 with its id already claimed, so Stripe never sends it again"
+    },
+    {
+      "id": "cancelling-is-not-arrears",
+      "protects": "D12",
+      "stage": "21",
+      "status": "live",
+      "impl": "runtime/test/stripe.test.ts",
+      "proves": "CANCELLING CLEARS THE ANCHOR",
+      "fails": "a 37-day countdown to erasure started over a decision nobody disputed, because `past_due_at` is what every rung of the ladder is measured from"
     }
   ]
 }

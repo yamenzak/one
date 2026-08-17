@@ -203,6 +203,7 @@ if (what === "guards") {
     ["packages", "granting, revoking and expiring a bought bundle"],
     ["inbox", "notifications: the policy, the audience, the read"],
     ["services", "the lane out to a provider — AI and mail"],
+    ["stripe", "the card lane: a page Stripe owns, a signature that proves an event is theirs, and the ladder one moves"],
     ["config", "what the deployment was told — the credentials it holds, encrypted under a key its database has never seen"],
     ["mail", "a letter that leaves the process: the message written out, and the refusal to pretend one was sent"],
     ["webpush", "the two specifications a notification travels on — VAPID, and the sealed body"],

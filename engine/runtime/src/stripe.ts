@@ -1,0 +1,380 @@
+/**
+ * SOMETHING TAKES A CARD.
+ *
+ * ⚠️ WE ARE NOT IN THE MONEY PATH, AND THAT IS THE DESIGN. Nothing here holds a
+ * card number, a CVC or a 3-D Secure result. A workspace is sent to a page
+ * Stripe owns and we learn the outcome from a SIGNED notification — so the
+ * tokenisation, the SCA dance and the retries stay with the people who are
+ * regulated to do them.
+ *
+ * ⚠️ THE PRICE IS BUILT FROM THE MANIFEST, NOT SYNCED TO A CATALOGUE. A plan is a
+ * declaration; syncing it to Stripe means a second copy of every price, a job to
+ * reconcile them, and a window where an edited plan sells the old number. Inline
+ * `price_data` has one price — the declared one — and an edit takes effect on
+ * the next checkout rather than on the next sync.
+ *
+ * ⚠️ AN UNSIGNED WEBHOOK IS ANYBODY CLAIMING A PAYMENT LANDED. The endpoint is
+ * public by construction, so verification is not a hardening step: without the
+ * signature this route is a way for a stranger to mark any workspace paid. A
+ * deployment with no webhook secret REFUSES every event rather than trusting
+ * them.
+ *
+ * ⚠️ AND AN EVENT WE CANNOT ATTRIBUTE IS RECORDED, NEVER DROPPED. Answering one
+ * `200 {received: true}` with its id already claimed means Stripe never retries:
+ * money captured, nothing granted, and no trace anywhere that it happened. The
+ * row is the trace, and it is readable.
+ */
+
+import type { AppId, Instant, PlanSpec, TenantId } from "@engine/kernel";
+import { configOf } from "./config.js";
+import type { SchemaModule } from "./schema.js";
+import type { Db } from "./sql.js";
+
+/* ----------------------------------------------------------------- schema --- */
+
+export const STRIPE_SCHEMA: SchemaModule = {
+  id: "stripe",
+  statements: [
+    /*
+      ⚠️ EVERY VERIFIED EVENT, ONCE. Stripe retries — that is the contract, and
+      it is what makes delivery reliable — so an event applied twice is a month
+      granted twice. The primary key is the whole of the idempotency.
+
+      ⚠️ AND `why` IS WHY IT WAS NOT APPLIED. A dead letter nobody can read is
+      the same silent success with an extra table.
+    */
+    `CREATE TABLE IF NOT EXISTS stripe_event (id TEXT PRIMARY KEY, kind TEXT NOT NULL, tenant_id TEXT, app_id TEXT, at TEXT NOT NULL, why TEXT);`,
+    `CREATE INDEX IF NOT EXISTS ix_stripe_event_parked ON stripe_event (why, at);`,
+  ],
+};
+
+/* ------------------------------------------------------------- the signature --- */
+
+const enc = new TextEncoder();
+
+const hex = (bytes: ArrayBuffer): string =>
+  [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
+
+/**
+ * ⚠️ CONSTANT TIME, because the comparison is against a value an attacker
+ * supplies and can vary a byte at a time. `a === b` on a signature leaks how
+ * much of a guess was right, which is the whole of a forgery attack given
+ * enough attempts — and this endpoint accepts as many as anybody likes.
+ */
+function same(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let out = 0;
+  for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return out === 0;
+}
+
+/** ⚠️ Five minutes, which is Stripe's own tolerance. A replay of a captured
+    request is otherwise valid for as long as the secret is. */
+export const SIGNATURE_TOLERANCE_MS = 5 * 60 * 1000;
+
+export type SignatureRefusal = "no_secret" | "malformed" | "too_old" | "wrong";
+
+/**
+ * Whether this body really came from Stripe.
+ *
+ * ⚠️ THE RAW BODY, NOT A PARSED ONE. The signature covers the bytes; re-encoding
+ * a parsed object changes key order and whitespace, and every event then fails
+ * verification for a reason nothing in the error says.
+ */
+export async function verifySignature(
+  secret: string | null, header: string | null, raw: string, now: Date,
+): Promise<null | SignatureRefusal> {
+  if (!secret) return "no_secret";
+  if (!header) return "malformed";
+
+  const parts = Object.fromEntries(
+    header.split(",").map((p) => p.split("=", 2)).filter((p) => p.length === 2) as [string, string][]);
+  const t = parts.t;
+  const v1 = parts.v1;
+  if (!t || !v1) return "malformed";
+
+  const stamped = Number(t) * 1000;
+  if (!Number.isFinite(stamped)) return "malformed";
+  if (Math.abs(now.getTime() - stamped) > SIGNATURE_TOLERANCE_MS) return "too_old";
+
+  const key = await crypto.subtle.importKey(
+    "raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = await crypto.subtle.sign("HMAC", key, enc.encode(`${t}.${raw}`));
+  return same(hex(mac), v1) ? null : "wrong";
+}
+
+/* ---------------------------------------------------------------- the client --- */
+
+export interface StripeDeps {
+  readonly directory: Db;
+  readonly configSecret?: string;
+}
+
+const KEY = "stripe.secret_key";
+const WEBHOOK = "stripe.webhook_secret";
+
+export const stripeKey = (deps: StripeDeps): Promise<string | null> =>
+  configOf(deps.directory, deps.configSecret, KEY);
+
+export const webhookSecret = (deps: StripeDeps): Promise<string | null> =>
+  configOf(deps.directory, deps.configSecret, WEBHOOK);
+
+/**
+ * ⚠️ FORM-ENCODED AND NESTED, WHICH IS STRIPE'S WIRE FORMAT AND NOT A CHOICE.
+ * `a[b][c]=d` is how a nested object is expressed; sending JSON gets a 400 that
+ * says nothing about why.
+ */
+function form(into: URLSearchParams, value: unknown, prefix = ""): URLSearchParams {
+  if (value === null || value === undefined) return into;
+  if (Array.isArray(value)) {
+    value.forEach((v, i) => form(into, v, `${prefix}[${i}]`));
+    return into;
+  }
+  if (typeof value === "object") {
+    for (const [k, v] of Object.entries(value)) {
+      form(into, v, prefix ? `${prefix}[${k}]` : k);
+    }
+    return into;
+  }
+  into.append(prefix, String(value));
+  return into;
+}
+
+export type CheckoutRefusal = "not_charging" | "free_plan" | "stripe_refused";
+
+export interface Checkout {
+  readonly url: string;
+}
+
+/**
+ * A PAGE STRIPE OWNS, FOR ONE WORKSPACE AND ONE PLAN.
+ *
+ * ⚠️ THE WORKSPACE AND THE PRODUCT TRAVEL IN THE METADATA, and that is what
+ * makes the answer attributable. Without them the webhook arrives carrying a
+ * customer we have never seen and a payment nobody can place, which is the
+ * `unattributable` row this module exists to avoid producing.
+ *
+ * ⚠️ AND A FREE PLAN IS REFUSED RATHER THAN CHARGED FOR ZERO. Stripe answers a
+ * zero-amount subscription with a session that completes and bills nothing — so
+ * the workspace lands in a paid state it never paid for, and the parking plan it
+ * should have been on is the one thing nothing recorded.
+ */
+export async function startCheckout(
+  deps: StripeDeps,
+  ask: {
+    readonly tenantId: TenantId;
+    readonly appId: AppId;
+    readonly plan: PlanSpec;
+    readonly email: string | null;
+    readonly successUrl: string;
+    readonly cancelUrl: string;
+  },
+): Promise<Checkout | CheckoutRefusal> {
+  const key = await stripeKey(deps);
+  if (!key) return "not_charging";
+  if (ask.plan.price <= 0) return "free_plan";
+
+  const body = form(new URLSearchParams(), {
+    mode: "subscription",
+    success_url: ask.successUrl,
+    cancel_url: ask.cancelUrl,
+    ...(ask.email ? { customer_email: ask.email } : {}),
+    line_items: [{
+      quantity: 1,
+      price_data: {
+        currency: ask.plan.currency.toLowerCase(),
+        unit_amount: ask.plan.price,
+        recurring: { interval: "month" },
+        product_data: { name: ask.plan.name },
+      },
+    }],
+    /* ⚠️ ON THE SESSION AND ON THE SUBSCRIPTION, AND IT IS ONE OBJECT RATHER
+       THAN TWO SPREADS. A session's metadata does not travel to the invoices
+       that follow it, so a renewal a year later would arrive with nothing on it
+       but a customer id — and writing `subscription_data` twice in one literal
+       silently keeps the second, which is how the trial once took the metadata
+       with it. */
+    metadata: { tenant: ask.tenantId, app: ask.appId, plan: ask.plan.id },
+    subscription_data: {
+      metadata: { tenant: ask.tenantId, app: ask.appId, plan: ask.plan.id },
+      ...(ask.plan.trialDays ? { trial_period_days: ask.plan.trialDays } : {}),
+    },
+  });
+
+  const said = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${key}`,
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body,
+  }).catch(() => null);
+
+  if (!said?.ok) return "stripe_refused";
+  const made = await said.json().catch(() => null) as { url?: string } | null;
+  return made?.url ? { url: made.url } : "stripe_refused";
+}
+
+/* ------------------------------------------------------------------ events --- */
+
+export interface Event {
+  readonly id: string;
+  readonly type: string;
+  readonly data: { readonly object: Record<string, unknown> };
+}
+
+export type EventOutcome =
+  | { readonly did: "already" }
+  | { readonly did: "ignored" }
+  | { readonly did: "parked"; readonly why: string }
+  | { readonly did: "applied"; readonly tenantId: TenantId; readonly appId: AppId };
+
+/** Where an event says which workspace it is about, when it says so at all. */
+const metaOf = (o: Record<string, unknown>): { tenant?: string; app?: string } => {
+  const meta = (o.metadata ?? {}) as Record<string, unknown>;
+  return { tenant: meta.tenant as string | undefined, app: meta.app as string | undefined };
+};
+
+/**
+ * ⚠️ THE CUSTOMER IS THE FALLBACK, AND IT IS LOAD-BEARING. A renewal invoice
+ * often carries no metadata of ours at all — it was made by Stripe from a
+ * subscription, months later — so without this lookup every month after the
+ * first is unattributable.
+ */
+async function tenantByCustomer(db: Db, customer: string): Promise<TenantId | null> {
+  const row = await db.prepare(`SELECT tenant_id FROM billing_account WHERE customer_ref = ?`)
+    .bind(customer).first<{ tenant_id: string }>();
+  return (row?.tenant_id as TenantId | undefined) ?? null;
+}
+
+export async function noteCustomer(
+  db: Db, tenantId: TenantId, customer: string, currency: string, now = new Date(),
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO billing_account (tenant_id, customer_ref, currency, balance, held, at)
+     VALUES (?, ?, ?, 0, 0, ?)
+     ON CONFLICT(tenant_id) DO UPDATE SET customer_ref = excluded.customer_ref`)
+    .bind(tenantId, customer, currency, now.toISOString()).run();
+}
+
+/** ⚠️ What the ladder needs done, handed in — see `applyEvent`. */
+export interface Ladder {
+  subscribe(tenantId: TenantId, appId: AppId, planId: string): Promise<void>;
+  paid(tenantId: TenantId, appId: AppId): Promise<void>;
+  pastDue(tenantId: TenantId, appId: AppId): Promise<void>;
+  cancelled(tenantId: TenantId, appId: AppId): Promise<void>;
+}
+
+/**
+ * ⚠️ EVERY EVENT IS RECORDED, INCLUDING THE ONES WE IGNORE. Which types a
+ * deployment acts on changes; what arrived does not, and a row saying "we saw
+ * this and did nothing on purpose" is the difference between a quiet integration
+ * and one nobody can audit.
+ */
+async function note(
+  db: Db, event: Event, at: Instant,
+  found: { tenantId?: TenantId; appId?: AppId; why?: string },
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO stripe_event (id, kind, tenant_id, app_id, at, why) VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO NOTHING`)
+    .bind(event.id, event.type, found.tenantId ?? null, found.appId ?? null,
+      at, found.why ?? null).run();
+}
+
+/** The types this deployment acts on. Anything else is recorded and ignored. */
+const ACTED_ON = new Set([
+  "checkout.session.completed",
+  "invoice.paid",
+  "invoice.payment_failed",
+  "customer.subscription.deleted",
+]);
+
+/**
+ * ONE VERIFIED EVENT, APPLIED ONCE.
+ *
+ * ⚠️ THE IDEMPOTENCY IS THE ROW, AND IT IS WRITTEN BEFORE THE WORK. Stripe
+ * retries by design; a second delivery that re-ran the ladder would grant a
+ * second month, and `INSERT … ON CONFLICT DO NOTHING` is what makes the second
+ * one a no-op rather than a duplicate.
+ */
+export async function applyEvent(
+  db: Db, event: Event, ladder: Ladder, now = new Date(),
+): Promise<EventOutcome> {
+  const at = now.toISOString() as Instant;
+
+  const seen = await db.prepare(`SELECT id FROM stripe_event WHERE id = ?`)
+    .bind(event.id).first<{ id: string }>();
+  if (seen) return { did: "already" };
+
+  if (!ACTED_ON.has(event.type)) {
+    await note(db, event, at, { why: "not_acted_on" });
+    return { did: "ignored" };
+  }
+
+  const o = event.data.object;
+  const meta = metaOf(o);
+  const customer = typeof o.customer === "string" ? o.customer : null;
+
+  const tenantId = (meta.tenant as TenantId | undefined)
+    ?? (customer ? await tenantByCustomer(db, customer) : null);
+  const appId = meta.app as AppId | undefined;
+
+  /*
+    ⚠️ PARKED, NOT DROPPED, AND NOT RETRIED FOREVER EITHER. Stripe cannot fix an
+    attribution problem by sending the same event again, so answering 500 would
+    be days of retries and a queue nobody drains. The row is what somebody reads.
+  */
+  if (!tenantId) {
+    await note(db, event, at, { why: "no_tenant" });
+    return { did: "parked", why: "no_tenant" };
+  }
+  if (!appId) {
+    await note(db, event, at, { ...(tenantId ? { tenantId } : {}), why: "no_app" });
+    return { did: "parked", why: "no_app" };
+  }
+
+  await note(db, event, at, { tenantId, appId });
+
+  switch (event.type) {
+    case "checkout.session.completed": {
+      /* ⚠️ THE CUSTOMER IS RECORDED HERE AND NOWHERE ELSE, which is what makes
+         every later invoice attributable — see `tenantByCustomer`. */
+      if (customer) {
+        await noteCustomer(db, tenantId, customer,
+          typeof o.currency === "string" ? o.currency : "usd", now);
+      }
+      const plan = (o.metadata as Record<string, unknown> | undefined)?.plan;
+      if (typeof plan === "string" && plan) await ladder.subscribe(tenantId, appId, plan);
+      await ladder.paid(tenantId, appId);
+      break;
+    }
+    case "invoice.paid":
+      await ladder.paid(tenantId, appId);
+      break;
+    case "invoice.payment_failed":
+      await ladder.pastDue(tenantId, appId);
+      break;
+    case "customer.subscription.deleted":
+      await ladder.cancelled(tenantId, appId);
+      break;
+  }
+
+  return { did: "applied", tenantId, appId };
+}
+
+/** ⚠️ The dead letter, readable — see the header. */
+export interface Parked {
+  readonly id: string;
+  readonly kind: string;
+  readonly at: string;
+  readonly why: string;
+}
+
+export async function parkedEvents(db: Db, limit = 50): Promise<readonly Parked[]> {
+  const rows = await db.prepare(
+    `SELECT id, kind, at, why FROM stripe_event
+     WHERE why IS NOT NULL AND why != 'not_acted_on' ORDER BY at DESC LIMIT ?`)
+    .bind(limit).all<Parked>();
+  return rows.results;
+}

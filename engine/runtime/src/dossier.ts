@@ -195,6 +195,13 @@ export const HOLDINGS: readonly HeldBy[] = [
      key this database has never held — see `config.ts`. */
   { table: "deployment_config", person: [],
     why: "what the deployment was told: its sender, and the account it charges through" },
+  /* ⚠️ NOT ERASED WITH THE WORKSPACE, AND DELIBERATELY. It is the record that a
+     payment arrived and what was done about it — the row somebody reads when a
+     charge is disputed months later, and a dispute is precisely the case where
+     the workspace is gone. It holds an event id and a workspace id, never a
+     name, an address or a card. */
+  { table: "stripe_event", person: [],
+    why: "which payments arrived, and what each one was applied to" },
   { table: "maintenance", person: [], why: "the deployment's own switches" },
   { table: "_schema", person: [], why: "the migration marker" },
 

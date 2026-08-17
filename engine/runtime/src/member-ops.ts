@@ -73,6 +73,21 @@ export interface PlatformCtx extends Ctx {
    * only symptom is somebody waiting for an email that was never attempted.
    */
   readonly channels: readonly Channel[];
+  /**
+   * ⚠️ THE ORIGIN THIS REQUEST ARRIVED AT, AND ITS SLUG, so a page somebody is
+   * sent AWAY to knows how to send them back. A constant here would return an EU
+   * workspace on its own domain to somebody else's hostname — and the doors ARE
+   * the tenancy, so the address is a fact about the request rather than about
+   * the deployment.
+   */
+  readonly origin: string;
+  readonly slug: string | null;
+  /**
+   * ⚠️ WHAT A STORED CREDENTIAL IS ENCRYPTED UNDER — see `config.ts`. Absent is a
+   * deployment that holds no keys, and every lane behind one refuses rather than
+   * running on a value it could not read.
+   */
+  readonly configSecret?: string;
 }
 
 const asPlatform = (ctx: Ctx): PlatformCtx => ctx as PlatformCtx;

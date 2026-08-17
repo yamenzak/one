@@ -573,10 +573,11 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
           return ctx.fail("platform.forbidden");
         }
 
-        /* DEFER(engine-21) stage:21 — nothing takes a card yet, so `paid` is
-           false and the only lane through is an operator's allowance. The
-           refusal is already the right one, which is the half that matters:
-           when payment lands it sets this and nothing else here changes. */
+        /* DEFER(engine-44) stage:44 — THE CARD LANE TAKES SUBSCRIPTIONS, NOT
+           ONE-OFF PURCHASES, so `paid` is false and the only way through is an
+           operator's allowance. The refusal is already the right one, which is
+           the half that matters: a one-off checkout sets this and nothing else
+           here changes. */
         const done = await becomeCommercial(
           ctx.directory, tenant.id, ctx.session!.accountId,
           { legalName, paid: false }, ctx.now);

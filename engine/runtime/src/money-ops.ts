@@ -14,12 +14,12 @@
 
 import type { AppId, AppSpec, TenantId } from "@engine/kernel";
 import { billFor, mixedCurrencies, subscriptionFor } from "./billing.js";
+import { startCheckout } from "./stripe.js";
 import { balanceOf } from "./credits.js";
 import type { PlatformCtx } from "./member-ops.js";
 import type { Resolved } from "./compose.js";
 
 export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
-  void app;
   const spec: Resolved = {
     id: "money.view",
     kind: "read",
@@ -69,5 +69,66 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       return { apps: held, bill, balance, mixed: mixedCurrencies(bill.lines) };
     },
   };
-  return { "money.view": spec };
+  /**
+   * WHERE SOMEBODY GOES TO PAY.
+   *
+   * ⚠️ THE PLAN IS RESOLVED FROM THE MANIFEST, NEVER FROM THE BODY. A price in a
+   * request is a price the caller chose — the oldest checkout bug there is — and
+   * an id that names no declared plan is refused rather than defaulted.
+   *
+   * ⚠️ AND IT GRANTS NOTHING. Pressing this opens a page Stripe owns; the plan is
+   * stamped only when a SIGNED event says the money moved. A handler that wrote
+   * the subscription here would be one where opening the page and closing it
+   * bought a month.
+   *
+   * ⚠️ `billing:manage`, NOT `billing:read`. Looking at what a workspace pays and
+   * committing it to a monthly charge are different authorities, and the second
+   * one is an owner's.
+   */
+  const checkout: Resolved = {
+    id: "money.checkout",
+    kind: "write",
+    method: "POST",
+    path: "/api/money.checkout",
+    permission: "billing:manage",
+    spec: {
+      id: "money.checkout", kind: "write", summary: "Start paying for a plan.",
+      input: {}, output: {},
+      permission: "billing:manage",
+      idempotency: { mode: "none" },
+      async handler() { return {} as never; },
+    } as Resolved["spec"],
+    run: async (bare, input) => {
+      const ctx = bare as PlatformCtx;
+      const appId = String(input.app ?? app.id) as AppId;
+      const of = ctx.appOf(appId);
+      if (!of) return ctx.fail("platform.not_found");
+
+      const plan = of.plans.find((p) => p.id === String(input.plan ?? ""));
+      if (!plan) return ctx.fail("platform.invalid");
+
+      const made = await startCheckout(
+        { directory: ctx.directory, ...(ctx.configSecret ? { configSecret: ctx.configSecret } : {}) },
+        {
+          tenantId: ctx.tenantId as TenantId,
+          appId,
+          plan,
+          email: ctx.email,
+          /* ⚠️ THE RETURN ADDRESSES COME FROM THE REQUEST'S OWN ORIGIN, handed
+             down by the deployment. A constant here would send an EU workspace
+             on a custom domain back to somebody else's hostname. */
+          successUrl: `${ctx.origin}/space/w/${ctx.slug ?? ""}/money?paid=1`,
+          cancelUrl: `${ctx.origin}/space/w/${ctx.slug ?? ""}/money`,
+        });
+
+      /* ⚠️ THREE REFUSALS, THREE DIFFERENT THINGS TO DO NEXT: ask us to
+         configure it, choose a plan that costs something, or try again. */
+      if (made === "not_charging") return ctx.fail("platform.unavailable");
+      if (made === "free_plan") return ctx.fail("platform.invalid");
+      if (made === "stripe_refused") return ctx.fail("platform.unavailable");
+      return { url: made.url };
+    },
+  };
+
+  return { "money.view": spec, "money.checkout": checkout };
 }

@@ -9,6 +9,7 @@
 
 import { Chip } from "@heroui/react";
 import { Screen, Shelf, notice } from "@engine/design";
+import { api } from "../api.js";
 import { useLoad, type MoneyView } from "./data.js";
 
 export function Plan({ app }: { readonly app: string }) {
@@ -38,9 +39,22 @@ export function Plan({ app }: { readonly app: string }) {
               plans={held.plans}
               entitlements={held.entitlements}
               current={held.planId ?? undefined}
-              /* ⚠️ Honest until the payment rail lands: choosing is recorded
-                 nowhere, so the screen says so instead of pretending. */
-              onChoose={() => notice.warn("Changing plans arrives with the payment rail.")}
+              /*
+                ⚠️ CHOOSING OPENS A PAGE STRIPE OWNS, AND GRANTS NOTHING. The
+                plan is stamped only when a signed event says the money moved —
+                so closing the tab leaves the workspace exactly where it was,
+                which is the behaviour somebody who changes their mind expects.
+
+                ⚠️ AND A FULL PAGE LOAD, NOT A NEW TAB. A popup is what a browser
+                blocks and what a phone loses behind the app it came from; the
+                return address is already carried in the session.
+              */
+              onChoose={(planId) => void (async () => {
+                const out = await api.post<{ url: string }>(
+                  "money.checkout", { app, plan: planId });
+                if (!out.ok) { notice.fail(out.problem.title); return; }
+                window.location.assign(out.value.url);
+              })()}
             />
           </>
         );

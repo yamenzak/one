@@ -74,10 +74,13 @@ export async function subscriptionFor(
   return row ? asSub(row) : null;
 }
 
-/* DEFER(engine-21) stage:21 — the four writes below are the ladder, and nothing
-   drives them: no card is taken, so no webhook confirms a payment and no clock
-   marks a workspace past due. `standingFor` reads the row they would write, so
-   every workspace is permanently in whatever state it was created in. */
+/**
+ * ⚠️ THE FOUR WRITES BELOW ARE THE LADDER, AND ONLY A VERIFIED EVENT DRIVES
+ * THEM. Nothing here is reachable from a route a caller can press: a workspace
+ * that could write its own subscription row is a workspace that can grant itself
+ * a plan, and the whole of the payment design is that the money moving is the
+ * only thing that stamps one.
+ */
 export async function subscribe(
   db: Db, tenantId: TenantId, appId: AppId, planId: string, status: SubStatus, now = new Date(),
 ): Promise<void> {
@@ -89,7 +92,6 @@ export async function subscribe(
 }
 
 /** ⚠️ The anchor every rung of the ladder is measured from. Set once, cleared on payment. */
-/* DEFER(engine-21) stage:21 — see the note above. */
 export async function markPastDue(
   db: Db, tenantId: TenantId, appId: AppId, now = new Date(),
 ): Promise<void> {
@@ -98,11 +100,25 @@ export async function markPastDue(
      WHERE tenant_id = ? AND app_id = ?`).bind(now.toISOString(), tenantId, appId).run();
 }
 
-/* DEFER(engine-21) stage:21 — see the note above. */
 export async function markPaid(db: Db, tenantId: TenantId, appId: AppId): Promise<void> {
   await db.prepare(
     `UPDATE subscription SET status = 'active', past_due_at = NULL WHERE tenant_id = ? AND app_id = ?`)
     .bind(tenantId, appId).run();
+}
+
+/**
+ * ⚠️ CANCELLED IS NOT PAST DUE, AND THE ANCHOR IS WHY. `past_due_at` is what
+ * every rung of the ladder is measured from, and a workspace that CHOSE to stop
+ * has no arrears — dating one would start a 37-day countdown to erasure over a
+ * decision nobody disputed. The row keeps its records and its plan history; what
+ * ends is the charge.
+ */
+export async function markCancelled(
+  db: Db, tenantId: TenantId, appId: AppId,
+): Promise<void> {
+  await db.prepare(
+    `UPDATE subscription SET status = 'cancelled', past_due_at = NULL
+     WHERE tenant_id = ? AND app_id = ?`).bind(tenantId, appId).run();
 }
 
 /* ------------------------------------------------------------- resolution --- */
@@ -146,7 +162,10 @@ export async function heldBy(
  * one-way door — the only way back discarded the grandfathering with it. Two
  * columns, because they want opposite rules.
  */
-/* DEFER(engine-21) stage:21 — see the note above. */
+/* DEFER(engine-45) stage:45 — nothing EDITS a plan. Grandfathering is what holds
+   an existing workspace at what it was sold when a plan is narrowed, and the
+   plans are declarations in a manifest today — so there is no edit for it to
+   catch, and the day there is, forgetting this silently downgrades everybody. */
 export async function grandfather(
   db: Db, tenantId: TenantId, appId: AppId, was: Readonly<Record<string, Allowance>>,
 ): Promise<void> {

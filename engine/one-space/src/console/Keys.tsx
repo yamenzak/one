@@ -37,9 +37,17 @@ interface Credential {
   readonly readable: boolean;
 }
 
+interface Parked {
+  readonly id: string;
+  readonly kind: string;
+  readonly at: string;
+  readonly why: string;
+}
+
 interface Answer {
   readonly items: readonly Credential[];
   readonly canKeepSecrets: boolean;
+  readonly parked: readonly Parked[];
 }
 
 /** ⚠️ The three states, in the words somebody can act on. */
@@ -76,6 +84,30 @@ export function Keys() {
                 </NoteRow>
               </Group>
             )}
+
+            {/*
+              ⚠️ SHOWN ONLY WHEN THERE IS ONE, and it belongs on this screen
+              because this is where somebody is standing when a payment did not
+              land. Each row is money that arrived against a workspace nothing
+              could place — the failure the table exists to make visible rather
+              than to record silently.
+            */}
+            {data.parked.length ? (
+              <Group
+                label="Payments that could not be placed"
+                under="Each one arrived signed and was recorded rather than applied"
+              >
+                {data.parked.map((p) => (
+                  <ControlRow
+                    key={p.id}
+                    label={p.kind}
+                    under={`${p.id} · ${p.at.slice(0, 10)} · ${p.why}`}
+                  >
+                    <span />
+                  </ControlRow>
+                ))}
+              </Group>
+            ) : null}
 
             {lanes.map((lane) => (
               <Group key={lane} label={sentence(lane)}>

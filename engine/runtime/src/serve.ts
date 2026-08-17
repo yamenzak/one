@@ -131,6 +131,33 @@ export interface Wiring {
    * deployment cannot send on — which is the exact thing it exists to prevent.
    */
   readonly pusher?: Pusher;
+  /**
+   * ⚠️ WHAT A VERIFIED PAYMENT DOES, HANDED IN. The webhook is answered here
+   * because it must be answered before any door resolves a workspace — Stripe
+   * has no session and knows nothing about a tenancy — but WHAT it means is the
+   * money module's, and putting the ladder here would be a second copy of it.
+   *
+   * ⚠️ ABSENT IS A DEPLOYMENT THAT TAKES NO CARD, and the route then answers 404
+   * rather than 500. A stranger probing for an endpoint learns nothing either
+   * way, and an operator reading a log sees "not configured" instead of a stack.
+   */
+  readonly payments?: Payments;
+  /**
+   * ⚠️ WHAT A STORED CREDENTIAL IS ENCRYPTED UNDER — see `config.ts`. Handed to
+   * every handler, because a handler about to CHARGE somebody needs the key and
+   * nothing else here may read one.
+   */
+  readonly configSecret?: string;
+}
+
+/**
+ * ⚠️ ONE SEAM, AND IT IS DELIBERATELY NARROW. Everything about Stripe — the key,
+ * the signature, the event shape — is `stripe.ts`'s; everything about what a
+ * payment MEANS is the app's ladder. What crosses here is a raw body, a header
+ * and a clock.
+ */
+export interface Payments {
+  answer(raw: string, signature: string | null, now: Date): Promise<Response>;
 }
 
 /**
@@ -353,6 +380,36 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
       return new Response(png, { headers: picture("image/png") });
     }
 
+    /*
+      ⚠️ THE WEBHOOK IS ANSWERED BEFORE ANY DOOR RESOLVES ANYTHING, and it has to
+      be: Stripe carries no session, no cookie and no idea which workspace an
+      event is about — the event itself says, and only after it is verified.
+
+      ⚠️ IT IS OUTSIDE `/api/` ON PURPOSE. Everything under that prefix is an
+      operation, and an operation has a caller, a gate and an audit row. This has
+      none of the three, so putting it there would mean a branch inside
+      `performOperation` that skips all of them — which is exactly where a
+      cross-cutting concern goes missing (D12).
+
+      ⚠️ AND IT IS THE ROOT DOOR, WHICH IS THE ONE ADDRESS THAT IS NOT A PLACE.
+      A workspace's own hostname would make the endpoint move when a workspace is
+      renamed; the operator door would put it behind the console's own meaning.
+      The signpost is not an app and never was.
+    */
+    if (url.pathname === "/webhook/stripe") {
+      if (!wiring.payments || door.kind !== "signpost") {
+        return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
+      }
+      if (request.method !== "POST") {
+        return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
+      }
+      /* ⚠️ THE RAW BODY, because the signature covers the bytes — see
+         `verifySignature`. Parsing and re-encoding changes key order and
+         whitespace, and every event then fails for a reason nothing says. */
+      return wiring.payments.answer(
+        await request.text(), request.headers.get("stripe-signature"), now);
+    }
+
     if (url.pathname === "/mcp") return answerMcp(wiring, request, door, now);
     if (!url.pathname.startsWith("/api/")) return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
 
@@ -397,6 +454,7 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
     const outcome = await performOperation(
       wiring, located, who, { composed, op }, input,
       request.headers.get("idempotency-key"), now,
+      { origin: url.origin, slug: door.kind === "tenant" ? door.slug : null },
     );
     switch (outcome.kind) {
       case "replay": return json(outcome.answer, 200, { "idempotent-replay": "true" });
@@ -432,6 +490,13 @@ export async function performOperation(
   wiring: Wiring, located: Located, who: Who,
   found: { readonly composed: Composed; readonly op: ResolvedOp },
   input: Record<string, unknown>, given: string | null, now: Date,
+  /**
+   * ⚠️ WHERE THE REQUEST ARRIVED, because a handler that sends somebody AWAY has
+   * to know how to send them back. The doors ARE the tenancy, so this is a fact
+   * about the request rather than about the deployment — a constant would return
+   * a workspace on its own domain to somebody else's hostname.
+   */
+  at: { readonly origin: string; readonly slug: string | null },
 ): Promise<Performed> {
   const { composed, op } = found;
   const catalog = composed.catalog;
@@ -556,6 +621,9 @@ export async function performOperation(
     /* ⚠️ THE SAME ANSWER THE DISPATCH USES — one call, so the switch a person is
        offered and the channel a note is sent on cannot disagree. */
     channels: await availableChannels(wiring),
+    origin: at.origin,
+    slug: at.slug,
+    ...(wiring.configSecret ? { configSecret: wiring.configSecret } : {}),
     /* ⚠️ ONE READ PER REQUEST AT MOST, AND ONLY IF A HANDLER ASKS. Resolved for
        the app the operation belongs to, because a setting is that app's. */
     setting: async (id: string) => (await settings())[id],

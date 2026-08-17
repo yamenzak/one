@@ -96,7 +96,8 @@ export async function answerMcp(
       return rpcResult(rpc.id, { tools: await listTools(wiring, located, who) });
 
     case "tools/call":
-      return callTool(wiring, located, who, rpc, now);
+      return callTool(wiring, located, who, rpc, now,
+        { origin: new URL(request.url).origin, slug: door.slug });
 
     default:
       return rpcError(rpc.id, -32601, `no such method: ${rpc.method}`);
@@ -160,6 +161,9 @@ const composedApps = (wiring: Wiring, located: Located): readonly Composed[] =>
 
 async function callTool(
   wiring: Wiring, located: Located, who: Who, rpc: RpcRequest, now: Date,
+  /* ⚠️ The same address the HTTP door passes, so a tool that sends somebody
+     somewhere sends them to the workspace they are actually in. */
+  at: { readonly origin: string; readonly slug: string | null },
 ): Promise<Response> {
   const name = String(rpc.params?.name ?? "");
   const given = rpc.params?.arguments ?? {};
@@ -184,7 +188,7 @@ async function callTool(
   }
 
   const outcome = await performOperation(
-    wiring, located, who, found, given as Record<string, unknown>, null, now,
+    wiring, located, who, found, given as Record<string, unknown>, null, now, at,
   );
 
   /*

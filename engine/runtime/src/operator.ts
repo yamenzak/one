@@ -34,6 +34,7 @@ import {
   liveAppsOfTenant, setCommercialGrant, shards, tenantById, tenantBySlug,
 } from "./directory.js";
 import { CREDENTIALS, configState, setConfig } from "./config.js";
+import { parkedEvents } from "./stripe.js";
 import { runsOf } from "./jobs.js";
 import { makePushKeys, vapidOf } from "./push.js";
 import type { PersonalBook, PersonalCtx } from "./personal.js";
@@ -323,6 +324,18 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
              no secret bound, every secret row is unwritable and the reason is
              the deployment's rather than the operator's. */
           canKeepSecrets: !!deps.configSecret,
+          /*
+            ⚠️ THE DEAD LETTER TRAVELS WITH THE KEYS, because this is the screen
+            somebody is on when a payment did not land. A parked event is money
+            captured against a workspace nothing could place — and a dead letter
+            nobody can read is the same silent success with an extra table.
+
+            ⚠️ AND IT FAILS OPEN. A deployment that has never taken a payment has
+            no table yet, and refusing to draw the credentials screen over a
+            missing row would make configuring Stripe impossible on exactly the
+            deployment that has not configured Stripe.
+          */
+          parked: await parkedEvents(ctx.directory).catch(() => []),
         };
       },
     },

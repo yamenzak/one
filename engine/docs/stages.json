@@ -116,8 +116,8 @@
     },
     {
       "n": 21,
-      "title": "Payment — something takes a card",
-      "status": "planned"
+      "title": "Payment — a workspace subscribes, and only a signed event stamps the plan",
+      "status": "shipped"
     },
     {
       "n": 22,
@@ -228,6 +228,16 @@
       "n": 43,
       "status": "planned",
       "title": "Hello's remaining screens reach the workspace's own records — the report against its target, and writing a note"
+    },
+    {
+      "n": 44,
+      "status": "planned",
+      "title": "A one-off purchase — a credit pack, and becoming a business — through the same checkout"
+    },
+    {
+      "n": 45,
+      "status": "planned",
+      "title": "A plan is edited, and everybody already on it keeps what they were sold"
     }
   ]
 }

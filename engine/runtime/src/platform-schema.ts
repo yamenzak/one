@@ -31,6 +31,7 @@ import { LEGAL_SCHEMA } from "./legal.js";
 import { MEMBERSHIP_SCHEMA } from "./membership.js";
 import { OPERATOR_SCHEMA } from "./operator.js";
 import { CONFIG_SCHEMA } from "./config.js";
+import { STRIPE_SCHEMA } from "./stripe.js";
 import { PACKAGE_SCHEMA } from "./packages.js";
 import { PUSH_SCHEMA } from "./push.js";
 import { MOVE_SCHEMA } from "./move.js";
@@ -58,6 +59,11 @@ export const DIRECTORY_MODULES: readonly SchemaModule[] = [
      copy per shard would be one rotation that has to reach N databases and does
      not. See `config.ts` for why it is here rather than in a Worker secret. */
   CONFIG_SCHEMA,
+  /* ⚠️ IN THE DIRECTORY, BESIDE THE BILLING ACCOUNT IT RESOLVES AGAINST. A
+     webhook arrives with a customer id and no idea which shard the workspace is
+     on — looking that up per shard would mean asking every database in the
+     deployment which one recognises a stranger. */
+  STRIPE_SCHEMA,
   /* ⚠️ WHAT THE DEPLOYMENT HAS MADE FOR ITSELF, in the directory because it is
      about the deployment rather than about any workspace — and because the
      reaper reads it to decide what it may destroy. */

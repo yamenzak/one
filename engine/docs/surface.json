@@ -304,6 +304,13 @@
         "permission": "billing:read"
       },
       {
+        "id": "money.checkout",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/money.checkout",
+        "permission": "billing:manage"
+      },
+      {
         "id": "centre.view",
         "kind": "read",
         "method": "GET",
@@ -861,6 +868,13 @@
         "table": "deployment_config",
         "export": null,
         "why": "what the deployment was told: its sender, and the account it charges through",
+        "onForget": [],
+        "onClose": null
+      },
+      {
+        "table": "stripe_event",
+        "export": null,
+        "why": "which payments arrived, and what each one was applied to",
         "onForget": [],
         "onClose": null
       },
