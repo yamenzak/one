@@ -223,6 +223,57 @@ jobs:
             echo "::notice::Minted $name."
           done
 
+      # ── The three that are PASTED, not minted. ────────────────────────────
+      #
+      # ⚠️ THESE ARE PUT ON EVERY PROVISION RUN, and that is the difference from
+      # the three above. Those are key material: re-putting one is destructive,
+      # differently so for each. These are a list of addresses and an account
+      # credential — things somebody EDITS, and the way to edit them has to be
+      # changing the repository secret and running this again.
+      #
+      # ⚠️ AND `OPERATOR_EMAILS` IS A BOOTSTRAP DEADLOCK OF ITS OWN. Every key
+      # this deployment needs — Stripe, Gemini, a mail provider — is pasted into
+      # the operator console, encrypted under CONFIG_SECRET, which no workflow
+      # can read. Reaching that console needs an address on this list. With the
+      # list empty a live deployment admits NOBODY, which is the honest reading
+      # of "unconfigured" and is also a product nobody can finish setting up.
+      # The seeded sender below breaks the mail half; this breaks the rest.
+      #
+      # ⚠️ THE ACCOUNT TOKEN IS SEPARATE FROM THE ONE THIS WORKFLOW DEPLOYS WITH,
+      # deliberately. `CLOUDFLARE_API_TOKEN` is a deploy credential that lives in
+      # Actions; `CF_API_TOKEN` is what the running worker reconciles resources
+      # with, and it wants D1:Edit, KV:Edit, R2:Edit, Queues:Edit and
+      # Scripts:Edit and nothing else. Absent is a working deployment — every
+      # declared need stays `wanted` and nothing fails.
+      - name: Put the secrets somebody has to choose
+        working-directory: engine/one
+        env:
+          OPERATOR_EMAILS: ${{ secrets.ENGINE_OPERATOR_EMAILS }}
+          CF_API_TOKEN: ${{ secrets.ENGINE_CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -uo pipefail
+          put() {
+            if [ -z "${2:-}" ]; then return 1; fi
+            printf '%s' "$2" | pnpm exec wrangler secret put "$1" \
+              && echo "::notice::Set $1."
+          }
+
+          put OPERATOR_EMAILS "$OPERATOR_EMAILS" || echo "::warning::\
+          ENGINE_OPERATOR_EMAILS is not set, so the operator console admits nobody \
+          and every key it is the only way to paste stays unset. Add a repository \
+          secret with the comma-separated addresses that may open it, then run this \
+          workflow again with 'provision' ticked."
+
+          put CF_API_TOKEN "$CF_API_TOKEN" || echo "::notice::\
+          ENGINE_CF_API_TOKEN is not set, so the worker will not provision the \
+          buckets and queues its products declare. Everything else works; each \
+          declared need stays 'wanted' until a scoped token is added."
+
+          put CF_ACCOUNT_ID "$CF_ACCOUNT_ID" || echo "::notice::\
+          CLOUDFLARE_ACCOUNT_ID is not set, so the reconciler has no account to \
+          act in."
+
   # ── Deploy. ───────────────────────────────────────────────────────────────
   #
   # `claude/quad` is in the trigger because that is where the work is and there
