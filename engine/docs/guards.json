@@ -651,6 +651,42 @@
       "fails": "two tiers priced in different currencies and a bill that adds them together"
     },
     {
+      "id": "storage-is-measured-from-the-ledger",
+      "protects": "D12",
+      "stage": "47",
+      "status": "live",
+      "impl": "runtime/test/storage-meter.test.ts",
+      "proves": "adds up from the ledger rather than the bucket",
+      "fails": "a bill built by listing every object in a bucket - a request per thousand files, slower with every upload, and unanswerable at the size where it starts to matter"
+    },
+    {
+      "id": "a-fraction-of-a-credit-is-neither-free-nor-rounded-up",
+      "protects": "D12",
+      "stage": "47",
+      "status": "live",
+      "impl": "runtime/test/storage-meter.test.ts",
+      "proves": "collects once the fractions have added up to a credit",
+      "fails": "storage that is free for ever because a day of it rounds down, or costs thirty times the price because it rounds up"
+    },
+    {
+      "id": "a-metered-charge-takes-what-there-is",
+      "protects": "D12",
+      "stage": "47",
+      "status": "live",
+      "impl": "runtime/test/storage-meter.test.ts",
+      "proves": "takes what there is and keeps owing the rest",
+      "fails": "a wallet with money in it beside an uncollected debt, which reads to everybody as a bug"
+    },
+    {
+      "id": "an-unpayable-meter-costs-the-writes-and-never-the-files",
+      "protects": "D12",
+      "stage": "47",
+      "status": "live",
+      "impl": "runtime/test/storage-meter.test.ts",
+      "proves": "says so when the wallet cannot cover what is owed",
+      "fails": "a product that deletes a customer's files to settle a bill, which is one nobody can safely put anything in"
+    },
+    {
       "id": "a-standing-charge-is-armed-by-a-person",
       "protects": "D12",
       "stage": "46",

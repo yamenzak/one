@@ -141,6 +141,21 @@ const PLANS: readonly PlanSpec[] = [
  * somebody would buy the floor and top up for ever, which is the shape of every
  * failed usage-based upsell.
  */
+/**
+ * WHAT A GIGABYTE-MONTH COSTS ABOVE WHAT A PLAN INCLUDES, IN CREDITS.
+ *
+ * ⚠️ THERE IS NO CLIFF BETWEEN TIERS AND NO "CONTACT US". A plan's storage is
+ * where the meter STARTS, not where the product stops — so the step from 50 GB
+ * to 250 GB is a price rather than a wall, and somebody at 60 GB pays for 10
+ * rather than being told to buy a business tier.
+ *
+ * ⚠️ AND IT IS A PRICE, SO IT IS DECLARED HERE. At a credit to the cent this is
+ * twenty cents a gigabyte-month against about one and a half to store it —
+ * enough margin to be worth running, cheap enough that nobody deletes a
+ * photograph over it.
+ */
+const STORAGE_CREDITS_PER_GB_MONTH = 20;
+
 const PACKS: readonly PackDef[] = [
   { id: "p1", name: "1,000 credits", credits: 1_000, price: 1000, currency: "USD", order: 0 },
   { id: "p5", name: "5,000 credits", credits: 5_000, price: 4500, currency: "USD", order: 1 },
@@ -566,7 +581,7 @@ const handler = (env: Env) => {
       request body. It sits beside the subscriptions it signs for, which are the
       sensitive half and are already there; alone it grants nothing.
     */
-    plans: PLANS, packs: PACKS,
+    plans: PLANS, packs: PACKS, storageRate: STORAGE_CREDITS_PER_GB_MONTH,
     pusher: pusherOver(directory),
 
     ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
@@ -924,6 +939,11 @@ export default {
              A deployment that binds neither simply never charges anybody — see
              `sweepTopUps`. */
           packs: PACKS,
+          /* ⚠️ AND WHAT STORAGE OVER THE INCLUDED AMOUNT COSTS. Both together,
+             because the meter is what pushes a balance under the top-up
+             threshold — see `sweepStorage`. */
+          plans: PLANS,
+          storageRate: STORAGE_CREDITS_PER_GB_MONTH,
           ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
           /* ⚠️ ONLY WHERE THERE IS A TOKEN. Absent is a deployment that cannot
              provision, which is a state it has to survive rather than an error

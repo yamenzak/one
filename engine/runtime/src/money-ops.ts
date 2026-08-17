@@ -17,6 +17,7 @@ import { PLATFORM_ENTITLEMENTS, isBusiness } from "@engine/kernel";
 import { MEMBERSHIP, billFor, mixedCurrencies, subscriptionFor } from "./billing.js";
 import { startCheckout, startTopUp } from "./stripe.js";
 import { armAutoTopUp, autoTopUpOf, movements, spentByApp, walletOf } from "./wallet.js";
+import { bytesUsed } from "./storage.js";
 import type { PlatformCtx } from "./member-ops.js";
 import type { Resolved } from "./compose.js";
 
@@ -70,6 +71,22 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
          topping up and what to do about it. */
       const armed = await autoTopUpOf(ctx.directory, ctx.tenantId as TenantId);
 
+      /*
+        ⚠️ AND WHERE THE STORAGE STANDS, BEFORE THE METER IS THE FIRST ANYBODY
+        HEARS OF IT. The included amount is where the meter starts rather than
+        where the product stops, which is only kind if somebody can see the line
+        coming — a bill that arrives without a screen that predicted it is the
+        same surprise as a refusal, arriving later.
+      */
+      const included = plan?.includes.storage;
+      const storage = {
+        used: await bytesUsed(ctx.db, ctx.tenantId as TenantId),
+        included: typeof included === "number" ? included : 0,
+        /* ⚠️ A price, so it is shown rather than discovered. */
+        creditsPerGbMonth: ctx.storageRate ?? 0,
+        owedMilli: wallet.owedMilli,
+      };
+
       return {
         /* ⚠️ THE PLAN IS THE WORKSPACE'S; the products are what it reaches. */
         plan: plan ? { id: plan.id, name: plan.name, kind: plan.kind } : null,
@@ -86,6 +103,7 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         wallet,
         packs: ctx.packs,
         armed,
+        storage,
         spent,
         statement,
         mixed: mixedCurrencies(bill.lines),

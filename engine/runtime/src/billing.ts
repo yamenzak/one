@@ -45,7 +45,14 @@ export const BILLING_SCHEMA: SchemaModule = {
       not work, which is the one thing a customer needs and a log cannot give
       them.
     */
-    `CREATE TABLE IF NOT EXISTS billing_account (tenant_id TEXT PRIMARY KEY, customer_ref TEXT, currency TEXT NOT NULL, granted INTEGER, bought INTEGER, held INTEGER NOT NULL, auto_pack TEXT, auto_below INTEGER, auto_at TEXT, auto_error TEXT, at TEXT NOT NULL);`,
+    /*
+      ⚠️ AND `storage_milli` IS A DEBT IN THOUSANDTHS OF A CREDIT, which is not
+      fussiness. Storage over the included amount is charged daily and the daily
+      figure is usually a fraction of a credit — rounded down it is free for
+      ever, rounded up it is thirty times the price. An accumulator is the only
+      arithmetic that is neither.
+    */
+    `CREATE TABLE IF NOT EXISTS billing_account (tenant_id TEXT PRIMARY KEY, customer_ref TEXT, currency TEXT NOT NULL, granted INTEGER, bought INTEGER, held INTEGER NOT NULL, auto_pack TEXT, auto_below INTEGER, auto_at TEXT, auto_error TEXT, storage_milli INTEGER, at TEXT NOT NULL);`,
     /* ⚠️ AND ONE PER PRODUCT THEY HAVE SWITCHED ON. */
     `CREATE TABLE IF NOT EXISTS subscription (tenant_id TEXT NOT NULL, app_id TEXT NOT NULL, plan_id TEXT NOT NULL, status TEXT NOT NULL, at TEXT NOT NULL, past_due_at TEXT, trial_ends_at TEXT, overrides_json TEXT, adjustments_json TEXT, PRIMARY KEY (tenant_id, app_id));`,
     `CREATE INDEX IF NOT EXISTS ix_subscription_due ON subscription (status, past_due_at);`,

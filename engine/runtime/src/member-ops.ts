@@ -91,6 +91,12 @@ export interface PlatformCtx extends Ctx {
   /** ⚠️ And what it sells one-off. One wallet, so one list — see `PACKS`. */
   readonly packs: readonly PackDef[];
   /**
+   * ⚠️ WHAT A GIGABYTE-MONTH OVER THE INCLUDED AMOUNT COSTS, so the screen can
+   * say the line is coming before the meter does. A price nobody could see until
+   * it was charged is the same surprise as a refusal, arriving later.
+   */
+  readonly storageRate: number;
+  /**
    * ⚠️ WHAT A STORED CREDENTIAL IS ENCRYPTED UNDER — see `config.ts`. Absent is a
    * deployment that holds no keys, and every lane behind one refuses rather than
    * running on a value it could not read.

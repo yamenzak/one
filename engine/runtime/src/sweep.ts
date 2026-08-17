@@ -26,19 +26,22 @@
  * every shard and times out at the size where it starts to matter.
  */
 
-import type { AppSpec, Instant, PackDef, TenantId } from "@engine/kernel";
+import type { AppSpec, Instant, PackDef, PlanSpec, TenantId } from "@engine/kernel";
+import { UNLIMITED } from "@engine/kernel";
 
 import { erase } from "./records.js";
 import { closeTenant, forgetBelonging, membersOfTenant, tenantById } from "./directory.js";
 import { forgetWorkspace } from "./dossier.js";
-import { eraseObjects, type Bucket, type Where } from "./storage.js";
+import { bytesUsed, eraseObjects, type Bucket, type Where } from "./storage.js";
 import { forgetBranding } from "./branding.js";
 import { forgetIcon } from "./icon.js";
 import { dueForErasure, run } from "./jobs.js";
 import { apply, type ApplyDeps } from "./resources.js";
 import { carryObjects, carryRows, finishMove, reapMoved } from "./move.js";
 import { chargeOffSession, type StripeDeps } from "./stripe.js";
-import { dueForTopUp, noteTopUpAttempt, noteTopUpFailed } from "./wallet.js";
+import {
+  collectOwed, dueForTopUp, noteTopUpAttempt, noteTopUpFailed, owe, walletOf, MILLI,
+} from "./wallet.js";
 import { column, table, type Db } from "./sql.js";
 
 export interface SweepDeps {
@@ -66,6 +69,17 @@ export interface SweepDeps {
    * every test and every `wrangler dev` runs.
    */
   readonly packs?: readonly PackDef[];
+  /**
+   * ⚠️ WHAT A WORKSPACE'S PLAN INCLUDES, so the storage meter knows where the
+   * included amount ends. Absent is a deployment that meters nothing.
+   */
+  readonly plans?: readonly PlanSpec[];
+  /**
+   * ⚠️ WHAT A GIGABYTE-MONTH COSTS OVER THE INCLUDED AMOUNT, in credits. It is
+   * the deployment's number rather than a constant here, because it is a price
+   * and every price in this repository is a declaration somebody can read.
+   */
+  readonly storageRate?: number;
   /** ⚠️ What a stored Stripe key is encrypted under — see `config.ts`. */
   readonly configSecret?: string;
   /**
@@ -255,6 +269,16 @@ export async function sweep(deps: SweepDeps): Promise<void> {
     for — and because the point is to top up BEFORE the balance reaches zero,
     which is a question about a threshold rather than about a refusal.
   */
+  /*
+    ⚠️ THE STORAGE METER RUNS BEFORE THE TOP-UPS, and the order is deliberate:
+    the meter is what pushes a balance under the threshold, so metering second
+    would leave every workspace it emptied waiting a day for the top-up that
+    would have covered it.
+  */
+  if (deps.plans?.length && deps.storageRate) {
+    await run(deps.directory, "storage", () => sweepStorage(deps), now);
+  }
+
   if (deps.packs?.length) {
     await run(deps.directory, "topups", () => sweepTopUps(deps), now);
   }
@@ -403,6 +427,85 @@ export async function sweepTopUps(deps: SweepDeps): Promise<{ touched: number; d
     }
     charged++;
     said.push(`${owing.tenantId}: ${pack.id}`);
+  }
+
+  return { touched: charged, detail: said.join("; ") || "nothing to do" };
+}
+
+/* --------------------------------------------------------------- storage --- */
+
+/** ⚠️ A month, for proration. Not a calendar month — an average, so a February
+    day does not cost more than a March one for the same bytes. */
+const DAYS_IN_MONTH = 30;
+const GB = 1024 * 1024 * 1024;
+
+/**
+ * WHAT EVERY WORKSPACE IS STORING, AND WHAT THE EXCESS COSTS.
+ *
+ * ⚠️ A METER, NOT A REFUSAL, AND THAT IS THE DESIGN. A seat and a domain are
+ * things somebody adds deliberately, so refusing past the number is fair.
+ * Storage accumulates as a side effect of ordinary work — refusing an upload
+ * because a colleague filled the bucket punishes the wrong person for doing
+ * their job, and it does it at the worst possible moment. So the included amount
+ * is where the meter STARTS rather than where the product stops.
+ *
+ * ⚠️ AND IT NEVER DELETES ANYTHING. Not at the included amount, not when the
+ * wallet empties, not ever. A product that deletes a customer's files to settle
+ * a bill is one nobody can safely put anything in.
+ *
+ * ⚠️ WHAT AN EMPTY WALLET COSTS IS THE WRITES, and only the writes. The debt
+ * stays owed, `locate` narrows the standing to read-only, and everything is
+ * still there to read and to export — the same rung the unpaid-invoice ladder
+ * starts on, for the same reason.
+ *
+ * ⚠️ AND UNLIMITED IS UNLIMITED. `-1` is a real answer every consumer knows, and
+ * a meter that treated it as a number would charge the tiers that were sold as
+ * having no limit.
+ */
+export async function sweepStorage(deps: SweepDeps): Promise<{ touched: number; detail: string }> {
+  const now = (deps.now ?? (() => new Date()))();
+  const plans = deps.plans ?? [];
+  const rate = deps.storageRate ?? 0;
+  if (!rate) return { touched: 0, detail: "no rate" };
+
+  const rows = await deps.directory.prepare(
+    `SELECT t.id AS tenant_id, s.plan_id AS plan_id
+     FROM tenant t LEFT JOIN subscription s ON s.tenant_id = t.id
+     WHERE t.closed_at IS NULL`).all<{ tenant_id: string; plan_id: string | null }>();
+
+  let charged = 0;
+  const said: string[] = [];
+
+  for (const row of rows.results) {
+    const tenantId = row.tenant_id as TenantId;
+    const plan = plans.find((p) => p.id === row.plan_id)
+      ?? plans.find((p) => p.parking);
+    const included = plan?.includes.storage;
+    /* ⚠️ Unlimited is unlimited, and a plan silent about storage is refused at
+       boot — so a missing number here is a workspace nothing can price. */
+    if (included === UNLIMITED || typeof included !== "number") continue;
+
+    const db = await deps.shardOf(tenantId);
+    /* ⚠️ A SHARD THIS DEPLOYMENT DOES NOT BIND IS SKIPPED, NOT CHARGED. Reading
+       zero bytes off a database we cannot reach and calling it "under the
+       limit" is a meter that silently stops metering. */
+    if (!db) { said.push(`${tenantId}: no shard`); continue; }
+
+    const used = await bytesUsed(db, tenantId);
+    const over = used - included;
+    if (over <= 0) continue;
+
+    /* ⚠️ THOUSANDTHS, because a day of a few hundred megabytes over is a
+       fraction of a credit — see `owe`. */
+    const milli = (over / GB) * rate * MILLI / DAYS_IN_MONTH;
+    await owe(deps.directory, tenantId, milli);
+
+    const took = await collectOwed(deps.directory, tenantId, "Storage over your plan", now);
+    if (took > 0) charged++;
+
+    const wallet = await walletOf(deps.directory, tenantId);
+    said.push(`${tenantId}: ${Math.round(over / GB * 100) / 100}GB over`
+      + (wallet.owing ? ", unpaid" : ""));
   }
 
   return { touched: charged, detail: said.join("; ") || "nothing to do" };

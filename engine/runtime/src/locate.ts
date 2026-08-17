@@ -113,6 +113,27 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
       : standing;
 
     const wallet = await walletOf(deps.directory, tenant.id);
+
+    /*
+      ⚠️ A METERED DEBT AN EMPTY WALLET CANNOT COVER STOPS THE WRITES, and it
+      stops nothing else. Storage over the included amount is metered rather than
+      refused — refusing an upload because a colleague filled the bucket punishes
+      the wrong person — so the consequence arrives here instead, one rung up:
+      everything is still readable and exportable, and adding credits clears it.
+
+      ⚠️ AND IT NARROWS RATHER THAN REPLACES, like the move above. Replacing
+      would hand a suspended workspace `serving: true` because it happens to owe
+      for storage as well; the strictest standing wins here as it does everywhere.
+    */
+    const owing = wallet.owing
+      ? {
+        writable: false,
+        serving: settled.serving,
+        reason: settled.reason
+          || "This workspace is over its included storage and out of credits. "
+            + "Adding credits makes it writable again. Nothing has been deleted.",
+      }
+      : settled;
     /* ⚠️ SETTLED BEFORE THE GATE RUNS. The gate asks synchronously and a
        database does not answer synchronously, so the counts are read here and
        served from memory — which also means two gates in one request cannot
@@ -134,7 +155,7 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
          JURISDICTION. Residency is in the addressing rather than in a check —
          see `bucketOf`. */
       residency: tenant.residency,
-      standing: settled,
+      standing: owing,
       entitlements: held.entitlements,
       flags: (await deps.flags?.(tenant)) ?? {},
       balance: wallet.spendable,

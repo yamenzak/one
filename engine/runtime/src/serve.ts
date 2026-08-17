@@ -157,6 +157,8 @@ export interface Wiring {
   readonly plans?: readonly PlanSpec[];
   /** ⚠️ And the one-off packs, for the same reason — see `PlatformCtx.packs`. */
   readonly packs?: readonly PackDef[];
+  /** ⚠️ What storage over a plan's included amount costs — see `PlatformCtx`. */
+  readonly storageRate?: number;
 }
 
 /**
@@ -637,6 +639,7 @@ export async function performOperation(
        nothing, which every reader already handles as the parking state. */
     plans: wiring.plans ?? [],
     packs: wiring.packs ?? [],
+    storageRate: wiring.storageRate ?? 0,
     ...(wiring.configSecret ? { configSecret: wiring.configSecret } : {}),
     /* ⚠️ ONE READ PER REQUEST AT MOST, AND ONLY IF A HANDLER ASKS. Resolved for
        the app the operation belongs to, because a setting is that app's. */

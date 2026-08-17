@@ -63,18 +63,38 @@ export interface Wallet {
   readonly balance: number;
   /** What may actually be spent right now. */
   readonly spendable: number;
+  /**
+   * ⚠️ WHAT THE METERS COULD NOT COLLECT, in thousandths of a credit. Storage
+   * over the included amount is charged daily against this wallet; what an empty
+   * wallet could not cover stays here rather than being written off, because a
+   * debt forgiven silently is a meter that stops metering.
+   */
+  readonly owedMilli: number;
+  /**
+   * ⚠️ OWING AND UNABLE TO PAY, which is the one condition that stops writes
+   * without an invoice behind it. A workspace that is merely over its included
+   * storage is fine — the meter draws and nobody notices, which is the whole
+   * point of metering rather than refusing.
+   */
+  readonly owing: boolean;
 }
 
-const shape = (granted: number, bought: number, held: number): Wallet => {
+const shape = (granted: number, bought: number, held: number, owedMilli: number): Wallet => {
   const balance = granted + bought;
-  return { granted, bought, held, balance, spendable: Math.max(0, balance - held) };
+  const spendable = Math.max(0, balance - held);
+  return {
+    granted, bought, held, balance, spendable, owedMilli,
+    owing: owedMilli > 0 && spendable <= 0,
+  };
 };
 
 export async function walletOf(db: Db, tenantId: TenantId): Promise<Wallet> {
   const row = await db.prepare(
-    `SELECT granted, bought, held FROM billing_account WHERE tenant_id = ?`)
-    .bind(tenantId).first<{ granted: number | null; bought: number | null; held: number }>();
-  return shape(row?.granted ?? 0, row?.bought ?? 0, row?.held ?? 0);
+    `SELECT granted, bought, held, storage_milli FROM billing_account WHERE tenant_id = ?`)
+    .bind(tenantId).first<{
+      granted: number | null; bought: number | null; held: number; storage_milli: number | null;
+    }>();
+  return shape(row?.granted ?? 0, row?.bought ?? 0, row?.held ?? 0, row?.storage_milli ?? 0);
 }
 
 export async function openAccount(
@@ -355,6 +375,61 @@ export async function settle(
 export async function release(db: Db, tenantId: TenantId, held: Reserve): Promise<void> {
   await db.prepare(`UPDATE billing_account SET held = MAX(0, held - ?) WHERE tenant_id = ?`)
     .bind(held.credits, tenantId).run();
+}
+
+/* ------------------------------------------------------- what the meters owe --- */
+
+/**
+ * A METERED CHARGE THE WALLET COULD NOT COVER STAYS OWED.
+ *
+ * ⚠️ THE DEBT IS IN THOUSANDTHS, AND THE ARITHMETIC IS THE REASON. A day's
+ * storage over the included amount is usually a fraction of a credit: rounded
+ * down it is free for ever, rounded up it is thirty times the price, and both
+ * are wrong on every deployment every day. The accumulator is neither.
+ *
+ * ⚠️ AND IT DRAWS AS FAR AS IT CAN RATHER THAN ALL-OR-NOTHING. A workspace with
+ * 3 credits and a 5-credit debt pays 3 and owes 2 — refusing the whole charge
+ * would leave a wallet with money in it and a debt beside it, which reads to
+ * everybody as a bug.
+ */
+export const MILLI = 1000;
+
+export async function owe(
+  db: Db, tenantId: TenantId, milli: number,
+): Promise<void> {
+  if (milli <= 0) return;
+  await db.prepare(
+    `UPDATE billing_account SET storage_milli = COALESCE(storage_milli, 0) + ? WHERE tenant_id = ?`)
+    .bind(Math.round(milli), tenantId).run();
+}
+
+/**
+ * Take what is owed, as far as the wallet allows.
+ *
+ * ⚠️ WHOLE CREDITS ONLY, AND THE REMAINDER STAYS OWED. Drawing a fraction is not
+ * a thing a ledger can record, and a ledger that cannot record a movement is one
+ * whose balance nobody can reconstruct.
+ *
+ * ⚠️ THE ALLOWANCE FIRST, LIKE EVERY OTHER SPEND — see `settle`.
+ */
+export async function collectOwed(
+  db: Db, tenantId: TenantId, reason: string, now = new Date(),
+): Promise<number> {
+  const wallet = await walletOf(db, tenantId);
+  const wanted = Math.floor(wallet.owedMilli / MILLI);
+  const take = Math.min(wanted, wallet.spendable);
+  if (take <= 0) return 0;
+
+  await db.prepare(
+    `UPDATE billing_account SET
+       granted = MAX(0, COALESCE(granted, 0) - MIN(COALESCE(granted, 0), ?)),
+       bought = MAX(0, COALESCE(bought, 0) - MAX(0, ? - COALESCE(granted, 0))),
+       storage_milli = MAX(0, COALESCE(storage_milli, 0) - ?)
+     WHERE tenant_id = ?`)
+    .bind(take, take, take * MILLI, tenantId).run();
+
+  await record(db, tenantId, -take, reason, {}, now);
+  return take;
 }
 
 /* ----------------------------------------------------------------- report --- */

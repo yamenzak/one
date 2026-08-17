@@ -169,6 +169,25 @@ export async function mediaOf(
   return rows.results.map(asRow);
 }
 
+/**
+ * HOW MUCH ROOM THIS WORKSPACE IS TAKING.
+ *
+ * ⚠️ FROM THE LEDGER, NOT FROM THE BUCKET. R2 has no "how many bytes does this
+ * prefix hold" — answering it means listing every object, which costs a request
+ * per thousand files and gets slower with every upload. The ledger row carries
+ * the size because every write goes through one place (`putMedia`), which is the
+ * property that makes this a single `SUM`.
+ *
+ * ⚠️ AND IT IS THE MEASURE A BILL IS BUILT FROM, so a file written behind the
+ * ledger is one nobody is charged for — which is the same hole as a file nobody
+ * can erase, and is why there is exactly one writer.
+ */
+export async function bytesUsed(db: Db, tenantId: TenantId): Promise<number> {
+  const row = await db.prepare(`SELECT SUM(bytes) AS n FROM media WHERE tenant_id = ?`)
+    .bind(tenantId).first<{ n: number | null }>();
+  return row?.n ?? 0;
+}
+
 /* --------------------------------------------------------------- erasure --- */
 
 /**

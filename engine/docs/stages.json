@@ -243,6 +243,11 @@
       "n": 46,
       "status": "shipped",
       "title": "The wallet tops itself up — a standing instruction, a cooldown, and a decline the customer can read"
+    },
+    {
+      "n": 47,
+      "status": "shipped",
+      "title": "Storage is metered rather than refused — the included amount is where the meter starts, and an empty wallet costs the writes and never the files"
     }
   ]
 }

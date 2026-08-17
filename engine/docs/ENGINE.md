@@ -398,7 +398,7 @@ env or a binding.
 | `records` | the generated reads and writes behind a collection | 6 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
 | `billing` | plans, subscriptions, the bill, the ladder | 12 | 1 |
-| `wallet` | OneWallet: the allowance, what was bought, and reserve → settle → release | 17 | — |
+| `wallet` | OneWallet: the allowance, what was bought, and reserve → settle → release | 20 | — |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
 | `inbox` | notifications: the policy, the audience, the read | 10 | — |
 | `services` | the lane out to a provider — AI and mail | 5 | 1 |
@@ -424,17 +424,17 @@ env or a binding.
 | `installable` | the manifest and the icon a workspace is installed as | 6 | — |
 | `platform-schema` | the platform's own tables, in dependency order, listed once | 2 | — |
 | `dispatch` | an event an operation raises becomes a note in somebody's inbox | 1 | — |
-| `sweep` | the daily clock: erase what is past the ladder's last rung | 5 | — |
+| `sweep` | the daily clock: erase what is past the ladder's last rung | 6 | — |
 | `vault-ops` | consent, grants, who looked, the processing record, export and erasure | 1 | — |
 | `dossier` | everything we hold about one person, and everything of theirs we delete | 8 | — |
 | `legal` | who agreed to what version, and the wall until they have | 6 | — |
 | `cloudflare` | the one door out to the account — create, destroy, and add a binding | 7 | — |
-| `storage` | files: the object, the row that knows its key, and the erasure of both | 6 | — |
+| `storage` | files: the object, the row that knows its key, and the erasure of both | 7 | — |
 | `move` | a workspace's records change shard — the only way its jurisdiction can | 8 | — |
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**297 of them**, 294 reached by something today.
+**302 of them**, 299 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -585,6 +585,10 @@ its own header, cited by other files, and doing nothing.
 | `every-key-a-product-declares-is-priced-by-every-tier` | D1 | a feature built, shipped and sold to nobody - an unpriced key resolves to off for every workspace on every tier, and no screen anywhere says why |
 | `the-lobby-is-free-and-cannot-be-bought` | D21 | a workspace charged for the parking state it never chose, or offered it at checkout as though not having a plan were a plan |
 | `one-catalogue-one-currency` | D1 | two tiers priced in different currencies and a bill that adds them together |
+| `storage-is-measured-from-the-ledger` | D12 | a bill built by listing every object in a bucket - a request per thousand files, slower with every upload, and unanswerable at the size where it starts to matter |
+| `a-fraction-of-a-credit-is-neither-free-nor-rounded-up` | D12 | storage that is free for ever because a day of it rounds down, or costs thirty times the price because it rounds up |
+| `a-metered-charge-takes-what-there-is` | D12 | a wallet with money in it beside an uncollected debt, which reads to everybody as a bug |
+| `an-unpayable-meter-costs-the-writes-and-never-the-files` | D12 | a product that deletes a customer's files to settle a bill, which is one nobody can safely put anything in |
 | `a-standing-charge-is-armed-by-a-person` | D12 | a card charged on a standing instruction the customer never set - the shape of every subscription complaint there has ever been |
 | `a-standing-charge-runs-at-most-once-an-hour` | D12 | a workspace out of credits on a busy afternoon charged as fast as its requests arrive, with the first sign of it being the statement |
 | `the-threshold-reads-what-can-be-spent` | D12 | a workspace out of usable credits with a standing instruction that never fires, because the balance still looks healthy under a large hold |
@@ -793,7 +797,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 89 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 93 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -886,8 +890,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 44 | A one-off purchase — a credit pack, and becoming a business — through the same checkout | shipped |
 | 45 | A plan is edited, and everybody already on it keeps what they were sold | **planned** |
 | 46 | The wallet tops itself up — a standing instruction, a cooldown, and a decline the customer can read | shipped |
+| 47 | Storage is metered rather than refused — the included amount is where the meter starts, and an empty wallet costs the writes and never the files | shipped |
 
-**37 shipped, 9 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**38 shipped, 9 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---
