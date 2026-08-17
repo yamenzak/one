@@ -61,6 +61,7 @@ reader can trust this table instead of re-reading the code.
 | 33 | A setting reaches the code — a handler reads one, and a guard refuses a switch that changes nothing | planned |
 | 34 | The kernel's remaining conveniences are each used by a lane or removed | planned |
 | 35 | A workspace runs its own retention ladder against its own customers, and ours freezes it | planned |
+| 36 | The deployment provisions itself — a product declares what it needs underneath it, and the reconciler makes it exist in the right jurisdiction, binds it, and reaps it after a drain | shipped |
 
 ## What is NOT built, and where to pick it up
 
@@ -724,13 +725,13 @@ The guard registry, its checks, and the standards that bind them.
 | D3 | One worker on the request path; heavy work splits over RPC service bindings | 6 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 1 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 9 |
-| D6 | Jurisdiction is a workspace fact, derived from the business's country | 1 |
+| D6 | Jurisdiction is a workspace fact, derived from the business's country | 2 |
 | D7 | HeroUI v3 is the component layer, and its components are not restyled | 57 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
 | D9 | Libraries encode decisions; we write invariants | 1 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 15 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 54 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 59 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -946,6 +947,12 @@ the library decides FOR us.
 | `the-copy-and-the-deletion-are-reachable` | D11 | a complete ledger walked by no operation — the third whole mechanism in this repository to ship with no address |
 | `agreed-before-the-product-opens` | D12 | somebody using a product under terms they never saw, with a record that says they agreed to a version that did not exist yet |
 | `an-acceptance-scope-is-derived` | D12 | a guest answering the data-processing agreement for a business they do not run, recorded for ever as that business having signed it |
+| `one-door-out-to-the-account` | D12 | a second caller reaching the account token's API, inheriting none of the bounds written in cloudflare.ts |
+| `bindings-are-added-never-repointed` | D12 | a leaked account token repointing DIRECTORY at somebody else's database, taking every account, session and workspace with it, with nothing looking wrong |
+| `the-current-bindings-are-read-first` | D12 | a computed binding set replacing the array rather than adding to it, deleting every binding the computation did not know about |
+| `a-residency-verdict-per-resource-kind` | D6 | a queue or a KV namespace carrying somebody's name under an EU promise the vendor offers no way to keep |
+| `live-is-written-only-where-the-binding-is-seen` | D12 | a resource reported usable while its binding still reads undefined, which is an empty answer rather than an error |
+| `a-resource-drains-before-it-is-destroyed` | D12 | an app removed by a typo taking its database with it in the same minute, behind a green log line |
 <!-- /generated -->
 
 ## Commands

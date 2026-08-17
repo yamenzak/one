@@ -33,6 +33,7 @@ import { closeTenant, forgetBelonging, membersOfTenant, tenantById } from "./dir
 import { forgetWorkspace } from "./dossier.js";
 import { forgetBranding } from "./branding.js";
 import { dueForErasure, run } from "./jobs.js";
+import { apply, type ApplyDeps } from "./resources.js";
 import { column, table, type Db } from "./sql.js";
 
 export interface SweepDeps {
@@ -47,6 +48,14 @@ export interface SweepDeps {
    * per customer.
    */
   readonly shards: readonly Db[];
+  /**
+   * ⚠️ THE INFRASTRUCTURE RECONCILER, AND IT IS OPTIONAL BECAUSE A DEPLOYMENT
+   * WITH NO TOKEN IS A LEGITIMATE DEPLOYMENT. Absent means every resource a
+   * product declares stays `wanted` and every capability behind one reads as
+   * absent — which is the honest behaviour, and is what a self-host and every
+   * test run actually are.
+   */
+  readonly reconcile?: Omit<ApplyDeps, "directory" | "now">;
   readonly now?: () => Date;
 }
 
@@ -187,4 +196,32 @@ export async function sweep(deps: SweepDeps): Promise<void> {
      asks after something was kept too long. Two jobs, two records, and the
      console shows which of them stopped. */
   await run(deps.directory, "retention", () => sweepRetention(deps), now);
+
+  /*
+    ⚠️ AND THE INFRASTRUCTURE, ON THE SAME CLOCK. Reconciling on a schedule
+    rather than on a deploy is what makes "this app needs a queue" a line in a
+    manifest instead of a ticket: the declaration lands, the next pass makes it
+    exist, and the pass after that sees the binding and marks it live.
+
+    ⚠️ IT CANNOT DESTROY ANYTHING IT DECIDED ABOUT TODAY. Everything destructive
+    here is at the far end of a thirty-day drain, so a nightly job holding the
+    account token cannot turn a bad edit into data loss — the worst it can do
+    overnight is create something spurious, which is a bill and not an
+    incident.
+  */
+  if (deps.reconcile) {
+    const at = deps.reconcile;
+    await run(deps.directory, "resources", async () => {
+      const out = await apply({ ...at, directory: deps.directory, now: () => now });
+      /* ⚠️ A REFUSAL THROWS, BECAUSE `run` DECIDES `ok` FROM WHETHER THIS DID.
+         Returned as an ordinary result it is a green run row over a
+         reconciliation that achieved nothing — a job quietly doing nothing for a
+         month, which is exactly how a reconciler stops being one. What DID
+         happen is in the message, so a partial pass is not lost either. */
+      if (out.refused.length) {
+        throw new Error([...out.did, ...out.refused.map((r) => `refused: ${r}`)].join("; "));
+      }
+      return { touched: out.did.length, detail: out.did.join("; ") || "nothing to do" };
+    }, now);
+  }
 }

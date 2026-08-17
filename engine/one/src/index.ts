@@ -16,13 +16,13 @@
  * than six lookups each caller does for itself.
  */
 
-import type { AccountId, AppSpec, DeploymentLegal, Door, TenantId } from "@engine/kernel";
+import type { AccountId, AppSpec, DeploymentLegal, Door, Residency, TenantId } from "@engine/kernel";
 import { subProcessor, under } from "@engine/kernel";
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
   NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, acceptanceScope,
   deploymentFaults, locator,
-  accept, memberFor, noteShardApp, owedBy, sweep, tenantById, tenantBySlug,
+  accept, memberFor, noteShardApp, observe, owedBy, sweep, tenantById, tenantBySlug,
   operatorOps, permissionsResolver, personalOps, schemaFor, serve, sessionIdFrom, shardFor,
   subscriptionFor, whoIs,
   type Db, type TenantRow,
@@ -53,6 +53,14 @@ const APPS: Readonly<Record<string, () => AppSpec>> = {
  * whoever signed in first would discover.
  */
 const SHARDS = ["eu-1"] as const;
+
+/**
+ * ⚠️ WHICH JURISDICTIONS THIS DEPLOYMENT ACTUALLY PROMISES, derived from the
+ * shards it binds. It is what decides whether a queue carrying somebody's name
+ * is a broken promise or an ordinary queue — see `refuseNeeds`. Written beside
+ * `SHARDS` because the two are one fact: a shard IS a jurisdiction.
+ */
+const SHARD_RESIDENCY: readonly Residency[] = ["eu"];
 
 /**
  * ⚠️ THE SERVICE BINDINGS SOMETHING ACTUALLY REACHES. Empty is the honest answer
@@ -149,6 +157,22 @@ export interface Env {
    * special category cannot write one, and the write says so — see `VaultSeam`.
    */
   readonly VAULT_SECRET?: string;
+  /**
+   * ⚠️ THE ACCOUNT TOKEN, AND IT IS A WORKER SECRET RATHER THAN A ROW ON
+   * PURPOSE. It can create and destroy this deployment's databases and edit the
+   * worker's own bindings; a row holding it is readable by anything that can
+   * read the database, and this credential can rewrite what the database IS.
+   *
+   * ⚠️ SCOPE IT. D1:Edit, Workers KV:Edit, Workers R2:Edit, Queues:Edit and
+   * Workers Scripts:Edit are the whole surface `cloudflare.ts` uses. An
+   * account-wide token buys nothing here and loses everything if it leaks.
+   *
+   * ⚠️ ABSENT IS A WORKING DEPLOYMENT. Every declared need stays `wanted`, every
+   * capability behind one reads as absent, and nothing fails — which is exactly
+   * what a self-host and every test run are.
+   */
+  readonly CF_API_TOKEN?: string;
+  readonly CF_ACCOUNT_ID?: string;
   readonly [binding: string]: unknown;
 }
 
@@ -194,11 +218,20 @@ const boot = (env: Env): Promise<void> => {
   booted ??= (async () => {
     const directory = env.DIRECTORY as unknown as Db;
     await applySchema(directory, DIRECTORY_MODULES);
-    /* Every app this deployment serves, on the one shard it has today. */
-    await applySchema(env.SHARD_EU_1 as unknown as Db, [
-      ...Object.values(APPS).map((make) => schemaFor(make())),
-      ...SHARD_MODULES,
-    ]);
+    /*
+      ⚠️ EVERY SHARD IN `SHARDS`, NOT ONE NAMED BINDING. This read
+      `env.SHARD_EU_1` while `SHARDS` drove registration, so the second shard
+      would have been registered, placed on, and never migrated — and the fault
+      is not an error anywhere: `placeOn` picks the emptiest eligible shard, so
+      the FIRST new workspace lands on it and every request it makes answers
+      "no such table". One list, walked.
+    */
+    for (const id of SHARDS) {
+      await applySchema(shardFor(env as never, id), [
+        ...Object.values(APPS).map((make) => schemaFor(make())),
+        ...SHARD_MODULES,
+      ]);
+    }
     /*
       ⚠️ THE SHARD THIS DEPLOYMENT BINDS IS DECLARED AT BOOT, IDEMPOTENTLY. The
       directory places every new workspace on a registered shard — with no row,
@@ -223,6 +256,15 @@ const boot = (env: Env): Promise<void> => {
       boot over any of them would take a serving deployment down to report a
       cost. What must not happen is silence, and that is what this ends.
     */
+    /*
+      ⚠️ AND WHAT THE LAST RECONCILIATION ASKED FOR, CONFIRMED BY AN ISOLATE THAT
+      CAN ACTUALLY SEE IT. A binding is added by a PATCH that produces a new
+      version, so the isolate that asked cannot observe its own request landing;
+      this one is running that version. Nothing else in the system knows the
+      difference between "we asked for it" and "it is there".
+    */
+    for (const said of await observe(directory, env)) console.log(`[boot] ${said}`);
+
     for (const fault of deploymentFaults({
       env,
       shards: [...SHARDS],
@@ -366,7 +408,22 @@ const handler = (env: Env) => {
         admits the signed-in developer and NOBODY in production — an empty
         allow-list on a live deployment is unconfigured, not open.
       */
-      ...operatorOps({ apps: APPS, isOperator }),
+      ...operatorOps({
+        apps: APPS, isOperator,
+        deployment: "one",
+        serves: [...new Set(SHARD_RESIDENCY)],
+        /*
+          ⚠️ THE TOKEN COMES FROM `env` AND NEVER FROM A ROW, and this closure is
+          the whole of its reach. It can create this deployment's databases and
+          add bindings to this worker — so a copy in the directory would be a
+          credential that can rewrite what the directory IS, readable by anything
+          that can read it. Absent is a deployment that cannot provision, which
+          the console reports rather than throwing over.
+        */
+        account: () => env.CF_API_TOKEN && env.CF_ACCOUNT_ID
+          ? { accountId: env.CF_ACCOUNT_ID, token: env.CF_API_TOKEN, script: "one" }
+          : null,
+      }),
     },
 
     /*
@@ -522,6 +579,23 @@ export default {
           /* ⚠️ Retention is a rule about rows: one statement per table per
              database, not one per workspace. */
           shards: SHARDS.map((id) => shardFor(env as never, id)),
+          /* ⚠️ ONLY WHERE THERE IS A TOKEN. Absent is a deployment that cannot
+             provision, which is a state it has to survive rather than an error
+             — a self-host, a test run, and this one before the secret is set. */
+          ...(env.CF_API_TOKEN && env.CF_ACCOUNT_ID
+            ? {
+              reconcile: {
+                at: {
+                  accountId: env.CF_ACCOUNT_ID, token: env.CF_API_TOKEN,
+                  /* The worker's own name, from its config. */
+                  script: "one",
+                },
+                deployment: "one",
+                apps: Object.values(APPS).map((make) => make()),
+                serves: [...new Set(SHARD_RESIDENCY)],
+              },
+            }
+            : {}),
         });
       } catch (why) {
         console.error("[sweep]", why);

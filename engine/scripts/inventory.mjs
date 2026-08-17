@@ -158,6 +158,7 @@ if (what === "guards") {
    */
   const KERNEL = [
     ["primitives", "ids, days, instants, slugs — the words everything else is spelled in"],
+    ["infra", "what a product needs underneath it, and what each kind can promise"],
     ["field", "what a value is: its kind, its bounds, what it holds, whether it is the app's to keep"],
     ["collection", "what a thing an app keeps is — and the six operations it gets for free"],
     ["operation", "one declaration carrying every cross-cutting concern (D12)"],
@@ -220,6 +221,8 @@ if (what === "guards") {
     ["vault-ops", "consent, grants, who looked, the processing record, export and erasure"],
     ["dossier", "everything we hold about one person, and everything of theirs we delete"],
     ["legal", "who agreed to what version, and the wall until they have"],
+    ["cloudflare", "the one door out to the account — create, destroy, and add a binding"],
+    ["resources", "wanted → created → bound → live → draining → gone, and the reaper"],
   ];
 
   const pkg = what === "declares" ? "kernel" : "runtime";

@@ -11,7 +11,7 @@
  * a list of company names without it answers nothing.
  */
 
-import type { DocumentDef, RopaEntry, SubProcessorBook } from "@engine/kernel";
+import type { DocumentDef, NeedBook, RopaEntry, SubProcessorBook } from "@engine/kernel";
 import { Button, Card, Chip, Table } from "@heroui/react";
 import { ControlRow, FieldRow, Group } from "../parts/surfaces.js";
 import { SPACE } from "../tokens/metrics.js";
@@ -153,3 +153,55 @@ export function SubProcessors({ book }: { readonly book: SubProcessorBook }) {
     </>
   );
 }
+
+/**
+ * WHERE IT ACTUALLY LIVES — the infrastructure holding somebody's records, and
+ * whether it can be held to the jurisdiction they were promised.
+ *
+ * ⚠️ THIS IS THE HALF OF A PRIVACY NOTICE THAT IS USUALLY A SENTENCE SOMEBODY
+ * WROTE. "Your data is stored in the EU" is either true of every store the
+ * product touches or it is not true at all, and the difference is invisible from
+ * outside: a bucket in the right jurisdiction and a queue with none look
+ * identical to everybody except a regulator.
+ *
+ * ⚠️ SO IT IS DERIVED FROM `AppSpec.needs`, WHICH IS THE SAME DECLARATION THE
+ * RECONCILER PROVISIONS FROM. One list: what a product needs, where it was made,
+ * and what it can promise. A store that cannot keep the promise is shown saying
+ * so rather than omitted — a record that quietly lists only the compliant half
+ * is the one that gets somebody in trouble.
+ */
+export function WhereItLives(
+  { needs, keeps }: {
+    readonly needs: NeedBook;
+    /** ⚠️ The kernel's table, passed rather than imported, so this stays a view. */
+    readonly keeps: Readonly<Record<string, boolean>>;
+  },
+) {
+  const all = Object.values(needs);
+  if (!all.length) return null;
+  return (
+    <div className={`flex flex-col ${SPACE.snug}`}>
+      {all.map((n) => (
+        <Group key={n.id} label={n.why}>
+          <FieldRow label="What holds it" value={KIND_SAID[n.kind] ?? n.kind} />
+          <FieldRow label="What goes through it" value={n.holds === "none" ? "Nothing personal" : n.holds} />
+          {/*
+            ⚠️ NAMED IN BOTH DIRECTIONS. A store that can be pinned to a region
+            says so; one that cannot says that, and a reader can tell which
+            without knowing anything about the vendor.
+          */}
+          <FieldRow
+            label="Kept in one region"
+            value={keeps[n.kind] ? "Yes" : "No — so nothing personal is put through it here"}
+          />
+        </Group>
+      ))}
+    </div>
+  );
+}
+
+/** ⚠️ A vendor's product name means nothing to the person reading this. */
+const KIND_SAID: Readonly<Record<string, string>> = {
+  d1: "A database", r2: "File storage", kv: "A cache",
+  queue: "A work queue", ai: "A model provider", do: "A live session",
+};

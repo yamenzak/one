@@ -21,7 +21,11 @@
  */
 
 import type { AccountId, AppId, Allowance, AppSpec, FlagBook, ModelRow, TenantId } from "@engine/kernel";
-import { inLane, mayIsolate, refuseCatalogue, refusePrompt } from "@engine/kernel";
+import { KEEPS_RESIDENCY, inLane, mayIsolate, refuseCatalogue, refusePrompt } from "@engine/kernel";
+import type { Residency } from "@engine/kernel";
+import type { Account } from "./cloudflare.js";
+import { verify } from "./cloudflare.js";
+import { apply, plan, resources, wanted } from "./resources.js";
 import { actionsOf, bind, bindingsOf, running } from "./ai-actions.js";
 import { adjust, subscriptionFor } from "./billing.js";
 import {
@@ -95,6 +99,17 @@ export interface OperatorDeps {
   readonly isOperator: (email: string | null) => boolean;
   /** ⚠️ The model catalogue — the platform's, and the same rows metering reads. */
   readonly models?: () => Promise<readonly ModelRow[]>;
+  /**
+   * ⚠️ THE ACCOUNT, AND ITS ABSENCE IS AN ANSWER RATHER THAN A FAILURE. A
+   * deployment with no token cannot provision, which is the state of a
+   * self-host, of every test run, and of this one before the secret is set. The
+   * console says so in a sentence instead of offering a button that 500s.
+   */
+  readonly account?: () => Account | null;
+  /** Which residencies the deployment promises — see `refuseNeeds`. */
+  readonly serves?: readonly Residency[];
+  /** Its own name, which is what the resource names are built from. */
+  readonly deployment?: string;
 }
 
 export function operatorOps(input: OperatorDeps): PersonalBook {
@@ -396,6 +411,84 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
 
         await addShard(ctx.directory, found.id, found.where, found.ceiling, tenant.id, ctx.now);
         return { shard: found.id, slug: tenant.slug };
+      },
+    },
+
+    /* ------------------------------------------------------- infrastructure --- */
+
+    /*
+      ⚠️ WHAT EXISTS, WHAT IS OWED, AND WHAT IS ABOUT TO BE DESTROYED — one
+      read, and the third column is the reason it is a screen rather than a log
+      line. Every destructive step in this system is at the far end of a
+      thirty-day drain, so this is where a mistake is still free: a database
+      listed as draining is a sentence somebody can act on a month before it
+      becomes a deletion.
+    */
+    "op.infra": {
+      kind: "read", needs: "session", doors: ["operator"],
+      async run(ctx): Promise<unknown> {
+        operator(ctx);
+        const at = deps.account?.() ?? null;
+        const have = await resources(ctx.directory);
+        const want = wanted(deps.deployment ?? "one", every(), deps.serves ?? []);
+        return {
+          /* ⚠️ Never the token itself, and never a prefix of it. */
+          configured: !!at,
+          serves: deps.serves ?? [],
+          items: have,
+          /* ⚠️ THE PLAN, WHICH CHANGES NOTHING. Reading what an apply would do
+             has to be free, or nobody looks before pressing. */
+          steps: plan(want, have, ctx.now).map((s) => s.do === "create" || s.do === "bind"
+            ? { do: s.do, name: s.want.name, kind: s.want.kind, residency: s.want.residency }
+            : { do: s.do, name: s.row.name, kind: s.row.kind, after: s.row.drainAfter }),
+          /*
+            ⚠️ AND WHAT THIS DEPLOYMENT CANNOT PROMISE, NAMED. A need dropped for
+            a residency is a feature that does not exist there — silently, and
+            correctly. Reporting it is the difference between a considered
+            refusal and a product that mysteriously does less in Europe.
+          */
+          withheld: every().flatMap((app) => Object.values(app.needs ?? {})
+            .filter((n) => n.holds !== "none" && !KEEPS_RESIDENCY[n.kind])
+            .flatMap((n) => (deps.serves ?? []).filter((r) => r !== "global")
+              .map((r) => ({ app: app.id, need: n.id, kind: n.kind, residency: r,
+                why: `a ${n.kind} carries ${n.holds} data and the vendor offers no residency control for it` })))),
+        };
+      },
+    },
+
+    /*
+      ⚠️ THE APPLY, AND IT IS DELIBERATELY ALSO ON THE CLOCK. The nightly sweep
+      runs the same function, so this button is "do it now" rather than the only
+      way it ever happens — an operator who never presses it still gets a
+      deployment that converges.
+    */
+    "op.infra.apply": {
+      kind: "write", needs: "session", doors: ["operator"],
+      async run(ctx): Promise<unknown> {
+        operator(ctx);
+        const at = deps.account?.() ?? null;
+        if (!at) return ctx.fail("platform.unavailable");
+        return apply({
+          directory: ctx.directory, at,
+          deployment: deps.deployment ?? "one",
+          apps: every(), serves: deps.serves ?? [], now: () => ctx.now,
+        });
+      },
+    },
+
+    /*
+      ⚠️ WHAT THE TOKEN CAN ACTUALLY DO, ASKED RATHER THAN ASSUMED. A token with
+      D1 but not Queues produces a reconciler that half works and reports the
+      other half as an outage; one call names the missing permission.
+    */
+    "op.infra.verify": {
+      kind: "read", needs: "session", doors: ["operator"],
+      async run(ctx): Promise<unknown> {
+        operator(ctx);
+        const at = deps.account?.() ?? null;
+        if (!at) return { configured: false, can: [] };
+        const out = await verify(at);
+        return out.ok ? { configured: true, can: out.value.can } : { configured: true, can: [], why: out.why };
       },
     },
 

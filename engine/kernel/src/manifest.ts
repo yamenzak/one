@@ -40,6 +40,8 @@ import type { GuideBook, HelpBook, MilestoneBook } from "./guide.js";
 import { refuseGuide } from "./guide.js";
 import type { JobBook } from "./job.js";
 import { refuseJobs } from "./job.js";
+import type { NeedBook } from "./infra.js";
+import { refuseNeeds } from "./infra.js";
 import type { DeploymentLegal, DocumentBook, SubProcessorBook, SubProcessorDef } from "./legal.js";
 import { refuseLegal } from "./legal.js";
 import type { NotificationBook } from "./notify.js";
@@ -109,6 +111,13 @@ export interface AppSpec {
   readonly documents?: DocumentBook;
   readonly processors?: SubProcessorBook;
   readonly jobs?: JobBook;
+  /**
+   * ⚠️ WHAT THIS PRODUCT NEEDS UNDERNEATH IT — a queue, a bucket, a model lane.
+   * Declared rather than configured, so the reconciler can make it exist, the
+   * residency rule can refuse it, and the processing record can name it. See
+   * `infra.ts`.
+   */
+  readonly needs?: NeedBook;
   readonly packs?: readonly PackDef[];
   readonly meters?: MeterBook;
   readonly lanes?: readonly Lane[];
@@ -390,6 +399,15 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
   }
 
   /* --- what it spends ----------------------------------------------------- */
+
+  /* ⚠️ ASKED WITH NO RESIDENCY, WHICH IS THE APP-LOCAL HALF ON PURPOSE. Whether a
+     queue can keep an EU promise depends on which jurisdictions the DEPLOYMENT
+     serves, and an app does not know that — `deploymentFaults` asks the other
+     half at boot and the reconciler refuses to bind it. What is answerable here
+     is whether the app contradicts itself. */
+  for (const p of refuseNeeds(spec.needs ?? {}, [])) {
+    at(`need ${p.of}`, `${p.why}: ${p.detail}`);
+  }
 
   for (const id of unbounded(spec.meters ?? {})) {
     at(`meter ${id}`, "no output ceiling, so the reserve is a guess and the platform pays the difference");

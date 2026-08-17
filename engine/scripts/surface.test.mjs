@@ -71,6 +71,10 @@ const SURFACES = {
   purposes: { file: "design/src/rendered/vault.tsx", renders: "export function ConsentSheet" },
   documents: { file: "design/src/rendered/legal.tsx", renders: "export function Documents" },
   processors: { file: "design/src/rendered/legal.tsx", renders: "export function SubProcessors" },
+  /* ⚠️ WHERE THE RECORDS ACTUALLY SIT, and whether that can be promised. It is
+     the half of a privacy notice that is usually a sentence somebody wrote —
+     derived here from the same declaration the reconciler provisions from. */
+  needs: { file: "design/src/rendered/legal.tsx", renders: "export function WhereItLives" },
 
   /*
     ⚠️ NOTHING IS OWED TODAY, and the shape stays here on purpose: `{ owed: "N" }`

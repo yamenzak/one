@@ -14,7 +14,7 @@
 
 import {
   area, collection, defineApp, field, flag, notification, operation, purpose, setting,
-  vaultField, vaultKeyFor,
+  need, vaultField, vaultKeyFor,
   type AppSpec,
 } from "@engine/kernel";
 
@@ -484,6 +484,26 @@ export const HELLO: AppSpec = defineApp({
     recipient that is genuinely THIS app's: a gateway only it charges through, a
     model provider only it calls. It has none.
   */
+
+  /*
+    ⚠️ WHAT IT NEEDS UNDERNEATH, DECLARED RATHER THAN CONFIGURED. Nobody edits a
+    config file, nobody runs wrangler, nobody remembers to do it again on the
+    next deployment: the reconciler reads this, makes the bucket exist in the
+    right jurisdiction, adds the binding, and the boot after that confirms the
+    binding is really there.
+
+    ⚠️ AND `holds` IS THE HALF THAT BITES. A bucket keeps a residency promise and
+    a queue does not, so the same declaration that provisions the first one
+    REFUSES the second wherever an EU promise has been made — the feature does
+    not exist there, which is a shape a product can explain, rather than a
+    sentence in a privacy notice that is not true.
+  */
+  needs: {
+    covers: need({
+      id: "covers", kind: "r2", holds: "none", perResidency: true,
+      why: "Holds the cover image on a note.",
+    }),
+  },
 
   settingAreas: {
     notes: area({

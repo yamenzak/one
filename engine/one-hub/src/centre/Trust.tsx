@@ -9,8 +9,10 @@
  */
 
 import {
-  Documents, Group, NavRow, Nothing, Screen, Section, SubProcessors, distinguishing, glyphOf,
+  Documents, Group, NavRow, Nothing, Screen, Section, SubProcessors, WhereItLives,
+  distinguishing, glyphOf,
 } from "@engine/design";
+import { KEEPS_RESIDENCY } from "@engine/kernel";
 import type { Where } from "../door.js";
 import { accountUrl } from "../door.js";
 import type { CentreView } from "./data.js";
@@ -21,6 +23,7 @@ export function Trust({ view, where }: {
 }) {
   const documented = view.apps.filter((a) => Object.keys(a.documents).length > 0);
   const processing = view.apps.filter((a) => Object.keys(a.processors).length > 0);
+  const housed = view.apps.filter((a) => Object.keys(a.needs ?? {}).length > 0);
 
   return (
     /* ⚠️ `detail` — one subject (what is held about you here) and its facts.
@@ -46,7 +49,23 @@ export function Trust({ view, where }: {
               <SubProcessors book={app.processors} />
             </Section>
           ))}
-          {!documented.length && !processing.length
+          {/*
+            ⚠️ WHERE IT ACTUALLY SITS, BESIDE WHO ELSE TOUCHES IT. "Your data is
+            stored in the EU" is the half of a privacy notice that is normally a
+            sentence somebody wrote — here it is derived from the same
+            declaration the reconciler provisions from, so a store that cannot be
+            pinned to a region says so instead of being quietly omitted.
+          */}
+          {housed.map((app) => (
+            <Section
+              key={app.id}
+              label={distinguishing(housed, app.name) ?? "Where it is kept"}
+              under="Every store a fact can reach, and whether it stays in one region"
+            >
+              <WhereItLives needs={app.needs ?? {}} keeps={KEEPS_RESIDENCY} />
+            </Section>
+          ))}
+          {!documented.length && !processing.length && !housed.length
             ? <Nothing says="Nothing to disclose" under="No product here names a document or a third party" />
             : null}
       </>

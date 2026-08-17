@@ -90,6 +90,7 @@ the whole rail. Stage 33.
 | `unreadFlags` | `flag` | composition |
 | `orphanHelp` | `guide` | composition |
 | `refuseGuide` | `guide` | composition |
+| `refuseNeeds` | `infra` | composition |
 | `refuseJob` | `job` | composition |
 | `refuseJobs` | `job` | composition |
 | `stalled` | `job` | surface |

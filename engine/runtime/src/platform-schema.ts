@@ -31,6 +31,7 @@ import { LEGAL_SCHEMA } from "./legal.js";
 import { MEMBERSHIP_SCHEMA } from "./membership.js";
 import { OPERATOR_SCHEMA } from "./operator.js";
 import { PACKAGE_SCHEMA } from "./packages.js";
+import { RESOURCE_SCHEMA } from "./resources.js";
 import type { SchemaModule } from "./schema.js";
 import { SETTING_SCHEMA } from "./settings.js";
 import { VAULT_SCHEMA } from "./vault.js";
@@ -39,6 +40,10 @@ import { VAULT_SCHEMA } from "./vault.js";
 export const DIRECTORY_MODULES: readonly SchemaModule[] = [
   DIRECTORY_SCHEMA, IDENTITY_SCHEMA, BILLING_SCHEMA, BRANDING_SCHEMA,
   JOBS_SCHEMA, OPERATOR_SCHEMA, AI_ACTION_SCHEMA,
+  /* ⚠️ WHAT THE DEPLOYMENT HAS MADE FOR ITSELF, in the directory because it is
+     about the deployment rather than about any workspace — and because the
+     reaper reads it to decide what it may destroy. */
+  RESOURCE_SCHEMA,
   /* ⚠️ IN THE DIRECTORY, NOT ON A SHARD. One person accepts the terms once for
      the whole deployment; an acceptance beside a workspace's records would be
      asked again per workspace and lost when that workspace closed. */

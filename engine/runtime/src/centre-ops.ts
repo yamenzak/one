@@ -34,6 +34,10 @@ const publicFace = (
   notifications: a.notifications ?? {},
   documents: a.documents ?? {},
   processors: a.processors ?? {},
+  /* ⚠️ WHERE ITS RECORDS ACTUALLY SIT. The same declaration the reconciler
+     provisions from, carried to the Data & Trust screen — a privacy notice
+     whose "where is it kept" half is derived rather than written. */
+  needs: a.needs ?? {},
   permissions,
   /* ⚠️ The role NAMES — declared and this workspace's own — so the People
      screen offers real choices and the gate never has to refuse a typo. */

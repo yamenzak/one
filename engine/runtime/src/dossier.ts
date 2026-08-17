@@ -161,6 +161,8 @@ export const HOLDINGS: readonly HeldBy[] = [
   { table: "shard", person: [], why: "the deployment's placement map" },
   { table: "shard_app", person: [], why: "the deployment's placement map" },
   { table: "job_run", person: [], why: "the deployment's own clock" },
+  { table: "resource", person: [],
+    why: "the databases and buckets the deployment made for itself" },
   { table: "deployment_flag", person: [], why: "the deployment's own switches" },
   { table: "maintenance", person: [], why: "the deployment's own switches" },
   { table: "_schema", person: [], why: "the migration marker" },

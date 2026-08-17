@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type {
-  AreaBook, DocumentBook, NotificationBook, ScreenSpec, SettingBook, SubProcessorBook,
+  AreaBook, DocumentBook, NotificationBook, ScreenSpec, SettingBook, NeedBook, SubProcessorBook,
 } from "@engine/kernel";
 import { ready, trouble, waiting, type Loaded } from "@engine/design";
 import { api } from "../api.js";
@@ -29,6 +29,8 @@ export interface CentreApp {
   readonly notifications: NotificationBook;
   readonly documents: DocumentBook;
   readonly processors: SubProcessorBook;
+  /** ⚠️ Where its records actually sit — see `WhereItLives`. */
+  readonly needs: NeedBook;
   /** What THIS caller may do in this app, resolved by the one resolver (D15). */
   readonly permissions: readonly string[];
   /** The role names on offer — declared and this workspace's own. */

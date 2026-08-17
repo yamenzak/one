@@ -43,6 +43,7 @@ a call site over in a product.
 | Module | What it is for | Ships | Waiting |
 |---|---|---|---|
 | `primitives` | ids, days, instants, slugs — the words everything else is spelled in | 10 | 2 |
+| `infra` | what a product needs underneath it, and what each kind can promise | 8 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 8 | — |
 | `collection` | what a thing an app keeps is — and the six operations it gets for free | 13 | — |
 | `operation` | one declaration carrying every cross-cutting concern (D12) | 10 | 1 |
@@ -69,7 +70,7 @@ a call site over in a product.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**198 of them**, 181 reached by something today.
+**206 of them**, 189 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -127,8 +128,10 @@ layering failure rather than a shortcut. A guard says so.
 | `vault-ops` | consent, grants, who looked, the processing record, export and erasure | 1 | — |
 | `dossier` | everything we hold about one person, and everything of theirs we delete | 8 | — |
 | `legal` | who agreed to what version, and the wall until they have | 6 | — |
+| `cloudflare` | the one door out to the account — create, destroy, and add a binding | 7 | — |
+| `resources` | wanted → created → bound → live → draining → gone, and the reaper | 6 | — |
 
-**203 of them**, 186 reached by something today.
+**216 of them**, 199 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -165,6 +168,7 @@ the request is being served, and each one names the failure it exists to catch.
 | `unreadFlags` | `flag` | composition |
 | `orphanHelp` | `guide` | composition |
 | `refuseGuide` | `guide` | composition |
+| `refuseNeeds` | `infra` | composition |
 | `refuseJob` | `job` | composition |
 | `refuseJobs` | `job` | composition |
 | `stalled` | `job` | surface |

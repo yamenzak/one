@@ -1738,6 +1738,60 @@
       "impl": "runtime/src/legal.ts",
       "proves": "not_yours_to_give",
       "fails": "a guest answering the data-processing agreement for a business they do not run, recorded for ever as that business having signed it"
+    },
+    {
+      "id": "one-door-out-to-the-account",
+      "protects": "D12",
+      "stage": "36",
+      "status": "live",
+      "impl": "scripts/infra.test.mjs",
+      "proves": "api.cloudflare.com",
+      "fails": "a second caller reaching the account token's API, inheriting none of the bounds written in cloudflare.ts"
+    },
+    {
+      "id": "bindings-are-added-never-repointed",
+      "protects": "D12",
+      "stage": "36",
+      "status": "live",
+      "impl": "runtime/src/cloudflare.ts",
+      "proves": "NEVER_REPOINTED",
+      "fails": "a leaked account token repointing DIRECTORY at somebody else's database, taking every account, session and workspace with it, with nothing looking wrong"
+    },
+    {
+      "id": "the-current-bindings-are-read-first",
+      "protects": "D12",
+      "stage": "36",
+      "status": "live",
+      "impl": "runtime/src/cloudflare.ts",
+      "proves": "const current = await bindings(at)",
+      "fails": "a computed binding set replacing the array rather than adding to it, deleting every binding the computation did not know about"
+    },
+    {
+      "id": "a-residency-verdict-per-resource-kind",
+      "protects": "D6",
+      "stage": "36",
+      "status": "live",
+      "impl": "kernel/src/infra.ts",
+      "proves": "KEEPS_RESIDENCY",
+      "fails": "a queue or a KV namespace carrying somebody's name under an EU promise the vendor offers no way to keep"
+    },
+    {
+      "id": "live-is-written-only-where-the-binding-is-seen",
+      "protects": "D12",
+      "stage": "36",
+      "status": "live",
+      "impl": "runtime/src/resources.ts",
+      "proves": "env[row.binding]",
+      "fails": "a resource reported usable while its binding still reads undefined, which is an empty answer rather than an error"
+    },
+    {
+      "id": "a-resource-drains-before-it-is-destroyed",
+      "protects": "D12",
+      "stage": "36",
+      "status": "live",
+      "impl": "runtime/src/resources.ts",
+      "proves": "DRAIN_DAYS * 24 * 60 * 60 * 1000",
+      "fails": "an app removed by a typo taking its database with it in the same minute, behind a green log line"
     }
   ]
 }

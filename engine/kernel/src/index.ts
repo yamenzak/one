@@ -22,6 +22,7 @@ export * from "./entitlement.js";
 export * from "./gate.js";
 export * from "./dunning.js";
 export * from "./tenancy.js";
+export * from "./infra.js";
 export * from "./signin.js";
 export * from "./tone.js";
 
