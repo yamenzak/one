@@ -19,7 +19,7 @@
 import { Chip } from "@heroui/react";
 import { isBusiness, type Kind } from "@engine/kernel";
 import {
-  AmountRow, Bill, Credits, Group, Screen, Storage, Wallet, appFace, glyphOf,
+  AmountRow, Bill, Credits, Group, Screen, Storage, Wallet, glyphOf, notice,
 } from "@engine/design";
 import { api } from "../api.js";
 import { useLoad, type CentreView, type MoneyView } from "./data.js";
@@ -43,6 +43,15 @@ export function Money({ view, onGo }: {
   const buy = async (packId: string) => {
     const got = await api.post<{ url: string }>("money.topup", { pack: packId });
     if (got.ok) globalThis.location.assign(got.value.url);
+  };
+
+  /* ⚠️ RE-READ AFTER THE WRITE, because the answer this screen shows is the
+     server's. A control that kept its own copy would show an instruction that
+     was refused as though it had been saved. */
+  const arm = async (packId: string | null, below: number) => {
+    const got = await api.post("money.auto", { pack: packId ?? "", below });
+    if (!got.ok) { notice.fail(got.problem.title); return; }
+    money.again();
   };
 
   return (
@@ -92,6 +101,8 @@ export function Money({ view, onGo }: {
             appName={(id) => data.apps.find((a) => a.id === id)?.name ?? id}
             packs={data.packs}
             onBuy={(id) => { void buy(id); }}
+            armed={data.armed}
+            onArm={(packId, below) => { void arm(packId, below); }}
           />
 
           <Storage
@@ -99,22 +110,6 @@ export function Money({ view, onGo }: {
             included={data.storage.included}
             creditsPerGbMonth={data.storage.creditsPerGbMonth}
           />
-
-          {/*
-            ⚠️ A STANDING TOP-UP THAT FAILED IS SAID HERE, because nobody was
-            present when the bank refused it. Without this row the credits stop
-            arriving and the only record of why is a log the customer cannot see.
-          */}
-          {data.armed.error ? (
-            <Group label="Buying more credits automatically">
-              <AmountRow
-                tone="warning"
-                label={data.armed.error}
-                under="Nothing was charged — check the card on file"
-                amount={<Credits value={data.armed.below} as="inline" />}
-              />
-            </Group>
-          ) : null}
 
           {/*
             ⚠️ THE STATEMENT, BECAUSE A BALANCE WITH NO HISTORY IS A NUMBER

@@ -169,6 +169,58 @@ stops — correct for a permission, confiscation for a balance. A suspended
 workspace must not lose credits it paid cash for. Renewal *sets* the monthly
 grant rather than adding to it.
 
+### 1.6 OneWallet, and what a meter may do
+
+⚠️ **ONE WALLET PER WORKSPACE, MADE OF TWO NUMBERS THAT OBEY OPPOSITE RULES.**
+`granted` is the month's allowance and is SET on renewal; `bought` was paid for
+with a card and is never reset or swept. The allowance is always spent first —
+draw from the balance that expires while it still can. An app never touches
+either directly: it declares a meter and calls `generate`, and `reserve → run →
+settle` does the rest.
+
+Three rules govern anything that spends:
+
+- **A reserve is a ceiling on revenue.** Settlement charges `min(held, actual)`,
+  so every unit an estimate fails to anticipate is a unit the platform pays for.
+  The cap is why a runaway cannot bankrupt a customer, and it is also why an
+  optimistic estimate cannot be caught downstream — nothing downstream is
+  allowed to charge more. `plan()` returns the prompt and the reserve it implies
+  from one call, so a caller cannot budget for one text and send another.
+- **The hold is taken in the statement that checks it.** `SELECT` then `UPDATE`
+  is a race two concurrent calls both win, and the symptom is a balance that went
+  negative long after the calls that did it.
+- **A missing usage report falls back to the reserve, never to a recount.**
+  Because of the cap a recount can only ever charge less than the truth.
+
+⚠️ **AND A LIMIT IS EITHER A REFUSAL OR A METER — decide which by asking who is
+adding it.** Seats, clients and domains are things somebody adds deliberately, so
+refusing past the number is fair and `withheld: "quota"` does it. Storage
+accumulates as a side effect of ordinary work: refusing an upload because a
+colleague filled the bucket punishes the wrong person at the worst moment, so the
+plan's `storage` is where the meter STARTS rather than where the product stops.
+The daily sweep prices the excess against the wallet.
+
+What a meter may never do:
+
+- **Delete anything.** Not at the included amount, not when the wallet empties.
+  A product that deletes a customer's files to settle a bill is one nobody can
+  safely put anything in. What an unpayable debt costs is the WRITES — `locate`
+  narrows the standing to read-only, everything stays readable and exportable,
+  and adding credits clears it.
+- **Round a daily fraction.** A day of storage over the limit is usually a
+  fraction of a credit: rounded down it is free for ever, rounded up it is thirty
+  times the price. `storage_milli` accumulates in thousandths and only whole
+  credits are ever drawn.
+- **Refuse a partial collection.** Three credits against a five-credit debt pays
+  three and owes two. Refusing the whole charge leaves a wallet with money in it
+  beside a debt, which reads to everybody as a bug.
+
+⚠️ **AND MONEY MOVES ONLY WHEN A SIGNED EVENT SAYS IT DID.** A checkout session
+grants nothing — opening the page and closing it must leave the workspace exactly
+where it was. The plan is stamped, the credits land, and a workspace becomes a
+business only from `applyEvent`, which is also where the idempotency lives:
+Stripe retries by design, and an event applied twice is a month granted twice.
+
 ---
 
 ## 2. The rule the whole framework is built around

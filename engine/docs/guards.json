@@ -651,6 +651,42 @@
       "fails": "two tiers priced in different currencies and a bill that adds them together"
     },
     {
+      "id": "the-two-balances-say-which-one-lapses",
+      "protects": "D1",
+      "stage": "6",
+      "status": "live",
+      "impl": "design/test/surface.test.tsx",
+      "proves": "says which half of the balance lapses and which does not",
+      "fails": "one figure that drops on the first of the month with nothing saying why - a support conversation every month for ever"
+    },
+    {
+      "id": "a-hold-is-shown-rather-than-quietly-subtracted",
+      "protects": "D12",
+      "stage": "6",
+      "status": "live",
+      "impl": "design/test/surface.test.tsx",
+      "proves": "shows a hold rather than quietly subtracting it",
+      "fails": "a balance that disagrees with what can actually be spent, discovered at the moment of a refusal"
+    },
+    {
+      "id": "a-standing-charge-can-be-turned-off-where-it-is-armed",
+      "protects": "D12",
+      "stage": "46",
+      "status": "live",
+      "impl": "design/test/surface.test.tsx",
+      "proves": "offers the standing top-up only where something can arm it",
+      "fails": "an operation that charges a card on a schedule and no surface that reaches it - the failure this framework is built around, on the one feature where it costs money"
+    },
+    {
+      "id": "the-storage-rate-is-shown-before-it-is-charged",
+      "protects": "D12",
+      "stage": "47",
+      "status": "live",
+      "impl": "design/test/surface.test.tsx",
+      "proves": "says the rate before anybody is paying it",
+      "fails": "a bill that arrives without a screen that predicted it, which is the same surprise as a refusal arriving later"
+    },
+    {
       "id": "the-currency-marks-bars-are-not-clipped",
       "protects": "D7",
       "stage": "6",

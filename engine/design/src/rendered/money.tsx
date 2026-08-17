@@ -11,6 +11,7 @@
  * otherwise "one wallet" is just "we stopped telling you".
  */
 
+import React from "react";
 import type { JobBook, PackDef } from "@engine/kernel";
 import { stalled } from "@engine/kernel";
 import { Button, Card, Chip, Meter, ProgressBar } from "@heroui/react";
@@ -18,6 +19,7 @@ import { money } from "./console.js";
 import { Grid, Stack } from "../parts/arrange.js";
 import { Credits } from "../parts/credits.js";
 import { Balance } from "../parts/heads.js";
+import { Choice, NumberInput } from "../parts/forms.js";
 import { AmountRow, ControlRow, Group } from "../parts/surfaces.js";
 import { TYPE } from "../tokens/type.js";
 import { SPACE } from "../tokens/metrics.js";
@@ -99,6 +101,18 @@ export interface WalletProps {
   readonly onBuy: (packId: string) => void;
   /** ⚠️ What is owed and could not be collected — see `owedMilli`. */
   readonly owed?: number;
+  /**
+   * ⚠️ THE STANDING INSTRUCTION, AND WHY IT LAST FAILED. Nobody is present when
+   * a bank refuses an off-session charge, so this screen is the only place
+   * somebody learns their credits stopped topping up.
+   */
+  readonly armed?: {
+    readonly packId: string | null;
+    readonly below: number;
+    readonly error: string | null;
+  };
+  /** ⚠️ Clearing the pack turns it off, and that is never refused. */
+  readonly onArm?: (packId: string | null, below: number) => void;
 }
 
 /**
@@ -114,10 +128,15 @@ export interface WalletProps {
  * refusal, which is the worst possible moment to be discovered.
  */
 export function Wallet({
-  granted, bought, held, spentByApp, appName, packs, onBuy, owed = 0,
+  granted, bought, held, spentByApp, appName, packs, onBuy, owed = 0, armed, onArm,
 }: WalletProps) {
   const spendable = Math.max(0, granted + bought - held);
   const spent = spentByApp.reduce((n, s) => n + s.credits, 0);
+
+  /* ⚠️ THE FORM HOLDS WHAT IS ON SCREEN AND THE SERVER HOLDS THE TRUTH. A
+     control bound straight to the loaded answer cannot be typed into. */
+  const [pick, setPick] = React.useState(armed?.packId ?? "");
+  const [below, setBelow] = React.useState(armed?.below || 500);
 
   return (
     <Stack space="snug">
@@ -190,6 +209,49 @@ export function Wallet({
               )}
             />
           ))}
+        </Group>
+      ) : null}
+
+      {/*
+        ⚠️ THE STANDING INSTRUCTION IS A CONTROL, NOT A SETTING BURIED ELSEWHERE.
+        It authorises a charge to a card with nobody present, so it belongs on
+        the screen that shows the balance it protects — where somebody watching
+        their credits run down is already looking.
+
+        ⚠️ AND ITS LAST FAILURE IS SAID HERE. Nobody was present when the bank
+        refused, so without this row the credits simply stop arriving.
+      */}
+      {onArm ? (
+        <Group label="Buy more automatically">
+          {armed?.error ? (
+            <AmountRow
+              tone="warning"
+              label={armed.error}
+              under="Nothing was charged — check the card on file"
+              amount={<Credits value={armed.below} as="inline" />}
+            />
+          ) : null}
+          <ControlRow label="When the balance falls below" under="Checked once a day">
+            <NumberInput label="Credits" value={below} min={0} onChange={setBelow} />
+          </ControlRow>
+          <ControlRow label="Buy" under="Nothing is charged until the balance actually falls">
+            <Choice
+              label="Pack"
+              value={pick}
+              placeholder="Off"
+              options={[
+                { id: "", label: "Off" },
+                ...[...packs].sort((a, b) => a.order - b.order)
+                  .map((p) => ({ id: p.id, label: p.name })),
+              ]}
+              onChange={setPick}
+            />
+          </ControlRow>
+          <ControlRow label="" under={pick ? undefined : "Turning this off stops every future charge"}>
+            <Button variant="primary" onPress={() => onArm(pick || null, below)}>
+              {pick ? "Turn on" : "Turn off"}
+            </Button>
+          </ControlRow>
         </Group>
       ) : null}
 

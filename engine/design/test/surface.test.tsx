@@ -20,6 +20,7 @@ import { Settings, settingsShown } from "../src/rendered/settings.js";
 import { Shown } from "../src/rendered/edit.js";
 import { NotificationPolicy, policyShown } from "../src/rendered/policy.js";
 import { FlagConsole, Shelf, saying, money } from "../src/rendered/console.js";
+import { Storage, Wallet } from "../src/rendered/money.js";
 import { Shell, reachable } from "../src/frame/shell.js";
 import { ControlRow } from "../src/parts/surfaces.js";
 import { CONTROL_SHARE } from "../src/tokens/metrics.js";
@@ -992,5 +993,112 @@ describe("the screen shapes", () => {
     expect(several).not.toContain("inside");
     expect(several).toContain("Hello");
     expect(several).toContain("Atlas");
+  });
+});
+
+/* ------------------------------------------------------------ the wallet --- */
+
+/**
+ * ONE BALANCE MADE OF TWO NUMBERS, AND THE SCREEN HAS TO SAY WHICH IS WHICH.
+ *
+ * ⚠️ A SINGLE FIGURE THAT DROPS ON THE FIRST OF THE MONTH, with nothing on the
+ * screen saying why, is a support conversation every month for ever. What lapses
+ * and what does not are two rows, and the copy on each says its RULE rather than
+ * its name — "allowance" and "bought" are labels somebody has to be taught.
+ */
+describe("the wallet", () => {
+  const PACKS = [
+    { id: "p1", name: "1,000 credits", credits: 1000, price: 1000, currency: "USD", order: 0 },
+  ];
+
+  it("says which half of the balance lapses and which does not", () => {
+    const out = html(
+      <Wallet granted={1000} bought={2500} held={0} spentByApp={[]}
+        appName={(id) => id} packs={PACKS} onBuy={() => {}} />,
+    );
+    expect(out).toContain("Ends when the month does");
+    expect(out).toContain("Never expires");
+    /* ⚠️ And the hero is what can be SPENT — a balance that silently includes a
+       hold disagrees with the product at the moment of a refusal. */
+    expect(out).toContain("3,500");
+  });
+
+  it("shows a hold rather than quietly subtracting it", () => {
+    const out = html(
+      <Wallet granted={1000} bought={0} held={800} spentByApp={[]}
+        appName={(id) => id} packs={PACKS} onBuy={() => {}} />,
+    );
+    expect(out).toContain("For calls that are still running");
+    expect(out).toContain("200");
+  });
+
+  /*
+    ⚠️ A DEBT IS SAID PLAINLY, AND SO IS THE WAY OUT. Storage over the included
+    amount is metered rather than refused, so this row is the only place somebody
+    learns the meter could not collect — and that it is what stopped their writes.
+  */
+  it("says what is owed, and that nothing was deleted", () => {
+    const out = html(
+      <Wallet granted={0} bought={0} held={0} owed={12} spentByApp={[]}
+        appName={(id) => id} packs={PACKS} onBuy={() => {}} />,
+    );
+    expect(out).toContain("Owed");
+    expect(out).toContain("nothing has been deleted");
+  });
+
+  /*
+    ⚠️ THE STANDING CHARGE IS A CONTROL ON THIS SCREEN, and its absence is the
+    failure the whole framework is built around: an operation that exists and no
+    surface that reaches it. It is also where somebody watching their credits run
+    down is already looking.
+  */
+  it("offers the standing top-up only where something can arm it", () => {
+    const off = html(
+      <Wallet granted={0} bought={0} held={0} spentByApp={[]}
+        appName={(id) => id} packs={PACKS} onBuy={() => {}} />,
+    );
+    expect(off).not.toContain("Buy more automatically");
+
+    const on = html(
+      <Wallet granted={0} bought={0} held={0} spentByApp={[]}
+        appName={(id) => id} packs={PACKS} onBuy={() => {}} onArm={() => {}} />,
+    );
+    expect(on).toContain("Buy more automatically");
+    /* ⚠️ Turning it off has to be reachable, and it is never a refusal. */
+    expect(on).toContain("Turn off");
+  });
+
+  /* ⚠️ AND A DECLINE REACHES THE CUSTOMER. Nobody was present when the bank
+     refused, so without this the credits simply stop arriving. */
+  it("says why the last automatic charge did not work", () => {
+    const out = html(
+      <Wallet granted={0} bought={0} held={0} spentByApp={[]}
+        appName={(id) => id} packs={PACKS} onBuy={() => {}} onArm={() => {}}
+        armed={{ packId: "p1", below: 500, error: "Your bank did not approve the charge." }} />,
+    );
+    expect(out).toContain("Your bank did not approve the charge.");
+  });
+});
+
+/* ----------------------------------------------------------- the storage --- */
+
+describe("the storage meter", () => {
+  /*
+    ⚠️ THE PRICE IS ON THE SCREEN WHETHER OR NOT IT IS BEING PAID. The included
+    amount is where the meter starts rather than where the product stops, and
+    that is only kind if somebody can see the line coming — a charge that arrives
+    without a screen that predicted it is the same surprise as a refusal.
+  */
+  it("says the rate before anybody is paying it", () => {
+    const GB = 1024 * 1024 * 1024;
+    const out = html(<Storage used={2 * GB} included={10 * GB} creditsPerGbMonth={20} />);
+    expect(out).toContain("Within your plan");
+    expect(out).toContain("per GB");
+  });
+
+  it("says how far over the included amount a workspace is", () => {
+    const GB = 1024 * 1024 * 1024;
+    const out = html(<Storage used={14 * GB} included={10 * GB} creditsPerGbMonth={20} />);
+    expect(out).toContain("4 GB over what your plan includes");
   });
 });

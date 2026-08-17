@@ -585,6 +585,10 @@ its own header, cited by other files, and doing nothing.
 | `every-key-a-product-declares-is-priced-by-every-tier` | D1 | a feature built, shipped and sold to nobody - an unpriced key resolves to off for every workspace on every tier, and no screen anywhere says why |
 | `the-lobby-is-free-and-cannot-be-bought` | D21 | a workspace charged for the parking state it never chose, or offered it at checkout as though not having a plan were a plan |
 | `one-catalogue-one-currency` | D1 | two tiers priced in different currencies and a bill that adds them together |
+| `the-two-balances-say-which-one-lapses` | D1 | one figure that drops on the first of the month with nothing saying why - a support conversation every month for ever |
+| `a-hold-is-shown-rather-than-quietly-subtracted` | D12 | a balance that disagrees with what can actually be spent, discovered at the moment of a refusal |
+| `a-standing-charge-can-be-turned-off-where-it-is-armed` | D12 | an operation that charges a card on a schedule and no surface that reaches it - the failure this framework is built around, on the one feature where it costs money |
+| `the-storage-rate-is-shown-before-it-is-charged` | D12 | a bill that arrives without a screen that predicted it, which is the same surprise as a refusal arriving later |
 | `the-currency-marks-bars-are-not-clipped` | D7 | a plain numeral beside every credit figure - the platform's own logo standing in for a unit, which reads as a mistake rather than as a currency |
 | `a-currency-mark-takes-the-size-of-its-number` | D7 | a mark the right size in one of the six places a credit figure appears and visibly wrong in the other five |
 | `storage-is-measured-from-the-ledger` | D12 | a bill built by listing every object in a bucket - a request per thousand files, slower with every upload, and unanswerable at the size where it starts to matter |
@@ -788,7 +792,7 @@ its own header, cited by other files, and doing nothing.
 <!-- generated: node scripts/inventory.mjs decisions -->
 | # | Decision | Guarded by |
 |---|---|---|
-| D1 | The tenant is primary; an app is a capability switched on for it | 14 |
+| D1 | The tenant is primary; an app is a capability switched on for it | 15 |
 | D2 | The framework is OneEngine; the deployment is One; packages are `@engine/*` | 3 |
 | D3 | One worker on the request path; heavy work splits over RPC service bindings | 6 |
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 3 |
@@ -799,7 +803,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 93 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 96 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
