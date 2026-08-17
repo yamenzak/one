@@ -858,6 +858,15 @@
       "fails": "a database of one's own sold over a shard full of strangers, with every workspace on it working perfectly and nothing downstream noticing"
     },
     {
+      "id": "a-field-is-never-the-colour-of-the-card-it-sits-on",
+      "protects": "D7",
+      "stage": "19",
+      "status": "live",
+      "impl": "scripts/ground.test.mjs",
+      "proves": "fills: every painted surface names the tier it belongs to",
+      "fails": "a control that exists, is focusable, and cannot be seen until somebody types into it — in both themes, with no border anywhere to draw its edge"
+    },
+    {
       "id": "the-hub-has-one-door-to-the-api",
       "protects": "D12",
       "stage": "10",

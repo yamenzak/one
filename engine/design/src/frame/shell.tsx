@@ -293,7 +293,15 @@ export function Shell(props: ShellProps) {
             reserve room for. Set in both places it is twice the room under the
             last card, which is the failure mode of every measurement that lives
             in two files. */}
-        <main className={`flex-1 min-w-0 ${PAD}`}>
+        {/* ⚠️ A COLUMN, NOT A BLOCK, AND IT IS THE ONE LINK IN THE HEIGHT CHAIN.
+            `Page` is a full-height column and a `Screen` inside it grows to fill
+            what is left — but a block `main` in between absorbs the height and
+            hands its children none of it, so an empty state that asked to be
+            centred in the page was centred in its own 188px instead and sat
+            under the heading with the viewport blank beneath it. Nothing
+            overflows and nothing warns; it simply looks like a page that stopped
+            loading. */}
+        <main className={`flex flex-1 min-w-0 flex-col ${PAD}`}>
           <CrownSocketProvider onClaim={setClaim}>{children}</CrownSocketProvider>
         </main>
       </div>

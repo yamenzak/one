@@ -144,9 +144,22 @@ function tier(mode: "light" | "dark"): string {
     `--surface-tertiary: ${tinted(g.raised, t)};`,
     /* An overlay is a surface that floats; it is the raised tier, not a shadow. */
     `--overlay: ${tinted(g.raised, t)};`,
-    /* ⚠️ A FIELD IS A SURFACE TOO. Left alone it stays pure white on a tinted
-       card, which is the one place the old palette's dustiness would survive. */
-    `--field-background: ${tinted(g.surface, t)};`,
+    /*
+      ⚠️ A FIELD IS A CONTROL, NOT A SURFACE, AND IT WAS ON THE WRONG TIER. At
+      `surface` it is EXACTLY a card's own colour — measured on a real screen,
+      `oklab(0.2428)` against `oklab(0.2428)` in dark and `oklab(0.981)` against
+      `oklab(0.981)` in light — so an empty text field inside a card was
+      invisible in both themes. There are no borders here, so nothing else was
+      drawing its edge: the control existed, was focusable, and could not be
+      seen until somebody typed into it.
+
+      ⚠️ `control` IS THE TIER, and its own comment is the argument: it was
+      chosen to clear ALL THREE grounds a control can sit on — a card, the
+      island and the page — by the 0.04 floor. A field is exactly that, so it
+      takes exactly that value, and `--default` beside it now means a filled
+      control and a field read as the same kind of thing.
+    */
+    `--field-background: ${tinted(g.control, t)};`,
     `--default: ${tinted(g.control, CONTROL_TINT[mode])};`,
     /* ⚠️ NO EDGES. Both are ways of saying "separate", and a design needs one. */
     `--surface-shadow: none;`,

@@ -15,8 +15,9 @@
  */
 
 import * as React from "react";
+import { Button } from "@heroui/react";
 import { field, mayBrand, type Kind } from "@engine/kernel";
-import { BrandTile, Field, Group, Nothing, Screen, Stack, ToggleRow } from "@engine/design";
+import { BrandTile, Field, Group, Screen, Stack, ToggleRow, ready } from "@engine/design";
 
 /** ⚠️ The tokens a workspace edits, declared — so each gets its own control. */
 const FIELDS = {
@@ -62,22 +63,33 @@ export function Brand({ title, name, kind, theme, surfaces, offered, onTheme, on
      a screen cannot come to offer what a route refuses — and the day what
      commercial buys changes, it changes here too without this file being
      touched. A `kind === "commercial"` here is one product's private opinion. */
-  if (!mayBrand(kind)) {
-    return (
-      <Screen shape="detail" title={title}>
-        <Nothing
-          says="This is for business workspaces"
-          under={`Make ${name} a business and it carries your logo, your colour and your icon across every app here.`}
-          offer={{ label: "Make it a business", onDo: onBecome }}
-        />
-      </Screen>
-    );
-  }
-
+  const commercial = mayBrand(kind);
   const { ground, ink, glyph } = tile(theme, name);
 
   return (
-    <Screen shape="detail" title={title}>
+    /*
+      ⚠️ THE EMPTY STATE GOES THROUGH THE SCREEN'S OWN CHANNEL RATHER THAN BEING
+      RENDERED AS CONTENT, and that is what puts it in the middle of the page.
+      Drawn as a child it sits under the heading with the rest of the viewport
+      blank beneath it, which reads as a page that stopped loading — and the
+      sentence explaining the emptiness is the one thing nobody trusts on a page
+      that looks broken.
+    */
+    <Screen
+      shape="detail"
+      title={title}
+      of={ready(commercial)}
+      isNothing={(yes) => !yes}
+      nothing={{
+        says: "This is for business workspaces",
+        under: `Make ${name} a business and it carries your logo, your colour and your icon across every app here`,
+        /* ⚠️ THE WAY OUT BELONGS TO THE EMPTY STATE, NOT TO THE SCREEN. Declared
+           as the screen's `does` it is promoted to the primary action — so once
+           the workspace IS a business, the nav still offered "Make it a
+           business" over an editor for the brand it already had. */
+        does: <Button variant="primary" onPress={onBecome}>Make it a business</Button>,
+      }}
+      then={() => (
       <Stack space="roomy">
         {/* ⚠️ THE TILE FIRST, BECAUSE IT IS WHAT IS BEING DECIDED. Controls above
             a preview make somebody change a value and then go looking for the
@@ -121,6 +133,7 @@ export function Brand({ title, name, kind, theme, surfaces, offered, onTheme, on
           </Stack>
         </Group>
       </Stack>
-    </Screen>
+      )}
+    />
   );
 }

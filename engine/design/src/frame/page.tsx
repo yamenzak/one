@@ -293,6 +293,14 @@ export interface BandProps {
   /** ⚠️ Which one of the family — see `PageProps.seedling`. */
   readonly seedling?: string;
   readonly tone?: Tone;
+  /**
+   * ⚠️ TAKE THE ROOM LEFT ON THE PAGE. For a band that IS the page — a screen
+   * whose whole body is an empty state or a refusal — so its content can sit in
+   * the middle of what is left rather than under the heading with the rest of
+   * the viewport blank beneath it. Opt-in, because a run of bands each claiming
+   * the leftover room would share it and space a page out like a menu.
+   */
+  readonly grow?: boolean;
   readonly children?: React.ReactNode;
 }
 
@@ -304,7 +312,7 @@ export interface BandProps {
  * stays readable — and doing it per screen is how you get a product where some
  * sections are inset and some are not, for no reason anybody remembers.
  */
-export function Band({ bleed = "hold", width = "read", sky, seedling, tone, children }: BandProps) {
+export function Band({ bleed = "hold", width = "read", sky, seedling, tone, grow, children }: BandProps) {
   /* ⚠️ THE SAME ENGINE A PAGE USES, because a section that lifts is a scene at a
      smaller reach and not a second mechanism — and now literally the same call,
      rather than the same three lines written twice. */
@@ -319,13 +327,17 @@ export function Band({ bleed = "hold", width = "read", sky, seedling, tone, chil
 
   return (
     <section
-      className="w-full"
+      /* ⚠️ `grow` IS FOR A BAND THAT IS THE PAGE, and it is opt-in because it is
+         wrong for every band that is a section OF one: a run of them each
+         claiming the leftover room would share it, and a page of four sections
+         would space itself out like a menu. */
+      className={grow ? "flex w-full grow flex-col" : "w-full"}
       {...(lit ? own.attrs : {})}
       {...(tone ? { "data-tone": tone } : {})}
       style={own.css}
     >
       {own.field}
-      <div className={inner}>{children}</div>
+      <div className={grow ? `${inner} flex grow flex-col` : inner}>{children}</div>
     </section>
   );
 }

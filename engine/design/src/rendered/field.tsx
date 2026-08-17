@@ -24,7 +24,7 @@ import {
 } from "@heroui/react";
 import { parseDate, parseDateTime } from "@internationalized/date";
 import type { DateValue } from "@internationalized/date";
-import { sentence } from "../tokens/type.js";
+import { TYPE, sentence } from "../tokens/type.js";
 
 export interface FieldProps {
   readonly name: string;
@@ -150,6 +150,17 @@ export function Field({ name, spec, value, onChange, disabled, set, bare }: Fiel
           <ColorPicker.Trigger isDisabled={disabled || pending}>
             <ColorSwatch size="lg" />
             {bare ? null : <Label>{label}</Label>}
+            {/* ⚠️ THE VALUE IN WORDS, BECAUSE A SWATCH CANNOT SAY "UNSET". An
+                empty colour falls back to `#000000` above — it has to, the
+                picker needs one — and a black disc is indistinguishable from a
+                black somebody chose. On a dark card it is not even a disc: it
+                is a hole. So the hex is written beside it, and when there is
+                nothing it says so. */}
+            {bare ? null : (
+              <span className={`${TYPE.note} ms-auto`}>
+                {typeof value === "string" && value ? value : "Not set"}
+              </span>
+            )}
           </ColorPicker.Trigger>
           <ColorPicker.Popover>
             <ColorArea

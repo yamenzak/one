@@ -45,7 +45,7 @@ import type { Density } from "../scene/index.js";
 import { Await, Nothing, RowsWaiting, FigureWaiting, FormWaiting, TextWaiting, TilesWaiting, nothingIn, type Loaded } from "../parts/state.js";
 import { Stack } from "../parts/arrange.js";
 import {
-  NUDGE, PAD, SAFE_BOTTOM, SCREEN_TITLE_PAD, SPACE,
+  NUDGE, PAD, SAFE_BOTTOM, SCREEN_TITLE_PAD, SPACE, WHOLE,
 } from "../tokens/metrics.js";
 import { ARRIVE, arriveAt } from "../tokens/motion.js";
 
@@ -271,8 +271,20 @@ export interface ScreenProps<T> {
   readonly again?: () => void;
   /** Overrides the shape's own skeleton where the content is unusual. */
   readonly waiting?: React.ReactNode;
-  /** ⚠️ What is true when the answer is legitimately nothing. */
-  readonly nothing?: { readonly says: string; readonly under?: string };
+  /**
+   * ⚠️ What is true when the answer is legitimately nothing.
+   *
+   * ⚠️ `does` IS FOR A WAY OUT THAT IS NOT A BUTTON — a field to fill first, a
+   * sheet's trigger. Without it a screen whose emptiness ends in anything more
+   * than one press had to render its own `Nothing` as content, which is the
+   * shape that put an empty state under the heading with the rest of the
+   * viewport blank beneath it. The way out belongs INSIDE the nothing.
+   */
+  readonly nothing?: {
+    readonly says: string;
+    readonly under?: string;
+    readonly does?: React.ReactNode;
+  };
   /**
    * ⚠️ A FIFTH OUTCOME, AND IT IS NOT `trouble`. "You may not see this" is a
    * fact about the person, known before any request is made — a `Problem` is a
@@ -349,8 +361,11 @@ export function Screen<T = unknown>({
             <Nothing
               says={nothing.says}
               under={nothing.under}
-              /* ⚠️ The way out lives IN the empty state — see `shows`. */
-              does={does ? <Button variant="primary" onPress={does.onDo}>{does.label}</Button> : undefined}
+              /* ⚠️ The way out lives IN the empty state — see `shows`. The
+                 screen's own `does` is the ordinary case; a node given here
+                 replaces it, for the ways out that take more than one press. */
+              does={nothing.does
+                ?? (does ? <Button variant="primary" onPress={does.onDo}>{does.label}</Button> : undefined)}
             />
           )
           : undefined}
@@ -408,8 +423,19 @@ export function Screen<T = unknown>({
         </Band>
       ) : null}
 
-      <Band bleed="hold" width={preset.width}>
-        <div className={NUDGE.body}>{body}</div>
+      {/*
+        ⚠️ AN EMPTY STATE IS THE WHOLE SCREEN, SO IT TAKES THE WHOLE SCREEN. Laid
+        out like content it sits under the heading with eight hundred pixels of
+        nothing beneath it, which does not read as "there is nothing here" — it
+        reads as a page that stopped loading, and the sentence explaining the
+        emptiness is the one thing nobody trusts on a page that looks broken.
+
+        ⚠️ AND IT IS DECIDED HERE RATHER THAN IN `Nothing`, because only the
+        screen knows whether the emptiness IS the page. The same component drawn
+        inside a card, beside other blocks, must stay where it was put.
+      */}
+      <Band bleed="hold" width={preset.width} grow={where !== "act"}>
+        <div className={where !== "act" ? `${NUDGE.body} ${WHOLE}` : NUDGE.body}>{body}</div>
       </Band>
 
       {/* ⚠️ THE SCREEN OWNS THE SPACE UNDER ITS CONTENT, so the dock below is at
@@ -417,8 +443,11 @@ export function Screen<T = unknown>({
           SCROLL on a long one. Without it a page with three rows on it put the
           primary action floating in the middle of an empty screen — sticky does
           nothing on a page that does not scroll, which is exactly the page
-          where it looks most like a mistake. */}
-      <Spacer />
+          where it looks most like a mistake.
+
+          ⚠️ Not when the body already grew — two things claiming the leftover
+          room share it, and the empty state lands a quarter of the way up. */}
+      {where === "act" ? <Spacer /> : null}
 
       {/* ⚠️ ONE COMPONENT FOR THE DOCK — see `Docked`. The same act the crown
           carries above `md`, and the crown's copy is `wide` so exactly one of

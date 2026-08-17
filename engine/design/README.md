@@ -49,6 +49,9 @@ found, in one pass:
 |---|---|
 | `Menu` | nested a `<button>` in a `<button>` — invalid HTML and a hydration error, on every dropdown in the product |
 | `Gauge` | drew its arc in `--accent`, which is monochrome here, so 62% and 0% were the same picture |
+| `Screen` | laid an empty state out as content: under the heading with the rest of the viewport blank beneath it, which reads as a page that stopped loading — and `Shell`'s `main` was a block, so the height chain that would have centred it stopped there |
+| `Field` (colour) | fell back to `#000000` for an unset colour, so "not chosen" and "chosen black" were the same disc — and on a dark card it was not a disc, it was a hole |
+| `--field-background` | was on the `surface` tier, which is a CARD's tier, so an empty text field inside a card was exactly its colour in both themes |
 | `BrandTile` | new, and the reason it is here rather than in a screen: an installed tile was always going to be drawn twice — a swatch beside a colour picker and the real thing in a web manifest — and two drawings of one artwork is how somebody picks a colour, installs the app, and finds a different tile on the phone |
 | `Stat` / `Hero` | had `unit` as a PREFIX only, so `unit="min"` printed `min120`. `Meter` and `Ring` were given the `unit`/`suffix` split and these two were not |
 | `Milestones` | rendered `said` and dropped `label` — the explanation with no subject, in a chip stretched the width of the page |

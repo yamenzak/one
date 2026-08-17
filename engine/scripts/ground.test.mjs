@@ -173,6 +173,40 @@ for (const mode of ["light", "dark"]) {
 if (!gaps) ok(`tiers: every pair of surfaces clears ${floor} in both themes`);
 
 /**
+ * ⚠️ AND EVERY VARIABLE THAT PAINTS A SURFACE HAS TO BE ON ONE OF THOSE TIERS,
+ * which is the half the pair check cannot see: the tiers were four correct
+ * numbers and `--field-background` pointed at the same one a CARD uses, so an
+ * empty text field inside a card was exactly its colour — measured
+ * `oklab(0.2428)` on `oklab(0.2428)` in dark, `oklab(0.981)` on `oklab(0.981)`
+ * in light. With no borders, the control existed, was focusable, and could not
+ * be seen until somebody typed into it.
+ *
+ * ⚠️ SO THE RULE IS WHICH TIER, NOT WHICH VALUE. A field is a control and takes
+ * the control tier — the one already chosen to clear a card, the island AND the
+ * page. Checking the number instead would pass the day somebody wrote the same
+ * number by hand somewhere else.
+ */
+const CLAIMED = {
+  "--field-background": "control",
+  "--default": "control",
+  "--overlay": "raised",
+};
+let wrong = 0;
+for (const [name, tier] of Object.entries(CLAIMED)) {
+  const line = new RegExp(`\`${name}: \\$\\{tinted\\(g\\.(\\w+)`).exec(GROUND_SRC)?.[1];
+  if (!line) {
+    wrong++;
+    fail(`ground.ts: ${name} is not painted from a tier at all — the guard cannot see what it is.`);
+  } else if (line !== tier) {
+    wrong++;
+    fail(`ground.ts: ${name} is on the \`${line}\` tier and belongs on \`${tier}\`.\n` +
+         `       On \`surface\` a field is EXACTLY a card's own colour, and there are no borders\n` +
+         `       here to draw its edge — so the control is invisible until somebody types in it.`);
+  }
+}
+if (!wrong) ok(`fills: every painted surface names the tier it belongs to`);
+
+/**
  * ⚠️ A CONTROL IS NEVER GREYER THAN THE GROUND UNDER IT. Value separation is
  * only half of visibility on a TINTED ground: a chip that is less saturated
  * than the field it sits on reads as a grey wash over colour — grime, not a

@@ -79,6 +79,14 @@ export const LEAD =
   "flex size-10 shrink-0 items-center justify-center rounded-full" as const;
 
 /**
+ * ⚠️ WHERE AN EMPTY STATE GOES WHEN IT IS THE WHOLE SCREEN: centred in what is
+ * left, rather than under the heading with the viewport blank beneath it. The
+ * second reads as a page that stopped loading, and the sentence explaining the
+ * emptiness is the one thing nobody trusts on a page that looks broken.
+ */
+export const WHOLE = "flex grow flex-col justify-center" as const;
+
+/**
  * ⚠️ AN INSTALLED TILE IS A SQUIRCLE, AND THE RADIUS IS A PLATFORM CONVENTION
  * RATHER THAN OUR TASTE. iOS and Android both mask an app icon to roughly a
  * quarter of its side; drawing anything else in a preview shows somebody a shape

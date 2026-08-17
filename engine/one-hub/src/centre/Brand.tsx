@@ -16,7 +16,7 @@ import * as React from "react";
 import { Button } from "@heroui/react";
 import { field, mayBrand, type Kind, type Theme } from "@engine/kernel";
 import {
-  BrandTile, Field, Group, Nothing, Row, Screen, Stack, TextInput, ToggleRow, notice,
+  BrandTile, Field, Group, Row, Screen, Stack, TextInput, ToggleRow, notice, ready,
 } from "@engine/design";
 import { api } from "../api.js";
 import { useLoad } from "./data.js";
@@ -98,7 +98,27 @@ function Editor({ name, slug, answer, again }: {
     again();
   };
 
-  if (!commercial) return <Become name={name} slug={slug} again={again} />;
+  /*
+    ⚠️ A PERSONAL WORKSPACE IS A LEGITIMATE NOTHING FOR THIS SCREEN, and saying
+    so through `isNothing` rather than returning an empty state as content is
+    what puts it in the middle of the page. Drawn as content it sits under the
+    heading with the viewport blank beneath it, which reads as a page that
+    stopped loading.
+  */
+  if (!commercial) {
+    return (
+      <Screen
+        shape="detail"
+        of={ready(false)}
+        isNothing={() => true}
+        nothing={{
+          says: "This is for business workspaces",
+          under: `Make ${name} a business and it carries your logo, your colour and your icon across every app here. It cannot be undone.`,
+          does: <Become name={name} slug={slug} again={again} />,
+        }}
+      />
+    );
+  }
 
   return (
     <Stack space="roomy">
@@ -155,10 +175,9 @@ function Editor({ name, slug, answer, again }: {
 }
 
 /**
- * ⚠️ THE OFFER, WITH THE ONE THING IT NEEDS ATTACHED. Sending somebody to
+ * ⚠️ THE WAY OUT OF THE EMPTY STATE, WHICH LIVES INSIDE IT. Sending somebody to
  * another screen to type a legal name would be a second destination for a
- * decision with one field in it — and the empty state is where the way forward
- * belongs, not beside it.
+ * decision with one field in it.
  *
  * ⚠️ AND IT IS ONE WAY, SAID BEFORE IT IS PRESSED rather than in a confirmation
  * afterwards. A dialog asking "are you sure" about something already decided is
@@ -179,28 +198,22 @@ function Become({ name, slug, again }: {
   };
 
   return (
-    <Nothing
-      says="This is for business workspaces"
-      under={`Make ${name} a business and it carries your logo, your colour and your icon across every app here. It cannot be undone.`}
-      does={(
-        <Stack space="snug">
-          <TextInput
-            label="Legal name"
-            value={legalName}
-            onChange={setLegalName}
-            help="Who is trading. It goes on invoices and on anything we are bound by."
-          />
-          <Row>
-            <Button
-              variant="primary"
-              isDisabled={!legalName.trim()}
-              onPress={() => void become()}
-            >
-              Make it a business
-            </Button>
-          </Row>
-        </Stack>
-      )}
-    />
+    <Stack space="snug">
+      <TextInput
+        label="Legal name"
+        value={legalName}
+        onChange={setLegalName}
+        help="Who is trading. It goes on invoices and on anything we are bound by."
+      />
+      <Row>
+        <Button
+          variant="primary"
+          isDisabled={!legalName.trim()}
+          onPress={() => void become()}
+        >
+          Make it a business
+        </Button>
+      </Row>
+    </Stack>
   );
 }
