@@ -325,6 +325,19 @@ export const GROUND_CSS = [
   `.modal__dialog--full { padding: 0; }`,
 
   /*
+    ⚠️ A TAB PANEL IS NOT A GUTTER, AND ITS 8px MADE ONE SCREEN NARROWER THAN
+    EVERY OTHER. `Band` is the page gutter and the only one; a screen that
+    happens to use tabs was inheriting a third inset from the library, so the
+    same card was 8px in from the column on Settings and flush with it
+    everywhere else — measured as a card at 40px from the edge against 16px on
+    the screen beside it.
+
+    ⚠️ THE INLINE AXIS ONLY. A panel's vertical padding is the air under the tab
+    row, which is the library's business and is right.
+  */
+  `.tabs__panel { padding-inline: 0; }`,
+
+  /*
     ⚠️ A PROGRESS CIRCLE MEASURES, SO IT DRAWS IN `--data`. The library's arc is
     `--accent`, and this interface's accent is monochrome — so its fill and its
     track were the same value, and a gauge at 62% drew the identical ring to a

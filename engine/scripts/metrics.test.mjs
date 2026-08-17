@@ -177,6 +177,43 @@ if (!/NAV_SPACE/.test(layout) || !/nav\?: React\.ReactNode/.test(layout)) {
   ok(`chrome: the page reserves room for its nav`);
 }
 
+/**
+ * ⚠️ ONE PADDER FOR THE PAGE GUTTER, AND IT IS `Band`. Three things applied it —
+ * the shell's `main`, the band, and HeroUI's tab panel — so measured at 390px a
+ * card sat 40px from the edge on the settings screen and 16px on the list beside
+ * it. Nothing failed and no test knew: the screens simply did not line up with
+ * each other, which is a fault nobody can point at and everybody feels.
+ */
+const shellSrc = readFileSync(join(ENGINE, "design/src/frame/shell.tsx"), "utf8");
+const main = /<main\s+className=\{?["`]([^"`]*)["`]/.exec(shellSrc)?.[1] ?? null;
+if (main === null) {
+  fail(`shell.tsx: cannot find the <main> element, so the guard is blind to what pads it.`);
+} else if (/\b(p|px|py|ps|pe|pl|pr)-\d/.test(main) || /\bPAD\b/.test(main)) {
+  fail(`shell.tsx: the <main> pads the page, and \`Band\` already does.\n` +
+       `       Two gutters is a card 32px from the edge on one screen and 16 on the next.`);
+} else {
+  ok(`gutter: the page is padded by \`Band\` and nothing else`);
+}
+
+/*
+  ⚠️ AND A SNAPPING SCROLLER NEEDS THE GUTTER TWICE. `snap-start` aligns an item
+  to the scroller's BORDER edge, so a rail with padding and no SCROLL padding is
+  scrolled left by exactly the gutter and its first card lands flush against the
+  screen — measured as `scrollLeft: 16` on a rail padded 16. It hid behind the
+  double gutter for as long as that existed, because the card ate one of the two.
+*/
+const arrange = readFileSync(join(ENGINE, "design/src/parts/arrange.tsx"), "utf8");
+/* ⚠️ To the NEXT export, not to the first `}` on its own line — that one is
+   inside the JSX, so the extract stopped before the class list and the check
+   passed on a rail with no scroll padding at all. */
+const rail = /export function Rail[\s\S]*?(?=\nexport |\n\/\*\*)/.exec(arrange)?.[0] ?? "";
+if (/snap-x/.test(rail) && !/SCROLL_GUTTER/.test(rail)) {
+  fail(`arrange.tsx: \`Rail\` snaps and pads but sets no scroll padding.\n` +
+       `       The browser scrolls the first card out by the gutter, flush to the screen edge.`);
+} else {
+  ok(`rail: a snapping scroller keeps its gutter when it snaps`);
+}
+
 console.log(bad
   ? `\nmetrics: ${bad} finding(s) — spacing nobody owns drifts, and drift is invisible per diff.`
   : `\nmetrics: one source for every measurement, and a floor under every control.`);

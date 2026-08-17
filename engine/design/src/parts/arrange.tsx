@@ -13,7 +13,7 @@
 
 import * as React from "react";
 import {
-  BAND_PAD, BLEED_PULL, GUTTER, SPACE,
+  BAND_PAD, BLEED_PULL, GUTTER, SCROLL_GUTTER, SPACE,
 } from "../tokens/metrics.js";
 import type { Space } from "../tokens/metrics.js";
 import { WIDTH } from "../tokens/metrics.js";
@@ -119,7 +119,10 @@ export function Rail({ space = "snug", children }: {
   readonly children: React.ReactNode;
 }) {
   return (
-    <div className={`${BLEED_PULL} flex snap-x snap-mandatory overflow-x-auto scrollbar-none ${GUTTER} ${SPACE[space]}`}>
+    <div
+      className={`${BLEED_PULL} flex snap-x snap-mandatory overflow-x-auto scrollbar-none
+        ${GUTTER} ${SCROLL_GUTTER} ${SPACE[space]}`}
+    >
       {React.Children.map(children, (child) => (
         <div className="w-[85%] shrink-0 snap-start sm:w-72">{child}</div>
       ))}

@@ -326,7 +326,13 @@ export function Shell(props: ShellProps) {
             under the heading with the viewport blank beneath it. Nothing
             overflows and nothing warns; it simply looks like a page that stopped
             loading. */}
-        <main className={`flex flex-1 min-w-0 flex-col ${PAD}`}>
+        {/* ⚠️ NO PADDING HERE. `Band` is the page gutter and it is the ONLY one
+            — measured, this `main` added a second inset on top of it and a
+            tabbed screen's HeroUI panel added a third, so one app's cards sat at
+            40px from the edge on Settings and 16px on its list screen. Nothing
+            failed; the screens simply did not line up with each other, which is
+            the kind of thing nobody can point at and everybody feels. */}
+        <main className="flex flex-1 min-w-0 flex-col">
           <CrownSocketProvider onClaim={setClaim}>{children}</CrownSocketProvider>
         </main>
       </div>

@@ -51,6 +51,8 @@ found, in one pass:
 | `Gauge` | drew its arc in `--accent`, which is monochrome here, so 62% and 0% were the same picture |
 | `Screen` | laid an empty state out as content: under the heading with the rest of the viewport blank beneath it, which reads as a page that stopped loading — and `Shell`'s `main` was a block, so the height chain that would have centred it stopped there |
 | `Field` (colour) | fell back to `#000000` for an unset colour, so "not chosen" and "chosen black" were the same disc — and on a dark card it was not a disc, it was a hole |
+| `Shell` / `Band` / `.tabs__panel` | three of them padded the page, so measured at 390px a card sat 40px from the edge on the settings screen and 16px on the list beside it — nothing failed, the screens simply did not line up |
+| `Rail` | snapped past its own gutter: `snap-start` aligns to the scroller's BORDER edge, so the browser scrolled the first card left by exactly the padding (`scrollLeft: 16`) and it landed flush against the screen. Hidden for as long as the double gutter existed, because the card ate one of the two |
 | `ControlRow` | left the control uncapped, so a text or number field took the whole row, pushed the label under its floor and wrapped — measured as heights of 64, 100, 67 and 100 in ONE settings card at 390px, and 64, 64, 67, 64 at 900px, which is why it read as correct on the screen it was built on |
 | `Field` (colour, `bare`) | dropped the value along with the label, so a settings row's entire answer was a coloured disc |
 | `--field-background` | was on the `surface` tier, which is a CARD's tier, so an empty text field inside a card was exactly its colour in both themes |

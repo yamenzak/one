@@ -307,8 +307,33 @@ export const CARD_ROWS = "px-4 py-0" as const;
 /** Between a section's heading and the card under it. */
 export const HEAD_GAP = "gap-2" as const;
 
-/** The page gutter. Wider on a desktop because the column is not the screen. */
+/**
+ * THE PAGE GUTTER, AND THE ONLY ONE.
+ *
+ * ⚠️ `Band` APPLIES IT AND NOTHING ELSE MAY. It was applied three times over —
+ * the shell's `main`, this, and HeroUI's own tab panel — so measured on one app
+ * at 390px a card sat 40px from the edge on the settings screen and 16px on the
+ * list beside it. Nothing failed; the screens simply did not line up, which is
+ * the kind of fault nobody can point at and everybody feels.
+ *
+ * Wider on a desktop, because there the column is not the screen.
+ */
 export const GUTTER = "px-4 md:px-6" as const;
+
+/**
+ * ⚠️ A SNAPPING SCROLLER NEEDS THE GUTTER TWICE — ONCE AS PADDING AND ONCE AS
+ * SCROLL PADDING — AND THE SECOND IS INVISIBLE UNTIL IT IS NOT THERE.
+ * `snap-start` aligns an item to the scroller's BORDER edge, not its padding
+ * box, so the browser scrolls the first card left by exactly the gutter and it
+ * lands flush against the screen. Measured: `scrollLeft` of 16 on a rail whose
+ * padding was 16.
+ *
+ * ⚠️ AND IT HID BEHIND THE DOUBLE PADDING FOR AS LONG AS THAT EXISTED — the
+ * card ate one of the two gutters and still had one left, so it looked right.
+ * Fixing the padding is what made this visible, which is the ordinary way a
+ * second fault surfaces.
+ */
+export const SCROLL_GUTTER = "scroll-pl-4 md:scroll-pl-6" as const;
 
 /** Above and below a band's content. */
 export const BAND_PAD = "py-6" as const;
