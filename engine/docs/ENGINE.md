@@ -842,6 +842,7 @@ its own header, cited by other files, and doing nothing.
 | D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 3 |
 | D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 9 |
 | D22 | Branding and the installable app belong to the workspace, never to one app inside it | 4 |
+| D23 | A stranger joins a workspace as a `customer`, and only ever as a `customer` | 0 |
 <!-- /generated -->
 
 ---
@@ -925,8 +926,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 46 | The wallet tops itself up — a standing instruction, a cooldown, and a decline the customer can read | shipped |
 | 47 | Storage is metered rather than refused — the included amount is where the meter starts, and an empty wallet costs the writes and never the files | shipped |
 | 48 | The deployment's legal identity is complete — the registered address it is written to, and whether selling where it sells needs a representative there | **planned** |
+| 49 | A stranger joins a workspace by themselves — a door the workspace opens, a role the app names, and a ceiling the plan sells (D23) | **planned** |
 
-**39 shipped, 9 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**39 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

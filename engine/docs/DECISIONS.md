@@ -518,3 +518,72 @@ surface a workspace can switch on that no app offers; an installable per product
 a manifest or icon behind a session; a personal workspace's tile left blank
 rather than wearing ours; a push subscription reused across workspaces, or an
 icon URL sent in a notification payload.
+
+---
+
+## D23 — A stranger joins a workspace as a `customer`, and only ever as a `customer`
+
+There are two ways into a workspace today: founding it, or an invitation claimed
+by signing in as the address it was sent to. Neither scales to a business's own
+customers — nobody invites a hundred thousand consumers by hand, and a business
+that has to type in each of its suppliers has a spreadsheet, not a product.
+
+Self-service joining is a third way and the shape is fixed here before an app
+asks for it, because every part of it that is decided in a hurry is decided
+against somebody who is not in the room. Designed 2026-08-18, unbuilt: stage 49.
+
+**The workspace opens the door; the platform never does, and it is shut.** A
+per-app setting on the workspace, `closed` by default, in three states:
+
+- `closed` — nobody joins. Invitations still work.
+- `code` — a per-workspace secret carried in the link, rotatable and revocable.
+  This is what a business puts on its website or sends to its suppliers. It names
+  the workspace's willingness and no person, which is exactly what separates it
+  from an invitation.
+- `open` — anybody who can sign in. For a consumer product where the sign-up IS
+  the product.
+
+**The app names the role; the workspace cannot choose it.** `access.joining`,
+beside `access.founding`. Three refusals at composition, and the third is the one
+the whole design rests on:
+
+1. a joining role that is not a declared app role;
+2. a joining role whose platform role is anything but `customer` — a stranger
+   admitted as `manager` is privilege escalation with a form on it;
+3. **a joining role holding any permission that reads a `tenant`-scoped
+   collection.**
+
+The third works because `scopeOf` already filters a `subject`-scoped
+collection's generated verbs by whoever is asking: a person's own records are
+theirs by construction rather than by a handler remembering a `WHERE`. A
+tenant-scoped collection is the whole workspace's, so a joining role holding a
+key to one would show every stranger every other stranger's records — with
+nothing failing anywhere, on a door the business opened on purpose. Seeing
+somebody else's records stays what it is today: a different operation the app
+declares, with a permission a customer does not hold.
+
+**The door says which workspace.** `me.join` on the personal lane, needing a
+session, resolving the tenant from the host exactly as `acceptanceScope` does. A
+tenant id in a request body is a tenant id somebody can change.
+
+**The ceiling is an entitlement, never a seat.** Customers cost no seat — that is
+refused at composition already, because they are the product rather than the
+staff — so hanging the ceiling there would make the two rules contradict. It is a
+`customers` number the plan sells, checked at the door, refused with a sentence
+that names the upgrade. Beside it, the same per-address and per-IP ceiling the
+sign-in code carries: an open door with no rate ceiling is a way to manufacture
+accounts.
+
+**Nothing about identity, legal or leaving changes, and that is the point.** One
+account across every workspace; the terms and the privacy notice bind the person
+and are asked at their first sign-in whatever door they arrive at; the
+data-processing agreement binds the business and `owedBy` asks it only of
+somebody who can bind it, so a customer is never shown a contract for a company
+they do not run. `me.leave`, `me.export` and `me.forget` already work for them.
+Joining is one new verb, not a second kind of person.
+
+**Therefore never:** a join that takes its tenant from the body; a joining role
+that is not `customer`, or that can read a tenant-scoped collection; a workspace
+joinable by default; a ceiling enforced through seats; a join code that
+identifies a person, which is an invitation and already exists; a joined customer
+who cannot leave without asking the business.

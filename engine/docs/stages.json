@@ -254,6 +254,12 @@
       "status": "planned",
       "title": "The deployment's legal identity is complete — the registered address it is written to, and whether selling where it sells needs a representative there",
       "ends": "`IDENTITY.address` is the address on the licence rather than the Emirate, and either a representative is declared beside the sub-processors or a written decision says none is needed for where this deployment sells"
+    },
+    {
+      "n": 49,
+      "status": "planned",
+      "title": "A stranger joins a workspace by themselves — a door the workspace opens, a role the app names, and a ceiling the plan sells (D23)",
+      "ends": "an app declares `access.joining`, composition refuses a joining role that is not a customer or that reads a tenant-scoped collection, `me.join` resolves its workspace from the door, and the customer ceiling refuses with a sentence naming the upgrade"
     }
   ]
 }
