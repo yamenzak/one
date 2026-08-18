@@ -20,7 +20,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  Group, NotificationPolicy, Nothing, PermissionRow, Screen, notice, type Permission,
+  Group, NotificationPolicy, Nothing, PermissionRow, Screen, glyphOf, notice, type Permission,
 } from "@engine/design";
 import { BellRing } from "lucide-react";
 import { api } from "../api.js";
@@ -152,7 +152,7 @@ export function Told({ view }: { readonly view: CentreView }) {
             />
           ))}
           {view.apps.length === 0
-            ? <Nothing says="Nothing here sends notifications yet" />
+            ? <Nothing icon={glyphOf("bell")} says="Nothing here sends notifications yet" />
             : null}
         </>
       )}

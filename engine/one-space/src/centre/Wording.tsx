@@ -15,7 +15,7 @@
 import { useState } from "react";
 import { Button, Card } from "@heroui/react";
 import {
-  LongText, Row, Screen, Stack, Whichever, appFace, notice,
+  LongText, Row, Screen, Stack, Whichever, appFace, glyphOf, notice,
 } from "@engine/design";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView } from "./data.js";
@@ -45,6 +45,7 @@ export function Wording({ view, app, onGo }: {
       <Screen
         shape="settings"
         refused={{
+          icon: glyphOf("shield"),
           says: "Only an owner or a manager may change these words",
           under: "Ask somebody who runs this workspace",
         }}
@@ -61,7 +62,7 @@ export function Wording({ view, app, onGo }: {
       face={(a) => appFace(a.id, a.mark)}
       chosen={app}
       onChoose={onGo}
-      nothing={{ says: "Nothing here is yours to reword" }}
+      nothing={{ icon: glyphOf("sparkle"), says: "Nothing here is yours to reword" }}
       then={(a) => <AppWording app={a} />}
     />
   );
@@ -81,6 +82,7 @@ function AppWording({ app }: { readonly app: CentreApp }) {
       again={of.again}
       isNothing={(d) => d.items.length === 0}
       nothing={{
+        icon: glyphOf("sparkle"),
         says: "Nothing here is yours to reword",
         under: `Every AI feature ${app.name} has uses the product's own words`,
       }}

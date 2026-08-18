@@ -13,7 +13,7 @@
  * too late — which is the whole failure the chart vocabulary exists to prevent.
  */
 
-import { Board, Group, Meter, Screen, Tile, sentence } from "@engine/design";
+import { Board, Group, Meter, Screen, Tile, glyphOf, sentence } from "@engine/design";
 import type { Shard } from "@engine/kernel";
 import { useLoad } from "../centre/data.js";
 
@@ -39,7 +39,11 @@ export function Ground() {
       of={of.of}
       again={of.again}
       isNothing={(d) => d.items.length === 0}
-      nothing={{ says: "No shard is registered", under: "Placement has nowhere to put a workspace" }}
+      nothing={{
+        icon: glyphOf("database"),
+        says: "No shard is registered",
+        under: "Placement has nowhere to put a workspace",
+      }}
       then={(data) => (
         <Board>
           {data.items.map((s, i) => (

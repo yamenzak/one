@@ -13,7 +13,9 @@
  * product mysteriously does less in Europe" into a decision somebody made.
  */
 
-import { ControlRow, FieldRow, Group, Nothing, Screen, Section, notice } from "@engine/design";
+import {
+  ControlRow, FieldRow, Group, Nothing, Screen, Section, glyphOf, notice,
+} from "@engine/design";
 import { Button, Chip } from "@heroui/react";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
@@ -109,6 +111,7 @@ export function Footing() {
           {!data.configured
             ? (
               <Nothing
+                icon={glyphOf("database")}
                 says="This deployment cannot provision anything"
                 under="No account token is set, so every declared need is still waiting"
               />
@@ -144,7 +147,7 @@ export function Footing() {
                   ))}
                 </Group>
               )
-              : <Nothing says="Nothing has been made yet" />}
+              : <Nothing icon={glyphOf("database")} says="Nothing has been made yet" />}
           </Section>
 
           {/*
@@ -169,7 +172,13 @@ export function Footing() {
                   ))}
                 </Group>
               )
-              : <Nothing says="Nothing to do" under="Everything declared exists and is bound" />}
+              : (
+                <Nothing
+                  icon={glyphOf("list")}
+                  says="Nothing to do"
+                  under="Everything declared exists and is bound"
+                />
+              )}
 
             {data.configured
               ? (

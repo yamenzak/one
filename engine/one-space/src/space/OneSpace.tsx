@@ -141,7 +141,10 @@ function Screen({ where, onGo, onLeave }: {
     <Layout
       sky={groundOf(where)}
       seedling={seedOf(where)}
-      subject={subjectOf(where, person)}
+      /* ⚠️ WHAT THIS SCREEN IS, AND WHOSE WORLD IT STANDS IN — two facts, and
+         only the first draws a title card. See `aboutOf`. */
+      subject={aboutOf(where, person)}
+      world={subjectOf(where, person)}
       /* ⚠️ THE ROOT HAS NO FRAME, BECAUSE ITS FACE IS ITS HEADING — see below. */
       frame={root ? undefined : {
         title: where.at === "workspace" ? held?.name ?? where.slug : nameOf(where),
@@ -214,6 +217,33 @@ export const subjectOf = (where: Where, person: Me | null): FaceOf | undefined =
      whole area stands in their own light. */
   return person ? whoFace(person.accountId) : undefined;
 };
+
+/**
+ * WHETHER THIS SCREEN IS ITS SUBJECT, OR ONLY STANDS IN ITS WORLD.
+ *
+ * ⚠️ THE TITLE CARD IS A COMPOSITION FOR A NOUN, AND ONLY SOME SCREENS ARE ONE.
+ * A workspace's own screen is that workspace: its planet at the size of the page
+ * with its name across it is the one arrangement that says "here". "Your
+ * workspaces" is a list of places and "Your data" is a set of controls — handed
+ * the same treatment, the frame drew the PERSON at the size of the screen with
+ * the word "Workspaces" over it, which is a title card for the wrong noun.
+ *
+ * ⚠️ SO THE AREA HANDS EVERY SCREEN A WORLD AND ONLY THESE NAME A SUBJECT. The
+ * ground stays continuous — which is the whole point of the area — and the hero
+ * appears exactly where the screen and the thing are the same.
+ *
+ * ⚠️ AND A PERSON IS NEVER ONE, WHICH WAS FOUND BY TRYING IT. `you` is a screen
+ * about you, so it looked like the second entry — and a person's face at the
+ * size of a screen is a flat cartoon blob with "You" written across it, above
+ * the same face again at row size and the address it belongs to. A place is seen
+ * from outside and scales; a person does not. See `Orb`.
+ */
+const ABOUT_ITSELF: readonly Where["at"][] = ["workspace"];
+
+const aboutOf = (where: Where, person: Me | null): FaceOf | undefined =>
+  (ABOUT_ITSELF as readonly string[]).includes(where.at)
+    ? subjectOf(where, person)
+    : undefined;
 
 /**
  * WHICH GROUND, FROM THE ADDRESS — one decision for every screen in OneSpace.

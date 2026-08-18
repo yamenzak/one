@@ -198,6 +198,23 @@ export interface LayoutProps {
    */
   readonly subject?: FaceOf;
   /**
+   * WHOSE WORLD THIS PAGE STANDS IN, WHERE THE PAGE IS NOT ABOUT THEM.
+   *
+   * ⚠️ TWO FACTS WERE ONE, AND THE SECOND ONE IS WHY THIS EXISTS. `subject`
+   * decides three things at once, which is right when a page IS a thing: a
+   * workspace's own screen wears its planet AND is titled by it. It is wrong for
+   * every other screen in the same area. "Your workspaces" stands in the
+   * person's light and is about a LIST of places — given it as a subject, the
+   * frame drew that person's face at the size of the screen with the word
+   * "Workspaces" across it, which is a title card for the wrong noun.
+   *
+   * ⚠️ SO THE GROUND FALLS BACK TO THIS AND THE TITLE CARD DOES NOT. An area
+   * hands every screen in it a world; only the screens that ARE their subject
+   * name one. Ignored where `subject` is set — a page has one ground, and the
+   * subject's own is the better answer whenever there is one.
+   */
+  readonly world?: FaceOf;
+  /**
    * ⚠️ AN INTENT, AND THE DEFAULT IS THE INTERESTING PART. A page with a subject
    * is somewhere somebody ARRIVED — the world is most of what is on it, so it
    * runs `rich`. A page wearing a material is a page with work on it. Named here
@@ -224,16 +241,19 @@ export interface LayoutProps {
  * how dense, whose face — three of which are the same fact.
  */
 export function Layout(
-  { sky = "plain", seedling, subject, density, tone, frame, nav, children }: LayoutProps,
+  { sky = "plain", seedling, subject, world: standingIn, density, tone, frame, nav, children }:
+  LayoutProps,
 ) {
-  const world = worldFor(subject) ?? undefined;
+  /* ⚠️ THE GROUND TAKES EITHER; THE TITLE CARD TAKES ONLY A SUBJECT — see
+     `world`. That asymmetry is the whole of the split. */
+  const world = worldFor(subject ?? standingIn) ?? undefined;
   const inside = frame ? <Framed frame={frame}>{children}</Framed> : children;
   return (
     <Page
       sky={sky}
       seedling={seedling}
       world={world}
-      density={density ?? (subject ? "rich" : "even")}
+      density={density ?? (subject ?? standingIn ? "rich" : "even")}
       tone={tone}
       nav={nav}
     >
@@ -283,6 +303,13 @@ export interface ScreenProps<T> {
   readonly nothing?: {
     readonly says: string;
     readonly under?: string;
+    /**
+     * ⚠️ THE SCREEN'S OWN NOUN — `glyphOf("workspace")`, not a shrug. See
+     * `Nothing`: an empty state with the neutral circle on it is the same
+     * drawing on every screen in the product, so the one moment a surface has
+     * nothing to show is the one moment it stops looking like itself.
+     */
+    readonly icon?: React.ReactNode;
     readonly does?: React.ReactNode;
   };
   /**
@@ -293,7 +320,11 @@ export interface ScreenProps<T> {
    * title, no way back, a sentence alone on a page. The refusal is content now,
    * and the screen it refuses still has a name and a way out of it.
    */
-  readonly refused?: { readonly says: string; readonly under?: string };
+  readonly refused?: {
+    readonly says: string;
+    readonly under?: string;
+    readonly icon?: React.ReactNode;
+  };
   /** For a screen with no request behind it. */
   readonly children?: React.ReactNode;
 }
@@ -348,7 +379,7 @@ export function Screen<T = unknown>({
   }
 
   const body = refused
-    ? <Nothing says={refused.says} under={refused.under} />
+    ? <Nothing icon={refused.icon} says={refused.says} under={refused.under} />
     : of !== undefined
     ? (
       <Await
@@ -359,6 +390,7 @@ export function Screen<T = unknown>({
         nothing={nothing
           ? (
             <Nothing
+              icon={nothing.icon}
               says={nothing.says}
               under={nothing.under}
               /* ⚠️ The way out lives IN the empty state — see `shows`. The
@@ -621,7 +653,11 @@ export function Whichever<T>({
   readonly onChoose: (id: string) => void;
   readonly then: (item: T) => React.ReactNode;
   /** What is true when there is nothing to choose between at all. */
-  readonly nothing: { readonly says: string; readonly under?: string };
+  readonly nothing: {
+    readonly says: string;
+    readonly under?: string;
+    readonly icon?: React.ReactNode;
+  };
 }) {
   if (items.length === 0) return <Screen shape="list" refused={nothing} />;
 

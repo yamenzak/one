@@ -15,7 +15,7 @@
 import * as React from "react";
 import { Chip } from "@heroui/react";
 import {
-  Listing, Place, Rail, Screen, SectionTitle, Stack, Tally,
+  Listing, Place, Rail, Screen, SectionTitle, Stack, Tally, glyphOf,
   type Loaded,
 } from "@engine/design";
 import type { Note } from "./sample.js";
@@ -54,6 +54,7 @@ export function Notes({ title, of, again, density = "comfortable", onNew, onOpen
       again={again}
       isNothing={(rows) => rows.length === 0}
       nothing={{
+        icon: glyphOf("note"),
         says: "Nothing written yet",
         under: "A note is a title and whatever follows it",
       }}
@@ -90,7 +91,7 @@ export function Notes({ title, of, again, density = "comfortable", onNew, onOpen
               of={{ status: "ready", data: rows.filter((n) => !n.pinned) }}
               rowKey={(n) => n.id}
               onOpen={onOpen}
-              says={{ nothing: "Nothing else written" }}
+              says={{ icon: glyphOf("note"), nothing: "Nothing else written" }}
               asRow={(n) => ({
                 name: n.title,
                 /* ⚠️ COMPACT DROPS THE SECOND LINE, which is what density IS —

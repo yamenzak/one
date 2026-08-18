@@ -107,7 +107,7 @@ export function Settings(props: SettingsProps) {
   const pages = areasOn(book, areas, level)
     .filter((a) => settingsIn(book, level, a.id).some((s) => visible(s, held)));
 
-  if (!pages.length) return <Nothing says="Nothing to change here" />;
+  if (!pages.length) return <Nothing icon={glyphOf("settings")} says="Nothing to change here" />;
 
   return (
     <Whichever
@@ -118,7 +118,7 @@ export function Settings(props: SettingsProps) {
       icon={(a) => glyphOf(a.icon)}
       chosen={area}
       onChoose={onArea}
-      nothing={{ says: "Nothing to change here" }}
+      nothing={{ icon: glyphOf("settings"), says: "Nothing to change here" }}
       then={(a) => <Page {...props} area={a.id} label={a.label} said={a.said} />}
     />
   );

@@ -27,7 +27,7 @@ import {
   CompositionBar, Delta, DivergingChart, DonutChart, DumbbellChart, Gauge, Grid,
   HeatmapChart, Hero, LineChart, Meter, PeriodInput, Reveal, Ring, Rings, Row,
   ScatterChart, Screen, Section, Segmented, Sparkline, Stack, StackedChart, Stat,
-  StatRow, spanOf, type Dates, type Loaded, type PeriodId,
+  StatRow, glyphOf, spanOf, type Dates, type Loaded, type PeriodId,
 } from "@engine/design";
 import {
   AGAINST_TARGET, BY_KIND, KIND_BY_WEEK, LENGTH_AGAINST_TIME, MONTH_ON_MONTH,
@@ -70,6 +70,7 @@ export function Reports({ title, of, again, today, period, onPeriod }: {
       again={again}
       isNothing={(f) => f.written.length === 0}
       nothing={{
+        icon: glyphOf("chart"),
         says: "Nothing to report yet",
         under: "A week of notes is enough for the shape of a week to appear",
       }}

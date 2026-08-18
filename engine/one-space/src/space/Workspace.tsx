@@ -55,6 +55,7 @@ export function OneWorkspace({ slug, onGo }: {
       <Screen
         shape="detail"
         refused={{
+          icon: glyphOf("workspace"),
           says: "You are not in this workspace",
           under: "It may have been closed, or your access taken away",
         }}

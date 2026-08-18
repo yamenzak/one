@@ -248,6 +248,66 @@ for (const file of FILES) {
 }
 if (!framed) ok(`frames: no container picks its own rhythm`);
 
+/* -------------------------------------------------------------- the mark --- */
+
+/**
+ * ⚠️ AN EMPTY STATE WEARS THE SCREEN'S OWN NOUN, AND WITHOUT ONE IT WEARS THE
+ * NEUTRAL CIRCLE — the same anonymous drawing on every surface in the product,
+ * shown at the one moment a screen has nothing else to identify itself with.
+ * `Nothing` cannot pick the mark for the caller: only the caller knows whether
+ * the emptiness is about people, packages or a search that found nothing.
+ *
+ * ⚠️ SO IT IS CHECKED RATHER THAN TYPED. Making `icon` required would be the
+ * compiler's job and it is nearly right — but the two threading wrappers
+ * (`Screen`'s `nothing`/`refused` and `Listing`'s `says`) pass it on, and a
+ * required prop on those would force the same value through a third hop with
+ * nothing gained. This asks the one question the type cannot: does the place
+ * that KNOWS the noun say it.
+ *
+ * ⚠️ AND IT SWEEPS THE APPS TOO. Every empty state a person actually meets is in
+ * a product's own screens, so a check that stopped at the design system and
+ * OneSpace would pass while the surfaces it exists for drew circles.
+ */
+const MARK_FILES = [...FILES, ...filesIn("apps")].filter((f) => !/\.test\.tsx?$/.test(f));
+
+/** ⚠️ The definition and the two that forward it. The list can only shrink. */
+const MARK_DEFINES = new Set([
+  "design/src/parts/state.tsx",
+  "design/src/frame/screen.tsx",
+  "design/src/parts/listing.tsx",
+]);
+
+/* `<Nothing …>` up to the closing angle, and the object forms that reach it. */
+const DRAWN = /<Nothing\b[^>]*>/g;
+const DECLARED = /\b(?:nothing|refused|says)=\{\{[\s\S]*?\}\}/g;
+
+let unmarked = 0;
+for (const file of MARK_FILES) {
+  const name = rel(file);
+  if (MARK_DEFINES.has(name)) continue;
+  const src = strip(readFileSync(file, "utf8"));
+
+  for (const [whole] of src.matchAll(DRAWN)) {
+    if (/\bicon=/.test(whole)) continue;
+    unmarked++;
+    fail(`${name}: an empty state with no mark — ${whole.slice(0, 48)}… (D7).\n` +
+         `       Name the screen's own noun: \`icon={glyphOf("people")}\`. Without one\n` +
+         `       it draws the neutral circle, which is the same picture everywhere.`);
+  }
+
+  /* ⚠️ `says={{…}}` IS ONLY A `Listing`'S when it carries `nothing:` — a
+     `says` prop elsewhere is an ordinary sentence, and matching it would be
+     the guard inventing a rule for a component that has no empty state. */
+  for (const [whole] of src.matchAll(DECLARED)) {
+    if (/^says=/.test(whole) && !/\bnothing:/.test(whole)) continue;
+    if (/\bicon:/.test(whole)) continue;
+    unmarked++;
+    fail(`${name}: an empty state with no mark — ${whole.slice(0, 48)}… (D7).\n` +
+         `       Add \`icon: glyphOf("…")\` beside \`says\`. See \`Nothing\`.`);
+  }
+}
+if (!unmarked) ok(`marks: every empty state wears its own noun, not the neutral circle`);
+
 console.log(bad
   ? `\nstates: ${bad} finding(s) — surfaces that answer three questions with one sentence.`
   : `\nstates: four outcomes, shaped placeholders, three kinds of motion, one rhythm.`);

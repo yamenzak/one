@@ -306,6 +306,23 @@ export const GLYPH_GAP = "gap-[0.3em]" as const;
 export const PAD = "p-4" as const;
 
 /**
+ * ⚠️ AN EMPTY STATE IS GIVEN ROOM, BECAUSE ROOM IS WHAT IT IS MADE OF. At `PAD`
+ * it is a short stack of centred text pinned to the top of whatever space it was
+ * dropped into, which reads as content that failed to arrive. The height is what
+ * turns it into a considered pause — and it is vertical only, because the words
+ * take their own measure below.
+ */
+export const EMPTY_PAD = "px-6 py-14" as const;
+
+/**
+ * ⚠️ THE LINE UNDER IT IS NARROWER THAN THE SCREEN. A centred sentence set to a
+ * phone's full width breaks into three ragged lines; held near forty characters
+ * it breaks into two even ones, which is the difference between a caption and a
+ * sentence somebody reads.
+ */
+export const EMPTY_READ = "max-w-[22rem]" as const;
+
+/**
  * ⚠️ A CARD FULL OF ROWS PADS SIDEWAYS ONLY, BECAUSE THE ROWS PAD THEMSELVES.
  * `.card` is `p-4` and every row is `py-3`, so the first row sat 28px below the
  * card's top edge and the last 28 above the bottom — a card of three rows with

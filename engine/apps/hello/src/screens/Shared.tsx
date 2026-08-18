@@ -15,7 +15,7 @@
  */
 
 import { Chip } from "@heroui/react";
-import { Listing, Screen, Tally, type Loaded } from "@engine/design";
+import { Listing, Screen, Tally, glyphOf, type Loaded } from "@engine/design";
 import type { Note } from "./sample.js";
 
 export function Shared({ title, of, again, onOpen }: {
@@ -40,6 +40,7 @@ export function Shared({ title, of, again, onOpen }: {
          offer here would be a button that has to ask "which one" — a screen
          sending somebody somewhere else to start what it advertised. */
       nothing={{
+        icon: glyphOf("star"),
         says: "Nothing is shared",
         under: "Open a note and share it to put it on a public page",
       }}

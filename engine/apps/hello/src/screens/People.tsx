@@ -22,7 +22,7 @@ import * as React from "react";
 import { Button, Chip } from "@heroui/react";
 import {
   Agree, FieldRow, Group, Listing, OneOf, Orb, Screen, Stack, TextInput, Tray,
-  notice, whoFace, type Loaded,
+  glyphOf, notice, whoFace, type Loaded,
 } from "@engine/design";
 import type { Person } from "./sample.js";
 
@@ -55,6 +55,7 @@ export function People({ title, of, again, onInvite, onOpen }: {
         again={again}
         isNothing={(rows) => rows.length === 0}
         nothing={{
+          icon: glyphOf("people"),
           says: "Nobody here yet",
           under: "Invite somebody by email — they join by signing in as that address",
         }}
@@ -64,7 +65,7 @@ export function People({ title, of, again, onInvite, onOpen }: {
             of={{ status: "ready", data: rows }}
             rowKey={(p) => p.id}
             onOpen={(p) => { setOpen(p); onOpen(p); }}
-            says={{ nothing: "Nobody here yet" }}
+            says={{ icon: glyphOf("people"), nothing: "Nobody here yet" }}
             asRow={(p) => ({
               name: p.name,
               face: p.pending ? undefined : whoFace(p.id),

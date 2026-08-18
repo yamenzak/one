@@ -20,7 +20,7 @@
 import * as React from "react";
 import {
   Choice, Cluster, Columns, Listing, Nothing, Screen, SearchInput, Segmented, Stack,
-  Tags,
+  Tags, glyphOf,
   type Loaded,
 } from "@engine/design";
 import type { Note } from "./sample.js";
@@ -58,6 +58,7 @@ export function Search({ title, q, onQ, of, recent, onRecent }: {
       of={of}
       isNothing={(rows) => asked && rows.length === 0}
       nothing={{
+        icon: glyphOf("search"),
         says: `Nothing matches “${q.trim()}”`,
         under: "Search looks at titles, what is written under them, and topics",
       }}
@@ -101,14 +102,22 @@ export function Search({ title, q, onQ, of, recent, onRecent }: {
                   picture as a page that failed to load. "Nothing typed" is a
                   state, and a state with no copy is a blank. */}
               {asked ? null : (
-                <Nothing says="Search the notes" under="Titles and the words under them — results appear as you type" />
+                <Nothing
+                  icon={glyphOf("search")}
+                  says="Search the notes"
+                  under="Titles and the words under them — results appear as you type"
+                />
               )}
               {asked ? (
                 <Listing
                   label="Matches"
                   of={{ status: "ready", data: kept }}
                   rowKey={(n) => n.id}
-                  says={{ nothing: "Nothing matches that filter", under: "Try “All” — the note may be a draft" }}
+                  says={{
+                    icon: glyphOf("search"),
+                    nothing: "Nothing matches that filter",
+                    under: "Try “All” — the note may be a draft",
+                  }}
                   asRow={(n) => ({ name: n.title, under: n.said })}
                   cols={[
                     { id: "title", label: "Note", cell: (n) => n.title },

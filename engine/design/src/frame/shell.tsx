@@ -52,6 +52,10 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
      landing on the neutral mark — an anonymous circle in a menu, which is the
      one glyph that says nothing at all. */
   workspace: <Building2 />, person: <UserRound />,
+  /* ⚠️ A PRODUCT IS A NOUN THIS SYSTEM SAYS CONSTANTLY AND HAD NO MARK FOR.
+     The crown drew `Boxes` inline for "Your products" while every other surface
+     that meant the same thing fell through to the neutral circle. */
+  apps: <Boxes />, product: <Boxes />,
   money: <Coins />, coins: <Coins />, bank: <Banknote />,
   settings: <Cog />, cog: <Cog />,
   trust: <Shield />, shield: <Shield />,

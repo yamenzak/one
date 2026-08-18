@@ -13,7 +13,7 @@
 import { Button } from "@heroui/react";
 import {
   Await, ControlRow, FlagConsole, Group, NoteRow, Nothing, RowsWaiting, Screen, Stack,
-  TYPE, appFace, notice,
+  TYPE, appFace, glyphOf, notice,
 } from "@engine/design";
 import type { FlagBook } from "@engine/kernel";
 import { api } from "../api.js";
@@ -104,7 +104,7 @@ export function Switches() {
         waiting={<RowsWaiting rows={3} />}
         again={flags.again}
         isNothing={(d) => d.apps.length === 0}
-        nothing={<Nothing says="No product here declares a flag" />}
+        nothing={<Nothing icon={glyphOf("sparkle")} says="No product here declares a flag" />}
         then={(data) => (
           <Stack space="roomy">
             {data.apps.map((app) => (

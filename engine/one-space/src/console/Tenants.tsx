@@ -8,7 +8,7 @@
  */
 
 import { Chip } from "@heroui/react";
-import { Listing, Screen, TableWaiting, placeFace, sentence } from "@engine/design";
+import { Listing, Screen, TableWaiting, glyphOf, placeFace, sentence } from "@engine/design";
 import type { Allowance, EntitlementDef, PlanSpec } from "@engine/kernel";
 import { useLoad } from "../centre/data.js";
 
@@ -51,13 +51,17 @@ export function Tenants({ onGo }: { readonly onGo: (id: string) => void }) {
       again={of.again}
       isNothing={(d) => d.items.length === 0}
       waiting={<TableWaiting cols={4} rows={6} />}
-      nothing={{ says: "No workspaces yet", under: "The first one arrives through the setup door" }}
+      nothing={{
+        icon: glyphOf("workspace"),
+        says: "No workspaces yet",
+        under: "The first one arrives through the setup door",
+      }}
       then={(data) => (
         <Listing
           label="Workspaces"
           of={{ status: "ready", data: data.items }}
           rowKey={(t) => t.id}
-          says={{ nothing: "No workspaces yet" }}
+          says={{ icon: glyphOf("workspace"), nothing: "No workspaces yet" }}
           /*
             ⚠️ FOUR COLUMNS IN A PHONE'S WIDTH IS NOT A TABLE — see `Listing`.
             "Northwind Strength" wrapped to two lines, "DE · eu-1" to two more,

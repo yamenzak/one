@@ -30,7 +30,7 @@ import { PLATFORM_ROLES } from "@engine/kernel";
 import { Button, Card, Chip } from "@heroui/react";
 import {
   Await, Choice, Confirm, Listing, Menu, Nothing, RowsWaiting, Screen, Stack, TextInput, Tray,
-  notice, money as saidMoney, whoFace,
+  glyphOf, notice, money as saidMoney, whoFace,
 } from "@engine/design";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView, type HoldingLine, type MemberLine, type PackageLine } from "./data.js";
@@ -62,6 +62,7 @@ export function People({ view }: { readonly view: CentreView }) {
         isNothing={(d) => d.items.length === 0}
         waiting={<RowsWaiting rows={4} />}
         nothing={{
+          icon: glyphOf("people"),
           says: "Nobody here yet",
           under: "Invite somebody by email — they join by signing in as that address",
         }}
@@ -73,7 +74,7 @@ export function People({ view }: { readonly view: CentreView }) {
             /* ⚠️ EMPTY IS THE SCREEN'S NOW, NOT THE LISTING'S. Two components
                both able to answer "there is nothing here" is two answers, and
                only one of them can also stand the primary action down. */
-            says={{ nothing: "Nobody here yet" }}
+            says={{ icon: glyphOf("people"), nothing: "Nobody here yet" }}
             /* ⚠️ A ROSTER IS A LIST OF PEOPLE BEFORE IT IS A TABLE. On a phone
                the three columns were a scroll box with two of them cut off
                mid-word; the same rows carry the same facts in the shape the
@@ -307,7 +308,13 @@ function AppHoldings({ app, member }: { readonly app: CentreApp; readonly member
           <Card.Content>
             <Stack space="snug">
               {holdings.items.length === 0
-                ? <Nothing says="Holds nothing here" under="Grant one below — a paid one arrives the same way" />
+                ? (
+                  <Nothing
+                    icon={glyphOf("package")}
+                    says="Holds nothing here"
+                    under="Grant one below — a paid one arrives the same way"
+                  />
+                )
                 : holdings.items.map((h) => (
                   <div key={h.packageId} className="flex flex-wrap items-center justify-between">
                     <span>{h.name}</span>

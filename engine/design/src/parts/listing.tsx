@@ -57,7 +57,12 @@ export interface ListingProps<T> {
   /** Rows per page. The pager appears only past this. */
   readonly pageSize?: number;
   /** What is true when the answer is legitimately no rows. */
-  readonly says?: { readonly nothing: string; readonly under?: string };
+  /** ⚠️ `icon` IS THE TABLE'S OWN NOUN — see `Nothing`. */
+  readonly says?: {
+    readonly nothing: string;
+    readonly under?: string;
+    readonly icon?: React.ReactNode;
+  };
   readonly again?: () => void;
   /** What this table is, for the screen reader. */
   readonly label: string;
@@ -85,7 +90,9 @@ export function Listing<T>(
     <Await
       of={of}
       waiting={<TableWaiting cols={cols.length} rows={Math.min(pageSize, 6)} />}
-      nothing={says ? <Nothing says={says.nothing} under={says.under} /> : undefined}
+      nothing={says
+        ? <Nothing icon={says.icon} says={says.nothing} under={says.under} />
+        : undefined}
       again={again}
       then={(rows) => {
         const sorter = order ? cols.find((c) => c.id === order.id)?.by : undefined;

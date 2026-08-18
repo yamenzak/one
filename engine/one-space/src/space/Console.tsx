@@ -66,6 +66,7 @@ export function ConsoleHome({ onGo }: { readonly onGo: (to: Where) => void }) {
       <Screen
         shape="list"
         refused={{
+          icon: glyphOf("shield"),
           says: "The console admits operators only",
           under: "Everything you can reach is under Workspaces",
         }}

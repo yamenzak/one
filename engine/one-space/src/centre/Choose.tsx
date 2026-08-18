@@ -13,7 +13,7 @@
  * a chooser with one card is a screen whose entire content is a button.
  */
 
-import { Nothing, Place, Stack, Title, appFace } from "@engine/design";
+import { Nothing, Place, Stack, Title, appFace, glyphOf } from "@engine/design";
 import type { CentreView } from "./data.js";
 
 export function Choose({ view, onGo }: {
@@ -23,6 +23,7 @@ export function Choose({ view, onGo }: {
   if (view.apps.length === 0) {
     return (
       <Nothing
+        icon={glyphOf("apps")}
         says="This workspace has no products switched on"
         under="Somebody who runs it can add one from Money"
       />

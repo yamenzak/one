@@ -18,7 +18,7 @@ import { useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import {
   AmountRow, ControlRow, Credits, Group, Identity, NumberInput, Row, RowsWaiting, Screen,
-  Stack, TYPE, TextInput, Tray, appFace, notice, placeFace, sentence,
+  Stack, TYPE, TextInput, Tray, appFace, glyphOf, notice, placeFace, sentence,
 } from "@engine/design";
 import type { Allowance, EntitlementDef, PlanSpec } from "@engine/kernel";
 import { isBusiness } from "@engine/kernel";
@@ -93,7 +93,11 @@ export function OneTenant({ id }: { readonly id: string }) {
       again={of.again}
       waiting={<RowsWaiting rows={3} />}
       isNothing={(d) => !d.items.some((t) => t.id === id)}
-      nothing={{ says: "No such workspace", under: "It may have been closed since this list was read" }}
+      nothing={{
+        icon: glyphOf("workspace"),
+        says: "No such workspace",
+        under: "It may have been closed since this list was read",
+      }}
       then={(data) => {
         const tenant = data.items.find((t) => t.id === id)!;
         return (

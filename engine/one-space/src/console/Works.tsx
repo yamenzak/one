@@ -7,7 +7,7 @@
  * draws exactly that — this is the console pointing it at the deployment.
  */
 
-import { Jobs, Screen } from "@engine/design";
+import { Jobs, Screen, glyphOf } from "@engine/design";
 import type { JobBook } from "@engine/kernel";
 import { useLoad } from "../centre/data.js";
 
@@ -32,7 +32,7 @@ export function Works() {
       of={of.of}
       again={of.again}
       isNothing={(d) => Object.keys(d.book).length === 0}
-      nothing={{ says: "No product here declares a job" }}
+      nothing={{ icon: glyphOf("clock"), says: "No product here declares a job" }}
       then={(data) => (
         <Jobs book={data.book} runs={data.runs} missedMs={A_DAY} now={Date.now()} />
       )}

@@ -17,7 +17,7 @@ import { Button } from "@heroui/react";
 import { field, mayBrand, type Kind, type Problem, type Theme } from "@engine/kernel";
 import {
   BrandTile, Center, EditRow, Group, PickFile, Row, Screen, Stack, TextInput, ToggleRow,
-  notice, ready,
+  glyphOf, notice, ready,
 } from "@engine/design";
 import { api } from "../api.js";
 import { useLoad } from "./data.js";
@@ -203,6 +203,7 @@ export function Editor({ name, slug, answer, again }: {
         of={ready(false)}
         isNothing={() => true}
         nothing={{
+          icon: glyphOf("workspace"),
           says: "This is for business workspaces",
           under: `Make ${name} a business and it carries your logo, your colour and your icon across every app here. It cannot be undone.`,
           does: <Become name={name} slug={slug} again={again} />,

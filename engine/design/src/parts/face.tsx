@@ -395,6 +395,19 @@ function OnePlate() {
  * ⚠️ IT MOVES, BECAUSE AT THIS SIZE THE MOVEMENT IS THE POINT. The rule that
  * stills a chip is about a twitch in the corner of the eye at 32px; a planet
  * filling half a phone that does not turn is a photograph of one.
+ *
+ * ⚠️ A WORKSPACE AND NOTHING ELSE, AND THAT WAS TESTED RATHER THAN ASSUMED. The
+ * composition works because a place is a thing seen from OUTSIDE: a lit sphere
+ * at the size of the screen with a name across it reads as a title card. A
+ * person is not a place. Drawn the same way — the ground composed out, the crop
+ * removed, everything the planet gets — a `moods` face is a flat cartoon blob
+ * three hundred pixels wide with the word "You" written across it, sitting above
+ * the same face again at row size and the address it belongs to. It was built,
+ * photographed and deleted in the same hour.
+ *
+ * ⚠️ SO A PERSON'S FACE HAS ONE SIZE RANGE AND IT IS A ROW'S. What the account
+ * area wears instead is their LIGHT — `aura` as the ground under every screen in
+ * it (`subjectOf`), which is the same identity at the scale that suits it.
  */
 export function Orb({ of, size = 280 }: {
   readonly of: FaceOf;
@@ -404,9 +417,7 @@ export function Orb({ of, size = 280 }: {
   const at = React.useRef<HTMLImageElement>(null);
   const still = useStill(at);
   const src = React.useMemo(
-    () => (of.kind === "workspace"
-      ? bakeWorld(of.seed, !still, size * 2)
-      : of.kind === "person" ? bake(of.kind, of.seed, !still, size * 2) : null),
+    () => (of.kind === "workspace" ? bakeWorld(of.seed, !still, size * 2) : null),
     [of.kind, of.seed, still, size],
   );
   if (!src) return null;

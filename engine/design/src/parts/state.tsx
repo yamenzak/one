@@ -23,9 +23,10 @@
 
 import * as React from "react";
 import { Alert, Button, EmptyState, Skeleton, Spinner } from "@heroui/react";
+import { Circle } from "lucide-react";
 import type { Problem } from "@engine/kernel";
 import { TYPE } from "../tokens/type.js";
-import { PAD, ROW, SPACE } from "../tokens/metrics.js";
+import { EMPTY_PAD, EMPTY_READ, NUDGE, PAD, ROW, SPACE } from "../tokens/metrics.js";
 import { ARRIVE } from "../tokens/motion.js";
 import { Group } from "./surfaces.js";
 
@@ -198,7 +199,15 @@ const statusOf = (tone: Problem["tone"]): Status => STATUS[tone] ?? "default";
  * ⚠️ AND IT CARRIES THE ACTION THAT WOULD END IT, where there is one. An empty
  * state with no way out of it is a dead end with good manners.
  */
-export function Nothing({ says, under, offer, does }: {
+export function Nothing({ icon, says, under, offer, does }: {
+  /**
+   * ⚠️ THE ONE MARK, AND IT IS THE SCREEN'S OWN. A glyph from the same set the
+   * navigation uses, so an empty roster is a quiet drawing of PEOPLE rather than
+   * a generic shrug — the emptiness is about a particular thing and the mark is
+   * what says which. Absent draws the neutral one, which is honest for a surface
+   * with no noun (`glyphOf`).
+   */
+  readonly icon?: React.ReactNode;
   readonly says: string;
   readonly under?: string;
   readonly offer?: { readonly label: string; readonly onDo: () => void };
@@ -212,13 +221,50 @@ export function Nothing({ says, under, offer, does }: {
   readonly does?: React.ReactNode;
 }) {
   return (
-    <EmptyState {...ARRIVE} className={`flex flex-col items-center ${SPACE.snug} ${PAD}`}>
-      <p className={TYPE.label}>{says}</p>
-      {under ? <p className={`${TYPE.note} text-center text-balance`}>{under}</p> : null}
+    <EmptyState {...ARRIVE} className={`flex flex-col items-center ${SPACE.snug} ${EMPTY_PAD}`}>
+      {/*
+        ⚠️ A HALO, NOT AN ILLUSTRATION. The obvious move is a picture, and it is
+        the wrong one twice over: a drawing per empty state is a drawing per
+        screen for the one moment a screen has nothing to show, and any picture
+        with colour in it fights the workspace whose brand the page is wearing.
+        This is one plate of the page's OWN light — `currentColor`, so it takes
+        the ground's hue wherever it lands and takes the accent nowhere.
+
+        ⚠️ AND IT IS A VALUE, NOT A RING (D7). A hairline round it is the second
+        way of saying "separate thing" in a design that has one, and the fill is
+        already doing the work — a plate at 7% of the ink is findable on every
+        tier this can land on.
+
+        ⚠️ AND IT IS SIZED IN `rem` RATHER THAN BY A FACE SIZE. The face scale is
+        for a subject; this is furniture, and borrowing `panel` would tie an
+        empty roster's mark to whatever a person's avatar measures next.
+      */}
+      <span
+        aria-hidden
+        className="flex size-20 items-center justify-center rounded-[1.75rem]
+          bg-current/[0.07] [&>svg]:size-8 [&>svg]:opacity-40"
+      >
+        {icon ?? <Circle />}
+      </span>
+      {/*
+        ⚠️ THE SENTENCE IS `section`, NOT `label`. An empty state is the only
+        thing on the screen when it shows, so at label weight it read as a caption
+        for a missing thing rather than as the answer to what is here.
+      */}
+      <p className={`${TYPE.section} text-center text-balance`}>{says}</p>
+      {under
+        ? <p className={`${TYPE.note} text-center text-balance ${EMPTY_READ}`}>{under}</p>
+        : null}
       {/* ⚠️ A VARIANT, NEVER A COLOUR. Naming one here would be this file
           deciding what an accent looks like, which is the library's answer and
           not ours (D7). */}
-      {offer ? <Button variant="primary" onPress={offer.onDo}>{offer.label}</Button> : null}
+      {offer
+        ? (
+          <span className={NUDGE.over}>
+            <Button variant="primary" onPress={offer.onDo}>{offer.label}</Button>
+          </span>
+        )
+        : null}
       {does}
     </EmptyState>
   );

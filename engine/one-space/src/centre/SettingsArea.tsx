@@ -19,7 +19,7 @@
  * to be two screens (DESIGN.md §3).
  */
 
-import { Screen, Settings, Whichever, appFace, notice } from "@engine/design";
+import { Screen, Settings, Whichever, appFace, glyphOf, notice } from "@engine/design";
 import { settingsOn } from "@engine/kernel";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView } from "./data.js";
@@ -57,6 +57,7 @@ export function SettingsArea({ view, level, app, area, onGo, onArea }: {
       chosen={app}
       onChoose={onGo}
       nothing={{
+        icon: glyphOf("settings"),
         says: "Nothing to change here",
         under: "No product in this workspace declares a setting",
       }}

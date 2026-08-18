@@ -16,7 +16,7 @@ import { useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import {
   Agree, AmountRow, Await, Choice, Confirm, Group, MoneyInput, NumberInput, Picks, RowsWaiting,
-  Nothing, Screen, Stack, TextInput, Tray, notice, money as saidMoney,
+  Nothing, Screen, Stack, TextInput, Tray, glyphOf, notice, money as saidMoney,
 } from "@engine/design";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView, type PackageLine } from "./data.js";
@@ -79,6 +79,7 @@ function AppPackages({ app, among }: { readonly app: CentreApp; readonly among: 
         data.items.length === 0
           ? (
             <Nothing
+              icon={glyphOf("package")}
               says={among > 1 ? `Nothing on sale for ${app.name}` : "Nothing on sale yet"}
               under="A package is what a customer buys: some access, a price, and a clock"
             />

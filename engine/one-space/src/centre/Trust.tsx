@@ -84,7 +84,13 @@ export function Trust({ view, where }: {
           {/* ⚠️ The deployment's documents are always there, so this is about
               what the PRODUCTS add. */}
           {!documented.length && !processing.length && !housed.length
-            ? <Nothing says="Nothing to disclose" under="No product here names a document or a third party" />
+            ? (
+              <Nothing
+                icon={glyphOf("trust")}
+                says="Nothing to disclose"
+                under="No product here names a document or a third party"
+              />
+            )
             : null}
       </>
 

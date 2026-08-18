@@ -15,7 +15,7 @@
 
 import { Chip } from "@heroui/react";
 import {
-  Group, Nothing, PersonRow, Screen, placeFace, sentence,
+  Group, Nothing, PersonRow, Screen, glyphOf, placeFace, sentence,
 } from "@engine/design";
 import { useSession } from "../session.js";
 import { here, spaceAt, isHere, setupUrl, tenantUrl } from "../door.js";
@@ -55,7 +55,9 @@ export function Workspaces({ onGo }: { readonly onGo: (to: Where) => void }) {
     >
       {person && belongs.length === 0
         ? (
+          /* ⚠️ THE MARK IS THE SCREEN'S OWN NOUN — a workspace, not a shrug. */
           <Nothing
+            icon={glyphOf("workspace")}
             says="You are not in any workspace yet"
             under="An invitation arrives by email, and signing in as that address claims it"
           />
