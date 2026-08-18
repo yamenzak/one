@@ -8,27 +8,53 @@
  * ⚠️ AND THE FOUR-WAY IS `Screen`'S, WHICH IS WHY THE WAITING STATE IS A
  * SKELETON AND A REFUSAL IS A REFUSAL. This handed `Inbox` a `null` for
  * everything that was not a loaded answer, and `Inbox` drew "Loading…" for it —
- * so `inbox.list` answering 404 on the account door, which it does, was a
- * spinner-less page that never resolved.
+ * so a 404 was a spinner-less page that never resolved.
+ *
+ * ⚠️ ONE SCREEN, TWO READS, AND THE DOOR DECIDES WHICH. On a workspace it is
+ * that workspace's notes (`inbox.list`, a member op); on the account door it is
+ * EVERY workspace's, merged, each row naming where it came from (`me.inbox`, a
+ * personal op that walks this account's own shards). They are the same list
+ * asked at two scopes, so they are one screen rather than two that could drift.
+ *
+ * ⚠️ AND THAT IS WHY THE ACCOUNT DOOR HAS AN INBOX AT ALL. It used to call the
+ * member op here, which needs a `tenantId` the account door does not have, so it
+ * 404'd; the row was then removed, which left the one address that spans every
+ * workspace unable to tell somebody that any of them needed them. A notification
+ * is addressed to a PERSON — email and push already go to one address and one
+ * device — so the inbox was the only channel disagreeing about the audience.
  */
 
 import { Inbox, RowsWaiting, Screen, glyphOf } from "@engine/design";
 import { api } from "../api.js";
+import { useSession } from "../session.js";
 import { useLoad, type InboxView } from "./data.js";
 
 export function InboxScreen({ onGo, onSeen }: {
   readonly onGo: (path: string) => void;
   readonly onSeen: () => void;
 }) {
-  const inbox = useLoad<InboxView>("inbox.list");
+  const { where } = useSession();
+  /* ⚠️ `undefined` UNTIL THE DOOR IS KNOWN, and `useLoad` is not called with a
+     guess. Defaulting to either op would fire the wrong read on the first paint
+     and then the right one, so every open of this screen would flash somebody
+     else's scope. */
+  const mine = where?.kind !== "tenant";
+  const inbox = useLoad<InboxView>(mine ? "me.inbox" : "inbox.list");
 
-  const open = async (note: { id: string; link: string | null; seen: boolean }) => {
-    if (!note.seen) { await api.post("inbox.seen", { id: note.id }); onSeen(); }
+  /* ⚠️ THE SEEN WRITE FOLLOWS THE READ, because a note read from another
+     workspace's shard cannot be marked through this one's operation — the row is
+     not in this database. `me.seen` takes the slug the note arrived with. */
+  const markOne = (note: { id: string; slug?: string }) => mine
+    ? api.post("me.seen", { id: note.id, ...(note.slug ? { slug: note.slug } : {}) })
+    : api.post("inbox.seen", { id: note.id });
+
+  const open = async (note: { id: string; link: string | null; seen: boolean; slug?: string }) => {
+    if (!note.seen) { await markOne(note); onSeen(); }
     if (note.link) onGo(note.link);
   };
 
   const sweep = async () => {
-    await api.post("inbox.seen", {});
+    await api.post(mine ? "me.seen" : "inbox.seen", {});
     inbox.again();
     onSeen();
   };
@@ -54,7 +80,9 @@ export function InboxScreen({ onGo, onSeen }: {
       nothing={{
         icon: glyphOf("inbox"),
         says: "Nothing here yet",
-        under: "Anything a product needs to tell you arrives here, and stays",
+        under: mine
+          ? "Anything any of your workspaces needs to tell you arrives here, and stays"
+          : "Anything a product needs to tell you arrives here, and stays",
       }}
       then={(data) => <Inbox notes={data.items} onOpen={(n) => void open(n)} />}
     />

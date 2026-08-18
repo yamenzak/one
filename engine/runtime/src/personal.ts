@@ -38,6 +38,7 @@ import {
   revokeToken, spendCode, startSession, tokensOf, type Session,
 } from "./identity.js";
 import { claimInvitations, found, memberFor, membersOf } from "./membership.js";
+import { inboxOf, markSeen, unseenCount } from "./inbox.js";
 import { eraseObjects, type Bucket, type Where } from "./storage.js";
 import type { Db } from "./sql.js";
 
@@ -529,7 +530,14 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
              where they can go; a product switched off keeps its records and its
              tables (see `Enablement`) and must not appear as somewhere to go. */
           const apps = await liveAppsOfTenant(ctx.directory, t.id);
-          const member = await memberFor(ctx.shardOf(t), t.id, accountId);
+          /* ⚠️ TOGETHER, BECAUSE THEY ARE THE SAME SHARD AND NEITHER FEEDS THE
+             OTHER. Awaited one after the other this walk would cost two round
+             trips per workspace on the read every door makes at boot; run
+             concurrently it costs one query's latency however many there are. */
+          const [member, unseen] = await Promise.all([
+            memberFor(ctx.shardOf(t), t.id, accountId),
+            unseenCount(ctx.shardOf(t), t.id, accountId),
+          ]);
           /* ⚠️ Only where it is worth saying. A badge on every row is texture;
              one on the workspace that stopped paying is why somebody looked. */
           const owing = deps.needsAttention
@@ -549,6 +557,11 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
             appRoles: member?.appRoles ?? {},
             apps,
             attention: owing.some(Boolean),
+            /* ⚠️ CARRIED BY THE READ EVERY DOOR ALREADY MAKES. A bell with no
+               number is a bell somebody has to open to learn anything from, and
+               the count is the one fact that decides whether they do. Fetched
+               separately it would be a second walk over the same shards. */
+            unseen,
           };
         }));
         return {
@@ -839,6 +852,81 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
            "invalid" would send somebody to check all three. */
         if (no.length) return ctx.fail("platform.invalid", { field: no[0]! });
         return { presentation: want };
+      },
+    },
+
+    /* --------------------------------------------------------------- told --- */
+
+    /*
+      ⚠️ EVERY WORKSPACE'S NOTES, IN ONE LIST, BECAUSE A NOTIFICATION IS
+      ADDRESSED TO A PERSON. Email and push already go to one address and one
+      device — account-wide by construction. The inbox channel was the only one
+      filed per workspace, so somebody in four workspaces had four inboxes and
+      nowhere that said "something needs you". That is not a missing screen, it
+      is the three channels disagreeing about who the audience is.
+
+      ⚠️ IT FANS OUT, AND THE BOUND IS THE PERSON. `me.who` above already reads
+      every one of this account's shards for a role and a standing, and states
+      why: bounded by how many workspaces one person is in — a handful, not a
+      catalogue. This is the same walk with one more read on it, concurrently, so
+      it costs one query's latency rather than N.
+
+      ⚠️ AND IT IS NOT WHAT D5 FORBIDS. That rule is about a CROSS-TENANT
+      question — the operator console, the dunning sweep, purge — which fans out
+      over every shard on the deployment and gets slower with each one added.
+      A person's own workspaces are a list the directory already holds and that
+      does not grow with the deployment.
+
+      ⚠️ EACH NOTE CARRIES WHERE IT CAME FROM, or the merged list is a column of
+      sentences about work with no way to tell which workspace any of them is
+      about — which is worse than four inboxes, not better.
+    */
+    "me.inbox": {
+      kind: "read", needs: "session",
+      async run(ctx): Promise<unknown> {
+        const accountId = ctx.session!.accountId;
+        const tenants = await tenantsOf(ctx.directory, accountId);
+        const per = await Promise.all(tenants.map(async (t) => {
+          const notes = await inboxOf(ctx.shardOf(t), t.id, accountId);
+          return notes.map((note) => ({ ...note, slug: t.slug, where: t.name }));
+        }));
+        /* ⚠️ SORTED ACROSS WORKSPACES, NOT CONCATENATED. `at` is an `Instant`, so
+           the comparison is lexicographic and correct — which is the whole reason
+           nothing here is stored in a reader's own conventions. */
+        const items = per.flat().sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+        return {
+          items: items.slice(0, 50),
+          /* ⚠️ COUNTED OVER EVERYTHING, NOT OVER THE PAGE. A bell reading `50`
+             on an account with two hundred unread is a number that stops moving
+             when somebody reads one. */
+          unseen: items.filter((n) => !n.seen).length,
+        };
+      },
+    },
+
+    /*
+      ⚠️ THE WORKSPACE IS NAMED BY THE CALLER, BECAUSE THE ROW IS ON ITS SHARD.
+      There is no "mark this one read" that does not know which database the one
+      is in — and a mark-all with no slug is a walk over the same handful, which
+      is the only shape that can clear a merged list from the screen showing it.
+    */
+    "me.seen": {
+      kind: "write", needs: "session",
+      async run(ctx, input): Promise<unknown> {
+        const accountId = ctx.session!.accountId;
+        const slug = input.slug === undefined || input.slug === null
+          ? null : String(input.slug);
+        const tenants = (await tenantsOf(ctx.directory, accountId))
+          .filter((t) => slug === null || t.slug === slug);
+        /* ⚠️ A SLUG THAT NAMES NOTHING THIS ACCOUNT IS IN IS A REFUSAL, not a
+           quiet no-op: the caller is asserting a membership, and answering 200
+           to a false one is how a screen comes to show a cleared list that was
+           never cleared. */
+        if (slug !== null && !tenants.length) return ctx.fail("platform.not_found");
+        const id = input.id ? String(input.id) : null;
+        await Promise.all(tenants.map((t) =>
+          markSeen(ctx.shardOf(t), t.id, accountId, id, ctx.now)));
+        return { seen: true };
       },
     },
 

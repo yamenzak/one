@@ -133,6 +133,16 @@ export interface InboxView {
     readonly id: string; readonly type: string; readonly title: string;
     readonly link: string | null; readonly tone: string; readonly at: string;
     readonly seen: boolean;
+    /*
+      ⚠️ WHICH WORKSPACE, ON THE ACCOUNT DOOR ONLY. `me.inbox` merges every
+      workspace this person is in, so without it the list is a column of
+      sentences about work with no way to tell which of four places any of them
+      is about — which is worse than four inboxes, not better. A workspace's own
+      inbox omits both: naming the workspace on every row of its own screen is
+      the heading repeated N times.
+    */
+    readonly where?: string;
+    readonly slug?: string;
   }[];
   readonly unseen: number;
 }

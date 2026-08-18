@@ -144,6 +144,8 @@ they are in, leaving one, taking a copy, deleting themselves.
 | `me.export` | read | session | *every door* |
 | `me.forget` | write | session + recent proof | *every door* |
 | `me.presentation` | write | session | *every door* |
+| `me.inbox` | read | session | *every door* |
+| `me.seen` | write | session | *every door* |
 | `me.token.create` | write | session | `account` |
 | `me.token.list` | read | session | `account` |
 | `me.token.revoke` | write | session | `account` |

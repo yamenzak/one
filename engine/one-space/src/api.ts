@@ -196,4 +196,6 @@ export interface Belonging {
   readonly apps?: readonly string[];
   /** ⚠️ Only where it is worth saying — see `me.who`. */
   readonly attention?: boolean;
+  /** ⚠️ Unread notes in this workspace — see `me.who`. */
+  readonly unseen?: number;
 }

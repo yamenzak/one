@@ -572,6 +572,20 @@
       "proof": null
     },
     {
+      "id": "me.inbox",
+      "kind": "read",
+      "needs": "session",
+      "doors": null,
+      "proof": null
+    },
+    {
+      "id": "me.seen",
+      "kind": "write",
+      "needs": "session",
+      "doors": null,
+      "proof": null
+    },
+    {
       "id": "me.token.create",
       "kind": "write",
       "needs": "session",

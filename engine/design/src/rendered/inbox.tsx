@@ -39,6 +39,15 @@ export interface Note {
   readonly tone: string;
   readonly at: string;
   readonly seen: boolean;
+  /**
+   * ⚠️ WHICH WORKSPACE, WHERE SEVERAL ARE MERGED — and absent where they are
+   * not. The account door shows every workspace's notes in one list, and without
+   * this it is a column of sentences about work with no way to tell which of
+   * four places any of them is about. A workspace's own inbox leaves it off:
+   * naming the workspace on every row of its own screen is the heading printed
+   * again per line.
+   */
+  readonly where?: string;
 }
 
 export interface InboxProps {
@@ -76,10 +85,13 @@ export function Inbox({ notes, now, onOpen }: InboxProps) {
             <NavRow
               key={note.id}
               label={note.title}
-              /* ⚠️ THE TIME ALONE — the heading above already said which day,
-                 and a full date on every row is three fields repeated down a
-                 list with one of them varying. */
-              under={sayTime(shown, note.at as Instant)}
+              /* ⚠️ THE TIME, AND THE WORKSPACE ONLY WHERE THERE IS MORE THAN
+                 ONE — the heading above already said which day, and a full date
+                 on every row is three fields repeated down a list with one of
+                 them varying. */
+              under={note.where
+                ? `${note.where} · ${sayTime(shown, note.at as Instant)}`
+                : sayTime(shown, note.at as Instant)}
               /*
                 ⚠️ ZERO IS TEXTURE AND SO IS "SEEN". Only the unread ones are
                 marked — a chip on every row is a chip that says nothing.

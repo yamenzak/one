@@ -48,6 +48,10 @@ export function SpaceHome({ person, onGo }: {
      trip is a wrong answer wearing a loading state's excuse. */
   const workspaces = person?.tenants ?? null;
   const needing = workspaces?.filter((t) => t.attention).length ?? 0;
+  /* ⚠️ SUMMED ACROSS EVERY WORKSPACE, because this row IS the merge — a count
+     of one of them on a row that opens all of them is a number that disagrees
+     with the screen it leads to. */
+  const unread = workspaces?.reduce((n, t) => n + (t.unseen ?? 0), 0) ?? 0;
 
   return (
     <Stack space="roomy">
@@ -75,12 +79,32 @@ export function SpaceHome({ person, onGo }: {
             : undefined}
           onOpen={() => onGo({ at: "workspaces" })}
         />
-        {/* ⚠️ NO INBOX ROW. It was here AND on the screen one row below it, and
-            on this door it went nowhere either time: an inbox belongs to a
-            WORKSPACE (`inbox.list` reads `tenantId`), so the account door
-            answers it 404 — a named destination with nothing behind it, which
-            this file's own header bans. It is on a workspace's chrome, where
-            there is one to be the inbox OF. */}
+        {/* ⚠️ THE INBOX IS BACK, AND IT NOW GOES SOMEWHERE. It was removed from
+            here because the screen behind it called a member operation, which
+            404s on this door — a named destination with nothing behind it,
+            which this file's own header bans. The read was the bug, not the
+            row: `me.inbox` merges every workspace this account is in, so on
+            this door the answer is the one thing a person opens it to learn.
+
+            ⚠️ AND IT IS ON THE `You` SCREEN TOO, WHICH IS NOT A DUPLICATE. This
+            is the first screen of the account door and that is the drawer of
+            everything about you — the same relationship Workspaces has with the
+            row above it. What must never happen again is the same row twice
+            with nothing behind either. */}
+        <NavRow
+          icon={glyphOf("inbox")}
+          label="Inbox"
+          /* ⚠️ ONE LINE, like every other row here — see the operator row below.
+             A description on one row of a menu makes it a different SHAPE from
+             its neighbours, which reads as the odd one out rather than as the
+             important one, and the count already says whether it needs them. */
+          /* ⚠️ ZERO IS TEXTURE. A badge reading `0` beside a row is a mark that
+             says only that the row exists, which is what the icon said. */
+          aside={unread > 0
+            ? <Chip color="accent" variant="soft"><Chip.Label>{unread}</Chip.Label></Chip>
+            : undefined}
+          onOpen={() => onGo({ at: "inbox" })}
+        />
         <NavRow
           icon={glyphOf("person")}
           /* ⚠️ THE ROW IS NAMED BY WHERE IT GOES, not by a synonym. It said

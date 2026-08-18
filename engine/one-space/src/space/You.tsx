@@ -41,20 +41,18 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
       />
 
       <Group>
-        {/* ⚠️ AN INBOX BELONGS TO A WORKSPACE, so it is offered where there is
-            one to be the inbox OF. `inbox.list` reads `tenantId`, which the
-            account door does not have — it answered 404 there, and the screen
-            reported that as "Loading…" indefinitely. Offering it here and on
-            the home screen made that two dead rows rather than one. */}
-        {where?.kind === "tenant"
-          ? (
-            <NavRow
-              icon={glyphOf("inbox")}
-              label="Inbox"
-              onOpen={() => onGo({ at: "inbox" })}
-            />
-          )
-          : null}
+        {/* ⚠️ ON EVERY DOOR, AND THE SCOPE IS WHAT CHANGES. This was gated to a
+            workspace because the screen behind it called a MEMBER operation,
+            which 404s where there is no tenancy — so the row was hidden rather
+            than the read being fixed, and the one address that spans every
+            workspace could not say that any of them needed somebody.
+            `InboxScreen` picks `me.inbox` or `inbox.list` from the door now. */}
+        <NavRow
+          icon={glyphOf("inbox")}
+          label="Inbox"
+          under={where?.kind === "tenant" ? undefined : "Everywhere you belong"}
+          onOpen={() => onGo({ at: "inbox" })}
+        />
         <NavRow
           icon={glyphOf("bell")}
           label="How you are told"

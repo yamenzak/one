@@ -75,9 +75,16 @@ export function Workspaces({ onGo }: { readonly onGo: (to: Where) => void }) {
                 face={placeFace(w.slug)}
                 name={w.name}
                 under={said(w.apps, w.platformRole)}
+                /* ⚠️ THE STANDING WINS OVER THE COUNT, because they are not
+                   equally urgent: unread notes are a workspace to visit and a
+                   failed payment is one about to stop working. Two chips on one
+                   row would make the reader rank them, which is this row's job
+                   rather than theirs. */
                 aside={w.attention
                   ? <Chip color="warning" variant="soft"><Chip.Label>Needs attention</Chip.Label></Chip>
-                  : undefined}
+                  : (w.unseen ?? 0) > 0
+                    ? <Chip color="accent" variant="soft"><Chip.Label>{w.unseen}</Chip.Label></Chip>
+                    : undefined}
                 onOpen={() => open(w.slug)}
               />
             ))}

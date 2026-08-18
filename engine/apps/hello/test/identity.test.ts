@@ -136,7 +136,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   sent.length = 0;
-  for (const t of ["membership", "custom_role", "note", "check_in", "audit", "replay"]) {
+  for (const t of ["membership", "custom_role", "note", "check_in", "audit", "replay", "inbox"]) {
     await shard().exec(`DELETE FROM ${t};`);
   }
   for (const t of ["invited", "belongs", "tenant_app", "tenant", "session", "code", "account"]) {
@@ -899,4 +899,115 @@ describe("turning push on", () => {
      not exist rather than because of the door filter — a check that cannot fail.
      `operator.test.ts` sweeps every operator operation against every other door,
      which is where that assertion belongs. */
+});
+
+/* --------------------------------------------------------------- the inbox --- */
+
+/*
+  ⚠️ A NOTIFICATION IS ADDRESSED TO A PERSON, AND THE INBOX WAS THE ONLY CHANNEL
+  THAT DISAGREED. Email and push already go to one address and one device;
+  `inbox` rows are filed per workspace, so somebody in three of them had three
+  inboxes and nowhere that said any of them needed them. `me.inbox` is the merge,
+  and it is the reason the account door has an inbox at all — the member
+  operation it used to call has no tenancy there and 404s.
+*/
+describe("the inbox across every workspace", () => {
+  /** ⚠️ Filed straight into the shard: what a dispatch writes, without one. */
+  const file = async (slug: string, id: string, title: string, at: string) => {
+    const tenant = await tenantBySlug(directory(), slug);
+    const who = await directory().prepare(`SELECT id FROM account WHERE email = ?`)
+      .bind("sam@example.com").first<{ id: string }>();
+    await shard().prepare(
+      `INSERT INTO inbox (id, tenant_id, account_id, type, title, body, link, tone, icon, at, seen_at)
+       VALUES (?, ?, ?, 'said', ?, NULL, NULL, 'neutral', 'bell', ?, NULL)`)
+      .bind(id, tenant!.id, who!.id, title, at).run();
+  };
+
+  const two = async (cookie: string) => {
+    await post("setup", "/api/me.tenant.create",
+      { slug: "northwind", name: "Northwind", country: "DE" }, cookie);
+    await post("setup", "/api/me.tenant.create",
+      { slug: "contoso", name: "Contoso", country: "DE" }, cookie);
+  };
+
+  /*
+    ⚠️ SORTED ACROSS WORKSPACES, NOT CONCATENATED — which is the assertion that
+    fails on the obvious implementation. Two lists appended stay in workspace
+    order, so the newest note in the second workspace sits below the oldest in
+    the first, and the merged inbox reads as two inboxes with no headings.
+  */
+  it("merges every workspace's notes, newest first, each naming where it is from", async () => {
+    const cookie = await signIn("sam@example.com");
+    await two(cookie);
+    await file("northwind", "inb_a", "Older, Northwind", "2026-08-01T09:00:00.000Z");
+    await file("contoso", "inb_b", "Newest, Contoso", "2026-08-03T09:00:00.000Z");
+    await file("northwind", "inb_c", "Middle, Northwind", "2026-08-02T09:00:00.000Z");
+
+    const out = await get("setup", "/api/me.inbox", cookie).then((r) => r.json()) as
+      { items: { id: string; where: string; slug: string }[]; unseen: number };
+
+    expect(out.items.map((n) => n.id)).toEqual(["inb_b", "inb_c", "inb_a"]);
+    expect(out.items.map((n) => n.where)).toEqual(["Contoso", "Northwind", "Northwind"]);
+    /* ⚠️ The slug travels too, or nothing can be marked read: the row is on
+       another workspace's shard and only its slug says which. */
+    expect(out.items[0]!.slug).toBe("contoso");
+    expect(out.unseen).toBe(3);
+  });
+
+  /*
+    ⚠️ ONE WORKSPACE'S NOTES, WITHOUT TOUCHING THE OTHERS. Marking read is the
+    write most likely to be written as "clear everything" — and on a merged list
+    that silently empties workspaces the person never looked at.
+  */
+  it("marks one workspace read and leaves the rest alone", async () => {
+    const cookie = await signIn("sam@example.com");
+    await two(cookie);
+    await file("northwind", "inb_a", "Northwind", "2026-08-01T09:00:00.000Z");
+    await file("contoso", "inb_b", "Contoso", "2026-08-02T09:00:00.000Z");
+
+    expect((await post("setup", "/api/me.seen", { slug: "northwind" }, cookie)).status).toBe(200);
+
+    const out = await get("setup", "/api/me.inbox", cookie).then((r) => r.json()) as
+      { items: { id: string; seen: boolean }[]; unseen: number };
+    expect(out.unseen).toBe(1);
+    expect(out.items.find((n) => n.id === "inb_a")!.seen).toBe(true);
+    expect(out.items.find((n) => n.id === "inb_b")!.seen).toBe(false);
+
+    /* ⚠️ And with no slug it is every workspace, which is what the merged
+       screen's "Mark all as read" means. */
+    await post("setup", "/api/me.seen", {}, cookie);
+    const after = await get("setup", "/api/me.inbox", cookie).then((r) => r.json()) as
+      { unseen: number };
+    expect(after.unseen).toBe(0);
+  });
+
+  /*
+    ⚠️ A SLUG NAMING A WORKSPACE THIS ACCOUNT IS NOT IN IS A REFUSAL, not a quiet
+    no-op. The caller is asserting a membership; answering 200 to a false one is
+    how a screen comes to show a cleared list that was never cleared — and it
+    would also be a way to probe which slugs exist.
+  */
+  it("refuses a workspace the caller is not in", async () => {
+    const cookie = await signIn("sam@example.com");
+    await two(cookie);
+    const theirs = await signIn("alex@example.com");
+    await post("setup", "/api/me.tenant.create",
+      { slug: "fabrikam", name: "Fabrikam", country: "DE" }, theirs);
+
+    expect((await post("setup", "/api/me.seen", { slug: "fabrikam" }, cookie)).status).toBe(404);
+    expect((await post("setup", "/api/me.seen", { slug: "nope" }, cookie)).status).toBe(404);
+  });
+
+  /* ⚠️ IT IS THE ACCOUNT'S, SO IT ANSWERS ON A WORKSPACE DOOR TOO — and there it
+     is still every workspace, not that one. The SCREEN picks which read to make
+     from the door; the operation does not second-guess it. */
+  it("answers on a workspace door with the same account-wide list", async () => {
+    const cookie = await signIn("sam@example.com");
+    await two(cookie);
+    await file("contoso", "inb_b", "Contoso", "2026-08-02T09:00:00.000Z");
+
+    const out = await get("northwind", "/api/me.inbox", cookie).then((r) => r.json()) as
+      { items: { id: string }[] };
+    expect(out.items.map((n) => n.id)).toEqual(["inb_b"]);
+  });
 });
