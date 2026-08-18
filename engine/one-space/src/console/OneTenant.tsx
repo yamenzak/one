@@ -17,8 +17,9 @@
 import { useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import {
-  AmountRow, ControlRow, Credits, Group, Identity, NumberInput, Row, RowsWaiting, Screen,
-  Stack, TYPE, TextInput, Tray, appFace, glyphOf, notice, placeFace, sentence, useShown,
+  AmountRow, ControlRow, Credits, FieldRow, Group, Identity, Nothing, NumberInput, Row,
+  RowsWaiting, Screen, Stack, TYPE, TextInput, Tray, appFace, glyphOf, notice, placeFace,
+  sentence, useShown,
 } from "@engine/design";
 import type { Allowance, EntitlementDef, PlanSpec } from "@engine/kernel";
 import { isBusiness, sayDate, sayNumber, type Instant } from "@engine/kernel";
@@ -52,6 +53,24 @@ interface TenantLine {
   readonly adjustments: Readonly<Record<string, Allowance>>;
   readonly apps: readonly Held[];
 }
+
+/**
+ * ⚠️ WHAT IS WRONG WITH THIS WORKSPACE, IN ONE ANSWER, OR NOTHING AT ALL. A row
+ * that says "active" is a row that exists to say nothing; what an operator opened
+ * this screen for is the case where it does not.
+ */
+const standing = (t: TenantLine): {
+  readonly says: string; readonly under?: string; readonly ink: "warning" | "danger";
+} | null => {
+  if (t.closedAt) return { says: "Closed", under: "It is on its way out", ink: "danger" };
+  if (t.status === "past_due") {
+    return { says: "Behind on payment", under: "Read-only once the grace runs out", ink: "warning" };
+  }
+  if (t.status && t.status !== "active" && t.status !== "trialing") {
+    return { says: sentence(t.status), ink: "warning" };
+  }
+  return null;
+};
 
 interface AppLine {
   readonly id: string;
@@ -112,10 +131,15 @@ export function OneTenant({ id }: { readonly id: string }) {
               /* ⚠️ CLOSED WINS THE ONE SLOT. A closed workspace's kind is not
                  what an operator opened this screen to find out, and two chips
                  side by side make neither of them the answer. */
+              /* ⚠️ AND IT IS ONE WORD. This carried the registered name — up to
+                 forty characters in a capsule beside a title — so the chip was
+                 wider than the heading it sat next to and wrapped on a phone.
+                 What it is belongs here; WHAT IT IS CALLED is a fact, and a
+                 fact is a row. */
               aside={tenant.closedAt
                 ? <Chip color="danger" variant="soft"><Chip.Label>Closed</Chip.Label></Chip>
                 : isBusiness(tenant.kind ?? "personal")
-                  ? <Chip variant="soft"><Chip.Label>{tenant.legalName || "A business"}</Chip.Label></Chip>
+                  ? <Chip variant="soft"><Chip.Label>Business</Chip.Label></Chip>
                   : undefined}
             />
 
@@ -123,25 +147,58 @@ export function OneTenant({ id }: { readonly id: string }) {
                 one row of truth. Drawn per product it was the same plan four
                 times, and the adjustment tray beside each of them wrote to the
                 same place. */}
-            <Group label="Membership">
-              <ControlRow
-                label={data.plans.find((p) => p.id === tenant.planId)?.name ?? "No plan"}
-                under={[
-                  /* ⚠️ GIVEN IS THE FIRST THING SAID, because everything after
-                     it reads differently: a comped workspace has no invoice, so
-                     "has not paid" is not a question to ask about it. */
-                  tenant.compedAt ? "given, not bought" : "",
-                  tenant.status === "past_due" ? "payment failed" : tenant.status ?? "",
-                  Object.keys(tenant.adjustments).length
-                    ? `${Object.keys(tenant.adjustments).length} adjusted`
-                    : "",
-                ].filter(Boolean).join(" · ")}
-              >
+            {/*
+              ⚠️ THE ACTIONS ARE AT THE FOOT, NOT IN THE ROW'S CONTROL SLOT. Two
+              ghost buttons in a `ControlRow` fit on a desktop and wrap on a
+              phone — measured: they stacked under the label, left-aligned, with
+              nothing around them saying they were controls, so the card read as
+              a plan with two words printed under it. A card with something to do
+              about it is what `does` is for.
+
+              ⚠️ AND THE FACTS ARE ROWS RATHER THAN A DOT-RUN. "given, not bought
+              · past_due · 1 adjusted" is three unrelated answers in one grey
+              line, and the one that matters — nobody is paying for this — was
+              the middle of it.
+            */}
+            <Group
+              label="Membership"
+              does={
                 <Row space="tight">
                   <PlanTray tenant={tenant} plans={data.plans} onDone={of.again} />
                   <AdjustTray tenant={tenant} apps={data.apps} onDone={of.again} />
                 </Row>
-              </ControlRow>
+              }
+            >
+              <FieldRow
+                label="Plan"
+                value={data.plans.find((p) => p.id === tenant.planId)?.name ?? "No plan"}
+                /* ⚠️ GIVEN IS SAID HERE, because everything else reads
+                   differently once it is: a comped workspace has no invoice, so
+                   "has not paid" is not a question to ask about it. */
+                under={tenant.compedAt ? "Given, not bought" : undefined}
+              />
+              {standing(tenant) ? (
+                <FieldRow
+                  label="Standing"
+                  /* ⚠️ IN THE TONE, because it is the one fact on the card that
+                     is a problem — and a monochrome product has exactly one
+                     channel for saying so. */
+                  value={<span data-ink={standing(tenant)!.ink}>{standing(tenant)!.says}</span>}
+                  under={standing(tenant)!.under}
+                />
+              ) : null}
+              {tenant.legalName ? (
+                <FieldRow label="Registered as" value={tenant.legalName} />
+              ) : null}
+              {Object.keys(tenant.adjustments).length ? (
+                /* ⚠️ WHICH KEYS, NOT HOW MANY. "1" over the word "seats" is a
+                   count and its own footnote; what an operator needs to know is
+                   which of a workspace's limits somebody has moved. */
+                <FieldRow
+                  label="Adjusted for this workspace"
+                  value={Object.keys(tenant.adjustments).join(", ")}
+                />
+              ) : null}
             </Group>
 
             <Money tenant={tenant} />
@@ -162,8 +219,11 @@ export function OneTenant({ id }: { readonly id: string }) {
                   </ControlRow>
                 );
               })}
+              {/* ⚠️ A ROW WITH AN EMPTY CONTROL IS NOT AN EMPTY STATE. It drew a
+                  label and a blank slot, which reads as a product whose switch
+                  failed to load. */}
               {tenant.apps.length === 0
-                ? <ControlRow label="No product here"><span /></ControlRow>
+                ? <Nothing icon={glyphOf("apps")} says="No product is switched on here" />
                 : null}
             </Group>
           </>
@@ -233,7 +293,10 @@ function AdjustTray({ tenant, apps, onDone }: {
 
   return (
     <Tray
-      trigger={<Button variant="ghost">Adjust</Button>}
+      /* ⚠️ `secondary` — THIS IS A CARD'S FOOT, and a ghost there is a word
+         floating under a list of facts with nothing saying it can be pressed.
+         A button says so by being one (DESIGN.md §5). */
+      trigger={<Button variant="secondary">Adjust</Button>}
       title={`What ${tenant.name} gets`}
       actions={
         <Button
@@ -303,7 +366,14 @@ function Money({ tenant }: { readonly tenant: TenantLine }) {
 
   return (
     <>
-      <Group label="Wallet">
+      {/* ⚠️ GIVING CREDITS IS THE CARD'S ACTION, AT ITS FOOT. It was a row whose
+          control was a tray trigger, so on a phone the button wrapped under its
+          own label and sat in the middle of a list of balances looking like one
+          of them. */}
+      <Group
+        label="Wallet"
+        does={<CompTray tenant={tenant} onDone={of.again} />}
+      >
         {/* ⚠️ THE TWO BALANCES, because one figure that drops on the first of
             the month is a support conversation every month for ever. */}
         <AmountRow
@@ -340,20 +410,24 @@ function Money({ tenant }: { readonly tenant: TenantLine }) {
             amount={<Credits value={Math.ceil(wallet.owedMilli / 1000)} as="inline" />}
           />
         ) : null}
-        {/* ⚠️ AND WHY A STANDING CHARGE LAST FAILED. It is the answer to the
-            question the customer is about to ask, and nobody was present when
-            the bank gave it. */}
+        {/*
+          ⚠️ AND WHY A STANDING CHARGE LAST FAILED. It is the answer to the
+          question the customer is about to ask, and nobody was present when the
+          bank gave it.
+
+          ⚠️ THE LABEL IS WHAT HAPPENED AND THE BANK'S WORDS ARE THE DETAIL. This
+          had them the other way round — "Your card was declined" as the row's
+          own name — so a sentence written by somebody else's payment processor,
+          addressed to the customer, was the heading of a row on our console.
+        */}
         {auto.error ? (
           <AmountRow
             tone="warning"
-            label={auto.error}
-            under="Their standing top-up did not go through"
+            label="Standing top-up failed"
+            under={auto.error}
             amount={<Credits value={auto.below} as="inline" />}
           />
         ) : null}
-        <ControlRow label="Give them credits" under="Lands where a purchase does, and never expires">
-          <CompTray tenant={tenant} onDone={of.again} />
-        </ControlRow>
       </Group>
 
       {statement.length > 0 ? (
@@ -402,7 +476,7 @@ function CompTray({ tenant, onDone }: {
 
   return (
     <Tray
-      trigger={<Button variant="ghost">Give credits</Button>}
+      trigger={<Button variant="secondary">Give credits</Button>}
       title={`Give credits to ${tenant.name}`}
       actions={
         <Button
@@ -458,7 +532,7 @@ function PlanTray({ tenant, plans, onDone }: {
 
   return (
     <Tray
-      trigger={<Button variant="ghost">Give a plan</Button>}
+      trigger={<Button variant="secondary">Give a plan</Button>}
       title={`Give ${tenant.name} a plan`}
       actions={
         <Button slot="close" variant="primary" isDisabled={!pick} onPress={() => void give()}>
