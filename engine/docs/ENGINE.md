@@ -167,6 +167,7 @@ live inside workspaces and an operator stands outside all of them.
 |---|---|
 | `op.tenants` | read |
 | `op.tenant.adjust` | write |
+| `op.tenant.plan` | write |
 | `op.tenant.money` | read |
 | `op.tenant.comp` | write |
 | `op.tenant.app` | write |
@@ -352,7 +353,7 @@ and a manifest that does not compose refuses to boot.
 | `access` | permissions, roles, and what an app may never claim | 15 | 1 |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
 | `manifest` | the whole app, and the composition that refuses a broken one | 9 | — |
-| `entitlement` | what a plan includes, and the allowance algebra over it | 7 | — |
+| `entitlement` | what a plan includes, and the allowance algebra over it | 9 | — |
 | `credit` | metered work: the reserve, the rate, the ceiling | 7 | 1 |
 | `dunning` | the ladder from past due to erased | 5 | — |
 | `package` | a priced bundle of timed grants | 8 | 1 |
@@ -373,7 +374,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**209 of them**, 202 reached by something today.
+**211 of them**, 204 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -399,8 +400,8 @@ env or a binding.
 | `serve` | the one path every request ends in — both doors | 5 | — |
 | `records` | the generated reads and writes behind a collection | 6 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
-| `billing` | plans, subscriptions, the bill, the ladder | 12 | 1 |
-| `wallet` | OneWallet: the allowance, what was bought, and reserve → settle → release | 20 | — |
+| `billing` | plans, subscriptions, the bill, the ladder | 14 | 1 |
+| `wallet` | OneWallet: the allowance, what was bought, and reserve → settle → release | 22 | — |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
 | `inbox` | notifications: the policy, the audience, the read | 10 | — |
 | `services` | the lane out to a provider — AI and mail | 5 | 1 |
@@ -426,7 +427,7 @@ env or a binding.
 | `installable` | the manifest and the icon a workspace is installed as | 6 | — |
 | `platform-schema` | the platform's own tables, in dependency order, listed once | 2 | — |
 | `dispatch` | an event an operation raises becomes a note in somebody's inbox | 1 | — |
-| `sweep` | the daily clock: erase what is past the ladder's last rung | 6 | — |
+| `sweep` | the daily clock: erase what is past the ladder's last rung | 7 | — |
 | `vault-ops` | consent, grants, who looked, the processing record, export and erasure | 1 | — |
 | `dossier` | everything we hold about one person, and everything of theirs we delete | 8 | — |
 | `legal` | who agreed to what version, and the wall until they have | 6 | — |
@@ -436,7 +437,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**303 of them**, 300 reached by something today.
+**308 of them**, 305 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -591,6 +592,9 @@ its own header, cited by other files, and doing nothing.
 | `a-signed-event-actually-reaches-the-ladder` | D12 | every Stripe event answered 405 by the static assets - money captured, no plan stamped, no credits, and no error anywhere because from the worker's side no request was ever refused |
 | `a-deployment-grants-only-packs-it-sells` | D12 | credits granted from a number that made a round trip through the customer's browser |
 | `the-one-way-door-opens-on-the-payment` | D21 | a workspace charged for a business tier and still personal, with the money already taken |
+| `a-comped-plan-keeps-granting-after-the-first-month` | D18 | a plan an operator gave granting its credits once, on the day of the comp, and never again - nothing throws and the workspace simply stops being able to do the thing it was comped for |
+| `a-paying-workspace-is-renewed-by-one-clock` | D12 | an allowance set twice a month on two drifting days, once by Stripe and once by our own sweep |
+| `an-allowance-override-reaches-the-clock` | D12 | an override honoured by the screen and ignored by the renewal - a promise of credits that never arrive, with the two halves in different files |
 | `a-comp-survives-the-next-renewal` | D18 | an apology for something we broke expiring on the first of the month, silently - and a balance that moved with nothing on the statement explaining it |
 | `the-operator-can-see-what-a-workspace-holds` | D18 | a console that can change a customer's balance and cannot read it, so every support conversation about credits starts by opening the database |
 | `the-two-balances-say-which-one-lapses` | D1 | one figure that drops on the first of the month with nothing saying why - a support conversation every month for ever |
@@ -811,13 +815,13 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 98 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 100 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
 | D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 4 |
 | D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 4 |
-| D18 | The operator stands outside every workspace, and the console is a door rather than a role | 6 |
+| D18 | The operator stands outside every workspace, and the console is a door rather than a role | 7 |
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 3 |
 | D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 3 |
 | D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 9 |

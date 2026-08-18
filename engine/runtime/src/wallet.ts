@@ -34,7 +34,7 @@
  */
 
 import type { AppId, PlanSpec, TenantId } from "@engine/kernel";
-import { newId, settle as settleAt, type Reserve } from "@engine/kernel";
+import { allowanceFor, newId, settle as settleAt, type Reserve } from "@engine/kernel";
 import { MEMBERSHIP, subscriptionFor } from "./billing.js";
 import type { Db } from "./sql.js";
 
@@ -149,8 +149,12 @@ export async function grantAllowance(
     await record(db, tenantId, -before.granted, LEDGER.expired, {}, now);
   }
   await record(db, tenantId, credits, LEDGER.allowance, {}, now);
-  await db.prepare(`UPDATE billing_account SET granted = ? WHERE tenant_id = ?`)
-    .bind(Math.max(0, credits), tenantId).run();
+  /* ⚠️ AND WHEN, because a comped workspace has no Stripe subscription to
+     renew it and our own clock needs an anchor — see `dueForAllowance`. It is
+     stamped on every grant rather than only the comped ones, so the two lanes
+     cannot disagree about when a period began. */
+  await db.prepare(`UPDATE billing_account SET granted = ?, granted_at = ? WHERE tenant_id = ?`)
+    .bind(Math.max(0, credits), now.toISOString(), tenantId).run();
 }
 
 /**
@@ -175,8 +179,12 @@ export async function renewAllowance(
   /* ⚠️ NO PLAN GRANTS NOTHING, AND DOES NOT ZERO. A workspace whose row we
      cannot read is not one to take an allowance from. */
   if (!plan) return 0;
-  await grantAllowance(db, tenantId, plan.credits, now);
-  return plan.credits;
+  /* ⚠️ THE SAME RESOLUTION `heldBy` READS — see `allowanceFor`. An operator's
+     override honoured by one and not the other is a screen promising credits
+     that never arrive. */
+  const credits = allowanceFor(plan, sub?.adjustments ?? {});
+  await grantAllowance(db, tenantId, credits, now);
+  return credits;
 }
 
 /**
@@ -194,6 +202,34 @@ export async function topUp(
   await record(db, tenantId, credits, reason, opts, now);
   await db.prepare(`UPDATE billing_account SET bought = COALESCE(bought, 0) + ? WHERE tenant_id = ?`)
     .bind(credits, tenantId).run();
+}
+
+/**
+ * ⚠️ A MONTH, AND IT IS THE SAME AVERAGE THE STORAGE METER PRORATES BY. A comped
+ * workspace has no invoice to hang a period off, so the period is measured from
+ * the last grant.
+ */
+export const PERIOD_DAYS = 30;
+
+/**
+ * WHEN A COMPED WORKSPACE'S ALLOWANCE IS DUE AGAIN.
+ *
+ * ⚠️ THIS IS THE HALF THAT WOULD HAVE BEEN FORGOTTEN. `renewAllowance` is called
+ * from the ladder's `paid`, which only fires on a Stripe event — so a plan an
+ * operator granted would get its credits once, on the day of the comp, and never
+ * again. Nothing would fail: the workspace would simply stop being able to do
+ * the thing it was comped for, a month later, quietly.
+ */
+export async function dueForAllowance(
+  db: Db, tenantId: TenantId, now = new Date(), periodDays = PERIOD_DAYS,
+): Promise<boolean> {
+  const row = await db.prepare(`SELECT granted_at FROM billing_account WHERE tenant_id = ?`)
+    .bind(tenantId).first<{ granted_at: string | null }>();
+  /* ⚠️ NEVER GRANTED IS DUE. A comp made before this column existed, or a
+     workspace whose account was opened and never renewed, must not wait a month
+     for its first allowance. */
+  if (!row?.granted_at) return true;
+  return Date.parse(row.granted_at) <= now.getTime() - periodDays * 24 * 60 * 60 * 1000;
 }
 
 /* ------------------------------------------------------- topping up by itself --- */

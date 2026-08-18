@@ -687,6 +687,33 @@
       "fails": "a workspace charged for a business tier and still personal, with the money already taken"
     },
     {
+      "id": "a-comped-plan-keeps-granting-after-the-first-month",
+      "protects": "D18",
+      "stage": "6",
+      "status": "live",
+      "impl": "runtime/test/allowance.test.ts",
+      "proves": "grants again a month later, and sets rather than adds",
+      "fails": "a plan an operator gave granting its credits once, on the day of the comp, and never again - nothing throws and the workspace simply stops being able to do the thing it was comped for"
+    },
+    {
+      "id": "a-paying-workspace-is-renewed-by-one-clock",
+      "protects": "D12",
+      "stage": "6",
+      "status": "live",
+      "impl": "runtime/test/allowance.test.ts",
+      "proves": "stops being ours to renew the moment somebody pays",
+      "fails": "an allowance set twice a month on two drifting days, once by Stripe and once by our own sweep"
+    },
+    {
+      "id": "an-allowance-override-reaches-the-clock",
+      "protects": "D12",
+      "stage": "6",
+      "status": "live",
+      "impl": "runtime/test/allowance.test.ts",
+      "proves": "is what the renewal grants, not the plan's own number",
+      "fails": "an override honoured by the screen and ignored by the renewal - a promise of credits that never arrive, with the two halves in different files"
+    },
+    {
       "id": "a-comp-survives-the-next-renewal",
       "protects": "D18",
       "stage": "6",

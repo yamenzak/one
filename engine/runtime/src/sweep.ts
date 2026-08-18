@@ -40,8 +40,10 @@ import { apply, type ApplyDeps } from "./resources.js";
 import { carryObjects, carryRows, finishMove, reapMoved } from "./move.js";
 import { chargeOffSession, type StripeDeps } from "./stripe.js";
 import {
-  collectOwed, dueForTopUp, noteTopUpAttempt, noteTopUpFailed, owe, walletOf, MILLI,
+  collectOwed, dueForAllowance, dueForTopUp, noteTopUpAttempt, noteTopUpFailed, owe,
+  renewAllowance, walletOf, MILLI,
 } from "./wallet.js";
+import { compedSubscriptions } from "./billing.js";
 import { column, table, type Db } from "./sql.js";
 
 export interface SweepDeps {
@@ -269,6 +271,16 @@ export async function sweep(deps: SweepDeps): Promise<void> {
     for — and because the point is to top up BEFORE the balance reaches zero,
     which is a question about a threshold rather than about a refusal.
   */
+  /*
+    ⚠️ AND A COMPED WORKSPACE IS RENEWED BY THIS CLOCK, because it has no other.
+    It runs FIRST, before the meter and the top-ups, for the same reason they are
+    in the order they are: the allowance is the money, and everything after it
+    reads a balance.
+  */
+  if (deps.plans?.length) {
+    await run(deps.directory, "allowances", () => sweepAllowances(deps), now);
+  }
+
   /*
     ⚠️ THE STORAGE METER RUNS BEFORE THE TOP-UPS, and the order is deliberate:
     the meter is what pushes a balance under the threshold, so metering second
@@ -509,4 +521,36 @@ export async function sweepStorage(deps: SweepDeps): Promise<{ touched: number; 
   }
 
   return { touched: charged, detail: said.join("; ") || "nothing to do" };
+}
+
+/* ------------------------------------------------------------ allowances --- */
+
+/**
+ * THE MONTHLY ALLOWANCE FOR EVERY WORKSPACE NOBODY IS BILLING.
+ *
+ * ⚠️ A PAYING WORKSPACE IS NOT HERE, AND MUST NOT BE. Its allowance is granted
+ * by `invoice.paid`, on Stripe's own period boundary; renewing it here as well
+ * would set the same number on a second, drifting day of the month — harmless
+ * while the two agree and a support conversation the first time somebody watches
+ * their credits reset twice.
+ *
+ * ⚠️ AND `renewAllowance` SETS RATHER THAN ADDS, so a pass that runs twice in a
+ * day is a no-op rather than a double grant. That is what makes this safe to
+ * re-run after a failure, which is the property every sweep here is written for.
+ */
+export async function sweepAllowances(deps: SweepDeps): Promise<{ touched: number; detail: string }> {
+  const now = (deps.now ?? (() => new Date()))();
+  const plans = deps.plans ?? [];
+
+  let granted = 0;
+  const said: string[] = [];
+
+  for (const one of await compedSubscriptions(deps.directory)) {
+    if (!await dueForAllowance(deps.directory, one.tenantId, now)) continue;
+    const credits = await renewAllowance(deps.directory, one.tenantId, plans, now);
+    granted++;
+    said.push(`${one.tenantId}: ${credits}`);
+  }
+
+  return { touched: granted, detail: said.join("; ") || "nothing to do" };
 }

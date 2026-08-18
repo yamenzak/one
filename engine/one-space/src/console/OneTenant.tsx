@@ -18,7 +18,7 @@ import { useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import {
   AmountRow, ControlRow, Credits, Group, Identity, NumberInput, Row, RowsWaiting, Screen,
-  Stack, TextInput, Tray, appFace, notice, placeFace, sentence,
+  Stack, TYPE, TextInput, Tray, appFace, notice, placeFace, sentence,
 } from "@engine/design";
 import type { Allowance, EntitlementDef, PlanSpec } from "@engine/kernel";
 import { isBusiness } from "@engine/kernel";
@@ -47,6 +47,8 @@ interface TenantLine {
   /** ⚠️ One membership, at the workspace. */
   readonly planId: string | null;
   readonly status: string | null;
+  /** ⚠️ Given rather than bought — the two look identical without this. */
+  readonly compedAt: string | null;
   readonly adjustments: Readonly<Record<string, Allowance>>;
   readonly apps: readonly Held[];
 }
@@ -65,6 +67,10 @@ interface MoneyLine {
     readonly spendable: number; readonly owedMilli: number; readonly owing: boolean;
   };
   readonly auto: { readonly packId: string | null; readonly below: number; readonly error: string | null };
+  /** ⚠️ What a month grants, and what the plan alone would — see `allowanceFor`. */
+  readonly allowance: {
+    readonly monthly: number; readonly plan: number; readonly comped: string | null;
+  };
   readonly statement: readonly {
     readonly at: string; readonly delta: number; readonly reason: string;
   }[];
@@ -117,13 +123,20 @@ export function OneTenant({ id }: { readonly id: string }) {
               <ControlRow
                 label={data.plans.find((p) => p.id === tenant.planId)?.name ?? "No plan"}
                 under={[
+                  /* ⚠️ GIVEN IS THE FIRST THING SAID, because everything after
+                     it reads differently: a comped workspace has no invoice, so
+                     "has not paid" is not a question to ask about it. */
+                  tenant.compedAt ? "given, not bought" : "",
                   tenant.status === "past_due" ? "payment failed" : tenant.status ?? "",
                   Object.keys(tenant.adjustments).length
                     ? `${Object.keys(tenant.adjustments).length} adjusted`
                     : "",
                 ].filter(Boolean).join(" · ")}
               >
-                <AdjustTray tenant={tenant} apps={data.apps} onDone={of.again} />
+                <Row space="tight">
+                  <PlanTray tenant={tenant} plans={data.plans} onDone={of.again} />
+                  <AdjustTray tenant={tenant} apps={data.apps} onDone={of.again} />
+                </Row>
               </ControlRow>
             </Group>
 
@@ -281,7 +294,7 @@ function Money({ tenant }: { readonly tenant: TenantLine }) {
       </Group>
     );
   }
-  const { wallet, auto, statement } = of.of.data;
+  const { wallet, auto, statement, allowance } = of.of.data;
 
   return (
     <>
@@ -297,6 +310,20 @@ function Money({ tenant }: { readonly tenant: TenantLine }) {
           label="Credits they bought"
           under="Never expires"
           amount={<Credits value={wallet.bought} as="inline" />}
+        />
+        {/*
+          ⚠️ WHAT A MONTH GRANTS, AND WHETHER IT IS THE PLAN'S OWN NUMBER. An
+          override honoured in the product and invisible here is one nobody can
+          explain to the customer asking about it — and it is set from the same
+          tray as every other adjustment, which is why it is a row and not a
+          control of its own.
+        */}
+        <AmountRow
+          label="Granted every month"
+          under={allowance.monthly === allowance.plan
+            ? "What their plan includes"
+            : `Set for this workspace — their plan gives ${allowance.plan.toLocaleString("en-US")}`}
+          amount={<Credits value={allowance.monthly} as="inline" />}
         />
         {wallet.owedMilli > 0 ? (
           <AmountRow
@@ -391,6 +418,71 @@ function CompTray({ tenant, onDone }: {
           onChange={setWhy}
           help="This is what they will read on their own statement."
         />
+      </Stack>
+    </Tray>
+  );
+}
+
+/**
+ * PUTTING A WORKSPACE ON A PLAN NOBODY IS PAYING FOR.
+ *
+ * ⚠️ THE COPY SAYS WHAT IT IS, because the control looks exactly like the
+ * customer's own plan picker and is not one. Nothing is charged, no invoice
+ * exists, and the workspace's credits come from our clock rather than Stripe's —
+ * an operator who thinks they moved somebody onto a paid plan will wonder for a
+ * month why no payment arrived.
+ *
+ * ⚠️ AND THE LOBBY IS THE WAY BACK. Comping the parking plan is how a comp ends;
+ * a separate "un-comp" would be a second verb for the same write, which is how
+ * the two come to disagree.
+ */
+function PlanTray({ tenant, plans, onDone }: {
+  readonly tenant: TenantLine;
+  readonly plans: readonly PlanSpec[];
+  readonly onDone: () => void;
+}) {
+  const [pick, setPick] = useState(tenant.planId ?? "");
+
+  const give = async () => {
+    const out = await api.post("op.tenant.plan", { tenant: tenant.id, plan: pick });
+    if (!out.ok) { notice.fail(out.problem.title); return; }
+    notice.ok(`${tenant.name} is on ${plans.find((p) => p.id === pick)?.name ?? pick}. Nothing was charged.`);
+    onDone();
+  };
+
+  return (
+    <Tray
+      trigger={<Button variant="ghost">Give a plan</Button>}
+      title={`Give ${tenant.name} a plan`}
+      actions={
+        <Button slot="close" variant="primary" isDisabled={!pick} onPress={() => void give()}>
+          Give it
+        </Button>
+      }
+    >
+      <Stack space="roomy">
+        {/* ⚠️ EVERY PLAN IS A ROW WITH ITS PRICE AND ITS CREDITS ON IT. An
+            operator is choosing what to give away, and the two numbers that
+            decide it are the ones the picker would hide. */}
+        <Group label="What they get">
+          {[...plans].sort((a, b) => a.order - b.order).map((plan) => (
+            <AmountRow
+              key={plan.id}
+              label={plan.name}
+              under={plan.parking
+                ? "The lobby — this is how a comp ends"
+                : `${plan.credits.toLocaleString("en-US")} credits a month`}
+              amount={plan.id === pick ? "giving this" : "—"}
+              aside={plan.id === pick
+                ? undefined
+                : <Button variant="ghost" onPress={() => setPick(plan.id)}>Choose</Button>}
+            />
+          ))}
+        </Group>
+        <span className={TYPE.note}>
+          Nothing is charged and no invoice is raised. Their credits are granted
+          on our own clock every month until somebody pays.
+        </span>
       </Stack>
     </Tray>
   );

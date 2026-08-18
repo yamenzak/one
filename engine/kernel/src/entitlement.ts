@@ -117,6 +117,44 @@ export const PLATFORM_ENTITLEMENTS: Readonly<Record<string, EntitlementDef>> = {
   domains: { label: "Custom domains", withheld: "quota" },
 };
 
+/**
+ * THE MONTH'S ALLOWANCE, WHEN AN OPERATOR HAS SET ONE FOR THIS WORKSPACE.
+ *
+ * ⚠️ IT LIVES IN THE ADJUSTMENTS BLOB AND IS NOT AN ENTITLEMENT, and both halves
+ * are load-bearing. The blob is right because the semantics are identical to
+ * every other operator adjustment — absolute, either direction, cleared per key —
+ * so it reuses the one write path and the one console tray rather than growing a
+ * second kind of override nobody would think to look for.
+ *
+ * ⚠️ AND IT IS NOT IN `keys`, WHICH IS WHAT KEEPS IT OUT OF `walk`. That walk
+ * ends in a clamp that zeroes everything when standing stops — correct for a
+ * permission, confiscation for a balance. `walk` iterates the declared keys, this
+ * is not one of them, and `refuseManifest` refuses an app that declares it — so
+ * the clamp structurally cannot reach it rather than being trusted not to.
+ */
+export const ALLOWANCE_KEY = "credits";
+
+/**
+ * WHAT A PERIOD GRANTS THIS WORKSPACE.
+ *
+ * ⚠️ ONE FUNCTION, BECAUSE TWO READERS ASK. What a workspace HOLDS (`heldBy`)
+ * and what a renewal GRANTS (`renewAllowance`) have to be the same number: an
+ * override honoured by one and not the other is a screen promising credits that
+ * never arrive, or credits arriving that no screen accounts for.
+ *
+ * ⚠️ AND A NEGATIVE IS THE PLAN'S OWN, NOT UNLIMITED. `-1` means unlimited for an
+ * entitlement; an unlimited BALANCE is not a thing this system can meter, so the
+ * only honest reading of a negative here is "no override".
+ */
+export function allowanceFor(
+  plan: { readonly credits: number } | null,
+  adjustments: Readonly<Record<string, Allowance>> = {},
+): number {
+  const set = adjustments[ALLOWANCE_KEY];
+  if (typeof set === "number" && set >= 0) return Math.trunc(set);
+  return plan?.credits ?? 0;
+}
+
 /* ------------------------------------------------------------------- walk --- */
 
 export type Source = "plan" | "grandfathered" | "adjusted";

@@ -19,7 +19,7 @@
  */
 
 import type { Allowance, AppId, EntitlementDef, Instant, PlanSpec, Resolved, Standing, TenantId } from "@engine/kernel";
-import { standingFor, walk, type SubStatus } from "@engine/kernel";
+import { allowanceFor, standingFor, walk, type SubStatus } from "@engine/kernel";
 import type { SchemaModule } from "./schema.js";
 import type { Db } from "./sql.js";
 
@@ -52,9 +52,14 @@ export const BILLING_SCHEMA: SchemaModule = {
       ever, rounded up it is thirty times the price. An accumulator is the only
       arithmetic that is neither.
     */
-    `CREATE TABLE IF NOT EXISTS billing_account (tenant_id TEXT PRIMARY KEY, customer_ref TEXT, currency TEXT NOT NULL, granted INTEGER, bought INTEGER, held INTEGER NOT NULL, auto_pack TEXT, auto_below INTEGER, auto_at TEXT, auto_error TEXT, storage_milli INTEGER, at TEXT NOT NULL);`,
+    `CREATE TABLE IF NOT EXISTS billing_account (tenant_id TEXT PRIMARY KEY, customer_ref TEXT, currency TEXT NOT NULL, granted INTEGER, bought INTEGER, held INTEGER NOT NULL, auto_pack TEXT, auto_below INTEGER, auto_at TEXT, auto_error TEXT, storage_milli INTEGER, granted_at TEXT, at TEXT NOT NULL);`,
     /* ⚠️ AND ONE PER PRODUCT THEY HAVE SWITCHED ON. */
-    `CREATE TABLE IF NOT EXISTS subscription (tenant_id TEXT NOT NULL, app_id TEXT NOT NULL, plan_id TEXT NOT NULL, status TEXT NOT NULL, at TEXT NOT NULL, past_due_at TEXT, trial_ends_at TEXT, overrides_json TEXT, adjustments_json TEXT, PRIMARY KEY (tenant_id, app_id));`,
+    /* ⚠️ `comped_at` IS A PLAN NOBODY IS PAYING FOR, and it is a column rather
+       than a derivation. "No customer record" would nearly answer it and would
+       be wrong the first time a paying workspace's checkout half-completed —
+       and what hangs off it is whether the monthly allowance is granted by
+       Stripe or by our own clock. A guess is not good enough for that. */
+    `CREATE TABLE IF NOT EXISTS subscription (tenant_id TEXT NOT NULL, app_id TEXT NOT NULL, plan_id TEXT NOT NULL, status TEXT NOT NULL, at TEXT NOT NULL, past_due_at TEXT, trial_ends_at TEXT, comped_at TEXT, overrides_json TEXT, adjustments_json TEXT, PRIMARY KEY (tenant_id, app_id));`,
     `CREATE INDEX IF NOT EXISTS ix_subscription_due ON subscription (status, past_due_at);`,
     `CREATE TABLE IF NOT EXISTS credit_ledger (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, app_id TEXT, at TEXT NOT NULL, delta INTEGER NOT NULL, reason TEXT NOT NULL, ref TEXT);`,
     `CREATE INDEX IF NOT EXISTS ix_credit_ledger_tenant ON credit_ledger (tenant_id, at);`,
@@ -69,6 +74,8 @@ export interface SubRow {
   readonly planId: string;
   readonly status: SubStatus;
   readonly pastDueAt: Instant | null;
+  /** ⚠️ Set when an operator granted this plan. Cleared the moment money moves. */
+  readonly compedAt: Instant | null;
   readonly overrides: Readonly<Record<string, Allowance>>;
   readonly adjustments: Readonly<Record<string, Allowance>>;
 }
@@ -79,6 +86,7 @@ const asSub = (r: Record<string, unknown>): SubRow => ({
   planId: r.plan_id as string,
   status: r.status as SubStatus,
   pastDueAt: (r.past_due_at as Instant | null) ?? null,
+  compedAt: (r.comped_at as Instant | null) ?? null,
   overrides: JSON.parse((r.overrides_json as string | null) ?? "{}") as Record<string, Allowance>,
   adjustments: JSON.parse((r.adjustments_json as string | null) ?? "{}") as Record<string, Allowance>,
 });
@@ -108,10 +116,56 @@ export async function subscribe(
   db: Db, tenantId: TenantId, appId: AppId, planId: string, status: SubStatus, now = new Date(),
 ): Promise<void> {
   await db.prepare(
-    `INSERT INTO subscription (tenant_id, app_id, plan_id, status, at, past_due_at, trial_ends_at, overrides_json, adjustments_json)
-     VALUES (?, ?, ?, ?, ?, NULL, NULL, '{}', '{}')
-     ON CONFLICT(tenant_id, app_id) DO UPDATE SET plan_id = excluded.plan_id, status = excluded.status`)
+    `INSERT INTO subscription (tenant_id, app_id, plan_id, status, at, past_due_at, trial_ends_at, comped_at, overrides_json, adjustments_json)
+     VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, '{}', '{}')
+     ON CONFLICT(tenant_id, app_id) DO UPDATE SET plan_id = excluded.plan_id, status = excluded.status,
+       comped_at = NULL`)
     .bind(tenantId, appId, planId, status, now.toISOString()).run();
+}
+
+/**
+ * A PLAN AN OPERATOR GRANTED, THAT NOBODY IS PAYING FOR.
+ *
+ * ⚠️ IT IS A SECOND WRITER OF `plan_id`, AND THE RULE IT LOOKS LIKE IT BREAKS IS
+ * NOT THE RULE. "Only a signed event may stamp a plan" exists so a WORKSPACE
+ * cannot grant itself one — every path a customer can reach opens a page Stripe
+ * owns and waits. An operator stands outside every workspace (D18), reaches this
+ * only through the console door, and leaves a dated row saying so.
+ *
+ * ⚠️ AND THE STAMP IS WHAT MAKES THE MONTHLY CLOCK POSSIBLE. A comped workspace
+ * has no Stripe subscription, so no `invoice.paid` ever arrives — and the
+ * allowance is granted from that event and nowhere else. Without this column the
+ * comp would grant one month's credits and silently never grant another.
+ *
+ * ⚠️ A REAL PAYMENT CLEARS IT, in `subscribe` above. A workspace that starts
+ * paying must stop being renewed by our own clock as well as Stripe's, or it
+ * gets its allowance twice on two different days of the month.
+ */
+export async function compPlan(
+  db: Db, tenantId: TenantId, appId: AppId, planId: string, now = new Date(),
+): Promise<void> {
+  const at = now.toISOString();
+  await db.prepare(
+    `INSERT INTO subscription (tenant_id, app_id, plan_id, status, at, past_due_at, trial_ends_at, comped_at, overrides_json, adjustments_json)
+     VALUES (?, ?, ?, 'active', ?, NULL, NULL, ?, '{}', '{}')
+     ON CONFLICT(tenant_id, app_id) DO UPDATE SET plan_id = excluded.plan_id,
+       status = 'active', past_due_at = NULL, comped_at = excluded.comped_at`)
+    .bind(tenantId, appId, planId, at, at).run();
+}
+
+/**
+ * ⚠️ EVERY COMPED WORKSPACE, FOR THE CLOCK THAT RENEWS THEM. Asked of the
+ * directory rather than by walking shards (D5) — this is the cross-workspace
+ * question the whole split exists to make answerable in one statement.
+ */
+export async function compedSubscriptions(
+  db: Db,
+): Promise<readonly { readonly tenantId: TenantId; readonly planId: string }[]> {
+  const rows = await db.prepare(
+    `SELECT tenant_id, plan_id FROM subscription
+     WHERE comped_at IS NOT NULL AND status = 'active'`)
+    .all<{ tenant_id: string; plan_id: string }>();
+  return rows.results.map((r) => ({ tenantId: r.tenant_id as TenantId, planId: r.plan_id }));
 }
 
 /** ⚠️ The anchor every rung of the ladder is measured from. Set once, cleared on payment. */
@@ -196,7 +250,7 @@ export async function heldBy(
     /* ⚠️ WHAT THE MONTH GRANTS, BESIDE WHAT THE PLAN ALLOWS. Every reader that
        asks what a workspace HAS also has to say what it may spend, and two
        lookups is two answers. */
-    credits: plan?.credits ?? 0,
+    credits: allowanceFor(plan, sub?.adjustments ?? {}),
     entitlements: walk(plan, of.keys, sub?.overrides ?? {}, sub?.adjustments ?? {}, standing),
   };
 }

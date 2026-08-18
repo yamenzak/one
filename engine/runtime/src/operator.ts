@@ -24,7 +24,9 @@ import type {
   AccountId, AppId, Allowance, AppSpec, FlagBook, ModelRow, PlanSpec, TenantId,
 } from "@engine/kernel";
 import {
-  KEEPS_RESIDENCY, PLATFORM_ENTITLEMENTS, inLane, mayIsolate, refuseCatalogue, refusePrompt,
+  ALLOWANCE_KEY, KEEPS_RESIDENCY, PLATFORM_ENTITLEMENTS, allowanceFor, inLane, mayIsolate,
+  refuseCatalogue,
+  refusePrompt,
 } from "@engine/kernel";
 import type { Residency } from "@engine/kernel";
 import type { Account } from "./cloudflare.js";
@@ -32,8 +34,8 @@ import { verify } from "./cloudflare.js";
 import { apply, plan, resources, wanted } from "./resources.js";
 import { beginMove } from "./move.js";
 import { actionsOf, bind, bindingsOf, running } from "./ai-actions.js";
-import { MEMBERSHIP, adjust, subscriptionFor } from "./billing.js";
-import { autoTopUpOf, movements, spentByApp, topUp, walletOf } from "./wallet.js";
+import { MEMBERSHIP, adjust, compPlan, subscriptionFor } from "./billing.js";
+import { autoTopUpOf, movements, renewAllowance, spentByApp, topUp, walletOf } from "./wallet.js";
 import {
   addShard, appsOfTenant, commercialAllowance, commercialLeft, disableApp, enableApp,
   liveAppsOfTenant, setCommercialGrant, shards, tenantById, tenantBySlug,
@@ -182,6 +184,10 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
             id, slug: r.slug, name: r.name, country: r.country,
             planId: sub?.planId ?? null,
             status: sub?.status ?? null,
+            /* ⚠️ GIVEN OR BOUGHT, because they look identical on this row and
+               only one of them has an invoice behind it. An operator about to
+               ask why a workspace has not paid needs to know we told it not to. */
+            compedAt: sub?.compedAt ?? null,
             adjustments: sub?.adjustments ?? {},
             /* ⚠️ WHAT IT IS, BESIDE WHAT IT BOUGHT. The console's whole job is
                telling one workspace from another, and personal and commercial
@@ -231,11 +237,51 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
           ...PLATFORM_ENTITLEMENTS,
           ...Object.fromEntries(every().flatMap((a) => Object.entries(a.entitlements))),
         };
-        if (!(key in holdable)) return ctx.fail("platform.invalid");
+        /*
+          ⚠️ AND THE MONTH'S ALLOWANCE, WHICH IS NOT AN ENTITLEMENT — see
+          `ALLOWANCE_KEY`. It rides the same write because the semantics are
+          identical: absolute, either direction, cleared per key. What it must
+          never do is join `holdable`, because that is the list `walk` iterates
+          and the walk ends in a clamp that would confiscate a balance.
+        */
+        if (key !== ALLOWANCE_KEY && !(key in holdable)) return ctx.fail("platform.invalid");
         /* ⚠️ Against the MEMBERSHIP row, which is the workspace's and belongs to
            no product — see `MEMBERSHIP`. */
         await adjust(ctx.directory, tenantId, MEMBERSHIP, key, value, ctx.now);
         return { tenant: tenantId, key };
+      },
+    },
+
+    /**
+     * A PLAN AN OPERATOR GIVES, THAT NOBODY IS PAYING FOR.
+     *
+     * ⚠️ THE ONLY OTHER WRITER OF `plan_id`, AND THE RULE IT LOOKS LIKE IT
+     * BREAKS IS NOT THE RULE. "Only a signed event may stamp a plan" exists so a
+     * WORKSPACE cannot grant itself one — every path a customer can reach opens
+     * a page Stripe owns and waits for the money. An operator stands outside
+     * every workspace (D18), reaches this only through the console door, and
+     * leaves a dated row saying the plan was given rather than bought.
+     *
+     * ⚠️ AND IT GRANTS THE ALLOWANCE IMMEDIATELY, because the sweep that renews
+     * a comped workspace runs tomorrow. A comp that took a day to become usable
+     * is one an operator makes twice.
+     *
+     * ⚠️ THE LOBBY IS THE WAY BACK. Comping `none` puts a workspace back where
+     * it started, which is how a comp ends — there is no separate un-comp, and a
+     * second verb for the same write is how the two come to disagree.
+     */
+    "op.tenant.plan": {
+      kind: "write", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const tenantId = String(input.tenant ?? "") as TenantId;
+        const planId = String(input.plan ?? "");
+        const plan = (deps.plans ?? []).find((p) => p.id === planId);
+        if (!tenantId || !plan) return ctx.fail("platform.invalid");
+
+        await compPlan(ctx.directory, tenantId, MEMBERSHIP, plan.id, ctx.now);
+        await renewAllowance(ctx.directory, tenantId, deps.plans ?? [], ctx.now);
+        return { tenant: tenantId, plan: plan.id, credits: plan.credits };
       },
     },
 
@@ -259,9 +305,19 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
         const tenantId = String(input.tenant ?? "") as TenantId;
         if (!tenantId) return ctx.fail("platform.invalid");
 
+        /* ⚠️ THE RESOLVED ALLOWANCE, not the plan's own — an override honoured
+           in the product and invisible here is one nobody can explain. */
+        const sub = await subscriptionFor(ctx.directory, tenantId, MEMBERSHIP);
+        const plan = (deps.plans ?? []).find((p) => p.id === sub?.planId) ?? null;
+
         return {
           wallet: await walletOf(ctx.directory, tenantId),
           auto: await autoTopUpOf(ctx.directory, tenantId),
+          allowance: {
+            monthly: allowanceFor(plan, sub?.adjustments ?? {}),
+            plan: plan?.credits ?? 0,
+            comped: sub?.compedAt ?? null,
+          },
           /* ⚠️ THE STATEMENT, because "where did my credits go" is the question
              this screen exists to answer and a balance alone cannot. */
           statement: await movements(ctx.directory, tenantId),

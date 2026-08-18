@@ -628,6 +628,10 @@
       "kind": "write"
     },
     {
+      "id": "op.tenant.plan",
+      "kind": "write"
+    },
+    {
       "id": "op.tenant.money",
       "kind": "read"
     },

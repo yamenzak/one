@@ -32,7 +32,7 @@ import type { MeterBook } from "./credit.js";
 import { unbounded } from "./credit.js";
 import { unknownInPrompt } from "./ai.js";
 import type { EntitlementDef } from "./entitlement.js";
-import { PLATFORM_ENTITLEMENTS, unenforced } from "./entitlement.js";
+import { ALLOWANCE_KEY, PLATFORM_ENTITLEMENTS, unenforced } from "./entitlement.js";
 import { holdingsIn, type Holding } from "./field.js";
 import type { FlagBook } from "./flag.js";
 import { refuseFlags, unreadFlags } from "./flag.js";
@@ -351,6 +351,13 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
   for (const key of Object.keys(spec.entitlements)) {
     if (key in PLATFORM_ENTITLEMENTS) {
       at("catalogue", `"${key}" is the platform's to sell, not an app's`);
+    }
+    /* ⚠️ AND THE ALLOWANCE IS NOT AN ENTITLEMENT AT ALL. Declaring it would put
+       it in `keys`, which is the one list `walk` iterates — and that walk ends
+       in a clamp that zeroes everything when standing stops. Correct for a
+       permission; confiscation for a balance somebody paid for. */
+    if (key === ALLOWANCE_KEY) {
+      at("catalogue", `"${key}" is the wallet's allowance, not an entitlement`);
     }
   }
   /* ⚠️ AND A PRICE LIST IS THE DEPLOYMENT'S, WHOLE. Plans and credit packs both

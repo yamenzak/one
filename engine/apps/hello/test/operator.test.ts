@@ -14,6 +14,7 @@
  */
 
 import { env } from "cloudflare:test";
+import type { PlanSpec } from "@engine/kernel";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
@@ -32,6 +33,16 @@ const ROOTS = { root: "one.test" };
 const sent: { to: string; code: string }[] = [];
 
 /** ⚠️ Who the DEPLOYMENT says is an operator — never a role, never a claim. */
+/** ⚠️ One membership, so one list — the shape `refuseCatalog` demands. */
+const PLANS: readonly PlanSpec[] = [
+  { id: "none", name: "No plan", said: "", kind: "personal", price: 0, currency: "USD",
+    credits: 0, order: 0, parking: true,
+    includes: { seats: 1, storage: 0, domains: 0, notes: 5, publishing: false } },
+  { id: "solo", name: "Solo", said: "", kind: "personal", price: 1200, currency: "USD",
+    credits: 1500, order: 1,
+    includes: { seats: 3, storage: 100, domains: 0, notes: -1, publishing: true } },
+];
+
 const OPERATORS = ["ops@example.com"];
 
 const app = () => serve({
@@ -47,6 +58,10 @@ const app = () => serve({
     ...operatorOps({
       apps: { hello },
       isOperator: (email) => !!email && OPERATORS.includes(email),
+      /* ⚠️ THE DEPLOYMENT'S CATALOGUE, because comping a plan resolves the id
+         against it — a console with no catalogue can refuse every plan and look
+         exactly like one with a wrong id typed into it. */
+      plans: PLANS,
     }),
   },
   locate: async (door) => {
@@ -241,6 +256,75 @@ describe("what the console can change", () => {
     /* ⚠️ And on the statement the CUSTOMER reads, in the operator's own words. */
     expect(said.statement.some((m) => m.reason === "The outage on the 14th" && m.delta === 500))
       .toBe(true);
+  });
+
+  /*
+    ⚠️ A PLAN AN OPERATOR GIVES IS THE OTHER WRITER OF `plan_id`, and the rule it
+    looks like it breaks is not the rule. "Only a signed event may stamp a plan"
+    exists so a WORKSPACE cannot grant itself one; an operator stands outside
+    every workspace and leaves a dated row saying the plan was given.
+  */
+  it("gives a workspace a plan nobody is paying for, and its credits with it", async () => {
+    const tenant = (await tenantBySlug(directory(), "eastgate"))!;
+
+    expect((await post("admin", "/api/op.tenant.plan",
+      { tenant: tenant.id, plan: "ghost" }, ops)).status).toBe(400);
+
+    expect((await post("admin", "/api/op.tenant.plan",
+      { tenant: tenant.id, plan: "solo" }, ops)).status).toBe(200);
+
+    const seen = await (await get("admin", "/api/op.tenants", ops)).json() as
+      { items: { slug: string; planId: string; compedAt: string | null }[] };
+    const line = seen.items.find((t) => t.slug === "eastgate")!;
+    expect(line.planId).toBe("solo");
+    /* ⚠️ GIVEN, NOT BOUGHT — the two look identical on the row and only one of
+       them has an invoice behind it. */
+    expect(line.compedAt).not.toBeNull();
+
+    /* ⚠️ AND THE CREDITS ARRIVE NOW, because the sweep that renews a comped
+       workspace runs tomorrow. A comp that took a day to become usable is one
+       an operator makes twice. */
+    const money = await (await get(
+      "admin", `/api/op.tenant.money?tenant=${tenant.id}`, ops)).json() as {
+        wallet: { granted: number };
+      };
+    expect(money.wallet.granted).toBeGreaterThan(0);
+  });
+
+  /*
+    ⚠️ THE MONTH'S ALLOWANCE IS OVERRIDABLE AND IS NOT AN ENTITLEMENT. It rides
+    the same write because the semantics are identical — absolute, either
+    direction, cleared per key — and it must never join the entitlement list,
+    because that is the one `walk` iterates and the walk ends in a clamp that
+    would confiscate a balance.
+  */
+  it("sets a workspace's monthly allowance, and clears it back to the plan's", async () => {
+    const tenant = (await tenantBySlug(directory(), "eastgate"))!;
+    await post("admin", "/api/op.tenant.plan", { tenant: tenant.id, plan: "solo" }, ops);
+
+    const read = async () => (await (await get(
+      "admin", `/api/op.tenant.money?tenant=${tenant.id}`, ops)).json()) as {
+        allowance: { monthly: number; plan: number };
+      };
+    const onPlan = (await read()).allowance.plan;
+
+    expect((await post("admin", "/api/op.tenant.adjust",
+      { tenant: tenant.id, key: "credits", value: 40000 }, ops)).status).toBe(200);
+    expect((await read()).allowance.monthly).toBe(40000);
+
+    /* ⚠️ AND THE RENEWAL GRANTS THE SAME NUMBER. An override honoured by the
+       screen and not by the clock is a promise of credits that never arrive. */
+    expect((await post("admin", "/api/op.tenant.plan",
+      { tenant: tenant.id, plan: "solo" }, ops)).status).toBe(200);
+    const money = await (await get(
+      "admin", `/api/op.tenant.money?tenant=${tenant.id}`, ops)).json() as {
+        wallet: { granted: number };
+      };
+    expect(money.wallet.granted).toBe(40000);
+
+    expect((await post("admin", "/api/op.tenant.adjust",
+      { tenant: tenant.id, key: "credits", value: null }, ops)).status).toBe(200);
+    expect((await read()).allowance.monthly).toBe(onPlan);
   });
 
   /* ⚠️ A switch nothing declares is a switch that does nothing — refused, or
