@@ -230,7 +230,10 @@ const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "");
 {
   const shell = readFileSync(join(ENGINE, "design/src/frame/shell.tsx"), "utf8");
   const known = new Set();
-  for (const m of shell.matchAll(/([\w-]+):\s*<\w+ ?\/>/g)) known.add(m[1]);
+  /* ⚠️ A QUOTED KEY IS STILL A KEY. `"bell-ring": <BellRing />` has to be
+     quoted because of the hyphen, and the first pattern here could not see it —
+     so the guard reported a name the map does have. */
+  for (const m of shell.matchAll(/"?([\w-]+)"?:\s*<\w+ ?\/>/g)) known.add(m[1]);
 
   const used = new Map();
   const walk = (dir) => {

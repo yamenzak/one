@@ -22,7 +22,6 @@ import { useEffect, useState } from "react";
 import {
   Group, NotificationPolicy, Nothing, PermissionRow, Screen, glyphOf, notice, type Permission,
 } from "@engine/design";
-import { BellRing } from "lucide-react";
 import { api } from "../api.js";
 import { pushState, turnPushOff, turnPushOn } from "../push.js";
 import { useLoad, type CentreView } from "./data.js";
@@ -98,7 +97,7 @@ function OnThisDevice({ says }: { readonly says: string }) {
   return (
     <Group label="On this device">
       <PermissionRow
-        icon={<BellRing />}
+        icon={glyphOf("bell-ring")}
         label="Notifications"
         under={says}
         state={busy && state !== "denied" ? "asking" : state}

@@ -320,3 +320,100 @@ export const ARRIVE_RISE = { "data-arrive": "rise" } as const;
  */
 export const doorAt = (index: number): React.CSSProperties =>
   ({ ["--tw-animation-delay" as string]: `${index * 110}ms` });
+
+/* ------------------------------------------------------------------ glyphs --- */
+
+/**
+ * AN ICON ANSWERS IN ITS OWN CHARACTER, AND THAT IS THE WHOLE RULE.
+ *
+ * ⚠️ A SCALE-AND-FADE ON EVERY MARK IS THE SAME AS NO ANIMATION AT ALL. It says
+ * "something was pressed", which the row's own press already said — so it is a
+ * second copy of one fact, and the eye stops seeing it within a day. A bell that
+ * RINGS says which thing was pressed, and that is information the press does not
+ * carry.
+ *
+ * ⚠️ NINE CHARACTERS, NOT ONE PER ICON. Every mark in the registry is one of
+ * these, and which one falls out of what the mark IS rather than out of taste —
+ * the same rule the three arrival kinds follow. A tenth is a decision somebody
+ * makes on purpose, having failed to fit a mark into the nine.
+ *
+ * ⚠️ THE WHOLE GLYPH MOVES, NOT ITS PARTS. Lucide draws each mark as several
+ * paths whose order is the library's business; a bell whose clapper swings needs
+ * `svg > path:nth-child(2)`, which is a selector that silently animates the
+ * wrong path the day lucide redraws the icon. A transform on the mark is robust
+ * across every version and reads as clearly at 20px.
+ *
+ * ⚠️ AND BOTH OPT-OUTS ARE HERE, WHICH IS THE PRICE OF OWNING A KEYFRAME. This
+ * file's header bans hand-rolled motion precisely because it escapes the
+ * library's reduced-motion machinery. These do not: the media query and the
+ * `data-reduce-motion` ancestor both stop them dead, and the curves are the
+ * library's own `EASE` variables rather than new cubic-beziers.
+ */
+export const GLYPH_MOTION = [
+  /* A bell swings from its crown and damps out. */
+  `@keyframes glyph-ring {`,
+  `  0% { transform: rotate(0deg) }  20% { transform: rotate(16deg) }`,
+  `  40% { transform: rotate(-12deg) } 60% { transform: rotate(7deg) }`,
+  `  80% { transform: rotate(-3deg) } 100% { transform: rotate(0deg) }`,
+  `}`,
+  /* A container takes something in: down, and settle back. */
+  `@keyframes glyph-take {`,
+  `  0% { transform: translateY(0) } 45% { transform: translateY(3px) scaleY(0.92) }`,
+  `  100% { transform: translateY(0) }`,
+  `}`,
+  /* Something protective braces. */
+  `@keyframes glyph-guard {`,
+  `  0% { transform: scale(1) } 35% { transform: scale(1.18) }`,
+  `  100% { transform: scale(1) }`,
+  `}`,
+  /* A mechanism turns. */
+  `@keyframes glyph-turn { to { transform: rotate(90deg) } }`,
+  /* A face shows its other side. */
+  `@keyframes glyph-flip { to { transform: rotateY(180deg) } }`,
+  /* A confirmation lands. */
+  `@keyframes glyph-pop {`,
+  `  0% { transform: scale(1) } 40% { transform: scale(1.35) }`,
+  `  100% { transform: scale(1) }`,
+  `}`,
+  /* Something catches the light. */
+  `@keyframes glyph-twinkle {`,
+  `  0% { transform: rotate(0) scale(1) } 50% { transform: rotate(90deg) scale(1.2) }`,
+  `  100% { transform: rotate(180deg) scale(1) }`,
+  `}`,
+  /* A living thing acknowledges you. */
+  `@keyframes glyph-nod {`,
+  `  0% { transform: translateY(0) } 30% { transform: translateY(-4px) }`,
+  `  60% { transform: translateY(1px) } 100% { transform: translateY(0) }`,
+  `}`,
+  /* Something that looks, looks around. */
+  `@keyframes glyph-seek {`,
+  `  0% { transform: rotate(0) } 25% { transform: rotate(-18deg) }`,
+  `  75% { transform: rotate(18deg) } 100% { transform: rotate(0) }`,
+  `}`,
+  /*
+    ⚠️ THE MARK IS ITS OWN STACKING AND TRANSFORM CONTEXT. Without
+    `display:inline-flex` a span wrapping an SVG has no box to rotate about, and
+    `transform-origin` lands somewhere the text baseline decided.
+  */
+  `[data-glyph] { display: inline-flex; transform-origin: center }`,
+  `[data-glyph="ring"] { transform-origin: top center }`,
+  `[data-glyph="turn"], [data-glyph="twinkle"] { transform-origin: center }`,
+  /*
+    ⚠️ WRITTEN OUT, NOT GENERATED FROM A TABLE. The first version built these nine
+    rules with a `.map`, so the string `animation: glyph-ring` never appeared in
+    this file — and `motion.test.mjs` refuses a keyframe it cannot SEE wired up,
+    which is the check that makes "declared and never used" impossible. It was
+    right: a table is shorter and hides the one line that proves the motion runs.
+  */
+  `[data-glyph="ring"][data-lively="true"] { animation: glyph-ring ${DURATION.moderate} ${EASE.settle} both }`,
+  `[data-glyph="take"][data-lively="true"] { animation: glyph-take ${DURATION.moderate} ${EASE.settle} both }`,
+  `[data-glyph="guard"][data-lively="true"] { animation: glyph-guard ${DURATION.quick} ${EASE.settle} both }`,
+  `[data-glyph="turn"][data-lively="true"] { animation: glyph-turn ${DURATION.moderate} ${EASE.travel} both }`,
+  `[data-glyph="flip"][data-lively="true"] { animation: glyph-flip ${DURATION.moderate} ${EASE.travel} both }`,
+  `[data-glyph="pop"][data-lively="true"] { animation: glyph-pop ${DURATION.quick} ${EASE.settle} both }`,
+  `[data-glyph="twinkle"][data-lively="true"] { animation: glyph-twinkle ${DURATION.moderate} ${EASE.travel} both }`,
+  `[data-glyph="nod"][data-lively="true"] { animation: glyph-nod ${DURATION.moderate} ${EASE.settle} both }`,
+  `[data-glyph="seek"][data-lively="true"] { animation: glyph-seek ${DURATION.moderate} ${EASE.settle} both }`,
+  `@media (prefers-reduced-motion: reduce) { [data-glyph] { animation: none !important } }`,
+  `[data-reduce-motion="true"] [data-glyph] { animation: none !important }`,
+].join("\n");

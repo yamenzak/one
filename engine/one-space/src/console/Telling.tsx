@@ -21,9 +21,8 @@
  */
 
 import { useState } from "react";
-import { BellRing } from "lucide-react";
 import { Button } from "@heroui/react";
-import { ControlRow, FieldRow, Group, NoteRow, Screen, TYPE, notice } from "@engine/design";
+import { ControlRow, FieldRow, Group, NoteRow, Screen, TYPE, glyphOf, notice } from "@engine/design";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
 
@@ -97,7 +96,7 @@ export function Telling() {
           {!push.live ? (
             <Group>
               <ControlRow
-                icon={<BellRing />}
+                icon={glyphOf("bell-ring")}
                 label="Generate a keypair"
                 under="Made here — there is nothing to paste in"
               >

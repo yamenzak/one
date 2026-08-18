@@ -22,8 +22,8 @@
  */
 
 import * as React from "react";
-import { Alert, Button, EmptyState, Skeleton, Spinner } from "@heroui/react";
 import { Circle } from "lucide-react";
+import { Alert, Button, EmptyState, Skeleton, Spinner } from "@heroui/react";
 import type { Problem } from "@engine/kernel";
 import { TYPE } from "../tokens/type.js";
 import { EMPTY_PAD, EMPTY_READ, NUDGE, PAD, ROW, SPACE } from "../tokens/metrics.js";
@@ -244,6 +244,12 @@ export function Nothing({ icon, says, under, offer, does }: {
         className="flex size-20 items-center justify-center rounded-[1.75rem]
           bg-current/[0.07] [&>svg]:size-8 [&>svg]:opacity-40"
       >
+        {/* ⚠️ THE NEUTRAL MARK, AND IT IS THE ONE ICON A SCREEN MAY DRAW
+            ITSELF. `glyphs.test.mjs` refuses a direct lucide import of anything
+            the registry ANIMATES, because a still copy of a lively mark is the
+            same picture until somebody presses it. A circle has no character to
+            lose, and routing it through the registry would make this file
+            import the shell — a cycle for no gain. */}
         {icon ?? <Circle />}
       </span>
       {/*

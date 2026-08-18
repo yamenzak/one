@@ -28,6 +28,7 @@ import {
   Banknote, Bell, Building2, Calendar, CheckCheck, Circle, ClipboardList, Clock, Cog, Coins, Database,
   Boxes, ChartColumn, FileText, House, Inbox as InboxGlyph, Mail, NotebookPen, Package, Plus, Search,
   Shield, Sparkles, Star, Sun, UserRound, Users,
+  BellRing, LogOut,
 } from "lucide-react";
 import { Page } from "./page.js";
 import { Island } from "./chrome.js";
@@ -79,7 +80,86 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
      manifest, so nothing can typecheck it; the only place it is visible is a
      rendered nav. */
   chart: <ChartColumn />, search: <Search />, star: <Star />,
+  /* ⚠️ A BELL THAT IS ALREADY RINGING, for the row that turns ringing on. Two
+     screens imported it straight from lucide and drew a mark with no character
+     — see `LIVELY`, and `scripts/glyphs.test.mjs`, which now refuses that. */
+  "bell-ring": <BellRing />,
+  /* ⚠️ LEAVING IS A ROW LIKE ANY OTHER AND NEEDS A MARK LIKE ANY OTHER. Sign
+     out was the one row in the account centre with an empty lead, which reads
+     as a row that failed to load rather than as a different kind of thing. */
+  leave: <LogOut />,
 };
+
+/**
+ * WHAT EACH MARK DOES WHEN IT IS PRESSED — one of `GLYPH_MOTION`'s nine.
+ *
+ * ⚠️ THE CHARACTER FALLS OUT OF WHAT THE MARK IS. A bell rings, a shield braces,
+ * a cog turns, an inbox takes something in. That is information the press itself
+ * cannot carry: the row's own shrink says SOMETHING was pressed, and the mark
+ * says WHICH — which is why a uniform scale-and-fade on every icon is the same
+ * as no animation at all.
+ *
+ * ⚠️ A MARK MAY BE STILL, AND SAYING SO IS THE POINT. `Circle` is the neutral
+ * fallback and has no character to have; a mark that is merely absent from this
+ * map is indistinguishable from one somebody forgot, so the guard reads the
+ * omission as deliberate only where it is written down (`STILL`).
+ */
+export const LIVELY: Readonly<Record<string, string>> = {
+  bell: "ring", "bell-ring": "ring", mail: "take", inbox: "take", package: "take",
+  trust: "guard", shield: "guard",
+  settings: "turn", cog: "turn", clock: "turn",
+  money: "flip", coins: "flip", bank: "flip", calendar: "flip", card: "flip",
+  check: "pop", add: "pop", star: "twinkle", sparkle: "twinkle",
+  people: "nod", users: "nod", person: "nod", home: "nod", house: "nod",
+  search: "seek", chart: "seek", list: "seek", file: "seek", note: "seek",
+  apps: "pop", product: "pop", workspace: "guard", database: "guard",
+  sun: "twinkle", leave: "seek",
+};
+
+/** ⚠️ Marks with no character, on purpose — see `LIVELY`. */
+export const STILL: readonly string[] = ["circle"];
+
+/**
+ * A MARK THAT ANSWERS WHEN ITS ROW IS PRESSED.
+ *
+ * ⚠️ IT LISTENS ON ITS HOST RATHER THAN ON ITSELF, because a thumb lands on the
+ * label far more often than on the icon — an icon that only answers when hit
+ * directly is one most people never see move. The nearest pressable ancestor is
+ * the row, and that is what a person pressed.
+ *
+ * ⚠️ AND THE ANIMATION RESTARTS BY REMOUNTING. CSS cancels an animation the
+ * moment its trigger is removed, so driving this from `:active` or the row's own
+ * `data-pressed` plays a fraction of the character on a quick tap and the whole
+ * of it only if somebody holds — which is backwards. A counter in the key
+ * remounts the span, which is the one way to replay a keyframe from the start.
+ */
+export function Glyph({ of }: { readonly of: string }) {
+  const [beat, setBeat] = React.useState(0);
+  const at = React.useRef<HTMLSpanElement>(null);
+  const character = LIVELY[of];
+
+  React.useEffect(() => {
+    if (!character) return;
+    const host = at.current?.closest("button, a, [data-row]");
+    if (!host) return;
+    const go = () => setBeat((n) => n + 1);
+    host.addEventListener("pointerdown", go);
+    return () => { host.removeEventListener("pointerdown", go); };
+  }, [character]);
+
+  return (
+    <span
+      key={beat}
+      ref={at}
+      {...(character ? { "data-glyph": character } : {})}
+      /* ⚠️ Only after a real press — otherwise every mark on the screen plays
+         its character on first paint, which is the jungle AMBIENCE.md bans. */
+      {...(character && beat > 0 ? { "data-lively": "true" } : {})}
+    >
+      {GLYPHS[of] ?? <Circle />}
+    </span>
+  );
+}
 
 /**
  * ⚠️ WHICH NAMES EXIST, AS DATA, so a check can ask. Twice now a declaration has
@@ -90,8 +170,14 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
  */
 export const GLYPH_NAMES: readonly string[] = Object.keys(GLYPHS);
 
+/**
+ * ⚠️ EVERY MARK IN THE PRODUCT COMES THROUGH HERE, AND THAT IS WHAT MAKES THE
+ * ANIMATION A PROPERTY OF THE SYSTEM RATHER THAN OF A SCREEN. A component
+ * importing `Bell` from lucide gets a still bell that looks identical until
+ * somebody touches it — `scripts/glyphs.test.mjs` refuses that.
+ */
 export const glyphOf = (name?: string): React.ReactNode =>
-  (name && GLYPHS[name]) ?? <Circle />;
+  name ? <Glyph of={name} /> : <Circle />;
 
 /**
  * ⚠️ THE DATA IN THE CROWN, NOT THE CROWN ITSELF. `Crown` is the component in

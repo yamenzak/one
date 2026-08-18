@@ -29,6 +29,7 @@ import type { Me } from "../api.js";
 import { useSession } from "../session.js";
 import { spaceAt, operatorUrl } from "../door.js";
 import { nameOf, pathOf, type Where } from "./where.js";
+import { SignOut } from "./SignOut.js";
 
 export function SpaceHome({ person, onGo }: {
   readonly person: Me | null;
@@ -125,6 +126,13 @@ export function SpaceHome({ person, onGo }: {
           <NavRow icon={glyphOf("shield")} label="Operator" onOpen={console_} />
         </Group>
       ) : null}
+
+      {/* ⚠️ THE EXIT IS ON BOTH SCREENS, AND THAT IS NOT A DUPLICATE ROW. This
+          is the first screen of the account door — where somebody who came to
+          leave arrives — and `You` is the drawer of everything about them. Every
+          account surface anybody trusts offers it from both; what it must never
+          be is a second COPY, which is why it is one component. */}
+      <SignOut />
     </Stack>
   );
 }

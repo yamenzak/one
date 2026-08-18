@@ -18,14 +18,13 @@
  * account list, after a rule, and there is no reason to be different.
  */
 
-import {
-  ActionRow, Confirm, Group, Identity, NavRow, Screen, glyphOf, notice, whoFace,
-} from "@engine/design";
+import { Group, Identity, NavRow, Screen, glyphOf, whoFace } from "@engine/design";
 import { useSession } from "../session.js";
+import { SignOut } from "./SignOut.js";
 import { nameOf, type Where } from "./where.js";
 
 export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
-  const { me, leave, where } = useSession();
+  const { me, where } = useSession();
   const person = me && me !== "nobody" ? me : null;
 
   return (
@@ -56,6 +55,10 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
         <NavRow
           icon={glyphOf("bell")}
           label="How you are told"
+          /* ⚠️ A LINE LIKE ITS NEIGHBOURS. It was the one row in this card with
+             a bare label between two that had one, which reads as a row whose
+             description failed to load rather than as a shorter row. */
+          under="Which notifications reach you, and where"
           onOpen={() => onGo({ at: "told" })}
         />
         {/* ⚠️ YOURS, NOT A WORKSPACE'S. What you prefer follows you into every
@@ -87,37 +90,8 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
         />
       </Group>
 
-      {/*
-        ⚠️ ITS OWN CARD, BECAUSE IT IS ITS OWN KIND OF THING. Signing out sat as
-        the third row of the card holding the two places you go — separated from
-        them by a hairline, which is a line asking somebody to notice a
-        difference the layout was not making. Two cards make the difference
-        structural: these are places, that is an exit, and the gap says so at
-        every size with nothing to align.
-      */}
-      <Group>
-        {/*
-          ⚠️ DANGER IS A VOICE, NOT A FILL. A filled red control is for the
-          confirming button INSIDE the two-step, where somebody is already
-          reading carefully; as a row in a list it is an alarm going off on an
-          account page.
-        */}
-        <Confirm
-          trigger={<ActionRow label="Sign out" tone="danger" />}
-          title="Sign out?"
-          act={{
-            label: "Sign out",
-            onDo: () => {
-              void leave().then(() => {
-                notice.ok("Signed out.");
-                location.assign("/");
-              });
-            },
-          }}
-        >
-          Your workspaces stay exactly as they are. You will need a new code to come back.
-        </Confirm>
-      </Group>
+      <SignOut />
+
     </Screen>
   );
 }

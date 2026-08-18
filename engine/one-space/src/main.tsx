@@ -2,7 +2,8 @@ import * as React from "react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  ARRIVE_MOTION, CHART_MOTION, DOOR_MOTION, FACE_CSS, GROUND_CSS, SKY_MOTION, ambienceStylesheet,
+  ARRIVE_MOTION, CHART_MOTION, DOOR_MOTION, FACE_CSS, GLYPH_MOTION, GROUND_CSS, SKY_MOTION,
+  ambienceStylesheet,
   brandCss,
   applyAppearance, Presenting,
 } from "@engine/design";
@@ -44,6 +45,7 @@ const MONO = "oklch(0.62 0 0)";
 const sky = document.createElement("style");
 sky.textContent = [
   FACE_CSS, GROUND_CSS, ambienceStylesheet(), SKY_MOTION, ARRIVE_MOTION, DOOR_MOTION, CHART_MOTION,
+  GLYPH_MOTION,
   /*
     ⚠️ ONE'S OWN BRAND, AND IT IS MONOCHROME. `GROUND_CSS` ships a blue as the
     colour a deployment has before anybody chooses — right for a framework,
