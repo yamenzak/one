@@ -35,6 +35,7 @@ import { Workspaces } from "./Workspaces.js";
 import { OneWorkspace } from "./Workspace.js";
 import { WorkspacePart } from "./Part.js";
 import { Preferences } from "../centre/Preferences.js";
+import { Formats } from "./Formats.js";
 import { ConsoleHome, ConsolePart } from "./Console.js";
 import { OneTenant } from "../console/OneTenant.js";
 import { InboxScreen } from "../centre/InboxScreen.js";
@@ -65,7 +66,7 @@ import {
  * own, which no other list holds.
  */
 export const SPACE_SCREENS: readonly Where["at"][] = [
-  "home", "you", "inbox", "told", "data", "prefs", "workspaces", "workspace",
+  "home", "you", "inbox", "told", "data", "prefs", "formats", "workspaces", "workspace",
   ...OF_WORKSPACE_SCREEN,
   "console", "tenant",
   ...OF_CONSOLE,
@@ -361,6 +362,7 @@ function Inside({ where, onGo }: {
     case "data": return <Data />;
     /* ⚠️ YOUR OWN PREFERENCES, ACROSS EVERY PRODUCT — no slug, because they are
        not a workspace's. The same split as `told` against `notices`. */
+    case "formats": return <Formats />;
     case "prefs": return <Preferences where={where} onGo={onGo} />;
     case "workspaces": return <Workspaces onGo={onGo} />;
     case "workspace": return <OneWorkspace slug={where.slug} onGo={onGo} />;

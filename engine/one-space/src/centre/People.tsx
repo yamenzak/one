@@ -26,11 +26,11 @@
  */
 
 import { useState } from "react";
-import { PLATFORM_ROLES } from "@engine/kernel";
+import { PLATFORM_ROLES, sayDate, type Instant } from "@engine/kernel";
 import { Button, Card, Chip } from "@heroui/react";
 import {
   Await, Choice, Confirm, Listing, Menu, Nothing, RowsWaiting, Screen, Stack, TextInput, Tray,
-  glyphOf, notice, money as saidMoney, whoFace,
+  glyphOf, notice, useMoney, useShown, whoFace,
 } from "@engine/design";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView, type HoldingLine, type MemberLine, type PackageLine } from "./data.js";
@@ -277,6 +277,8 @@ function Holdings({ view, member }: { readonly view: CentreView; readonly member
 }
 
 function AppHoldings({ app, member }: { readonly app: CentreApp; readonly member: MemberLine }) {
+  const price = useMoney();
+  const reader = useShown();
   const held = useLoad<{ items: readonly HoldingLine[] }>("package.held",
     { member: member.id, app: app.id });
   const sold = useLoad<{ items: readonly PackageLine[] }>("package.list", { app: app.id });
@@ -323,7 +325,7 @@ function AppHoldings({ app, member }: { readonly app: CentreApp; readonly member
                       variant="soft"
                     >
                       <Chip.Label>
-                        {h.state === "active" && h.paidUntil ? `Until ${h.paidUntil.slice(0, 10)}`
+                        {h.state === "active" && h.paidUntil ? `Until ${sayDate(reader, h.paidUntil as Instant)}`
                           : h.state === "grace" ? "In grace — renew to keep it"
                             : "Lapsed"}
                       </Chip.Label>
@@ -343,7 +345,7 @@ function AppHoldings({ app, member }: { readonly app: CentreApp; readonly member
                     trigger={<Button variant="secondary">Grant a package</Button>}
                     items={sold.of.data.items.map((p) => ({
                       id: p.id,
-                      label: `${p.name} — ${saidMoney(p.priceCents, p.currency)} / ${p.periodDays} days`,
+                      label: `${p.name} — ${price(p.priceCents, p.currency)} / ${p.periodDays} days`,
                       onDo: () => void grant(p.id),
                     }))}
                   />

@@ -13,7 +13,7 @@
  * one from a status code.
  */
 
-import { newId, problem, type Problem } from "@engine/kernel";
+import { newId, problem, type Presentation, type Problem } from "@engine/kernel";
 import { PROBLEMS } from "./problems.js";
 
 export interface Ok<T> { readonly ok: true; readonly value: T }
@@ -156,6 +156,14 @@ export interface Me {
    * refuses with a status the screen has no reason to expect.
    */
   readonly owed?: readonly Owed[];
+  /**
+   * ⚠️ HOW THEY READ A DATE, A NUMBER AND A QUANTITY — carried by the boot read
+   * for the same reason `owed` is: the first paint has dates on it. Fetched
+   * separately it arrives after the screen, so every timestamp is drawn once in
+   * the browser's convention and rewritten in theirs a moment later, which is a
+   * flicker on every list on every load for everybody who set a preference.
+   */
+  readonly presentation?: Presentation;
 }
 
 /** One document somebody has not agreed to yet. */

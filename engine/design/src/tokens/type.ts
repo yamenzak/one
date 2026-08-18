@@ -84,6 +84,14 @@ export const TYPE = {
    */
   figure: "font-mark text-2xl font-bold tabular-nums tracking-[-0.025em]",
   /**
+   * ⚠️ THE NUMERALS WITHOUT THE SIZE — for a figure that lands INSIDE a row, a
+   * heading or a sentence, and takes whatever size it lands in. `figure` is a
+   * size AND a weight AND a face, so a date or a price wearing it inside a row
+   * came out at 24px bold; the only part of it a value in flow needs is the
+   * tabular digits, and that is the whole of this.
+   */
+  figures: "tabular-nums",
+  /**
    * ⚠️ THE FRACTIONAL PART OF AN AMOUNT, RELATIVE TO ITS WHOLE. `€1,051.70` at
    * one size is a number; with a smaller `.70` it is a sum of money, because the
    * eye lands on the part that matters. `em` rather than a fixed size, so the

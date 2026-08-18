@@ -13,6 +13,12 @@ import {
   arcPath, arcs, areaPath, band, compact, compactLike, extent, linePath, norm, place, polar, stack,
   stackSpan, ticks,
 } from "./scale.js";
+import { DEFAULT_PRESENTATION, shownAs } from "@engine/kernel";
+
+/* ⚠️ AN AXIS IS READ BY SOMEBODY, so every number helper takes a reader now —
+   see `present.ts`. British here, because the assertions below are written in
+   its separators. */
+const READER = shownAs(DEFAULT_PRESENTATION, { locale: "en-GB", zone: "UTC" });
 
 describe("the domain", () => {
   it("includes zero by default, because a bar's length is the value", () => {
@@ -116,43 +122,43 @@ describe("stacking", () => {
 
 describe("formatting", () => {
   it("compacts a headline and keeps one decimal where it carries information", () => {
-    expect(compact(12914)).toBe("12.9K");
-    expect(compact(4_200_000)).toBe("4.2M");
+    expect(compact(READER, 12914)).toBe("12.9K");
+    expect(compact(READER, 4_200_000)).toBe("4.2M");
   });
 
   it("drops the decimal once it stops meaning anything", () => {
-    expect(compact(121_000)).toBe("121K");
+    expect(compact(READER, 121_000)).toBe("121K");
   });
 
   it("groups four figures rather than compacting them — same width, less said", () => {
-    expect(compact(1284)).toBe("1,284");
+    expect(compact(READER, 1284)).toBe("1,284");
   });
 
   it("leaves a small integer alone", () => {
-    expect(compact(42)).toBe("42");
+    expect(compact(READER, 42)).toBe("42");
   });
 
   it("compacts a negative the same way, sign kept", () => {
-    expect(compact(-25_400)).toBe("-25.4K");
+    expect(compact(READER, -25_400)).toBe("-25.4K");
   });
 
   it("drops a trailing zero decimal, which carries nothing", () => {
-    expect(compact(25_000)).toBe("25K");
+    expect(compact(READER, 25_000)).toBe("25K");
   });
 
   it("keeps one notation all the way to a destination, for a number being counted", () => {
     /* ⚠️ A count to 12,914 through plain `compact` runs 2,292 → 9,554 → 12.7K,
        changing NOTATION a third of the way up — which the eye reads as a glitch
        rather than as a scale. */
-    const toward = compactLike(12_914);
+    const toward = compactLike(READER, 12_914);
     expect(toward(2_292)).toBe("2.3K");
     expect(toward(9_554)).toBe("9.6K");
     expect(toward(12_914)).toBe("12.9K");
   });
 
   it("leaves a small destination on the ordinary rules", () => {
-    expect(compactLike(842)(300)).toBe("300");
-    expect(compactLike(842)(842)).toBe("842");
+    expect(compactLike(READER, 842)(300)).toBe("300");
+    expect(compactLike(READER, 842)(842)).toBe("842");
   });
 });
 

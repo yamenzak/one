@@ -17,10 +17,11 @@
  */
 
 import { useState } from "react";
+import { sayNumber } from "@engine/kernel";
 import { Button } from "@heroui/react";
 import {
   AmountRow, Await, Credits, Group, Money, NoteRow, NumberInput, RowsWaiting, Screen, Stack,
-  TYPE, Tray, notice,
+  TYPE, Tray, notice, useMoney, useShown,
 } from "@engine/design";
 import type { Allowance, EntitlementDef } from "@engine/kernel";
 import { api } from "../api.js";
@@ -111,7 +112,7 @@ function Rows({ now, again }: { readonly now: CatalogueAnswer; readonly again: (
               plan.parking ? "The lobby — free, and nobody chooses it" : plan.said,
               `${now.on[plan.id] ?? 0} on it`,
             ].filter(Boolean).join(" · ")}
-            amount={<Money amount={plan.price / 100} currency="$" size="figure" />}
+            amount={<Money minor={plan.price} currency={plan.currency} size="figure" />}
             aside={
               <EditTray
                 plan={plan}
@@ -144,6 +145,8 @@ function EditTray({ plan, declared, keys, on, edited, onReset, onDone }: {
   readonly onReset: () => void;
   readonly onDone: () => void;
 }) {
+  const say = useMoney();
+  const reader = useShown();
   const [price, setPrice] = useState<number | undefined>(undefined);
   const [credits, setCredits] = useState<number | undefined>(undefined);
   const [key, setKey] = useState<string>("");
@@ -189,13 +192,13 @@ function EditTray({ plan, declared, keys, on, edited, onReset, onDone }: {
           <AmountRow
             label="A month"
             under={declared && declared.price !== plan.price
-              ? `The code says ${(declared.price / 100).toFixed(2)}` : undefined}
-            amount={<Money amount={plan.price / 100} currency="$" size="figure" />}
+              ? `The code says ${say(declared.price, plan.currency)}` : undefined}
+            amount={<Money minor={plan.price} currency={plan.currency} size="figure" />}
           />
           <AmountRow
             label="Credits a month"
             under={declared && declared.credits !== plan.credits
-              ? `The code says ${declared.credits.toLocaleString()}` : undefined}
+              ? `The code says ${sayNumber(reader, declared.credits)}` : undefined}
             amount={<Credits value={plan.credits} as="figure" />}
           />
         </Group>

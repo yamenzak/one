@@ -13,11 +13,12 @@
 
 import React from "react";
 import type { JobBook, PackDef } from "@engine/kernel";
-import { stalled } from "@engine/kernel";
+import { sayBytes, stalled } from "@engine/kernel";
 import { Button, Card, Chip, Meter, ProgressBar } from "@heroui/react";
-import { money } from "./console.js";
+import { useMoney } from "./console.js";
 import { Grid, Stack } from "../parts/arrange.js";
 import { Credits } from "../parts/credits.js";
+import { Num, useShown } from "../parts/said.js";
 import { Balance } from "../parts/heads.js";
 import { Choice, NumberInput } from "../parts/forms.js";
 import { AmountRow, ControlRow, Group } from "../parts/surfaces.js";
@@ -41,6 +42,7 @@ const said = (lines: number): string =>
     : lines === 1 ? "For one product" : `Across ${lines} products`;
 
 export function Bill({ lines, total, currency, appName, mixed }: BillProps) {
+  const money = useMoney();
   return (
     <Stack space="snug">
       {/*
@@ -130,6 +132,7 @@ export interface WalletProps {
 export function Wallet({
   granted, bought, held, spentByApp, appName, packs, onBuy, owed = 0, armed, onArm,
 }: WalletProps) {
+  const money = useMoney();
   const spendable = Math.max(0, granted + bought - held);
   const spent = spentByApp.reduce((n, s) => n + s.credits, 0);
 
@@ -143,7 +146,11 @@ export function Wallet({
       <Balance
         eyebrow="To spend"
         figure={<Credits value={spendable} as="display" label="credits" />}
-        identifier={granted > 0 ? `${granted.toLocaleString("en-US")} of it this month's allowance` : undefined}
+        identifier={granted > 0
+          ? <>
+            <Num value={granted} /> of it this month&rsquo;s allowance
+          </>
+          : undefined}
       />
 
       {/*
@@ -293,9 +300,11 @@ export interface StorageProps {
   readonly creditsPerGbMonth: number;
 }
 
-const GB = 1024 * 1024 * 1024;
-const inGb = (bytes: number): string =>
-  `${(Math.round((bytes / GB) * 10) / 10).toLocaleString("en-US")} GB`;
+/*
+  ⚠️ POWERS OF TWO, AND THE LABEL SAYS SO — `sayBytes`. This divided by 2³⁰ and
+  wrote "GB", which is the decimal unit: a seven percent lie, in the direction
+  that makes a quota look further away than it is.
+*/
 
 /**
  * WHERE THE STORAGE STANDS, BEFORE THE METER IS THE FIRST ANYBODY HEARS OF IT.
@@ -305,13 +314,18 @@ const inGb = (bytes: number): string =>
  * arrives without a screen that predicted it is the same surprise as a refusal,
  * arriving later — so the rate is on the screen whether or not it is being paid.
  */
+const GB = 1024 * 1024 * 1024;
+
 export function Storage({ used, included, creditsPerGbMonth }: StorageProps) {
   const over = Math.max(0, used - included);
+  const shown = useShown();
   return (
     <Group label="Storage">
       <AmountRow
-        label={over > 0 ? `${inGb(over)} over what your plan includes` : "Within your plan"}
-        under={`${inGb(used)} of ${inGb(included)} included`}
+        label={over > 0
+          ? `${sayBytes(shown, over)} over what your plan includes`
+          : "Within your plan"}
+        under={`${sayBytes(shown, used)} of ${sayBytes(shown, included)} included`}
         tone={over > 0 ? "warning" : "neutral"}
         amount={<Credits value={Math.round((over / GB) * creditsPerGbMonth)} as="inline" />}
         aside={(
@@ -324,7 +338,7 @@ export function Storage({ used, included, creditsPerGbMonth }: StorageProps) {
           and somebody reading this row is deciding whether to tidy up or to pay. */}
       <ControlRow label="Over the included amount" under="Charged monthly, to the nearest day">
         <span className={TYPE.note}>
-          <Credits value={creditsPerGbMonth} as="inline" /> per GB
+          <Credits value={creditsPerGbMonth} as="inline" /> per GiB
         </span>
       </ControlRow>
     </Group>

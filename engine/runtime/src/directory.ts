@@ -17,10 +17,12 @@
  */
 
 import type {
-  AccountId, AppId, CommercialAllowance, Kind, Residency, Shard, TenantId,
+  AccountId, AppId, CommercialAllowance, Kind, Presentation, PresentationRefusal,
+  Residency, Shard, TenantId,
 } from "@engine/kernel";
 import {
-  allowanceLeft, mayBecome, newAccountId, newTenantId, placeOn, refuseCommercial, refusePlacement,
+  DEFAULT_PRESENTATION, allowanceLeft, mayBecome, newAccountId, newTenantId, placeOn,
+  refuseCommercial, refusePlacement, refusePresentation,
 } from "@engine/kernel";
 import { openAccount } from "./wallet.js";
 import type { SchemaModule } from "./schema.js";
@@ -34,7 +36,11 @@ export const DIRECTORY_SCHEMA: SchemaModule = {
     /* ⚠️ `commercial_granted` IS A COUNT AN OPERATOR SETS, and the count of
        commercial workspaces this account has FOUNDED is what it is measured
        against — derived rather than stored, so the two can never disagree. */
-    `CREATE TABLE IF NOT EXISTS account (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT, commercial_granted INTEGER NOT NULL DEFAULT 0, at TEXT NOT NULL);`,
+    /* ⚠️ `presentation_json` IS ON THE ACCOUNT AND NOT ON A WORKSPACE, because
+       how somebody reads a date follows the PERSON. Filed per workspace it
+       would be the same choice made once per workspace, disagreeing with
+       itself, and a new one would start by getting it wrong. */
+    `CREATE TABLE IF NOT EXISTS account (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT, commercial_granted INTEGER NOT NULL DEFAULT 0, presentation_json TEXT, at TEXT NOT NULL);`,
     /* ⚠️ `dedicated_to` IS THE ISOLATION PROMISE, and it lives on the SHARD
        because every placement asks "may this workspace go here" — a fact held
        only on the arriving tenant cannot answer that about the database. */
@@ -107,6 +113,63 @@ export async function upsertAccount(
   await db.prepare(`INSERT INTO account (id, email, name, at) VALUES (?, ?, ?, ?)`)
     .bind(id, email, name, at).run();
   return id;
+}
+
+/**
+ * HOW THIS PERSON READS DATES, NUMBERS AND QUANTITIES.
+ *
+ * ⚠️ EVERY UNSET FIELD FALLS BACK TO `auto`, WHICH IS THE BROWSER'S ANSWER. A
+ * stored blob written before a field existed is missing that key, and defaulting
+ * it to anything but `auto` would silently pin somebody to a convention they
+ * never chose — see `DEFAULT_PRESENTATION`.
+ *
+ * ⚠️ AND A CORRUPT BLOB READS AS DEFAULTS RATHER THAN THROWING. This is on the
+ * path of `me.who`, which every door calls before it draws anything, so a parse
+ * error here is a deployment where nobody can sign in.
+ */
+export async function presentationOf(db: Db, accountId: AccountId): Promise<Presentation> {
+  const row = await db.prepare(`SELECT presentation_json FROM account WHERE id = ?`)
+    .bind(accountId).first<{ presentation_json: string | null }>();
+  return asPresentation(row?.presentation_json ?? null);
+}
+
+export const asPresentation = (stored: string | null): Presentation => {
+  if (!stored) return DEFAULT_PRESENTATION;
+  try { return presentationFrom(JSON.parse(stored)); }
+  catch { return DEFAULT_PRESENTATION; }
+};
+
+/**
+ * ⚠️ WHAT ARRIVED, OVER THE DEFAULTS, WITH NOTHING ELSE CARRIED THROUGH. A
+ * spread of the whole body would store every stray key a caller sent — which is
+ * how a settings blob becomes a place to park arbitrary data on somebody's
+ * account, at their own request, forever.
+ */
+export const presentationFrom = (sent: unknown): Presentation => {
+  const from = (sent ?? {}) as Record<string, unknown>;
+  const word = (key: keyof Presentation): string =>
+    (typeof from[key] === "string" ? from[key] : DEFAULT_PRESENTATION[key]);
+  return {
+    language: word("language"), region: word("region"), zone: word("zone"),
+    dateOrder: word("dateOrder") as Presentation["dateOrder"],
+    clock: word("clock") as Presentation["clock"],
+    units: word("units") as Presentation["units"],
+  };
+};
+
+/**
+ * ⚠️ REFUSED BEFORE IT IS STORED. `Intl` throws on a tag it cannot parse, from
+ * inside a render, on every screen showing a date — so an unchecked write is a
+ * way for somebody to lock themselves out of the only screen that could undo it.
+ */
+export async function setPresentation(
+  db: Db, accountId: AccountId, of: Presentation,
+): Promise<readonly PresentationRefusal[]> {
+  const no = refusePresentation(of);
+  if (no.length) return no;
+  await db.prepare(`UPDATE account SET presentation_json = ? WHERE id = ?`)
+    .bind(JSON.stringify(of), accountId).run();
+  return [];
 }
 
 /* ----------------------------------------------------------------- shards --- */

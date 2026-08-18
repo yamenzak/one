@@ -22,7 +22,7 @@ import {
   ActionRow, Confirm, Group, Identity, NavRow, Screen, glyphOf, notice, whoFace,
 } from "@engine/design";
 import { useSession } from "../session.js";
-import type { Where } from "./where.js";
+import { nameOf, type Where } from "./where.js";
 
 export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
   const { me, leave, where } = useSession();
@@ -71,6 +71,15 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
           label="Your data"
           under="Take a copy of everything we hold, or delete it"
           onOpen={() => onGo({ at: "data" })}
+        />
+        {/* ⚠️ ABOVE THE PRODUCTS' OWN PREFERENCES, because it governs every one
+            of them. A date is written the same way in every product here, and a
+            row filed under one of them would say otherwise. */}
+        <NavRow
+          icon={glyphOf("calendar")}
+          label={nameOf({ at: "formats" })}
+          under="Dates, times, numbers and measurements, everywhere"
+          onOpen={() => onGo({ at: "formats" })}
         />
         <NavRow
           icon={glyphOf("cog")}

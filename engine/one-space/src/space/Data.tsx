@@ -19,9 +19,9 @@
 
 import { useState } from "react";
 import {
-  ActionRow, Confirm, Group, NoteRow, Prose, Screen, glyphOf, notice,
+  ActionRow, Confirm, Group, NoteRow, Prose, Screen, glyphOf, notice, useShown,
 } from "@engine/design";
-import type { Problem } from "@engine/kernel";
+import { dayIn, type Instant, type Problem } from "@engine/kernel";
 import { api } from "../api.js";
 import { useSession } from "../session.js";
 import { Trouble } from "@engine/design";
@@ -39,6 +39,7 @@ interface Forgotten {
 }
 
 export function Data() {
+  const reader = useShown();
   const { leave } = useSession();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<Problem | null>(null);
@@ -58,7 +59,9 @@ export function Data() {
       new Blob([JSON.stringify(out.value, null, 2)], { type: "application/json" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `your-data-${out.value.at.slice(0, 10)}.json`;
+    /* ⚠️ THE DAY IN THE FILENAME IS THEIRS, not UTC's. A file saved at 23:30 in
+       Berlin named with yesterday's date is a file somebody cannot find. */
+    a.download = `your-data-${dayIn(reader, out.value.at as Instant)}.json`;
     a.click();
     setTimeout(() => { URL.revokeObjectURL(url); }, 0);
     notice.ok("Copy downloaded.");

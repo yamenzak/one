@@ -14,8 +14,9 @@
  */
 
 import {
-  ControlRow, FieldRow, Group, Nothing, Screen, Section, glyphOf, notice,
+  ControlRow, FieldRow, Group, Nothing, Screen, Section, glyphOf, notice, useShown,
 } from "@engine/design";
+import { sayDate, type Instant } from "@engine/kernel";
 import { Button, Chip } from "@heroui/react";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
@@ -74,6 +75,7 @@ const TONE: Readonly<Record<string, "default" | "success" | "warning" | "danger"
 };
 
 export function Footing() {
+  const reader = useShown();
   const of = useLoad<Answer>("op.infra");
   /* ⚠️ A MOVE IN FLIGHT HOLDS A WORKSPACE READ-ONLY, so it is not something to
      learn about from its owner. It sits here rather than on its own screen
@@ -139,7 +141,7 @@ export function Footing() {
                       <Chip color={TONE[item.state] ?? "default"} variant="soft">
                         <Chip.Label>
                           {item.state === "draining" && item.drainAfter
-                            ? `draining until ${item.drainAfter.slice(0, 10)}`
+                            ? `draining until ${sayDate(reader, item.drainAfter as Instant)}`
                             : item.state}
                         </Chip.Label>
                       </Chip>
@@ -167,7 +169,7 @@ export function Footing() {
                     <FieldRow
                       key={`${step.do}-${step.name}`}
                       label={step.name}
-                      value={step.after ? `${step.do} after ${step.after.slice(0, 10)}` : step.do}
+                      value={step.after ? `${step.do} after ${sayDate(reader, step.after as Instant)}` : step.do}
                     />
                   ))}
                 </Group>

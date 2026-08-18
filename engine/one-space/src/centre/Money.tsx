@@ -17,21 +17,19 @@
  */
 
 import { Chip } from "@heroui/react";
-import { isBusiness, type Kind } from "@engine/kernel";
+import { isBusiness, sayDate, type Instant, type Kind } from "@engine/kernel";
 import {
-  AmountRow, Bill, Credits, Group, Screen, Storage, Wallet, glyphOf, notice,
+  AmountRow, Bill, Credits, Group, Screen, Storage, Wallet, glyphOf, notice, useMoney, useShown,
 } from "@engine/design";
 import { api } from "../api.js";
 import { useLoad, type CentreView, type MoneyView } from "./data.js";
-
-/** ⚠️ A movement is dated, and a statement without dates is a list of amounts. */
-const on = (at: string): string =>
-  new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
 export function Money({ view, onGo }: {
   readonly view: CentreView;
   readonly onGo: () => void;
 }) {
+  const price = useMoney();
+  const shown = useShown();
   void view;
   const money = useLoad<MoneyView>("money.view");
 
@@ -81,10 +79,7 @@ export function Money({ view, onGo }: {
               under={data.status === "past_due"
                 ? "The last payment did not go through"
                 : data.plan && isBusiness(data.plan.kind as Kind) ? "A business" : "Personal"}
-              amount={data.bill.total > 0
-                ? new Intl.NumberFormat("en", { style: "currency", currency: data.bill.currency })
-                  .format(data.bill.total / 100)
-                : "Free"}
+              amount={data.bill.total > 0 ? price(data.bill.total, data.bill.currency) : "Free"}
               aside={data.status === "past_due"
                 ? <Chip color="warning" variant="soft"><Chip.Label>!</Chip.Label></Chip>
                 : undefined}
@@ -122,7 +117,7 @@ export function Money({ view, onGo }: {
                 <AmountRow
                   key={`${m.at}-${i}`}
                   label={m.reason}
-                  under={on(m.at)}
+                  under={sayDate(shown, m.at as Instant)}
                   amount={<Credits value={m.delta} as="inline" signed />}
                 />
               ))}

@@ -13,13 +13,15 @@
  */
 
 import type { Allowance, EntitlementDef, FlagBook, FlagDef, PlanSpec } from "@engine/kernel";
-import { UNLIMITED, overdue, resolve, settableBy } from "@engine/kernel";
+import * as React from "react";
+import { UNLIMITED, overdue, resolve, sayMoney, settableBy } from "@engine/kernel";
 import { Table } from "@heroui/react";
 import { Stack } from "../parts/arrange.js";
 import { AmountRow, Group, ToggleRow } from "../parts/surfaces.js";
 import type { FaceOf } from "../parts/face.js";
 import { SPACE } from "../tokens/metrics.js";
 import { Reveal } from "../parts/blocks.js";
+import { useShown } from "../parts/said.js";
 
 /* ------------------------------------------------------------------ flags --- */
 
@@ -108,11 +110,26 @@ export const saying = (value: Allowance): string => {
   return String(value);
 };
 
-export const money = (minor: number, currency: string): string =>
-  minor === 0 ? "Free" : new Intl.NumberFormat("en", { style: "currency", currency })
-    .format(minor / 100);
+/**
+ * ⚠️ A PRICE, IN THE READER'S CONVENTIONS. This was `Intl.NumberFormat("en", …)`
+ * with `minor / 100` — hardcoded American grouping for everybody, and a
+ * hundredth of the real figure for every currency with no minor unit. It is a
+ * HOOK now, so it cannot be called anywhere the reader is unknown.
+ *
+ * ⚠️ AND ZERO IS "FREE" RATHER THAN "€0.00". A price list where the free tier
+ * reads as a formatted nothing makes somebody look twice at the one row that
+ * needs no thought.
+ */
+export function useMoney(): (minor: number, currency: string) => string {
+  const shown = useShown();
+  return React.useCallback(
+    (minor: number, currency: string) => (minor === 0 ? "Free" : sayMoney(shown, minor, currency)),
+    [shown],
+  );
+}
 
 export function Shelf({ plans, entitlements, current, onChoose }: ShelfProps) {
+  const money = useMoney();
   /* ⚠️ The parking plan is where somebody who never chose lands. It is shown —
      hiding it would make the screen disagree with the plan they are on. */
   const shown = [...plans].sort((a, b) => a.order - b.order);

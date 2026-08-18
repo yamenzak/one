@@ -28,6 +28,7 @@ import * as React from "react";
 import { Button, Card, Chip, Label, Skeleton, Switch } from "@heroui/react";
 import { Pencil } from "lucide-react";
 import type { Tone } from "@engine/kernel";
+import { sayMoneyParts } from "@engine/kernel";
 import { TYPE } from "../tokens/type.js";
 import {
   CARD_ROWS, CONTROL_SHARE, CROWN_SIZE, HEAD_GAP, ICON, INSET, LEAD, NUDGE, PAD, ROW, SPACE,
@@ -43,6 +44,7 @@ import type { Sky } from "../scene/index.js";
 import { Face, type FaceOf } from "./face.js";
 import { Hint } from "./beside.js";
 import { Tally } from "./tally.js";
+import { useShown } from "./said.js";
 
 /* ------------------------------------------------------------------ group --- */
 
@@ -874,10 +876,17 @@ export function TileGrid({ tiles }: {
  * is neutral — never red, which is for something being wrong. A product that
  * paints every outgoing payment red tells somebody their groceries were a fault.
  */
-export function Money({ amount, currency = "€", size = "display", tone = "neutral", count = false }: {
+export function Money({ minor, currency, size = "display", tone = "neutral", count = false }: {
   /** ⚠️ Minor units, as an integer. A float here is a rounding error later. */
-  readonly amount: number;
-  readonly currency?: string;
+  readonly minor: number;
+  /**
+   * ⚠️ THE ISO CODE, NOT A SYMBOL. It defaulted to `"€"` — so every call site
+   * that forgot it printed euros over whatever the workspace is actually billed
+   * in, and there is no reading of a price in the wrong currency that is not a
+   * lie. `Intl` turns the code into the symbol the READER expects, on the side
+   * they expect it, which no default here could do.
+   */
+  readonly currency: string;
   /**
    * ⚠️ `display` IS THE DEFAULT BECAUSE THAT IS WHERE MONEY GOES. Every call site
    * in the product puts this in a hero, and defaulting to the row size meant the
@@ -896,22 +905,33 @@ export function Money({ amount, currency = "€", size = "display", tone = "neut
    */
   readonly count?: boolean;
 }) {
-  const sign = amount < 0 ? "−" : tone === "success" ? "+" : "";
-  const part = String(Math.abs(amount) % 100).padStart(2, "0");
+  const shown = useShown();
+  /*
+    ⚠️ THE PIECES COME FROM `Intl`, NOT FROM ARITHMETIC. This split the amount
+    with `% 100` and pinned the symbol in front — which is wrong for the yen
+    (no minor unit), wrong in Germany (symbol last, comma for a decimal), and
+    wrong for a Briton reading a dollar price (`US$`, not `$`). See
+    `sayMoneyParts`.
+  */
+  const part = sayMoneyParts(shown, minor, currency);
+  const sign = part.sign || (tone === "success" && minor > 0 ? "+" : "");
   const big = size === "display" ? TYPE.display : size === "figure" ? TYPE.figure : TYPE.label;
 
+  /* ⚠️ THE GROUPED WHOLE IS WHAT COUNTS, SO THE TALLY IS HANDED THE STRING. It
+     used to be given a number and told to `toLocaleString()` it — the browser's
+     convention rather than the reader's, which is the whole bug one layer
+     down. */
   return (
     <span className={`${big} tabular-nums`} data-tone={tone}>
-      {sign}{currency}
+      {sign}{part.before}
       {/* ⚠️ THE WHOLE UNITS COUNT AND THE FRACTION DOES NOT. Cents ticking
           through 99 values is a slot machine; the pounds are what somebody is
           reading and the pence are precision that should simply be there. */}
-      <Tally
-        value={Math.floor(Math.abs(amount) / 100)}
-        format={(n) => n.toLocaleString()}
-        count={count}
-      />
-      <span className={TYPE.minor}>.{part}</span>
+      <Tally value={Math.floor(Math.abs(minor) / 100)} format={() => part.whole} count={count} />
+      {/* ⚠️ EMPTY FOR A CURRENCY WITH NO MINOR UNIT, rather than `.00` — a yen
+          price with two decimals is a price nobody in Japan has ever seen. */}
+      {part.fraction ? <span className={TYPE.minor}>{part.fraction}</span> : null}
+      {part.after}
     </span>
   );
 }

@@ -13,9 +13,10 @@
 import { Button } from "@heroui/react";
 import {
   Await, ControlRow, FlagConsole, Group, NoteRow, Nothing, RowsWaiting, Screen, Stack,
-  TYPE, appFace, glyphOf, notice,
+  TYPE, appFace, glyphOf, notice, useDay,
 } from "@engine/design";
 import type { FlagBook } from "@engine/kernel";
+import { instant } from "@engine/kernel";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
 
@@ -36,6 +37,9 @@ const MODES: readonly { readonly id: "off" | "readonly" | "full"; readonly label
 ];
 
 export function Switches() {
+  /* ⚠️ THE OPERATOR'S OWN DAY, NOT UTC'S. A flag scheduled to end "today" is
+     read against the day the person reading it is having. */
+  const today = useDay(instant());
   const flags = useLoad<FlagsAnswer>("op.flags");
   const care = useLoad<{ mode: string }>("op.maintenance");
 
@@ -115,7 +119,7 @@ export function Switches() {
                 face={appFace(app.id, app.mark)}
                 label={app.name}
                 deployment={data.deployment}
-                today={new Date().toISOString().slice(0, 10)}
+                today={today}
                 onSet={(id, on) => void set(id, on)}
               />
             ))}

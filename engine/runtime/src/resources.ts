@@ -30,7 +30,7 @@
 import type { AppSpec, NeedDef, Residency, ResourceKind, ResourceState } from "@engine/kernel";
 import {
   DRAIN_DAYS, IS_CREATED, KEEPS_RESIDENCY, LIVE_STATES,
-  bindingName, needsOf, newId, resourceName,
+  bindingName, dayOf, instant, needsOf, newId, resourceName,
 } from "@engine/kernel";
 import type { Account, WireBinding } from "./cloudflare.js";
 import { create, destroy, listRemote, patchBindings } from "./cloudflare.js";
@@ -296,7 +296,7 @@ export async function apply(deps: ApplyDeps): Promise<Reconciled> {
     if (step.do === "drain") {
       const after = new Date(now.getTime() + DRAIN_DAYS * 24 * 60 * 60 * 1000);
       await setState(deps.directory, step.row.id, "draining", { drain_after: after.toISOString() });
-      did.push(`draining ${step.row.name} until ${after.toISOString().slice(0, 10)}`);
+      did.push(`draining ${step.row.name} until ${dayOf(instant(after))}`);
     }
 
     if (step.do === "reap") {

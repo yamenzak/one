@@ -74,6 +74,8 @@ export type Where =
    * not a workspace's, so they are not filed under one.
    */
   | { readonly at: "prefs"; readonly app?: string; readonly area?: string }
+  /** ⚠️ Not a product's setting — how THIS PERSON reads every product. */
+  | { readonly at: "formats" }
   | { readonly at: "workspaces" }
   /** One workspace: what it includes, and the way into everything about it. */
   | { readonly at: "workspace"; readonly slug: string }
@@ -256,6 +258,7 @@ export function parseWhere(path: string): Where {
   if (head === "inbox") return { at: "inbox" };
   if (head === "told") return { at: "told" };
   if (head === "data") return { at: "data" };
+  if (head === "formats") return { at: "formats" };
   if (head === "prefs") {
     const [app, area] = tail;
     return app ? (area ? { at: "prefs", app, area } : { at: "prefs", app }) : { at: "prefs" };
@@ -309,6 +312,7 @@ export function pathOf(where: Where): string {
     case "inbox": return `${SPACE}/inbox`;
     case "told": return `${SPACE}/told`;
     case "data": return `${SPACE}/data`;
+    case "formats": return `${SPACE}/formats`;
     case "prefs":
       return `${SPACE}/prefs${where.app ? `/${where.app}` : ""}${where.app && where.area ? `/${where.area}` : ""}`;
     case "workspaces": return `${SPACE}/workspaces`;
@@ -353,6 +357,7 @@ export function above(where: Where): Where | null {
   switch (where.at) {
     case "home": return null;
     case "you": case "inbox": case "workspaces": case "console": return { at: "home" };
+    case "formats": return { at: "you" };
     /* ⚠️ How you are told is a detail of YOU, so leaving it goes back there
        rather than to the root — the crown's arrow has to agree with how
        somebody got here. */
@@ -385,6 +390,7 @@ export const nameOf = (where: Where): string => {
     case "inbox": return "Inbox";
     case "told": return "How you are told";
     case "data": return "Your data";
+    case "formats": return "Dates and numbers";
     case "prefs": return "Your preferences";
     case "workspaces": return "Workspaces";
     case "workspace": return "Workspace";

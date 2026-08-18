@@ -37,6 +37,7 @@ import { TYPE } from "../tokens/type.js";
 import { SPACE } from "../tokens/metrics.js";
 import { GRID, QUIET, assign, seriesColour } from "./palette.js";
 import { arcPath, arcs, compact } from "./scale.js";
+import { useFigures } from "../parts/said.js";
 
 /* ⚠️ One coordinate space for every round chart — see `charts.tsx`'s `W`/`H`. */
 const BOX = 120;
@@ -90,6 +91,7 @@ export function Ring({ label, value, limit, unit = "", suffix = "", severity = t
   readonly severity?: boolean;
   readonly describes?: string;
 }) {
+  const say = useFigures();
   const t = limit > 0 ? Math.min(1, Math.max(0, value / limit)) : 0;
   const pct = Math.round(t * 100);
   /* ⚠️ THE TOKEN IS NAMED, NOT INHERITED. This first shipped stroking
@@ -99,7 +101,7 @@ export function Ring({ label, value, limit, unit = "", suffix = "", severity = t
      rest of the system names the token (`Meter` does), and so does this. */
   const tone = severity && t >= 0.95 ? "danger" : severity && t >= 0.8 ? "warning" : "data";
   const r = MID - THICK / 2;
-  const reads = `${unit}${compact(value)}${suffix} of ${unit}${compact(limit)}${suffix}`;
+  const reads = `${unit}${say.compact(value)}${suffix} of ${unit}${say.compact(limit)}${suffix}`;
   const name = describes ?? `${label}: ${reads}`;
 
   return (
@@ -174,6 +176,7 @@ export function Rings({ items, describes }: {
   }[];
   readonly describes: string;
 }) {
+  const say = useFigures();
   const shown = items.slice(0, RINGS_MAX);
   const dark = useDark();
 
@@ -210,7 +213,7 @@ export function Rings({ items, describes }: {
               />
               <span className="grow">{item.label}</span>
               <span className="tabular-nums">
-                {compact(item.value)} / {compact(item.limit)}
+                {say.compact(item.value)} / {say.compact(item.limit)}
               </span>
             </li>
           ))}
@@ -247,6 +250,7 @@ export function DonutChart({ describes, data, unit = "", suffix = "", total: tot
   /** ⚠️ What the middle says. Defaults to the sum, which is usually right. */
   readonly total?: string;
 }) {
+  const say = useFigures();
   const dark = useDark();
   const shown = fold(data);
   const total = shown.reduce((a, d) => a + Math.max(0, d.value), 0);
@@ -274,7 +278,7 @@ export function DonutChart({ describes, data, unit = "", suffix = "", total: tot
           x={MID} y={MID + 2} textAnchor="middle" dominantBaseline="middle"
           className={TYPE.figure} fill="currentColor" style={{ fontSize: 20 }}
         >
-          {totalLabel ?? `${unit}${compact(total)}${suffix}`}
+          {totalLabel ?? `${unit}${say.compact(total)}${suffix}`}
         </text>
       </svg>
       <figcaption>
@@ -287,7 +291,7 @@ export function DonutChart({ describes, data, unit = "", suffix = "", total: tot
                 style={{ background: colours[i] }}
               />
               <span className="grow">{d.label}</span>
-              <span className="tabular-nums">{unit}{compact(d.value)}{suffix}</span>
+              <span className="tabular-nums">{unit}{say.compact(d.value)}{suffix}</span>
             </li>
           ))}
         </ul>
@@ -335,6 +339,7 @@ export function CompositionBar({ describes, data, unit = "", suffix = "" }: {
   /** ⚠️ After it — every other unit of measure there is. */
   readonly suffix?: string;
 }) {
+  const say = useFigures();
   const dark = useDark();
   const shown = fold(data);
   const total = shown.reduce((a, d) => a + Math.max(0, d.value), 0);
@@ -386,7 +391,7 @@ export function CompositionBar({ describes, data, unit = "", suffix = "" }: {
               />
               {d.label}
               <span className="tabular-nums" style={{ color: QUIET }}>
-                {unit}{compact(d.value)}{suffix}
+                {unit}{say.compact(d.value)}{suffix}
               </span>
             </li>
           ))}

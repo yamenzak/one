@@ -12,10 +12,24 @@
  * somebody was willing to look at it, and the "could not load" branch under it
  * was unreachable code. `Await` owns that decision (`state.tsx`), the screen
  * hands it a `Loaded`, and this draws the one case where there are notes.
+ *
+ * ⚠️ IT IS CUT INTO DAYS, AND THE DAYS ARE THE READER'S OWN. A flat list of
+ * forty notifications is forty timestamps somebody has to read to place; under
+ * "Today" and "Yesterday" the same forty are two glances. Past two days the
+ * headings are DATES rather than "3 days ago" — a relative phrase goes stale on
+ * a page left open, and this is the surface people leave open.
+ *
+ * ⚠️ AND THE DAY IS DECIDED IN THEIR TIME ZONE, WHICH IS THE PART THAT WOULD GO
+ * WRONG SILENTLY. A notification at 23:30 in Berlin is stamped 21:30Z, and
+ * cutting on the UTC date files it under yesterday for the person who was there
+ * when it arrived. `useDays` asks `present.ts`, once per list.
  */
 
 import { Chip } from "@heroui/react";
+import { sayTime, type Instant } from "@engine/kernel";
 import { Group, NavRow } from "../parts/surfaces.js";
+import { Stack } from "../parts/arrange.js";
+import { useDays, useShown } from "../parts/said.js";
 
 export interface Note {
   readonly id: string;
@@ -30,56 +44,61 @@ export interface Note {
 export interface InboxProps {
   /** ⚠️ LOADED. The four-way is the screen's — see the header. */
   readonly notes: readonly Note[];
+  /**
+   * ⚠️ WHAT "TODAY" MEANS, AS A PROP. Read from the clock inside the render this
+   * component could not be asserted, and every test of it would pass only on the
+   * day it was written.
+   */
+  readonly now?: Instant;
   readonly onOpen: (note: Note) => void;
 }
 
-/**
- * ⚠️ THE DAY AND THE TIME, NOT AN ISO STRING WITH ITS `T` SWAPPED FOR A SPACE.
- * A notification is read as "when", and `2026-08-18 14:03` makes somebody parse
- * a date to answer a question they asked by glancing.
- */
-const when = (at: string): string => {
-  const on = new Date(at);
-  if (Number.isNaN(on.getTime())) return at;
-  return on.toLocaleString(undefined, {
-    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-  });
-};
+export function Inbox({ notes, now, onOpen }: InboxProps) {
+  const shown = useShown();
+  const days = useDays(notes, (n) => n.at as Instant, now);
 
-export function Inbox({ notes, onOpen }: InboxProps) {
   return (
     /*
-      ⚠️ ROWS IN ONE CARD, NOT A CARD EACH. Every note was a `Card` with a
+      ⚠️ ONE CARD PER DAY, NOT ONE PER NOTE. Every note was a `Card` with a
       header, a description and a content area holding a chip and a button — so
       four notifications filled a phone and the only thing being scanned for,
       which of them is new, was the third element of the third block of each.
-
-      ⚠️ AND THE WHOLE ROW OPENS IT. The press marks it seen and follows the
-      link; a button inside a row makes the other 90% of the row a dead target,
-      which is the one part of it a thumb actually lands on.
+      Grouped, the heading carries the date and every row under it carries only
+      the time, which is the field that actually differs.
     */
-    <Group>
-      {notes.map((note) => (
-        <NavRow
-          key={note.id}
-          label={note.title}
-          under={when(note.at)}
-          /*
-            ⚠️ ZERO IS TEXTURE AND SO IS "SEEN". Only the unread ones are
-            marked — a chip on every row is a chip that says nothing.
+    <Stack space="roomy">
+      {days.map((day) => (
+        <Group key={day.day} label={day.says}>
+          {day.items.map((note) => (
+            /* ⚠️ THE WHOLE ROW OPENS IT. The press marks it seen and follows the
+               link; a button inside a row makes the other 90% of the row a dead
+               target, which is the part a thumb actually lands on. */
+            <NavRow
+              key={note.id}
+              label={note.title}
+              /* ⚠️ THE TIME ALONE — the heading above already said which day,
+                 and a full date on every row is three fields repeated down a
+                 list with one of them varying. */
+              under={sayTime(shown, note.at as Instant)}
+              /*
+                ⚠️ ZERO IS TEXTURE AND SO IS "SEEN". Only the unread ones are
+                marked — a chip on every row is a chip that says nothing.
 
-            ⚠️ AND ONE MARK, NOT ONE PER TONE. This wore `colorFor(note.tone)`,
-            so a list held a grey "New" beside a green "New" beside an amber
-            one — the same word in three colours, which asks the reader to
-            decode a difference the label denies. Unread is one state; what the
-            notification is ABOUT is its sentence, which is the row.
-          */
-          aside={note.seen
-            ? undefined
-            : <Chip color="accent" variant="soft"><Chip.Label>New</Chip.Label></Chip>}
-          onOpen={() => onOpen(note)}
-        />
+                ⚠️ AND ONE MARK, NOT ONE PER TONE. This wore
+                `colorFor(note.tone)`, so a list held a grey "New" beside a green
+                "New" beside an amber one — the same word in three colours, which
+                asks the reader to decode a difference the label denies. Unread
+                is one state; what the notification is ABOUT is its sentence,
+                which is the row.
+              */
+              aside={note.seen
+                ? undefined
+                : <Chip color="accent" variant="soft"><Chip.Label>New</Chip.Label></Chip>}
+              onOpen={() => onOpen(note)}
+            />
+          ))}
+        </Group>
       ))}
-    </Group>
+    </Stack>
   );
 }

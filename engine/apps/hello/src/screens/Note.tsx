@@ -146,7 +146,7 @@ export function Note({ title, note, onBack, onPublish, onOpen }: {
                         from the bill. */}
                     <FieldRow
                       label="What it cost"
-                      value={<Money amount={note.cost} currency="€" size="label" />}
+                      value={<Money minor={note.cost} currency="EUR" size="label" />}
                     />
                     <FieldRow
                       label="Follows"

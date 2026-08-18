@@ -19,7 +19,7 @@ import { area, field, flag, notification, setting, type Channel, type FieldSpec 
 import { Settings, settingsShown } from "../src/rendered/settings.js";
 import { Shown } from "../src/rendered/edit.js";
 import { NotificationPolicy, policyShown } from "../src/rendered/policy.js";
-import { FlagConsole, Shelf, saying, money } from "../src/rendered/console.js";
+import { FlagConsole, Shelf, saying } from "../src/rendered/console.js";
 import { Storage, Wallet } from "../src/rendered/money.js";
 import { Shell, reachable } from "../src/frame/shell.js";
 import { ControlRow } from "../src/parts/surfaces.js";
@@ -30,6 +30,7 @@ import { ambienceStylesheet, skyWorld, worldCss } from "../src/tokens/ambience.j
 import { SKIES } from "../src/scene/index.js";
 import { BEAT } from "../src/tokens/motion.js";
 import { Screen, Whichever } from "../src/frame/screen.js";
+import { Presenting } from "../src/parts/said.js";
 import { ready, trouble, waiting } from "../src/parts/state.js";
 import { Documents, SubProcessors } from "../src/rendered/legal.js";
 import { Await } from "../src/parts/state.js";
@@ -298,8 +299,33 @@ describe("the plan shelf", () => {
     expect(saying(0)).toBe("—");
     expect(saying(true)).toBe("Included");
     expect(saying(5)).toBe("5");
-    expect(money(0, "EUR")).toBe("Free");
-    expect(money(900, "EUR")).toContain("9");
+  });
+
+  /*
+    ⚠️ A PRICE IS THE READER'S NOW — `useMoney`. It was `Intl.NumberFormat("en")`
+    with `minor / 100`, so a German price list grouped the American way and every
+    yen figure was a hundredth of itself. The rendered shelf is what proves it:
+    a helper asserted on its own would pass while nothing on screen used it.
+  */
+  it("prices a shelf in the reader's own conventions, and says Free rather than nothing", () => {
+    const shelf = (
+      <Shelf
+        current="free"
+        plans={[
+          { id: "free", name: "Free", said: "For a look", price: 0, currency: "EUR", order: 0, allows: {} },
+          { id: "solo", name: "Solo", said: "For one", price: 123456, currency: "EUR", order: 1, allows: {} },
+        ] as never}
+        entitlements={{}}
+        onChoose={() => {}}
+      />
+    );
+    const british = html(<Presenting machine={{ locale: "en-GB", zone: "UTC" }}>{shelf}</Presenting>);
+    expect(british).toContain("Free");
+    expect(british).toContain("1,234.56");
+
+    const german = html(<Presenting machine={{ locale: "de-DE", zone: "Europe/Berlin" }}>{shelf}</Presenting>);
+    expect(german).toContain("1.234,56");
+    expect(german).not.toContain("1,234.56");
   });
 
   it("shows every plan including the one somebody lands on by not choosing", () => {
@@ -1141,12 +1167,15 @@ describe("the storage meter", () => {
     const GB = 1024 * 1024 * 1024;
     const out = html(<Storage used={2 * GB} included={10 * GB} creditsPerGbMonth={20} />);
     expect(out).toContain("Within your plan");
-    expect(out).toContain("per GB");
+    /* ⚠️ GiB, NOT GB. The component divides by 2³⁰ and the label now says so —
+       calling that "GB" is the decimal unit, a seven percent overstatement in
+       the direction that makes a quota look further away than it is. */
+    expect(out).toContain("per GiB");
   });
 
   it("says how far over the included amount a workspace is", () => {
     const GB = 1024 * 1024 * 1024;
     const out = html(<Storage used={14 * GB} included={10 * GB} creditsPerGbMonth={20} />);
-    expect(out).toContain("4 GB over what your plan includes");
+    expect(out).toContain("4.0 GiB over what your plan includes");
   });
 });

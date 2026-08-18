@@ -19,6 +19,8 @@
 import { Mark } from "../frame/arrival.js";
 import { GLYPH_GAP } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
+import { sayNumber, type Shown } from "@engine/kernel";
+import { useShown } from "./said.js";
 
 export interface CreditsProps {
   readonly value: number;
@@ -48,13 +50,17 @@ const ROLE: Readonly<Record<NonNullable<CreditsProps["as"]>, string>> = {
  * ⚠️ GROUPED, ALWAYS. Four digits without a separator is the difference between
  * reading a balance and counting one, and credit figures run to five.
  */
-const grouped = (n: number, signed: boolean): string => {
-  const body = Math.abs(n).toLocaleString("en-US");
-  if (n < 0) return `−${body}`;
+const grouped = (shown: Shown, n: number, signed: boolean): string => {
+  /* ⚠️ THE READER'S SEPARATOR, NOT `"en-US"`. A German balance written
+     `12,500` is twelve and a half, and the reader has no way to know which of
+     the two the product meant. */
+  const body = sayNumber(shown, Math.abs(n));
+  if (n < 0) return `\u2212${body}`;
   return signed ? `+${body}` : body;
 };
 
 export function Credits({ value, as = "figure", signed = false, label }: CreditsProps) {
+  const shown = useShown();
   return (
     <span className={`inline-flex items-center ${GLYPH_GAP} ${ROLE[as]}`}>
       {/*
@@ -67,7 +73,7 @@ export function Credits({ value, as = "figure", signed = false, label }: Credits
       <span className="inline-flex items-center text-[0.85em] opacity-70">
         <Mark of="wallet" size="inline" label={label} />
       </span>
-      {grouped(value, signed)}
+      {grouped(shown, value, signed)}
     </span>
   );
 }

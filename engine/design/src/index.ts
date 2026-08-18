@@ -23,6 +23,7 @@ export * from "./parts/tally.js";
 export * from "./tokens/appearance.js";
 export * from "./tokens/motion.js";
 export * from "./tokens/type.js";
+export * from "./parts/said.js";
 export * from "./tokens/ground.js";
 export * from "./chart/index.js";
 export * from "./frame/page.js";

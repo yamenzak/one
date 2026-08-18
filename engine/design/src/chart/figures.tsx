@@ -17,7 +17,8 @@ import { PAD, SPACE } from "../tokens/metrics.js";
 import { ARRIVE, arriveAt } from "../tokens/motion.js";
 import { Tally } from "../parts/tally.js";
 import { Sparkline } from "./charts.js";
-import { type Point, compact, compactLike } from "./scale.js";
+import { type Point, compactLike } from "./scale.js";
+import { useFigures, useShown } from "../parts/said.js";
 
 /* ------------------------------------------------------------------ delta --- */
 
@@ -38,6 +39,7 @@ export function Delta({ value, of, upIsGood = true, unit = "" }: {
   readonly upIsGood?: boolean;
   readonly unit?: string;
 }) {
+  const say = useFigures();
   if (!value) return <span className={TYPE.note}>No change {of}</span>;
   const up = value > 0;
   const good = up === upIsGood;
@@ -48,7 +50,7 @@ export function Delta({ value, of, upIsGood = true, unit = "" }: {
       style={{ color: good ? "var(--success)" : "var(--danger)" }}
     >
       <span aria-hidden="true">{up ? "▲" : "▼"}</span>
-      {unit}{compact(Math.abs(value))}
+      {unit}{say.compact(Math.abs(value))}
       <span className="text-muted">{of}</span>
     </span>
   );
@@ -82,12 +84,13 @@ export function Stat({ label, value, unit = "", suffix = "", delta, trend, upIsG
   readonly trend?: readonly Point[];
   readonly upIsGood?: boolean;
 }) {
+  const say = useFigures();
   return (
     <div className={`flex flex-col ${SPACE.tight}`}>
       <span className={TYPE.note}>{label}</span>
       <span className={`flex items-baseline ${SPACE.tight}`}>
         <span className={TYPE.figure} style={{ fontVariantNumeric: "proportional-nums" }}>
-          {unit}{typeof value === "number" ? compact(value) : value}{suffix}
+          {unit}{typeof value === "number" ? say.compact(value) : value}{suffix}
         </span>
         {delta ? <Delta value={delta.value} of={delta.of} upIsGood={upIsGood} unit={unit} /> : null}
       </span>
@@ -137,13 +140,14 @@ export function Hero({ eyebrow, value, unit = "", suffix = "", delta, upIsGood =
    */
   readonly count?: boolean;
 }) {
+  const shown = useShown();
   return (
     <div className={`flex flex-col items-center ${SPACE.tight} text-center`}>
       {eyebrow ? <span className={TYPE.note}>{eyebrow}</span> : null}
       <span className={TYPE.display}>
         {unit}
         {typeof value === "number"
-          ? <Tally value={value} format={compactLike(value)} count={count} />
+          ? <Tally value={value} format={compactLike(shown, value)} count={count} />
           : value}
         {suffix}
       </span>
@@ -180,6 +184,7 @@ export function Meter({ label, value, limit, unit = "", suffix = "" }: {
    */
   readonly suffix?: string;
 }) {
+  const say = useFigures();
   const share = limit > 0 ? Math.max(0, Math.min(1, value / limit)) : 0;
   /* ⚠️ `data`, NOT `accent` — a meter fill MEASURES, and the accent is
      monochrome now. See `DATA` in `palette.ts`. */
@@ -189,7 +194,7 @@ export function Meter({ label, value, limit, unit = "", suffix = "" }: {
       <span className={`flex items-baseline justify-between ${SPACE.tight}`}>
         <span className={TYPE.label}>{label}</span>
         <span className={`${TYPE.note} tabular-nums`}>
-          {unit}{compact(value)}{suffix} of {unit}{compact(limit)}{suffix}
+          {unit}{say.compact(value)}{suffix} of {unit}{say.compact(limit)}{suffix}
         </span>
       </span>
       <span

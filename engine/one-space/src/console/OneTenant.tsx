@@ -18,10 +18,10 @@ import { useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import {
   AmountRow, ControlRow, Credits, Group, Identity, NumberInput, Row, RowsWaiting, Screen,
-  Stack, TYPE, TextInput, Tray, appFace, glyphOf, notice, placeFace, sentence,
+  Stack, TYPE, TextInput, Tray, appFace, glyphOf, notice, placeFace, sentence, useShown,
 } from "@engine/design";
 import type { Allowance, EntitlementDef, PlanSpec } from "@engine/kernel";
-import { isBusiness } from "@engine/kernel";
+import { isBusiness, sayDate, sayNumber, type Instant } from "@engine/kernel";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
 
@@ -289,6 +289,7 @@ function AdjustTray({ tenant, apps, onDone }: {
  * for a screen that shows none of them.
  */
 function Money({ tenant }: { readonly tenant: TenantLine }) {
+  const reader = useShown();
   const of = useLoad<MoneyLine>("op.tenant.money", { tenant: tenant.id });
 
   if (of.of.status !== "ready") {
@@ -326,7 +327,7 @@ function Money({ tenant }: { readonly tenant: TenantLine }) {
           label="Granted every month"
           under={allowance.monthly === allowance.plan
             ? "What their plan includes"
-            : `Set for this workspace — their plan gives ${allowance.plan.toLocaleString("en-US")}`}
+            : `Set for this workspace — their plan gives ${sayNumber(reader, allowance.plan)}`}
           amount={<Credits value={allowance.monthly} as="inline" />}
         />
         {wallet.owedMilli > 0 ? (
@@ -361,7 +362,7 @@ function Money({ tenant }: { readonly tenant: TenantLine }) {
             <AmountRow
               key={`${m.at}-${i}`}
               label={m.reason}
-              under={new Date(m.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              under={sayDate(reader, m.at as Instant)}
               amount={<Credits value={m.delta} as="inline" signed />}
             />
           ))}
@@ -445,6 +446,7 @@ function PlanTray({ tenant, plans, onDone }: {
   readonly plans: readonly PlanSpec[];
   readonly onDone: () => void;
 }) {
+  const reader = useShown();
   const [pick, setPick] = useState(tenant.planId ?? "");
 
   const give = async () => {
@@ -475,7 +477,7 @@ function PlanTray({ tenant, plans, onDone }: {
               label={plan.name}
               under={plan.parking
                 ? "The lobby — this is how a comp ends"
-                : `${plan.credits.toLocaleString("en-US")} credits a month`}
+                : `${sayNumber(reader, plan.credits)} credits a month`}
               amount={plan.id === pick ? "giving this" : "—"}
               aside={plan.id === pick
                 ? undefined

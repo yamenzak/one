@@ -18,6 +18,8 @@
  * they apply to a card.
  */
 
+import { sayNumber, type Shown } from "@engine/kernel";
+
 /** A closed numeric range. */
 export interface Span { readonly min: number; readonly max: number }
 
@@ -308,16 +310,18 @@ export function stackSpan(rows: readonly (readonly number[])[]): Span {
  * that as a glitch rather than as a scale. Given the value it is heading for,
  * every step is written the way the destination will be.
  */
-export const compactLike = (destination: number) => (v: number): string => {
+export const compactLike = (shown: Shown, destination: number) => (v: number): string => {
   const scale = Math.abs(destination);
-  if (scale < 1e4) return compact(v);
+  if (scale < 1e4) return compact(shown, v);
   const [at, suffix] = scale >= 1e9 ? [1e9, "B"] : scale >= 1e6 ? [1e6, "M"] : [1e3, "K"] as const;
   const n = v / at;
-  const shown = Math.abs(n) < 100 ? n.toFixed(1).replace(/\.0$/, "") : String(Math.round(n));
-  return `${shown}${suffix}`;
+  /* ⚠️ Not `shown` — that is the reader now, and shadowing it here is what
+     made the fallback above compact against a locale rather than a number. */
+  const said = Math.abs(n) < 100 ? n.toFixed(1).replace(/\.0$/, "") : String(Math.round(n));
+  return `${said}${suffix}`;
 };
 
-export function compact(v: number): string {
+export function compact(shown: Shown, v: number): string {
   const abs = Math.abs(v);
   /*
     ⚠️ FOUR FIGURES ARE GROUPED, NOT COMPACTED. `1,284` is a number somebody
@@ -325,7 +329,10 @@ export function compact(v: number): string {
     saved — they are the same width. Compacting starts where grouping stops
     helping, which is five figures.
   */
-  if (abs < 1e4) return Number.isInteger(v) ? v.toLocaleString() : v.toFixed(1);
+  /* ⚠️ THE READER'S SEPARATOR, NOT THE BROWSER'S — see `present.ts`. An axis
+     reading `1,284` to somebody who writes `1.284` is off by three orders of
+     magnitude, and an axis is exactly where nobody checks. */
+  if (abs < 1e4) return sayNumber(shown, v, Number.isInteger(v) ? undefined : 1);
 
   const unit = [[1e9, "B"], [1e6, "M"], [1e3, "K"]] as const;
   for (const [at, suffix] of unit) {
@@ -342,4 +349,4 @@ export function compact(v: number): string {
 }
 
 /** Thousands-separated, for an axis tick or a table cell. */
-export const grouped = (v: number): string => v.toLocaleString();
+export const grouped = (shown: Shown, v: number): string => sayNumber(shown, v);

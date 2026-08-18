@@ -29,9 +29,9 @@ import {
   AXIS, DATA, GRID, QUIET, SEPARATOR, assign, emphasis, magnitude, polarity, pole, seriesColour,
 } from "./palette.js";
 import {
-  type Point, type Span, areaPath, band, barPath, barPathX, compact, extent, grouped,
-  linePath, norm, place, stack, stackSpan, ticks,
+  type Point, type Span, areaPath, band, barPath, barPathX, extent, linePath, norm, place, stack, stackSpan, ticks,
 } from "./scale.js";
+import { useFigures } from "../parts/said.js";
 
 /* ------------------------------------------------------------------ frame --- */
 
@@ -75,6 +75,7 @@ interface FrameProps {
  * sentence the only reader who ever hears it.
  */
 function Frame({ describes, y, rules = true, children, under }: FrameProps) {
+  const say = useFigures();
   return (
     <figure className={`flex w-full flex-col ${SPACE.tight}`}>
       {/*
@@ -109,7 +110,7 @@ function Frame({ describes, y, rules = true, children, under }: FrameProps) {
                     className={TYPE.note} fill="currentColor"
                     style={{ fontSize: 8 }}
                   >
-                    {compact(t)}
+                    {say.compact(t)}
                   </text>
                 </g>
               );
@@ -330,6 +331,7 @@ export function BarChart({ describes, data, subject }: {
   readonly data: readonly Datum[];
   readonly subject?: number;
 }) {
+  const say = useFigures();
   const x = extent(data.map((d) => d.value));
   const { step, thick, offset } = band(H, data.length, 20);
   const rows = data.length * step;
@@ -362,7 +364,7 @@ export function BarChart({ describes, data, subject }: {
                 x={80 + Math.max(1, w) + 6} y={i * step + step / 2 + 3}
                 className={TYPE.note} fill="currentColor" style={{ fontSize: 9 }}
               >
-                {compact(d.value)}
+                {say.compact(d.value)}
               </text>
             </g>
           );
@@ -661,6 +663,7 @@ export function ChartTable({ columns, rows }: {
   readonly columns: readonly string[];
   readonly rows: readonly (readonly (string | number)[])[];
 }) {
+  const say = useFigures();
   return (
     <table className={`w-full ${TYPE.note}`}>
       <thead>
@@ -674,7 +677,7 @@ export function ChartTable({ columns, rows }: {
                  has to align; a large standalone figure set in tabular figures
                  looks loose, because every digit takes a zero's width. */
               <td key={ci} className={ci ? "text-right tabular-nums" : "text-left"}>
-                {typeof cell === "number" ? grouped(cell) : cell}
+                {typeof cell === "number" ? say.grouped(cell) : cell}
               </td>
             ))}
           </tr>

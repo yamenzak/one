@@ -1,14 +1,15 @@
+import * as React from "react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import {
   ARRIVE_MOTION, CHART_MOTION, DOOR_MOTION, FACE_CSS, GROUND_CSS, SKY_MOTION, ambienceStylesheet,
   brandCss,
-  applyAppearance,
+  applyAppearance, Presenting,
 } from "@engine/design";
 import "./styles.css";
 import { App } from "./App.js";
 import { Reading } from "./legal.js";
-import { SessionProvider } from "./session.js";
+import { SessionProvider, useSession } from "./session.js";
 
 /**
  * ⚠️ THE SKY IS ONE STYLE ELEMENT, BUILT FROM THE SHARED TOKENS. Every rule
@@ -65,6 +66,17 @@ sky.textContent = [
 ].join("\n");
 document.head.append(sky);
 
+/**
+ * ⚠️ THE ONE PLACE THE PERSON'S CONVENTIONS ENTER THE TREE. It is a component
+ * rather than a prop on `SessionProvider` because it has to READ that provider:
+ * the preferences arrive on `me.who`, and a value passed in beside the session
+ * would be one render behind it forever.
+ */
+function AsThey({ children }: { readonly children: React.ReactNode }) {
+  const { me } = useSession();
+  return <Presenting of={me && me !== "nobody" ? me.presentation : undefined}>{children}</Presenting>;
+}
+
 const root = document.getElementById("root");
 /* ⚠️ A missing mount point is a build that shipped wrong, not a runtime
    condition to degrade around — say so where somebody will see it. */
@@ -73,12 +85,18 @@ if (!root) throw new Error("no #root to mount OneSpace into");
 createRoot(root).render(
   <StrictMode>
     <SessionProvider>
-      {/* ⚠️ ABOVE EVERY DOOR AND EVERY SCREEN, so the terms can be read from the
-          sign-in screen without costing somebody the sign-in screen — see
-          `legal.tsx`. It reads nothing until something asks it to open. */}
-      <Reading>
-        <App />
-      </Reading>
+      {/* ⚠️ INSIDE THE SESSION AND ABOVE EVERYTHING ELSE. Every date, time,
+          number and price below it is written in the conventions this person
+          chose; before they have signed in there is nobody to have chosen, and
+          the browser's own are exactly right. */}
+      <AsThey>
+        {/* ⚠️ ABOVE EVERY DOOR AND EVERY SCREEN, so the terms can be read from
+            the sign-in screen without costing somebody the sign-in screen — see
+            `legal.tsx`. It reads nothing until something asks it to open. */}
+        <Reading>
+          <App />
+        </Reading>
+      </AsThey>
     </SessionProvider>
   </StrictMode>,
 );

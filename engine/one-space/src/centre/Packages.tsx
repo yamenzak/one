@@ -16,7 +16,7 @@ import { useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import {
   Agree, AmountRow, Await, Choice, Confirm, Group, MoneyInput, NumberInput, Picks, RowsWaiting,
-  Nothing, Screen, Stack, TextInput, Tray, glyphOf, notice, money as saidMoney,
+  Nothing, Screen, Stack, TextInput, Tray, glyphOf, notice, useMoney,
 } from "@engine/design";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView, type PackageLine } from "./data.js";
@@ -64,6 +64,7 @@ export function Packages({ view }: { readonly view: CentreView }) {
 }
 
 function AppPackages({ app, among }: { readonly app: CentreApp; readonly among: number }) {
+  const price = useMoney();
   const sold = useLoad<{ items: readonly PackageLine[] }>("package.list", { app: app.id });
 
   return (
@@ -92,7 +93,7 @@ function AppPackages({ app, among }: { readonly app: CentreApp; readonly among: 
                   key={p.id}
                   label={p.name}
                   under={`Every ${p.periodDays} days`}
-                  amount={saidMoney(p.priceCents, p.currency)}
+                  amount={price(p.priceCents, p.currency)}
                   aside={<ArchiveButton app={app} pkg={p} onDone={sold.again} />}
                 />
               ))}

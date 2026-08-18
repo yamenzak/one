@@ -143,6 +143,7 @@ they are in, leaving one, taking a copy, deleting themselves.
 | `me.leave` | write | session | *every door* |
 | `me.export` | read | session | *every door* |
 | `me.forget` | write | session + recent proof | *every door* |
+| `me.presentation` | write | session | *every door* |
 | `me.token.create` | write | session | `account` |
 | `me.token.list` | read | session | `account` |
 | `me.token.revoke` | write | session | `account` |
@@ -351,6 +352,7 @@ and a manifest that does not compose refuses to boot.
 | Module | What it is for | Ships | Waiting |
 |---|---|---|---|
 | `primitives` | ids, days, instants, slugs — the words everything else is spelled in | 10 | — |
+| `present` | how a date, a number, a price and a measurement are written for one reader | 17 | — |
 | `infra` | what a product needs underneath it, and what each kind can promise | 10 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 8 | — |
 | `collection` | what a thing an app keeps is — and the six operations it gets for free | 13 | — |
@@ -379,7 +381,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**220 of them**, 213 reached by something today.
+**237 of them**, 230 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -396,7 +398,7 @@ env or a binding.
 |---|---|---|---|
 | `schema` | the composed schema runner — declarations become tables | 7 | — |
 | `sql` | the one typed seam onto D1 | 4 | — |
-| `directory` | accounts, workspaces, placement, enablement, allowances | 25 | — |
+| `directory` | accounts, workspaces, placement, enablement, allowances | 29 | — |
 | `handles` | which binding holds which shard | 3 | — |
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
 | `identity` | sign-in codes, sessions, tokens, proof | 21 | — |
@@ -443,7 +445,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**317 of them**, 315 reached by something today.
+**321 of them**, 319 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -508,6 +510,7 @@ its own header, cited by other files, and doing nothing.
 | `unreachable` | `operation` | composition |
 | `unrecordedWrites` | `operation` | composition |
 | `refusePackage` | `package` | runtime |
+| `refusePresentation` | `present` | runtime |
 | `unknownProblems` | `problem` | composition |
 | `refuseSetting` | `setting` | composition |
 | `refuseSettings` | `setting` | composition |

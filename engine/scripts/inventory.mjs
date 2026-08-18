@@ -158,6 +158,7 @@ if (what === "guards") {
    */
   const KERNEL = [
     ["primitives", "ids, days, instants, slugs — the words everything else is spelled in"],
+    ["present", "how a date, a number, a price and a measurement are written for one reader"],
     ["infra", "what a product needs underneath it, and what each kind can promise"],
     ["field", "what a value is: its kind, its bounds, what it holds, whether it is the app's to keep"],
     ["collection", "what a thing an app keeps is — and the six operations it gets for free"],

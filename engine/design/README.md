@@ -167,11 +167,11 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 56 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | internal |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 52 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 122 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 135 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 51 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**320 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**333 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -207,6 +207,7 @@ there is no deep import, and a guard says so.
 - `parts/logo.tsx` — `Lockup`, `LockupProps`
 - `parts/permission.tsx` — `Permission`, `PermissionRow`, `PermissionRowProps`
 - `parts/pick-file.tsx` — `PickFile`, `PickFileProps`
+- `parts/said.tsx` — `Amount`, `Clock`, `Dated`, `machineHere`, `Num`, `Presenting`, `Size`, `useAmount`, `useDay`, `useDays`, `useFigures`, `useShown`, `When`
 - `parts/state.tsx` — `Await`, `AwaitProps`, `ChartWaiting`, `FigureWaiting`, `FormWaiting`, `Loaded`, `Nothing`, `nothingIn`, `ready`, `RowsWaiting`, `TableWaiting`, `TextWaiting`, `TilesWaiting`, `trouble`, `Trouble`, `waiting`, `Working`
 - `parts/surfaces.tsx` — `ActionRow`, `AmountRow`, `BrandTile`, `ControlRow`, `CopyRow`, `FieldRow`, `Group`, `GroupProps`, `Identity`, `Money`, `NavRow`, `NavRowProps`, `NoteRow`, `OfferRow`, `PersonRow`, `Place`, `QuickActions`, `SeeAll`, `Sheet`, `StepRow`, `Swatch`, `TileGrid`, `ToggleRow`
 - `parts/tally.tsx` — `Tally`, `TallyProps`
@@ -214,7 +215,7 @@ there is no deep import, and a guard says so.
 ### `rendered/`
 
 - `rendered/ai.tsx` — `AiLanes`, `LanesProps`
-- `rendered/console.tsx` — `FlagConsole`, `FlagConsoleProps`, `money`, `saying`, `Shelf`, `ShelfProps`
+- `rendered/console.tsx` — `FlagConsole`, `FlagConsoleProps`, `saying`, `Shelf`, `ShelfProps`, `useMoney`
 - `rendered/edit.tsx` — `Edit`, `EditProps`, `EditRow`, `Refusal`, `refuse`, `Shown`
 - `rendered/field.tsx` — `Field`, `FieldProps`
 - `rendered/guide.tsx` — `Guide`, `GuideProps`, `Help`, `HelpProps`, `Milestones`, `MilestonesProps`

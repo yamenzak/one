@@ -32,6 +32,7 @@ import {
   RangeCalendar, Select, Slider, Tag, TagGroup, TextArea, TextField, TimeField, ToggleButton,
   ToggleButtonGroup,
 } from "@heroui/react";
+import { dayOf, instant } from "@engine/kernel";
 import { CODE_SLOT, SPACE } from "../tokens/metrics.js";
 
 /* ⚠️ The code box's height, beside the control that sets it. */
@@ -659,7 +660,11 @@ export const PERIODS = [
 
 export type PeriodId = (typeof PERIODS)[number]["id"] | "custom";
 
-const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+/* ⚠️ `dayOf`, NOT A SLICE. These are day KEYS being shifted by whole days, which
+   is the one place the UTC date is the right answer — and saying so with the
+   kernel's own function is what distinguishes it from the six screens that cut a
+   person's timestamp the same way and named the wrong day. */
+const iso = (ms: number) => dayOf(instant(new Date(ms)));
 const DAY = 86_400_000;
 
 /**

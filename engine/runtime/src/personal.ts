@@ -26,7 +26,9 @@ import {
 } from "@engine/kernel";
 import {
   appsOfTenant, becomeCommercial, closeTenant, createTenant, forgetInvitation, invitationsFor,
-  liveAppsOfTenant, noteBelonging, tenantBySlug, tenantsOf, upsertAccount, type TenantRow,
+  liveAppsOfTenant, noteBelonging, presentationFrom, presentationOf, setPresentation,
+  tenantBySlug, tenantsOf,
+  upsertAccount, type TenantRow,
 } from "./directory.js";
 import { subscribeDevice, unsubscribeDevice, vapidOf } from "./push.js";
 import { dossierOf, forgetPerson, forgetWorkspace, type Place } from "./dossier.js";
@@ -554,6 +556,14 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
           /* ⚠️ An account fact, not a workspace one — an operator stands
              outside every workspace, so no roster could answer it. */
           operator: deps.isOperator?.(ctx.email) === true,
+          /*
+            ⚠️ CARRIED BY THE READ EVERY DOOR ALREADY MAKES, because the first
+            paint has dates on it. Fetched separately it would arrive after the
+            screen, and every timestamp in the product would be drawn once in
+            the browser's convention and then rewritten in theirs — a flicker on
+            every list, on every load, for everybody who set a preference.
+          */
+          presentation: await presentationOf(ctx.directory, accountId),
           tenants: belongs,
           /*
             ⚠️ WHAT THEY STILL OWE AN AGREEMENT TO, CARRIED BY THE ONE READ EVERY
@@ -808,6 +818,30 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
       dead in ninety days unless re-minted; revocable this instant because it is
       a row (see `identity.ts`).
     */
+    /* -------------------------------------------------- how you read it --- */
+
+    /**
+     * ⚠️ ONE WRITE FOR THE WHOLE OBJECT, NOT A FIELD AT A TIME. The six choices
+     * are read together on every render — a locale is composed from the language
+     * AND the region — so saving them one at a time would leave the account in
+     * combinations nobody chose for the length of a round trip each.
+     *
+     * ⚠️ AND IT IS `account`-DOORED LIKE THE REST OF `me.*`, ON PURPOSE: this
+     * follows the person, so there is no workspace whose door should own it.
+     */
+    "me.presentation": {
+      kind: "write", needs: "session",
+      async run(ctx, input): Promise<unknown> {
+        const want = presentationFrom(input.presentation);
+        const no = await setPresentation(ctx.directory, ctx.session!.accountId, want);
+        /* ⚠️ THE REFUSAL IS NAMED, because the three are three different fixes:
+           a language tag, a country code and a zone are not interchangeable and
+           "invalid" would send somebody to check all three. */
+        if (no.length) return ctx.fail("platform.invalid", { field: no[0]! });
+        return { presentation: want };
+      },
+    },
+
     "me.token.create": {
       kind: "write", needs: "session", doors: ["account"],
       async run(ctx, input): Promise<unknown> {

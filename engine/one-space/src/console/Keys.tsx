@@ -18,10 +18,11 @@
  */
 
 import { useState } from "react";
+import { sayDate, type Instant } from "@engine/kernel";
 import { Button } from "@heroui/react";
 import {
   ControlRow, Group, NoteRow, RowsWaiting, Screen, Stack, TextInput, Tray,
-  notice, sentence,
+  notice, sentence, useShown,
 } from "@engine/design";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
@@ -58,6 +59,7 @@ const stateOf = (it: Credential): string => {
 };
 
 export function Keys() {
+  const reader = useShown();
   const of = useLoad<Answer>("op.config");
 
   return (
@@ -101,7 +103,7 @@ export function Keys() {
                   <ControlRow
                     key={p.id}
                     label={p.kind}
-                    under={`${p.id} · ${p.at.slice(0, 10)} · ${p.why}`}
+                    under={`${p.id} · ${sayDate(reader, p.at as Instant)} · ${p.why}`}
                   >
                     <span />
                   </ControlRow>
