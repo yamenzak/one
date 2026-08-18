@@ -226,6 +226,15 @@ export function emailSql(id) {
 /** Every app directory that looks deployable — used to catch an unregistered one. */
 export function discoverWorkerDirs() {
   const out = [];
+  /*
+    ⚠️ `apps/` IS THE ONLY TREE THIS REGISTRY GOVERNS, AND THE OTHER WORKER IS
+    COVERED SOMEWHERE ELSE ON PURPOSE. A `wrangler.jsonc` outside `apps/` is
+    invisible here, which for `engine/` is the design rather than a hole: One
+    must never be selectable by `deploy.yml`, and `engine/scripts/inert.test.mjs`
+    fails if it is ever registered or if its worker or database names collide
+    with a live one. Two guards asking opposite questions of the same file, each
+    where it belongs — widening this walk would put them in contradiction.
+  */
   for (const name of readdirSync(join(ROOT, "apps"))) {
     const dir = join("apps", name);
     if (existsSync(join(ROOT, dir, "wrangler.jsonc"))) out.push(dir);

@@ -1,0 +1,20 @@
+# Copy to `.dev.vars` before your first `pnpm engine:dev`. Wrangler reads this in
+# preference to `wrangler.jsonc`'s `vars`, which is the DEPLOYED config.
+#
+# ⚠️ `.dev.vars` is gitignored. Nothing in it is a secret worth having, and that
+# is the point: none of these values may ever be the ones a deployment uses.
+
+# The doors are subdomains of this. Browsers resolve `*.localhost` to loopback
+# and wrangler preserves the Host, so `setup.localhost:8080` IS the setup door.
+ROOT=localhost
+
+# ⚠️ What unlocks the development lane: the sign-in code goes to the terminal
+# instead of an inbox. In a deployed config this would put codes in retained
+# logs — see the header of wrangler.jsonc.
+ENVIRONMENT=development
+
+# ⚠️ Signs the sign-in codes. Any string will do here; in production it is a
+# WORKER SECRET set once (`wrangler secret put AUTH_SECRET`), never a var, and
+# never this value — a deployment signing codes with a string from a public
+# repository is one where anybody can mint one.
+AUTH_SECRET=dev-only-not-a-secret

@@ -1,0 +1,23 @@
+{
+  "name": "@engine/runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The ONLY code that touches a binding. The directory, the shards, the derived schema, the routing and the dispatch. See engine/docs/BUILDING.md §1.4.",
+  "exports": { ".": "./src/index.ts" },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@engine/kernel": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.8.55",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

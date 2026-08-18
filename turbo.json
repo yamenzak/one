@@ -25,6 +25,22 @@
     // reason it was worth doing now — CACHEABLE: the SPA build lands in turbo's
     // cache with everything else instead of being a 24-second `pnpm --filter`
     // outside the graph on every run.
+    // The same edge, on the framework's own deployment. `@engine/worker` serves
+    // `engine/one-space/dist`; without the build its suite boots Miniflare against
+    // a missing directory and aborts reporting "no tests", which reads as a
+    // pass. Nothing in the dependency graph connects them — an
+    // `assets.directory` is a filesystem path.
+    //
+    // ⚠️ THIS NAMED `@one/one` AND `@one/one-space` FOR AS LONG AS THE PACKAGES
+    // HAVE BEEN `@engine/*`. Turbo ignores a task key for a package it does not
+    // have, silently, so the edge this paragraph argues for did not exist — and
+    // it stayed invisible because a `dist` from an earlier build was always
+    // lying around. The suite was running against whatever SPA was last built,
+    // which on a stale checkout is a different product than the one under test.
+    "@engine/worker#test": {
+      "dependsOn": ["^build", "@engine/space#build"],
+      "outputs": ["coverage/**"]
+    },
     "@kova/api#test": {
       "dependsOn": ["^build", "@kova/app#build"],
       "outputs": ["coverage/**"]

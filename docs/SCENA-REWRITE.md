@@ -1,3 +1,7 @@
+---
+kind: plan
+---
+
 # Bringing Scena onto the platform
 
 A rewrite plan. Written after reading Scena at `0cff6c6` (45,556 lines of

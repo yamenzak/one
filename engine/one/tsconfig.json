@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    /* ⚠️ Both: the worker's own source needs the runtime's types (D1Database and
+       friends), and the suite needs the pool's. Only one of them was here, and
+       the missing half fails as "Cannot find name D1Database" in a file that is
+       obviously about D1. */
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers"],
+    "lib": ["ES2023", "DOM"],
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false
+  },
+  "include": ["src/**/*", "test/**/*"]
+}

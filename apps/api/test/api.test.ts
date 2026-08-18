@@ -313,16 +313,16 @@ describe("auth — sign-out revokes the session", () => {
 });
 
 describe("notifications — email provider + per-user preferences", () => {
-  it("owner sets Brevo (key masked) and tunes notification channels", async () => {
+  it("owner turns email off and tunes notification channels", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    // Configure Brevo as the tenant email provider.
-    const patch = await SELF.fetch(`${ORIGIN}/api/settings`, { method: "PATCH", headers: H, body: JSON.stringify({ email: { provider: "brevo", brevoApiKey: "xkeysib-secret", senderEmail: "coach@studio.com", senderName: "Studio" } }) });
+    // ⚠️ TWO LANES NOW. Bringing your own provider was a second processor, a
+    // second set of terms and one no sub-processor list disclosed.
+    const patch = await SELF.fetch(`${ORIGIN}/api/settings`, { method: "PATCH", headers: H, body: JSON.stringify({ email: { provider: "off", senderName: "Studio" } }) });
     expect(patch.status).toBe(200);
-    const settings = (await (await SELF.fetch(`${ORIGIN}/api/settings`, { headers: auth(ownerCookie) })).json()) as { email: { provider: string; brevoKeySet: boolean; ready: boolean; senderEmail: string }; emailPlatformFrom: string };
-    expect(settings.email.provider).toBe("brevo");
-    expect(settings.email.brevoKeySet).toBe(true); // masked — the key itself never returns
-    expect(settings.email.ready).toBe(true);
-    expect(settings.email.senderEmail).toBe("coach@studio.com");
+    const settings = (await (await SELF.fetch(`${ORIGIN}/api/settings`, { headers: auth(ownerCookie) })).json()) as { email: { provider: string; ready: boolean; senderEmail: string }; emailPlatformFrom: string };
+    expect(settings.email.provider).toBe("off");
+    /* ⚠️ `off` sends nothing, and says so rather than reporting success. */
+    expect(settings.email.ready).toBe(false);
     // The platform sender, which three call sites used to inline separately.
     // Asserted against the exported constant so a future change moves in one
     // place instead of leaving `GET /admin/email` and the actual send disagreeing.
@@ -4424,7 +4424,7 @@ describe("a nuclear reset keeps platform configuration", () => {
       ["stripe.mode", "test"],
       ["google.gemini_key", "gemini_sentinel"],
       ["ai.markup", "4"],
-      ["email.provider", "brevo"],
+      ["email.provider", "platform"],
     ];
     for (const [k, v] of secrets) {
       await db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v).run();
@@ -4498,7 +4498,7 @@ describe("email on the Kova lane is metered and priced visibly", () => {
  * An invite that was never emailed must say so.
  *
  * The coach's whole mental model is "I added them, they'll get an email". When
- * the send fails — email switched off, out of credits, an unconfigured Brevo
+ * the send fails — email switched off, out of credits, an unconfigured platform
  * account, or a FRESH DEPLOY that cannot send at all until the platform sender is
  * configured — the client is simply never contacted and nobody finds out. The
  * response already carries a working invite link and QR token, so the recovery is

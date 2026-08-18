@@ -1,0 +1,123 @@
+/**
+ * A SWITCH THAT IS OURS.
+ *
+ * ⚠️ A FLAG IS OUR DECISION AND AN ENTITLEMENT IS THEIR PURCHASE, and the whole
+ * reason both exist is that they refuse differently. A customer told to upgrade
+ * for something we have turned off has been sold something that does not exist —
+ * so an unset flag answers "no such thing" and never "pay us".
+ *
+ * ⚠️ THE DEPLOYMENT'S `off` IS ABSORBING. A flag exists so a thing can be turned
+ * off in a hurry — during an incident, on legal advice, because it is costing
+ * money — and a switch a tenant can override is not that switch. Every other
+ * level may only narrow what the level above allows.
+ *
+ * ⚠️ AND A FLAG IS TEMPORARY BY CONSTRUCTION. One with no retirement date is a
+ * permanent branch in the code that nobody will ever delete, because deleting it
+ * means finding out who is relying on it. `retire` is required while it is being
+ * tried, and a flag past its date is reported rather than enforced — taking a
+ * capability away on a date somebody typed a year ago is not a kindness.
+ *
+ * Layer 2. Imports primitives.
+ */
+
+import type { Day } from "./primitives.js";
+
+/* ------------------------------------------------------------------ shape --- */
+
+/**
+ *   building  ours only. Nobody outside the deployment sees it.
+ *   trying    on for some, off for others. This is the state that needs a date.
+ *   on        it is the product now. The flag is waiting to be deleted.
+ */
+export type Stage = "building" | "trying" | "on";
+
+/** The lowest authority that may set it. Everything above may always set it. */
+export type SetBy = "operator" | "tenant" | "person";
+
+export interface FlagDef {
+  readonly id: string;
+  readonly label: string;
+  /** ⚠️ What it is FOR, in a sentence. A flag whose purpose is lost is a flag
+      nobody dares remove, which is how a codebase acquires permanent branches. */
+  readonly why: string;
+  readonly stage: Stage;
+  readonly fallback: boolean;
+  readonly setBy: SetBy;
+  /** ⚠️ Required while `trying`. See the header. */
+  readonly retire?: Day;
+}
+
+export type FlagBook = Readonly<Record<string, FlagDef>>;
+
+export const flag = (def: FlagDef): FlagDef => def;
+
+/* ---------------------------------------------------------------- resolve --- */
+
+export interface Switches {
+  readonly deployment?: boolean;
+  readonly tenant?: boolean;
+  readonly person?: boolean;
+}
+
+/**
+ * Whether a flag is on, for this request.
+ *
+ * ⚠️ ONE WALK, AND `false` AT A HIGHER LEVEL WINS. Anything else makes the kill
+ * switch advisory — and a kill switch that a tenant setting can beat is one that
+ * does not work on the day it is needed, which is the only day it is used.
+ */
+export function resolve(def: FlagDef, switches: Switches = {}): boolean {
+  let on = def.fallback;
+  if (switches.deployment !== undefined) on = switches.deployment;
+  if (switches.deployment === false) return false;
+
+  if (switches.tenant !== undefined && def.setBy !== "operator") on = switches.tenant;
+  if (switches.tenant === false && def.setBy !== "operator") return false;
+
+  if (switches.person !== undefined && def.setBy === "person") on = switches.person;
+  return on;
+}
+
+/** ⚠️ What a screen shows beside the switch: who can still change it from here. */
+export const settableBy = (def: FlagDef, switches: Switches = {}): readonly SetBy[] => {
+  if (switches.deployment === false) return ["operator"];
+  if (def.setBy === "operator") return ["operator"];
+  if (switches.tenant === false) return ["operator", "tenant"];
+  if (def.setBy === "tenant") return ["operator", "tenant"];
+  return ["operator", "tenant", "person"];
+};
+
+/* ------------------------------------------------------------------ rules --- */
+
+export type FlagRefusal = "trying_without_a_date" | "no_reason" | "shipped_with_a_date";
+
+export interface FlagProblem { readonly flag: string; readonly why: FlagRefusal; readonly detail: string }
+
+export function refuseFlag(def: FlagDef): readonly FlagProblem[] {
+  const out: FlagProblem[] = [];
+  const at = (why: FlagRefusal, detail: string) => out.push({ flag: def.id, why, detail });
+
+  if (!def.why.trim()) at("no_reason", "no reason given, so nobody will ever dare delete it");
+  if (def.stage === "trying" && !def.retire) {
+    at("trying_without_a_date", "being tried with no date to stop trying");
+  }
+  if (def.stage === "on" && def.retire) {
+    at("shipped_with_a_date", "it is the product now — the flag is what should go, not the date");
+  }
+  return out;
+}
+
+export const refuseFlags = (book: FlagBook): readonly FlagProblem[] =>
+  Object.values(book).flatMap(refuseFlag);
+
+/**
+ * ⚠️ REPORTED, NEVER ENFORCED. A flag whose date has passed is a conversation
+ * for the console — withholding a capability because of a date typed a year ago
+ * is an outage nobody asked for.
+ */
+export const overdue = (book: FlagBook, today: Day): readonly string[] =>
+  Object.values(book).filter((f) => f.retire && f.retire < today).map((f) => f.id);
+
+/** ⚠️ A flag nothing reads is a switch that does nothing (see `setting.unread`). */
+export const unreadFlags = (book: FlagBook, named: readonly string[]): readonly string[] =>
+  Object.keys(book).filter((id) => !named.includes(id));

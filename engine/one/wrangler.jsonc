@@ -1,0 +1,97 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "one",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-07-12",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // ⚠️ NO `routes` HERE, DELIBERATELY. Declaring them makes `wrangler dev`
+  // rewrite the incoming Host to the route's hostname, which collapses every
+  // door onto one — and the doors ARE the tenancy (see `kernel/door.ts`), so a
+  // collapsed Host is a development environment where none of this works and
+  // nothing says why. The production routes are a dashboard step.
+
+  // ⚠️ THIS BLOCK IS THE DEPLOYED CONFIG. Local overrides go in `.dev.vars`
+  // (copy `.dev.vars.example`), which wrangler reads in preference to this — so
+  // a value here is what a real request sees, and nothing else.
+  "vars": {
+    // ⚠️ `ROOT` IS WHAT `doorFor` MEASURES EVERY HOSTNAME AGAINST, so a wrong
+    // one is not a misconfiguration — it is a deployment where every door is
+    // `none` and every request 404s. It read `localhost` here for exactly as
+    // long as this file was never deployed.
+    //
+    // ⚠️ AND IT IS DELIBERATELY NOT `4dl.app`. Kova's production routes are
+    // `kova.4dl.app/*` and `*.kova.4dl.app/*`; putting One at the apex would
+    // make `*.4dl.app/*` One's, and One's wildcard would then match a live
+    // tenant's address. One label of its own keeps the two disjoint, which is
+    // the whole isolation while Kova has not migrated.
+    //
+    // `t` for tenant: every door is one label under it, so a workspace is
+    // `<slug>.t.4dl.app` — shorter to say, shorter to type, and shorter on the
+    // wire in every request a screen or a phone makes.
+    "ROOT": "t.4dl.app",
+
+    // ⚠️ NEVER `development` HERE. The development lane puts sign-in codes in
+    // retained logs and turns on the lane that fabricates AI output and bills
+    // for it. `.dev.vars` is what turns it on locally.
+    "ENVIRONMENT": "production"
+  },
+
+  "dev": {
+    "port": 8080,
+    // The whole point of the local port: every door is a subdomain of it.
+    "local_protocol": "http"
+  },
+
+  "assets": {
+    // ⚠️ A FILESYSTEM PATH, NOT A PACKAGE DEPENDENCY — which is why `turbo.json`
+    // declares the build edge by hand. Nothing in the dependency graph connects
+    // this worker to OneSpace's build, and a missing one does not fail: the
+    // worker boots and serves nothing, which reads as a broken deploy rather
+    // than a missing step.
+    "directory": "../one-space/dist",
+    "binding": "ASSETS",
+    // The SPA owns its routing; every unknown path is its business.
+    "not_found_handling": "single-page-application"
+  },
+
+  // ⚠️ MAIL LEAVES THROUGH THIS AND NOWHERE ELSE. `destination_address` is what
+  // Cloudflare requires on a `send_email` binding that is not restricted to one
+  // address; the SENDER is `email.from` in the operator console, because that is
+  // the value somebody rotates. A deployment without this binding refuses to send
+  // rather than answering "check your email" over nothing — see `mail.ts`.
+  //
+  // ⚠️ AND THE ZONE HAS TO HAVE THE SENDER VERIFIED. That is a dashboard step per
+  // zone and there is no way around it: a plausible-looking address that bounces
+  // is worse than a refusal, because the refusal is visible.
+  "send_email": [{ "name": "SEND_EMAIL" }],
+
+  "d1_databases": [
+    {
+      "binding": "DIRECTORY",
+      "database_name": "one-directory",
+      // ⚠️ A PLACEHOLDER UNTIL PROVISIONING WRITES THE REAL ONE. A deploy with
+      // this id in place would bind a database that does not exist and answer
+      // every request 500 — so nothing ships until it is replaced.
+      "database_id": "PLACEHOLDER-directory"
+    },
+    {
+      "binding": "SHARD_EU_1",
+      "database_name": "one-shard-eu-1",
+      "database_id": "PLACEHOLDER-shard-eu-1"
+    }
+  ],
+
+  // ⚠️ THE CLOCK, AND ONCE A DAY IS THE RIGHT RATE. The only thing the sweep
+  // does is destroy the records of a workspace 37 days past due, and that date
+  // is a day — running it hourly would be twenty-three passes that find nothing
+  // and one that finds the same thing a daily pass would. 03:00 UTC is quiet
+  // everywhere it matters and far from any month boundary a person watches.
+  //
+  // ⚠️ AND A HANDLER WITHOUT THIS DECLARATION NEVER RUNS. `scheduled` in the
+  // worker compiles, typechecks, is unit-tested and is called by nothing — the
+  // exact shape this deployment is a catalogue of, one config file over.
+  "triggers": { "crons": ["0 3 * * *"] },
+
+  "observability": { "enabled": true }
+}

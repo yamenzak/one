@@ -1,3 +1,7 @@
+---
+kind: guide
+---
+
 # Kova — Guide for Clients
 
 Everything here describes what the app does today. Things that aren't ready yet

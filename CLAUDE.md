@@ -834,17 +834,69 @@ deliverability pre-flight — was mounted by Kova and by neither other app. Read
 before assuming a shared capability reaches every product, and before adding an
 app.
 
-**[docs/ONE-PLATFORM.md](docs/ONE-PLATFORM.md) is the PLAN for what replaces all
-of this, and nothing in it is built.** A new framework directory that owns the
-runtime, the data model, the surface (HTTP + AI tools + webhooks) and the chrome,
-driven by a typed manifest per app, with the apps living inside it. Four
-decisions are settled there — a declarative shell with code screens, absorbing
-`@4dl/*` rather than wrapping it, Kova migrating first, and one 4DL identity with
-SSO — and each carries consequences that are cheap now and expensive later. Read
-it before starting anything structural, and read §7 before touching Kova's data:
-the migration pattern it prescribes is the one audit step 5.2 proved on Scena's
-billing tables, and it exists because the naive version is a total outage rather
-than a degraded feature.
+⚠️ **THERE WAS A SECOND "ONE" IN THIS REPOSITORY AND IT IS GONE.** `platform/`
+was the first attempt at what `engine/` is now — its own kernel, runtime, hello
+and coaching app — and it was abandoned the day OneEngine started. A superseded
+framework kept alongside its successor is not a reference, it is a second answer
+to every structural question, and the reader cannot tell which one is live. It
+was deleted on 2026-08-16 along with `_ui-archive/`, the interface language it
+carried, whose own README asked to be deleted once it stopped being consulted.
+`git log` is where both are read now.
+
+**Its rules survived it, which is why deleting it was cheap.** They govern
+`engine/` today, in [engine/docs/BUILDING.md](engine/docs/BUILDING.md) §5: **a
+deferral is a marker in a comment, never a sentence** — `DEFER(engine-N)`, FOUND
+by a script rather than remembered, and a stage cannot be flipped to `shipped`
+while anything still defers to it; an inventory lives in a verified generated
+block or not at all; every document declares a `kind`; and ⚠️ **a comment states
+the INVARIANT, never the incident** — "the reserve is a ceiling on revenue" stays
+true forever, while "Scena's copy under-counted four ways" describes a codebase
+that will not exist and reads as a live warning about an impossible problem. If a
+past defect is worth preventing, that is a test, not a paragraph.
+
+## OneEngine — the framework, and One — the deployment
+
+⚠️ **`engine/` IS THE SUCCESSOR TO EVERYTHING ABOVE, AND IT IS
+WHERE NEW STRUCTURAL WORK GOES. THERE ARE TWO DOCUMENTS AND YOU START AT THE
+FIRST.** [engine/docs/ENGINE.md](engine/docs/ENGINE.md) is **what exists** — every
+operation an app gets without declaring it, the doors, the gates, the refusals,
+every table and what erasure does to it, and the list of what is built and
+reached by nothing. It is generated end to end, from the real composer and the
+real registries, so it cannot go stale.
+[engine/docs/BUILDING.md](engine/docs/BUILDING.md) is **why it is shaped that way
+and how to add to it**, and [engine/docs/DECISIONS.md](engine/docs/DECISIONS.md)
+is the append-only ledger both cite by number. Nothing else is
+required to resume the work; **start there rather than from recall.**
+
+⚠️ **AND THE DOCUMENTS ARE NOT WHERE THE WORK IS RECORDED.** A new module needs a
+line in `engine/scripts/inventory.mjs`; a new table needs a row in `HOLDINGS`; a
+new operation, door, gate or problem appears by itself from
+`EMIT=1 pnpm --filter @engine/hello test`. Each generator REFUSES rather than
+skipping, so a capability cannot be added and quietly left out of the index —
+which is the mechanism that makes reinvention hard. BUILDING.md §7 is the list.
+
+⚠️ **BUILDING A SCREEN IS A DIFFERENT STARTING POINT, AND IT IS
+[engine/design/README.md](engine/design/README.md).** The design language and the
+ambience engine live beside the package that draws them — `DESIGN.md` and
+`AMBIENCE.md` are in `engine/design/`, not in `engine/docs/` — so everything
+needed to build a surface is one `ls` away. The README's export list is
+generated, so "does this already exist" is a question with a current answer.
+
+**The two names mean different things and neither is the other.** **OneEngine** is the
+FRAMEWORK — `@engine/kernel` (pure contracts), `@engine/runtime` (the only code that
+touches a binding), **`@engine/design`** — the browser half and the design system
+every app draws with, named **OneDesign**, router-free — and the reference apps.
+**One** is the DEPLOYMENT built on it: `engine/one` is the worker
+that answers every door for every product, `engine/one-space` is the page a person
+opens at the root, `id.` and `setup.`. A product is a manifest inside
+it, and `hello` is the only one — the coaching app that proved stage 9 left the
+tree on 2026-08-16 to be rewritten under a new name. So "One" is what a customer types and "OneEngine" is what a contributor imports,
+and the day there is a second deployment the split is what makes that cheap.
+
+**`engine/` is INERT to the legacy tree by construction**: nothing in it is in
+`apps.json`, so `deploy.yml` can never select it. Its tests and guards DO run —
+`pnpm engine:test`, `engine:typecheck`, and `engine:gate`, which is inside the root
+`pnpm gate`.
 
 **That whole class is a guard now.** `scripts/capability-reachable.test.mjs` (in
 `pnpm gate`) fails on any app — the template included — that applies a package's
@@ -1054,7 +1106,8 @@ Two neighbours: **[docs/SCENA-REWRITE.md](docs/SCENA-REWRITE.md) is the plan** �
 what was kept, what was rewired, the six decisions and their rationale, and the
 ten stages — and **[docs/SCENA-UI-INVENTORY.md](docs/SCENA-UI-INVENTORY.md)** is
 the record of the UI rewrite, one section per sub-stage, each naming the defects
-it closed. **[apps/scena/DEPLOY.md](apps/scena/DEPLOY.md)** is how it ships, and
+it closed. **[apps/scena/DEPLOY.md](apps/scena/DEPLOY.md)** is how it ships
+(Tessa's own is [apps/tessa/DEPLOY.md](apps/tessa/DEPLOY.md)), and
 it is genuinely different from the other two apps' — Scena deploys **two workers
 and a marketing site**, and `tv.4dl.app` (where the player bundle is served) and
 `play.scena.4dl.app` (the device door the bundle calls) are two different things

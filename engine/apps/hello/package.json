@@ -1,0 +1,35 @@
+{
+  "name": "@engine/hello",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The smallest complete app on OneEngine: one collection, one operation, and every cross-cutting declaration wired. It exists to be proved \u2014 every stage's exit criterion is asserted against it.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./screens": "./src/screens/index.tsx",
+    "./live": "./src/screens/live.tsx"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run && vitest run --config vitest.screens.config.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@engine/design": "workspace:*",
+    "@engine/kernel": "workspace:*",
+    "@engine/runtime": "workspace:*",
+    "@heroui/react": "^3.0.5",
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.8.55",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.0"
+  }
+}

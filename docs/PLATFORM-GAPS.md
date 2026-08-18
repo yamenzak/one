@@ -1,3 +1,8 @@
+---
+kind: record
+superseded_by: docs/PLATFORM-AUDIT.md
+---
+
 # What is still an app's that should be the platform's
 
 Assessed 2026-08-02, with two apps live. One app cannot tell a platform concern

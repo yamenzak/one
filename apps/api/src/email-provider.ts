@@ -1,7 +1,7 @@
 /**
  * Kova's binding of `@4dl/email`'s per-tenant provider (SPEC §3 notifications).
  *
- * The provider logic — platform lane vs a tenant's own Brevo key vs `off`, the
+ * The provider logic — the platform lane vs `off`, the
  * redaction of the stored key, the sender-name resolution — is the platform's.
  * What is Kova's is the METER: on the platform lane a send costs the tenant
  * credits, and the credit authority is `TenantBillingDO`.
