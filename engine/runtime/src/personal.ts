@@ -39,6 +39,7 @@ import {
 } from "./identity.js";
 import { claimInvitations, found, memberFor, membersOf } from "./membership.js";
 import { inboxOf, markSeen, unseenCount } from "./inbox.js";
+import { acceptancesOf } from "./legal.js";
 import { eraseObjects, type Bucket, type Where } from "./storage.js";
 import type { Db } from "./sql.js";
 
@@ -106,6 +107,26 @@ export interface PersonalOp {
 }
 
 export type PersonalBook = Readonly<Record<string, PersonalOp>>;
+
+/**
+ * WHAT SOMEBODY HAS SIGNED, WITH THE WORKSPACE NAMED.
+ *
+ * ⚠️ THE NAME, NOT THE ID. A row reading `t_01J…` is a record somebody cannot
+ * check, which defeats the only reason to show them the list — and a workspace
+ * they have since LEFT still has a row here, because the agreement happened.
+ * A missing name means the workspace is gone; the row stays and says so.
+ */
+const signedBy = async (ctx: PersonalCtx, accountId: string) => {
+  const signed = await acceptancesOf(ctx.directory, accountId as AccountId);
+  if (!signed.length) return [];
+  const named = new Map(
+    (await tenantsOf(ctx.directory, accountId as AccountId)).map((t) => [t.id as string, t.name]));
+  return signed.map((one) => ({
+    document: one.document, version: one.version, at: one.at,
+    tenantId: one.tenantId, appId: one.appId,
+    where: one.tenantId ? named.get(one.tenantId) ?? null : null,
+  }));
+};
 
 /* ------------------------------------------------------------------ seams --- */
 
@@ -233,6 +254,7 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
       kind: "read", needs: "session", beforeAccepting: true,
       async run(ctx): Promise<unknown> {
         if (!ctx.session) return ctx.fail("platform.unauthorized");
+        const accountId = ctx.session.accountId;
         return {
           /*
             ⚠️ THE BOOK, WITHOUT THE WORDS — `legal.list` carries those, publicly,
@@ -246,6 +268,20 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
             url: legalUrlOf(d), mustAccept: d.mustAccept, binds: d.binds,
           })),
           owed: deps.owed ? await deps.owed(ctx) : [],
+          /*
+            ⚠️ AND WHAT THEY ALREADY AGREED TO, WHICH IS THE HALF THIS READ DID
+            NOT HAVE. Owed answers "is there a wall in front of me"; a person
+            asking what they signed, to what version and when, had nowhere to
+            look — and that is the question the record exists to answer. It is
+            kept per VERSION, so a document accepted twice is two rows and the
+            history is the point rather than a duplicate.
+
+            ⚠️ NO FAN-OUT: acceptances are in the DIRECTORY, keyed by account,
+            because one person accepts the terms once for the whole deployment
+            (`platform-schema.ts`). The workspace NAME is resolved from the same
+            database, so a business agreement says which business.
+          */
+          accepted: await signedBy(ctx, accountId),
         };
       },
     },

@@ -82,6 +82,16 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
           under="Dates, times, numbers and measurements, everywhere"
           onOpen={() => onGo({ at: "formats" })}
         />
+        {/* ⚠️ UNDER YOU, BECAUSE AN AGREEMENT IS SIGNED BY A PERSON. One
+            account accepts the terms once for the whole deployment, and a
+            business agreement names the workspace it was signed in — both are
+            facts about the hand that signed, not about a workspace. */}
+        <NavRow
+          icon={glyphOf("file")}
+          label={nameOf({ at: "agreed" })}
+          under="Every document you have accepted, and when"
+          onOpen={() => onGo({ at: "agreed" })}
+        />
         <NavRow
           icon={glyphOf("cog")}
           label="Your preferences"

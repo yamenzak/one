@@ -36,6 +36,7 @@ import { OneWorkspace } from "./Workspace.js";
 import { WorkspacePart } from "./Part.js";
 import { Preferences } from "../centre/Preferences.js";
 import { Formats } from "./Formats.js";
+import { Agreed } from "./Agreed.js";
 import { ConsoleHome, ConsolePart } from "./Console.js";
 import { OneTenant } from "../console/OneTenant.js";
 import { InboxScreen } from "../centre/InboxScreen.js";
@@ -43,7 +44,8 @@ import { Data } from "./Data.js";
 import { TellingMe } from "./TellingMe.js";
 import {
   OF_CONSOLE, OF_WORKSPACE_SCREEN,
-  SPACE, above, atConsoleScreen, atWorkspaceScreen, isConsole, nameOf, parseWhere, pathOf,
+  SPACE, above, atConsoleScreen, atWorkspaceScreen, groundOf, isConsole, nameOf, parseWhere,
+  pathOf, seedOf,
   type Where,
 } from "./where.js";
 
@@ -66,7 +68,7 @@ import {
  * own, which no other list holds.
  */
 export const SPACE_SCREENS: readonly Where["at"][] = [
-  "home", "you", "inbox", "told", "data", "prefs", "formats", "workspaces", "workspace",
+  "home", "you", "inbox", "told", "data", "prefs", "formats", "agreed", "workspaces", "workspace",
   ...OF_WORKSPACE_SCREEN,
   "console", "tenant",
   ...OF_CONSOLE,
@@ -261,28 +263,7 @@ const aboutOf = (where: Where, person: Me | null): FaceOf | undefined =>
  * that chose would be a screen somebody has to remember to update, and the
  * OneSpace has twenty of them.
  */
-const groundOf = (where: Where): Sky => {
-  /* ⚠️ The operator's side is about a deployment rather than a business, and
-     the material says so before a word is read: ruled, not woven. */
-  return isConsole(where) ? "etch" : "cloth";
-};
 
-/*
-  ⚠️ AND `cloth` IS NOW A FLOOR RATHER THAN AN AREA. Every address outside the
-  console names a subject (`subjectOf`), and a subject's world wins over a named
-  sky in `Page` — so what this returns for them applies only in the moment before
-  the session resolves, where the alternative is a flat page that gains a world a
-  frame later. It was the material two thirds of OneSpace actually wore, because
-  a subject was named on two addresses out of twenty.
-*/
-
-/**
- * ⚠️ AND WHICH ONE OF THE FAMILY, FROM THE ADDRESS. `silk`, `linen` and `wire`
- * were three hand-tuned settings of one generator, which is what a seed is —
- * so OneSpace's materials are two families now and every address inside them
- * has a ground of its own. Nobody tunes a fourth.
- */
-const seedOf = (where: Where): string => `space|${where.at}`;
 
 /**
  * ⚠️ A FACT, OR NOTHING AT ALL. Every screen used to carry a sentence under its
@@ -363,6 +344,7 @@ function Inside({ where, onGo }: {
     /* ⚠️ YOUR OWN PREFERENCES, ACROSS EVERY PRODUCT — no slug, because they are
        not a workspace's. The same split as `told` against `notices`. */
     case "formats": return <Formats />;
+    case "agreed": return <Agreed />;
     case "prefs": return <Preferences where={where} onGo={onGo} />;
     case "workspaces": return <Workspaces onGo={onGo} />;
     case "workspace": return <OneWorkspace slug={where.slug} onGo={onGo} />;

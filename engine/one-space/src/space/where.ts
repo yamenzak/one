@@ -23,6 +23,8 @@
  * is unreachable.
  */
 
+import type { Sky } from "@engine/design";
+
 export const SPACE = "/space";
 
 export type Where =
@@ -76,6 +78,7 @@ export type Where =
   | { readonly at: "prefs"; readonly app?: string; readonly area?: string }
   /** ⚠️ Not a product's setting — how THIS PERSON reads every product. */
   | { readonly at: "formats" }
+  | { readonly at: "agreed" }
   | { readonly at: "workspaces" }
   /** One workspace: what it includes, and the way into everything about it. */
   | { readonly at: "workspace"; readonly slug: string }
@@ -259,6 +262,7 @@ export function parseWhere(path: string): Where {
   if (head === "told") return { at: "told" };
   if (head === "data") return { at: "data" };
   if (head === "formats") return { at: "formats" };
+  if (head === "agreed") return { at: "agreed" };
   if (head === "prefs") {
     const [app, area] = tail;
     return app ? (area ? { at: "prefs", app, area } : { at: "prefs", app }) : { at: "prefs" };
@@ -313,6 +317,7 @@ export function pathOf(where: Where): string {
     case "told": return `${SPACE}/told`;
     case "data": return `${SPACE}/data`;
     case "formats": return `${SPACE}/formats`;
+    case "agreed": return `${SPACE}/agreed`;
     case "prefs":
       return `${SPACE}/prefs${where.app ? `/${where.app}` : ""}${where.app && where.area ? `/${where.area}` : ""}`;
     case "workspaces": return `${SPACE}/workspaces`;
@@ -358,6 +363,7 @@ export function above(where: Where): Where | null {
     case "home": return null;
     case "you": case "inbox": case "workspaces": case "console": return { at: "home" };
     case "formats": return { at: "you" };
+    case "agreed": return { at: "you" };
     /* ⚠️ How you are told is a detail of YOU, so leaving it goes back there
        rather than to the root — the crown's arrow has to agree with how
        somebody got here. */
@@ -391,6 +397,7 @@ export const nameOf = (where: Where): string => {
     case "told": return "How you are told";
     case "data": return "Your data";
     case "formats": return "Dates and numbers";
+    case "agreed": return "What you agreed to";
     case "prefs": return "Your preferences";
     case "workspaces": return "Workspaces";
     case "workspace": return "Workspace";
@@ -416,3 +423,34 @@ export const nameOf = (where: Where): string => {
     case "keys": return "Keys";
   }
 };
+
+/* ---------------------------------------------------------------- material --- */
+
+/**
+ * WHICH MATERIAL AN ADDRESS STANDS ON, AND IT IS DECIDED HERE ONLY.
+ *
+ * ⚠️ THIS LIVED IN `OneSpace.tsx` AND MOVED, because it is a fact about the
+ * ADDRESS like every other function in this file — the name, the path, the way
+ * back — and a card that wants its page's material had to either import the
+ * router or type a family into itself. `scene.test.mjs` refuses the second, and
+ * it is right to: one surface naming `glow` by hand is how the door into a
+ * workspace came to be the single place that workspace's world was missing.
+ *
+ * ⚠️ THE OPERATOR'S SIDE IS RULED, NOT WOVEN. It is about a deployment rather
+ * than a business, and the material says so before a word is read.
+ *
+ * ⚠️ AND SO IS THE RECORD OF WHAT SOMEBODY SIGNED. Everything else in the
+ * account centre is a menu or a control and stands on `cloth`; agreements are
+ * the one surface here that is a DOCUMENT, and `etch` is what this system
+ * already means by that.
+ */
+export const groundOf = (where: Where): Sky =>
+  (isConsole(where) || where.at === "agreed" ? "etch" : "cloth");
+
+/**
+ * ⚠️ AND WHICH ONE OF THE FAMILY, FROM THE ADDRESS. `silk`, `linen` and `wire`
+ * were three hand-tuned settings of one generator, which is what a seed is — so
+ * OneSpace's materials are two families now and every address inside them has a
+ * ground of its own. Nobody tunes a fourth.
+ */
+export const seedOf = (where: Where): string => `space|${where.at}`;
