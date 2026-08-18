@@ -934,10 +934,10 @@ that names no stage, so this list cannot grow by forgetting.
 <!-- generated: node scripts/inventory.mjs deployment -->
 | Binding | Resource | |
 |---|---|---|
-| `DIRECTORY` | *not made yet* | **placeholder** |
-| `SHARD_EU_1` | *not made yet* | **placeholder** |
+| `DIRECTORY` | `5ed31d36-67f4-4970-a658-276eb6322c93` | live |
+| `SHARD_EU_1` | `afe4e35c-bf44-48ff-b43e-c55b913efcda` | live |
 
-**2 of 2 are placeholders, so nothing is deployed.** A deploy with them in place binds a worker to databases that do not exist, which is why the workflow SKIPS rather than shipping: Actions → **OneEngine** → Run workflow with `provision` ticked creates them, writes their ids back and mints the signing secret.
+**Every binding names a resource that exists.**
 
 Two steps a workflow cannot take: the DNS records for the root and its
 wildcard, and the Worker routes. `wrangler.jsonc` declares no `routes`

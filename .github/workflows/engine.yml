@@ -192,6 +192,13 @@ jobs:
       # a shard, and every cross-tenant question at one workspace's records.
       - run: node engine/scripts/inert.test.mjs
 
+      # ⚠️ THE DOCUMENT IS REGENERATED IN THE SAME COMMIT, and leaving it out is
+      # why the first provision always ended red. `ENGINE.md`'s deployment table
+      # is generated FROM this file — it read "2 of 2 are placeholders, so
+      # nothing is deployed" — so a job that rewrites the ids and not the block
+      # derived from them leaves `docs.test.mjs` failing on the very next run.
+      # A generated block is only worth having if whatever moves its source
+      # moves it too.
       - name: Record the ids
         run: |
           set -euo pipefail
@@ -201,7 +208,8 @@ jobs:
             echo "Already bound — nothing to commit."
             exit 0
           fi
-          git add engine/one/wrangler.jsonc
+          node engine/scripts/docs.test.mjs --write
+          git add engine/one/wrangler.jsonc engine/docs/ENGINE.md
           git commit -m "Bind One's D1 databases [skip ci]"
           # A GITHUB_TOKEN push starts no new workflow run, so this cannot loop.
           git push origin HEAD:${{ github.ref_name }}
