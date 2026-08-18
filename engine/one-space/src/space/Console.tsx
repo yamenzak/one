@@ -19,8 +19,10 @@
  * lives behind that workspace's own address.
  */
 
+import type * as React from "react";
 import { Group, NavRow, Screen, glyphOf } from "@engine/design";
 import { useSession } from "../session.js";
+import { useLoad } from "../centre/data.js";
 import { Actions } from "../console/Actions.js";
 import { Catalogue } from "../console/Catalogue.js";
 import { Footing } from "../console/Footing.js";
@@ -42,7 +44,9 @@ import { OF_CONSOLE, nameOf, type ConsolePart, type Where } from "./where.js";
 export type ConsolePartId = ConsolePart;
 
 /* ⚠️ A MARK PER ROW, because a menu with unmarked rows reads as a mistake beside
-   every other menu in this product. */
+   every other menu in this product — and `key` and `layers` were names nobody had
+   mapped, so two of these nine drew the neutral circle on the one screen where
+   every other row had a mark. */
 const GLYPH: Readonly<Record<ConsolePartId, string>> = {
   tenants: "workspace",
   catalogue: "bank",
@@ -55,9 +59,94 @@ const GLYPH: Readonly<Record<ConsolePartId, string>> = {
   footing: "layers",
 };
 
+/**
+ * WHAT SOMEBODY COMES BACK TO, AND WHAT THEY SET UP ONCE.
+ *
+ * ⚠️ NINE ROWS IN ONE CARD IS A MENU WITH NO SHAPE, and it is the same fault the
+ * workspace screen had: the list an operator opens every day sits in the same run
+ * as the push keypair they will generate once, so the frequent one loses its
+ * prominence to the rare one (DESIGN.md §3). Three runs, and the gap between them
+ * is the whole of the explanation.
+ */
+const DAILY: readonly ConsolePartId[] = ["tenants", "catalogue", "works"];
+const ONCE: readonly ConsolePartId[] = ["keys", "telling"];
+/**
+ * ⚠️ THE MIDDLE IS WHAT IS LEFT, NEVER A THIRD LIST. Three hand-written lists is
+ * three places a new console screen has to be remembered, and the one that
+ * forgets makes the screen unreachable from its own menu with nothing failing —
+ * which is the fault this file's own header is about, one level up.
+ */
+const RARELY: readonly ConsolePartId[] =
+  OF_CONSOLE.filter((p) => !DAILY.includes(p) && !ONCE.includes(p));
+
+/**
+ * ⚠️ WHAT NEEDS SOMEBODY, ON THE ROW THAT LEADS TO IT. Every one of these was
+ * knowable and none of it was on the screen an operator opens first: a nightly
+ * pass that failed, a payment that arrived and could not be placed, a workspace
+ * whose card was declined, a store counting down to deletion. Nine one-word rows
+ * with no hint that anything is wrong means somebody finds out by opening all
+ * nine — or from the customer.
+ */
+interface Attention {
+  readonly jobs: number;
+  readonly parked: number;
+  readonly pastDue: number;
+  readonly draining: number;
+  readonly maintenance: string;
+}
+
+const ONE = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * ⚠️ IT WEARS THE TONE, BECAUSE THAT IS THE WHOLE REASON IT IS THERE. A second
+ * line in the row's ordinary grey is a description; these are the only lines on
+ * the menu, and each one is the reason to open THAT row rather than another. The
+ * ink is the one channel a monochrome product has for saying so — see
+ * `TONE_CSS`.
+ */
+const needing = (says: string, ink: "warning" | "danger" = "warning") =>
+  <span data-ink={ink}>{says}</span>;
+
+const saidOf = (part: ConsolePartId, at: Attention | null): React.ReactNode => {
+  if (!at) return undefined;
+  switch (part) {
+    case "works": return at.jobs
+      ? needing(`${ONE(at.jobs, "job", "jobs")} did not run`) : undefined;
+    case "keys": return at.parked
+      ? needing(`${ONE(at.parked, "payment", "payments")} could not be placed`) : undefined;
+    case "tenants": return at.pastDue
+      ? needing(`${ONE(at.pastDue, "workspace", "workspaces")} behind on payment`) : undefined;
+    case "footing": return at.draining
+      ? needing(`${ONE(at.draining, "store", "stores")} counting down to deletion`) : undefined;
+    /* ⚠️ THE ONE THAT IS NOT A COUNT. Leaving the doors shut is the mistake
+       nobody makes deliberately and everybody makes once, and it is the only
+       item here that is withholding the product from everybody right now. */
+    case "switches": return at.maintenance === "readonly" ? needing("Writes are held")
+      : at.maintenance === "full" ? needing("Every door but this one is shut", "danger")
+        : undefined;
+    default: return undefined;
+  }
+};
+
 export function ConsoleHome({ onGo }: { readonly onGo: (to: Where) => void }) {
   const { me } = useSession();
   const person = me && me !== "nobody" ? me : null;
+  /* ⚠️ ONE READ FOR THE WHOLE MENU. Four reads before anything is drawn, on the
+     screen that has to be instant, is what asking each destination would cost —
+     and a failure to read it leaves nine ordinary rows rather than a broken
+     screen, which is why it is not part of the `Screen`'s own outcome. */
+  const at = useLoad<Attention>("op.attention");
+  const needs = at.of.status === "ready" ? at.of.data : null;
+
+  const rows = (parts: readonly ConsolePartId[]) => parts.map((part) => (
+    <NavRow
+      key={part}
+      icon={glyphOf(GLYPH[part])}
+      label={nameOf({ at: part })}
+      under={saidOf(part, needs)}
+      onOpen={() => onGo({ at: part })}
+    />
+  ));
 
   /* ⚠️ Drawn for an operator only, and the deployment decides who those are —
      never this page. Five rows that all refuse is worse than one sentence. */
@@ -84,27 +173,24 @@ export function ConsoleHome({ onGo }: { readonly onGo: (to: Where) => void }) {
        five rows. No primary: a console is a way IN to five things, not a place
        where one of them is the point. */
     <Screen shape="list">
-      {/* ⚠️ Unlabelled: the crown already says where this is, and a heading
-          repeating it is the same sentence twice — see `OneSpace.tsx`. */}
       {/*
         ⚠️ A GLYPH PER ROW AND NO DESCRIPTION, WHICH IS THE WORKSPACE SCREEN'S
         GRAMMAR — see `Workspace.tsx`, where the same fault was fixed. Every row
-        here carried a sentence, so five destinations came out as ten lines of
-        text: a wall to read where the menu beside it is a list to scan. The
-        sentence is what each screen says when somebody arrives on it (`said` in
-        `OneSpace.tsx`), which is where it is useful and where it is not competing
-        with four others.
+        here carried a sentence, so nine destinations came out as eighteen lines
+        of text: a wall to read where the menu beside it is a list to scan. What
+        the screen IS gets said on arrival (`said` in `OneSpace.tsx`).
+
+        ⚠️ THE SECOND LINE IS RESERVED FOR SOMETHING BEING WRONG, and that is why
+        it is worth its space here. A description repeated on nine rows is
+        texture; a count on the two that need somebody is the reason to open one
+        rather than another.
       */}
-      <Group>
-        {OF_CONSOLE.map((part) => (
-          <NavRow
-            key={part}
-            icon={glyphOf(GLYPH[part])}
-            label={nameOf({ at: part })}
-            onOpen={() => onGo({ at: part })}
-          />
-        ))}
-      </Group>
+      <Group>{rows(DAILY)}</Group>
+      <Group>{rows(RARELY)}</Group>
+      {/* ⚠️ THE ONES SET ONCE, LAST. Neither is opened twice in a year, and both
+          are how the deployment reaches anybody at all — so they belong together
+          and they belong at the bottom. */}
+      <Group>{rows(ONCE)}</Group>
     </Screen>
   );
 }

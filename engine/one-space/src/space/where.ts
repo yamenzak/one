@@ -411,15 +411,27 @@ export const nameOf = (where: Where): string => {
     case "brand": return "Brand";
     case "wording": return "In your words";
     case "console": return "Operator";
-    case "tenants": return "Tenants";
+    /*
+      ⚠️ THE CONSOLE MAY USE A TECHNICAL WORD AND MAY NOT USE A DIFFERENT WORD
+      FOR THE SAME THING. This said "Tenants" while every other surface in the
+      product — the account centre, the switcher, the shard meter — said
+      workspaces, so the one screen an operator opens to find a customer was
+      filed under a noun that appears nowhere else they look.
+
+      ⚠️ AND FOUR OF THESE WERE NOUNS NOBODY COULD PLACE. "Works", "Ground" and
+      "Footing" are three words for three unrelated screens and no two of them
+      tell you which is which; a nine-row menu of one-word labels is nine
+      guesses. What each one now says is what is behind it.
+    */
+    case "tenants": return "Workspaces";
     case "catalogue": return "Price list";
     case "tenant": return "Workspace";
-    case "actions": return "Actions";
+    case "actions": return "AI actions";
     case "switches": return "Switches";
-    case "works": return "Works";
-    case "ground": return "Ground";
-    case "telling": return "Telling people";
-    case "footing": return "Footing";
+    case "works": return "Nightly work";
+    case "ground": return "Shards";
+    case "telling": return "Push notifications";
+    case "footing": return "What it runs on";
     case "keys": return "Keys";
   }
 };

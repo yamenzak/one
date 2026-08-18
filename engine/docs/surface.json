@@ -716,6 +716,10 @@
       "kind": "read"
     },
     {
+      "id": "op.attention",
+      "kind": "read"
+    },
+    {
       "id": "op.shards",
       "kind": "read"
     },

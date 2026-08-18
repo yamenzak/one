@@ -27,6 +27,7 @@ import {
   ALLOWANCE_KEY, KEEPS_RESIDENCY, allowanceFor, entitlementKeys, inLane, mayIsolate,
   refuseCatalogue,
   refusePrompt,
+  stalled,
 } from "@engine/kernel";
 import type { Residency } from "@engine/kernel";
 import type { Account } from "./cloudflare.js";
@@ -142,6 +143,9 @@ export interface OperatorDeps {
   /** ⚠️ The deployment's catalogue — one membership, one list. */
   readonly plans?: readonly PlanSpec[];
 }
+
+/** ⚠️ The same window the jobs screen reads a silence against — see `Jobs`. */
+const A_DAY = 86_400_000;
 
 export function operatorOps(input: OperatorDeps): PersonalBook {
   /* ⚠️ A deployment with no catalogue wired has NO models, which every reader
@@ -715,6 +719,56 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
         operator(ctx);
         const book = Object.fromEntries(every().flatMap((a) => Object.entries(a.jobs ?? {})));
         return { book, runs: await runsOf(ctx.directory, book, 50) };
+      },
+    },
+
+    /**
+     * WHAT NEEDS SOMEBODY, COUNTED, SO THE CONSOLE'S FRONT DOOR IS NOT A MENU.
+     *
+     * ⚠️ EVERY ONE OF THESE WAS ALREADY KNOWABLE AND NONE OF IT WAS ANYWHERE AN
+     * OPERATOR LOOKS FIRST. A nightly pass that failed, a payment that arrived
+     * and could not be placed, a workspace whose card was declined, a database
+     * counting down to deletion: four facts on four different screens, each
+     * behind a row whose label gives no hint that anything is wrong. Somebody
+     * finds out by opening all nine, or by a customer telling them.
+     *
+     * ⚠️ COUNTS, NOT ROWS. This is the line under a destination — "1 failed
+     * last night" — and the screen behind it is where the detail already lives.
+     * Answering with the rows would be a second copy of four screens, drifting.
+     *
+     * ⚠️ AND IT IS ONE READ. Four reads on a menu is four round trips before
+     * anything is drawn, on the one screen that has to be instant.
+     */
+    "op.attention": {
+      kind: "read", needs: "session", doors: ["operator"],
+      async run(ctx): Promise<unknown> {
+        operator(ctx);
+        const book = Object.fromEntries(every().flatMap((a) => Object.entries(a.jobs ?? {})));
+        const runs = await runsOf(ctx.directory, book, 50);
+        /* ⚠️ FAILED AND STALLED ARE ONE COUNT, because they are one question:
+           did the work happen. A job that errored says so; a job that simply
+           stopped being scheduled says nothing at all, which is the worse of
+           the two and the reason `stalled` exists. */
+        const failed = new Set(runs.filter((r) => r.ok === false).map((r) => r.jobId));
+        for (const id of stalled(book, runs, ctx.now.getTime(), A_DAY)) failed.add(id);
+
+        const due = await ctx.directory.prepare(
+          `SELECT COUNT(*) AS n FROM subscription WHERE status = 'past_due'`)
+          .first<{ n: number }>();
+
+        const have = await resources(ctx.directory);
+
+        return {
+          jobs: failed.size,
+          parked: (await parkedEvents(ctx.directory, 50)).length,
+          pastDue: due?.n ?? 0,
+          /* ⚠️ A STORE COUNTING DOWN TO ITS OWN DELETION is the one item here
+             with a deadline rather than a state. */
+          draining: have.filter((r) => r.state === "draining").length,
+          /* ⚠️ AND THE SWITCH THAT CLOSES EVERY DOOR, because leaving it on is
+             the mistake nobody makes deliberately and everybody makes once. */
+          maintenance: await maintenanceMode(ctx.directory),
+        };
       },
     },
 

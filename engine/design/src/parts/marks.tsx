@@ -189,6 +189,45 @@ export const SearchMark = () => (
 );
 
 /**
+ * A KEY TURNS.
+ *
+ * ⚠️ AND IT TURNS ABOUT ITS OWN BOW, WHICH IS THE WHOLE DIFFERENCE. A key
+ * rotated about the middle of its box swings the blade through an arc no lock
+ * has; a key rotated about the ring is a hand turning it. The blade is what
+ * moves and the ring is where it moves from.
+ */
+export const KeyMark = () => (
+  <Mark>
+    <g data-part="key">
+      <circle cx="7.5" cy="15.5" r="4.5" />
+      <path d="m10.7 12.3 8.3-8.3" />
+      <path d="m17 6 2.5 2.5" />
+      <path d="m14 9 2.5 2.5" />
+    </g>
+  </Mark>
+);
+
+/**
+ * A STACK SETTLES.
+ *
+ * ⚠️ THE TOP PLATE LANDS AND THE ONES UNDER IT TAKE IT, which is what a stack
+ * DOES — the mark for the deployment's own layers is the only one here whose
+ * subject is a pile of things sitting on each other. Sliding the whole stack
+ * would be a picture of the pile being moved.
+ */
+export const LayersMark = () => (
+  <Mark>
+    <g data-part="plate">
+      <path d="M12 2 2.5 6.5 12 11l9.5-4.5z" />
+    </g>
+    <g data-part="under">
+      <path d="m2.5 12 9.5 4.5 9.5-4.5" />
+      <path d="m2.5 17.5 9.5 4.5 9.5-4.5" />
+    </g>
+  </Mark>
+);
+
+/**
  * AGREED — a seal, not a tick in a line of text.
  *
  * ⚠️ IT IS FILLED, WHICH IS THE WHOLE POINT. Every other mark in the set is a

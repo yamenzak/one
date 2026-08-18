@@ -33,7 +33,8 @@ import {
    by its clapper and a calendar turns its days over; neither is a transform on
    the outside, and lucide's path order is not something to build on. */
 import {
-  BellMark, CalendarMark, CheckMark, InboxMark, LeaveMark, SearchMark, ShieldMark,
+  BellMark, CalendarMark, CheckMark, InboxMark, KeyMark, LayersMark, LeaveMark, SearchMark,
+  ShieldMark,
 } from "../parts/marks.js";
 import { Page } from "./page.js";
 import { Island } from "./chrome.js";
@@ -93,6 +94,10 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
      out was the one row in the account centre with an empty lead, which reads
      as a row that failed to load rather than as a different kind of thing. */
   leave: <LeaveMark />,
+  /* ⚠️ TWO OF THE OPERATOR CONSOLE'S OWN NINE ROWS DREW THE NEUTRAL CIRCLE, on
+     the one menu where every other row has a mark — which is the failure this
+     map's header describes, on the screen written after it. */
+  key: <KeyMark />, layers: <LayersMark />,
 };
 
 /**
@@ -123,6 +128,8 @@ export const LIVELY: Readonly<Record<string, string>> = {
   money: "flip", coins: "flip", bank: "flip", card: "flip",
   star: "twinkle", sparkle: "twinkle", sun: "twinkle",
   people: "nod", users: "nod", person: "nod", home: "nod", house: "nod",
+  /* A key turns in a lock, and a stack of plates settles when one lands. */
+  key: "unlock", layers: "stack",
 };
 
 /** ⚠️ Marks with no character, on purpose — see `LIVELY`. */

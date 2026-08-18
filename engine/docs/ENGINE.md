@@ -186,6 +186,7 @@ live inside workspaces and an operator stands outside all of them.
 | `op.ai` | read |
 | `op.ai.bind` | write |
 | `op.jobs` | read |
+| `op.attention` | read |
 | `op.shards` | read |
 | `op.shard.dedicate` | write |
 | `op.infra` | read |
@@ -499,7 +500,7 @@ its own header, cited by other files, and doing nothing.
 | `refuseNeeds` | `infra` | composition |
 | `refuseJob` | `job` | composition |
 | `refuseJobs` | `job` | composition |
-| `stalled` | `job` | surface |
+| `stalled` | `job` | runtime |
 | `missingDocuments` | `legal` | runtime |
 | `refuseLegal` | `legal` | composition |
 | `refuseApp` | `manifest` | composition |

@@ -420,6 +420,18 @@ export const GLYPH_MOTION = [
   `  0% { transform: rotate(0) scale(1) } 50% { transform: rotate(90deg) scale(1.16) }`,
   `  100% { transform: rotate(180deg) scale(1) }`,
   `}`,
+  /* A key turns in a lock, about its own bow rather than about the box. */
+  `@keyframes glyph-unlock {`,
+  `  0% { transform: rotate(0deg) } 55% { transform: rotate(-58deg) }`,
+  `  78% { transform: rotate(-50deg) } 100% { transform: rotate(-58deg) }`,
+  `}`,
+  /* The top plate lands, and the ones under it take the weight. */
+  `@keyframes glyph-land {`,
+  `  0% { transform: translateY(-5px); opacity: 0 }`,
+  `  45% { transform: translateY(0); opacity: 1 }`,
+  `  62% { transform: translateY(1px) }`,
+  `  100% { transform: translateY(0); opacity: 1 }`,
+  `}`,
   /* A living thing acknowledges you. */
   `@keyframes glyph-nod {`,
   `  0% { transform: translateY(0) } 30% { transform: translateY(-3px) }`,
@@ -469,6 +481,15 @@ export const GLYPH_MOTION = [
   `[data-glyph="seek"][data-lively="true"] [data-part="lens"],`,
   `[data-glyph="seek"][data-lively="true"] [data-part="handle"] {`,
   `  animation: glyph-sweep ${DURATION.stately} ${EASE.settle} both }`,
+  /* ⚠️ THE BOW IS THE PIVOT, not the middle of the box — a key turned about its
+     centre swings the blade through an arc no lock has. */
+  `[data-glyph="unlock"] [data-part="key"] { transform-origin: 31% 74% }`,
+  `[data-glyph="unlock"][data-lively="true"] [data-part="key"] {`,
+  `  animation: glyph-unlock ${DURATION.stately} ${EASE.settle} both }`,
+  `[data-glyph="stack"][data-lively="true"] [data-part="plate"] {`,
+  `  animation: glyph-land ${DURATION.stately} ${EASE.settle} both }`,
+  `[data-glyph="stack"][data-lively="true"] [data-part="under"] {`,
+  `  animation: glyph-settle ${DURATION.stately} ${EASE.settle} 90ms both }`,
   /*
     ⚠️ AND FOUR MARKS WHERE THE WHOLE SELF MOVING *IS* THE PURPOSE — a cog turns,
     a coin flips, a star twinkles, a person nods. These are still lucide's, and
