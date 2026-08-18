@@ -252,6 +252,40 @@ if (rowPad === undefined || cardY === undefined || cardX === undefined) {
   ok(`inset: a card caps at ${four(cardY) + four(rowPad)}px, the same as between its rows`);
 }
 
+/* -------------------------------------------------------------- the marker --- */
+
+/**
+ * ⚠️ A ROW SAYS IT IS ONE, OR THE CARD PADS IT TWICE. `CARD_OTHERS` gives a
+ * row's inset to any child of a card that is not marked `data-row` — so a row
+ * component that forgets the attribute gets its own `py-3` AND the card's, and
+ * lands 24px inside a list where every neighbour is at 12. It is not a crash and
+ * it is not a type error; it is one row in a list sitting lower than the rest,
+ * which is exactly the kind of drift nobody can point at in a diff.
+ *
+ * ⚠️ AND IT IS COUNTED PER COMPONENT RATHER THAN IN TOTAL, because a total is a
+ * number somebody keeps in step by editing the number.
+ */
+const SURFACES = readFileSync(join(ENGINE, "design/src/parts/surfaces.tsx"), "utf8");
+const rows = [...SURFACES.matchAll(/export function (\w*Row)\(/g)].map((m) => m[1]);
+const unmarked = rows.filter((name) => {
+  const at = SURFACES.indexOf(`export function ${name}(`);
+  const next = SURFACES.slice(at + 1).search(/\nexport (?:function|const|interface)/);
+  const body = SURFACES.slice(at, next === -1 ? undefined : at + 1 + next);
+  return !/\bdata-row\b/.test(body);
+});
+
+if (!rows.length) {
+  fail(`surfaces.tsx: no row component found at all — the guard is blind.`);
+} else if (unmarked.length) {
+  fail(`surfaces.tsx: ${unmarked.join(", ")} render no \`data-row\`.\n` +
+       `       A card gives its own inset to anything not marked as a row, so this one\n` +
+       `       is padded twice and sits lower than every row beside it. Put the\n` +
+       `       attribute on the OUTERMOST element — a marker inside the button matches\n` +
+       `       nothing, because the selector reads a direct child of the card.`);
+} else {
+  ok(`marker: all ${rows.length} row component(s) tell the card they are one`);
+}
+
 console.log(bad
   ? `\nmetrics: ${bad} finding(s) — spacing nobody owns drifts, and drift is invisible per diff.`
   : `\nmetrics: one source for every measurement, and a floor under every control.`);

@@ -109,9 +109,8 @@ export function Telling() {
           ) : (
             <Group label="Replacing it">
               <NoteRow>
-                A browser subscribes to the public key above, so a new one makes every
-                device that is subscribed today unreachable — permanently, and with
-                nothing telling them. Each person has to turn notifications on again.
+                A new key makes every subscribed device unreachable, permanently and
+                silently. Each person has to turn notifications on again.
               </NoteRow>
               <ControlRow
                 label="Replace the keypair"

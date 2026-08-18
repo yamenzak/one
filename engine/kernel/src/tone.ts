@@ -33,6 +33,19 @@ export type Voice =
   /** What is true when there is nothing here. */
   | "empty"
   /**
+   * ⚠️ A PARAGRAPH INSIDE A CARD, AND THE ONE VOICE THAT HAD NO RULE — which is
+   * why the account-deletion card carried forty-five words in three sentences
+   * on a screen whose whole design language is "as short as it can be and still
+   * be true". Every other voice here is capped; a prose block with no cap is
+   * where the words a screen could not fit anywhere else collect.
+   *
+   * ⚠️ AND THE CAP IS TWO SENTENCES RATHER THAN A WORD COUNT ALONE, because
+   * that is the fault: not one long sentence but a THIRD one, which is where a
+   * card stops being read and starts being skipped. Detail past that belongs in
+   * the two-step the action opens, where somebody is already reading carefully.
+   */
+  | "body"
+  /**
    * ⚠️ A SENTENCE THE PRODUCT SAYS ABOUT SOMETHING THAT HAPPENED — a refusal, a
    * notification. It is not a `title`: "We could not reach One" is the right
    * shape for a problem and the wrong shape for a screen, and holding both to
@@ -145,6 +158,19 @@ export function refuseCopy(voice: Voice, text: string): readonly CopyRefusal[] {
       /* ⚠️ Still no terminal stop: it sits in a card beside four others that
          have none, and the inconsistency is what a reader notices. */
       if (/\.$/.test(trimmed)) out.push({ rule: "punctuation", why: "a notice takes no full stop" });
+      break;
+
+    case "body":
+      if (n > 24) out.push({ rule: "length", why: `${n} words; a paragraph in a card is twenty-four or fewer` });
+      /* ⚠️ COUNTED ON THE STOPS, and an abbreviation is not one — `e.g.` has no
+         space after its full stop, so the split ignores it rather than reporting
+         a sentence that is not there. */
+      {
+        const stops = trimmed.split(/[.?!](?:\s|$)/).filter((part) => part.trim()).length;
+        if (stops > 2) {
+          out.push({ rule: "length", why: `${stops} sentences; a card says two, and the rest belongs where the action is confirmed` });
+        }
+      }
       break;
 
     case "empty":

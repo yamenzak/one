@@ -346,6 +346,24 @@ export const EMPTY_READ = "max-w-[22rem]" as const;
  */
 export const CARD_ROWS = "px-4 py-3" as const;
 
+/**
+ * WHAT A CARD DOES TO A CHILD THAT IS NOT A ROW.
+ *
+ * ⚠️ A CARD'S RHYTHM IS THE ROW'S, AND EVERY ROW BRINGS IT — so a `Choice`, a
+ * `Lookup` or a paragraph dropped into one brought nothing and sat at half the
+ * spacing of the rows beside it. On `Dates and numbers` that put two pickers
+ * hard against each other with no air between the first one's control and the
+ * second one's label, which is what "sticking together" looks like.
+ *
+ * ⚠️ SO THE CARD GIVES IT, RATHER THAN EVERY CALLER REMEMBERING TO. `data-row`
+ * is stamped by the row components on their OUTERMOST element (the `Button`,
+ * not the `span` inside it — the selector matches a direct child of the card,
+ * so a marker one level in matches nothing). Anything without it gets exactly
+ * what a row has, so the spacing between any two children of a card is one
+ * number whatever they are.
+ */
+export const CARD_OTHERS = "[&>*:not([data-row])]:py-3" as const;
+
 /** Between a section's heading and the card under it. */
 export const HEAD_GAP = "gap-2" as const;
 

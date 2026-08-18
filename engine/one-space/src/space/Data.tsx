@@ -18,6 +18,7 @@
  */
 
 import { useState } from "react";
+import { Button } from "@heroui/react";
 import {
   ActionRow, Confirm, Group, NoteRow, Screen, glyphOf, notice, useShown,
 } from "@engine/design";
@@ -103,23 +104,42 @@ export function Data() {
         ) : null}
       </Group>
 
-      <Group label="Delete everything" under="This cannot be undone">
-        {/* ⚠️ `NoteRow`, NOT `Prose`. A card's inset caps its ends and its ROWS
-            carry the rest (`CARD_ROWS`), so a bare text block inside one sits on
-            half the rhythm of every row beside it. `Prose` is for a page of
-            prose; a paragraph inside a card is a row that happens to be words. */}
+      {/*
+        ⚠️ A HEADING, A LINE AND A BUTTON — see `Group.does`. This was a
+        forty-two word paragraph over a red row: the whole consequence of the
+        act, printed where somebody is scrolling past it, above a control that
+        did not look like one. The card says what the section IS and offers the
+        act; what exactly goes is said in the two-step, where somebody has
+        already decided to read.
+
+        ⚠️ AND THE DETAIL DID NOT GET SHORTER, IT MOVED. Nothing a person needed
+        was cut — it is one press later, at the moment they are actually
+        deciding, which is the only moment they read it.
+      */}
+      <Group
+        label="Delete everything"
+        under="This cannot be undone"
+        does={(
+          <Confirm
+            trigger={<Button variant="danger-soft">Delete my account</Button>}
+            title="Delete everything?"
+            act={{ label: "Delete", onDo: () => { void destroy(); } }}
+          >
+            Your account, your place in every workspace and your own records go, along
+            with the encrypted facts held for you. A workspace only you can run closes
+            with you; records that belong to a workspace stay, with your name unwritten
+            from them. There is no way back — take a copy first if you want one.
+          </Confirm>
+        )}
+      >
+        {/* ⚠️ ONE SENTENCE, BECAUSE THE CARD IS NOT WHERE THIS IS DECIDED. What
+            exactly goes, and what survives, is four lines of consequence — read
+            here it is scrolled past, read in the two-step it is read. A card
+            with a `does` and nothing else would be a button with a box drawn
+            round it, which is the shape `You.tsx` already refuses. */}
         <NoteRow>
-          Your account, your place in every workspace, your own records and the encrypted
-          facts held for you are deleted. A workspace only you can run is closed with you.
-          Records that belong to a workspace stay, with your name unwritten from them.
+          Your account, your places in every workspace, and everything held about you.
         </NoteRow>
-        <Confirm
-          trigger={<ActionRow label="Delete my account" tone="danger" />}
-          title="Delete everything?"
-          act={{ label: "Delete", onDo: () => { void destroy(); } }}
-        >
-          There is no way back from this. Take a copy first if you want one.
-        </Confirm>
       </Group>
     </Screen>
   );

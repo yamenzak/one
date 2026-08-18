@@ -111,6 +111,39 @@ for (const file of SOURCES) {
   }
 }
 
+/* -------------------------------------------------------- the prose block --- */
+
+/*
+  ⚠️ THE ONE PLACE COPY HID FROM THIS CHECK: NOT A PROP, BUT CHILDREN. Every
+  string above is `label="…"` or `under: "…"` — a `NoteRow`'s words are BETWEEN
+  its tags, so the account-deletion card carried forty-five words in three
+  sentences with nothing to catch it. A rule that only reads props is a rule
+  with a hole exactly the shape of a paragraph.
+
+  ⚠️ AND ONLY WHERE THE TEXT IS LITERAL. A block holding `{name}` is assembled
+  at render and its length is not this file's to judge, so it is skipped rather
+  than guessed at — a guard that scolds about an interpolation is one people
+  learn to route around.
+*/
+const BLOCKS = /<NoteRow[^>]*>([\s\S]*?)<\/NoteRow>/g;
+
+for (const file of SOURCES) {
+  const name = rel(file);
+  if (EXEMPT.has(name)) continue;
+  const src = strip(readFileSync(file, "utf8"));
+
+  for (const [, inner] of src.matchAll(BLOCKS)) {
+    if (/[{<]/.test(inner)) continue;
+    const text = inner.replace(/\s+/g, " ").trim();
+    if (text.length < 2) continue;
+    checked++;
+    for (const why of refuseCopy("body", text)) {
+      found++;
+      fail(`${name}: a card's paragraph "${text.slice(0, 56)}…"\n       ${why.rule} — ${why.why}`);
+    }
+  }
+}
+
 if (!found) ok(`copy: ${checked} written string(s), all in one voice`);
 
 /**
@@ -123,6 +156,8 @@ const MUST_CATCH = [
   ["under", "Hide amounts for all balances.", "punctuation"],
   ["action", "Submit", "vague"],
   ["empty", "0 results", "system-voice"],
+  /* ⚠️ The wall of text that had no rule to break — see the `body` voice. */
+  ["body", "One. Two. Three sentences is one past what a card is read for.", "length"],
 ];
 
 let proved = 0;

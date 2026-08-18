@@ -31,7 +31,7 @@ import type { Tone } from "@engine/kernel";
 import { sayMoneyParts } from "@engine/kernel";
 import { TYPE } from "../tokens/type.js";
 import {
-  CARD_ROWS, CONTROL_SHARE, CROWN_SIZE, HEAD_GAP, ICON, INSET, LEAD, NUDGE, PAD, ROW, SPACE,
+  CARD_OTHERS, CARD_ROWS, CONTROL_SHARE, CROWN_SIZE, HEAD_GAP, ICON, INSET, LEAD, NUDGE, PAD, ROW, SPACE,
   TILE,
 } from "../tokens/metrics.js";
 import type { Inset } from "../tokens/metrics.js";
@@ -61,6 +61,22 @@ export interface GroupProps {
   readonly face?: FaceOf;
   /** One line under the label, for a group whose consequence is not obvious. */
   readonly under?: string;
+  /**
+   * ONE ACTION AT THE FOOT OF THE CARD, AS A REAL BUTTON.
+   *
+   * ⚠️ A CARD WITH SOMETHING TO DO ABOUT IT IS A SHAPE THE VOCABULARY DID NOT
+   * HAVE, and its absence is what turned the delete-my-account card into a
+   * paragraph with a red sentence under it. `ActionRow` is right for a
+   * destructive item in a LIST of items — the grammar every settings screen
+   * uses — and wrong as the only thing in a card, where nothing around it says
+   * a row is pressable. A button says so by being one.
+   *
+   * ⚠️ AND IT IS A NODE RATHER THAN A LABEL AND A HANDLER, because the action
+   * that most often belongs here opens a two-step: what goes in the slot is a
+   * `Confirm` whose trigger is the button. A `{label, onDo}` prop would make
+   * that the one case the slot could not hold.
+   */
+  readonly does?: React.ReactNode;
   /**
    * ⚠️ ITS PLACE IN A SEQUENCE OF BLOCKS, WHICH IS THE ONLY STAGGER THERE IS.
    * Pass the index within a screen's sections and they arrive in reading order;
@@ -97,7 +113,7 @@ export interface GroupProps {
  * four beats. `arriveAt` is offered for exactly that — a stagger BETWEEN blocks,
  * capped, never within one.
  */
-export function Group({ label, under, face, at, sky, seedling, children }: GroupProps) {
+export function Group({ label, under, face, at, sky, seedling, does, children }: GroupProps) {
   const own = useScenery({ sky, seedling, reach: "card" });
   return (
     /* ⚠️ THE WORLD'S VARIABLES GO ON OUR OWN ELEMENT AND THE ATTRIBUTE GOES ON
@@ -133,7 +149,14 @@ export function Group({ label, under, face, at, sky, seedling, children }: Group
             between every row ON TOP of the separator that already says where
             one ends. A rule with air either side of it is a rule you notice. */}
         <Card.Content className="gap-0">
-          <div className="flex flex-col">{children}</div>
+          {/* ⚠️ `CARD_OTHERS` — a child that is not a row is given a row's
+              inset, so two pickers in a card are spaced like two rows rather
+              than jammed together. See the token. */}
+          <div className={`flex flex-col ${CARD_OTHERS}`}>{children}</div>
+          {/* ⚠️ THE FOOT IS THE CARD'S OWN INSET AGAIN, so a button there sits
+              exactly where a row's text does and the card reads as one block
+              rather than as a card with something bolted under it. */}
+          {does ? <div className={`flex ${ROW.pad}`}>{does}</div> : null}
         </Card.Content>
       </Card>
     </section>
@@ -457,7 +480,7 @@ export interface NavRowProps extends RowBase {
 
 export function NavRow({ icon, face, label, under, aside, onOpen, isDisabled }: NavRowProps) {
   return (
-    <Button variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.tap}`} isDisabled={isDisabled} onPress={onOpen}>
+    <Button data-row variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.tap}`} isDisabled={isDisabled} onPress={onOpen}>
       <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
         <Lead icon={icon} face={face} />
         <Body label={label} under={under} />
@@ -493,6 +516,7 @@ export function ActionRow({ icon, face, label, under, onDo, tone = "neutral" }: 
       already uses — and the two-step it opens is where the red button lives.
     */
     <Button
+      data-row
       variant="ghost"
       className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.tap}`}
       onPress={onDo}
@@ -521,7 +545,7 @@ export function ToggleRow({ icon, face, label, under, value, onChange, isDisable
     /* ⚠️ THE BREATHING ROOM IS ON OUR WRAPPER, NOT ON THE SWITCH. Padding is a
        component's own density; setting it here would be restyling the library,
        and the restyle guard is right to refuse it. */
-    <div className={`flex w-full ${ROW.pad} ${ROW.tap} items-center`}>
+    <div data-row className={`flex w-full ${ROW.pad} ${ROW.tap} items-center`}>
     <Switch
       /* ⚠️ `justify-between` IS THE WHOLE FIX. Without it the content takes the
          full width and the control wraps to a second line — which reads as a
@@ -567,7 +591,7 @@ export function ControlRow({ icon, face, label, under, wide, children }: RowBase
   readonly children: React.ReactNode;
 }) {
   return (
-    <div className={`flex flex-wrap items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
+    <div data-row className={`flex flex-wrap items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
       <Lead icon={icon} face={face} />
       {/* ⚠️ THE FLOOR IS A FEW WORDS, NOT A COLUMN. At 12rem it was wider than
           most labels, so on a phone EVERY control dropped to a line of its own
@@ -606,7 +630,7 @@ export function FieldRow({ label, value, under, onEdit }: {
   readonly onEdit?: () => void;
 }) {
   return (
-    <div className={`flex items-center ${ROW.gap} ${ROW.pad} ${ROW.still}`}>
+    <div data-row className={`flex items-center ${ROW.gap} ${ROW.pad} ${ROW.still}`}>
       <span className={`flex min-w-0 grow flex-col items-start text-left ${SPACE.hair}`}>
         <span className={TYPE.note}>{label}</span>
         <span className={`flex min-w-0 items-center ${SPACE.tight} ${TYPE.body}`}>{value}</span>
@@ -669,7 +693,7 @@ export function PersonRow({ name, under, when, unread, aside, goes, face, onOpen
   readonly onOpen: () => void;
 }) {
   return (
-    <Button variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.tap}`} onPress={onOpen}>
+    <Button data-row variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.tap}`} onPress={onOpen}>
       <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
         <Face of={face} name={name} />
         <Body label={name} under={under} />
@@ -733,8 +757,8 @@ export function AmountRow({ icon, face, label, under, amount, aside, tone = "neu
     </span>
   );
   return onOpen
-    ? <Button variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.tap}`} onPress={onOpen}>{inner}</Button>
-    : <div className="flex w-full">{inner}</div>;
+    ? <Button data-row variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.tap}`} onPress={onOpen}>{inner}</Button>
+    : <div data-row className="flex w-full">{inner}</div>;
 }
 
 /* ---------------------------------------------------------------- clusters --- */
@@ -951,7 +975,7 @@ export function CopyRow({ label, value, onCopy }: {
   readonly onCopy: (value: string) => void;
 }) {
   return (
-    <div className={`flex items-center ${ROW.gap} ${ROW.pad} ${ROW.still}`}>
+    <div data-row className={`flex items-center ${ROW.gap} ${ROW.pad} ${ROW.still}`}>
       <span className={`flex min-w-0 grow flex-col items-start text-left ${SPACE.hair}`}>
         <span className={TYPE.note}>{label}</span>
         {/* ⚠️ MONO, BECAUSE THIS IS AN IDENTIFIER RATHER THAN A WORD. A seal
@@ -984,7 +1008,7 @@ export function NoteRow({ icon, face, children }: {
   readonly children: React.ReactNode;
 }) {
   return (
-    <div className={`flex items-start ${ROW.gap} ${ROW.pad}`}>
+    <div data-row className={`flex items-start ${ROW.gap} ${ROW.pad}`}>
       <Lead icon={icon} face={face} />
       <p className={TYPE.body}>{children}</p>
     </div>
@@ -1002,7 +1026,7 @@ export function OfferRow({ icon, face, label, under, offer }: RowBase & {
   readonly offer: { readonly label: string; readonly onDo: () => void };
 }) {
   return (
-    <div className={`flex items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
+    <div data-row className={`flex items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
       <Lead icon={icon} face={face} />
       <Body label={label} under={under} />
       <span className="shrink-0">
@@ -1022,7 +1046,7 @@ export function OfferRow({ icon, face, label, under, offer }: RowBase & {
  */
 export function StepRow({ icon, face, label, under }: RowBase) {
   return (
-    <div className={`flex items-start ${ROW.gap} ${ROW.pad} ${ROW.still}`}>
+    <div data-row className={`flex items-start ${ROW.gap} ${ROW.pad} ${ROW.still}`}>
       <Lead icon={icon} face={face} />
       <Body label={label} under={under} />
     </div>
