@@ -13,7 +13,7 @@
  */
 
 import type { AppId, AppSpec, TenantId } from "@engine/kernel";
-import { PLATFORM_ENTITLEMENTS, isBusiness } from "@engine/kernel";
+import { entitlementKeys, isBusiness } from "@engine/kernel";
 import { MEMBERSHIP, billFor, mixedCurrencies, subscriptionFor } from "./billing.js";
 import { startCheckout, startTopUp } from "./stripe.js";
 import { armAutoTopUp, autoTopUpOf, movements, spentByApp, walletOf } from "./wallet.js";
@@ -94,10 +94,7 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         plans: ctx.plans,
         /* ⚠️ Every key the workspace could hold — the platform's and every
            enabled product's — so the shelf can say what a tier changes. */
-        entitlements: {
-          ...PLATFORM_ENTITLEMENTS,
-          ...Object.fromEntries(apps.flatMap((a) => Object.entries(a.entitlements))),
-        },
+        entitlements: entitlementKeys(apps),
         apps: apps.map((a) => ({ id: a.id, name: a.name, mark: a.mark })),
         bill,
         wallet,

@@ -23,6 +23,7 @@ import { AI_ACTION_SCHEMA } from "./ai-actions.js";
 import { AUDIT_SCHEMA, REPLAY_SCHEMA } from "./audit.js";
 import { BILLING_SCHEMA } from "./billing.js";
 import { BRANDING_SCHEMA } from "./branding.js";
+import { CATALOGUE_SCHEMA } from "./catalogue.js";
 import { DIRECTORY_SCHEMA } from "./directory.js";
 import { IDENTITY_SCHEMA } from "./identity.js";
 import { INBOX_SCHEMA } from "./inbox.js";
@@ -54,6 +55,10 @@ export const DIRECTORY_MODULES: readonly SchemaModule[] = [
      another shard entirely — see `push.ts`. */
   PUSH_SCHEMA,
   JOBS_SCHEMA, OPERATOR_SCHEMA, AI_ACTION_SCHEMA,
+  /* ⚠️ IN THE DIRECTORY, BESIDE THE SUBSCRIPTIONS IT PRICES. There is one
+     catalogue for the whole deployment — a copy per shard would be a plan edited
+     in Frankfurt and not in Virginia, i.e. two prices for one product. */
+  CATALOGUE_SCHEMA,
   /* ⚠️ IN THE DIRECTORY, BECAUSE A CREDENTIAL IS THE DEPLOYMENT'S. One Stripe
      account and one sender stand behind every workspace on every shard, so a
      copy per shard would be one rotation that has to reach N databases and does

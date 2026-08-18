@@ -120,7 +120,7 @@ beforeEach(async () => {
   sent.length = 0;
   for (const t of ["membership", "note", "audit", "replay"]) await shard().exec(`DELETE FROM ${t};`);
   for (const t of ["invited", "belongs", "tenant_app", "tenant", "session", "code", "account",
-    "subscription", "maintenance", "deployment_flag"]) {
+    "subscription", "maintenance", "deployment_flag", "plan_edit"]) {
     await directory().exec(`DELETE FROM ${t};`);
   }
   ops = await signIn("ops@example.com");
@@ -342,6 +342,57 @@ describe("what the console can change", () => {
     const ground = await (await get("admin", "/api/op.shards", ops)).json() as
       { items: { id: string }[] };
     expect(ground.items.map((s) => s.id)).toContain("eu-1");
+  });
+
+  /*
+    ⚠️ THE PRICE LIST, EDITED THROUGH THE DOOR RATHER THAN THROUGH A DEPLOY. What
+    this asserts past the unit tests is that the edit REACHES the rest of the
+    product: `op.tenants` prices against the same list a gate resolves against, so
+    an edit visible on one and not the other is a screen promising what a route
+    refuses.
+  */
+  it("edits a plan, holds everybody on it, and puts it back", async () => {
+    const tenant = (await tenantBySlug(directory(), "eastgate"))!;
+    expect((await post("admin", "/api/op.tenant.plan",
+      { tenant: tenant.id, plan: "solo" }, ops)).status).toBe(200);
+
+    const cut = await post("admin", "/api/op.plan.edit",
+      { plan: "solo", edit: { price: 1900, includes: { seats: 1 } } }, ops);
+    expect(cut.status).toBe(200);
+    /* ⚠️ AND IT SAYS HOW MANY IT HELD. An operator who narrows a tier is told
+       what that did — otherwise the safest thing this product does is invisible. */
+    expect((await cut.json() as { held: number }).held).toBe(1);
+
+    const seen = await (await get("admin", "/api/op.plans", ops)).json() as {
+      declared: { id: string; price: number }[];
+      sold: { id: string; price: number }[];
+      on: Record<string, number>;
+    };
+    expect(seen.sold.find((p) => p.id === "solo")?.price).toBe(1900);
+    /* ⚠️ AND WHAT THE CODE SAYS, BESIDE IT — a screen that showed only the
+       current number could not offer a way back to the declaration. */
+    expect(seen.declared.find((p) => p.id === "solo")?.price).toBe(1200);
+    expect(seen.on.solo).toBe(1);
+
+    /* ⚠️ THE WHOLE PRODUCT READS THE EDIT, not just the screen that made it. */
+    const tenants = await (await get("admin", "/api/op.tenants", ops)).json() as
+      { plans: { id: string; price: number }[] };
+    expect(tenants.plans.find((p) => p.id === "solo")?.price).toBe(1900);
+
+    /* ⚠️ A CATALOGUE CI WOULD REFUSE CANNOT BE TYPED IN HERE EITHER. */
+    expect((await post("admin", "/api/op.plan.edit",
+      { plan: "none", edit: { price: 400 } }, ops)).status).toBe(400);
+
+    expect((await post("admin", "/api/op.plan.reset", { plan: "solo" }, ops)).status).toBe(200);
+    const back = await (await get("admin", "/api/op.plans", ops)).json() as
+      { sold: { id: string; price: number }[] };
+    expect(back.sold.find((p) => p.id === "solo")?.price).toBe(1200);
+  });
+
+  /* ⚠️ AND IT IS THE OPERATOR DOOR'S, like everything else here. */
+  it("refuses a price change from anywhere but the console", async () => {
+    expect((await post("eastgate", "/api/op.plan.edit",
+      { plan: "solo", edit: { price: 1 } }, owner)).status).toBe(404);
   });
 });
 

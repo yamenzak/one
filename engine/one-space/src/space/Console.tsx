@@ -22,6 +22,7 @@
 import { Group, NavRow, Screen, glyphOf } from "@engine/design";
 import { useSession } from "../session.js";
 import { Actions } from "../console/Actions.js";
+import { Catalogue } from "../console/Catalogue.js";
 import { Footing } from "../console/Footing.js";
 import { Ground } from "../console/Ground.js";
 import { Keys } from "../console/Keys.js";
@@ -44,6 +45,7 @@ export type ConsolePartId = ConsolePart;
    every other menu in this product. */
 const GLYPH: Readonly<Record<ConsolePartId, string>> = {
   tenants: "workspace",
+  catalogue: "bank",
   actions: "sparkle",
   keys: "key",
   switches: "settings",
@@ -116,11 +118,23 @@ export function ConsolePart({ part, app, onGo }: {
     case "tenants": return <Tenants onGo={(id) => onGo({ at: "tenant", id })} />;
     case "actions":
       return <Actions app={app} onGo={(id) => onGo({ at: "actions", app: id })} />;
+    case "catalogue": return <Catalogue />;
     case "switches": return <Switches />;
     case "telling": return <Telling />;
     case "works": return <Works />;
     case "ground": return <Ground />;
     case "keys": return <Keys />;
     case "footing": return <Footing />;
+    /*
+      ⚠️ A MISSING BRANCH IS A BUILD FAILURE, NOT A BLANK PAGE. Without this the
+      switch simply returns `undefined` for a part nobody wrote a case for, React
+      renders nothing, and the row leads to an empty screen with every suite
+      green — which is precisely how `/space/console/footing` shipped once. Same
+      assertion `Inside` makes over the whole address grammar.
+    */
+    default: {
+      const missing: never = part;
+      throw new Error(`no screen for console part ${String(missing)}`);
+    }
   }
 }

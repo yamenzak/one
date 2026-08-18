@@ -170,6 +170,9 @@ live inside workspaces and an operator stands outside all of them.
 | `op.tenant.plan` | write |
 | `op.tenant.money` | read |
 | `op.tenant.comp` | write |
+| `op.plans` | read |
+| `op.plan.edit` | write |
+| `op.plan.reset` | write |
 | `op.tenant.app` | write |
 | `op.account.commercial` | write |
 | `op.config` | read |
@@ -299,6 +302,7 @@ before an app is resolved draws on them.
 | `maintenance` | — *the deployment's own switches* | — | kept |
 | `ai_binding` | — *which model an action runs on* | — | kept |
 | `ai_wording` | — *a workspace's own prompt letterheads* | — | `tenant_id: delete` |
+| `plan_edit` | — *what the catalogue was edited to, and who edited it* | — | kept |
 | `deployment_config` | — *what the deployment was told: its sender, and the account it charges through* | — | kept |
 | `stripe_event` | — *which payments arrived, and what each one was applied to* | — | kept |
 | `resource` | — *the databases and buckets the deployment made for itself* | — | kept |
@@ -353,7 +357,7 @@ and a manifest that does not compose refuses to boot.
 | `access` | permissions, roles, and what an app may never claim | 15 | 1 |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
 | `manifest` | the whole app, and the composition that refuses a broken one | 9 | — |
-| `entitlement` | what a plan includes, and the allowance algebra over it | 10 | — |
+| `entitlement` | what a plan includes, and the allowance algebra over it | 11 | — |
 | `credit` | metered work: the reserve, the rate, the ceiling | 7 | 1 |
 | `dunning` | the ladder from past due to erased | 5 | — |
 | `package` | a priced bundle of timed grants | 8 | 1 |
@@ -374,7 +378,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**212 of them**, 205 reached by something today.
+**213 of them**, 206 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -400,8 +404,9 @@ env or a binding.
 | `serve` | the one path every request ends in — both doors | 5 | — |
 | `records` | the generated reads and writes behind a collection | 6 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
-| `billing` | plans, subscriptions, the bill, the ladder | 15 | 1 |
+| `billing` | plans, subscriptions, the bill, the ladder | 15 | — |
 | `wallet` | OneWallet: the allowance, what was bought, and reserve → settle → release | 22 | — |
+| `catalogue` | the price list an operator edits over the declaration, and what it holds for the people already on a tier | 8 | — |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
 | `inbox` | notifications: the policy, the audience, the read | 10 | — |
 | `services` | the lane out to a provider — AI and mail | 5 | 1 |
@@ -437,7 +442,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**309 of them**, 306 reached by something today.
+**317 of them**, 315 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -802,6 +807,11 @@ its own header, cited by other files, and doing nothing.
 | `arriving-after-the-edit-gets-the-edit` | D12 | an operator narrowing a tier and changing nothing at all, because the snapshot was written onto future subscriptions as well and the plan's own numbers stopped being reachable |
 | `grandfathering-only-ever-ratchets-up` | D12 | a tier cut in two steps losing everything the first step protected — the second snapshot overwrites the first, so narrowing twice is a way to take back what was held |
 | `an-edit-reaches-only-the-plan-it-edits` | D12 | editing one tier pinning every workspace on every other tier to whatever that one used to include, so the catalogue stops meaning anything the moment it is edited twice |
+| `the-console-cannot-type-a-catalogue-ci-would-refuse` | D12 | a lapsed workspace charged for a plan it never chose, or not paying buying more than the cheapest tier does — every rule the build checks, reachable through a form that checks none of them |
+| `an-edit-may-not-invent-an-entitlement` | D12 | a tier sold with a capability no gate reads, because the apps declare the keys and a price list that could add one is selling something nothing enforces |
+| `an-unservable-catalogue-falls-back-to-the-code` | D12 | one stale row taking the whole deployment down — every gate, price and standing resolves against this list, and an edit written against last month's declaration can stop merging into a valid one with nobody having done anything |
+| `an-edit-is-a-diff-not-a-copy` | D12 | a plan whose trial cannot be turned off, and untouched fields frozen at whatever they were on the day somebody edited the price — a zero read as an absence is the whole difference between a diff and a copy |
+| `an-edited-price-reaches-the-whole-product` | D12 | the price list edited on one screen and read from the code everywhere else — the gate, the bill and the checkout resolving against a catalogue nobody can see, which is a screen promising what a route refuses |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -820,7 +830,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 105 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 110 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -855,9 +865,8 @@ nothing yet.
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `runtime/src/jobs.ts` | 1 |
 | **41** — A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have | `kernel/src/brand.ts` | 1 |
 | **42** — A screen asks the gate before it draws a control, rather than after it is pressed | `kernel/src/gate.ts` | 1 |
-| **45** — A plan is edited, and everybody already on it keeps what they were sold | `runtime/src/billing.ts` | 1 |
 
-**10 declarations** are built and reached by nothing, each waiting on a
+**9 declarations** are built and reached by nothing, each waiting on a
 stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one
 that names no stage, so this list cannot grow by forgetting.
 <!-- /generated -->
@@ -911,11 +920,11 @@ that names no stage, so this list cannot grow by forgetting.
 | 42 | A screen asks the gate before it draws a control, rather than after it is pressed | **planned** |
 | 43 | Hello's remaining screens reach the workspace's own records — the report against its target, and writing a note | **planned** |
 | 44 | A one-off purchase — a credit pack, and becoming a business — through the same checkout | shipped |
-| 45 | A plan is edited, and everybody already on it keeps what they were sold | **planned** |
+| 45 | A plan is edited from the console, and everybody already on it keeps what they were sold | shipped |
 | 46 | The wallet tops itself up — a standing instruction, a cooldown, and a decline the customer can read | shipped |
 | 47 | Storage is metered rather than refused — the included amount is where the meter starts, and an empty wallet costs the writes and never the files | shipped |
 
-**38 shipped, 9 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**39 shipped, 8 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

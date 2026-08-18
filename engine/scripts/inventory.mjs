@@ -200,6 +200,7 @@ if (what === "guards") {
     ["settings", "reading and writing a workspace's own switches"],
     ["billing", "plans, subscriptions, the bill, the ladder"],
     ["wallet", "OneWallet: the allowance, what was bought, and reserve → settle → release"],
+    ["catalogue", "the price list an operator edits over the declaration, and what it holds for the people already on a tier"],
     ["packages", "granting, revoking and expiring a bought bundle"],
     ["inbox", "notifications: the policy, the audience, the read"],
     ["services", "the lane out to a provider — AI and mail"],

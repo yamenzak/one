@@ -298,10 +298,6 @@ export async function grandfather(
  * this plan" answered by walking shards is the fan-out the whole split exists to
  * avoid, and this runs while somebody is waiting for a form to save.
  */
-/* DEFER(engine-45) stage:45 — the EDIT is what calls this, and the catalogue is
-   still a declaration in code. The mechanism is built and proved first on
-   purpose: an editor shipped without it downgrades every existing customer on
-   its first save, silently, and that is not a thing to be adding afterwards. */
 export async function holdEveryoneOn(
   db: Db, planId: string, was: PlanSpec, now: PlanSpec,
 ): Promise<number> {

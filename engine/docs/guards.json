@@ -2575,6 +2575,51 @@
       "impl": "runtime/test/grandfather.test.ts",
       "proves": "holds only the workspaces that were on the plan",
       "fails": "editing one tier pinning every workspace on every other tier to whatever that one used to include, so the catalogue stops meaning anything the moment it is edited twice"
+    },
+    {
+      "id": "the-console-cannot-type-a-catalogue-ci-would-refuse",
+      "protects": "D12",
+      "stage": "45",
+      "status": "live",
+      "impl": "runtime/test/catalogue.test.ts",
+      "proves": "refuses an edit that puts a price on the lobby",
+      "fails": "a lapsed workspace charged for a plan it never chose, or not paying buying more than the cheapest tier does — every rule the build checks, reachable through a form that checks none of them"
+    },
+    {
+      "id": "an-edit-may-not-invent-an-entitlement",
+      "protects": "D12",
+      "stage": "45",
+      "status": "live",
+      "impl": "runtime/test/catalogue.test.ts",
+      "proves": "drops a key the declared plan does not include",
+      "fails": "a tier sold with a capability no gate reads, because the apps declare the keys and a price list that could add one is selling something nothing enforces"
+    },
+    {
+      "id": "an-unservable-catalogue-falls-back-to-the-code",
+      "protects": "D12",
+      "stage": "45",
+      "status": "live",
+      "impl": "runtime/test/catalogue.test.ts",
+      "proves": "serves the declaration rather than a catalogue that would be refused",
+      "fails": "one stale row taking the whole deployment down — every gate, price and standing resolves against this list, and an edit written against last month's declaration can stop merging into a valid one with nobody having done anything"
+    },
+    {
+      "id": "an-edit-is-a-diff-not-a-copy",
+      "protects": "D12",
+      "stage": "45",
+      "status": "live",
+      "impl": "runtime/test/catalogue.test.ts",
+      "proves": "can set a trial to zero",
+      "fails": "a plan whose trial cannot be turned off, and untouched fields frozen at whatever they were on the day somebody edited the price — a zero read as an absence is the whole difference between a diff and a copy"
+    },
+    {
+      "id": "an-edited-price-reaches-the-whole-product",
+      "protects": "D12",
+      "stage": "45",
+      "status": "live",
+      "impl": "apps/hello/test/operator.test.ts",
+      "proves": "edits a plan, holds everybody on it, and puts it back",
+      "fails": "the price list edited on one screen and read from the code everywhere else — the gate, the bill and the checkout resolving against a catalogue nobody can see, which is a screen promising what a route refuses"
     }
   ]
 }

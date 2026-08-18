@@ -118,6 +118,24 @@ export const PLATFORM_ENTITLEMENTS: Readonly<Record<string, EntitlementDef>> = {
 };
 
 /**
+ * EVERY KEY A WORKSPACE COULD HOLD — the platform's, and every product's.
+ *
+ * ⚠️ ONE FUNCTION, BECAUSE THIS UNION HAD FOUR COPIES. The boot check, the
+ * request resolver, the shelf and the operator's adjustment each spread the same
+ * two objects in the same order — and a fifth reader that got the order backwards
+ * would let a product silently redefine `seats`, which is the one key the seat
+ * gate and the price both read.
+ */
+export function entitlementKeys(
+  apps: readonly { readonly entitlements: Readonly<Record<string, EntitlementDef>> }[],
+): Readonly<Record<string, EntitlementDef>> {
+  return {
+    ...PLATFORM_ENTITLEMENTS,
+    ...Object.fromEntries(apps.flatMap((a) => Object.entries(a.entitlements))),
+  };
+}
+
+/**
  * THE MONTH'S ALLOWANCE, WHEN AN OPERATOR HAS SET ONE FOR THIS WORKSPACE.
  *
  * ⚠️ IT LIVES IN THE ADJUSTMENTS BLOB AND IS NOT AN ENTITLEMENT, and both halves

@@ -115,6 +115,14 @@ export type Where =
    * (DESIGN.md §3).
    */
   | { readonly at: "tenant"; readonly id: string }
+  /**
+   * ⚠️ WHAT THIS DEPLOYMENT SELLS, WHICH IS NOT WHAT ITS CODE DECLARES. The
+   * declaration decides which plans exist and which keys each one prices; the
+   * numbers over it are somebody's edit, and without a screen they are values
+   * only a deploy can change — so a price change is a code push, which is how a
+   * catalogue comes to be a year out of date.
+   */
+  | { readonly at: "catalogue" }
   | { readonly at: "actions"; readonly app?: string }
   | { readonly at: "switches" }
   | { readonly at: "works" }
@@ -186,7 +194,7 @@ export const atConsoleScreen = (
  * between them is the whole of the explanation.
  */
 export const OFTEN: readonly WorkspacePart[] = ["people", "money"];
-export const OF_CONSOLE = ["tenants", "actions", "keys", "switches", "telling", "works", "ground", "footing"] as const;
+export const OF_CONSOLE = ["tenants", "catalogue", "actions", "keys", "switches", "telling", "works", "ground", "footing"] as const;
 
 export type WorkspacePart = typeof OF_WORKSPACE[number];
 export type ConsolePart = typeof OF_CONSOLE[number];
@@ -308,9 +316,6 @@ export function pathOf(where: Where): string {
     case "console": return `${SPACE}/console`;
     case "actions": return `${SPACE}/console/actions${where.app ? `/${where.app}` : ""}`;
     case "tenant": return `${SPACE}/console/tenants/${where.id}`;
-    case "tenants": case "keys": case "switches": case "telling": case "works": case "ground":
-    case "footing":
-      return `${SPACE}/console/${where.at}`;
     case "plan": return `${SPACE}/w/${where.slug}/plan`;
     /* ⚠️ THE PAGE IS IN THE ADDRESS TOO. Settings descend, and an area that only
        lived in the parser is one somebody can reach and never link to — and
@@ -320,7 +325,18 @@ export function pathOf(where: Where): string {
         where.app && where.area ? `/${where.area}` : ""}`;
     case "wording":
       return `${SPACE}/w/${where.slug}/wording${where.app ? `/${where.app}` : ""}`;
-    default: return `${SPACE}/w/${where.slug}/${where.at}`;
+    /*
+      ⚠️ DECIDED BY SHAPE, NEVER BY A SECOND LIST. Seven console parts were
+      written out here beside the `OF_CONSOLE` they came from — so the eighth
+      fell through to the workspace arm and addressed itself as
+      `/w/undefined/catalogue`, which resolves to a screen and renders nothing.
+      A workspace screen carries a slug and a console screen does not, and that
+      is a fact about the address rather than a list somebody keeps.
+    */
+    default:
+      return "slug" in where
+        ? `${SPACE}/w/${where.slug}/${where.at}`
+        : `${SPACE}/console/${where.at}`;
   }
 }
 
@@ -347,9 +363,6 @@ export function above(where: Where): Where | null {
     case "workspace": return { at: "workspaces" };
     case "actions": return where.app ? { at: "actions" } : { at: "console" };
     case "tenant": return { at: "tenants" };
-    case "tenants": case "keys": case "switches": case "telling": case "works": case "ground":
-    case "footing":
-      return { at: "console" };
     case "plan": return { at: "money", slug: where.slug };
     case "settings":
       return where.area ? { at: "settings", slug: where.slug, app: where.app }
@@ -357,7 +370,10 @@ export function above(where: Where): Where | null {
           : { at: "workspace", slug: where.slug };
     case "wording":
       return where.app ? { at: where.at, slug: where.slug } : { at: "workspace", slug: where.slug };
-    default: return { at: "workspace", slug: where.slug };
+    /* ⚠️ THE SAME SHAPE TEST AS `pathOf`, and for the same reason — a console
+       screen with no slug went "up" to a workspace that does not exist. */
+    default:
+      return "slug" in where ? { at: "workspace", slug: where.slug } : { at: "console" };
   }
 }
 
@@ -383,6 +399,7 @@ export const nameOf = (where: Where): string => {
     case "wording": return "In your words";
     case "console": return "Operator";
     case "tenants": return "Tenants";
+    case "catalogue": return "Price list";
     case "tenant": return "Workspace";
     case "actions": return "Actions";
     case "switches": return "Switches";

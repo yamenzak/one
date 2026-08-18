@@ -24,7 +24,7 @@ import type {
   AccountId, AppId, Allowance, AppSpec, FlagBook, ModelRow, PlanSpec, TenantId,
 } from "@engine/kernel";
 import {
-  ALLOWANCE_KEY, KEEPS_RESIDENCY, PLATFORM_ENTITLEMENTS, allowanceFor, inLane, mayIsolate,
+  ALLOWANCE_KEY, KEEPS_RESIDENCY, allowanceFor, entitlementKeys, inLane, mayIsolate,
   refuseCatalogue,
   refusePrompt,
 } from "@engine/kernel";
@@ -35,6 +35,10 @@ import { apply, plan, resources, wanted } from "./resources.js";
 import { beginMove } from "./move.js";
 import { actionsOf, bind, bindingsOf, running } from "./ai-actions.js";
 import { MEMBERSHIP, adjust, compPlan, subscriptionFor } from "./billing.js";
+import {
+  catalogueProblems, editPlan, effectivePlans, onEachPlan, planEdits, resetPlan,
+  type PlanEdit,
+} from "./catalogue.js";
 import { autoTopUpOf, movements, renewAllowance, spentByApp, topUp, walletOf } from "./wallet.js";
 import {
   addShard, appsOfTenant, commercialAllowance, commercialLeft, disableApp, enableApp,
@@ -151,6 +155,15 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
     if (!deps.isOperator(ctx.email)) ctx.fail("platform.forbidden");
   };
 
+  /**
+   * ⚠️ WHAT IS ACTUALLY SOLD, WHICH IS NOT WHAT THE CODE DECLARES ANY MORE.
+   * `deps.plans` is the declaration — the authority for which plans exist and
+   * which keys each prices, checked at boot. The console edits the numbers over
+   * it, so every operation that reports or grants a plan has to ask.
+   */
+  const sold = (ctx: PersonalCtx): Promise<readonly PlanSpec[]> =>
+    effectivePlans(ctx.directory, deps.plans ?? [], entitlementKeys(every()));
+
   return {
     /*
       ⚠️ ONE ROW PER WORKSPACE, WITH ITS STANDING PER PRODUCT. The adjustments
@@ -204,7 +217,7 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
           id: a.id, name: a.name, mark: a.mark,
           entitlements: a.entitlements,
         }));
-        return { items, apps, plans: deps.plans ?? [] };
+        return { items, apps, plans: await sold(ctx) };
       },
     },
 
@@ -233,10 +246,7 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
           membership, so a lookup in one app's book would refuse half of what is
           on the screen in front of them.
         */
-        const holdable = {
-          ...PLATFORM_ENTITLEMENTS,
-          ...Object.fromEntries(every().flatMap((a) => Object.entries(a.entitlements))),
-        };
+        const holdable = entitlementKeys(every());
         /*
           ⚠️ AND THE MONTH'S ALLOWANCE, WHICH IS NOT AN ENTITLEMENT — see
           `ALLOWANCE_KEY`. It rides the same write because the semantics are
@@ -276,11 +286,12 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
         operator(ctx);
         const tenantId = String(input.tenant ?? "") as TenantId;
         const planId = String(input.plan ?? "");
-        const plan = (deps.plans ?? []).find((p) => p.id === planId);
+        const plans = await sold(ctx);
+        const plan = plans.find((p) => p.id === planId);
         if (!tenantId || !plan) return ctx.fail("platform.invalid");
 
         await compPlan(ctx.directory, tenantId, MEMBERSHIP, plan.id, ctx.now);
-        await renewAllowance(ctx.directory, tenantId, deps.plans ?? [], ctx.now);
+        await renewAllowance(ctx.directory, tenantId, plans, ctx.now);
         return { tenant: tenantId, plan: plan.id, credits: plan.credits };
       },
     },
@@ -308,7 +319,7 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
         /* ⚠️ THE RESOLVED ALLOWANCE, not the plan's own — an override honoured
            in the product and invisible here is one nobody can explain. */
         const sub = await subscriptionFor(ctx.directory, tenantId, MEMBERSHIP);
-        const plan = (deps.plans ?? []).find((p) => p.id === sub?.planId) ?? null;
+        const plan = (await sold(ctx)).find((p) => p.id === sub?.planId) ?? null;
 
         return {
           wallet: await walletOf(ctx.directory, tenantId),
@@ -356,6 +367,85 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
 
         await topUp(ctx.directory, tenantId, credits, why, {}, ctx.now);
         return { tenant: tenantId, credits };
+      },
+    },
+
+    /**
+     * THE CATALOGUE, AS DECLARED AND AS SOLD.
+     *
+     * ⚠️ BOTH, BECAUSE AN EDITOR SHOWING ONLY THE CURRENT NUMBERS CANNOT SAY
+     * WHICH OF THEM SOMEBODY TYPED. "Reset to what the code says" is the one
+     * action every editable-configuration screen needs and the one it cannot
+     * offer without knowing what the code says.
+     *
+     * ⚠️ AND HOW MANY WORKSPACES ARE ON EACH TIER, BEFORE THE EDIT RATHER THAN
+     * AFTER. Cutting a limit is a different decision at three customers and at
+     * three hundred, and the number is one query away from the person deciding.
+     */
+    "op.plans": {
+      kind: "read", needs: "session", doors: ["operator"],
+      async run(ctx): Promise<unknown> {
+        operator(ctx);
+        const declared = deps.plans ?? [];
+        return {
+          declared,
+          sold: await sold(ctx),
+          edits: await planEdits(ctx.directory),
+          on: await onEachPlan(ctx.directory),
+          keys: entitlementKeys(every()),
+          /* ⚠️ WHY THE EDITS ARE NOT BEING SERVED, WHEN THEY ARE NOT. The
+             fallback is correct and silent, which is the problem it creates —
+             see `catalogueProblems`. */
+          problems: await catalogueProblems(ctx.directory, declared, entitlementKeys(every())),
+        };
+      },
+    },
+
+    /**
+     * A PLAN'S NUMBERS CHANGE.
+     *
+     * ⚠️ IT GRANDFATHERS FIRST, ALWAYS — `editPlan` owns that order, because
+     * afterwards the old numbers are gone and there is nothing left to snapshot.
+     * The count comes back so the operator is told how many workspaces were held
+     * rather than left to assume it happened.
+     *
+     * ⚠️ AND A REFUSAL IS THE BUILD'S REFUSAL, REPORTED RATHER THAN CORRECTED.
+     * `refuseCatalog` over the merged result: the same function, the same
+     * reasons, so a catalogue that would fail CI cannot be typed into the
+     * console instead.
+     */
+    "op.plan.edit": {
+      kind: "write", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const planId = String(input.plan ?? "");
+        const edit = (input.edit ?? {}) as PlanEdit;
+        if (!planId || typeof edit !== "object") return ctx.fail("platform.invalid");
+
+        const out = await editPlan(
+          ctx.directory, deps.plans ?? [], entitlementKeys(every()),
+          planId, edit, ctx.now, ctx.email);
+        if ("unknown" in out) return ctx.fail("platform.invalid");
+        /* ⚠️ THE REFUSAL NAMES THE RULE. "That is not a valid catalogue" with
+           nothing else is a screen telling somebody to guess, and the rules are
+           the build's own — one line each, keyed by which one was broken. */
+        if (!out.ok) {
+          return ctx.fail("platform.invalid", {},
+            { fields: Object.fromEntries(out.problems.map((p) => [p.why, p.detail])) });
+        }
+        /* ⚠️ The status carries the yes; the body carries what happened. */
+        return { plan: out.plan, held: out.held };
+      },
+    },
+
+    /** A plan goes back to what the code says — see `resetPlan`. */
+    "op.plan.reset": {
+      kind: "write", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const planId = String(input.plan ?? "");
+        if (!planId) return ctx.fail("platform.invalid");
+        return { plan: planId, held: await resetPlan(ctx.directory, deps.plans ?? [], planId) };
       },
     },
 

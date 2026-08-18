@@ -16,7 +16,7 @@
 import type { AppSpec, Door, Instant, TenantId } from "@engine/kernel";
 import { seatsUsed, tableFor } from "@engine/kernel";
 import { heldBy } from "./billing.js";
-import { PLATFORM_ENTITLEMENTS, type PlanSpec } from "@engine/kernel";
+import { entitlementKeys, type PlanSpec } from "@engine/kernel";
 import { walletOf } from "./wallet.js";
 import { tenantBySlug, type TenantRow } from "./directory.js";
 import { membersOf } from "./membership.js";
@@ -78,10 +78,7 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
       and it also meant "the strictest standing wins" was reducing over rows that
       were always going to agree, because there is one membership behind them.
     */
-    const keys = {
-      ...PLATFORM_ENTITLEMENTS,
-      ...Object.fromEntries(apps.flatMap((a) => Object.entries(a.entitlements))),
-    };
+    const keys = entitlementKeys(apps);
     const held = await heldBy(
       deps.directory, tenant.id, { plans: deps.plans, keys }, now, charging);
     const standing = held.standing;

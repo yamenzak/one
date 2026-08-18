@@ -203,6 +203,11 @@ export const HOLDINGS: readonly HeldBy[] = [
   { table: "stripe_event", person: [],
     why: "which payments arrived, and what each one was applied to" },
   { table: "maintenance", person: [], why: "the deployment's own switches" },
+  /* ⚠️ THE PRICE LIST, NOT ANYBODY'S RECORD. It holds a plan id, some numbers and
+     the address of the operator who typed them — which is a colleague rather
+     than a customer, and the one name a price change has to be traceable to. */
+  { table: "plan_edit", person: [],
+    why: "what the catalogue was edited to, and who edited it" },
   { table: "_schema", person: [], why: "the migration marker" },
 
   /* --- a shard: the workspace's roster, its inbox, its record of what happened --- */

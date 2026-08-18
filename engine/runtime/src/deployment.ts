@@ -23,7 +23,7 @@
  */
 
 import type { AppSpec, DeploymentLegal, PackDef, PlanSpec } from "@engine/kernel";
-import { PLATFORM_ENTITLEMENTS, holdingsOf, missingDocuments, refuseCatalog, refusePacks } from "@engine/kernel";
+import { entitlementKeys, holdingsOf, missingDocuments, refuseCatalog, refusePacks } from "@engine/kernel";
 import { incoherent, unledgered } from "./dossier.js";
 import { unbound, type Env } from "./handles.js";
 import { unreachableByErasure } from "./records.js";
@@ -90,10 +90,7 @@ export function deploymentFaults(of: Deployment): readonly string[] {
     the same fault whichever half declared it.
   */
   if (of.plans) {
-    const keys = {
-      ...PLATFORM_ENTITLEMENTS,
-      ...Object.fromEntries(of.apps.flatMap((a) => Object.entries(a.entitlements))),
-    };
+    const keys = entitlementKeys(of.apps);
     for (const p of refuseCatalog(of.plans, keys)) {
       out.push(`catalogue: ${p.why} — ${p.detail}`);
     }

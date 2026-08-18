@@ -19,12 +19,12 @@
 import type {
   AccountId, AppSpec, DeploymentLegal, Door, PackDef, PlanSpec, Residency, TenantId,
 } from "@engine/kernel";
-import { MEDIA_NEED, subProcessor, under } from "@engine/kernel";
+import { MEDIA_NEED, entitlementKeys, subProcessor, under } from "@engine/kernel";
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
   NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, acceptanceScope,
   liveAppsOfTenant,
-  deploymentFaults, isPlatformPath, locator,
+  deploymentFaults, effectivePlans, isPlatformPath, locator,
   accept, bindingKey, liveBindings, memberFor, noteShardApp, observe, owedBy, sweep,
   tenantById, tenantBySlug,
   applyEvent, becomeCommercial, markCancelled, markPaid, markPastDue, renewAllowance, stripeKey,
@@ -88,6 +88,11 @@ const APPS: Readonly<Record<string, () => AppSpec>> = {
  * us" — a seat and a client are things somebody adds deliberately, so refusing
  * is fair, while storage accumulates as a side effect of ordinary work.
  */
+/* ⚠️ Every product's manifest, and `once` above is what makes asking cheap. The
+   entitlement KEYS are the union of these and the platform's — see
+   `entitlementKeys`. */
+const everyApp = () => Object.values(APPS).map((make) => make());
+
 const GB = 1024 * 1024 * 1024;
 
 const PLANS: readonly PlanSpec[] = [
@@ -463,8 +468,21 @@ const boot = (env: Env): Promise<void> => {
 
 /* ----------------------------------------------------------------- wiring --- */
 
-const handler = (env: Env) => {
+const handler = async (env: Env) => {
   const directory = env.DIRECTORY as unknown as Db;
+
+  /*
+    ⚠️ WHAT IS ACTUALLY SOLD, RESOLVED ONCE PER REQUEST. `PLANS` is the
+    DECLARATION — the authority for which plans exist and which keys each one
+    prices, checked at boot by `refuseCatalog`. The console edits the numbers
+    over it, so every gate, price and standing resolution below reads the merged
+    answer rather than the code's.
+
+    ⚠️ ONCE, RATHER THAN WHEREVER IT IS NEEDED. The gate, the shelf and the
+    handler that prices something must agree within one request — two reads
+    either side of a save would price a checkout at one number and grant another.
+  */
+  const sold = await effectivePlans(directory, PLANS, entitlementKeys(everyApp()));
   const shardOf = (tenant: TenantRow) => shardFor(env as never, tenant.shardId);
 
   /**
@@ -581,7 +599,7 @@ const handler = (env: Env) => {
       request body. It sits beside the subscriptions it signs for, which are the
       sensitive half and are already there; alone it grants nothing.
     */
-    plans: PLANS, packs: PACKS, storageRate: STORAGE_CREDITS_PER_GB_MONTH,
+    plans: sold, packs: PACKS, storageRate: STORAGE_CREDITS_PER_GB_MONTH,
     pusher: pusherOver(directory),
 
     ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
@@ -762,7 +780,7 @@ const handler = (env: Env) => {
     locate: locator({
       directory,
       shardOf,
-      plans: PLANS,
+      plans: sold,
       appsOf: async (tenant) => {
         /* ⚠️ WHAT IS ON, NOT WHAT WAS EVER ON. This list becomes the composed
            surface, so a product switched off has to leave it — otherwise the
@@ -891,7 +909,7 @@ export default {
        here and the platform's own grew past it: the manifest and the icon are
        served by `serve.ts` and were never routed to it, so a phone asking for
        the manifest got the page with a 200 on it. See `isPlatformPath`. */
-    if (isPlatformPath(url.pathname)) return handler(env)(request);
+    if (isPlatformPath(url.pathname)) return (await handler(env))(request);
     return env.ASSETS.fetch(request);
   },
 
@@ -942,7 +960,12 @@ export default {
           /* ⚠️ AND WHAT STORAGE OVER THE INCLUDED AMOUNT COSTS. Both together,
              because the meter is what pushes a balance under the top-up
              threshold — see `sweepStorage`. */
-          plans: PLANS,
+          /* ⚠️ WHAT IS SOLD, NOT WHAT IS DECLARED. The nightly pass grants the
+             month's allowance and meters storage against the included amount —
+             so a sweep reading the code's numbers would go on granting last
+             week's credits every night after an edit, silently. */
+          plans: await effectivePlans(
+            env.DIRECTORY as unknown as Db, PLANS, entitlementKeys(everyApp())),
           storageRate: STORAGE_CREDITS_PER_GB_MONTH,
           ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
           /* ⚠️ ONLY WHERE THERE IS A TOKEN. Absent is a deployment that cannot
