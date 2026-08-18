@@ -330,6 +330,47 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
   }
 }
 
+/* ------------------------------------------------------- one ground per area --- */
+
+/**
+ * ⚠️ A SCREEN DOES NOT PICK ITS OWN GROUND, AND ONE DID. `groundOf` says it in
+ * its own header — "a screen that chose would be a screen somebody has to
+ * remember to update, and the OneSpace has twenty of them" — and one surface
+ * named `glow` by hand anyway, so the door into a workspace was the single place
+ * that workspace's world was missing. Nothing failed; it just looked like a
+ * different product for one screen.
+ *
+ * ⚠️ THE ADDRESS DECIDES, IN ONE FUNCTION. A screen names its SUBJECT and the
+ * layout derives the rest (the guard above), or it names nothing and inherits
+ * the area's. Naming a sky is the third way, and there is exactly one file
+ * allowed to do it.
+ */
+{
+  const DECIDES = "one-space/src/space/OneSpace.tsx";
+  /* ⚠️ A LITERAL, NOT AN EXPRESSION. The decider passes `sky={groundOf(where)}`,
+     which is the rule rather than a breach of it; what is forbidden is a screen
+     writing the material into itself. */
+  const NAMES_A_SKY = /\bsky=(?:"|\{\s*")/;
+  let named = 0;
+  for (const file of filesIn("one-space/src", /\.tsx$/)) {
+    if (rel(file) === DECIDES) continue;
+    const m = NAMES_A_SKY.exec(code(readFileSync(file, "utf8")));
+    if (!m) continue;
+    named++;
+    fail(`${rel(file)}: names its own sky.\n` +
+         `       Which ground an address wears is decided once, in ${DECIDES}. ` +
+         `A screen names its SUBJECT and inherits the rest — one that picks a material ` +
+         `is one somebody has to remember when the area's changes.`);
+  }
+  const decider = readFileSync(join(ENGINE, DECIDES), "utf8");
+  if (!/\bsky=\{/.test(decider)) {
+    fail(`${DECIDES}: hands no sky to a layout — this guard would pass over a rule `
+      + `nothing applies.`);
+  } else if (!named) {
+    ok("ground: one address, one material — no screen picks its own");
+  }
+}
+
 console.log(bad
   ? `\nscene: ${bad} finding(s) — a world that is not the same world twice.`
   : `\nscene: seeded, compositor-only, masked rather than washed, sized by area, bound not built.`);

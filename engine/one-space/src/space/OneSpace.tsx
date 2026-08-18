@@ -197,10 +197,22 @@ function Screen({ where, onGo, onLeave }: {
  * frame, which is a flash of somebody else's colours on the screen that is
  * supposed to be yours.
  */
-const subjectOf = (where: Where, person: Me | null): FaceOf | undefined => {
-  if (where.at === "workspace") return placeFace(where.slug);
-  if (where.at === "home" && person) return whoFace(person.accountId);
-  return undefined;
+export const subjectOf = (where: Where, person: Me | null): FaceOf | undefined => {
+  /* ⚠️ THE OPERATOR'S SIDE HAS NO SUBJECT, AND THAT IS WHY IT LOOKS DIFFERENT.
+     A console screen is about the deployment rather than about anybody in it, so
+     there is nothing whose colours it could be wearing — `groundOf` gives it a
+     ruled ground of its own. */
+  if (isConsole(where)) return undefined;
+  /* ⚠️ A WORKSPACE'S OWN PLANET, ON EVERY SCREEN OF IT — not only on its front
+     one. Its roster, its bill, its packages and its trust page are all that
+     workspace, so they are all somewhere INSIDE its world; a screen that lost
+     the subject fell through to a shared grey material and read as a different
+     product one tap in. `"slug" in where` is the same question `pathOf` asks. */
+  if ("slug" in where) return placeFace(where.slug);
+  /* ⚠️ AND THE ACCOUNT IS THE PERSON, WHEREVER YOU ARE IN IT. Their inbox,
+     their data, what they are told and how they sign in are one subject, so the
+     whole area stands in their own light. */
+  return person ? whoFace(person.accountId) : undefined;
 };
 
 /**
@@ -223,6 +235,15 @@ const groundOf = (where: Where): Sky => {
      the material says so before a word is read: ruled, not woven. */
   return isConsole(where) ? "etch" : "cloth";
 };
+
+/*
+  ⚠️ AND `cloth` IS NOW A FLOOR RATHER THAN AN AREA. Every address outside the
+  console names a subject (`subjectOf`), and a subject's world wins over a named
+  sky in `Page` — so what this returns for them applies only in the moment before
+  the session resolves, where the alternative is a flat page that gains a world a
+  frame later. It was the material two thirds of OneSpace actually wore, because
+  a subject was named on two addresses out of twenty.
+*/
 
 /**
  * ⚠️ AND WHICH ONE OF THE FAMILY, FROM THE ADDRESS. `silk`, `linen` and `wire`

@@ -16,6 +16,7 @@ import { COUNTRIES, byName, nameOf } from "../src/countries.js";
 import { Signpost } from "../src/screens/Signpost.js";
 import { Elsewhere } from "../src/screens/Elsewhere.js";
 import { Editor } from "../src/centre/Brand.js";
+import { subjectOf } from "../src/space/OneSpace.js";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node);
 
@@ -297,5 +298,55 @@ describe("a workspace's brand", () => {
     expect(out).toContain("Legal name");
     /* ⚠️ No editor at all — not a disabled one. */
     expect(out).not.toContain("On a home screen");
+  });
+});
+
+/* ----------------------------------------------------------------- ground --- */
+
+/**
+ * THREE AREAS, THREE WORLDS, AND THE ADDRESS DECIDES WHICH.
+ *
+ * ⚠️ THE FAMILY FALLS OUT OF WHAT THE SUBJECT IS (`face.tsx`'s `SKY`), so this
+ * asks the only question a screen actually answers: WHOSE screen is this. A
+ * workspace is a place you look at from outside and gets a planet; a person is a
+ * room you stand in and gets their own light; the operator's side is about a
+ * deployment and is nobody's, so it falls to a ruled material of its own.
+ *
+ * ⚠️ AND IT IS EVERY ADDRESS, NOT THE TWO THAT HAPPENED TO HAVE ONE. A subject
+ * was named on `workspace` and `home` alone, so eighteen screens fell through to
+ * a shared grey material — a workspace's roster, its bill and its trust page all
+ * looked like a different product one tap in from its front door, and the fault
+ * is invisible unless you walk the whole area.
+ */
+describe("whose screen this is", () => {
+  const me = { accountId: "acc_1", email: "sam@example.com", tenants: [] } as never;
+
+  it("gives every screen of a workspace that workspace's own planet", () => {
+    for (const at of ["workspace", "people", "money", "packages", "settings", "trust", "brand"]) {
+      const face = subjectOf({ at, slug: "ironworks" } as never, me);
+      expect(face, at).toEqual({ kind: "workspace", seed: "ironworks" });
+    }
+  });
+
+  it("gives every screen of the account the person's own light", () => {
+    for (const at of ["home", "you", "inbox", "told", "data", "prefs", "workspaces"]) {
+      const face = subjectOf({ at } as never, me);
+      expect(face, at).toEqual({ kind: "person", seed: "acc_1" });
+    }
+  });
+
+  /* ⚠️ AND THE OPERATOR'S SIDE IS NOBODY'S. A console screen wearing the
+     operator's own aura would say the deployment belongs to whoever is signed
+     in, which is the one thing it must not say (D18). */
+  it("gives the operator's side no subject at all", () => {
+    for (const at of ["console", "tenants", "catalogue", "keys", "switches"]) {
+      expect(subjectOf({ at } as never, me), at).toBeUndefined();
+    }
+  });
+
+  /* ⚠️ Before the session resolves there is nobody to be — and a face invented
+     from nothing would be a different person's light for one frame. */
+  it("has no subject for the account before anybody is known", () => {
+    expect(subjectOf({ at: "home" } as never, null)).toBeUndefined();
   });
 });

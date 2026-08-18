@@ -18,7 +18,7 @@
  */
 
 import {
-  Await, Band, Crown, Face, Page, Shell, Spacer, TYPE, Working, whoFace,
+  Await, Band, Crown, Face, Layout, Shell, Spacer, TYPE, Working, placeFace, whoFace,
 } from "@engine/design";
 import type { ScreenSpec } from "@engine/kernel";
 import { Button } from "@heroui/react";
@@ -59,7 +59,17 @@ export function Product({ path, onGo, onOpenSpace, onOpenInbox }: {
            which app somebody wants. */
         if (!app) {
           return (
-            <Page sky="glow">
+            /* ⚠️ THE WORKSPACE'S OWN PLANET, LIKE EVERY OTHER SCREEN OF IT.
+               This named `glow` by hand — the one surface in the product that
+               chose its own ground, which is what `groundOf` says must never
+               happen — so the door INTO a workspace was the one place that
+               workspace's world was absent.
+
+               ⚠️ AND IT NAMES THE SUBJECT RATHER THAN BUILDING THE WORLD.
+               `Layout` derives the ground, the density and the subject context
+               from one face; a screen calling `worldFor` itself is a second
+               derivation of one fact, which `scripts/scene.test.mjs` refuses. */
+            <Layout subject={placeFace(view.tenant.slug)}>
               {/* ⚠️ THE SAME LEAD EVERY OTHER CROWN HAS. This screen used to
                   hand-assemble an `aside` from a face and an email — the `You`
                   helper — which is how the one screen with no product open came
@@ -75,7 +85,7 @@ export function Product({ path, onGo, onOpenSpace, onOpenInbox }: {
               />
               <Band width="read"><div className="py-2"><Choose view={view} onGo={onGo} /></div></Band>
               <Spacer />
-            </Page>
+            </Layout>
           );
         }
 
