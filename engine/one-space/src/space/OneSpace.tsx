@@ -356,7 +356,7 @@ function Inside({ where, onGo }: {
   switch (where.at) {
     case "you": return <You onGo={onGo} />;
     case "inbox": return <InboxScreen onGo={() => undefined} onSeen={() => undefined} />;
-    case "told": return <TellingMe />;
+    case "told": return <TellingMe onGo={onGo} />;
     /* ⚠️ THE COPY AND THE DELETION — see `Data.tsx`. Reachable from the
        acceptance wall too, which is what keeps that wall leaveable. */
     case "data": return <Data />;

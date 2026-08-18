@@ -18,9 +18,36 @@
 import { SettingsArea } from "./SettingsArea.js";
 import { useCentre } from "./data.js";
 import { Screen } from "@engine/design";
+import { useSession } from "../session.js";
+import { PickWorkspace } from "../space/PickWorkspace.js";
 import type { Where } from "../space/where.js";
 
 export function Preferences({ where, onGo }: {
+  readonly where: Extract<Where, { at: "prefs" }>;
+  readonly onGo: (to: Where) => void;
+}) {
+  /*
+    ⚠️ ON THE ACCOUNT DOOR IT IS A CHOOSER, and the header above is why it looked
+    as though it should not need to be. What you prefer does follow you — but the
+    SETTINGS are declared by apps, and which apps you have is a fact about a
+    workspace, so the manifests this screen renders come from `centre.view`. On
+    `id.` that 404s, and the whole page drew a title over "That is not here".
+  */
+  const door = useSession().where;
+  if (door?.kind !== "tenant") {
+    return (
+      <PickWorkspace
+        to={{ at: "prefs" }}
+        under="What a product does for you is set where the product is"
+        empty="Products are switched on in a workspace, and you are not in one"
+        onGo={onGo}
+      />
+    );
+  }
+  return <Inside where={where} onGo={onGo} />;
+}
+
+function Inside({ where, onGo }: {
   readonly where: Extract<Where, { at: "prefs" }>;
   readonly onGo: (to: Where) => void;
 }) {
