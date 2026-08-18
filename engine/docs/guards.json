@@ -2530,6 +2530,51 @@
       "impl": "runtime/test/stripe.test.ts",
       "proves": "CANCELLING CLEARS THE ANCHOR",
       "fails": "a 37-day countdown to erasure started over a decision nobody disputed, because `past_due_at` is what every rung of the ladder is measured from"
+    },
+    {
+      "id": "an-edit-snapshots-only-what-it-took",
+      "protects": "D12",
+      "stage": "45",
+      "status": "live",
+      "impl": "runtime/test/grandfather.test.ts",
+      "proves": "names the narrowings and nothing else",
+      "fails": "every early customer frozen at the numbers the tier had on the day they joined — a later raise reaches everybody except the people who have been paying longest, and nothing anywhere reports it"
+    },
+    {
+      "id": "a-plan-edited-down-holds-everybody-on-it",
+      "protects": "D12",
+      "stage": "45",
+      "status": "live",
+      "impl": "runtime/test/grandfather.test.ts",
+      "proves": "holds an existing workspace at what it was sold",
+      "fails": "a tier narrowed on Tuesday quietly taking seats, storage and the monthly allowance off every workspace that had already bought it, with nothing failing and nobody told until a refusal arrives"
+    },
+    {
+      "id": "arriving-after-the-edit-gets-the-edit",
+      "protects": "D12",
+      "stage": "45",
+      "status": "live",
+      "impl": "runtime/test/grandfather.test.ts",
+      "proves": "gives the new number to a workspace that arrives after the edit",
+      "fails": "an operator narrowing a tier and changing nothing at all, because the snapshot was written onto future subscriptions as well and the plan's own numbers stopped being reachable"
+    },
+    {
+      "id": "grandfathering-only-ever-ratchets-up",
+      "protects": "D12",
+      "stage": "45",
+      "status": "live",
+      "impl": "runtime/test/grandfather.test.ts",
+      "proves": "keeps the highest number it ever promised",
+      "fails": "a tier cut in two steps losing everything the first step protected — the second snapshot overwrites the first, so narrowing twice is a way to take back what was held"
+    },
+    {
+      "id": "an-edit-reaches-only-the-plan-it-edits",
+      "protects": "D12",
+      "stage": "45",
+      "status": "live",
+      "impl": "runtime/test/grandfather.test.ts",
+      "proves": "holds only the workspaces that were on the plan",
+      "fails": "editing one tier pinning every workspace on every other tier to whatever that one used to include, so the catalogue stops meaning anything the moment it is edited twice"
     }
   ]
 }

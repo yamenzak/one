@@ -353,7 +353,7 @@ and a manifest that does not compose refuses to boot.
 | `access` | permissions, roles, and what an app may never claim | 15 | 1 |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
 | `manifest` | the whole app, and the composition that refuses a broken one | 9 | — |
-| `entitlement` | what a plan includes, and the allowance algebra over it | 9 | — |
+| `entitlement` | what a plan includes, and the allowance algebra over it | 10 | — |
 | `credit` | metered work: the reserve, the rate, the ceiling | 7 | 1 |
 | `dunning` | the ladder from past due to erased | 5 | — |
 | `package` | a priced bundle of timed grants | 8 | 1 |
@@ -374,7 +374,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**211 of them**, 204 reached by something today.
+**212 of them**, 205 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -400,7 +400,7 @@ env or a binding.
 | `serve` | the one path every request ends in — both doors | 5 | — |
 | `records` | the generated reads and writes behind a collection | 6 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
-| `billing` | plans, subscriptions, the bill, the ladder | 14 | 1 |
+| `billing` | plans, subscriptions, the bill, the ladder | 15 | 1 |
 | `wallet` | OneWallet: the allowance, what was bought, and reserve → settle → release | 22 | — |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
 | `inbox` | notifications: the policy, the audience, the read | 10 | — |
@@ -437,7 +437,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**308 of them**, 305 reached by something today.
+**309 of them**, 306 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -797,6 +797,11 @@ its own header, cited by other files, and doing nothing.
 | `a-renewal-is-attributed-by-its-customer` | D12 | every month after the first going unplaced — the workspace pays and goes past due anyway, because a renewal invoice carries no metadata of ours |
 | `a-payment-that-cannot-be-placed-is-recorded` | D12 | money captured, nothing granted, and no trace anywhere — the event answered 200 with its id already claimed, so Stripe never sends it again |
 | `cancelling-is-not-arrears` | D12 | a 37-day countdown to erasure started over a decision nobody disputed, because `past_due_at` is what every rung of the ladder is measured from |
+| `an-edit-snapshots-only-what-it-took` | D12 | every early customer frozen at the numbers the tier had on the day they joined — a later raise reaches everybody except the people who have been paying longest, and nothing anywhere reports it |
+| `a-plan-edited-down-holds-everybody-on-it` | D12 | a tier narrowed on Tuesday quietly taking seats, storage and the monthly allowance off every workspace that had already bought it, with nothing failing and nobody told until a refusal arrives |
+| `arriving-after-the-edit-gets-the-edit` | D12 | an operator narrowing a tier and changing nothing at all, because the snapshot was written onto future subscriptions as well and the plan's own numbers stopped being reachable |
+| `grandfathering-only-ever-ratchets-up` | D12 | a tier cut in two steps losing everything the first step protected — the second snapshot overwrites the first, so narrowing twice is a way to take back what was held |
+| `an-edit-reaches-only-the-plan-it-edits` | D12 | editing one tier pinning every workspace on every other tier to whatever that one used to include, so the catalogue stops meaning anything the moment it is edited twice |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -815,7 +820,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 100 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 105 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |

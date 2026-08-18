@@ -314,7 +314,7 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
           wallet: await walletOf(ctx.directory, tenantId),
           auto: await autoTopUpOf(ctx.directory, tenantId),
           allowance: {
-            monthly: allowanceFor(plan, sub?.adjustments ?? {}),
+            monthly: allowanceFor(plan, sub?.adjustments ?? {}, sub?.overrides ?? {}),
             plan: plan?.credits ?? 0,
             comped: sub?.compedAt ?? null,
           },

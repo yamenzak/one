@@ -142,6 +142,13 @@ export const ALLOWANCE_KEY = "credits";
  * override honoured by one and not the other is a screen promising credits that
  * never arrive, or credits arriving that no screen accounts for.
  *
+ * ⚠️ AND IT IS THE SAME WALK THE ENTITLEMENTS TAKE, in the same order:
+ * plan → grandfathered → adjusted. The grandfathering only ratchets UP, because
+ * it exists to hold somebody at the allowance they were sold when a tier is cut;
+ * the operator's adjustment is absolute and either direction. Reading only one of
+ * the two blobs is how a plan edit comes to take credits from the people the
+ * grandfathering was written to protect.
+ *
  * ⚠️ AND A NEGATIVE IS THE PLAN'S OWN, NOT UNLIMITED. `-1` means unlimited for an
  * entitlement; an unlimited BALANCE is not a thing this system can meter, so the
  * only honest reading of a negative here is "no override".
@@ -149,10 +156,17 @@ export const ALLOWANCE_KEY = "credits";
 export function allowanceFor(
   plan: { readonly credits: number } | null,
   adjustments: Readonly<Record<string, Allowance>> = {},
+  overrides: Readonly<Record<string, Allowance>> = {},
 ): number {
+  let value = plan?.credits ?? 0;
+
+  const held = overrides[ALLOWANCE_KEY];
+  if (typeof held === "number" && held > value) value = held;
+
   const set = adjustments[ALLOWANCE_KEY];
   if (typeof set === "number" && set >= 0) return Math.trunc(set);
-  return plan?.credits ?? 0;
+
+  return Math.trunc(value);
 }
 
 /* ------------------------------------------------------------------- walk --- */
@@ -230,6 +244,48 @@ export function withinQuota(allowed: Allowance, used: number): boolean {
   if (allowed === false) return false;
   if (allowed === UNLIMITED) return true;
   return used < allowed;
+}
+
+/* --------------------------------------------------------- grandfathering --- */
+
+/**
+ * WHAT A PLAN EDIT TAKES, AND THEREFORE WHAT HAS TO BE KEPT.
+ *
+ * ⚠️ A PLAN EDITED DOWN IS A SILENT DOWNGRADE OF EVERYBODY ALREADY ON IT. They
+ * were sold a number; narrowing the tier changes what they have without anybody
+ * telling them, and the first they know is a refusal on a Tuesday. So an edit
+ * that lowers anything writes what it lowered onto every subscription holding
+ * that plan, and `walk` reads it back as a floor.
+ *
+ * ⚠️ ONLY WHAT WENT DOWN. An edit that RAISES a limit should reach existing
+ * customers — that is a gift, and snapshotting it would freeze them below the
+ * tier they are on for ever. This returns the narrowings and nothing else.
+ *
+ * ⚠️ AND THE ALLOWANCE IS IN HERE TOO, under `ALLOWANCE_KEY`. It is not an
+ * entitlement — see that constant — but it is a number somebody was sold, and
+ * cutting a tier's monthly credits without holding existing customers is the
+ * same broken promise in the same edit.
+ */
+export function snapshotDowngrade(
+  was: PlanSpec,
+  now: PlanSpec,
+): Readonly<Record<string, Allowance>> {
+  const kept: Record<string, Allowance> = {};
+
+  for (const [key, before] of Object.entries(was.includes)) {
+    const after = now.includes[key];
+    /* ⚠️ A KEY THE NEW PLAN DOES NOT MENTION AT ALL IS THE SHARPEST NARROWING —
+       it resolves to `false` for everybody, which is further down than any
+       number. `refuseCatalog` refuses that catalogue, and this holds the line
+       for anyone already on it in the window before somebody notices. */
+    if (after === undefined || above(before, after)) kept[key] = before;
+  }
+
+  /* ⚠️ `-1` is unlimited and beats every number, so a tier that WAS unlimited
+     and is now 50 is caught by the same comparison the entitlements use. */
+  if (was.credits > now.credits) kept[ALLOWANCE_KEY] = was.credits;
+
+  return kept;
 }
 
 /* ------------------------------------------------------------------ rules --- */

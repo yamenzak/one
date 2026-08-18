@@ -19,7 +19,9 @@
  */
 
 import type { Allowance, AppId, EntitlementDef, Instant, PlanSpec, Resolved, Standing, TenantId } from "@engine/kernel";
-import { allowanceFor, standingFor, walk, type SubStatus } from "@engine/kernel";
+import {
+  allowanceFor, snapshotDowngrade, standingFor, walk, type SubStatus,
+} from "@engine/kernel";
 import type { SchemaModule } from "./schema.js";
 import type { Db } from "./sql.js";
 
@@ -250,7 +252,7 @@ export async function heldBy(
     /* ⚠️ WHAT THE MONTH GRANTS, BESIDE WHAT THE PLAN ALLOWS. Every reader that
        asks what a workspace HAS also has to say what it may spend, and two
        lookups is two answers. */
-    credits: allowanceFor(plan, sub?.adjustments ?? {}),
+    credits: allowanceFor(plan, sub?.adjustments ?? {}, sub?.overrides ?? {}),
     entitlements: walk(plan, of.keys, sub?.overrides ?? {}, sub?.adjustments ?? {}, standing),
   };
 }
@@ -261,18 +263,63 @@ export async function heldBy(
  * one-way door — the only way back discarded the grandfathering with it. Two
  * columns, because they want opposite rules.
  */
-/* DEFER(engine-45) stage:45 — nothing EDITS a plan. Grandfathering is what holds
-   an existing workspace at what it was sold when a plan is narrowed, and the
-   plans are declarations in a manifest today — so there is no edit for it to
-   catch, and the day there is, forgetting this silently downgrades everybody. */
 export async function grandfather(
   db: Db, tenantId: TenantId, appId: AppId, was: Readonly<Record<string, Allowance>>,
 ): Promise<void> {
   const sub = await subscriptionFor(db, tenantId, appId);
   if (!sub) return;
+  /* ⚠️ WHAT IS ALREADY HELD WINS, because grandfathering only ratchets up. A
+     workspace narrowed twice keeps the FIRST, highest number it was sold — the
+     second edit must not overwrite the promise the first one made. */
   const merged = { ...was, ...sub.overrides };
   await db.prepare(`UPDATE subscription SET overrides_json = ? WHERE tenant_id = ? AND app_id = ?`)
     .bind(JSON.stringify(merged), tenantId, appId).run();
+}
+
+/**
+ * A PLAN IS EDITED, AND EVERYBODY ALREADY ON IT KEEPS WHAT THEY WERE SOLD.
+ *
+ * ⚠️ THIS IS THE ONE STEP AN EDITABLE CATALOGUE CANNOT SHIP WITHOUT. Narrowing a
+ * tier changes what every existing customer has, without anybody telling them,
+ * and the first they hear of it is a refusal on an ordinary Tuesday. There is no
+ * error, no failing test and no screen that would show it — the numbers simply
+ * become smaller.
+ *
+ * ⚠️ ONLY THE NARROWINGS ARE WRITTEN — see `snapshotDowngrade`. An edit that
+ * RAISES a limit should reach existing customers; snapshotting that too would
+ * freeze them below the tier they are on, for ever, as a reward for being early.
+ *
+ * ⚠️ AND IT RUNS BEFORE THE EDIT LANDS, ALWAYS. Afterwards the old numbers are
+ * gone and there is nothing left to snapshot — which is a mistake with no
+ * symptom, because the write still succeeds and the rows it should have written
+ * simply do not exist.
+ *
+ * ⚠️ IT IS THE DIRECTORY'S QUESTION, ASKED ONCE (D5). "Which workspaces are on
+ * this plan" answered by walking shards is the fan-out the whole split exists to
+ * avoid, and this runs while somebody is waiting for a form to save.
+ */
+/* DEFER(engine-45) stage:45 — the EDIT is what calls this, and the catalogue is
+   still a declaration in code. The mechanism is built and proved first on
+   purpose: an editor shipped without it downgrades every existing customer on
+   its first save, silently, and that is not a thing to be adding afterwards. */
+export async function holdEveryoneOn(
+  db: Db, planId: string, was: PlanSpec, now: PlanSpec,
+): Promise<number> {
+  const kept = snapshotDowngrade(was, now);
+  /* ⚠️ AN EDIT THAT TOOK NOTHING WRITES NOTHING. A raise, a rename or a price
+     change leaves every existing customer exactly where they were, and stamping
+     an empty snapshot on every subscription would make the next reader think a
+     narrowing had happened. */
+  if (!Object.keys(kept).length) return 0;
+
+  const rows = await db.prepare(
+    `SELECT tenant_id FROM subscription WHERE plan_id = ? AND app_id = ?`)
+    .bind(planId, MEMBERSHIP).all<{ tenant_id: string }>();
+
+  for (const row of rows.results) {
+    await grandfather(db, row.tenant_id as TenantId, MEMBERSHIP, kept);
+  }
+  return rows.results.length;
 }
 
 export async function adjust(

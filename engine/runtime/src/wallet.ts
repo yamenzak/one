@@ -182,7 +182,7 @@ export async function renewAllowance(
   /* ⚠️ THE SAME RESOLUTION `heldBy` READS — see `allowanceFor`. An operator's
      override honoured by one and not the other is a screen promising credits
      that never arrive. */
-  const credits = allowanceFor(plan, sub?.adjustments ?? {});
+  const credits = allowanceFor(plan, sub?.adjustments ?? {}, sub?.overrides ?? {});
   await grantAllowance(db, tenantId, credits, now);
   return credits;
 }
