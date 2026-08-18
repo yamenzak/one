@@ -551,6 +551,28 @@ bell being moved, not a bell ringing. The motion is in the icon's PARTS, at
   whatever the library happens to put second and silently animates the wrong
   thing the day it redraws the icon.
 
+### A reported state wears `data-ink`, and nothing else carries a tone
+
+A monochrome product has one channel left for "this is the one that is wrong",
+and it is the colour of the VALUE — the amount, the sentence, the figure. So a
+`Tone` lands on the thing that says it: `data-ink="danger"` on the span, styled
+once in `TONE_CSS`. `neutral` has no rule on purpose; it is the ink the row
+already has.
+
+⚠️ **A CARD, A PAGE AND A BAND TOOK A `tone` AND ALL THREE ARE GONE.** A tone on
+a card paints every word inside it, which is not what any of them meant — and
+none of them was ever passed one. What they had instead was `data-tone`, stamped
+in seven places and styled in none: measured in a browser, `danger` and
+`neutral` computed to the same colour, so a failed nightly job drew in exactly
+the grey a successful one drew in. `scripts/attrs.test.mjs` refuses that shape
+now.
+
+⚠️ **AND IT IS AN ATTRIBUTE RATHER THAN A UTILITY CLASS FOR A REASON.**
+`text-danger` works because something in the product uses it; `text-warning` and
+`text-success` generate no CSS at all, because Tailwind emits only what it finds
+written down. A component reaching for a utility that does not exist is the same
+silence one level down.
+
 **One hue is a convention rather than a choice, and it is the seal.** This theme
 is monochrome — `info` resolves to a grey — so a "verified" tick drawn in the
 theme's own colours is the same value as the words beside it and reads as
@@ -686,6 +708,9 @@ Some of this is guarded and some is judgement. What is checked today:
   a screen rather than a tab.
 - `cards` — only `surfaces.tsx` builds a `<Card`, and every one of them names
   `CARD_ROWS`, so a card's inset is one number rather than a component's opinion.
+- `attrs` — every `data-` attribute the markup stamps is read by a selector, a
+  Tailwind variant or a DOM query. An attribute nothing reads is a decision that
+  never reaches a screen, and it looks identical to one that does.
 - `glyphs` — every mark in the registry is animated or deliberately still, and
   no screen draws a registered mark itself.
 - `present` — one file builds an `Intl`; nothing slices an instant into a day;

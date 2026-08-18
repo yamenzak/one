@@ -8,7 +8,6 @@
  */
 
 import * as React from "react";
-import type { Tone } from "@engine/kernel";
 import type { Sky, World } from "../tokens/ambience.js";
 import { skyWorld, worldCss } from "../tokens/ambience.js";
 import { BAND_PAD, GUTTER, NAV_SPACE, SAFE_TOP, WIDTH } from "../tokens/metrics.js";
@@ -71,7 +70,6 @@ export interface PageProps {
    * engine's. A page of rows takes `quiet`, an arrival takes `rich`.
    */
   readonly density?: Density;
-  readonly tone?: Tone;
   /**
    * ⚠️ THE NAV IS THE PAGE'S, NOT THE CONTENT'S, AND THIS IS WHY. A sticky island
    * floats over whatever precedes it, so the last card on a screen is cropped
@@ -166,7 +164,7 @@ export function useScenery(
  * which reads as a broken layout rather than as a unit bug.
  */
 export function Page(
-  { sky = "plain", seedling, world, density = "even", tone = "neutral", nav, children }: PageProps,
+  { sky = "plain", seedling, world, density = "even", nav, children }: PageProps,
 ) {
   /*
     ⚠️ THE THEME PICKS A SKY, AND THIS REPLACES A RULE THAT SHOULD NEVER HAVE
@@ -193,7 +191,6 @@ export function Page(
     <div
       className="min-h-dvh flex flex-col"
       {...own.attrs}
-      data-tone={tone}
       style={own.css}
     >
       {/*
@@ -292,7 +289,6 @@ export interface BandProps {
   readonly sky?: Sky;
   /** ⚠️ Which one of the family — see `PageProps.seedling`. */
   readonly seedling?: string;
-  readonly tone?: Tone;
   /**
    * ⚠️ TAKE THE ROOM LEFT ON THE PAGE. For a band that IS the page — a screen
    * whose whole body is an empty state or a refusal — so its content can sit in
@@ -312,7 +308,7 @@ export interface BandProps {
  * stays readable — and doing it per screen is how you get a product where some
  * sections are inset and some are not, for no reason anybody remembers.
  */
-export function Band({ bleed = "hold", width = "read", sky, seedling, tone, grow, children }: BandProps) {
+export function Band({ bleed = "hold", width = "read", sky, seedling, grow, children }: BandProps) {
   /* ⚠️ THE SAME ENGINE A PAGE USES, because a section that lifts is a scene at a
      smaller reach and not a second mechanism — and now literally the same call,
      rather than the same three lines written twice. */
@@ -333,7 +329,6 @@ export function Band({ bleed = "hold", width = "read", sky, seedling, tone, grow
          would space itself out like a menu. */
       className={grow ? "flex w-full grow flex-col" : "w-full"}
       {...(lit ? own.attrs : {})}
-      {...(tone ? { "data-tone": tone } : {})}
       style={own.css}
     >
       {own.field}

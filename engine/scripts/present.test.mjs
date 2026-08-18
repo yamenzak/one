@@ -105,10 +105,16 @@ if (!formatted) ok(`formatters: ${FILES.length} file(s), one place builds an \`I
 /*
   ⚠️ ONLY WHERE THE RECEIVER IS A MOMENT. `rows.slice(0, 10)` is the first ten
   rows of a list and has nothing to do with dates — a check that flagged it would
-  be one people learn to ignore, which is worse than no check. The names are the
-  ones this codebase actually uses for an instant.
+  be one people learn to ignore, which is worse than no check. The receivers are
+  derived below, from the kernel's own `: Day` and `: Instant` declarations.
+
+  ⚠️ AND ANY OFFSET, NOT JUST TEN. This looked for `slice(0, 10)` alone, so
+  `startedAt.slice(0, 16).replace("T", " ")` and `startedAt.slice(11, 16)` went
+  straight past it — and those two were on the operator's jobs screen, printing
+  a UTC date and a UTC clock time to whoever was reading it. Cutting an instant
+  at 10 is the same mistake as cutting it at 16; the number was never the fault.
 */
-const SLICED = /(?:toISOString\(\)|\b\w*(?:at|At|Until|After|Since|On)\b)\.slice\(\s*0\s*,\s*10\s*\)/g;
+const SLICED = /(?:toISOString\(\)|\b\w*(?:at|At|Until|After|Since|On)\b)\.slice\(\s*\d+\s*,\s*\d+\s*\)/g;
 const SLICE_OK = new Set([
   "kernel/src/primitives.ts",
   "kernel/src/present.ts",
@@ -121,10 +127,11 @@ for (const file of FILES) {
   const src = strip(readFileSync(file, "utf8"));
   for (const [] of src.matchAll(SLICED)) {
     sliced++;
-    fail(`${name}: slices an instant into a day (D7).\n` +
-         `       \`slice(0, 10)\` is UTC, so it names the wrong day for anybody whose\n` +
-         `       evening is another date. \`dayOf\` for a key, \`dayIn\`/\`useDay\` for a\n` +
-         `       person, \`<Dated>\` to show one.`);
+    fail(`${name}: cuts an instant up by hand (D7).\n` +
+         `       A slice of an instant is UTC at whatever offset it takes — the wrong\n` +
+         `       day for anybody whose evening is another date, and the wrong clock for\n` +
+         `       everybody. \`dayOf\` for a key, \`dayIn\`/\`useDay\` for a person,\n` +
+         `       \`sayDate\`/\`sayTime\` or \`<Dated>\`/\`<Clock>\` to show one.`);
   }
 }
 if (!sliced) ok(`slices: no instant is cut into a day by hand`);

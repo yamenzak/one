@@ -38,7 +38,6 @@ export function Choose({ view, onGo }: {
           <Place
             key={app.id}
             at={i}
-            tone={i === 0 ? "info" : "neutral"}
             face={appFace(app.id, app.mark)}
             name={app.name}
             said={app.screens.map((s) => s.label).slice(0, 3).join(" · ")}

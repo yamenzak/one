@@ -375,7 +375,7 @@ export function Identity({ name, under, aside, face }: {
  * with four workspaces told "None yet" for the length of a round trip is a
  * wrong answer wearing a loading state's excuse.
  */
-export function Place({ name, said, foot, face, tone = "neutral", sky = "glow", at, onOpen }: {
+export function Place({ name, said, foot, face, sky = "glow", at, onOpen }: {
   readonly name: string;
   /** What this place IS, in a line. Never a list of its contents. */
   readonly said: string;
@@ -387,7 +387,6 @@ export function Place({ name, said, foot, face, tone = "neutral", sky = "glow", 
    */
   readonly face?: FaceOf;
   readonly foot?: React.ReactNode | null;
-  readonly tone?: Tone;
   /**
    * ⚠️ A DESTINATION EARNS A GROUND — see `GroupProps.sky`. It seeds on the
    * place's own NAME, so a shelf of them is a row of different worlds in one
@@ -420,7 +419,7 @@ export function Place({ name, said, foot, face, tone = "neutral", sky = "glow", 
           32px from its edge while every row in the product sits at 16, so a
           shelf of places did not line up with the cards above or below it and
           nothing said which of the two paddings was the wrong one. */}
-      <Card className={CARD_ROWS} {...(own.css ? own.attrs : {})} data-tone={tone}>
+      <Card className={CARD_ROWS} {...(own.css ? own.attrs : {})}>
         {own.field}
         <Card.Content>
           {/* ⚠️ THE WHOLE CARD IS THE TARGET, and it is a real Button — the
@@ -821,7 +820,7 @@ export function AmountRow({ icon, face, label, under, amount, aside, tone = "neu
     <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
       <Lead icon={icon} face={face} />
       <Body label={label} under={under} />
-      <span className={`shrink-0 ${TYPE.label} tabular-nums`} data-tone={tone}>{amount}</span>
+      <span className={`shrink-0 ${TYPE.label} tabular-nums`} data-ink={tone}>{amount}</span>
       {aside}
       {onOpen ? <span aria-hidden="true" className={TYPE.note}>›</span> : null}
     </span>
@@ -1016,7 +1015,7 @@ export function Money({ minor, currency, size = "display", tone = "neutral", cou
      convention rather than the reader's, which is the whole bug one layer
      down. */
   return (
-    <span className={`${big} tabular-nums`} data-tone={tone}>
+    <span className={`${big} tabular-nums`} data-ink={tone}>
       {sign}{part.before}
       {/* ⚠️ THE WHOLE UNITS COUNT AND THE FRACTION DOES NOT. Cents ticking
           through 99 values is a slot machine; the pounds are what somebody is

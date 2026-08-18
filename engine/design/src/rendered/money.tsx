@@ -12,8 +12,8 @@
  */
 
 import React from "react";
-import type { JobBook, PackDef } from "@engine/kernel";
-import { sayBytes, stalled } from "@engine/kernel";
+import type { Instant, JobBook, PackDef, Shown } from "@engine/kernel";
+import { sayBytes, sayDate, sayTime, stalled } from "@engine/kernel";
 import { Button, Card, Chip, Meter, ProgressBar } from "@heroui/react";
 import { useMoney } from "./console.js";
 import { Grid, Stack } from "../parts/arrange.js";
@@ -363,6 +363,7 @@ export interface JobsProps {
  * the only thing this screen is for.
  */
 export function Jobs({ book, runs, missedMs, now }: JobsProps) {
+  const shown = useShown();
   const quiet_ = stalled(book, runs, now, missedMs);
   return (
     /*
@@ -390,8 +391,8 @@ export function Jobs({ book, runs, missedMs, now }: JobsProps) {
 
         return (
           <ControlRow key={job.id} label={job.label} under={job.why}>
-            <span className={`${TYPE.note} text-end`} data-tone={last?.ok === false ? "danger" : "neutral"}>
-              {lastRun(last, quiet)}
+            <span className={`${TYPE.note} text-end`} data-ink={last?.ok === false ? "danger" : "neutral"}>
+              {lastRun(shown, last, quiet)}
             </span>
           </ControlRow>
         );
@@ -405,13 +406,19 @@ export function Jobs({ book, runs, missedMs, now }: JobsProps) {
  * started and never came back, then silence, then the ordinary answer — an
  * operator scanning this is looking for the one that is wrong, and four chips
  * on a row is four things to rule out per job.
+ *
+ * ⚠️ AND THE TIMES ARE THE READER'S. This cut the instant up by hand —
+ * `startedAt.slice(0, 16).replace("T", " ")` and `.slice(11, 16)` — which is UTC
+ * in the database's spelling, printed to whoever opened the screen. An operator
+ * three time zones away read a job's run at somebody else's midnight and had no
+ * way to tell.
  */
 const lastRun = (
-  last: JobsProps["runs"][number] | undefined, quiet: boolean,
+  shown: Shown, last: JobsProps["runs"][number] | undefined, quiet: boolean,
 ): string => {
   if (last?.ok === false) return `Last run failed: ${last.detail ?? "no detail"}`;
   if (last && !last.endedAt) return "Started and never came back";
   if (!last) return "Has never run";
-  if (quiet) return `Nothing since ${last.startedAt.slice(0, 16).replace("T", " ")}`;
-  return `${last.touched} handled at ${last.startedAt.slice(11, 16)}`;
+  if (quiet) return `Nothing since ${sayDate(shown, last.startedAt as Instant, "short")}`;
+  return `${last.touched} handled at ${sayTime(shown, last.startedAt as Instant)}`;
 };

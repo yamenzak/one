@@ -46,8 +46,7 @@ export function Delta({ value, of, upIsGood = true, unit = "" }: {
   return (
     <span
       className={`inline-flex items-center ${SPACE.tight} ${TYPE.note}`}
-      data-tone={good ? "success" : "danger"}
-      style={{ color: good ? "var(--success)" : "var(--danger)" }}
+      data-ink={good ? "success" : "danger"}
     >
       <span aria-hidden="true">{up ? "▲" : "▼"}</span>
       {unit}{say.compact(Math.abs(value))}

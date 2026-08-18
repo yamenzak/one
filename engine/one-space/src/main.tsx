@@ -2,7 +2,7 @@ import * as React from "react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  ARRIVE_MOTION, CHART_MOTION, DOOR_MOTION, FACE_CSS, GLYPH_MOTION, GROUND_CSS,
+  ARRIVE_MOTION, CHART_MOTION, DOOR_MOTION, FACE_CSS, GLYPH_MOTION, GROUND_CSS, TONE_CSS,
   ambienceStylesheet,
   brandCss,
   applyAppearance, Presenting,
@@ -44,7 +44,7 @@ const MONO = "oklch(0.62 0 0)";
 
 const sky = document.createElement("style");
 sky.textContent = [
-  FACE_CSS, GROUND_CSS, ambienceStylesheet(), ARRIVE_MOTION, DOOR_MOTION, CHART_MOTION,
+  FACE_CSS, GROUND_CSS, ambienceStylesheet(), ARRIVE_MOTION, DOOR_MOTION, CHART_MOTION, TONE_CSS,
   GLYPH_MOTION,
   /*
     ⚠️ ONE'S OWN BRAND, AND IT IS MONOCHROME. `GROUND_CSS` ships a blue as the

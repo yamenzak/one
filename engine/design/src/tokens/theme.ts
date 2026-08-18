@@ -97,6 +97,35 @@ export function brandCssFor(light: Theme, dark?: Theme): string {
   return `${one}\n${other}`;
 }
 
+/* ------------------------------------------------------------------- tone --- */
+
+/**
+ * WHAT A REPORTED VALUE MEANS, IN THE ONE CHANNEL A MONOCHROME PRODUCT HAS LEFT.
+ *
+ * ⚠️ THIS EXISTS BECAUSE THE ATTRIBUTE ALREADY DID AND NOTHING STYLED IT.
+ * `data-tone` was set in seven places across this package — a job's last run, a
+ * wallet row's amount, a figure's good-or-bad — and there was no rule for it
+ * anywhere. Measured in the browser: `danger` and `neutral` computed to the
+ * SAME colour, so the one screen whose entire purpose is "did the nightly pass
+ * run" drew a failure in exactly the grey it drew a success in.
+ *
+ * ⚠️ AN ATTRIBUTE RATHER THAN A CLASS, AND THAT IS THE CORRECTION. `text-danger`
+ * works because something in the product uses it; `text-warning` and
+ * `text-success` generate NO CSS AT ALL, because Tailwind emits only what it
+ * finds written down and nothing had written them. A component reaching for a
+ * utility that does not exist is the same silence one level down.
+ *
+ * ⚠️ AND IT IS INK, NOT A SURFACE. A tone on a CARD would paint every word
+ * inside it; what carries a state here is the VALUE — the amount, the sentence,
+ * the figure — so the attribute goes on the thing that says it. `neutral` has no
+ * rule on purpose: it is the ink the row already has.
+ */
+export const TONE_CSS = `
+[data-ink="info"] { color: var(--accent); }
+[data-ink="success"] { color: var(--success); }
+[data-ink="warning"] { color: var(--warning); }
+[data-ink="danger"] { color: var(--danger); }`;
+
 /* -------------------------------------------------------------------- sky --- */
 
 /*

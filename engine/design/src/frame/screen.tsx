@@ -221,7 +221,6 @@ export interface LayoutProps {
    * only where a screen knows better than that.
    */
   readonly density?: Density;
-  readonly tone?: Tone;
   /**
    * ⚠️ ABSENT WHERE THE SCREEN IS ITS OWN HEADING — OneSpace's root is a face, an
    * address and a list, and a display title over it names a screen the face has
@@ -241,7 +240,7 @@ export interface LayoutProps {
  * how dense, whose face — three of which are the same fact.
  */
 export function Layout(
-  { sky = "plain", seedling, subject, world: standingIn, density, tone, frame, nav, children }:
+  { sky = "plain", seedling, subject, world: standingIn, density, frame, nav, children }:
   LayoutProps,
 ) {
   /* ⚠️ THE GROUND TAKES EITHER; THE TITLE CARD TAKES ONLY A SUBJECT — see
@@ -254,7 +253,6 @@ export function Layout(
       seedling={seedling}
       world={world}
       density={density ?? (subject ?? standingIn ? "rich" : "even")}
-      tone={tone}
       nav={nav}
     >
       <SubjectContext.Provider value={subject ?? null}>{inside}</SubjectContext.Provider>
