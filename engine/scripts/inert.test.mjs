@@ -9,11 +9,17 @@
  * and `tessa-CACHE` both end in `CACHE`, it took the first hit, and Kova's cache
  * pointed at Tessa's namespace. Nothing failed. Nothing said anything.
  *
- * ⚠️ AND THE INERTNESS IS A FACT ABOUT `apps.json`, NOT A HABIT. `deploy.yml`,
- * `ci.yml` and `provision.yml` derive every app they touch from that registry.
- * One is absent from it, which is what makes it unreachable by all three — so
- * the day somebody "tidily" registers One there, the production deploy workflow
- * gains a new app and this check is what says so.
+ * ⚠️ AND THE REGISTRY CHECK OUTLIVED THE WORKFLOWS THAT READ IT. `apps.json` was
+ * how `deploy.yml`, `ci.yml` and `provision.yml` chose what to ship; all three
+ * are deleted, and the legacy tree is frozen. The check stays because the
+ * registry is what any future pipeline over `apps/` would read first, and One
+ * appearing in it is the one edit that would put the framework back on a shared
+ * deploy path beside a live tenant.
+ *
+ * ⚠️ THE OTHER FOUR ARE THE ONES DOING THE WORK NOW. A worker name and a D1 name
+ * are account-wide, and One serves `*.${ROOT}` — so a name collision or a wrong
+ * ROOT reaches Kova's deployment whatever any workflow says. Nothing else is
+ * watching that account any more.
  */
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -44,10 +50,11 @@ const apps = registry.apps ?? [];
 const registered = apps.filter((a) => (a.dir ?? "").startsWith("engine/"));
 if (registered.length) {
   fail(`apps.json registers ${registered.map((a) => a.id).join(", ")} under engine/.\n` +
-       `       deploy.yml derives its app list from that file, so this puts the\n` +
-       `       framework on the production deploy path beside a live tenant.`);
+       `       That registry is what a pipeline over the frozen tree reads first,\n` +
+       `       so this is the edit that puts the framework back on a shared deploy\n` +
+       `       path beside a live tenant.`);
 } else {
-  ok(`registry: apps.json names nothing under engine/, so deploy.yml cannot select it`);
+  ok(`registry: apps.json names nothing under engine/, so no pipeline over it can select One`);
 }
 
 /* ---------------------------------------------------------- no shared names --- */

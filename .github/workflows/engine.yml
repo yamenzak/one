@@ -39,15 +39,18 @@ name: OneEngine
 # has no way to read — so a repository compromise yields no live merchant
 # credential, and rotating one is a form rather than a code push.
 #
-# ── Both branches, and `claude/quad` goes when the work does ────────────────
+# ── One branch ──────────────────────────────────────────────────────────────
 #
-# `main` is a push trigger again: the engine lives there now, so the gate has a
-# tree to run against. `claude/quad` stays while the work is on it, and the day
-# it is gone this is one line shorter.
+# ⚠️ AND A SECOND ONE HERE IS A SECOND DEPLOY, NOT A SECOND OPINION. `main` and
+# `claude/quad` were identical for a while and both were triggers, so every push
+# ran the whole gate twice and uploaded the same worker twice — and the
+# concurrency group is keyed on the ref, so the two did not even serialise
+# against each other. The work is on `main` now, which is the whole of what this
+# repository ships.
 #
 on:
   push:
-    branches: [main, claude/quad]
+    branches: [main]
     paths:
       - "engine/**"
       - ".github/workflows/engine.yml"
