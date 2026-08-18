@@ -17,6 +17,7 @@ import { Button, Card, Chip, ProgressBar } from "@heroui/react";
 import { colorFor } from "../tokens/theme.js";
 import { SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
+import { Group, NoteRow } from "../parts/surfaces.js";
 
 export interface GuideProps {
   readonly book: GuideBook;
@@ -34,13 +35,8 @@ export function Guide({ book, events, held, onGo }: GuideProps) {
   if (!left.length) return null;
 
   return (
-    <Card>
-      <Card.Header>
-        <Card.Title>Getting started</Card.Title>
-        <Card.Description>{done.done.length} of {done.total} done</Card.Description>
-      </Card.Header>
-      <Card.Content>
-        <div className={`flex flex-col ${SPACE.snug}`}>
+    <Group label="Getting started" under={`${done.done.length} of ${done.total} done`}>
+      <div className={`flex flex-col ${SPACE.snug}`}>
           <ProgressBar value={done.done.length} maxValue={Math.max(1, done.total)}>
             <ProgressBar.Track><ProgressBar.Fill /></ProgressBar.Track>
           </ProgressBar>
@@ -54,8 +50,7 @@ export function Guide({ book, events, held, onGo }: GuideProps) {
             </div>
           ))}
         </div>
-      </Card.Content>
-    </Card>
+    </Group>
   );
 }
 
@@ -115,10 +110,9 @@ export function Help({ book, screen }: HelpProps) {
   return (
     <div className={`flex flex-col ${SPACE.snug}`}>
       {mine.map((h) => (
-        <Card key={h.id}>
-          <Card.Header><Card.Title>{h.title}</Card.Title></Card.Header>
-          <Card.Content>{h.body}</Card.Content>
-        </Card>
+        <Group key={h.id} label={h.title}>
+          <NoteRow>{h.body}</NoteRow>
+        </Group>
       ))}
     </div>
   );

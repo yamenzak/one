@@ -50,10 +50,85 @@ describe("what the machine already knows", () => {
     ⚠️ ENGLISH WORDS, GERMAN CONVENTIONS — the combination one locale dropdown
     cannot express, and the reason language and region are two fields.
   */
-  it("joins a chosen language to a chosen region", () => {
+  /*
+    ⚠️ `en-DE` IS NOT WHAT IT LOOKS LIKE, AND THIS IS THE MEASUREMENT. Its
+    NUMBERS are German and its DATES and CURRENCY are English — so a reader who
+    set their region to Germany got `1.234.567,50`, `18/08/2026` and `€1,234.56`
+    on one screen. The patterns come from the region's own locale instead; the
+    words still come from the language.
+  */
+  it("takes the words from the language and the patterns from the region", () => {
     const both = shownAs({ ...DEFAULT_PRESENTATION, language: "en", region: "DE" });
     expect(both.locale).toBe("en-DE");
+    expect(both.numeric).toBe("de-DE");
+
     expect(sayNumber(both, 1234.56, 2)).toBe("1.234,56");
+    expect(sayDate(both, at("2026-08-18T10:00:00.000Z"), "numeric")).toBe("18.08.2026");
+    /* ⚠️ The month stays English — that is what the language is for. */
+    expect(sayDate(both, at("2026-08-18T10:00:00.000Z"), "long")).toBe("18 August 2026");
+    expect(sayMoney(both, 123456, "EUR").replace(/[\u00a0\u202f]/g, " ")).toBe("1.234,56 €");
+  });
+
+  /*
+    ⚠️ AND IT IS BORROWED ONLY WHERE THE SCRIPTS MATCH. `ar-AE` would give an
+    English reader in Dubai a numeric date carrying right-to-left marks, and
+    `ja-JP` would give one in Tokyo a Japanese date shape — the region's patterns
+    are only safe when the two alphabets are the same one.
+  */
+  it("does not borrow a region's patterns across a script", () => {
+    /*
+      ⚠️ AND FALLS BACK TO THE DEVICE, NOT TO THE COMBINATION. `en-AE` and
+      `en-JP` are well-formed tags `Intl` holds no data for, so both resolve to
+      the root — which is American. An English reader in Tokyo would have got
+      `08/19/2026` and `3:47 AM`: not Japan's conventions, not their phone's,
+      and confident. The machine's own locale is the honest answer for the half
+      we cannot borrow.
+    */
+    const machine = { locale: "en-GB", zone: "Europe/London" };
+    const dubai = shownAs({ ...DEFAULT_PRESENTATION, language: "en", region: "AE" }, machine);
+    expect(dubai.numeric).toBe("en-GB");
+    expect(dubai.clock).toBe("24");
+    const tokyo = shownAs({ ...DEFAULT_PRESENTATION, language: "en", region: "JP" }, machine);
+    expect(tokyo.numeric).toBe("en-GB");
+    expect(tokyo.dateOrder).toBe("dmy");
+    /* ⚠️ The WORDS fall back too, or the reorder carries American literals into
+       a British order — `19 August, 2026`, with a comma from nowhere. */
+    expect(sayDate(tokyo, at("2026-08-18T20:00:00.000Z"), "long")).toBe("18 August 2026");
+
+    /* ⚠️ Same script, so the region's own patterns ARE borrowed. */
+    const paris = shownAs({ ...DEFAULT_PRESENTATION, language: "en", region: "FR" }, machine);
+    expect(paris.numeric).toBe("fr-FR");
+  });
+
+  /*
+    ⚠️ THE DEVICE SAYS WHERE IT IS, AND THAT BEATS WHAT LANGUAGE IT IS IN. This
+    is the whole of the reported bug: somebody in Germany with an English phone
+    read `18/08/2026` and `€1,234.56` under a setting called "same as this
+    device". `navigator.language` is `en-GB` because of which installer they ran;
+    the zone is where they are. `machineHere` works the country out from the zone
+    and reports it HERE, beside the tag rather than stitched into it.
+  */
+  it("takes the place from the device, not from its language tag", () => {
+    const english = { locale: "en-GB", zone: "Europe/Berlin", region: "DE" };
+    const shown = shownAs(DEFAULT_PRESENTATION, english);
+    expect(shown.locale).toBe("en-DE");
+    expect(shown.numeric).toBe("de-DE");
+    expect(shown.units).toBe("metric");
+    expect(sayDate(shown, at("2026-08-18T10:00:00.000Z"), "numeric")).toBe("18.08.2026");
+    /* ⚠️ And the words are still the device's. */
+    expect(sayDate(shown, at("2026-08-18T10:00:00.000Z"), "long")).toBe("18 August 2026");
+  });
+
+  /*
+    ⚠️ AND AN EXPLICIT CHOICE STILL WINS OVER THE PLACE. Somebody who moved and
+    pinned their region is the reason this screen exists; a device that
+    contradicts them is exactly the case they were correcting.
+  */
+  it("lets a chosen region beat the device's own", () => {
+    const abroad = { locale: "en-GB", zone: "Europe/Berlin", region: "DE" };
+    const pinned = shownAs({ ...DEFAULT_PRESENTATION, region: "US" }, abroad);
+    expect(pinned.numeric).toBe("en-US");
+    expect(pinned.units).toBe("imperial");
   });
 });
 
@@ -292,7 +367,7 @@ describe("what is refused", () => {
   /* ⚠️ AND A STORED VALUE THAT SLIPPED THROUGH STILL RENDERS. A row written
      before the check existed must not take the screen down. */
   it("falls back rather than throwing on a tag it cannot use", () => {
-    const bad = { locale: "!!!", zone: "UTC", dateOrder: "dmy", clock: "24", units: "metric" } as const;
+    const bad = { locale: "!!!", numeric: "!!!", zone: "UTC", dateOrder: "dmy", clock: "24", units: "metric" } as const;
     expect(() => sayDate(bad, at("2026-08-05T10:00:00.000Z"))).not.toThrow();
     expect(() => sayNumber(bad, 12)).not.toThrow();
   });

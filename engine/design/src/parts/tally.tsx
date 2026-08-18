@@ -105,12 +105,24 @@ export function Tally({ value, format = String, count = false, className }: Tall
     return () => cancelAnimationFrame(frame);
   }, [value, counting]);
 
+  /*
+    ⚠️ THE SPLIT EXISTS ONLY WHILE IT IS COUNTING, AND UNCONDITIONALLY IT WAS A
+    NUMBER PRINTED TWICE. `sr-only` is hidden from the eye and present in the
+    DOM, so a price rendered `€` + `1,234` + `1,234` + `.56`: selecting it,
+    copying it or reading the page's text gave `€1,2341,234.56`. Nothing about
+    a still number needs two copies — the tween is the only reason one of them
+    has to be hidden from a screen reader.
+  */
+  if (!counting) return <span ref={at} className={className}>{format(value)}</span>;
+
   return (
     <span ref={at} className={className}>
       {/* ⚠️ ROUNDED, BECAUSE A FORMATTER IS GIVEN A REAL NUMBER MID-TWEEN and
           most of them will happily render `12913.7421`. The final frame is the
           exact value, so nothing is lost. */}
       <span aria-hidden="true">{format(shown === value ? value : Math.round(shown))}</span>
+      {/* ⚠️ THE DESTINATION, ANNOUNCED ONCE. A screen reader must not be read a
+          number that is still moving. */}
       <span className="sr-only">{format(value)}</span>
     </span>
   );

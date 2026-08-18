@@ -21,7 +21,7 @@ import { Credits } from "../parts/credits.js";
 import { Num, useShown } from "../parts/said.js";
 import { Balance } from "../parts/heads.js";
 import { Choice, NumberInput } from "../parts/forms.js";
-import { AmountRow, ControlRow, Group } from "../parts/surfaces.js";
+import { AmountRow, ControlRow, Group, NoteRow } from "../parts/surfaces.js";
 import { TYPE } from "../tokens/type.js";
 import { SPACE } from "../tokens/metrics.js";
 
@@ -266,26 +266,25 @@ export function Wallet({
           however many packs somebody priced. See `Shelf`. */}
       <Grid min="15rem">
         {[...packs].sort((a, b) => a.order - b.order).map((pack) => (
-          <Card key={pack.id}>
-            <Card.Header>
-              <Card.Title>{pack.name}</Card.Title>
-              <Card.Description>
-                <Credits value={pack.credits} as="inline" />
-              </Card.Description>
-            </Card.Header>
-            <Card.Content>
+          <Group
+            key={pack.id}
+            label={pack.name}
+            /* ⚠️ THE FOOT IS WHAT A `Card.Footer` WAS — see `Group.does`. One
+               card grammar, so a pack sits on the same inset as every row in
+               the product rather than on HeroUI's own. */
+            does={<Button variant="primary" onPress={() => onBuy(pack.id)}>Buy</Button>}
+          >
+            <NoteRow>
+              <Credits value={pack.credits} as="inline" /> ·{" "}
               <strong>{money(pack.price, pack.currency)}</strong>
-              {/* ⚠️ SAID ON THE CARD, NOT IN THE SMALL PRINT. It is the reason
-                  somebody buys a pack instead of waiting for the month to turn,
-                  and it is the one thing the allowance beside it does not do. */}
-              <Chip variant="soft">
-                <Chip.Label>Never expires</Chip.Label>
-              </Chip>
-            </Card.Content>
-            <Card.Footer>
-              <Button variant="primary" onPress={() => onBuy(pack.id)}>Buy</Button>
-            </Card.Footer>
-          </Card>
+            </NoteRow>
+            {/* ⚠️ SAID ON THE CARD, NOT IN THE SMALL PRINT. It is the reason
+                somebody buys a pack instead of waiting for the month to turn,
+                and it is the one thing the allowance beside it does not do. */}
+            <Chip variant="soft">
+              <Chip.Label>Never expires</Chip.Label>
+            </Chip>
+          </Group>
         ))}
       </Grid>
     </Stack>

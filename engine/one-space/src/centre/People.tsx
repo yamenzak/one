@@ -29,7 +29,7 @@ import { useState } from "react";
 import { PLATFORM_ROLES, sayDate, type Instant } from "@engine/kernel";
 import { Button, Card, Chip } from "@heroui/react";
 import {
-  Await, Choice, Confirm, Listing, Menu, Nothing, RowsWaiting, Screen, Stack, TextInput, Tray,
+  Await, Choice, Confirm, Group, Listing, Menu, Nothing, RowsWaiting, Screen, Stack, TextInput, Tray,
   glyphOf, notice, useMoney, useShown, whoFace,
 } from "@engine/design";
 import { api } from "../api.js";
@@ -303,12 +303,8 @@ function AppHoldings({ app, member }: { readonly app: CentreApp; readonly member
       waiting={<RowsWaiting rows={1} />}
       again={held.again}
       then={(holdings) => (
-        <Card>
-          <Card.Header>
-            <Card.Title>Packages in {app.name}</Card.Title>
-          </Card.Header>
-          <Card.Content>
-            <Stack space="snug">
+        <Group label={`Packages in ${app.name}`}>
+          <Stack space="snug">
               {holdings.items.length === 0
                 ? (
                   <Nothing
@@ -352,8 +348,7 @@ function AppHoldings({ app, member }: { readonly app: CentreApp; readonly member
                 )
                 : null}
             </Stack>
-          </Card.Content>
-        </Card>
+        </Group>
       )}
     />
   );

@@ -22,13 +22,8 @@ export function Ropa({ rows }: { readonly rows: readonly RopaEntry[] }) {
   return (
     <div className={`flex flex-col ${SPACE.snug}`}>
       {rows.map((row) => (
-        <Card key={row.of}>
-          <Card.Header>
-            <Card.Title>{row.of}</Card.Title>
-            <Card.Description>{row.why}</Card.Description>
-          </Card.Header>
-          <Card.Content>
-            <div className={`flex flex-col ${SPACE.tight}`}>
+        <Group key={row.of} label={row.of} under={row.why}>
+          <div className={`flex flex-col ${SPACE.tight}`}>
               <div className={`flex flex-wrap ${SPACE.tight}`}>
                 {row.holdings.map((h) => (
                   <Chip key={h} color={h === "sensitive" ? "warning" : "default"} variant="soft">
@@ -46,8 +41,7 @@ export function Ropa({ rows }: { readonly rows: readonly RopaEntry[] }) {
                 ? <span>Shared with: {row.recipients.join(", ")}</span>
                 : <span>Not shared with anybody outside this deployment</span>}
             </div>
-          </Card.Content>
-        </Card>
+        </Group>
       ))}
     </div>
   );

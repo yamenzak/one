@@ -27,14 +27,22 @@ import * as React from "react";
 import { useState } from "react";
 import {
   Amount, Choice, Clock, Dated, Group, Lookup, Money, Num, Presenting, SPACE, Screen, Section,
-  Size, Stack, TYPE, When, notice, useShown,
+  Size, Stack, TYPE, When, machineHere, notice,
 } from "@engine/design";
 import {
   DEFAULT_PRESENTATION, instant, type Machine, type Presentation,
 } from "@engine/kernel";
 import { api } from "../api.js";
 import { useSession } from "../session.js";
-import { byName } from "../countries.js";
+import { byName, nameOf } from "../countries.js";
+
+/** ⚠️ The region subtag, or nothing — a language tag often carries none. */
+const regionOf = (tag: string): string => {
+  for (const part of tag.split("-").slice(1)) {
+    if (/^[A-Za-z]{2}$/.test(part)) return part.toUpperCase();
+  }
+  return "";
+};
 
 /* ⚠️ ONE OPTION LIST PER CONTROL, and "auto" is the first entry in every one —
    it is the default and it is what somebody comes back to. */
@@ -84,14 +92,21 @@ export function Formats() {
     the point of the screen.
   */
   const [want, setWant] = useState<Presentation>(stored);
-  const here = useShown();
 
   /* ⚠️ THE PREVIEW IS THE REAL ELEMENTS UNDER A SECOND `Presenting`, resolved
      from what is PICKED rather than from what is saved — so the examples repaint
      on the choice rather than on the round trip, and they are drawn by the same
      components every other screen uses rather than by a preview that could
-     disagree with them. */
-  const machine: Machine = { locale: here.locale, zone: here.zone };
+     disagree with them.
+
+     ⚠️ AND THE DEVICE IS ASKED DIRECTLY, NOT REBUILT FROM A `Shown`. This was
+     `{ locale: here.locale, zone: here.zone }` off `useShown()`, which is the
+     RESOLVED answer: its `locale` is already the language and region joined, and
+     it carries no `region` of its own. Feeding that back in as a machine made
+     every `auto` on this screen resolve from a value that had itself resolved —
+     so an English reader in Tokyo previewed American dates, and the preview was
+     the one place in the product that disagreed with the product. */
+  const machine: Machine = machineHere();
 
   const set = async (next: Presentation) => {
     setWant(next);
@@ -108,13 +123,22 @@ export function Formats() {
     void refresh();
   };
 
+  /*
+    ⚠️ "SAME AS THIS DEVICE" NAMES WHAT IT RESOLVED TO. A browser reports no
+    country outright — a LANGUAGE (`en-GB`) and a zone — and the country is
+    worked out from the ZONE, which is the only one of the two that is about
+    where somebody is (`machineHere`). It is a good answer and not a certain one:
+    a week abroad moves it. Printing it turns "why are my dates British" from a
+    mystery into a one-tap correction, which is the whole reason the label is not
+    just the word "Automatic".
+  */
   const countries = [
-    { id: SAME, label: "Same as this device" },
+    { id: SAME, label: `Same as this device — ${nameOf(machine.region ?? regionOf(machine.locale)) || machine.locale}` },
     ...byName().map((c) => ({ id: c.code, label: c.name })),
   ];
 
   const timeZones = [
-    { id: SAME, label: "Same as this device" },
+    { id: SAME, label: `Same as this device — ${machine.zone.replace(/_/g, " ")}` },
     ...zones().map((z) => ({ id: z, label: z.replace(/_/g, " ") })),
   ];
 

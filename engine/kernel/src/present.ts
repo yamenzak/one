@@ -101,6 +101,25 @@ export interface Machine {
   readonly locale: string;
   /** `Intl.DateTimeFormat().resolvedOptions().timeZone`. */
   readonly zone: string;
+  /**
+   * WHERE THE DEVICE SAYS IT IS — a country code, when one can be worked out.
+   *
+   * ⚠️ SEPARATE FROM `locale` BECAUSE THEY ARE SEPARATE FACTS, and conflating
+   * them is the bug this field exists to close. `navigator.language` is `en-GB`
+   * because somebody ran an English installer; the time zone is a statement
+   * about the chair they are sitting in. Somebody in Berlin with an English
+   * phone read `18/08/2026` and `€1,234.56` under a setting called "same as this
+   * device" — the device did say where it was, and nothing asked.
+   *
+   * ⚠️ AND STITCHING IT INTO `locale` INSTEAD IS WHAT THE FIRST ATTEMPT DID,
+   * which loses the device's own conventions. They are needed as the FALLBACK
+   * wherever the region's cannot be borrowed (see `numeric`) — overwrite the tag
+   * and an English reader in Tokyo gets American dates, from `en-JP`, which is
+   * neither country's answer.
+   *
+   * Absent on a runtime that cannot say (and on the server, which has no place).
+   */
+  readonly region?: string;
 }
 
 export const MACHINE: Machine = { locale: "en-GB", zone: "UTC" };
@@ -162,8 +181,26 @@ const zoneOk = (zone: string): boolean => {
  * arguments.
  */
 export interface Shown {
-  /** ⚠️ The tag the formatters use — language and region, already joined. */
+  /**
+   * ⚠️ THE WORDS. Language and region joined — month names, and nothing else.
+   */
   readonly locale: string;
+  /**
+   * THE PATTERNS: separators, grouping, where a currency sits, how a numeric
+   * date is punctuated.
+   *
+   * ⚠️ IT IS A SECOND TAG BECAUSE `en-DE` DOES NOT MEAN WHAT IT LOOKS LIKE.
+   * Measured: `Intl.NumberFormat("en-DE")` gives `1.234.567,5` — German — while
+   * `Intl.DateTimeFormat("en-DE")` gives `18/08/2026` and its currency gives
+   * `€1,234.56`, both English. So somebody who set their region to Germany read
+   * German numbers, British dates and an American price on ONE screen, which is
+   * worse than being wrong consistently. The `-u-rg-` region-override extension
+   * does not fix it either; that was measured too.
+   *
+   * ⚠️ SO THE PATTERNS COME FROM THE REGION'S OWN LOCALE — `de-DE`, derived
+   * with `Intl.Locale.maximize()` rather than from a table of our own.
+   */
+  readonly numeric: string;
   readonly zone: string;
   readonly dateOrder: "dmy" | "mdy" | "ymd";
   readonly clock: "12" | "24";
@@ -178,14 +215,39 @@ export interface Shown {
  */
 export function shownAs(of: Presentation, machine: Machine = MACHINE): Shown {
   const language = of.language === "auto" ? languageOf(machine.locale) : of.language;
-  const region = of.region === "auto" ? regionOf(machine.locale) : of.region;
-  const locale = region ? `${language}-${region}` : language;
+  /* ⚠️ THE PLACE WINS OVER THE LANGUAGE TAG — see `Machine.region`. Of the two
+     things a device reports, only one of them is about where somebody is. */
+  const region = of.region === "auto"
+    ? (machine.region || regionOf(machine.locale))
+    : of.region;
+  /**
+   * ⚠️ WHERE THE REGION'S PATTERNS CANNOT BE BORROWED, THE WHOLE TAG FALLS BACK
+   * — and the fallback is the language with the DEVICE's region, not the raw
+   * device tag and not the combination. `en-JP` is well-formed and `Intl` holds
+   * no data for it, so it resolves to the root; the root is American, so an
+   * English reader in Tokyo got `August 19, 2026`, `08/19/2026` and `3:47 AM`
+   * from a British phone. That is neither country's convention.
+   *
+   * ⚠️ THE LANGUAGE SURVIVES, WHICH IS WHY IT IS NOT SIMPLY `machine.locale`.
+   * `fr` + `JP` becomes `fr-GB`, which `Intl` also lacks — but a language it
+   * KNOWS falls back to that language's own conventions, so the answer is
+   * French. English is the pathological case precisely because its own default
+   * region is the United States.
+   */
+  const borrowed = patternsFor(language, region);
+  const locale = !region ? language
+    : borrowed ? `${language}-${region}`
+      : withRegion(language, regionOf(machine.locale));
+  const numeric = borrowed ?? locale;
 
   return {
     locale,
+    numeric,
     zone: of.zone === "auto" ? machine.zone : of.zone,
-    dateOrder: of.dateOrder === "auto" ? orderIn(locale) : of.dateOrder,
-    clock: of.clock === "auto" ? (hour12In(locale) ? "12" : "24") : of.clock,
+    /* ⚠️ ORDER AND CLOCK FOLLOW THE PATTERNS, NOT THE TAG, for the same reason:
+       they are the two conventions `en-JP` answers wrongly and confidently. */
+    dateOrder: of.dateOrder === "auto" ? orderIn(numeric) : of.dateOrder,
+    clock: of.clock === "auto" ? (hour12In(numeric) ? "12" : "24") : of.clock,
     units: of.units === "auto" ? (imperialIn(region) ? "imperial" : "metric") : of.units,
   };
 }
@@ -193,11 +255,50 @@ export function shownAs(of: Presentation, machine: Machine = MACHINE): Shown {
 const languageOf = (tag: string): string => tag.split("-")[0] ?? "en";
 
 /**
+ * THE REGION'S OWN LOCALE, WHERE BORROWING IT IS SAFE.
+ *
+ * ⚠️ ONLY WHERE THE TWO SHARE A SCRIPT, and that is the whole rule. `de-DE` for
+ * an English reader in Germany is right: same alphabet, and all that changes is
+ * `.` for `/` and where the euro sits. `ar-AE` for an English reader in Dubai is
+ * NOT: its numeric date carries right-to-left marks and its patterns assume a
+ * script the rest of the page is not in. Same for `ja-JP`, which would render
+ * `2026/08/18` in a Japanese calendar's shape.
+ *
+ * ⚠️ ASKED OF `Intl.Locale.maximize()` RATHER THAN LISTED. Which language a
+ * country writes is CLDR's likely-subtags data, it changes, and a table here
+ * would be this file holding an opinion it gets wrong for somewhere.
+ */
+const patternsFor = (language: string, region: string): string | null => {
+  if (!region) return null;
+  try {
+    const theirs = new Intl.Locale(`und-${region}`).maximize();
+    const ours = new Intl.Locale(language).maximize();
+    if (theirs.script !== ours.script) return null;
+    return `${theirs.language}-${region}`;
+  } catch { return null; }
+};
+
+/**
  * ⚠️ THE REGION SUBTAG, WHICH IS NOT ALWAYS THE SECOND ONE. `zh-Hant-TW` carries
  * a SCRIPT in the second position, so taking `parts[1]` yields "Hant" — a region
  * `Intl` does not recognise, on a tag it then falls back from, silently, for
  * every reader of traditional Chinese.
  */
+/**
+ * ⚠️ THE REGION SUBTAG IS NOT ALWAYS THE SECOND ONE — `zh-Hant-TW` carries a
+ * SCRIPT there. Replacing by position yields `zh-DE-TW`, which is not a tag, and
+ * `Intl` falls back from it silently for every reader of traditional Chinese.
+ */
+const withRegion = (locale: string, region: string): string => {
+  if (!region) return locale;
+  const parts = locale.split("-");
+  const at = parts.findIndex((p, i) => i > 0 && /^[A-Za-z]{2}$/.test(p));
+  if (at > 0) { parts[at] = region; return parts.join("-"); }
+  const script = parts[1] && /^[A-Za-z]{4}$/.test(parts[1]) ? 2 : 1;
+  parts.splice(script, 0, region);
+  return parts.join("-");
+};
+
 const regionOf = (tag: string): string => {
   for (const part of tag.split("-").slice(1)) {
     if (/^[A-Za-z]{2}$/.test(part)) return part.toUpperCase();
@@ -304,8 +405,11 @@ export function sayDate(
 ): string {
   const on = asDate(at);
   if (!on) return String(at);
-  const parts = dates(shown.locale, { ...DATE_OPTS[length], timeZone: shown.zone })
-    .formatToParts(on);
+  /* ⚠️ THE NUMERIC SHAPE IS THE REGION'S AND THE MONTH NAME IS THE LANGUAGE'S —
+     see `Shown.numeric`. `18.08.2026` for a German region, `18 August 2026` in
+     English words, which is the pair somebody actually wants. */
+  const parts = dates(length === "numeric" ? shown.numeric : shown.locale,
+    { ...DATE_OPTS[length], timeZone: shown.zone }).formatToParts(on);
   return reorder(parts, shown.dateOrder);
 }
 
@@ -338,7 +442,7 @@ const reorder = (
 export function sayTime(shown: Shown, at: Instant | Date, seconds = false): string {
   const on = asDate(at);
   if (!on) return String(at);
-  return dates(shown.locale, {
+  return dates(shown.numeric, {
     hour: "numeric", minute: "2-digit", ...(seconds ? { second: "2-digit" } : {}),
     hour12: shown.clock === "12", timeZone: shown.zone,
   }).format(on);
@@ -451,7 +555,7 @@ export function byDay<T>(
 /* ----------------------------------------------------------------- numbers --- */
 
 export function sayNumber(shown: Shown, value: number, places?: number): string {
-  return numbers(shown.locale, places === undefined ? {} : {
+  return numbers(shown.numeric, places === undefined ? {} : {
     minimumFractionDigits: places, maximumFractionDigits: places,
   }).format(value);
 }
@@ -470,7 +574,7 @@ export function sayNumber(shown: Shown, value: number, places?: number): string 
  * that is a penny out is a bill somebody does not trust.
  */
 export function sayMoney(shown: Shown, minor: number, currency: string): string {
-  return numbers(shown.locale, {
+  return numbers(shown.numeric, {
     style: "currency", currency,
     /* ⚠️ Zero-decimal currencies exist (JPY, KRW) and `Intl` knows which, so the
        digits are left to it rather than divided by a hardcoded hundred. */
@@ -521,7 +625,7 @@ export interface MoneyParts {
 }
 
 export function sayMoneyParts(shown: Shown, minor: number, currency: string): MoneyParts {
-  const parts = numbers(shown.locale, { style: "currency", currency })
+  const parts = numbers(shown.numeric, { style: "currency", currency })
     .formatToParts(Math.abs(minor) / minorPer(currency));
 
   let before = "", whole = "", fraction = "", after = "";
@@ -629,7 +733,7 @@ export function sayAmount(shown: Shown, base: number, measure: Measure): string 
      tag. `SHOW_UNITS` in the suite is what stops it happening; this is what
      stops it being fatal on a runtime whose list is older than ours. */
   try {
-    return numbers(shown.locale, {
+    return numbers(shown.numeric, {
       style: "unit", unit: how.unit, unitDisplay: "short",
       minimumFractionDigits: how.places, maximumFractionDigits: how.places,
     }).format(value);

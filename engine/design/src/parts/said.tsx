@@ -53,8 +53,65 @@ export const machineHere = (): Machine => {
   let zone = MACHINE.zone;
   try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || MACHINE.zone; }
   catch { zone = MACHINE.zone; }
-  return { locale, zone };
+  /* ⚠️ THE PLACE IS REPORTED BESIDE THE TAG, NEVER STITCHED INTO IT — see
+     `Machine.region`. Overwriting the region subtag loses the device's own
+     conventions, which are the fallback wherever the region's cannot be
+     borrowed. */
+  return { locale, zone, region: countryOf(zone) ?? undefined };
 };
+
+/* -------------------------------------------------------------- where they are --- */
+
+/**
+ * ⚠️ `Intl.Locale.getTimeZones()` IS THE INVERSE OF THE QUESTION, so the answer
+ * is found by scanning regions rather than by holding a table of 418 zones that
+ * would be this file having an opinion about borders. It is one lookup per
+ * session — the device's zone does not move while a page is open — and the
+ * result is remembered.
+ *
+ * ⚠️ DEPRECATED CODES ARE DROPPED BY CANONICALISING, and that is not tidiness.
+ * `DD` (East Germany) still carries `Europe/Berlin` in CLDR and sorts before
+ * `DE`, so the obvious scan resolves Berlin to a country that stopped existing
+ * in 1990 — and `und-DD` formats nothing, so every date on the screen silently
+ * falls back. A code that does not survive `maximize()` is an alias, not a place.
+ *
+ * ⚠️ AND THE ZONE IS CANONICALISED TOO. `Europe/Kyiv` is what a modern runtime
+ * REPORTS and `Europe/Kiev` is what its own region data still LISTS, so the
+ * lookup misses on the one country where getting this right matters most.
+ */
+const known = new Map<string, string | null>();
+const countryOf = (zone: string): string | null => {
+  const had = known.get(zone);
+  if (had !== undefined) return had;
+  let found: string | null = null;
+  try {
+    const zonesOf = (code: string) =>
+      (new Intl.Locale(`und-${code}`) as { getTimeZones?: () => string[] | undefined })
+        .getTimeZones?.();
+    /* ⚠️ A RUNTIME WITHOUT IT ANSWERS NOTHING, and nothing is the honest answer —
+       the caller then keeps the language's own region, which is what every
+       browser did before this existed. */
+    if (!zonesOf("DE")) { known.set(zone, null); return null; }
+    const want = new Intl.DateTimeFormat("en", { timeZone: zone }).resolvedOptions().timeZone;
+    /* ⚠️ `fallback: "none"` — an unassigned code answers `undefined` rather than
+       echoing itself back, which is what makes this a filter at all. */
+    const names = new Intl.DisplayNames(["en"], { type: "region", fallback: "none" });
+    outer:
+    for (let a = 65; a <= 90; a++) {
+      for (let b = 65; b <= 90; b++) {
+        const code = String.fromCharCode(a, b);
+        if (!names.of(code)) continue;
+        if (new Intl.Locale(`und-${code}`).maximize().region !== code) continue;
+        if (!zonesOf(code)?.includes(want)) continue;
+        found = code;
+        break outer;
+      }
+    }
+  } catch { found = null; }
+  known.set(zone, found);
+  return found;
+};
+
 
 /**
  * ⚠️ ONE OF THESE, AT THE ROOT, ALWAYS. Absent, everything below falls back to
@@ -70,7 +127,7 @@ export function Presenting({ of, machine, children }: {
   const from = machine ?? machineHere();
   const shown = React.useMemo(
     () => shownAs(of ?? DEFAULT_PRESENTATION, from),
-    [of, from.locale, from.zone],
+    [of, from.locale, from.zone, from.region],
   );
   return <Ctx.Provider value={shown}>{children}</Ctx.Provider>;
 }

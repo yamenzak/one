@@ -31,7 +31,7 @@ import type { Tone } from "@engine/kernel";
 import { sayMoneyParts } from "@engine/kernel";
 import { TYPE } from "../tokens/type.js";
 import {
-  CARD_OTHERS, CARD_ROWS, CONTROL_SHARE, CROWN_SIZE, HEAD_GAP, ICON, INSET, LEAD, NUDGE, PAD, ROW, SPACE,
+  CARD_OTHERS, CARD_ROWS, CONTROL_SHARE, CROWN_SIZE, HEAD_GAP, ICON, INSET, LEAD, NUDGE, ROW, SPACE,
   TILE,
 } from "../tokens/metrics.js";
 import type { Inset } from "../tokens/metrics.js";
@@ -364,7 +364,13 @@ export function Place({ name, said, foot, face, tone = "neutral", sky = "glow", 
         own world at card size: never wrong-looking, never right either, and
         identical on all three cards.
       */}
-      <Card {...(own.css ? own.attrs : {})} data-tone={tone}>
+      {/* ⚠️ `CARD_ROWS`, LIKE EVERY OTHER CARD. This named no inset at all, so it
+          took the library's `p-4` — and the span inside it added `PAD` on top,
+          which is two box insets stacked inside one box. The tile's contents sat
+          32px from its edge while every row in the product sits at 16, so a
+          shelf of places did not line up with the cards above or below it and
+          nothing said which of the two paddings was the wrong one. */}
+      <Card className={CARD_ROWS} {...(own.css ? own.attrs : {})} data-tone={tone}>
         {own.field}
         <Card.Content>
           {/* ⚠️ THE WHOLE CARD IS THE TARGET, and it is a real Button — the
@@ -376,7 +382,11 @@ export function Place({ name, said, foot, face, tone = "neutral", sky = "glow", 
             className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush}`}
             onPress={onOpen}
           >
-            <span className={`flex w-full min-w-0 flex-col items-start text-left ${SPACE.tight} ${PAD}`}>
+            {/* ⚠️ `ROW.pad`, NOT `PAD` — the card supplies the gutter (`ROW.flush`),
+                so what is left for the contents is a row's vertical rhythm and
+                nothing else. A tile is a row that reads top-down, not a card
+                inside a card. */}
+            <span className={`flex w-full min-w-0 flex-col items-start text-left ${SPACE.tight} ${ROW.pad}`}>
               {/* ⚠️ ABOVE THE NAME, NOT BESIDE IT. A lead beside two lines of
                   text turns the card into a tall row; a place is a destination
                   and reads top-down, which is what makes it different from
@@ -1091,7 +1101,12 @@ export function Sheet({ title, lead, children }: {
   readonly children: React.ReactNode;
 }) {
   return (
-    <Card className="w-full max-w-lg">
+    /* ⚠️ `CARD_ROWS` — A SHEET IS A CARD, so its box inset is the one every
+       other card has rather than the library's `p-4`, which is a number nobody
+       in this repo chose. What sits inside brings its own rhythm: a `Group`'s
+       children are rows and bring `ROW.pad`, a sheet's are a heading and a
+       column and bring the card's own gap. The BOX is the standard. */
+    <Card className={`w-full max-w-lg ${CARD_ROWS}`}>
       <Card.Header>
         <Card.Title>{title}</Card.Title>
         {lead ? <Card.Description>{lead}</Card.Description> : null}

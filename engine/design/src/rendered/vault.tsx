@@ -14,8 +14,13 @@
  */
 
 import type { Disclosure } from "@engine/kernel";
-import { Button, Card, Chip, Separator, Switch, Label } from "@heroui/react";
+import { Button, Chip, Separator, Switch, Label } from "@heroui/react";
 import { SPACE } from "../tokens/metrics.js";
+import { Group } from "../parts/surfaces.js";
+import { Nothing } from "../parts/state.js";
+import { glyphOf } from "../frame/shell.js";
+import { sayMoment, type Instant } from "@engine/kernel";
+import { useShown } from "../parts/said.js";
 
 export interface ConsentProps {
   readonly shown: readonly Disclosure[];
@@ -26,15 +31,10 @@ export interface ConsentProps {
 export function ConsentSheet({ shown, given, onChange }: ConsentProps) {
   return (
     <div className={`flex flex-col ${SPACE.snug}`}>
+      {/* ⚠️ In the subject's own terms. `under` is the sentence they decide on. */}
       {shown.map(({ purpose, fields, required }) => (
-        <Card key={purpose.id}>
-          <Card.Header>
-            <Card.Title>{purpose.label}</Card.Title>
-            {/* ⚠️ In the subject's own terms. This is the sentence they decide on. */}
-            <Card.Description>{purpose.why}</Card.Description>
-          </Card.Header>
-          <Card.Content>
-            <div className={`flex flex-col ${SPACE.snug}`}>
+        <Group key={purpose.id} label={purpose.label} under={purpose.why}>
+          <div className={`flex flex-col ${SPACE.snug}`}>
               <ul className={`flex flex-col ${SPACE.hair}`}>
                 {fields.map((f) => <li key={f.id}>{f.label}</li>)}
               </ul>
@@ -66,8 +66,7 @@ export function ConsentSheet({ shown, given, onChange }: ConsentProps) {
                 </Chip>
               </div>
             </div>
-          </Card.Content>
-        </Card>
+        </Group>
       ))}
     </div>
   );
@@ -84,31 +83,31 @@ export interface Look {
 }
 
 export function WhoLooked({ looks }: { readonly looks: readonly Look[] }) {
+  const shown = useShown();
+  /* ⚠️ AN EMPTY STATE, NOT AN EMPTY CARD. This was a `Group` with a label and no
+     children — a heading over a box with nothing in it, which reads as a section
+     that failed to load rather than as an answer. "Nobody looked" IS the answer,
+     and `Nothing` is the shape the product says one in. */
   if (!looks.length) {
-    return (
-      <Card>
-        <Card.Header><Card.Title>Nobody has looked at any of this</Card.Title></Card.Header>
-      </Card>
-    );
+    return <Nothing icon={glyphOf("check")} says="Nobody has looked" under="Every read of these facts is recorded here" />;
   }
   return (
     <div className={`flex flex-col ${SPACE.tight}`}>
       {looks.map((look, i) => (
-        <Card key={`${look.at}-${i}`}>
-          <Card.Header>
-            <Card.Title>{look.grantee} · {look.field}</Card.Title>
-            <Card.Description>{look.at.slice(0, 16).replace("T", " ")} · {look.purpose}</Card.Description>
-          </Card.Header>
+        <Group
+          key={`${look.at}-${i}`}
+          label={`${look.grantee} · ${look.field}`}
+          /* ⚠️ `sayMoment`, NOT A SLICE. This cut the ISO string and swapped its
+             `T` for a space — UTC, in nobody's conventions, on the one screen
+             whose whole subject is who saw what and when. */
+          under={`${sayMoment(shown, look.at as Instant)} · ${look.purpose}`}
+        >
           {/* ⚠️ Refused attempts are shown too. "Did anybody try" is the question
               actually asked after something goes wrong. */}
           {look.refused
-            ? (
-              <Card.Content>
-                <Chip color="warning" variant="soft"><Chip.Label>Refused — {look.refused}</Chip.Label></Chip>
-              </Card.Content>
-            )
+            ? <Chip color="warning" variant="soft"><Chip.Label>Refused — {look.refused}</Chip.Label></Chip>
             : null}
-        </Card>
+        </Group>
       ))}
     </div>
   );
@@ -124,13 +123,8 @@ export interface MineProps {
 
 export function MyData({ onExport, onErase, erased }: MineProps) {
   return (
-    <Card>
-      <Card.Header>
-        <Card.Title>Your data</Card.Title>
-        <Card.Description>Take a copy, or have it destroyed.</Card.Description>
-      </Card.Header>
-      <Card.Content>
-        <div className={`flex flex-wrap items-center ${SPACE.snug}`}>
+    <Group label="Your data" under="Take a copy, or have it destroyed">
+      <div className={`flex flex-wrap items-center ${SPACE.snug}`}>
           <Button variant="secondary" onPress={onExport}>Download everything</Button>
           <Button variant="danger" isDisabled={erased} onPress={onErase}>Erase everything</Button>
           {/*
@@ -148,8 +142,7 @@ export function MyData({ onExport, onErase, erased }: MineProps) {
           {erased
             ? <Chip color="success" variant="soft"><Chip.Label>Already erased</Chip.Label></Chip>
             : null}
-        </div>
-      </Card.Content>
-    </Card>
+      </div>
+    </Group>
   );
 }

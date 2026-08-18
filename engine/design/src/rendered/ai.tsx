@@ -22,6 +22,7 @@ import type { Lane, ModelRow } from "@engine/kernel";
 import { defaultIn, inLane } from "@engine/kernel";
 import { Card, Chip, Switch, Label } from "@heroui/react";
 import { SPACE } from "../tokens/metrics.js";
+import { Group } from "../parts/surfaces.js";
 
 export interface LanesProps {
   /** What the app asked for. */
@@ -38,15 +39,12 @@ export function AiLanes({ lanes, models, onEnable }: LanesProps) {
         const chosen = defaultIn(models, lane);
 
         return (
-          <Card key={lane}>
-            <Card.Header>
-              <Card.Title>{lane}</Card.Title>
-              <Card.Description>
-                {chosen ? `${chosen.label} answers this` : "Nothing answers this"}
-              </Card.Description>
-            </Card.Header>
-            <Card.Content>
-              <div className={`flex flex-col ${SPACE.snug}`}>
+          <Group
+            key={lane}
+            label={lane}
+            under={chosen ? `${chosen.label} answers this` : "Nothing answers this"}
+          >
+            <div className={`flex flex-col ${SPACE.snug}`}>
                 {/* ⚠️ Said plainly, because every call into it refuses for ever. */}
                 {!chosen
                   ? (
@@ -87,8 +85,7 @@ export function AiLanes({ lanes, models, onEnable }: LanesProps) {
                   </div>
                 ))}
               </div>
-            </Card.Content>
-          </Card>
+          </Group>
         );
       })}
     </div>

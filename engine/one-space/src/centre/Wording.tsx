@@ -15,7 +15,7 @@
 import { useState } from "react";
 import { Button, Card } from "@heroui/react";
 import {
-  LongText, Row, Screen, Stack, Whichever, appFace, glyphOf, notice,
+  Group, LongText, Row, Screen, Stack, Whichever, appFace, glyphOf, notice,
 } from "@engine/design";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView } from "./data.js";
@@ -112,15 +112,11 @@ function WordingRow({ app, line, onDone }: {
   };
 
   return (
-    <Card>
-      <Card.Header>
-        <Card.Title>{line.summary}</Card.Title>
-        <Card.Description>
-          {line.prompt ? "In your words" : "The product's own words"}
-        </Card.Description>
-      </Card.Header>
-      <Card.Content>
-        <Stack space="snug">
+    <Group
+      label={line.summary}
+      under={line.prompt ? "In your words" : "The product's own words"}
+    >
+      <Stack space="snug">
           <LongText
             label="Instructions"
             value={text}
@@ -138,7 +134,6 @@ function WordingRow({ app, line, onDone }: {
               : null}
           </Row>
         </Stack>
-      </Card.Content>
-    </Card>
+    </Group>
   );
 }
