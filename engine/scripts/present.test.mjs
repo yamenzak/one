@@ -160,6 +160,78 @@ for (const file of FILES) {
 }
 if (!pinned) ok(`readers: no surface chooses a locale on somebody's behalf`);
 
+/* ------------------------------------------------------------- the raw date --- */
+
+/**
+ * ⚠️ A STORED DATE PRINTED STRAIGHT INTO A SCREEN IS THE ONE THIS GUARD KEPT
+ * MISSING, and it is the commonest of the four. `Version {of.version}` rendered
+ * `2026-08-01` on the legal sheet — no `Intl`, no `toLocale*`, no slice and no
+ * locale literal, so every check above passed it. It is the database's spelling
+ * of a day shown to somebody who told us how they write one, which is exactly
+ * the fault this file exists to prevent, arriving through the one door that was
+ * open: not formatting at all.
+ *
+ * ⚠️ SO THE RECEIVERS ARE DERIVED FROM THE KERNEL'S OWN DECLARATIONS. A hand-kept
+ * list of date-shaped names is the shape that stops covering the field added next
+ * week — and it already had: the ISO-slice check above lists `at|At|Until|After|
+ * Since|On`, and a `Day` called `version` is none of them. Every `readonly x: Day`
+ * and `readonly x: Instant` in `kernel/src` is a name whose value is a date, so
+ * that is the list, and it grows by itself.
+ */
+const DATED = new Set();
+for (const file of filesIn("kernel/src")) {
+  for (const [, name] of readFileSync(file, "utf8")
+    .matchAll(/readonly\s+(\w+)\??\s*:\s*(?:Day|Instant)\b/g)) DATED.add(name);
+}
+if (DATED.size < 5) {
+  fail(`kernel/src: read ${DATED.size} date-shaped field(s) — this check is parsing the wrong thing.\n` +
+       `       It would then pass over an empty list, which is a green run asserting nothing.`);
+}
+
+/**
+ * ⚠️ TWO SHAPES, AND BOTH HAVE TO BE A MEMBER PATH. `{at}` on its own is as often
+ * a loop index as a moment — `groups.map(([from, to], at)` is in this codebase —
+ * and a check people learn to ignore is worse than no check. `{row.at}` is not
+ * ambiguous.
+ *
+ * ⚠️ AND A TEMPLATE LITERAL COUNTS, because that is where the second one was:
+ * `` foot={`${n.minutes} min · ${n.at}`} `` is a raw instant under a card's title
+ * and looks like string building rather than like formatting.
+ */
+const CHILD = /([^=$\s])\s*\{\s*([A-Za-z_$][\w$]*(?:\??\.[\w$]+)+)\s*\}/g;
+const TPL = /\$\{\s*([A-Za-z_$][\w$]*(?:\??\.[\w$]+)+)\s*\}/g;
+
+let raw = 0;
+for (const file of FILES.filter((f) => /\.tsx$/.test(f))) {
+  const name = rel(file);
+  /* ⚠️ BLANKED RATHER THAN CUT, so a reported line is the file's own — the
+     stripper above collapses lines and every number after a comment is wrong. */
+  const src = readFileSync(file, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+    .replace(/^(\s*)\/\/.*$/gm, "$1");
+  const lines = src.split("\n");
+  const found = (at, path, how) => {
+    if (!DATED.has(path.split(".").pop())) return;
+    const line = src.slice(0, at).split("\n").length;
+    /* ⚠️ A KEY IS NOT SHOWN TO ANYBODY. `key={`${row.at}-${i}`}` is React's
+       identity for a row and formatting it would be a bug of its own. */
+    if (how === "a template" && /key=\{`/.test(lines[line - 1].slice(0, at - src.lastIndexOf("\n", at - 1) - 1))) return;
+    raw++;
+    fail(`${name}:${line} draws \`${path}\` into ${how} unformatted (D7).\n` +
+         `       That is a \`Day\` or an \`Instant\` — the stored spelling of a date —\n` +
+         `       shown to somebody who told us how they write one. \`sayDate\`/\`sayTime\`\n` +
+         `       with \`useShown()\`, or \`<Dated>\`.`);
+  };
+  for (const m of src.matchAll(CHILD)) found(m.index, m[2], "a screen");
+  for (const m of src.matchAll(TPL)) found(m.index, m[1], "a template");
+}
+/* ⚠️ NOT REPORTED AS A PASS WHEN THE LIST IS EMPTY. A run that says "no screen
+   prints a stored date" over nought known names is the cheerful green this file
+   already learned to distrust once. */
+if (!raw && DATED.size >= 5) {
+  ok(`dates: no screen prints a stored date as it is stored (${DATED.size} dated field name(s))`);
+}
+
 /* ------------------------------------------------------------------ the store --- */
 
 /**

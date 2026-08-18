@@ -870,10 +870,13 @@ describe("the legal surfaces", () => {
        and never see it, then never see it again. */
     expect(out).toContain("Privacy");
     expect(out).toContain("Not agreed yet");
-    /* ⚠️ THE VERSION IS A BADGE AND THE SIGNATURE IS THE SECOND LINE — run
-       together as one grey run-on, neither was findable and the two dates read
-       as one fact. The badge is what carries the version now. */
-    expect(out).toContain("2026-01-01");
+    /* ⚠️ AND THE VERSION IS SAID AS THE DAY IT IS, NOT PRINTED AS IT IS STORED.
+       The row carried `2026-01-01` in a badge; a version IS a publication date,
+       so the row says when the wording was published in the reader's own
+       conventions. The stored spelling appearing anywhere on a screen is what
+       `present.test.mjs` refuses. */
+    expect(out).not.toContain("2026-01-01");
+    expect(out).toContain("Published Jan 1, 2026");
   });
 
   /*

@@ -15,9 +15,10 @@
 import * as React from "react";
 import { Chip } from "@heroui/react";
 import {
-  Listing, Place, Rail, Screen, SectionTitle, Stack, Tally, glyphOf,
+  Dated, Listing, Place, Rail, Screen, SectionTitle, Stack, Tally, glyphOf, useShown,
   type Loaded,
 } from "@engine/design";
+import { sayDate, type Instant } from "@engine/kernel";
 import type { Note } from "./sample.js";
 
 export function Notes({ title, of, again, density = "comfortable", onNew, onOpen }: {
@@ -41,6 +42,10 @@ export function Notes({ title, of, again, density = "comfortable", onNew, onOpen
      the table it was supposed to head sat outside the card with no heading at
      all. A heading over the wrong block is worse than none. */
   const count = of.status === "ready" ? of.data.length : null;
+  /* ⚠️ THE DATES ARE THE READER'S. A stored instant printed as it is stored is
+     the database's spelling of a day, and this screen had two of them — a card
+     foot and a table cell. `present.test.mjs` refuses both now. */
+  const shown = useShown();
 
   return (
     <Screen
@@ -78,7 +83,7 @@ export function Notes({ title, of, again, density = "comfortable", onNew, onOpen
                       key={n.id}
                       name={n.title}
                       said={n.said}
-                      foot={`${n.minutes} min · ${n.at}`}
+                      foot={`${n.minutes} min · ${sayDate(shown, n.at as Instant, "short")}`}
                       onOpen={() => onOpen(n)}
                     />
                   ))}
@@ -113,7 +118,7 @@ export function Notes({ title, of, again, density = "comfortable", onNew, onOpen
                     </Chip>
                   ),
                 },
-                { id: "at", label: "Written", numeric: true, cell: (n) => n.at,
+                { id: "at", label: "Written", numeric: true, cell: (n) => <Dated at={n.at as Instant} />,
                   by: (a, b) => a.at.localeCompare(b.at) },
               ]}
             />

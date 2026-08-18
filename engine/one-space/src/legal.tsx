@@ -31,9 +31,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@heroui/react";
 import {
   Await, Document, Documents, ReadingProvider, SPACE, TYPE, TextWaiting, Tray, useReading,
-  type Loaded, ready, trouble, waiting,
+  useShown, type Loaded, ready, trouble, waiting,
 } from "@engine/design";
-import type { DocumentDef } from "@engine/kernel";
+import { sayDate, type Day, type DocumentDef } from "@engine/kernel";
 import { api } from "./api.js";
 
 /** One document as the deployment publishes it. */
@@ -92,10 +92,16 @@ const asDef = (d: Published): DocumentDef => ({
  * the whole fault this file exists to end, one level down.
  */
 function Reader({ of }: { readonly of: Published }) {
+  /* ⚠️ THE VERSION IS A DAY AND IT IS SAID AS ONE. This read `Version
+     2026-08-01` — the database's spelling of a date, printed to somebody who
+     told us how they write them, on the one screen in the product whose whole
+     job is to be read. What it names is when this wording was published, so it
+     says that, in their own conventions. */
+  const shown = useShown();
   return (
     <div className={`flex flex-col ${SPACE.snug}`}>
       <h2 className={TYPE.section}>{of.title}</h2>
-      <p className={TYPE.note}>Version {of.version}</p>
+      <p className={TYPE.note}>Published {sayDate(shown, of.version as Day, "long")}</p>
       {/* ⚠️ A DOCUMENT HELD SOMEWHERE ELSE STILL GETS A LINK, and says so. We do
           not have its words, and drawing an empty sheet would pretend we do. */}
       {of.text

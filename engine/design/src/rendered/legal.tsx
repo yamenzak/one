@@ -89,11 +89,16 @@ export function Documents({ documents, outstanding = [], signed, onOpen }: Docum
       facts and one control, once per document, on a screen that is a list of
       documents.
 
-      ⚠️ THE SIGNATURE IS THE SECOND LINE AND THE VERSION IS A BADGE, and the
-      split is which of the two somebody came to read. "Did I agree, and when" is
-      the sentence; the version is the reference beside it. Run together as one
-      grey line — "Version 2026-08-01 · agreed 11 Feb 2026" — neither was
-      findable, and the two dates read as one fact when they frequently are not.
+      ⚠️ ONE LINE UNDER THE TITLE, AND IT IS THE ONE SOMEBODY CAME TO READ. The
+      row carried a version badge beside the name as well, which is a third fact
+      on a row that already has a title, a state and a date — and the version is
+      printed inside the document it opens, so the badge was a reference nobody
+      needed at the moment of choosing what to open.
+
+      ⚠️ AND A VERSION IS A DAY, SO IT IS SAID AS ONE. `2026-08-01` in a badge is
+      the database's spelling of a date, shown to a reader who told us how they
+      write them. What the row says instead is when the wording was published,
+      in their own conventions — the same fact, legible.
     */
     <Group>
       {documents.map((doc) => {
@@ -114,8 +119,9 @@ export function Documents({ documents, outstanding = [], signed, onOpen }: Docum
                     : `Earlier version agreed ${sayDate(shown, one.at as Instant, "short")}`}
                 </span>
               )
-              : owed.has(doc.id) ? "Not agreed yet" : undefined}
-            aside={<Chip color="default" variant="soft"><Chip.Label>{doc.version}</Chip.Label></Chip>}
+              : owed.has(doc.id)
+                ? "Not agreed yet"
+                : `Published ${sayDate(shown, doc.version, "short")}`}
             onOpen={() => onOpen(doc.id)}
           />
         );
