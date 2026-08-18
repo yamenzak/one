@@ -43,7 +43,7 @@ import { refuseJobs } from "./job.js";
 import type { NeedBook } from "./infra.js";
 import { mediaNeedFor, refuseNeeds } from "./infra.js";
 import type { DeploymentLegal, DocumentBook, SubProcessorBook, SubProcessorDef } from "./legal.js";
-import { refuseLegal } from "./legal.js";
+import { PLATFORM_HOLDINGS, refuseLegal } from "./legal.js";
 import type { NotificationBook } from "./notify.js";
 import { deadLinks, unaddressable, unraisable } from "./notify.js";
 import type { AnyOperation } from "./operation.js";
@@ -219,7 +219,14 @@ export const needsOf = (spec: AppSpec): NeedBook => {
  * the same agreement, demanded once per product somebody opens.
  */
 export function under(deployment: DeploymentLegal, spec: AppSpec): AppSpec {
-  const held = holdingsOf(spec);
+  /* ⚠️ THE PLATFORM'S HOLDINGS COUNT TOO, and leaving them out is a
+     narrowing that reads as a disclosure. This intersection exists so an app's
+     page names only recipients its own data reaches — but every app's data
+     travels with an email address, an account and an audit trail, which no
+     manifest declares. Asked of the app alone, the company running the
+     databases was disclosed as receiving special categories and NOT somebody's
+     email address, which is the opposite of the truth. */
+  const held = [...PLATFORM_HOLDINGS, ...holdingsOf(spec)];
   const base: Record<string, SubProcessorDef> = {};
   for (const p of Object.values(deployment.processors)) {
     const receives = p.receives.filter((h) => held.includes(h));

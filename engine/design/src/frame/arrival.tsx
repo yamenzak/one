@@ -17,7 +17,7 @@
 import * as React from "react";
 import { Link } from "@heroui/react";
 import {
-  MARK_BEAK, MARK_STEM, beakOpacity, inkOf, partsOf, type MarkOf,
+  LEGAL_INDEX, MARK_BEAK, MARK_STEM, beakOpacity, inkOf, partsOf, type MarkOf,
 } from "@engine/kernel";
 import { ARRIVE_MARK, ARRIVE_RISE, doorAt } from "../tokens/motion.js";
 import {
@@ -300,6 +300,25 @@ export function Arrival({ name, claim, children, aside, sky, brand }: {
             {aside
               ? <div {...ARRIVE_RISE} style={doorAt(3)}>{aside}</div>
               : null}
+
+            {/*
+              ⚠️ ON EVERY DOOR, WITHOUT THE CALLER HAVING TO REMEMBER. The terms,
+              the privacy notice and the rest were served at their own addresses
+              and linked from nowhere at all — so somebody deciding whether to
+              sign up could not read them first, which is the one moment they are
+              actually for. A prop the caller passes is a prop three of four doors
+              would eventually be missing.
+
+              ⚠️ A REAL ANCHOR, FOR THE SAME REASON `AsideRoute` USES ONE: these
+              pages are served by the worker rather than drawn by the app, so it
+              is a page load either way and this buys middle-click and a status
+              bar for free.
+            */}
+            <div {...ARRIVE_RISE} style={doorAt(4)}>
+              <a className={`${TYPE.note} underline underline-offset-4`} href={LEGAL_INDEX}>
+                Terms, privacy and the rest
+              </a>
+            </div>
           </Stack>
         </div>
       </div>

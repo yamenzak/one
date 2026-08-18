@@ -13,7 +13,8 @@
 
 import type { DocumentDef, NeedBook, RopaEntry, SubProcessorBook } from "@engine/kernel";
 import { Button, Card, Chip, Table } from "@heroui/react";
-import { ControlRow, FieldRow, Group } from "../parts/surfaces.js";
+import { ControlRow, FieldRow, Group, NavRow } from "../parts/surfaces.js";
+import { glyphOf } from "../frame/shell.js";
 import { SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 
@@ -55,11 +56,18 @@ export function Ropa({ rows }: { readonly rows: readonly RopaEntry[] }) {
 export interface DocumentsProps {
   readonly documents: readonly DocumentDef[];
   /** What is still owed. An acceptance of an older version is no acceptance. */
-  readonly outstanding: readonly DocumentDef[];
-  readonly onAccept: (id: string) => void;
+  readonly outstanding?: readonly DocumentDef[];
+  /**
+   * ⚠️ OPENING IS THE ONLY THING A ROW DOES, AND THAT IS THE CORRECTION. These
+   * rows carried a button reading "Read and accept" that only accepted — there
+   * was nowhere in this component a document could be read. Agreeing is one
+   * decision about the whole list and belongs to the screen; a row's job is to
+   * show somebody what they are being asked.
+   */
+  readonly onOpen: (id: string) => void;
 }
 
-export function Documents({ documents, outstanding, onAccept }: DocumentsProps) {
+export function Documents({ documents, outstanding = [], onOpen }: DocumentsProps) {
   const owed = new Set(outstanding.map((d) => d.id));
   return (
     /*
@@ -68,25 +76,23 @@ export function Documents({ documents, outstanding, onAccept }: DocumentsProps) 
       facts and one control, once per document, on a screen that is a list of
       documents.
 
-      ⚠️ AND "ACCEPTED" IS A NOTE RATHER THAN A GREEN CHIP. `success` is for
-      something that just WENT WELL — a payment cleared, a job finished — and a
-      standing fact about a signature from months ago is not that. Two green
-      pills stacked were the only colour on a monochrome screen, which read as an
-      alert rather than as a record.
+      ⚠️ AND WHETHER IT IS AGREED IS A NOTE RATHER THAN A GREEN CHIP. `success`
+      is for something that just WENT WELL — a payment cleared, a job finished —
+      and a standing fact about a signature from months ago is not that. Two
+      green pills stacked were the only colour on a monochrome screen, which read
+      as an alert rather than as a record.
     */
     <Group>
       {documents.map((doc) => (
-        <ControlRow
+        <NavRow
           key={doc.id}
+          icon={glyphOf("file")}
           label={doc.title}
           /* ⚠️ The version is a DATE, because "did they accept the one from
              before the change" is the only question ever asked of it. */
-          under={`Version of ${doc.version}`}
-        >
-          {owed.has(doc.id)
-            ? <Button variant="primary" onPress={() => onAccept(doc.id)}>Read and accept</Button>
-            : <span className={TYPE.note}>Accepted</span>}
-        </ControlRow>
+          under={`Version ${doc.version}${owed.has(doc.id) ? " · not agreed yet" : ""}`}
+          onOpen={() => onOpen(doc.id)}
+        />
       ))}
     </Group>
   );

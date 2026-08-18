@@ -369,7 +369,7 @@ and a manifest that does not compose refuses to boot.
 | `problem` | the one refusal shape, and the platform's own catalogue | 6 | — |
 | `tone` | the voice — the rules a written string has to pass | 1 | — |
 | `vault` | the facts that are not an app's to keep (D11) | 8 | — |
-| `legal` | documents, purposes, sub-processors, the record of processing | 7 | — |
+| `legal` | documents, purposes, sub-processors, the record of processing | 11 | — |
 | `guide` | help, onboarding, the milestones a workspace passes | 5 | — |
 | `job` | scheduled work, and the record that it ran | 5 | — |
 | `brand` | which surfaces a workspace may put its own mark on | 10 | 1 |
@@ -378,7 +378,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**216 of them**, 209 reached by something today.
+**220 of them**, 213 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 

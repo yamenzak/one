@@ -24,7 +24,8 @@
 
 import type { AppSpec, DeploymentLegal, PackDef, PlanSpec } from "@engine/kernel";
 import {
-  entitlementKeys, holdingsOf, missingDocuments, refuseCatalog, refuseLegal, refusePacks,
+  PLATFORM_HOLDINGS, entitlementKeys, holdingsOf, missingDocuments, refuseCatalog, refuseLegal,
+  refusePacks,
 } from "@engine/kernel";
 import { incoherent, unledgered } from "./dossier.js";
 import { unbound, type Env } from "./handles.js";
@@ -117,8 +118,14 @@ export function deploymentFaults(of: Deployment): readonly string[] {
      everything the deployment holds across every product, because that is the
      scope of the promise. */
   if (of.legal) {
-    const held = of.apps.flatMap((a) => holdingsOf(a));
-    for (const p of missingDocuments(of.legal.documents, held)) {
+    /* ⚠️ THE PLATFORM'S OWN, AND THEN THE PRODUCTS'. An email address, an
+       account, an audit trail and an invoice are held by the framework rather
+       than by any manifest — see `PLATFORM_HOLDINGS`. Asked of the apps alone,
+       the deployment disclosed as collected only what a product happened to
+       declare, and every recipient of the other four was reported as receiving
+       something nothing collects. */
+    const held = [...PLATFORM_HOLDINGS, ...of.apps.flatMap((a) => holdingsOf(a))];
+    for (const p of missingDocuments(of.legal.documents, held, of.legal.identity)) {
       out.push(`${p.why}: ${p.detail}`);
     }
     /*

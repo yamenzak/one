@@ -20,12 +20,12 @@
  */
 
 import type {
-  AppSpec, Caller, DeploymentLegal, Door, DocumentDef, Kind, PackDef, PlanSpec, Problem,
-  Resolved as _Resolved, Roots, Standing,
+  AppSpec, Caller, DeploymentLegal, DocumentBook, DocumentDef, Door, Kind, PackDef, PlanSpec,
+  Problem, Resolved as _Resolved, Roots, Standing,
 } from "@engine/kernel";
 import {
-  IN_GOOD_STANDING, LEGAL_PATH, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, check, doorFor, newId,
-  passagesOf, problem,
+  IN_GOOD_STANDING, LEGAL_INDEX, LEGAL_PATH, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, check, doorFor,
+  newId, passagesOf, problem,
 } from "@engine/kernel";
 import { compose, type Composed, type Resolved as ResolvedOp } from "./compose.js";
 import { tell } from "./dispatch.js";
@@ -259,7 +259,7 @@ const INSTALLABLE = new Set([
 export const isPlatformPath = (pathname: string): boolean =>
   pathname.startsWith("/api/") || pathname === "/health" || pathname === "/mcp"
   || pathname === WEBHOOK_PATH
-  || pathname.startsWith(LEGAL_PATH)
+  || pathname === LEGAL_INDEX || pathname.startsWith(LEGAL_PATH)
   || INSTALLABLE.has(pathname);
 
 /**
@@ -292,14 +292,7 @@ const safe = (text: string): string => text
  * ⚠️ AND IT ANSWERS IN BOTH THEMES WITHOUT ASKING. `color-scheme` hands the two
  * grounds to the user agent, so a document opened at night is not a white sheet.
  */
-function legalPage(doc: DocumentDef, root: string): string {
-  const title = `${safe(doc.title)} · ${safe(root)}`;
-  return `<!doctype html>
-<html lang="en"><head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${title}</title>
-<style>
+const LEGAL_STYLE = `
   :root { color-scheme: light dark; }
   body {
     margin: 0 auto; padding: 3rem 1.25rem 6rem; max-width: 38rem;
@@ -309,16 +302,55 @@ function legalPage(doc: DocumentDef, root: string): string {
   .v { opacity: .6; font-size: .875rem; margin: 0 0 2.5rem; }
   p { margin: 0 0 1.1rem; }
   h2 { font-size: 1.125rem; margin: 2rem 0 .6rem; }
-</style>
+  ul { margin: 0; padding: 0; list-style: none; }
+  li { margin: 0 0 1.25rem; }
+  a { color: inherit; }
+  .b { display: inline-block; margin-top: 2.5rem; opacity: .6; font-size: .875rem; }
+`;
+
+const legalShell = (title: string, body: string): string => `<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${title}</title>
+<style>${LEGAL_STYLE}</style>
 </head><body>
-<h1>${safe(doc.title)}</h1>
+${body}
+</body></html>`;
+
+function legalPage(doc: DocumentDef, root: string): string {
+  return legalShell(`${safe(doc.title)} · ${safe(root)}`, `<h1>${safe(doc.title)}</h1>
 <p class="v">Version ${safe(String(doc.version))}</p>
 ${/* ⚠️ CUT BY THE KERNEL'S RULE, which is also what the sheet inside the app
       renders — one wording cannot come out as two documents. */
   passagesOf(doc.text ?? "")
     .map((p) => (p.heading ? `<h2>${safe(p.text)}</h2>` : `<p>${safe(p.text)}</p>`))
     .join("\n")}
-</body></html>`;
+<a class="b" href="${LEGAL_PATH}">All documents</a>`);
+}
+
+/**
+ * ⚠️ THE INDEX, BECAUSE A DOCUMENT WITH NO WAY TO FIND IT IS NOT PUBLISHED. Each
+ * one had an address that answered and nothing anywhere linked to any of them —
+ * so somebody deciding whether to sign up could not read the terms first, and
+ * somebody who had already agreed could not read them again. Both are the same
+ * absence, and this is the page that ends it.
+ *
+ * ⚠️ IT LISTS WHAT THIS DEPLOYMENT HOLDS THE WORDS OF, and nothing else. A row
+ * for a document served from somewhere else would be a promise about a link this
+ * page cannot keep — which is the exact fault the address rule exists to stop.
+ */
+function legalIndex(book: DocumentBook, root: string): string {
+  const rows = Object.values(book)
+    .filter((d) => d.text?.trim())
+    .sort((a, b) => a.title.localeCompare(b.title));
+  return legalShell(`Documents · ${safe(root)}`, `<h1>Documents</h1>
+<p class="v">What ${safe(root)} promises, and what it asks you to agree to.</p>
+<ul>
+${rows.map((d) => `<li><a href="${LEGAL_PATH}${safe(d.id)}">${safe(d.title)}</a><br />`
+    + `<span class="v">Version ${safe(String(d.version))}`
+    + `${d.mustAccept ? " · agreed before you can use One" : ""}</span></li>`).join("\n")}
+</ul>`);
 }
 
 /**
@@ -421,11 +453,16 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
       somebody does BEFORE they are anybody here, and a term nobody can read
       without accepting the terms was never offered.
     */
-    if (url.pathname.startsWith(LEGAL_PATH)) {
+    if (url.pathname === LEGAL_INDEX || url.pathname.startsWith(LEGAL_PATH)) {
+      const book = wiring.legal?.documents ?? {};
       const id = url.pathname.slice(LEGAL_PATH.length);
-      const doc = Object.values(wiring.legal?.documents ?? {}).find((d) => d.id === id);
-      if (!doc?.text) return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
-      return new Response(legalPage(doc, wiring.roots.root), {
+      const doc = Object.values(book).find((d) => d.id === id);
+      /* ⚠️ The index at `/legal` and at `/legal/` alike — a trailing slash is
+         not a different page, and half the links people write carry one. */
+      const page = id === "" ? legalIndex(book, wiring.roots.root)
+        : doc?.text ? legalPage(doc, wiring.roots.root) : null;
+      if (page === null) return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
+      return new Response(page, {
         headers: {
           "content-type": "text/html; charset=utf-8",
           /* ⚠️ A VERSION IS THE THING BEING AGREED TO, so the text for one never

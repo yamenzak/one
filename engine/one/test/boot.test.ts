@@ -18,7 +18,10 @@ import {
   addShard, createTenant, found, noteBelonging, noteShardApp, owedBy, startSession, upsertAccount,
   type Db,
 } from "@engine/runtime";
-import { PLATFORM_ENTITLEMENTS, refuseCatalog } from "@engine/kernel";
+import {
+  LADDER, PLATFORM_ENTITLEMENTS, PLATFORM_HOLDINGS, holdingsOf, missingDocuments, refuseCatalog,
+  refuseLegal, under,
+} from "@engine/kernel";
 import worker, { APPS, LEGAL, PLANS } from "../src/index.js";
 
 const call = (host: string, path: string, init: RequestInit = {}) =>
@@ -612,5 +615,134 @@ describe("what this deployment sells", () => {
      carrying both produces a bill whose lines do not sum to its own total. */
   it("prices everything in one currency", () => {
     expect(new Set(PLANS.map((p) => p.currency)).size).toBe(1);
+  });
+});
+
+/* ------------------------------------------------------- what it discloses --- */
+
+/**
+ * WHAT THIS DEPLOYMENT SAYS IT DOES WITH SOMEBODY'S DATA.
+ *
+ * ⚠️ EVERY ASSERTION HERE IS A FAULT THE LIVE DEPLOYMENT ACTUALLY SHIPPED, and
+ * each one passed every other check in the repository. The register held one
+ * entry claiming a category that is not a category; the payment processor was
+ * named in two documents and in no register; the terms promised records stay
+ * readable while the ladder withheld the workspace and then destroyed it; and
+ * the list the data processing agreement calls "published" was published
+ * nowhere. None of them is a crash, and none would ever be found by using the
+ * product.
+ *
+ * ⚠️ AND IT IS ASKED OF THE REAL DECLARATION, not of a fixture. A fixture would
+ * be a second catalogue that is correct while the shipped one is not.
+ */
+describe("what this deployment discloses", () => {
+  /* ⚠️ THE PLATFORM'S OWN AND THEN THE PRODUCTS'. An email address, an account,
+     an audit trail and an invoice are the framework's, so a disclosure assembled
+     from the manifests alone under-states what is held — see
+     `PLATFORM_HOLDINGS`. */
+  const held = () => [...PLATFORM_HOLDINGS,
+    ...Object.values(APPS).flatMap((make) => holdingsOf(make()))];
+  const sensitiveCovered = () => Object.values(APPS).some((make) =>
+    Object.values(make().purposes ?? {}).some((p) => p.holdings.includes("sensitive")));
+
+  /*
+    ⚠️ ONE STATED EXEMPTION, AND IT CAN ONLY SHRINK. The company's name, address,
+    contact and governing law are the four facts no code can supply — declaring
+    them plausible would make every document look finished while naming a party
+    that does not exist. Filling in `IDENTITY` makes this list empty, and the day
+    it does this assertion has to be edited, on purpose, in review.
+  */
+  it("has exactly one thing missing, and it is the company's own name", () => {
+    expect([
+      ...missingDocuments(LEGAL.documents, held(), LEGAL.identity),
+      ...refuseLegal(LEGAL.documents, LEGAL.processors, held(), sensitiveCovered()),
+    ].map((p) => p.why)).toEqual(["no_entity_named"]);
+  });
+
+  /*
+    ⚠️ NAMED IN PROSE IS NOT DECLARED. The privacy notice and the data processing
+    agreement both named the payment processor while the register held only one
+    entry — so the published list, the record of processing and the trust screen,
+    all three derived from that register, disagreed with the words somebody was
+    asked to agree to.
+  */
+  it("registers every recipient its documents name", () => {
+    expect(Object.keys(LEGAL.processors).sort()).toEqual(["cloudflare", "push", "stripe"]);
+  });
+
+  /*
+    ⚠️ `none` IS WHAT A FIELD SAYS ABOUT ITSELF, NOT SOMETHING A RECIPIENT CAN BE
+    SENT — and declaring it had a consequence rather than being untidy. `under`
+    intersects a recipient's list with what is actually held, so the wrong entry
+    survived and the right ones did not: the trust screen told people the company
+    running the databases received their special-category data and NOT their
+    email address.
+  */
+  it("says what each recipient actually receives", () => {
+    for (const p of Object.values(LEGAL.processors)) {
+      expect(p.receives, p.id).not.toContain("none");
+      expect(p.receives.length, p.id).toBeGreaterThan(0);
+    }
+    /* ⚠️ AND THE APP'S OWN PAGE NAMES THE PLATFORM'S CATEGORIES TOO. `under`
+       intersects a recipient's list with what is held so a product discloses
+       only what its own data reaches — but every product's data travels with an
+       email address, an account, an audit trail and an invoice, and no manifest
+       declares any of them. Asked of the app alone this list loses exactly those,
+       which is a disclosure with a hole in it rather than a shorter one. */
+    const composed = under(LEGAL, Object.values(APPS)[0]!());
+    const reaches = composed.processors?.cloudflare?.receives ?? [];
+    for (const platformOnly of ["identity", "usage", "financial"]) {
+      expect(reaches, platformOnly).toContain(platformOnly);
+    }
+  });
+
+  /*
+    ⚠️ THE LIST THE DPA CALLS PUBLISHED, PUBLISHED. It promised "the current
+    list" while the only one anywhere lived inside a workspace behind a sign-in.
+    It is written by the register rather than typed beside it, so a recipient
+    added in a hurry cannot be left out of it.
+  */
+  it("publishes the register as a document, written by the register", () => {
+    const doc = LEGAL.documents["sub-processors"]!;
+    for (const p of Object.values(LEGAL.processors)) {
+      expect(doc.text, p.id).toContain(p.name);
+      expect(doc.text, p.id).toContain(p.country);
+    }
+  });
+
+  /*
+    ⚠️ THE TERMS CANNOT CONTRADICT THE LADDER, BECAUSE THEY ARE WRITTEN FROM IT.
+    They said records "stay readable and exportable throughout" while
+    `standingFor` stopped serving the workspace on day ${"" + LADDER.blockedAfter}
+    and the sweep destroyed its records on day ${"" + LADDER.purgeAfter} — a
+    promise and a behaviour that disagreed, in the one place a customer would
+    quote us.
+  */
+  it("carries the ladder's own numbers into the terms", () => {
+    const terms = LEGAL.documents.terms!.text ?? "";
+    for (const days of [LADDER.readOnlyAfter, LADDER.blockedAfter, LADDER.purgeAfter]) {
+      expect(terms, `${days}`).toContain(`${days} days`);
+    }
+  });
+
+  /*
+    ⚠️ AND EVERY DOCUMENT IS READABLE WITHOUT A SESSION, INDEX INCLUDED. Each had
+    an address that answered and nothing anywhere linked to any of them — so
+    somebody deciding whether to sign up could not read the terms first, which is
+    the one moment they are for.
+  */
+  it("lists and serves every document to somebody with no session", async () => {
+    const index = await callDev("localhost", "/legal");
+    expect(index.status).toBe(200);
+    const listed = await index.text();
+
+    for (const doc of Object.values(LEGAL.documents)) {
+      expect(listed, doc.id).toContain(doc.title);
+      const page = await callDev("localhost", `/legal/${doc.id}`);
+      expect(page.status, doc.id).toBe(200);
+      expect(await page.text(), doc.id).toContain(doc.title);
+    }
+    /* ⚠️ A trailing slash is not a different page. */
+    expect((await callDev("localhost", "/legal/")).status).toBe(200);
   });
 });

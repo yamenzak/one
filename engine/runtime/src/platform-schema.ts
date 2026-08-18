@@ -91,3 +91,4 @@ export const SHARD_MODULES: readonly SchemaModule[] = [
      an EU workspace's file index in the EU with everything else of theirs. */
   MEDIA_SCHEMA,
 ];
+

@@ -23,24 +23,14 @@
  * (`must_accept_without_binding`), so every row here has something to open.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@heroui/react";
 import type { Problem } from "@engine/kernel";
-import {
-  Arrival, AsideRoute, Await, Document, Group, NavRow, SPACE, TYPE, TextWaiting, Tray, Trouble,
-  glyphOf, notice, ready, trouble, waiting, type Loaded,
-} from "@engine/design";
+import { Arrival, AsideRoute, SPACE, Trouble, notice } from "@engine/design";
 import { api, type Owed } from "../api.js";
+import { DocumentList } from "../legal.js";
 import { Data } from "../space/Data.js";
 import { useSession } from "../session.js";
-
-/** What a document actually holds, once the read comes back. */
-interface Held {
-  readonly text: string | null;
-  readonly url: string | null;
-}
-
-type Book = Readonly<Record<string, Held>>;
 
 export function Agreements({ owed }: { readonly owed: readonly Owed[] }) {
   const { refresh, leave } = useSession();
@@ -54,37 +44,6 @@ export function Agreements({ owed }: { readonly owed: readonly Owed[] }) {
    * between.
    */
   const [leaving, setLeaving] = useState(false);
-  const [reading, setReading] = useState<Owed | null>(null);
-  /**
-   * ⚠️ READ ONCE, WHEN THE WALL DRAWS, RATHER THAN WHEN A ROW IS PRESSED. The
-   * words are what this screen is asking about; fetching them on the press puts
-   * a spinner between "let me read that" and the text, on the one screen where
-   * somebody has already been told they cannot go anywhere else.
-   *
-   * ⚠️ AND IT IS ITS OWN READ RATHER THAN A FIELD ON THE BOOT PAYLOAD. What is
-   * owed is computed on every operation the deployment answers, so carrying the
-   * text there would put three legal documents on every response of every
-   * screen.
-   */
-  const [book, setBook] = useState<Loaded<Book>>(waiting());
-
-  useEffect(() => {
-    let live = true;
-    void (async () => {
-      const got = await api.get<{
-        readonly documents: readonly ({ readonly id: string } & Held)[];
-      }>("me.agreements");
-      if (!live) return;
-      /* ⚠️ A FAILED READ IS A PROBLEM, NEVER AN EMPTY BOOK. Rendering "nothing
-         to read" over a dropped connection is the exact shape this codebase
-         keeps finding — see `session.tsx`. */
-      if (!got.ok) { setBook(trouble(got.problem)); return; }
-      setBook(ready(Object.fromEntries(
-        got.value.documents.map((d) => [d.id, { text: d.text, url: d.url }]),
-      )));
-    })();
-    return () => { live = false; };
-  }, []);
 
   const agree = async () => {
     setBusy(true);
@@ -141,20 +100,9 @@ export function Agreements({ owed }: { readonly owed: readonly Owed[] }) {
       {problem ? <Trouble problem={problem} /> : null}
 
       <div className={`flex flex-col ${SPACE.snug}`}>
-        <Group>
-          {owed.map((doc) => (
-            <NavRow
-              key={`${doc.appId ?? "one"}:${doc.id}`}
-              icon={glyphOf("file")}
-              label={doc.title}
-              /* ⚠️ THE VERSION IS SHOWN, because it is what is being agreed to
-                 and because somebody asked again after a change deserves to see
-                 that it changed. */
-              under={`Version ${doc.version}${doc.binds === "tenant" ? " · for your workspace" : ""}`}
-              onOpen={() => { setReading(doc); }}
-            />
-          ))}
-        </Group>
+        {/* ⚠️ THE SAME LIST THE TRUST SCREEN DRAWS, and it opens in a sheet
+            rather than a tab — see `legal.tsx` for why a tab was a trap. */}
+        <DocumentList show={owed} outstanding={owed} />
 
         <Button
           variant="primary"
@@ -180,41 +128,6 @@ export function Agreements({ owed }: { readonly owed: readonly Owed[] }) {
         </Button>
       </div>
 
-      {/* ⚠️ A TRAY RATHER THAN A DIALOG: the screen behind is still the subject,
-          because reading is a step on the way to answering it (see `overlay`). */}
-      <Tray
-        title={reading?.title ?? ""}
-        isOpen={reading !== null}
-        onOpenChange={(open) => { if (!open) setReading(null); }}
-        actions={(
-          <Button variant="ghost" onPress={() => { setReading(null); }}>Close</Button>
-        )}
-      >
-        {reading ? (
-          <div className={`flex flex-col ${SPACE.snug}`}>
-            <p className={TYPE.note}>Version {reading.version}</p>
-            <Await
-              of={book}
-              waiting={<TextWaiting lines={10} />}
-              then={(held) => {
-                const doc = held[reading.id];
-                if (doc?.text) return <Document text={doc.text} />;
-                /* ⚠️ A DOCUMENT HOSTED SOMEWHERE ELSE IS A LINK, AND SAYING SO
-                   IS THE HONEST ANSWER. We do not hold its words, so pretending
-                   to show them would be showing a blank sheet. */
-                const away = doc?.url ?? reading.url;
-                return away ? (
-                  <Button variant="secondary" onPress={() => { window.open(away, "_blank", "noopener"); }}>
-                    Read it on the web
-                  </Button>
-                ) : (
-                  <p className={TYPE.body}>This one is not published here yet.</p>
-                );
-              }}
-            />
-          </div>
-        ) : null}
-      </Tray>
     </Arrival>
   );
 }

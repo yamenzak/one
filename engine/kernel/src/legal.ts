@@ -63,6 +63,14 @@ export type DocumentBook = Readonly<Record<string, DocumentDef>>;
 export const LEGAL_PATH = "/legal/";
 
 /**
+ * ⚠️ THE INDEX, AND IT IS A SEPARATE CONSTANT BECAUSE A TRAILING SLASH IS NOT A
+ * DIFFERENT PAGE. Half the links anybody writes by hand carry one and half do
+ * not; a route that answered only the slashed form would 404 the other, which is
+ * the same silence a document with no address had.
+ */
+export const LEGAL_INDEX = "/legal";
+
+/**
  * WHERE A DOCUMENT IS READ, DERIVED FROM THE DOCUMENT.
  *
  * ⚠️ NEVER TYPED BESIDE IT, WHICH IS EXACTLY WHAT WENT WRONG. The declaration
@@ -117,6 +125,38 @@ export interface SubProcessorDef {
 export type SubProcessorBook = Readonly<Record<string, SubProcessorDef>>;
 
 /**
+ * WHAT THE PLATFORM ITSELF HOLDS ABOUT A PERSON, WHATEVER ANY PRODUCT DOES.
+ *
+ * ⚠️ `holdingsOf(app)` WALKS AN APP'S COLLECTIONS AND VAULT, AND THE PLATFORM IS
+ * NEITHER. The framework's own tables hold somebody's email address, the account
+ * it belongs to, a log of which operation ran in which workspace, and what has
+ * been paid — none of which any manifest declares, because none of it is any
+ * product's. So a deployment's disclosure was assembled from the apps' holdings
+ * alone: a recipient correctly named as receiving payment details was reported
+ * as receiving something nothing collects, and the recipient of an email address
+ * had no category to be named under at all.
+ *
+ * - `identity` — an account and the workspaces it belongs to.
+ * - `contact` — the email address somebody signs in with.
+ * - `usage` — which operation ran, in which workspace and when; and the device
+ *   address a notification is sent to.
+ * - `financial` — the plan, the invoices, and what is owed.
+ *
+ * ⚠️ IT IS A LIST RATHER THAN A DERIVATION, AND THAT IS THE HONEST SHAPE. These
+ * tables are the framework rather than declared collections, so there is nothing
+ * to walk. What keeps it true is that it is asked on every boot: a platform
+ * table holding a new category, with this left alone, makes that category's
+ * recipient `undisclosed_recipient` at the next deploy.
+ *
+ * ⚠️ `sensitive` IS DELIBERATELY ABSENT. The platform stores special categories
+ * only inside the vault, on behalf of an app that declared them — so it is the
+ * APP's holding, and claiming it here would disclose a category on a deployment
+ * where no product handles any.
+ */
+export const PLATFORM_HOLDINGS: readonly Holding[] =
+  ["identity", "contact", "usage", "financial"];
+
+/**
  * WHAT THE DEPLOYMENT PROMISES, AS OPPOSED TO WHAT A PRODUCT DOES.
  *
  * ⚠️ TERMS AND A PRIVACY NOTICE BIND A LEGAL ENTITY, NOT A FEATURE. There is one
@@ -143,9 +183,92 @@ export type SubProcessorBook = Readonly<Record<string, SubProcessorDef>>;
 export interface DeploymentLegal {
   readonly documents: DocumentBook;
   readonly processors: SubProcessorBook;
+  /**
+   * ⚠️ WHO THE OTHER PARTY IS. Terms with no named entity are not a contract
+   * with anybody, and a privacy notice with no controller and no address does
+   * not give somebody the one thing every data-protection regime starts with:
+   * an addressee for the request. Absent is REPORTED (`no_entity_named`), never
+   * filled in with something plausible.
+   */
+  readonly identity?: DeploymentIdentity;
 }
 
+/**
+ * THE FACTS ONLY THE OPERATOR CAN SUPPLY, DECLARED ONCE.
+ *
+ * ⚠️ NOT INTERPOLATED INTO EVERY DOCUMENT BY HAND. Written into three texts, the
+ * company's own address is three things to change when it moves, and the one
+ * nobody changes is the one somebody writes to. The entity-bearing paragraph is
+ * COMPOSED from this, so a document either carries the current facts or is
+ * openly missing them.
+ *
+ * ⚠️ AND THE MISSING CASE IS AN ABSENT PARAGRAPH, NEVER A GAP IN A SENTENCE. A
+ * document reading "governed by the laws of ." is worse than one that does not
+ * mention governing law, because it looks like a rendering fault in a contract.
+ */
+export interface DeploymentIdentity {
+  /** The legal name that is party to the terms. */
+  readonly entity: string;
+  /** Postal address. It is what a data-protection request is sent to. */
+  readonly address: string;
+  /** The address a person writes to about their own data. */
+  readonly contact: string;
+  /** ⚠️ Whose law governs — "England and Wales", "the Emirate of Dubai". */
+  readonly law: string;
+  /** Which courts hear a dispute. */
+  readonly courts: string;
+}
+
+/**
+ * ⚠️ THE ONE PARAGRAPH THAT NAMES THE COMPANY, BUILT RATHER THAN TYPED. Every
+ * document that binds somebody ends with it, so the address a person writes to
+ * is the same address in all of them, for ever, from one declaration.
+ */
+export const whoWeAre = (of: DeploymentIdentity): string =>
+  `# Who you are agreeing with\n\n`
+  + `${of.entity}, ${of.address}. Write to ${of.contact} about anything in this `
+  + `document or about your own information. This agreement is governed by the law of `
+  + `${of.law}, and the courts of ${of.courts} hear any dispute about it.`;
+
 export const subProcessor = (def: SubProcessorDef): SubProcessorDef => def;
+
+/** What a category is called in a sentence somebody reads. */
+const SAID: Readonly<Record<Holding, string>> = {
+  none: "nothing personal",
+  identity: "who you are",
+  contact: "how to reach you",
+  usage: "what you did here",
+  financial: "payment details",
+  sensitive: "special categories",
+};
+
+/**
+ * THE SUB-PROCESSOR DOCUMENT, WRITTEN BY THE REGISTER.
+ *
+ * ⚠️ A LIST OF RECIPIENTS MAINTAINED BY HAND IS THE ONE THAT IS WRONG. It is
+ * accurate the day it is typed and drifts the first time a service is added in a
+ * hurry — which is exactly how an undisclosed recipient happens, and it is the
+ * disclosure failure regulators actually find. This deployment already declares
+ * every recipient in one place because the record of processing is built from
+ * it; the published list is the same declaration in sentences.
+ *
+ * ⚠️ AND IT IS WHY THE DPA MAY PROMISE A CURRENT LIST. That promise was already
+ * in the text while the only published list lived inside a workspace behind a
+ * sign-in, which is not published.
+ */
+export const subProcessorText = (
+  processors: SubProcessorBook,
+  intro = "These are every company that receives any part of what this service holds.",
+): string => {
+  const rows = Object.values(processors)
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
+  if (!rows.length) return `${intro}\n\nThere are none: nothing here leaves this service.`;
+  return [intro, ...rows.map((p) =>
+    `# ${p.name}\n\n${p.role} Established in ${p.country}. `
+    + `Receives ${p.receives.map((h) => SAID[h]).join(", ")}.`
+    + (p.url ? ` Their own terms: ${p.url}` : ""))].join("\n\n");
+};
 
 /* -------------------------------------------------------------- the record --- */
 
@@ -198,6 +321,7 @@ export const ropa = (
 export type LegalRefusal =
   | "no_privacy_document" | "no_terms" | "must_accept_without_binding"
   | "processor_receives_nothing_collected" | "undisclosed_recipient"
+  | "not_a_category" | "no_entity_named"
   | "sensitive_without_a_purpose";
 
 export interface LegalProblem { readonly of: string; readonly why: LegalRefusal; readonly detail: string }
@@ -246,6 +370,22 @@ export function refuseLegal(
       at(p.id, "processor_receives_nothing_collected", "listed as a recipient of nothing");
     }
     for (const h of p.receives) {
+      /*
+        ⚠️ `none` IS NOT A CATEGORY A RECIPIENT CAN RECEIVE. It is what a FIELD
+        says about itself — "this column holds nothing personal" — and a
+        processor declaring it is a declaration mistake with a consequence:
+        `under` intersects a processor's list with what the app holds, so the
+        wrong entry survives and the right ones do not. The live deployment
+        declared its only processor as receiving `none` and `sensitive`, and the
+        trust screen then told people the company running the databases received
+        their special-category data and NOT their email address.
+      */
+      if (h === "none") {
+        at(p.id, "not_a_category",
+          "declared as receiving \"none\", which is what a field says about itself rather than "
+          + "something a recipient can be sent");
+        continue;
+      }
       if (!collected.includes(h)) {
         at(p.id, "undisclosed_recipient", `receives ${h}, which no declaration says is collected`);
       }
@@ -267,9 +407,27 @@ export function refuseLegal(
 export function missingDocuments(
   book: DocumentBook,
   collected: readonly Holding[],
+  /**
+   * ⚠️ ASKED HERE AND NOT IN `refuseLegal`, BECAUSE AN APP HAS NO IDENTITY.
+   * There is one company behind every product on a deployment; asking each
+   * manifest to name it would be four answers to a question with one, and three
+   * of them would be stubs.
+   */
+  identity?: DeploymentIdentity,
 ): readonly LegalProblem[] {
   const out: LegalProblem[] = [];
   const kinds = new Set(Object.values(book).map((d) => d.kind));
+
+  /*
+    ⚠️ A CONTRACT WITH NO NAMED COUNTERPARTY. Somebody is being asked to agree,
+    and the document does not say who they are agreeing WITH, where to write, or
+    whose law decides a disagreement. Every other rule here is about whether a
+    document exists; this is about whether the one that exists is an agreement.
+  */
+  if (!identity && Object.values(book).some((d) => d.mustAccept)) {
+    out.push({ of: "identity", why: "no_entity_named",
+      detail: "agreement is demanded and no company, address, contact or governing law is named" });
+  }
   if (collected.length && !kinds.has("privacy")) {
     out.push({ of: "documents", why: "no_privacy_document",
       detail: "personal data is collected and nothing describes what happens to it" });

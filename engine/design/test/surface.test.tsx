@@ -821,11 +821,15 @@ describe("the legal surfaces", () => {
       },
     ] as const satisfies readonly DocumentDef[];
     const out = html(
-      <Documents documents={docs} outstanding={[docs[0]!]} onAccept={() => {}} />,
+      <Documents documents={docs} outstanding={[docs[0]!]} onOpen={() => {}} />,
     );
     expect(out).toContain("Terms");
-    expect(out).toContain("Read and accept");
-    expect(out).toContain("Accepted");
+    /* ⚠️ EVERY ROW OPENS, INCLUDING THE ONE ALREADY AGREED TO. The version that
+       carried "Read and accept" on the owed row and a flat "Accepted" on the
+       other had no way to read either — so somebody could agree to a document
+       and never see it, then never see it again. */
+    expect(out).toContain("Privacy");
+    expect(out).toContain("not agreed yet");
   });
 });
 

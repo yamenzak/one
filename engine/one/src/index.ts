@@ -17,9 +17,12 @@
  */
 
 import type {
-  AccountId, AppSpec, DeploymentLegal, Door, PackDef, PlanSpec, Residency, TenantId,
+  AccountId, AppSpec, DeploymentIdentity, DeploymentLegal, Door, PackDef, PlanSpec, Residency,
+  SubProcessorBook, TenantId,
 } from "@engine/kernel";
-import { MEDIA_NEED, entitlementKeys, subProcessor, under } from "@engine/kernel";
+import {
+  LADDER, MEDIA_NEED, entitlementKeys, subProcessor, subProcessorText, under, whoWeAre,
+} from "@engine/kernel";
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
   NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, acceptanceScope,
@@ -202,114 +205,343 @@ const SERVICES_REACHED: readonly string[] = [];
    Nine copies of that list had drifted — see `platform-schema.ts`. */
 
 /**
+ * THE BASE EVERY PRODUCT HERE INHERITS, AND IT IS THE LIST A REGULATOR ASKS FOR.
+ *
+ * ⚠️ EVERY RECIPIENT, WITH WHAT IT ACTUALLY RECEIVES. `under` intersects this
+ * with what each app holds, so a category left out here is a category the trust
+ * screen never names — which is a disclosure with a hole in it rather than a
+ * shorter disclosure. The register held one entry claiming `none` and
+ * `sensitive`, so the company running the databases was disclosed as receiving
+ * people's special-category data and NOT their email address.
+ *
+ * ⚠️ AND WHAT IS NAMED IN A DOCUMENT MUST BE HERE. The privacy notice and the
+ * data processing agreement both named the payment processor in prose while it
+ * was in no register — so the published list, the record of processing and the
+ * trust screen, all three derived from this, disagreed with the words somebody
+ * was asked to agree to.
+ */
+const PROCESSORS: SubProcessorBook = {
+  cloudflare: subProcessor({
+    id: "cloudflare", name: "Cloudflare, Inc.", country: "US",
+    role: "Runs the application, stores its records and files, and carries the email we send you.",
+    /* ⚠️ EVERYTHING, BECAUSE IT RUNS EVERYTHING. The databases, the object
+       store, the compute and the outbound mail are all theirs — so every
+       category this deployment holds passes through them by construction, and
+       any narrower list here would be a claim rather than a description. */
+    receives: ["identity", "contact", "usage", "financial", "sensitive"],
+    url: "https://www.cloudflare.com/trust-hub/gdpr/",
+  }),
+  /* ⚠️ NAMED IN TWO DOCUMENTS BEFORE IT WAS EVER IN THE REGISTER. It receives
+     what a payment needs — who is paying, how to reach them, and what they
+     owe — and never the records inside a workspace. */
+  stripe: subProcessor({
+    id: "stripe", name: "Stripe, Inc.", country: "US",
+    role: "Takes the payments and holds the card details, which never reach us.",
+    receives: ["identity", "contact", "financial"],
+    url: "https://stripe.com/legal/dpa",
+  }),
+  /*
+    ⚠️ ONE ENTRY FOR FOUR COMPANIES, BECAUSE WHICH ONE IS YOUR BROWSER'S CHOICE
+    AND NOT OURS. A push subscription is issued by whoever makes the browser, and
+    a message sent to it passes through them — so somebody switching notifications
+    on is adding a recipient, and they are entitled to know that before they do.
+    Reached only where the switch is on.
+  */
+  push: subProcessor({
+    id: "push", name: "Your browser's push service (Google, Apple, Microsoft or Mozilla)",
+    country: "US",
+    role: "Delivers a notification to your device, only if you turn notifications on.",
+    receives: ["identity", "usage"],
+    url: "https://www.w3.org/TR/push-api/",
+  }),
+};
+
+/**
+ * THE FOUR FACTS ONLY THE OPERATOR CAN SUPPLY — AND THIS DEPLOYMENT HAS NOT.
+ *
+ * ⚠️ IT IS `null` RATHER THAN PLAUSIBLE, AND THAT IS THE WHOLE POINT. A company
+ * name and an address guessed by whoever wrote the code would make every
+ * document below look finished while naming a party that does not exist, and
+ * nothing downstream could tell the difference. Absent, `missingDocuments`
+ * reports `no_entity_named` on every boot and the paragraph that names the
+ * company is simply not in the documents — which is visibly incomplete rather
+ * than confidently wrong.
+ *
+ * ⚠️ FILLING IT IN IS THE COMMIT THAT MAKES THESE AGREEMENTS. Until then they
+ * describe what the software does, accurately, and bind nobody in particular.
+ *
+ * ⚠️ AND THE WORDS BELOW HAVE NOT BEEN READ BY A LAWYER. They are written from
+ * the code — every promise in them is one this deployment actually keeps, which
+ * is the half engineers usually get wrong — but the liability, warranty and
+ * transfer clauses a counterparty's counsel will look for are decisions rather
+ * than descriptions, and they are not ours to make.
+ */
+const IDENTITY: DeploymentIdentity | null = null;
+
+/**
+ * ⚠️ THE PARAGRAPH THAT NAMES THE COMPANY, APPENDED RATHER THAN TYPED IN EACH.
+ * Written into six texts, an address is six things to change when it moves and
+ * the one nobody changes is the one somebody writes to.
+ */
+const binding = (body: string): string =>
+  IDENTITY ? `${body.trim()}\n\n${whoWeAre(IDENTITY)}` : body.trim();
+
+/**
+ * ⚠️ THE DAY THE WORDING TAKES EFFECT, AND MOVING IT ASKS EVERYBODY AGAIN. That
+ * is the feature rather than a cost: editing the text without moving this
+ * records everybody who agreed to the old wording as having agreed to the new,
+ * which is a record that is confidently wrong rather than merely absent.
+ */
+const VERSION = "2026-08-19" as never;
+
+/**
  * ⚠️ WHAT THIS DEPLOYMENT PROMISES, AND IT IS THE DEPLOYMENT'S RATHER THAN A
  * PRODUCT'S. One company, one contract, one description of what happens to
  * somebody's data — a person opening the second product here does not sign a
  * second agreement, and four products with four privacy notices is either four
  * copies of one or four that disagree.
  *
- * ⚠️ THE VERSION IS A DAY, AND MOVING IT ASKS EVERYBODY AGAIN. That is the
- * feature: editing the wording without moving it records everybody who agreed
- * to the old text as having agreed to the new, which is a record that is
- * confidently wrong rather than merely absent.
- *
  * ⚠️ AND `binds` IS WHEN IT IS ASKED. `person` is every human at their first
  * sign-in; `tenant` is whoever creates a workspace, on its behalf. An app may
  * add its own, and those bind where that app is enabled.
+ *
+ * ⚠️ THE DUNNING NUMBERS ARE READ FROM `LADDER`, NEVER TYPED. The terms said
+ * records "stay readable and exportable throughout" while the ladder withheld
+ * the workspace on day 30 and destroyed its records on day 37 — a promise and a
+ * behaviour that disagreed, in the one place a customer would quote us. Written
+ * from the constant the sweep runs on, they cannot.
  */
 const LEGAL: DeploymentLegal = {
+  ...(IDENTITY ? { identity: IDENTITY } : {}),
   documents: {
     terms: {
       id: "terms", kind: "terms", title: "Terms of use",
-      version: "2026-08-18" as never, mustAccept: true, binds: "person",
-      text: `
+      version: VERSION, mustAccept: true, binds: "person",
+      text: binding(`
 One is a place to keep your work and the records that go with it. These terms
-are between you and the company that runs this deployment.
+are the agreement between you and the company that runs this deployment. They
+apply from the moment you sign in.
 
 # Your account
 
-You sign in with a code sent to your email address. Keep access to that inbox:
-anybody who can read it can sign in as you. Tell us if you think somebody else
-has.
+You sign in with a code sent to your email address. There is no password, so
+access to that inbox is access to your account: keep it secure, and tell us if
+you think somebody else has it. You may also mint tokens for software acting on
+your behalf; a token can do what you can do, and you can revoke one at any time
+from your account.
+
+One account, one person. Sharing it is how somebody ends up seeing records they
+were never given access to, and the audit trail will say it was you.
 
 # Your workspaces
 
 A workspace holds records. You may belong to several, and what you can do in
-each is decided by whoever runs it. A personal workspace is yours; a commercial
-one belongs to the business that created it, and that business decides who has
-access to what is in it.
+each is decided by whoever runs it — not by us. Someone who invites you into
+their workspace decides what you can see; someone you invite into yours is your
+decision in the same way.
+
+A personal workspace is yours. A commercial one belongs to the business that
+created it, and that business decides who has access to what is in it. If you
+leave a commercial workspace, the records in it stay with the business — they
+were never yours to take.
+
+# The records you put in
+
+They stay yours. We do not claim any right over them, we do not use them to
+train anything, and we do not use them to advertise to you. What we do with
+them is run the service you asked for.
+
+You can take a copy of everything held about you, at any time, in a form you can
+read elsewhere. It is a button, not a request.
 
 # What you may not do
 
 Do not use One to break the law, to store material you have no right to store,
-or to attack the service or the people using it. We may close a workspace that
-does, and we will say why.
+to send anything to anybody who did not ask for it, or to attack the service or
+the people using it. Do not try to reach records that are not yours, or to work
+around a limit you were not sold. The acceptable use document says the same at
+more length.
+
+If a workspace does one of these we may make it read-only or close it. We will
+say which rule and why, and — unless the law stops us, or acting immediately is
+the only way to protect somebody — we will say so before we act rather than
+afterwards.
 
 # Paying
 
-Plans and prices are shown before you buy and in your workspace's own billing
-screen. Payment is taken monthly until you cancel. If a payment fails we will
-tell you, and the workspace becomes read-only before anything is withheld — your
-records stay readable and exportable throughout.
+Plans and prices are shown before you buy and on the workspace's own billing
+screen. Payment is taken monthly until you cancel, and cancelling stops the next
+one rather than refunding the last. A price change applies from your next
+renewal and never to a period you have already paid for.
+
+Some things are metered rather than included, and are drawn from a balance you
+can see and top up. A balance you bought does not expire while the workspace
+does; an allowance that came with a plan renews with it and does not accumulate.
+
+# When a payment fails
+
+Nothing changes for the first ${LADDER.readOnlyAfter} days. We will tell you.
+
+After ${LADDER.readOnlyAfter} days the workspace becomes read-only: everything is
+still there, still readable, still exportable, and nothing new can be written.
+
+After ${LADDER.blockedAfter} days the workspace stops being served. Your own
+account, your export and your ability to close things stay open throughout —
+paying has to be a way out and not the only one.
+
+After ${LADDER.purgeAfter} days the workspace's records are destroyed. This is
+not reversible, it is ${LADDER.purgeAfter} days after the first failed payment,
+and it is the reason we would rather you told us about a problem than let it run.
 
 # Ending it
 
-You can leave a workspace or close your account at any time, and you can take a
-copy of your records first. Closing is not instant: there is a window in which
-it can be undone, and after that the records are destroyed.
+You can leave a workspace, close a workspace, or close your account, at any
+time, and take a copy first.
 
-# Changes
+Closing your account destroys your records immediately. There is no waiting
+period and nothing to undo, which is exactly why we ask you to prove it is you
+before we do it. If you are the only person who could run a workspace, that
+workspace is closed and destroyed with you — leaving it behind would make it
+unreachable rather than closed, with a bill still running.
+
+# Availability
+
+We do not promise a percentage. What we do promise is that planned interruptions
+are announced in the product before they start, and that during one your records
+are readable even when they cannot be changed.
+
+# Changes to the service
+
+Products here change. We may add, alter or withdraw a feature. If we withdraw
+something you are paying for, you may cancel and we will refund the unused part
+of the period.
+
+# Changes to these terms
 
 If these terms change we will ask you again, and the version you agreed to is
-recorded. Nothing you already agreed to changes retroactively.
-`,
+recorded against your account with the date. Nothing you already agreed to
+changes retroactively, and continuing to use the service is not how you agree —
+pressing the button is.
+
+# What we are responsible for
+
+We are responsible for running the service with reasonable care and for what we
+say in the privacy notice and the data processing agreement. We are not
+responsible for what you or your colleagues put into a workspace, for a decision
+somebody makes on the basis of what is in one, or for a third party you connect
+yourself.
+`),
     },
     privacy: {
       id: "privacy", kind: "privacy", title: "Privacy notice",
-      version: "2026-08-18" as never, mustAccept: true, binds: "person",
-      text: `
-This explains what One holds about you, why, and what you can do about it.
+      version: VERSION, mustAccept: true, binds: "person",
+      text: binding(`
+This explains what One holds about you, why we are allowed to, who else sees it,
+and what you can do about it. It covers the service itself. Where a workspace
+you belong to holds records about other people, the business running that
+workspace decides what is held and why — and the data processing agreement is
+the document that covers it.
 
 # What we hold
 
-Your email address, because it is how you sign in. The records you or your
-colleagues put into a workspace. A log of what happened — which operation ran,
-in which workspace, and when — so that a workspace can be audited. If you turn
-on notifications, the address of the device to send them to.
+Your email address, because it is how you sign in, and the account it belongs
+to. Which workspaces you belong to and what you can do in each. The records you
+or your colleagues put into a workspace. A record of what happened — which
+operation ran, in which workspace, by which account, and when — so a workspace
+can be audited by whoever runs it. What has been paid and what is owed. If you
+turn on notifications, the address your browser gives us to reach that device.
+
+# Why we are allowed to hold it
+
+Your account, your workspaces and their records: because we cannot provide what
+you asked for without them.
+
+The audit record and the limits we enforce: because a shared workspace that
+cannot say who did what is not safe to share, and because we have to be able to
+stop abuse.
+
+What has been paid: because we have to keep it, and because we are required to.
+
+Special categories, and notifications: only where you have said yes, and only
+for as long as you have not changed your mind. Both are a switch you control.
 
 # What we do not do
 
-We do not sell anything about you, and we do not use your records to advertise
-to you. Our logs record what happened, not who it happened to.
+We do not sell anything about you. We do not use your records to advertise to
+you, and we do not use them to train models. We do not profile you, and nothing
+here makes an automated decision that has a legal or similarly significant
+effect on you.
+
+Our operational logs record what happened, not who it happened to.
 
 # Where it is kept
 
 Records are stored in the region the workspace was created for, and stay there.
-The service runs on Cloudflare — the databases, the files and the code — and
-payments are handled by Stripe, which sees what it needs to take a payment and
-not your records.
+You are told which region before the workspace exists, and the trust screen in
+every workspace names it.
 
-# Sensitive information
+# Who else receives it
 
-Where a product here handles special categories of information, it is encrypted
-separately, and destroying the key destroys it. Not every product handles any.
+The full list, with what each one receives, is published as its own document
+here and is assembled from the same declaration the service runs on — so it
+cannot quietly fall behind. Today it is the company that runs the infrastructure,
+the company that takes the payments, and — only if you switch notifications on —
+the push service your own browser uses.
 
-# How long
+Some of them are established outside the region your records are stored in. Where
+that is so, the transfer is made under the standard contractual terms that
+regime provides for, and the recipient's own commitments are linked from the
+list.
 
-For as long as the workspace exists. When a workspace is closed or an account is
-deleted, the records are destroyed after a short window in which the decision can
-be reversed.
+# Special categories
 
-# What you can ask for
+Some products handle information the law treats as special — health, for
+example. Where one does, it is stored separately from the rest, encrypted under a
+key that belongs to you alone, and destroying that key destroys it. You are asked
+before any of it is collected, you are told what each purpose covers, and you can
+withdraw at any time. Not every product handles any.
 
-A copy of everything held about you, in a form you can read elsewhere. Deletion
-of your account and what belongs to it. Correction of anything wrong. Every one
-of these is a button in the product rather than a request you have to make.
+# How long we keep it
 
-# Asking us
+Your account and its records: while the account exists.
 
-Write to the address on the deployment that sent you here.
-`,
+A workspace's records: while the workspace exists. If it is closed, or destroyed
+after ${LADDER.purgeAfter} days of non-payment, they go with it.
+
+The audit record: with the workspace, and it is erased with it.
+
+What was paid: for as long as we are required to keep it, which outlives the
+account.
+
+# Cookies and what is stored in your browser
+
+One session cookie, so you stay signed in. A small amount of local storage so
+the app can start without asking the server what it already knew. Nothing that
+follows you anywhere else, no advertising, no analytics that identify you. There
+is no banner because there is nothing to ask you about — the separate cookie
+document lists exactly what is set.
+
+# What you can ask for, and how
+
+A copy of everything held about you, in a form you can read elsewhere.
+Correction of anything wrong. Deletion of your account and what belongs to it.
+Withdrawal of any consent you gave. Restriction, and objection.
+
+Every one of these is a control in the product rather than a request you have to
+make and wait for. Where you would rather write to us, the address is at the end
+of this document.
+
+# Children
+
+One is not for people under 16, and we do not knowingly hold anything about
+somebody who is.
+
+# If you are unhappy
+
+Tell us first, at the address below — we would rather fix it. You also have the
+right to complain to the data protection authority in the country you live in,
+and doing so does not need our permission or our involvement.
+`),
     },
     /* ⚠️ THE BUSINESS ONE IS BOUND BY WHOEVER CREATES THE WORKSPACE, not by
        everybody in it. A colleague invited into a workspace agreed to the terms
@@ -317,59 +549,222 @@ Write to the address on the deployment that sent you here.
        them to would be asking somebody to bind a company they do not run. */
     dpa: {
       id: "dpa", kind: "dpa", title: "Data processing agreement",
-      version: "2026-08-18" as never, mustAccept: true, binds: "tenant",
-      text: `
+      version: VERSION, mustAccept: true, binds: "tenant",
+      text: binding(`
 This applies where your workspace holds records about other people — your
 customers, your staff, your clients. You decide what is held and why; we hold it
-for you and act on your instructions.
+for you and act on your instructions. In data protection terms you are the
+controller and we are your processor. It forms part of the terms of use and is
+agreed by whoever creates the workspace, on the workspace's behalf.
+
+# What is being processed
+
+Subject matter: providing the products you have switched on in your workspace.
+
+Duration: for as long as the workspace exists, and it ends when the workspace
+does.
+
+Nature and purpose: storing, organising, retrieving, transmitting and erasing
+the records you put in, so that the people you give access to can work with
+them.
+
+Categories of person: whoever you choose to keep records about — your customers,
+your staff, and the colleagues you invite.
+
+Categories of record: whatever the products you enabled collect. Each product
+declares its own, and your workspace's trust screen lists them, field by field,
+derived from the product itself rather than written out by hand.
 
 # What we do with it
 
 Only what running the service requires, and only what you have asked for. We do
-not use your workspace's records for our own purposes.
+not use your workspace's records for our own purposes, we do not sell them, and
+we do not use them to train anything.
 
-# Who else touches it
+If we ever believed an instruction from you broke the law, we would tell you
+rather than carry it out quietly.
 
-Cloudflare, which runs the databases, the file storage and the code. Stripe,
-where you pay us. Any provider you switch on yourself inside your workspace. The
-current list is published with this deployment.
+# Who touches it on our side
+
+Only people who need to in order to run or fix the service, and they are bound
+to keep it confidential. Every operation is recorded against the account that
+performed it.
+
+# Sub-processors
+
+You agree to the ones on the published list, which is assembled from the same
+declaration the service runs on and is a document here rather than a page
+somebody maintains. Each is bound by terms no weaker than these, and we remain
+responsible to you for what they do.
+
+If we intend to add one or replace one, we will tell you at least 30 days before
+it starts, through the workspace's own inbox and by email. If you object within
+those 30 days, you may end the agreement and take your records with you; we will
+not charge you for the part you have not used.
+
+# Where it is processed
+
+The region your workspace was created for. It is not moved out of it. Where a
+sub-processor is established elsewhere, the transfer is made under the standard
+contractual terms that regime provides for, and the list names where each is
+established.
 
 # Keeping it safe
 
-Access is limited to what an operation needs. What happened is recorded. Special
-categories of information are encrypted under a key that can be destroyed on its
-own.
+Access is decided per operation, not per person: what somebody may do is
+resolved from their role in that workspace every time they ask, and there is no
+path around it.
 
-# Where it is
+Records for one workspace are stored apart from another's, and a request that
+resolves to a workspace can only reach that workspace's data.
 
-The region your workspace was created for. It is not moved out of it.
+Special categories are held apart from the rest and encrypted under a key
+belonging to the person they are about, so that destroying that key destroys
+them even where a copy survives.
+
+What happened is recorded — the operation, the workspace, the account and the
+time — and the record is the workspace's to read.
+
+Sign-in is a single-use code with a short life, or a token you minted and can
+revoke. Anything destructive asks you to prove it is you again, within minutes.
+
+We do not claim a certification we do not hold. If you need one named in a
+contract, ask us before you sign rather than after.
+
+# Helping you answer your own people
+
+If one of your customers asks you for a copy of what you hold about them, or
+asks you to delete it, the product gives you the controls to answer without
+involving us. Where you still need us, we will help, and we will not charge you
+for it.
+
+The same applies if a regulator asks you for a record of what is processed and
+by whom: it is a screen in your workspace, generated from the declarations,
+rather than a document we have to write for you.
+
+# Telling you about a breach
+
+If we become aware of a breach affecting your workspace's records, we will tell
+you without undue delay and in any case within 72 hours of becoming aware, with
+what we know, what we are doing, and what we suggest you do. We will keep you
+updated as we learn more rather than waiting until we have everything.
+
+# Audits
+
+We will answer your reasonable questions about how we do the above, and give you
+what we have. Where that is not enough for you, we will agree an audit — once a
+year unless something has gone wrong, at your cost, with reasonable notice, and
+without exposing another customer's records.
 
 # When it ends
 
-You can export everything at any time. When you close the workspace the records
-are destroyed after a short window in which closing can be undone.
+You can export everything at any time, throughout, including while the workspace
+is read-only or suspended for non-payment.
 
-# If something goes wrong
+When you close the workspace its records are destroyed, and its files with them.
+If the workspace is destroyed after ${LADDER.purgeAfter} days of non-payment, the
+same happens. There is no archive we keep afterwards.
 
-We will tell you about a breach affecting your workspace's records without undue
-delay, with what we know and what we are doing.
-`,
+# If this and the terms disagree
+
+This document wins on anything about the records you hold about other people.
+The terms of use win on everything else.
+`),
+    },
+    /*
+      ⚠️ NOT `mustAccept`, AND THAT IS NOT A DOWNGRADE. Nothing here is a
+      promise somebody gives us — it is a statement of what the browser is asked
+      to store, and putting a wall in front of it would be asking for agreement
+      to a fact. It is published, linked, and versioned like the rest.
+    */
+    cookies: {
+      id: "cookies", kind: "cookies", title: "Cookies and local storage",
+      version: VERSION, mustAccept: false, binds: "person",
+      text: binding(`
+There is no cookie banner here because there is nothing to ask you about. This
+is the whole list.
+
+# What is set
+
+A session cookie, once you sign in, so that you stay signed in. It holds a
+reference to a session and nothing about you. It is removed when you sign out,
+and it expires on its own.
+
+A small amount of local storage in your browser, holding your theme choice and
+enough of what the app last knew to start without a round trip. It never leaves
+your device.
+
+If you install One as an app or turn on notifications, your browser stores what
+it needs to do that. That is your browser's, not ours.
+
+# What is not set
+
+No advertising cookies. No analytics that identify you. Nothing shared with
+another site, and nothing that follows you off this one. No third-party script
+runs on these pages at all.
+`),
+    },
+    "acceptable-use": {
+      id: "acceptable-use", kind: "acceptable-use", title: "Acceptable use",
+      version: VERSION, mustAccept: false, binds: "person",
+      text: binding(`
+The terms of use say this in a paragraph. This is the same rule at the length
+somebody can actually check themselves against.
+
+# Do not break the law with it
+
+Anything illegal where you are or where we are. That includes material you have
+no right to hold, and it includes using a workspace to plan something illegal
+elsewhere.
+
+# Do not harm other people with it
+
+No harassment, no threats, no material that sexualises children, no content
+whose purpose is to make somebody a target. No sending anything to anybody who
+did not ask for it.
+
+# Do not attack the service
+
+No attempting to reach records that are not yours, no working around a limit you
+were not sold, no probing for weaknesses without asking us first, and nothing
+that degrades the service for other people. Automated access is fine and
+supported — mint a token and stay within your limits.
+
+If you think you have found a security weakness, tell us. We would rather hear
+it from you, we will not take action against somebody who reports one in good
+faith, and we will tell you what we did about it.
+
+# Do not misrepresent
+
+Not us, not somebody else, not where a message came from. Do not use a workspace
+to imitate a person or a company.
+
+# What happens
+
+We may make a workspace read-only, or close it. We will say which rule and why.
+Where we can tell you first we will; where acting immediately is the only way to
+protect somebody, we will act and then tell you.
+`),
+    },
+    /*
+      ⚠️ WRITTEN BY THE REGISTER, WHICH IS THE ONLY REASON THE DPA MAY PROMISE A
+      CURRENT LIST. A list of recipients maintained by hand is accurate the day
+      it is typed and drifts the first time a service is added in a hurry — and
+      that is not a documentation problem, it is the disclosure failure
+      regulators actually find. This is the same declaration the record of
+      processing is built from, in sentences.
+    */
+    "sub-processors": {
+      id: "sub-processors", kind: "sub-processors", title: "Who else touches your data",
+      version: VERSION, mustAccept: false, binds: "person",
+      text: binding(subProcessorText(PROCESSORS,
+        "Every company that receives any part of what this service holds, what they do "
+        + "with it, and where they are. This list is assembled from the service's own "
+        + "declarations rather than written out by hand, so nothing can reach one of them "
+        + "without appearing here.")),
     },
   },
-  /*
-    ⚠️ THE BASE EVERY PRODUCT HERE INHERITS. The records are in D1, the objects
-    in R2 and the code in Workers — all one vendor, true of every app on this
-    deployment whether or not anybody writes it down. An app adds only what is
-    genuinely its own.
-  */
-  processors: {
-    cloudflare: subProcessor({
-      id: "cloudflare", name: "Cloudflare, Inc.", country: "US",
-      role: "Runs the application and stores its records and files.",
-      receives: ["none", "sensitive"],
-      url: "https://www.cloudflare.com/trust-hub/gdpr/",
-    }),
-  },
+  processors: PROCESSORS,
 };
 
 export interface Env {
