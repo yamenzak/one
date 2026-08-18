@@ -19,7 +19,7 @@
 
 import type { AccountId, AppSpec, DocumentBook, Door, TenantId } from "@engine/kernel";
 import {
-  foundingAppRole, permissionsFor, residencyFor, slugOk, slugTaken, wouldStrand,
+  foundingAppRole, newId, permissionsFor, residencyFor, slugOk, slugTaken, wouldStrand,
 } from "@engine/kernel";
 import {
   appsOfTenant, becomeCommercial, closeTenant, createTenant, forgetInvitation, invitationsFor,
@@ -290,9 +290,26 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
         */
         try {
           await deps.deliver(email, issued.code);
-        } catch {
+        } catch (why) {
           await forgetCode(ctx.directory, issued.id);
-          return ctx.fail("platform.unavailable");
+          /*
+            ⚠️ THE ONE THING THAT KNEW WHY WAS BEING DISCARDED. A bare `catch {}`
+            here turns "this deployment has no sender configured" into a generic
+            apology with nothing anywhere saying more — and the person who could
+            fix it in a minute has no way to learn what it was. It cannot be told
+            to the CALLER, who is anonymous at a sign-in form and must not be
+            handed the deployment's configuration state; so it goes to the log,
+            under a reference the copy already promises.
+
+            ⚠️ AND THE REFERENCE IS WHY `{ref}` WAS A LITERAL BRACE ON SCREEN.
+            `platform.unavailable` reads "Quote {ref} if you tell us about it",
+            and nothing minted one — so the refusal asked somebody to quote a
+            token that had never been substituted. A promise in the copy is a
+            parameter at the call site.
+          */
+          const ref = newId("err", ctx.now);
+          console.error(`[me.code] ${ref} could not deliver:`, why);
+          return ctx.fail("platform.unavailable", {}, { ref });
         }
         return { sent: true };
       },
@@ -394,9 +411,26 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
         if (issued === "too_soon") return ctx.fail("platform.too_many", { retryAfter: 60 });
         try {
           await deps.deliver(email, issued.code);
-        } catch {
+        } catch (why) {
           await forgetCode(ctx.directory, issued.id);
-          return ctx.fail("platform.unavailable");
+          /*
+            ⚠️ THE ONE THING THAT KNEW WHY WAS BEING DISCARDED. A bare `catch {}`
+            here turns "this deployment has no sender configured" into a generic
+            apology with nothing anywhere saying more — and the person who could
+            fix it in a minute has no way to learn what it was. It cannot be told
+            to the CALLER, who is anonymous at a sign-in form and must not be
+            handed the deployment's configuration state; so it goes to the log,
+            under a reference the copy already promises.
+
+            ⚠️ AND THE REFERENCE IS WHY `{ref}` WAS A LITERAL BRACE ON SCREEN.
+            `platform.unavailable` reads "Quote {ref} if you tell us about it",
+            and nothing minted one — so the refusal asked somebody to quote a
+            token that had never been substituted. A promise in the copy is a
+            parameter at the call site.
+          */
+          const ref = newId("err", ctx.now);
+          console.error(`[me.prove.code] ${ref} could not deliver:`, why);
+          return ctx.fail("platform.unavailable", {}, { ref });
         }
         return { sent: true };
       },

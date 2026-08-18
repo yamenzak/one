@@ -14,7 +14,7 @@
  */
 
 import { env } from "cloudflare:test";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
   AUDIT_SCHEMA, CODE_TRIES, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, MEMBERSHIP_SCHEMA, NOBODY,
@@ -43,6 +43,9 @@ const sent: { to: string; code: string }[] = [];
  * ordinary hygiene; rotating this is the silent loss of every fact stored under
  * it, with no error until somebody reads one.
  */
+/** ⚠️ Set to make every send throw — the deployment with no sender configured. */
+let mailBroken = false;
+
 const app = (vaultSecret: string | null = "test-vault-secret") => serve({
   roots: ROOTS,
   apps: { hello },
@@ -52,7 +55,10 @@ const app = (vaultSecret: string | null = "test-vault-secret") => serve({
   personal: personalOps({
     secret: SECRET,
     appId: "hello",
-    deliver: async (to, code) => { sent.push({ to, code }); },
+    deliver: async (to, code) => {
+      if (mailBroken) throw new Error("no email provider is configured");
+      sent.push({ to, code });
+    },
   }),
   locate: async (door) => {
     if (door.kind !== "tenant" || !door.slug) return null;
@@ -290,6 +296,47 @@ describe("signing in", () => {
 });
 
 /* ------------------------------------------------------------ a workspace --- */
+
+/*
+  A DEPLOYMENT THAT CANNOT SEND SAYS SO, AND SAYS IT WITH A REFERENCE.
+
+  ⚠️ THIS IS THE FIRST THING A FRESH DEPLOYMENT DOES, AND THE FIRST THING THAT
+  CAN BE WRONG. Nobody can reach the console to configure a sender without
+  signing in, and signing in needs the sender — so the refusal here is the only
+  thing standing between an operator and a screen that says nothing useful.
+
+  ⚠️ AND THE CODE IS WITHDRAWN WITH IT. The row is written before the send is
+  attempted, so leaving it there refuses the NEXT attempt as "too often" while
+  no code was ever delivered — a deployment that locks somebody out over its own
+  failure.
+*/
+describe("when the deployment cannot send", () => {
+  beforeEach(() => { mailBroken = true; });
+  afterEach(() => { mailBroken = false; });
+
+  it("refuses, and quotes a reference the copy actually promised", async () => {
+    const asked = await post("setup", "/api/me.code", { email: "nomail@example.com" });
+    expect(asked.status).toBe(503);
+
+    const said = await asked.json() as {
+      problem: { code: string; ref?: string; detail?: string };
+    };
+    expect(said.problem.code).toBe("platform.unavailable");
+    /* ⚠️ THE WHOLE POINT: the copy reads "Quote {ref} if you tell us about it",
+       and nothing minted one — so a live deployment showed a literal brace to
+       the one person who could have fixed it. */
+    expect(said.problem.ref).toBeTruthy();
+    expect(said.problem.detail ?? "").not.toContain("{ref}");
+    expect(said.problem.detail ?? "").toContain(said.problem.ref as string);
+  });
+
+  /* ⚠️ AND THE NEXT ATTEMPT IS NOT REFUSED AS "TOO OFTEN". */
+  it("withdraws the code it never delivered", async () => {
+    expect((await post("setup", "/api/me.code", { email: "again@example.com" })).status).toBe(503);
+    mailBroken = false;
+    expect((await post("setup", "/api/me.code", { email: "again@example.com" })).status).toBe(200);
+  });
+});
 
 describe("making a workspace", () => {
   it("creates it, places it, and makes the founder somebody who can run it", async () => {

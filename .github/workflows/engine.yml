@@ -382,8 +382,16 @@ jobs:
       # word `cloudflare`. The keys that ARE secret cannot be seeded from here
       # and are not — they are pasted into the console, encrypted under
       # CONFIG_SECRET, which this workflow has no way to read.
+      # ⚠️ `always()`, AND IT IS THE WHOLE POINT OF THE STEP. A step whose `if:`
+      # names no status function has `success()` ANDed into it — so this one was
+      # skipped whenever the boot check above failed. The boot check fails on
+      # exactly one deployment: a fresh one, whose DNS and routes are dashboard
+      # steps that come AFTER the first deploy. The step that exists to break the
+      # bootstrap deadlock was gated behind the only condition under which the
+      # deadlock exists, and the symptom was a sign-in that answered
+      # `platform.unavailable` with no sender row anywhere.
       - name: Seed the sender, so the first person can sign in
-        if: steps.ready.outputs.go == 'true'
+        if: always() && steps.ready.outputs.go == 'true'
         working-directory: engine/one
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
