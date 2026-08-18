@@ -16,6 +16,7 @@ import { sayDate } from "@engine/kernel";
 import { Button, Card, Chip, Table } from "@heroui/react";
 import { ControlRow, FieldRow, Group, NavRow } from "../parts/surfaces.js";
 import { glyphOf } from "../frame/shell.js";
+import { AgreedMark } from "../parts/marks.js";
 import { useShown } from "../parts/said.js";
 import { SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
@@ -65,9 +66,9 @@ export interface DocumentsProps {
 
 export function Documents({ documents, outstanding = [], signed, onOpen }: DocumentsProps & {
   /**
-   * ⚠️ WHEN EACH ONE WAS AGREED, WHERE THAT IS KNOWN — the account's own record.
-   * Absent on the wall, which is about what is still owed and has no history to
-   * show yet; present on the account centre, which is only about the history.
+   * ⚠️ WHEN EACH ONE WAS AGREED, AND TO WHICH VERSION. Absent on the wall, which
+   * is about what is still owed and has no history to show yet; present on the
+   * account centre, which is only about the history.
    *
    * ⚠️ AND IT IS THE SAME RENDERER EITHER WAY. Agreeing to something and looking
    * it up months later are the same list with one more fact on the row, which is
@@ -76,10 +77,11 @@ export function Documents({ documents, outstanding = [], signed, onOpen }: Docum
   readonly signed?: Readonly<Record<string, { readonly at: string; readonly version: string }>>;
 }) {
   const owed = new Set(outstanding.map((d) => d.id));
-  /* ⚠️ FORMATTED HERE, IN THE READER'S OWN CONVENTIONS. `under` is a string, so
-     a `Dated` element cannot go in it — and a date built with `toLocaleString`
-     would be the one date in the product that ignores what somebody chose. */
+  /* ⚠️ FORMATTED HERE, IN THE READER'S OWN CONVENTIONS. A date built with
+     `toLocaleString` would be the one date in the product ignoring what somebody
+     chose. */
   const shown = useShown();
+
   return (
     /*
       ⚠️ A DOCUMENT IS A ROW, NOT A CARD. Each one was a `Card` with a title, a
@@ -87,49 +89,40 @@ export function Documents({ documents, outstanding = [], signed, onOpen }: Docum
       facts and one control, once per document, on a screen that is a list of
       documents.
 
-      ⚠️ AND WHETHER IT IS AGREED IS A NOTE RATHER THAN A GREEN CHIP. `success`
-      is for something that just WENT WELL — a payment cleared, a job finished —
-      and a standing fact about a signature from months ago is not that. Two
-      green pills stacked were the only colour on a monochrome screen, which read
-      as an alert rather than as a record.
+      ⚠️ THE SIGNATURE IS THE SECOND LINE AND THE VERSION IS A BADGE, and the
+      split is which of the two somebody came to read. "Did I agree, and when" is
+      the sentence; the version is the reference beside it. Run together as one
+      grey line — "Version 2026-08-01 · agreed 11 Feb 2026" — neither was
+      findable, and the two dates read as one fact when they frequently are not.
     */
     <Group>
-      {documents.map((doc) => (
-        <NavRow
-          key={doc.id}
-          icon={glyphOf("file")}
-          label={doc.title}
-          /* ⚠️ The version is a DATE, because "did they accept the one from
-             before the change" is the only question ever asked of it. */
-          /*
-            ⚠️ THE VERSION SHOWN IS THE PUBLISHED ONE AND THE DATE IS WHEN THEY
-            SIGNED — which are the same fact only while nothing has changed. Put
-            side by side without saying so, the row read "Version 2026-08-01 ·
-            agreed 11 Feb 2026" for somebody who agreed to the FEBRUARY wording,
-            which is the row claiming they accepted text they have never seen.
-          */
-          under={`Version ${doc.version}`
-            + (owed.has(doc.id) ? " · not agreed yet" : "")
-            + said(shown, doc.version, signed?.[doc.id])}
-          onOpen={() => onOpen(doc.id)}
-        />
-      ))}
+      {documents.map((doc) => {
+        const one = signed?.[doc.id];
+        return (
+          <NavRow
+            key={doc.id}
+            icon={glyphOf("file")}
+            label={doc.title}
+            under={one
+              ? (
+                <span className={`inline-flex items-center ${SPACE.hair}`}>
+                  <span aria-hidden="true" className="inline-flex size-4 shrink-0">
+                    <AgreedMark />
+                  </span>
+                  {one.version === doc.version
+                    ? `Agreed ${sayDate(shown, one.at as Instant, "short")}`
+                    : `Earlier version agreed ${sayDate(shown, one.at as Instant, "short")}`}
+                </span>
+              )
+              : owed.has(doc.id) ? "Not agreed yet" : undefined}
+            aside={<Chip color="default" variant="soft"><Chip.Label>{doc.version}</Chip.Label></Chip>}
+            onOpen={() => onOpen(doc.id)}
+          />
+        );
+      })}
     </Group>
   );
 }
-
-/** ⚠️ What a row says about a signature, and it is honest about a stale one. */
-const said = (
-  shown: Parameters<typeof sayDate>[0],
-  published: string,
-  one?: { readonly at: string; readonly version: string },
-): string => {
-  if (!one) return "";
-  const on = sayDate(shown, one.at as Instant, "short");
-  return one.version === published
-    ? ` · agreed ${on}`
-    : ` · earlier version agreed ${on}`;
-};
 
 export function SubProcessors({ book }: { readonly book: SubProcessorBook }) {
   const all = Object.values(book);

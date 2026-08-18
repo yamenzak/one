@@ -63,10 +63,37 @@ export function Agreed() {
           const had = when[one.document];
           if (!had || had.at < one.at) when[one.document] = { at: one.at, version: one.version };
         }
+        /*
+          ⚠️ TWO SECTIONS, BECAUSE ONE LIST COULD NOT ANSWER THE QUESTION IT WAS
+          FOR. Six documents in a column with three carrying a date and three
+          carrying nothing reads as "did I agree to those or are they just
+          here?" — the reader has to infer the meaning of an ABSENCE, which is
+          the one thing a list should never ask. Split, each heading says which
+          it is and the rows underneath need no interpreting.
+
+          ⚠️ AND THE SECOND IS ONLY DRAWN WHEN THERE IS ONE. An empty "Not
+          agreed" heading is a section that exists to report nothing.
+        */
+        const mine = data.documents.filter((d) => when[d.id]);
+        const rest = data.documents.filter((d) => !when[d.id]);
         return (
-          <Group label="The documents" under="What you agreed to, which version, and when">
-            <DocumentList outstanding={data.owed} signed={when} />
-          </Group>
+          <>
+            <Group label="Agreed" under="What you accepted, which version, and when">
+              <DocumentList show={mine} outstanding={data.owed} signed={when} />
+            </Group>
+            {rest.length ? (
+              /* ⚠️ NOT "OUTSTANDING". Most of these are published for reading
+                 and were never put in front of anybody — a heading implying a
+                 debt would invent one. What is genuinely owed says so on its own
+                 row, and the wall is what stops somebody past it. */
+              <Group
+                label="Published, not signed"
+                under="Here to read. You will be asked when one applies"
+              >
+                <DocumentList show={rest} outstanding={data.owed} />
+              </Group>
+            ) : null}
+          </>
         );
       }}
     />

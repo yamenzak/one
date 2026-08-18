@@ -187,3 +187,40 @@ export const SearchMark = () => (
     </g>
   </Mark>
 );
+
+/**
+ * AGREED — a seal, not a tick in a line of text.
+ *
+ * ⚠️ IT IS FILLED, WHICH IS THE WHOLE POINT. Every other mark in the set is a
+ * stroke, so this one reads as a STAMP against them rather than as one more
+ * outline — which is what "verified" means everywhere anybody has seen it.
+ *
+ * ⚠️ AND IT CARRIES ITS OWN BLUE, WHICH IS THE ONE HUE IN THE PRODUCT THAT IS A
+ * CONVENTION RATHER THAN A CHOICE. This theme is MONOCHROME — the kernel's
+ * `info` resolves to the library's `accent`, which here is a grey — so a seal
+ * drawn in the theme's own colours is the same value as the words beside it and
+ * reads as a decoration. Verified is blue everywhere anybody has seen it, and
+ * borrowing that is what makes this legible without a legend.
+ *
+ * ⚠️ ONE PLACE, NOT A TOKEN, DELIBERATELY. A blue in the theme would be a second
+ * brand colour every surface could reach for; a blue in the one mark that means
+ * "we hold a record of this" is a fact about that mark. If a second thing ever
+ * needs it, that is the moment it becomes a token — not before.
+ */
+const VERIFIED = "oklch(0.62 0.16 250)";
+
+export const AgreedMark = () => (
+  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <circle cx="12" cy="12" r="10" fill={VERIFIED} />
+    {/* ⚠️ KNOCKED OUT IN WHITE RATHER THAN THE SURFACE'S COLOUR. The seal is a
+        solid at a fixed value, so the tick has to contrast with the SEAL — a
+        surface variable would make it invisible on a light theme's card. */}
+    <path
+      d="m8 12.5 2.5 2.5 5.5-5.5"
+      stroke="#fff"
+      strokeWidth={2.4}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);

@@ -11,6 +11,7 @@ export * from "./blobs.js";
 export * from "./glow.js";
 export * from "./cloth.js";
 export * from "./etch.js";
+export * from "./tint.js";
 
 import { SPACE } from "./space.js";
 import { AURA } from "./aura.js";
@@ -19,6 +20,7 @@ import { BLOBS } from "./blobs.js";
 import { GLOW } from "./glow.js";
 import { CLOTH } from "./cloth.js";
 import { ETCH } from "./etch.js";
+import { TINT } from "./tint.js";
 
 /**
  * EVERY WORLD THIS PRODUCT HAS, IN ONE PLACE.
@@ -43,6 +45,10 @@ import { ETCH } from "./etch.js";
 export const FAMILIES = {
   space: SPACE, aura: AURA, loops: LOOPS, blobs: BLOBS,
   glow: GLOW, cloth: CLOTH, etch: ETCH,
+  /* ⚠️ THE ONE FAMILY WITH A HUE OF ITS OWN — see `tint.ts`. Every other draws
+     in the theme's colours, which on a monochrome product means no colour at
+     all; there is no seed of a mono palette that produces a tint. */
+  tint: TINT,
 } as const;
 
 /** ⚠️ Named, never handed over — a family composed at a call site is exactly
@@ -73,4 +79,4 @@ export const SKIES: readonly SceneFamily[] = (Object.keys(FAMILIES) as SceneFami
  * somebody ARRIVES at — a balance, a home, a result — never a form and never a
  * list.
  */
-export type Sky = "plain" | "glow" | "cloth" | "etch" | "loops" | "blobs";
+export type Sky = "plain" | "glow" | "cloth" | "etch" | "loops" | "blobs" | "tint";

@@ -165,13 +165,13 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | Home | What it is for | Ships |
 |---|---|---|
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 57 |
-| `scene/` | the ambience engine — families, marks, the world behind a screen | internal |
+| `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 55 |
 | `parts/` | rows, cards, lists, controls, the four outcomes | 135 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 51 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**337 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**338 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -182,6 +182,10 @@ there is no deep import, and a guard says so.
 - `tokens/motion.ts` — `ARRIVE`, `ARRIVE_MARK`, `ARRIVE_MOTION`, `ARRIVE_RISE`, `arriveAt`, `BEAT`, `DOOR_MOTION`, `doorAt`, `Duration`, `DURATION`, `Ease`, `EASE`, `GLYPH_MOTION`, `Intent`, `MOTION`, `REDUCED`, `transition`, `turns`, `useStill`
 - `tokens/theme.ts` — `brandCss`, `brandCssFor`, `colorFor`, `readable`, `SKY_MOTION`
 - `tokens/type.ts` — `FACE_CSS`, `FACE_STACK`, `MARK_STACK`, `MONO_STACK`, `Role`, `ROLES`, `sentence`, `text`, `TYPE`
+
+### `scene/`
+
+- `scene/tint.ts` — `TINT`
 
 ### `frame/`
 

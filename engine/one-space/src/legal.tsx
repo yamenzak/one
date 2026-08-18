@@ -121,28 +121,50 @@ function Reader({ of }: { readonly of: Published }) {
  * document shows the list; choosing one replaces it and Back returns. Nested
  * overlays each trap focus, and the second to close hands it to the wrong place.
  */
+/**
+ * ⚠️ WHAT IS BENEATH A DOCUMENT DEPENDS ON HOW IT WAS OPENED, and the first
+ * version did not remember. Opened from the door there IS a list underneath, and
+ * Back returns to it; opened from a ROW on a page — the account's own record, the
+ * wall — the row was the list, and Back walked somebody from a document they
+ * chose into a second list of the same documents inside the sheet. A screen
+ * nobody asked for, reached by the control that means "undo that".
+ *
+ * ⚠️ ONE STATE, SO THE PAIR CANNOT CONTRADICT. `null` is shut; anything else
+ * carries both where we are and what is under it, set together in `read` and
+ * nowhere else.
+ */
+interface Open {
+  /** `list` when the tray was opened at the index, `one` when at a document. */
+  readonly root: "list" | "one";
+  readonly at: string | null;
+}
+
 export function Reading({ children }: { readonly children: React.ReactNode }) {
-  /* ⚠️ `undefined` IS SHUT, `null` IS OPEN AT THE LIST, a string is a document.
-     Two flags would let the pair contradict — open with nothing to show, or shut
-     on a document. */
-  const [at, setAt] = useState<string | null | undefined>(undefined);
-  const read = useCallback((id?: string) => { setAt(id ?? null); }, []);
+  const [open, setOpen] = useState<Open | null>(null);
+  const read = useCallback((id?: string) => {
+    setOpen(id === undefined ? { root: "list", at: null } : { root: "one", at: id });
+  }, []);
+  const shut = useCallback(() => { setOpen(null); }, []);
+
+  /* ⚠️ BACK EXISTS ONLY WHERE THERE IS SOMETHING BEHIND. On a document opened
+     directly the only honest control is the one that closes. */
+  const deeper = open?.root === "list" && open.at !== null;
 
   return (
     <ReadingProvider value={{ read }}>
       {children}
       <Tray
-        title={at ? "" : "Documents"}
-        isOpen={at !== undefined}
-        onOpenChange={(is) => { if (!is) setAt(undefined); }}
-        actions={at
-          ? <Button variant="ghost" onPress={() => { setAt(null); }}>Back</Button>
-          : <Button variant="ghost" onPress={() => { setAt(undefined); }}>Close</Button>}
+        title={open?.at ? "" : "Documents"}
+        isOpen={open !== null}
+        onOpenChange={(is) => { if (!is) shut(); }}
+        actions={deeper
+          ? <Button variant="ghost" onPress={() => { setOpen({ root: "list", at: null }); }}>Back</Button>
+          : <Button variant="ghost" onPress={shut}>Close</Button>}
       >
         {/* ⚠️ MOUNTED ONLY WHILE IT IS OPEN, so a tray sitting above every page
             costs a request on no page at all. The read fires the first time
             somebody actually asks for the documents. */}
-        {at !== undefined ? <Book at={at} onOpen={read} /> : null}
+        {open ? <Book at={open.at} onOpen={(id) => { setOpen({ root: open.root, at: id }); }} /> : null}
       </Tray>
     </ReadingProvider>
   );

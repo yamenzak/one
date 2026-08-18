@@ -869,7 +869,42 @@ describe("the legal surfaces", () => {
        other had no way to read either — so somebody could agree to a document
        and never see it, then never see it again. */
     expect(out).toContain("Privacy");
-    expect(out).toContain("not agreed yet");
+    expect(out).toContain("Not agreed yet");
+    /* ⚠️ THE VERSION IS A BADGE AND THE SIGNATURE IS THE SECOND LINE — run
+       together as one grey run-on, neither was findable and the two dates read
+       as one fact. The badge is what carries the version now. */
+    expect(out).toContain("2026-01-01");
+  });
+
+  /*
+    ⚠️ THE PUBLISHED VERSION AND THE DAY SOMEBODY SIGNED ARE THE SAME FACT ONLY
+    WHILE NOTHING HAS CHANGED. Printed side by side without saying so, the row
+    read "Version 2026-08-01 · agreed 11 Feb 2026" for a person who agreed to the
+    FEBRUARY wording — the row claiming they accepted text they have never seen.
+  */
+  it("says a signature is against an earlier version, and seals a current one", () => {
+    const docs = [
+      {
+        id: "terms", kind: "terms", title: "Terms", version: "2026-08-01" as never,
+        mustAccept: true, binds: "person", url: "/terms",
+      },
+      {
+        id: "privacy", kind: "privacy", title: "Privacy", version: "2026-08-01" as never,
+        mustAccept: true, binds: "person", url: "/privacy",
+      },
+    ] as const satisfies readonly DocumentDef[];
+    const out = html(
+      <Documents
+        documents={docs}
+        onOpen={() => {}}
+        signed={{
+          terms: { at: "2026-08-04T10:00:00.000Z", version: "2026-08-01" },
+          privacy: { at: "2026-02-11T10:00:00.000Z", version: "2026-02-01" },
+        }}
+      />,
+    );
+    expect(out).toContain("Agreed ");
+    expect(out).toContain("Earlier version agreed ");
   });
 });
 

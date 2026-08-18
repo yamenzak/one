@@ -424,8 +424,16 @@ interface RowBase {
    */
   readonly face?: FaceOf;
   readonly label: string;
-  /** ⚠️ ONE LINE, AND NO FULL STOP — see `tone.ts`. */
-  readonly under?: string;
+  /**
+   * ⚠️ ONE LINE, AND NO FULL STOP — see `tone.ts`.
+   *
+   * ⚠️ AND IT MAY CARRY A MARK. A string cannot hold the seal that says a
+   * document was agreed, and the alternative — a chip in `aside` — puts the
+   * status on the far side of the row from the sentence it qualifies. The tone
+   * check reads the literal strings a screen writes, so a node here is outside
+   * what it can see: keep the words in the string parts.
+   */
+  readonly under?: React.ReactNode;
 }
 
 /**
@@ -435,7 +443,9 @@ interface RowBase {
  * it read as amateur without being nameable. `justify-start` on the button is
  * not enough: the block itself has to align its own lines.
  */
-const Body = ({ label, under }: { readonly label: string; readonly under?: string }) => (
+const Body = ({ label, under }: {
+  readonly label: string; readonly under?: React.ReactNode;
+}) => (
   <span className={`flex min-w-0 grow flex-col items-start text-left ${SPACE.hair}`}>
     <span className={TYPE.label}>{label}</span>
     {under ? <span className={TYPE.note}>{under}</span> : null}

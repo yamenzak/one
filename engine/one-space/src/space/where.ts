@@ -439,13 +439,13 @@ export const nameOf = (where: Where): string => {
  * ⚠️ THE OPERATOR'S SIDE IS RULED, NOT WOVEN. It is about a deployment rather
  * than a business, and the material says so before a word is read.
  *
- * ⚠️ AND SO IS THE RECORD OF WHAT SOMEBODY SIGNED. Everything else in the
- * account centre is a menu or a control and stands on `cloth`; agreements are
- * the one surface here that is a DOCUMENT, and `etch` is what this system
- * already means by that.
+ * ⚠️ AND THE RECORD OF WHAT SOMEBODY SIGNED IS GLASS. It is the one destination
+ * in the account centre — everything else here is a menu or a control — and
+ * `tint` is the only family that brings a hue, which is what makes the card
+ * offering it read as a place rather than as another row with a picture on it.
  */
 export const groundOf = (where: Where): Sky =>
-  (isConsole(where) || where.at === "agreed" ? "etch" : "cloth");
+  isConsole(where) ? "etch" : where.at === "agreed" ? "tint" : "cloth";
 
 /**
  * ⚠️ AND WHICH ONE OF THE FAMILY, FROM THE ADDRESS. `silk`, `linen` and `wire`
