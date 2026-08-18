@@ -54,10 +54,22 @@ export function SessionProvider({ children }: { readonly children: React.ReactNo
     setStuck(who.problem);
   }, []);
 
+  /*
+    ⚠️ TOGETHER, BECAUSE NEITHER ANSWER FEEDS THE OTHER. `/health` says which door
+    this hostname is; `me.who` says who is here. They were awaited one after the
+    other, so the person watched two round trips end to end — and on a cold
+    isolate each one pays for the schema being applied, so the wait was two cold
+    starts rather than one.
+
+    ⚠️ AND `me.who` IS SAFE ON EVERY DOOR, INCLUDING THE ONES WHERE IT MEANS
+    NOTHING. It already ran on all of them; the signpost answers 401, which is
+    "nobody is signed in" rather than a failure, and `pickScreen` decides the
+    signpost from the DOOR before it ever reads the session.
+  */
   useEffect(() => {
     let live = true;
     void (async () => {
-      const health = await api.health();
+      const [health] = await Promise.all([api.health(), refresh()]);
       if (!live) return;
       if (!health.ok) { setStuck(health.problem); return; }
       setWhere({
@@ -65,7 +77,6 @@ export function SessionProvider({ children }: { readonly children: React.ReactNo
         root: health.value.root,
         slug: health.value.slug ?? null,
       });
-      await refresh();
     })();
     return () => { live = false; };
   }, [refresh]);

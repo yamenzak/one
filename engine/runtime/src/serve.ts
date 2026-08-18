@@ -20,7 +20,8 @@
  */
 
 import type {
-  AppSpec, Caller, Door, Kind, PackDef, PlanSpec, Problem, Resolved as _Resolved, Roots, Standing,
+  AppSpec, Caller, DeploymentLegal, Door, DocumentDef, Kind, PackDef, PlanSpec, Problem,
+  Resolved as _Resolved, Roots, Standing,
 } from "@engine/kernel";
 import {
   IN_GOOD_STANDING, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, check, doorFor, newId, problem,
@@ -116,6 +117,13 @@ export interface Wiring {
   readonly owed?: (
     who: Who, located: Located,
   ) => Promise<readonly { readonly id: string; readonly title: string }[]>;
+  /**
+   * ⚠️ THE DOCUMENTS THEMSELVES, SO THERE IS SOMETHING TO READ. `owed` says what
+   * somebody still has to agree to; this is what it says. They were separate,
+   * and only the first existed — so the consent screen listed titles pointing at
+   * an address nothing answered.
+   */
+  readonly legal?: DeploymentLegal;
   /**
    * ⚠️ WHO THIS DEPLOYMENT IS, FOR THE TILES THAT WEAR OUR MARK. A personal
    * workspace installs as ours; nothing about a hostname can supply a name and a
@@ -250,7 +258,66 @@ const INSTALLABLE = new Set([
 export const isPlatformPath = (pathname: string): boolean =>
   pathname.startsWith("/api/") || pathname === "/health" || pathname === "/mcp"
   || pathname === WEBHOOK_PATH
+  || pathname.startsWith(LEGAL_PATH)
   || INSTALLABLE.has(pathname);
+
+/**
+ * ⚠️ WHERE A DOCUMENT SOMEBODY IS ASKED TO AGREE TO IS ACTUALLY READ. It was not
+ * anywhere: the deployment declared `/legal/terms`, nothing answered it, the
+ * request fell through to the page, and the app drew the consent screen again —
+ * so the one screen that stops somebody demanded agreement to a text it could
+ * not show them.
+ *
+ * ⚠️ AND IT NEEDS NO SESSION, ON ANY DOOR. Deciding whether to agree is a thing
+ * somebody does BEFORE they are anybody here, and a term nobody can read without
+ * first accepting the terms is not a term that was offered.
+ */
+export const LEGAL_PATH = "/legal/";
+
+/** ⚠️ Anything from a declaration is somebody's text, and it goes into a page. */
+const safe = (text: string): string => text
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/**
+ * ⚠️ THE WHOLE PAGE, WRITTEN OUT, AND IT IS NOT THE APP. A legal document read
+ * inside the single-page app is a document behind a boot, a session resolution
+ * and a consent gate — which is what made it unreadable in the first place. This
+ * answers with the text and nothing else: no script, no fetch, no state.
+ *
+ * ⚠️ AND IT ANSWERS IN BOTH THEMES WITHOUT ASKING. `color-scheme` hands the two
+ * grounds to the user agent, so a document opened at night is not a white sheet.
+ */
+function legalPage(doc: DocumentDef, root: string): string {
+  const title = `${safe(doc.title)} · ${safe(root)}`;
+  return `<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${title}</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0 auto; padding: 3rem 1.25rem 6rem; max-width: 38rem;
+    font: 16px/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  h1 { font-size: 1.75rem; line-height: 1.2; margin: 0 0 .25rem; text-wrap: balance; }
+  .v { opacity: .6; font-size: .875rem; margin: 0 0 2.5rem; }
+  p { margin: 0 0 1.1rem; }
+  h2 { font-size: 1.125rem; margin: 2rem 0 .6rem; }
+</style>
+</head><body>
+<h1>${safe(doc.title)}</h1>
+<p class="v">Version ${safe(String(doc.version))}</p>
+${(doc.text ?? "").trim().split(/\n{2,}/).map((para) => {
+    const line = para.trim();
+    /* ⚠️ A LEADING `#` IS A HEADING, and that is the whole of the formatting.
+       A markdown library for two shapes is a dependency for two shapes. */
+    return line.startsWith("# ")
+      ? `<h2>${safe(line.slice(2))}</h2>`
+      : `<p>${safe(line)}</p>`;
+  }).join("\n")}
+</body></html>`;
+}
 
 /**
  * ⚠️ THE WEBHOOK'S PATH, NAMED ONCE, AND IT HAPPENED AGAIN. The paragraph above
@@ -346,6 +413,27 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
         slug: door.kind === "tenant" ? door.slug : null,
       });
     }
+    /*
+      ⚠️ A DOCUMENT SOMEBODY IS ASKED TO AGREE TO, READ WITHOUT AGREEING FIRST.
+      Public on every door and behind nothing: deciding whether to accept is what
+      somebody does BEFORE they are anybody here, and a term nobody can read
+      without accepting the terms was never offered.
+    */
+    if (url.pathname.startsWith(LEGAL_PATH)) {
+      const id = url.pathname.slice(LEGAL_PATH.length);
+      const doc = Object.values(wiring.legal?.documents ?? {}).find((d) => d.id === id);
+      if (!doc?.text) return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
+      return new Response(legalPage(doc, wiring.roots.root), {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          /* ⚠️ A VERSION IS THE THING BEING AGREED TO, so the text for one never
+             changes — a new wording is a new version, and a stale copy of a
+             version is the same bytes as a fresh one. */
+          "cache-control": "public, max-age=3600",
+        },
+      });
+    }
+
     /*
       ⚠️ THE AGENT DOOR, AND IT IS THE SAME BUILDING (D13). `/mcp` answers on a
       tenant's own address with the tenant's own tools — a projection of the

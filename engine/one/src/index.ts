@@ -221,13 +221,95 @@ const LEGAL: DeploymentLegal = {
   documents: {
     terms: {
       id: "terms", kind: "terms", title: "Terms of use",
-      version: "2026-08-17" as never, mustAccept: true, binds: "person",
-      url: "/legal/terms",
+      version: "2026-08-18" as never, mustAccept: true, binds: "person",
+      text: `
+One is a place to keep your work and the records that go with it. These terms
+are between you and the company that runs this deployment.
+
+# Your account
+
+You sign in with a code sent to your email address. Keep access to that inbox:
+anybody who can read it can sign in as you. Tell us if you think somebody else
+has.
+
+# Your workspaces
+
+A workspace holds records. You may belong to several, and what you can do in
+each is decided by whoever runs it. A personal workspace is yours; a commercial
+one belongs to the business that created it, and that business decides who has
+access to what is in it.
+
+# What you may not do
+
+Do not use One to break the law, to store material you have no right to store,
+or to attack the service or the people using it. We may close a workspace that
+does, and we will say why.
+
+# Paying
+
+Plans and prices are shown before you buy and in your workspace's own billing
+screen. Payment is taken monthly until you cancel. If a payment fails we will
+tell you, and the workspace becomes read-only before anything is withheld — your
+records stay readable and exportable throughout.
+
+# Ending it
+
+You can leave a workspace or close your account at any time, and you can take a
+copy of your records first. Closing is not instant: there is a window in which
+it can be undone, and after that the records are destroyed.
+
+# Changes
+
+If these terms change we will ask you again, and the version you agreed to is
+recorded. Nothing you already agreed to changes retroactively.
+`,
     },
     privacy: {
       id: "privacy", kind: "privacy", title: "Privacy notice",
-      version: "2026-08-17" as never, mustAccept: true, binds: "person",
-      url: "/legal/privacy",
+      version: "2026-08-18" as never, mustAccept: true, binds: "person",
+      text: `
+This explains what One holds about you, why, and what you can do about it.
+
+# What we hold
+
+Your email address, because it is how you sign in. The records you or your
+colleagues put into a workspace. A log of what happened — which operation ran,
+in which workspace, and when — so that a workspace can be audited. If you turn
+on notifications, the address of the device to send them to.
+
+# What we do not do
+
+We do not sell anything about you, and we do not use your records to advertise
+to you. Our logs record what happened, not who it happened to.
+
+# Where it is kept
+
+Records are stored in the region the workspace was created for, and stay there.
+The service runs on Cloudflare — the databases, the files and the code — and
+payments are handled by Stripe, which sees what it needs to take a payment and
+not your records.
+
+# Sensitive information
+
+Where a product here handles special categories of information, it is encrypted
+separately, and destroying the key destroys it. Not every product handles any.
+
+# How long
+
+For as long as the workspace exists. When a workspace is closed or an account is
+deleted, the records are destroyed after a short window in which the decision can
+be reversed.
+
+# What you can ask for
+
+A copy of everything held about you, in a form you can read elsewhere. Deletion
+of your account and what belongs to it. Correction of anything wrong. Every one
+of these is a button in the product rather than a request you have to make.
+
+# Asking us
+
+Write to the address on the deployment that sent you here.
+`,
     },
     /* ⚠️ THE BUSINESS ONE IS BOUND BY WHOEVER CREATES THE WORKSPACE, not by
        everybody in it. A colleague invited into a workspace agreed to the terms
@@ -235,8 +317,43 @@ const LEGAL: DeploymentLegal = {
        them to would be asking somebody to bind a company they do not run. */
     dpa: {
       id: "dpa", kind: "dpa", title: "Data processing agreement",
-      version: "2026-08-17" as never, mustAccept: true, binds: "tenant",
-      url: "/legal/dpa",
+      version: "2026-08-18" as never, mustAccept: true, binds: "tenant",
+      text: `
+This applies where your workspace holds records about other people — your
+customers, your staff, your clients. You decide what is held and why; we hold it
+for you and act on your instructions.
+
+# What we do with it
+
+Only what running the service requires, and only what you have asked for. We do
+not use your workspace's records for our own purposes.
+
+# Who else touches it
+
+Cloudflare, which runs the databases, the file storage and the code. Stripe,
+where you pay us. Any provider you switch on yourself inside your workspace. The
+current list is published with this deployment.
+
+# Keeping it safe
+
+Access is limited to what an operation needs. What happened is recorded. Special
+categories of information are encrypted under a key that can be destroyed on its
+own.
+
+# Where it is
+
+The region your workspace was created for. It is not moved out of it.
+
+# When it ends
+
+You can export everything at any time. When you close the workspace the records
+are destroyed after a short window in which closing can be undone.
+
+# If something goes wrong
+
+We will tell you about a breach affecting your workspace's records without undue
+delay, with what we know and what we are doing.
+`,
     },
   },
   /*
@@ -827,6 +944,10 @@ const handler = async (env: Env) => {
       ? owedBy(directory, who.accountId as never, LEGAL.documents,
         await placeOf(who.accountId as never, located.tenantId as never))
       : [],
+    /* ⚠️ THE SAME BOOK `owed` NAMES, so the consent screen's list and the text
+       behind each row cannot be about different documents. Serving it is what
+       makes `/legal/<id>` an address rather than a claim. */
+    legal: LEGAL,
     identify: async (request, located) => {
       /*
         ⚠️ TWO WAYS TO SAY WHO YOU ARE, ONE ANSWER TO WHAT YOU MAY DO. A person

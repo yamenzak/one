@@ -203,6 +203,29 @@ describe("the record and the documents", () => {
     expect(refuseLegal(docs, {}, [], false).map((p) => p.why)).toEqual(["must_accept_without_binding"]);
   });
 
+  /*
+    ⚠️ A PATH IS NOT SOMETHING TO READ, AND THIS CHECK USED TO ACCEPT ONE. Every
+    document on the live deployment declared `url: "/legal/<id>"` and passed —
+    nothing answered those paths, so the consent screen listed titles whose text
+    did not exist anywhere. A declaration cannot promise that a route exists;
+    either the words are here, or the address is one a browser reaches without
+    this deployment routing it.
+  */
+  it("does not accept a path as something to read", () => {
+    const docs = { t: { id: "t", kind: "terms" as const, title: "T", version: "2026-08-01" as Day,
+      mustAccept: true, binds: "person" as const, url: "/legal/t" } };
+    expect(refuseLegal(docs, {}, [], false).map((p) => p.why)).toEqual(["must_accept_without_binding"]);
+  });
+
+  it("takes the words themselves, or an address off this deployment", () => {
+    const base = { id: "t", kind: "terms" as const, title: "T", version: "2026-08-01" as Day,
+      mustAccept: true, binds: "person" as const };
+    expect(refuseLegal({ t: { ...base, text: "What you agree to." } }, {}, [], false)).toEqual([]);
+    expect(refuseLegal({ t: { ...base, url: "https://example.test/t" } }, {}, [], false)).toEqual([]);
+    /* ⚠️ And whitespace is not words. */
+    expect(refuseLegal({ t: { ...base, text: "   " } }, {}, [], false).length).toBe(1);
+  });
+
   /* ⚠️ Every row of the record comes from a declaration; a hand-written half is
      the half that is wrong. */
   it("assembles the record and its recipients from the sources", () => {

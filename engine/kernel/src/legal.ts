@@ -41,6 +41,19 @@ export interface DocumentDef {
   readonly mustAccept: boolean;
   /** Who it binds: the person signing in, or the business signing up. */
   readonly binds: "person" | "tenant";
+  /**
+   * ⚠️ THE WORDS THEMSELVES, AND WITHOUT THEM THERE IS NOTHING TO READ. A
+   * document used to be a title, a version and a `url` — and the url was checked
+   * for being DECLARED, never for being answered. `/legal/terms` fell through to
+   * the page, the app booted, found the document unaccepted and drew the consent
+   * screen again: somebody was asked to agree to a text the deployment did not
+   * have. Carrying the text is what makes `mustAccept` mean something.
+   */
+  readonly text?: string;
+  /**
+   * ⚠️ ONLY FOR A DOCUMENT HOSTED SOMEWHERE ELSE, and it must be absolute. A
+   * relative url is a promise about a route, and a declaration cannot keep it.
+   */
   readonly url?: string;
 }
 
@@ -188,9 +201,21 @@ export function refuseLegal(
   const out: LegalProblem[] = [];
   const at = (of: string, why: LegalRefusal, detail: string) => out.push({ of, why, detail });
 
+  /*
+    ⚠️ READABLE, NOT MERELY REFERENCED. This asked whether a `url` was declared,
+    which a relative path satisfies whether or not anything answers it — and one
+    did not, on a live deployment, for every document it demanded agreement to.
+    Either the text is here, or the address is somewhere a browser can actually
+    reach without this deployment routing it.
+  */
   for (const d of Object.values(book)) {
-    if (d.mustAccept && !d.url) {
-      at(d.id, "must_accept_without_binding", "acceptance is demanded and there is nothing to read");
+    if (!d.mustAccept) continue;
+    const hosted = (d.url ?? "").startsWith("https://");
+    if (!d.text?.trim() && !hosted) {
+      at(d.id, "must_accept_without_binding",
+        d.url
+          ? `acceptance is demanded and ${d.url} is a path this declaration cannot promise answers`
+          : "acceptance is demanded and there is nothing to read");
     }
   }
 

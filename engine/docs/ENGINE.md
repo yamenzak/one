@@ -401,7 +401,7 @@ env or a binding.
 | `identity` | sign-in codes, sessions, tokens, proof | 21 | — |
 | `membership` | the roster and what each member may do | 12 | — |
 | `compose` | a manifest becomes a live surface of operations | 2 | — |
-| `serve` | the one path every request ends in — both doors | 5 | — |
+| `serve` | the one path every request ends in — both doors | 6 | — |
 | `records` | the generated reads and writes behind a collection | 6 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
 | `billing` | plans, subscriptions, the bill, the ladder | 15 | — |
@@ -442,7 +442,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**317 of them**, 315 reached by something today.
+**318 of them**, 316 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

@@ -269,7 +269,17 @@ export function App() {
             this one was invisible while the class sat inside a ternary. */}
         <div className="min-h-[68dvh] flex items-center justify-center py-8">
           <Center space="roomy">
-            {screen === "waiting" ? <Working says="Getting your workspaces" /> : null}
+            {/*
+              ⚠️ TWO STATES WORE ONE CAPTION, AND IT DESCRIBED NEITHER. `waiting`
+              is either "the door is not classified yet" or "the session is not
+              resolved yet"; it said "Getting your workspaces" for both, which is
+              a third thing that happens later and only for somebody signed in.
+              A person watching a slow boot was reading an explanation of work
+              that was not being done.
+            */}
+            {screen === "waiting"
+              ? <Working says={face === null ? "Finding this place" : "Checking who you are"} />
+              : null}
             {screen === "stuck" && stuck ? <Trouble problem={stuck} /> : null}
             {screen === "elsewhere" && where ? <Elsewhere where={where} kind={where.kind} /> : null}
           </Center>

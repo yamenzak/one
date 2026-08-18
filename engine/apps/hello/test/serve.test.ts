@@ -12,6 +12,24 @@
 import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PLATFORM_ROLES } from "@engine/kernel";
+import type { DeploymentLegal } from "@engine/kernel";
+
+/** ⚠️ One that carries its words, and one that only points at an address. */
+const LEGAL: DeploymentLegal = {
+  documents: {
+    terms: {
+      id: "terms", kind: "terms", title: "Terms of use",
+      version: "2026-08-18" as never, mustAccept: true, binds: "person",
+      text: "The first paragraph.\n\n# A heading\n\nAnd <b>markup</b> somebody typed.",
+    },
+    ghost: {
+      id: "ghost", kind: "terms", title: "Points at nothing",
+      version: "2026-08-18" as never, mustAccept: false, binds: "person",
+      url: "/legal/ghost",
+    },
+  },
+  processors: {},
+};
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
   AUDIT_SCHEMA, DIRECTORY_SCHEMA, NOBODY, REPLAY_SCHEMA, addShard, applySchema, compose,
@@ -65,6 +83,7 @@ const app = () => serve({
   roots: ROOTS,
   apps: { hello },
   directory: directory(),
+  legal: LEGAL,
   locate: async (door) =>
     door.kind === "tenant" && door.slug === "westwind"
       ? {
@@ -503,5 +522,62 @@ describe("changing a record", () => {
     const id = await makeNote();
     await post("/api/note.update", { id, title: "First" });
     expect((await rowOf(id))?.edited_at).toBeTruthy();
+  });
+});
+
+/* --------------------------------------------------------------- the words --- */
+
+/*
+  A DOCUMENT SOMEBODY IS ASKED TO AGREE TO CAN BE READ.
+
+  ⚠️ THIS IS THE ONE THAT WAS MISSING, AND IT SHIPPED. The deployment declared
+  every document with `url: "/legal/<id>"`, nothing answered that path, the
+  request fell through to the page, the app booted, found the document
+  unaccepted and drew the consent screen again. So the screen that stops
+  somebody demanded agreement to a text it could not show them — and the check
+  that was supposed to prevent it asked whether a url was DECLARED, which a
+  path satisfies whether or not anything serves it.
+
+  ⚠️ AND IT IS PUBLIC, ON EVERY DOOR. Deciding whether to accept is what
+  somebody does before they are anybody here; a term nobody can read without
+  first accepting the terms was never offered.
+*/
+describe("reading what you are asked to agree to", () => {
+  it("answers with the document, to nobody in particular", async () => {
+    const said = await call("/legal/terms");
+    expect(said.status).toBe(200);
+    expect(said.headers.get("content-type")).toContain("text/html");
+
+    const page = await said.text();
+    expect(page).toContain("Terms of use");
+    /* ⚠️ THE VERSION IS ON IT, because the version is the thing being agreed to
+       and a reader cannot tell two wordings apart without it. */
+    expect(page).toContain("2026-08-18");
+    expect(page).toContain("The first paragraph.");
+  });
+
+  /* ⚠️ A BLANK LINE IS A PARAGRAPH AND A LEADING HASH IS A HEADING — the whole
+     of the formatting, so a document is readable without a markdown library. */
+  it("gives the text its shape", async () => {
+    const page = await (await call("/legal/terms")).text();
+    expect(page).toContain("<h2>A heading</h2>");
+    expect(page).toContain("<p>The first paragraph.</p>");
+  });
+
+  /* ⚠️ EVERYTHING IN A DECLARATION IS SOMEBODY'S TEXT, and it lands in a page. */
+  it("escapes what it was given", async () => {
+    const page = await (await call("/legal/terms")).text();
+    expect(page).toContain("&lt;b&gt;markup&lt;/b&gt;");
+    expect(page).not.toContain("<b>markup</b>");
+  });
+
+  /*
+    ⚠️ A DOCUMENT WITH NO WORDS IS A 404, NOT A BLANK PAGE. `ghost` declares the
+    address and no text — exactly the shape that shipped — and answering it with
+    an empty document would reproduce the original failure quietly.
+  */
+  it("refuses a document that has no text", async () => {
+    expect((await call("/legal/ghost")).status).toBe(404);
+    expect((await call("/legal/nothing-like-this")).status).toBe(404);
   });
 });
