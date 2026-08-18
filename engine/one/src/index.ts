@@ -257,26 +257,35 @@ const PROCESSORS: SubProcessorBook = {
 };
 
 /**
- * THE FOUR FACTS ONLY THE OPERATOR CAN SUPPLY — AND THIS DEPLOYMENT HAS NOT.
+ * WHO IS ON THE OTHER SIDE OF EVERY DOCUMENT HERE.
  *
- * ⚠️ IT IS `null` RATHER THAN PLAUSIBLE, AND THAT IS THE WHOLE POINT. A company
- * name and an address guessed by whoever wrote the code would make every
- * document below look finished while naming a party that does not exist, and
- * nothing downstream could tell the difference. Absent, `missingDocuments`
- * reports `no_entity_named` on every boot and the paragraph that names the
- * company is simply not in the documents — which is visibly incomplete rather
- * than confidently wrong.
+ * ⚠️ DECLARED ONCE, AND EVERY BINDING DOCUMENT ENDS WITH IT (`whoWeAre`).
+ * Written into six texts instead, the address is six things to change when it
+ * moves, and the one nobody changes is the one somebody writes to.
  *
- * ⚠️ FILLING IT IN IS THE COMMIT THAT MAKES THESE AGREEMENTS. Until then they
- * describe what the software does, accurately, and bind nobody in particular.
+ * ⚠️ THE LICENCE NAME IS THE PARTY; THE PRODUCT NAME IS WHAT THEY RECOGNISE.
+ * A contract naming only the registered entity is correct and unrecognisable —
+ * somebody who signed up to One reads a company they have never heard of and
+ * cannot tell whether it is the same one.
  *
  * ⚠️ AND THE WORDS BELOW HAVE NOT BEEN READ BY A LAWYER. They are written from
- * the code — every promise in them is one this deployment actually keeps, which
- * is the half engineers usually get wrong — but the liability, warranty and
- * transfer clauses a counterparty's counsel will look for are decisions rather
- * than descriptions, and they are not ours to make.
+ * the code, so every promise in them is one this deployment actually keeps —
+ * which is the half that is usually wrong. The liability position, the warranty
+ * position and the transfer mechanics are the ordinary ones for a business of
+ * this size rather than anything tuned to this one.
  */
-const IDENTITY: DeploymentIdentity | null = null;
+const IDENTITY: DeploymentIdentity | null = {
+  entity: "Four Degree Labs",
+  tradingAs: "4\u00b0 Labs",
+  /* ⚠️ THE EMIRATE, UNTIL THERE IS A STREET. A data-protection request has to
+     have somewhere to go, and a plausible-looking street address would be worse
+     than a real jurisdiction and a real mailbox. Replace it with the address on
+     the licence when it is to hand. */
+  address: "Abu Dhabi, United Arab Emirates",
+  contact: "legal@fourdegreelabs.com",
+  law: "the United Arab Emirates, as applied in the Emirate of Abu Dhabi",
+  courts: "Abu Dhabi",
+};
 
 /**
  * ⚠️ THE PARAGRAPH THAT NAMES THE COMPANY, APPENDED RATHER THAN TYPED IN EACH.
@@ -292,7 +301,7 @@ const binding = (body: string): string =>
  * records everybody who agreed to the old wording as having agreed to the new,
  * which is a record that is confidently wrong rather than merely absent.
  */
-const VERSION = "2026-08-19" as never;
+const VERSION = "2026-08-20" as never;
 
 /**
  * ⚠️ WHAT THIS DEPLOYMENT PROMISES, AND IT IS THE DEPLOYMENT'S RATHER THAN A
@@ -425,11 +434,57 @@ pressing the button is.
 
 # What we are responsible for
 
-We are responsible for running the service with reasonable care and for what we
-say in the privacy notice and the data processing agreement. We are not
-responsible for what you or your colleagues put into a workspace, for a decision
-somebody makes on the basis of what is in one, or for a third party you connect
-yourself.
+We are responsible for running One with reasonable skill and care, and for
+keeping what we say in the privacy notice and in the data processing agreement.
+
+We are not responsible for what you or your colleagues put into a workspace, for
+a decision somebody makes on the basis of what is in one, or for a service you
+connect to yours yourself.
+
+# What you are responsible for
+
+The records you put in, and having the right to put them there. If somebody
+brings a claim against us because of what a workspace of yours holds or does —
+material you had no right to store, a law broken with it, a person harmed
+through it — you cover what that costs us, as long as we tell you promptly and
+let you take it over.
+
+# The service as it is
+
+We do not promise One is free of faults, that it will suit a purpose you have in
+mind, or that it will never be interrupted. Where the law would otherwise imply
+a promise we have not made, it is excluded as far as the law allows.
+
+# Where the limit is
+
+Apart from the three things in the next paragraph, the most either of us can owe
+the other for anything arising out of this agreement is, in total, what you paid
+us in the twelve months before the claim. Where you have paid us nothing, that
+is nothing. Neither of us owes the other for lost profit, lost business, or a
+loss that was not a foreseeable result of what went wrong.
+
+That limit does not apply to death or personal injury caused by negligence, to
+fraud, or to anything the law does not allow to be limited.
+
+# Things outside anybody's control
+
+Neither of us is in breach because of something genuinely outside our control —
+a network we do not run, a change in the law, a disaster. If it lasts more than
+30 days, either of us may end the agreement.
+
+# Telling each other things
+
+We write to you at the address you sign in with, and in the product. You write
+to us at the address at the end of this document.
+
+# The rest of it
+
+If part of this agreement turns out to be unenforceable, the rest still stands,
+and not enforcing something once does not give it up. You may not transfer this
+agreement without our agreement; we may transfer it to whoever takes over the
+business, and we will tell you. This document, the privacy notice, the
+acceptable use document, and the data processing agreement where it applies, are
+the whole of what is agreed between us about One.
 `),
     },
     privacy: {
@@ -479,6 +534,12 @@ Our operational logs record what happened, not who it happened to.
 Records are stored in the region the workspace was created for, and stay there.
 You are told which region before the workspace exists, and the trust screen in
 every workspace names it.
+
+We are established in the United Arab Emirates, so the people who run the
+service reach it from there. Where your records are stored in the European
+Economic Area, that access is a transfer out of it, and it is made under the
+European Commission's standard contractual clauses, which the data processing
+agreement carries.
 
 # Who else receives it
 
@@ -538,9 +599,12 @@ somebody who is.
 
 # If you are unhappy
 
-Tell us first, at the address below — we would rather fix it. You also have the
-right to complain to the data protection authority in the country you live in,
-and doing so does not need our permission or our involvement.
+Tell us first, at the address below — we would rather fix it.
+
+You can also complain to a regulator, and you do not need our permission or our
+involvement to do it: the UAE Data Office if you are here, or the data
+protection authority in your own country if you are in the European Economic
+Area or the United Kingdom.
 `),
     },
     /* ⚠️ THE BUSINESS ONE IS BOUND BY WHOEVER CREATES THE WORKSPACE, not by
@@ -604,10 +668,24 @@ not charge you for the part you have not used.
 
 # Where it is processed
 
-The region your workspace was created for. It is not moved out of it. Where a
-sub-processor is established elsewhere, the transfer is made under the standard
-contractual terms that regime provides for, and the list names where each is
-established.
+The region your workspace was created for. It is not moved out of it.
+
+We are established in the United Arab Emirates and the sub-processors on the
+published list are established in the United States. Where the region your
+workspace was created for is in the European Economic Area or the United
+Kingdom, reaching it from either place is a transfer out of it. The European
+Commission's standard contractual clauses, and the United Kingdom's addendum to
+them, are incorporated into this agreement for those transfers, and this
+document supplies the details they ask for. The published list links each
+sub-processor's own commitments.
+
+# Which law this is written to
+
+Article 28 of the European Union and United Kingdom General Data Protection
+Regulation, and the corresponding requirements of the United Arab Emirates'
+Federal Decree-Law No. 45 of 2021 on the protection of personal data. If a
+regime that applies to you asks for something this does not cover, tell us and
+we will agree it.
 
 # Keeping it safe
 

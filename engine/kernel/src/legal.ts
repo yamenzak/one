@@ -207,8 +207,16 @@ export interface DeploymentLegal {
  * mention governing law, because it looks like a rendering fault in a contract.
  */
 export interface DeploymentIdentity {
-  /** The legal name that is party to the terms. */
+  /** The legal name that is party to the terms — the one on the licence. */
   readonly entity: string;
+  /**
+   * ⚠️ THE NAME ON THE PRODUCT, WHERE IT IS NOT THE NAME ON THE LICENCE. A
+   * document naming only the registered entity is correct and unrecognisable:
+   * somebody who signed up to One, from a company they know as one thing, reads
+   * a contract with a company they have never heard of and cannot tell whether
+   * it is the same one. Absent means the two names are the same.
+   */
+  readonly tradingAs?: string;
   /** Postal address. It is what a data-protection request is sent to. */
   readonly address: string;
   /** The address a person writes to about their own data. */
@@ -224,11 +232,13 @@ export interface DeploymentIdentity {
  * document that binds somebody ends with it, so the address a person writes to
  * is the same address in all of them, for ever, from one declaration.
  */
-export const whoWeAre = (of: DeploymentIdentity): string =>
-  `# Who you are agreeing with\n\n`
-  + `${of.entity}, ${of.address}. Write to ${of.contact} about anything in this `
-  + `document or about your own information. This agreement is governed by the law of `
-  + `${of.law}, and the courts of ${of.courts} hear any dispute about it.`;
+export const whoWeAre = (of: DeploymentIdentity): string => [
+  "# Who you are agreeing with",
+  `${of.entity}${of.tradingAs ? `, trading as ${of.tradingAs}` : ""}, of ${of.address}.`
+  + ` Write to ${of.contact} about anything in this document or about your own information.`,
+  `This agreement is governed by the law of ${of.law}, and the courts of ${of.courts} hear`
+  + ` any dispute about it.`,
+].join("\n\n");
 
 export const subProcessor = (def: SubProcessorDef): SubProcessorDef => def;
 

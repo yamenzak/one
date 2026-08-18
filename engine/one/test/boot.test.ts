@@ -646,17 +646,37 @@ describe("what this deployment discloses", () => {
     Object.values(make().purposes ?? {}).some((p) => p.holdings.includes("sensitive")));
 
   /*
-    ⚠️ ONE STATED EXEMPTION, AND IT CAN ONLY SHRINK. The company's name, address,
-    contact and governing law are the four facts no code can supply — declaring
-    them plausible would make every document look finished while naming a party
-    that does not exist. Filling in `IDENTITY` makes this list empty, and the day
-    it does this assertion has to be edited, on purpose, in review.
+    ⚠️ NOTHING IS MISSING, AND THIS LIST HAS NO EXEMPTIONS IN IT. It carried one
+    for a day — the company's name, address, contact and governing law are the
+    four facts no code can supply, and declaring them plausible would have made
+    every document look finished while naming a party that does not exist. They
+    are declared now, so the exemption is gone rather than tolerated: an empty
+    array is the only shape this assertion has, and anything added to the
+    declaration that breaks a rule fails here rather than being waived.
   */
-  it("has exactly one thing missing, and it is the company's own name", () => {
+  it("has nothing missing from what it promises", () => {
     expect([
       ...missingDocuments(LEGAL.documents, held(), LEGAL.identity),
       ...refuseLegal(LEGAL.documents, LEGAL.processors, held(), sensitiveCovered()),
-    ].map((p) => p.why)).toEqual(["no_entity_named"]);
+    ]).toEqual([]);
+  });
+
+  /*
+    ⚠️ AND THE PARTY IS NAMED IN EVERY DOCUMENT THAT BINDS SOMEBODY, not only in
+    the one where the entity happened to be typed. `whoWeAre` is appended from
+    the single declaration, so an address that moves moves everywhere — and a
+    document demanding agreement while naming no counterparty is not an agreement
+    at all.
+  */
+  it("names the company, where to write and whose law applies, in every document", () => {
+    const who = LEGAL.identity!;
+    for (const doc of Object.values(LEGAL.documents)) {
+      const text = doc.text ?? "";
+      expect(text, doc.id).toContain(who.entity);
+      expect(text, doc.id).toContain(who.contact);
+      expect(text, doc.id).toContain(who.law);
+      expect(text, doc.id).toContain(who.courts);
+    }
   });
 
   /*
