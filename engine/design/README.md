@@ -136,7 +136,7 @@ An engine takes a DECLARATION and produces a result nobody hand-assembles.
 | Directory | What is in it | The test |
 |---|---|---|
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | Does it export VALUES rather than elements? |
-| `scene/` | the ambience engine — seven families, three mark primitives | Is it about what a GROUND is made of? |
+| `scene/` | the ambience engine — eight families, three mark primitives | Is it about what a GROUND is made of? |
 | `frame/` | page, shape, crown, nav, dock, overlays | Does it wrap a screen rather than sit inside one? |
 | `parts/` | rows, cards, lists, controls, the four outcomes | Could an app of any kind use it without explaining? |
 | `rendered/` | surfaces drawn from a kernel declaration | Does it take a *book* and draw the whole thing? |

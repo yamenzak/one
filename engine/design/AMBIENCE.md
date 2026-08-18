@@ -17,7 +17,7 @@ family + seed + settings  →  a ground, a field, and the colour type sits on
 
 - **A FAMILY** declares what a kind of world is made of: named colour SLOTS, a
   GROUND built from them, MARKS (scattered, laid on a lattice, or drawn whole),
-  optional shared `defs`, and the `veil` type sits against. There are seven.
+  optional shared `defs`, and the `veil` type sits against. There are eight.
 - **A SEED** decides which world you get. Same seed, same world, forever — a
   scene is an identity, and `Math.random` appears nowhere in the directory.
 - **SETTINGS** are density and motion. Nothing else.
@@ -40,9 +40,9 @@ multipliers and a bespoke composer. All of it is gone.
 
 ⚠️ **The ratio is the argument.** Each of the twenty-four was one world drawn
 once, so the twenty-fifth was the same afternoon again and none of them could
-vary per workspace at all. Each of the seven is *every* world in its own space.
+vary per workspace at all. Each of the eight is *every* world in its own space.
 
-## The seven families
+## The eight families
 
 `FAMILIES` in `design/src/scene/index.ts` is the whole list, and a family not in it
 is a family nothing can reach.
@@ -59,15 +59,48 @@ The world falls out of what the subject IS — nothing picks it per screen
 | the beat | a twinkle — most of the way out, in 3–5s | a breath — a fifth of a stop, over 13–19s | a quarter TURN, in 47–71s | a breath |
 | the colours | read from its planet | read from its mood | the theme | the theme |
 
-### Three a SCREEN may name
+### Four a SCREEN may name
 
-`glow`, `cloth` and `etch` — plus `loops` and `blobs`, which a screen may name too.
+`glow`, `cloth`, `etch` and `tint` — plus `loops` and `blobs`, which a screen may
+name too.
 
 | family | what it is | reach for it when |
 |---|---|---|
 | **glow** | pure light — three seeded poles and a crush. The only family with no marks at all | most screens. It is what a page wants behind it when it wants anything |
 | **cloth** | a swept field of fine lines, drawn whole, tiling by construction | a premium dark ground; a screen somebody works on for a while |
 | **etch** | ruled geometry — a lattice whose tile draws some subset of its own edges and diagonals | technical: a console, a deployment, monitoring, planning |
+| **tint** | glass: an edge-lit ground carrying a green of its own, under a near-transparent veil | the one card on a screen that is a destination rather than a control |
+
+⚠️ **`tint` IS THE ONE FAMILY THAT BRINGS A COLOUR, AND THAT IS WHY IT IS A
+FAMILY.** This product is MONOCHROME, so `glow` on it is light with no colour in
+it at all and there is no seed of a mono palette that produces a tint. A screen
+wanting one had to write a hue into itself, which `scene.test.mjs` refuses and
+should. The hue is declared once, in `scene/tint.ts`, as a constraint on the
+family rather than a choice at a call site — every world it makes carries the
+same green at a different placement and strength.
+
+⚠️ **AND IT IS BARELY A COLOUR, BUT IT HAS TO BE VISIBLE.** The first pass sat at
+a chroma of 0.06, measured correctly in the variable and could not be seen: a
+low-chroma green at a quarter strength over a near-black ground is a shift of a
+couple of values. Hue is scarce here and a green anybody would call green is a
+second brand, so this is the narrow band where a surface beside a `cloth` one is
+visibly cooler and still not nameable.
+
+⚠️ **ITS PLACEMENT IS OPPOSED BY CONSTRUCTION, AND THE MASK IS WHY.** `MATTE`
+fades every ground out below 62% of its height and hollows an ellipse down the
+reading column, so a ground is only ever SEEN at the top and along the two sides.
+Poles placed freely — and then poles placed at the four corners — both measured
+beautifully in the gradient string and produced a card lit on ONE side, because
+the ones at the bottom were painting into the part of the mask that is not there.
+Both sides are lit in every world; the seed's whole freedom is which of them
+burns. Measured green across the card's top: 12.5 / 6.5 / 11.0 on night,
+11 / 5 / 12 on paper.
+
+⚠️ **AND A WHITENED POLE IS WHAT CARRIES A HUE, NOT A SATURATED ONE.** Measured:
+a whitened pole read 12 points of green above the card's own ground; a pole of
+the raw hue, opposite it, at nominally the same strength, read 2.5 — a
+mid-lightness green at a quarter alpha over a near-black card is almost exactly
+the card. Placement alone does not distribute a tint; the light does.
 
 ```tsx
 <Layout sky="cloth" seedling={`space|${where.at}`}>
@@ -115,7 +148,7 @@ rows of settings.
 same mistake:
 
 - `veil` has not been a family since the engine replaced twenty-four drawn
-  grounds with seven seeded ones. The attribute still matched the ground rules,
+  grounds with seeded ones. The attribute still matched the ground rules,
   because they select on `[data-sky]:not([data-sky="plain"])` rather than on a
   name.
 - `--world-ground` is an INHERITED custom property, so what those rules painted
@@ -445,6 +478,6 @@ consumer of one family wants to differ, that is the change.
   of every beat, and the smear CHANGES as the marks move under it — which is the
   one thing a fixed control must never do. `--scene-veil` publishes the ground's
   own colour, and a chip is the world's hue at the palette's value: separable in
-  both themes, over seven families, with no readback at all.
+  both themes, over every family, with no readback at all.
 - **Twenty-four names.** They are gone from the code, from the type, from the
   gallery and from here. If a screen wants one back, the answer is a seed.

@@ -66,6 +66,34 @@ Read these as tests you can apply to a screenshot without knowing the codebase.
 - **A wire value is not copy.** `comfortable`, `past_due`, `hello` are keys. Say
   "Comfortable", "Payment failed", "Hello".
 
+### A date, a time, a number and a price are said in the reader's conventions
+
+**A stored value printed as it is stored is the database's spelling, shown to
+somebody who told us how they write one.** `2026-08-01` is a `Day`; what the
+reader gets is "1 August 2026", or "01.08.2026", or whatever their account says —
+and the same for `1.234,56` against `1,234.56`, for 24-hour against 12, and for
+kilograms against pounds.
+
+| Instead of | Write |
+|---|---|
+| `{of.version}` | `sayDate(shown, of.version, "long")` |
+| `` `${n.minutes} min · ${n.at}` `` | `` `${n.minutes} min · ${sayDate(shown, n.at, "short")}` `` |
+| `cell: (n) => n.at` | `cell: (n) => <Dated at={n.at} />` |
+| `at.toLocaleDateString("en-US")` | `useShown()` and a `say*` |
+
+`kernel/src/present.ts` is the ONLY file that may build an `Intl` formatter or
+call a `toLocale*`; everything else goes through `useShown()`, the `say*`
+functions, or an element from `said.tsx` (`<Dated>`, `<Clock>`, `<Num>`,
+`<Amount>`, `<Size>`). `scripts/present.test.mjs` refuses all four shapes above,
+and derives the date-shaped field names from the kernel's own `: Day` and
+`: Instant` declarations so the list grows by itself — a hand-kept one had
+already stopped covering `version`.
+
+⚠️ **THE ISO SLICE IS THE ONE THAT DOES NOT LOOK LIKE FORMATTING.**
+`at.slice(0, 10)` is correct for a database key and wrong for a person: it is
+UTC, so it names the wrong day for anybody whose evening is another date. `dayOf`
+for a key, `dayIn` for a person.
+
 ---
 
 ## 3. Where a thing lives
@@ -150,6 +178,16 @@ where there IS a nav, the nav takes the act: `Island.act`, arriving through the
 crown socket the screen already publishes itself through. The bar then carries
 the destinations as glyphs and the act as the one thing wearing a word, because
 the crown says where you are and the bar is at the thumb.
+
+⚠️ **A PINNED BAR THAT TRAVELS MUST CLIP THE TRAVEL, OR THE PAGE MOVES ON ITS
+OWN.** A transformed box still counts toward the document's scrollable overflow,
+so a `sticky bottom-0` nav translated out of the way makes the page taller by its
+own height while it is gone and shorter again when it returns — and at the foot
+of a long page that shrink is a CLAMP, so the scroll jumps upward with nobody
+touching it. The nav carries `overflow-clip` and the transform sits on the bar
+inside it, because clipping cannot help an element against its own transform.
+`scripts/motion.test.mjs` refuses the shape. It is invisible until a page is long
+enough to reach the bottom of, which is why it shipped.
 
 ⚠️ **THAT RULE SURVIVED BEING OVERRIDDEN, WHICH IS THE BEST EVIDENCE FOR IT.**
 For one day a product screen rendered both, stacked, the dock lifted onto the nav
@@ -429,6 +467,23 @@ One button inside a card is a button with a box drawn round it — put it where 
 belongs: in the crown, at the end of the row it acts on, or under the block it
 finishes.
 
+**And never put a card inside a card.** Not a style rule — an arithmetic one.
+Every card is `CARD_ROWS` (`px-4 py-3`) and every row is `ROW.pad` (`py-3`), so
+the space from the card's edge to its first line is 12 + 12 = 24, exactly what
+sits between two rows. Two cards make it 48, and because they are the same
+colour what somebody SEES is one card whose first row starts twice as far down
+as every other card in the product — which reads as a spacing fault in the row.
+It shipped on the legal screen for exactly that reason, with every suite green.
+
+⚠️ **IT IS THE LIBRARY'S PROBLEM, NOT THE SCREEN'S, BECAUSE IT ARRIVES FROM TWO
+CORRECT DECISIONS.** A rendered list owns a `Group` so it can stand on a screen
+alone; a screen owns a `Group` so it can head the block. Neither is wrong and
+their composition is the defect, so a nested `Group` now renders its rows into
+the card it is already in. It stands down rather than throwing because the
+nestings this codebase actually has are a waiting state or a rendered list inside
+a card — `RowsWaiting` under an `Await`, a `Listing` inside a section — and each
+of those wants precisely that.
+
 **Charts are part of the vocabulary and are barely used.** `@engine/design/chart`
 ships nine chart forms, five figure blocks and four round ones, with the rule for
 picking between them written at the top of the file. Anywhere the product shows a
@@ -464,6 +519,44 @@ between two rows against 4px inside one, and a six-to-one ratio already says
 edge in a product that banned borders and shadows everywhere else, and it was
 asymmetric — inset past the glyph on the left, flush to the card on the right —
 which is what made every list look hand-assembled.
+
+**A press is the card's width, not the text's.** A row is `px-0` because the card
+owns the gutter, so a pressed fill drawn on the row stopped 16px short of the
+card on both sides — a shape floating INSIDE the card with no relationship to it,
+which is what "it sticks to the content" describes. `ROW.press` pulls the fill
+back out to the card's own edges. Note the two things that make it work and are
+each one edit from being wrong: the row must DROP `w-full` (it wins on the same
+property at the same specificity, so the negative margin shifts the row left
+instead of widening it), and the width is spelled `w-[calc(100%_+_2rem)]` because
+CSS needs whitespace around the `+` and Tailwind spells that `_`.
+
+### Every mark animates, and it animates as its purpose
+
+**A bell rings by its clapper. A calendar turns its days over. Leaving is the
+arrow leaving, and the door stays put.** A rotate, a nudge or a scale on the
+whole glyph is the cheap version and it shows: rotating a bell is a picture of a
+bell being moved, not a bell ringing. The motion is in the icon's PARTS, at
+`DURATION.stately`, and no amount of easing on the outside produces it.
+
+- **The registry is the only door.** `glyphOf(name)` wraps every mark in `Glyph`,
+  which carries the character and both reduced-motion opt-outs. A component
+  importing an icon straight from lucide gets none of that, and gets it silently
+   — the difference is only visible to somebody who presses it.
+- **Every mark is accounted for.** A name with an entry in `LIVELY` moves; one in
+  `STILL` deliberately does not. A mark in neither is indistinguishable from one
+  somebody forgot, so `scripts/glyphs.test.mjs` refuses it.
+- **A mark whose motion is inside it is drawn here.** `parts/marks.tsx` — 24×24,
+  `currentColor`, stroke 2, round caps, the same skeleton lucide uses, with the
+  moving parts named by `data-part`. Selecting `svg > path:nth-child(2)` animates
+  whatever the library happens to put second and silently animates the wrong
+  thing the day it redraws the icon.
+
+**One hue is a convention rather than a choice, and it is the seal.** This theme
+is monochrome — `info` resolves to a grey — so a "verified" tick drawn in the
+theme's own colours is the same value as the words beside it and reads as
+decoration. `AgreedMark` carries its own blue, in one place, because verified is
+blue everywhere anybody has seen it. If a second thing ever needs it, that is
+when it becomes a token; not before.
 
 ### Faces
 
@@ -591,6 +684,17 @@ Some of this is guarded and some is judgement. What is checked today:
   declared destination (a mark, a line saying what is behind it, an explicit
   order); a level lists its pages rather than stacking them; and an authority is
   a screen rather than a tab.
+- `cards` — only `surfaces.tsx` builds a `<Card`, and every one of them names
+  `CARD_ROWS`, so a card's inset is one number rather than a component's opinion.
+- `glyphs` — every mark in the registry is animated or deliberately still, and
+  no screen draws a registered mark itself.
+- `present` — one file builds an `Intl`; nothing slices an instant into a day;
+  no surface pins a locale; and no screen prints a stored date as it is stored.
+- `motion` — one set of curves and roles, reduced motion answered, and no pinned
+  element whose travel changes the page's height.
+- `doors` — a screen the account door renders decides for itself which door it
+  is on, in its own file. A helper somewhere in the import closure satisfying the
+  check is not a weaker check; it is no check.
 
 What is **not** checked, and is therefore on the person writing the screen:
 placement, density, whether a screen is doing two jobs, and whether the reader
