@@ -29,6 +29,7 @@ import { Spacer, Stack } from "../parts/arrange.js";
 import type { Sky } from "../tokens/ambience.js";
 import { ONE_FACE, worldFor } from "../parts/face.js";
 import { Lockup } from "../parts/logo.js";
+import { useReading } from "./reading.js";
 
 /* ------------------------------------------------------------------- mark --- */
 
@@ -308,16 +309,9 @@ export function Arrival({ name, claim, children, aside, sky, brand }: {
               sign up could not read them first, which is the one moment they are
               actually for. A prop the caller passes is a prop three of four doors
               would eventually be missing.
-
-              ⚠️ A REAL ANCHOR, FOR THE SAME REASON `AsideRoute` USES ONE: these
-              pages are served by the worker rather than drawn by the app, so it
-              is a page load either way and this buys middle-click and a status
-              bar for free.
             */}
             <div {...ARRIVE_RISE} style={doorAt(4)}>
-              <a className={`${TYPE.note} underline underline-offset-4`} href={LEGAL_INDEX}>
-                Terms, privacy and the rest
-              </a>
+              <LegalLine />
             </div>
           </Stack>
         </div>
@@ -362,5 +356,35 @@ export function AsideRoute({ says, label, href, onDo, isDisabled }: {
         {href ? <Link.Icon /> : null}
       </Link>
     </p>
+  );
+}
+
+/**
+ * THE LINE OF SMALL PRINT AT THE FOOT OF A DOOR.
+ *
+ * ⚠️ A SHEET WHERE THE APP CAN OPEN ONE, A LINK WHERE IT CANNOT. Reading the
+ * terms from a sign-in screen must not cost somebody the sign-in screen — an
+ * anchor there is a full page load away from a half-typed address and back
+ * through the whole boot, which is a working link doing the wrong thing.
+ *
+ * ⚠️ AND THE ANCHOR IS THE FALLBACK RATHER THAN THE ABSENCE. A deployment that
+ * provides no reader still publishes the documents at a real address, so the
+ * worst case is a page load and never a dead end.
+ */
+export function LegalLine() {
+  const reading = useReading();
+  const says = "Terms, privacy and the rest";
+  const look = `${TYPE.note} underline underline-offset-4`;
+
+  /* ⚠️ THE SAME COMPONENT EITHER WAY, so the two shapes cannot look different.
+     `Link` with `onPress` and no `href` is the library's own way to say "reads
+     like a link, does not travel" — which is exactly what a sheet is. */
+  return (
+    <Link
+      className={look}
+      {...(reading ? { onPress: () => { reading.read(); } } : { href: LEGAL_INDEX })}
+    >
+      {says}
+    </Link>
   );
 }

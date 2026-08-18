@@ -388,7 +388,6 @@ describe("what somebody who has not agreed can do", () => {
     const out = await at("/api/me.agreements", { headers: { cookie: owner } });
     const said = await out.json() as {
       readonly owed: readonly { id: string; title: string; version: string; url: string | null }[];
-      readonly documents: readonly { id: string; text: string | null }[];
     };
     expect(said.owed.length).toBeGreaterThan(0);
 
@@ -404,10 +403,24 @@ describe("what somebody who has not agreed can do", () => {
       expect(body, doc.id).toContain(`Version ${doc.version}`);
     }
 
-    /* ⚠️ AND THE SHEET INSIDE THE APP READS THE SAME WORDS FROM THIS READ, so a
-       document reachable at its own address and empty here is half a fix. */
-    for (const doc of said.owed) {
-      expect(said.documents.find((d) => d.id === doc.id)?.text, doc.id).toBeTruthy();
+  });
+
+  /*
+    ⚠️ AND THE SHEET INSIDE THE APP READS THEM WITH NO SESSION AT ALL, because
+    the sign-in door has nobody to ask as and reading the terms there must not
+    cost somebody the sign-in door. `legal.list` is the one carrier of the words
+    — `me.agreements` says what is still OWED, which is a different question with
+    a different answer per person.
+  */
+  it("hands the words to somebody who is not signed in", async () => {
+    const out = await at("/api/legal.list");
+    expect(out.status).toBe(200);
+    const said = await out.json() as {
+      readonly documents: readonly { id: string; title: string; text: string | null }[];
+    };
+    expect(said.documents.length).toBeGreaterThan(0);
+    for (const doc of said.documents) {
+      expect(doc.text, doc.id).toBeTruthy();
     }
   });
 

@@ -8,9 +8,11 @@
  * what `PUBLIC` means in the kernel and what this lane is.
  *
  * ⚠️ AND IT IS NOT A HOLE. Every operation here still requires a session except
- * the two that create one, and neither of those grants anything: one sends a
- * code to an address, the other exchanges a code for a session as whoever owns
- * that address. Nothing in this lane takes an account id from a caller.
+ * the two that create one and the one that reads the deployment's published
+ * documents. None of the three grants anything: one sends a code to an address,
+ * one exchanges a code for a session as whoever owns that address, and one
+ * answers with text the worker already serves to anybody at `/legal/<id>`.
+ * Nothing in this lane takes an account id from a caller.
  *
  * ⚠️ LEAVING IS ALWAYS ALLOWED. This lane is deliberately outside the standing
  * gate: a workspace in arrears must not be a trap, and paying has to be a way
@@ -73,7 +75,12 @@ export interface PersonalCtx {
 
 export interface PersonalOp {
   readonly kind: "read" | "write";
-  /** ⚠️ `nobody` is only for the two operations that create a session. */
+  /**
+   * ⚠️ `nobody` IS FOR WHAT SOMEBODY DOES BEFORE THEY ARE ANYBODY HERE — the two
+   * operations that create a session, and reading the documents they are about
+   * to be asked to agree to. Nothing on this setting takes an account id from a
+   * caller, and nothing on it answers with anything belonging to a person.
+   */
   readonly needs: "session" | "nobody";
   /** Which doors it answers on. A workspace is not where a workspace is made. */
   readonly doors?: readonly Door["kind"][];
@@ -225,20 +232,15 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
         if (!ctx.session) return ctx.fail("platform.unauthorized");
         return {
           /*
-            ⚠️ THE WORDS COME WITH IT, AND THAT IS THE WHOLE READ. A list of
-            titles and a link is what this answered before, and it left the
-            consent screen with nothing to show but a new tab — which loaded the
-            app, which drew the consent screen again. This is the operation the
-            wall must never refuse, so it is the operation that carries the text.
-
-            ⚠️ AND IT IS THIS ONE RATHER THAN THE BOOT READ. `owed` is computed
-            on every operation the deployment answers; putting three legal
-            documents on it would put them on every response of every screen.
+            ⚠️ THE BOOK, WITHOUT THE WORDS — `legal.list` carries those, publicly,
+            and it is the only thing that does. Two carriers of one wording is
+            two renderings that agree until somebody edits one, which is the
+            fault this whole area is a catalogue of. What this read is FOR is
+            what is still owed by whoever is asking, which needs a session.
           */
           documents: Object.values(deps.documents ?? {}).map((d) => ({
             id: d.id, kind: d.kind, title: d.title, version: d.version,
-            url: legalUrlOf(d), text: d.text ?? null,
-            mustAccept: d.mustAccept, binds: d.binds,
+            url: legalUrlOf(d), mustAccept: d.mustAccept, binds: d.binds,
           })),
           owed: deps.owed ? await deps.owed(ctx) : [],
         };
@@ -276,6 +278,36 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
           return ctx.fail("platform.forbidden");
         }
         return { document: id, version };
+      },
+    },
+
+    /*
+      ⚠️ THE DOCUMENTS THEMSELVES, TO ANYBODY, WITH NO SESSION AT ALL. Deciding
+      whether to agree is what somebody does BEFORE they are anybody here — so
+      the sign-in door has to be able to show the terms without sending the
+      person away from it, and it has nobody to ask as.
+
+      ⚠️ IT IS NOT A NEW EXPOSURE. These are the same bytes the worker already
+      serves unauthenticated at `/legal/<id>`; what this adds is a shape a sheet
+      can render, so reading them is not a full page load away from whatever the
+      person was doing. That page stays: it is the address the documents are
+      published at, and a link somebody can send.
+
+      ⚠️ AND IT IS THE ONE CARRIER OF THE WORDS. `me.agreements` says what is
+      still OWED, which needs a session; this says what the documents SAY, which
+      does not. Two reads carrying one wording is two renderings that agree until
+      somebody edits one.
+    */
+    "legal.list": {
+      kind: "read", needs: "nobody", beforeAccepting: true,
+      async run(): Promise<unknown> {
+        return {
+          documents: Object.values(deps.documents ?? {}).map((d) => ({
+            id: d.id, kind: d.kind, title: d.title, version: d.version,
+            url: legalUrlOf(d), text: d.text ?? null,
+            mustAccept: d.mustAccept, binds: d.binds,
+          })),
+        };
       },
     },
 

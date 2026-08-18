@@ -7,6 +7,7 @@ import {
 } from "@engine/design";
 import "./styles.css";
 import { App } from "./App.js";
+import { Reading } from "./legal.js";
 import { SessionProvider } from "./session.js";
 
 /**
@@ -72,7 +73,12 @@ if (!root) throw new Error("no #root to mount OneSpace into");
 createRoot(root).render(
   <StrictMode>
     <SessionProvider>
-      <App />
+      {/* ⚠️ ABOVE EVERY DOOR AND EVERY SCREEN, so the terms can be read from the
+          sign-in screen without costing somebody the sign-in screen — see
+          `legal.tsx`. It reads nothing until something asks it to open. */}
+      <Reading>
+        <App />
+      </Reading>
     </SessionProvider>
   </StrictMode>,
 );

@@ -166,12 +166,12 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 |---|---|---|
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 56 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | internal |
-| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 48 |
+| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 52 |
 | `parts/` | rows, cards, lists, controls, the four outcomes | 122 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**318 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**322 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -185,11 +185,12 @@ there is no deep import, and a guard says so.
 
 ### `frame/`
 
-- `frame/arrival.tsx` — `Arrival`, `AsideRoute`, `Mark`, `MarkSize`
+- `frame/arrival.tsx` — `Arrival`, `AsideRoute`, `LegalLine`, `Mark`, `MarkSize`
 - `frame/chrome.tsx` — `Docked`, `Island`
 - `frame/crown.tsx` — `Crown`, `CrownClaim`, `crownFor`, `CrownProps`, `CrownSocketProvider`, `LeaveChip`, `PageCrown`, `Slot`, `useCrownSocket`
 - `frame/overlay.tsx` — `Confirm`, `Dialog`, `Menu`, `MenuItem`, `notice`, `NoticeHost`, `Over`, `Peek`, `Tray`
 - `frame/page.tsx` — `Band`, `BandProps`, `Bleed`, `Page`, `PageProps`, `useNight`, `useScenery`
+- `frame/reading.tsx` — `Reading`, `ReadingProvider`, `useReading`
 - `frame/screen.tsx` — `Act`, `Board`, `Frame`, `Framed`, `Layout`, `LayoutProps`, `Screen`, `ScreenProps`, `Shape`, `Tile`, `Whichever`
 - `frame/shell.tsx` — `CrownInfo`, `GLYPH_NAMES`, `glyphOf`, `reachable`, `Shell`, `ShellProps`
 

@@ -467,6 +467,13 @@
       "proof": null
     },
     {
+      "id": "legal.list",
+      "kind": "read",
+      "needs": "nobody",
+      "doors": null,
+      "proof": null
+    },
+    {
       "id": "me.code",
       "kind": "write",
       "needs": "nobody",

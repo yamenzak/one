@@ -130,6 +130,7 @@ they are in, leaving one, taking a copy, deleting themselves.
 |---|---|---|---|
 | `me.agreements` | read | session | *every door* |
 | `me.accept` | write | session | *every door* |
+| `legal.list` | read | **nobody** | *every door* |
 | `me.code` | write | **nobody** | *every door* |
 | `me.session` | write | **nobody** | *every door* |
 | `me.signout` | write | session | *every door* |
