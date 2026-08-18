@@ -33,9 +33,30 @@ name: OneEngine
 # keys live encrypted in the directory under `CONFIG_SECRET`, which this workflow
 # has no way to read — so a repository compromise yields no live merchant
 # credential, and rotating one is a form rather than a code push.
+#
+# ── Why `main` is not a push trigger, and why this file is on it anyway ──────
+#
+# ⚠️ THIS FILE HAS TO EXIST ON THE DEFAULT BRANCH OR NOBODY CAN RUN IT. GitHub
+# only offers "Run workflow" for a workflow present on the default branch, and
+# provisioning is `workflow_dispatch` only — deliberately, because creating a
+# database is not something a push should do. So the file is on `main`.
+#
+# ⚠️ BUT `main` HOLDS NO `engine/` YET. The gate's first step reads
+# `engine/scripts/inert.test.mjs`, so a push-triggered run there would fail on a
+# missing directory — permanently red on the default branch, which is where a
+# real failure goes to hide. The branch that HAS the engine is the branch that
+# builds it.
+#
+# ⚠️ A DISPATCH RUNS THE FILE FROM THE REF IT IS GIVEN, so choosing
+# `claude/quad` in the dialog runs that branch's full gate against that branch's
+# tree. The copy on `main` is what makes the button exist; it is not what runs.
+#
+# The day the engine merges to `main`, this list becomes `[main]` and the line
+# below it goes away with the branch. It is one edit, and it is the same edit the
+# deploy job's own note already anticipates.
 on:
   push:
-    branches: [main, claude/quad]
+    branches: [claude/quad]
     paths:
       - "engine/**"
       - ".github/workflows/engine.yml"
