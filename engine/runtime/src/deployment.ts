@@ -23,7 +23,9 @@
  */
 
 import type { AppSpec, DeploymentLegal, PackDef, PlanSpec } from "@engine/kernel";
-import { entitlementKeys, holdingsOf, missingDocuments, refuseCatalog, refusePacks } from "@engine/kernel";
+import {
+  entitlementKeys, holdingsOf, missingDocuments, refuseCatalog, refuseLegal, refusePacks,
+} from "@engine/kernel";
 import { incoherent, unledgered } from "./dossier.js";
 import { unbound, type Env } from "./handles.js";
 import { unreachableByErasure } from "./records.js";
@@ -118,6 +120,22 @@ export function deploymentFaults(of: Deployment): readonly string[] {
     const held = of.apps.flatMap((a) => holdingsOf(a));
     for (const p of missingDocuments(of.legal.documents, held)) {
       out.push(`${p.why}: ${p.detail}`);
+    }
+    /*
+      ⚠️ AND THE DEPLOYMENT'S OWN BOOK GOES THROUGH THE SAME RULES AS AN APP'S,
+      WHICH IT DID NOT. `refuseLegal` was reached from `refuseManifest` alone, so
+      every rule in it — including the one refusing a document that demands
+      agreement with nothing to read — was asked of every app's documents and of
+      none of the deployment's. The deployment's are the three everybody on every
+      product is stopped by, so it was the one book where the rule mattered and
+      the one book nobody asked.
+    */
+    for (const p of refuseLegal(
+      of.legal.documents, of.legal.processors, held,
+      of.apps.some((a) => Object.values(a.purposes ?? {})
+        .some((x) => x.holdings.includes("sensitive"))),
+    )) {
+      out.push(`legal ${p.of}: ${p.why} — ${p.detail}`);
     }
   }
 

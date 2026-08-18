@@ -24,7 +24,8 @@ import type {
   Resolved as _Resolved, Roots, Standing,
 } from "@engine/kernel";
 import {
-  IN_GOOD_STANDING, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, check, doorFor, newId, problem,
+  IN_GOOD_STANDING, LEGAL_PATH, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, check, doorFor, newId,
+  passagesOf, problem,
 } from "@engine/kernel";
 import { compose, type Composed, type Resolved as ResolvedOp } from "./compose.js";
 import { tell } from "./dispatch.js";
@@ -271,8 +272,12 @@ export const isPlatformPath = (pathname: string): boolean =>
  * ⚠️ AND IT NEEDS NO SESSION, ON ANY DOOR. Deciding whether to agree is a thing
  * somebody does BEFORE they are anybody here, and a term nobody can read without
  * first accepting the terms is not a term that was offered.
+ *
+ * ⚠️ THE PATH IS THE KERNEL'S (`LEGAL_PATH`, `legalUrlOf`) AND NOT THIS FILE'S,
+ * because the link on the consent screen is derived from the same rule. A
+ * constant here and a string there is how the screen came to point at a route
+ * this worker does not answer.
  */
-export const LEGAL_PATH = "/legal/";
 
 /** ⚠️ Anything from a declaration is somebody's text, and it goes into a page. */
 const safe = (text: string): string => text
@@ -308,14 +313,11 @@ function legalPage(doc: DocumentDef, root: string): string {
 </head><body>
 <h1>${safe(doc.title)}</h1>
 <p class="v">Version ${safe(String(doc.version))}</p>
-${(doc.text ?? "").trim().split(/\n{2,}/).map((para) => {
-    const line = para.trim();
-    /* ⚠️ A LEADING `#` IS A HEADING, and that is the whole of the formatting.
-       A markdown library for two shapes is a dependency for two shapes. */
-    return line.startsWith("# ")
-      ? `<h2>${safe(line.slice(2))}</h2>`
-      : `<p>${safe(line)}</p>`;
-  }).join("\n")}
+${/* ⚠️ CUT BY THE KERNEL'S RULE, which is also what the sheet inside the app
+      renders — one wording cannot come out as two documents. */
+  passagesOf(doc.text ?? "")
+    .map((p) => (p.heading ? `<h2>${safe(p.text)}</h2>` : `<p>${safe(p.text)}</p>`))
+    .join("\n")}
 </body></html>`;
 }
 

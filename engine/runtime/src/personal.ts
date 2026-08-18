@@ -19,7 +19,8 @@
 
 import type { AccountId, AppSpec, DocumentBook, Door, TenantId } from "@engine/kernel";
 import {
-  foundingAppRole, newId, permissionsFor, residencyFor, slugOk, slugTaken, wouldStrand,
+  foundingAppRole, legalUrlOf, newId, permissionsFor, residencyFor, slugOk, slugTaken,
+  wouldStrand,
 } from "@engine/kernel";
 import {
   appsOfTenant, becomeCommercial, closeTenant, createTenant, forgetInvitation, invitationsFor,
@@ -223,9 +224,21 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
       async run(ctx): Promise<unknown> {
         if (!ctx.session) return ctx.fail("platform.unauthorized");
         return {
+          /*
+            ⚠️ THE WORDS COME WITH IT, AND THAT IS THE WHOLE READ. A list of
+            titles and a link is what this answered before, and it left the
+            consent screen with nothing to show but a new tab — which loaded the
+            app, which drew the consent screen again. This is the operation the
+            wall must never refuse, so it is the operation that carries the text.
+
+            ⚠️ AND IT IS THIS ONE RATHER THAN THE BOOT READ. `owed` is computed
+            on every operation the deployment answers; putting three legal
+            documents on it would put them on every response of every screen.
+          */
           documents: Object.values(deps.documents ?? {}).map((d) => ({
             id: d.id, kind: d.kind, title: d.title, version: d.version,
-            url: d.url ?? null, mustAccept: d.mustAccept, binds: d.binds,
+            url: legalUrlOf(d), text: d.text ?? null,
+            mustAccept: d.mustAccept, binds: d.binds,
           })),
           owed: deps.owed ? await deps.owed(ctx) : [],
         };

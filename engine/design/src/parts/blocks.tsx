@@ -16,8 +16,9 @@ import {
   Accordion, Breadcrumbs, Button, Disclosure, Kbd, ProgressCircle, Tabs, type KbdKey,
 } from "@heroui/react";
 import { Check } from "lucide-react";
+import { passagesOf } from "@engine/kernel";
 import {
-  NUDGE, SPACE,
+  NUDGE, SPACE, WIDTH,
 } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 
@@ -247,6 +248,40 @@ export function Crumbs({ trail }: {
         </Breadcrumbs.Item>
       ))}
     </Breadcrumbs>
+  );
+}
+
+/* --------------------------------------------------------------- document --- */
+
+/**
+ * A WHOLE TEXT, SET RATHER THAN DUMPED — terms, a notice, a policy.
+ *
+ * ⚠️ THE ONE PLACE A WALL OF WORDS IS THE POINT. Everything else in this system
+ * fights prose: a refusal is a sentence, a row is a line, the copy rule is short
+ * and actionable. A document somebody is asked to AGREE to is the exception — it
+ * has to be readable end to end, so it gets a measure, a rhythm, and headings
+ * that can be found while scrolling.
+ *
+ * ⚠️ `Prose` IS ONE PARAGRAPH THE CALLER WROTE; this is many the deployment
+ * declared. Different jobs, and the split is why this one takes a string rather
+ * than children — the text arrives from a declaration or an operation, never as
+ * markup somebody assembled.
+ *
+ * ⚠️ AND THE CUTTING IS THE KERNEL'S (`passagesOf`), NOT THIS COMPONENT'S. The
+ * same text is served as a standalone page by the worker, for anybody reading it
+ * without the app open; two ideas of what a paragraph is would be two documents.
+ */
+export function Document({ text }: { readonly text: string }) {
+  return (
+    <div className={`flex flex-col ${SPACE.snug} ${WIDTH.read}`}>
+      {passagesOf(text).map((p, i) => (p.heading
+        /* ⚠️ AIR ABOVE A HEADING AND NOT BELOW IT — the space is what says the
+           paragraph under it belongs to it. Never on the first, where it would
+           open the document with a gap. */
+        ? <h2 key={i} className={`${TYPE.section} ${i === 0 ? "" : NUDGE.over}`}>{p.text}</h2>
+        : <p key={i} className={TYPE.body}>{p.text}</p>
+      ))}
+    </div>
   );
 }
 

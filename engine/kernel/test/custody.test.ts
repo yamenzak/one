@@ -14,7 +14,10 @@ import {
   refuseRead, refuseVault, discloseVault, consented, live, strayFacts,
   type Consent, type VaultGrant,
 } from "../src/vault.js";
-import { refuseLegal, missingDocuments, ropa, outstanding, type Acceptance } from "../src/legal.js";
+import {
+  legalUrlOf, refuseLegal, missingDocuments, ropa, outstanding, type Acceptance,
+} from "../src/legal.js";
+import { passagesOf } from "../src/primitives.js";
 import { settle, estimate, plan, charged, refusePacks, unbounded, THINKING_HEADROOM } from "../src/credit.js";
 import { refuseTheme, refuseSurfaces, contrast, OURS } from "../src/brand.js";
 import { field, refuseField } from "../src/field.js";
@@ -224,6 +227,47 @@ describe("the record and the documents", () => {
     expect(refuseLegal({ t: { ...base, url: "https://example.test/t" } }, {}, [], false)).toEqual([]);
     /* ⚠️ And whitespace is not words. */
     expect(refuseLegal({ t: { ...base, text: "   " } }, {}, [], false).length).toBe(1);
+  });
+
+  /*
+    ⚠️ WHERE A DOCUMENT IS READ IS DERIVED FROM IT, AND THAT IS THE FIX FOR THE
+    WHOLE CLASS. The address was typed beside the text and the two drifted the
+    first time either moved: the words went INTO the document, the url came out,
+    and the consent screen went on opening whatever `url` still said — which was
+    nothing, so it opened the app, which drew the consent screen again.
+  */
+  it("addresses a document it holds the words of, and links one it does not", () => {
+    const base = { id: "t", kind: "terms" as const, title: "T", version: "2026-08-01" as Day,
+      mustAccept: true, binds: "person" as const };
+    expect(legalUrlOf({ ...base, text: "What you agree to." })).toBe("/legal/t");
+    expect(legalUrlOf({ ...base, url: "https://example.test/t" })).toBe("https://example.test/t");
+    /* ⚠️ OURS WINS WHEN THERE ARE BOTH, because the route answers on exactly the
+       condition this branch tests — a document linked away while we hold the
+       words somebody was asked to agree to is two wordings, one signature. */
+    expect(legalUrlOf({ ...base, text: "Words.", url: "https://example.test/t" })).toBe("/legal/t");
+    /* ⚠️ And nothing to read is `null`, never a path that answers nothing. */
+    expect(legalUrlOf(base)).toBe(null);
+    expect(legalUrlOf({ ...base, text: "  " })).toBe(null);
+  });
+
+  /*
+    ⚠️ ONE CUT, BECAUSE THE SAME TEXT IS DRAWN TWICE — as a standalone page by
+    the worker, and in a sheet inside the app. Two ideas of what a paragraph is
+    would be two documents with one version between them.
+  */
+  it("cuts a document into paragraphs and headings, and nothing else", () => {
+    expect(passagesOf("# Scope\n\nWhat we do.\n\nAnd what we do not.")).toEqual([
+      { heading: true, text: "Scope" },
+      { heading: false, text: "What we do." },
+      { heading: false, text: "And what we do not." },
+    ]);
+    /* ⚠️ A single newline is a wrapped line, not a new paragraph — a document
+       hard-wrapped in the source must not come out as one paragraph per line. */
+    expect(passagesOf("One line\nand its continuation.")).toEqual([
+      { heading: false, text: "One line\nand its continuation." },
+    ]);
+    /* ⚠️ Nothing in is nothing out, rather than one empty paragraph. */
+    expect(passagesOf("   ")).toEqual([]);
   });
 
   /* ⚠️ Every row of the record comes from a declaration; a hand-written half is

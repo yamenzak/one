@@ -365,6 +365,50 @@ describe("what somebody who has not agreed can do", () => {
   });
 
   /*
+    ⚠️ AND THE ADDRESS IT REPORTS IS ONE THIS DEPLOYMENT ANSWERS. This is the
+    check that was missing, and its absence cost the entire wall: the declaration
+    carried a url, nothing served that path, the request fell through to the
+    page, the page booted, found the document unaccepted and drew the wall again
+    — so the only way to read what was being asked led straight back to being
+    asked. Every rule around it passed. The link was declared, the documents
+    existed, the gate worked.
+
+    ⚠️ IT FOLLOWS THE LINK RATHER THAN INSPECTING IT, which is the whole
+    difference. Asserting that the url is a string, or that it starts with
+    `/legal/`, is the check that already existed in spirit — and it is satisfied
+    by a path nothing routes.
+
+    ⚠️ AND IT ASKS WITH NO SESSION, because deciding whether to agree is what
+    somebody does BEFORE they are anybody here.
+  */
+  it("serves every document it asks somebody to agree to", async () => {
+    const out = await at("/api/me.agreements", { headers: { cookie: owner } });
+    const said = await out.json() as {
+      readonly owed: readonly { id: string; title: string; version: string; url: string | null }[];
+      readonly documents: readonly { id: string; text: string | null }[];
+    };
+    expect(said.owed.length).toBeGreaterThan(0);
+
+    for (const doc of said.owed) {
+      expect(doc.url, doc.id).toBeTruthy();
+      const page = await at(doc.url!);
+      expect(page.status, doc.id).toBe(200);
+      expect(page.headers.get("content-type"), doc.id).toContain("text/html");
+      /* ⚠️ THE WORDS, NOT MERELY A 200. The page this used to reach answered 200
+         as well — it was the app, which is what made the fault invisible. */
+      const body = await page.text();
+      expect(body, doc.id).toContain(doc.title);
+      expect(body, doc.id).toContain(`Version ${doc.version}`);
+    }
+
+    /* ⚠️ AND THE SHEET INSIDE THE APP READS THE SAME WORDS FROM THIS READ, so a
+       document reachable at its own address and empty here is half a fix. */
+    for (const doc of said.owed) {
+      expect(said.documents.find((d) => d.id === doc.id)?.text, doc.id).toBeTruthy();
+    }
+  });
+
+  /*
     ⚠️ AND THE COLLEAGUE IS NOT ASKED TO SIGN THE BUSINESS'S AGREEMENT. They
     agreed to the terms as a person; the data-processing agreement binds a
     company they do not run, so asking them for it is a wall with no door in it —

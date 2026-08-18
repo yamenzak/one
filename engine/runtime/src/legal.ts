@@ -19,7 +19,7 @@
  */
 
 import type { AccountId, Acceptance, DocumentBook, DocumentDef, TenantId } from "@engine/kernel";
-import { newId, outstanding } from "@engine/kernel";
+import { legalUrlOf, newId, outstanding } from "@engine/kernel";
 import type { SchemaModule } from "./schema.js";
 import type { Db } from "./sql.js";
 
@@ -125,6 +125,11 @@ export interface Owed {
   readonly title: string;
   readonly kind: string;
   readonly version: string;
+  /**
+   * ⚠️ WHERE TO READ IT, DERIVED (`legalUrlOf`) — never copied from the
+   * declaration. Copying it is what put a dead link on the one screen nobody
+   * can get past.
+   */
   readonly url: string | null;
   /** Where it is asked: the person, or the workspace they are opening. */
   readonly binds: DocumentDef["binds"];
@@ -163,7 +168,7 @@ export async function owedBy(
 
   const say = (d: DocumentDef, appId: string | null): Owed => ({
     id: d.id, title: d.title, kind: d.kind, version: d.version,
-    url: d.url ?? null, binds: d.binds, appId,
+    url: legalUrlOf(d), binds: d.binds, appId,
   });
 
   /* The person's own, wherever they are. */

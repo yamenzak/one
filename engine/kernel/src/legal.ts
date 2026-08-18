@@ -59,6 +59,28 @@ export interface DocumentDef {
 
 export type DocumentBook = Readonly<Record<string, DocumentDef>>;
 
+/** ⚠️ Where a document carrying its own text is answered — see `legalUrlOf`. */
+export const LEGAL_PATH = "/legal/";
+
+/**
+ * WHERE A DOCUMENT IS READ, DERIVED FROM THE DOCUMENT.
+ *
+ * ⚠️ NEVER TYPED BESIDE IT, WHICH IS EXACTLY WHAT WENT WRONG. The declaration
+ * carried `url: "/legal/terms"` while nothing answered that path; the text later
+ * moved INTO the document and the url was dropped — and the consent screen went
+ * on opening whatever `url` still said, which by then was nothing. So it opened
+ * the app, which booted, found the document unaccepted, and drew the consent
+ * screen again. One rule in one place is what makes the link and the route
+ * unable to disagree.
+ *
+ * ⚠️ AND OUR OWN TEXT WINS OVER A DECLARED URL, because the route answers on
+ * exactly the condition this branch tests. A document with both would otherwise
+ * be linked somewhere this deployment does not control while holding the words
+ * it was actually asked to agree to.
+ */
+export const legalUrlOf = (d: DocumentDef): string | null =>
+  d.text?.trim() ? `${LEGAL_PATH}${d.id}` : (d.url ?? null);
+
 export interface Acceptance {
   readonly document: string;
   readonly version: Day;

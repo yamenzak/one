@@ -349,7 +349,7 @@ and a manifest that does not compose refuses to boot.
 <!-- generated: node scripts/inventory.mjs declares -->
 | Module | What it is for | Ships | Waiting |
 |---|---|---|---|
-| `primitives` | ids, days, instants, slugs — the words everything else is spelled in | 9 | — |
+| `primitives` | ids, days, instants, slugs — the words everything else is spelled in | 10 | — |
 | `infra` | what a product needs underneath it, and what each kind can promise | 10 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 8 | — |
 | `collection` | what a thing an app keeps is — and the six operations it gets for free | 13 | — |
@@ -369,7 +369,7 @@ and a manifest that does not compose refuses to boot.
 | `problem` | the one refusal shape, and the platform's own catalogue | 6 | — |
 | `tone` | the voice — the rules a written string has to pass | 1 | — |
 | `vault` | the facts that are not an app's to keep (D11) | 8 | — |
-| `legal` | documents, purposes, sub-processors, the record of processing | 5 | — |
+| `legal` | documents, purposes, sub-processors, the record of processing | 7 | — |
 | `guide` | help, onboarding, the milestones a workspace passes | 5 | — |
 | `job` | scheduled work, and the record that it ran | 5 | — |
 | `brand` | which surfaces a workspace may put its own mark on | 10 | 1 |
@@ -378,7 +378,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**213 of them**, 206 reached by something today.
+**216 of them**, 209 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -401,7 +401,7 @@ env or a binding.
 | `identity` | sign-in codes, sessions, tokens, proof | 21 | — |
 | `membership` | the roster and what each member may do | 12 | — |
 | `compose` | a manifest becomes a live surface of operations | 2 | — |
-| `serve` | the one path every request ends in — both doors | 6 | — |
+| `serve` | the one path every request ends in — both doors | 5 | — |
 | `records` | the generated reads and writes behind a collection | 6 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
 | `billing` | plans, subscriptions, the bill, the ladder | 15 | — |
@@ -442,7 +442,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**318 of them**, 316 reached by something today.
+**317 of them**, 315 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

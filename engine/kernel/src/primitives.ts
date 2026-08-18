@@ -106,3 +106,34 @@ export const RESERVED_SLUGS: readonly string[] = [
 ];
 
 export const slugTaken = (slug: string): boolean => RESERVED_SLUGS.includes(slug);
+
+/* ------------------------------------------------------------------ prose --- */
+
+export interface Passage {
+  readonly heading: boolean;
+  readonly text: string;
+}
+
+/**
+ * A LONG TEXT, CUT INTO THE ONLY TWO SHAPES IT HAS.
+ *
+ * ⚠️ ONE RULE, READ BY EVERYTHING THAT DRAWS THE SAME WORDS. A legal document is
+ * served as a standalone page by the worker and shown in a sheet inside the app;
+ * two copies of "a blank line ends a paragraph, a leading `#` is a heading" is
+ * two renderings of one text that agree until somebody edits one, and nobody
+ * would ever compare them.
+ *
+ * ⚠️ AND IT IS DELIBERATELY NOT MARKDOWN. Two shapes are two shapes; a parser
+ * for them is a dependency, an escaping surface, and a set of behaviours nobody
+ * declared — links, images and raw HTML arriving in a document because the
+ * library supports them.
+ */
+export const passagesOf = (text: string): readonly Passage[] =>
+  text.trim().split(/\n{2,}/)
+    .map((block) => {
+      const line = block.trim();
+      return line.startsWith("# ")
+        ? { heading: true, text: line.slice(2).trim() }
+        : { heading: false, text: line };
+    })
+    .filter((p) => p.text !== "");
