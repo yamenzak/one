@@ -1,26 +1,31 @@
 name: OneEngine
 
-# ONE — the framework's own deployment. Separate from `deploy.yml` on purpose,
-# and the separation is the safety property rather than tidiness.
+# ONE — and, since the legacy workflows were deleted, the only thing this
+# repository ships.
 #
-# ── Why this cannot touch the live product ──────────────────────────────────
+# ── The legacy tree is FROZEN, not gone ─────────────────────────────────────
 #
-# `deploy.yml`, `ci.yml` and `provision.yml` derive every app they touch from
-# `apps.json`. OneEngine is absent from it, so none of the three can select One —
-# and `engine/scripts/inert.test.mjs` (in `pnpm engine:gate`, and run below before
-# anything is created) fails if somebody registers it there, if the worker name
-# collides with a live one, if a D1 name does, or if `ROOT` overlaps a route a
-# paying tenant answers on. That last one is the collision nobody sees coming:
-# One serves `*.${ROOT}`, so a `ROOT` of `4dl.app` would put One's wildcard over
-# `<slug>.kova.4dl.app` and route precedence, not intent, would decide who
-# answers a customer's address.
+# `ci.yml`, `deploy.yml` and `provision.yml` are deleted. `apps/` and `packages/`
+# are still on disk, because Kova has to be read while it is ported — but nothing
+# builds, tests or deploys them any more. Kova's worker goes on serving the
+# version last deployed from it; the way to change that is to bring the workflow
+# back deliberately, not to push.
 #
-# The reverse direction is the `paths:` filter below: a push that changes only
-# `apps/` or `packages/` runs nothing here.
+# ⚠️ AND THAT IS WHY `inert.test.mjs` MATTERS MORE NOW, NOT LESS. Kova is still
+# LIVE on this Cloudflare account with a paying tenant on it, and nothing else is
+# watching it any more. The guard runs in `pnpm engine:gate` and again below
+# before anything is created: it fails if One's worker name collides with a live
+# one, if a D1 name does, or if `ROOT` overlaps a hostname a customer answers on.
+# That last is the collision nobody sees coming — One serves `*.${ROOT}`, so a
+# `ROOT` of `4dl.app` would put One's wildcard over `<slug>.kova.4dl.app`, and
+# route precedence rather than intent would decide who answers.
+#
+# The `paths:` filter below is the other half: a push touching only the frozen
+# tree runs nothing at all.
 #
 # ── Secrets ─────────────────────────────────────────────────────────────────
 #
-#   CLOUDFLARE_API_TOKEN   — the same account token deploy.yml uses
+#   CLOUDFLARE_API_TOKEN   — an account token with D1:Edit, to create and deploy
 #   CLOUDFLARE_ACCOUNT_ID  — the account id
 #
 # ⚠️ AND THE WORKER GETS NEITHER. The three WORKER secrets — `AUTH_SECRET`,
@@ -34,29 +39,15 @@ name: OneEngine
 # has no way to read — so a repository compromise yields no live merchant
 # credential, and rotating one is a form rather than a code push.
 #
-# ── Why `main` is not a push trigger, and why this file is on it anyway ──────
+# ── Both branches, and `claude/quad` goes when the work does ────────────────
 #
-# ⚠️ THIS FILE HAS TO EXIST ON THE DEFAULT BRANCH OR NOBODY CAN RUN IT. GitHub
-# only offers "Run workflow" for a workflow present on the default branch, and
-# provisioning is `workflow_dispatch` only — deliberately, because creating a
-# database is not something a push should do. So the file is on `main`.
+# `main` is a push trigger again: the engine lives there now, so the gate has a
+# tree to run against. `claude/quad` stays while the work is on it, and the day
+# it is gone this is one line shorter.
 #
-# ⚠️ BUT `main` HOLDS NO `engine/` YET. The gate's first step reads
-# `engine/scripts/inert.test.mjs`, so a push-triggered run there would fail on a
-# missing directory — permanently red on the default branch, which is where a
-# real failure goes to hide. The branch that HAS the engine is the branch that
-# builds it.
-#
-# ⚠️ A DISPATCH RUNS THE FILE FROM THE REF IT IS GIVEN, so choosing
-# `claude/quad` in the dialog runs that branch's full gate against that branch's
-# tree. The copy on `main` is what makes the button exist; it is not what runs.
-#
-# The day the engine merges to `main`, this list becomes `[main]` and the line
-# below it goes away with the branch. It is one edit, and it is the same edit the
-# deploy job's own note already anticipates.
 on:
   push:
-    branches: [claude/quad]
+    branches: [main, claude/quad]
     paths:
       - "engine/**"
       - ".github/workflows/engine.yml"
@@ -95,10 +86,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Before install, dependency-free, for the reason the other workflows run
-      # theirs there: a check that needs the workspace installed cannot guard the
-      # workspace's own install. A broken workflow does not fail — it does not
-      # RUN, and GitHub lists it by filename with nothing saying why.
+      # Before install, and dependency-free on purpose: a check that needs the
+      # workspace installed cannot guard the workspace's own install. A broken
+      # workflow does not fail — it does not RUN, and GitHub lists it by filename
+      # with nothing saying why.
       - run: node .github/workflows/workflows-parse.test.mjs
       # ⚠️ THE ISOLATION CHECK, AND IT RUNS FIRST. Everything else here is about
       # whether OneEngine works; this is about whether OneEngine can reach the deployment a
@@ -125,20 +116,21 @@ jobs:
       - run: pnpm engine:gate
       - run: pnpm engine:typecheck
 
-      # ⚠️ SERIALLY. `ci.yml` documents why at length: three Workers-pool suites
-      # started at turbo's default concurrency on a 2-core runner get one of them
-      # KILLED — no assertion, no stack, a `workerd` left orphaned — and `retry`
-      # cannot help, because the runtime dies before a test exists to retry.
+      # ⚠️ SERIALLY, AND THE FLAG IS LOAD-BEARING. Several Workers-pool suites
+      # started at turbo's default concurrency on a two-core runner get one of
+      # them KILLED — no assertion, no stack, a `workerd` left orphaned — and
+      # `retry` cannot help, because the runtime dies before a test exists to
+      # retry.
       - run: pnpm turbo run test --filter='./engine/*' --filter='./engine/apps/*' --concurrency=1
 
   # ── Create the databases One binds, and write their ids in. ───────────────
   #
-  # ⚠️ MANUAL, AND THAT IS DELIBERATE. `deploy.yml` find-or-creates a KV
-  # namespace on its own deploy path and explains why that is safe there: the
-  # worst case is an empty namespace. A DATABASE is not that. `wrangler d1
-  # create` succeeds under any name it has not seen, so a config whose name had
-  # drifted would quietly get a second, empty database — and every request would
-  # then succeed against it while the real rows sat somewhere else.
+  # ⚠️ MANUAL, AND THAT IS DELIBERATE. Find-or-create on a deploy path is safe
+  # for a KV namespace, where the worst case is an empty one. A DATABASE is not
+  # that: `wrangler d1 create` succeeds under any name it has not seen, so a
+  # config whose name had drifted would quietly get a second, empty database —
+  # and every request would then succeed against it while the real rows sat
+  # somewhere else.
   #
   # Idempotent: it lists first and creates only what is missing. Creating on the
   # basis of a FAILED list is how duplicates get made, so a list that errors
