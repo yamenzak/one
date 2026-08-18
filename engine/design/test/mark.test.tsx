@@ -18,6 +18,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Mark } from "../src/frame/arrival.js";
 import { Lockup } from "../src/parts/logo.js";
+import * as MARKS from "../src/parts/marks.js";
 
 const svgOf = (node: React.ReactElement) => renderToStaticMarkup(node);
 
@@ -175,5 +176,27 @@ describe("the wallet's mark", () => {
     const svg = svgOf(<Mark of="wallet" size="inline" />);
     expect(svg).toContain('height="1em"');
     expect(svg).toMatch(/width="[\d.]+em"/);
+  });
+});
+
+/*
+  ⚠️ A MARK WITH NO SIZE IS NOT A SMALL MARK, IT IS NO MARK. An SVG carrying only
+  a `viewBox` has no intrinsic size, so it lays out at 0×0 wherever nothing sets
+  one — and every host in this product that is a ROW sets one, which is why the
+  marks we draw ourselves worked for weeks and then simply were not there inside
+  a text field's prefix. Measured before the fix: 0 by 0, no error, no gap.
+
+  ⚠️ AND IT IS A FLOOR RATHER THAN A SCALE. A class beats a presentational
+  attribute, so `[&>svg]:size-5` still wins wherever a host has an opinion.
+*/
+describe("the marks we draw ourselves", () => {
+  it("each carries a size, so it is visible where nothing sets one", () => {
+    const drawn = Object.entries(MARKS).filter(([name]) => name.endsWith("Mark"));
+    expect(drawn.length).toBeGreaterThan(6);
+    for (const [name, Drawn] of drawn) {
+      const svg = svgOf(<Drawn />);
+      expect(svg, `${name} has no width`).toMatch(/width="\d+"/);
+      expect(svg, `${name} has no height`).toMatch(/height="\d+"/);
+    }
   });
 });

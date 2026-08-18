@@ -28,12 +28,21 @@ import * as React from "react";
 
 /**
  * ⚠️ ONE SKELETON, SO EVERY MARK IS THE SAME OBJECT. Size comes from the class
- * the row sets (`[&>svg]:size-*`), never from a number here — a mark that sets
- * its own is one that ignores the scale on the one screen somebody forgot.
+ * its host sets (`[&>svg]:size-*`) and a class beats a presentational attribute,
+ * so the numbers below are a FLOOR rather than a scale of our own.
+ *
+ * ⚠️ AND WITHOUT THEM A MARK IS 0×0 WHEREVER NOTHING SETS A SIZE. Measured: the
+ * search glyph in a text field's prefix laid out at zero by zero and simply was
+ * not there — no error, no gap, an input that looked like it had no icon because
+ * it had none. An SVG carrying only a `viewBox` has no intrinsic size; lucide
+ * ships `width` and `height` on every icon and ours did not, so every mark we
+ * draw ourselves worked inside a row and vanished everywhere else.
  */
 const Mark = ({ children }: { readonly children: React.ReactNode }) => (
   <svg
     viewBox="0 0 24 24"
+    width={24}
+    height={24}
     fill="none"
     stroke="currentColor"
     strokeWidth={2}
@@ -249,7 +258,7 @@ export const LayersMark = () => (
 const VERIFIED = "oklch(0.62 0.16 250)";
 
 export const AgreedMark = () => (
-  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+  <svg viewBox="0 0 24 24" width={24} height={24} fill="none" aria-hidden="true">
     <circle cx="12" cy="12" r="10" fill={VERIFIED} />
     {/* ⚠️ KNOCKED OUT IN WHITE RATHER THAN THE SURFACE'S COLOUR. The seal is a
         solid at a fixed value, so the tick has to contrast with the SEAL — a

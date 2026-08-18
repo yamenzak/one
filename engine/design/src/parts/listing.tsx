@@ -24,6 +24,13 @@
  * its job is what made it look deliberate. Columns are for comparing values
  * down a page, and a phone has no page to compare down.
  *
+ * ⚠️ AND A LONG LIST CAN BE SEARCHED, BECAUSE PAGING IS NOT FINDING. Ten rows a
+ * page over two hundred workspaces is twenty presses to reach a name somebody
+ * already knows — and the operator's list is the one place in the product where
+ * every customer on the deployment is a row. What a row matches ON is the
+ * caller's (`find.of`), for the same reason `asRow` is: nothing in `cols` says
+ * which values a person would type.
+ *
  * ⚠️ AND THE CALLER SAYS HOW IT COLLAPSES, BECAUSE ONLY THE CALLER KNOWS. Which
  * column is the name, which is the line under it, which belongs in the corner —
  * none of that is recoverable from `cols`, and a component guessing it is a
@@ -36,6 +43,9 @@ import { Pagination, Table } from "@heroui/react";
 import { Await, Nothing, TableWaiting, type Loaded } from "./state.js";
 import type { FaceOf } from "./face.js";
 import { Group, PersonRow } from "./surfaces.js";
+import { TextInput } from "./forms.js";
+import { glyphOf } from "../frame/shell.js";
+import { SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 
 export interface Col<T> {
@@ -78,13 +88,24 @@ export interface ListingProps<T> {
     /** ⚠️ WHO OR WHAT, NOT A PICTURE — `whoFace`/`placeFace`/`appFace`. */
     readonly face?: FaceOf;
   };
+  /**
+   * ⚠️ WHAT A ROW MATCHES ON, AND ABSENT MEANS NO SEARCH AT ALL. A short list
+   * with a search box is furniture; the field appears only where the caller has
+   * said what would be typed.
+   */
+  readonly find?: {
+    readonly of: (row: T) => string;
+    /** What somebody is looking for here. Two or three words. */
+    readonly label?: string;
+  };
 }
 
 export function Listing<T>(
-  { of, cols, rowKey, onOpen, pageSize = 10, says, again, label, asRow }: ListingProps<T>,
+  { of, cols, rowKey, onOpen, pageSize = 10, says, again, label, asRow, find }: ListingProps<T>,
 ) {
   const [order, setOrder] = React.useState<{ readonly id: string; readonly up: boolean } | null>(null);
   const [page, setPage] = React.useState(1);
+  const [looking, setLooking] = React.useState("");
 
   return (
     <Await
@@ -95,10 +116,16 @@ export function Listing<T>(
         : undefined}
       again={again}
       then={(rows) => {
+        /* ⚠️ MATCHED FOLDED AND TRIMMED, because nobody types a workspace's
+           capitalisation and half of them are pasted with a space on the end. */
+        const want = looking.trim().toLowerCase();
+        const found = want && find
+          ? rows.filter((r) => find.of(r).toLowerCase().includes(want))
+          : rows;
         const sorter = order ? cols.find((c) => c.id === order.id)?.by : undefined;
         const sorted = sorter
-          ? [...rows].sort((a, b) => (order?.up ? sorter(a, b) : sorter(b, a)))
-          : rows;
+          ? [...found].sort((a, b) => (order?.up ? sorter(a, b) : sorter(b, a)))
+          : found;
         const pages = Math.max(1, Math.ceil(sorted.length / pageSize));
         const at = Math.min(page, pages);
         const shown = sorted.slice((at - 1) * pageSize, at * pageSize);
@@ -110,7 +137,15 @@ export function Listing<T>(
              own edge and the whole screen scrolled sideways, while the
              `ScrollContainer` that exists to prevent exactly that sat there
              with nothing to do. */
-          <div className="flex min-w-0 flex-col">
+          <div className={`flex min-w-0 flex-col ${find ? SPACE.snug : ""}`}>
+            {find ? (
+              <TextInput
+                label={find.label ?? "Find one"}
+                value={looking}
+                onChange={(v) => { setLooking(v); setPage(1); }}
+                before={glyphOf("search")}
+              />
+            ) : null}
             {/*
               ⚠️ BOTH SHAPES RENDER AND CSS PICKS ONE, rather than a hook
               measuring the viewport. A width read in JavaScript is a width that
@@ -187,6 +222,13 @@ export function Listing<T>(
             </div>
             {sorted.length > pageSize ? (
               <Paged page={at} pages={pages} count={sorted.length} pageSize={pageSize} onPage={setPage} />
+            ) : null}
+            {/* ⚠️ A SEARCH THAT FOUND NOTHING IS NOT AN EMPTY LIST. `says` is
+                what is true when the deployment HAS none; this is what is true
+                when the words do not match, and answering the first with the
+                second tells somebody their workspaces are gone. */}
+            {find && want && sorted.length === 0 ? (
+              <Nothing icon={glyphOf("search")} says="Nothing matches that" />
             ) : null}
           </div>
         );
