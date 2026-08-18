@@ -323,17 +323,28 @@ export const EMPTY_PAD = "px-6 py-14" as const;
 export const EMPTY_READ = "max-w-[22rem]" as const;
 
 /**
- * ⚠️ A CARD FULL OF ROWS PADS SIDEWAYS ONLY, BECAUSE THE ROWS PAD THEMSELVES.
- * `.card` is `p-4` and every row is `py-3`, so the first row sat 28px below the
- * card's top edge and the last 28 above the bottom — a card of three rows with
- * a row and a half of air stacked at each end. It reads as a component that has
- * been given room twice, which is what it is.
+ * A CARD'S OWN INSET, AND IT IS THE SAME NUMBER A ROW USES.
  *
- * ⚠️ HORIZONTAL PADDING STAYS, because nothing else supplies it: the rows are
- * flush by design (see `ROW.flush`) so that a separator can line up with the
- * labels rather than with the card.
+ * ⚠️ THE END CAP MUST EQUAL THE GAP BETWEEN ROWS, WHICH IS THE WHOLE
+ * ARITHMETIC. Every row is `py-3`, so two adjacent rows put 24px between their
+ * texts. A card that adds `py-3` puts 12 + 12 = 24 at each end too, and the
+ * rhythm is one number from the first line to the last. `p-4` made the ends 28
+ * against 24 in the middle, which is what "given room twice" looked like; the
+ * fix for that was `py-0`, and it overshot into something worse.
+ *
+ * ⚠️ BECAUSE `py-0` ASSUMES EVERYTHING INSIDE IS A ROW, AND NOTHING ENFORCED
+ * THAT. A card holding a paragraph, a `Choice` or a `Lookup` — three screens do
+ * — had its first line 1–2px from the top edge and its last flush against the
+ * bottom, on a card with a 24px corner radius, so the text ran into the curve.
+ * Measured, not guessed: `Your data` was `T2`, `Dates and numbers` was `T1 B0`.
+ * A padding that is correct only for one kind of child is a padding that is
+ * wrong on the first screen that has another.
+ *
+ * ⚠️ HORIZONTAL PADDING IS THE CARD'S ALONE, because nothing else supplies it:
+ * the rows are flush by design (see `ROW.flush`) so a separator lines up with
+ * the labels rather than with the card.
  */
-export const CARD_ROWS = "px-4 py-0" as const;
+export const CARD_ROWS = "px-4 py-3" as const;
 
 /** Between a section's heading and the card under it. */
 export const HEAD_GAP = "gap-2" as const;

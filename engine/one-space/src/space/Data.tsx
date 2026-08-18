@@ -19,7 +19,7 @@
 
 import { useState } from "react";
 import {
-  ActionRow, Confirm, Group, NoteRow, Prose, Screen, glyphOf, notice, useShown,
+  ActionRow, Confirm, Group, NoteRow, Screen, glyphOf, notice, useShown,
 } from "@engine/design";
 import { dayIn, type Instant, type Problem } from "@engine/kernel";
 import { api } from "../api.js";
@@ -104,11 +104,15 @@ export function Data() {
       </Group>
 
       <Group label="Delete everything" under="This cannot be undone">
-        <Prose>
+        {/* ⚠️ `NoteRow`, NOT `Prose`. A card's inset caps its ends and its ROWS
+            carry the rest (`CARD_ROWS`), so a bare text block inside one sits on
+            half the rhythm of every row beside it. `Prose` is for a page of
+            prose; a paragraph inside a card is a row that happens to be words. */}
+        <NoteRow>
           Your account, your place in every workspace, your own records and the encrypted
           facts held for you are deleted. A workspace only you can run is closed with you.
           Records that belong to a workspace stay, with your name unwritten from them.
-        </Prose>
+        </NoteRow>
         <Confirm
           trigger={<ActionRow label="Delete my account" tone="danger" />}
           title="Delete everything?"

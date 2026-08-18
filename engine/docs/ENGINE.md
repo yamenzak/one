@@ -930,8 +930,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 47 | Storage is metered rather than refused — the included amount is where the meter starts, and an empty wallet costs the writes and never the files | shipped |
 | 48 | The deployment's legal identity is complete — the registered address it is written to, and whether selling where it sells needs a representative there | **planned** |
 | 49 | A stranger joins a workspace by themselves — a door the workspace opens, a role the app names, and a ceiling the plan sells (D23) | **planned** |
+| 50 | The interface speaks a second language — dictionaries, a language control, and the copy guard reading both | **planned** |
 
-**39 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**39 shipped, 11 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

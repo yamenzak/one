@@ -214,6 +214,44 @@ if (/snap-x/.test(rail) && !/SCROLL_GUTTER/.test(rail)) {
   ok(`rail: a snapping scroller keeps its gutter when it snaps`);
 }
 
+/* -------------------------------------------------------------- the inset --- */
+
+/**
+ * ⚠️ A CARD'S END CAP MUST EQUAL THE GAP BETWEEN ITS ROWS, AND IT IS ARITHMETIC
+ * RATHER THAN TASTE. Two adjacent rows put `2 × ROW.pad` between their texts;
+ * the card's own padding plus one row's is what sits at each end. Equal, and a
+ * list has one rhythm from its first line to its last.
+ *
+ * ⚠️ AND ZERO IS THE FAILURE THIS EXISTS TO CATCH. `py-0` was correct for a card
+ * whose every child is a row and silently wrong for the three screens holding a
+ * paragraph or a picker — measured at 1–2px of clearance from a 24px corner
+ * radius, so the text ran into the curve. A padding that is right for one kind
+ * of child is wrong on the first screen with another, and nothing about that
+ * shows up in a diff, a type or a render test.
+ */
+const TOKENS = readFileSync(join(ENGINE, "design/src/tokens/metrics.ts"), "utf8");
+const four = (cls) => Number(cls) * 4;
+
+const cardPad = /export const CARD_ROWS = "([^"]+)"/.exec(TOKENS)?.[1] ?? "";
+const rowPad = /^\s*pad: "py-(\d+)"/m.exec(TOKENS)?.[1];
+const cardY = /\bpy-(\d+)\b/.exec(cardPad)?.[1];
+const cardX = /\bpx?-(\d+)\b/.exec(cardPad)?.[1];
+
+if (rowPad === undefined || cardY === undefined || cardX === undefined) {
+  fail(`metrics.ts: cannot read the card's inset or the row's — the guard is blind.\n` +
+       `       \`CARD_ROWS\` must name both axes and \`ROW.pad\` a vertical one.`);
+} else if (four(cardY) === 0 || four(cardX) === 0) {
+  fail(`metrics.ts: \`CARD_ROWS\` is ${cardPad} — an axis with no inset at all.\n` +
+       `       Content that is not a row then sits against the card's edge, inside a\n` +
+       `       24px corner radius. Rows pad themselves; everything else does not.`);
+} else if (four(cardY) !== four(rowPad)) {
+  fail(`metrics.ts: the card caps at ${four(cardY)}px and its rows sit ${four(rowPad) * 2}px apart.\n` +
+       `       The end cap is card + row = ${four(cardY) + four(rowPad)}px against ${four(rowPad) * 2}px between,\n` +
+       `       so the first and last rows are spaced differently from every other.`);
+} else {
+  ok(`inset: a card caps at ${four(cardY) + four(rowPad)}px, the same as between its rows`);
+}
+
 console.log(bad
   ? `\nmetrics: ${bad} finding(s) — spacing nobody owns drifts, and drift is invisible per diff.`
   : `\nmetrics: one source for every measurement, and a floor under every control.`);
