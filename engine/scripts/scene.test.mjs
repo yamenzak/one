@@ -330,6 +330,47 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
   }
 }
 
+/* ------------------------------------------------ the ornament cannot scroll --- */
+
+/**
+ * ⚠️ A DECORATIVE LAYER MAY NEVER GROW THE DOCUMENT, AND IT DID — TWICE, ON
+ * DIFFERENT AXES, WITH THE SAME CAUSE. The ground drifts by `scale(1.14)` and a
+ * translate, so it hangs past every edge of its host by design. Unclipped, that
+ * overhang is scrollable overflow: the page scrolls into nothing, and further
+ * every second, because the scroll area tracks the animation.
+ *
+ * The inline axis was found and clipped. The block axis was left open on purpose
+ * — "so the page still scrolls the way it is supposed to" — and that reasoning
+ * is wrong: the host is `min-h-dvh` and grows with its content, so nothing but
+ * the ornament is ever outside it. Measured on the sign-in door at 412×830, the
+ * document was 869 tall: 39px of scroll under a screen with nothing below the
+ * fold, on every page in the product.
+ *
+ * ⚠️ AND `clip` RATHER THAN `hidden` IS THE HALF THAT IS FRAGILE. `hidden` makes
+ * the host a scroll container and every sticky crown and nav inside it stops
+ * sticking — measured at -900 after a 900px scroll, where both `clip` forms hold
+ * at 0. So this asks for both: clipped on both axes, and clipped rather than
+ * hidden.
+ */
+{
+  const src = readFileSync(join(ENGINE, "design/src/tokens/ambience.ts"), "utf8");
+  const host = /`\[data-sky\] \{([^`]*)\}`/.exec(src);
+  if (!host) {
+    fail("design/src/tokens/ambience.ts: cannot find the `[data-sky]` host rule — it moved.");
+  } else if (/overflow\s*:\s*hidden/.test(host[1])) {
+    fail("design/src/tokens/ambience.ts: the ground's host uses `overflow: hidden`.\n" +
+         "       That makes it a scroll container and every sticky crown and nav inside it " +
+         "stops sticking. `clip` clips without scrolling.");
+  } else if (!/overflow\s*:\s*clip/.test(host[1])) {
+    fail("design/src/tokens/ambience.ts: the ground's host does not clip on both axes.\n" +
+         "       The drifting layer is scaled past every edge, and an unclipped overhang is " +
+         "scrollable overflow — a page that scrolls into nothing, further every second, " +
+         "because the scroll area tracks the animation.");
+  } else {
+    ok("overscan: the ground is clipped on both axes, and clipped rather than hidden");
+  }
+}
+
 /* ------------------------------------------------------- one ground per area --- */
 
 /**

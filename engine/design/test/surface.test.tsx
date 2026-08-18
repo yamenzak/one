@@ -703,12 +703,26 @@ describe("a workspace's branding", () => {
       element was ever out of bounds — the overflow is a pseudo-element's, which
       is exactly why looking for a wide child finds nothing.
 
-      ⚠️ `clip`, NEVER `hidden`. `hidden` makes this a scroll container and every
-      `sticky` crown and nav inside it stops sticking — measured, both ways.
-      Inline axis only, so the page still scrolls the way it is supposed to.
+      ⚠️ AND ON BOTH AXES, WHICH IT WAS NOT. This asserted `overflow-x` and so
+      pinned half a fix: the block axis was left open on the reasoning that "the
+      page still scrolls the way it is supposed to", and the ornament's overhang
+      below the fold was scrollable overflow exactly as its overhang sideways
+      had been. Measured on the sign-in door at 412×830, the document came out
+      869 tall — 39px of scroll under a screen with nothing below it, on every
+      page in the product. Clipping does not stop a page scrolling: the host is
+      `min-h-dvh` and grows with its content, so nothing but the ornament is ever
+      outside it. Verified in a browser, with a 3000px filler: 3830 tall, and
+      `scrollTo(1200)` lands at 1200.
+
+      ⚠️ `clip`, NEVER `hidden`, AND THAT IS THE FRAGILE HALF. `hidden` makes
+      this a scroll container and every `sticky` crown and nav inside it stops
+      sticking. Measured, all three: `overflow-x: clip` and `overflow: clip` both
+      hold a sticky crown at 0 after a 900px scroll; `overflow: hidden` rides it
+      away to -900.
     */
-    expect(css).toContain("[data-sky] { position: relative; isolation: isolate; overflow-x: clip;");
+    expect(css).toContain("[data-sky] { position: relative; isolation: isolate; overflow: clip;");
     expect(css).not.toContain("[data-sky] { position: relative; isolation: isolate; overflow: hidden");
+    expect(css).not.toContain("[data-sky] { position: relative; isolation: isolate; overflow-x: clip");
 
     /* ⚠️ ONE drift keyframe, and it takes its numbers in — not one per
        ambience. Twenty-four grounds move; there is one rule for all of them. */

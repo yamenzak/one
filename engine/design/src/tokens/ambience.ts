@@ -436,16 +436,26 @@ export function ambienceStylesheet(): string {
     /* ⚠️ `-1` and `isolation` on the host, or the layer paints over the content
        of any ancestor that happens to create a stacking context.
 
-       ⚠️ AND THE HOST CLIPS SIDEWAYS, BECAUSE THE OVERSCAN BELOW IS MEANT TO BE
-       HIDDEN. The drifting layer is `scale(1.14)` and translated — that is what
-       there is to move — so at 1280 it hangs ~90px past each edge. Nothing was
-       clipping it, so the DOCUMENT grew: the page could be scrolled sideways
-       into nothing, and further every second, because the scroll area tracked
-       the animation. `clip` rather than `hidden` is load-bearing — `hidden`
-       makes this a scroll container and every `sticky` crown and nav inside it
-       stops sticking; and it is the inline axis alone, so the page still scrolls
-       the way it is supposed to. */
-    `[data-sky] { position: relative; isolation: isolate; overflow-x: clip; --sky: 1; }`,
+       ⚠️ AND THE HOST CLIPS ON BOTH AXES, BECAUSE THE OVERSCAN IS MEANT TO BE
+       UNSEEN. The drifting layer is `scale(1.14)` and translated — that is what
+       there is to move — so it hangs past every edge. Unclipped, the DOCUMENT
+       grows: the page scrolls into nothing, and further every second, because
+       the scroll area tracks the animation.
+
+       ⚠️ ONE AXIS WAS CLIPPED AND THE OTHER WAS NOT, AND THE SECOND HALF IS THE
+       ONE PEOPLE FELT. Measured on the sign-in door at 412×830: the document was
+       869 tall — 39px of scroll under a screen with nothing below the fold, on
+       every page in the product. The reasoning for leaving the block axis alone
+       was that the page still has to scroll; it does, and clipping does not stop
+       it. The host is `min-h-dvh` and GROWS with its content, so content is
+       never outside the box — the only thing beyond it is the ornament.
+
+       ⚠️ `clip`, NEVER `hidden`, AND THAT IS THE PART THAT IS ACTUALLY FRAGILE.
+       `hidden` makes this a scroll container and every `sticky` crown and nav
+       inside it stops sticking. Measured, all three: with `overflow-x: clip` and
+       with `overflow: clip` a sticky crown holds at 0 after a 900px scroll; with
+       `overflow: hidden` it rides away to -900. */
+    `[data-sky] { position: relative; isolation: isolate; overflow: clip; --sky: 1; }`,
     /*
       ⚠️ ONE MULTIPLIER PER THEME, AND IT IS DOWN TO ONE. This carried five —
       `--sky`, `--thread`, `--etch`, `--lumen`, `--field` — because twenty-four
