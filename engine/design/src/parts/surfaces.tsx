@@ -379,7 +379,7 @@ export function Place({ name, said, foot, face, tone = "neutral", sky = "glow", 
               is visible to somebody not using a mouse. */}
           <Button
             variant="ghost"
-            className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush}`}
+            className={`justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.press}`}
             onPress={onOpen}
           >
             {/* ⚠️ `ROW.pad`, NOT `PAD` — the card supplies the gutter (`ROW.flush`),
@@ -490,7 +490,7 @@ export interface NavRowProps extends RowBase {
 
 export function NavRow({ icon, face, label, under, aside, onOpen, isDisabled }: NavRowProps) {
   return (
-    <Button data-row variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.tap}`} isDisabled={isDisabled} onPress={onOpen}>
+    <Button data-row variant="ghost" className={`justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.press} ${ROW.tap}`} isDisabled={isDisabled} onPress={onOpen}>
       <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
         <Lead icon={icon} face={face} />
         <Body label={label} under={under} />
@@ -528,7 +528,7 @@ export function ActionRow({ icon, face, label, under, onDo, tone = "neutral" }: 
     <Button
       data-row
       variant="ghost"
-      className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.tap}`}
+      className={`justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.press} ${ROW.tap}`}
       onPress={onDo}
     >
       <span
@@ -703,7 +703,7 @@ export function PersonRow({ name, under, when, unread, aside, goes, face, onOpen
   readonly onOpen: () => void;
 }) {
   return (
-    <Button data-row variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.tap}`} onPress={onOpen}>
+    <Button data-row variant="ghost" className={`justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.press} ${ROW.tap}`} onPress={onOpen}>
       <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
         <Face of={face} name={name} />
         <Body label={name} under={under} />
@@ -767,7 +767,7 @@ export function AmountRow({ icon, face, label, under, amount, aside, tone = "neu
     </span>
   );
   return onOpen
-    ? <Button data-row variant="ghost" className={`w-full justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.tap}`} onPress={onOpen}>{inner}</Button>
+    ? <Button data-row variant="ghost" className={`justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.press} ${ROW.tap}`} onPress={onOpen}>{inner}</Button>
     : <div data-row className="flex w-full">{inner}</div>;
 }
 

@@ -58,6 +58,33 @@ export const ROW = {
    * row and every place IS a button, so this rides wherever `free` does.
    */
   wrap: "whitespace-normal",
+  /**
+   * WHAT A PRESS LOOKS LIKE, AND IT IS THE CARD'S WIDTH RATHER THAN THE TEXT'S.
+   *
+   * ⚠️ THE FILL WAS THE TEXT COLUMN'S WIDTH, NOT THE CARD'S. A row is `px-0`
+   * because the card owns the gutter (`ROW.flush`), so the pressed fill stopped
+   * 16px short of the card on both sides — measured at 21px once the button's
+   * own `scale(0.97)` had pulled it in further. That is a shape floating INSIDE
+   * the card with no relationship to it, which is what "it sticks to the
+   * content" describes.
+   *
+   * ⚠️ SO IT BLEEDS BACK OUT TO THE CARD'S EDGE, undoing the gutter for the FILL
+   * while the content keeps it. `.button`'s own `scale(0.97)` then pulls the row
+   * off the card's edges as it goes down, so the press reads as this row lifting
+   * out of this card rather than as a pill dropped on it — geometry, not a
+   * border D7 would refuse anyway.
+   *
+   * ⚠️ AND THE RADIUS IS THE LIBRARY'S, DELIBERATELY. `.button` is `rounded-3xl`
+   * and 24px is large for an 89px row — but a radius is APPEARANCE, so setting
+   * one here is a component restyled behind the theme's back and a workspace's
+   * branding stops reaching it. `heroui.test.mjs` refused exactly that, and it
+   * was right to: the fix for a radius is the theme, never a class.
+   *
+   * ⚠️ THE WIDTH IS EXPLICIT BECAUSE `w-full` WOULD WIN. Same property, same
+   * specificity, and the negative margin then shifts the row left instead of
+   * widening it — which measured as a fill hanging 32px off the right edge.
+   */
+  press: "-mx-4 w-[calc(100%_+_2rem)] px-4",
 } as const;
 
 /**
