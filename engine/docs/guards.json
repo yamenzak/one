@@ -2529,7 +2529,7 @@
       "status": "live",
       "impl": "runtime/test/stripe.test.ts",
       "proves": "CANCELLING CLEARS THE ANCHOR",
-      "fails": "a 37-day countdown to erasure started over a decision nobody disputed, because `past_due_at` is what every rung of the ladder is measured from"
+      "fails": "the countdown to erasure started over a decision nobody disputed, because `past_due_at` is what every rung of the ladder is measured from"
     },
     {
       "id": "an-edit-snapshots-only-what-it-took",

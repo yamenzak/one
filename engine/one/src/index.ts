@@ -301,7 +301,7 @@ const binding = (body: string): string =>
  * records everybody who agreed to the old wording as having agreed to the new,
  * which is a record that is confidently wrong rather than merely absent.
  */
-const VERSION = "2026-08-20" as never;
+const VERSION = "2026-08-21" as never;
 
 /**
  * ⚠️ WHAT THIS DEPLOYMENT PROMISES, AND IT IS THE DEPLOYMENT'S RATHER THAN A
@@ -316,9 +316,9 @@ const VERSION = "2026-08-20" as never;
  *
  * ⚠️ THE DUNNING NUMBERS ARE READ FROM `LADDER`, NEVER TYPED. The terms said
  * records "stay readable and exportable throughout" while the ladder withheld
- * the workspace on day 30 and destroyed its records on day 37 — a promise and a
- * behaviour that disagreed, in the one place a customer would quote us. Written
- * from the constant the sweep runs on, they cannot.
+ * the workspace at one rung and destroyed its records at the next — a promise
+ * and a behaviour that disagreed, in the one place a customer would quote us.
+ * Written from the constant the sweep runs on, they cannot.
  */
 const LEGAL: DeploymentLegal = {
   ...(IDENTITY ? { identity: IDENTITY } : {}),
@@ -398,9 +398,10 @@ After ${LADDER.blockedAfter} days the workspace stops being served. Your own
 account, your export and your ability to close things stay open throughout —
 paying has to be a way out and not the only one.
 
-After ${LADDER.purgeAfter} days the workspace's records are destroyed. This is
-not reversible, it is ${LADDER.purgeAfter} days after the first failed payment,
-and it is the reason we would rather you told us about a problem than let it run.
+After ${LADDER.purgeAfter} days — three months from the first failed payment —
+the workspace's records are destroyed. That is not reversible. Anything you take
+a copy of before then is yours to keep, and we would much rather you told us
+about a problem than let it run that far.
 
 # Ending it
 
@@ -1510,7 +1511,8 @@ export default {
   /*
     ⚠️ THE CLOCK. Standing climbs the ladder by itself — it is derived from
     `past_due_at` on every read — so the rung that needs a scheduler is the last
-    one, and it is the irreversible one: at day 37 the records go. A deletion
+    one, and it is the irreversible one: at the ladder's last rung the records
+    go. A deletion
     that only happens when somebody visits is a deletion that never happens for
     exactly the workspaces nobody visits.
 

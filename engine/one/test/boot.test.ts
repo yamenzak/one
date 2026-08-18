@@ -192,8 +192,9 @@ describe("signing in through the deployment", () => {
  * ⚠️ THE SWEEP IS THE ONE THING NOBODY IS WAITING FOR, WHICH IS WHY IT NEEDS A
  * TEST MORE THAN A ROUTE DOES. A route that stops working is a person on the
  * phone; a scheduled handler that stops working is silence, and the thing it
- * does — destroying the records of a workspace 37 days past due — is the one
- * step nothing else in the platform will ever take.
+ * does — destroying the records of a workspace that has been past due for the
+ * whole of the ladder — is the one step nothing else in the platform will ever
+ * take.
  *
  * ⚠️ AND IT IS DRIVEN THROUGH `worker.scheduled`, not through the sweep it
  * calls. The handler compiling, typechecking and being unit-tested is exactly
@@ -233,16 +234,23 @@ describe("what happens to a workspace nobody is looking at", () => {
     return rows.results.length;
   };
 
+  /* ⚠️ EITHER SIDE OF THE LAST RUNG, READ FROM THE LADDER. Written as numbers,
+     these are two constants that agree with `LADDER` until somebody softens a
+     rung — and the one that then reads as passing is the one asserting a
+     workspace IS erased, because a day count short of the new rung erases
+     nothing and a test looking for zero notes on a workspace that was never
+     touched would need the record to be there in the first place. Derived, a
+     changed ladder moves the fixture with it. */
   it("erases what is past the last rung and leaves what is not", async () => {
-    const doomed = await overdue("faded", 40);
-    const inArrears = await overdue("lately", 10);
+    const doomed = await overdue("faded", LADDER.purgeAfter + 3);
+    const inArrears = await overdue("lately", LADDER.readOnlyAfter + 3);
 
     await fire();
 
     expect(await notesOf(doomed)).toBe(0);
-    /* ⚠️ READ-ONLY IS NOT ERASED. Ten days past due is a conversation about a
-       bill; the ladder's destructive rung is 37, and a sweep that took the
-       whole list would delete the records of everybody who was merely late. */
+    /* ⚠️ READ-ONLY IS NOT ERASED. A few days past due is a conversation about a
+       bill; the destructive rung is months away, and a sweep that took the whole
+       list would delete the records of everybody who was merely late. */
     expect(await notesOf(inArrears)).toBe(1);
   });
 
@@ -746,10 +754,9 @@ describe("what this deployment discloses", () => {
   /*
     ⚠️ THE TERMS CANNOT CONTRADICT THE LADDER, BECAUSE THEY ARE WRITTEN FROM IT.
     They said records "stay readable and exportable throughout" while
-    `standingFor` stopped serving the workspace on day ${"" + LADDER.blockedAfter}
-    and the sweep destroyed its records on day ${"" + LADDER.purgeAfter} — a
-    promise and a behaviour that disagreed, in the one place a customer would
-    quote us.
+    `standingFor` stopped serving the workspace at one rung and the sweep
+    destroyed its records at the next — a promise and a behaviour that
+    disagreed, in the one place a customer would quote us.
   */
   it("carries the ladder's own numbers into the terms", () => {
     const terms = LEGAL.documents.terms!.text ?? "";

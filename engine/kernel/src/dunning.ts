@@ -42,12 +42,20 @@ export interface Ladder {
 }
 
 /**
- * ⚠️ SEVEN DAYS TO NOTICE, A MONTH TO ACT, A WEEK MORE BEFORE ANYTHING IS LOST.
- * The gap between blocked and purged is the one that matters: it is the window
- * in which somebody who has stopped reading our emails can still be reached by a
- * colleague, and it must be long enough for a holiday.
+ * ⚠️ SEVEN DAYS TO NOTICE, A MONTH TO ACT, TWO MONTHS MORE BEFORE ANYTHING IS
+ * LOST. The gap between blocked and purged is the one that matters, and it is
+ * the only rung measured against a person rather than an invoice: it is the
+ * window in which somebody who has stopped reading our email can still be
+ * reached by a colleague, come back from leave, or change their mind. A week was
+ * enough to be defensible and not enough to survive one holiday, and the cost of
+ * the longer window is storage we are already paying for.
+ *
+ * ⚠️ NOTHING QUOTES THESE NUMBERS BUT THIS LINE. The terms of use are written
+ * from them (`whoWeAre`'s neighbours in the deployment's documents), so softening
+ * a rung here softens the sentence a customer reads — which is the only way the
+ * two can be kept from disagreeing.
  */
-export const LADDER: Ladder = { readOnlyAfter: 7, blockedAfter: 30, purgeAfter: 37 };
+export const LADDER: Ladder = { readOnlyAfter: 7, blockedAfter: 30, purgeAfter: 90 };
 
 const DAY = 24 * 60 * 60 * 1000;
 

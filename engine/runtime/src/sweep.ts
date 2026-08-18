@@ -5,7 +5,8 @@
  * `past_due_at` every time it is read, so a workspace slides from serving to
  * read-only to blocked with nothing running — which is the right design and is
  * also why the missing clock was invisible for so long. The rung that needs a
- * clock is the last one: at day 37 the records are destroyed, and a deletion
+ * clock is the last one: at the ladder's last rung the records are destroyed,
+ * and a deletion
  * that only happens when somebody visits is a deletion that never happens for
  * exactly the workspaces nobody visits.
  *

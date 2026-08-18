@@ -188,7 +188,7 @@ export async function markPaid(db: Db, tenantId: TenantId, appId: AppId): Promis
 /**
  * ⚠️ CANCELLED IS NOT PAST DUE, AND THE ANCHOR IS WHY. `past_due_at` is what
  * every rung of the ladder is measured from, and a workspace that CHOSE to stop
- * has no arrears — dating one would start a 37-day countdown to erasure over a
+ * has no arrears — dating one would start the countdown to erasure over a
  * decision nobody disputed. The row keeps its records and its plan history; what
  * ends is the charge.
  */

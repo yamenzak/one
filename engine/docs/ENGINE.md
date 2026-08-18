@@ -802,7 +802,7 @@ its own header, cited by other files, and doing nothing.
 | `a-payment-is-applied-once` | D12 | a month granted twice every time a delivery is slow, because retrying is what makes Stripe's delivery reliable |
 | `a-renewal-is-attributed-by-its-customer` | D12 | every month after the first going unplaced — the workspace pays and goes past due anyway, because a renewal invoice carries no metadata of ours |
 | `a-payment-that-cannot-be-placed-is-recorded` | D12 | money captured, nothing granted, and no trace anywhere — the event answered 200 with its id already claimed, so Stripe never sends it again |
-| `cancelling-is-not-arrears` | D12 | a 37-day countdown to erasure started over a decision nobody disputed, because `past_due_at` is what every rung of the ladder is measured from |
+| `cancelling-is-not-arrears` | D12 | the countdown to erasure started over a decision nobody disputed, because `past_due_at` is what every rung of the ladder is measured from |
 | `an-edit-snapshots-only-what-it-took` | D12 | every early customer frozen at the numbers the tier had on the day they joined — a later raise reaches everybody except the people who have been paying longest, and nothing anywhere reports it |
 | `a-plan-edited-down-holds-everybody-on-it` | D12 | a tier narrowed on Tuesday quietly taking seats, storage and the monthly allowance off every workspace that had already bought it, with nothing failing and nobody told until a refusal arrives |
 | `arriving-after-the-edit-gets-the-edit` | D12 | an operator narrowing a tier and changing nothing at all, because the snapshot was written onto future subscriptions as well and the plan's own numbers stopped being reachable |
