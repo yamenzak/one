@@ -181,10 +181,17 @@ function Book({ at, onOpen }: {
  * same tray the door opens, or the wall and the door would be two readers of one
  * text again.
  */
-export function DocumentList({ show, outstanding = [] }: {
+export function DocumentList({ show, outstanding = [], signed }: {
   /** Which to list. Absent lists everything the deployment publishes. */
   readonly show?: readonly { readonly id: string }[];
   readonly outstanding?: readonly { readonly id: string }[];
+  /**
+   * ⚠️ WHEN EACH WAS AGREED, BY DOCUMENT ID. The wall passes nothing — it is
+   * about what is still owed and there is no history to show yet; the account's
+   * own record passes the dates, and it is the SAME list either way rather than
+   * a second one that could disagree about a title or a version.
+   */
+  readonly signed?: Readonly<Record<string, { readonly at: string; readonly version: string }>>;
 }) {
   const book = useDocuments();
   const reading = useReading();
@@ -203,6 +210,7 @@ export function DocumentList({ show, outstanding = [] }: {
           <Documents
             documents={wanted.map(asDef)}
             outstanding={wanted.filter((d) => outstanding.some((o) => o.id === d.id)).map(asDef)}
+            {...(signed ? { signed } : {})}
             onOpen={reading.read}
           />
         );

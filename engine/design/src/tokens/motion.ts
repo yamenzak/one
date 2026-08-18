@@ -350,70 +350,142 @@ export const doorAt = (index: number): React.CSSProperties =>
  * library's own `EASE` variables rather than new cubic-beziers.
  */
 export const GLYPH_MOTION = [
-  /* A bell swings from its crown and damps out. */
-  `@keyframes glyph-ring {`,
-  `  0% { transform: rotate(0deg) }  20% { transform: rotate(16deg) }`,
-  `  40% { transform: rotate(-12deg) } 60% { transform: rotate(7deg) }`,
-  `  80% { transform: rotate(-3deg) } 100% { transform: rotate(0deg) }`,
+  /*
+    ⚠️ THE PART MOVES, NOT THE MARK — see `marks.tsx`. A bell rings by its
+    clapper; a calendar turns its days over; an arrow leaves through a door that
+    stays. Each of these names a `data-part` we drew, so nothing here depends on
+    the order lucide happens to put its paths in.
+  */
+  `@keyframes glyph-clapper {`,
+  `  0% { transform: rotate(0deg) }   18% { transform: rotate(19deg) }`,
+  `  38% { transform: rotate(-15deg) } 56% { transform: rotate(10deg) }`,
+  `  72% { transform: rotate(-6deg) }  86% { transform: rotate(3deg) }`,
+  `  100% { transform: rotate(0deg) }`,
   `}`,
-  /* A container takes something in: down, and settle back. */
-  `@keyframes glyph-take {`,
-  `  0% { transform: translateY(0) } 45% { transform: translateY(3px) scaleY(0.92) }`,
+  /* ⚠️ The body rocks a fraction of the clapper's arc — a bell held, not shaken. */
+  `@keyframes glyph-body {`,
+  `  0% { transform: rotate(0deg) } 22% { transform: rotate(4deg) }`,
+  `  50% { transform: rotate(-3deg) } 78% { transform: rotate(1.5deg) }`,
+  `  100% { transform: rotate(0deg) }`,
+  `}`,
+  /* A page turning: the days rise out and the next set rises in behind them. */
+  `@keyframes glyph-page-out {`,
+  `  0% { transform: translateY(0); opacity: 1 }`,
+  `  45% { transform: translateY(-5px); opacity: 0 }`,
+  `  100% { transform: translateY(-5px); opacity: 0 }`,
+  `}`,
+  `@keyframes glyph-page-in {`,
+  `  0% { transform: translateY(5px); opacity: 0 }`,
+  `  45% { transform: translateY(5px); opacity: 0 }`,
+  `  100% { transform: translateY(0); opacity: 1 }`,
+  `}`,
+  /* The arrow goes through the opening and comes back — the row is still there. */
+  `@keyframes glyph-depart {`,
+  `  0% { transform: translateX(0); opacity: 1 }`,
+  `  45% { transform: translateX(7px); opacity: 0 }`,
+  `  55% { transform: translateX(-7px); opacity: 0 }`,
+  `  100% { transform: translateX(0); opacity: 1 }`,
+  `}`,
+  /* Something lands in the tray, and the tray takes the weight. */
+  `@keyframes glyph-arrive {`,
+  `  0% { transform: translateY(-4px); opacity: 0 }`,
+  `  40% { opacity: 1 }`,
+  `  70% { transform: translateY(1px); opacity: 1 }`,
+  `  100% { transform: translateY(0); opacity: 0 }`,
+  `}`,
+  `@keyframes glyph-settle {`,
+  `  0%, 55% { transform: translateY(0) }`,
+  `  72% { transform: translateY(1.5px) }`,
   `  100% { transform: translateY(0) }`,
   `}`,
-  /* Something protective braces. */
-  `@keyframes glyph-guard {`,
-  `  0% { transform: scale(1) } 35% { transform: scale(1.18) }`,
-  `  100% { transform: scale(1) }`,
+  /*
+    ⚠️ A STROKE BEING MADE, WHICH NEEDS `pathLength={1}` ON THE PATH. With it the
+    dash numbers are fractions of the whole and survive the path being redrawn;
+    without it they are user units somebody measured once.
+  */
+  `@keyframes glyph-draw {`,
+  `  0% { stroke-dasharray: 1; stroke-dashoffset: 1 }`,
+  `  100% { stroke-dasharray: 1; stroke-dashoffset: 0 }`,
   `}`,
-  /* A mechanism turns. */
-  `@keyframes glyph-turn { to { transform: rotate(90deg) } }`,
-  /* A face shows its other side. */
+  /* A glass moved over a page: the lens leads and the handle follows it. */
+  `@keyframes glyph-sweep {`,
+  `  0% { transform: translate(0, 0) }   30% { transform: translate(-2.5px, 1px) }`,
+  `  65% { transform: translate(2px, -1px) } 100% { transform: translate(0, 0) }`,
+  `}`,
+  /* A mechanism turns, which is the one mark whose whole self moving IS its job. */
+  `@keyframes glyph-turn { to { transform: rotate(60deg) } }`,
   `@keyframes glyph-flip { to { transform: rotateY(180deg) } }`,
-  /* A confirmation lands. */
-  `@keyframes glyph-pop {`,
-  `  0% { transform: scale(1) } 40% { transform: scale(1.35) }`,
-  `  100% { transform: scale(1) }`,
-  `}`,
   /* Something catches the light. */
   `@keyframes glyph-twinkle {`,
-  `  0% { transform: rotate(0) scale(1) } 50% { transform: rotate(90deg) scale(1.2) }`,
+  `  0% { transform: rotate(0) scale(1) } 50% { transform: rotate(90deg) scale(1.16) }`,
   `  100% { transform: rotate(180deg) scale(1) }`,
   `}`,
   /* A living thing acknowledges you. */
   `@keyframes glyph-nod {`,
-  `  0% { transform: translateY(0) } 30% { transform: translateY(-4px) }`,
-  `  60% { transform: translateY(1px) } 100% { transform: translateY(0) }`,
-  `}`,
-  /* Something that looks, looks around. */
-  `@keyframes glyph-seek {`,
-  `  0% { transform: rotate(0) } 25% { transform: rotate(-18deg) }`,
-  `  75% { transform: rotate(18deg) } 100% { transform: rotate(0) }`,
+  `  0% { transform: translateY(0) } 30% { transform: translateY(-3px) }`,
+  `  62% { transform: translateY(1px) } 100% { transform: translateY(0) }`,
   `}`,
   /*
-    ⚠️ THE MARK IS ITS OWN STACKING AND TRANSFORM CONTEXT. Without
-    `display:inline-flex` a span wrapping an SVG has no box to rotate about, and
-    `transform-origin` lands somewhere the text baseline decided.
+    ⚠️ THE MARK IS ITS OWN TRANSFORM CONTEXT, AND SO IS EVERY PART. Without
+    `transform-box: fill-box` an SVG group rotates about the viewport's origin,
+    which throws the clapper off the screen — the one difference between these
+    rules and the same rules on an HTML element.
   */
-  `[data-glyph] { display: inline-flex; transform-origin: center }`,
-  `[data-glyph="ring"] { transform-origin: top center }`,
-  `[data-glyph="turn"], [data-glyph="twinkle"] { transform-origin: center }`,
+  `[data-glyph] { display: inline-flex }`,
+  `[data-glyph] [data-part] { transform-box: fill-box; transform-origin: center }`,
+  `[data-glyph="ring"] [data-part="clapper"], [data-glyph="ring"] [data-part="body"] {`,
+  `  transform-origin: top center }`,
   /*
-    ⚠️ WRITTEN OUT, NOT GENERATED FROM A TABLE. The first version built these nine
-    rules with a `.map`, so the string `animation: glyph-ring` never appeared in
-    this file — and `motion.test.mjs` refuses a keyframe it cannot SEE wired up,
-    which is the check that makes "declared and never used" impossible. It was
-    right: a table is shorter and hides the one line that proves the motion runs.
+    ⚠️ SLOWER THAN A CONTROL, AND THAT IS THE POINT. `instant` and `quick` are
+    paced for something done a hundred times a day, where anything longer is a
+    tax on every repetition. A mark answering in character is a small piece of
+    craft somebody is meant to NOTICE — under about half a second it reads as a
+    flicker, which is worse than nothing.
   */
-  `[data-glyph="ring"][data-lively="true"] { animation: glyph-ring ${DURATION.moderate} ${EASE.settle} both }`,
-  `[data-glyph="take"][data-lively="true"] { animation: glyph-take ${DURATION.moderate} ${EASE.settle} both }`,
-  `[data-glyph="guard"][data-lively="true"] { animation: glyph-guard ${DURATION.quick} ${EASE.settle} both }`,
-  `[data-glyph="turn"][data-lively="true"] { animation: glyph-turn ${DURATION.moderate} ${EASE.travel} both }`,
-  `[data-glyph="flip"][data-lively="true"] { animation: glyph-flip ${DURATION.moderate} ${EASE.travel} both }`,
-  `[data-glyph="pop"][data-lively="true"] { animation: glyph-pop ${DURATION.quick} ${EASE.settle} both }`,
-  `[data-glyph="twinkle"][data-lively="true"] { animation: glyph-twinkle ${DURATION.moderate} ${EASE.travel} both }`,
-  `[data-glyph="nod"][data-lively="true"] { animation: glyph-nod ${DURATION.moderate} ${EASE.settle} both }`,
-  `[data-glyph="seek"][data-lively="true"] { animation: glyph-seek ${DURATION.moderate} ${EASE.settle} both }`,
-  `@media (prefers-reduced-motion: reduce) { [data-glyph] { animation: none !important } }`,
-  `[data-reduce-motion="true"] [data-glyph] { animation: none !important }`,
+  `[data-glyph="ring"][data-lively="true"] [data-part="clapper"] {`,
+  `  animation: glyph-clapper ${DURATION.stately} ${EASE.settle} both }`,
+  `[data-glyph="ring"][data-lively="true"] [data-part="body"] {`,
+  `  animation: glyph-body ${DURATION.stately} ${EASE.settle} both }`,
+  `[data-glyph="page"][data-lively="true"] [data-part="days"] {`,
+  `  animation: glyph-page-out ${DURATION.stately} ${EASE.travel} both }`,
+  `[data-glyph="page"][data-lively="true"] [data-part="days-next"] {`,
+  `  animation: glyph-page-in ${DURATION.stately} ${EASE.travel} both }`,
+  /* ⚠️ The next set is invisible until the mark is pressed, or a calendar sits
+     with two rows of days printed over each other. */
+  `[data-glyph="page"] [data-part="days-next"] { opacity: 0 }`,
+  `[data-glyph="depart"][data-lively="true"] [data-part="arrow"] {`,
+  `  animation: glyph-depart ${DURATION.stately} ${EASE.travel} both }`,
+  `[data-glyph="take"][data-lively="true"] [data-part="post"] {`,
+  `  animation: glyph-arrive ${DURATION.stately} ${EASE.travel} both }`,
+  `[data-glyph="take"][data-lively="true"] [data-part="tray"] {`,
+  `  animation: glyph-settle ${DURATION.stately} ${EASE.settle} both }`,
+  `[data-glyph="take"] [data-part="post"] { opacity: 0 }`,
+  `[data-glyph="guard"][data-lively="true"] [data-part="tick"] {`,
+  `  animation: glyph-draw ${DURATION.stately} ${EASE.enter} both }`,
+  `[data-glyph="draw"][data-lively="true"] [data-part="tick"] {`,
+  `  animation: glyph-draw ${DURATION.moderate} ${EASE.enter} both }`,
+  `[data-glyph="draw"][data-lively="true"] [data-part="tick-two"] {`,
+  `  animation: glyph-draw ${DURATION.moderate} ${EASE.enter} 140ms both }`,
+  `[data-glyph="seek"][data-lively="true"] [data-part="lens"],`,
+  `[data-glyph="seek"][data-lively="true"] [data-part="handle"] {`,
+  `  animation: glyph-sweep ${DURATION.stately} ${EASE.settle} both }`,
+  /*
+    ⚠️ AND FOUR MARKS WHERE THE WHOLE SELF MOVING *IS* THE PURPOSE — a cog turns,
+    a coin flips, a star twinkles, a person nods. These are still lucide's, and
+    that is correct: drawing our own to move them the same way would be a bespoke
+    icon nobody could tell from the library's, which is cost with no picture.
+  */
+  `[data-glyph="turn"][data-lively="true"] {`,
+  `  animation: glyph-turn ${DURATION.stately} ${EASE.travel} both }`,
+  `[data-glyph="flip"][data-lively="true"] {`,
+  `  animation: glyph-flip ${DURATION.stately} ${EASE.travel} both }`,
+  `[data-glyph="twinkle"][data-lively="true"] {`,
+  `  animation: glyph-twinkle ${DURATION.stately} ${EASE.travel} both }`,
+  `[data-glyph="nod"][data-lively="true"] {`,
+  `  animation: glyph-nod ${DURATION.moderate} ${EASE.settle} both }`,
+  `@media (prefers-reduced-motion: reduce) {`,
+  `  [data-glyph], [data-glyph] [data-part] { animation: none !important }`,
+  `}`,
+  `[data-reduce-motion="true"] [data-glyph],`,
+  `[data-reduce-motion="true"] [data-glyph] [data-part] { animation: none !important }`,
 ].join("\n");

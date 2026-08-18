@@ -28,8 +28,13 @@ import {
   Banknote, Bell, Building2, Calendar, CheckCheck, Circle, ClipboardList, Clock, Cog, Coins, Database,
   Boxes, ChartColumn, FileText, House, Inbox as InboxGlyph, Mail, NotebookPen, Package, Plus, Search,
   Shield, Sparkles, Star, Sun, UserRound, Users,
-  BellRing, LogOut,
 } from "lucide-react";
+/* ⚠️ OURS, BECAUSE THEIR MOTION IS INSIDE THEM — see `marks.tsx`. A bell rings
+   by its clapper and a calendar turns its days over; neither is a transform on
+   the outside, and lucide's path order is not something to build on. */
+import {
+  BellMark, CalendarMark, CheckMark, InboxMark, LeaveMark, SearchMark, ShieldMark,
+} from "../parts/marks.js";
 import { Page } from "./page.js";
 import { Island } from "./chrome.js";
 import {
@@ -59,12 +64,12 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
   apps: <Boxes />, product: <Boxes />,
   money: <Coins />, coins: <Coins />, bank: <Banknote />,
   settings: <Cog />, cog: <Cog />,
-  trust: <Shield />, shield: <Shield />,
-  inbox: <InboxGlyph />, bell: <Bell />, mail: <Mail />,
+  trust: <ShieldMark />, shield: <ShieldMark />,
+  inbox: <InboxMark />, bell: <BellMark />, mail: <Mail />,
   /* ⚠️ Clearing a list is a noun this system says on more than one screen. */
-  check: <CheckCheck />,
+  check: <CheckMark />,
   note: <NotebookPen />, file: <FileText />, list: <ClipboardList />,
-  calendar: <Calendar />, package: <Package />,
+  calendar: <CalendarMark />, package: <Package />,
   /* ⚠️ Making a new one of something is a row like any other, and it needs a
      mark like any other — a menu with one unmarked row reads as a mistake. */
   add: <Plus />,
@@ -79,15 +84,15 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
      describes, reached by the app it was written for. A glyph name is data in a
      manifest, so nothing can typecheck it; the only place it is visible is a
      rendered nav. */
-  chart: <ChartColumn />, search: <Search />, star: <Star />,
+  chart: <ChartColumn />, search: <SearchMark />, star: <Star />,
   /* ⚠️ A BELL THAT IS ALREADY RINGING, for the row that turns ringing on. Two
      screens imported it straight from lucide and drew a mark with no character
      — see `LIVELY`, and `scripts/glyphs.test.mjs`, which now refuses that. */
-  "bell-ring": <BellRing />,
+  "bell-ring": <BellMark />,
   /* ⚠️ LEAVING IS A ROW LIKE ANY OTHER AND NEEDS A MARK LIKE ANY OTHER. Sign
      out was the one row in the account centre with an empty lead, which reads
      as a row that failed to load rather than as a different kind of thing. */
-  leave: <LogOut />,
+  leave: <LeaveMark />,
 };
 
 /**
@@ -105,19 +110,33 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
  * omission as deliberate only where it is written down (`STILL`).
  */
 export const LIVELY: Readonly<Record<string, string>> = {
-  bell: "ring", "bell-ring": "ring", mail: "take", inbox: "take", package: "take",
+  /* Parts move — see `marks.tsx`. */
+  bell: "ring", "bell-ring": "ring",
+  inbox: "take",
+  calendar: "page",
+  leave: "depart",
   trust: "guard", shield: "guard",
+  check: "draw",
+  search: "seek",
+  /* The whole mark moving IS the purpose. */
   settings: "turn", cog: "turn", clock: "turn",
-  money: "flip", coins: "flip", bank: "flip", calendar: "flip", card: "flip",
-  check: "pop", add: "pop", star: "twinkle", sparkle: "twinkle",
+  money: "flip", coins: "flip", bank: "flip", card: "flip",
+  star: "twinkle", sparkle: "twinkle", sun: "twinkle",
   people: "nod", users: "nod", person: "nod", home: "nod", house: "nod",
-  search: "seek", chart: "seek", list: "seek", file: "seek", note: "seek",
-  apps: "pop", product: "pop", workspace: "guard", database: "guard",
-  sun: "twinkle", leave: "seek",
 };
 
 /** ⚠️ Marks with no character, on purpose — see `LIVELY`. */
-export const STILL: readonly string[] = ["circle"];
+/**
+ * ⚠️ MARKS WITH NO ACT OF THEIR OWN, ON PURPOSE. A file, a list, a note, a
+ * workspace, a product: nouns. There is no motion a document MAKES, and giving
+ * one a nudge would be exactly the uniform scale-and-fade the character
+ * vocabulary exists to replace. `circle` is the neutral fallback and has no
+ * subject at all.
+ */
+export const STILL: readonly string[] = [
+  "circle", "mail", "package", "note", "file", "list", "add", "apps", "product",
+  "workspace", "database", "chart", "add", "plus",
+];
 
 /**
  * A MARK THAT ANSWERS WHEN ITS ROW IS PRESSED.

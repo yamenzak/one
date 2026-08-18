@@ -11,10 +11,12 @@
  * a list of company names without it answers nothing.
  */
 
-import type { DocumentDef, NeedBook, RopaEntry, SubProcessorBook } from "@engine/kernel";
+import type { DocumentDef, Instant, NeedBook, RopaEntry, SubProcessorBook } from "@engine/kernel";
+import { sayDate } from "@engine/kernel";
 import { Button, Card, Chip, Table } from "@heroui/react";
 import { ControlRow, FieldRow, Group, NavRow } from "../parts/surfaces.js";
 import { glyphOf } from "../frame/shell.js";
+import { useShown } from "../parts/said.js";
 import { SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 
@@ -61,8 +63,23 @@ export interface DocumentsProps {
   readonly onOpen: (id: string) => void;
 }
 
-export function Documents({ documents, outstanding = [], onOpen }: DocumentsProps) {
+export function Documents({ documents, outstanding = [], signed, onOpen }: DocumentsProps & {
+  /**
+   * ⚠️ WHEN EACH ONE WAS AGREED, WHERE THAT IS KNOWN — the account's own record.
+   * Absent on the wall, which is about what is still owed and has no history to
+   * show yet; present on the account centre, which is only about the history.
+   *
+   * ⚠️ AND IT IS THE SAME RENDERER EITHER WAY. Agreeing to something and looking
+   * it up months later are the same list with one more fact on the row, which is
+   * what stops the two surfaces disagreeing about a document's name or version.
+   */
+  readonly signed?: Readonly<Record<string, { readonly at: string; readonly version: string }>>;
+}) {
   const owed = new Set(outstanding.map((d) => d.id));
+  /* ⚠️ FORMATTED HERE, IN THE READER'S OWN CONVENTIONS. `under` is a string, so
+     a `Dated` element cannot go in it — and a date built with `toLocaleString`
+     would be the one date in the product that ignores what somebody chose. */
+  const shown = useShown();
   return (
     /*
       ⚠️ A DOCUMENT IS A ROW, NOT A CARD. Each one was a `Card` with a title, a
@@ -84,13 +101,35 @@ export function Documents({ documents, outstanding = [], onOpen }: DocumentsProp
           label={doc.title}
           /* ⚠️ The version is a DATE, because "did they accept the one from
              before the change" is the only question ever asked of it. */
-          under={`Version ${doc.version}${owed.has(doc.id) ? " · not agreed yet" : ""}`}
+          /*
+            ⚠️ THE VERSION SHOWN IS THE PUBLISHED ONE AND THE DATE IS WHEN THEY
+            SIGNED — which are the same fact only while nothing has changed. Put
+            side by side without saying so, the row read "Version 2026-08-01 ·
+            agreed 11 Feb 2026" for somebody who agreed to the FEBRUARY wording,
+            which is the row claiming they accepted text they have never seen.
+          */
+          under={`Version ${doc.version}`
+            + (owed.has(doc.id) ? " · not agreed yet" : "")
+            + said(shown, doc.version, signed?.[doc.id])}
           onOpen={() => onOpen(doc.id)}
         />
       ))}
     </Group>
   );
 }
+
+/** ⚠️ What a row says about a signature, and it is honest about a stale one. */
+const said = (
+  shown: Parameters<typeof sayDate>[0],
+  published: string,
+  one?: { readonly at: string; readonly version: string },
+): string => {
+  if (!one) return "";
+  const on = sayDate(shown, one.at as Instant, "short");
+  return one.version === published
+    ? ` · agreed ${on}`
+    : ` · earlier version agreed ${on}`;
+};
 
 export function SubProcessors({ book }: { readonly book: SubProcessorBook }) {
   const all = Object.values(book);

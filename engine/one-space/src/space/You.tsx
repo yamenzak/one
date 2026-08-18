@@ -18,10 +18,10 @@
  * account list, after a rule, and there is no reason to be different.
  */
 
-import { Group, Identity, NavRow, Screen, glyphOf, whoFace } from "@engine/design";
+import { Group, Identity, NavRow, Place, Screen, glyphOf, whoFace } from "@engine/design";
 import { useSession } from "../session.js";
 import { SignOut } from "./SignOut.js";
-import { nameOf, type Where } from "./where.js";
+import { groundOf, nameOf, type Where } from "./where.js";
 
 export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
   const { me, where } = useSession();
@@ -82,16 +82,6 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
           under="Dates, times, numbers and measurements, everywhere"
           onOpen={() => onGo({ at: "formats" })}
         />
-        {/* ⚠️ UNDER YOU, BECAUSE AN AGREEMENT IS SIGNED BY A PERSON. One
-            account accepts the terms once for the whole deployment, and a
-            business agreement names the workspace it was signed in — both are
-            facts about the hand that signed, not about a workspace. */}
-        <NavRow
-          icon={glyphOf("file")}
-          label={nameOf({ at: "agreed" })}
-          under="Every document you have accepted, and when"
-          onOpen={() => onGo({ at: "agreed" })}
-        />
         <NavRow
           icon={glyphOf("cog")}
           label="Your preferences"
@@ -99,6 +89,37 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
           onOpen={() => onGo({ at: "prefs" })}
         />
       </Group>
+
+      {/*
+        ⚠️ A DESTINATION, NOT A ROW, AND IT IS THE ONE CARD HERE THAT WEARS A
+        WORLD. Everything above is a menu — five rows of settings, which
+        AMBIENCE.md says never earns a ground. What somebody has bound themselves
+        to is a RECORD, and a record is the one thing in the account centre that
+        is a place to go rather than a control to move.
+
+        ⚠️ THE MATERIAL IS ASKED, NEVER TYPED. `scene.test.mjs` refuses a screen
+        that writes a family into itself; `groundOf` is the one decider and it
+        says this address is ruled rather than woven, because it is a document.
+
+        ⚠️ UNDER YOU, BECAUSE AN AGREEMENT IS SIGNED BY A PERSON. One account
+        accepts the terms once for the whole deployment, and a business agreement
+        names the workspace it was signed in — both are facts about the hand that
+        signed, not about a workspace.
+      */}
+      <Place
+        name={nameOf({ at: "agreed" })}
+        said="Every document you have accepted, which version, and the day you agreed"
+        sky={groundOf({ at: "agreed" })}
+        /* ⚠️ NO FACE, AND `foot` IS A SENTENCE RATHER THAN A GAP. `appFace`'s
+           glyph is a manifest's own MARK — a character it prints literally — so
+           passing a glyph NAME drew the word "file" in the plate; and `foot`
+           left null draws a skeleton, which on a card with nothing loading is a
+           grey bar that never resolves. The world and the words are what make
+           this a destination; a plate with an initial in it would say only that
+           somebody wanted one there. */
+        foot="Read what you signed"
+        onOpen={() => onGo({ at: "agreed" })}
+      />
 
       <SignOut />
 
