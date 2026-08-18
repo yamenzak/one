@@ -344,10 +344,22 @@ export interface ScreenProps<T> {
  * A screen with no request at all is always ready, which is the fourth case and
  * needs no branch.
  */
-const shows = <T,>(of: Loaded<T> | undefined, isNothing?: (d: T) => boolean): "act" | "empty" | "no" =>
+/**
+ * ⚠️ WAITING IS ITS OWN ANSWER HERE, AND COLLAPSING IT INTO "NO" MOVED THE
+ * SKELETON. `status !== "ready"` folded waiting in with a refusal, and a refusal
+ * takes the WHOLE screen (centred in what is left) — so every screen in the
+ * product drew its placeholder in the MIDDLE of the viewport and then dropped
+ * the real content to the top when it arrived. A skeleton exists to make nothing
+ * move; centring it guarantees the one jump it was there to prevent.
+ */
+const shows = <T,>(
+  of: Loaded<T> | undefined,
+  isNothing?: (d: T) => boolean,
+): "act" | "empty" | "wait" | "no" =>
   of === undefined ? "act"
-    : of.status !== "ready" ? "no"
-      : nothingIn(of.data, isNothing) ? "empty" : "act";
+    : of.status === "waiting" ? "wait"
+      : of.status === "trouble" ? "no"
+        : nothingIn(of.data, isNothing) ? "empty" : "act";
 
 export function Screen<T = unknown>({
   shape, title, under, back, leave, does, also = [],
@@ -465,9 +477,20 @@ export function Screen<T = unknown>({
         ⚠️ AND IT IS DECIDED HERE RATHER THAN IN `Nothing`, because only the
         screen knows whether the emptiness IS the page. The same component drawn
         inside a card, beside other blocks, must stay where it was put.
+
+        ⚠️ BUT NEVER WHILE WAITING — see `shows`. A skeleton is the geometry of
+        what is coming, so it belongs exactly where the content will be; centred,
+        it is a placeholder that guarantees the jump it exists to prevent. The
+        box still GROWS, so the dock below it stays at the bottom of the
+        viewport rather than following the placeholder up the page.
       */}
       <Band bleed="hold" width={preset.width} grow={where !== "act"}>
-        <div className={where !== "act" ? `${NUDGE.body} ${WHOLE}` : NUDGE.body}>{body}</div>
+        <div className={where === "empty" || where === "no"
+          ? `${NUDGE.body} ${WHOLE}`
+          : NUDGE.body}
+        >
+          {body}
+        </div>
       </Band>
 
       {/* ⚠️ THE SCREEN OWNS THE SPACE UNDER ITS CONTENT, so the dock below is at

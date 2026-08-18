@@ -25,7 +25,7 @@ import { useSession } from "../session.js";
 import type { Where } from "./where.js";
 
 export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
-  const { me, leave } = useSession();
+  const { me, leave, where } = useSession();
   const person = me && me !== "nobody" ? me : null;
 
   return (
@@ -41,11 +41,20 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
       />
 
       <Group>
-        <NavRow
-          icon={glyphOf("inbox")}
-          label="Inbox"
-          onOpen={() => onGo({ at: "inbox" })}
-        />
+        {/* ⚠️ AN INBOX BELONGS TO A WORKSPACE, so it is offered where there is
+            one to be the inbox OF. `inbox.list` reads `tenantId`, which the
+            account door does not have — it answered 404 there, and the screen
+            reported that as "Loading…" indefinitely. Offering it here and on
+            the home screen made that two dead rows rather than one. */}
+        {where?.kind === "tenant"
+          ? (
+            <NavRow
+              icon={glyphOf("inbox")}
+              label="Inbox"
+              onOpen={() => onGo({ at: "inbox" })}
+            />
+          )
+          : null}
         <NavRow
           icon={glyphOf("bell")}
           label="How you are told"
@@ -53,7 +62,7 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
         />
         {/* ⚠️ YOURS, NOT A WORKSPACE'S. What you prefer follows you into every
             workspace you are in, so it is filed under you rather than under one
-            of them — the same reason the inbox and `told` are here. */}
+            of them — which is exactly the test the inbox above fails. */}
         {/* ⚠️ UNDER YOU, BECAUSE THE WALK BEHIND IT CROSSES EVERY WORKSPACE.
             Filed under one of them it would answer for a fraction of what is
             held and say so in a heading nobody reads. */}

@@ -85,6 +85,50 @@ for (const file of FILES) {
 }
 if (!rolled) ok(`outcomes: ${FILES.length} file(s), none hand-rolls the four-way`);
 
+/* --------------------------------------------------- the four-way as props --- */
+
+/**
+ * ⚠️ THE SAME FAILURE ARRIVES THROUGH THE PROP LIST, AND THE CHECK ABOVE CANNOT
+ * SEE IT. `Inbox` took `notes: Note[] | null` plus `failed: boolean` and branched
+ * on them in that order — which is `Await` rewritten by hand, with the null
+ * branch first, so a REFUSED inbox rendered "Loading…" indefinitely and the
+ * "could not load" branch beneath it was unreachable code. Nothing declared a
+ * `loading` variable, so nothing fired.
+ *
+ * ⚠️ AND `failed: boolean` IS THE PART WORTH BANNING BY ITSELF. A `Problem`
+ * carries the sentence, the tone and whether trying again could work; a boolean
+ * throws all three away and leaves the receiving component to invent copy the
+ * platform already wrote (`Trouble` — "there is no `message` prop and there must
+ * not be one"). A component that can be told a request failed must be told WHAT
+ * failed.
+ */
+const AS_PROP = /readonly\s+(failed|errored|isError|hasError)\s*\??\s*:\s*boolean/g;
+
+/** ⚠️ The visible symptom, banned on its own — a skeleton is what waiting looks like. */
+const SAYS_LOADING = /["'>]\s*Loading[….]/g;
+
+let handed = 0;
+for (const file of [...FILES, ...filesIn("apps")].filter((f) => !/\.test\.tsx?$/.test(f))) {
+  const name = rel(file);
+  if (DEFINES.has(name)) continue;
+  const src = strip(readFileSync(file, "utf8"));
+  for (const [, which] of src.matchAll(AS_PROP)) {
+    handed++;
+    fail(`${name}: takes \`${which}: boolean\` (D7).\n` +
+         `       A failure is a \`Problem\`, and a boolean has thrown away the sentence,\n` +
+         `       the tone and whether a retry could work. Take \`Loaded<T>\` and let\n` +
+         `       \`Await\` decide, or take the \`Problem\` itself.`);
+  }
+  for (const [] of src.matchAll(SAYS_LOADING)) {
+    handed++;
+    fail(`${name}: writes its own "Loading…" (D7).\n` +
+         `       Waiting is a SKELETON shaped like what is coming — \`RowsWaiting\`,\n` +
+         `       \`TableWaiting\`, \`FormWaiting\`. A word where the content goes is a\n` +
+         `       layout that jumps, and it is what a refusal looked like here.`);
+  }
+}
+if (!handed) ok(`handed: no surface is told "it failed" without being told what`);
+
 /* ------------------------------------------------------- the empty array --- */
 
 /**

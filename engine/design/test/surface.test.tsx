@@ -964,6 +964,36 @@ describe("the screen shapes", () => {
   });
 
   /*
+    ⚠️ THE SKELETON GOES WHERE THE CONTENT GOES, AND THE EMPTY STATE DOES NOT.
+    `shows` read anything that was not `ready` as one answer, so waiting shared
+    the empty state's treatment — centred in what is left of the viewport — and
+    every screen in the product dropped its content to the top the moment it
+    arrived. That is the one jump a skeleton exists to prevent, and it was in the
+    frame rather than in any screen, so no screen could be blamed for it.
+  */
+  it("centres an empty screen and a refusal, and never a skeleton", () => {
+    const centred = /justify-center/;
+
+    const wait = html(
+      <Screen shape="list" title="People" of={waiting<string[]>()} then={() => null} />,
+    );
+    expect(wait).not.toMatch(centred);
+
+    const empty = html(
+      <Screen
+        shape="list" title="People"
+        of={ready<string[]>([])} nothing={{ says: "Nobody here yet" }} then={() => null}
+      />,
+    );
+    expect(empty).toMatch(centred);
+
+    const no = html(
+      <Screen shape="list" title="People" refused={{ says: "Not for you" }} />,
+    );
+    expect(no).toMatch(centred);
+  });
+
+  /*
     ⚠️ A REFUSAL KEEPS ITS CROWN, which five screens did not. Returned early,
     above the frame, it is a sentence alone on a page — no title, no way back.
   */

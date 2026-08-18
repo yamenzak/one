@@ -25,7 +25,7 @@ import type { Kind, ScreenSpec } from "@engine/kernel";
 import { PRIMARY_MAX, isBusiness, primaryOf } from "@engine/kernel";
 import { Button, Separator } from "@heroui/react";
 import {
-  Banknote, Bell, Building2, Calendar, Circle, ClipboardList, Clock, Cog, Coins, Database,
+  Banknote, Bell, Building2, Calendar, CheckCheck, Circle, ClipboardList, Clock, Cog, Coins, Database,
   Boxes, ChartColumn, FileText, House, Inbox as InboxGlyph, Mail, NotebookPen, Package, Plus, Search,
   Shield, Sparkles, Star, Sun, UserRound, Users,
 } from "lucide-react";
@@ -60,6 +60,8 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
   settings: <Cog />, cog: <Cog />,
   trust: <Shield />, shield: <Shield />,
   inbox: <InboxGlyph />, bell: <Bell />, mail: <Mail />,
+  /* ⚠️ Clearing a list is a noun this system says on more than one screen. */
+  check: <CheckCheck />,
   note: <NotebookPen />, file: <FileText />, list: <ClipboardList />,
   calendar: <Calendar />, package: <Package />,
   /* ⚠️ Making a new one of something is a row like any other, and it needs a

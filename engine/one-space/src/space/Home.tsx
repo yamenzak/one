@@ -13,10 +13,10 @@
  * number that says whether the row needs them. The description each place
  * carried is what a row's own screen says on arrival.
  *
- * ⚠️ AND THE COUNTS ARE ON THE ROWS, WHICH IS THE POINT OF HAVING THEM. Unread
- * mail and a workspace that stopped paying are the two reasons anybody opens
- * this screen at all; buried as the third line of a card they were something to
- * read rather than something to see.
+ * ⚠️ AND THE COUNT IS ON THE ROW, WHICH IS THE POINT OF HAVING IT. A workspace
+ * that stopped paying is the reason anybody opens this screen at all; buried as
+ * the third line of a card it was something to read rather than something to
+ * see.
  *
  * ⚠️ A PLACE IS NEVER DRAWN OVER NOTHING. The console is absent for everybody
  * who is not an operator — which is everybody — because a named destination
@@ -26,7 +26,6 @@
 import { Chip } from "@heroui/react";
 import { Group, Identity, NavRow, Stack, glyphOf, whoFace } from "@engine/design";
 import type { Me } from "../api.js";
-import { useLoad, type InboxView } from "../centre/data.js";
 import { useSession } from "../session.js";
 import { spaceAt, operatorUrl } from "../door.js";
 import { nameOf, pathOf, type Where } from "./where.js";
@@ -36,7 +35,6 @@ export function SpaceHome({ person, onGo }: {
   readonly onGo: (to: Where) => void;
 }) {
   const { where } = useSession();
-  const inbox = useLoad<InboxView>("inbox.list");
 
   /* ⚠️ The console answers on the operator door and nowhere else (D18), so
      from anywhere else this travels — see `spaceAt`. */
@@ -50,7 +48,6 @@ export function SpaceHome({ person, onGo }: {
      trip is a wrong answer wearing a loading state's excuse. */
   const workspaces = person?.tenants ?? null;
   const needing = workspaces?.filter((t) => t.attention).length ?? 0;
-  const unread = inbox.of.status === "ready" ? inbox.of.data.unseen : 0;
 
   return (
     <Stack space="roomy">
@@ -78,15 +75,12 @@ export function SpaceHome({ person, onGo }: {
             : undefined}
           onOpen={() => onGo({ at: "workspaces" })}
         />
-        <NavRow
-          icon={glyphOf("inbox")}
-          label="Inbox"
-          /* ⚠️ Zero is texture, never a badge saying nothing happened. */
-          aside={unread > 0
-            ? <Chip color="accent" variant="soft"><Chip.Label>{unread}</Chip.Label></Chip>
-            : undefined}
-          onOpen={() => onGo({ at: "inbox" })}
-        />
+        {/* ⚠️ NO INBOX ROW. It was here AND on the screen one row below it, and
+            on this door it went nowhere either time: an inbox belongs to a
+            WORKSPACE (`inbox.list` reads `tenantId`), so the account door
+            answers it 404 — a named destination with nothing behind it, which
+            this file's own header bans. It is on a workspace's chrome, where
+            there is one to be the inbox OF. */}
         <NavRow
           icon={glyphOf("person")}
           /* ⚠️ THE ROW IS NAMED BY WHERE IT GOES, not by a synonym. It said

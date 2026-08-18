@@ -1,25 +1,21 @@
 /**
- * THE BELL AND THE INBOX.
+ * THE INBOX.
  *
  * ⚠️ THIS IS THE SCREEN A PREVIOUS PLATFORM NEVER SHIPPED. It had the schema,
  * the Durable Object, four routes, a registry and sixteen dispatch sites — and
  * nowhere a person could look, for three stages, with every suite green. The
  * note saying the bell was coming became the reason nobody checked.
  *
- * ⚠️ `null` IS NOT `[]`. A count that has not arrived yet is not zero and an
- * inbox that has not loaded is not empty — "You're all caught up" while still
- * fetching is a wrong answer wearing a loading state's excuse, and somebody acts
- * on it.
- *
- * ⚠️ AND A FAILED POLL IS ONLY SHOWN WHILE THERE IS NOTHING TO SHOW. A dropped
- * connection that blanks a list somebody was reading is indistinguishable, to
- * them, from their records being gone.
+ * ⚠️ AND IT TAKES LOADED NOTES, NEVER A `null` MEANING "NOT YET". This drew its
+ * own four-way out of `notes: Note[] | null` plus `failed: boolean`, with the
+ * null branch first — so a REFUSED inbox rendered "Loading…" for as long as
+ * somebody was willing to look at it, and the "could not load" branch under it
+ * was unreachable code. `Await` owns that decision (`state.tsx`), the screen
+ * hands it a `Loaded`, and this draws the one case where there are notes.
  */
 
-import { Button, Card, Chip, Separator } from "@heroui/react";
-import { colorFor } from "../tokens/theme.js";
-import type { Tone } from "@engine/kernel";
-import { SPACE } from "../tokens/metrics.js";
+import { Chip } from "@heroui/react";
+import { Group, NavRow } from "../parts/surfaces.js";
 
 export interface Note {
   readonly id: string;
@@ -31,90 +27,59 @@ export interface Note {
   readonly seen: boolean;
 }
 
-export interface BellProps {
-  /** ⚠️ `null` means not known yet — see the header. */
-  readonly unseen: number | null;
-  readonly onOpen: () => void;
-}
-
-export function Bell({ unseen, onOpen }: BellProps) {
-  return (
-    <Button variant="ghost" aria-label="Notifications" onPress={onOpen}>
-      {/* Nothing while it is unknown, and nothing at zero: a zero badge is texture. */}
-      {unseen === null || unseen === 0
-        ? "Inbox"
-        : <Chip color="danger" variant="primary"><Chip.Label>{unseen}</Chip.Label></Chip>}
-    </Button>
-  );
-}
-
 export interface InboxProps {
-  /** ⚠️ `null` until the first answer arrives. */
-  readonly notes: readonly Note[] | null;
-  readonly failed?: boolean;
+  /** ⚠️ LOADED. The four-way is the screen's — see the header. */
+  readonly notes: readonly Note[];
   readonly onOpen: (note: Note) => void;
-  readonly onSeenAll: () => void;
 }
 
-export function Inbox({ notes, failed, onOpen, onSeenAll }: InboxProps) {
-  if (notes === null) {
-    return (
-      <Card>
-        <Card.Header><Card.Title>Loading…</Card.Title></Card.Header>
-      </Card>
-    );
-  }
+/**
+ * ⚠️ THE DAY AND THE TIME, NOT AN ISO STRING WITH ITS `T` SWAPPED FOR A SPACE.
+ * A notification is read as "when", and `2026-08-18 14:03` makes somebody parse
+ * a date to answer a question they asked by glancing.
+ */
+const when = (at: string): string => {
+  const on = new Date(at);
+  if (Number.isNaN(on.getTime())) return at;
+  return on.toLocaleString(undefined, {
+    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+};
 
-  /* ⚠️ The failure is shown only because there is nothing else to show. */
-  if (failed && notes.length === 0) {
-    return (
-      <Card>
-        <Card.Header>
-          <Card.Title>Could not load your inbox</Card.Title>
-          <Card.Description>Nothing is lost — try again in a moment.</Card.Description>
-        </Card.Header>
-      </Card>
-    );
-  }
-
-  if (notes.length === 0) {
-    return (
-      <Card>
-        <Card.Header><Card.Title>Nothing here yet</Card.Title></Card.Header>
-      </Card>
-    );
-  }
-
+export function Inbox({ notes, onOpen }: InboxProps) {
   return (
-    <div className={`flex flex-col ${SPACE.tight}`}>
-      <div className="flex justify-end">
-        <Button variant="ghost" onPress={onSeenAll}>Mark all as read</Button>
-      </div>
+    /*
+      ⚠️ ROWS IN ONE CARD, NOT A CARD EACH. Every note was a `Card` with a
+      header, a description and a content area holding a chip and a button — so
+      four notifications filled a phone and the only thing being scanned for,
+      which of them is new, was the third element of the third block of each.
+
+      ⚠️ AND THE WHOLE ROW OPENS IT. The press marks it seen and follows the
+      link; a button inside a row makes the other 90% of the row a dead target,
+      which is the one part of it a thumb actually lands on.
+    */
+    <Group>
       {notes.map((note) => (
-        <Card key={note.id}>
-          <Card.Header>
-            <Card.Title>{note.title}</Card.Title>
-            <Card.Description>{note.at.slice(0, 16).replace("T", " ")}</Card.Description>
-          </Card.Header>
-          <Card.Content>
-            <div className={`flex items-center ${SPACE.snug}`}>
-              {!note.seen
-                ? (
-                  <Chip color={colorFor(note.tone as Tone)} variant="soft">
-                    <Chip.Label>New</Chip.Label>
-                  </Chip>
-                )
-                : null}
-              {/* ⚠️ A row with a dead link is worse than a row with none: it is a
-                  promise that goes nowhere, and the person blames the product. */}
-              {note.link
-                ? <Button variant="secondary" onPress={() => onOpen(note)}>Open</Button>
-                : null}
-            </div>
-          </Card.Content>
-          <Separator />
-        </Card>
+        <NavRow
+          key={note.id}
+          label={note.title}
+          under={when(note.at)}
+          /*
+            ⚠️ ZERO IS TEXTURE AND SO IS "SEEN". Only the unread ones are
+            marked — a chip on every row is a chip that says nothing.
+
+            ⚠️ AND ONE MARK, NOT ONE PER TONE. This wore `colorFor(note.tone)`,
+            so a list held a grey "New" beside a green "New" beside an amber
+            one — the same word in three colours, which asks the reader to
+            decode a difference the label denies. Unread is one state; what the
+            notification is ABOUT is its sentence, which is the row.
+          */
+          aside={note.seen
+            ? undefined
+            : <Chip color="accent" variant="soft"><Chip.Label>New</Chip.Label></Chip>}
+          onOpen={() => onOpen(note)}
+        />
       ))}
-    </div>
+    </Group>
   );
 }
