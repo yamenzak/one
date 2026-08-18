@@ -193,16 +193,23 @@ export function Island({ items, here, onGo, act, only }: {
          is the page's own content on its way past, and the bar is only 370px of
          a 402px screen. */
       data-hem="bottom"
-      className={`sticky bottom-0 z-10 flex justify-center ${GUTTER} ${PAD} ${SAFE_BOTTOM}`
+      /*
+        ⚠️ `overflow-clip` IS WHAT STOPS THE PAGE MOVING ON ITS OWN, and it is
+        the whole of the bug below. A TRANSFORMED box still counts toward the
+        document's scrollable overflow, so a sticky bar translated past the
+        bottom edge makes the page 88px TALLER while it is away — and shorter
+        again the moment it comes back. Reach the foot of a long page, move a
+        finger the other way, and the browser clamps the scroll to a document
+        that just shrank: the page jumps upward, by itself, with nobody
+        touching it. Measured synthetically: 1288 → 1376 → 1288.
+
+        ⚠️ IT IS ON THE NAV AND THE TRAVEL IS ON THE BAR INSIDE IT, because
+        clipping cannot help an element against its own transform. `clip`
+        rather than `hidden`: `hidden` makes this a scroll container, and the
+        note on `overflow-x: clip` below is the same trap one element over.
+      */
+      className={`sticky bottom-0 z-10 flex justify-center overflow-clip ${GUTTER} ${PAD} ${SAFE_BOTTOM}`
         + (only === "phone" ? " md:hidden" : "")}
-      style={{
-        /* ⚠️ PAST ITS OWN HEIGHT PLUS THE SAFE AREA, or it rests half off the
-           bottom edge on a phone with a home indicator — which reads as a bar
-           that failed to finish rather than as one that left. */
-        transform: away ? "translateY(calc(100% + env(safe-area-inset-bottom)))" : "none",
-        opacity: away ? 0 : 1,
-        transition: away ? MOTION.exit : MOTION.enter,
-      }}
     >
       {/*
         ⚠️ IT SPANS THE COLUMN AND THE CLOSED ITEMS SHARE WHAT IS LEFT. A bar
@@ -228,6 +235,17 @@ export function Island({ items, here, onGo, act, only }: {
       <div
         data-island="true"
         className={`flex w-full ${WIDTH.read} flex-row items-center ${SPACE.hair} ${ISLAND_PAD}`}
+        style={{
+          /* ⚠️ PAST ITS OWN HEIGHT PLUS THE SAFE AREA, or it rests half off the
+             bottom edge on a phone with a home indicator — which reads as a bar
+             that failed to finish rather than as one that left. The distance is
+             the nav's own bottom inset, so it clears the clip exactly. */
+          transform: away
+            ? "translateY(calc(100% + max(0.75rem, env(safe-area-inset-bottom))))"
+            : "none",
+          opacity: away ? 0 : 1,
+          transition: away ? MOTION.exit : MOTION.enter,
+        }}
       >
         {shown.map((item) => {
           /* ⚠️ OPEN ONLY WHEN THERE IS NO ACT — see `act`. The bar carries one

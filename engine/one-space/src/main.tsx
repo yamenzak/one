@@ -2,7 +2,7 @@ import * as React from "react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  ARRIVE_MOTION, CHART_MOTION, DOOR_MOTION, FACE_CSS, GLYPH_MOTION, GROUND_CSS, SKY_MOTION,
+  ARRIVE_MOTION, CHART_MOTION, DOOR_MOTION, FACE_CSS, GLYPH_MOTION, GROUND_CSS,
   ambienceStylesheet,
   brandCss,
   applyAppearance, Presenting,
@@ -14,9 +14,9 @@ import { SessionProvider, useSession } from "./session.js";
 
 /**
  * ⚠️ THE SKY IS ONE STYLE ELEMENT, BUILT FROM THE SHARED TOKENS. Every rule
- * comes from `@engine/design` — the grounds from the scene engine, the motion from
- * `SKY_MOTION`, which is a transition on a token rather than an animation, so
- * both `prefers-reduced-motion` and a `data-reduce-motion` ancestor can stop it.
+ * comes from `@engine/design` — the grounds from the scene engine, the drift from
+ * `ambienceStylesheet`, which answers both `prefers-reduced-motion` and a
+ * `data-reduce-motion` ancestor.
  *
  * ⚠️ AND IT IS INJECTED RATHER THAN WRITTEN INTO THE STYLESHEET, because the
  * gradients are derived from the accent at runtime — a workspace's brand has to
@@ -44,7 +44,7 @@ const MONO = "oklch(0.62 0 0)";
 
 const sky = document.createElement("style");
 sky.textContent = [
-  FACE_CSS, GROUND_CSS, ambienceStylesheet(), SKY_MOTION, ARRIVE_MOTION, DOOR_MOTION, CHART_MOTION,
+  FACE_CSS, GROUND_CSS, ambienceStylesheet(), ARRIVE_MOTION, DOOR_MOTION, CHART_MOTION,
   GLYPH_MOTION,
   /*
     ⚠️ ONE'S OWN BRAND, AND IT IS MONOCHROME. `GROUND_CSS` ships a blue as the

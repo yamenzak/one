@@ -261,6 +261,56 @@ if (!grain) {
   ever be wrong.
 */
 
+
+/* ------------------------------------------ motion that moves the document --- */
+
+/**
+ * A TRANSFORM STILL COUNTS TOWARD THE PAGE'S HEIGHT, AND THAT IS THE ONE THAT
+ * BITES.
+ *
+ * ⚠️ THE SYMPTOM IS A PAGE THAT SCROLLS BY ITSELF. The nav is `sticky bottom-0`
+ * and slides away while somebody reads; a translated box is still part of the
+ * document's scrollable overflow, so the page grows by the bar's height while
+ * it is gone and shrinks again the moment it returns. At the foot of a long
+ * page that shrink is a CLAMP — the browser has to move the scroll to fit a
+ * document that just got shorter — so the page jumps upward with nobody
+ * touching it. Measured synthetically: 1288 → 1376 → 1288.
+ *
+ * ⚠️ AND IT IS INVISIBLE UNTIL A PAGE IS LONG ENOUGH TO REACH THE BOTTOM OF.
+ * Every screen shorter than a viewport behaves perfectly, which is most of them
+ * while a product is being built — so this ships, and is reported much later as
+ * "something scrolls back up sometimes".
+ *
+ * ⚠️ SO A PINNED ELEMENT THAT TRAVELS HAS TO CLIP THE TRAVEL. `overflow-clip`
+ * on the pinned box, with the transform on a child inside it: clipped overflow
+ * is not scrollable overflow. `overflow-hidden` would also work and makes the
+ * element a scroll container, which is its own trap.
+ */
+{
+  const PINNED = /\b(?:sticky|fixed)\b[^"`]*\b(?:top-0|bottom-0)\b/;
+  let looked = 0;
+  let loose = 0;
+  for (const file of filesIn("design/src", /\.tsx$/)) {
+    const src = strip(readFileSync(file, "utf8"));
+    /* ⚠️ ELEMENT BY ELEMENT, because a file may hold a pinned bar and an
+       unrelated transform and neither is the other's problem. */
+    for (const [element] of src.matchAll(/<[a-zA-Z][^>]*?(?:\/>|>)/gs)) {
+      if (!PINNED.test(element)) continue;
+      looked++;
+      if (!/translate(?:Y|3d|X)?\(/.test(element)) continue;
+      if (/overflow-(?:clip|hidden)/.test(element)) continue;
+      loose++;
+      const line = src.slice(0, src.indexOf(element)).split("\n").length;
+      fail(`${rel(file)}:${line} pins an element and translates it in the same box.\n`
+        + `       The travel is still part of the document's height, so the page grows\n`
+        + `       while it is away and SHRINKS when it comes back — which clamps the\n`
+        + `       scroll and moves the page on its own. Clip the pinned box\n`
+        + `       (\`overflow-clip\`) and put the transform on a child inside it.`);
+    }
+  }
+  if (!loose) ok(`document: ${looked} pinned element(s), none whose travel changes the page's height`);
+}
+
 console.log(bad
   ? `\nmotion: ${bad} finding(s) — a product with no motion and no typography of its own.`
   : `\nmotion: one set of curves, one set of roles, and reduced motion answered.`);

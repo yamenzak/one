@@ -99,27 +99,20 @@ export function brandCssFor(light: Theme, dark?: Theme): string {
 
 /* -------------------------------------------------------------------- sky --- */
 
+/*
+  ⚠️ THERE WAS A `SKY_MOTION` HERE AND IT MOVED NOTHING. It sized, repeated and
+  drifted a background-image on the `[data-sky]` element — three rules and a
+  24-second transition on a property whose value, measured in the browser, is
+  `none` on every skyed element in the product. The ground moved to the layer
+  under the element (`::before`) when the scene engine was written, and the
+  rules that used to drive it stayed behind, still shipping, still passing.
 
-/**
- * ⚠️ MOTION IS OPT-IN AND `prefers-reduced-motion` IS NOT NEGOTIABLE. An
- * ambience that drifts is pleasant to most people and makes some people ill;
- * respecting the setting is the difference between a nice touch and a product
- * somebody cannot use.
- */
-export const SKY_MOTION = `
-[data-sky] { background-repeat: no-repeat; background-size: 140% 140%; }
-[data-sky]:not([data-sky="plain"]) { transition: ${MOTION.drift}; background-position: 50% 0%; }
-[data-sky]:not([data-sky="plain"]):hover { background-position: 50% 6%; }
-
-/* ⚠️ BOTH SWITCHES, BECAUSE THE LIBRARY HONOURS BOTH. A page that respected only
-   the media query would keep drifting for somebody who turned motion off inside
-   the product, and one that respected only the attribute would ignore the
-   setting on their device. */
-[data-sky][data-reduce-motion="true"],
-[data-reduce-motion="true"] [data-sky] { transition-property: none; }
-@media (prefers-reduced-motion: reduce) {
-  [data-sky] { transition-property: none; }
-}`;
+  ⚠️ THE DRIFT IS `one-drift`, IN `ambienceStylesheet`, on the layer that
+  actually carries the ground — and it answers both reduced-motion switches
+  there. A second drift here would have been two ambient motions on one world;
+  what it was instead is a stylesheet nobody could tell was dead, because a rule
+  that applies to nothing looks exactly like a rule that applies.
+*/
 
 /**
  * ⚠️ OUR TONE, THEIR COLOUR NAME. A declaration says what HAPPENED — five tones,
