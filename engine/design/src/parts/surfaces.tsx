@@ -113,8 +113,56 @@ export interface GroupProps {
  * four beats. `arriveAt` is offered for exactly that — a stagger BETWEEN blocks,
  * capped, never within one.
  */
+/**
+ * ⚠️ A CARD INSIDE A CARD, AND WHY IT IS THE LIBRARY'S PROBLEM RATHER THAN THE
+ * SCREEN'S. Two cards nest and the result is not a visible mistake — both are
+ * the same colour, so what somebody sees is ONE card whose first row starts
+ * twice as far down as every other card in the product, which reads as a
+ * spacing bug in the row rather than as a second card. Measured on the legal
+ * screen: 2 nested cards there, 0 everywhere else, and nothing failed.
+ *
+ * ⚠️ AND IT HAPPENS FOR A GOOD REASON EVERY TIME. A rendered list owns a `Group`
+ * so it can be dropped onto a screen on its own; a screen owns a `Group` so it
+ * can head the block. Both are right, and the composition of two right decisions
+ * is the defect — which is exactly the kind a call-site fix does not prevent
+ * from coming back.
+ */
+const InCard = React.createContext(false);
+
 export function Group({ label, under, face, at, sky, seedling, does, children }: GroupProps) {
+  /* ⚠️ CALLED BEFORE THE BRANCH, because it is a hook — and its answer is
+     discarded when nested, which is correct: a world belongs to the card, and
+     the card here is somebody else's. */
   const own = useScenery({ sky, seedling, reach: "card" });
+  const nested = React.useContext(InCard);
+
+  /*
+    ⚠️ THE INNER ONE STANDS DOWN RATHER THAN THROWING, because every nesting
+    this codebase actually has is a waiting state or a rendered list inside a
+    card — `RowsWaiting` inside a `Group`, a `Listing` inside a section — and
+    each of those wants precisely this: its rows, in the card that is already
+    there. A throw would be correct about the shape and would take working
+    screens down over a spacing question.
+
+    ⚠️ THE LABEL SURVIVES AS A HEADING IN THE FLOW. Dropping it would make a
+    nested group silently lose the one thing it was given, which is a worse
+    failure than the one this fixes.
+  */
+  if (nested) {
+    return (
+      <>
+        {label ? (
+          <div className={`flex flex-col ${SPACE.hair} ${ROW.pad}`}>
+            <h3 className={TYPE.section}>{label}</h3>
+            {under ? <p className={TYPE.note}>{under}</p> : null}
+          </div>
+        ) : null}
+        {children}
+        {does ? <div className={`flex ${ROW.pad}`}>{does}</div> : null}
+      </>
+    );
+  }
+
   return (
     /* ⚠️ THE WORLD'S VARIABLES GO ON OUR OWN ELEMENT AND THE ATTRIBUTE GOES ON
        THE CARD, which needs no wrapper because this section is already here. A
@@ -152,7 +200,9 @@ export function Group({ label, under, face, at, sky, seedling, does, children }:
           {/* ⚠️ `CARD_OTHERS` — a child that is not a row is given a row's
               inset, so two pickers in a card are spaced like two rows rather
               than jammed together. See the token. */}
-          <div className={`flex flex-col ${CARD_OTHERS}`}>{children}</div>
+          <InCard.Provider value>
+            <div className={`flex flex-col ${CARD_OTHERS}`}>{children}</div>
+          </InCard.Provider>
           {/* ⚠️ THE FOOT IS THE CARD'S OWN INSET AGAIN, so a button there sits
               exactly where a row's text does and the card reads as one block
               rather than as a card with something bolted under it. */}
@@ -1126,7 +1176,12 @@ export function Sheet({ title, lead, children }: {
             is not a step on it — so a sheet's rows sat a pixel apart from every
             other stack in the product, defensibly, and nobody could point at
             which one was wrong. */}
-        <div className={`flex flex-col ${SPACE.snug}`}>{children}</div>
+        {/* ⚠️ AND A SHEET IS A CARD FOR THIS PURPOSE TOO — see `InCard`. A
+            `Group` dropped in here would draw a second card inside this one,
+            which is the same invisible double inset one surface over. */}
+        <InCard.Provider value>
+          <div className={`flex flex-col ${SPACE.snug}`}>{children}</div>
+        </InCard.Provider>
       </Card.Content>
     </Card>
   );

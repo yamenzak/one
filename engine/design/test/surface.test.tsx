@@ -22,7 +22,7 @@ import { NotificationPolicy, policyShown } from "../src/rendered/policy.js";
 import { FlagConsole, Shelf, saying } from "../src/rendered/console.js";
 import { Storage, Wallet } from "../src/rendered/money.js";
 import { Shell, reachable } from "../src/frame/shell.js";
-import { ControlRow } from "../src/parts/surfaces.js";
+import { ControlRow, Group, NavRow } from "../src/parts/surfaces.js";
 import { CONTROL_SHARE } from "../src/tokens/metrics.js";
 import { crownFor } from "../src/frame/crown.js";
 import { brandCss, brandCssFor, readable, colorFor } from "../src/tokens/theme.js";
@@ -833,6 +833,38 @@ describe("a workspace's branding", () => {
  * that produces no partial output, no console warning a person would see, and no
  * difference between "broken" and "not built yet".
  */
+describe("a card inside a card", () => {
+  /*
+    ⚠️ THE NESTING IS INVISIBLE, WHICH IS THE WHOLE REASON THIS IS PINNED. Two
+    cards are the same colour, so what somebody sees is one card whose first row
+    starts twice as far down as every other card in the product — and it reads as
+    a spacing fault in the ROW. It shipped on the legal screen exactly that way,
+    with every suite green.
+
+    ⚠️ AND IT ARRIVES FROM TWO CORRECT DECISIONS. A rendered list owns a `Group`
+    so it can stand on a screen alone; a screen owns a `Group` so it can head the
+    block. Neither is wrong; the composition is. So the library answers it.
+  */
+  it("draws one card when a group is nested in a group", () => {
+    const one = html(<Group><NavRow label="A" onOpen={() => {}} /></Group>);
+    const two = html(
+      <Group label="Outer">
+        <Group><NavRow label="A" onOpen={() => {}} /></Group>
+      </Group>,
+    );
+    expect(one.split('data-slot="card"').length - 1).toBe(1);
+    expect(two.split('data-slot="card"').length - 1).toBe(1);
+    /* ⚠️ AND THE INNER LABEL IS NOT SWALLOWED. Standing the card down is a
+       spacing fix; losing what somebody named the block would be a worse
+       failure than the one it repairs. */
+    const named = html(
+      <Group label="Outer"><Group label="Inner"><NavRow label="A" onOpen={() => {}} /></Group></Group>,
+    );
+    expect(named).toContain("Inner");
+    expect(named.split('data-slot="card"').length - 1).toBe(1);
+  });
+});
+
 describe("the legal surfaces", () => {
   it("renders the sub-processor table, which needs the collection to exist", () => {
     const out = html(
