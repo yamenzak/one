@@ -295,6 +295,41 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
   }
 }
 
+/* ------------------------------------------------- the ground fits the frame --- */
+
+/**
+ * ⚠️ THE GROUND AND THE FRAME ARE MEASURED IN ONE UNIT, AND THIS IS THE ONLY
+ * THING THAT CAN ASK. `Page` is `min-h-dvh`; the ground fills it, is
+ * `position: absolute` inside it, and only `overflow-x: clip` sits above — so a
+ * ground measured in `vh` stands taller than the frame by exactly the height of
+ * a phone's browser chrome, hangs past the bottom, and makes EVERY page in the
+ * product scrollable by that much with nothing to scroll to.
+ *
+ * ⚠️ AND NO RENDERED TEST COULD SEE IT. Headless Chromium has no chrome, so
+ * `100vh === 100dvh` there and the overflow is exactly zero — the fault exists
+ * only on the devices nothing in this repository runs on. Which is why this
+ * asks about the UNIT rather than about pixels.
+ */
+{
+  const src = readFileSync(join(ENGINE, "design/src/tokens/ambience.ts"), "utf8");
+  const reach = /export const REACH = "([^"]+)"/.exec(src);
+  const frame = readFileSync(join(ENGINE, "design/src/frame/page.tsx"), "utf8");
+  const sized = /min-h-(dvh|screen|\[[^\]]+\])/.exec(code(frame));
+  if (!reach || !sized) {
+    fail("scene: cannot find the ground's reach or the frame's height — one of them moved.");
+  } else if (!reach[1].endsWith("dvh")) {
+    fail(`design/src/tokens/ambience.ts: REACH is "${reach[1]}" and the frame is `
+      + `min-h-${sized[1]}.\n`
+      + `       A ground in \`vh\` inside a frame in \`dvh\` overhangs by the height of a `
+      + `phone's browser chrome, and every page scrolls by that much over nothing.`);
+  } else if (sized[1] !== "dvh") {
+    fail(`design/src/frame/page.tsx: the frame is min-h-${sized[1]} while the ground reaches `
+      + `${reach[1]} — the two have to be one unit.`);
+  } else {
+    ok(`reach: the ground (${reach[1]}) and the frame (min-h-${sized[1]}) are one unit`);
+  }
+}
+
 console.log(bad
   ? `\nscene: ${bad} finding(s) — a world that is not the same world twice.`
   : `\nscene: seeded, compositor-only, masked rather than washed, sized by area, bound not built.`);
