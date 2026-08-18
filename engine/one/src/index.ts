@@ -241,6 +241,17 @@ const PROCESSORS: SubProcessorBook = {
     url: "https://stripe.com/legal/dpa",
   }),
   /*
+    ⚠️ NOBODY IS DECLARED HERE FOR WHERE WE SELL, AND THAT IS A DECISION NOBODY
+    HAS TAKEN RATHER THAN ONE TAKEN. This deployment is established in one
+    jurisdiction and stores records in another, which is the arrangement that
+    normally obliges a controller to name somebody reachable where its customers
+    are. Declaring one we have not appointed would put a name in a privacy notice
+    that answers no letter, which is the failure this whole file is a catalogue
+    of; leaving it out is visibly incomplete, which is the honest half.
+    DEFER(engine-48) stage:48 — a representative where this deployment sells, or
+    a written decision that selling there does not need one.
+  */
+  /*
     ⚠️ ONE ENTRY FOR FOUR COMPANIES, BECAUSE WHICH ONE IS YOUR BROWSER'S CHOICE
     AND NOT OURS. A push subscription is issued by whoever makes the browser, and
     a message sent to it passes through them — so somebody switching notifications
@@ -277,10 +288,11 @@ const PROCESSORS: SubProcessorBook = {
 const IDENTITY: DeploymentIdentity | null = {
   entity: "Four Degree Labs",
   tradingAs: "4\u00b0 Labs",
-  /* ⚠️ THE EMIRATE, UNTIL THERE IS A STREET. A data-protection request has to
+  /* ⚠️ THE EMIRATE, AND NOT YET THE STREET. A data-protection request has to
      have somewhere to go, and a plausible-looking street address would be worse
-     than a real jurisdiction and a real mailbox. Replace it with the address on
-     the licence when it is to hand. */
+     than a real jurisdiction and a real mailbox — so this is short rather than
+     invented.
+     DEFER(engine-48) stage:48 — the address on the licence. */
   address: "Abu Dhabi, United Arab Emirates",
   contact: "legal@fourdegreelabs.com",
   law: "the United Arab Emirates, as applied in the Emirate of Abu Dhabi",

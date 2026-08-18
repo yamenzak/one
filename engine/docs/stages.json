@@ -248,6 +248,12 @@
       "n": 47,
       "status": "shipped",
       "title": "Storage is metered rather than refused — the included amount is where the meter starts, and an empty wallet costs the writes and never the files"
+    },
+    {
+      "n": 48,
+      "status": "planned",
+      "title": "The deployment's legal identity is complete — the registered address it is written to, and whether selling where it sells needs a representative there",
+      "ends": "`IDENTITY.address` is the address on the licence rather than the Emirate, and either a representative is declared beside the sub-processors or a written decision says none is needed for where this deployment sells"
     }
   ]
 }
