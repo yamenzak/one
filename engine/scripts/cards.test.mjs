@@ -130,4 +130,50 @@ if (OPENERS.length === 0) {
   if (bare === 0) ok(`every Card in ${HOME} names CARD_ROWS (${OPENERS.length})`);
 }
 
+/* --------------------------------------------------- a row that leads nowhere --- */
+
+/**
+ * A ROW HANDED TO A SHEET AS ITS TRIGGER, WITHOUT SAYING SO.
+ *
+ * ⚠️ `NavRow` DRAWS A CHEVRON AND TAKES A PRESS ONLY WHEN IT LEADS SOMEWHERE.
+ * That rule replaced a silent fault — a row with no destination rendered as a
+ * button, took a press and did nothing, eight times across three screens — and
+ * it leaves one case the component cannot see: a row used as a `Tray` or
+ * `Confirm` trigger IS pressable, and react-aria supplies that press through
+ * context rather than through a prop. Such a row says `opens`.
+ *
+ * ⚠️ AND THE NEW FAILURE IS LOUD RATHER THAN SILENT, which is the whole trade:
+ * a trigger missing `opens` renders inert and the sheet does not open on the
+ * first press anybody tries. This catches it before anybody has to.
+ */
+{
+  const walk = (dir, out = []) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === "node_modules" || e.name === "dist" || e.name.startsWith(".")) continue;
+      const p = join(dir, e.name);
+      if (e.isDirectory()) walk(p, out);
+      else if (e.name.endsWith(".tsx")) out.push(p);
+    }
+    return out;
+  };
+
+  let inert = 0;
+  let triggers = 0;
+  for (const file of walk(join(ENGINE, "one-space", "src"))) {
+    const src = readFileSync(file, "utf8");
+    /* ⚠️ A `trigger=` whose value contains a NavRow, however it is wrapped. */
+    for (const m of src.matchAll(/trigger=\{[\s\S]{0,400}?\}\s*\n/g)) {
+      if (!/<NavRow\b/.test(m[0])) continue;
+      triggers++;
+      if (/\bopens\b/.test(m[0])) continue;
+      inert++;
+      const line = src.slice(0, m.index).split("\n").length;
+      fail(`${file.slice(ENGINE.length + 1)}:${line} passes a NavRow as a trigger without `
+        + `\`opens\`.\n       It renders as a fact — no chevron, no press — so the sheet `
+        + `never opens.`);
+    }
+  }
+  if (!inert) ok(`triggers: ${triggers} row trigger(s), each saying it opens something`);
+}
+
 process.exit(bad ? 1 : 0);

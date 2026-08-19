@@ -552,24 +552,59 @@ export interface NavRowProps extends RowBase {
    * does nothing, which is a lie in the shape of a prop.
    */
   readonly onOpen?: () => void;
+  /**
+   * ⚠️ SAY SO WHEN THE PRESS IS SOMEBODY ELSE'S. A row handed to `Tray` or
+   * `Confirm` as their trigger is pressable and has no `onOpen` of its own —
+   * react-aria supplies the press through context — so without this it would be
+   * drawn as the fact it is not.
+   *
+   * ⚠️ AND FORGETTING IT IS LOUD, WHICH IS THE WHOLE REASON THE FLAG IS HERE
+   * RATHER THAN INFERRED. A trigger missing it renders inert and the sheet does
+   * not open on the first press anybody tries. The state it replaces was silent:
+   * a row with no destination drew a chevron, took a press, and did nothing.
+   */
+  readonly opens?: boolean;
   /** A count, a status, a value — whatever sits before the chevron. */
   readonly aside?: React.ReactNode;
   readonly isDisabled?: boolean;
 }
 
-export function NavRow({ icon, face, label, under, aside, onOpen, isDisabled }: NavRowProps) {
+/**
+ * ⚠️ THE CHEVRON IS THE PROMISE THAT SOMETHING IS BEHIND THIS, AND A ROW THAT
+ * CANNOT KEEP IT MUST NOT MAKE IT. It was drawn unconditionally, so a row with
+ * no destination rendered as a button, took a press and did nothing — eight of
+ * them shipped across three console screens, and the first anybody knew was
+ * somebody pressing "64 new models" and staying where they were.
+ *
+ * ⚠️ SO A ROW THAT LEADS NOWHERE IS NOT A BUTTON EITHER. Losing only the chevron
+ * would leave a focusable control with press styling and no behaviour, which is
+ * the same lie one layer down — worse for anybody arriving by keyboard, who
+ * would tab to it.
+ */
+export function NavRow({ icon, face, label, under, aside, onOpen, opens, isDisabled }: NavRowProps) {
+  const leads = !!onOpen || !!opens;
+  const inside = (
+    <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
+      <Lead icon={icon} face={face} />
+      <Body label={label} under={under} />
+      <span className={`flex shrink-0 items-center ${SPACE.tight}`}>
+        {aside}
+        {leads ? <span aria-hidden="true" className={TYPE.note}>›</span> : null}
+      </span>
+    </span>
+  );
+
+  /* ⚠️ A FACT KEEPS THE ROW'S GEOMETRY AND LOSES ITS AFFORDANCES, so a list that
+     mixes the two still reads as one list rather than as two shapes. */
+  if (!leads) {
+    return (
+      <div data-row className={`flex w-full ${ROW.free} ${ROW.wrap} ${ROW.flush}`}>{inside}</div>
+    );
+  }
+
   return (
     <Button data-row variant="ghost" className={`justify-start ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.press} ${ROW.tap}`} isDisabled={isDisabled} onPress={onOpen}>
-      <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
-        <Lead icon={icon} face={face} />
-        <Body label={label} under={under} />
-        <span className={`flex shrink-0 items-center ${SPACE.tight}`}>
-          {aside}
-          {/* ⚠️ The chevron is the promise that something is behind this. A row
-              without one that navigates is a row people do not press. */}
-          <span aria-hidden="true" className={TYPE.note}>›</span>
-        </span>
-      </span>
+      {inside}
     </Button>
   );
 }

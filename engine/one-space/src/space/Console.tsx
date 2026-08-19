@@ -209,7 +209,7 @@ export function ConsolePart({ part, app, onGo }: {
     case "tenants": return <Tenants onGo={(id) => onGo({ at: "tenant", id })} />;
     case "ai": return <Ai onGo={onGo} />;
     case "models": return <Models />;
-    case "gateway": return <Gateway />;
+    case "gateway": return <Gateway onGo={onGo} />;
     case "finding": return <Finding />;
     case "actions":
       return <Actions app={app} onGo={(id) => onGo({ at: "actions", app: id })} />;

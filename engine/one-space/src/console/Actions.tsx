@@ -191,7 +191,7 @@ function BindTray({ app, action, onDone }: {
 
   return (
     <Tray
-      trigger={<NavRow label={action.summary} under={said(action)} />}
+      trigger={<NavRow label={action.summary} under={said(action)} opens />}
       title={action.summary}
       actions={
         <Button slot="close" variant="primary" onPress={() => void bind({ prompt })}>

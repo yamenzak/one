@@ -29,6 +29,7 @@ import type { JobRun, JobShown } from "@engine/design";
 import { sayMoment, type Instant } from "@engine/kernel";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
+import type { Where } from "../space/where.js";
 
 /**
  * ⚠️ THE TYPES ARE `@engine/design`'s, NOT A SECOND COPY. The Nightly work
@@ -46,7 +47,7 @@ interface Answer {
 const COSTS = "ai-costs";
 const SYNC = "models";
 
-export function Gateway() {
+export function Gateway({ onGo }: { readonly onGo: (to: Where) => void }) {
   const of = useLoad<Answer>("op.jobs");
   /* ⚠️ `sayMoment`, NOT A SLICE (D7). Cutting an ISO string leaves UTC in
      nobody's conventions on a screen whose whole subject is when something last
@@ -106,10 +107,16 @@ export function Gateway() {
             <Group label="The catalogue" under="What the models cost us, refreshed nightly">
               {sync ? (
                 <Stack space="tight">
+                  {/* ⚠️ THE ROW LEADS WHERE THE NUMBER SENDS SOMEBODY. "64 new"
+                      is read as an invitation to go and look at them, and for a
+                      while it was a chevron over nothing — the models are on
+                      the next screen and this is the only place that says how
+                      many there are. */}
                   <NavRow
                     icon={glyphOf("bank")}
                     label={said(last(SYNC)).label}
                     under={said(last(SYNC), shown).under}
+                    onOpen={() => onGo({ at: "models" })}
                   />
                   {/*
                     ⚠️ AND A WAY TO RUN IT. Until this has run once there are no
