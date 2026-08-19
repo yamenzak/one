@@ -652,10 +652,23 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
                 prompt: now.prompt,
                 wordedBy: now.wordedBy,
                 model: now.model?.id ?? null,
+                /* ⚠️ THE NAME THE PICKER USES, so the row and the sheet are not
+                   two different-looking facts about one model. The id is the
+                   provider path and belongs where a binding is written. */
+                modelLabel: now.model?.label ?? null,
                 bound: binding?.model ?? null,
                 /* ⚠️ Only the rows this lane can actually use — see `lanesFor`. */
                 choices: inLane(models, action.ai.lane).filter((m) => m.enabled)
-                  .map((m) => ({ id: m.id, label: m.label, provider: m.provider })),
+                  /* ⚠️ WITH WHAT THEY COST, BECAUSE THAT IS THE CHOICE. The
+                     election picks the cheapest enabled row, so an operator
+                     overriding it is trading money for something — and a picker
+                     that hides the price makes that trade invisible. Credits per
+                     thousand units, before the row's markup, which is what these
+                     cost US rather than what a workspace is charged. */
+                  .map((m) => ({
+                    id: m.id, label: m.label, provider: m.provider,
+                    input: m.input, output: m.output,
+                  })),
               };
             }),
           };

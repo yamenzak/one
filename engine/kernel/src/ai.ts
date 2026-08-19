@@ -224,16 +224,16 @@ export function refuseCatalogue(rows: readonly ModelRow[], needed: readonly Lane
   const at = (of: string, why: AiRefusal, detail: string) => out.push({ of, why, detail });
 
   for (const r of rows) {
-    if (!laneOf(r.task)) at(r.id, "unknown_task", `task "${r.task}" maps to no lane, so nothing will select it`);
+    if (!laneOf(r.task)) at(r.id, "unknown_task", `Its task, "${r.task}", maps to no lane, so nothing will ever select it`);
     if (r.enabled && r.input <= 0 && r.output <= 0) {
-      at(r.id, "priced_at_nothing", "enabled and priced at zero, so every call settles free");
+      at(r.id, "priced_at_nothing", "Enabled and priced at zero, so every call settles free");
     }
   }
   for (const lane of needed) {
     const usable = inLane(rows, lane).filter((r) => r.enabled);
-    if (!usable.length) at(lane, "lane_with_no_model", "an app asks for this lane and no enabled model answers");
+    if (!usable.length) at(lane, "lane_with_no_model", "An app asks for this lane and no enabled model answers");
     if (usable.filter((r) => r.isDefault).length > 1) {
-      at(lane, "two_defaults", "two rows claim the default, so the one used depends on row order");
+      at(lane, "two_defaults", "Two rows claim the default, so which one runs depends on row order");
     }
   }
   return out;
