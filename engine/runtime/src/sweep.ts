@@ -50,7 +50,7 @@ import { compedSubscriptions } from "./billing.js";
 import { column, table, type Db } from "./sql.js";
 import { type LogReader } from "./gateway.js";
 import { dropItem, ensureInstance, listModels, putItem, type Account } from "./cloudflare.js";
-import { readCatalogue, syncModels } from "./models.js";
+import { propertyIdsOf, readCatalogue, syncModels } from "./models.js";
 import { inCredits, lossesIn, marginsSince, trueUp } from "./reconcile.js";
 import { flushIndex, instanceFor, type Index } from "./search.js";
 
@@ -441,9 +441,22 @@ export function platformJobs(deps: SweepDeps): JobBook {
             + `token under Keys, which is a different credential and is used for running `
             + `models rather than listing them.`);
         }
-        const out = await syncModels(
-          deps.directory, readCatalogue(answer.value), deps.multiplier, now);
-        if (out.refused.length) throw new Error(`catalogue refused: ${out.refused.join(", ")}`);
+        const found = readCatalogue(answer.value);
+        const out = await syncModels(deps.directory, found, deps.multiplier, now);
+        /*
+          ⚠️ A REFUSAL SAYS WHAT IT SAW, because the alternative is what happened
+          here: `no_priced_row` was true, correct, and told nobody whether the
+          catalogue was empty, the permission wrong or the parser looking for a
+          field that does not exist. The property ids from the first row are the
+          one fact that separates those three, and they cost a sentence.
+        */
+        if (out.refused.length) {
+          const saw = answer.value[0];
+          const ids = saw ? propertyIdsOf(saw).join(", ") : "none";
+          throw new Error(`catalogue refused: ${out.refused.join(", ")}. `
+            + `${answer.value.length} row(s) read; the first one is `
+            + `"${saw?.id ?? "unnamed"}" and carries: ${ids}.`);
+        }
         return {
           touched: out.added + out.priced + out.retired,
           detail: `${out.added} new, ${out.priced} repriced, ${out.retired} retired`,

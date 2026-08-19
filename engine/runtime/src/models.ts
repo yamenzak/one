@@ -271,6 +271,58 @@ const propOf = (row: CatalogueRow, id: string): string | null => {
   return hit && hit.value != null ? String(hit.value) : null;
 };
 
+/** ⚠️ The raw value, because a price is not always a scalar — see `priceIn`. */
+const rawOf = (row: CatalogueRow, id: string): unknown =>
+  row.properties?.find((p) => p.property_id === id)?.value ?? null;
+
+/** ⚠️ Every property id on a row, so a refusal can say what it actually saw. */
+export const propertyIdsOf = (row: CatalogueRow): readonly string[] =>
+  (row.properties ?? []).map((p) => p.property_id ?? "?");
+
+/**
+ * A PRICE OUT OF WHATEVER SHAPE THE CATALOGUE QUOTES IT IN.
+ *
+ * ⚠️ THIS GUESSED AT FIELD NAMES AND WAS WRONG, twice, against a live account —
+ * the whole sync refused with `no_priced_row` while the catalogue was right
+ * there. The published shape is not in the API docs, so the honest design is to
+ * read the SHAPES that are possible rather than one set of names, and to report
+ * what was found when none of them fit (see `refuseDiscovered`).
+ *
+ * ⚠️ THE `price` PROPERTY IS AN ARRAY ON WORKERS AI'S OWN ROWS — one entry per
+ * unit, each `{ unit, price, currency }` — so `String(value)` on it yields
+ * `[object Object]` and every number parse fails. That is exactly the fault
+ * this exists to end.
+ */
+const KIND = { in: /input|prompt|\bin\b/i, out: /output|completion|\bout\b/i } as const;
+
+export function priceFrom(value: unknown, want: "in" | "out"): number | undefined {
+  /* A bare number is already what it says it is. */
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value === "string") return usdPerMillion(value);
+
+  /* ⚠️ AN ARRAY IS ONE ENTRY PER UNIT, and the unit is what says which half of
+     the price it is. Taking the first entry would price every output token at
+     the input rate — under-charging on exactly the expensive half. */
+  if (Array.isArray(value)) {
+    const rows = value as readonly { unit?: unknown; price?: unknown; currency?: unknown }[];
+    const hit = rows.find((r) => KIND[want].test(String(r?.unit ?? "")));
+    if (hit?.price != null) return priceFrom(hit.price, want);
+    /* ⚠️ A SINGLE UNPRICED-BY-DIRECTION ENTRY IS ONE RATE FOR BOTH, which is how
+       an embedding or a classifier quotes itself. */
+    if (rows.length === 1 && rows[0]?.price != null) return priceFrom(rows[0].price, want);
+    return undefined;
+  }
+
+  /* An object keyed by direction. */
+  if (value && typeof value === "object") {
+    const at = value as Record<string, unknown>;
+    for (const [key, held] of Object.entries(at)) {
+      if (KIND[want].test(key) && held != null) return priceFrom(held, want);
+    }
+  }
+  return undefined;
+}
+
 /**
  * ⚠️ A PRICE IS PARSED FROM A SENTENCE, BECAUSE THAT IS HOW IT IS PUBLISHED.
  * "$0.29 per M input tokens" is a string in a properties list, not a number in a
@@ -317,9 +369,24 @@ const PREFIXES: readonly (readonly [RegExp, string])[] = [
 const providerOf = (id: string): string =>
   PREFIXES.find(([re]) => re.test(id))?.[1] ?? "";
 
+/**
+ * ⚠️ THE ONE PROPERTY CLOUDFLARE ACTUALLY PUBLISHES IS `price`, and the aliases
+ * beside it are for the partner rows that quote the two halves separately. Every
+ * one of them is tried, in the shape-reading way above, because the catalogue is
+ * a fact about the world and the world does not tell us before it changes it.
+ */
+const PRICED: readonly string[] = ["price", "pricing", "price_in", "input_price", "prices"];
+
 const pricing = (row: CatalogueRow): Partial<Discovered> => {
-  const inp = usdPerMillion(propOf(row, "price_in") ?? propOf(row, "input_price"));
-  const out = usdPerMillion(propOf(row, "price_out") ?? propOf(row, "output_price"));
+  const found = (want: "in" | "out"): number | undefined => {
+    for (const id of PRICED) {
+      const got = priceFrom(rawOf(row, id), want);
+      if (got !== undefined) return got;
+    }
+    return priceFrom(rawOf(row, want === "in" ? "price_in" : "price_out"), want);
+  };
+  const inp = found("in");
+  const out = found("out") ?? inp;
   const ceiling = Number(propOf(row, "max_output_tokens") ?? propOf(row, "context_window"));
   return {
     ...(inp === undefined ? {} : { usdPerMillionIn: inp }),
