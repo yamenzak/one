@@ -35,6 +35,21 @@ export interface SettledProps {
 }
 
 /**
+ * ⚠️ THE WORD IS NOT DECORATION — `Switch.Content` IS WHERE THE INPUT LIVES.
+ * HeroUI renders the control's hidden `<input type="checkbox" role="switch">`
+ * inside its content slot, so a switch written without one is two styled spans:
+ * it draws correctly, it is in the markup, it has no input, and no press of it
+ * does anything. Every test that renders a screen to a string still passed,
+ * because what was missing is exactly the thing markup assertions do not look
+ * for.
+ *
+ * ⚠️ SO THERE IS A DEFAULT RATHER THAN AN OPTIONAL SLOT. A caller who wants no
+ * word cannot have one — a switch with no accessible name is unusable to anybody
+ * on a screen reader anyway, so the two requirements are the same requirement.
+ */
+const STATE = (on: boolean): string => (on ? "On" : "Off");
+
+/**
  * ⚠️ THE SERVER'S ANSWER WINS ONCE IT ARRIVES. `value` changing under a settled
  * control is a re-read landing, an operator on another tab, or a rollback — and
  * in every one of those the row is right and the local memory is stale.
@@ -64,7 +79,8 @@ export function SettledSwitch({ value, onSet, isDisabled, says }: SettledProps) 
   return (
     <Switch isSelected={shown} isDisabled={isDisabled || busy} onChange={(on) => void flip(on)}>
       <Switch.Control><Switch.Thumb /></Switch.Control>
-      {says ? <Switch.Content><Label>{says(shown)}</Label></Switch.Content> : null}
+      {/* ⚠️ ALWAYS RENDERED — it carries the input. See `STATE`. */}
+      <Switch.Content><Label>{(says ?? STATE)(shown)}</Label></Switch.Content>
     </Switch>
   );
 }

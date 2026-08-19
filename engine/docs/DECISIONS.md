@@ -936,3 +936,70 @@ and it would otherwise be there twice. The useful consequence: Cloudflare's
 `google/gemini-3.7-flash` and Google's own `gemini-3.7-flash` become ONE row
 rather than two that disagree about what the same model costs.
 
+---
+
+## D34 — The prices are parsed from Google's own page, and a modality is a set
+
+D32 held Gemini's rates in a table in `google.ts` and said the trigger to
+revisit was a published rates API. There is no API, but there IS a published
+page — `ai.google.dev/gemini-api/docs/pricing.md.txt`, in markdown, listing
+every model and every rate. The table went stale in a week: it priced ten
+families from the 2.5 generation while the page lists thirty, most of them
+newer. So the price is a fact about the world again, which is the same argument
+the model catalogue itself already rests on.
+
+**The catalogue is the INTERSECTION of two reads.** The API says which models
+this key can reach; the page says what each costs. A model in only the first
+cannot be sold because we do not know what it charges us, and one in only the
+second cannot be called. Intersecting them is also what retires a generation:
+when Google drops a model from the API the sync stops seeing it and the retire
+pass marks the row — so "which are retired" needs no separate source.
+
+**Four ways a cell can be misread, and three of them cost money.**
+- **Standard, not the cheapest tier on the page.** Every model quotes Standard,
+  Batch, Flex and Priority; Batch is half price and is a different request we do
+  not make. Metering an ordinary call at the batch rate under-charges by half.
+- **The date.** "$0.75 through December 31, 2026. $1.50 starting January 1,
+  2027" is one cell holding two rates and the day the first stops being true.
+  Reading the first number sells at half cost from New Year's Day.
+- **The modality, which is a SET.** "$0.30 (text / image / video) $1.00 (audio)"
+  is one rate for three kinds of input and another for the fourth. Taking the
+  largest quotes a text prompt at three times cost; taking the first quotes an
+  image model's output at a twentieth of it. Asking which single modality a
+  quote IS matched `image` inside "(text / image / video)" and silently lost
+  nine of twenty-nine models.
+- **The unit.** The column says "per 1M tokens" and one row under it says
+  "$0.039 per image" anyway — a millionth of the real rate, which is the
+  settles-for-nothing failure walking straight past the check built to catch it.
+  A quote in another unit is REFUSED rather than converted: the conversion needs
+  a token count per picture that nobody publishes.
+
+**And the two ends of a model are in different modalities.** A voice model is
+prompted in text and answers in audio; an image model is prompted in text and
+answers in pictures. One modality across both rows priced a voice model's speech
+at the rate for the sentence that asked for it.
+
+⚠️ **An output row that could not be priced is a refusal, and it must not share
+a branch with a model that HAS no output row.** The second is an embedder, which
+genuinely has one rate; falling back to the input rate for the first priced
+pictures at the rate for the prompt.
+
+---
+
+## D35 — A model answers more than one lane, and one task column could not say so
+
+Every Gemini model from 2.0 on reads a picture in the same request as the
+prompt. With one `task` per row they all sat in `text`, so the vision lane
+reported "an app asks for this lane and no enabled model answers" while eight
+models that could answer it were switched on one lane over — a screen describing
+our schema rather than the world.
+
+`ModelRow.also` is the lanes a row answers BESIDE its own, and it is **additive,
+never a replacement**: `task` stays what the model is FOR — what it is elected to
+do by default, and what its price is quoted against. It is reconciled as a column
+rather than altered in, because a `CREATE TABLE IF NOT EXISTS` cannot add one to
+a database that has already booted.
+
+⚠️ **And it is not claimed for every model.** An embedder takes text and a voice
+model speaks it; claiming vision for those would elect one to read a photograph.
+

@@ -43,6 +43,13 @@ export const MODEL_SCHEMA: SchemaModule = {
     + `max_output INTEGER NOT NULL, retired INTEGER, at TEXT NOT NULL);`,
     `CREATE INDEX IF NOT EXISTS ix_ai_model_task ON ai_model (task, enabled);`,
   ],
+  /* ⚠️ RECONCILED RATHER THAN ALTERED, because a `CREATE TABLE IF NOT EXISTS`
+     cannot add a column to a database that already booted — see `SchemaModule`.
+     `also` is the lanes a model answers BESIDE its own: a Gemini text model
+     reads pictures in the same request as the prompt, and one task column cannot
+     say so, so the vision lane reported "nothing answers" while eight rows that
+     could answer it sat enabled one lane over. */
+  columns: { ai_model: { also: "TEXT" } },
 };
 
 /* ------------------------------------------------------------------ store --- */
@@ -54,6 +61,7 @@ interface Row {
   readonly enabled: number; readonly is_default: number | null;
   readonly thinks: number | null; readonly max_output: number;
   readonly retired: number | null;
+  readonly also: string | null;
 }
 
 const asModel = (r: Row): ModelRow => ({
@@ -66,12 +74,15 @@ const asModel = (r: Row): ModelRow => ({
   ...(r.thinks ? { thinks: true } : {}),
   maxOutput: r.max_output,
   ...(r.retired ? { retired: true } : {}),
+  /* ⚠️ Stored comma-joined: a lane name is a hyphenated key with no comma in it,
+     and a JSON column for a list of two short strings is a parse per row. */
+  ...(r.also ? { also: r.also.split(",").filter(Boolean) } : {}),
 });
 
 export async function modelsOf(db: Db): Promise<readonly ModelRow[]> {
   const rows = await db.prepare(
     `SELECT id, provider, task, label, about, meter, input, output, multiplier,`
-    + ` enabled, is_default, thinks, max_output, retired FROM ai_model ORDER BY id`)
+    + ` enabled, is_default, thinks, max_output, retired, also FROM ai_model ORDER BY id`)
     .all<Row>();
   return rows.results.map(asModel);
 }
@@ -154,6 +165,8 @@ export interface Discovered {
   readonly usdPerMillionOut?: number;
   readonly meter?: Meter;
   readonly thinks?: boolean;
+  /** ⚠️ Lanes it answers BESIDE its own task — see `ModelRow.also`. */
+  readonly also?: readonly string[];
 }
 
 /** ⚠️ Nothing is sold at cost — see `MIN_MULTIPLIER`. Five is the deployment's. */
@@ -294,11 +307,12 @@ export async function syncModels(
     if (!seen) {
       await db.prepare(
         `INSERT INTO ai_model (id, provider, task, label, about, meter, input, output,`
-        + ` multiplier, enabled, is_default, thinks, max_output, retired, at)`
-        + ` VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, 0, ?)`)
+        + ` multiplier, enabled, is_default, thinks, max_output, retired, also, at)`
+        + ` VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, 0, ?, ?)`)
         .bind(it.id, it.provider ?? "", task, it.name ?? it.id, it.description ?? null,
           it.meter ?? "token", input, output, multiplier, it.thinks ? 1 : 0,
-          it.maxOutput ?? it.contextLength ?? FALLBACK_MAX_OUTPUT, at).run();
+          it.maxOutput ?? it.contextLength ?? FALLBACK_MAX_OUTPUT,
+          (it.also ?? []).join(","), at).run();
       added++;
       continue;
     }
@@ -309,11 +323,12 @@ export async function syncModels(
        undoing an operator. */
     await db.prepare(
       `UPDATE ai_model SET provider = ?, task = ?, label = ?, about = ?, meter = ?,`
-      + ` input = ?, output = ?, thinks = ?, max_output = ?, retired = 0, at = ?`
+      + ` input = ?, output = ?, thinks = ?, max_output = ?, retired = 0, also = ?, at = ?`
       + ` WHERE id = ?`)
       .bind(it.provider ?? seen.provider, task || seen.task, it.name ?? seen.label,
         it.description ?? seen.about ?? null, it.meter ?? seen.meter, input, output,
-        it.thinks ? 1 : 0, it.maxOutput ?? it.contextLength ?? seen.maxOutput, at, it.id).run();
+        it.thinks ? 1 : 0, it.maxOutput ?? it.contextLength ?? seen.maxOutput,
+        (it.also ?? seen.also ?? []).join(","), at, it.id).run();
     if (input !== seen.input || output !== seen.output) priced++;
   }
 

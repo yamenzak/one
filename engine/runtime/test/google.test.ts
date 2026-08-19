@@ -9,12 +9,24 @@
  */
 
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { GEMINI_RATES, listGeminiModels, rateForModel } from "../src/google.js";
+import { listGeminiModels, priceAt, readGeminiPricing } from "../src/google.js";
 import { preferOurs } from "../src/models.js";
 
 const listed = (models: unknown[], nextPageToken?: string) =>
   new Response(JSON.stringify({ models, ...(nextPageToken ? { nextPageToken } : {}) }),
     { status: 200, headers: { "content-type": "application/json" } });
+
+/**
+ * ⚠️ TWO READS PER SYNC, AND THE STUB HAS TO KNOW WHICH IS WHICH. The catalogue
+ * is the INTERSECTION of what the key can reach and what the page prices, so a
+ * test that answered both with the same body would prove nothing about either.
+ */
+const both = (
+  models: () => Response | Promise<Response>, page: string = PAGE,
+) => vi.fn(async (url: string) =>
+  (String(url).startsWith("https://ai.google.dev")
+    ? new Response(page, { status: 200 })
+    : models()));
 
 const model = (name: string, extra: Record<string, unknown> = {}) => ({
   name: `models/${name}`,
@@ -25,45 +37,213 @@ const model = (name: string, extra: Record<string, unknown> = {}) => ({
 
 afterEach(() => { vi.unstubAllGlobals(); });
 
-describe("pricing a family", () => {
+/**
+ * ⚠️ THE PAGE IS THE SOURCE, AND THE FIXTURE IS THE PAGE'S OWN SHAPE. A table in
+ * our own file went stale the week it was written — it priced ten families from
+ * the 2.5 generation while Google's page listed thirty, most of them newer.
+ */
+const PAGE = `
+## Gemini 3.7 Flash
+
+*\`gemini-3.7-flash\`*
+
+Our most capable Flash model.
+
+### Standard
+
+|   | Free Tier | Paid Tier, per 1M tokens in USD |
+|---|---|---|
+| Input price | Free of charge | $0.75 through December 31, 2026. $1.50 starting January 1, 2027. |
+| Output price (including thinking tokens) | Free of charge | $3.75 through December 31, 2026. $7.50 starting January 1, 2027. |
+
+### Batch
+
+|   | Free Tier | Paid Tier, per 1M tokens in USD |
+|---|---|---|
+| Input price | Not available | $0.375 through December 31, 2026. |
+| Output price (including thinking tokens) | Not available | $1.875 through December 31, 2026. |
+
+## Gemini 3.1 Flash Image (Nano Banana 2) 🍌
+
+*\`gemini-3.1-flash-image\`*
+
+### Standard
+
+|   | Free Tier | Paid Tier, per 1M tokens in USD |
+|---|---|---|
+| Input price | Not available | $0.50 (text/image) |
+| Output price | Not available | $3 (text and thinking) $60.00 (images) |
+
+## Gemini 3.1 Flash TTS
+
+*\`gemini-3.1-flash-tts-preview\`*
+
+### Standard
+
+|   | Free Tier | Paid Tier, per 1M tokens in USD |
+|---|---|---|
+| Input price | Free of charge | $1.00 (text) |
+| Output price | Free of charge | $20.00 (audio) |
+
+## Gemini 2.5 Flash Image
+
+*\`gemini-2.5-flash-image\`*
+
+### Standard
+
+|   | Free Tier | Paid Tier, per 1M tokens in USD |
+|---|---|---|
+| Input price | Not available | $0.30 (text / image) |
+| Output price | Not available | $0.039 per image |
+
+## Gemini Embedding 2
+
+*\`gemini-embedding-2\`*
+
+### Standard
+
+|   | Free Tier | Paid Tier, per 1M tokens in USD |
+|---|---|---|
+| Text input price | Free of charge | $0.20 |
+| Image input price | Free of charge | $0.45 ($0.00012 per image) |
+
+## Something With No Price
+
+*\`gemini-mystery\`*
+
+### Standard
+
+|   | Free Tier | Paid Tier |
+|---|---|---|
+| Used to improve our products | Yes | No |
+`;
+
+const BEFORE = new Date("2026-08-19T00:00:00Z");
+const AFTER = new Date("2027-03-01T00:00:00Z");
+
+describe("reading the published prices", () => {
   /*
-    ⚠️ THE ONE THAT WOULD HAVE COST MONEY. Google ships a model and four dated
-    snapshots of it, so the table is matched by PREFIX — and `-flash-lite` starts
-    with `-flash`. Shortest-first, the cheap model is priced at the expensive
-    one's rate: four times its cost, in our favour, which is exactly the error
-    nobody complains about and nothing else would catch.
+    ⚠️ THE DATED CELL IS THE ONE THAT WOULD HAVE COST MONEY QUIETLY. "$0.75
+    through December 31, 2026. $1.50 starting January 1, 2027" is one cell
+    holding two rates and the day the first stops being true. Reading the first
+    number sells at half cost from New Year's Day, for as long as nobody looks.
   */
-  it("takes the longest matching prefix, not the first", () => {
-    expect(rateForModel("gemini-2.5-flash-lite")).toEqual([0.1, 0.4]);
-    expect(rateForModel("gemini-2.5-flash")).toEqual([0.3, 2.5]);
+  it("takes the rate in effect, not the first one printed", () => {
+    expect(priceAt("$0.75 through December 31, 2026. $1.50 starting January 1, 2027.", BEFORE))
+      .toBe(0.75);
+    expect(priceAt("$0.75 through December 31, 2026. $1.50 starting January 1, 2027.", AFTER))
+      .toBe(1.5);
   });
 
-  /* ⚠️ A dated snapshot is the family, which is the whole reason for prefixes. */
-  it("prices a snapshot at its family's rate", () => {
-    expect(rateForModel("gemini-2.5-flash-preview-05-20")).toEqual([0.3, 2.5]);
-    expect(rateForModel("gemini-2.5-pro-001")).toEqual([1.25, 10]);
+  /*
+    ⚠️ AND A CELL WITH SEVERAL NUMBERS TAKES THE ONE FOR THE MODALITY ASKED FOR.
+    "$3 (text and thinking) $60.00 (images)" is one output price for two kinds of
+    output; taking the larger quotes a text answer at twenty times its cost and
+    taking the first quotes a picture at a twentieth of it. Neither is a rounding
+    error — this row is what a workspace is charged from.
+  */
+  it("takes the number for the modality asked for", () => {
+    const cell = "$3 (text and thinking) $60.00 (images)";
+    expect(priceAt(cell, BEFORE, "text")).toBe(3);
+    expect(priceAt(cell, BEFORE, "image")).toBe(60);
   });
 
-  it("says nothing rather than guessing at a family it has no rate for", () => {
-    expect(rateForModel("some-model-nobody-has-priced")).toBeNull();
+  /*
+    ⚠️ AND A LABEL NAMES A SET. "$0.30 (text / image / video) $1.00 (audio)" is
+    one rate for three kinds of input and a different one for the fourth — asking
+    which single modality the first IS matched `image`, so every multimodal text
+    model on the page failed to price and was silently not stored. That was nine
+    of twenty-nine.
+  */
+  it("reads a quote that names several modalities at once", () => {
+    const cell = "$0.30 (text / image / video) $1.00 (audio)";
+    expect(priceAt(cell, BEFORE, "text")).toBe(0.3);
+    expect(priceAt(cell, BEFORE, "image")).toBe(0.3);
+    expect(priceAt(cell, BEFORE, "audio")).toBe(1);
   });
 
-  /* ⚠️ Every rate is real: a zero here settles free on every call. */
-  it("carries no rate that is a placeholder", () => {
-    for (const [id, into, out] of GEMINI_RATES) {
-      expect(Number.isFinite(into), id).toBe(true);
-      expect(Number.isFinite(out), id).toBe(true);
-      expect(out >= into, id).toBe(true);
-    }
+  /*
+    ⚠️ AND A PRICE PER PICTURE IS NOT A PRICE PER MILLION TOKENS. The column says
+    "per 1M tokens" and one row under it says "$0.039 per image" anyway. Read as
+    the column's unit that is a millionth of the real rate — a model that settles
+    to nothing on every call.
+  */
+  it("refuses a quote in a unit the column does not use", () => {
+    expect(priceAt("$0.039 per image", BEFORE, "image")).toBeUndefined();
+    /* ⚠️ But the column's own unit restated is still the column's unit. */
+    expect(priceAt("$0.025 / 1,000,000 tokens", BEFORE)).toBe(0.025);
+  });
+
+  it("says nothing for a cell with no price in it", () => {
+    expect(priceAt("Free of charge", BEFORE)).toBeUndefined();
+    expect(priceAt("Not available", BEFORE)).toBeUndefined();
+  });
+
+  /* ⚠️ The id is the backticked line; the heading is a display name with a
+     version, a nickname and sometimes an emoji. */
+  it("keys each model by the id a call is addressed to", () => {
+    expect([...readGeminiPricing(PAGE, BEFORE).keys()]).toEqual([
+      "gemini-3.7-flash", "gemini-3.1-flash-image", "gemini-3.1-flash-tts-preview",
+      "gemini-embedding-2",
+    ]);
+  });
+
+  /*
+    ⚠️ THE TWO ENDS ASK FOR DIFFERENT THINGS. A voice model is prompted in text
+    and answers in audio; an image model is prompted in text and answers in
+    pictures. One modality across both rows priced a voice model's speech at the
+    rate for the sentence that asked for it — twenty times under, on the
+    expensive half.
+  */
+  it("prices each end at the modality that end is in", () => {
+    const at = readGeminiPricing(PAGE, BEFORE);
+    expect(at.get("gemini-3.1-flash-tts-preview")).toEqual({ input: 1, output: 20 });
+    expect(at.get("gemini-3.1-flash-image")).toEqual({ input: 0.5, output: 60 });
+  });
+
+  /*
+    ⚠️ AN OUTPUT ROW THAT COULD NOT BE PRICED IS A REFUSAL, and it must not share
+    a branch with a model that HAS no output row. Falling back to the input rate
+    priced pictures at the rate for the prompt, which is the settles-for-nothing
+    failure wearing a plausible number.
+  */
+  it("drops a model whose output it could not price rather than reusing the input", () => {
+    expect(readGeminiPricing(PAGE, BEFORE).has("gemini-2.5-flash-image")).toBe(false);
+  });
+
+  /*
+    ⚠️ STANDARD ONLY. Every model also quotes Batch at half price, and metering
+    an ordinary call at the batch rate under-charges by half — which the settle
+    cap turns into a permanent loss rather than an error anybody sees.
+  */
+  it("reads the standard tier and not the cheaper ones beside it", () => {
+    const at = readGeminiPricing(PAGE, BEFORE).get("gemini-3.7-flash")!;
+    expect(at).toEqual({ input: 0.75, output: 3.75 });
+  });
+
+  it("follows a price change on its own date", () => {
+    expect(readGeminiPricing(PAGE, AFTER).get("gemini-3.7-flash"))
+      .toEqual({ input: 1.5, output: 7.5 });
+  });
+
+  /* ⚠️ No output row is one rate for both — an embedder has no output to bill. */
+  it("prices an embedder from its input alone", () => {
+    expect(readGeminiPricing(PAGE, BEFORE).get("gemini-embedding-2"))
+      .toEqual({ input: 0.2, output: 0.2 });
+  });
+
+  /* ⚠️ A model with no price is not carried at zero — see the header. */
+  it("carries no model it could not price", () => {
+    expect(readGeminiPricing(PAGE, BEFORE).has("gemini-mystery")).toBe(false);
   });
 });
 
 describe("reading Google's list", () => {
   it("addresses a model by the segment after `models/`", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => listed([model("gemini-2.5-flash")])));
-    const out = await listGeminiModels("a-key");
+    vi.stubGlobal("fetch", both(() => listed([model("gemini-3.7-flash")])));
+    const out = await listGeminiModels("a-key", BEFORE);
     expect(out.ok).toBe(true);
-    expect(out.value?.[0]?.id).toBe("gemini-2.5-flash");
+    expect(out.value?.[0]?.id).toBe("gemini-3.7-flash");
     /* ⚠️ Cloudflare's own name for the lane — `/compat` is what addresses it. */
     expect(out.value?.[0]?.provider).toBe("google-ai-studio");
   });
@@ -74,34 +254,38 @@ describe("reading Google's list", () => {
     message around it.
   */
   it("never puts the key in the URL", async () => {
-    const call = vi.fn(async () => listed([model("gemini-2.5-flash")]));
+    const call = both(() => listed([model("gemini-3.7-flash")]));
     vi.stubGlobal("fetch", call);
-    await listGeminiModels("secret-key");
-    const [url, init] = call.mock.calls[0] as unknown as [string, RequestInit];
+    await listGeminiModels("secret-key", BEFORE);
+    const listing = call.mock.calls
+      .find(([url]) => !String(url).startsWith("https://ai.google.dev"))!;
+    const [url, init] = listing as unknown as [string, RequestInit];
     expect(url).not.toContain("secret-key");
     expect((init.headers as Record<string, string>)["x-goog-api-key"]).toBe("secret-key");
+    /* ⚠️ And the pricing page is public — it must carry no key at all. */
+    const pricing = call.mock.calls.find(([u]) => String(u).startsWith("https://ai.google.dev"))!;
+    expect(JSON.stringify(pricing)).not.toContain("secret-key");
   });
 
   /* ⚠️ Not a name: what a model answers to is the only statement of what it is. */
   it("reads the task from what the model answers to", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => listed([
-      model("gemini-embedding-001", { supportedGenerationMethods: ["embedContent"] }),
-      model("gemini-2.5-pro"),
+    vi.stubGlobal("fetch", both(() => listed([
+      model("gemini-embedding-2", { supportedGenerationMethods: ["embedContent"] }),
+      model("gemini-3.7-flash"),
+      model("gemini-3.1-flash-image"),
     ])));
-    const out = await listGeminiModels("a-key");
-    const by = new Map(out.value?.map((m) => [m.id, m]));
-    expect(by.get("gemini-embedding-001")?.task).toBe("text-embeddings");
-    expect(by.get("gemini-2.5-pro")?.task).toBe("text-generation");
+    const by = new Map((await listGeminiModels("a-key", BEFORE)).value?.map((m) => [m.id, m]));
+    expect(by.get("gemini-embedding-2")?.task).toBe("text-embeddings");
+    expect(by.get("gemini-3.7-flash")?.task).toBe("text-generation");
+    /* ⚠️ An image model in the text lane would be elected to answer a chat. */
+    expect(by.get("gemini-3.1-flash-image")?.task).toBe("text-to-image");
   });
 
   /* ⚠️ A thinking model bills for tokens nobody requested — the reserve widens. */
   it("marks the reasoning models", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => listed([
-      model("gemini-2.5-pro"), model("gemini-1.5-flash"),
-    ])));
-    const by = new Map((await listGeminiModels("a-key")).value?.map((m) => [m.id, m]));
-    expect(by.get("gemini-2.5-pro")?.thinks).toBe(true);
-    expect(by.get("gemini-1.5-flash")?.thinks).toBeUndefined();
+    vi.stubGlobal("fetch", both(() => listed([model("gemini-3.7-flash")])));
+    const by = new Map((await listGeminiModels("a-key", BEFORE)).value?.map((m) => [m.id, m]));
+    expect(by.get("gemini-3.7-flash")?.thinks).toBe(true);
   });
 
   /*
@@ -110,20 +294,19 @@ describe("reading Google's list", () => {
     provider's invoice arrives anyway.
   */
   it("drops a model it has no rate for rather than storing it at nothing", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => listed([
-      model("gemini-2.5-flash"), model("aqa"), model("chat-bison-001"),
+    vi.stubGlobal("fetch", both(() => listed([
+      model("gemini-3.7-flash"), model("aqa"), model("chat-bison-001"),
     ])));
-    const out = await listGeminiModels("a-key");
-    expect(out.value?.map((m) => m.id)).toEqual(["gemini-2.5-flash"]);
+    const out = await listGeminiModels("a-key", BEFORE);
+    expect(out.value?.map((m) => m.id)).toEqual(["gemini-3.7-flash"]);
   });
 
   it("follows the pages, because one page is not the catalogue", async () => {
-    const call = vi.fn()
-      .mockResolvedValueOnce(listed([model("gemini-2.5-flash")], "more"))
-      .mockResolvedValueOnce(listed([model("gemini-2.5-pro")]));
-    vi.stubGlobal("fetch", call);
-    const out = await listGeminiModels("a-key");
-    expect(out.value?.map((m) => m.id)).toEqual(["gemini-2.5-flash", "gemini-2.5-pro"]);
+    const pages = [listed([model("gemini-3.7-flash")], "more"),
+      listed([model("gemini-embedding-2", { supportedGenerationMethods: ["embedContent"] })])];
+    vi.stubGlobal("fetch", both(() => pages.shift()!));
+    const out = await listGeminiModels("a-key", BEFORE);
+    expect(out.value?.map((m) => m.id)).toEqual(["gemini-3.7-flash", "gemini-embedding-2"]);
   });
 });
 
@@ -134,25 +317,33 @@ describe("reading Google's list", () => {
  */
 describe("when Google does not answer", () => {
   it("refuses on a network fault", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("nope"); }));
-    const out = await listGeminiModels("a-key");
+    vi.stubGlobal("fetch", both(() => { throw new Error("nope"); }));
+    const out = await listGeminiModels("a-key", BEFORE);
     expect(out.ok).toBe(false);
     expect(out.value).toBeUndefined();
   });
 
   it("refuses on a rejected key, and says which key", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("no", { status: 403 })));
-    const out = await listGeminiModels("a-key");
+    vi.stubGlobal("fetch", both(() => new Response("no", { status: 403 })));
+    const out = await listGeminiModels("a-key", BEFORE);
     expect(out.ok).toBe(false);
     expect(out.why).toContain("403");
     expect(out.why).toContain("AI Studio");
   });
 
+  /* ⚠️ AND A CHANGED PRICING PAGE IS A REFUSAL TOO. Parsed to nothing and
+     applied, it would drop every Gemini row rather than report that the reader
+     is out of date — the same silent retirement, one source over. */
+  it("refuses a pricing page it could read no price from", async () => {
+    vi.stubGlobal("fetch", both(() => listed([model("gemini-3.7-flash")]), "# nothing here"));
+    expect((await listGeminiModels("a-key", BEFORE)).ok).toBe(false);
+  });
+
   /* ⚠️ A key that reaches Google and matches nothing is a stale rate table, and
      that is a thing to say rather than a silent retirement. */
   it("refuses an answer it could price none of", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => listed([model("aqa")])));
-    expect((await listGeminiModels("a-key")).ok).toBe(false);
+    vi.stubGlobal("fetch", both(() => listed([model("aqa")])));
+    expect((await listGeminiModels("a-key", BEFORE)).ok).toBe(false);
   });
 });
 

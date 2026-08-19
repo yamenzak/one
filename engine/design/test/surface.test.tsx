@@ -22,7 +22,9 @@ import { NotificationPolicy, policyShown } from "../src/rendered/policy.js";
 import { FlagConsole, Shelf, saying } from "../src/rendered/console.js";
 import { Storage, Wallet } from "../src/rendered/money.js";
 import { Shell, reachable } from "../src/frame/shell.js";
-import { ControlRow, Group, NavRow } from "../src/parts/surfaces.js";
+import { ControlRow, Group, NavRow, ToggleRow } from "../src/parts/surfaces.js";
+import { SettledSwitch } from "../src/parts/settle.js";
+import { ModelLine } from "../src/rendered/ai.js";
 import { CONTROL_SHARE } from "../src/tokens/metrics.js";
 import { crownFor } from "../src/frame/crown.js";
 import { brandCss, brandCssFor, readable, colorFor } from "../src/tokens/theme.js";
@@ -1247,5 +1249,58 @@ describe("the storage meter", () => {
     const GB = 1024 * 1024 * 1024;
     const out = html(<Storage used={14 * GB} included={10 * GB} creditsPerGbMonth={20} />);
     expect(out).toContain("4.0 GiB over what your plan includes");
+  });
+});
+
+/**
+ * A CONTROL WITH NO INPUT IS A PICTURE OF A CONTROL.
+ *
+ * ⚠️ HEROUI PUTS THE SWITCH'S HIDDEN `<input role="switch">` INSIDE ITS CONTENT
+ * SLOT, so a switch written without one renders two styled spans: correct
+ * shape, correct colour, correct position, and nothing to press. It shipped
+ * that way and the report was "the switch does not work no matter how much I
+ * click it", which is exactly what it was.
+ *
+ * ⚠️ AND EVERY OTHER TEST IN THIS FILE STILL PASSED, which is the point of
+ * adding this one. Markup assertions ask what is OFFERED; none of them asked
+ * whether the thing offered can be operated, so the one property that was
+ * missing is the one nothing looked for.
+ */
+describe("a switch has something to press", () => {
+  const inputs = (node: React.ReactNode) => (html(node).match(/<input\b/g) ?? []).length;
+
+  it("renders an input with no word asked for", () => {
+    expect(inputs(<SettledSwitch value={false} onSet={async () => true} />)).toBe(1);
+  });
+
+  it("renders an input with a word asked for", () => {
+    expect(inputs(
+      <SettledSwitch value onSet={async () => true} says={(on) => (on ? "Yes" : "No")} />,
+    )).toBe(1);
+  });
+
+  /* ⚠️ Says its state, because a switch with no accessible name is unusable to
+     anybody who cannot see the thumb. */
+  it("says which way it is", () => {
+    expect(html(<SettledSwitch value onSet={async () => true} />)).toContain("On");
+    expect(html(<SettledSwitch value={false} onSet={async () => true} />)).toContain("Off");
+  });
+
+  /* ⚠️ THE ROW IT ACTUALLY SHIPS IN. The component was right in isolation and
+     wrong where it was used, which is the shape half of this file exists for. */
+  it("still has one inside a model's row", () => {
+    expect(inputs(
+      <ModelLine
+        label="llama" id="@cf/meta/llama" meter="token" input={1} output={2}
+        controls={<SettledSwitch value={false} onSet={async () => true} />}
+      />,
+    )).toBe(1);
+  });
+
+  /* ⚠️ And the settings row that predates it, so the rule covers both. */
+  it("and one on a toggle row", () => {
+    expect(inputs(
+      <ToggleRow label="Email me" value onChange={() => undefined} />,
+    )).toBe(1);
   });
 });

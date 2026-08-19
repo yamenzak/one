@@ -441,7 +441,7 @@ env or a binding.
 | `ai-actions` | which model an action runs on, and in whose words | 7 | — |
 | `models` | the model catalogue — what exists, what it costs us, what a workspace pays | 15 | — |
 | `gateway` | the one door out to a model, and where a run's real cost is read | 8 | — |
-| `google` | the models Cloudflare does not host, and what we hold their rates at | 3 | — |
+| `google` | the models Cloudflare does not host, and what Google publishes them at | 4 | — |
 | `spend` | one row per run: where a workspace's credits went, and never what was said | 4 | — |
 | `reconcile` | the check on the money that is not our own arithmetic | 6 | — |
 | `ai-ops` | which model a workspace picked, and what it will cost them | 1 | — |
@@ -468,7 +468,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**397 of them**, 396 reached by something today.
+**398 of them**, 397 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -879,6 +879,8 @@ its own header, cited by other files, and doing nothing.
 | D31 | Two capabilities assessed and not adopted, with the trigger that reopens each | 0 |
 | D32 | The catalogue has two sources, and one is priced from a table we hold | 0 |
 | D33 | A lane is an address, and a model we do not sell is not a fault | 0 |
+| D34 | The prices are parsed from Google's own page, and a modality is a set | 0 |
+| D35 | A model answers more than one lane, and one task column could not say so | 0 |
 <!-- /generated -->
 
 ---

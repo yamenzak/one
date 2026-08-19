@@ -17,7 +17,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { ModelRow } from "../src/ai.js";
-import { LANES, inLane, laneOf, refuseCatalogue, taskKey } from "../src/ai.js";
+import { LANES, defaultIn, inLane, laneOf, refuseCatalogue, taskKey } from "../src/ai.js";
 
 const row = (over: Partial<ModelRow> = {}): ModelRow => ({
   id: "@cf/meta/small", provider: "workers-ai", task: "text-generation", label: "Small",
@@ -85,5 +85,41 @@ describe("what the catalogue reports as a fault", () => {
   it("still names a lane nothing answers", () => {
     const out = refuseCatalogue([row({ task: "Text Classification" })], ["text"]);
     expect(out.map((f) => f.why)).toEqual(["lane_with_no_model"]);
+  });
+});
+
+/**
+ * A MODEL ANSWERS MORE THAN ONE LANE, AND ONE TASK COLUMN COULD NOT SAY SO.
+ *
+ * ⚠️ EVERY MODERN GEMINI MODEL READS A PICTURE IN THE SAME REQUEST AS THE
+ * PROMPT. With one task per row they all sat in `text`, so the vision lane
+ * reported "an app asks for this lane and no enabled model answers" while eight
+ * models that could answer it were switched on one lane over — a screen
+ * describing our schema rather than the world.
+ */
+describe("a model that answers more than one lane", () => {
+  const multi = row({ task: "text-generation", also: ["image-to-text"], enabled: true });
+
+  it("is in both", () => {
+    expect(inLane([multi], "text")).toHaveLength(1);
+    expect(inLane([multi], "vision")).toHaveLength(1);
+  });
+
+  /* ⚠️ ADDITIVE, NEVER A REPLACEMENT — its own task is still what it is FOR. */
+  it("is in no lane it did not claim", () => {
+    expect(inLane([multi], "speech")).toHaveLength(0);
+    expect(inLane([multi], "embed")).toHaveLength(0);
+  });
+
+  /* ⚠️ AND THE LANE STOPS REPORTING A FAULT, which is the whole visible point. */
+  it("answers for a lane that would otherwise have nothing", () => {
+    expect(refuseCatalogue([multi], ["vision"])).toEqual([]);
+    expect(refuseCatalogue([row({ enabled: true })], ["vision"]).map((f) => f.why))
+      .toEqual(["lane_with_no_model"]);
+  });
+
+  /* ⚠️ It can be elected there too, or it answers the lane and never runs. */
+  it("can be the lane's default", () => {
+    expect(defaultIn([multi], "vision")?.id).toBe(multi.id);
   });
 });

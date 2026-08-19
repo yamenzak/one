@@ -106,6 +106,16 @@ export interface ModelRow {
    * election, which is what "nobody has chosen" already means.
    */
   readonly retired?: boolean;
+  /**
+   * ⚠️ THE LANES IT ANSWERS BESIDE ITS OWN, and one task column could not say so.
+   * A modern Gemini model reads a picture in the same request as the prompt, so
+   * a deployment reporting "nothing answers vision" while eight of them sit
+   * enabled in the text lane is describing our schema rather than the world.
+   *
+   * ⚠️ IT IS ADDITIVE, NEVER A REPLACEMENT. `task` stays what the model is FOR —
+   * what it is elected to do by default, and what its price is quoted against.
+   */
+  readonly also?: readonly string[];
 }
 
 /** ⚠️ What a workspace may be shown: no cost, no multiplier — see `priceFor`. */
@@ -142,7 +152,12 @@ export const priceFor = (row: ModelRow, lane: Lane): ModelOffer => ({
 
 /** ⚠️ A retired row still RESOLVES and is never OFFERED — see `ModelRow`. */
 export const inLane = (rows: readonly ModelRow[], lane: Lane): readonly ModelRow[] =>
-  rows.filter((r) => lanesFor(lane).includes(taskKey(r.task)));
+  rows.filter((r) => {
+    const names = lanesFor(lane);
+    /* ⚠️ ITS OWN TASK OR ANY IT ALSO ANSWERS — see `ModelRow.also`. */
+    return names.includes(taskKey(r.task))
+      || (r.also ?? []).some((t) => names.includes(taskKey(t)));
+  });
 
 /** What a workspace may choose from: in the lane, enabled, and still sold. */
 export const offeredIn = (rows: readonly ModelRow[], lane: Lane): readonly ModelRow[] =>

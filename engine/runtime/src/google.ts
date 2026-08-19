@@ -55,65 +55,240 @@ interface Listed {
 }
 
 /**
- * WHAT A FAMILY COSTS, IN USD PER MILLION TOKENS.
+ * WHAT EACH MODEL COSTS, READ FROM THE PAGE GOOGLE PUBLISHES IT ON.
  *
- * ⚠️ MATCHED BY PREFIX, LONGEST FIRST, because Google ships a model and four
- * dated snapshots of it — `gemini-2.5-flash`, `gemini-2.5-flash-preview-05-20`,
- * `-latest`, `-001`. A table keyed by exact id prices the family and leaves
- * every snapshot of it unpriced, which is the same as not having the family.
+ * ⚠️ THIS WAS A TABLE IN THIS FILE AND THE TABLE WENT STALE IMMEDIATELY. It was
+ * written from the 2.5 generation and priced ten families; Google's own page
+ * lists thirty, most of them newer, and a rate we hold by hand is the one number
+ * in the metering chain nobody is checking. Parsing the published page makes the
+ * price a fact about the world again — the same argument the model catalogue
+ * itself already rests on.
  *
- * ⚠️ THE ORDER OF THIS LIST IS LOAD-BEARING. `gemini-2.5-flash-lite` is a
- * cheaper model than `gemini-2.5-flash` and its id starts with that one's, so a
- * shortest-first match would sell it at four times its cost — in our favour,
- * which is exactly the kind of error nothing complains about.
- *
- * Published rates, read 2026-08-19. Standard context; the long-context tiers
- * above 200k tokens cost more and are not modelled, so a very long prompt is
- * under-estimated — which the nightly cost check is what catches.
+ * ⚠️ AND IT IS THE STANDARD TIER, NOT THE CHEAPEST ONE ON THE PAGE. Every model
+ * quotes Standard, Batch, Flex and Priority; Batch is half price and is a
+ * different request that this deployment does not make. Metering an ordinary
+ * call at the batch rate would under-charge by half, which the settle cap turns
+ * into a permanent loss rather than an error anybody sees.
  */
-export const GEMINI_RATES: readonly (readonly [string, number, number])[] = [
-  ["gemini-2.5-pro", 1.25, 10],
-  ["gemini-2.5-flash-lite", 0.1, 0.4],
-  ["gemini-2.5-flash", 0.3, 2.5],
-  ["gemini-2.0-flash-lite", 0.075, 0.3],
-  ["gemini-2.0-flash", 0.1, 0.4],
-  ["gemini-1.5-pro", 1.25, 5],
-  ["gemini-1.5-flash-8b", 0.0375, 0.15],
-  ["gemini-1.5-flash", 0.075, 0.3],
-  ["text-embedding-004", 0.0, 0.0],
-  ["gemini-embedding", 0.15, 0.15],
-];
+const PRICING = "https://ai.google.dev/gemini-api/docs/pricing.md.txt";
 
 /**
- * ⚠️ LONGEST PREFIX WINS, DERIVED RATHER THAN TRUSTED TO THE ORDER ABOVE. The
- * comment there says the order matters and a comment is not a mechanism: sorting
- * by length here means a row inserted in the wrong place is still priced
- * correctly, and the note stays as the explanation rather than as the guard.
+ * ONE CELL, SEVERAL PRICES, AND THEY ARE NOT ALTERNATIVES TO EACH OTHER.
+ *
+ * ⚠️ A CELL CARRIES A DATE, AND THE PRICE IN IT CHANGES ON THAT DATE. "$0.75
+ * through December 31, 2026. $1.50 starting January 1, 2027" is one cell holding
+ * two rates and the day the first stops being true. Reading the first number
+ * would sell at half cost from New Year's Day, silently, for as long as nobody
+ * looked.
+ *
+ * ⚠️ AND IT CARRIES A MODALITY, WHICH IS THE ONE THAT NEARLY COST REAL MONEY IN
+ * BOTH DIRECTIONS. "$0.10 (text / image / video) $0.70 (audio)" is one input
+ * price for four kinds of input; taking the largest quotes every text prompt at
+ * seven times its cost, and taking the first quotes an image model's output at
+ * the text rate. Neither is a rounding error — the row is what a workspace is
+ * charged from. So the modality is read, and the one that matches what the model
+ * is FOR is the one taken.
+ *
+ * ⚠️ AND A PRICE PER PICTURE IS NOT A PRICE PER MILLION TOKENS. The column says
+ * "per 1M tokens" and one row under it says "$0.039 per image" anyway. Read as
+ * the column's unit that is a millionth of the real rate — a model that settles
+ * to nothing on every call, which is the exact failure `refuseDiscovered`
+ * exists to catch and this would have walked straight past it. A quote in
+ * another unit is refused rather than converted: the conversion needs a token
+ * count per image that nobody publishes.
  */
-const rated = [...GEMINI_RATES].sort((a, b) => b[0].length - a[0].length);
+type Modality = "text" | "image" | "audio" | "video";
 
-export const rateForModel = (id: string): readonly [number, number] | null => {
-  const hit = rated.find(([prefix]) => id.startsWith(prefix));
-  return hit ? [hit[1], hit[2]] : null;
+interface Quote {
+  readonly amount: number;
+  readonly from?: number;
+  readonly until?: number;
+  /**
+   * ⚠️ A SET, NOT ONE. "$0.30 (text / image / video)" is a single rate for three
+   * kinds of input, and asking which one it IS matched `image` and lost every
+   * multimodal text model on the page — nine of twenty-nine, silently, because a
+   * model that cannot be priced is simply not stored.
+   */
+  readonly of: ReadonlySet<Modality>;
+  /** ⚠️ Set when the quote is per something that is not a token. */
+  readonly per: boolean;
+}
+
+const DATED = /\b(through|starting)\s+([A-Z][a-z]+\s+\d{1,2},\s*\d{4})/;
+/* ⚠️ "per 1,000,000 tokens" is the column's own unit restated, not another one. */
+const PER_OTHER = /\bper\s+(?!1M\b|1,000,000\s+tokens|M\s+tokens)[\d.,]*\s*[A-Za-z]/;
+
+export function quotesIn(cell: string): readonly Quote[] {
+  const out: Quote[] = [];
+  /* ⚠️ SEGMENTED AT EACH `$`, because what qualifies a number is the words
+     AFTER it and before the next one. */
+  for (const part of cell.split(/(?=\$)/)) {
+    const hit = /^\$\s*([\d.]+)/.exec(part.trim());
+    if (!hit) continue;
+    const amount = Number(hit[1]);
+    if (!Number.isFinite(amount)) continue;
+
+    const said = part.toLowerCase();
+    const when = DATED.exec(part);
+    const at = when ? Date.parse(when[2]!) : NaN;
+    out.push({
+      amount,
+      ...(Number.isFinite(at) && when![1] === "through" ? { until: at } : {}),
+      ...(Number.isFinite(at) && when![1] === "starting" ? { from: at } : {}),
+      of: new Set<Modality>([
+        ...(/\baudio\b/.test(said) ? ["audio" as const] : []),
+        ...(/\bimages?\b/.test(said) ? ["image" as const] : []),
+        ...(/\bvideo\b/.test(said) ? ["video" as const] : []),
+        ...(/\btext\b/.test(said) ? ["text" as const] : []),
+      ]),
+      per: PER_OTHER.test(said),
+    });
+  }
+  return out;
+}
+
+/**
+ * ⚠️ THE MODALITY FIRST, THEN THE DATE. A cell may hold both — the qualified
+ * prices are the alternatives and the dated ones are the same price over time —
+ * and narrowing to the wrong modality before choosing a date would compare rates
+ * for two different things.
+ */
+export function priceAt(cell: string, now: Date, want: Modality = "text"): number | undefined {
+  const all = quotesIn(cell);
+  if (!all.length) return undefined;
+
+  /* ⚠️ AN UNLABELLED QUOTE IS THE BASE RATE. Most cells hold one number and say
+     nothing about what it is for, which is the ordinary case. */
+  const named = all.filter((q) => q.of.has(want));
+  const plain = all.filter((q) => q.of.size === 0);
+  const chosen = named.length ? named : plain;
+  if (!chosen.length) return undefined;
+
+  /* ⚠️ Refused, not converted — see the header. */
+  if (chosen.every((q) => q.per)) return undefined;
+  const usable = chosen.filter((q) => !q.per);
+
+  const at = now.getTime();
+  const dated = usable.filter((q) => q.from !== undefined || q.until !== undefined);
+  if (!dated.length) return usable[0]!.amount;
+
+  const live = dated.filter((q) => (q.from ?? -Infinity) <= at && at <= (q.until ?? Infinity));
+  if (live.length) return live[0]!.amount;
+  /* ⚠️ A gap between windows takes the latest that has STARTED rather than
+     nothing — a price does not stop existing because a page phrased its dates
+     loosely, and answering `undefined` would drop the model entirely. */
+  const begun = dated.filter((q) => (q.from ?? -Infinity) <= at);
+  return (begun.length ? begun : dated).at(-1)!.amount;
+}
+
+/** ⚠️ The paid column is the LAST cell — the first is the free tier. */
+const paidIn = (row: string): string => {
+  const cells = row.split("|").map((c) => c.trim()).filter(Boolean);
+  return cells[cells.length - 1] ?? "";
 };
 
+const IN_ROW = /^\|\s*(?:Text\s+)?Input price/i;
+const OUT_ROW = /^\|\s*Output price/i;
+
 /**
- * ⚠️ WHAT A MODEL DOES, READ FROM WHAT IT ANSWERS TO. Google does not publish a
- * task, so the generation methods are the only statement of it — `embedContent`
- * is an embedder and `generateContent` is a text model, whatever the name says.
+ * EVERY MODEL THE PAGE PRICES, BY THE ID A CALL IS ADDRESSED TO.
+ *
+ * ⚠️ THE ID IS THE BACKTICKED LINE, NOT THE HEADING. The heading is a display
+ * name with a version, a nickname and sometimes an emoji — "Gemini 3.1 Flash
+ * Image (Nano Banana 2) 🍌" — and the thing an API call names is on the line
+ * under it.
  */
-const taskOf = (it: Listed): string => {
+export function readGeminiPricing(
+  page: string, now: Date,
+): ReadonlyMap<string, { input: number; output: number }> {
+  const out = new Map<string, { input: number; output: number }>();
+
+  for (const section of page.split(/^## /m).slice(1)) {
+    const id = /^\s*\*`([a-z0-9.\-]+)`\*/m.exec(section)?.[1];
+    if (!id) continue;
+
+    /* ⚠️ STANDARD ONLY — see `PRICING`. Everything after the next `###` is
+       another request mode at another price. */
+    const from = section.search(/^### Standard\b/m);
+    const block = from < 0 ? section : section.slice(from + 1);
+    const standard = block.split(/^### /m)[0] ?? "";
+
+    /*
+      ⚠️ THE MODALITY IS THE MODEL'S OWN, AND IT DIFFERS BETWEEN THE TWO ENDS. A
+      voice model is prompted in text and answers in audio; an image model is
+      prompted in text and answers in pictures. Asking for one modality across
+      both rows priced a voice model's speech at the rate for the sentence that
+      asked for it — twenty times under, on the expensive half.
+    */
+    const speaks = /-tts(-|$)/.test(id);
+    const draws = /-image(-|$)/.test(id) || /^imagen/.test(id);
+    const answers: Modality = speaks ? "audio" : draws ? "image" : "text";
+
+    const rows = standard.split("\n");
+    const input = rows.filter((r) => IN_ROW.test(r)).map((r) => priceAt(paidIn(r), now, "text"))
+      .find((n) => n !== undefined);
+    if (input === undefined) continue;
+
+    /*
+      ⚠️ NO OUTPUT ROW IS ONE RATE FOR BOTH — that is how an embedder quotes
+      itself, having no output to charge for. AN OUTPUT ROW THAT COULD NOT BE
+      PRICED IS A REFUSAL, and the two must not share a branch: falling back to
+      the input rate priced an image model's pictures at the rate for the prompt,
+      which is the settles-for-nothing failure wearing a plausible number.
+    */
+    const outRows = rows.filter((r) => OUT_ROW.test(r));
+    if (!outRows.length) { out.set(id, { input, output: input }); continue; }
+    const output = outRows.map((r) => priceAt(paidIn(r), now, answers))
+      .find((n) => n !== undefined);
+    if (output === undefined) continue;
+
+    out.set(id, { input, output });
+  }
+  return out;
+}
+
+/**
+ * WHAT A MODEL DOES, READ FROM WHAT IT ANSWERS TO AND WHAT IT IS CALLED.
+ *
+ * ⚠️ GOOGLE PUBLISHES NO TASK, so the generation methods are the only statement
+ * of one — `embedContent` is an embedder whatever the name says. Where they do
+ * not separate two things the id does: every image model ends `-image` and every
+ * voice one `-tts`, and both would otherwise land in the text lane and be
+ * elected to answer a chat.
+ */
+const taskOf = (it: Listed, id: string): string => {
   const can = it.supportedGenerationMethods ?? [];
   if (can.includes("embedContent") || can.includes("batchEmbedContents")) return "text-embeddings";
-  if (can.includes("predictLongRunning")) return "text-to-video";
+  if (/-image(-|$)/.test(id) || /^imagen/.test(id)) return "text-to-image";
+  if (/-tts(-|$)/.test(id)) return "text-to-speech";
+  if (/^veo/.test(id) || can.includes("predictLongRunning")) return "text-to-video";
   return "text-generation";
 };
 
 /**
- * ⚠️ A THINKING MODEL BILLS FOR TOKENS NOBODY REQUESTED, which is why the
- * reserve widens for one. Every 2.5 model reasons by default.
+ * ⚠️ A GEMINI TEXT MODEL READS PICTURES TOO, AND ONE TASK CANNOT SAY SO. Every
+ * model from 2.0 on takes an image in the same request as the prompt, so a
+ * deployment whose vision lane reports "nothing answers" while eight Gemini rows
+ * sit enabled in the text lane is describing our schema rather than the world.
+ * A row therefore names the lanes it ALSO answers, and `text-generation` is
+ * still its own — what it is asked for by default does not change.
+ *
+ * ⚠️ AND IT IS NOT EVERY MODEL. An embedder takes text, a voice model speaks it;
+ * claiming vision for those would elect one to read a photograph.
  */
-const thinks = (id: string): boolean => /^gemini-2\.5/.test(id);
+const alsoOf = (id: string, task: string): readonly string[] =>
+  task === "text-generation" && !/^gemini-1\./.test(id) ? ["image-to-text"] : [];
+
+/**
+ * ⚠️ A THINKING MODEL BILLS FOR TOKENS NOBODY REQUESTED, which is why the
+ * reserve widens for one. Everything from 2.5 on reasons by default, and the
+ * families are numbered, so this asks the number rather than listing them —
+ * a list would have been right in May and wrong by August.
+ */
+const thinks = (id: string): boolean => {
+  const gen = /^gemini-(\d+(?:\.\d+)?)/.exec(id)?.[1];
+  return gen !== undefined && Number(gen) >= 2.5;
+};
 
 export interface Answer<T> { readonly ok: boolean; readonly value?: T; readonly why: string }
 
@@ -126,7 +301,29 @@ export interface Answer<T> { readonly ok: boolean; readonly value?: T; readonly 
  * the same request with the credential somewhere it cannot leak by being
  * quoted.
  */
-export async function listGeminiModels(key: string): Promise<Answer<readonly Discovered[]>> {
+export async function listGeminiModels(
+  key: string, now = new Date(),
+): Promise<Answer<readonly Discovered[]>> {
+  /*
+    ⚠️ TWO READS, AND THE CATALOGUE IS THEIR INTERSECTION. The API says which
+    models this KEY can reach; the pricing page says what each COSTS. A model in
+    only the first cannot be sold because we do not know what it charges us, and
+    one in only the second cannot be called. Intersecting them is also what
+    retires a generation: when Google drops a model from the API the sync stops
+    seeing it, and the retire pass marks the row.
+  */
+  let priced: ReadonlyMap<string, { input: number; output: number }>;
+  try {
+    const page = await fetch(PRICING);
+    if (!page.ok) return { ok: false, why: `Google's pricing page answered ${page.status}` };
+    priced = readGeminiPricing(await page.text(), now);
+  } catch {
+    return { ok: false, why: "could not read Google's pricing page" };
+  }
+  /* ⚠️ A PAGE THAT PARSED TO NOTHING IS A CHANGED PAGE, and applying it would
+     drop every Gemini model rather than report that the reader is out of date. */
+  if (!priced.size) return { ok: false, why: "Google's pricing page parsed to no prices" };
+
   const out: Discovered[] = [];
   let page: string | undefined;
 
@@ -153,19 +350,23 @@ export async function listGeminiModels(key: string): Promise<Answer<readonly Dis
          addresses is the segment after it. */
       const id = (it.name ?? "").replace(/^models\//, "");
       if (!id) continue;
-      const rate = rateForModel(id);
+      const rate = priced.get(id);
       /* ⚠️ Unpriced is not stored — see the header. */
       if (!rate) continue;
+      const task = taskOf(it, id);
 
       out.push({
         id,
         name: it.displayName ?? id,
         ...(it.description ? { description: it.description } : {}),
-        task: taskOf(it),
+        task,
+        also: alsoOf(id, task),
         provider: PROVIDER,
+        /* ⚠️ EVERY GEMINI RATE IS PER TOKEN, image models included — an image is
+           charged as output tokens rather than per picture. */
         meter: "token",
-        usdPerMillionIn: rate[0],
-        usdPerMillionOut: rate[1],
+        usdPerMillionIn: rate.input,
+        usdPerMillionOut: rate.output,
         ...(it.outputTokenLimit ? { maxOutput: it.outputTokenLimit } : {}),
         ...(thinks(id) ? { thinks: true } : {}),
       });
@@ -181,5 +382,5 @@ export async function listGeminiModels(key: string): Promise<Answer<readonly Dis
      is a thing to say rather than a silent retirement of every Gemini row. */
   return out.length
     ? { ok: true, value: out, why: "" }
-    : { ok: false, why: "Google listed no model this deployment has a rate for" };
+    : { ok: false, why: "no model Google lists is on its own pricing page" };
 }
