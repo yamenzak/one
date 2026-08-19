@@ -100,6 +100,22 @@ export function brandCssFor(light: Theme, dark?: Theme): string {
 /* ------------------------------------------------------------------- tone --- */
 
 /**
+ * ⚠️ AND A NEUTRAL CHIP MUST NOT OUT-SHOUT A TONED ONE. Measured in the dark
+ * theme: the library's `default` chip label computes to `oklch(0.9911 0 0)` —
+ * white — so on a list of nightly jobs the CADENCE ("Daily") was the brightest
+ * thing on every row, brighter than the job's own name and brighter than the
+ * green chip saying a run had failed. The same inversion put "creating" above
+ * "live" on the infrastructure screen.
+ *
+ * ⚠️ A CHIP IS AN ANNOTATION. It sits beside something and says one more thing
+ * about it; a neutral one is by definition the case with nothing to report, so
+ * it takes the ink a quiet line takes. The toned chips are untouched — being
+ * louder than the neutral is the whole of their job.
+ */
+const NEUTRAL_CHIP = `
+.chip--default.chip--soft { color: var(--muted); }`;
+
+/**
  * WHAT A REPORTED VALUE MEANS, IN THE ONE CHANNEL A MONOCHROME PRODUCT HAS LEFT.
  *
  * ⚠️ THIS EXISTS BECAUSE THE ATTRIBUTE ALREADY DID AND NOTHING STYLED IT.
@@ -124,7 +140,8 @@ export const TONE_CSS = `
 [data-ink="info"] { color: var(--accent); }
 [data-ink="success"] { color: var(--success); }
 [data-ink="warning"] { color: var(--warning); }
-[data-ink="danger"] { color: var(--danger); }`;
+[data-ink="danger"] { color: var(--danger); }
+${NEUTRAL_CHIP}`;
 
 /* -------------------------------------------------------------------- sky --- */
 

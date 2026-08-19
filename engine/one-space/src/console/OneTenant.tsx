@@ -196,7 +196,10 @@ export function OneTenant({ id }: { readonly id: string }) {
                    which of a workspace's limits somebody has moved. */
                 <FieldRow
                   label="Adjusted for this workspace"
-                  value={Object.keys(tenant.adjustments).join(", ")}
+                  /* ⚠️ AND THEY ARE NAMED, NOT KEYED. `seats` under a sentence in
+                     sentence case is the identifier the entitlement is stored
+                     under, printed where its name was meant. */
+                  value={Object.keys(tenant.adjustments).map(sentence).join(", ")}
                 />
               ) : null}
             </Group>

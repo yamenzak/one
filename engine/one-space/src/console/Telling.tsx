@@ -56,6 +56,7 @@ export function Telling() {
   return (
     <Screen
       shape="settings"
+      under="Whether a phone can be reached from here at all"
       of={of.of}
       again={of.again}
       then={(push) => (

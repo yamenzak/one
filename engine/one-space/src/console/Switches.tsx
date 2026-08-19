@@ -60,7 +60,7 @@ export function Switches() {
   return (
     /* ⚠️ `settings` — two independent controls, each saving the moment it is
        pressed, and no submit anywhere. The shape refuses a primary outright. */
-    <Screen shape="settings">
+    <Screen shape="settings" under="What is switched on, and for whom">
       {/* ⚠️ The crown already says "Switches" — see `OneSpace.tsx`. This screen drew
           it a second time over the flags, four lines under the first. */}
       <Await
