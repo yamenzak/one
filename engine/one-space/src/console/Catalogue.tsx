@@ -20,8 +20,8 @@ import { useState } from "react";
 import { bytesOfGb, gbOf, isSwitch, sayAllowance, sayNumber } from "@engine/kernel";
 import { Button, Chip } from "@heroui/react";
 import {
-  AmountRow, Await, Credits, Group, Money, NoteRow, NumberInput, RowsWaiting, Screen, Stack,
-  TYPE, ToggleRow, Tray, notice, useMoney, useShown,
+  AmountRow, Await, Credits, Group, Money, MoneyInput, NoteRow, NumberInput, RowsWaiting, Screen,
+  Stack, TYPE, ToggleRow, Tray, notice, useMoney, useShown,
 } from "@engine/design";
 import type { Allowance, EntitlementDef } from "@engine/kernel";
 import { api } from "../api.js";
@@ -282,12 +282,19 @@ function EditTray({ plan, declared, keys, on, edited, onReset, onDone, onClose }
           />
         </Group>
 
-        <NumberInput
+        {/* ⚠️ `MoneyInput`, BECAUSE THE FIELD UNDER `$34.00` SAID `34`. A price
+            typed as a bare number is the one field on this screen whose unit is
+            carried by a help line rather than by the value, and the row directly
+            above it prints the same amount as money. The currency is the plan's
+            own, upper-cased because an ISO code is what this takes — `Money`,
+            which DISPLAYS, is the one that takes a symbol. */}
+        <MoneyInput
           label="New price a month"
+          currency={plan.currency.toUpperCase()}
           value={price}
           onChange={setPrice}
           min={0}
-          help="Dollars. The lobby must stay at zero."
+          help="The lobby must stay at zero."
         />
         <NumberInput
           label="New credits a month"

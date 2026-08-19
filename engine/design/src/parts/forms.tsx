@@ -214,9 +214,31 @@ export function NumberInput({ value, onChange, min, max, step, format, ...p }: N
       isDisabled={p.disabled === true || pending}
     >
       <Label>{p.label}</Label>
-      <NumberField.Group>
+      {/*
+        ⚠️ `h-auto`, BECAUSE THE GROUP IS SHORTER THAN WHAT IS INSIDE IT ON A
+        PHONE. HeroUI's group is a hard `h-9` with `overflow-hidden`, and its
+        button is `h-10 md:h-9` — so above the breakpoint everything is 36 and
+        agrees, and on a phone a 40px button and a 40px input sit in a 36px box
+        and are CLIPPED, top and bottom. Measured: group 364x36 holding a 284x40
+        input. Letting the group take its children's height is the fix at every
+        width, rather than pinning a second number that has to track theirs.
+      */}
+      <NumberField.Group className="h-auto">
         <NumberField.DecrementButton />
-        <NumberField.Input />
+        {/*
+          ⚠️ THE VALUE SITS BETWEEN THE TWO CONTROLS, NOT WELDED TO ONE OF THEM.
+          The input is `text-start` by default, which is right for a field
+          somebody types a sentence into and wrong for a stepper: measured at a
+          phone's width the number was hard against the minus with 244px of
+          nothing before the plus, so the control read as a text box that
+          happened to have buttons rather than as a stepper.
+
+          ⚠️ AND `tabular-nums` SO STEPPING DOES NOT SHUFFLE THE DIGITS. Going
+          249 → 250 → 251 under somebody's thumb moves every glyph in a
+          proportional face, which reads as the number redrawing rather than
+          incrementing.
+        */}
+        <NumberField.Input className="text-center tabular-nums" />
         <NumberField.IncrementButton />
       </NumberField.Group>
       <Tail help={p.help} error={p.error} />
