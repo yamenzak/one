@@ -26,8 +26,8 @@
 import * as React from "react";
 import { useState } from "react";
 import {
-  Amount, Choice, Clock, Dated, Group, Lookup, Money, Num, Presenting, SPACE, Screen, Section,
-  Size, Stack, TYPE, When, machineHere, notice,
+  Amount, AmountRow, Choice, Clock, Dated, Group, Lookup, Money, Num, Presenting, Screen,
+  Size, When, machineHere, notice,
 } from "@engine/design";
 import {
   DEFAULT_PRESENTATION, instant, type Machine, type Presentation,
@@ -205,34 +205,32 @@ export function Formats() {
 function Preview() {
   const now = instant();
   return (
-    <Section label="What that looks like">
-      <Stack space="tight">
-        <Line says="A date"><Dated at={now} length="long" /></Line>
-        <Line says="In a column"><Dated at={now} length="numeric" /></Line>
-        <Line says="A time"><Clock at={now} /></Line>
-        {/* ⚠️ WHAT A LIST OF THINGS THAT HAPPENED WILL SAY OVER TODAY'S — see
-            the inbox. It is the one example here that is not a format at all
-            but a WORD, and somebody changing their zone is changing which day
-            it names. */}
-        <Line says="In the inbox"><When at={now} now={now} /></Line>
-        <Line says="A number"><Num value={1234567.5} places={2} /></Line>
-        <Line says="A price"><Money minor={123456} currency="EUR" size="label" /></Line>
-        <Line says="A weight"><Amount base={82000} measure="mass" /></Line>
-        <Line says="A distance"><Amount base={5000} measure="distance" /></Line>
-        <Line says="A file"><Size bytes={5 * 1024 ** 3} /></Line>
-      </Stack>
-    </Section>
+    /*
+      ⚠️ A CARD, LIKE THE TWO BLOCKS THAT DECIDE WHAT IT SHOWS. This was a
+      `Section` holding nine hand-written rows, so the samples sat on the page's
+      own ground — no card, no inset, running out to the gutter and wider than
+      every control above them, on the one screen whose whole job is to show
+      what the product looks like.
+
+      ⚠️ AND THE ROW IS THE VOCABULARY'S, NOT A LOCAL ONE. `AmountRow` is a named
+      thing and a value on the right, which is exactly this — and a private
+      `Line` beside it is a tenth row shape whose padding, gap and baseline only
+      match the other nine until somebody changes one of them.
+    */
+    <Group label="What that looks like">
+      <AmountRow label="A date" amount={<Dated at={now} length="long" />} />
+      <AmountRow label="In a column" amount={<Dated at={now} length="numeric" />} />
+      <AmountRow label="A time" amount={<Clock at={now} />} />
+      {/* ⚠️ WHAT A LIST OF THINGS THAT HAPPENED WILL SAY OVER TODAY'S — see
+          the inbox. It is the one example here that is not a format at all
+          but a WORD, and somebody changing their zone is changing which day
+          it names. */}
+      <AmountRow label="In the inbox" amount={<When at={now} now={now} />} />
+      <AmountRow label="A number" amount={<Num value={1234567.5} places={2} />} />
+      <AmountRow label="A price" amount={<Money minor={123456} currency="EUR" size="label" />} />
+      <AmountRow label="A weight" amount={<Amount base={82000} measure="mass" />} />
+      <AmountRow label="A distance" amount={<Amount base={5000} measure="distance" />} />
+      <AmountRow label="A file" amount={<Size bytes={5 * 1024 ** 3} />} />
+    </Group>
   );
 }
-
-/* ⚠️ `SPACE`, NOT A CHOSEN GAP — see `metrics.ts`. A row that picks its own
-   rhythm is a row that does not match the ones above it. */
-const Line = ({ says, children }: {
-  readonly says: string;
-  readonly children: React.ReactNode;
-}) => (
-  <div className={`flex items-baseline justify-between ${SPACE.roomy}`}>
-    <span className={TYPE.note}>{says}</span>
-    {children}
-  </div>
-);
