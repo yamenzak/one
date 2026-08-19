@@ -337,8 +337,15 @@ export interface Run {
  * caller that has to reshape its data to ask a question is a caller that works
  * the answer out for itself instead. Two fields is the whole question.
  */
+/*
+  ⚠️ KEYED BY JOB ID, NOT A `JobBook`, BECAUSE THAT IS ALL IT READS. A definition
+  carries a function body, which cannot cross a wire — so the console receives a
+  described shape rather than the declaration, and demanding the full type here
+  would have forced its one caller to build a fake `JobDef` per row to ask a
+  question about the keys.
+*/
 export const stalled = (
-  book: JobBook,
+  book: Readonly<Record<string, unknown>>,
   runs: readonly Pick<Run, "jobId" | "startedAt">[],
   now: number,
   missedMs: number,

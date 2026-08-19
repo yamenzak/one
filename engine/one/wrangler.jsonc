@@ -82,16 +82,30 @@
     }
   ],
 
-  // ⚠️ THE CLOCK, AND ONCE A DAY IS THE RIGHT RATE. The only thing the sweep
-  // does is destroy the records of a workspace 37 days past due, and that date
-  // is a day — running it hourly would be twenty-three passes that find nothing
-  // and one that finds the same thing a daily pass would. 03:00 UTC is quiet
-  // everywhere it matters and far from any month boundary a person watches.
+  // ⚠️ THE CLOCK TICKS HOURLY AND DECIDES NOTHING. It used to be `0 3 * * *`,
+  // and while one pass ran everything that was the same statement twice: the
+  // trigger WAS the schedule, so every job's declared cron was decoration and
+  // 03:00 was the only cadence this deployment could express.
+  //
+  // ⚠️ SO THE TRIGGER IS A HEARTBEAT AND THE SCHEDULE IS THE JOB'S. Each pass
+  // asks every job whether it is due (`dueNow`) and runs the ones that are, so
+  // a job declared hourly is hourly and one declared `0 3 * * *` still fires
+  // once, at 03:00. Twenty-three of the twenty-four passes are a handful of
+  // indexed reads that answer no.
+  //
+  // ⚠️ AND AN HOURLY HEARTBEAT IS WHAT MAKES RESCHEDULING REAL. An operator can
+  // move a job from the console without a deploy; against a daily trigger,
+  // moving one to anything finer than a day would have been a setting that
+  // saved successfully and changed nothing.
+  //
+  // ⚠️ A MISSED TICK IS NOT A MISSED RUN, which is the other half. Due means
+  // "should have fired by now" rather than "is firing this minute", so a cold
+  // start or a skipped hour runs the job late instead of dropping it in silence.
   //
   // ⚠️ AND A HANDLER WITHOUT THIS DECLARATION NEVER RUNS. `scheduled` in the
   // worker compiles, typechecks, is unit-tested and is called by nothing — the
   // exact shape this deployment is a catalogue of, one config file over.
-  "triggers": { "crons": ["0 3 * * *"] },
+  "triggers": { "crons": ["0 * * * *"] },
 
   "observability": { "enabled": true }
 }
