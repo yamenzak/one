@@ -47,7 +47,11 @@ export interface Note {
    * naming the workspace on every row of its own screen is the heading printed
    * again per line.
    */
-  readonly where?: string;
+  /* ⚠️ `from`, NOT `where`. `where` is a JURISDICTION everywhere else on this
+     platform — a `Residency` on a placement, a shard, a resource — and one name
+     with two meanings is a name the next reader has to check. What this holds is
+     a workspace's name. */
+  readonly from?: string;
 }
 
 export interface InboxProps {
@@ -89,8 +93,8 @@ export function Inbox({ notes, now, onOpen }: InboxProps) {
                  ONE — the heading above already said which day, and a full date
                  on every row is three fields repeated down a list with one of
                  them varying. */
-              under={note.where
-                ? `${note.where} · ${sayTime(shown, note.at as Instant)}`
+              under={note.from
+                ? `${note.from} · ${sayTime(shown, note.at as Instant)}`
                 : sayTime(shown, note.at as Instant)}
               /*
                 ⚠️ ZERO IS TEXTURE AND SO IS "SEEN". Only the unread ones are

@@ -945,7 +945,7 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
         const tenants = await tenantsOf(ctx.directory, accountId);
         const per = await Promise.all(tenants.map(async (t) => {
           const notes = await inboxOf(ctx.shardOf(t), t.id, accountId);
-          return notes.map((note) => ({ ...note, slug: t.slug, where: t.name }));
+          return notes.map((note) => ({ ...note, slug: t.slug, from: t.name }));
         }));
         /* ⚠️ SORTED ACROSS WORKSPACES, NOT CONCATENATED. `at` is an `Instant`, so
            the comparison is lexicographic and correct — which is the whole reason

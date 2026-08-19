@@ -170,7 +170,7 @@ export function Footing() {
                       under={m.detail ?? m.tenant_id}
                     >
                       <Chip color={m.state === "copying" ? "warning" : "default"} variant="soft">
-                        <Chip.Label>{m.state}</Chip.Label>
+                        <Chip.Label>{sentence(m.state)}</Chip.Label>
                       </Chip>
                     </ControlRow>
                   ))}
@@ -206,8 +206,12 @@ export function Footing() {
                       : [sentence(sayKind(item.kind as ResourceKind)), where(item.residency), item.binding]
                         .join(" · ")}
                   >
+                    {/* ⚠️ SAID, NOT PRINTED. `live`, `draining`, `creating` are
+                        the reconciler's own words and they are the right ones —
+                        lowercase in a chip beside "Behind" and "Closed" on the
+                        workspaces list, they were the reconciler's SPELLING. */}
                     <Chip color={TONE[item.state] ?? "default"} variant="soft">
-                      <Chip.Label>{item.state}</Chip.Label>
+                      <Chip.Label>{sentence(item.state)}</Chip.Label>
                     </Chip>
                   </ControlRow>
                 ))

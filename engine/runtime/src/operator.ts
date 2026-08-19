@@ -24,7 +24,8 @@ import type {
   AccountId, AppId, Allowance, AppSpec, FlagBook, ModelRow, PlanSpec, TenantId,
 } from "@engine/kernel";
 import {
-  ALLOWANCE_KEY, KEEPS_RESIDENCY, allowanceFor, entitlementKeys, inLane, mayIsolate,
+  ALLOWANCE_KEY, KEEPS_RESIDENCY, LANES as LANE_NAMES, allowanceFor, entitlementKeys, inLane,
+  mayIsolate,
   sayKind,
   refuseCatalogue,
   refusePrompt,
@@ -690,8 +691,14 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
           finding.
         */
         const needed = [...new Set(every().flatMap((a) => actionsOf(a).map((x) => x.ai.lane)))];
-        const faults = refuseCatalogue(models, needed)
-          .map((f) => ({ of: f.of, why: f.why, detail: f.detail }));
+        /* ⚠️ WHETHER THE SUBJECT IS A LANE OR A MODEL, because they are named
+           differently and only this layer knows which. A lane is one of ours and
+           is said in words; a model's id is the provider's own path and has to
+           stay exactly as the provider spells it. */
+        const faults = refuseCatalogue(models, needed).map((f) => ({
+          of: f.of, why: f.why, detail: f.detail,
+          lane: (LANE_NAMES as readonly string[]).includes(f.of),
+        }));
         return { apps, faults };
       },
     },

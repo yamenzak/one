@@ -51,7 +51,17 @@ interface Fault {
   readonly of: string;
   readonly why: string;
   readonly detail: string;
+  /** ⚠️ Whether `of` is one of OUR lanes or a provider's own model path. */
+  readonly lane: boolean;
 }
+
+/**
+ * ⚠️ A LANE IS SAID AND A MODEL ID IS QUOTED, and the difference matters both
+ * ways. "image" is one of our words and belongs in the reader's language;
+ * `@cf/meta/llama-3.1-8b-instruct` is the provider's own spelling, and a screen
+ * that tidied it would be showing an id that matches nothing anybody can look up.
+ */
+const subject = (f: Fault): string => (f.lane ? sentence(f.of) : f.of);
 
 interface AiAnswer {
   readonly apps: readonly {
@@ -110,7 +120,7 @@ export function Actions({ app, onGo }: {
               {faults.map((f) => (
                 <FieldRow
                   key={`${f.of}:${f.why}`}
-                  label={f.of}
+                  label={subject(f)}
                   value={<span data-ink="danger">{sentence(f.why)}</span>}
                   under={f.detail}
                 />

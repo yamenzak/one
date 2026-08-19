@@ -993,10 +993,10 @@ describe("the inbox across every workspace", () => {
     await file("northwind", "inb_c", "Middle, Northwind", "2026-08-02T09:00:00.000Z");
 
     const out = await get("setup", "/api/me.inbox", cookie).then((r) => r.json()) as
-      { items: { id: string; where: string; slug: string }[]; unseen: number };
+      { items: { id: string; from: string; slug: string }[]; unseen: number };
 
     expect(out.items.map((n) => n.id)).toEqual(["inb_b", "inb_c", "inb_a"]);
-    expect(out.items.map((n) => n.where)).toEqual(["Contoso", "Northwind", "Northwind"]);
+    expect(out.items.map((n) => n.from)).toEqual(["Contoso", "Northwind", "Northwind"]);
     /* ⚠️ The slug travels too, or nothing can be marked read: the row is on
        another workspace's shard and only its slug says which. */
     expect(out.items[0]!.slug).toBe("contoso");

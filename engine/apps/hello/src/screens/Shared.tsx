@@ -15,7 +15,7 @@
  */
 
 import { Chip } from "@heroui/react";
-import { Listing, Screen, Tally, glyphOf, type Loaded } from "@engine/design";
+import { Listing, Screen, Tally, glyphOf, sentence, type Loaded } from "@engine/design";
 import type { Note } from "./sample.js";
 
 export function Shared({ title, of, again, onOpen }: {
@@ -56,7 +56,9 @@ export function Shared({ title, of, again, onOpen }: {
             { id: "said", label: "About", cell: (n) => n.said },
             {
               id: "kind", label: "Kind",
-              cell: (n) => <Chip variant="soft"><Chip.Label>{n.kind}</Chip.Label></Chip>,
+              /* ⚠️ A KIND IS A CLOSED SET, so it is said rather than printed —
+                 see `scripts/keys.test.mjs`. */
+              cell: (n) => <Chip variant="soft"><Chip.Label>{sentence(n.kind)}</Chip.Label></Chip>,
             },
           ]}
         />
