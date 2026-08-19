@@ -18,6 +18,7 @@ import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import { addShard, createTenant, noteShardApp, setIcon, type Db } from "@engine/runtime";
 import worker, { APPS } from "../src/index.js";
+import { booted } from "./warm.js";
 
 const asDev = { ...env, ROOT: "localhost", ENVIRONMENT: "development", AUTH_SECRET: "test" };
 const call = (host: string, path: string) =>
@@ -44,7 +45,7 @@ let personal = "";
 let business = "";
 
 beforeAll(async () => {
-  await call("localhost", "/health");
+  await booted(asDev);
   await addShard(directory(), "eu-1", "eu", 100);
   for (const id of Object.keys(APPS)) await noteShardApp(directory(), "eu-1", id);
 

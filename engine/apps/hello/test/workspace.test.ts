@@ -57,7 +57,9 @@ const app = () => serve({
     plans: [],
     charging: async () => false,
   }),
-  identify: async (request, located) => {
+  identify: async (request, finding) => {
+    const located = await finding;
+    if (!located) return NOBODY;
     const { session, email, accountId } = await whoIs(directory(), sessionIdFrom(request), new Date());
     if (!session || !accountId) return NOBODY;
     const member = await memberFor(located.db, located.tenantId as never, accountId);

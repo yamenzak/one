@@ -21,7 +21,7 @@
 
 import type {
   AppSpec, Caller, CollectionSpec, DeploymentLegal, DocumentBook, DocumentDef, Door, Kind, PackDef,
-  PlanSpec, Problem, Resolved as _Resolved, Roots, Standing,
+  PlanSpec, Problem, Resolved as _Resolved, Roots, Standing, TenantId,
 } from "@engine/kernel";
 import {
   IN_GOOD_STANDING, LEGAL_INDEX, LEGAL_PATH, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, check, doorFor,
@@ -33,7 +33,7 @@ import { answerMcp } from "./mcp.js";
 import type { PlatformCtx } from "./member-ops.js";
 import { keyFor, record, remember, seen, entryFor } from "./audit.js";
 import { clearCookie, sessionIdFrom, setCookie, type Session } from "./identity.js";
-import { maintenanceMode } from "./operator.js";
+import { maintenanceMode, type MaintenanceMode } from "./operator.js";
 import type { Bucket, Where } from "./storage.js";
 import { whoIs, type PersonalBook, type PersonalCtx } from "./personal.js";
 import type { TenantRow } from "./directory.js";
@@ -93,8 +93,22 @@ export interface Wiring {
    */
   readonly bucketOf?: (where: Where) => Bucket | null;
   /** Resolve a tenant's slug (or custom host) to where its records are. */
-  readonly locate: (door: Door) => Promise<Located | null>;
-  readonly identify?: (request: Request, located: Located) => Promise<Who>;
+  /**
+   * ⚠️ IT ANSWERS TWICE, AND THE EARLY ANSWER IS WHY. Where a door is comes back
+   * one query in; what the workspace holds — the plan, the wallet, every quota
+   * count — is three or four. The identity needs only the first, so handing it
+   * the second put three round trips in front of every request. See `Locating`,
+   * and `asLocating` for a wiring that already has a whole `Located`.
+   */
+  readonly locate: (door: Door) => Locating;
+  /**
+   * ⚠️ IT IS HANDED A PROMISE, AND THAT IS THE POINT. Reading the session needs
+   * nothing about the workspace, and reading the roster needs only its shard —
+   * so this starts beside `locate` rather than after it, and awaits `where` at
+   * the moment it actually needs a database. `null` means the door resolved to no
+   * workspace, and the only correct answer to that is `NOBODY`.
+   */
+  readonly identify?: (request: Request, where: Promise<Whereabouts | null>) => Promise<Who>;
   readonly now?: () => Date;
   /**
    * ⚠️ THE OPERATIONS ABOUT YOURSELF, WHICH RESOLVE NO WORKSPACE. Somebody has
@@ -436,6 +450,22 @@ export interface Located {
   readonly used?: (key: string) => number;
 }
 
+/** ⚠️ Where a door IS: the two facts an identity needs, and nothing else. */
+export interface Whereabouts {
+  readonly tenantId: TenantId;
+  readonly db: Db;
+}
+
+/**
+ * ⚠️ TWO ANSWERS FROM ONE LOOKUP — see `locator`. `where` lands one round trip
+ * in; `located` lands three or four. A caller that needs both awaits both, and
+ * pays for the lookup once.
+ */
+export interface Locating {
+  readonly where: Promise<Whereabouts | null>;
+  readonly located: Promise<Located | null>;
+}
+
 /* ------------------------------------------------------------------ serve --- */
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}): Response =>
@@ -444,6 +474,46 @@ const json = (body: unknown, status = 200, headers: Record<string, string> = {})
   });
 
 const asProblem = (p: Problem): Response => json({ problem: p }, p.status);
+
+/**
+ * WHICH DOOR THIS IS — the one question a page asks before it can draw anything.
+ *
+ * ⚠️ IT READS A HOSTNAME AND NOTHING ELSE, WHICH IS WHY IT IS OUT HERE. Every
+ * other path this runtime answers needs the database — the plan catalogue is
+ * resolved before a request is even dispatched — so a deployment binds them all
+ * behind the schema runner. This one needs none of it, and a person watching
+ * "Finding this place" on a cold start was watching a migration run in front of
+ * four fields derived from the address bar.
+ *
+ * ⚠️ SO A DEPLOYMENT MAY ANSWER IT BEFORE BOOTING, and `engine/one` does. The
+ * function is shared rather than copied for the reason the comments below give:
+ * a second classifier in a second place is a second idea of what a custom domain
+ * is, and when the two disagree the page offers a control the runtime refuses.
+ *
+ * ⚠️ THE DOOR IS REPORTED, SO THE BROWSER NEVER CLASSIFIES ITS OWN HOSTNAME.
+ * `root` comes with it because the addresses of the other doors are derived from
+ * a fact the deployment holds, not from a constant baked into a bundle at build
+ * time — and the SLUG comes with it because a page that worked out which
+ * workspace it was on by cutting the hostname apart would be that second
+ * classifier one more time.
+ *
+ * ⚠️ AN UNRECOGNISED HOST IS NOT FOUND, NOT A DOOR CALLED `none`. `serve` refuses
+ * one before it reaches any path at all, so answering 200 here would make the
+ * same hostname 404 through the router and 200 through the probe — which is how
+ * a deployment comes to report that somebody else's domain is alive on it. This
+ * is the reason the refusal lives in this function rather than beside its caller.
+ *
+ * ⚠️ AND IT IS NEVER CACHED. The answer names one workspace, and a shared cache
+ * holding it would hand that workspace's identity to the next hostname asking.
+ */
+export function healthOf(request: Request, roots: Roots): Response {
+  const door = doorFor(new URL(request.url).host, roots);
+  if (door.kind === "none") return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
+  return json({
+    ok: true, door: door.kind, root: roots.root,
+    slug: door.kind === "tenant" ? door.slug : null,
+  }, 200, { "cache-control": "no-store" });
+}
 
 export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
   return async (request: Request): Promise<Response> => {
@@ -477,12 +547,7 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
       constantly, because opening a workspace is a route where it already is
       and a full page load anywhere else.
     */
-    if (url.pathname === "/health") {
-      return json({
-        ok: true, door: door.kind, root: wiring.roots.root,
-        slug: door.kind === "tenant" ? door.slug : null,
-      });
-    }
+    if (url.pathname === "/health") return healthOf(request, wiring.roots);
     /*
       ⚠️ A DOCUMENT SOMEBODY IS ASKED TO AGREE TO, READ WITHOUT AGREEING FIRST.
       Public on every door and behind nothing: deciding whether to accept is what
@@ -610,8 +675,39 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
     if (own) return answerPersonal(wiring, own, id, request, url, door, now);
     if (door.kind !== "tenant") return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
 
-    const located = await wiring.locate(door);
-    if (!located) return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
+    /*
+      ⚠️ THREE QUESTIONS START HERE AND ONE OF THEM IS AWAITED. Where this door
+      is, who is asking, and whether the deployment is closed are answered by
+      three different tables and none is an input to another — but they were asked
+      in that order, so a request paid for all three end to end before its own
+      handler ran.
+
+      ⚠️ AND THE IDENTITY IS THE EXPENSIVE ONE TO HAVE WAITED FOR. Resolving who
+      is asking needs a session and this workspace's roster; the roster is on the
+      shard, and the shard is known after the FIRST query `locate` makes. Handing
+      over the full answer meant waiting for the plan catalogue, the wallet and
+      every quota count first — three round trips in front of a lookup that needed
+      none of them. `locate` answers twice now, from one read: see `Locating`.
+    */
+    const locating = wiring.locate(door);
+    const identifying = wiring.identify?.(request, locating.where) ?? Promise.resolve(NOBODY);
+    const caring = maintenanceMode(wiring.directory);
+
+    /*
+      ⚠️ A REFUSAL STILL SETTLES WHAT IT STARTED. Every path below can return
+      before either of those is awaited — an unknown workspace, an unknown
+      operation, the wrong method — and a query abandoned in flight is a
+      rejection nobody handles and, in the Workers test runtime, a storage frame
+      that cannot be popped. Both have been travelling for as long as the lookup
+      took already, so waiting costs a refusal nothing it had not spent.
+    */
+    const refusing = async (why: Problem): Promise<Response> => {
+      await Promise.allSettled([identifying, caring]);
+      return asProblem(why);
+    };
+
+    const located = await locating.located;
+    if (!located) return refusing(problem(PLATFORM_PROBLEMS, "platform.not_found"));
 
     /* ⚠️ ONLY THE APP THE OPERATION BELONGS TO IS COMPOSED (D4). Searching the
        tenant's own list rather than every registered app is what keeps the cost
@@ -624,22 +720,24 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
       const op = composed.byId.get(id);
       if (op) { found = { composed, op }; break; }
     }
-    if (!found) return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
+    if (!found) return refusing(problem(PLATFORM_PROBLEMS, "platform.not_found"));
 
     const { composed, op } = found;
     const catalog = composed.catalog;
     const expects = op.kind === "read" ? "GET" : "POST";
-    if (request.method !== expects) return asProblem(problem(catalog, "platform.not_found"));
+    if (request.method !== expects) return refusing(problem(catalog, "platform.not_found"));
 
     const input = await readInput(request, url);
-    if (input === null) return asProblem(problem(catalog, "platform.invalid"));
+    if (input === null) return refusing(problem(catalog, "platform.invalid"));
 
-    const who = (await wiring.identify?.(request, located)) ?? NOBODY;
+    const who = await identifying;
 
     const outcome = await performOperation(
       wiring, located, who, { composed, op }, input,
       request.headers.get("idempotency-key"), now,
       { origin: url.origin, slug: door.kind === "tenant" ? door.slug : null },
+      /* ⚠️ Started at the top of the request — see there. */
+      caring,
     );
     switch (outcome.kind) {
       case "replay": return json(outcome.answer, 200, { "idempotent-replay": "true" });
@@ -682,6 +780,13 @@ export async function performOperation(
    * a workspace on its own domain to somebody else's hostname.
    */
   at: { readonly origin: string; readonly slug: string | null },
+  /**
+   * ⚠️ STARTED BY THE CALLER WHERE THE CALLER CAN START IT EARLY. Whether the
+   * deployment is closed is one row and is nobody's input, so the HTTP path asks
+   * it at the top of the request and hands the promise down. Absent — the agent
+   * door — it is asked here, which is where it always was.
+   */
+  care?: Promise<MaintenanceMode>,
 ): Promise<Performed> {
   const { composed, op } = found;
   const catalog = composed.catalog;
@@ -709,9 +814,9 @@ export async function performOperation(
     that order is below, where the answers are read. Asking early is not deciding
     early.
   */
-  const [owed, care, permissions] = await Promise.all([
+  const [owed, closed, permissions] = await Promise.all([
     op.spec.beforeAccepting || !wiring.owed ? Promise.resolve([]) : wiring.owed(who, located),
-    maintenanceMode(wiring.directory),
+    care ?? maintenanceMode(wiring.directory),
     /* ⚠️ Resolved for the app THIS operation belongs to (D15) — the flat set the
        caller used to carry was whichever app was first on the tenant's list. */
     who.permissionsIn(composed.app.id),
@@ -724,7 +829,7 @@ export async function performOperation(
     and the personal lane never reach this function — which is the exemption
     list, by construction rather than by remembering.
   */
-  if (care === "full" || (care === "readonly" && op.kind === "write")) {
+  if (closed === "full" || (closed === "readonly" && op.kind === "write")) {
     return { kind: "refused", problem: problem(catalog, "platform.maintenance") };
   }
 

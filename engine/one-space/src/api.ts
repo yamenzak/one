@@ -45,6 +45,34 @@ export const whenSessionExpires = (run: () => void): void => { onExpired = run; 
  */
 const NOT_AN_EXPIRY = new Set(["me.code", "me.session", "me.who"]);
 
+/**
+ * WHAT WAS ALREADY ASKED BEFORE THIS FILE EXISTED — see `index.html`.
+ *
+ * ⚠️ TWO ANSWERS ARE IN FLIGHT BEFORE THE BUNDLE IS. Which door this is and who
+ * is here decide the first screen, so nothing can be drawn without them; asked
+ * from here they were asked after several hundred kilobytes had been downloaded
+ * and parsed, which made them a second wait rather than a concurrent one. An
+ * inline script in the page starts both while that download is still happening
+ * and leaves them on `window.__one`.
+ *
+ * ⚠️ CONSUMED ONCE, BECAUSE A `Response` IS READ ONCE. It is deleted as it is
+ * taken, so the second ask — signing in, refreshing, a screen re-reading — is an
+ * ordinary request. Left in place it would answer a signed-in caller with the
+ * page's own pre-sign-in answer, permanently.
+ *
+ * ⚠️ AND IT IS A HEAD START, NEVER A DEPENDENCY. A preflight that failed
+ * resolves to `null` and the caller asks again for real, so a page served
+ * without the script — an old cached shell, a browser that refused to run it —
+ * behaves exactly as it did before this existed.
+ */
+const early = (key: string): Promise<Response | null> | null => {
+  const held = (globalThis as { __one?: Record<string, Promise<Response | null>> }).__one;
+  const flying = held?.[key];
+  if (!flying) return null;
+  delete held![key];
+  return flying;
+};
+
 const readProblem = async (res: Response): Promise<Problem> => {
   try {
     const body = await res.json() as { problem?: Problem };
@@ -76,9 +104,12 @@ async function call<T>(
 
   const raw = body instanceof ArrayBuffer || ArrayBuffer.isView(body);
 
+  /* ⚠️ Only a bare GET can have been asked ahead of time — see `early`. */
+  const ahead = method === "GET" && !body ? await early(id) : null;
+
   let res: Response;
   try {
-    res = await fetch(`/api/${id}${query}`, {
+    res = ahead ?? await fetch(`/api/${id}${query}`, {
       method,
       /* ⚠️ The session is a cookie the runtime sets; `same-origin` is what sends
          it back, and its absence is a sign-in that appears to work once. */
@@ -118,7 +149,8 @@ export const api = {
    */
   async health(): Promise<Answer<Health>> {
     try {
-      const res = await fetch("/health", { credentials: "same-origin" });
+      /* ⚠️ The page asked this before the bundle loaded — see `early`. */
+      const res = await early("health") ?? await fetch("/health", { credentials: "same-origin" });
       if (!res.ok) return { ok: false, problem: await readProblem(res) };
       return { ok: true, value: await res.json() as Health };
     } catch {

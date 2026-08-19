@@ -59,7 +59,9 @@ const app = () => serve({
     plans: [],
     charging: async () => false,
   }),
-  identify: async (request, located) => {
+  identify: async (request, finding) => {
+    const located = await finding;
+    if (!located) return NOBODY;
     const { session, email, accountId } =
       await whoIs(onDirectory.db, sessionIdFrom(request), new Date());
     if (!session || !accountId) return NOBODY;
@@ -127,8 +129,15 @@ describe("what a read costs", () => {
       continent away that is a tenth of a second each. The failure this catches
       is not a slow query; it is a tenth question added to the nine already
       asked, by somebody who could not see the other nine.
+
+      ⚠️ TEN QUERIES, THREE WAITS — and the gap between those two numbers is the
+      whole point of measuring depth rather than trips. It was eleven waits, then
+      seven, then three: the workspace lookup, the identity and the maintenance
+      switch all start together now (`Locating`), so the only things left in a
+      line are the three that genuinely feed each other — which workspace this
+      is, then what it holds and who is on its roster, then the answer.
     */
-    expect(at.depth, `depth ${at.depth}, trips ${at.trips}`).toBeLessThanOrEqual(7);
+    expect(at.depth, `depth ${at.depth}, trips ${at.trips}`).toBeLessThanOrEqual(3);
     expect(at.trips, `depth ${at.depth}, trips ${at.trips}`).toBeLessThanOrEqual(10);
   });
 

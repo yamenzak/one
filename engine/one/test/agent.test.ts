@@ -21,6 +21,7 @@ import {
 } from "@engine/runtime";
 import { HELLO } from "@engine/hello";
 import worker, { LEGAL } from "../src/index.js";
+import { booted } from "./warm.js";
 
 const asDev = { ...env, ROOT: "localhost", ENVIRONMENT: "development", AUTH_SECRET: "test" };
 const call = (host: string, path: string, init: RequestInit = {}) =>
@@ -42,7 +43,7 @@ let readerCookie = "";
 let tenantId = "";
 
 beforeAll(async () => {
-  await call("localhost", "/health");
+  await booted(asDev);
   await addShard(directory(), "eu-1", "eu", 100);
   await noteShardApp(directory(), "eu-1", "hello");
 

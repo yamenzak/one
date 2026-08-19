@@ -22,6 +22,7 @@ import {
   personalOps, schemaFor, serve, sessionIdFrom, startSession, tenantBySlug, whoIs, type Db,
   b64urlOf, makePushKeys, subscriptionsOf,
 } from "@engine/runtime";
+import { asLocating } from "./wiring.js";
 import { HELLO, hello } from "../src/index.js";
 
 const directory = () => env.DIRECTORY as unknown as Db;
@@ -60,7 +61,7 @@ const app = (vaultSecret: string | null = "test-vault-secret") => serve({
       sent.push({ to, code });
     },
   }),
-  locate: async (door) => {
+  locate: asLocating(async (door) => {
     if (door.kind !== "tenant" || !door.slug) return null;
     const tenant = await tenantBySlug(directory(), door.slug);
     return tenant
@@ -75,7 +76,7 @@ const app = (vaultSecret: string | null = "test-vault-secret") => serve({
         ],
       }
       : null;
-  },
+  }),
   /*
     ⚠️ WHO IS ASKING IS RESOLVED FROM THE SESSION AND THE WORKSPACE'S OWN
     ROSTER — never from anything the request said about itself. Permissions are
@@ -83,7 +84,9 @@ const app = (vaultSecret: string | null = "test-vault-secret") => serve({
     the app role only in its app, and a custom role works wherever a declared
     one does.
   */
-  identify: async (request, located) => {
+  identify: async (request, finding) => {
+    const located = await finding;
+    if (!located) return NOBODY;
     const { session, email, accountId } = await whoIs(directory(), sessionIdFrom(request), new Date());
     if (!session || !accountId) return NOBODY;
     const member = await memberFor(located.db, located.tenantId as never, accountId);

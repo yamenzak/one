@@ -20,7 +20,7 @@ import { entitlementKeys, type PlanSpec } from "@engine/kernel";
 import { walletOf } from "./wallet.js";
 import { tenantBySlug, type TenantRow } from "./directory.js";
 import { membersOf } from "./membership.js";
-import type { Located } from "./serve.js";
+import type { Located, Locating } from "./serve.js";
 import type { Db } from "./sql.js";
 
 export interface LocateDeps {
@@ -59,12 +59,44 @@ export interface LocateDeps {
  * writes, because the bill is the workspace's. Serving one product to a business
  * that is not paying for another is how a business ends up with a product it
  * cannot pay for and cannot stop using.
+ *
+ * ⚠️ IT ANSWERS TWICE FROM ONE READ, AND THAT IS THE WHOLE SHAPE OF IT. WHERE a
+ * door is — the workspace and its shard — is known after the first query;
+ * everything else (the plan, the wallet, the counts) is three more waits on top.
+ * The identity does not need any of that: resolving who is asking needs a session
+ * and a roster, and the roster is on the shard. Waiting for the bill to be
+ * resolved before looking anybody up put three round trips in front of every
+ * request for no reason anybody could name.
+ *
+ * ⚠️ ONE PROMISE UNDERNEATH BOTH, so the workspace is looked up ONCE. Two
+ * functions here would be two reads of the same row, and worse, two places that
+ * could disagree about whether a closed workspace is a workspace.
  */
-export function locator(deps: LocateDeps): (door: Door) => Promise<Located | null> {
-  return async (door: Door): Promise<Located | null> => {
-    if (door.kind !== "tenant" || !door.slug) return null;
-    const tenant = await tenantBySlug(deps.directory, door.slug);
-    if (!tenant || tenant.closedAt) return null;
+export function locator(deps: LocateDeps): (door: Door) => Locating {
+  return (door: Door): Locating => {
+    const found = (async (): Promise<TenantRow | null> => {
+      if (door.kind !== "tenant" || !door.slug) return null;
+      const row = await tenantBySlug(deps.directory, door.slug);
+      return !row || row.closedAt ? null : row;
+    })();
+
+    const where = found.then((t) => (t ? { tenantId: t.id, db: deps.shardOf(t) } : null));
+    /* ⚠️ HANDLED HERE SO A FAILED LOOKUP IS NOT AN UNHANDLED REJECTION. A caller
+       that only wants the full answer never awaits `where`, and a rejected
+       promise nobody awaited is a warning in the log about a fault that WAS
+       reported, on the other half, correctly. Awaiting it still rejects. */
+    where.catch(() => undefined);
+
+    return { where, located: everything(deps, found) };
+  };
+}
+
+async function everything(
+  deps: LocateDeps, found: Promise<TenantRow | null>,
+): Promise<Located | null> {
+  {
+    const tenant = await found;
+    if (!tenant) return null;
 
     const now = (deps.now?.() ?? new Date()).toISOString() as Instant;
     const db = deps.shardOf(tenant);
@@ -179,7 +211,7 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
       balance: wallet.spendable,
       used,
     };
-  };
+  }
 }
 
 async function prime(

@@ -68,7 +68,7 @@ if (!/maintenanceMode\(wiring\.directory\)/.test(serve)) {
   fail(`runtime/src/serve.ts: the one operation path no longer asks about\n` +
        `       maintenance — a closed deployment serves right through the agent door,\n` +
        `       and nothing anywhere says so.`);
-} else if (!/care === "full" \|\| \(care === "readonly" && op\.kind === "write"\)/.test(serve)) {
+} else if (!/closed === "full" \|\| \(closed === "readonly" && op\.kind === "write"\)/.test(serve)) {
   fail(`runtime/src/serve.ts: maintenance no longer distinguishes reading from\n` +
        `       writing — "readonly" either withholds the records people came to look\n` +
        `       at, or refuses nothing at all.`);

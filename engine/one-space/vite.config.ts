@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { design } from "@engine/design/vite";
 
 /**
  * THE SPACE'S BUILD.
@@ -12,7 +13,19 @@ import tailwindcss from "@tailwindcss/vite";
  * pass.
  */
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  /*
+    ⚠️ `design()` IS NOT COSMETIC — it keeps 1.19 MB of compiled JSON-schema
+    validator out of the bundle, and it refuses rather than skips if the modules
+    it stubs ever move. See `@engine/design/vite`.
+
+    ⚠️ AND `entryUnder` IS A CEILING SOMEBODY HAS TO RAISE. The entry chunk is
+    what every visitor downloads on every door before anything is drawn; it
+    reached 407 kB without any one commit being at fault, which is how weight
+    always arrives. 376 kB today; a screen that would push it over belongs
+    behind a dynamic import (`src/console/parts.tsx` is the pattern), and a number
+    raised here is a number somebody reads in review.
+  */
+  plugins: [react(), tailwindcss(), design({ entryUnder: 390 })],
   server: {
     /*
       ⚠️ EVERY DOOR IS A SUBDOMAIN, SO THE DEV SERVER HAS TO ANSWER TO ALL OF

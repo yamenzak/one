@@ -81,12 +81,12 @@ describe("moving a workspace's records", () => {
       directory: directory(), shardOf: () => one(),
       appsOf: async () => [app()], plans: [], charging: async () => false,
     });
-    const before = await locate({ kind: "tenant", slug: "carry", host: "carry.localhost" });
+    const before = await locate({ kind: "tenant", slug: "carry", host: "carry.localhost" }).located;
     expect(before?.standing?.writable).toBe(true);
 
     expect(await beginMove(directory(), id as never, "eu-2")).toBeNull();
 
-    const during = await locate({ kind: "tenant", slug: "carry", host: "carry.localhost" });
+    const during = await locate({ kind: "tenant", slug: "carry", host: "carry.localhost" }).located;
     expect(during?.standing?.writable).toBe(false);
     /* ⚠️ Reads are never withheld — the difference between a few minutes of
        "you cannot change this right now" and an outage. */

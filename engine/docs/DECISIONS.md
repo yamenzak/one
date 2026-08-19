@@ -1087,3 +1087,120 @@ version of the per-row check required a `{`, and a brace-less
 false positive was as instructive: a query STARTED in a loop and awaited
 afterwards is the FIX, and reads almost identically to the fault.
 
+
+---
+
+## D38 — Nothing that reads no table waits for a schema
+
+**A cold isolate served no HTML at all until every schema module had been applied
+to the directory and to each shard.** `boot` was awaited at the top of `fetch`, in
+front of every request — the page, its bundle, its stylesheet, its fonts and the
+health probe included. So the first thing a person saw after a deploy was several
+seconds of blank screen, and the request they were actually waiting on
+(`/health`, which is four fields read off the hostname) was behind a migration it
+has nothing to do with.
+
+**The split is by what a path READS, and it is `isPlatformPath` rather than a
+second list.** Everything the platform answers reaches D1 — the operations, the
+webhook, the icons, the manifest — because the plan catalogue is resolved before
+a request is even dispatched. The SPA's own files reach none of it. `/health` is
+the one exception in the other direction: `healthOf` is the runtime's own
+classifier, exported so the deployment can answer before booting, and `serve`
+calls the same function, so there is still one idea of what a door is.
+
+⚠️ **The cold start is paid while the browser is busy.** A static path hands the
+boot to `ctx.waitUntil` and answers immediately, so the migration runs during the
+several hundred kilobytes of bundle the browser is downloading anyway. By the
+time the app makes its first operation the work is usually done.
+
+⚠️ **AND THE TEST HAD TO BE ABOUT A COLD ISOLATE, WHICH NO OTHER SUITE HERE CAN
+SEE.** `boot` is memoised, so after the second request "did that wait?" has no
+observable answer. `one/test/cold.test.ts` resets the module registry and
+hands the worker a database that never settles: a path that waits hangs, a path
+that does not answers, and there is nothing in between to be ambiguous about. The
+other direction — that an operation still waits — is an ORDER assertion, because
+against a hanging database an operation stalls whichever way the code is written.
+
+## D39 — `locate` answers twice from one read
+
+**Where a door is comes back one query in; what the workspace holds is three or
+four.** The plan catalogue, the wallet, the standing and every quota count are
+resolved before `locate` returns — and the IDENTITY needs none of them. Resolving
+who is asking needs a session and this workspace's roster, and the roster is on
+the shard, which is known from the first row. Handing the identity the full answer
+put three round trips in front of a lookup that needed one of them.
+
+**So the seam is `Locating`: a `where` and a `located`, both derived from one
+tenant promise.** Two functions would be two reads of the same row and, worse, two
+places that could disagree about whether a closed workspace is a workspace.
+`serve` starts the identity and the maintenance switch beside the lookup and
+awaits each where it is used. Measured on a list read: **depth 7 → 3**, with the
+trip count unchanged at ten. The remaining three are the ones that genuinely feed
+each other — which workspace this is, then what it holds and who is on its roster,
+then the answer.
+
+⚠️ **A REFUSAL STILL SETTLES WHAT IT STARTED.** Four paths return before either
+promise is awaited — an unknown workspace, an unknown operation, the wrong method,
+an unreadable body — and a query abandoned in flight is a rejection nobody handles
+and, in the Workers test runtime, a storage frame that cannot be popped. Both have
+been travelling for as long as the lookup took already, so waiting costs a refusal
+nothing it had not spent.
+
+⚠️ **And the helper for a hand-written lookup lives with the tests, not in the
+runtime.** `asLocating` adapts a one-answer wiring, one wait slower; nothing
+shipped uses it, and `capability.test.mjs` was right to call it out as an export
+with no caller. It is `apps/hello/test/wiring.ts`.
+
+## D40 — The weight of the first screen is a number somebody has to raise
+
+**Three things were being downloaded by every visitor to every door that no
+visitor needed.** A megabyte of compiled JSON-schema validator inside
+`@dicebear/core`, checking two style files we vendor and an options object we
+write by hand — an answer fixed at build time, paid for at runtime, by everybody.
+The thirteen screens of the operator console. And the workspace-detail screen
+behind them.
+
+**The validator is answered once, where the answer is fixed.**
+`@engine/design/vite` stubs the two modules in the browser build;
+`design/test/faces.test.tsx` runs the REAL validators over every option this
+product actually passes, so an upgrade that genuinely invalidates a style file
+fails a test rather than somebody's avatar. Deleting the check would have been the
+cheap version of this. The plugin REFUSES rather than skips if the modules move —
+otherwise the bundle silently regains a megabyte and the only symptom is a slower
+first paint months later.
+
+**Measured, both changes together: 1,493.8 → 1,297.5 kB raw, 415.7 → 385.5 kB
+gzipped.** Splitting `space/` and `centre/` as well was considered and rejected:
+both are on the critical path of their own door, so it would move a wait rather
+than remove one.
+
+⚠️ **`entryUnder` is the mechanism, not the numbers.** The entry chunk reached
+four hundred kilobytes without any one commit being at fault, which is how weight
+always arrives — a screen here, a dependency there, and nothing in the review of
+any of them saying what it cost. A ceiling in the build makes the next one a
+decision.
+
+## D41 — The page asks before the bundle arrives
+
+**Which door this is and who is here decide the first screen, and both were asked
+after several hundred kilobytes of JavaScript had been downloaded, parsed and
+run.** Two full waits, one after the other, for answers that could have been
+travelling the whole time.
+
+**An inline script in `index.html` starts both as the parser reaches it** — a
+module script is deferred by definition, so nothing in the application can run
+this early — and leaves the promises on `window.__one`. `api.ts` picks them up
+instead of asking again.
+
+⚠️ **Consumed once, because a `Response` reads once.** The answer was taken before
+anybody signed in, so reusing it after `me.session` would leave somebody who has
+just signed in looking at the signed-out screen, permanently, with the session
+cookie already set.
+
+⚠️ **A head start, never a dependency.** Every failure resolves to `null` and the
+caller asks again for real, so a page served without the script behaves exactly as
+it did before this existed.
+
+⚠️ **AND BOTH HALVES ARE CHECKED TOGETHER.** A page that asks with nothing
+collecting is two wasted requests; a collector with nothing to collect is a branch
+that never runs. `space/test/preflight.test.ts` reads the real `index.html`.

@@ -11,6 +11,7 @@
 import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { running } from "@engine/runtime";
+import { asLocating } from "./wiring.js";
 import type { ModelRow } from "@engine/kernel";
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
@@ -50,7 +51,7 @@ const app = () => serve({
       models: async () => MODELS,
     }),
   },
-  locate: async (door) => {
+  locate: asLocating(async (door) => {
     if (door.kind !== "tenant" || !door.slug) return null;
     const tenant = await tenantBySlug(directory(), door.slug);
     return tenant
@@ -59,8 +60,10 @@ const app = () => serve({
         entitlements: [{ key: "seats", value: 10, source: "plan" as const, plan: 10 }],
       }
       : null;
-  },
-  identify: async (request, located) => {
+  }),
+  identify: async (request, finding) => {
+    const located = await finding;
+    if (!located) return NOBODY;
     const { session, email, accountId } = await whoIs(directory(), sessionIdFrom(request), new Date());
     if (!session || !accountId) return NOBODY;
     const member = await memberFor(located.db, located.tenantId as never, accountId);

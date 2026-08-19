@@ -19,6 +19,7 @@ import {
   keep, consent, put, type Db,
 } from "@engine/runtime";
 import worker, { APPS } from "../src/index.js";
+import { booted } from "./warm.js";
 
 const directory = () => env.DIRECTORY as unknown as Db;
 const shard = () => env.SHARD_EU_1 as unknown as Db;
@@ -33,7 +34,7 @@ const at = (path: string, cookie: string, init: RequestInit = {}) =>
 interface Held { of: string; table: string; where: string; rows: unknown[] }
 
 beforeAll(async () => {
-  await worker.fetch(new Request("http://localhost:8080/health"), asDevEnv as never);
+  await booted(asDevEnv);
   await addShard(directory(), "eu-1", "eu", 100);
   for (const id of Object.keys(APPS)) await noteShardApp(directory(), "eu-1", id);
 });

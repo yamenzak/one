@@ -167,11 +167,11 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 57 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 53 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 137 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 138 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 55 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**342 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**343 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -204,7 +204,7 @@ there is no deep import, and a guard says so.
 - `parts/beside.tsx` — `Hint`, `Pip`
 - `parts/blocks.tsx` — `Crumbs`, `Document`, `Faq`, `Gauge`, `Hotkey`, `Moment`, `PageTabs`, `Reveal`, `Step`, `Steps`, `TabSpec`, `Timeline`
 - `parts/credits.tsx` — `Credits`, `CreditsProps`
-- `parts/face.tsx` — `appFace`, `Face`, `FaceKind`, `FaceOf`, `FaceProps`, `FaceSize`, `ONE_FACE`, `Orb`, `placeFace`, `whoFace`, `worldFor`
+- `parts/face.tsx` — `appFace`, `Face`, `FaceKind`, `FaceOf`, `FaceProps`, `FaceSize`, `faceUri`, `ONE_FACE`, `Orb`, `placeFace`, `whoFace`, `worldFor`
 - `parts/forms.tsx` — `Agree`, `Choice`, `CodeEntry`, `DateInput`, `Dates`, `Dial`, `LongText`, `Lookup`, `MoneyInput`, `NumberInput`, `NumberInputProps`, `OneOf`, `Option`, `PeriodId`, `PeriodInput`, `PERIODS`, `Picks`, `Said`, `SearchInput`, `SecretInput`, `Segmented`, `spanOf`, `Tags`, `Tail`, `TextInput`, `TextInputProps`, `TimeInput`
 - `parts/heads.tsx` — `Balance`, `distinguishing`, `Figure`, `Prose`, `Section`, `SectionTitle`, `Title`
 - `parts/listing.tsx` — `Col`, `Listing`, `ListingProps`, `Paged`

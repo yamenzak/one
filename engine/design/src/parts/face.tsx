@@ -143,6 +143,25 @@ const drawn = new Map<string, string>();
  * variants at WEIGHT ZERO, so a seed alone never picks one — leave the option
  * off and every face in the product is the `none` variant, silently, forever.
  */
+/**
+ * ⚠️ THE PICTURE, WITHOUT A COMPONENT AROUND IT. `Face` puts it on HeroUI's
+ * plate and `Orb` puts it on a page, and both need the same string — so the one
+ * that draws it is exported rather than reached through whichever component
+ * happens to be convenient. What it exists for beyond that is the build: the
+ * browser bundle stubs DiceBear's schema validators (`../../vite.ts`), and this
+ * is what `test/faces.test.tsx` calls to run the REAL ones over every option
+ * this product actually passes.
+ *
+ * ⚠️ TWO KINDS ONLY. A product and the deployment have no generated picture at
+ * all — see `appFace` — so asking for one is a caller's mistake, not a fallback.
+ */
+export const faceUri = (
+  of: FaceOf, size: FaceSize = "row", moving = MOVES[size],
+): string | null =>
+  (of.kind === "person" || of.kind === "workspace")
+    ? bake(of.kind, of.seed, moving, PIXELS[size])
+    : null;
+
 const bake = (kind: "person" | "workspace", seed: string, moving: boolean, px: number): string => {
   const key = `${kind}|${moving ? "m" : "s"}|${px}|${seed}`;
   const had = drawn.get(key);

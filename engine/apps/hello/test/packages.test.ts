@@ -17,6 +17,7 @@ import {
   REPLAY_SCHEMA, addShard, applySchema, memberFor, membersOf, noteShardApp, permissionsResolver,
   personalOps, schemaFor, serve, sessionIdFrom, tenantBySlug, whoIs, type Db,
 } from "@engine/runtime";
+import { asLocating } from "./wiring.js";
 import { HELLO, hello } from "../src/index.js";
 
 const directory = () => env.DIRECTORY as unknown as Db;
@@ -40,7 +41,7 @@ const app = () => serve({
     secret: "test-secret", appId: "hello",
     deliver: async (to, code) => { sent.push({ to, code }); },
   }),
-  locate: async (door) => {
+  locate: asLocating(async (door) => {
     if (door.kind !== "tenant" || !door.slug) return null;
     const tenant = await tenantBySlug(directory(), door.slug);
     return tenant
@@ -53,8 +54,10 @@ const app = () => serve({
         ],
       }
       : null;
-  },
-  identify: async (request, located) => {
+  }),
+  identify: async (request, finding) => {
+    const located = await finding;
+    if (!located) return NOBODY;
     const { session, email, accountId } = await whoIs(directory(), sessionIdFrom(request), clock);
     if (!session || !accountId) return NOBODY;
     const member = await memberFor(located.db, located.tenantId as never, accountId);

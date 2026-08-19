@@ -22,6 +22,7 @@ import {
   permissionsResolver, personalOps, readCatalogue, schemaFor, serve, sessionIdFrom, syncModels,
   tenantBySlug, whoIs, type Db,
 } from "@engine/runtime";
+import { asLocating } from "./wiring.js";
 import { HELLO, hello } from "../src/index.js";
 
 const directory = () => env.DIRECTORY as unknown as Db;
@@ -110,14 +111,16 @@ const app = () => serve({
       models: () => modelsOf(directory()),
     }),
   },
-  locate: async (door) => {
+  locate: asLocating(async (door) => {
     if (door.kind !== "tenant" || !door.slug) return null;
     const tenant = await tenantBySlug(directory(), door.slug);
     return tenant
       ? { tenantId: tenant.id, db: shard(), apps: ["hello"], entitlements: [] }
       : null;
-  },
-  identify: async (request, located) => {
+  }),
+  identify: async (request, finding) => {
+    const located = await finding;
+    if (!located) return NOBODY;
     const { session, email, accountId } = await whoIs(directory(), sessionIdFrom(request), new Date());
     if (!session || !accountId) return NOBODY;
     const member = await memberFor(located.db, located.tenantId as never, accountId);

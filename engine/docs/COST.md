@@ -22,6 +22,12 @@ allowance of twenty-five **billion**. That was three seconds of somebody's life
 and approximately zero money. Fixing it bought speed and changed the bill by
 nothing.
 
+⚠️ **That has held through every round of it since, which is worth knowing before
+the next one.** A list read went from eleven waits to three, the cold boot came
+off the page path entirely, and a fifth of the browser bundle was deleted — and
+the bill is the same $5. Speed and cost are separate questions here; treating a
+slow thing as an expensive thing sends the work to the wrong place.
+
 ---
 
 ## 2. What is actually bound
@@ -113,8 +119,10 @@ Three files, asking two different questions.
 
 | | Asks | Fails when |
 |---|---|---|
-| `apps/hello/test/request-cost.test.ts` | how many round trips a request costs, and how many WAIT | a chain grows — depth 7 for a list read, 4 for `me.who` |
+| `apps/hello/test/request-cost.test.ts` | how many round trips a request costs, and how many WAIT | a chain grows — depth 3 for a list read, 4 for `me.who` |
 | `apps/hello/test/boot-cost.test.ts` | what a cold isolate pays before the first byte | the schema is asked per module again |
+| `one/test/cold.test.ts` | which paths WAIT for that schema and which do not | the page or the probe starts waiting again, or an operation stops |
+| `design/vite.ts` (`entryUnder`) | what every visitor downloads before anything is drawn | the entry chunk passes its gzipped ceiling |
 | `scripts/runaway.test.mjs` | is anything UNBOUNDED | a poll, a retry with no ceiling, a paged walk with no ceiling, a cron finer than a quarter hour, a log per request, a query per row |
 
 ⚠️ **The split is the useful part.** Something that costs twice as much is a
@@ -125,6 +133,13 @@ belongs in `runaway`, where the answer is never a bigger number.
 ⚠️ **And the budgets are ceilings, not targets.** A change that makes a request
 cheaper tightens them in the same commit; one that makes it dearer has to raise
 a number somebody will read in review.
+
+⚠️ **Two of these are about a person's TIME rather than about money, and they
+are here anyway.** Neither the round-trip budget nor the bundle ceiling changes
+the bill by a cent — Workers charges CPU, not waiting, and static assets are free.
+They sit beside the cost guards because they are the same mechanism applied to the
+other scarce thing: a number in the build that somebody has to raise on purpose,
+rather than a size nobody measures until it is a complaint.
 
 ---
 

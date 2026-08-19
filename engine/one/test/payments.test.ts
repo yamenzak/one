@@ -21,6 +21,7 @@ import {
   MEMBERSHIP, type Db,
 } from "@engine/runtime";
 import worker, { APPS, PACKS, PLANS } from "../src/index.js";
+import { booted } from "./warm.js";
 
 const directory = () => env.DIRECTORY as unknown as Db;
 
@@ -59,8 +60,9 @@ const send = async (event: unknown) => {
 let id = "";
 
 beforeAll(async () => {
-  /* The worker applies its own schema on the first request. */
-  await worker.fetch(new Request("http://localhost:8080/health"), asDev as never);
+  /* ⚠️ The worker applies its own schema on the first request that reads a
+     table, and WARMS it on every other — see `warm.ts`. */
+  await booted(asDev);
   await addShard(directory(), "eu-1", "eu", 100);
   for (const app of Object.keys(APPS)) await noteShardApp(directory(), "eu-1", app);
   /* ⚠️ WITHOUT A SECRET EVERY EVENT IS REFUSED, deliberately — the endpoint is

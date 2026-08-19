@@ -19,23 +19,10 @@
  * lives behind that workspace's own address.
  */
 
-import type * as React from "react";
-import { Group, NavRow, Screen, glyphOf } from "@engine/design";
+import * as React from "react";
+import { Group, NavRow, Screen, Working, glyphOf } from "@engine/design";
 import { useSession } from "../session.js";
 import { useLoad } from "../centre/data.js";
-import { Actions } from "../console/Actions.js";
-import { Ai } from "../console/Ai.js";
-import { Finding } from "../console/Finding.js";
-import { Gateway } from "../console/Gateway.js";
-import { Models } from "../console/Models.js";
-import { Catalogue } from "../console/Catalogue.js";
-import { Footing } from "../console/Footing.js";
-import { Ground } from "../console/Ground.js";
-import { Keys } from "../console/Keys.js";
-import { Switches } from "../console/Switches.js";
-import { Telling } from "../console/Telling.js";
-import { Tenants } from "../console/Tenants.js";
-import { Works } from "../console/Works.js";
 import { OF_CONSOLE, nameOf, type AiPart, type ConsolePart, type Where } from "./where.js";
 
 /**
@@ -199,8 +186,22 @@ export function ConsoleHome({ onGo }: { readonly onGo: (to: Where) => void }) {
   );
 }
 
-/** ⚠️ The bodies are the ones that already existed — this is only the seam. */
-export function ConsolePart({ part, app, lane, onGo }: {
+/**
+ * ⚠️ THE SEAM, AND IT IS A CHUNK BOUNDARY. The thirteen bodies live in
+ * `console/parts.tsx` behind one `import()`, so the operator console is not in
+ * the bundle every visitor to every door downloads — see the header there. The
+ * dispatch, and the `never` that makes an unanswered part a build failure, moved
+ * with them.
+ *
+ * ⚠️ THE WAIT IS SHOWN RATHER THAN LEFT BLANK, and it happens once. A null
+ * fallback is a screen that appears to have failed for as long as the chunk takes
+ * to arrive; after the first console screen the chunk is in memory and this never
+ * renders again.
+ */
+const Parts = React.lazy(() => import("../console/parts.js")
+  .then((m) => ({ default: m.ConsoleParts })));
+
+export function ConsolePart(props: {
   readonly part: ConsolePartId | AiPart;
   readonly app?: string;
   /* ⚠️ One area's screens descend, so the seam has to carry what they descend
@@ -208,31 +209,22 @@ export function ConsolePart({ part, app, lane, onGo }: {
   readonly lane?: string;
   readonly onGo: (to: Where) => void;
 }) {
-  switch (part) {
-    case "tenants": return <Tenants onGo={(id) => onGo({ at: "tenant", id })} />;
-    case "ai": return <Ai onGo={onGo} />;
-    case "models": return <Models where={{ at: "models", ...(lane ? { lane } : {}) }} onGo={onGo} />;
-    case "gateway": return <Gateway onGo={onGo} />;
-    case "finding": return <Finding />;
-    case "actions":
-      return <Actions app={app} onGo={(id) => onGo({ at: "actions", app: id })} />;
-    case "catalogue": return <Catalogue />;
-    case "switches": return <Switches />;
-    case "telling": return <Telling />;
-    case "works": return <Works />;
-    case "ground": return <Ground />;
-    case "keys": return <Keys />;
-    case "footing": return <Footing />;
-    /*
-      ⚠️ A MISSING BRANCH IS A BUILD FAILURE, NOT A BLANK PAGE. Without this the
-      switch simply returns `undefined` for a part nobody wrote a case for, React
-      renders nothing, and the row leads to an empty screen with every suite
-      green — which is precisely how `/space/console/footing` shipped once. Same
-      assertion `Inside` makes over the whole address grammar.
-    */
-    default: {
-      const missing: never = part;
-      throw new Error(`no screen for console part ${String(missing)}`);
-    }
-  }
+  return (
+    <React.Suspense fallback={<Working says="Opening the console" />}>
+      <Parts {...props} />
+    </React.Suspense>
+  );
+}
+
+/** ⚠️ The same chunk, so opening a workspace from the list costs no second
+    fetch — see `ConsolePart` above and the header in `console/parts.tsx`. */
+const Tenant = React.lazy(() => import("../console/parts.js")
+  .then((m) => ({ default: m.OneTenant })));
+
+export function ConsoleTenant({ id }: { readonly id: string }) {
+  return (
+    <React.Suspense fallback={<Working says="Opening the console" />}>
+      <Tenant id={id} />
+    </React.Suspense>
+  );
 }

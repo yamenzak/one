@@ -27,7 +27,7 @@ import {
   DIRECTORY_MODULES, SHARD_MODULES,
   NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, acceptanceScope,
   liveAppsOfTenant,
-  deploymentFaults, effectivePlans, isPlatformPath, locator,
+  deploymentFaults, effectivePlans, healthOf, isPlatformPath, locator,
   accept, bindingKey, jobBookFor, liveBindings, memberFor, noteShardApp, observe, owedBy,
   runnerFor, schedulesOf, sweep, type SweepDeps,
   tenantById, tenantBySlug,
@@ -1731,7 +1731,7 @@ const handler = async (env: Env) => {
        behind each row cannot be about different documents. Serving it is what
        makes `/legal/<id>` an address rather than a claim. */
     legal: LEGAL,
-    identify: async (request, located) => {
+    identify: async (request, finding) => {
       /*
         ⚠️ TWO WAYS TO SAY WHO YOU ARE, ONE ANSWER TO WHAT YOU MAY DO. A person
         arrives with a session cookie; an agent arrives with a bearer token the
@@ -1742,14 +1742,22 @@ const handler = async (env: Env) => {
         the `recent` proof gate, which exists against exactly that.
       */
       const now = new Date();
-      const bearer = bearerFrom(request);
-      const viaToken = bearer ? await accountOfToken(directory, bearer, env.AUTH_SECRET, now) : null;
-      const { session, email, accountId: viaSession } = viaToken
-        ? { session: null, email: null, accountId: null }
-        : await whoIs(directory, sessionIdFrom(request), now);
+      /*
+        ⚠️ THE SESSION IS READ BESIDE THE WORKSPACE, NOT AFTER IT. Neither is an
+        input to the other — the cookie says who, the hostname says where — and
+        awaiting the workspace first put the whole of `locate` in front of a
+        lookup that needed one row of it. `finding` is that one row, which is why
+        this seam is handed a promise (see `Wiring.identify`).
+      */
+      const [saying, located] = await Promise.all([
+        saidBy(request, directory, env.AUTH_SECRET, now),
+        finding,
+      ]);
+      const { session, email, accountId } = saying;
 
-      const accountId = viaToken ?? viaSession;
-      if (!accountId) return NOBODY;
+      /* ⚠️ A door that resolved to no workspace has no roster to ask, and the
+         only honest answer to "what may you do here" is nothing. */
+      if (!accountId || !located) return NOBODY;
       const member = await memberFor(located.db, located.tenantId as never, accountId);
       return {
         accountId,
@@ -1767,6 +1775,31 @@ const handler = async (env: Env) => {
 
 /* ------------------------------------------------------------------ fetch --- */
 
+/**
+ * WHO IS ASKING, FROM WHICHEVER OF THE TWO THINGS THEY BROUGHT.
+ *
+ * ⚠️ ONE FUNCTION SO THE SEAM ABOVE CAN START IT IN A `Promise.all`. A bearer
+ * token and a session cookie are the same question with two answers, and pulled
+ * apart at the call site the workspace lookup could only be raced against one of
+ * them.
+ *
+ * ⚠️ A TOKEN NEVER CARRIES `provenAt`. Anything a machine can hold must not
+ * satisfy the `recent` proof gate, which exists against exactly that.
+ */
+const saidBy = async (
+  request: Request, directory: Db, secret: string, now: Date,
+): Promise<{
+  readonly session: { readonly provenAt: string | null } | null;
+  readonly email: string | null;
+  readonly accountId: AccountId | null;
+}> => {
+  const bearer = bearerFrom(request);
+  const account = bearer ? await accountOfToken(directory, bearer, secret, now) : null;
+  if (account) return { session: null, email: null, accountId: account };
+  if (bearer) return { session: null, email: null, accountId: null };
+  return whoIs(directory, sessionIdFrom(request), now);
+};
+
 /** ⚠️ The reason goes to the log, where the operator is. The request gets a
     status a probe can act on and nothing about our configuration. */
 /**
@@ -1781,6 +1814,28 @@ const handler = async (env: Env) => {
  * "it did not start" tells an operator where to look without telling anybody
  * else what we are made of.
  */
+/**
+ * ⚠️ WORK THAT OUTLIVES THE ANSWER. Cloudflare keeps the isolate alive for
+ * anything handed to `waitUntil`; a bare floating promise is not promised
+ * anything at all, so warming the boot without this would be a migration that
+ * may or may not have finished depending on whether the isolate was evicted.
+ */
+interface Waiting { waitUntil(p: Promise<unknown>): void }
+
+/**
+ * ⚠️ OPTIONAL, BECAUSE A TEST DRIVING THIS MODULE DIRECTLY HAS NO RUNTIME TO
+ * SUPPLY ONE. Cloudflare always passes it; a suite calling `worker.fetch(req,
+ * env)` does not, and making twenty call sites invent an execution context buys
+ * nothing over saying so once. What the fallback must not do is drop the work
+ * silently — a warm-up that vanished would be a boot the next request pays for,
+ * which is the thing this exists to avoid.
+ */
+const warming = (ctx: Waiting | undefined, work: Promise<unknown>): void => {
+  const quiet = work.catch((why) => { console.error("[boot]", why); });
+  if (ctx) ctx.waitUntil(quiet);
+  else void quiet;
+};
+
 const unavailable = (why: "unconfigured" | "boot"): Response =>
   new Response(
     JSON.stringify({
@@ -1795,7 +1850,7 @@ const unavailable = (why: "unconfigured" | "boot"): Response =>
   );
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: Waiting): Promise<Response> {
     /*
       ⚠️ A DEPLOYMENT THAT CANNOT START SAYS SO ON EVERY PATH, `/health`
       INCLUDED. Letting the throw escape answers 500 with no body — which is
@@ -1814,13 +1869,6 @@ export default {
       return unavailable("unconfigured");
     }
 
-    try {
-      await boot(env);
-    } catch (why) {
-      console.error("[boot]", why);
-      return unavailable("boot");
-    }
-
     const url = new URL(request.url);
     /*
       ⚠️ THE API IS THE PLATFORM'S AND EVERYTHING ELSE IS THE PAGE. A single-page
@@ -1832,7 +1880,60 @@ export default {
        here and the platform's own grew past it: the manifest and the icon are
        served by `serve.ts` and were never routed to it, so a phone asking for
        the manifest got the page with a 200 on it. See `isPlatformPath`. */
-    if (isPlatformPath(url.pathname)) return (await handler(env))(request);
+    const ours = isPlatformPath(url.pathname);
+
+    /*
+      ⚠️ WHICH DOOR THIS IS, BEFORE ANYTHING IS APPLIED TO ANY DATABASE. It is
+      four fields read off the hostname and it is the FIRST thing the page asks —
+      the spinner that says "Finding this place" is this request — so putting a
+      schema runner in front of it meant a person watched a migration to be told
+      what their own address was. `healthOf` is the runtime's own; the branch
+      inside `serve` calls the same function, so there is still one classifier.
+    */
+    if (url.pathname === "/health") {
+      warming(ctx, boot(env));
+      return healthOf(request, { root: env.ROOT });
+    }
+
+    /*
+      ⚠️ A REQUEST THAT TOUCHES NO DATABASE DOES NOT WAIT FOR ONE, AND THIS IS
+      THE LINE THAT MADE THE PRODUCT FEEL SLOW TO OPEN. `boot` applies every
+      schema module to the directory and to each shard; it was awaited in front
+      of EVERY request, the bundle and the stylesheet included. So a cold isolate
+      served nothing at all — not a byte of HTML — until the migration runner had
+      finished, and the first thing a person saw was several seconds of blank
+      page. Measured on this deployment, that is the whole of "opening it takes
+      seven or eight seconds".
+      ⚠️ AND IT IS `isPlatformPath` RATHER THAN A SECOND LIST, because a second
+      list is the failure this file already carries a warning about: the platform
+      grows a path, the copy here does not, and the symptom is served by the SPA
+      with a 200 on it. Every path the platform answers reaches D1 — an operation,
+      the webhook, the icons, the manifest; the SPA's own files reach none.
+    */
+    if (ours) {
+      try {
+        await boot(env);
+      } catch (why) {
+        console.error("[boot]", why);
+        return unavailable("boot");
+      }
+      return (await handler(env))(request);
+    }
+
+    /*
+      ⚠️ AND THE COLD START IS PAID WHILE THE BROWSER IS BUSY. The very first
+      request of an isolate is almost always the page, and the very next thing
+      that happens is a browser downloading and parsing several hundred kilobytes
+      of bundle — which is exactly long enough to apply a schema in. Warming it
+      here means the first operation the app makes usually finds the work already
+      done, instead of being the request that discovers it.
+
+      ⚠️ IT CANNOT FAIL THE REQUEST, AND MUST NOT. A static file has nothing to
+      do with the database; `boot` forgets its own failures (see there) so the
+      next request retries, and the caller that actually needs D1 is the one that
+      reports the fault.
+    */
+    warming(ctx, boot(env));
     return env.ASSETS.fetch(request);
   },
 
@@ -1852,7 +1953,7 @@ export default {
     sweep that stopped months ago and a bill nobody is chasing. `run` records
     every attempt, so the console can show the LAST one rather than the next.
   */
-  async scheduled(_event: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<void> {
+  async scheduled(_event: unknown, env: Env, ctx: Waiting): Promise<void> {
     const work = (async () => {
       try {
         await boot(env);

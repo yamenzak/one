@@ -36,6 +36,7 @@ import {
   createTenant, noteShardApp, schemaFor, serve, surfaceOfComposed,
   type Db, type Located, type Who,
 } from "@engine/runtime";
+import { asLocating } from "./wiring.js";
 import { HELLO, hello } from "../src/index.js";
 
 const directory = () => env.DIRECTORY as unknown as Db;
@@ -84,14 +85,14 @@ const app = () => serve({
   apps: { hello },
   directory: directory(),
   legal: LEGAL,
-  locate: async (door) =>
+  locate: asLocating(async (door) =>
     door.kind === "tenant" && door.slug === "westwind"
       ? {
         tenantId, db: shard(), apps: ["hello"],
         ...(standing ? { standing } : {}),
         entitlements, used,
       }
-      : null,
+      : null),
   identify: async () => who,
 });
 

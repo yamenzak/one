@@ -69,13 +69,25 @@ export async function answerMcp(
   if (door.kind !== "tenant") return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
   if (request.method !== "POST") return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
 
-  const located = await wiring.locate(door);
-  if (!located) return asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found"));
+  /* ⚠️ THE SAME TWO-ANSWER SHAPE THE HTTP DOOR USES, for the same reason: the
+     identity needs where this workspace IS and nothing about what it holds, so
+     both start here rather than one after the other. See `Locating`. */
+  const locating = wiring.locate(door);
+  const identifying = wiring.identify?.(request, locating.where) ?? Promise.resolve(NOBODY);
+
+  /* ⚠️ A refusal still settles what it started — see the same note in `serve`. */
+  const refusing = async <T>(answer: T): Promise<T> => {
+    await Promise.allSettled([identifying]);
+    return answer;
+  };
+
+  const located = await locating.located;
+  if (!located) return refusing(asProblem(problem(PLATFORM_PROBLEMS, "platform.not_found")));
 
   const rpc = await readRpc(request);
-  if (!rpc) return rpcError(null, -32700, "expected a JSON-RPC 2.0 request object");
+  if (!rpc) return refusing(rpcError(null, -32700, "expected a JSON-RPC 2.0 request object"));
 
-  const who = (await wiring.identify?.(request, located)) ?? NOBODY;
+  const who = await identifying;
 
   switch (rpc.method) {
     case "initialize":

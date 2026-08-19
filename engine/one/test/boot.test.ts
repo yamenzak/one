@@ -23,19 +23,32 @@ import {
   refuseLegal, under,
 } from "@engine/kernel";
 import worker, { APPS, LEGAL, PLANS } from "../src/index.js";
+import { warm } from "./warm.js";
+
+/**
+ * ⚠️ THE WARM-UP IS COLLECTED RATHER THAN DISCARDED, AND THAT IS THE CONTRACT.
+ * A path that touches no database — the page, its bundle, `/health` — does not
+ * WAIT for the schema to be applied; it hands the work to the runtime and answers
+ * immediately, which is what stopped a cold start blocking the first paint. So a
+ * test that needs the tables has to await the same promise Cloudflare would, and
+ * this suite additionally ASSERTS that something was handed over. See `warm.ts`.
+ */
+const { ctx, handed, settled } = warm();
 
 const call = (host: string, path: string, init: RequestInit = {}) =>
-  worker.fetch(new Request(`http://${host}:8080${path}`, init), env as never);
+  worker.fetch(new Request(`http://${host}:8080${path}`, init), env as never, ctx);
 
 /** ⚠️ What `wrangler dev` passes; the deployed config says `production`. */
 const asDev = { ...env, ROOT: "localhost", ENVIRONMENT: "development", AUTH_SECRET: "test" };
 const callDev = (host: string, path: string, init: RequestInit = {}) =>
-  worker.fetch(new Request(`http://${host}:8080${path}`, init), asDev as never);
+  worker.fetch(new Request(`http://${host}:8080${path}`, init), asDev as never, ctx);
 
 beforeAll(async () => {
-  /* The worker applies its own schema on the first request — that is the thing
-     being tested — so all this needs is somewhere to put a workspace. */
+  /* The worker applies its own schema on the first request that needs one, and
+     warms it on every other — so all this needs is that warm-up to land, and
+     somewhere to put a workspace. */
   await callDev("localhost", "/health");
+  await settled();
   await addShard(env.DIRECTORY as unknown as Db, "eu-1", "eu", 100);
   for (const id of Object.keys(APPS)) await noteShardApp(env.DIRECTORY as unknown as Db, "eu-1", id);
 });
@@ -108,15 +121,40 @@ describe("the worker on its own", () => {
   });
 
   /*
-    ⚠️ THE SCHEMA IS APPLIED BY THE WORKER, ONCE, BEFORE THE FIRST REQUEST IS
-    ANSWERED. Firing it rather than awaiting it answers "no such table" to
-    whoever happens to be first after a deploy — a fault that appears once and
-    never reproduces.
+    ⚠️ THE SCHEMA IS APPLIED BY THE WORKER, ONCE, BEFORE THE FIRST REQUEST THAT
+    NEEDS IT IS ANSWERED. Firing it rather than awaiting it answers "no such
+    table" to whoever happens to be first after a deploy — a fault that appears
+    once and never reproduces.
   */
-  it("has its tables before it answers anything", async () => {
+  it("has its tables before it answers anything that reads one", async () => {
     const row = await (env.DIRECTORY as unknown as Db)
       .prepare(`SELECT COUNT(*) AS n FROM tenant`).first<{ n: number }>();
     expect(row?.n).toBe(0);
+  });
+
+  /*
+    ⚠️ AND A REQUEST THAT READS NOTHING DOES NOT WAIT FOR THAT, which is the
+    difference between a cold start somebody sees and one they do not. `boot`
+    applies every schema module to the directory and to each shard; awaited in
+    front of the PAGE it meant a cold isolate served no HTML at all until the
+    migration runner had finished, and the first thing anybody saw was several
+    seconds of blank screen.
+
+    ⚠️ WHAT IS ASSERTED IS THE HANDOVER, because the wait itself is invisible
+    once an isolate is warm. A path that answers off the hostname alone hands the
+    boot to the runtime (`waitUntil`) and returns; a path that reads a table
+    awaits it and hands over nothing. Putting the await back at the top of
+    `fetch` — the shape this replaced — empties this list.
+  */
+  it("warms the boot on the page and the probe rather than waiting for it", async () => {
+    for (const path of ["/health", "/settings/notifications"]) {
+      handed.length = 0;
+      await callDev("id.localhost", path);
+      expect(handed.length, path).toBeGreaterThan(0);
+    }
+    handed.length = 0;
+    await callDev("setup.localhost", "/api/nothing.here");
+    expect(handed.length, "an operation waits for the schema itself").toBe(0);
   });
 });
 

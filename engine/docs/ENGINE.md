@@ -418,7 +418,7 @@ env or a binding.
 | `identity` | sign-in codes, sessions, tokens, proof | 21 | — |
 | `membership` | the roster and what each member may do | 12 | — |
 | `compose` | a manifest becomes a live surface of operations | 2 | — |
-| `serve` | the one path every request ends in — both doors | 5 | — |
+| `serve` | the one path every request ends in — both doors | 6 | — |
 | `records` | the generated reads and writes behind a collection | 6 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
 | `billing` | plans, subscriptions, the bill, the ladder | 15 | — |
@@ -468,7 +468,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**400 of them**, 399 reached by something today.
+**401 of them**, 400 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -883,6 +883,10 @@ its own header, cited by other files, and doing nothing.
 | D35 | A model answers more than one lane, and one task column could not say so | 0 |
 | D36 | The latency budget: how many round trips a screen costs | 0 |
 | D37 | Depth is the number, and unbounded is a different question from expensive | 0 |
+| D38 | Nothing that reads no table waits for a schema | 0 |
+| D39 | `locate` answers twice from one read | 0 |
+| D40 | The weight of the first screen is a number somebody has to raise | 0 |
+| D41 | The page asks before the bundle arrives | 0 |
 <!-- /generated -->
 
 ---

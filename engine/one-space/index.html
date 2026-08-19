@@ -22,6 +22,35 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
 
+    <!-- ⚠️ THE TWO QUESTIONS EVERY VISIT STARTS WITH, ASKED BEFORE THE BUNDLE
+         HAS ARRIVED. Which door this is and who is here are what decide the
+         first screen, and nothing in the page can be drawn without them — so
+         asked from the application they were asked AFTER several hundred
+         kilobytes of JavaScript had been downloaded, parsed and run. Two waits,
+         end to end, for answers that could have been travelling the whole time.
+
+         ⚠️ AN INLINE SCRIPT, BECAUSE THAT IS THE ONLY THING THAT RUNS THIS
+         EARLY. A module script is deferred by definition; this executes as the
+         parser reaches it, which is before the browser has finished fetching
+         anything below. `api.ts` picks the answers up when it needs them, so the
+         round trip overlaps the download instead of following it.
+
+         ⚠️ AND IT CANNOT BREAK THE PAGE. Every failure resolves to `null` and
+         the application asks again for real — a preflight is a head start, never
+         a dependency. `same-origin` is what sends the session cookie; without it
+         the answer would be "nobody is signed in", confidently, every time. -->
+    <script>
+      (function () {
+        try {
+          var ask = function (url) {
+            return fetch(url, { credentials: "same-origin" })
+              .catch(function () { return null; });
+          };
+          window.__one = { "health": ask("/health"), "me.who": ask("/api/me.who") };
+        } catch (e) {}
+      })();
+    </script>
+
     <!-- ⚠️ The ground is painted before a single component mounts. Without it a
          cold start on a dark device is a white flash, which reads as a fault. -->
     <meta name="color-scheme" content="light dark" />
