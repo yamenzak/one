@@ -11,24 +11,35 @@
  * ⚠️ AND IT SAYS WHEN THE CHECK IS NOT RUNNING. A margin screen that draws a
  * healthy zero because no cost has ever been read is worse than an empty one —
  * it is a green light wired to nothing.
+ *
+ * ⚠️ IT READS `op.jobs`'s OWN SHAPE, WHICH IS `{ book, runs }`. It declared a
+ * `{ jobs }` of its own invention and threw on the first field it touched, so
+ * this page — the one whose whole job is to say "no gateway is configured, set
+ * it under Keys" — was a black rectangle on exactly the deployment that needed
+ * to read it. `useLoad<T>` is a type ARGUMENT, not a check: the compiler
+ * believed the declaration and the server never sent it. `Await` catches the
+ * throw now; reading the real shape is what stops there being one.
  */
 
+import * as React from "react";
 import {
-  Group, NavRow, Row, Screen, Spacer, Stack, glyphOf, useShown,
+  ActionRow, Group, NavRow, Row, Screen, Spacer, Stack, glyphOf, useShown,
 } from "@engine/design";
+import type { JobRun, JobShown } from "@engine/design";
 import { sayMoment, type Instant } from "@engine/kernel";
+import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
 
-interface Run {
-  readonly id: string;
-  readonly label: string;
-  readonly lastAt: string | null;
-  readonly lastOk: boolean | null;
-  readonly lastDetail: string | null;
-}
-
+/**
+ * ⚠️ THE TYPES ARE `@engine/design`'s, NOT A SECOND COPY. The Nightly work
+ * screen already renders this exact payload through `Jobs`, and a private
+ * re-declaration here is how this file came to expect a `{ jobs }` nothing ever
+ * sent. One shape, one home — and the compiler now checks this page against the
+ * same definition the other one is drawn from.
+ */
 interface Answer {
-  readonly jobs: readonly Run[];
+  readonly book: Readonly<Record<string, JobShown>>;
+  readonly runs: readonly JobRun[];
 }
 
 /** ⚠️ The two jobs this screen is about, named where the ids are. */
@@ -41,13 +52,28 @@ export function Gateway() {
      nobody's conventions on a screen whose whole subject is when something last
      happened. */
   const shown = useShown();
+  const [running, setRunning] = React.useState<string | null>(null);
+
+  /* ⚠️ THE JOB EXISTS AND THE CONSOLE CAN ALREADY START ONE, so an operator who
+     reads "the catalogue is empty" here does not then have to go and find the
+     Nightly work screen to do the one thing this page just told them to do. */
+  const runNow = async (id: string) => {
+    setRunning(id);
+    try { await api.post("op.job.run", { job: id }); of.again?.(); }
+    finally { setRunning(null); }
+  };
 
   return (
     <Screen shape="list" under="Where the calls go, and whether the margin is holding"
       of={of.of} again={of.again}
       then={(at) => {
-        const costs = at.jobs.find((j) => j.id === COSTS);
-        const sync = at.jobs.find((j) => j.id === SYNC);
+        /* ⚠️ THE NEWEST RUN OF ONE JOB, DERIVED. `runs` is every job's, newest
+           first, so the first match is the last time this one ran — and a job
+           that has never run has none, which is a state this screen has to be
+           able to say out loud. */
+        const last = (id: string): JobRun | undefined => at.runs.find((r) => r.jobId === id);
+        const costs = at.book[COSTS];
+        const sync = at.book[SYNC];
 
         return (
           <>
@@ -60,8 +86,8 @@ export function Gateway() {
               {costs ? (
                 <NavRow
                   icon={glyphOf("clock")}
-                  label={costs.lastOk === false ? "Sold under cost" : "Every run above cost"}
-                  under={said(costs, shown)}
+                  label={said(last(COSTS)).label}
+                  under={said(last(COSTS), shown).under}
                 />
               ) : (
                 <NavRow
@@ -79,18 +105,33 @@ export function Gateway() {
 
             <Group label="The catalogue" under="What the models cost us, refreshed nightly">
               {sync ? (
-                <NavRow
-                  icon={glyphOf("bank")}
-                  label={sync.lastOk === false ? "Last sync failed" : "Prices are current"}
-                  under={said(sync, shown)}
-                />
+                <Stack space="tight">
+                  <NavRow
+                    icon={glyphOf("bank")}
+                    label={said(last(SYNC)).label}
+                    under={said(last(SYNC), shown).under}
+                  />
+                  {/*
+                    ⚠️ AND A WAY TO RUN IT. Until this has run once there are no
+                    models at all, so every lane reports "no model answers" and
+                    every product's AI is off — which is the state a fresh
+                    deployment is in, and the one an operator opens this to fix.
+                  */}
+                  <ActionRow
+                    icon={glyphOf("sparkle")}
+                    label={running === SYNC ? "Syncing" : "Sync now"}
+                    under="Discovers every model and refreshes what each one costs"
+                    onDo={() => void runNow(SYNC)}
+                  />
+                </Stack>
               ) : (
                 <NavRow
                   icon={glyphOf("bank")}
                   label="Not running"
                   under={(
                     <span data-ink="warning">
-                      No account token, so the catalogue is whatever it was when it last ran.
+                      This deployment holds no Cloudflare account token, so nothing can
+                      discover a model or a price. Until it does, no model answers any lane.
                     </span>
                   )}
                 />
@@ -124,7 +165,22 @@ export function Gateway() {
   );
 }
 
-/** ⚠️ The run's own words. A job's detail is written to be read here. */
-const said = (job: Run, shown: ReturnType<typeof useShown>): string =>
-  !job.lastAt ? "Has never run"
-    : `${job.lastDetail ?? (job.lastOk ? "ran" : "failed")} · ${sayMoment(shown, job.lastAt as Instant)}`;
+/**
+ * ⚠️ THE RUN'S OWN WORDS, AND "HAS NEVER RUN" IS ONE OF THE ANSWERS. A job that
+ * is declared and has never fired reads identically to one that ran and found
+ * nothing unless the screen says which — and on a fresh deployment it is always
+ * the first of the two.
+ */
+const said = (
+  run: JobRun | undefined, shown?: ReturnType<typeof useShown>,
+): { label: string; under: React.ReactNode } => {
+  if (!run) return { label: "Has never run", under: "Nothing has happened here yet" };
+  const when = shown ? sayMoment(shown, run.startedAt as Instant) : "";
+  const detail = run.detail ?? (run.ok ? "ran" : "failed");
+  return {
+    label: run.ok === false ? "Last run failed" : "Ran",
+    under: run.ok === false
+      ? <span data-ink="danger">{detail} · {when}</span>
+      : `${detail} · ${when}`,
+  };
+};

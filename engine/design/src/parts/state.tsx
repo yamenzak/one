@@ -24,6 +24,7 @@
 import * as React from "react";
 import { Circle } from "lucide-react";
 import { Alert, Button, EmptyState, Skeleton, Spinner } from "@heroui/react";
+import { PLATFORM_PROBLEMS, problem } from "@engine/kernel";
 import type { Problem } from "@engine/kernel";
 import { TYPE } from "../tokens/type.js";
 import { EMPTY_PAD, EMPTY_READ, NUDGE, PAD, ROW, SPACE } from "../tokens/metrics.js";
@@ -94,7 +95,58 @@ export function Await<T>({ of, waiting: skeleton, nothing, isNothing, then, agai
   */
   if (empty && nothing !== undefined) return <>{nothing}</>;
 
-  return <>{then(of.data)}</>;
+  /*
+    ⚠️ AND THE FIFTH OUTCOME: THE ANSWER ARRIVED AND THE SCREEN COULD NOT DRAW
+    IT. `then` runs against a shape the caller ASSERTED — `useLoad<Answer>` is a
+    type argument, not a check — so a route that answers `{ book, runs }` to a
+    screen expecting `{ jobs }` throws inside render. Without a boundary React
+    unmounts the whole tree and the page goes black: no message, no retry, no
+    clue, and nothing in any log a person can reach.
+
+    ⚠️ AND THE SCREEN THAT CRASHES IS THE ONE ABOUT THE UNCONFIGURED STATE. That
+    is not a coincidence and it is why this is here rather than in one page: the
+    branches a shape mismatch reaches first are the ones nobody has data for yet,
+    so the screens that explain an empty deployment are exactly the screens that
+    go dark on a fresh one — which is the moment somebody most needs them.
+  */
+  return <Drew again={again}>{then(of.data)}</Drew>;
+}
+
+/**
+ * ⚠️ A CLASS, BECAUSE REACT HAS NO HOOK FOR THIS. `componentDidCatch` is the only
+ * way to keep a render fault inside the page it happened on, and it is worth the
+ * one class in this package: the alternative is every screen being one wrong
+ * field name away from a blank browser window.
+ *
+ * ⚠️ IT REPORTS THE SAME `Trouble` A FAILED REQUEST DOES. A person cannot act on
+ * the difference between "the server would not answer" and "the answer was not
+ * what this page expected", and inventing a second vocabulary for it would put a
+ * developer's distinction on a customer's screen.
+ */
+class Drew extends React.Component<
+  { readonly children: React.ReactNode; readonly again?: () => void },
+  { readonly broke: boolean }
+> {
+  override state = { broke: false };
+
+  static getDerivedStateFromError() { return { broke: true }; }
+
+  override componentDidCatch(thrown: unknown) {
+    /* ⚠️ THE CONSOLE IS WHERE THIS IS DIAGNOSED, so it says what threw rather
+       than only that something did. Nobody can reach a Worker log from a phone;
+       this is the one trace the person looking at the blank page can get. */
+    console.error("a screen could not draw its answer", thrown);
+  }
+
+  override render() {
+    if (!this.state.broke) return <>{this.props.children}</>;
+    return (
+      <Trouble
+        problem={problem(PLATFORM_PROBLEMS, "platform.undrawable")}
+        {...(this.props.again ? { again: this.props.again } : {})}
+      />
+    );
+  }
 }
 
 /**

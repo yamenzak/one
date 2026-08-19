@@ -153,6 +153,18 @@ export const PLATFORM_PROBLEMS: ProblemCatalog = {
     title: "Something went wrong on our side",
     detail: "It is not you. Quote {ref} if you tell us about it.",
   },
+  /*
+    ⚠️ THE ANSWER ARRIVED AND THE PAGE COULD NOT DRAW IT, which is neither a
+    failed request nor an empty one. It is raised by `Await`'s boundary rather
+    than by a route — the request succeeded — and it is here rather than built
+    by hand in the browser so the words are in the catalogue with every other
+    refusal, and one edit changes every screen that hits it.
+  */
+  "platform.undrawable": {
+    status: 500, retryable: true, tone: "danger",
+    title: "This did not draw",
+    detail: "The answer came back in a shape this page did not expect",
+  },
 };
 
 /**

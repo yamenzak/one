@@ -277,6 +277,7 @@ it. A caller's job is to show it, never to invent one from a status code.
 | `platform.read_only` | 402 | This workspace is read-only | — |
 | `platform.no_credits` | 402 | Not enough credits | — |
 | `platform.unavailable` | 503 | Something went wrong on our side | yes |
+| `platform.undrawable` | 500 | This did not draw | yes |
 <!-- /generated -->
 
 An app may add its own catalogue; these are the platform's, and a refusal raised

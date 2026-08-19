@@ -146,6 +146,13 @@
       "title": "Something went wrong on our side",
       "tone": "danger",
       "retryable": true
+    },
+    {
+      "code": "platform.undrawable",
+      "status": 500,
+      "title": "This did not draw",
+      "tone": "danger",
+      "retryable": true
     }
   ],
   "operations": {

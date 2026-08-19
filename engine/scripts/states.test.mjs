@@ -352,6 +352,45 @@ for (const file of MARK_FILES) {
 }
 if (!unmarked) ok(`marks: every empty state wears its own noun, not the neutral circle`);
 
+/* ------------------------------------------------------------ the fifth --- */
+
+/**
+ * ⚠️ THE ANSWER ARRIVED AND THE PAGE COULD NOT DRAW IT, which is the outcome
+ * this file's own header does not list — and it is the one with no symptom. A
+ * screen reads `useLoad<Answer>` and that is a type ARGUMENT, not a check: the
+ * compiler believes the declaration and the server never sent it. `then` throws
+ * on the first field, React unmounts the whole tree, and the page is BLACK. No
+ * message, no retry, nothing in a log anybody on a phone can reach.
+ *
+ * ⚠️ AND THE SCREENS IT REACHES FIRST ARE THE ONES ABOUT AN EMPTY DEPLOYMENT.
+ * Those branches are the ones nobody has data for while building, so the pages
+ * that explain an unconfigured product are exactly the pages that go dark on an
+ * unconfigured product. The console's Gateway screen — whose whole text is "no
+ * gateway is configured, set it under Keys" — shipped as a black rectangle for
+ * precisely that reason.
+ *
+ * ⚠️ SO THE BOUNDARY IS CHECKED HERE, because deleting it restores the black
+ * screen and nothing else notices: every suite renders the shapes it declared.
+ */
+{
+  const src = STATE;
+  const fn = /export function Await<T>\([\s\S]*?\n\}/.exec(src)?.[0] ?? "";
+
+  if (!fn) {
+    fail("design/src/parts/state.tsx: no `Await` — the four-way decision has no home.");
+  } else if (!/<Drew\b/.test(fn)) {
+    fail("design/src/parts/state.tsx: `Await` renders `then` outside a boundary.\n"
+      + "       A screen handed a shape it did not expect throws in render, React unmounts\n"
+      + "       the tree, and the page goes black — no message, no retry, and nothing in a\n"
+      + "       log a person can reach.");
+  } else if (!/getDerivedStateFromError/.test(src)) {
+    fail("design/src/parts/state.tsx: the boundary catches nothing.\n"
+      + "       `getDerivedStateFromError` is what keeps a render fault inside its own page.");
+  } else {
+    ok("drew: an answer the page cannot draw is a refusal, not a black screen");
+  }
+}
+
 console.log(bad
   ? `\nstates: ${bad} finding(s) — surfaces that answer three questions with one sentence.`
   : `\nstates: four outcomes, shaped placeholders, three kinds of motion, one rhythm.`);
