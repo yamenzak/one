@@ -41,7 +41,7 @@
  */
 
 /* ⚠️ The pace and the curve are the vocabulary's, not this file's — see `DRIFT`. */
-import { BEAT, DURATION, EASE, transition, turns } from "./motion.js";
+import { BEAT, DURATION, EASE, transition } from "./motion.js";
 import {
   DENSITY, FAMILIES, render, type Density, type SceneFamily, type Sky,
 } from "../scene/index.js";
@@ -387,6 +387,15 @@ export function ambienceStylesheet(): string {
     is a live element now, so the page's own CSS reaches it — one definition
     rather than one per scene, and both opt-outs for free.
 
+    ⚠️ AND THE `.q-` CLASS IS ON A RENDERED LAYER, NEVER ON A MARK. It was on
+    the mark — one `<g>` per placement inside the `<pattern>` — and the whole
+    system was inert for as long as it existed: Chromium rasterises a pattern's
+    tile ONCE and paints the cache, so an animation declared inside one is
+    created, is reported by `getAnimations()`, and never repaints. Measured by
+    screenshot rather than by API: identical pixels a second and a half apart,
+    on every family. `render` splits the marks by beat and gives each group its
+    own layer, so what carries the class is an element the page actually draws.
+
     ⚠️ ONE KEYFRAME PER BEAT, BECAUSE THE DIP IS THE BEAT'S. A single shared
     `1 → .3` is right for a star and is the whole page throbbing when the mark is
     a fifth of the screen wide — see `BEAT`.
@@ -395,26 +404,22 @@ export function ambienceStylesheet(): string {
   const beats = [
     `@media (prefers-reduced-motion: no-preference) {`,
     ...names.flatMap((b) => [
-      /*
-        ⚠️ A TURN NEEDS `fill-box`, AND WITHOUT IT THE TILE ORBITS THE PAGE. An
-        SVG element's default `transform-origin` is the user-space ORIGIN, not
-        its own middle — so a rotation meant to spin a tile in place swings it
-        around the top-left corner of the whole picture instead. It is the one
-        line that separates "the pattern re-routes itself" from "everything
-        slides off the screen", and nothing warns.
-      */
-      turns(b)
-        ? `@keyframes one-${b} {`
-          + ` 0%, 17% { transform: rotate(0deg) } 23%, 42% { transform: rotate(90deg) }`
-          + ` 48%, 67% { transform: rotate(180deg) } 73%, 92% { transform: rotate(270deg) }`
-          + ` 98%, 100% { transform: rotate(360deg) } }`
-        : `@keyframes one-${b} { 0%, 100% { opacity: 1 } 50% { opacity: ${(BEAT[b] as { dip: number }).dip} } }`,
-      `.q-${b} { animation: one-${b} ${BEAT[b].period} ${EASE.plain} infinite ${BEAT[b].delay};`
-        + `${turns(b) ? " transform-box: fill-box; transform-origin: center;" : ""} }`,
+      `@keyframes one-${b} { 0%, 100% { opacity: 1 } 50% { opacity: ${BEAT[b].dip} } }`,
+      `.q-${b} { animation: one-${b} ${BEAT[b].period} ${EASE.plain} infinite ${BEAT[b].delay}; }`,
     ]),
     `}`,
-    /* ⚠️ The in-app switch, for whom this is not a preference — see `REDUCED`. */
-    `[data-reduce-motion="true"] ${names.map((b) => `.q-${b}`).join(", ")} { animation: none; }`,
+    /*
+      ⚠️ THE IN-APP SWITCH, FOR WHOM THIS IS NOT A PREFERENCE — see `REDUCED`.
+
+      ⚠️ AND THE ANCESTOR IS REPEATED ON EVERY SELECTOR, WHICH IT WAS NOT. This
+      was one `[data-reduce-motion="true"]` followed by a comma-separated list,
+      and a descendant combinator binds to the FIRST selector only — so six of
+      the seven beats were `animation: none` for EVERYBODY, unconditionally,
+      from the day the line was written. It was invisible because the beats were
+      inside a `<pattern>` and none of them painted either: two faults stacked,
+      each of them the reason nobody could see the other.
+    */
+    ...names.map((b) => `[data-reduce-motion="true"] .q-${b} { animation: none; }`),
   ];
 
   /*
@@ -430,6 +435,36 @@ export function ambienceStylesheet(): string {
     `  border-radius: inherit;`,
     `  ${MATTE};`,
     `}`,
+    /*
+      ⚠️ THE FIELD DRIFTS TOO, AGAINST THE GROUND, AND WITHOUT THIS HALF OF THE
+      FAMILIES DO NOT MOVE AT ALL. A beat is carried by a placed MARK, so a
+      family that draws its whole field in one stroke — `cloth`, which is the
+      material under every workspace and account screen in the product — has
+      nowhere to put one and was completely still. Measured: one animation on
+      the page, the ground's, and its whole travel was four pixels.
+      ⚠️ AND TWO LAYERS MOVING TOGETHER IS NOT DEPTH, IT IS ONE LAYER. What makes
+      a ground read as material rather than as a picture is the marks moving
+      ACROSS the light behind them — so this runs the other way, at a fraction of
+      the distance, and the two are out of phase by a negative delay rather than
+      by a second period nobody would be able to name.
+      ⚠️ SCALED, BECAUSE TRANSLATING SOMETHING THAT EXACTLY COVERS ITS BOX
+      UNCOVERS AN EDGE. The overscan is what there is to move — the same reason
+      the ground is at 1.1.
+    */
+    `@keyframes one-float {`,
+    `  from { transform: translate3d(1.2%, 0.8%, 0) scale(1.05); }`,
+    `  to { transform: translate3d(-1.2%, -0.8%, 0) scale(1.08); }`,
+    `}`,
+    `@media (prefers-reduced-motion: no-preference) {`,
+    `  [data-field] {`,
+    `    animation: one-float ${DURATION.ambient} ${EASE.plain} infinite alternate;`,
+    /* ⚠️ NEGATIVE, SO IT STARTS PART-WAY THROUGH RATHER THAN WAITING. A positive
+       delay would hold the field still for nine seconds after every page load,
+       which is most of the time anybody spends on a screen. */
+    `    animation-delay: -9s;`,
+    `  }`,
+    `}`,
+    `[data-reduce-motion="true"] [data-field] { animation: none; }`,
   ];
 
   return [
@@ -497,9 +532,18 @@ export function ambienceStylesheet(): string {
       would keep moving for the person who turned it off where they could see the
       switch. For some people this is not a preference.
     */
+    /*
+      ⚠️ AND THE DISTANCE IS THE PART THAT WAS WRONG. This drifted half a percent
+      each way — four pixels on a phone, across twenty-four seconds, which is a
+      quarter of a pixel a second. It is not a subtle animation, it is an absent
+      one: measured on the screens people actually look at, the page held
+      completely still. The rule an ambience has to satisfy is that it is
+      noticeable if you watch it and invisible if you do not, and only the first
+      half of that was ever tested.
+    */
     `@keyframes one-drift {`,
-    `  from { transform: translate3d(-0.5%, -0.4%, 0) scale(1.1); }`,
-    `  to { transform: translate3d(0.5%, 0.4%, 0) scale(1.14); }`,
+    `  from { transform: translate3d(-2.4%, -1.6%, 0) scale(1.1); }`,
+    `  to { transform: translate3d(2.4%, 1.6%, 0) scale(1.18); }`,
     `}`,
     `@media (prefers-reduced-motion: no-preference) {`,
     `  [data-sky]:not([data-sky="plain"])::before {`,

@@ -28,6 +28,7 @@ export * from "./parts/said.js";
 export * from "./tokens/ground.js";
 export * from "./chart/index.js";
 export * from "./frame/page.js";
+export * from "./frame/travel.js";
 export * from "./frame/crown.js";
 export * from "./frame/chrome.js";
 export * from "./parts/arrange.js";

@@ -3,7 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import {
   ARRIVE_MOTION, BLOCK_MOTION, CHART_MOTION, DOOR_MOTION, FACE_CSS, GLYPH_MOTION, GROUND_CSS,
-  TONE_CSS,
+  TONE_CSS, TRAVEL_MOTION,
   ambienceStylesheet,
   brandCss,
   applyAppearance, Presenting,
@@ -47,7 +47,7 @@ const sky = document.createElement("style");
 sky.textContent = [
   FACE_CSS, GROUND_CSS, ambienceStylesheet(), ARRIVE_MOTION, BLOCK_MOTION, DOOR_MOTION,
   CHART_MOTION, TONE_CSS,
-  GLYPH_MOTION,
+  GLYPH_MOTION, TRAVEL_MOTION,
   /*
     ⚠️ ONE'S OWN BRAND, AND IT IS MONOCHROME. `GROUND_CSS` ships a blue as the
     colour a deployment has before anybody chooses — right for a framework,

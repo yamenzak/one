@@ -772,21 +772,42 @@ describe("a workspace's branding", () => {
     */
     const beats = Object.keys(BEAT);
     expect(beats.length).toBeGreaterThan(0);
-    expect([...css.matchAll(/@keyframes one-(?!drift)/g)]).toHaveLength(beats.length);
+    /* ⚠️ `drift` is the ground's and `float` is the field's — the two whole-layer
+       animations, which are not beats and are counted separately. */
+    expect([...css.matchAll(/@keyframes one-(?!drift|float)/g)]).toHaveLength(beats.length);
     for (const beat of beats) {
       expect(css, `${beat} has no keyframe`).toContain(`@keyframes one-${beat} {`);
       expect(css, `${beat} is not offered to the system preference`)
         .toContain(`.q-${beat} { animation: one-${beat}`);
-      expect(css, `${beat} cannot be switched off inside the app`)
-        .toContain(`.q-${beat}`);
+      /*
+        ⚠️ ITS OWN COMPLETE SELECTOR, AND THIS IS THE ASSERTION THAT MATTERS.
+        The opt-out was one ancestor followed by a comma-separated list —
+        `[data-reduce-motion="true"] .q-medium, .q-large, …` — and a descendant
+        combinator binds to the FIRST selector only, so six of the seven beats
+        were `animation: none` for EVERYBODY, unconditionally, from the day the
+        line was written. The old assertion here compared the whole line to the
+        same `join(", ")` that produced it, which is a test agreeing with the
+        bug. Asking per beat is what makes it a check.
+      */
+      expect(css, `${beat}'s opt-out is a bare selector in a list — it applies to everyone`)
+        .toContain(`[data-reduce-motion="true"] .q-${beat} {`);
     }
-    expect(css).toContain(`[data-reduce-motion="true"] ${beats.map((b) => `.q-${b}`).join(", ")}`);
 
     /* ⚠️ The field is an ELEMENT, and it wears the same matte the ground does —
        two halves of one world receding differently is a visible edge exactly
        where content sits. */
     expect(css).toContain("[data-field] {");
     expect(css).toMatch(/\[data-field\] \{[^}]*mask-image/);
+    /*
+      ⚠️ AND IT MOVES, AGAINST THE GROUND. A family that draws its whole field in
+      one stroke has nowhere to hang a beat — `cloth`, which is the material
+      under most of the product, had none at all — so the layer's own drift is
+      the motion every world is guaranteed. `test/sky.test.tsx` measures that it
+      paints; this is what keeps the rule from being deleted as redundant.
+    */
+    expect(css).toContain("@keyframes one-float {");
+    expect(css).toMatch(/\[data-field\] \{[^}]*animation: one-float/);
+    expect(css).toContain(`[data-reduce-motion="true"] [data-field] { animation: none; }`);
   });
 
   /**

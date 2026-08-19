@@ -124,10 +124,20 @@ export function useScenery(
   const scene = world ?? (!sky || sky === "plain"
     ? null
     : skyWorld(sky as Exclude<Sky, "plain">, seedling ?? sky));
-  const own = scene ? worldCss(scene, { night, density }) : null;
-  if (!own) return { attrs: { "data-sky": "plain" }, field: null };
+  if (!scene) return { attrs: { "data-sky": "plain" }, field: null };
+  const own = worldCss(scene, { night, density });
   return {
-    attrs: { "data-sky": "world", ...(reach ? { "data-reach": reach } : {}) },
+    /*
+      ⚠️ THE FAMILY'S OWN NAME, AND IT USED TO SAY `world` FOR ALL SEVEN. Nothing
+      in the stylesheet selects on it — every rule is `:not([data-sky="plain"])`,
+      which is what keeps the sheet family-agnostic and is asserted — so the
+      attribute was carrying one bit where it could carry the answer. What reads
+      it is `travel()`: whether the next screen stands on the SAME material is
+      what decides between sliding and opening, and asking the DOM means no
+      router has to know the families and no family has to be registered
+      anywhere to be covered.
+    */
+    attrs: { "data-sky": scene.family, ...(reach ? { "data-reach": reach } : {}) },
     css: own.css as React.CSSProperties,
     /*
       ⚠️ THE FIELD IS AN ELEMENT, AND IT HAS TO BE. It was a `background-image`

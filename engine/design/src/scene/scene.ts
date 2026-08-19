@@ -328,18 +328,34 @@ export function render(scene: Scene): Rendered {
   const r = prng(hash(`${family.id}|${scene.seed}`));
 
   const want = family.tile ?? { w: 1400, h: 1000 };
-  const marks: string[] = [];
 
   /*
-    ⚠️ THE BEAT GETS ITS OWN `<g>`, NESTED INSIDE THE PLACEMENT. In SVG2 the
-    `transform` ATTRIBUTE is the CSS `transform` property, so a keyframe
-    animating `transform` REPLACES the translate that put the mark where it
-    belongs — every turning tile would snap to the origin and orbit it. Two
-    elements, one for where it is and one for what it does, and neither can
-    overwrite the other.
+    ⚠️ THE MARKS ARE KEPT IN GROUPS BY BEAT, WHICH IS THE WHOLE FIX. Every mark
+    is still emitted exactly once and the tile is still one pattern's worth of
+    drawing per group, so this costs a `<pattern>` and a `<rect>` per beat — at
+    most three in any family here — and it buys a beat that paints. Everything
+    on one beat pulsing together is not a loss: they shared a delay already, so
+    they were always in phase by construction.
   */
-  const placed = (at: string, beat: string | null, body: string) =>
-    `<g transform="${at}">${beat ? `<g class="q-${beat}">${body}</g>` : body}</g>`;
+  const groups = new Map<string, string[]>();
+  const push = (beat: string | null, svg: string) => {
+    const key = beat ?? "";
+    const held = groups.get(key);
+    if (held) held.push(svg); else groups.set(key, [svg]);
+  };
+  const count = () => [...groups.values()].reduce((n, g) => n + g.length, 0);
+
+  /*
+    ⚠️ THE BEAT IS NOT ON THE MARK, AND FOR THREE YEARS' WORTH OF COMMITS IT WAS.
+    A mark lives inside the `<pattern>`, and Chromium rasterises a pattern's tile
+    ONCE and paints that cache — so an animation declared in there is created,
+    is reported by `getAnimations()`, and never repaints anything. Measured by
+    screenshot rather than by API: byte-identical pictures a second and a half
+    apart, on every family that had one. What carries a beat now is the LAYER
+    (below): the marks are split into one pattern per beat, and the `<rect>` that
+    paints each is a rendered element the page's own CSS can reach.
+  */
+  const placed = (at: string, body: string) => `<g transform="${at}">${body}</g>`;
 
   /* ⚠️ THE SHARE IS DRAWN PER INSTANCE, from the same stream, so which marks
      move is part of the world rather than a second decision. */
@@ -374,12 +390,12 @@ export function render(scene: Scene): Rendered {
         const beat = beatOf(v);
         const at = `translate(${+(ix * cell).toFixed(1)} ${+(iy * cell).toFixed(1)})`
           + ` scale(${+cell.toFixed(2)})`;
-        marks.push(placed(at, beat, v.draw(palette, r)));
+        push(beat, placed(at, v.draw(palette, r)));
       }
     }
   }
 
-  if (family.drawn) marks.push(family.drawn(palette, r, tile));
+  if (family.drawn) push(null, family.drawn(palette, r, tile));
 
   const megapixels = (tile.w * tile.h) / 1_000_000;
   for (const speck of family.specks ?? []) {
@@ -387,7 +403,7 @@ export function render(scene: Scene): Rendered {
     for (const [x, y] of scatter(r, tile.w, tile.h, count)) {
       const v = pick(r, speck.variants);
       const beat = beatOf(v);
-      marks.push(placed(`translate(${x} ${y})`, beat, v.draw(palette, r)));
+      push(beat, placed(`translate(${x} ${y})`, v.draw(palette, r)));
     }
   }
 
@@ -404,19 +420,41 @@ export function render(scene: Scene): Rendered {
   const scoped = (svg: string) =>
     svg.replace(/\bid="([\w-]+)"/g, `id="${ns}-$1"`).replace(/url\(#([\w-]+)\)/g, `url(#${ns}-$1)`);
 
-  const defs = marks.length && family.defs ? `<defs>${family.defs(palette)}</defs>` : "";
-  const body = scoped(`${defs}${marks.join("")}`);
+  const any = count() > 0;
+  const shared = any && family.defs ? `<defs>${family.defs(palette)}</defs>` : "";
+
+  /*
+    ⚠️ ONE PATTERN AND ONE RECT PER BEAT, AND THE STILL MARKS ARE ONE OF THEM.
+    The rects are stacked in the order the groups were filled, which is the order
+    the family declares them, so a lattice still sits under its specks.
+
+    ⚠️ `userSpaceOnUse` AND THE TILE IS IN CSS PIXELS. A pattern in object units
+    would resize with the viewport, so the same world would be a different
+    constellation on a phone and on a laptop — which is what a stretched sky
+    looks like, and the reason the old background version pinned an explicit
+    `background-size`.
+  */
+  const layers = [...groups.entries()].map(([beat, held], i) => ({
+    beat,
+    pattern: `<pattern id="tile${i}" width="${tile.w}" height="${tile.h}"`
+      + ` patternUnits="userSpaceOnUse">${held.join("")}</pattern>`,
+    rect: `<rect${beat ? ` class="q-${beat}"` : ""}`
+      + ` width="100%" height="100%" fill="url(#tile${i})"/>`,
+  }));
 
   return {
-    /* ⚠️ `userSpaceOnUse` AND THE TILE IS IN CSS PIXELS. A pattern in object
-       units would resize with the viewport, so the same world would be a
-       different constellation on a phone and on a laptop — which is what a
-       stretched sky looks like, and the reason the old background version pinned
-       an explicit `background-size`. */
-    field: marks.length
-      ? `<defs><pattern id="${ns}-tile" width="${tile.w}" height="${tile.h}"`
-        + ` patternUnits="userSpaceOnUse">${body}</pattern></defs>`
-        + `<rect width="100%" height="100%" fill="url(#${ns}-tile)"/>`
+    /*
+      ⚠️ SCOPED IN ONE PASS, OVER EVERYTHING. The first version of this split
+      scoped the shared defs and left the patterns alone — so a mark referring to
+      a gradient by `url(#l)` pointed at an id that had just been renamed, and
+      every family whose marks take a gradient (`aura`, `blobs`) drew NOTHING.
+      It fails silently, in both directions: the picture is empty rather than
+      wrong, and the pattern ids are unqualified so two worlds on one page take
+      each other's marks. One string, one rewrite, nothing to keep in step.
+    */
+    field: any
+      ? scoped(`${shared}<defs>${layers.map((l) => l.pattern).join("")}</defs>`
+        + layers.map((l) => l.rect).join(""))
       : "",
     ground: family.ground(palette, prng(hash(`${family.id}|ground|${scene.seed}`))).join(", "),
     veil: family.veil?.(palette) ?? "",

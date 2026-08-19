@@ -113,18 +113,21 @@ export const REDUCED = { "data-reduce-motion": "true" } as const;
  * pulsed like a warning light.
  */
 /**
- * ⚠️ AND A BEAT IS A FADE **OR** A TURN, WHICH IS NOT A SECOND KIND OF THING SO
- * MUCH AS THE SECOND THING A MARK CAN DO WITHOUT COSTING A LAYOUT. A pattern of
- * interlocking arcs has no brightness to give — what it has is ORIENTATION, and
- * rotating one tile by a quarter re-routes every curve running through it. The
- * lines that met now miss and two others join, so the whole field re-draws
- * itself without a single mark appearing or disappearing.
+ * ⚠️ EVERY BEAT IS A FADE, AND TWO OF THEM USED TO BE A TURN. The turn was the
+ * better idea on paper: a lattice of interlocking arcs has no brightness to
+ * give, and rotating a tile by a quarter re-routes every curve through it, so
+ * the field re-draws itself without a mark appearing or disappearing. It cannot
+ * survive where a beat actually has to run — on the whole GROUP at once, rather
+ * than on one tile (`render`) — because rotating a field that is wider than it
+ * is tall leaves two bare corners. A slow, shallow fade of a share of the
+ * lattice says the same thing: the lines that were there are the lines that are
+ * there, at a different weight, and the pattern was different when you looked
+ * back.
  *
- * ⚠️ HOLD, SNAP, HOLD — never a continuous spin. A tile turning steadily is a
- * spinning graphic and the eye locks onto it; a tile that sits still for four
- * fifths of its cycle and turns in the remaining fifth is a pattern that was
- * different when you looked back. The rhythm is taken from the avatar style
- * these came from, which had already solved it.
+ * ⚠️ THE TWO LATTICE BEATS ARE MEASURED IN MINUTES AND BARELY MOVE. A quarter
+ * of a screen of ruled line-work dipping to a third is the page flickering; the
+ * dips here are the shallowest in the table for exactly that reason, and the
+ * periods are long enough that nobody watching sees a cycle.
  */
 export const BEAT = {
   /* A sky's three: small, sharp marks, so they may go most of the way out. */
@@ -134,13 +137,10 @@ export const BEAT = {
   /* An aura's two: enormous and soft, so they barely move and take an age. */
   swell: { period: "13s", delay: "0s", dip: 0.62 },
   breathe: { period: "19s", delay: "6.5s", dip: 0.78 },
-  /* A lattice's two. Minutes, not seconds — see above. */
-  quarter: { period: "47s", delay: "0s", turn: true },
-  half: { period: "71s", delay: "17s", turn: true },
+  /* A lattice's two. Minutes, not seconds, and hardly a dip — see above. */
+  quarter: { period: "47s", delay: "0s", dip: 0.72 },
+  half: { period: "71s", delay: "17s", dip: 0.8 },
 } as const;
-
-/** ⚠️ Every beat is one or the other, and the stylesheet asks which. */
-export const turns = (beat: keyof typeof BEAT): boolean => "turn" in BEAT[beat];
 
 /**
  * WHETHER MOTION IS SWITCHED OFF FOR THIS ELEMENT.
