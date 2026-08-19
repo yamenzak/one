@@ -406,7 +406,16 @@ export function Screen<T = unknown>({
       <Await
         of={of}
         again={again}
-        waiting={waiting ?? (recalled ? <ShapeWaiting blocks={recalled} /> : preset.waiting())}
+        /*
+          ⚠️ WHAT WAS ACTUALLY DRAWN BEATS BOTH GUESSES, AND A SCREEN'S OWN
+          GUESS BEATS THE SHAPE'S. `waiting` used to win outright, which made it
+          an override — so the four screens that had hand-tuned one could never
+          be exact, permanently, and the tuning was the reason. It is the
+          FIRST-VISIT answer now: better than the preset because the screen's
+          author knew what was coming, and superseded the moment the screen has
+          been seen once.
+        */
+        waiting={recalled ? <ShapeWaiting blocks={recalled} /> : waiting ?? preset.waiting()}
         isNothing={isNothing}
         nothing={nothing
           ? (

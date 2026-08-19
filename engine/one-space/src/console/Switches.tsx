@@ -105,12 +105,16 @@ export function Switches() {
 
       <Await
         of={flags.of}
+        /* ⚠️ A nested `Await` has no screen behind it, so nothing remembers its
+           shape — the placeholder is the author's, and it has to be. */
         waiting={<RowsWaiting rows={3} />}
         again={flags.again}
         isNothing={(d) => d.apps.length === 0}
         nothing={<Nothing icon={glyphOf("flag")} says="No product here declares a flag" />}
         then={(data) => (
-          <Stack space="roomy">
+          /* ⚠️ NO `Stack` — see `Keys.tsx`. The screen's own rhythm is the DOM's,
+             so a column here collapses every product into one block. */
+          <>
             {data.apps.map((app) => (
               <FlagConsole
                 key={app.id}
@@ -123,7 +127,7 @@ export function Switches() {
                 onSet={(id, on) => void set(id, on)}
               />
             ))}
-          </Stack>
+          </>
         )}
       />
     </Screen>

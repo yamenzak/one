@@ -887,6 +887,8 @@ its own header, cited by other files, and doing nothing.
 | D39 | `locate` answers twice from one read | 0 |
 | D40 | The weight of the first screen is a number somebody has to raise | 0 |
 | D41 | The page asks before the bundle arrives | 0 |
+| D42 | The route decides the direction, the world decides the gesture | 0 |
+| D43 | The skeleton is the screen somebody saw last time | 0 |
 <!-- /generated -->
 
 ---

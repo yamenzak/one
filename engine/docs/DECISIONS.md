@@ -1204,3 +1204,50 @@ it did before this existed.
 ⚠️ **AND BOTH HALVES ARE CHECKED TOGETHER.** A page that asks with nothing
 collecting is two wasted requests; a collector with nothing to collect is a branch
 that never runs. `space/test/preflight.test.ts` reads the real `index.html`.
+
+## D42 — The route decides the direction, the world decides the gesture
+
+**A page changed instantly and a screen appeared, which is what a router does and
+not what a product does.** The fix a transition system usually gets is a prop on
+every screen, and that is the fix that decays: twenty screens, each able to
+declare the wrong one or forget, and no way to tell from the outside which.
+
+**Both answers already exist as facts.** Which way somebody is going is a fact
+about the two addresses — descending slides the screen away to the left, going up
+mirrors it — and whether they are still in the same WORLD is a fact about the
+ground the page mounted, read off `data-sky` before the swap and again after it.
+Nothing is declared, so there is nothing to forget.
+
+⚠️ **The direction cannot come from the history stack**, because the crown's back
+arrow is a `pushState` like any other. The phone's own gesture is answered from a
+step number kept in `history.state`: a `popstate` says the address changed and
+never says which way.
+
+⚠️ **A new family does not slide.** Sliding says "the next one along"; going from
+a workspace's woven ground to the console's ruled one is somewhere else. It opens,
+on a scale, with no direction at all.
+
+⚠️ **It is the browser's own view transition, and `flushSync` is load-bearing.**
+Nothing else can show the page somebody is LEAVING — React has replaced it before
+any animation could run, and keeping the old tree mounted is a second copy of a
+screen, its scene and its requests on the device least able to afford it. The
+browser captures the "after" picture the moment the callback returns, so a queued
+update is a transition between two identical frames.
+
+## D43 — The skeleton is the screen somebody saw last time
+
+**A placeholder chosen by SHAPE is a placeholder for a different page.** Eight
+presets covered twenty-odd screens, so a console page of three headed cards
+holding one, two and no rows waited behind one un-headed card of four rows — the
+exact fault a skeleton exists to prevent, wearing the fix's clothes.
+
+**So it is measured, not declared and not generated.** Declaring one per screen is
+twenty declarations that go stale the first time a card is added; generating them
+from source needs a script that can predict how a component composes. Reading the
+real DOM after the real render is exact by construction — heading height, row
+count, block height, kept under the address.
+
+⚠️ **The first visit is the honest limit**, and it falls back to the shape's own
+placeholder. ⚠️ **And the outer box is fixed rather than composed**: everything
+inside a skeleton is an approximation, and approximations add up to a column
+sixty pixels short, which is the jump again.

@@ -136,6 +136,53 @@ const firstInside = (src, from) => {
   }
 }
 
+/* -------------------------------------------- nor at the top of a screen --- */
+
+/**
+ * ⚠️ THE SAME FAULT ONE LEVEL UP, AND IT IS QUIETER. `Screen` puts its content
+ * in a `<Stack blocks>` and the rhythm is that container's `gap`, so a screen
+ * whose `then` returns a single `Stack` wrapping everything has ONE block: the
+ * screen's own gap applies between nothing, and the wrapper's applies instead.
+ * It happens to look identical when the two spacings agree, which is why it
+ * survived on two console screens — and it is not only spacing. The remembered
+ * skeleton (`design/src/parts/recall.tsx`) measures top-level blocks, so a
+ * screen wrapped like this waits behind one six-hundred-pixel slab where there
+ * are five cards.
+ *
+ * ⚠️ A FRAGMENT IS THE ANSWER, AND IT COSTS NOTHING. Fragments produce no DOM
+ * nodes, so whatever a component composed lands as siblings in the frame's own
+ * container — which is the whole reason the rhythm is the DOM's.
+ */
+{
+  let screens = 0;
+  let wrapped = 0;
+  /* ⚠️ The opening of a `then` or `children`, and what it returns first. */
+  const RETURNS = /\bthen=\{\s*\([^)]*\)\s*=>\s*\(\s*(?:\{\s*\/\*[\s\S]*?\*\/\s*\}\s*|\/\*[\s\S]*?\*\/\s*)*<([A-Z][A-Za-z]*)/g;
+  for (const file of FILES) {
+    const src = readFileSync(file, "utf8");
+    /* ⚠️ Only where the `then` belongs to a `Screen` — a nested `Await` inside a
+       card is a different container with a rhythm of its own. */
+    if (!/<Screen\b/.test(src)) continue;
+    for (const m of src.matchAll(RETURNS)) {
+      screens++;
+      if (!RESTACKS.test(m[1])) continue;
+      /* ⚠️ Attributed to a `Screen` only when one opens before this `then` and
+         no other `then` sits between — the cheap test, and it is enough because
+         a nested `Await`'s `then` would be the nearer match. */
+      const before = src.slice(0, m.index);
+      if (!/<Screen\b[^>]*$|<Screen\b(?![\s\S]*<Await\b)/.test(before.slice(-4000))) continue;
+      wrapped++;
+      fail(`${rel(file)}:${before.split("\n").length}: a screen's content is one `
+        + `<${m[1]}>.\n`
+        + `       The frame already puts every top-level block in a column at the scale, so\n`
+        + `       this collapses the whole screen into ONE block — the gap applies between\n`
+        + `       nothing, and the remembered skeleton draws one slab where there are five\n`
+        + `       cards. Return a fragment; fragments make no DOM nodes.`);
+    }
+  }
+  if (!wrapped) ok(`screens: ${screens} content block(s), none wrapped in a second column`);
+}
+
 console.log(bad
   ? `\nrhythm: ${bad} finding(s) — a second rhythm inside one container.`
   : `\nrhythm: one rhythm per container, and the screen's is the DOM's.`);

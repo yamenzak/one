@@ -119,9 +119,12 @@ export function Keys() {
       under="What this deployment was told, and what is still running on nothing"
       of={of.of}
       again={of.again}
-      waiting={<RowsWaiting rows={4} />}
       then={(data) => (
-        <Stack space="roomy">
+        /* ⚠️ NO `Stack` — the screen is already one, and it is the DOM's. A
+           column here made every card on this page ONE block: the block rhythm
+           applied between nothing, and the remembered skeleton (`recall.tsx`)
+           saw a single six-hundred-pixel slab where there are five cards. */
+        <>
           {/* ⚠️ SAID ONCE, ABOVE EVERYTHING, because it is the deployment's
               own state rather than any one row's — and repeated per row it
               would be four copies of one sentence. */}
@@ -193,7 +196,7 @@ export function Keys() {
               </Group>
             );
           })}
-        </Stack>
+        </>
       )}
     />
   );

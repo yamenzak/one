@@ -456,6 +456,52 @@ see this" is a fact about the person, known before any request is made; a
 with a bare sentence returned EARLY, above the frame, which took the crown with
 it: no title, no way back, a sentence alone on a page. A refusal is content.
 
+### The skeleton is this screen, not this shape
+
+A shape's placeholder stands in for every screen that names the shape, and eight
+shapes cover twenty-odd screens — so a console page of three headed cards
+holding one, two and no rows waited behind one un-headed card of four rows with
+a face on each. Right vocabulary, wrong drawing, and it is the exact fault a
+skeleton exists to prevent: the content lands and every block is somewhere else.
+
+**So it is measured.** `useRecalledShape` reads the real DOM after the real
+render — per top-level block, the heading's height, the row count and the
+block's height — keeps it under the address, and draws that on the next visit.
+Nothing is declared per screen and nothing is generated from source: a
+declaration goes stale the first time a card is added, and no script can predict
+how a component composes. The first visit still falls back to the shape's own
+placeholder, and that is the honest limit of it.
+
+- **The heading is a HEIGHT, never a boolean.** A name with a line under it and
+  a name without are twenty pixels apart, and a bar drawn at the wrong one moves
+  the card beneath it.
+- **The block is drawn at exactly the height it was, and clipped to it.**
+  Everything inside is an approximation, and approximations compose into a
+  column sixty pixels short — which is the jump again, arriving by way of the
+  fix.
+
+### Going from one screen to the next
+
+**Two mechanisms, and no screen declares either.** The ROUTE decides direction:
+descending into an address slides the screen away to the left and brings the
+next in from the right, going up mirrors it, and a sibling counts as forward
+because it is somebody choosing to go somewhere. The AMBIENCE decides the
+gesture: within one family the two grounds cross-fade while the page slides —
+the same place from a different position — and crossing into another family does
+not slide at all, it opens on a scale, because a place has no direction.
+
+- **The direction is a fact about the two addresses**, not about the history
+  stack: the crown's back arrow is a `pushState` like any other. The phone's
+  back gesture is answered from a step number kept in `history.state`, because a
+  `popstate` says the address changed and never says which way.
+- **The world is read off the DOM**, before the swap and again after it. Written
+  as a prop, every router would have to know every ambience family — and a
+  family nobody added to that list would transition wrongly, silently.
+- **It is the browser's own view transition**, which is the only way the screen
+  somebody is LEAVING exists at all: React has replaced it before any animation
+  could run, and keeping the old tree mounted means a second copy of a screen,
+  its scene and its requests for a quarter of a second.
+
 ### Within the shape
 
 Use the whole width. A phone is one column, a desktop is not — `Grid`, `Columns`
@@ -779,6 +825,11 @@ Some of this is guarded and some is judgement. What is checked today:
   no surface pins a locale; and no screen prints a stored date as it is stored.
 - `motion` — one set of curves and roles, reduced motion answered, and no pinned
   element whose travel changes the page's height.
+- `travel` — one mechanism moves the page: nothing writes history outside the
+  router, both directions and both worlds have a rule, and the ambience family
+  is read from what was mounted rather than declared by a router.
+- `rhythm` — no second rhythm inside one container, and a screen's own is the
+  DOM's rather than a walk over React children.
 - `doors` — a screen the account door renders decides for itself which door it
   is on, in its own file. A helper somewhere in the import closure satisfying the
   check is not a weaker check; it is no check.

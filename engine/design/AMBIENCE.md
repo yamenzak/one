@@ -56,7 +56,7 @@ The world falls out of what the subject IS — nothing picks it per screen
 |---|---|---|---|---|
 | what it is | a landscape you look AT | an atmosphere you stand IN | a system, so a lattice | the thing all of them are inside |
 | the marks | ~190 tiny sharp stars per megapixel | ~7 enormous soft blooms | one tile in four rotations, edge to edge | ~4 generated silhouettes |
-| the beat | a twinkle — most of the way out, in 3–5s | a breath — a fifth of a stop, over 13–19s | a quarter TURN, in 47–71s | a breath |
+| the beat | a twinkle — most of the way out, in 3–5s | a breath — a fifth of a stop, over 13–19s | a shallow fade, in 47–71s | a breath |
 | the colours | read from its planet | read from its mood | the theme | the theme |
 
 ### Four a SCREEN may name
@@ -226,13 +226,37 @@ weave under the setting that asks for calm.
   `<pattern>` now, so the browser still lays out two elements whatever it
   contains, and the beats are ordinary rules in `ambienceStylesheet`. That also
   deleted the two-bake requirement.
-- **A beat animates opacity or a quarter TURN, and nothing else.** How far it
-  dips is the beat's (`BEAT.dip`), because `1 → .3` is right for a star and is
-  the whole page throbbing when the mark is a fifth of the screen wide. A turn
-  needs `transform-box: fill-box` or the tile orbits the page rather than
-  spinning in place, and it needs its own `<g>` — in SVG2 the transform attribute
-  IS the CSS transform property, so a keyframe would replace the translate that
-  put the mark where it belongs.
+- ⚠️ **AND THE BEAT IS ON A RENDERED LAYER, NOT ON A MARK — WHICH IS THE SECOND
+  HALF OF THE SAME FAULT.** Making the field an element was necessary and not
+  sufficient: the marks live inside a `<pattern>`, and **Chromium rasterises a
+  pattern's tile once and paints the cache**, so an animation declared in there
+  is created, is reported by `getAnimations()`, and repaints nothing. Measured by
+  screenshot rather than by API — byte-identical pictures a second and a half
+  apart, on every family. `render` splits the marks into one pattern and one
+  `<rect>` per beat now, and the class goes on the rect. Everything on one beat
+  pulses together, which is not a loss: they shared a delay already.
+- ⚠️ **A THIRD THING WAS WRONG AND IT HID BOTH OF THEM.** The in-app opt-out was
+  written as one ancestor and a comma-separated list —
+  `[data-reduce-motion="true"] .q-medium, .q-large, …` — and a descendant
+  combinator binds to the FIRST selector only, so six of the seven beats were
+  `animation: none` for everybody, unconditionally, from the day the line was
+  written. Every guard in the repository checked that motion had been DECLARED.
+  `design/test/sky.test.tsx` takes two screenshots and compares them.
+- **A beat animates opacity and nothing else.** How far it dips is the beat's
+  (`BEAT.dip`), because `1 → .3` is right for a star and is the whole page
+  throbbing when the mark is a fifth of the screen wide. The two lattice beats
+  used to be a quarter TURN, which is the better idea and cannot survive a beat
+  that runs on the whole group: rotating a field wider than it is tall leaves two
+  bare corners. A slow shallow fade of a share of the lattice says the same
+  thing — the pattern was different when you looked back.
+- ⚠️ **AND EVERY FAMILY MOVES, INCLUDING THE ONES WITH NO MARK TO HANG A BEAT
+  ON.** `cloth` draws its whole field in one stroke, so it had none at all — and
+  it is the material under most of the product. `one-float` drifts the field
+  against the ground, at a fraction of the distance and out of phase, which is
+  the parallax that makes a ground read as material rather than as a picture.
+  The ground's own drift travelled half a percent before this: four pixels, over
+  twenty-four seconds. An ambience has to be noticeable if you watch it and
+  invisible if you do not, and only the second half was ever true.
 - ⚠️ **A light is not a hue.** Turn a hue up and you get more of that hue; turn a
   real source up and it goes toward WHITE. `moods` picks faces from twelve
   saturated colours, and mixing one straight into a dark teal ground gives
