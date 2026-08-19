@@ -176,6 +176,33 @@ export function useScenery(
  * frame is then a constant height, the document never re-clamps under a moving
  * finger, and a screen shorter than the viewport still fills it. The ground is
  * measured in the same unit (`REACH`) and `scripts/scene.test.mjs` says so.
+ *
+ * ⚠️ AND THE FRAME SCROLLS, NOT THE DOCUMENT — WHICH IS THE HALF THE UNIT COULD
+ * NOT FIX. A browser only retracts its address bar for the ROOT scroller, and
+ * while it retracts it consumes the gesture and resizes the viewport under it.
+ * On a page with plenty of room that is the immersive reading mode it is meant
+ * to be. On a page a little taller than the screen it is the product fighting
+ * back: the operator console's home is 866px in a 760px viewport, so it has 106
+ * pixels of travel — and Chrome's own bar is ~56 of them. More than half of
+ * every flick moves browser chrome rather than content, the viewport grows
+ * mid-gesture, the reachable bottom moves up to meet it, and the page lurches
+ * backwards. Measured: at the foot of that screen, growing the viewport 60px
+ * drops the offset from 106 to 46.
+ *
+ * ⚠️ AN APP IS NOT A DOCUMENT, AND THAT IS THE ARGUMENT RATHER THAN THE
+ * WORKAROUND. This one is installable, its crown and its nav are pinned chrome,
+ * and a person moving between five screens is not reading a page. So the frame
+ * is exactly one viewport tall and the CONTENT scrolls inside it: the scrollport
+ * is a box we own, no browser chrome can resize it, and the whole class of
+ * "something moved the page while I was touching it" cannot happen on any screen
+ * of any product built on this. The cost is one address bar's worth of height in
+ * a browser tab, and none at all once installed.
+ *
+ * ⚠️ SO `scrollY` IS NOT THE ANSWER TO "HOW FAR DOWN ARE WE" ANY MORE, and three
+ * separate listeners used to ask it — the hem, the collapsing crown, the folding
+ * nav. `useScrolled` below is the one way to ask, `scripts/scene.test.mjs`
+ * refuses the other, and the hazard it removes is silent: a listener left on the
+ * window simply never fires, so a crown stops collapsing and nothing errors.
  */
 export function Page(
   { sky = "plain", seedling, world, density = "even", nav, children }: PageProps,
@@ -196,14 +223,29 @@ export function Page(
   /* ⚠️ THE PAGE OWNS IT BECAUSE THE PAGE OWNS THE CROWN'S ROOM — see
      `useHemOnScroll`. Every address goes through here, so one listener covers
      every crown in the product and no crown has to remember. */
-  useHemOnScroll();
   /* ⚠️ ONE PATH FOR BOTH. A subject's world and a named sky differ only in where
      the family and the two colours came from — everything after that is the same
      engine, which is what "one engine powers every scene" has to mean. */
   const own = useScenery({ sky, seedling, world, density });
+  /* ⚠️ STATE RATHER THAN A REF, because everything that listens has to re-subscribe
+     when the node appears — a ref changes without telling anybody, and the crown
+     would have registered its listener against `null` on the first render and
+     never again. */
+  const [port, setPort] = React.useState<HTMLElement | null>(null);
   return (
     <div
-      className="min-h-svh flex flex-col"
+      ref={setPort}
+      /* ⚠️ WHAT MAKES THIS THE SCROLLPORT RATHER THAN A TALL BOX — the overflow
+         rules are in `ambienceStylesheet`, beside the clipping argument they are
+         an exception to. */
+      data-port=""
+      /*
+        ⚠️ `h-svh`, NOT `min-h-svh`, AND THAT IS THE WHOLE CHANGE. A minimum
+        grows with its content, so the box would still stand 866 tall and the
+        DOCUMENT would still be the thing that scrolls. Exactly one viewport, and
+        everything past it moves inside.
+      */
+      className="h-svh flex flex-col"
       {...own.attrs}
       style={own.css}
     >
@@ -221,10 +263,58 @@ export function Page(
         subtree of SVG built as text.
       */}
       {own.field}
-      <div className={`flex grow flex-col ${nav ? NAV_SPACE : ""}`}>{children}</div>
-      {nav}
+      <ScrollPort.Provider value={port}>
+        {/* ⚠️ INSIDE THE PROVIDER, WHICH IS NOT A DETAIL. `Page` publishes the
+            scrollport to its children, so a hook called in `Page`'s own body
+            reads whatever is ABOVE it — nothing — and quietly listens to a
+            window that no longer moves. A component is how a page concern gets
+            to be a child of the page. */}
+        <TopHem />
+        <div className={`flex grow flex-col ${nav ? NAV_SPACE : ""}`}>{children}</div>
+        {nav}
+      </ScrollPort.Provider>
     </div>
   );
+}
+
+/* ------------------------------------------------------------ what scrolls --- */
+
+/**
+ * ⚠️ THE BOX THAT SCROLLS, PUBLISHED ONCE. `Page` is the only thing that knows
+ * which element it is, and before this every listener assumed the answer was the
+ * window — which was true until the frame became a scrollport, and then silently
+ * was not.
+ */
+const ScrollPort = React.createContext<HTMLElement | null>(null);
+
+/**
+ * HOW FAR DOWN THE CURRENT SCREEN IS, FOR ANYTHING THAT REACTS TO IT.
+ *
+ * ⚠️ THE WINDOW IS THE FALLBACK, NOT THE DEFAULT. A crown drawn outside a `Page`
+ * — a door, a story in the showcase — still scrolls its document, and reading
+ * the window there is right. Inside a `Page` the window never moves at all, so
+ * the fallback firing would be a listener that reports zero for ever.
+ *
+ * ⚠️ THE CALLBACK IS HELD IN A REF SO ITS IDENTITY CANNOT RESUBSCRIBE. Every
+ * caller writes its reader inline; with `read` in the dependency list, each
+ * render would tear the listener down and build a new one — during a scroll,
+ * which is when it is being called.
+ */
+export function useScrolled(read: (top: number) => void): void {
+  const port = React.useContext(ScrollPort);
+  const held = React.useRef(read);
+  held.current = read;
+
+  React.useEffect(() => {
+    const on: HTMLElement | Window = port ?? window;
+    const fire = () => held.current(port ? port.scrollTop : window.scrollY);
+    /* ⚠️ ONCE ON MOUNT, because a screen can arrive already scrolled — restored
+       by the browser, or entered from a link — and a hem that waits for a
+       gesture is a hem that is wrong until somebody moves. */
+    fire();
+    on.addEventListener("scroll", fire, { passive: true });
+    return () => on.removeEventListener("scroll", fire);
+  }, [port]);
 }
 
 /**
@@ -249,26 +339,26 @@ export function Page(
  * settling — anything that moves the page by a pixel would otherwise flicker the
  * hem on and off under somebody's hands.
  */
+function TopHem() {
+  useHemOnScroll();
+  return null;
+}
+
 function useHemOnScroll(at = 8): void {
-  React.useEffect(() => {
-    const root = document.documentElement;
-    let on: boolean | null = null;
-    const read = () => {
-      const now = scrollY > at;
-      if (now === on) return;
-      on = now;
-      root.style.setProperty("--hem-top", now ? "1" : "0");
-    };
-    read();
-    addEventListener("scroll", read, { passive: true });
-    return () => {
-      removeEventListener("scroll", read);
-      /* ⚠️ Cleared rather than left at whatever it was, because the property is
-         on the ROOT and outlives this page — a screen that unmounted while
-         scrolled would hand the next one a hem it never asked for. */
-      root.style.removeProperty("--hem-top");
-    };
-  }, [at]);
+  const on = React.useRef<boolean | null>(null);
+  useScrolled((top) => {
+    const now = top > at;
+    if (now === on.current) return;
+    on.current = now;
+    document.documentElement.style.setProperty("--hem-top", now ? "1" : "0");
+  });
+  React.useEffect(() => () => {
+    /* ⚠️ Cleared rather than left at whatever it was, because the property is
+       on the ROOT and outlives this page — a screen that unmounted while
+       scrolled would hand the next one a hem it never asked for. */
+    document.documentElement.style.removeProperty("--hem-top");
+    on.current = null;
+  }, []);
 }
 
 /**

@@ -460,6 +460,27 @@ export function ambienceStylesheet(): string {
        `overflow: hidden` it rides away to -900. */
     `[data-sky] { position: relative; isolation: isolate; overflow: clip; --sky: 1; }`,
     /*
+      ⚠️ AND THE FRAME IS THE ONE GROUND THAT SCROLLS, SO IT CANNOT BE `clip` ON
+      BOTH AXES. `Page` is exactly one viewport tall and the content moves inside
+      it — see the frame's own header for why the document must not be what
+      scrolls — and `overflow: clip` on the block axis would simply hide
+      everything below the fold. The inline axis still clips the drifting
+      ornament, which is what the rule above is for.
+
+      ⚠️ THE SPECIFICITY IS THE POINT OF THE SECOND ATTRIBUTE. `[data-sky]` and a
+      utility class weigh the same, so which one won would be decided by the
+      order two stylesheets happened to load in — and losing means a page that
+      renders one screen and refuses to scroll at all.
+
+      ⚠️ `overscroll-behavior` IS NOT DECORATION HERE. A flick at the top of a
+      scrollport chains to the document behind it, and on Android that arms
+      pull-to-refresh: the gesture somebody makes to scroll back up reloads the
+      application instead.
+    */
+    `[data-sky][data-port] {`,
+    `  overflow-x: clip; overflow-y: auto; overscroll-behavior-y: contain;`,
+    `}`,
+    /*
       ⚠️ ONE MULTIPLIER PER THEME, AND IT IS DOWN TO ONE. This carried five —
       `--sky`, `--thread`, `--etch`, `--lumen`, `--field` — because twenty-four
       hand-tuned grounds each needed light mode handled a different way, and each

@@ -298,46 +298,92 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
 /* ------------------------------------------------- the ground fits the frame --- */
 
 /**
- * ⚠️ THE GROUND AND THE FRAME ARE MEASURED IN ONE UNIT, AND THIS IS THE ONLY
- * THING THAT CAN ASK. `Page` is `min-h-svh`; the ground fills it, is
- * `position: absolute` inside it, and only `overflow-x: clip` sits above — so a
- * ground measured in `vh` stands taller than the frame by exactly the height of
- * a phone's browser chrome, hangs past the bottom, and makes EVERY page in the
- * product scrollable by that much with nothing to scroll to.
+ * ⚠️ THE FRAME IS EXACTLY ONE VIEWPORT AND THE CONTENT SCROLLS INSIDE IT, AND
+ * THIS IS THE ONLY THING THAT CAN ASK. A browser retracts its address bar for
+ * the ROOT scroller only, and while it retracts it eats the gesture and resizes
+ * the viewport under it. On a page with room to spare that is the immersive
+ * reading mode it is meant to be; on a page a little taller than the screen it
+ * is the product fighting back — the operator console's home is 866px in a 760px
+ * viewport, so 56 of its 106 pixels of travel are the bar's, and the page lurches
+ * backwards mid-flick. `h-svh` plus a scrollport takes the document out of it.
  *
- * ⚠️ AND THE UNIT IS `svh`, WHICH IS THE HALF THIS CHECK USED TO GET WRONG. It
- * pinned `dvh` — the CURRENTLY visible height, which changes as the address bar
- * retracts. On a page whose content lands within one address bar of the
- * viewport that is a loop: the bar hides, the frame grows, the content fits, the
- * scroll clamps to zero, the page is at the top so the bar returns, and it is
- * scrollable again. `svh` is the viewport with the chrome SHOWN and never
- * changes, so the document cannot re-clamp under a finger.
+ * ⚠️ `h-`, NEVER `min-h-`, AND THE DIFFERENCE IS THE WHOLE FIX. A minimum grows
+ * with its content, so the frame would still stand as tall as the page and the
+ * DOCUMENT would still be what scrolls — which looks identical in every
+ * screenshot and behaves identically everywhere except a phone.
  *
- * ⚠️ AND NO RENDERED TEST COULD SEE EITHER FAULT. Headless Chromium has no
- * chrome, so `100vh === 100dvh === 100svh` there and both are exactly zero
- * pixels wrong — they exist only on the devices nothing in this repository runs
- * on. Which is why this asks about the UNIT rather than about pixels.
+ * ⚠️ AND THE UNIT IS `svh`. `dvh` and `lvh` track the address bar, so a frame
+ * measured in either changes height while somebody is scrolling. `svh` is the
+ * viewport with the chrome shown and never changes. The ground fills the frame
+ * and is `position: absolute` inside it, so a ground measured in a different
+ * unit overhangs by exactly the height of a phone's browser chrome.
+ *
+ * ⚠️ AND NO RENDERED TEST COULD SEE ANY OF IT. Headless Chromium has no chrome,
+ * so `100vh === 100dvh === 100svh` there and every one of these faults is
+ * exactly zero pixels wrong — they exist only on the devices nothing in this
+ * repository runs on. Which is why this asks about the DECLARATION rather than
+ * about pixels.
  */
 {
   const src = readFileSync(join(ENGINE, "design/src/tokens/ambience.ts"), "utf8");
   const reach = /export const REACH = "([^"]+)"/.exec(src);
-  const frame = readFileSync(join(ENGINE, "design/src/frame/page.tsx"), "utf8");
-  const sized = /min-h-(svh|dvh|lvh|screen|\[[^\]]+\])/.exec(code(frame));
+  const frame = code(readFileSync(join(ENGINE, "design/src/frame/page.tsx"), "utf8"));
+  const sized = /(min-h|h)-(svh|dvh|lvh|screen|\[[^\]]+\])/.exec(frame);
   const unit = reach && /([a-z]+)$/.exec(reach[1]);
   if (!reach || !sized || !unit) {
     fail("scene: cannot find the ground's reach or the frame's height — one of them moved.");
-  } else if (unit[1] !== sized[1]) {
-    fail(`design/src/frame/page.tsx: the frame is min-h-${sized[1]} while the ground reaches `
+  } else if (sized[1] !== "h") {
+    fail(`design/src/frame/page.tsx: the frame is \`${sized[0]}\`, a MINIMUM.\n`
+      + `       A minimum grows with its content, so the frame stands as tall as the page and `
+      + `the DOCUMENT is what scrolls — which hands the browser's address bar the right to `
+      + `resize the viewport mid-gesture. \`h-svh\` makes it a scrollport instead.`);
+  } else if (unit[1] !== sized[2]) {
+    fail(`design/src/frame/page.tsx: the frame is h-${sized[2]} while the ground reaches `
       + `${reach[1]} — the two have to be one unit, or the ground overhangs the frame by `
       + `the height of a phone's browser chrome.`);
-  } else if (sized[1] !== "svh") {
-    fail(`design/src/frame/page.tsx: the frame and the ground are both \`${sized[1]}\`, and `
+  } else if (sized[2] !== "svh") {
+    fail(`design/src/frame/page.tsx: the frame and the ground are both \`${sized[2]}\`, and `
       + `the unit has to be \`svh\`.\n`
       + `       \`dvh\` and \`lvh\` track the address bar, so the frame changes height while `
-      + `somebody is scrolling — and on a page a little over one screen tall that is a loop `
-      + `rather than a jump. \`svh\` never changes.`);
+      + `somebody is scrolling. \`svh\` never changes.`);
+  } else if (!/data-port/.test(frame)) {
+    fail("design/src/frame/page.tsx: the frame is one viewport tall and nothing marks it as "
+      + "the scrollport.\n"
+      + "       `h-svh` alone is a box that CLIPS its overflow — the content below the fold "
+      + "would simply be unreachable. `data-port` is what `ambienceStylesheet` hangs "
+      + "`overflow-y: auto` on.");
   } else {
-    ok(`reach: the ground (${reach[1]}) and the frame (min-h-${sized[1]}) are one unit, and it is stable`);
+    ok(`reach: the frame is one ${sized[2]} and the scroll is inside it, not on the document`);
+  }
+}
+
+/*
+  ⚠️ AND THE SCROLLPORT HAS TO BE THE THING EVERYTHING READS. Three separate
+  listeners asked `window.scrollY` — the hem, the collapsing crown, the folding
+  nav — and the day the frame became a scrollport all three began reporting zero
+  for ever. Nothing throws: a crown just stops collapsing, a hem never arrives,
+  and the nav stops folding. `useScrolled` is the one way to ask, and the two
+  files that own pinned chrome are where it kept being got wrong.
+*/
+{
+  const OWN = "design/src/frame/page.tsx";
+  const hits = [];
+  for (const file of filesIn("design/src", /\.tsx?$/).concat(filesIn("one-space/src", /\.tsx?$/))) {
+    if (/\.test\.tsx?$/.test(file) || rel(file) === OWN) continue;
+    const src = code(readFileSync(file, "utf8")).replace(/^\s*\/\/.*$/gm, "");
+    if (/\baddEventListener\(\s*["']scroll["']/.test(src) || /\bwindow\.scrollY\b/.test(src)) {
+      hits.push(rel(file));
+    }
+  }
+  if (hits.length) {
+    for (const at of hits) {
+      fail(`${at}: listens to the window for a scroll.\n`
+        + `       The frame is the scrollport, so the window never moves and this listener `
+        + `never fires — silently. Read it through \`useScrolled\`, which knows which box is `
+        + `actually scrolling.`);
+    }
+  } else {
+    ok("scrolling: one way to ask how far down a screen is, and it knows what scrolls");
   }
 }
 
