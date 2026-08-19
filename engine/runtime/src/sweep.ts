@@ -50,7 +50,7 @@ import { compedSubscriptions } from "./billing.js";
 import { column, table, type Db } from "./sql.js";
 import { type LogReader } from "./gateway.js";
 import { dropItem, ensureInstance, listModels, putItem, type Account } from "./cloudflare.js";
-import { propertyIdsOf, readCatalogue, syncModels } from "./models.js";
+import { preferOurs, propertyIdsOf, readCatalogue, syncModels } from "./models.js";
 import { listGeminiModels } from "./google.js";
 import { inCredits, lossesIn, marginsSince, trueUp } from "./reconcile.js";
 import { flushIndex, instanceFor, type Index } from "./search.js";
@@ -472,7 +472,9 @@ export function platformJobs(deps: SweepDeps): JobBook {
             + `other retires every model the missing one sells.`);
         }
 
-        const found = [...readCatalogue(answer.value), ...(google?.value ?? [])];
+        /* ⚠️ THE ROW WE ARE ACTUALLY CHARGED FOR WINS — see `preferOurs`.
+           Cloudflare resells Gemini and this deployment does not buy it there. */
+        const found = preferOurs(readCatalogue(answer.value), google?.value ?? []);
         const out = await syncModels(deps.directory, found, deps.multiplier, now);
         /*
           ⚠️ A REFUSAL SAYS WHAT IT SAW, because the alternative is what happened

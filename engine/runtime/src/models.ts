@@ -213,6 +213,29 @@ export function refuseDiscovered(rows: readonly Discovered[]): readonly SyncRefu
   return out;
 }
 
+/**
+ * TWO CATALOGUES OFFERING THE SAME MODEL, AND THE PRICE MUST BE THE ONE WE PAY.
+ *
+ * ⚠️ CLOUDFLARE RESELLS GEMINI AND WE DO NOT BUY IT THERE. Its unified catalogue
+ * carries `google/gemini-3.7-flash` at Cloudflare's own resale rate; this
+ * deployment calls Google directly on its own key at Google's rate, because that
+ * is what holding the key is FOR (see `config.ts`). Both rows are for the same
+ * model and only one of them is what we are charged — so taking the wrong one
+ * meters every call against a price nobody billed us, in whichever direction
+ * happens to be wrong that quarter.
+ *
+ * ⚠️ SO THE SOURCE WE ACTUALLY CALL WINS, AND IT SAYS SO RATHER THAN RELYING ON
+ * WHICH ARRAY WAS CONCATENATED LAST. The rows are folded into one list before
+ * they are applied; an order-dependent answer would be correct today and would
+ * change the day somebody moved a line.
+ */
+export const preferOurs = (
+  resold: readonly Discovered[], ours: readonly Discovered[],
+): readonly Discovered[] => {
+  const held = new Set(ours.map((m) => m.id));
+  return [...resold.filter((m) => !held.has(m.id)), ...ours];
+};
+
 export interface Synced {
   readonly added: number;
   readonly priced: number;

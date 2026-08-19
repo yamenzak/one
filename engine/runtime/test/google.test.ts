@@ -10,6 +10,7 @@
 
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { GEMINI_RATES, listGeminiModels, rateForModel } from "../src/google.js";
+import { preferOurs } from "../src/models.js";
 
 const listed = (models: unknown[], nextPageToken?: string) =>
   new Response(JSON.stringify({ models, ...(nextPageToken ? { nextPageToken } : {}) }),
@@ -152,5 +153,32 @@ describe("when Google does not answer", () => {
   it("refuses an answer it could price none of", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => listed([model("aqa")])));
     expect((await listGeminiModels("a-key")).ok).toBe(false);
+  });
+});
+
+/**
+ * TWO CATALOGUES, ONE MODEL, AND THE PRICE MUST BE THE ONE WE PAY.
+ *
+ * ⚠️ CLOUDFLARE RESELLS GEMINI AND THIS DEPLOYMENT DOES NOT BUY IT THERE. Its
+ * unified catalogue carries `google/gemini-3.7-flash` at a resale rate; we call
+ * Google on our own key at Google's rate, which is what holding the key is for.
+ * Both rows describe the same model and only one of them is what we are charged,
+ * so taking the wrong one meters every call against a price nobody billed us.
+ */
+describe("when both catalogues carry the same model", () => {
+  const at = (id: string, into: number) =>
+    ({ id, provider: "google-ai-studio", task: "text-generation", usdPerMillionIn: into });
+
+  it("keeps the price from the source we actually call", () => {
+    const out = preferOurs([at("gemini-3.7-flash", 9.99)], [at("gemini-3.7-flash", 0.3)]);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.usdPerMillionIn).toBe(0.3);
+  });
+
+  /* ⚠️ And a model only the resold catalogue has is still offered — this is a
+     precedence rule, not a filter. */
+  it("keeps a model only the other catalogue has", () => {
+    const out = preferOurs([at("veo-3.1", 1)], [at("gemini-3.7-flash", 0.3)]);
+    expect(out.map((m) => m.id).sort()).toEqual(["gemini-3.7-flash", "veo-3.1"]);
   });
 });
