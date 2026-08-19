@@ -77,6 +77,15 @@ export function Documents({ documents, outstanding = [], signed, onOpen }: Docum
   readonly signed?: Readonly<Record<string, { readonly at: string; readonly version: string }>>;
 }) {
   const owed = new Set(outstanding.map((d) => d.id));
+  /*
+    ⚠️ AN OWED DOCUMENT IS MARKED ONLY WHERE IT IS THE EXCEPTION. On the sign-up
+    wall every row is owed, so an amber line on each of them is texture — the
+    page itself is the alarm. In the account centre one document waiting to be
+    accepted sits among documents that are merely published, and "Not agreed
+    yet" in the same grey as "Published Feb 1, 2026" is the one line asking
+    something of the reader, hidden among lines that ask nothing.
+  */
+  const mixed = owed.size > 0 && owed.size < documents.length;
   /* ⚠️ FORMATTED HERE, IN THE READER'S OWN CONVENTIONS. A date built with
      `toLocaleString` would be the one date in the product ignoring what somebody
      chose. */
@@ -120,7 +129,7 @@ export function Documents({ documents, outstanding = [], signed, onOpen }: Docum
                 </span>
               )
               : owed.has(doc.id)
-                ? "Not agreed yet"
+                ? <span data-ink={mixed ? "warning" : undefined}>Not agreed yet</span>
                 : `Published ${sayDate(shown, doc.version, "short")}`}
             onOpen={() => onOpen(doc.id)}
           />
