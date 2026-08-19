@@ -45,8 +45,8 @@ import { iconOf } from "./icon.js";
 import { availableChannels, type Pusher } from "./services.js";
 import { settingsFor } from "./settings.js";
 import type { Db } from "./sql.js";
-import { generatorFor } from "./ai-run.js";
-import { gatewayProvider, type Provider } from "./services.js";
+import { generatorFor, streamerFor } from "./ai-run.js";
+import { gatewayProvider, gatewayStreamer, type Provider } from "./services.js";
 import type { GatewayAt } from "./gateway.js";
 import { searchIn, type Searcher } from "./search.js";
 
@@ -844,6 +844,34 @@ export async function performOperation(
               t: located.tenantId, a: composed.app.id, o: op.id,
             })
             : wiring.aiFallback!,
+          environment: wiring.environment ?? "",
+        }),
+      }
+      : {}),
+    /*
+      ⚠️ STREAMING NEEDS A REAL GATEWAY, AND ITS ABSENCE IS THE HONEST ANSWER.
+      There is no mock stream: a fabricated one would be output nobody asked for
+      arriving token by token, which is more convincing than the same fabrication
+      in one lump. A deployment without a gateway simply has no `ctx.stream`, and
+      the handler falls back to the whole answer at once.
+    */
+    ...(wiring.gateway
+      ? {
+        stream: streamerFor({
+          directory: wiring.directory,
+          db: located.db,
+          tenantId: located.tenantId as never,
+          app: composed.app,
+          operation: op.id,
+          provider: gatewayProvider(wiring.gateway, {
+            t: located.tenantId, a: composed.app.id, o: op.id,
+          }),
+          /* ⚠️ THE SAME TAG ON BOTH. A streamed call that went out untagged
+             would be a hole in the one independent check on the money, exactly
+             where the long generations are. */
+          streamer: gatewayStreamer(wiring.gateway, {
+            t: located.tenantId, a: composed.app.id, o: op.id,
+          }),
           environment: wiring.environment ?? "",
         }),
       }

@@ -205,11 +205,17 @@ const ask = operation<{ id: string; who: string }, { asked: boolean }>({
  * its own voice — which a drafting tone should be, and an extraction rule
  * should not.
  */
-const draft = operation<{ about: string }, { text: string }>({
+const draft = operation<{ about: string; stream?: boolean }, { text: string }>({
   id: "note.draft",
   kind: "write",
   summary: "Draft a note from a line about it",
-  input: { about: field.text({ label: "About", required: true, holds: "none" }) },
+  input: {
+    about: field.text({ label: "About", required: true, holds: "none" }),
+    /* ⚠️ HOW THE ANSWER ARRIVES, NOT WHAT IT SAYS. Declared as an input so it
+       goes through the same validation everything else does — and so the tool
+       catalogue an agent reads knows the option exists. */
+    stream: field.bool({ label: "Send it as it is written", holds: "none" }),
+  },
   output: { text: field.text({ label: "Draft", holds: "none" }) },
   permission: "note:write",
   idempotency: { mode: "none" },
@@ -240,8 +246,26 @@ const draft = operation<{ about: string }, { text: string }>({
     const c = ctx as {
       generate?: (values: Readonly<Record<string, string>>) =>
         Promise<{ readonly text: string; readonly credits: number } | string>;
+      stream?: (values: Readonly<Record<string, string>>) => Promise<Response | string>;
       fail: (code: string, values?: Record<string, string>, extra?: { ref?: string }) => never;
     };
+    /*
+      ⚠️ THE SAME RUN, WORD BY WORD, WHEN THE CALLER ASKED FOR IT. A paragraph
+      takes seconds to generate and a spinner over those seconds reads as
+      something being stuck — so the caller says `stream` and gets the words as
+      they arrive. It is the SAME action, the same model, the same words and the
+      same charge; only the shape of the answer differs.
+
+      ⚠️ AND ITS ABSENCE FALLS BACK RATHER THAN REFUSING. A deployment with no
+      gateway has no stream and no generation either, so the refusal below is
+      the one that fires; a deployment that has one but cannot stream would
+      still rather answer late than not at all.
+    */
+    if (input.stream && c.stream) {
+      const live = await c.stream({ about: input.about });
+      if (typeof live === "string") c.fail("platform.unavailable", {}, { ref: live });
+      return live as never;
+    }
     if (!c.generate) c.fail("platform.unavailable");
     const out = await c.generate!({ about: input.about });
     if (typeof out === "string") c.fail("platform.unavailable", {}, { ref: out });

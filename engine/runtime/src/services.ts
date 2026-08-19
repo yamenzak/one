@@ -28,7 +28,10 @@
 
 import type { AppId, Channel, Instant, Lane, ModelRow, TenantId, Usage } from "@engine/kernel";
 import { boundModel, chargedFor, plan as planRun, type Planned } from "@engine/kernel";
-import { askModel, type Fetcher, type GatewayAt, type GatewayRefusal, type Answered } from "./gateway.js";
+import {
+  askModel, askModelStream,
+  type Answered, type Fetcher, type GatewayAt, type GatewayRefusal, type Streamed,
+} from "./gateway.js";
 import { recordRun, type Priced, type Recording } from "./spend.js";
 import { release, reserve, settle } from "./wallet.js";
 import type { Db } from "./sql.js";
@@ -228,6 +231,137 @@ export async function generate(deps: AiDeps, ask: Ask): Promise<Generated | AiRe
   });
 
   return { text: out.text, model: model.id, charged: paid.credits, milli: paid.milli, runId };
+}
+
+/* ------------------------------------------------------------------ stream --- */
+
+/**
+ * ⚠️ THE SAME FOUR BOUNDS, IN THE SAME FILE, AND THAT IS THE WHOLE POINT OF
+ * PUTTING IT HERE. A streaming path built beside the metered one is a second
+ * place that has to remember the hold, the release, the charge and the row — and
+ * the failure is not a bug report, it is a lane that generates perfectly good
+ * output and bills nobody. `scripts/metering.test.mjs` asks both functions the
+ * same questions for exactly that reason.
+ *
+ * ⚠️ THE CHARGE HAPPENS AT THE LAST TOKEN, NOT AT THE FIRST. The response is
+ * handed back while the run is still going, so the settle rides the END of the
+ * stream — which is where the usage arrives — rather than the return of this
+ * function.
+ */
+export interface Streamer {
+  runStream(
+    model: ModelRow, planned: Planned, maxOutput: number,
+  ): Promise<Streamed | GatewayRefusal>;
+}
+
+/** ⚠️ Built here for the same reason `gatewayProvider` is: the tag, once. */
+export const gatewayStreamer = (
+  at: GatewayAt | null, tag: { readonly t: string; readonly a: string; readonly o: string },
+  fetcher?: Fetcher,
+): Streamer => ({
+  runStream: (model, planned, maxOutput) =>
+    askModelStream(at, { model, system: planned.system, prompt: planned.prompt, maxOutput, tag },
+      fetcher ?? fetch),
+});
+
+export interface StreamDeps extends AiDeps {
+  readonly streamer: Streamer;
+}
+
+/**
+ * GENERATE, AND HAND THE WORDS OVER AS THEY ARRIVE.
+ *
+ * ⚠️ A CANCELLED STREAM SETTLES AT THE RESERVE AND IS LEFT OPEN FOR THE TRUE-UP.
+ * Somebody closing the tab half way through leaves us with an unknown amount
+ * generated and no usage report — and the two obvious answers are both wrong:
+ * charging nothing is free generation for anybody who cancels, and counting the
+ * characters we saw is an estimate, which under the settle cap can only ever
+ * lose money. So it charges what was held, records the log id, and the nightly
+ * check against the gateway's own bill corrects it DOWNWARD. Erring high on a
+ * number that is later replaced by the truth costs the customer nothing.
+ */
+export async function generateStream(
+  deps: StreamDeps, ask: Ask,
+): Promise<{ readonly body: ReadableStream<Uint8Array>; readonly model: string } | AiRefusal> {
+  const rows = await deps.models();
+  const model = boundModel(rows, ask.lane, ask.model);
+  if (!model) return "no_model";
+
+  const rate = {
+    meter: model.meter, input: model.input, output: model.output, multiplier: model.multiplier,
+  };
+  const ceiling = Math.min(ask.maxOutput, model.maxOutput);
+  const planned = planRun(`${ask.appId}.${ask.lane}`, ask.system, ask.prompt, rate, ceiling,
+    { ...(ask.units ? { units: ask.units } : {}), ...(model.thinks ? { thinks: true } : {}) });
+
+  const held = await reserve(deps.directory, ask.tenantId, planned.reserve.credits, planned.reserve.of);
+  if (held === "not_enough") return "not_enough_credits";
+
+  const record = (it: Omit<Recording, "tenantId" | "appId" | "action" | "model" | "lane" | "held">) =>
+    recordRun(deps.directory, {
+      tenantId: ask.tenantId, appId: ask.appId, action: ask.action,
+      model: model.id, lane: ask.lane, held: held.credits, ...it,
+    });
+
+  const out = await deps.streamer.runStream(model, planned, ceiling)
+    .catch((why: unknown) => String(why instanceof Error ? why.message : why));
+
+  /* ⚠️ A REFUSAL BEFORE THE FIRST TOKEN RELEASES AND STILL RECORDS — the same
+     two things `generate` does, for the same two reasons. */
+  if (typeof out === "string") {
+    await release(deps.directory, ask.tenantId, held);
+    await record({ chargedMilli: 0, source: "reserve", ok: false, detail: out });
+    return out === "no_key" ? "no_key" : "provider_failed";
+  }
+
+  const encoder = new TextEncoder();
+  let settled = false;
+  /*
+    ⚠️ SETTLED ONCE, WHATEVER HAPPENS TO THE STREAM. `flush` and `cancel` can
+    both run for one stream in some orders; charging twice for one generation is
+    the one failure here a customer would notice immediately and never forgive.
+  */
+  const finish = async (usage: Usage | null): Promise<number> => {
+    if (settled) return 0;
+    settled = true;
+    const chargedMilli = usage ? chargedFor(usage, rate) : null;
+    const paid = await settle(deps.directory, ask.tenantId, held, chargedMilli, { appId: ask.appId });
+    await record({
+      chargedMilli: paid.milli,
+      source: usage ? "usage" : "reserve",
+      ...(usage ? { unitsIn: usage.input, unitsOut: usage.output } : {}),
+      ...(out.logId ? { logId: out.logId } : {}),
+      ok: true,
+    });
+    return paid.credits;
+  };
+
+  const reader = out.parts.getReader();
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const { done, value } = await reader.read();
+      if (done) { controller.close(); return; }
+      if ("text" in value) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: value.text })}\n\n`));
+        return;
+      }
+      /* ⚠️ THE LAST THING ON THE WIRE IS WHAT IT COST, which is a fact the page
+         needs: a balance that moved with nothing saying by how much is the
+         question this whole ledger exists to answer. */
+      const credits = await finish(value.end.usage);
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, credits })}\n\n`));
+      controller.close();
+    },
+    async cancel() {
+      /* ⚠️ SOMEBODY CLOSED THE TAB. See the header: the reserve is charged and
+         the row is left open, so the nightly check corrects it downward against
+         what the gateway says it really cost. */
+      await reader.cancel().catch(() => undefined);
+      await finish(null);
+    },
+  });
+
+  return { body, model: model.id };
 }
 
 /**

@@ -185,6 +185,140 @@ export async function askModel(
   };
 }
 
+/* ----------------------------------------------------------------- stream --- */
+
+/**
+ * ⚠️ ONE PART OR THE OTHER, RATHER THAN A PROMISE READ AFTER THE FACT. The usage
+ * arrives as the LAST thing on the wire, so the obvious shape — a stream of text
+ * plus a `usage` getter to read afterwards — is a mutable variable somebody can
+ * read at the wrong moment and get `null` from. Making the end a part of the
+ * stream means the settle happens where the number arrives.
+ */
+export type Part =
+  | { readonly text: string }
+  | { readonly end: { readonly usage: Usage | null } };
+
+export interface Streamed {
+  readonly parts: ReadableStream<Part>;
+  readonly logId: string | null;
+}
+
+/**
+ * ⚠️ `stream_options: { include_usage: true }` IS NOT OPTIONAL HERE, AND ITS
+ * ABSENCE IS SILENT. Without it a streamed response carries no usage at all, so
+ * every streamed run settles at the reserve — which is the safe direction and
+ * therefore invisible: nothing fails, nobody is overcharged past what they were
+ * shown, and the estimate quietly becomes the price for a whole class of calls.
+ *
+ * ⚠️ AND THE SAME HEADERS GO OUT. A streamed call that skipped the tag would be
+ * a call the reconciliation cannot attribute — so the one independent check on
+ * the money would have a hole in it exactly where the long generations are.
+ */
+export async function askModelStream(
+  at: GatewayAt | null, ask: RunAsk, fetcher: Fetcher = fetch,
+): Promise<Streamed | GatewayRefusal> {
+  if (!at?.token || !at.accountId || !at.gateway) return "no_gateway";
+
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    "cf-aig-authorization": `Bearer ${at.token}`,
+    "cf-aig-metadata": JSON.stringify(ask.tag),
+    "cf-aig-custom-cost": JSON.stringify({
+      per_token_in: perTokenUsd(ask.model.input),
+      per_token_out: perTokenUsd(ask.model.output),
+    }),
+  };
+  const own = at.keys?.[ask.model.provider];
+  if (own) headers["authorization"] = `Bearer ${own}`;
+
+  let res: Response;
+  try {
+    res = await fetcher(`${gatewayUrl(at)}/compat/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: compatName(ask.model),
+        max_tokens: ask.maxOutput,
+        stream: true,
+        /* ⚠️ See the header. Without this there is no usage on a streamed run. */
+        stream_options: { include_usage: true },
+        messages: [
+          { role: "system", content: ask.system },
+          { role: "user", content: ask.prompt },
+        ],
+      }),
+    });
+  } catch {
+    return "refused";
+  }
+
+  if (!res.ok) return res.status === 401 || res.status === 403 ? "no_key" : "refused";
+  if (!res.body) return "unreadable";
+
+  return { parts: partsOf(res.body), logId: res.headers.get("cf-aig-log-id") };
+}
+
+/**
+ * SERVER-SENT EVENTS INTO PARTS.
+ *
+ * ⚠️ A CHUNK IS NOT A LINE AND A LINE IS NOT AN EVENT. The transport splits
+ * wherever it likes, so a naive per-chunk parse drops whatever straddles a
+ * boundary — usually a fragment of text, occasionally the final usage event,
+ * which is the one that decides what the call costs. The buffer is what makes
+ * that impossible rather than rare.
+ *
+ * ⚠️ AND THE END IS EMITTED EXACTLY ONCE, whether the usage arrived or not. A
+ * stream that finished without an end part would leave the hold outstanding for
+ * ever, which is a balance that shrank and never came back.
+ */
+export function partsOf(body: ReadableStream<Uint8Array>): ReadableStream<Part> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let usage: Usage | null = null;
+  let ended = false;
+
+  return new ReadableStream<Part>({
+    async start(out) {
+      const reader = body.getReader();
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          let cut = buffer.indexOf("\n");
+          for (; cut !== -1; cut = buffer.indexOf("\n")) {
+            const line = buffer.slice(0, cut).trim();
+            buffer = buffer.slice(cut + 1);
+            if (!line.startsWith("data:")) continue;
+            const payload = line.slice(5).trim();
+            if (!payload || payload === "[DONE]") continue;
+
+            let event: Compat & { choices?: readonly { delta?: { content?: string } }[] };
+            try { event = JSON.parse(payload); } catch { continue; }
+
+            /* ⚠️ THE USAGE EVENT CARRIES NO CHOICES, and both may be true of one
+               event on some providers — so this reads them independently rather
+               than as a branch. */
+            const seen = usageOf(event);
+            if (seen) usage = seen;
+            const text = event.choices?.[0]?.delta?.content;
+            if (text) out.enqueue({ text });
+          }
+        }
+      } catch {
+        /* ⚠️ A BROKEN CONNECTION ENDS THE STREAM RATHER THAN THROWING INTO IT.
+           A throw here would reject the reader and skip the end part, which is
+           the hold never released. */
+      } finally {
+        reader.releaseLock();
+        if (!ended) { ended = true; out.enqueue({ end: { usage } }); }
+        out.close();
+      }
+    },
+  });
+}
+
 /* ------------------------------------------------------------------- cost --- */
 
 export interface LoggedCost {

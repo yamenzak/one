@@ -773,3 +773,71 @@ the platform rather than by a handler.
 **Therefore never:** an index built from a whole row; a vault-backed field in
 `searchable`; a filter composed by a caller; a ledger row holding the indexed
 text; an erasure that deletes the ledger row instead of marking it.
+
+---
+
+## D30 — A stream is the same metered run, and the charge rides the last token
+
+A paragraph takes seconds to generate, and a spinner over those seconds reads as
+something stuck. So a caller may ask for the words as they arrive — and the whole
+design question is where the money goes, because the response is handed back
+while the run is still going.
+
+**The four bounds stay in one function with the non-streamed path.** A streaming
+lane that kept its own copy of the hold, the release, the charge and the row is a
+lane that produces perfect output, arriving beautifully, and bills nobody — which
+nothing downstream can catch, because the settle caps the charge and a missing
+settle is not an error. `generateStream` sits beside `generate` in the same file
+and `scripts/metering.test.mjs` asks both the same questions.
+
+**`stream_options: { include_usage: true }` is not optional.** Without it a
+streamed response carries no usage at all, every streamed run settles at the
+reserve, and nothing fails — the estimate quietly becomes the price for the
+longest and dearest calls this platform makes. Safe for the customer, invisible
+to us, and therefore never reported.
+
+**A cancelled stream settles at the reserve and is left OPEN for the true-up.**
+Somebody closing a tab leaves an unknown amount generated and no usage report,
+and both obvious answers are wrong: charging nothing is free generation for
+anybody who cancels, and counting the characters we saw is an estimate, which
+under the settle cap can only ever lose money (D27). So it charges what was held,
+keeps the log id, and the nightly check corrects it downward against the
+gateway's own bill. Erring high on a number that is later replaced by the truth
+costs the customer nothing.
+
+**And it needed no second lane through the platform.** An operation may already
+answer with a `Response` — a file read does — so the gates, the replay and the
+audit apply unchanged. What the audit records is that the run was STARTED: whether
+it finished is not known when the response is handed back, and a record claiming
+otherwise would be stating something nobody checked.
+
+**Therefore never:** a streaming path with its own reserve or its own settle; a
+streamed call without `include_usage` or without the metadata tag; a settle
+before the last part; a cancelled stream that charges nothing; a cached response
+on a body somebody paid for.
+
+---
+
+## D31 — Two capabilities assessed and not adopted, with the trigger that reopens each
+
+Both were read in full, weighed against what this tree already has, and left out.
+Recording them as decisions rather than as silence is the point: an unwritten
+"we looked at that" is indistinguishable from an oversight, and the next person
+re-derives it.
+
+**Vectorize is not exposed.** AI Search is Vectorize with the ingestion pipeline
+attached and the storage included, so offering both is two answers to "how do I
+find something" — the thing D29's single declaration exists to prevent. **The
+trigger:** the first app that needs its own dimensions, its own embedding model,
+or vectors over something that is not text. None of those is expressible through
+`searchable`, and none is a stretch of it.
+
+**The Agents SDK is not adopted, and D30 is why.** It was under consideration for
+streaming, and a plain Worker streams: a `ReadableStream` body and SSE is all a
+streamed answer needs. What the SDK genuinely adds is durable multi-turn agent
+sessions — recoverable execution, per-agent SQL, scheduled continuations,
+human-in-the-loop approval — and what it costs is a Durable Object namespace
+whose class name is load-bearing for ever, a second state model beside D1, and a
+second routing model beside the doors. **The trigger:** the first product that
+needs a conversation to survive a disconnect and resume where it stopped. Until
+then it is weight for a capability nothing has asked for.

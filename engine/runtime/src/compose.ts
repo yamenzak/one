@@ -109,6 +109,24 @@ export interface Ctx {
   readonly generate?: (
     values: Readonly<Record<string, string>>,
   ) => Promise<{ readonly text: string; readonly credits: number } | string>;
+  /**
+   * THE SAME RUN, HANDED OVER AS IT ARRIVES.
+   *
+   * ⚠️ IT ANSWERS WITH A `Response`, WHICH IS ALREADY A THING AN OPERATION MAY
+   * RETURN — so streaming needed no second lane through the platform, and the
+   * gates, the replay and the audit apply to it exactly as they do to a file
+   * read. What the audit records is that the run was STARTED: whether it
+   * finished is not known when the response is handed back, and claiming
+   * otherwise would be the record saying something nobody checked.
+   *
+   * ⚠️ AND THE MONEY IS STILL `generate`'s. The hold, the release, the charge
+   * and the row all live in one function with the non-streamed path, because a
+   * streaming lane that kept its own copy of them is a lane that generates
+   * perfectly good output and bills nobody — see `scripts/metering.test.mjs`.
+   */
+  readonly stream?: (
+    values: Readonly<Record<string, string>>,
+  ) => Promise<Response | string>;
   readonly fail: (
     code: string,
     values?: Record<string, string | number>,

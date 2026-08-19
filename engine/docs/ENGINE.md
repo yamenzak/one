@@ -425,7 +425,7 @@ env or a binding.
 | `catalogue` | the price list an operator edits over the declaration, and what it holds for the people already on a tier | 8 | — |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
 | `inbox` | notifications: the policy, the audience, the read | 10 | — |
-| `services` | the lane out to a provider — AI and mail | 6 | — |
+| `services` | the lane out to a provider — AI and mail | 8 | — |
 | `stripe` | the card lane: a page Stripe owns, a signature that proves an event is theirs, and the ladder one moves | 11 | — |
 | `config` | what the deployment was told — the credentials it holds, encrypted under a key its database has never seen | 6 | — |
 | `mail` | a letter that leaves the process: the message written out, and the refusal to pretend one was sent | 3 | — |
@@ -439,11 +439,11 @@ env or a binding.
 | `raster` | a PNG drawn in a Worker, for the tabs and home screens an SVG cannot reach | 3 | — |
 | `ai-actions` | which model an action runs on, and in whose words | 7 | — |
 | `models` | the model catalogue — what exists, what it costs us, what a workspace pays | 10 | — |
-| `gateway` | the one door out to a model, and where a run's real cost is read | 6 | — |
+| `gateway` | the one door out to a model, and where a run's real cost is read | 8 | — |
 | `spend` | one row per run: where a workspace's credits went, and never what was said | 4 | — |
 | `reconcile` | the check on the money that is not our own arithmetic | 6 | — |
 | `ai-ops` | which model a workspace picked, and what it will cost them | 1 | — |
-| `ai-run` | the seam an operation generates through — values in, a metered answer out | 1 | — |
+| `ai-run` | the seam an operation generates through — values in, a metered answer out | 2 | — |
 | `search` | what is findable: the ledger a write leaves, and the pass that carries it | 17 | — |
 | `search-ops` | the find operation a searchable collection gets, with its boundary already in it | 1 | — |
 | `operator` | the deployment looking at itself | 6 | — |
@@ -466,7 +466,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**384 of them**, 383 reached by something today.
+**389 of them**, 388 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -873,6 +873,8 @@ its own header, cited by other files, and doing nothing.
 | D27 | The charge is built on what the call cost, and something outside our arithmetic checks it | 0 |
 | D28 | A charge is milli-credits; the balance is whole ones, and the remainder carries | 0 |
 | D29 | A collection says which fields are findable, and everything else follows | 0 |
+| D30 | A stream is the same metered run, and the charge rides the last token | 0 |
+| D31 | Two capabilities assessed and not adopted, with the trigger that reopens each | 0 |
 <!-- /generated -->
 
 ---
@@ -956,8 +958,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 49 | A stranger joins a workspace by themselves — a door the workspace opens, a role the app names, and a ceiling the plan sells (D23) | **planned** |
 | 50 | The interface speaks a second language — dictionaries, a language control, and the copy guard reading both | **planned** |
 | 51 | A collection says `searchable` and becomes findable — the write marks, a pass carries, erasure removes, and one filter is the boundary | shipped |
+| 52 | The words arrive as they are written — one metered run, streamed, and the charge rides the last token | shipped |
 
-**41 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**42 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

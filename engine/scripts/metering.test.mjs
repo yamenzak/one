@@ -128,6 +128,82 @@ const read = (p) => strip(readFileSync(join(ENGINE, p), "utf8"));
   }
 }
 
+/* --------------------------------------------------------- the same, streamed --- */
+
+/**
+ * ⚠️ THE STREAMING LANE IS ASKED THE SAME QUESTIONS, BECAUSE IT IS THE OBVIOUS
+ * PLACE FOR THE FOUR TO COME APART. Handing a response back before the run has
+ * finished makes "settle at the end" feel like somebody else's problem — and a
+ * streaming path that took the hold and forgot the charge produces perfect
+ * output, arriving beautifully, billed to nobody.
+ */
+{
+  const src = read("runtime/src/services.ts");
+  const fn = /export async function generateStream\([\s\S]*?\n\}/.exec(src)?.[0] ?? "";
+
+  const owed = [
+    ["reserve", /await reserve\(/, "takes no hold"],
+    ["release", /await release\(/, "leaves credits held when the provider refuses"],
+    ["settle", /await settle\(/, "never charges"],
+  ].filter(([, re]) => !re.test(fn));
+
+  /* ⚠️ THE ROW IS CHECKED ON THE SUCCESS PATH, NOT ANYWHERE IN THE FUNCTION —
+     the same trap `generate`'s own check fell into. The refusal branch above
+     also records, so a version that deleted the settled row and kept the failed
+     one still mentioned `record(`, and the mutation written to catch exactly
+     that passed. What has to be true is that the settle is followed by a row. */
+  const settled = fn.slice(fn.indexOf("await settle("));
+  if (!owed.length && !/record\(\{/.test(settled)) owed.push(["record", null, "writes no spend row"]);
+
+  /* ⚠️ AND THE CHARGE RIDES THE END OF THE STREAM. Settling before the last
+     token is settling on a usage report that has not arrived — which silently
+     makes the reserve the price for every streamed run. */
+  const atEnd = /value\.end\.usage/.test(fn);
+  /* ⚠️ A CANCELLED STREAM STILL SETTLES. Somebody closing the tab with the hold
+     outstanding is a balance that shrank and never came back. */
+  const onCancel = /async cancel\(\)[\s\S]*?finish\(/.test(fn);
+
+  if (!fn) {
+    fail("runtime/src/services.ts: no `generateStream` — either streaming is gone, or it\n"
+      + "       moved out of the file that holds every bound on the money.");
+  } else if (owed.length) {
+    fail(`runtime/src/services.ts: \`generateStream\` ${owed.map((o) => o[2]).join("; and ")}.`);
+  } else if (!atEnd) {
+    fail("runtime/src/services.ts: a streamed run does not settle on the usage that arrives\n"
+      + "       with the last part. Settling earlier makes the reserve the price for every\n"
+      + "       streamed call, silently and in our customers' favour — which is why nobody\n"
+      + "       reports it.");
+  } else if (!onCancel) {
+    fail("runtime/src/services.ts: a cancelled stream never settles.\n"
+      + "       Somebody closes the tab and the hold stays: a balance that shrank for nothing.");
+  } else {
+    ok("stream: the same hold, charge and row, and the charge rides the last token");
+  }
+}
+
+/**
+ * ⚠️ `include_usage` IS WHAT MAKES A STREAMED RUN COUNTABLE AT ALL. Without it
+ * the provider sends no usage, every streamed run settles at the reserve, and
+ * nothing anywhere fails — the estimate just quietly becomes the price for the
+ * longest and dearest calls this platform makes.
+ */
+{
+  const gw = read("runtime/src/gateway.ts");
+  const fn = /export async function askModelStream\([\s\S]*?\n\}/.exec(gw)?.[0] ?? "";
+  if (!fn) {
+    fail("runtime/src/gateway.ts: no `askModelStream` to check.");
+  } else if (!/include_usage:\s*true/.test(fn)) {
+    fail("runtime/src/gateway.ts: a streamed call does not ask for usage.\n"
+      + "       Every streamed run then settles at the reserve — safe for the customer,\n"
+      + "       invisible to us, and the estimate becomes the price.");
+  } else if (!/"cf-aig-metadata"/.test(fn)) {
+    fail("runtime/src/gateway.ts: a streamed call goes out untagged, so the one independent\n"
+      + "       check on the money has a hole in it exactly where the long runs are.");
+  } else {
+    ok("stream: usage is asked for, and the call is tagged like every other");
+  }
+}
+
 /* --------------------------------------------- the row holds no content --- */
 
 /**
