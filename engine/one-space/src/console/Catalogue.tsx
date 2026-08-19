@@ -17,7 +17,7 @@
  */
 
 import { useState } from "react";
-import { sayNumber } from "@engine/kernel";
+import { bytesOfGb, sayAllowance, sayNumber } from "@engine/kernel";
 import { Button, Chip } from "@heroui/react";
 import {
   AmountRow, Await, Credits, Group, Money, NoteRow, NumberInput, RowsWaiting, Screen, Stack,
@@ -54,8 +54,9 @@ interface CatalogueAnswer {
 /* ⚠️ A number an operator typed, beside the one the code declares. `—` for
    unlimited would be a lie; `-1` is what the field takes and what the walk
    compares, so it is what the row shows. */
-const shown = (v: Allowance | undefined): string =>
-  v === undefined ? "—" : v === -1 ? "Unlimited" : v === false ? "Off" : v === true ? "On" : String(v);
+/* ⚠️ `sayAllowance` IS THE KERNEL'S — see there. This was its own ladder ending
+   in `String(v)`, which is how two terabytes of storage reached the screen as
+   `2199023255552`. */
 
 export function Catalogue() {
   const of = useLoad<CatalogueAnswer>("op.plans");
@@ -198,7 +199,11 @@ function EditTray({ plan, declared, keys, on, edited, onReset, onDone, onClose }
     const edit: Record<string, unknown> = {};
     if (price !== undefined) edit.price = Math.round(price * 100);
     if (credits !== undefined) edit.credits = credits;
-    if (key && limit !== undefined) edit.includes = { [key]: limit };
+    if (key && limit !== undefined) {
+      edit.includes = {
+        [key]: keys[key]?.unit === "bytes" ? bytesOfGb(limit) : limit,
+      };
+    }
     if (!Object.keys(edit).length) { notice.fail("Nothing to save."); return; }
 
     const out = await api.post("op.plan.edit", { plan: plan.id, edit });
@@ -275,20 +280,27 @@ function EditTray({ plan, declared, keys, on, edited, onReset, onDone, onClose }
               under={id === key
                 ? "changing this one"
                 : declared && declared.includes[id] !== plan.includes[id]
-                  ? `The code says ${shown(declared.includes[id])}`
+                  ? `The code says ${sayAllowance(reader, def, declared.includes[id])}`
                   : undefined}
-              amount={shown(plan.includes[id])}
+              amount={sayAllowance(reader, def, plan.includes[id])}
               aside={<Button variant="ghost" onPress={() => setKey(id)}>Change</Button>}
             />
           ))}
         </Group>
+        {/*
+          ⚠️ TYPED IN THE UNIT SOMEBODY THINKS IN. A byte quota edited as bytes is
+          thirteen digits and a stepper that would take a million presses to move
+          a gigabyte; the store stays bytes and the field asks for gigabytes.
+        */}
         {key
           ? (
             <NumberInput
               label={`New number for ${keys[key]?.label ?? key}`}
               value={limit}
               onChange={setLimit}
-              help="-1 is unlimited."
+              help={keys[key]?.unit === "bytes"
+                ? "Gigabytes. -1 is unlimited."
+                : "-1 is unlimited."}
             />
           )
           : null}

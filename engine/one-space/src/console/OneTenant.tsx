@@ -22,7 +22,7 @@ import {
   sentence, useShown,
 } from "@engine/design";
 import type { Allowance, EntitlementDef, PlanSpec } from "@engine/kernel";
-import { isBusiness, sayDate, sayNumber, type Instant } from "@engine/kernel";
+import { bytesOfGb, isBusiness, sayAllowance, sayDate, sayNumber, type Instant } from "@engine/kernel";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
 
@@ -283,14 +283,22 @@ function AdjustTray({ tenant, apps, onDone }: {
   const keys = Object.entries(
     Object.fromEntries(apps.flatMap((a) => Object.entries(a.entitlements))),
   ).filter(([, d]) => !d.reserved);
+  const reader = useShown();
   const [key, setKey] = useState(keys[0]?.[0] ?? "");
   const [value, setValue] = useState<number | undefined>(undefined);
-  const label = keys.find(([id]) => id === key)?.[1]?.label ?? key;
+  const of = keys.find(([id]) => id === key)?.[1];
+  const label = of?.label ?? key;
 
   const write = async (next: number | null, which = key) => {
-    const out = await api.post("op.tenant.adjust", { tenant: tenant.id, key: which, value: next });
+    /* ⚠️ TYPED IN GIGABYTES AND STORED IN BYTES — see `sayAllowance`. The field
+       asks in the unit somebody thinks in; the store never changes. */
+    const store = next !== null && keys.find(([id]) => id === which)?.[1]?.unit === "bytes"
+      ? bytesOfGb(next) : next;
+    const out = await api.post("op.tenant.adjust", { tenant: tenant.id, key: which, value: store });
     if (!out.ok) { notice.fail(out.problem.title); return; }
-    notice.ok(next === null ? "Back to the plan's own number." : `${which} is ${next} for ${tenant.name}.`);
+    notice.ok(next === null
+      ? "Back to the plan's own number."
+      : `${sentence(which)} is ${sayAllowance(reader, of, store ?? undefined)} for ${tenant.name}.`);
     onDone();
   };
 
@@ -322,7 +330,7 @@ function AdjustTray({ tenant, apps, onDone }: {
               key={id}
               label={def.label}
               under={id === key ? "changing this one" : undefined}
-              amount={tenant.adjustments[id] === undefined ? "—" : String(tenant.adjustments[id])}
+              amount={sayAllowance(reader, def, tenant.adjustments[id])}
               aside={tenant.adjustments[id] === undefined
                 ? <Button variant="ghost" onPress={() => setKey(id)}>Change</Button>
                 : <Button variant="ghost" onPress={() => void write(null, id)}>Clear</Button>}
@@ -333,7 +341,9 @@ function AdjustTray({ tenant, apps, onDone }: {
           label={`New number for ${label}`}
           value={value}
           onChange={setValue}
-          help="Absolute, either direction. -1 is unlimited."
+          help={of?.unit === "bytes"
+            ? "Gigabytes. Absolute, either direction. -1 is unlimited."
+            : "Absolute, either direction. -1 is unlimited."}
         />
       </Stack>
     </Tray>

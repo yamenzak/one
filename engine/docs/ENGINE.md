@@ -364,7 +364,7 @@ and a manifest that does not compose refuses to boot.
 | `access` | permissions, roles, and what an app may never claim | 15 | 1 |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
 | `manifest` | the whole app, and the composition that refuses a broken one | 9 | — |
-| `entitlement` | what a plan includes, and the allowance algebra over it | 11 | — |
+| `entitlement` | what a plan includes, and the allowance algebra over it | 14 | — |
 | `credit` | metered work: the reserve, the rate, the ceiling | 7 | 1 |
 | `dunning` | the ladder from past due to erased | 5 | — |
 | `package` | a priced bundle of timed grants | 8 | 1 |
@@ -385,7 +385,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**239 of them**, 232 reached by something today.
+**242 of them**, 235 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 

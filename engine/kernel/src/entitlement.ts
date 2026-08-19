@@ -13,9 +13,10 @@
  * absolute and either direction, because it is a deliberate per-tenant decision.
  * The clamp is last so a suspended tenant cannot be adjusted back into service.
  *
- * Layer 3. Imports primitives and tenancy.
+ * Layer 3. Imports primitives, presentation and tenancy.
  */
 
+import { sayBytes, sayNumber, type Shown } from "./present.js";
 import type { Kind, Standing } from "./tenancy.js";
 
 /* ------------------------------------------------------------------ shape --- */
@@ -36,6 +37,18 @@ export interface EntitlementDef {
    * mechanism behind it.
    */
   readonly withheld: "gate" | "quota" | "shape";
+  /**
+   * ⚠️ WHAT THE NUMBER IS, SO A SURFACE CAN SAY IT. A quota is a COUNT by
+   * default — seats, domains, notes — and bytes is the one that is not. Two
+   * terabytes of storage is `2199023255552`, and the operator console printed
+   * exactly that: thirteen digits nobody can read, in the column where "2 TiB"
+   * was meant, with a stepper under it that would take a million presses.
+   *
+   * ⚠️ AND IT IS DECLARED RATHER THAN SPECIAL-CASED. A console that checked for
+   * the key `storage` by name would be right until the second app sells a
+   * bucket — see `sayAllowance`, which is what every reader uses.
+   */
+  readonly unit?: "bytes";
   /**
    * ⚠️ RESERVED MEANS SOLD BY NOBODY AND ENFORCED BY NOTHING, ON PURPOSE — a key
    * kept so a future plan can use it without a migration. Unenforced by
@@ -113,9 +126,50 @@ export interface PlanSpec {
  */
 export const PLATFORM_ENTITLEMENTS: Readonly<Record<string, EntitlementDef>> = {
   seats: { label: "People", help: "An unanswered invitation counts.", withheld: "quota" },
-  storage: { label: "Storage", help: "Included before the meter starts.", withheld: "quota" },
+  storage: {
+    label: "Storage", help: "Included before the meter starts.",
+    withheld: "quota", unit: "bytes",
+  },
   domains: { label: "Custom domains", withheld: "quota" },
 };
+
+/**
+ * WHAT A LIMIT SAYS, IN WORDS, WHEREVER ONE IS SHOWN.
+ *
+ * ⚠️ ONE FUNCTION, BECAUSE THERE ARE ALREADY THREE READERS: the plan editor, the
+ * per-workspace adjustment, and whatever asks next. Each had its own ladder —
+ * `-1` to "Unlimited", `true` to "On" — and each stopped at `String(v)`, which
+ * is where the byte count came from and where a six-figure count loses its
+ * separators.
+ *
+ * ⚠️ AND IT TAKES THE DEFINITION, NOT THE KEY. What a number means is the
+ * declaration's to say; a surface that switched on the name `storage` would be
+ * a surface that is wrong about the second app to sell a bucket.
+ */
+export const sayAllowance = (
+  shown: Shown, of: EntitlementDef | undefined, value: Allowance | undefined,
+): string =>
+  value === undefined ? "—"
+    : value === true ? "On"
+      : value === false ? "Off"
+        : value === -1 ? "Unlimited"
+          : of?.unit === "bytes" ? sayBytes(shown, value)
+            : sayNumber(shown, value);
+
+/**
+ * ⚠️ AND IT IS TYPED IN GIGABYTES, because the store is bytes and nobody types
+ * bytes. The factor is here rather than at the two call sites that need it, so
+ * the plan editor and the per-workspace adjustment cannot disagree about it.
+ *
+ * ⚠️ THERE IS NO `gbOf` GOING THE OTHER WAY, and its absence is deliberate: both
+ * fields are blank until somebody types, because they ask for a NEW number
+ * rather than editing the old one. One was written, exported, called by nothing,
+ * and `scripts/capability.test.mjs` refused the commit — which is what that
+ * guard is for.
+ */
+export const GIB = 1024 ** 3;
+
+export const bytesOfGb = (gb: number): number => (gb === -1 ? -1 : Math.round(gb * GIB));
 
 /**
  * EVERY KEY A WORKSPACE COULD HOLD — the platform's, and every product's.
