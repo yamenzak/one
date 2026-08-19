@@ -133,14 +133,17 @@ function Rows({ now, again }: { readonly now: CatalogueAnswer; readonly again: (
                 : `${sayNumber(reader, plan.credits)} credits a month`,
               now.on[plan.id] ? `${now.on[plan.id]} on it` : "",
             ].filter(Boolean).join(" · ")}
-            amount={<Money minor={plan.price} currency={plan.currency} size="figure" />}
+            /* ⚠️ `label`, NOT `figure`. A figure is the one number a screen is
+               about; four of them in one card is four headlines, and measured
+               the price was twice the size of the plan's own name. */
+            amount={<Money minor={plan.price} currency={plan.currency} size="label" />}
             /* ⚠️ ONE CHIP IN THE CORNER, AND ONLY WHERE THERE IS ONE. Two of
                them stacked at a phone's width and pushed the price into the
                name; a plan's allowance and how many are on it are both facts
                ABOUT the plan and belong on its line, while "somebody has edited
                this over the code" is the exception and is what the corner is
                for. */
-            aside={edited.has(plan.id)
+            mark={edited.has(plan.id)
               ? <Chip variant="soft"><Chip.Label>Edited</Chip.Label></Chip>
               : undefined}
             onOpen={() => setEditing(plan.id)}
@@ -232,7 +235,10 @@ function EditTray({ plan, declared, keys, on, edited, onReset, onDone, onClose }
             label="A month"
             under={declared && declared.price !== plan.price
               ? `The code says ${say(declared.price, plan.currency)}` : undefined}
-            amount={<Money minor={plan.price} currency={plan.currency} size="figure" />}
+            /* ⚠️ `label`, NOT `figure`. A figure is the one number a screen is
+               about; four of them in one card is four headlines, and measured
+               the price was twice the size of the plan's own name. */
+            amount={<Money minor={plan.price} currency={plan.currency} size="label" />}
           />
           <AmountRow
             label="Credits a month"

@@ -808,7 +808,7 @@ export function PersonRow({ name, under, when, unread, aside, goes, face, onOpen
  * proportional digits ripples, and the reader ends up doing the arithmetic on
  * the ripple rather than on the values.
  */
-export function AmountRow({ icon, face, label, under, amount, aside, tone = "neutral", onOpen }: RowBase & {
+export function AmountRow({ icon, face, label, under, amount, aside, mark, tone = "neutral", onOpen }: RowBase & {
   /**
    * ⚠️ A NODE, BECAUSE AN AMOUNT IS NOT ALWAYS A STRING. A credit figure wears a
    * currency mark that is drawn rather than typed (`Credits`), and a row that
@@ -823,6 +823,16 @@ export function AmountRow({ icon, face, label, under, amount, aside, tone = "neu
    * alternative was a third column on a phone or a card per item.
    */
   readonly aside?: React.ReactNode;
+  /**
+   * ⚠️ A STATE MARKER, AND IT GOES BEFORE THE AMOUNT SO THE AMOUNTS LINE UP.
+   * Everything after the growing label is packed to the right, so a chip that
+   * appears on one row in four and sits AFTER the amount pushes that row's
+   * amount left by its own width — measured on the price list, where comparing
+   * the four numbers is the entire reason they are in a column. A control
+   * (`aside`) is on every row of its list or on none, so it does not do this;
+   * a marker is by definition the exception, so it must not follow the number.
+   */
+  readonly mark?: React.ReactNode;
   readonly tone?: Tone;
   readonly onOpen?: () => void;
 }) {
@@ -830,6 +840,7 @@ export function AmountRow({ icon, face, label, under, amount, aside, tone = "neu
     <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
       <Lead icon={icon} face={face} />
       <Body label={label} under={under} />
+      {mark}
       <span className={`shrink-0 ${TYPE.label} tabular-nums`} data-ink={tone}>{amount}</span>
       {aside}
       {onOpen ? <span aria-hidden="true" className={TYPE.note}>›</span> : null}
