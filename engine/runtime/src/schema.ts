@@ -24,7 +24,7 @@
 
 import type { AppSpec, CollectionSpec } from "@engine/kernel";
 import { eraseBy } from "@engine/kernel";
-import { column, liveTable, storeFor, table, type Db } from "./sql.js";
+import { asTable, column, liveTable, storeFor, table, type Db } from "./sql.js";
 
 /* ---------------------------------------------------------------- modules --- */
 
@@ -241,7 +241,14 @@ export async function applySchema(db: Db, modules: SchemaModules): Promise<reado
         /* ⚠️ NEVER `NOT NULL` ON AN ADDED COLUMN. Existing rows have no value
            for it, so SQLite refuses the ALTER outright — and the whole batch
            with it. A column added later is nullable, always. */
-        await db.exec(`ALTER TABLE ${table(name)} ADD COLUMN ${column(col)} ${type};`);
+        /* ⚠️ `asTable`, NOT `table` — the key here is ALREADY a table name, from
+           `columnsIn`'s parse of the CREATE or from `schemaFor`'s own
+           conversion. Put back through `table` it is validated against the
+           COLLECTION-ID rule, which forbids the underscores that function
+           exists to produce: every platform table with one in its name threw
+           here, out of `boot`, on the first deployment that had already booted.
+           See `asTable`. */
+        await db.exec(`ALTER TABLE ${asTable(name)} ADD COLUMN ${column(col)} ${type};`);
         added.push(`${name}.${col}`);
       }
     }

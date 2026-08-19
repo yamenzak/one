@@ -293,13 +293,57 @@ describe("what happens to a workspace nobody is looking at", () => {
        pool's behaviour rather than the sweep's. */
     await overdue("gone", 40);
     await fire();
+    /*
+      ⚠️ THE RUN RECORD IS REWOUND A DAY, AND WITHOUT IT THIS TEST ASSERTS
+      NOTHING. Every job is scheduled now rather than run on every tick, so a
+      second `fire()` in the same minute is correctly a no-op — the erasure's
+      next fire is tomorrow at 03:00. Rewinding the row is how a test says "the
+      next night", which is the thing re-runnability is actually about.
+    */
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    await directory().prepare(`UPDATE job_run SET started_at = ?`).bind(yesterday).run();
     await fire();
+
     const runs = await directory().prepare(
       `SELECT ok, touched FROM job_run WHERE job_id = 'erasure' ORDER BY started_at`)
       .all<{ ok: number; touched: number }>();
     expect(runs.results.length).toBeGreaterThanOrEqual(2);
     expect(runs.results.every((r) => r.ok === 1)).toBe(true);
     expect(runs.results.at(-1)?.touched).toBe(0);
+  });
+
+  /*
+    ⚠️ A JOB THAT IS NOT DUE DOES NOT RUN, WHICH IS THE HALF THE OLD SWEEP HAD
+    NO CONCEPT OF. Every declared schedule was a label: one pass at 03:00 called
+    everything, so "Daily" on the console was a string being rendered rather
+    than a promise anything kept. Firing twice in one minute is the cheapest
+    way to ask whether the schedule is now real.
+  */
+  it("does not run a job again before its schedule comes round", async () => {
+    await fire();
+    await fire();
+    const runs = await directory().prepare(
+      `SELECT job_id FROM job_run WHERE job_id = 'erasure'`).all<{ job_id: string }>();
+    expect(runs.results.length).toBe(1);
+  });
+
+  /*
+    ⚠️ AND AN APP'S OWN JOB IS RUN BY THE SAME PASS. `tidy` was declared,
+    validated, and listed on the operator's console for three stages while
+    nothing anywhere read the book to run it — so the screen said "Has never
+    run" and always would have. This is the assertion that could have failed
+    then.
+  */
+  it("runs a job an app declared, not only the platform's own", async () => {
+    await createTenant(directory(), {
+      slug: "tidied", name: "Tidied", country: "DE", where: "eu", apps: ["hello"],
+    });
+    await fire();
+    const run = await directory().prepare(
+      `SELECT ok, detail FROM job_run WHERE job_id = 'tidy'`)
+      .first<{ ok: number; detail: string | null }>();
+    expect(run).not.toBeNull();
+    expect(run?.ok).toBe(1);
   });
 });
 

@@ -46,12 +46,40 @@ const DOORS = [
 
 let bad = 0;
 
+/**
+ * ⚠️ IT ASKS MORE THAN ONCE, BECAUSE ONE ASK RACES THE DEPLOY. `wrangler deploy`
+ * returns before every colo is serving the new version, so a probe six seconds
+ * later can be answered by the OLD one — which is how a deployment that threw on
+ * every request passed this check and was found by somebody opening the app
+ * hours later. Retrying costs seconds and removes the race in the direction that
+ * matters: a worker that is broken stays broken, so the last answer is the true
+ * one.
+ */
+const settle = async (url) => {
+  let last;
+  for (let i = 0; i < 6; i++) {
+    if (i) await new Promise((r) => setTimeout(r, 5000));
+    try {
+      last = { res: await fetch(url, { redirect: "manual" }) };
+    } catch (why) {
+      last = { why };
+      continue;
+    }
+    /* ⚠️ A GOOD ANSWER IS NOT ENOUGH ON THE FIRST TRY, and that is the whole
+       point — the old version answers well too. Keep asking until the answers
+       stop changing, then believe the last one. */
+    if (last.res.status === 200 && i >= 1) return last;
+  }
+  return last;
+};
+
 for (const door of DOORS) {
   const url = door.path ? `${door.url}${door.path}` : door.url;
   let res;
-  try {
-    res = await fetch(url, { redirect: "manual" });
-  } catch (why) {
+  const out = await settle(url);
+  res = out.res;
+  if (!res) {
+    const why = out.why;
     const code = why?.cause?.code ?? why?.code ?? "";
     /* ⚠️ Not resolving is DNS, which is a dashboard step and therefore ours to
        report rather than to fail on. Anything else reached the network. */
@@ -68,7 +96,15 @@ for (const door of DOORS) {
     console.error(`BAD  ${url} answered ${res.status}. It resolves, so this is ours.`);
     /* 503 is the worker saying it is not configured — name it, because the
        reason is in the worker's log and nowhere else. */
-    if (res.status === 503) console.error(`     A 503 here means ROOT or AUTH_SECRET is unset. Check the worker's logs.`);
+    /* ⚠️ THE TWO 503s ARE DIFFERENT FAULTS AND THE BODY SAYS WHICH. This used
+       to assert it was a missing variable, which sent whoever read it to check
+       the one thing that was fine while the schema was failing to apply. */
+    if (res.status === 503) {
+      const said = await res.clone().json().catch(() => null);
+      console.error(`     503: ${said?.problem?.title ?? "no reason given"}.`
+        + ` "could not start" is the schema or a binding — the reason is in the`
+        + ` worker's log. "not configured" is ROOT or AUTH_SECRET.`);
+    }
     bad++;
     continue;
   }

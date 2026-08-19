@@ -689,6 +689,44 @@ export const HELLO: AppSpec = defineApp({
          — correctly, at speed, reporting success. */
       destroys: { floorDays: 30 },
       budgetSeconds: 20,
+      /*
+        ⚠️ THE BODY, AND FOR THREE STAGES THERE WAS NOT ONE. Everything above
+        this line was declared, validated and drawn on the operator's console,
+        and no code anywhere read the book to run it — so the row said "Has
+        never run" and always would have. A declaration whose work lives
+        somewhere else is a declaration something has to remember to wire up;
+        this one is the reference app, so the shape it shows is the shape every
+        app after it will copy.
+
+        ⚠️ AND IT USES ITS OWN DECLARED FLOOR RATHER THAN A SECOND NUMBER. Thirty
+        days is written once, above, where `refuseJob` can see it — a body with a
+        literal of its own is the configuration and the guard disagreeing, which
+        is the state a floor exists to make impossible.
+      */
+      async work(ctx) {
+        const floor = 30;
+        const db = ctx.db as {
+          prepare(q: string): {
+            bind(...v: unknown[]): { run(): Promise<{ meta?: { changes?: number } }> };
+          };
+        };
+        const before = new Date(Date.parse(ctx.now) - floor * 86_400_000).toISOString();
+        /* ⚠️ A DRAFT IS AN UNPINNED NOTE WITH NO BODY. Deleting by age alone
+           would take a short note somebody wrote once and meant to keep.
+
+           ⚠️ AND `edited_at` FALLS BACK TO `at`, because a note nobody has
+           edited has no edit date — read on its own it is NULL, the comparison
+           is never true, and the job reports success having swept nothing. The
+           two provenance columns are the platform's (`columnsFor`); there is no
+           `updated_at` here. */
+        const out = await db.prepare(
+          `DELETE FROM note
+            WHERE tenant_id = ? AND pinned = 0
+              AND (body IS NULL OR body = '') AND COALESCE(edited_at, at) < ?`)
+          .bind(ctx.tenantId, before).run();
+        const gone = out.meta?.changes ?? 0;
+        return { touched: gone, detail: gone ? `${gone} emptied draft(s)` : "nothing was stale" };
+      },
     },
   },
 });

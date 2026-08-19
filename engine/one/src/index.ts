@@ -28,7 +28,8 @@ import {
   NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, acceptanceScope,
   liveAppsOfTenant,
   deploymentFaults, effectivePlans, isPlatformPath, locator,
-  accept, bindingKey, liveBindings, memberFor, noteShardApp, observe, owedBy, sweep,
+  accept, bindingKey, jobBookFor, liveBindings, memberFor, noteShardApp, observe, owedBy,
+  runnerFor, schedulesOf, sweep, type SweepDeps,
   tenantById, tenantBySlug,
   applyEvent, becomeCommercial, markCancelled, markPaid, markPastDue, renewAllowance, stripeKey,
   subscribe, topUp, verifySignature,
@@ -996,7 +997,96 @@ const REQUIRED: readonly (keyof Env & string)[] = ["ROOT", "AUTH_SECRET"];
 const missingConfig = (env: Env): readonly string[] =>
   REQUIRED.filter((key) => !String(env[key] ?? "").trim());
 
+/**
+ * WHAT THE NIGHTLY PASS RUNS ON — and what the console runs one job with.
+ *
+ * ⚠️ ONE DEFINITION, BECAUSE TWO WOULD DRIFT AND THE DRIFT WOULD BE SILENT. The
+ * scheduled handler built this inline, so a "Run now" button assembling its own
+ * would be a second answer to what a job is handed: the same job, run from the
+ * console, against a different set of shards or a different plan catalogue, with
+ * nothing anywhere reporting a difference.
+ *
+ * ⚠️ IT IS `async` FOR ONE REASON — the catalogue. What a workspace was SOLD is
+ * a read, not a constant: a sweep on the code's numbers would go on granting
+ * last week's credits every night after an edit.
+ */
+async function sweepDeps(env: Env): Promise<SweepDeps> {
+  const directory = env.DIRECTORY as unknown as Db;
+  return {
+    directory,
+    shardOf: async (tenantId) => {
+      const tenant = await tenantById(directory, tenantId);
+      /* ⚠️ Null rather than a throw: a workspace on a shard this deployment
+         does not bind is reported by the sweep, not fatal. */
+      try { return tenant ? shardFor(env as never, tenant.shardId) : null; }
+      catch { return null; }
+    },
+    apps: APPS,
+    /* ⚠️ Retention is a rule about rows: one statement per table per database,
+       not one per workspace. */
+    shards: SHARDS.map((s) => shardFor(env as never, s.id)),
+    /* ⚠️ So the last rung takes the OBJECTS and not only the rows. */
+    bucketFor: (where) => bucketIn(where.residency),
+    /* ⚠️ BY ID, because a move's TARGET shard has no workspace on it yet and
+       `shardOf` resolves through the tenant. */
+    shardById: (id) => {
+      try { return shardFor(env as never, id); } catch { return null; }
+    },
+    residencyOf,
+    /* ⚠️ WHAT A STANDING TOP-UP MAY BUY, and the key it is charged with. A
+       deployment that binds neither simply never charges anybody. */
+    packs: PACKS,
+    /* ⚠️ WHAT IS SOLD, NOT WHAT IS DECLARED — see this function's header. */
+    plans: await effectivePlans(directory, PLANS, entitlementKeys(everyApp())),
+    storageRate: STORAGE_CREDITS_PER_GB_MONTH,
+    /* ⚠️ A CADENCE AN OPERATOR MOVED, READ ONCE PER PASS. The declaration stays
+       the authority for the floor, the budget and the failure route. */
+    scheduleOf: () => undefined,
+    ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
+    /* ⚠️ ONLY WHERE THERE IS A TOKEN. Absent is a deployment that cannot
+       provision, which is a state it has to survive rather than an error — a
+       self-host, a test run, and this one before the secret is set. */
+    ...(env.CF_API_TOKEN && env.CF_ACCOUNT_ID
+      ? {
+        reconcile: {
+          at: {
+            accountId: env.CF_ACCOUNT_ID, token: env.CF_API_TOKEN,
+            /* The worker's own name, from its config. */
+            script: "one",
+          },
+          deployment: "one",
+          apps: Object.values(APPS).map((make) => make()),
+          serves: [...new Set(SHARD_RESIDENCY)],
+        },
+      }
+      : {}),
+  };
+}
+
+/**
+ * ⚠️ THE OVERRIDES ARE READ ONCE PER PASS RATHER THAN PER JOB. There are a
+ * handful of rows and the alternative is a query inside the loop that decides
+ * whether to run each one.
+ */
+async function sweepWithOverrides(env: Env): Promise<SweepDeps> {
+  const base = await sweepDeps(env);
+  const moved = await schedulesOf(base.directory);
+  return { ...base, scheduleOf: (id) => moved[id] };
+}
+
 const boot = (env: Env): Promise<void> => {
+  /*
+    ⚠️ A FAILED BOOT IS NOT REMEMBERED, AND IT WAS. `booted ??=` caches the
+    promise — including a REJECTED one — so a single throw made every request
+    that isolate ever served answer 503, for the life of the isolate, with no
+    way back but a new version. Whatever the fault was, it is now permanent and
+    self-inflicted: a D1 hiccup during the first request of a cold start reads
+    exactly like a broken deployment.
+
+    ⚠️ SO THE FAILURE IS FORGOTTEN AND THE SUCCESS IS KEPT. The next request
+    tries again — the work is idempotent by construction — and a transient fault
+    costs one request rather than an isolate.
+  */
   booted ??= (async () => {
     const directory = env.DIRECTORY as unknown as Db;
     await applySchema(directory, DIRECTORY_MODULES);
@@ -1065,7 +1155,10 @@ const boot = (env: Env): Promise<void> => {
       /* ⚠️ Asked of the DEPLOYMENT, once — see `missingDocuments`. */
       legal: LEGAL,
     })) console.error(`[boot] ${fault}`);
-  })();
+  })().catch((why) => {
+    booted = null;
+    throw why;
+  });
   return booted;
 };
 
@@ -1352,6 +1445,11 @@ const handler = async (env: Env) => {
       */
       ...operatorOps({
         apps: APPS, isOperator, plans: PLANS,
+        /* ⚠️ THE SAME BOOK THE RUNNER RUNS, AND THE SAME DEPS. A console
+           deriving its own list showed the one app job nothing executed and
+           hid the seven the deployment does every night. */
+        jobs: async () => jobBookFor(await sweepDeps(env)),
+        runner: async () => runnerFor(await sweepWithOverrides(env)),
       /* ⚠️ Absent is a deployment that can hold an address and not a key — the
          console says so, rather than offering a field that saves nothing. */
       ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
@@ -1472,9 +1570,28 @@ const handler = async (env: Env) => {
 
 /** ⚠️ The reason goes to the log, where the operator is. The request gets a
     status a probe can act on and nothing about our configuration. */
-const unavailable = (): Response =>
+/**
+ * ⚠️ THE TWO FAULTS ARE NOT THE SAME FAULT, AND ONE MESSAGE FOR BOTH COST AN
+ * OUTAGE ITS DIAGNOSIS. "One is not configured" was returned when `ROOT` or
+ * `AUTH_SECRET` was unset AND when `boot` threw — so a deployment whose schema
+ * failed to apply reported a missing environment variable, on every door, and
+ * the first thing anybody would check was the one thing that was fine.
+ *
+ * ⚠️ THE TITLE SAYS WHICH; THE DETAIL STILL GOES TO THE LOG. What a caller gets
+ * is a status a probe can act on and the CLASS of fault, never our internals —
+ * "it did not start" tells an operator where to look without telling anybody
+ * else what we are made of.
+ */
+const unavailable = (why: "unconfigured" | "boot"): Response =>
   new Response(
-    JSON.stringify({ problem: { code: "platform.unavailable", title: "One is not configured" } }),
+    JSON.stringify({
+      problem: {
+        code: "platform.unavailable",
+        title: why === "unconfigured"
+          ? "One is not configured"
+          : "One could not start",
+      },
+    }),
     { status: 503, headers: { "content-type": "application/json; charset=utf-8" } },
   );
 
@@ -1495,14 +1612,14 @@ export default {
         `In development copy engine/one/.dev.vars.example to .dev.vars; in a ` +
         `deployment ROOT is a var and AUTH_SECRET is a worker secret.`,
       );
-      return unavailable();
+      return unavailable("unconfigured");
     }
 
     try {
       await boot(env);
     } catch (why) {
       console.error("[boot]", why);
-      return unavailable();
+      return unavailable("boot");
     }
 
     const url = new URL(request.url);
@@ -1540,60 +1657,7 @@ export default {
     const work = (async () => {
       try {
         await boot(env);
-        await sweep({
-          directory: env.DIRECTORY as unknown as Db,
-          shardOf: async (tenantId) => {
-            const tenant = await tenantById(env.DIRECTORY as unknown as Db, tenantId);
-            /* ⚠️ Null rather than a throw: a workspace on a shard this
-               deployment does not bind is reported by the sweep, not fatal. */
-            try { return tenant ? shardFor(env as never, tenant.shardId) : null; }
-            catch { return null; }
-          },
-          apps: APPS,
-          /* ⚠️ Retention is a rule about rows: one statement per table per
-             database, not one per workspace. */
-          shards: SHARDS.map((s) => shardFor(env as never, s.id)),
-          /* ⚠️ So the last rung takes the OBJECTS and not only the rows. */
-          bucketFor: (where) => bucketIn(where.residency),
-          /* ⚠️ BY ID, because a move's TARGET shard has no workspace on it yet
-             and `shardOf` resolves through the tenant. */
-          shardById: (id) => {
-            try { return shardFor(env as never, id); } catch { return null; }
-          },
-          residencyOf,
-          /* ⚠️ WHAT A STANDING TOP-UP MAY BUY, and the key it is charged with.
-             A deployment that binds neither simply never charges anybody — see
-             `sweepTopUps`. */
-          packs: PACKS,
-          /* ⚠️ AND WHAT STORAGE OVER THE INCLUDED AMOUNT COSTS. Both together,
-             because the meter is what pushes a balance under the top-up
-             threshold — see `sweepStorage`. */
-          /* ⚠️ WHAT IS SOLD, NOT WHAT IS DECLARED. The nightly pass grants the
-             month's allowance and meters storage against the included amount —
-             so a sweep reading the code's numbers would go on granting last
-             week's credits every night after an edit, silently. */
-          plans: await effectivePlans(
-            env.DIRECTORY as unknown as Db, PLANS, entitlementKeys(everyApp())),
-          storageRate: STORAGE_CREDITS_PER_GB_MONTH,
-          ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
-          /* ⚠️ ONLY WHERE THERE IS A TOKEN. Absent is a deployment that cannot
-             provision, which is a state it has to survive rather than an error
-             — a self-host, a test run, and this one before the secret is set. */
-          ...(env.CF_API_TOKEN && env.CF_ACCOUNT_ID
-            ? {
-              reconcile: {
-                at: {
-                  accountId: env.CF_ACCOUNT_ID, token: env.CF_API_TOKEN,
-                  /* The worker's own name, from its config. */
-                  script: "one",
-                },
-                deployment: "one",
-                apps: Object.values(APPS).map((make) => make()),
-                serves: [...new Set(SHARD_RESIDENCY)],
-              },
-            }
-            : {}),
-        });
+        await sweep(await sweepWithOverrides(env));
       } catch (why) {
         console.error("[sweep]", why);
       }

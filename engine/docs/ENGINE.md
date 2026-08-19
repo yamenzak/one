@@ -187,6 +187,8 @@ live inside workspaces and an operator stands outside all of them.
 | `op.ai` | read |
 | `op.ai.bind` | write |
 | `op.jobs` | read |
+| `op.job.run` | write |
+| `op.job.schedule` | write |
 | `op.attention` | read |
 | `op.shards` | read |
 | `op.shard.dedicate` | write |
@@ -303,7 +305,8 @@ before an app is resolved draws on them.
 | `tenant_icon` | — *a workspace's own logo* | — | `tenant_id: delete` |
 | `push_subscription` | The devices you asked to be notified on | `account_id: delete` | kept |
 | `push_key` | — *the deployment's own sending identity* | — | kept |
-| `job_run` | — *the deployment's own clock* | — | kept |
+| `job_run` | Nightly work you started by hand | `by: anonymise` | kept |
+| `job_schedule` | Nightly work you rescheduled | `by: anonymise` | kept |
 | `deployment_flag` | — *the deployment's own switches* | — | kept |
 | `maintenance` | — *the deployment's own switches* | — | kept |
 | `ai_binding` | — *which model an action runs on* | — | kept |
@@ -378,14 +381,14 @@ and a manifest that does not compose refuses to boot.
 | `vault` | the facts that are not an app's to keep (D11) | 8 | — |
 | `legal` | documents, purposes, sub-processors, the record of processing | 11 | — |
 | `guide` | help, onboarding, the milestones a workspace passes | 5 | — |
-| `job` | scheduled work, and the record that it ran | 5 | — |
+| `job` | scheduled work, and the record that it ran | 7 | — |
 | `brand` | which surfaces a workspace may put its own mark on | 10 | 1 |
 | `mark` | the logo as geometry, so the browser and the Worker draw one shape | 7 | — |
 | `ai` | a generating action: its lane, its prompt, its ceiling | 11 | 1 |
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**244 of them**, 237 reached by something today.
+**246 of them**, 239 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -401,7 +404,7 @@ env or a binding.
 | Module | What it is for | Ships | Waiting |
 |---|---|---|---|
 | `schema` | the composed schema runner — declarations become tables | 7 | — |
-| `sql` | the one typed seam onto D1 | 4 | — |
+| `sql` | the one typed seam onto D1 | 5 | — |
 | `directory` | accounts, workspaces, placement, enablement, allowances | 32 | — |
 | `handles` | which binding holds which shard | 3 | — |
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
@@ -424,7 +427,7 @@ env or a binding.
 | `push` | who has turned notifications on, on which device, at which door | 8 | — |
 | `vault` | encrypted facts, consent, grants, and who looked | 13 | — |
 | `audit` | what happened, and the replay that stops it happening twice | 7 | — |
-| `jobs` | the scheduler and the record that it ran | 6 | 1 |
+| `jobs` | the scheduler and the record that it ran | 10 | 1 |
 | `branding` | a workspace's own theme and marks | 4 | — |
 | `icon` | the picture a business uploads, and where a public route can read it | 8 | — |
 | `raster` | a PNG drawn in a Worker, for the tabs and home screens an SVG cannot reach | 3 | — |
@@ -439,7 +442,7 @@ env or a binding.
 | `installable` | the manifest and the icon a workspace is installed as | 6 | — |
 | `platform-schema` | the platform's own tables, in dependency order, listed once | 2 | — |
 | `dispatch` | an event an operation raises becomes a note in somebody's inbox | 1 | — |
-| `sweep` | the daily clock: erase what is past the ladder's last rung | 7 | — |
+| `sweep` | the daily clock: erase what is past the ladder's last rung | 10 | — |
 | `vault-ops` | consent, grants, who looked, the processing record, export and erasure | 1 | — |
 | `dossier` | everything we hold about one person, and everything of theirs we delete | 8 | — |
 | `legal` | who agreed to what version, and the wall until they have | 6 | — |
@@ -449,7 +452,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**325 of them**, 323 reached by something today.
+**333 of them**, 331 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

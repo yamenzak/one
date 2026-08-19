@@ -22,6 +22,30 @@ export function table(id: string): string {
   return id.replace(/-/g, "_");
 }
 
+/**
+ * A name that IS ALREADY A TABLE'S, checked rather than derived.
+ *
+ * ⚠️ `table` CONVERTS AND THIS ONE VALIDATES, AND CONFUSING THEM TOOK THE
+ * DEPLOYMENT DOWN. `table` takes a collection ID — hyphenated, which `NAME`
+ * enforces — and returns a table name with underscores. Handed a name that has
+ * already been through it, `NAME` rejects the underscores it just produced.
+ *
+ * ⚠️ IT FAILED IN THE ONE PLACE NOTHING COULD SEE. `applySchema` calls this on
+ * every table it is about to ALTER, and it only ALTERs a column a live table is
+ * MISSING — so on an empty database, which is every test, the branch never runs.
+ * The first deployment that had already booted threw here, out of `boot`, and
+ * answered 503 on every door. Twenty platform tables have an underscore in their
+ * name; not one of them could have gained a column.
+ */
+const TABLE_NAME = /^[a-z][a-z0-9_]*$/;
+
+export function asTable(name: string): string {
+  if (!TABLE_NAME.test(name)) {
+    throw new Error(`"${name}" is not a table name`);
+  }
+  return name;
+}
+
 export function column(name: string): string {
   if (!FIELD_NAME.test(name)) throw new Error(`"${name}" is not a name, so it cannot be a column`);
   return name;

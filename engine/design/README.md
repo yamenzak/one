@@ -168,10 +168,10 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 53 |
 | `parts/` | rows, cards, lists, controls, the four outcomes | 135 |
-| `rendered/` | whole surfaces drawn from a kernel declaration | 51 |
+| `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**336 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**338 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -225,7 +225,7 @@ there is no deep import, and a guard says so.
 - `rendered/guide.tsx` — `Guide`, `GuideProps`, `Help`, `HelpProps`, `Milestones`, `MilestonesProps`
 - `rendered/inbox.tsx` — `Inbox`, `InboxProps`, `Note`
 - `rendered/legal.tsx` — `Documents`, `DocumentsProps`, `Ropa`, `SubProcessors`, `WhereItLives`
-- `rendered/money.tsx` — `Bill`, `BillProps`, `Jobs`, `JobsProps`, `Storage`, `StorageProps`, `Wallet`, `WalletProps`
+- `rendered/money.tsx` — `Bill`, `BillProps`, `JobRun`, `Jobs`, `JobShown`, `JobsProps`, `Storage`, `StorageProps`, `Wallet`, `WalletProps`
 - `rendered/policy.tsx` — `NotificationPolicy`, `Offered`, `PolicyProps`, `policyShown`
 - `rendered/settings.tsx` — `Settings`, `SettingsProps`, `settingsShown`
 - `rendered/vault.tsx` — `ConsentProps`, `ConsentSheet`, `Look`, `MineProps`, `MyData`, `WhoLooked`
