@@ -354,6 +354,28 @@ jobs:
         if: steps.ready.outputs.go == 'true'
         run: pnpm turbo run build --filter=@engine/space
 
+      # ⚠️ WHAT IS SERVING NOW, READ BEFORE ANYTHING REPLACES IT. A rollback
+      # needs somewhere to roll back TO, and after the deploy the answer is the
+      # broken version. Recorded here or the recovery has no target.
+      #
+      # ⚠️ AND A FAILURE HERE IS NOT FATAL. A first deploy has no previous
+      # version; the rollback step simply reports that there is nothing to go
+      # back to, which is the honest answer rather than a red run.
+      - name: Remember what is serving
+        id: serving
+        if: steps.ready.outputs.go == 'true'
+        working-directory: engine/one
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -uo pipefail
+          id=$(pnpm exec wrangler versions list --json 2>/dev/null \
+               | jq -r '[.[]] | sort_by(.metadata.created_on) | reverse | .[0].id // empty' \
+               || true)
+          echo "was=$id" >> "$GITHUB_OUTPUT"
+          if [ -n "$id" ]; then echo "::notice::Serving version $id before this deploy."; fi
+
       - name: Deploy
         if: steps.ready.outputs.go == 'true'
         uses: cloudflare/wrangler-action@v3
@@ -368,9 +390,58 @@ jobs:
       # worker that deploys perfectly and throws on every request. A hostname
       # that does not resolve yet is a notice — DNS and the routes are dashboard
       # steps — while one that resolves and answers wrongly is a failure.
+      #
+      # ⚠️ AND IT ASKS MORE THAN ONCE — see `boot-check.mjs`. `wrangler deploy`
+      # returns before every colo serves the new version, so a single probe can
+      # be answered by the OLD one. That is how a worker that threw on every
+      # request passed this step and was found hours later by somebody opening
+      # the app.
       - name: Verify it can actually boot
+        id: boots
         if: steps.ready.outputs.go == 'true'
         run: node engine/scripts/boot-check.mjs
+
+      # ── Put the last good version back. ───────────────────────────────────
+      #
+      # ⚠️ A DEPLOY THAT DOES NOT SERVE MUST NOT STAY UP, AND UNTIL NOW ONE DID.
+      # The check above could tell a broken deployment from a working one and
+      # nothing acted on it: the run went red, the worker went on answering 503
+      # on every door, and recovery waited for a person to notice, read the log,
+      # and push a revert. That is the whole distance between an alarm and a
+      # safety.
+      #
+      # ⚠️ IT ROLLS BACK THE WORKER AND NOT THE DATABASE, which is why the schema
+      # runner must only ever ADD. A rollback puts the previous code in front of
+      # a database the new code has already migrated, so a module that dropped or
+      # narrowed anything would leave the old version reading a shape it does not
+      # know. `refuseSql` forbids DROP for exactly this reason; this step is what
+      # makes that rule load-bearing rather than tidy.
+      #
+      # ⚠️ AND IT REPORTS RATHER THAN HIDES. The job still fails — a rollback is
+      # a recovered outage, not a green deploy — so the commit that caused it is
+      # unmistakable in the run history.
+      - name: Put the last good version back
+        if: failure() && steps.boots.outcome == 'failure' && steps.serving.outputs.was != ''
+        working-directory: engine/one
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -uo pipefail
+          was="${{ steps.serving.outputs.was }}"
+          echo "::error::This deploy does not serve. Rolling back to $was."
+          if pnpm exec wrangler rollback "$was" \
+               --message "boot check failed on ${{ github.sha }}"; then
+            echo "::notice::Rolled back to $was. The deployment is serving the previous version."
+          else
+            echo "::error::ROLLBACK FAILED. The deployment is down and needs a person: \
+            run 'wrangler rollback $was' in engine/one, or revert ${{ github.sha }} and push."
+          fi
+          # ⚠️ AND THE RECOVERY IS RE-CHECKED, because a rollback that reported
+          # success and did not serve would be the same silence one level up.
+          node ../scripts/boot-check.mjs \
+            && echo "::notice::Verified: the previous version is answering." \
+            || echo "::error::The rollback ran and the deployment still does not answer."
 
       # ── Break the bootstrap deadlock. ─────────────────────────────────────
       #

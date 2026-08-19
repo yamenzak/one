@@ -36,8 +36,14 @@ export function table(id: string): string {
  * The first deployment that had already booted threw here, out of `boot`, and
  * answered 503 on every door. Twenty platform tables have an underscore in their
  * name; not one of them could have gained a column.
+ *
+ * ⚠️ A LEADING UNDERSCORE IS A TABLE NAME HERE. `_schema` is the runner's own
+ * marker, and a rule that refused it would throw on the one table every database
+ * has — the same fault as the one above, waiting for the first module that adds
+ * a column to it. Nothing else changes: this is still a plain identifier, still
+ * lower-case, and still has nothing a statement could be broken with.
  */
-const TABLE_NAME = /^[a-z][a-z0-9_]*$/;
+const TABLE_NAME = /^[a-z_][a-z0-9_]*$/;
 
 export function asTable(name: string): string {
   if (!TABLE_NAME.test(name)) {

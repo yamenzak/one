@@ -293,6 +293,7 @@ covered.
 | A name nobody mapped | `face`, `space` | a neutral circle in a list where every other row has a shape |
 | Words drifting | `tone`, `problem` | the product speaking in two voices, or one code meaning three things |
 | A document going stale | `docs` | a count typed by hand, wrong within a week, taking the rest of the page's credibility with it |
+| A deploy that does not serve | `deploy` | every guard green, the upload successful, and the first request throwing out of `boot` — with the migration path unexercised, the 503 naming the wrong fault, the probe answered by the version being replaced, and nothing putting the last good one back |
 
 ### 4a. Two failure modes, and only one of them is derived
 
@@ -433,7 +434,12 @@ that reports no count.
 it fire, restore. This has never been ceremony: the rules guard passed two
 mutations that deleted a rule's only caller, because the comment beside the call
 kept the identifier in the file — and a file that argues for a rule at length is
-exactly the file most likely to have stopped calling it.
+exactly the file most likely to have stopped calling it. The deploy guard failed
+the same way on its first run, one hiding place over: deleting the rollback
+command left the step's own error message telling a human to *"run `wrangler
+rollback`"*, and the check written for exactly that mutation passed. Anchor a
+check to the thing as it EXECUTES — a command at the start of its line, a call
+with its arguments — never to an identifier appearing somewhere in a file.
 
 ### 5.7 What we take, and what we write
 
