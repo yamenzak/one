@@ -9,7 +9,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  SPACE, OF_CONSOLE, OF_WORKSPACE, above, inSpace, nameOf, parseWhere, partsFor, pathOf,
+  SPACE, OF_AI, OF_CONSOLE, OF_WORKSPACE, above, groundOf, inSpace, isConsole, nameOf,
+  parseWhere, partsFor, pathOf,
 } from "../src/space/where.js";
 
 describe("what belongs to OneSpace", () => {
@@ -149,6 +150,11 @@ describe("leaving", () => {
       { at: "workspace", slug: "atlas" },
       ...OF_WORKSPACE.map((part) => ({ at: part, slug: "atlas" })),
       { at: "console" }, ...OF_CONSOLE.map((part) => ({ at: part })),
+      /* ⚠️ AND EVERYTHING INSIDE AN AREA. This list named the top level only, so
+         the four AI screens were never walked — which is how both of the faults
+         the block below is about survived a suite that was already asking the
+         right question one level up. */
+      ...OF_AI.map((part) => ({ at: part })),
     ] as const;
 
     for (const start of every) {
@@ -156,6 +162,54 @@ describe("leaving", () => {
       let steps = 0;
       while (where && steps < 10) { where = above(where); steps++; }
       expect(where, pathOf(start)).toBe(null);
+    }
+  });
+});
+
+/*
+  ⚠️ AN AREA IS A LEVEL, AND TWO THINGS HAVE TO AGREE WITH THAT — the way out and
+  the material. Both read the address, both got it wrong for the AI area, and
+  neither failed: the arrow went one level too far and the ground under three
+  screens was a workspace's. A person sees a seam and a back button that
+  overshoots; nothing throws, and no existing test looked inside an area.
+
+  ⚠️ EVERY ASSERTION HERE IS DERIVED FROM `OF_AI`, so the fifth sub-page is
+  covered on the day it is added rather than the day somebody remembers.
+*/
+describe("a screen inside an area", () => {
+  it("is addressed inside it", () => {
+    for (const part of OF_AI) {
+      expect(pathOf({ at: part } as never), part).toMatch(
+        new RegExp(`^${pathOf({ at: "ai" } as never)}/`));
+    }
+  });
+
+  /* ⚠️ THE ARROW GOES UP ONE LEVEL, NEVER PAST ONE. The path says the screen is
+     inside the area, so the way out of it is the area — landing on the console
+     skips the page somebody just came through. */
+  it("leaves upwards to its area, not past it", () => {
+    for (const part of OF_AI) {
+      expect(above({ at: part } as never), part).toEqual({ at: "ai" });
+    }
+  });
+
+  /* ⚠️ AND STANDS ON THE SAME MATERIAL. The area and its pages are one place;
+     two materials inside one place is a seam on every trip into it. */
+  it("stands on the area's own ground", () => {
+    const area = groundOf({ at: "ai" } as never);
+    for (const part of OF_AI) {
+      expect(groundOf({ at: part } as never), part).toBe(area);
+    }
+  });
+
+  /*
+    ⚠️ AND THE TWO QUESTIONS ABOUT THE OPERATOR'S SIDE ANSWER THE SAME WAY. They
+    were separate derivations and only one had been taught about areas — the one
+    that picks the material had not, which is the whole of the second fault.
+  */
+  it("is the operator's side by both of the tests that ask", () => {
+    for (const part of [...OF_CONSOLE, ...OF_AI]) {
+      expect(isConsole({ at: part } as never), part).toBe(true);
     }
   });
 });

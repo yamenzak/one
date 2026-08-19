@@ -204,13 +204,7 @@ export const atWorkspaceScreen = (
 export const atConsoleScreen = (
   where: Where,
 ): where is Extract<Where, { readonly at: ConsolePart | AiPart }> =>
-  (OF_CONSOLE as readonly string[]).includes(where.at)
-  /* ⚠️ AND EVERYTHING INSIDE THE AI AREA, because a sub-page is still the
-     operator's side — the material, the crown and the guard that every console
-     row leads somewhere all read this. Listing only the top level made the three
-     AI screens address themselves as a WORKSPACE's, which resolves to
-     `/w/undefined/models` and renders nothing. */
-  || (OF_AI as readonly string[]).includes(where.at);
+  OPERATOR_PARTS.includes(where.at);
 
 /**
  * ⚠️ WHAT SOMEBODY COMES BACK TO, AND WHAT THEY SET UP ONCE. Six rows in one
@@ -230,6 +224,22 @@ export const OF_CONSOLE = ["tenants", "catalogue", "ai", "keys", "switches", "te
  */
 export const OF_AI = ["models", "actions", "gateway", "finding"] as const;
 export type AiPart = typeof OF_AI[number];
+
+/**
+ * ⚠️ EVERY ADDRESS ON THE OPERATOR'S SIDE, TOP LEVEL AND INSIDE AN AREA, IN ONE
+ * LIST — because two functions were asking that question and only one of them
+ * had been taught about areas. `atConsoleScreen` knew the AI sub-pages were the
+ * operator's; `isConsole` did not, and `isConsole` is what picks the MATERIAL.
+ * So Models, Actions and Gateway drew a WORKSPACE's ground under a deployment's
+ * screens, and the AI index above them drew the operator's — the seam was
+ * visible on every trip into the area and nothing failed.
+ *
+ * ⚠️ AND THE COMMENT SAYING SO WAS ALREADY THERE, one function down. The fix had
+ * been made once, in the place that was noticed, and the second caller went on
+ * answering the old way. Two derivations of one question is the fault; a shared
+ * list is the fix.
+ */
+const OPERATOR_PARTS: readonly string[] = [...OF_CONSOLE, ...OF_AI];
 
 export type WorkspacePart = typeof OF_WORKSPACE[number];
 export type ConsolePart = typeof OF_CONSOLE[number];
@@ -273,8 +283,7 @@ const isAiPart = (v: string): v is AiPart => (OF_AI as readonly string[]).includ
  * screen simply reads as somebody's workspace.
  */
 export const isConsole = (where: Where): boolean =>
-  where.at === "console" || where.at === "tenant"
-  || (OF_CONSOLE as readonly string[]).includes(where.at);
+  where.at === "console" || where.at === "tenant" || OPERATOR_PARTS.includes(where.at);
 
 /** Whether a path is OneSpace's at all — the page under it renders otherwise. */
 export const inSpace = (path: string): boolean =>
@@ -416,7 +425,16 @@ export function above(where: Where): Where | null {
       return where.area ? { at: "prefs", app: where.app }
         : where.app ? { at: "prefs" } : { at: "you" };
     case "workspace": return { at: "workspaces" };
-    case "actions": return where.app ? { at: "actions" } : { at: "console" };
+    /*
+      ⚠️ AN AREA'S SUB-PAGE GOES UP TO ITS AREA, NOT PAST IT. Every AI screen
+      answered `console`, so the arrow in the crown skipped the page somebody had
+      just come through — three rows deep in, one press all the way out. The
+      `default` below sends anything unrecognised to the console, which is right
+      for a top-level part and wrong for everything inside one, so an area has to
+      name its own children.
+    */
+    case "models": case "gateway": case "finding": return { at: "ai" };
+    case "actions": return where.app ? { at: "actions" } : { at: "ai" };
     case "tenant": return { at: "tenants" };
     case "plan": return { at: "money", slug: where.slug };
     case "settings":
