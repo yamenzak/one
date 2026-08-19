@@ -30,7 +30,7 @@ import { PLATFORM_ROLES, sayDate, type Instant } from "@engine/kernel";
 import { Button, Card, Chip } from "@heroui/react";
 import {
   Await, Choice, Confirm, Group, Listing, Menu, Nothing, RowsWaiting, Screen, Stack, TextInput, Tray,
-  glyphOf, notice, useMoney, useShown, whoFace,
+  glyphOf, notice, sentence, useMoney, useShown, whoFace,
 } from "@engine/design";
 import { api } from "../api.js";
 import { useLoad, type CentreApp, type CentreView, type HoldingLine, type MemberLine, type PackageLine } from "./data.js";
@@ -88,9 +88,13 @@ export function People({ view }: { readonly view: CentreView }) {
                  initial: a face for somebody who has not arrived yet would be
                  a picture of nobody. */
               face: m.accountId ? whoFace(m.accountId) : undefined,
+              /* ⚠️ A ROLE IS NAMED, NOT KEYED. These are the strings the roster
+                 stores, and printed raw the row read "staff · Hello: writer" —
+                 on a screen where the name beside them is capitalised. */
               under: [
-                m.platformRole,
-                ...Object.entries(m.appRoles).map(([appId, role]) => `${nameOf(view, appId)}: ${role}`),
+                sentence(m.platformRole),
+                ...Object.entries(m.appRoles)
+                  .map(([appId, role]) => `${nameOf(view, appId)}: ${sentence(role)}`),
               ].join(" · "),
               aside: m.accepted
                 ? undefined
@@ -102,7 +106,7 @@ export function People({ view }: { readonly view: CentreView }) {
                 id: "role", label: "Workspace",
                 cell: (m) => (
                   <Chip color={m.platformRole === "customer" ? "default" : "accent"} variant="soft">
-                    <Chip.Label>{m.platformRole}</Chip.Label>
+                    <Chip.Label>{sentence(m.platformRole)}</Chip.Label>
                   </Chip>
                 ),
               },

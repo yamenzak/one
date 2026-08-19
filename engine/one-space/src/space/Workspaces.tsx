@@ -100,6 +100,10 @@ const said = (apps: readonly string[] | undefined, role: string | null | undefin
      answers before there is a tenancy to read manifests from, so every row read
      "hello · owner" on a screen where nothing else is lower case. */
   const products = (apps ?? []).map(sentence).join(" · ");
-  if (!role) return products || "Waiting for you to claim it";
-  return products ? `${products} · ${role}` : role;
+  /* ⚠️ AND SO IS A ROLE. The comment above described both halves of this line
+     and the code sentence-cased one of them, so every row read "Hello · owner"
+     — a product's name beside the key the roster stores. */
+  const said = role ? sentence(role) : null;
+  if (!said) return products || "Waiting for you to claim it";
+  return products ? `${products} · ${said}` : said;
 };

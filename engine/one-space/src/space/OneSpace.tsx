@@ -284,7 +284,12 @@ const said = (
       /* ⚠️ AN APP ID IS NOT A NAME — see `sentence`. `me.who` carries ids
          because it answers before there is a tenancy to read manifests from. */
       const products = (held?.apps ?? []).map(sentence).join(" · ");
-      const role = held?.platformRole ? `you are ${held.platformRole}` : "waiting for you to claim it";
+      /* ⚠️ AND SO IS A ROLE, and it is said the way the workspaces LIST says it
+         — this read "you are owner", which is both the stored key and a
+         sentence missing its article, four words from the same fact written
+         differently one screen away. */
+      const role = held?.platformRole
+        ? sentence(held.platformRole) : "waiting for you to claim it";
       return products ? `${products} · ${role}` : role;
     }
     /* ⚠️ WHOSE WORKSPACE THIS IS, four levels from the root, on a surface
