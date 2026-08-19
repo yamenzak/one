@@ -37,33 +37,6 @@ export type OnFail =
   | { readonly then: "park" }
   | { readonly then: "tell"; readonly notification: string };
 
-/**
- * WHAT A RUN IS HANDED.
- *
- * ⚠️ THE SHARD IS THE SCOPE MADE CONCRETE. A `deployment` job is given the
- * directory and no tenant; a `per-tenant` job is called once per workspace with
- * THAT workspace's database and id. The runner decides which — a job that
- * resolved its own would be a job discovering its work by asking every shard,
- * which is the walk D5 exists to forbid.
- *
- * ⚠️ AND `deadline` IS WHY `budgetSeconds` IS NOT DECORATION. A job that fans
- * out over workspaces has to be able to stop in the middle and say so, or the
- * budget is a number in a manifest that nothing can act on.
- */
-export interface JobCtx {
-  readonly db: unknown;
-  readonly tenantId?: string;
-  /** Epoch ms after which the run should stop and report what it did. */
-  readonly deadline: number;
-  readonly now: string;
-}
-
-/** What a run reports. `touched` is the count the console shows. */
-export interface JobResult {
-  readonly touched: number;
-  readonly detail?: string;
-}
-
 export interface JobDef {
   readonly id: string;
   readonly label: string;
@@ -73,18 +46,6 @@ export interface JobDef {
   readonly schedule: string;
   readonly scope: JobScope;
   readonly onFail: OnFail;
-  /**
-   * THE WORK ITSELF.
-   *
-   * ⚠️ THE DECLARATION CARRIES ITS BODY, LIKE AN OPERATION CARRIES ITS HANDLER,
-   * AND FOR THE REASON THIS WHOLE FILE EXISTS. Without it a job is a row on a
-   * console and a promise to nobody: `tidy` was declared, validated for its
-   * cron, its floor and its failure route, listed on the operator's screen —
-   * and no code anywhere read the book to run it, so the screen said "Has never
-   * run" and always would have. A declaration whose body is somewhere else is a
-   * declaration something has to remember to wire up.
-   */
-  readonly work: (ctx: JobCtx) => Promise<JobResult>;
   /**
    * ⚠️ SAFE TO RUN TWICE, OR A SENTENCE SAYING WHY IT WILL NOT BE. See the
    * header: it is going to happen either way.
@@ -119,157 +80,11 @@ export const scheduleOk = (cron: string): boolean => {
   return parts.length === 5 && parts.every((p) => FIELD.test(p));
 };
 
-/* ------------------------------------------------------------------ due --- */
-
-/**
- * ⚠️ A SCHEDULE NOTHING CAN EVALUATE IS A LABEL, AND THAT IS ALL IT WAS. Every
- * job declared a cron, `scheduleOk` checked it would parse, the console printed
- * it as a cadence — and the deployment ran one hardcoded pass at 03:00 and
- * called everything. "Daily" on the screen was a string being rendered, not a
- * promise anything kept.
- *
- * ⚠️ SO THE FIELDS ARE EXPANDED TO THE MINUTES THEY MEAN. Five sets, and
- * membership is the whole question — which makes a step, a range and a list the
- * same kind of answer instead of three parsers.
- */
-const expand = (field: string, min: number, max: number): ReadonlySet<number> => {
-  const out = new Set<number>();
-  for (const part of field.split(",")) {
-    const [range, step] = part.split("/");
-    const by = step ? Number(step) : 1;
-    if (!Number.isFinite(by) || by < 1) continue;
-    let from = min;
-    let to = max;
-    if (range && range !== "*") {
-      const [a, b] = range.split("-");
-      from = Number(a);
-      to = b === undefined ? Number(a) : Number(b);
-      /* ⚠️ A step with a single start means "from there on" — `5/10` is 5, 15,
-         25… Without this, `5/10` would be the single minute 5, silently. */
-      if (b === undefined && step) to = max;
-    }
-    if (!Number.isFinite(from) || !Number.isFinite(to)) continue;
-    for (let n = Math.max(from, min); n <= Math.min(to, max); n += by) out.add(n);
-  }
-  return out;
-};
-
-/**
- * ⚠️ DAY-OF-MONTH AND DAY-OF-WEEK ARE OR-ED WHEN BOTH ARE RESTRICTED, WHICH IS
- * CRON'S OLDEST SURPRISE AND IS NOT A BUG TO FIX. `0 0 1 * 1` is the first of
- * the month AND every Monday, not the first of the month when it is a Monday.
- * Getting this wrong makes a job fire far less often than its author intended,
- * which is the failure this whole file is about.
- */
-interface Parsed {
-  readonly minutes: ReadonlySet<number>;
-  readonly hours: ReadonlySet<number>;
-  readonly months: ReadonlySet<number>;
-  readonly dom: ReadonlySet<number>;
-  readonly dow: ReadonlySet<number>;
-  readonly anyDom: boolean;
-  readonly anyDow: boolean;
-}
-
-const parse = (cron: string): Parsed => {
-  const [mi, ho, dom, mo, dow] = cron.trim().split(/\s+/);
-  return {
-    minutes: expand(mi!, 0, 59),
-    hours: expand(ho!, 0, 23),
-    months: expand(mo!, 1, 12),
-    dom: expand(dom!, 1, 31),
-    /* ⚠️ 0 AND 7 ARE BOTH SUNDAY. A schedule written `0 0 * * 7` is somebody's
-       Sunday, and read strictly it is a day that does not exist. */
-    dow: new Set([...expand(dow!, 0, 7)].map((d) => (d === 7 ? 0 : d))),
-    anyDom: dom === "*",
-    anyDow: dow === "*",
-  };
-};
-
-/**
- * ⚠️ CRON OR-s THE TWO DAY FIELDS WHEN BOTH ARE RESTRICTED, which is its oldest
- * surprise and is not a bug to fix. `0 0 1 * 1` is the first of the month AND
- * every Monday, not the first when it happens to be a Monday. Read as an AND, a
- * job fires far less often than its author intended — which is the failure this
- * whole file is about.
- */
-const onDay = (p: Parsed, at: Date): boolean => {
-  if (!p.months.has(at.getUTCMonth() + 1)) return false;
-  if (p.anyDom && p.anyDow) return true;
-  const dom = p.dom.has(at.getUTCDate());
-  const dow = p.dow.has(at.getUTCDay());
-  if (p.anyDom) return dow;
-  if (p.anyDow) return dom;
-  return dom || dow;
-};
-
-/**
- * THE FIRST MINUTE THIS CRON FIRES STRICTLY AFTER `after`, OR NULL.
- *
- * ⚠️ DAYS FIRST, THEN THE MINUTES INSIDE A DAY THAT QUALIFIES. Walking every
- * minute is the obvious version and it is two million iterations before it can
- * answer "never": measured at 3.9 SECONDS for `0 0 30 2 *`, on a function
- * `refuseJob` calls for every job at composition. Skipping a day whose date
- * cannot match makes the same answer about fifteen hundred cheap comparisons.
- *
- * ⚠️ AND THE SEARCH IS BOUNDED, WHICH IS WHAT MAKES `null` POSSIBLE. The
- * thirtieth of February parses as five valid fields and never happens; a search
- * with no ceiling is an infinite loop inside a scheduler rather than a refusal
- * at composition. Four years covers every real schedule, leap day included.
- */
-const DAYS_AHEAD = 4 * 366;
-
-export const nextRun = (cron: string, after: Date): Date | null => {
-  if (!scheduleOk(cron)) return null;
-  const p = parse(cron);
-  if (!p.minutes.size || !p.hours.size || !p.months.size) return null;
-
-  /* ⚠️ FROM THE NEXT WHOLE MINUTE. Seconds are not a cron field, so a run that
-     started at 03:00:30 must not make 03:00 due again. */
-  const from = new Date(after.getTime());
-  from.setUTCSeconds(0, 0);
-  from.setUTCMinutes(from.getUTCMinutes() + 1);
-
-  const day = new Date(Date.UTC(
-    from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate(), 0, 0, 0, 0));
-
-  for (let d = 0; d <= DAYS_AHEAD; d++) {
-    if (onDay(p, day)) {
-      for (const h of [...p.hours].sort((a, b) => a - b)) {
-        for (const m of [...p.minutes].sort((a, b) => a - b)) {
-          const at = new Date(day.getTime());
-          at.setUTCHours(h, m, 0, 0);
-          if (at.getTime() >= from.getTime()) return at;
-        }
-      }
-    }
-    day.setUTCDate(day.getUTCDate() + 1);
-  }
-  return null;
-};
-
-/**
- * ⚠️ DUE MEANS "IT SHOULD HAVE FIRED BY NOW", NOT "IT IS FIRING THIS MINUTE".
- * A scheduler wakes on its own clock, and a job asked whether its cron matches
- * the current minute is a job that never runs unless the two clocks agree
- * exactly — so a missed tick, a cold start or a trigger every fifteen minutes
- * would each drop the run silently.
- *
- * ⚠️ AND A JOB THAT HAS NEVER RUN IS DUE. The alternative is a job waiting for a
- * previous run it will never have.
- */
-export const dueNow = (cron: string, lastRun: Date | null, now: Date): boolean => {
-  if (!scheduleOk(cron)) return false;
-  if (!lastRun) return true;
-  const next = nextRun(cron, lastRun);
-  return next !== null && next.getTime() <= now.getTime();
-};
-
 /* ------------------------------------------------------------------ rules --- */
 
 export type JobRefusal =
   | "unparseable_schedule" | "no_reason" | "destroys_without_a_floor"
-  | "unknown_failure_notification" | "retries_forever" | "no_work" | "never_fires";
+  | "unknown_failure_notification" | "retries_forever";
 
 export interface JobProblem { readonly job: string; readonly why: JobRefusal; readonly detail: string }
 
@@ -278,23 +93,7 @@ export function refuseJob(def: JobDef, notifications: readonly string[]): readon
   const at = (why: JobRefusal, detail: string) => out.push({ job: def.id, why, detail });
 
   if (!scheduleOk(def.schedule)) at("unparseable_schedule", `"${def.schedule}" would never fire`);
-  /*
-    ⚠️ AND A SCHEDULE THAT PARSES CAN STILL NEVER FIRE. "0 0 30 2 *" is five
-    valid fields and the thirtieth of February — checked here rather than left
-    to the runner, where it is a job that is simply never due and looks exactly
-    like one that runs and finds nothing to do.
-  */
-  else if (nextRun(def.schedule, new Date(0)) === null) {
-    at("never_fires", `"${def.schedule}" parses but names no minute that exists`);
-  }
   if (!def.why.trim()) at("no_reason", "runs on a schedule and does not say what for");
-  /*
-    ⚠️ THE WHOLE POINT, AND IT WAS ONCE POSSIBLE TO OMIT. A job with no body is
-    a console row and a promise to nobody — see `JobDef.work`.
-  */
-  if (typeof def.work !== "function") {
-    at("no_work", "declares a schedule and has no body, so it can only ever be a row on a screen");
-  }
   if (def.destroys && def.destroys.floorDays <= 0) {
     at("destroys_without_a_floor", "deletes with no floor, so a misconfiguration shreds on the first run");
   }
@@ -337,15 +136,8 @@ export interface Run {
  * caller that has to reshape its data to ask a question is a caller that works
  * the answer out for itself instead. Two fields is the whole question.
  */
-/*
-  ⚠️ KEYED BY JOB ID, NOT A `JobBook`, BECAUSE THAT IS ALL IT READS. A definition
-  carries a function body, which cannot cross a wire — so the console receives a
-  described shape rather than the declaration, and demanding the full type here
-  would have forced its one caller to build a fake `JobDef` per row to ask a
-  question about the keys.
-*/
 export const stalled = (
-  book: Readonly<Record<string, unknown>>,
+  book: JobBook,
   runs: readonly Pick<Run, "jobId" | "startedAt">[],
   now: number,
   missedMs: number,

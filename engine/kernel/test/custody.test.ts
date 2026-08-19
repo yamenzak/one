@@ -21,7 +21,7 @@ import { passagesOf } from "../src/primitives.js";
 import { settle, estimate, plan, charged, refusePacks, unbounded, THINKING_HEADROOM } from "../src/credit.js";
 import { refuseTheme, refuseSurfaces, contrast, OURS } from "../src/brand.js";
 import { field, refuseField } from "../src/field.js";
-import { dueNow, nextRun, refuseJob, scheduleOk, stalled } from "../src/job.js";
+import { refuseJob, scheduleOk, stalled } from "../src/job.js";
 import { inLane, defaultIn, lanesFor, refuseCatalogue, type ModelRow } from "../src/ai.js";
 import type { AccountId, Day, Instant } from "../src/primitives.js";
 
@@ -407,7 +407,6 @@ describe("work nobody is waiting for", () => {
     schedule: "0 3 * * *", scope: "per-tenant" as const,
     onFail: { then: "tell" as const, notification: "ops.job_failed" },
     rerunnable: true as const,
-    work: async () => ({ touched: 0 }),
   };
 
   /* ⚠️ A schedule the platform cannot parse never fires, and a job that never
@@ -450,104 +449,7 @@ describe("work nobody is waiting for", () => {
       [{ jobId: "dunning", startedAt: new Date(now - 60_000).toISOString() }],
       now, day)).toEqual([]);
   });
-
-  /*
-    ⚠️ A JOB WITH NO BODY IS A ROW ON A SCREEN AND A PROMISE TO NOBODY, and it
-    was once possible to declare one. `tidy` shipped that way: a cron, a floor, a
-    failure route, a console row reading "Has never run" — and no code anywhere
-    that could have run it.
-  */
-  it("refuses a job that declares a schedule and no work", () => {
-    const { work: _drop, ...bodyless } = sweep;
-    expect(refuseJob(bodyless as never, ["ops.job_failed"]).map((p) => p.why)).toEqual(["no_work"]);
-  });
 });
-
-/* ⚠️ THE SCHEDULE HAS TO BE COMPUTABLE OR IT IS A LABEL. Every job declared a
-   cron and the deployment ran one hardcoded pass at 03:00 for all of them, so
-   "Daily" on the console was a string being rendered rather than a promise
-   anything kept. */
-describe("when a job is next due", () => {
-  const at = (s: string) => new Date(s);
-
-  it("finds the next minute a cron fires, strictly after the last one", () => {
-    expect(nextRun("0 3 * * *", at("2026-08-19T02:00:00Z"))?.toISOString())
-      .toBe("2026-08-19T03:00:00.000Z");
-    /* ⚠️ STRICTLY after: a run that started at 03:00 must not make 03:00 due
-       again, or the job runs on every tick for the rest of the hour. */
-    expect(nextRun("0 3 * * *", at("2026-08-19T03:00:00Z"))?.toISOString())
-      .toBe("2026-08-20T03:00:00.000Z");
-    /* ⚠️ And seconds are not a cron field. */
-    expect(nextRun("0 3 * * *", at("2026-08-19T03:00:30Z"))?.toISOString())
-      .toBe("2026-08-20T03:00:00.000Z");
-  });
-
-  it("reads steps, ranges and lists", () => {
-    expect(nextRun("*/15 * * * *", at("2026-08-19T10:07:00Z"))?.toISOString())
-      .toBe("2026-08-19T10:15:00.000Z");
-    expect(nextRun("0 9-17 * * *", at("2026-08-19T18:30:00Z"))?.toISOString())
-      .toBe("2026-08-20T09:00:00.000Z");
-    expect(nextRun("0 0 1,15 * *", at("2026-08-02T00:00:00Z"))?.toISOString())
-      .toBe("2026-08-15T00:00:00.000Z");
-  });
-
-  /*
-    ⚠️ CRON OR-s THE TWO DAY FIELDS WHEN BOTH ARE RESTRICTED, which is its oldest
-    surprise and is not a bug to fix. Read as an AND, a job fires far less often
-    than its author intended — the exact failure this file is about.
-  */
-  it("ors day-of-month with day-of-week", () => {
-    /* 2026-09-01 is a Tuesday. `1 * 1` is the 1st OR any Monday, so from the
-       2nd the next fire is Monday the 7th rather than the 1st of October. */
-    expect(nextRun("0 0 1 * 1", at("2026-09-02T00:00:00Z"))?.toISOString())
-      .toBe("2026-09-07T00:00:00.000Z");
-    /* With day-of-week unrestricted it is the 1st and nothing else. */
-    expect(nextRun("0 0 1 * *", at("2026-09-02T00:00:00Z"))?.toISOString())
-      .toBe("2026-10-01T00:00:00.000Z");
-  });
-
-  it("treats 7 as Sunday, because somebody will write it", () => {
-    /* 2026-08-23 is a Sunday. */
-    expect(nextRun("0 0 * * 7", at("2026-08-19T00:00:00Z"))?.toISOString())
-      .toBe("2026-08-23T00:00:00.000Z");
-    expect(nextRun("0 0 * * 0", at("2026-08-19T00:00:00Z"))?.toISOString())
-      .toBe("2026-08-23T00:00:00.000Z");
-  });
-
-  /* ⚠️ A SEARCH WITH NO BOUND IS AN INFINITE LOOP IN A SCHEDULER. The thirtieth
-     of February parses and never happens. */
-  it("answers null for a schedule that names a minute that never comes", () => {
-    expect(scheduleOk("0 0 30 2 *")).toBe(true);
-    expect(nextRun("0 0 30 2 *", at("2026-01-01T00:00:00Z"))).toBeNull();
-    expect(refuseJob({ ...sweepDue, schedule: "0 0 30 2 *" }, []).map((p) => p.why))
-      .toEqual(["never_fires"]);
-  });
-
-  /*
-    ⚠️ DUE MEANS "SHOULD HAVE FIRED BY NOW", NOT "IS FIRING THIS MINUTE". A
-    scheduler wakes on its own clock; a job asked whether its cron matches the
-    current minute never runs unless the two agree exactly, so a missed tick or a
-    cold start drops the run in silence.
-  */
-  it("is due when its minute has passed, not only when it is that minute", () => {
-    expect(dueNow("0 3 * * *", at("2026-08-19T03:00:00Z"), at("2026-08-20T03:14:00Z"))).toBe(true);
-    expect(dueNow("0 3 * * *", at("2026-08-19T03:00:00Z"), at("2026-08-19T23:00:00Z"))).toBe(false);
-  });
-
-  /* ⚠️ And a job that has never run is due — the alternative is a job waiting
-     for a previous run it will never have. */
-  it("is due when it has never run", () => {
-    expect(dueNow("0 3 * * *", null, at("2026-08-19T00:01:00Z"))).toBe(true);
-  });
-});
-
-const sweepDue = {
-  id: "x", label: "X", why: "For the schedule tests.",
-  schedule: "0 3 * * *", scope: "deployment" as const,
-  onFail: { then: "park" as const },
-  rerunnable: true as const,
-  work: async () => ({ touched: 0 }),
-};
 
 /* -------------------------------------------------------------------- ai --- */
 

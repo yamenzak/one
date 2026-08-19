@@ -723,14 +723,6 @@
       "kind": "read"
     },
     {
-      "id": "op.job.run",
-      "kind": "write"
-    },
-    {
-      "id": "op.job.schedule",
-      "kind": "write"
-    },
-    {
       "id": "op.attention",
       "kind": "read"
     },
@@ -916,20 +908,9 @@
       },
       {
         "table": "job_run",
-        "export": "Nightly work you started by hand",
-        "why": null,
-        "onForget": [
-          "by: anonymise"
-        ],
-        "onClose": null
-      },
-      {
-        "table": "job_schedule",
-        "export": "Nightly work you rescheduled",
-        "why": null,
-        "onForget": [
-          "by: anonymise"
-        ],
+        "export": null,
+        "why": "the deployment's own clock",
+        "onForget": [],
         "onClose": null
       },
       {

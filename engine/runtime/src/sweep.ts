@@ -27,9 +27,7 @@
  * every shard and times out at the size where it starts to matter.
  */
 
-import type {
-  AppSpec, Instant, JobBook, JobDef, PackDef, PlanSpec, TenantId,
-} from "@engine/kernel";
+import type { AppSpec, Instant, PackDef, PlanSpec, TenantId } from "@engine/kernel";
 import { UNLIMITED } from "@engine/kernel";
 
 import { erase } from "./records.js";
@@ -38,7 +36,7 @@ import { forgetWorkspace } from "./dossier.js";
 import { bytesUsed, eraseObjects, type Bucket, type Where } from "./storage.js";
 import { forgetBranding } from "./branding.js";
 import { forgetIcon } from "./icon.js";
-import { dueForErasure, run, runDue, type RunnerDeps } from "./jobs.js";
+import { dueForErasure, run } from "./jobs.js";
 import { apply, type ApplyDeps } from "./resources.js";
 import { carryObjects, carryRows, finishMove, reapMoved } from "./move.js";
 import { chargeOffSession, type StripeDeps } from "./stripe.js";
@@ -103,14 +101,6 @@ export interface SweepDeps {
    * test run actually are.
    */
   readonly reconcile?: Omit<ApplyDeps, "directory" | "now">;
-  /**
-   * ⚠️ WHAT AN OPERATOR MOVED A JOB TO, IF ANYTHING. The declaration stays the
-   * authority for the floor, the budget and the failure route — none of which a
-   * console may edit — and only the cadence is theirs to change.
-   */
-  readonly scheduleOf?: (jobId: string) => string | undefined;
-  /** ⚠️ `onFail: tell` — where a failure is reported. */
-  readonly tell?: (notification: string, detail: string) => Promise<void>;
   readonly now?: () => Date;
 }
 
@@ -259,93 +249,51 @@ export async function sweepRetention(deps: SweepDeps): Promise<{ touched: number
  * has no user, no request, no 500 and no red test. The console reads the LAST
  * run, because a job that is merely scheduled tells you nothing.
  */
-/**
- * THE PLATFORM'S OWN JOBS, DECLARED LIKE EVERYBODY ELSE'S.
- *
- * ⚠️ THESE WERE STRING LITERALS PASSED TO `run`, AND THAT IS WHY THE CONSOLE
- * COULD NOT SEE THEM. `op.jobs` builds its book from every app's `jobs`, so the
- * seven things this deployment actually does every night appeared on no screen —
- * while the one app job that WAS on the screen was never run by anything. The
- * operator's "Nightly work" listed exactly the jobs that do not happen and
- * omitted exactly the ones that do.
- *
- * ⚠️ THE ORDER IS LOAD-BEARING AND IT IS THIS OBJECT'S KEY ORDER. The allowance
- * is the money and everything after it reads a balance, so allowances precede
- * the storage meter and the meter precedes the top-ups — metering second would
- * leave every workspace it emptied waiting a day for the top-up that would have
- * covered it.
- *
- * ⚠️ AND WHAT IS NOT CONFIGURED IS ABSENT RATHER THAN FAILING. A deployment with
- * no plans has no allowance to renew; listing the job anyway would put a row on
- * the console that is permanently quiet and means nothing.
- */
-export function platformJobs(deps: SweepDeps): JobBook {
+export async function sweep(deps: SweepDeps): Promise<void> {
   const now = (deps.now ?? (() => new Date()))();
-  const book: Record<string, JobDef> = {};
-  const at = (
-    id: string, label: string, why: string,
-    work: () => Promise<{ touched: number; detail: string }>,
-    extra: Partial<JobDef> = {},
-  ) => {
-    book[id] = {
-      id, label, why,
-      schedule: "0 3 * * *", scope: "deployment",
-      onFail: { then: "park" }, rerunnable: true,
-      work: async () => work(),
-      ...extra,
-    };
-  };
-
-  at("erasure", "Erase what is past its date",
-    "Destroys the records of workspaces that reached the end of the ladder.",
-    () => sweepErasure(deps),
-    /* ⚠️ THE LADDER'S OWN LAST RUNG IS THIRTY DAYS PAST DUE — see `dueForPurge`.
-       Declared here so `refuseJob` can see that this one deletes. */
-    { destroys: { floorDays: 30 }, budgetSeconds: 120 });
-
-  /* ⚠️ ITS OWN ROW, because "the sweep ran" is not the question anybody asks
-     after something was kept too long. */
-  at("retention", "Delete what was kept long enough",
-    "Enforces every collection's and every purpose's declared retention.",
-    () => sweepRetention(deps),
-    { destroys: { floorDays: 1 }, budgetSeconds: 120 });
+  await run(deps.directory, "erasure", () => sweepErasure(deps), now);
+  /* ⚠️ ITS OWN RUN ROW, because "the sweep ran" is not the question anybody
+     asks after something was kept too long. Two jobs, two records, and the
+     console shows which of them stopped. */
+  await run(deps.directory, "retention", () => sweepRetention(deps), now);
 
   /*
-    ⚠️ A MOVE IN FLIGHT IS ADVANCED, because nothing else will. The operator
+    ⚠️ AND A MOVE IN FLIGHT IS ADVANCED, because nothing else will. The operator
     starts one and the workspace goes read-only immediately; if the copy only
     ever ran from a request, a move begun and not finished would leave somebody
     unable to write with no path forward except a support conversation.
   */
-  at("moves", "Carry a workspace to its new shard",
-    "Advances every move in flight, and clears a source once it has drained.",
-    () => sweepMoves(deps), { budgetSeconds: 120 });
+  await run(deps.directory, "moves", () => sweepMoves(deps), now);
 
   /*
-    ⚠️ A COMPED WORKSPACE IS RENEWED BY THIS CLOCK, because it has no other.
+    ⚠️ AND THE STANDING TOP-UPS, WHICH ARE THE ONLY THING HERE THAT SPENDS
+    SOMEBODY'S MONEY. It runs on the sweep rather than on a request because a
+    Stripe round trip does not belong on the path of a call somebody is waiting
+    for — and because the point is to top up BEFORE the balance reaches zero,
+    which is a question about a threshold rather than about a refusal.
+  */
+  /*
+    ⚠️ AND A COMPED WORKSPACE IS RENEWED BY THIS CLOCK, because it has no other.
+    It runs FIRST, before the meter and the top-ups, for the same reason they are
+    in the order they are: the allowance is the money, and everything after it
+    reads a balance.
   */
   if (deps.plans?.length) {
-    at("allowances", "Renew the monthly allowance",
-      "Grants each workspace the credits its plan includes for the month.",
-      () => sweepAllowances(deps));
-  }
-
-  if (deps.plans?.length && deps.storageRate) {
-    at("storage", "Meter what is stored",
-      "Charges each workspace for the storage it keeps over what its plan includes.",
-      () => sweepStorage(deps));
+    await run(deps.directory, "allowances", () => sweepAllowances(deps), now);
   }
 
   /*
-    ⚠️ THE ONLY THING HERE THAT SPENDS SOMEBODY'S MONEY. It runs on the sweep
-    rather than on a request because a Stripe round trip does not belong on the
-    path of a call somebody is waiting for — and because the point is to top up
-    BEFORE the balance reaches zero, which is a question about a threshold rather
-    than about a refusal.
+    ⚠️ THE STORAGE METER RUNS BEFORE THE TOP-UPS, and the order is deliberate:
+    the meter is what pushes a balance under the threshold, so metering second
+    would leave every workspace it emptied waiting a day for the top-up that
+    would have covered it.
   */
+  if (deps.plans?.length && deps.storageRate) {
+    await run(deps.directory, "storage", () => sweepStorage(deps), now);
+  }
+
   if (deps.packs?.length) {
-    at("topups", "Buy the standing top-ups",
-      "Tops up a workspace that armed one and fell under its threshold.",
-      () => sweepTopUps(deps));
+    await run(deps.directory, "topups", () => sweepTopUps(deps), now);
   }
 
   /*
@@ -357,70 +305,25 @@ export function platformJobs(deps: SweepDeps): JobBook {
     ⚠️ IT CANNOT DESTROY ANYTHING IT DECIDED ABOUT TODAY. Everything destructive
     here is at the far end of a thirty-day drain, so a nightly job holding the
     account token cannot turn a bad edit into data loss — the worst it can do
-    overnight is create something spurious, which is a bill and not an incident.
+    overnight is create something spurious, which is a bill and not an
+    incident.
   */
   if (deps.reconcile) {
-    const re = deps.reconcile;
-    at("resources", "Make what the apps declared exist",
-      "Creates, binds and drains the stores every product's manifest asks for.",
-      async () => {
-        const out = await apply({ ...re, directory: deps.directory, now: () => now });
-        /* ⚠️ A REFUSAL THROWS, BECAUSE `run` DECIDES `ok` FROM WHETHER THIS DID.
-           Returned as an ordinary result it is a green run row over a
-           reconciliation that achieved nothing — a job quietly doing nothing for
-           a month, which is exactly how a reconciler stops being one. What DID
-           happen is in the message, so a partial pass is not lost either. */
-        if (out.refused.length) {
-          throw new Error([...out.did, ...out.refused.map((r) => `refused: ${r}`)].join("; "));
-        }
-        return { touched: out.did.length, detail: out.did.join("; ") || "nothing to do" };
-      },
-      { destroys: { floorDays: 30 }, budgetSeconds: 120 });
+    const at = deps.reconcile;
+    await run(deps.directory, "resources", async () => {
+      const out = await apply({ ...at, directory: deps.directory, now: () => now });
+      /* ⚠️ A REFUSAL THROWS, BECAUSE `run` DECIDES `ok` FROM WHETHER THIS DID.
+         Returned as an ordinary result it is a green run row over a
+         reconciliation that achieved nothing — a job quietly doing nothing for a
+         month, which is exactly how a reconciler stops being one. What DID
+         happen is in the message, so a partial pass is not lost either. */
+      if (out.refused.length) {
+        throw new Error([...out.did, ...out.refused.map((r) => `refused: ${r}`)].join("; "));
+      }
+      return { touched: out.did.length, detail: out.did.join("; ") || "nothing to do" };
+    }, now);
   }
-
-  return book;
 }
-
-/**
- * ⚠️ THE SWEEP IS NOW "RUN WHAT IS DUE", AND THE BOOK IS EVERYTHING. The
- * platform's seven and every app's own go through one runner, so a job cannot be
- * declared and left unrun — which is what happened to `tidy` for three stages,
- * with a console row saying so the whole time and nobody able to read it as a
- * fault.
- */
-export async function sweep(deps: SweepDeps): Promise<void> {
-  await runDue(runnerFor(deps), jobBookFor(deps));
-}
-
-/**
- * ⚠️ THE COMPOSED BOOK — the platform's, then every app's. The platform's come
- * first because the erasure and the money are what everything else stands on: an
- * app job fanning out over workspaces should not be walking one that is about to
- * be destroyed.
- */
-export const jobBookFor = (deps: SweepDeps): JobBook => ({
-  ...platformJobs(deps),
-  ...Object.fromEntries(
-    Object.values(deps.apps).flatMap((of) => Object.entries(of().jobs ?? {}))),
-});
-
-/**
- * ⚠️ THE FAN-OUT LIST IS THE DIRECTORY'S (D5). Every workspace this deployment
- * serves, minus the closed ones — a per-tenant job walking a closed workspace is
- * work against records the erasure job is on its way to destroy.
- */
-export const runnerFor = (deps: SweepDeps): RunnerDeps => ({
-  directory: deps.directory,
-  shardOf: deps.shardOf,
-  now: deps.now,
-  scheduleOf: deps.scheduleOf,
-  tell: deps.tell,
-  tenants: async () => {
-    const rows = await deps.directory.prepare(
-      `SELECT id FROM tenant WHERE closed_at IS NULL`).all<{ id: string }>();
-    return rows.results.map((r) => r.id as TenantId);
-  },
-});
 
 /**
  * CARRY EVERY MOVE THAT IS IN FLIGHT, AND CLEAR EVERY SOURCE THAT HAS DRAINED.

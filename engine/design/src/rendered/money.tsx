@@ -12,17 +12,16 @@
  */
 
 import React from "react";
-import type { Instant, PackDef, Shown } from "@engine/kernel";
+import type { Instant, JobBook, PackDef, Shown } from "@engine/kernel";
 import { sayBytes, sayDate, sayTime, stalled } from "@engine/kernel";
 import { Button, Card, Chip, Meter, ProgressBar } from "@heroui/react";
 import { useMoney } from "./console.js";
-import { Grid, Row, Stack } from "../parts/arrange.js";
+import { Grid, Stack } from "../parts/arrange.js";
 import { Credits } from "../parts/credits.js";
 import { Num, useShown } from "../parts/said.js";
 import { Balance } from "../parts/heads.js";
-import { Choice, NumberInput, TextInput } from "../parts/forms.js";
-import { Tray } from "../frame/overlay.js";
-import { AmountRow, ControlRow, FieldRow, Group, NavRow, NoteRow } from "../parts/surfaces.js";
+import { Choice, NumberInput } from "../parts/forms.js";
+import { AmountRow, ControlRow, Group, NoteRow } from "../parts/surfaces.js";
 import { TYPE } from "../tokens/type.js";
 import { SPACE } from "../tokens/metrics.js";
 
@@ -347,52 +346,15 @@ export function Storage({ used, included, creditsPerGbMonth }: StorageProps) {
 
 /* ------------------------------------------------------------------- jobs --- */
 
-/**
- * ONE JOB AS THE CONSOLE RECEIVES IT.
- *
- * ⚠️ NOT A `JobDef`, AND THE DIFFERENCE IS THE POINT. A definition carries a
- * function body, which cannot cross a wire, and it carries only what the CODE
- * says — so a job an operator has moved would still read as its declared
- * cadence. What a screen needs is the schedule in force, what the code declares,
- * and whether those differ.
- */
-export interface JobShown {
-  readonly id: string;
-  readonly label: string;
-  readonly why: string;
-  /** The cadence in force — an operator's, or the declaration's. */
-  readonly schedule: string;
-  readonly declared: string;
-  readonly moved: boolean;
-  readonly scope: string;
-  /** Days below which it refuses to delete, when it deletes at all. */
-  readonly destroys?: number;
-}
-
-export interface JobRun {
-  readonly jobId: string;
-  readonly startedAt: string;
-  readonly endedAt: string | null;
-  readonly ok: boolean | null;
-  readonly detail: string | null;
-  readonly touched: number;
-  /** ⚠️ Null is the clock; an address is somebody who pressed it. */
-  readonly by?: string | null;
-}
-
 export interface JobsProps {
-  readonly book: Readonly<Record<string, JobShown>>;
-  readonly runs: readonly JobRun[];
+  readonly book: JobBook;
+  readonly runs: readonly {
+    readonly jobId: string; readonly startedAt: string; readonly endedAt: string | null;
+    readonly ok: boolean | null; readonly detail: string | null; readonly touched: number;
+  }[];
   /** How long without a run is worth saying something about. */
   readonly missedMs: number;
   readonly now: number;
-  /**
-   * ⚠️ INJECTED, BECAUSE THIS LAYER HAS NO ROUTER AND NO FETCH. Absent is a
-   * console that can read the work and not start it — which is honest, and is
-   * what a deployment with nothing bound actually is.
-   */
-  readonly onRun?: (id: string) => Promise<void>;
-  readonly onSchedule?: (id: string, schedule: string) => Promise<void>;
 }
 
 /**
@@ -400,11 +362,9 @@ export interface JobsProps {
  * a job whose last run was three days ago is a job that has stopped, and that is
  * the only thing this screen is for.
  */
-export function Jobs({ book, runs, missedMs, now, onRun, onSchedule }: JobsProps) {
+export function Jobs({ book, runs, missedMs, now }: JobsProps) {
   const shown = useShown();
   const quiet_ = stalled(book, runs, now, missedMs);
-  const [open, setOpen] = React.useState<string | null>(null);
-  const here = open ? book[open] : undefined;
   return (
     /*
       ⚠️ A JOB IS A ROW, AND ITS STATE IS A SENTENCE. Each was a `Card` with a
@@ -418,7 +378,6 @@ export function Jobs({ book, runs, missedMs, now, onRun, onSchedule }: JobsProps
       them the colour means nothing. Quiet is a STATE, said in words; only a
       failed run is a failure.
     */
-    <>
     <Group>
       {Object.values(book).map((job) => {
         const last = runs.filter((r) => r.jobId === job.id)
@@ -443,15 +402,7 @@ export function Jobs({ book, runs, missedMs, now, onRun, onSchedule }: JobsProps
           if you already knew how often it should speak.
         */
         return (
-          /*
-            ⚠️ THE ROW OPENS, BECAUSE EVERYTHING WORTH KNOWING WAS BEING THROWN
-            AWAY. The payload has carried what a run DID — how many things it
-            touched, the message a failure left, whether somebody started it by
-            hand — and the screen rendered a chip and one sentence, so an
-            operator whose job failed at 03:00 could read that it failed and not
-            what it said.
-          */
-          <NavRow
+          <ControlRow
             key={job.id}
             label={job.label}
             under={
@@ -459,187 +410,14 @@ export function Jobs({ book, runs, missedMs, now, onRun, onSchedule }: JobsProps
                 {lastRun(shown, last, quiet)}
               </span>
             }
-            onOpen={() => setOpen(job.id)}
-            /* ⚠️ A MOVED CADENCE SAYS SO IN THE CORNER. Otherwise an override is
-               a number indistinguishable from the declaration. */
-            aside={(
-              <Chip color={job.moved ? "warning" : "default"} variant="soft">
-                <Chip.Label>{cadence(job.schedule)}</Chip.Label>
-              </Chip>
-            )}
-          />
+          >
+            <Chip color="default" variant="soft">
+              <Chip.Label>{cadence(job.schedule)}</Chip.Label>
+            </Chip>
+          </ControlRow>
         );
       })}
-      </Group>
-      {/*
-        ⚠️ A SIBLING OF THE LIST, NEVER A CHILD OF IT. `Group` publishes an
-        `InCard` context and an inner one STANDS DOWN — correct for a waiting
-        state or a rendered list inside a card, and wrong here: rendered inside
-        the list's own card, every group in the tray lost its card and the facts
-        sat loose on the tray's ground. Measured — the rows' parent had no
-        background and no radius.
-      */}
-      {here
-        ? (
-          <JobTray
-            key={here.id}
-            job={here}
-            last={runs.filter((r) => r.jobId === here.id)
-              .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))[0]}
-            onRun={onRun}
-            onSchedule={onSchedule}
-            onClose={() => setOpen(null)}
-          />
-        )
-        : null}
-    </>
-  );
-}
-
-/**
- * ONE JOB, AND WHAT ITS LAST PASS ACTUALLY DID.
- *
- * ⚠️ WHAT IT IS FOR IS HERE RATHER THAN ON THE ROW. `why` is a description —
- * what DESIGN.md §1 calls a symptom — and on the row it was the line an
- * operator's eye landed on while the fact they opened the screen for sat in a
- * corner. The list answers "did it run"; this answers "what is it, and what
- * happened".
- */
-function JobTray({ job, last, onRun, onSchedule, onClose }: {
-  readonly job: JobShown;
-  readonly last: JobRun | undefined;
-  readonly onRun?: (id: string) => Promise<void>;
-  readonly onSchedule?: (id: string, schedule: string) => Promise<void>;
-  readonly onClose: () => void;
-}) {
-  const shown = useShown();
-  const [schedule, setSchedule] = React.useState(job.schedule);
-  const [busy, setBusy] = React.useState(false);
-
-  const run = async () => {
-    if (!onRun) return;
-    setBusy(true);
-    try { await onRun(job.id); } finally { setBusy(false); }
-  };
-
-  return (
-    <Tray
-      isOpen
-      onOpenChange={(is) => { if (!is) onClose(); }}
-      title={job.label}
-      actions={onRun
-        ? (
-          <Button variant="primary" isPending={busy} onPress={() => void run()}>
-            Run it now
-          </Button>
-        )
-        : undefined}
-    >
-      <Stack space="roomy">
-        <NoteRow>{job.why}</NoteRow>
-
-        <Group label="What happened last time">
-          {last
-            ? [
-              <FieldRow
-                key="started"
-                label="Started"
-                value={sayTime(shown, last.startedAt as Instant)}
-                under={sayDate(shown, last.startedAt as Instant, "short")}
-              />,
-              <FieldRow
-                key="outcome"
-                label="Outcome"
-                value={last.ok === false
-                  ? <span data-ink="danger">Failed</span>
-                  : last.endedAt ? "Finished" : <span data-ink="warning">Still going</span>}
-                /* ⚠️ THE MESSAGE, WHICH IS THE WHOLE REASON A FAILURE IS WORTH
-                   OPENING. It was fetched and dropped. */
-                under={last.detail ?? undefined}
-              />,
-              <FieldRow key="handled" label="Handled" value={String(last.touched)} />,
-              /* ⚠️ THE CLOCK OR A PERSON, AND ONLY WHEN IT IS A PERSON. A row
-                 reading "started by: the schedule" on every job is a column of
-                 noise around the one that was not. */
-              ...(last.by
-                ? [<FieldRow key="by" label="Started by" value={last.by} under="By hand, from here" />]
-                : []),
-            ]
-            : <NoteRow>It has not run yet.</NoteRow>}
-        </Group>
-
-        <Group label="What it is">
-          <FieldRow
-            label="Runs"
-            value={cadence(job.schedule)}
-            /* ⚠️ WHAT THE CODE SAYS, BESIDE WHAT IS IN FORCE — the same shape
-               the price list uses for an edited plan. An override with nothing
-               naming the declaration is a number nobody can get back to. */
-            under={job.moved ? `The code says ${job.declared}` : job.schedule}
-          />
-          <FieldRow
-            label="Covers"
-            value={job.scope === "per-tenant" ? "Every workspace" : "The deployment"}
-          />
-          {/* ⚠️ THAT IT DELETES IS THE ONE FACT WORTH READING BEFORE PRESSING
-              the button above it, and the floor is what makes it survivable. */}
-          {job.destroys !== undefined
-            ? (
-              <FieldRow
-                label="Deletes"
-                value={<span data-ink="warning">Yes</span>}
-                under={`Never anything newer than ${job.destroys} days`}
-              />
-            )
-            : null}
-        </Group>
-
-        {onSchedule
-          ? (
-            <EditSchedule
-              value={schedule}
-              onChange={setSchedule}
-              onSave={async () => { await onSchedule(job.id, schedule); }}
-              declared={job.declared}
-            />
-          )
-          : null}
-      </Stack>
-    </Tray>
-  );
-}
-
-/**
- * ⚠️ THE CADENCE, AND NOTHING ELSE ON THE DECLARATION. A field for the floor or
- * the budget would be a console that can turn a retention rule into data loss;
- * those stay where composition can refuse them.
- */
-function EditSchedule({ value, onChange, onSave, declared }: {
-  readonly value: string;
-  readonly onChange: (next: string) => void;
-  readonly onSave: () => Promise<void>;
-  readonly declared: string;
-}) {
-  const [busy, setBusy] = React.useState(false);
-  const save = async () => {
-    setBusy(true);
-    /* ⚠️ THE REFUSAL IS THE CALLER'S TO SAY. This layer has no fetch and no
-       notice host; what it owes is a control that reports it is working and
-       stops when the write comes back either way. */
-    try { await onSave(); } finally { setBusy(false); }
-  };
-  return (
-    <Stack space="tight">
-      <TextInput
-        label="When it runs"
-        value={value}
-        onChange={onChange}
-        help={`Five fields, minute first. The code says ${declared}. Blank goes back to it.`}
-      />
-      <Row>
-        <Button variant="secondary" isPending={busy} onPress={() => void save()}>Save</Button>
-      </Row>
-    </Stack>
+    </Group>
   );
 }
 

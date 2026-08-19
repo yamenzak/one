@@ -21,7 +21,7 @@
  */
 
 import type {
-  AccountId, AppId, Allowance, AppSpec, FlagBook, JobBook, ModelRow, PlanSpec, TenantId,
+  AccountId, AppId, Allowance, AppSpec, FlagBook, ModelRow, PlanSpec, TenantId,
 } from "@engine/kernel";
 import {
   ALLOWANCE_KEY, KEEPS_RESIDENCY, LANES as LANE_NAMES, allowanceFor, entitlementKeys, inLane,
@@ -49,7 +49,7 @@ import {
 } from "./directory.js";
 import { CREDENTIALS, LANES, configState, setConfig } from "./config.js";
 import { parkedEvents } from "./stripe.js";
-import { runJob, runsOf, schedulesOf, setSchedule, type RunnerDeps } from "./jobs.js";
+import { runsOf } from "./jobs.js";
 import { makePushKeys, vapidOf } from "./push.js";
 import type { PersonalBook, PersonalCtx } from "./personal.js";
 import { applySchema, schemaFor, type SchemaModule } from "./schema.js";
@@ -118,20 +118,6 @@ export interface OperatorDeps {
   readonly isOperator: (email: string | null) => boolean;
   /** ⚠️ The model catalogue — the platform's, and the same rows metering reads. */
   readonly models?: () => Promise<readonly ModelRow[]>;
-  /**
-   * ⚠️ THE COMPOSED JOB BOOK — the platform's own and every app's, which is the
-   * same one the runner runs. The console built its own from `a.jobs` alone, so
-   * it listed the one app job nothing executed and omitted the seven the
-   * deployment does every night. Two derivations of "what runs here" is how a
-   * screen comes to describe a deployment that does not exist.
-   */
-  readonly jobs?: () => Promise<JobBook>;
-  /**
-   * ⚠️ AND WHAT IT TAKES TO RUN ONE ON DEMAND. Absent is a console that lists
-   * the work and cannot start it — which is honest, and is what a deployment
-   * with no shards bound actually is.
-   */
-  readonly runner?: () => Promise<RunnerDeps | null>;
   /**
    * ⚠️ THE ACCOUNT, AND ITS ABSENCE IS AN ANSWER RATHER THAN A FAILURE. A
    * deployment with no token cannot provision, which is the state of a
@@ -756,92 +742,8 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
       kind: "read", needs: "session", doors: ["operator"],
       async run(ctx): Promise<unknown> {
         operator(ctx);
-        /*
-          ⚠️ THE COMPOSED BOOK, WHICH IS THE PLATFORM'S AND EVERY APP'S. This
-          read used to build its book from `a.jobs` alone, so the screen listed
-          the one app job nothing ran and omitted the seven the deployment
-          actually does every night — the exact inverse of what an operator
-          opened it for. `jobBookFor` is the same book the runner runs, so the
-          list and the work cannot drift.
-        */
-        const book: JobBook = (await deps.jobs?.()) ?? {};
-        const moved = await schedulesOf(ctx.directory);
-        /*
-          ⚠️ WHAT IT IS SET TO AND WHAT THE CODE SAYS, BOTH. An operator looking
-          at a moved job needs to see that it was moved, or the override is a
-          number nobody can tell from a declaration.
-        */
-        const shown = Object.fromEntries(Object.entries(book).map(([id, def]) => [id, {
-          id: def.id, label: def.label, why: def.why,
-          schedule: moved[id] ?? def.schedule,
-          declared: def.schedule,
-          moved: moved[id] !== undefined && moved[id] !== def.schedule,
-          scope: def.scope,
-          destroys: def.destroys?.floorDays,
-        }]));
-        return { book: shown, runs: await runsOf(ctx.directory, book, 50) };
-      },
-    },
-
-    /**
-     * RUN ONE NOW, BECAUSE "WAIT UNTIL TONIGHT" IS NOT AN ANSWER.
-     *
-     * ⚠️ IT IGNORES THE SCHEDULE AND NOT THE OVERLAP. Somebody pressing this has
-     * decided it should run; what they have not decided is that it should run
-     * alongside a copy already going, which for anything that deletes is how a
-     * slow job becomes a corrupted one.
-     *
-     * ⚠️ AND IT IS AUDITED, because it is an operator reaching into a workspace's
-     * records out of hours. Every destructive thing this deployment does on a
-     * schedule can be done from here on demand.
-     */
-    "op.job.run": {
-      /* ⚠️ WHO PRESSED IT IS RECORDED ON THE RUN, NOT IN THE AUDIT. An operator
-         operation rides the personal lane and resolves no workspace, and the
-         audit is keyed on one — so `job_run.by` is where a hand-started run is
-         attributable, which is also where anybody looking would go. */
-      kind: "write", needs: "session", doors: ["operator"],
-      async run(ctx, input): Promise<unknown> {
-        operator(ctx);
-        const id = String(input.job ?? "");
-        const def = ((await deps.jobs?.()) ?? {})[id];
-        if (!def) return ctx.fail("platform.not_found");
-        const runner = await deps.runner?.();
-        /* ⚠️ A DEPLOYMENT THAT CANNOT RUN ONE SAYS SO. Answering 200 over a
-           press that did nothing is the silence this whole area is about. */
-        if (!runner) return ctx.fail("platform.unavailable");
-        const row = await runJob(runner, def, ctx.now, ctx.email);
-        if (!row) return { ran: false, why: "already_running" };
-        return { ran: true, ok: row.ok, touched: row.touched, detail: row.detail };
-      },
-    },
-
-    /**
-     * MOVE A JOB WITHOUT A DEPLOY.
-     *
-     * ⚠️ THE CADENCE ONLY. A console that could edit a `floorDays` would be a
-     * console that can turn a retention rule into data loss, so the floor, the
-     * budget, the failure route and whether a job deletes stay where
-     * `refuseJob` can see them.
-     */
-    "op.job.schedule": {
-      /* ⚠️ WHO MOVED IT IS ON THE ROW — `job_schedule.by`, for the same reason
-         the run record carries one. */
-      kind: "write", needs: "session", doors: ["operator"],
-      async run(ctx, input): Promise<unknown> {
-        operator(ctx);
-        const id = String(input.job ?? "");
-        if (!((await deps.jobs?.()) ?? {})[id]) return ctx.fail("platform.not_found");
-        const out = await setSchedule(
-          ctx.directory, id, String(input.schedule ?? ""), ctx.email, ctx.now);
-        /* ⚠️ THE REFUSAL NAMES WHICH RULE. "Invalid" over a cron field is a
-           screen telling somebody to guess at five positions. */
-        if (out !== "ok") {
-          return ctx.fail("platform.invalid", {}, { fields: { schedule: out === "unparseable"
-            ? "Five fields, minute first: 0 3 * * * is 03:00 every day."
-            : "That parses, and names a minute that never happens." } });
-        }
-        return { ok: true };
+        const book = Object.fromEntries(every().flatMap((a) => Object.entries(a.jobs ?? {})));
+        return { book, runs: await runsOf(ctx.directory, book, 50) };
       },
     },
 

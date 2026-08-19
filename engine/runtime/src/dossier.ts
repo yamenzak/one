@@ -180,25 +180,7 @@ export const HOLDINGS: readonly HeldBy[] = [
   { table: "credit_ledger", person: [], why: "a workspace's own spending", workspace: its() },
   { table: "shard", person: [], why: "the deployment's placement map" },
   { table: "shard_app", person: [], why: "the deployment's placement map" },
-  /*
-    ⚠️ THE CLOCK'S OWN RECORD, EXCEPT WHEN SOMEBODY PRESSED IT. `by` is null for
-    every scheduled run and holds an operator's address for a run started by
-    hand — and a manual run can erase a workspace's records out of hours, so
-    "the schedule did it" and "somebody did it" must not be the same row.
-    Operator operations resolve no workspace, so the ordinary audit — which is
-    keyed on one — cannot carry this.
-
-    ⚠️ ANONYMISED RATHER THAN DELETED, because the row is the deployment's record
-    OF an act rather than the person's own: deleting it when an operator leaves
-    would erase the evidence of a destructive run along with their account.
-  */
-  { table: "job_run", by: "email", label: "Nightly work you started by hand",
-    person: [{ column: "by", on: "anonymise",
-      why: "who started a run by hand is a record of the act, not of the person" }] },
-  /* ⚠️ Same shape one table over — who moved a job's cadence. */
-  { table: "job_schedule", by: "email", label: "Nightly work you rescheduled",
-    person: [{ column: "by", on: "anonymise",
-      why: "who moved a job is a record of the change, not of the person" }] },
+  { table: "job_run", person: [], why: "the deployment's own clock" },
   { table: "resource", person: [],
     why: "the databases and buckets the deployment made for itself" },
   /* ⚠️ NOT THE WORKSPACE'S TO ERASE, AND DELIBERATELY. The row says a copy of
