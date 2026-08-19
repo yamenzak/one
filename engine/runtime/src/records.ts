@@ -16,6 +16,7 @@
 
 import type { CollectionSpec } from "@engine/kernel";
 import { checkAll, checkSome, eraseBy, newId, vaultKeyFor } from "@engine/kernel";
+import { noteScopeGone } from "./search.js";
 import { column, table, type Db } from "./sql.js";
 
 export interface Written {
@@ -247,6 +248,23 @@ export async function erase(
   db: Db, specs: readonly CollectionSpec[], of: "tenant" | "subject", scope: string,
 ): Promise<readonly Erased[]> {
   const out: Erased[] = [];
+  /*
+    ⚠️ THE INDEX IS MARKED BY THE SAME CALL THAT DELETES THE ROWS, and that is
+    the whole reason it is here rather than at the four call sites. A searchable
+    record erased from the database and left in the index is a deletion request
+    answered with the text still findable, by meaning, for ever — and every
+    caller that forgot the second step would report a clean erasure.
+
+    ⚠️ AND IT MARKS RATHER THAN DELETING, because the ledger row is the only
+    handle on the remote item. The job removes it and forgets the row then.
+  */
+  try {
+    await noteScopeGone(db, of, scope);
+  } catch {
+    /* ⚠️ An older database legitimately has no ledger, and an erasure must not
+       stop half way through somebody's records over a table that predates the
+       feature. Same rule the per-collection delete below follows. */
+  }
   for (const spec of specs) {
     const eraseAt = eraseBy(spec);
     if (!eraseAt || eraseAt.of !== of) continue;

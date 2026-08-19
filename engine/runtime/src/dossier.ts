@@ -272,6 +272,22 @@ export const HOLDINGS: readonly HeldBy[] = [
   */
   { table: "ai_run", person: [], why: "a workspace's own AI spending", workspace: its() },
 
+  /*
+    ⚠️ A POINTER, NOT A COPY. The row names which record of which collection is
+    in the index and what state it is in; the text itself is re-read from the
+    record at flush time and never kept here. So there is nothing of anybody's
+    to export — what an export would say is "one of your notes is indexed",
+    which the note already says.
+
+    ⚠️ AND IT IS NOT ERASED BY SCOPE, WHICH IS THE UNUSUAL PART. `erase` marks
+    these rows `gone` rather than deleting them, because the row is the only
+    handle on the item in the index — deleting it here would leave the erased
+    records findable, by meaning, with nothing anywhere pointing at them. The
+    index pass removes the item and forgets the row then.
+  */
+  { table: "search_item", person: [],
+    why: "which records are in the index, and never what they say" },
+
   /* --- the vault: theirs, entirely --- */
   { table: "vault_subject", person: [theirs("subject_id")], workspace: its(),
     label: "Your vault" },

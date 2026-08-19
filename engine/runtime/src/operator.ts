@@ -25,7 +25,7 @@ import type {
 } from "@engine/kernel";
 import {
   ALLOWANCE_KEY, KEEPS_RESIDENCY, LANES as LANE_NAMES, MIN_MULTIPLIER, allowanceFor,
-  entitlementKeys, inLane, laneOf,
+  entitlementKeys, inLane, isSearchable, laneOf,
   mayIsolate,
   sayKind,
   refuseCatalogue,
@@ -55,6 +55,7 @@ import { runJob, runsOf, schedulesOf, setSchedule, type RunnerDeps } from "./job
 import { makePushKeys, vapidOf } from "./push.js";
 import type { PersonalBook, PersonalCtx } from "./personal.js";
 import { applySchema, schemaFor, type SchemaModule } from "./schema.js";
+import { indexState, instanceFor, itemsFailed } from "./search.js";
 import type { Db } from "./sql.js";
 
 /* ----------------------------------------------------------------- schema --- */
@@ -160,6 +161,13 @@ export interface OperatorDeps {
   readonly configSecret?: string;
   /** ⚠️ The deployment's catalogue — one membership, one list. */
   readonly plans?: readonly PlanSpec[];
+  /**
+   * ⚠️ EVERY SHARD, BECAUSE THE INDEX LEDGER IS A TABLE AND NOT A WORKSPACE. What
+   * is indexed, waiting and refused is one statement per database — asking it
+   * per workspace is the same answer arrived at once per customer, and the
+   * console's question is about the deployment.
+   */
+  readonly shards?: () => readonly Db[];
 }
 
 /** ⚠️ The same window the jobs screen reads a silence against — see `Jobs`. */
@@ -831,6 +839,67 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
           return ctx.fail("platform.not_found");
         }
         return { ok: true };
+      },
+    },
+
+    /**
+     * WHAT IS FINDABLE, WHAT IS WAITING, AND WHAT THE INDEX REFUSED.
+     *
+     * ⚠️ THE REFUSALS ARE THE REASON THIS SCREEN EXISTS. Everything else here is
+     * a number that goes up; a `failed` row is a record somebody saved that will
+     * never be findable, and `failed` is terminal on purpose — so without a
+     * screen naming them they would sit there for ever while the pending count
+     * looked healthy.
+     *
+     * ⚠️ AND IT NAMES THE COLLECTION, NEVER THE RECORD'S TEXT. This is an
+     * operator reading across every workspace on the deployment; what they need
+     * is which product and why it refused, and anything more would make the
+     * console a window onto customers' notes.
+     */
+    "op.search": {
+      kind: "read", needs: "session", doors: ["operator"],
+      async run(ctx): Promise<unknown> {
+        operator(ctx);
+        const shards = deps.shards?.() ?? [];
+        const total = { indexed: 0, pending: 0, failed: 0, gone: 0 };
+        const refused: { collection: string; app: string; why: string; at: string }[] = [];
+
+        for (const db of shards) {
+          /* ⚠️ A SHARD WITHOUT THE LEDGER IS SKIPPED, NOT FATAL. It predates the
+             feature until the next schema pass reaches it, and a console that
+             threw over that would be unreadable on exactly the deployment an
+             operator is trying to understand. */
+          try {
+            const at = await indexState(db);
+            total.indexed += at.indexed; total.pending += at.pending;
+            total.failed += at.failed; total.gone += at.gone;
+            for (const item of await itemsFailed(db, 10)) {
+              refused.push({
+                collection: item.collection, app: item.appId,
+                why: item.detail ?? "no reason given", at: item.at,
+              });
+            }
+          } catch { continue; }
+        }
+
+        return {
+          /* ⚠️ WHETHER THERE IS AN INDEX AT ALL. With no account token nothing
+             can create an instance or push an item, so a screen showing zeroes
+             would read as "nothing to index" over a deployment where indexing
+             cannot run. */
+          wired: !!deps.account?.(),
+          shards: shards.length,
+          ...total,
+          refused: refused.slice(0, 20),
+          /* ⚠️ WHICH COLLECTIONS SAID `searchable`, from the declarations — so a
+             product that indexes nothing is visibly indexing nothing rather
+             than absent from a list for an unknown reason. */
+          apps: every().map((a) => ({
+            id: a.id,
+            instance: deps.deployment ? instanceFor(deps.deployment, a.id) : null,
+            collections: a.collections.filter(isSearchable).map((c) => c.id),
+          })).filter((a) => a.collections.length),
+        };
       },
     },
 

@@ -188,6 +188,7 @@ live inside workspaces and an operator stands outside all of them.
 | `op.ai.bind` | write |
 | `op.models` | read |
 | `op.model.decide` | write |
+| `op.search` | read |
 | `op.jobs` | read |
 | `op.job.run` | write |
 | `op.job.schedule` | write |
@@ -344,6 +345,7 @@ before an app is resolved draws on them.
 | `vault_grant` | Who you let read them | `subject_id: delete`<br>`grantee: anonymise` | `tenant_id: delete` |
 | `vault_look` | Who looked, and when | `subject_id: delete`<br>`grantee: anonymise` | `tenant_id: delete` |
 | `media` | The files you uploaded | `subject_id: delete` | `tenant_id: delete` |
+| `search_item` | — *which records are in the index, and never what they say* | — | kept |
 
 Both walks read one ledger (`HOLDINGS` in `runtime/src/dossier.ts`), and a table
 declared by a schema module with no row in it fails `pnpm engine:gate` — which is
@@ -366,7 +368,7 @@ and a manifest that does not compose refuses to boot.
 | `present` | how a date, a number, a price and a measurement are written for one reader | 17 | — |
 | `infra` | what a product needs underneath it, and what each kind can promise | 11 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 8 | — |
-| `collection` | what a thing an app keeps is — and the six operations it gets for free | 13 | — |
+| `collection` | what a thing an app keeps is — and the six operations it gets for free | 16 | — |
 | `operation` | one declaration carrying every cross-cutting concern (D12) | 9 | — |
 | `access` | permissions, roles, and what an app may never claim | 15 | 1 |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
@@ -392,7 +394,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**259 of them**, 254 reached by something today.
+**262 of them**, 257 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -442,6 +444,8 @@ env or a binding.
 | `reconcile` | the check on the money that is not our own arithmetic | 6 | — |
 | `ai-ops` | which model a workspace picked, and what it will cost them | 1 | — |
 | `ai-run` | the seam an operation generates through — values in, a metered answer out | 1 | — |
+| `search` | what is findable: the ledger a write leaves, and the pass that carries it | 17 | — |
+| `search-ops` | the find operation a searchable collection gets, with its boundary already in it | 1 | — |
 | `operator` | the deployment looking at itself | 6 | — |
 | `deployment` | what is wrong with this deployment, asked at boot | 1 | — |
 | `mcp` | the agent door | 1 | — |
@@ -456,13 +460,13 @@ env or a binding.
 | `vault-ops` | consent, grants, who looked, the processing record, export and erasure | 1 | — |
 | `dossier` | everything we hold about one person, and everything of theirs we delete | 8 | — |
 | `legal` | who agreed to what version, and the wall until they have | 6 | — |
-| `cloudflare` | the one door out to the account — create, destroy, and add a binding | 8 | — |
+| `cloudflare` | the one door out to the account — create, destroy, and add a binding | 11 | — |
 | `storage` | files: the object, the row that knows its key, and the erasure of both | 7 | — |
 | `move` | a workspace's records change shard — the only way its jurisdiction can | 8 | — |
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**363 of them**, 362 reached by something today.
+**384 of them**, 383 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -868,6 +872,7 @@ its own header, cited by other files, and doing nothing.
 | D26 | A workspace ADDS to our instructions; it never replaces them, and it is never sent the base | 0 |
 | D27 | The charge is built on what the call cost, and something outside our arithmetic checks it | 0 |
 | D28 | A charge is milli-credits; the balance is whole ones, and the remainder carries | 0 |
+| D29 | A collection says which fields are findable, and everything else follows | 0 |
 <!-- /generated -->
 
 ---
@@ -950,8 +955,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 48 | The deployment's legal identity is complete — the registered address it is written to, and whether selling where it sells needs a representative there | **planned** |
 | 49 | A stranger joins a workspace by themselves — a door the workspace opens, a role the app names, and a ceiling the plan sells (D23) | **planned** |
 | 50 | The interface speaks a second language — dictionaries, a language control, and the copy guard reading both | **planned** |
+| 51 | A collection says `searchable` and becomes findable — the write marks, a pass carries, erasure removes, and one filter is the boundary | shipped |
 
-**40 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**41 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

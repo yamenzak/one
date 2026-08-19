@@ -193,6 +193,10 @@ describe("what the manifest produced", () => {
       "GET /api/note.list",
       "POST /api/note.publish",
       "GET /api/note.read",
+      /* ⚠️ NOTHING DECLARED THIS. `note` says `searchable: ["title", "body"]`
+         and the operation follows, with the workspace's own boundary already in
+         its filter — the same derivation the five verbs above it come from. */
+      "GET /api/note.search",
       "POST /api/note.share",
       "GET /api/note.start",
       "POST /api/note.update",

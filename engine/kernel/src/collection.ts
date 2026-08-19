@@ -57,6 +57,19 @@ export interface CollectionSpec {
   readonly versioned?: boolean;
   /** How a phone treats it with no signal. */
   readonly offline?: "cache" | "queue" | "none";
+  /**
+   * ⚠️ WHICH OF ITS OWN FIELDS ARE FINDABLE BY MEANING, AND NOTHING ELSE. Naming
+   * them here is the whole declaration: the index, the re-index on every edit,
+   * the removal on every delete, the removal on erasure and the search operation
+   * all derive from this list, so a collection becomes searchable without an app
+   * writing a line of retrieval code.
+   *
+   * ⚠️ AND IT IS A LIST OF FIELDS RATHER THAN `true`, because a record is not
+   * uniformly safe to copy out. Indexing sends text to a service outside this
+   * database, where it is chunked and embedded and cannot be selectively
+   * un-indexed later — so what leaves is named, one field at a time, in review.
+   */
+  readonly searchable?: readonly string[];
   /** ⚠️ Which operations the collection does NOT get. See `operationsFor`. */
   readonly without?: readonly CrudVerb[];
 }
@@ -128,7 +141,8 @@ export const eraseBy = (spec: CollectionSpec): { readonly column: string; readon
 export type CollectionRefusal =
   | "field_invalid" | "global_holds_data" | "kept_without_reason"
   | "subject_column_missing" | "quota_without_ceiling" | "no_operations_at_all"
-  | "not_a_name" | "vault_without_a_subject";
+  | "not_a_name" | "vault_without_a_subject"
+  | "searchable_unknown" | "searchable_not_text" | "searchable_vault";
 
 /**
  * ⚠️ AN ID AND A FIELD NAME BECOME A TABLE AND A COLUMN, AND AN IDENTIFIER
@@ -205,8 +219,63 @@ export function refuseCollection(spec: CollectionSpec): readonly CollectionProbl
     at("no_operations_at_all", "every verb opted out, so nothing can reach it");
   }
 
+  /*
+    ⚠️ WHAT IS INDEXED LEAVES THIS DATABASE, WHICH IS WHY ALL THREE OF THESE ARE
+    REFUSALS RATHER THAN WARNINGS. A searchable field's text is copied to a
+    retrieval service, chunked and embedded — and a chunk cannot be un-said. So
+    the declaration is checked before anything is ever sent.
+
+    ⚠️ AND `searchable_vault` IS THE SHARPEST OF THE THREE. A vault-backed field
+    is the one thing an app may not keep in its own table (D11): it lives
+    encrypted, behind a recorded grant, destroyable by shredding one key.
+    Indexing it would copy that fact out to a service that has no consent, keeps
+    no record of who looked, and cannot be crypto-shredded — so the whole
+    protection would be intact, and bypassed, with every guard green.
+  */
+  for (const name of spec.searchable ?? []) {
+    const f = spec.fields[name];
+    if (!f) {
+      at("searchable_unknown", `searchable names "${name}", which is not one of its fields`);
+    } else if (f.vault) {
+      at("searchable_vault",
+        `${name} is vault-backed — indexing it copies a special category out of the vault, `
+        + `where there is no consent, no record of who looked, and no way to shred it`);
+    } else if (f.kind !== "text" && f.kind !== "long") {
+      at("searchable_not_text",
+        `${name} is a ${f.kind} — search matches meaning in prose, and a number or a `
+        + `reference indexed as prose returns noise for every query`);
+    }
+  }
+
   return out;
 }
+
+/* ------------------------------------------------------------------ search --- */
+
+/**
+ * ⚠️ WHETHER THERE IS ANYTHING TO FIND, ASKED IN ONE PLACE. Every derived
+ * surface — the operation, the schema, the index job, the erasure — branches on
+ * this, and two spellings of "is it searchable" is how a collection comes to be
+ * indexed by one of them and erased by neither.
+ */
+export const isSearchable = (spec: CollectionSpec): boolean => (spec.searchable ?? []).length > 0;
+
+/** ⚠️ Reading, because finding a record is reading it — see `permissionFor`. */
+export const searchPermissionFor = (spec: CollectionSpec): string => `${spec.permission}:read`;
+
+/**
+ * ⚠️ THE TEXT THAT LEAVES, ASSEMBLED FROM THE DECLARED FIELDS AND NOTHING ELSE.
+ * A row carries columns nobody named — the scope, the provenance, whatever the
+ * app added since — and an index built from `SELECT *` would send every one of
+ * them the day it was added, with no diff to review.
+ */
+export const searchTextOf = (
+  spec: CollectionSpec, row: Readonly<Record<string, unknown>>,
+): string =>
+  (spec.searchable ?? [])
+    .map((name) => String(row[name] ?? "").trim())
+    .filter(Boolean)
+    .join("\n\n");
 
 /**
  * ⚠️ A `quota` NAMING NO ENTITLEMENT IS A CEILING NOTHING COUNTS. It reports the

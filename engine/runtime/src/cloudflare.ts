@@ -320,6 +320,56 @@ export async function listModels(at: Account): Promise<Answer<readonly Catalogue
   return call<readonly CatalogueRow[]>(at, "GET", "/ai/models/search?per_page=500&hide_experimental=true");
 }
 
+/* ---------------------------------------------------------------- search --- */
+
+/**
+ * THE ITEMS OF ONE AI SEARCH INSTANCE.
+ *
+ * ⚠️ HERE FOR THE SAME REASON THE MODEL CATALOGUE IS: the items API takes the
+ * account token, and every bound on that credential is written in this file. It
+ * is also why nothing on a request path may call this — the write path marks a
+ * row and a job carries it, so the credential that can rewrite this deployment's
+ * bindings never sits on the latency of somebody saving a note.
+ *
+ * ⚠️ AND AN UPLOAD UNDER AN EXISTING KEY REPLACES IT. That is the index's own
+ * rule, and it is what makes an edit a re-index rather than a second copy — so
+ * there is no update call here and no need for one.
+ */
+export async function ensureInstance(at: Account, instance: string): Promise<Answer<true>> {
+  /* ⚠️ LIST BEFORE CREATE, like everything else in this file — and a failed list
+     stops the pass rather than creating. See `listRemote`. */
+  const found = await call<readonly { id?: string }[]>(at, "GET", `/ai-search/instances?per_page=1000`);
+  if (!found.ok) return found;
+  if (found.value.some((r) => r.id === instance)) return yes(true);
+  const made = await call<unknown>(at, "POST", `/ai-search/instances`, { id: instance });
+  return made.ok ? yes(true) : made;
+}
+
+/** ⚠️ Multipart, because the field is a FILE — the key is its name. */
+export async function putItem(
+  at: Account, instance: string, key: string, text: string,
+): Promise<Answer<true>> {
+  const body = new FormData();
+  body.append("file", new File([text], key, { type: "text/plain" }));
+  const out = await call<unknown>(
+    at, "POST", `/ai-search/instances/${encodeURIComponent(instance)}/items`, body);
+  return out.ok ? yes(true) : out;
+}
+
+/**
+ * ⚠️ AN ITEM THAT IS ALREADY GONE IS A SUCCESS. A delete that reports failure on
+ * a missing item is a ledger row that can never be forgotten — it would be
+ * retried on every pass, for ever, over something that is already correct.
+ */
+export async function dropItem(
+  at: Account, instance: string, key: string,
+): Promise<Answer<true>> {
+  const out = await call<unknown>(at, "DELETE",
+    `/ai-search/instances/${encodeURIComponent(instance)}/items/${encodeURIComponent(key)}`);
+  if (out.ok) return yes(true);
+  return /not.?found|does not exist|404/i.test(out.why) ? yes(true) : out;
+}
+
 /** One row of the catalogue, reduced to what a price and a lane can be read from. */
 export interface CatalogueRow {
   readonly id?: string;

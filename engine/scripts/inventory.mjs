@@ -223,6 +223,8 @@ if (what === "guards") {
     ["reconcile", "the check on the money that is not our own arithmetic"],
     ["ai-ops", "which model a workspace picked, and what it will cost them"],
     ["ai-run", "the seam an operation generates through — values in, a metered answer out"],
+    ["search", "what is findable: the ledger a write leaves, and the pass that carries it"],
+    ["search-ops", "the find operation a searchable collection gets, with its boundary already in it"],
     ["operator", "the deployment looking at itself"],
     ["deployment", "what is wrong with this deployment, asked at boot"],
     ["mcp", "the agent door"],

@@ -42,6 +42,7 @@ import {
   type LogReader,
   type GatewayAt,
   mockProvider,
+  type Searcher,
 } from "@engine/runtime";
 import { hello } from "@engine/hello";
 
@@ -175,6 +176,16 @@ const PACKS: readonly PackDef[] = [
   { id: "p5", name: "5,000 credits", credits: 5_000, price: 4500, currency: "USD", order: 1 },
   { id: "p20", name: "20,000 credits", credits: 20_000, price: 16000, currency: "USD", order: 2 },
 ];
+
+/**
+ * ⚠️ THIS DEPLOYMENT'S OWN NAME, WHICH IS ALSO THE WORKER'S. It prefixes every
+ * resource this deployment makes for itself, search instances included — so a
+ * staging deployment on the same Cloudflare account has its own of everything
+ * rather than sharing an index with production, where a query would find live
+ * records. One constant, because the reconciler, the reader and the index job
+ * all have to compose the same names.
+ */
+const DEPLOYMENT = "one";
 
 /**
  * ⚠️ THE SHARDS THIS DEPLOYMENT PLACES ON, NAMED ONCE. `addShard` registers them
@@ -933,6 +944,13 @@ export interface Env {
    * is a deployment that can generate and cannot check its own margin.
    */
   readonly AI?: unknown;
+  /**
+   * ⚠️ THE SEARCH NAMESPACE, AND IT IS A NAMESPACE RATHER THAN AN INSTANCE ON
+   * PURPOSE — see the config. One binding serves every product, and which
+   * instance a query goes to is derived from the deployment and the app, so a
+   * product becoming searchable needs no binding, no deploy and no edit here.
+   */
+  readonly AI_SEARCH?: unknown;
   readonly [binding: string]: unknown;
 }
 
@@ -1069,7 +1087,7 @@ async function sweepDeps(env: Env): Promise<SweepDeps> {
             /* The worker's own name, from its config. */
             script: "one",
           },
-          deployment: "one",
+          deployment: DEPLOYMENT,
           apps: Object.values(APPS).map((make) => make()),
           serves: [...new Set(SHARD_RESIDENCY)],
         },
@@ -1089,6 +1107,10 @@ async function sweepDeps(env: Env): Promise<SweepDeps> {
       anything, which is why the name is resolved rather than assumed.
     */
     ...(env.AI && named ? { logs: () => aiLogs(env, named) } : {}),
+    /* ⚠️ THE SAME NAME THE READER USES. `serve` composes the instance from this
+       and the app id; two spellings would be a job filling one index and every
+       query reading another, which answers "no results" rather than failing. */
+    deployment: DEPLOYMENT,
     multiplier: DEFAULT_MULTIPLIER,
   };
 }
@@ -1394,6 +1416,15 @@ const handler = async (env: Env) => {
       ? { aiFallback: mockProvider(env.ENVIRONMENT) }
       : {}),
     environment: env.ENVIRONMENT,
+    /*
+      ⚠️ ONLY WHERE THE NAMESPACE IS BOUND. With no index there is nothing to
+      search, so `ctx.find` is absent and the generated find operation says
+      search is not on here — which is a sentence somebody can act on, rather
+      than every query answering "nothing found" over a working product.
+    */
+    ...(env.AI_SEARCH
+      ? { search: { searcher: env.AI_SEARCH as Searcher, deployment: DEPLOYMENT } }
+      : {}),
 
     ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
 
@@ -1547,10 +1578,13 @@ const handler = async (env: Env) => {
            hid the seven the deployment does every night. */
         jobs: async () => jobBookFor(await sweepDeps(env)),
         runner: async () => runnerFor(await sweepWithOverrides(env)),
+        /* ⚠️ EVERY SHARD, because the index ledger is a table rather than a
+           workspace — see `OperatorDeps.shards`. */
+        shards: () => SHARDS.map((s) => shardFor(env as never, s.id)),
       /* ⚠️ Absent is a deployment that can hold an address and not a key — the
          console says so, rather than offering a field that saves nothing. */
       ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
-        deployment: "one",
+        deployment: DEPLOYMENT,
         /* ⚠️ The address the VAPID subject is built from — a push service is
            entitled to reach somebody at it. */
         root: env.ROOT,

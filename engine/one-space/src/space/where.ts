@@ -142,6 +142,8 @@ export type Where =
   | { readonly at: "actions"; readonly app?: string }
   /** The gateway itself: where calls go, and whether the margin holds. */
   | { readonly at: "gateway" }
+  /** What is findable: what is indexed, what is waiting, what the index refused. */
+  | { readonly at: "finding" }
   | { readonly at: "switches" }
   | { readonly at: "works" }
   | { readonly at: "ground" }
@@ -226,7 +228,7 @@ export const OF_CONSOLE = ["tenants", "catalogue", "ai", "keys", "switches", "te
  * the address, and a screen keeping its own copy is a second answer to "what is
  * behind this" the day one of them changes.
  */
-export const OF_AI = ["models", "actions", "gateway"] as const;
+export const OF_AI = ["models", "actions", "gateway", "finding"] as const;
 export type AiPart = typeof OF_AI[number];
 
 export type WorkspacePart = typeof OF_WORKSPACE[number];
@@ -365,7 +367,7 @@ export function pathOf(where: Where): string {
     case "workspace": return `${SPACE}/w/${where.slug}`;
     case "console": return `${SPACE}/console`;
     case "actions": return `${SPACE}/console/ai/actions${where.app ? `/${where.app}` : ""}`;
-    case "models": case "gateway": return `${SPACE}/console/ai/${where.at}`;
+    case "models": case "gateway": case "finding": return `${SPACE}/console/ai/${where.at}`;
     case "tenant": return `${SPACE}/console/tenants/${where.id}`;
     case "plan": return `${SPACE}/w/${where.slug}/plan`;
     /* ⚠️ THE PAGE IS IN THE ADDRESS TOO. Settings descend, and an area that only
@@ -472,6 +474,7 @@ export const nameOf = (where: Where): string => {
     case "models": return "Models";
     case "actions": return "Actions";
     case "gateway": return "Gateway";
+    case "finding": return "Finding things";
     case "switches": return "Switches";
     case "works": return "Nightly work";
     case "ground": return "Shards";

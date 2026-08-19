@@ -727,6 +727,10 @@
       "kind": "write"
     },
     {
+      "id": "op.search",
+      "kind": "read"
+    },
+    {
       "id": "op.jobs",
       "kind": "read"
     },
@@ -1177,6 +1181,13 @@
           "subject_id: delete"
         ],
         "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "search_item",
+        "export": null,
+        "why": "which records are in the index, and never what they say",
+        "onForget": [],
+        "onClose": null
       }
     ]
   }

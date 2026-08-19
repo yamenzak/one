@@ -16,7 +16,7 @@
  * context is passed only to them.
  */
 
-import type { Allowance, AppSpec, Channel, PackDef, PlanSpec, RoleRegistry, TenantId, Theme } from "@engine/kernel";
+import type { Allowance, AppSpec, Channel, CollectionSpec, PackDef, PlanSpec, RoleRegistry, TenantId, Theme } from "@engine/kernel";
 import { PUBLIC, SURFACES, refusePolicy, seatsUsed, withinQuota } from "@engine/kernel";
 import { brandingOf, setBranding } from "./branding.js";
 import { LEAST_SIDE, MOST_BYTES, MOST_SIDE, forgetIcon, hasIcon, setIcon } from "./icon.js";
@@ -25,6 +25,7 @@ import { inboxOf, markSeen, policyOf, preferenceOf, setPolicy, setPreference, un
 import { invite, membersOf, remove, rolesFor, setAppRole, setPlatformRole } from "./membership.js";
 import type { Ctx, Resolved } from "./compose.js";
 import type { Db } from "./sql.js";
+import type { Found } from "./search.js";
 import type { Bucket } from "./storage.js";
 
 /**
@@ -102,6 +103,21 @@ export interface PlatformCtx extends Ctx {
    * running on a value it could not read.
    */
   readonly configSecret?: string;
+  /**
+   * FIND RECORDS BY MEANING, IN ONE SCOPE.
+   *
+   * ⚠️ BOUND BY THE DEPLOYMENT, WHICH IS WHERE THE INSTANCE NAME LIVES. An
+   * operation handed a raw index client would have to compose the instance name
+   * itself, and two spellings of it is a workspace searching an index nothing
+   * writes to — which answers "no results" rather than failing.
+   *
+   * ⚠️ AND ABSENT IS AN ANSWER. A deployment with no index bound still serves
+   * every other operation a searchable collection has; the find operation says
+   * so rather than throwing.
+   */
+  readonly find?: (
+    spec: CollectionSpec, scope: string, query: string, limit?: number,
+  ) => Promise<readonly Found[] | "no_index" | "failed">;
 }
 
 const asPlatform = (ctx: Ctx): PlatformCtx => ctx as PlatformCtx;

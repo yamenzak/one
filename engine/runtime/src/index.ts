@@ -26,6 +26,7 @@ export * from "./models.js";
 export * from "./gateway.js";
 export * from "./spend.js";
 export * from "./reconcile.js";
+export * from "./search.js";
 export * from "./vault.js";
 export * from "./records.js";
 export * from "./handles.js";

@@ -32,6 +32,8 @@ import { vaultOps } from "./vault-ops.js";
 import { mediaOps } from "./media-ops.js";
 import { moneyOps } from "./money-ops.js";
 import { aiOps } from "./ai-ops.js";
+import { searchOps } from "./search-ops.js";
+import { noteGone, noteWritten } from "./search.js";
 import { centreOps } from "./centre-ops.js";
 
 /* ------------------------------------------------------------------ shape --- */
@@ -150,7 +152,7 @@ export interface Composed {
 const scopeOf = (spec: CollectionSpec, ctx: Ctx): string =>
   eraseBy(spec)?.of === "subject" ? (ctx.accountId ?? "") : ctx.tenantId;
 
-function crudFor(spec: CollectionSpec, verb: CrudVerb): Resolved {
+function crudFor(spec: CollectionSpec, verb: CrudVerb, appId: string): Resolved {
   const id = `${spec.id}.${verb}`;
   const kind = verb === "list" || verb === "read" ? "read" as const : "write" as const;
 
@@ -205,6 +207,12 @@ function refuse(ctx: Pick<Ctx, "fail">, done: WriteRefusal, spec: CollectionSpec
       case "create": {
         const done = await put(ctx.db, spec, scope, input, ctx.accountId, ctx.now, ctx.vault);
         if ("why" in done) refuse(ctx, done, spec);
+        /* ⚠️ MARKED HERE RATHER THAN IN THE JOB, because only the write knows a
+           write happened. A job that scanned for un-indexed rows would have to
+           read every record of every searchable collection every night to find
+           the handful that changed. `noteWritten` returns immediately for a
+           collection that is not searchable. */
+        await noteWritten(ctx.db, spec, appId, scope, done.id, ctx.now);
         return done;
       }
       case "update": {
@@ -215,6 +223,10 @@ function refuse(ctx: Pick<Ctx, "fail">, done: WriteRefusal, spec: CollectionSpec
         const done = await patch(ctx.db, spec, scope, String(input.id ?? ""),
           input, ctx.accountId, ctx.now, ctx.vault);
         if ("why" in done) refuse(ctx, done, spec);
+        /* ⚠️ RE-INDEXED ON EVERY EDIT, INCLUDING ONE THAT CHANGED NOTHING — see
+           `noteWritten`. An index that only tracked edits it could prove were
+           relevant is one that silently drifts. */
+        await noteWritten(ctx.db, spec, appId, scope, done.id, ctx.now);
         return done;
       }
       case "delete": {
@@ -225,6 +237,10 @@ function refuse(ctx: Pick<Ctx, "fail">, done: WriteRefusal, spec: CollectionSpec
         await ctx.db.prepare(
           `DELETE FROM ${tableFor(spec)} WHERE id = ? AND ${eraseBy(spec)?.column ?? "id"} = ?`)
           .bind(String(input.id), scope).run();
+        /* ⚠️ MARKED GONE, NOT FORGOTTEN. The ledger row is the only handle on the
+           item in the index — dropping it here would leave a deleted record
+           findable by meaning with nothing anywhere pointing at it. */
+        await noteGone(ctx.db, spec, appId, String(input.id), ctx.now);
         return { id: String(input.id) };
       }
     }
@@ -269,7 +285,7 @@ export function compose(app: AppSpec): Composed {
   for (const spec of app.collections) {
     for (const opId of operationsFor(spec)) {
       const verb = opId.slice(spec.id.length + 1) as CrudVerb;
-      byId.set(opId, crudFor(spec, verb));
+      byId.set(opId, crudFor(spec, verb, app.id));
     }
   }
   /* ⚠️ THE ROSTER IS THE PLATFORM'S AND EVERY APP HAS IT (see `member-ops.ts`).
@@ -285,6 +301,10 @@ export function compose(app: AppSpec): Composed {
      otherwise. A product with nothing to generate should not answer two routes
      about which model does it. */
   for (const [id, resolved] of Object.entries(aiOps(app))) byId.set(id, resolved);
+  /* ⚠️ ONLY WHERE A COLLECTION SAID `searchable` — see `searchOps`. A find
+     endpoint over a product that indexes nothing answers "no results" for every
+     query, which reads as a broken search rather than an absent one. */
+  for (const [id, resolved] of Object.entries(searchOps(app))) byId.set(id, resolved);
   for (const [id, resolved] of Object.entries(centreOps(app))) byId.set(id, resolved);
   /* ⚠️ ONLY WHERE THERE IS SOMETHING TO CONSENT TO. An app that declares no
      purposes and no vault fields would otherwise answer eight routes about

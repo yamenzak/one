@@ -30,9 +30,9 @@
 import type {
   AppSpec, Instant, JobBook, JobDef, PackDef, PlanSpec, TenantId,
 } from "@engine/kernel";
-import { UNLIMITED } from "@engine/kernel";
+import { UNLIMITED, isSearchable } from "@engine/kernel";
 
-import { erase } from "./records.js";
+import { erase, readOne } from "./records.js";
 import { closeTenant, forgetBelonging, membersOfTenant, tenantById } from "./directory.js";
 import { forgetWorkspace } from "./dossier.js";
 import { bytesUsed, eraseObjects, type Bucket, type Where } from "./storage.js";
@@ -49,9 +49,10 @@ import {
 import { compedSubscriptions } from "./billing.js";
 import { column, table, type Db } from "./sql.js";
 import { type LogReader } from "./gateway.js";
-import { listModels, type Account } from "./cloudflare.js";
+import { dropItem, ensureInstance, listModels, putItem, type Account } from "./cloudflare.js";
 import { readCatalogue, syncModels } from "./models.js";
 import { inCredits, lossesIn, marginsSince, trueUp } from "./reconcile.js";
+import { flushIndex, instanceFor, type Index } from "./search.js";
 
 export interface SweepDeps {
   readonly directory: Db;
@@ -132,6 +133,14 @@ export interface SweepDeps {
    * running.
    */
   readonly logs?: () => LogReader | null;
+  /**
+   * ⚠️ WHICH DEPLOYMENT THIS IS, AND IT IS HALF OF EVERY SEARCH INSTANCE NAME.
+   * One Cloudflare account can carry a staging deployment and a live one, and an
+   * instance named for the app alone would be one index holding both — so a
+   * query in staging would find production records. The reader composes the same
+   * name from the same two halves; see `instanceFor`.
+   */
+  readonly deployment?: string;
   readonly now?: () => Date;
 }
 
@@ -460,8 +469,89 @@ export function platformJobs(deps: SweepDeps): JobBook {
       { budgetSeconds: 120 });
   }
 
+  /*
+    ⚠️ THE INDEX CATCHES UP HERE, WHICH IS WHY A SAVE NEVER WAITS ON IT. A write
+    marks a row and returns; this carries what is marked. Nothing about a
+    retrieval service is then on the latency of somebody saving a note, a save
+    cannot fail because an index was down, and the account token — which is what
+    the items API takes — never reaches a tenant request path.
+
+    ⚠️ IT RUNS MORE OFTEN THAN THE REST OF THE BOOK, because everything else here
+    is a daily rule about money or retention and this is a lag somebody can SEE:
+    a record saved in the morning and not findable until tomorrow reads as search
+    being broken. Quarter-hourly is the compromise between that and a job that
+    wakes up to do nothing.
+  */
+  if (deps.account && deps.deployment) {
+    const account = deps.account;
+    const deployment = deps.deployment;
+    at("search", "Carry what changed to the index",
+      "Sends new and edited records to search, and removes the deleted ones.",
+      async () => {
+        const to = account();
+        if (!to) throw new Error("search: no account token");
+        const apps = Object.values(deps.apps).map((make) => make());
+        const index = indexOn(to);
+        let sent = 0, removed = 0, failed = 0;
+        const said: string[] = [];
+
+        /* ⚠️ THE INSTANCES FIRST, AND A FAILURE HERE STOPS THE PASS. Pushing an
+           item to an instance that does not exist is a failure per item — every
+           row would be marked `failed`, which is terminal, so one missing
+           instance would permanently poison a whole product's index. */
+        for (const app of apps) {
+          if (!app.collections.some(isSearchable)) continue;
+          const ready = await ensureInstance(to, instanceFor(deployment, app.id));
+          if (!ready.ok) throw new Error(`search: ${app.id}: ${ready.why}`);
+        }
+
+        /* ⚠️ EVERY SHARD, NOT ONE PER WORKSPACE. The ledger is a table, and
+           asking it per workspace is the same statement run once per customer —
+           the same reason retention walks shards. */
+        for (const db of deps.shards) {
+          const out = await flushIndex({
+            db, index, deployment, now,
+            collections: (appId) => apps.find((a) => a.id === appId)?.collections ?? [],
+            read: (spec, scope, recordId) => readOne(db, spec, scope, recordId),
+          });
+          sent += out.sent; removed += out.removed; failed += out.failed;
+          if (out.failed) said.push(out.detail);
+        }
+
+        /* ⚠️ A REFUSED ITEM FAILS THE RUN. A green row over an index that is
+           quietly not taking anything is the shape every guard in this
+           repository exists against — and search failing silently reads to a
+           customer as their records having vanished. */
+        if (failed) {
+          throw new Error(`${sent} indexed, ${removed} removed, ${failed} refused: `
+            + (said[0] ?? "no reason given"));
+        }
+        return {
+          touched: sent + removed,
+          detail: `${sent} indexed, ${removed} removed`,
+        };
+      },
+      { schedule: "*/15 * * * *", budgetSeconds: 60 });
+  }
+
   return book;
 }
+
+/**
+ * ⚠️ THE ADAPTER IS HERE RATHER THAN IN `search.ts`, so that module knows nothing
+ * about an account token and the job that holds one is the only thing that binds
+ * it. `search.ts` takes an `Index`; this is the one that is real.
+ */
+const indexOn = (to: Account): Index => ({
+  put: async (instance, key, text) => {
+    const out = await putItem(to, instance, key, text);
+    return out.ok ? { ok: true } : { ok: false, why: out.why };
+  },
+  drop: async (instance, key) => {
+    const out = await dropItem(to, instance, key);
+    return out.ok ? { ok: true } : { ok: false, why: out.why };
+  },
+});
 
 /**
  * ⚠️ THE SWEEP IS NOW "RUN WHAT IS DUE", AND THE BOOK IS EVERYTHING. The

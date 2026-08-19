@@ -20,8 +20,8 @@
  */
 
 import type {
-  AppSpec, Caller, DeploymentLegal, DocumentBook, DocumentDef, Door, Kind, PackDef, PlanSpec,
-  Problem, Resolved as _Resolved, Roots, Standing,
+  AppSpec, Caller, CollectionSpec, DeploymentLegal, DocumentBook, DocumentDef, Door, Kind, PackDef,
+  PlanSpec, Problem, Resolved as _Resolved, Roots, Standing,
 } from "@engine/kernel";
 import {
   IN_GOOD_STANDING, LEGAL_INDEX, LEGAL_PATH, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, check, doorFor,
@@ -48,6 +48,7 @@ import type { Db } from "./sql.js";
 import { generatorFor } from "./ai-run.js";
 import { gatewayProvider, type Provider } from "./services.js";
 import type { GatewayAt } from "./gateway.js";
+import { searchIn, type Searcher } from "./search.js";
 
 /* ------------------------------------------------------------------ seams --- */
 
@@ -195,6 +196,14 @@ export interface Wiring {
   readonly aiFallback?: Provider;
   /** ⚠️ The one thing that decides whether a mock may run — see `services.ts`. */
   readonly environment?: string;
+  /**
+   * ⚠️ WHERE A RECORD IS FOUND BY MEANING, AND THE NAME IS HALF OF IT. The
+   * instance name is composed from the deployment and the app, and it has to be
+   * composed the same way by the reader and by the job that writes — so both
+   * take it from here rather than each spelling it. A deployment with no index
+   * bound leaves `ctx.find` absent, and the generated operation says so.
+   */
+  readonly search?: { readonly searcher: Searcher; readonly deployment: string };
 }
 
 /**
@@ -837,6 +846,17 @@ export async function performOperation(
             : wiring.aiFallback!,
           environment: wiring.environment ?? "",
         }),
+      }
+      : {}),
+    /* ⚠️ BOUND HERE SO THE INSTANCE NAME IS COMPOSED ONCE. The reader and the
+       job that writes the items must agree about which instance a product's
+       records are in, and two spellings of that is a search over an index
+       nothing fills — which answers "no results" rather than failing. */
+    ...(wiring.search
+      ? {
+        find: (spec: CollectionSpec, scope: string, query: string, limit?: number) =>
+          searchIn(wiring.search!.searcher, wiring.search!.deployment, composed.app.id,
+            spec, scope, query, limit),
       }
       : {}),
     fail: (code, values, extra) => { throw new Refused(problem(catalog, code, values, extra)); },

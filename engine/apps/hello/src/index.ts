@@ -38,6 +38,18 @@ const note = collection({
   onClose: { then: "purge" },
   quota: "notes",
   offline: "queue",
+  /*
+    ⚠️ THE WHOLE OF WHAT A SEARCHABLE COLLECTION DECLARES. From this: the ledger
+    row every write leaves, the job that carries the text to the index, the
+    removal on delete and on erasure, and a `note.search` operation with the
+    workspace's own boundary already in it. Nothing else is written anywhere.
+
+    ⚠️ AND IT NAMES FIELDS RATHER THAN SAYING `true`. What is listed here leaves
+    this database — it is chunked and embedded in a service that cannot un-say a
+    chunk — so `ask` (somebody else's address) and `extra` (whatever an app put
+    in it) are absent on purpose rather than by oversight.
+  */
+  searchable: ["title", "body"],
   fields: {
     title: field.text({ label: "Title", required: true, holds: "none", max: 200 }),
     body: field.long({ label: "Body", holds: "none", max: 20_000 }),

@@ -728,3 +728,48 @@ failure with no row is a button that did nothing and left no trace.
 **Therefore never:** a per-call `Math.ceil` onto the balance; a second carry
 column; a prompt, an output or any input text on a spend row; a successful run
 with no row behind it.
+
+---
+
+## D29 — A collection says which fields are findable, and everything else follows
+
+Retrieval written per app is a scope filter written per app, and one of them will
+be written wrong — with no error, because a wrong filter returns MORE results
+rather than fewer. So `searchable: ["title", "body"]` on a `CollectionSpec` is the
+whole declaration, and the ledger, the index pass, the removal on delete, the
+removal on erasure and the `<collection>.search` operation are all derived from
+it.
+
+**It names fields rather than saying `true`, because indexing is a disclosure.**
+The text leaves this database for a service that chunks and embeds it, and a
+chunk cannot be un-said. What leaves is therefore listed one field at a time, in
+review — and three declarations are refused outright: a field that does not
+exist, a field that is not prose, and a **vault-backed** field. That last is the
+sharp one: a special category lives encrypted behind a recorded grant and dies by
+shredding one key (D11), and indexing it would copy the fact somewhere with no
+consent, no record of who looked and nothing to shred — leaving the whole
+protection intact and bypassed.
+
+**The write marks and a pass carries, which is three problems solved by one
+split.** A save never waits on a retrieval service, a save cannot fail because
+one is down, and the account token — which is what the items API takes, the
+credential that can rewrite this deployment's bindings — never reaches a tenant
+request path. The cost is that the index is a pass behind, which is why a result
+is a record ID read back out of the database rather than the indexed copy.
+
+**`gone` is a state, not a delete.** The ledger row is the only handle on the
+remote item, so dropping it when the record goes would leave a deleted record
+findable, by meaning, with nothing anywhere pointing at it. `erase` marks; the
+pass removes and forgets. And the marking lives INSIDE `erase` rather than at its
+four call sites, because a caller that forgot it would report a clean erasure
+over records that are still searchable.
+
+**One instance per app, not per workspace**, and the boundary is the folder in
+the item's key. Every account here gets a personal workspace, so per-workspace is
+a design with a customer ceiling in it; the filter is composed in one function
+that owns the boundary, exactly as every other row-level scope here is written by
+the platform rather than by a handler.
+
+**Therefore never:** an index built from a whole row; a vault-backed field in
+`searchable`; a filter composed by a caller; a ledger row holding the indexed
+text; an erasure that deletes the ledger row instead of marking it.

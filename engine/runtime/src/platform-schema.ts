@@ -40,6 +40,7 @@ import { PUSH_SCHEMA } from "./push.js";
 import { MOVE_SCHEMA } from "./move.js";
 import { RESOURCE_SCHEMA } from "./resources.js";
 import type { SchemaModule } from "./schema.js";
+import { SEARCH_SCHEMA } from "./search.js";
 import { MEDIA_SCHEMA } from "./storage.js";
 import { ICON_SCHEMA } from "./icon.js";
 import { SETTING_SCHEMA } from "./settings.js";
@@ -104,5 +105,10 @@ export const SHARD_MODULES: readonly SchemaModule[] = [
      shard is what makes its erasure one pass over one database — and what keeps
      an EU workspace's file index in the EU with everything else of theirs. */
   MEDIA_SCHEMA,
+  /* ⚠️ AND THE SEARCH LEDGER FOR THE SAME REASON. It is a pointer at a record on
+     this shard, marked gone by the same scope rule that erases the record — a
+     copy in the directory would be a pair a move has to keep in step and a
+     deletion that has to reach across two databases to be complete. */
+  SEARCH_SCHEMA,
 ];
 

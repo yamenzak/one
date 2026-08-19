@@ -79,6 +79,18 @@
   // showing one nobody is measuring.
   "ai": { "binding": "AI" },
 
+  // ⚠️ A NAMESPACE, NOT AN INSTANCE, AND THAT IS WHY IT IS ONE LINE FOR EVERY
+  // PRODUCT. An instance binding would have to be added, deployed and named per
+  // app — so shipping a searchable collection would mean editing this file,
+  // which is the infrastructure work the whole framework exists to delete. The
+  // namespace binding takes the instance name at the call, and the name is
+  // derived from the deployment and the app (`instanceFor`).
+  //
+  // ⚠️ AND THE INSTANCES THEMSELVES ARE MADE BY THE JOB, not declared here. It
+  // holds the account token, it already lists-before-creates, and a product
+  // that becomes searchable is then a manifest change with no deploy step.
+  "ai_search_namespaces": [{ "binding": "AI_SEARCH", "namespace": "default" }],
+
   "d1_databases": [
     {
       "binding": "DIRECTORY",

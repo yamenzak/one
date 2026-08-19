@@ -25,6 +25,7 @@ import { useSession } from "../session.js";
 import { useLoad } from "../centre/data.js";
 import { Actions } from "../console/Actions.js";
 import { Ai } from "../console/Ai.js";
+import { Finding } from "../console/Finding.js";
 import { Gateway } from "../console/Gateway.js";
 import { Models } from "../console/Models.js";
 import { Catalogue } from "../console/Catalogue.js";
@@ -209,6 +210,7 @@ export function ConsolePart({ part, app, onGo }: {
     case "ai": return <Ai onGo={onGo} />;
     case "models": return <Models />;
     case "gateway": return <Gateway />;
+    case "finding": return <Finding />;
     case "actions":
       return <Actions app={app} onGo={(id) => onGo({ at: "actions", app: id })} />;
     case "catalogue": return <Catalogue />;

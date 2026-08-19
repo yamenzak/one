@@ -24,11 +24,18 @@ interface AiAt {
   readonly faults: readonly Fault[];
 }
 
+/** ⚠️ One glyph per row, named beside the words rather than nested in a ternary
+    that has to grow a branch every time a sub-page is added. */
+const GLYPH: Readonly<Record<AiPart, Parameters<typeof glyphOf>[0]>> = {
+  models: "bank", actions: "sparkle", gateway: "database", finding: "search",
+};
+
 /** ⚠️ What each row is FOR, in the reader's words — see `Console.tsx`'s `saidOf`. */
 const ABOUT: Readonly<Record<AiPart, string>> = {
   models: "What this deployment sells, and at what margin",
   actions: "What answers each product's actions, and whose words it uses",
   gateway: "Where the calls go, and whether we are being paid above cost",
+  finding: "What is indexed, and what the index would not take",
 };
 
 export function Ai({ onGo }: { readonly onGo: (to: Where) => void }) {
@@ -46,6 +53,7 @@ export function Ai({ onGo }: { readonly onGo: (to: Where) => void }) {
           : `${live} model${live === 1 ? "" : "s"} on`,
         actions: undefined,
         gateway: undefined,
+        finding: undefined,
       };
 
       return (
@@ -74,7 +82,7 @@ export function Ai({ onGo }: { readonly onGo: (to: Where) => void }) {
             {OF_AI.map((part) => (
               <NavRow
                 key={part}
-                icon={glyphOf(part === "models" ? "bank" : part === "actions" ? "sparkle" : "database")}
+                icon={glyphOf(GLYPH[part])}
                 label={nameOf({ at: part } as Where)}
                 under={said[part] ?? ABOUT[part]}
                 onOpen={() => onGo({ at: part } as Where)}

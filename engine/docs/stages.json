@@ -1,6 +1,6 @@
 {
   "$comment": [
-    "THE STAGE TABLE \u2014 the one place a stage's status is recorded.",
+    "THE STAGE TABLE — the one place a stage's status is recorded.",
     "",
     "`scripts/docs.test.mjs` reads this file. Two rules make it more than a list:",
     "",
@@ -10,18 +10,18 @@
     "  2. Every guard's `stage` names a row here, so a guard cannot protect work",
     "     that is not on the map.",
     "",
-    "`ends` is the exit criterion \u2014 an observable, not a feeling. It is what makes",
+    "`ends` is the exit criterion — an observable, not a feeling. It is what makes",
     "`shipped` a claim somebody could check rather than a decision somebody made."
   ],
   "stages": [
     {
       "n": 0,
-      "title": "Ground \u2014 workspace, docs, guard registry, standards",
+      "title": "Ground — workspace, docs, guard registry, standards",
       "status": "shipped"
     },
     {
       "n": 1,
-      "title": "Kernel \u2014 entities, declarations, gate algebra, problems",
+      "title": "Kernel — entities, declarations, gate algebra, problems",
       "status": "shipped"
     },
     {
@@ -31,7 +31,7 @@
     },
     {
       "n": 3,
-      "title": "Runtime \u2014 manifest \u2192 live worker",
+      "title": "Runtime — manifest → live worker",
       "status": "shipped"
     },
     {
@@ -41,17 +41,17 @@
     },
     {
       "n": 5,
-      "title": "Surface \u2014 HeroUI shell, nav, sky, rendered settings",
+      "title": "Surface — HeroUI shell, nav, sky, rendered settings",
       "status": "shipped"
     },
     {
       "n": 6,
-      "title": "Money \u2014 plans, entitlements, credits, jobs",
+      "title": "Money — plans, entitlements, credits, jobs",
       "status": "shipped"
     },
     {
       "n": 7,
-      "title": "Services \u2014 ai and notify over RPC",
+      "title": "Services — ai and notify over RPC",
       "status": "shipped"
     },
     {
@@ -66,67 +66,67 @@
     },
     {
       "n": 10,
-      "title": "One \u2014 the deployment and the OneSpace",
+      "title": "One — the deployment and the OneSpace",
       "status": "shipped"
     },
     {
       "n": 11,
-      "title": "The agent surface \u2014 every operation an MCP tool, derived",
+      "title": "The agent surface — every operation an MCP tool, derived",
       "status": "shipped"
     },
     {
       "n": 12,
-      "title": "Multi-app access \u2014 a platform role for the workspace, a role per app inside it",
+      "title": "Multi-app access — a platform role for the workspace, a role per app inside it",
       "status": "shipped"
     },
     {
       "n": 13,
-      "title": "The package rail \u2014 a priced bundle of timed grants, one ledger, one clock",
+      "title": "The package rail — a priced bundle of timed grants, one ledger, one clock",
       "status": "shipped"
     },
     {
       "n": 14,
-      "title": "The tenant centre \u2014 the shell with the router: five areas + app screens inside",
+      "title": "The tenant centre — the shell with the router: five areas + app screens inside",
       "status": "shipped"
     },
     {
       "n": 15,
-      "title": "The operator console \u2014 the same shell on `admin.`, and the maintenance switch",
+      "title": "The operator console — the same shell on `admin.`, and the maintenance switch",
       "status": "shipped"
     },
     {
       "n": 16,
-      "title": "AI actions \u2014 a lane per action, a model the operator binds, words that narrow",
+      "title": "AI actions — a lane per action, a model the operator binds, words that narrow",
       "status": "shipped"
     },
     {
       "n": 17,
-      "title": "OneSpace \u2014 one surface over the product, reachable from every door, addressed",
+      "title": "OneSpace — one surface over the product, reachable from every door, addressed",
       "status": "shipped"
     },
     {
       "n": 19,
-      "title": "OneDesign \u2014 the design system named, packaged, documented and fenced",
+      "title": "OneDesign — the design system named, packaged, documented and fenced",
       "status": "shipped"
     },
     {
       "n": 20,
-      "title": "Workspaces \u2014 personal or commercial, one brand, one installable, a shard of their own",
+      "title": "Workspaces — personal or commercial, one brand, one installable, a shard of their own",
       "status": "shipped"
     },
     {
       "n": 21,
-      "title": "Payment \u2014 a workspace subscribes, and only a signed event stamps the plan",
+      "title": "Payment — a workspace subscribes, and only a signed event stamps the plan",
       "status": "shipped"
     },
     {
       "n": 22,
-      "title": "OneSpace \u2014 `id`, `admin` and `setup` merge into one address off the workspace root",
+      "title": "OneSpace — `id`, `admin` and `setup` merge into one address off the workspace root",
       "status": "planned"
     },
     {
       "n": 23,
-      "title": "Mail that leaves the process \u2014 a letter, its variables, and a provider",
+      "title": "Mail that leaves the process — a letter, its variables, and a provider",
       "status": "planned"
     },
     {
@@ -136,27 +136,27 @@
     },
     {
       "n": 25,
-      "title": "Agreements \u2014 versioned documents, an acceptance per person per version, and the wall until there is one",
+      "title": "Agreements — versioned documents, an acceptance per person per version, and the wall until there is one",
       "status": "shipped"
     },
     {
       "n": 26,
-      "title": "The vault is opened \u2014 consent, who looked, your data, and an erasure that shreds",
+      "title": "The vault is opened — consent, who looked, your data, and an erasure that shreds",
       "status": "shipped"
     },
     {
       "n": 27,
-      "title": "The AI lane runs \u2014 a catalogue that syncs itself, one door out to every provider, a charge built on what the call really cost, and a nightly check against the bill we are sent",
+      "title": "The AI lane runs — a catalogue that syncs itself, one door out to every provider, a charge built on what the call really cost, and a nightly check against the bill we are sent",
       "status": "shipped"
     },
     {
       "n": 28,
-      "title": "Notifications are filed \u2014 an event raised becomes a note in somebody's inbox",
+      "title": "Notifications are filed — an event raised becomes a note in somebody's inbox",
       "status": "shipped"
     },
     {
       "n": 29,
-      "title": "The daily sweep \u2014 erasure happens on a clock, and every run is recorded",
+      "title": "The daily sweep — erasure happens on a clock, and every run is recorded",
       "status": "shipped"
     },
     {
@@ -166,7 +166,7 @@
     },
     {
       "n": 31,
-      "title": "Account security \u2014 sign out everywhere, and proving it is you again before something irreversible",
+      "title": "Account security — sign out everywhere, and proving it is you again before something irreversible",
       "status": "shipped"
     },
     {
@@ -176,7 +176,7 @@
     },
     {
       "n": 33,
-      "title": "A guard refuses a declared setting nothing names \u2014 the seam a handler reads one through is live; the completeness check over it is not",
+      "title": "A guard refuses a declared setting nothing names — the seam a handler reads one through is live; the completeness check over it is not",
       "status": "shipped"
     },
     {
@@ -191,33 +191,33 @@
     },
     {
       "n": 36,
-      "title": "The deployment provisions itself \u2014 a product declares what it needs underneath it, and the reconciler makes it exist in the right jurisdiction, binds it, and reaps it after a drain",
+      "title": "The deployment provisions itself — a product declares what it needs underneath it, and the reconciler makes it exist in the right jurisdiction, binds it, and reaps it after a drain",
       "status": "shipped"
     },
     {
       "n": 37,
-      "title": "A workspace's records change shard, which is the only way its jurisdiction can \u2014 read-only while it copies, verified before it flips, and the source drained rather than emptied",
+      "title": "A workspace's records change shard, which is the only way its jurisdiction can — read-only while it copies, verified before it flips, and the source drained rather than emptied",
       "status": "shipped"
     },
     {
       "n": 38,
-      "title": "A notification leaves the process \u2014 Web Push written out rather than depended on, a subscription filed under the door it was made at so it wears that workspace's own icon, and a keypair the console generates and never accepts",
+      "title": "A notification leaves the process — Web Push written out rather than depended on, a subscription filed under the door it was made at so it wears that workspace's own icon, and a keypair the console generates and never accepts",
       "status": "shipped"
     },
     {
       "n": 39,
-      "title": "The documentation is two generated pages \u2014 what exists, derived from the engine; and how to add to it, which no generator can derive",
+      "title": "The documentation is two generated pages — what exists, derived from the engine; and how to add to it, which no generator can derive",
       "status": "shipped"
     },
     {
       "n": 40,
-      "title": "An app ships a screen \u2014 a product's browser half is a chunk of its own, loaded when its workspace opens it, drawing that workspace's own records through the door it is handed",
+      "title": "An app ships a screen — a product's browser half is a chunk of its own, loaded when its workspace opens it, drawing that workspace's own records through the door it is handed",
       "status": "shipped"
     },
     {
       "n": 41,
       "status": "planned",
-      "title": "A workspace's brand reaches the screen \u2014 the surfaces it picked, and only the ones its products have"
+      "title": "A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have"
     },
     {
       "n": 42,
@@ -227,12 +227,12 @@
     {
       "n": 43,
       "status": "planned",
-      "title": "Hello's remaining screens reach the workspace's own records \u2014 the report against its target, and writing a note"
+      "title": "Hello's remaining screens reach the workspace's own records — the report against its target, and writing a note"
     },
     {
       "n": 44,
       "status": "shipped",
-      "title": "A one-off purchase \u2014 a credit pack, and becoming a business \u2014 through the same checkout"
+      "title": "A one-off purchase — a credit pack, and becoming a business — through the same checkout"
     },
     {
       "n": 45,
@@ -242,30 +242,36 @@
     {
       "n": 46,
       "status": "shipped",
-      "title": "The wallet tops itself up \u2014 a standing instruction, a cooldown, and a decline the customer can read"
+      "title": "The wallet tops itself up — a standing instruction, a cooldown, and a decline the customer can read"
     },
     {
       "n": 47,
       "status": "shipped",
-      "title": "Storage is metered rather than refused \u2014 the included amount is where the meter starts, and an empty wallet costs the writes and never the files"
+      "title": "Storage is metered rather than refused — the included amount is where the meter starts, and an empty wallet costs the writes and never the files"
     },
     {
       "n": 48,
       "status": "planned",
-      "title": "The deployment's legal identity is complete \u2014 the registered address it is written to, and whether selling where it sells needs a representative there",
+      "title": "The deployment's legal identity is complete — the registered address it is written to, and whether selling where it sells needs a representative there",
       "ends": "`IDENTITY.address` is the address on the licence rather than the Emirate, and either a representative is declared beside the sub-processors or a written decision says none is needed for where this deployment sells"
     },
     {
       "n": 49,
       "status": "planned",
-      "title": "A stranger joins a workspace by themselves \u2014 a door the workspace opens, a role the app names, and a ceiling the plan sells (D23)",
+      "title": "A stranger joins a workspace by themselves — a door the workspace opens, a role the app names, and a ceiling the plan sells (D23)",
       "ends": "an app declares `access.joining`, composition refuses a joining role that is not a customer or that reads a tenant-scoped collection, `me.join` resolves its workspace from the door, and the customer ceiling refuses with a sentence naming the upgrade"
     },
     {
       "n": 50,
       "status": "planned",
-      "title": "The interface speaks a second language \u2014 dictionaries, a language control, and the copy guard reading both",
+      "title": "The interface speaks a second language — dictionaries, a language control, and the copy guard reading both",
       "ends": "`Presentation.language` is offered on the Formats screen, every written string in `@engine/design` and `engine/one-space` resolves through a dictionary, and `tone.test.mjs` checks the voice in each language rather than only in English"
+    },
+    {
+      "n": 51,
+      "status": "shipped",
+      "title": "A collection says `searchable` and becomes findable — the write marks, a pass carries, erasure removes, and one filter is the boundary",
+      "ends": "`searchable` on a `CollectionSpec` produces the ledger, the `<collection>.search` operation, the quarter-hourly index pass and the removal on delete and on erasure, with `searching.test.mjs` making each of the four silences a test failure."
     }
   ]
 }
