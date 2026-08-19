@@ -20,7 +20,7 @@
 import { useState } from "react";
 import { Button } from "@heroui/react";
 import {
-  ActionRow, Confirm, Group, NoteRow, Screen, glyphOf, notice, useShown,
+  Confirm, Group, NoteRow, Screen, notice, useShown,
 } from "@engine/design";
 import { dayIn, type Instant, type Problem } from "@engine/kernel";
 import { api } from "../api.js";
@@ -87,13 +87,27 @@ export function Data() {
     <Screen shape="detail">
       {problem ? <Trouble problem={problem} /> : null}
 
-      <Group label="Take a copy" under="Everything we hold about you, as one file">
-        <ActionRow
-          icon={glyphOf("file")}
-          label={busy ? "Gathering…" : "Download my data"}
-          under="Your account, every workspace you are in, and your own records in each"
-          onDo={() => { void copy(); }}
-        />
+      {/*
+        ⚠️ THE SAME SHAPE AS THE CARD BELOW IT, AND FOR THE SAME REASON. This was
+        an `ActionRow` — which carries no chevron by design, because it does
+        something rather than going somewhere — so a neutral one is an ordinary
+        row of words with nothing at all saying it can be pressed. The card under
+        it already says what a section IS and offers the act as a button; two
+        cards side by side, one of them with an invisible control, is the reader
+        being asked to work out which of them is a control.
+      */}
+      <Group
+        label="Take a copy"
+        under="Everything we hold about you, as one file"
+        does={(
+          <Button variant="secondary" isDisabled={busy} onPress={() => { void copy(); }}>
+            {busy ? "Gathering…" : "Download it"}
+          </Button>
+        )}
+      >
+        <NoteRow>
+          Your account, every workspace you are in, and your own records in each.
+        </NoteRow>
         {took ? (
           /* ⚠️ WHAT WAS LOOKED IN, NOT ONLY WHAT WAS FOUND. The empty places are
              the half that makes the count mean something. */
