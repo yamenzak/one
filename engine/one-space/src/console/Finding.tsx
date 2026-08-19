@@ -83,12 +83,10 @@ export function Finding() {
               <NavRow
                 icon={glyphOf("database")}
                 label="No account token"
-                under={(
-                  <span data-ink="warning">
-                    Records are being marked as they change and nothing is carrying them.
-                    Set the Cloudflare token, and the next pass sends everything waiting.
-                  </span>
-                )}
+                /* ⚠️ THE FACT, NOT THE PARAGRAPH. This was two sentences and
+                   thirty words under a row — the second of them a direction to
+                   a screen, which is what a chevron is for (DESIGN.md §2). */
+                under={<span data-ink="warning">Waiting records are not being carried</span>}
               />
             </Group>
           )}

@@ -125,6 +125,42 @@ for (const file of SOURCES) {
   than guessed at — a guard that scolds about an interpolation is one people
   learn to route around.
 */
+/*
+  ⚠️ AND THE OTHER PLACE IT HID: A ROW'S SECOND LINE WRITTEN AS AN ELEMENT. The
+  props walk above reads `under="…"` and `under: "…"`; the moment a row needs a
+  TONE on that line it becomes `under={(<span data-ink="warning">…</span>)}`, and
+  the words are children again. Every warning line in the operator console is
+  written that way, so the longest copy in the product was in the one voice with
+  the tightest limit and nothing was reading it — thirty words under a heading on
+  the gateway screen, which is what "a wall of text" was reported for.
+
+  ⚠️ THE VOICE IS STILL `under`, BECAUSE THE SLOT DECIDES THE VOICE. A row's
+  second line is a fact whatever element it is wrapped in (DESIGN.md §2), and
+  letting the wrapper change the rule is how the rule comes to have an exception
+  for exactly the rows that most need it.
+
+  ⚠️ INTERPOLATIONS ARE SKIPPED, like the block below — a line assembled at render
+  has a length this file cannot know.
+*/
+const UNDER_NODES = /\bunder=\{\s*\(?\s*<(?:span|small|p)\b[^>]*>([\s\S]*?)<\/(?:span|small|p)>/g;
+
+for (const file of SOURCES) {
+  const name = rel(file);
+  if (EXEMPT.has(name)) continue;
+  const src = strip(readFileSync(file, "utf8"));
+
+  for (const [, inner] of src.matchAll(UNDER_NODES)) {
+    if (/[{<]/.test(inner)) continue;
+    const text = inner.replace(/\s+/g, " ").trim();
+    if (text.length < 2) continue;
+    checked++;
+    for (const why of refuseCopy("under", text)) {
+      found++;
+      fail(`${name}: a row's second line "${text.slice(0, 56)}…"\n       ${why.rule} — ${why.why}`);
+    }
+  }
+}
+
 const BLOCKS = /<NoteRow[^>]*>([\s\S]*?)<\/NoteRow>/g;
 
 for (const file of SOURCES) {

@@ -91,15 +91,17 @@ export function Gateway({ onGo }: { readonly onGo: (to: Where) => void }) {
                   under={said(last(COSTS), shown).under}
                 />
               ) : (
+                /* ⚠️ THE STATE ON THE LINE AND THE INSTRUCTION IN THE ROW.
+                   This said "…so nothing can read what a call cost. Set the
+                   gateway and its token under Keys" — twenty words, two
+                   sentences, the second of which is a direction to a screen the
+                   row could simply OPEN. A second line is a fact (DESIGN.md §2);
+                   telling somebody where to go is what a chevron is for. */
                 <NavRow
                   icon={glyphOf("clock")}
                   label="Not running"
-                  under={(
-                    <span data-ink="warning">
-                      No gateway is configured, so nothing can read what a call cost.
-                      Set the gateway and its token under Keys.
-                    </span>
-                  )}
+                  under={<span data-ink="warning">No gateway configured</span>}
+                  onOpen={() => onGo({ at: "keys" })}
                 />
               )}
             </Group>
@@ -138,15 +140,13 @@ export function Gateway({ onGo }: { readonly onGo: (to: Where) => void }) {
                   />
                 </>
               ) : (
+                /* ⚠️ Same shape, same fix — the fact, and a row that goes to
+                   the screen where the token is set. */
                 <NavRow
                   icon={glyphOf("bank")}
                   label="Not running"
-                  under={(
-                    <span data-ink="warning">
-                      This deployment holds no Cloudflare account token, so nothing can
-                      discover a model or a price. Until it does, no model answers any lane.
-                    </span>
-                  )}
+                  under={<span data-ink="warning">No Cloudflare token, so no model answers any lane</span>}
+                  onOpen={() => onGo({ at: "keys" })}
                 />
               )}
             </Group>
