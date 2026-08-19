@@ -578,44 +578,19 @@ function Arriving({ space, children }: {
   );
 }
 
-/* ------------------------------------------------------------------ board --- */
-
-/**
- * A GRID WHOSE ITEMS ARE NOT ALL THE SAME SIZE.
- *
- * ⚠️ THE SPANS ARE WHAT MAKES IT A BOARD RATHER THAN A LIST WITH COLUMNS. A grid
- * of identical tiles says every one of them matters equally, which is almost
- * never true and is the reason a wall of equal cards reads as a menu somebody
- * gave up sorting. One wide tile at the top is a hierarchy, expressed in the
- * only channel a grid has.
- *
- * ⚠️ AND IT IS TWO COLUMNS ON A PHONE, ALWAYS. One column is a list and should
- * have been declared as one; three is a phone showing 100px-wide cards. The
- * widening happens at `md`, where there is room for it and not before.
- */
-export function Board({ children }: { readonly children: React.ReactNode }) {
-  return (
-    <div className={`grid grid-cols-2 md:grid-cols-4 ${SPACE.snug}`}>{children}</div>
-  );
-}
-
-/**
- * ⚠️ `wide` AND `tall` RATHER THAN NUMBERS. A tile that could ask for four
- * columns is a tile that breaks the board on a phone, where there are two — so
- * the vocabulary offers the two spans a two-column grid can honour and nothing
- * else. On a wide board they become two of four, which is the same proportion.
- */
-export function Tile({ wide, tall, children }: {
-  readonly wide?: boolean;
-  readonly tall?: boolean;
-  readonly children: React.ReactNode;
-}) {
-  return (
-    <div className={`${wide ? "col-span-2" : ""} ${tall ? "row-span-2" : ""} min-w-0`}>
-      {children}
-    </div>
-  );
-}
+/*
+  ⚠️ `Board` AND `Tile` WERE HERE AND ARE GONE, WHICH IS WORTH ONE PARAGRAPH.
+  They were a fixed two-then-four column grid with `wide`/`tall` spans, and the
+  argument for them was hierarchy: one wide tile says which measure matters.
+  Their only caller was the operator's shard screen, and drawing it proved the
+  opposite — two columns on a phone is 190 pixels a tile, so a heading, a place
+  and a value wrapped onto three lines and no two tiles were the same height.
+  Bars stacked in one card compare BETTER, because they start at the same x.
+  What survives is `Grid` (auto-fit, so the column count follows the content's
+  own minimum width) and the `board` SHAPE, which is about page width rather
+  than about a grid. A span vocabulary can come back the day something needs a
+  span; until then it is a second way to lay out a page that nothing has tried.
+*/
 
 /* -------------------------------------------------------------- whichever --- */
 

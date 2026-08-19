@@ -453,9 +453,16 @@ it: no title, no way back, a sentence alone on a page. A refusal is content.
 ### Within the shape
 
 Use the whole width. A phone is one column, a desktop is not — `Grid`, `Columns`
-and `Split` exist and are under-used, and `board` gives you a real grid where
-`Tile` items can be `wide` or `tall`. Two figures that answer one question belong
-side by side, not stacked with a gap.
+and `Split` exist and are under-used, and `board` widens the page for them. Two
+figures that answer one question belong side by side, not stacked with a gap.
+
+**But a grid of two on a phone is not width, it is halves.** `Grid` takes a
+`min`, so the column count follows what the content needs to be readable and
+collapses to one when it cannot have it. A grid with a fixed column count says
+"two, whatever that is worth here" — measured on the shard screen, it was 190
+pixels a tile: a label wrapped onto three lines and no two tiles were the same
+height. Several bars stacked in ONE card compare better than several cards
+holding one bar each, because they start at the same x and are the same width.
 
 **Density is a decision.** Not everything is a full-width row. A count belongs in
 the corner of the row it counts. A rarely-used action belongs in a menu on the
