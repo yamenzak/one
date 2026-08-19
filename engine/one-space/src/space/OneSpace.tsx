@@ -334,6 +334,7 @@ function Inside({ where, onGo }: {
       <ConsolePart
         part={where.at}
         app={"app" in where ? where.app : undefined}
+        lane={"lane" in where ? where.lane : undefined}
         onGo={onGo}
       />
     );

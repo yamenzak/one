@@ -49,8 +49,28 @@ const ALIASES: Readonly<Record<Lane, readonly string[]>> = {
 /** Every provider name that answers for a lane. */
 export const lanesFor = (lane: Lane): readonly string[] => ALIASES[lane];
 
+/**
+ * A PROVIDER'S NAME FOR A TASK, IN OUR SPELLING.
+ *
+ * ⚠️ THE ALIAS TABLE ABOVE IS HYPHENATED AND A CATALOGUE IS NOT. Cloudflare
+ * publishes `Text Generation`, `Automatic Speech Recognition`, `Text
+ * Embeddings` — display names, with spaces and capitals — so matching them
+ * lowercased against `text-generation` finds nothing, and the lanes whose names
+ * happen to be one word (`Text-to-Image`) work while the rest silently do not.
+ * Four of six lanes were empty on a catalogue holding models for all six, and
+ * every one of those models was present on the screen saying nothing would ever
+ * select it.
+ *
+ * ⚠️ SO IT IS NORMALISED ONCE, HERE, AND EVERY READER GOES THROUGH IT — the
+ * lane lookup, the lane's membership test, and the sync that writes the column.
+ * Normalising at only the write end leaves every row already stored unreachable
+ * until somebody re-syncs, which is a fix that appears not to work.
+ */
+export const taskKey = (task: string): string =>
+  task.trim().toLowerCase().replace(/[\s_]+/g, "-");
+
 export const laneOf = (task: string): Lane | null =>
-  (LANES.find((l) => ALIASES[l].includes(task)) ?? null);
+  (LANES.find((l) => ALIASES[l].includes(taskKey(task))) ?? null);
 
 /* ----------------------------------------------------------------- models --- */
 
@@ -122,7 +142,7 @@ export const priceFor = (row: ModelRow, lane: Lane): ModelOffer => ({
 
 /** ⚠️ A retired row still RESOLVES and is never OFFERED — see `ModelRow`. */
 export const inLane = (rows: readonly ModelRow[], lane: Lane): readonly ModelRow[] =>
-  rows.filter((r) => lanesFor(lane).includes(r.task));
+  rows.filter((r) => lanesFor(lane).includes(taskKey(r.task)));
 
 /** What a workspace may choose from: in the lane, enabled, and still sold. */
 export const offeredIn = (rows: readonly ModelRow[], lane: Lane): readonly ModelRow[] =>
@@ -314,8 +334,18 @@ export function refuseCatalogue(rows: readonly ModelRow[], needed: readonly Lane
   const at = (of: string, why: AiRefusal, detail: string) => out.push({ of, why, detail });
 
   for (const r of rows) {
-    if (!laneOf(r.task)) at(r.id, "unknown_task", `Its task, "${r.task}", maps to no lane, so nothing will ever select it`);
+    /* ⚠️ A MODEL WE DO NOT SELL IS NOT A FAULT, AND SAYING SO BURIED THE ONES
+       THAT ARE. A provider's catalogue carries classifiers, translators,
+       rerankers and detectors; this deployment offers six lanes and none of them
+       is those. Reported per row, a sixty-model catalogue drew fifty red cards
+       above the list — so the screen's one real entry, a lane with nothing
+       enabled, was somewhere in the middle of them. Turning one ON is the
+       contradiction: an operator has sold something nothing can ever pick. */
     if (!r.enabled || r.retired) continue;
+    if (!laneOf(r.task)) {
+      at(r.id, "unknown_task",
+        `Switched on, but its task "${r.task}" maps to no lane, so nothing will ever select it`);
+    }
     if (r.input <= 0 && r.output <= 0) {
       at(r.id, "priced_at_nothing", "Enabled and priced at zero, so every call settles free");
     }

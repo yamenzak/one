@@ -219,6 +219,7 @@ if (what === "guards") {
     ["ai-actions", "which model an action runs on, and in whose words"],
     ["models", "the model catalogue — what exists, what it costs us, what a workspace pays"],
     ["gateway", "the one door out to a model, and where a run's real cost is read"],
+    ["google", "the models Cloudflare does not host, and what we hold their rates at"],
     ["spend", "one row per run: where a workspace's credits went, and never what was said"],
     ["reconcile", "the check on the money that is not our own arithmetic"],
     ["ai-ops", "which model a workspace picked, and what it will cost them"],

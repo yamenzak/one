@@ -391,11 +391,11 @@ and a manifest that does not compose refuses to boot.
 | `job` | scheduled work, and the record that it ran | 7 | — |
 | `brand` | which surfaces a workspace may put its own mark on | 10 | 1 |
 | `mark` | the logo as geometry, so the browser and the Worker draw one shape | 7 | — |
-| `ai` | a generating action: its lane, its prompt, its ceiling | 16 | — |
+| `ai` | a generating action: its lane, its prompt, its ceiling | 17 | — |
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**262 of them**, 257 reached by something today.
+**263 of them**, 258 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -441,6 +441,7 @@ env or a binding.
 | `ai-actions` | which model an action runs on, and in whose words | 7 | — |
 | `models` | the model catalogue — what exists, what it costs us, what a workspace pays | 13 | — |
 | `gateway` | the one door out to a model, and where a run's real cost is read | 8 | — |
+| `google` | the models Cloudflare does not host, and what we hold their rates at | 3 | — |
 | `spend` | one row per run: where a workspace's credits went, and never what was said | 4 | — |
 | `reconcile` | the check on the money that is not our own arithmetic | 6 | — |
 | `ai-ops` | which model a workspace picked, and what it will cost them | 1 | — |
@@ -467,7 +468,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**392 of them**, 391 reached by something today.
+**395 of them**, 394 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -876,6 +877,8 @@ its own header, cited by other files, and doing nothing.
 | D29 | A collection says which fields are findable, and everything else follows | 0 |
 | D30 | A stream is the same metered run, and the charge rides the last token | 0 |
 | D31 | Two capabilities assessed and not adopted, with the trigger that reopens each | 0 |
+| D32 | The catalogue has two sources, and one is priced from a table we hold | 0 |
+| D33 | A lane is an address, and a model we do not sell is not a fault | 0 |
 <!-- /generated -->
 
 ---

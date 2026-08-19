@@ -1046,6 +1046,10 @@ async function sweepDeps(env: Env): Promise<SweepDeps> {
   const directory = env.DIRECTORY as unknown as Db;
   /* ⚠️ Read once per pass rather than per job — see `sweepWithOverrides`. */
   const named = await configOf(directory, env.CONFIG_SECRET, "ai.gateway");
+  /* ⚠️ READ ONCE PER PASS, LIKE THE GATEWAY'S NAME. The catalogue sync needs it
+     because Cloudflare's own list covers Cloudflare's own models and nothing
+     else — see `SweepDeps.googleKey`. */
+  const google = await configOf(directory, env.CONFIG_SECRET, "google.api_key");
   return {
     directory,
     shardOf: async (tenantId) => {
@@ -1077,6 +1081,9 @@ async function sweepDeps(env: Env): Promise<SweepDeps> {
        the authority for the floor, the budget and the failure route. */
     scheduleOf: () => undefined,
     ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
+    /* ⚠️ SO THE CATALOGUE IS THE WHOLE CATALOGUE — Gemini is not in Cloudflare's
+       list, and a deployment with the key set had no row to switch on. */
+    googleKey: () => google || null,
     /* ⚠️ ONLY WHERE THERE IS A TOKEN. Absent is a deployment that cannot
        provision, which is a state it has to survive rather than an error — a
        self-host, a test run, and this one before the secret is set. */

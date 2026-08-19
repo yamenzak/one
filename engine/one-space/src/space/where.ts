@@ -24,6 +24,12 @@
  */
 
 import type { Sky } from "@engine/design";
+import { sentence } from "@engine/design";
+/* ⚠️ THE KERNEL'S OWN LANE LIST, ASKED. A second copy here would be right on the
+   day it was written and would silently 404 the seventh lane. */
+import { LANES, type Lane } from "@engine/kernel";
+
+const isLane = (v: string): v is Lane => (LANES as readonly string[]).includes(v);
 
 export const SPACE = "/space";
 
@@ -136,8 +142,16 @@ export type Where =
    * different days, so they are four destinations (DESIGN.md §3).
    */
   | { readonly at: "ai" }
-  /** Which models this deployment sells, at what margin. */
-  | { readonly at: "models" }
+  /**
+   * Which models this deployment sells, at what margin.
+   *
+   * ⚠️ AND A LANE IS AN ADDRESS, BECAUSE A CATALOGUE IS SIXTY ROWS. Flat, every
+   * model in every lane was one scroll — and the question somebody opens this
+   * with is always about a LANE ("does anything answer text, and which one wins")
+   * rather than about the catalogue. Six rows that descend answer it in a glance;
+   * the list answers it by being read (DESIGN.md §3, "descend, don't cram").
+   */
+  | { readonly at: "models"; readonly lane?: string }
   /** Per product: what answers each action, and whose words it uses. */
   | { readonly at: "actions"; readonly app?: string }
   /** The gateway itself: where calls go, and whether the margin holds. */
@@ -353,7 +367,13 @@ export function parseWhere(path: string): Where {
     if (part === "ai" && tail[1]) {
       const inner = tail[1];
       if (!isAiPart(inner)) return { at: "ai" };
-      return inner === "actions" && tail[2] ? { at: inner, app: tail[2] } : { at: inner };
+      if (inner === "actions") return tail[2] ? { at: inner, app: tail[2] } : { at: inner };
+      /* ⚠️ A LANE IS THE SEGMENT UNDER `models`, and an unknown one is the
+         index rather than a 404 — see the header: parsing is TOTAL. */
+      if (inner === "models" && tail[2]) {
+        return isLane(tail[2]) ? { at: inner, lane: tail[2] } : { at: inner };
+      }
+      return { at: inner };
     }
     return { at: part };
   }
@@ -376,7 +396,9 @@ export function pathOf(where: Where): string {
     case "workspace": return `${SPACE}/w/${where.slug}`;
     case "console": return `${SPACE}/console`;
     case "actions": return `${SPACE}/console/ai/actions${where.app ? `/${where.app}` : ""}`;
-    case "models": case "gateway": case "finding": return `${SPACE}/console/ai/${where.at}`;
+    case "models":
+      return `${SPACE}/console/ai/models${where.lane ? `/${where.lane}` : ""}`;
+    case "gateway": case "finding": return `${SPACE}/console/ai/${where.at}`;
     case "tenant": return `${SPACE}/console/tenants/${where.id}`;
     case "plan": return `${SPACE}/w/${where.slug}/plan`;
     /* ⚠️ THE PAGE IS IN THE ADDRESS TOO. Settings descend, and an area that only
@@ -433,7 +455,9 @@ export function above(where: Where): Where | null {
       for a top-level part and wrong for everything inside one, so an area has to
       name its own children.
     */
-    case "models": case "gateway": case "finding": return { at: "ai" };
+    /* ⚠️ A LANE GOES UP TO THE CATALOGUE, not past it to the area. */
+    case "models": return where.lane ? { at: "models" } : { at: "ai" };
+    case "gateway": case "finding": return { at: "ai" };
     case "actions": return where.app ? { at: "actions" } : { at: "ai" };
     case "tenant": return { at: "tenants" };
     case "plan": return { at: "money", slug: where.slug };
@@ -489,7 +513,9 @@ export const nameOf = (where: Where): string => {
     case "catalogue": return "Price list";
     case "tenant": return "Workspace";
     case "ai": return "AI";
-    case "models": return "Models";
+    /* ⚠️ THE LANE IS SAID, NOT PRINTED. `text` is a key in a closed set and
+       "Text" is the word for it — DESIGN.md §1.9. */
+    case "models": return where.lane ? sentence(where.lane) : "Models";
     case "actions": return "Actions";
     case "gateway": return "Gateway";
     case "finding": return "Finding things";

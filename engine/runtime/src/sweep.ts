@@ -51,6 +51,7 @@ import { column, table, type Db } from "./sql.js";
 import { type LogReader } from "./gateway.js";
 import { dropItem, ensureInstance, listModels, putItem, type Account } from "./cloudflare.js";
 import { propertyIdsOf, readCatalogue, syncModels } from "./models.js";
+import { listGeminiModels } from "./google.js";
 import { inCredits, lossesIn, marginsSince, trueUp } from "./reconcile.js";
 import { flushIndex, instanceFor, type Index } from "./search.js";
 
@@ -92,6 +93,14 @@ export interface SweepDeps {
   readonly storageRate?: number;
   /** ⚠️ What a stored Stripe key is encrypted under — see `config.ts`. */
   readonly configSecret?: string;
+  /**
+   * ⚠️ THE GOOGLE KEY, SO THE CATALOGUE IS THE WHOLE CATALOGUE. Cloudflare's own
+   * list covers the models it hosts and nothing else, so without this a
+   * deployment routing Gemini through the gateway has no Gemini row to sell.
+   * Absent is a deployment with no Google key set, which sells Cloudflare's
+   * models and says so.
+   */
+  readonly googleKey?: () => string | null;
   /**
    * ⚠️ A SHARD BY ITS ID, WHICH A MOVE NEEDS AND A TENANT LOOKUP CANNOT GIVE. The
    * target shard has no workspace on it yet, so `shardOf` — which resolves
@@ -441,7 +450,29 @@ export function platformJobs(deps: SweepDeps): JobBook {
             + `token under Keys, which is a different credential and is used for running `
             + `models rather than listing them.`);
         }
-        const found = readCatalogue(answer.value);
+        /*
+          ⚠️ TWO SOURCES, ONE CATALOGUE, AND CLOUDFLARE'S IS ONLY HALF OF IT.
+          `/ai/models/search` answers for the models Cloudflare HOSTS; Gemini
+          reaches us through the same gateway and appears in none of them. So a
+          deployment with a Google key set, a gateway that would route the call
+          and an operator who had done everything right had no Gemini row to
+          switch on, and nothing said why — from the catalogue's own side
+          nothing was missing.
+
+          ⚠️ AND GOOGLE'S FAILURE MUST NOT BE CLOUDFLARE'S. Retiring is scoped by
+          provider (see `syncModels`), so a pass that reached one vendor and not
+          the other retires everything the missing one sells. A partial answer is
+          therefore reported and NOT applied.
+        */
+        const alsoGoogle = deps.googleKey?.();
+        const google = alsoGoogle ? await listGeminiModels(alsoGoogle) : null;
+        if (google && !google.ok) {
+          throw new Error(`catalogue: Cloudflare answered, Google did not — ${google.why}. `
+            + `Nothing was applied, because a pass that reaches one vendor and not the `
+            + `other retires every model the missing one sells.`);
+        }
+
+        const found = [...readCatalogue(answer.value), ...(google?.value ?? [])];
         const out = await syncModels(deps.directory, found, deps.multiplier, now);
         /*
           ⚠️ A REFUSAL SAYS WHAT IT SAW, because the alternative is what happened

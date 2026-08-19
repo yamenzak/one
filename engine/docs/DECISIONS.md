@@ -848,3 +848,69 @@ whose class name is load-bearing for ever, a second state model beside D1, and a
 second routing model beside the doors. **The trigger:** the first product that
 needs a conversation to survive a disconnect and resume where it stopped. Until
 then it is weight for a capability nothing has asked for.
+
+---
+
+## D32 — The catalogue has two sources, and one is priced from a table we hold
+
+Cloudflare's `/ai/models/search` answers for the models Cloudflare HOSTS. Gemini
+reaches this deployment through the same gateway, over the same `/compat`
+endpoint, and appears in none of it — so a deployment with a Google key set, a
+gateway that would route the call and an operator who had done everything right
+had no Gemini row to switch on. Nothing failed and nothing said why, because from
+the catalogue's own side nothing was missing.
+
+**So the sync reads Google too, and prices it from a table in `google.ts`.**
+Google publishes what its models ARE — names, token limits, what each answers to
+— and not what they cost; the rates are on a page written for people. That
+asymmetry is the awkward fact the file is shaped around, and the shape is:
+discover from the API, price from a table we hold, dated in public, and **store
+nothing we cannot price**. A row at zero settles free on every call while the
+provider's invoice arrives anyway — a reserve is a ceiling on revenue, so the
+error only ever runs one way.
+
+**A table we hold is the one number in the metering chain nobody else checks**,
+which is the real cost of this decision. The answer is not a promise to keep it
+current: `ai-costs` reads the gateway's own log nightly and reports any workspace
+sold under cost, so a stale rate surfaces as a margin fault rather than as a
+quiet loss. **The trigger to revisit:** a published rates API from Google, or a
+second vendor needing the same treatment — two hand-held rate tables is a
+pattern, and a pattern belongs in the store rather than in a file each.
+
+⚠️ **And a partial answer is not applied.** Retiring is scoped by provider, so a
+pass that reaches Cloudflare and not Google would retire every Gemini model this
+deployment sells — at 03:00, over a rotated key. The job refuses instead, and
+says which vendor did not answer.
+
+---
+
+## D33 — A lane is an address, and a model we do not sell is not a fault
+
+Two failures on one screen, both of which made a working catalogue read as a
+broken one.
+
+**The lanes were empty because a display name is not a key.** The alias table is
+hyphenated (`text-generation`) and Cloudflare publishes `Text Generation`, so the
+lanes whose published name happened to be one hyphenated word resolved and the
+rest silently did not — four of six empty on a catalogue holding models for all
+six. `taskKey` normalises once and every reader goes through it, **including the
+write**: `laneOf` and `inLane` can normalise on read, but `decideModel` clears a
+lane's other defaults in SQL, where nothing can. That last one is why the column
+itself has to be canonical, and it was found by mutating the parser rather than
+by reading it.
+
+**And the catalogue's own breadth was reported as sixty problems.** A provider
+ships classifiers, translators, rerankers and detectors; this deployment offers
+six lanes and none of them is those. Reported per row as `unknown_task` they were
+fifty red cards stacked above the list, so the one entry that mattered — a lane
+an app asks for with nothing enabled — was somewhere inside them. A model we do
+not sell is a fact and takes one row; **switched ON into no lane it is a
+contradiction**, and that is the fault.
+
+**A lane is now a real address** (`/console/ai/models/<lane>`), because the
+question somebody opens this screen with is always about a lane. Six rows that
+descend answer "does anything answer text, and which one wins" at a glance; flat,
+it was one scroll of sixty rows each carrying the vendor's marketing paragraph.
+Held as component state a lane could not be linked to, landed on, or gone back
+from — so the crown's arrow would leave the whole catalogue from inside one of
+its lanes.

@@ -12,6 +12,7 @@ import {
   SPACE, OF_AI, OF_CONSOLE, OF_WORKSPACE, above, groundOf, inSpace, isConsole, nameOf,
   parseWhere, partsFor, pathOf,
 } from "../src/space/where.js";
+import { LANES } from "@engine/kernel";
 
 describe("what belongs to OneSpace", () => {
   it("claims its own prefix and nothing else", () => {
@@ -211,5 +212,45 @@ describe("a screen inside an area", () => {
     for (const part of [...OF_CONSOLE, ...OF_AI]) {
       expect(isConsole({ at: part } as never), part).toBe(true);
     }
+  });
+});
+
+/**
+ * A LANE IS AN ADDRESS, AND THAT IS WHAT MAKES DESCENDING FREE.
+ *
+ * ⚠️ THE CATALOGUE WAS ONE FLAT SCROLL OF SIXTY MODELS because a lane had
+ * nowhere to be. Six rows that descend answer "does anything answer text, and
+ * which one wins" at a glance — but only if the lane is in the path: held as
+ * component state it cannot be linked to, landed on, or gone BACK from, and the
+ * crown's arrow would leave the whole catalogue from inside one of its lanes.
+ */
+describe("one lane of the catalogue", () => {
+  it("is an address under the catalogue", () => {
+    expect(pathOf({ at: "models", lane: "text" })).toBe(`${pathOf({ at: "models" })}/text`);
+  });
+
+  it("survives the round trip", () => {
+    for (const lane of LANES) {
+      expect(parseWhere(pathOf({ at: "models", lane }))).toEqual({ at: "models", lane });
+    }
+  });
+
+  /* ⚠️ TOTAL: a lane nobody has is the catalogue, never a blank screen. */
+  it("reads an unknown lane as the catalogue itself", () => {
+    expect(parseWhere(`${pathOf({ at: "models" })}/telepathy`)).toEqual({ at: "models" });
+  });
+
+  /* ⚠️ UP ONE LEVEL, NEVER PAST ONE — a lane goes to the catalogue and the
+     catalogue goes to the area. Both arrows skipping to the console is the fault
+     this file already caught once, one level higher. */
+  it("leaves upwards to the catalogue, and the catalogue to its area", () => {
+    expect(above({ at: "models", lane: "text" })).toEqual({ at: "models" });
+    expect(above({ at: "models" })).toEqual({ at: "ai" });
+  });
+
+  /* ⚠️ SAID, NOT PRINTED. `text` is a key in a closed set (DESIGN.md §1.9). */
+  it("is named by the lane rather than by its key", () => {
+    expect(nameOf({ at: "models", lane: "text" })).toBe("Text");
+    expect(nameOf({ at: "models" })).toBe("Models");
   });
 });

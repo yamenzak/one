@@ -36,69 +36,86 @@ export const perMillion = (milliPerThousand: number): string => {
       : credits.toFixed(2);
 };
 
-export interface PriceProps {
-  readonly input: number;
-  readonly output: number;
-  /** What the numbers are per — "token", "image", "second". */
-  readonly meter: string;
-}
+/**
+ * ⚠️ WHAT THE NUMBERS ARE PER, IN THE READER'S WORDS — never the meter's key
+ * (DESIGN.md §1.9). `token`, `image` and `second` are values the code branches
+ * on; "1M tokens" is the thing on the screen.
+ *
+ * ⚠️ AND THERE IS NO `Price` CHIP ANY MORE. A price was a soft-filled capsule on
+ * every row of a sixty-row list, which is a screen of chips — the number belongs
+ * in the row's own second line, as the fact it is.
+ */
+export const per = (meter: string): string =>
+  meter === "token" ? "1M tokens" : meter === "image" ? "1k images" : "1k seconds";
 
-/** ⚠️ In and out, together, because one without the other is not a price. */
-export function Price({ input, output, meter }: PriceProps) {
-  const per = meter === "token" ? "1M tokens" : meter === "image" ? "1k images" : "1k seconds";
-  return (
-    <Chip color="default" variant="soft">
-      <Chip.Label>
-        <span className="tabular-nums">{perMillion(input)}</span>
-        {" in · "}
-        <span className="tabular-nums">{perMillion(output)}</span>
-        {` out · ${per}`}
-      </Chip.Label>
-    </Chip>
-  );
-}
-
+/**
+ * ⚠️ ONE LINE, BECAUSE A CATALOGUE IS A LIST AND NOT SIXTY ARTICLES. This drew
+ * the model's full marketing description under every row — "FLUX.1 [schnell] is
+ * a 12 billion parameter rectified flow transformer capable of…" — so a lane of
+ * twenty models was a wall of vendor prose that nobody setting a margin needed,
+ * and the switch they came for was four scrolls down. A row's second line is a
+ * FACT (DESIGN.md §2): what it costs, what it is called, whether it thinks.
+ *
+ * ⚠️ AND THE DESCRIPTION IS NOT DELETED, IT IS ONE PRESS AWAY. It is genuinely
+ * useful once — when somebody is deciding whether to sell a model they have not
+ * heard of — which is exactly what a sheet is for.
+ */
 export interface ModelLineProps {
   readonly label: string;
   readonly id: string;
-  readonly about?: string | null;
   readonly meter: string;
   readonly input: number;
   readonly output: number;
+  readonly multiplier?: number;
   readonly thinks?: boolean;
   readonly retired?: boolean;
+  readonly isDefault?: boolean;
   /** The operator's controls, or nothing at all for a workspace. */
   readonly controls?: React.ReactNode;
 }
 
 export function ModelLine({
-  label, id, about, meter, input, output, thinks, retired, controls,
+  label, id, meter, input, output, multiplier, thinks, retired, isDefault, controls,
 }: ModelLineProps) {
   return (
-    <Stack space="tight">
-      <Row space="tight">
-        <Stack space="tight">
-          <strong>{label}</strong>
-          <small data-ink="muted">{id}</small>
-        </Stack>
-        <Spacer />
-        {controls}
-      </Row>
-      {about ? <small data-ink="muted">{about}</small> : null}
-      <Cluster space="tight">
-        <Price input={input} output={output} meter={meter} />
-        {/* ⚠️ Worth its own mark: a thinking model bills for tokens nobody asked
-            for and nobody sees, which is why the reserve widens for one. */}
-        {thinks
-          ? <Chip color="warning" variant="soft"><Chip.Label>Thinks</Chip.Label></Chip>
-          : null}
-        {/* ⚠️ RETIRED IS SHOWN RATHER THAN HIDDEN. A model gone from a provider's
-            catalogue is still named on old runs and may still be bound; hiding it
-            makes "why is this on a model I cannot find" unanswerable. */}
-        {retired
-          ? <Chip color="danger" variant="soft"><Chip.Label>Gone from the provider</Chip.Label></Chip>
-          : null}
-      </Cluster>
-    </Stack>
+    <Row space="tight">
+      <Stack space="hair">
+        <Row space="tight">
+          <strong className="truncate">{label}</strong>
+          {/* ⚠️ THE ONE-WORD MARKS ONLY, INLINE. A thinking model bills for
+              tokens nobody asked for, and the lane's default is the row that
+              actually runs — both change what a press means, so both are on the
+              row rather than behind it. */}
+          {isDefault
+            ? <Chip color="success" variant="soft"><Chip.Label>Default</Chip.Label></Chip>
+            : null}
+          {thinks
+            ? <Chip color="warning" variant="soft"><Chip.Label>Thinks</Chip.Label></Chip>
+            : null}
+          {/* ⚠️ RETIRED IS SHOWN RATHER THAN HIDDEN. A model gone from a
+              provider's catalogue is still named on old runs and may still be
+              bound; hiding it makes "why is this on a model I cannot find"
+              unanswerable. */}
+          {retired
+            ? <Chip color="danger" variant="soft"><Chip.Label>Gone</Chip.Label></Chip>
+            : null}
+        </Row>
+        {/*
+          ⚠️ THE COST AND THE MARGIN ON ONE LINE, because either alone is
+          unreadable: a number with no multiplier beside it is not a margin, and
+          a multiplier with no number is not a price. This is the whole reason
+          the operator's row differs from a workspace's.
+        */}
+        <small data-ink="muted" className="tabular-nums">
+          {perMillion(input)}
+          {" / "}
+          {perMillion(output)}
+          {` per ${per(meter)}`}
+          {multiplier === undefined ? "" : ` · ${multiplier}× cost`}
+        </small>
+      </Stack>
+      <Spacer />
+      {controls}
+    </Row>
   );
 }

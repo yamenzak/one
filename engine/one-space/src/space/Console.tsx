@@ -200,15 +200,18 @@ export function ConsoleHome({ onGo }: { readonly onGo: (to: Where) => void }) {
 }
 
 /** ⚠️ The bodies are the ones that already existed — this is only the seam. */
-export function ConsolePart({ part, app, onGo }: {
+export function ConsolePart({ part, app, lane, onGo }: {
   readonly part: ConsolePartId | AiPart;
   readonly app?: string;
+  /* ⚠️ One area's screens descend, so the seam has to carry what they descend
+     INTO — see `Where`'s `models`. */
+  readonly lane?: string;
   readonly onGo: (to: Where) => void;
 }) {
   switch (part) {
     case "tenants": return <Tenants onGo={(id) => onGo({ at: "tenant", id })} />;
     case "ai": return <Ai onGo={onGo} />;
-    case "models": return <Models />;
+    case "models": return <Models where={{ at: "models", ...(lane ? { lane } : {}) }} onGo={onGo} />;
     case "gateway": return <Gateway onGo={onGo} />;
     case "finding": return <Finding />;
     case "actions":

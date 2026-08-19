@@ -23,7 +23,7 @@
  */
 
 import type { Meter, ModelRow } from "@engine/kernel";
-import { laneOf, lanesFor, milliFromUsd } from "@engine/kernel";
+import { laneOf, lanesFor, milliFromUsd, taskKey } from "@engine/kernel";
 import type { CatalogueRow } from "./cloudflare.js";
 import type { SchemaModule } from "./schema.js";
 import type { Db } from "./sql.js";
@@ -107,6 +107,13 @@ export async function decideModel(
          spelling; a second copy of that list here would be right on the day it
          was written and would silently miss half a lane after the next one is
          added. */
+      /* ⚠️ AND THIS IS THE ONE READER THAT CANNOT NORMALISE. `laneOf` and
+         `inLane` put a provider's task name through `taskKey` before matching,
+         so a stored `Text Generation` still resolves everywhere in TypeScript —
+         but SQL compares the column, so a row written unnormalised is invisible
+         to this `IN` and its default is never cleared. Two rows then claim the
+         lane and which one runs depends on row order. `readCatalogue` is what
+         keeps the column canonical; this is why that matters. */
       const names = lanesFor(lane);
       await db.prepare(
         `UPDATE ai_model SET is_default = 0 WHERE task IN (${names.map(() => "?").join(",")})`)
@@ -377,8 +384,10 @@ export const usdPerMillion = (said: string | null): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
+/* ⚠️ `taskKey`, NOT `toLowerCase` — a catalogue publishes DISPLAY names ("Text
+   Generation"), and the lane table is hyphenated. See `taskKey`. */
 const taskOf = (row: CatalogueRow): string =>
-  (typeof row.task === "string" ? row.task : row.task?.name ?? "").toLowerCase();
+  taskKey(typeof row.task === "string" ? row.task : row.task?.name ?? "");
 
 /**
  * ⚠️ WHAT A LANE COUNTS, DERIVED FROM WHAT THE MODEL DOES. An image model billed

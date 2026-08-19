@@ -167,11 +167,11 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 57 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 53 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 135 |
-| `rendered/` | whole surfaces drawn from a kernel declaration | 56 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 137 |
+| `rendered/` | whole surfaces drawn from a kernel declaration | 55 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**341 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**342 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -212,13 +212,14 @@ there is no deep import, and a guard says so.
 - `parts/permission.tsx` — `Permission`, `PermissionRow`, `PermissionRowProps`
 - `parts/pick-file.tsx` — `PickFile`, `PickFileProps`
 - `parts/said.tsx` — `Amount`, `Clock`, `Dated`, `machineHere`, `Num`, `Presenting`, `Size`, `useAmount`, `useDay`, `useDays`, `useFigures`, `useShown`, `When`
+- `parts/settle.tsx` — `SettledProps`, `SettledSwitch`
 - `parts/state.tsx` — `Await`, `AwaitProps`, `ChartWaiting`, `FigureWaiting`, `FormWaiting`, `Loaded`, `Nothing`, `nothingIn`, `ready`, `RowsWaiting`, `TableWaiting`, `TextWaiting`, `TilesWaiting`, `trouble`, `Trouble`, `waiting`, `Working`
 - `parts/surfaces.tsx` — `ActionRow`, `AmountRow`, `BrandTile`, `ControlRow`, `CopyRow`, `FieldRow`, `Group`, `GroupProps`, `Identity`, `Money`, `NavRow`, `NavRowProps`, `NoteRow`, `OfferRow`, `PersonRow`, `Place`, `QuickActions`, `SeeAll`, `Sheet`, `StepRow`, `Swatch`, `TileGrid`, `ToggleRow`
 - `parts/tally.tsx` — `Tally`, `TallyProps`
 
 ### `rendered/`
 
-- `rendered/ai.tsx` — `ModelLine`, `ModelLineProps`, `perMillion`, `Price`, `PriceProps`
+- `rendered/ai.tsx` — `ModelLine`, `ModelLineProps`, `per`, `perMillion`
 - `rendered/console.tsx` — `FlagConsole`, `FlagConsoleProps`, `saying`, `Shelf`, `ShelfProps`, `useMoney`
 - `rendered/edit.tsx` — `Edit`, `EditProps`, `EditRow`, `Refusal`, `refuse`, `Shown`
 - `rendered/field.tsx` — `Field`, `FieldProps`
