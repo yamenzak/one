@@ -356,7 +356,7 @@ and a manifest that does not compose refuses to boot.
 |---|---|---|---|
 | `primitives` | ids, days, instants, slugs — the words everything else is spelled in | 10 | — |
 | `present` | how a date, a number, a price and a measurement are written for one reader | 17 | — |
-| `infra` | what a product needs underneath it, and what each kind can promise | 10 | — |
+| `infra` | what a product needs underneath it, and what each kind can promise | 11 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 8 | — |
 | `collection` | what a thing an app keeps is — and the six operations it gets for free | 13 | — |
 | `operation` | one declaration carrying every cross-cutting concern (D12) | 9 | — |
@@ -367,7 +367,7 @@ and a manifest that does not compose refuses to boot.
 | `credit` | metered work: the reserve, the rate, the ceiling | 7 | 1 |
 | `dunning` | the ladder from past due to erased | 5 | — |
 | `package` | a priced bundle of timed grants | 8 | 1 |
-| `tenancy` | workspaces, kinds, shards, placement, standing | 11 | — |
+| `tenancy` | workspaces, kinds, shards, placement, standing | 12 | — |
 | `door` | the five doors, and which host is which | 2 | — |
 | `setting` | a switch a workspace owns, and the page it lives on | 9 | — |
 | `flag` | a switch WE own, with a date it stops being one | 7 | — |
@@ -384,7 +384,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**237 of them**, 230 reached by something today.
+**239 of them**, 232 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 

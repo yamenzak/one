@@ -25,6 +25,7 @@ import type {
 } from "@engine/kernel";
 import {
   ALLOWANCE_KEY, KEEPS_RESIDENCY, allowanceFor, entitlementKeys, inLane, mayIsolate,
+  sayKind,
   refuseCatalogue,
   refusePrompt,
   stalled,
@@ -877,7 +878,7 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
             .filter((n) => n.holds !== "none" && !KEEPS_RESIDENCY[n.kind])
             .flatMap((n) => (deps.serves ?? []).filter((r) => r !== "global")
               .map((r) => ({ app: app.id, need: n.id, kind: n.kind, residency: r,
-                why: `a ${n.kind} carries ${n.holds} data and the vendor offers no residency control for it` })))),
+                why: `A ${sayKind(n.kind)} carries ${n.holds} data, and the vendor offers no residency control for it` })))),
         };
       },
     },

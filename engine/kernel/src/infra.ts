@@ -43,6 +43,27 @@ import type { Residency } from "./tenancy.js";
 export type ResourceKind = "d1" | "kv" | "r2" | "queue" | "ai" | "do";
 
 /**
+ * WHAT A KIND OF STORE IS CALLED IN FRONT OF SOMEBODY.
+ *
+ * ⚠️ `d1`, `r2` AND `kv` ARE ONE VENDOR'S PRODUCT NAMES, and the operator screen
+ * was printing them as though they described anything: a row reading "d1 · the
+ * EU · SHARD_EU_1", and a withheld need explaining that "a ai carries personal
+ * data". The names are here rather than in a screen because the refusal
+ * sentences are written here too, and two wordings of one closed set is how they
+ * come to disagree.
+ */
+const KIND: Readonly<Record<ResourceKind, string>> = {
+  d1: "database",
+  kv: "cache",
+  r2: "bucket",
+  queue: "queue",
+  ai: "model provider",
+  do: "coordinator",
+};
+
+export const sayKind = (kind: ResourceKind): string => KIND[kind] ?? kind;
+
+/**
  * ⚠️ WHETHER THIS KIND CAN BE HELD TO A RESIDENCY, per the vendor. A `false`
  * here is not a gap in our implementation and cannot be closed by writing more
  * code — it is a capability the platform underneath does not have, and the only
@@ -202,7 +223,7 @@ export function refuseNeeds(
 
     if (n.holds !== "none" && promises.length && !KEEPS_RESIDENCY[n.kind]) {
       at(n.id, "residency_cannot_be_kept",
-        `a ${n.kind} carries ${n.holds} data and cannot be held to ${promises.join("/")} — `
+        `a ${sayKind(n.kind)} carries ${n.holds} data and cannot be held to ${promises.join("/")} — `
         + `the vendor offers no residency control for it, so the promise is broken the first time it runs`);
     }
   }

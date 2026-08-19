@@ -20,7 +20,7 @@
 
 import { Group, Meter, Screen, glyphOf, sentence } from "@engine/design";
 import { SPACE, TYPE } from "@engine/design";
-import type { Shard } from "@engine/kernel";
+import { sayWhere, type Shard } from "@engine/kernel";
 import { useLoad } from "../centre/data.js";
 
 export function Ground() {
@@ -62,10 +62,13 @@ export function Ground() {
                   500 with nothing saying it is that way on purpose, which is a
                   capacity problem an operator would then go and "fix" by
                   placing somebody on it. */}
+              {/* ⚠️ THE PLACE IS A PLACE, NOT THE KEY. `where` is `eu` | `global`
+                  — values the placement branches on, and printed raw a shard
+                  read "eu · Hello". See `sayWhere` in the kernel. */}
               <span className={TYPE.note}>
                 {s.dedicatedTo
-                  ? `${s.where} · kept for one workspace`
-                  : `${s.where} · ${s.apps.map(sentence).join(", ") || "no schemas applied"}`}
+                  ? `In ${sayWhere(s.where)} · kept for one workspace`
+                  : `In ${sayWhere(s.where)} · ${s.apps.map(sentence).join(", ") || "no schemas applied"}`}
               </span>
             </div>
           ))}

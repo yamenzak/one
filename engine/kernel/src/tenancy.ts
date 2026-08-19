@@ -90,6 +90,31 @@ export const EEA: readonly string[] = [
 export const residencyFor = (country: string): Residency =>
   EEA.includes(country.toUpperCase()) ? "eu" : "global";
 
+/**
+ * WHAT A JURISDICTION IS CALLED IN FRONT OF SOMEBODY.
+ *
+ * ⚠️ `eu` AND `global` ARE KEYS, AND FOUR SCREENS WERE PRINTING THEM. A shard
+ * described as "eu", a deployment "serving eu, global", a feature withheld "in
+ * eu" — each is a value the code branches on, rendered where a place was meant.
+ * The words are here rather than in a screen because there is one closed set and
+ * four readers, and the fifth reader would invent a fifth wording.
+ *
+ * ⚠️ AND `global` IS NOT "ANYWHERE" — see `residencyFor`. It is where records go
+ * when the EU was not promised, which is a fact about this deployment rather
+ * than a promise about the world, so it is named as one.
+ *
+ * ⚠️ BOTH ARE MID-SENTENCE FORMS, ON PURPOSE. Every reader puts a preposition in
+ * front of one ("serving …", "not in …", "kept in …"), and a capitalised phrase
+ * would have to be lowered again at each of them — which is the edit somebody
+ * gets wrong once and ships as "Not in The EU".
+ */
+const WHERE: Readonly<Record<Residency, string>> = {
+  eu: "the EU",
+  global: "the default region",
+};
+
+export const sayWhere = (where: Residency): string => WHERE[where] ?? where;
+
 /* --------------------------------------------------------------- entities --- */
 
 /** A person. One identity across every product (D1). */
