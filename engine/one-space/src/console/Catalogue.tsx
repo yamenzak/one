@@ -17,11 +17,11 @@
  */
 
 import { useState } from "react";
-import { bytesOfGb, sayAllowance, sayNumber } from "@engine/kernel";
+import { bytesOfGb, gbOf, isSwitch, sayAllowance, sayNumber } from "@engine/kernel";
 import { Button, Chip } from "@heroui/react";
 import {
   AmountRow, Await, Credits, Group, Money, NoteRow, NumberInput, RowsWaiting, Screen, Stack,
-  TYPE, Tray, notice, useMoney, useShown,
+  TYPE, ToggleRow, Tray, notice, useMoney, useShown,
 } from "@engine/design";
 import type { Allowance, EntitlementDef } from "@engine/kernel";
 import { api } from "../api.js";
@@ -188,21 +188,47 @@ function EditTray({ plan, declared, keys, on, edited, onReset, onDone, onClose }
 }) {
   const say = useMoney();
   const reader = useShown();
-  const [price, setPrice] = useState<number | undefined>(undefined);
-  const [credits, setCredits] = useState<number | undefined>(undefined);
+  /*
+    ⚠️ SEEDED FROM THE PLAN, NOT LEFT UNDEFINED — and the bug that taught this is
+    worth knowing before anybody "tidies" it back. `NumberInput` reads
+    `undefined` as NOT LOADED YET and disables itself, which is right for a value
+    still in flight. These fields meant something else by it — "nobody has typed
+    yet" — so every one of them rendered as an empty stepper that could not be
+    focused, stepped or typed into. The whole tray was dead, and it looked
+    finished: a label, a field, a Save button.
+
+    ⚠️ SO "CHANGED" IS A COMPARISON RATHER THAN A PRESENCE. What the sparse patch
+    needs to know is which fields DIFFER from the plan, which the seed answers
+    exactly and an `undefined` only approximated.
+  */
+  const [price, setPrice] = useState(plan.price / 100);
+  const [credits, setCredits] = useState(plan.credits);
   const [key, setKey] = useState<string>("");
-  const [limit, setLimit] = useState<number | undefined>(undefined);
+  const [limit, setLimit] = useState(0);
+  /* ⚠️ A gate is held or not — see `isSwitch`. */
+  const [allow, setAllow] = useState(false);
 
   const sellable = Object.entries(keys).filter(([, d]) => !d.reserved);
 
+  /* ⚠️ CHOOSING THE ROW IS WHAT LOADS THE FIELD. Bytes arrive in the unit the
+     field asks in; anything else arrives as it is stored. */
+  const choose = (id: string) => {
+    setKey(id);
+    const now = plan.includes[id];
+    if (isSwitch(keys[id])) { setAllow(now === true); return; }
+    setLimit(typeof now !== "number" ? 0 : keys[id]?.unit === "bytes" ? gbOf(now) : now);
+  };
+
   const write = async () => {
     const edit: Record<string, unknown> = {};
-    if (price !== undefined) edit.price = Math.round(price * 100);
-    if (credits !== undefined) edit.credits = credits;
-    if (key && limit !== undefined) {
-      edit.includes = {
-        [key]: keys[key]?.unit === "bytes" ? bytesOfGb(limit) : limit,
-      };
+    if (Math.round(price * 100) !== plan.price) edit.price = Math.round(price * 100);
+    if (credits !== plan.credits) edit.credits = credits;
+    if (key) {
+      const def = keys[key];
+      const next: Allowance = isSwitch(def)
+        ? allow
+        : def?.unit === "bytes" ? bytesOfGb(limit) : limit;
+      if (next !== plan.includes[key]) edit.includes = { [key]: next };
     }
     if (!Object.keys(edit).length) { notice.fail("Nothing to save."); return; }
 
@@ -215,7 +241,10 @@ function EditTray({ plan, declared, keys, on, edited, onReset, onDone, onClose }
     notice.ok(held
       ? `Saved. ${held} workspace${held === 1 ? "" : "s"} kept what they were sold.`
       : "Saved.");
-    setPrice(undefined); setCredits(undefined); setLimit(undefined); setKey("");
+    /* ⚠️ NOTHING IS CLEARED HERE. The tray is keyed on the plan and closes on the
+       next line, so it unmounts — and the fields seed from the plan on the way
+       back in, which is now the refetched one. Clearing them was writing to
+       state that no longer exists. */
     onDone();
     onClose();
   };
@@ -283,27 +312,45 @@ function EditTray({ plan, declared, keys, on, edited, onReset, onDone, onClose }
                   ? `The code says ${sayAllowance(reader, def, declared.includes[id])}`
                   : undefined}
               amount={sayAllowance(reader, def, plan.includes[id])}
-              aside={<Button variant="ghost" onPress={() => setKey(id)}>Change</Button>}
+              aside={<Button variant="ghost" onPress={() => choose(id)}>Change</Button>}
             />
           ))}
         </Group>
         {/*
-          ⚠️ TYPED IN THE UNIT SOMEBODY THINKS IN. A byte quota edited as bytes is
-          thirteen digits and a stepper that would take a million presses to move
-          a gigabyte; the store stays bytes and the field asks for gigabytes.
+          ⚠️ A GATE GETS A SWITCH AND A QUOTA GETS A NUMBER — see `isSwitch`.
+          Everything here used to get the stepper, so "New number for Publishing"
+          sat under a row reading `On`: a numeric field over a boolean, saving
+          `1` into a key every reader compares against `true`.
+
+          ⚠️ AND THE NUMBER IS TYPED IN THE UNIT SOMEBODY THINKS IN. A byte quota
+          edited as bytes is thirteen digits and a stepper that would take a
+          million presses to move a gigabyte; the store stays bytes and the field
+          asks for gigabytes.
         */}
-        {key
+        {key && isSwitch(keys[key])
           ? (
-            <NumberInput
-              label={`New number for ${keys[key]?.label ?? key}`}
-              value={limit}
-              onChange={setLimit}
-              help={keys[key]?.unit === "bytes"
-                ? "Gigabytes. -1 is unlimited."
-                : "-1 is unlimited."}
-            />
+            <Group label={`What ${keys[key]?.label ?? key} does on this plan`}>
+              <ToggleRow
+                label={keys[key]?.label ?? key}
+                under={keys[key]?.help}
+                value={allow}
+                onChange={setAllow}
+              />
+            </Group>
           )
-          : null}
+          : key
+            ? (
+              <NumberInput
+                label={`New number for ${keys[key]?.label ?? key}`}
+                value={limit}
+                onChange={setLimit}
+                min={-1}
+                help={keys[key]?.unit === "bytes"
+                  ? "Gigabytes. -1 is unlimited."
+                  : "-1 is unlimited."}
+              />
+            )
+            : null}
 
         {/* ⚠️ THE WAY BACK, AND IT GRANDFATHERS TOO — a declaration that moved
             down since the edit makes reverting a cut like any other. */}

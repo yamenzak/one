@@ -161,15 +161,35 @@ export const sayAllowance = (
  * bytes. The factor is here rather than at the two call sites that need it, so
  * the plan editor and the per-workspace adjustment cannot disagree about it.
  *
- * ⚠️ THERE IS NO `gbOf` GOING THE OTHER WAY, and its absence is deliberate: both
- * fields are blank until somebody types, because they ask for a NEW number
- * rather than editing the old one. One was written, exported, called by nothing,
- * and `scripts/capability.test.mjs` refused the commit — which is what that
- * guard is for.
+ * ⚠️ AND IT CONVERTS BOTH WAYS, BECAUSE A FIELD OPENS ON THE NUMBER IT IS ABOUT
+ * TO CHANGE. It used to open blank — "a NEW number, rather than editing the old
+ * one" — and that reads well and does not work: a stepper starting from nothing
+ * has nothing to step, so `+` on a 250 GiB quota offers 1, and the operator has
+ * to know and retype the current figure to move it by one. Seeded, `+` means
+ * what it looks like.
  */
 export const GIB = 1024 ** 3;
 
 export const bytesOfGb = (gb: number): number => (gb === -1 ? -1 : Math.round(gb * GIB));
+
+/**
+ * ⚠️ TWO DECIMALS, because a quota is a round number of gigabytes in every case
+ * anybody has typed one, and a seeded field that reads `232.83` invites somebody
+ * to save the rounding error back.
+ */
+export const gbOf = (bytes: number): number =>
+  (bytes === -1 ? -1 : Math.round((bytes / GIB) * 100) / 100);
+
+/**
+ * WHETHER THIS IS A SWITCH OR A NUMBER, ANSWERED BY THE DECLARATION.
+ *
+ * ⚠️ A `gate` IS HELD OR NOT HELD, AND A STEPPER CANNOT SAY THAT. The plan
+ * editor offered "New number for Publishing" under a row reading `On` — a
+ * numeric field over a boolean, which saves `1` into a key every reader compares
+ * against `true`. `Allowance` is `number | boolean` and this is the one place
+ * that decides which, so a second surface cannot decide differently.
+ */
+export const isSwitch = (of: EntitlementDef | undefined): boolean => of?.withheld === "gate";
 
 /**
  * EVERY KEY A WORKSPACE COULD HOLD — the platform's, and every product's.

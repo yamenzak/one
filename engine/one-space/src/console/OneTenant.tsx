@@ -18,11 +18,13 @@ import { useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import {
   AmountRow, ControlRow, Credits, FieldRow, Group, Identity, Nothing, NumberInput, Row,
-  RowsWaiting, Screen, Stack, TYPE, TextInput, Tray, appFace, glyphOf, notice, placeFace,
-  sentence, useShown,
+  RowsWaiting, Screen, Stack, TYPE, TextInput, ToggleRow, Tray, appFace, glyphOf, notice,
+  placeFace, sentence, useShown,
 } from "@engine/design";
 import type { Allowance, EntitlementDef, PlanSpec } from "@engine/kernel";
-import { bytesOfGb, isBusiness, sayAllowance, sayDate, sayNumber, type Instant } from "@engine/kernel";
+import {
+  bytesOfGb, gbOf, isBusiness, isSwitch, sayAllowance, sayDate, sayNumber, type Instant,
+} from "@engine/kernel";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
 
@@ -285,14 +287,37 @@ function AdjustTray({ tenant, apps, onDone }: {
   ).filter(([, d]) => !d.reserved);
   const reader = useShown();
   const [key, setKey] = useState(keys[0]?.[0] ?? "");
-  const [value, setValue] = useState<number | undefined>(undefined);
+  /*
+    ⚠️ SEEDED, NOT LEFT UNDEFINED — see the plan editor, which had this same bug.
+    `NumberInput` reads `undefined` as "still loading" and DISABLES itself, so a
+    field meaning "nobody has typed yet" by it can never be typed into: an empty
+    stepper, and a "Set it" button disabled on the same condition, for ever.
+  */
+  const seed = (id: string): number => {
+    const held = tenant.adjustments[id];
+    if (typeof held !== "number") return 0;
+    return keys.find(([k]) => k === id)?.[1]?.unit === "bytes" ? gbOf(held) : held;
+  };
+  const [value, setValue] = useState(() => seed(keys[0]?.[0] ?? ""));
+  /* ⚠️ A gate is held or not — see `isSwitch`. */
+  const [allow, setAllow] = useState(tenant.adjustments[keys[0]?.[0] ?? ""] === true);
   const of = keys.find(([id]) => id === key)?.[1];
   const label = of?.label ?? key;
 
-  const write = async (next: number | null, which = key) => {
+  /* ⚠️ CHOOSING THE ROW IS WHAT LOADS THE FIELD, so `+` steps from the number
+     the row is showing rather than from nothing. */
+  const choose = (id: string) => {
+    setKey(id);
+    if (isSwitch(keys.find(([k]) => k === id)?.[1])) setAllow(tenant.adjustments[id] === true);
+    else setValue(seed(id));
+  };
+
+  const write = async (next: Allowance | null, which = key) => {
     /* ⚠️ TYPED IN GIGABYTES AND STORED IN BYTES — see `sayAllowance`. The field
-       asks in the unit somebody thinks in; the store never changes. */
-    const store = next !== null && keys.find(([id]) => id === which)?.[1]?.unit === "bytes"
+       asks in the unit somebody thinks in; the store never changes. A gate is a
+       boolean and passes straight through. */
+    const store = typeof next === "number"
+      && keys.find(([id]) => id === which)?.[1]?.unit === "bytes"
       ? bytesOfGb(next) : next;
     const out = await api.post("op.tenant.adjust", { tenant: tenant.id, key: which, value: store });
     if (!out.ok) { notice.fail(out.problem.title); return; }
@@ -313,8 +338,8 @@ function AdjustTray({ tenant, apps, onDone }: {
         <Button
           slot="close"
           variant="primary"
-          isDisabled={value === undefined || !key}
-          onPress={() => void write(value ?? 0)}
+          isDisabled={!key}
+          onPress={() => void write(isSwitch(of) ? allow : value)}
         >
           Set it
         </Button>
@@ -332,19 +357,31 @@ function AdjustTray({ tenant, apps, onDone }: {
               under={id === key ? "changing this one" : undefined}
               amount={sayAllowance(reader, def, tenant.adjustments[id])}
               aside={tenant.adjustments[id] === undefined
-                ? <Button variant="ghost" onPress={() => setKey(id)}>Change</Button>
+                ? <Button variant="ghost" onPress={() => choose(id)}>Change</Button>
                 : <Button variant="ghost" onPress={() => void write(null, id)}>Clear</Button>}
             />
           ))}
         </Group>
-        <NumberInput
-          label={`New number for ${label}`}
-          value={value}
-          onChange={setValue}
-          help={of?.unit === "bytes"
-            ? "Gigabytes. Absolute, either direction. -1 is unlimited."
-            : "Absolute, either direction. -1 is unlimited."}
-        />
+        {/* ⚠️ A GATE GETS A SWITCH AND A QUOTA GETS A NUMBER — see `isSwitch`.
+            Every key used to get the stepper, so an on/off capability was set by
+            typing a number into it. */}
+        {isSwitch(of)
+          ? (
+            <Group label={`What ${label} does for this workspace`}>
+              <ToggleRow label={label} under={of?.help} value={allow} onChange={setAllow} />
+            </Group>
+          )
+          : (
+            <NumberInput
+              label={`New number for ${label}`}
+              value={value}
+              onChange={setValue}
+              min={-1}
+              help={of?.unit === "bytes"
+                ? "Gigabytes. Absolute, either direction. -1 is unlimited."
+                : "Absolute, either direction. -1 is unlimited."}
+            />
+          )}
       </Stack>
     </Tray>
   );
