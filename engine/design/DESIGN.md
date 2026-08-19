@@ -38,6 +38,12 @@ Read these as tests you can apply to a screenshot without knowing the codebase.
 7. **Never make somebody count.** If the answer is a number, show the number.
 8. **The default is safe.** A destructive thing is never the easy one to hit,
    and never a colour on its own.
+9. **Never print the value the code branches on.** `eu`, `d1`, `no_tenant`,
+   `owner`, `bind`, `seats` — each is a key in a closed set, and each was on a
+   screen where a place, a thing, a reason, a role, an act or a limit was meant.
+   The name lives beside the set it names (`sayWhere`, `sayKind`, `LANES`), so
+   there is one wording and the next reader inherits it; `sentence()` is the
+   floor, never the plan.
 
 ---
 
@@ -464,6 +470,30 @@ pixels a tile: a label wrapped onto three lines and no two tiles were the same
 height. Several bars stacked in ONE card compare better than several cards
 holding one bar each, because they start at the same x and are the same width.
 
+**A card holds one kind of thing.** A fact you can change as the first row of a
+five-row menu makes the reader read each row to find out which it is. Two cards
+with a gap between them already say "these are different kinds of thing", which
+is why a `Group`'s label is optional.
+
+**Peer blocks are cards, not sections.** A `Section` heading is nearly as loud as
+the screen's own title, so four of them stacked reads as four pages rather than
+one screen — and on the infrastructure screen the two blocks with a deadline on
+them were third and fourth. What happens NOW goes above what is merely true, and
+a block that only exists while something is happening (a workspace being copied)
+goes first or not at all.
+
+**A column of amounts shares a right edge, or it is not a column.** Everything
+after a row's growing label is packed to the right, so a marker on one row in
+four pushes that row's amount left by its own width. `AmountRow.mark` is the slot
+for a state marker and sits BEFORE the amount; `aside` stays after it and stays a
+control, because a control is on every row of its list or on none.
+
+**A finder appears once there is something to find.** `Listing.find` is
+permission rather than an instruction: over five rows a labelled search box is
+taller than two of the rows it filters, at the top of a screen where everything
+is already visible. The component decides, because a screen cannot know how many
+rows a deployment will have.
+
 **Density is a decision.** Not everything is a full-width row. A count belongs in
 the corner of the row it counts. A rarely-used action belongs in a menu on the
 block it acts on. Three related toggles are a `ToggleButtonGroup`, not three
@@ -511,6 +541,18 @@ away the one thing that reads instantly.
 | The screen's main action | `does` on the `Screen` | The shape decides — §4 |
 | A rare action on a block | A menu (`⋯`) | The block's corner |
 | Something destructive | `ActionRow tone="danger"` | Its own card, last |
+
+**A card that offers an act says so with a button** — `Group.does`. `ActionRow`
+carries no chevron by design, because it does something rather than going
+somewhere, so its whole affordance is the danger tone: right for "Sign out",
+and for a neutral act it is an ordinary row of words with nothing saying it can
+be pressed. "Take a copy" shipped that way directly above "Delete everything",
+which offers its act as a button.
+
+**A disclosure reads as a row.** A full-width button centres its content, so
+`Reveal`'s trigger sat in the middle of a card whose every other row began at
+the inset. Name on the left, chevron on the right, flush — which is what the
+accordion beside it already did.
 
 **An icon replaces a word only when the icon is unambiguous** — close, back,
 more, add. Everything else gets the word. An icon-only button that needs a
@@ -579,6 +621,19 @@ now.
 `text-success` generate no CSS at all, because Tailwind emits only what it finds
 written down. A component reaching for a utility that does not exist is the same
 silence one level down.
+
+**A neutral chip must not out-shout a toned one.** Measured in the dark theme,
+the library's `default` chip label computes to white — so on a list of nightly
+jobs the cadence ("Daily") was brighter than the job's name and brighter than the
+red line saying its last run failed. A chip is an annotation; a neutral one is by
+definition the case with nothing to report, so it takes the ink a quiet line
+takes (`NEUTRAL_CHIP`). The toned chips are untouched: being louder than the
+neutral is the whole of their job.
+
+**A card's verdict is the one line that wears a tone.** `Group.under` takes a
+node for exactly this — "a key with no signing secret takes money and never
+hears that it landed" is about the whole card, and the rows under it stay grey.
+Four toned lines in one card is a card with no verdict in it.
 
 **One hue is a convention rather than a choice, and it is the seal.** This theme
 is monochrome — `info` resolves to a grey — so a "verified" tick drawn in the
