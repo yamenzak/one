@@ -163,7 +163,16 @@ export const FALLBACK_MAX_OUTPUT = 4_096;
 export const rateFrom = (usdPerMillion: number): number =>
   milliFromUsd(usdPerMillion / 1000);
 
-export type SyncRefusal = "no_rows" | "no_priced_row";
+export type SyncRefusal = "no_rows" | "no_priced_row" | "no_addressable_row";
+
+/**
+ * ⚠️ A ROW IS ADDRESSABLE OR IT IS NOT A MODEL. `compatName` is
+ * `${provider}/${id}`, so a row whose vendor could not be read addresses `/<id>`
+ * — it can be listed, priced, grouped into a lane and switched on, and every
+ * call on it fails at the gateway. The provider is therefore not decoration on
+ * the row; it is half of the only name the row has.
+ */
+export const isAddressable = (row: Discovered): boolean => !!row.provider;
 
 /**
  * WHAT A DISCOVERED CATALOGUE MUST BE BEFORE ANY OF IT IS APPLIED.
@@ -176,11 +185,22 @@ export type SyncRefusal = "no_rows" | "no_priced_row";
  * ⚠️ AND A CATALOGUE WITH NO PRICES IS THE SAME FAULT ONE FIELD IN. If the shape
  * changed and nothing parses, every row lands at zero cost and every call after
  * that settles free — which looks like healthy usage until an invoice arrives.
+ *
+ * ⚠️ AND ONE WHERE NOTHING IS ADDRESSABLE IS THE SAME FAULT AGAIN, one field
+ * further over — it is the one that actually happened. Sixty-four rows synced,
+ * priced, tasked and reported as a success, every one keyed by an identifier no
+ * provider has ever answered to. A catalogue nothing can be called from is not a
+ * catalogue, and the sync must say so rather than counting it.
+ *
+ * ⚠️ ALL THREE ARE REPORTED, NOT THE FIRST. They are different faults with
+ * different fixes, and answering with whichever one was checked first sends
+ * somebody to look at prices when the shape changed underneath both.
  */
 export function refuseDiscovered(rows: readonly Discovered[]): readonly SyncRefusal[] {
   const out: SyncRefusal[] = [];
-  if (!rows.length) out.push("no_rows");
-  else if (!rows.some((r) => (r.usdPerMillionIn ?? 0) > 0 || (r.usdPerMillionOut ?? 0) > 0)) {
+  if (!rows.length) return ["no_rows"];
+  if (!rows.some(isAddressable)) out.push("no_addressable_row");
+  if (!rows.some((r) => (r.usdPerMillionIn ?? 0) > 0 || (r.usdPerMillionOut ?? 0) > 0)) {
     out.push("no_priced_row");
   }
   return out;
@@ -190,6 +210,8 @@ export interface Synced {
   readonly added: number;
   readonly priced: number;
   readonly retired: number;
+  /** ⚠️ Rows the catalogue offered that nothing could ever call — see `isAddressable`. */
+  readonly skipped: number;
   readonly refused: readonly SyncRefusal[];
 }
 
@@ -208,14 +230,32 @@ export async function syncModels(
   db: Db, found: readonly Discovered[], multiplier = DEFAULT_MULTIPLIER, now = new Date(),
 ): Promise<Synced> {
   const refused = refuseDiscovered(found);
-  if (refused.length) return { added: 0, priced: 0, retired: 0, refused };
+  if (refused.length) return { added: 0, priced: 0, retired: 0, skipped: 0, refused };
+
+  /* ⚠️ ONLY WHAT CAN BE CALLED IS STORED. A row with no provider is half a name
+     — see `isAddressable` — and storing it puts a switch on the screen that
+     turns on a model the gateway will refuse. It is counted rather than
+     dropped in silence, because a vendor we have no prefix for is a catalogue
+     that grew, not a fault. */
+  const usable = found.filter(isAddressable);
+  const skipped = found.length - usable.length;
+
+  /* ⚠️ AND ANY ALREADY STORED IS REMOVED — the one exception to "retired, never
+     deleted", and it holds because the rule is about a model that WENT AWAY:
+     actions are bound to it and runs are recorded against it, so the row is the
+     only thing that can still explain them. A row that was never addressable has
+     none of that behind it. `op.ai.bind` refuses to bind anything that is not
+     enabled and in a lane, so nothing points at it, and it is not a model that
+     went away — it is a row that was never a model. Left behind, it is an
+     enable-able switch wired to a call that cannot be made. */
+  await db.prepare(`DELETE FROM ai_model WHERE provider = ''`).run();
 
   const at = now.toISOString();
   const have = new Map((await modelsOf(db)).map((m) => [m.id, m]));
   let added = 0;
   let priced = 0;
 
-  for (const it of found) {
+  for (const it of usable) {
     const task = it.task ?? "";
     const input = rateFrom(it.usdPerMillionIn ?? 0);
     const output = rateFrom(it.usdPerMillionOut ?? 0);
@@ -250,8 +290,8 @@ export async function syncModels(
   /* ⚠️ RETIRED RATHER THAN DELETED — see the header. And only rows the sync
      could have seen: a catalogue answering for one provider must not retire
      another's. */
-  const providers = [...new Set(found.map((f) => f.provider).filter(Boolean))] as string[];
-  const seenIds = found.map((f) => f.id);
+  const providers = [...new Set(usable.map((f) => f.provider).filter(Boolean))] as string[];
+  const seenIds = usable.map((f) => f.id);
   let retired = 0;
   if (providers.length && seenIds.length) {
     const done = await db.prepare(
@@ -261,7 +301,7 @@ export async function syncModels(
     retired = done?.meta?.changes ?? 0;
   }
 
-  return { added, priced, retired, refused: [] };
+  return { added, priced, retired, skipped, refused: [] };
 }
 
 /* ------------------------------------------------------- reading a catalogue --- */
@@ -370,6 +410,37 @@ const providerOf = (id: string): string =>
   PREFIXES.find(([re]) => re.test(id))?.[1] ?? "";
 
 /**
+ * WHICH FIELD IS THE MODEL'S NAME, WHICH IS NOT THE FIELD CALLED `id`.
+ *
+ * ⚠️ CLOUDFLARE'S CATALOGUE ROW CARRIES A UUID IN `id` AND THE ADDRESSABLE PATH
+ * IN `name`, and reading the obvious one stored sixty-four models under
+ * identifiers no provider has ever answered to. Every one of them was priced,
+ * tasked, grouped into a lane and offered with a switch; `compatName` builds
+ * `${provider}/${id}`, so every call would have gone to `/<uuid>`. The sync
+ * reported a success and there was no way to tell from anywhere that it was not
+ * one.
+ *
+ * ⚠️ SO THE TEST IS THE SHAPE, NOT THE FIELD NAME — the same argument the price
+ * parser above already lost once. A model is addressed by a PATH, so whichever
+ * field looks like one is the name. That reads a marketplace-format row
+ * correctly too, where the roles are the other way round: the path is in `id`
+ * and `name` holds a human title.
+ */
+const PATHED = /\//;
+
+const addressOf = (row: CatalogueRow): string =>
+  (row.name && PATHED.test(row.name) ? row.name : row.id) ?? "";
+
+/**
+ * ⚠️ AND THE LABEL IS WHAT IS LEFT. A row whose only name is the path is titled
+ * by its last segment — `llama-3.1-8b-instruct`, which is what the vendor's own
+ * documentation calls it — because a list showing the full path twice, once as
+ * the title and once as the id beneath it, is a list of one fact.
+ */
+const titleOf = (row: CatalogueRow, id: string): string =>
+  row.name && !PATHED.test(row.name) ? row.name : id.slice(id.lastIndexOf("/") + 1) || id;
+
+/**
  * ⚠️ THE ONE PROPERTY CLOUDFLARE ACTUALLY PUBLISHES IS `price`, and the aliases
  * beside it are for the partner rows that quote the two halves separately. Every
  * one of them is tried, in the shape-reading way above, because the catalogue is
@@ -404,17 +475,18 @@ const pricing = (row: CatalogueRow): Partial<Discovered> => {
  */
 export const readCatalogue = (rows: readonly CatalogueRow[]): readonly Discovered[] =>
   rows
-    .filter((row): row is CatalogueRow & { id: string } => !!row.id)
-    .map((row) => {
+    .map((row) => ({ row, id: addressOf(row) }))
+    .filter(({ id }) => !!id)
+    .map(({ row, id }) => {
       const task = taskOf(row);
       return {
-        id: row.id,
-        ...(row.name ? { name: row.name } : {}),
+        id,
+        name: titleOf(row, id),
         ...(row.description ? { description: row.description } : {}),
         task,
         /* ⚠️ THE PREFIX `/compat` NEEDS, and Cloudflare's own rows do not carry
            one because from its side they are simply its models. */
-        provider: row.id.startsWith("@cf/") ? "workers-ai" : providerOf(row.id),
+        provider: id.startsWith("@cf/") ? "workers-ai" : providerOf(id),
         meter: meterOf(task),
         ...pricing(row),
         ...(propOf(row, "reasoning") ? { thinks: true } : {}),

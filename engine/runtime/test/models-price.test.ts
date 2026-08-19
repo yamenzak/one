@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { priceFrom, readCatalogue, refuseDiscovered } from "../src/models.js";
+import { isAddressable, priceFrom, readCatalogue, refuseDiscovered } from "../src/models.js";
 
 describe("reading a price", () => {
   it("takes a bare number as it stands", () => {
@@ -57,8 +57,19 @@ describe("reading a price", () => {
 });
 
 describe("reading a catalogue", () => {
+  /*
+    ⚠️ THE REAL ROW SHAPE, TAKEN FROM CLOUDFLARE'S OWN PUBLISHED CATALOGUE: `id`
+    is a UUID and `name` is the addressable path. This fixture used to have them
+    the other way round, which is why the code did too — a test written from the
+    same guess as the code confirms the guess and nothing else.
+  */
   const row = (properties: readonly { property_id: string; value: unknown }[]) =>
-    [{ id: "@cf/meta/llama-3", name: "Llama", task: { name: "Text Generation" }, properties }];
+    [{
+      id: "41975cc2-c82e-4e98-b7b8-88ffb186a545",
+      name: "@cf/meta/llama-3.1-8b-instruct",
+      task: { name: "Text Generation" },
+      properties,
+    }];
 
   /*
     ⚠️ THE END-TO-END CASE, because the parser being right about a value and
@@ -90,5 +101,59 @@ describe("reading a catalogue", () => {
     const [found] = readCatalogue(row([{ property_id: "context_window", value: 8192 }]));
     expect(found!.usdPerMillionIn).toBeUndefined();
     expect(refuseDiscovered([found!])).toEqual(["no_priced_row"]);
+  });
+});
+
+/**
+ * WHICH FIELD IS THE MODEL'S NAME.
+ *
+ * ⚠️ THE FAULT THESE EXIST FOR SHIPPED, RAN AND REPORTED SUCCESS. Sixty-four
+ * models synced under Cloudflare's UUIDs — priced, tasked, grouped into lanes,
+ * each with a switch — and `compatName` would have addressed every one of them
+ * as `/41975cc2-…`. Nothing failed anywhere, because nothing had been switched
+ * on yet: the first symptom would have been every AI call in the product
+ * refusing, weeks later, for a reason no screen could show.
+ */
+describe("addressing a model", () => {
+  const at = (row: { id?: string; name?: string }) =>
+    readCatalogue([{ ...row, task: { name: "Text Generation" } }])[0];
+
+  it("takes the path out of `name` when `id` is a UUID", () => {
+    const found = at({
+      id: "41975cc2-c82e-4e98-b7b8-88ffb186a545",
+      name: "@cf/meta/llama-3.1-8b-instruct",
+    });
+    expect(found!.id).toBe("@cf/meta/llama-3.1-8b-instruct");
+    /* ⚠️ And the vendor, which is the other half of the only name it has. */
+    expect(found!.provider).toBe("workers-ai");
+    /* ⚠️ Titled by its last segment — the path is already shown beneath it. */
+    expect(found!.name).toBe("llama-3.1-8b-instruct");
+  });
+
+  /* ⚠️ THE SAME RULE READ THE OTHER WAY, which is what makes it a rule about the
+     shape rather than about one vendor's field names. */
+  it("takes the path out of `id` when `name` is a human title", () => {
+    const found = at({ id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash" });
+    expect(found!.id).toBe("google/gemini-2.5-flash");
+    expect(found!.name).toBe("Gemini 2.5 Flash");
+  });
+
+  /*
+    ⚠️ AND A CATALOGUE NOTHING CAN BE CALLED FROM IS REFUSED WHOLE. This is the
+    check that turns the outage above into a visible failure: the rows parse,
+    they price, they have tasks — and not one of them resolves a vendor, so
+    every model in the answer is half a name.
+  */
+  it("refuses a catalogue where nothing resolves a vendor", () => {
+    const found = at({ id: "41975cc2-c82e-4e98-b7b8-88ffb186a545" });
+    expect(found!.provider).toBe("");
+    expect(isAddressable(found!)).toBe(false);
+    expect(refuseDiscovered([found!])).toContain("no_addressable_row");
+  });
+
+  /* ⚠️ Both faults at once are both reported — they have different fixes. */
+  it("reports every fault it found rather than the first", () => {
+    expect(refuseDiscovered([at({ id: "a-uuid-shaped-thing" })!]))
+      .toEqual(["no_addressable_row", "no_priced_row"]);
   });
 });

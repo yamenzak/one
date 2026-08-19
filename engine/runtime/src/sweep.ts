@@ -455,11 +455,16 @@ export function platformJobs(deps: SweepDeps): JobBook {
           const ids = saw ? propertyIdsOf(saw).join(", ") : "none";
           throw new Error(`catalogue refused: ${out.refused.join(", ")}. `
             + `${answer.value.length} row(s) read; the first one is `
-            + `"${saw?.id ?? "unnamed"}" and carries: ${ids}.`);
+            + `"${saw?.id ?? "unnamed"}"/"${saw?.name ?? "unnamed"}" and carries: ${ids}.`);
         }
+        /* ⚠️ A SKIPPED ROW IS SAID OUT LOUD. It is a model this deployment cannot
+           address — a vendor with no prefix here — and it is the difference
+           between a catalogue that grew and one that changed shape. Counted
+           silently, the second reads exactly like the first. */
         return {
           touched: out.added + out.priced + out.retired,
-          detail: `${out.added} new, ${out.priced} repriced, ${out.retired} retired`,
+          detail: `${out.added} new, ${out.priced} repriced, ${out.retired} retired`
+            + (out.skipped ? `, ${out.skipped} unaddressable` : ""),
         };
       },
       { budgetSeconds: 60 });

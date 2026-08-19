@@ -39,6 +39,7 @@ import {
   type Bucket, type Db, type TenantRow,
   configOf,
   DEFAULT_MULTIPLIER,
+  modelsOf,
   type LogReader,
   type GatewayAt,
   mockProvider,
@@ -1578,6 +1579,15 @@ const handler = async (env: Env) => {
            hid the seven the deployment does every night. */
         jobs: async () => jobBookFor(await sweepDeps(env)),
         runner: async () => runnerFor(await sweepWithOverrides(env)),
+        /* ⚠️ THE CATALOGUE, AND ITS ABSENCE READ AS AN EMPTY ONE. `OperatorDeps`
+           defaults `models` to no rows so a deployment that has wired no
+           catalogue reports "no lane has anything enabled" instead of throwing —
+           correct, and exactly what this console said the day after a sync wrote
+           sixty-four rows. A default that degrades honestly is a default nobody
+           can see is missing: the screen was right about a catalogue it was
+           never given, the run path read the real table, and the two disagreed
+           with nothing in between to say so. */
+        models: () => modelsOf(directory),
         /* ⚠️ EVERY SHARD, because the index ledger is a table rather than a
            workspace — see `OperatorDeps.shards`. */
         shards: () => SHARDS.map((s) => shardFor(env as never, s.id)),

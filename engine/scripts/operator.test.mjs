@@ -80,6 +80,58 @@ if (!/maintenanceMode\(wiring\.directory\)/.test(serve)) {
   ok(`maintenance: asked once, in the one operation path, and it fails open`);
 }
 
+/* ------------------------------------------------------------------ wired --- */
+
+/**
+ * ⚠️ EVERY DEPENDENCY THE CONSOLE DECLARES IS ONE THE DEPLOYMENT SUPPLIES, AND
+ * THE ONE IT FORGOT COST A DAY. `OperatorDeps` is optional almost throughout, on
+ * purpose: a self-host with no account token, no shards and no catalogue is a
+ * real deployment, and every screen degrades into a sentence saying what is not
+ * wired instead of throwing. That is the right design and it is also the trap —
+ * an omitted dependency is INDISTINGUISHABLE from a deployment that genuinely
+ * has nothing, so the console reports an empty world with total confidence.
+ *
+ * `models` was left out. The catalogue screen drew "no models yet" and the AI
+ * screen reported that no model answered any lane, on a deployment whose sync
+ * had just written sixty-four rows into the very table the run path reads. Every
+ * suite was green: the tests pass their own `models`, so the only caller that
+ * omits it is the only one that is not a test.
+ *
+ * So the rule is the whole interface, not a list of the important ones — the
+ * next field added is the next one that can be forgotten.
+ */
+{
+  const index = readFileSync(join(ENGINE, "one/src/index.ts"), "utf8");
+
+  /* The interface's own field names, so adding one extends the check by itself. */
+  const shape = /export interface OperatorDeps \{([\s\S]*?)\n\}/.exec(RAW)?.[1] ?? "";
+  const declared = [...strip(shape).matchAll(/^\s*readonly (\w+)\??:/gm)].map((m) => m[1]);
+
+  /* ⚠️ The CALL, not the file. A name that happens to appear elsewhere in eight
+     hundred lines of wiring is not this object being given a value. */
+  const call = /\.\.\.operatorOps\(\{([\s\S]*?)\n      \}\),/.exec(index)?.[1] ?? "";
+  const given = new Set([...strip(call).matchAll(/(?:^|[\s,{])(\w+)\s*[:,]/g)].map((m) => m[1]));
+
+  if (declared.length < 8) {
+    fail(`runtime/src/operator.ts: only ${declared.length} OperatorDeps field(s) parsed —\n` +
+         `       the interface has changed shape, and a dependency the deployment\n` +
+         `       never supplies would now pass unnoticed.`);
+  } else if (!call) {
+    fail(`one/src/index.ts: no operatorOps({…}) call found — the console is either\n` +
+         `       unwired or wired somewhere this cannot see, and neither fails anywhere.`);
+  } else {
+    const missing = declared.filter((name) => !given.has(name));
+    if (missing.length) {
+      fail(`one/src/index.ts: operatorOps is not given ${missing.join(", ")}.\n` +
+           `       Every one of these is optional and degrades into an empty answer, so\n` +
+           `       the console reports a deployment with nothing in it — confidently,\n` +
+           `       and identically to one that genuinely has nothing.`);
+    } else {
+      ok(`wired: the deployment supplies all ${declared.length} of the console's dependencies`);
+    }
+  }
+}
+
 /* ------------------------------------------------------------------ end --- */
 
 console.log(`\noperator: one door, one allow-list, one switch.`);

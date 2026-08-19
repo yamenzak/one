@@ -439,7 +439,7 @@ env or a binding.
 | `icon` | the picture a business uploads, and where a public route can read it | 8 | — |
 | `raster` | a PNG drawn in a Worker, for the tabs and home screens an SVG cannot reach | 3 | — |
 | `ai-actions` | which model an action runs on, and in whose words | 7 | — |
-| `models` | the model catalogue — what exists, what it costs us, what a workspace pays | 12 | — |
+| `models` | the model catalogue — what exists, what it costs us, what a workspace pays | 13 | — |
 | `gateway` | the one door out to a model, and where a run's real cost is read | 8 | — |
 | `spend` | one row per run: where a workspace's credits went, and never what was said | 4 | — |
 | `reconcile` | the check on the money that is not our own arithmetic | 6 | — |
@@ -467,7 +467,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**391 of them**, 390 reached by something today.
+**392 of them**, 391 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
