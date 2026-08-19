@@ -158,10 +158,24 @@ export function useScenery(
 /**
  * The frame every screen sits in.
  *
- * ⚠️ `min-h-dvh` RATHER THAN `min-h-screen`. On a phone, `100vh` is the height
+ * ⚠️ `min-h-svh` RATHER THAN `min-h-screen`. On a phone, `100vh` is the height
  * the viewport would be with the browser chrome hidden — so a page sized to it
  * is a page whose last control sits under the address bar until you scroll,
  * which reads as a broken layout rather than as a unit bug.
+ *
+ * ⚠️ AND `svh` RATHER THAN `dvh`, WHICH IS THE ONE THAT FIGHTS BACK. `dvh` is
+ * the CURRENTLY visible height, so it changes mid-gesture as the address bar
+ * retracts — and on any page whose content lands within one address bar of the
+ * viewport that is a loop, not a jump: the bar hides, the frame grows to the
+ * taller viewport, the content now fits, the browser clamps the scroll to zero,
+ * the page is at the top so the bar comes back, and the page is scrollable
+ * again. Measured on the operator console, whose screens are nearly all a little
+ * over one screen tall: scroll down, and it puts you back at the top.
+ *
+ * ⚠️ `svh` IS THE VIEWPORT WITH THE CHROME SHOWN, and it never changes. The
+ * frame is then a constant height, the document never re-clamps under a moving
+ * finger, and a screen shorter than the viewport still fills it. The ground is
+ * measured in the same unit (`REACH`) and `scripts/scene.test.mjs` says so.
  */
 export function Page(
   { sky = "plain", seedling, world, density = "even", nav, children }: PageProps,
@@ -189,7 +203,7 @@ export function Page(
   const own = useScenery({ sky, seedling, world, density });
   return (
     <div
-      className="min-h-dvh flex flex-col"
+      className="min-h-svh flex flex-col"
       {...own.attrs}
       style={own.css}
     >

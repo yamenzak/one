@@ -736,7 +736,7 @@ describe("a workspace's branding", () => {
       had been. Measured on the sign-in door at 412×830, the document came out
       869 tall — 39px of scroll under a screen with nothing below it, on every
       page in the product. Clipping does not stop a page scrolling: the host is
-      `min-h-dvh` and grows with its content, so nothing but the ornament is ever
+      `min-h-svh` and grows with its content, so nothing but the ornament is ever
       outside it. Verified in a browser, with a 3000px filler: 3830 tall, and
       `scrollTo(1200)` lands at 1200.
 

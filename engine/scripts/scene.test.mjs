@@ -299,34 +299,86 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
 
 /**
  * ⚠️ THE GROUND AND THE FRAME ARE MEASURED IN ONE UNIT, AND THIS IS THE ONLY
- * THING THAT CAN ASK. `Page` is `min-h-dvh`; the ground fills it, is
+ * THING THAT CAN ASK. `Page` is `min-h-svh`; the ground fills it, is
  * `position: absolute` inside it, and only `overflow-x: clip` sits above — so a
  * ground measured in `vh` stands taller than the frame by exactly the height of
  * a phone's browser chrome, hangs past the bottom, and makes EVERY page in the
  * product scrollable by that much with nothing to scroll to.
  *
- * ⚠️ AND NO RENDERED TEST COULD SEE IT. Headless Chromium has no chrome, so
- * `100vh === 100dvh` there and the overflow is exactly zero — the fault exists
- * only on the devices nothing in this repository runs on. Which is why this
- * asks about the UNIT rather than about pixels.
+ * ⚠️ AND THE UNIT IS `svh`, WHICH IS THE HALF THIS CHECK USED TO GET WRONG. It
+ * pinned `dvh` — the CURRENTLY visible height, which changes as the address bar
+ * retracts. On a page whose content lands within one address bar of the
+ * viewport that is a loop: the bar hides, the frame grows, the content fits, the
+ * scroll clamps to zero, the page is at the top so the bar returns, and it is
+ * scrollable again. `svh` is the viewport with the chrome SHOWN and never
+ * changes, so the document cannot re-clamp under a finger.
+ *
+ * ⚠️ AND NO RENDERED TEST COULD SEE EITHER FAULT. Headless Chromium has no
+ * chrome, so `100vh === 100dvh === 100svh` there and both are exactly zero
+ * pixels wrong — they exist only on the devices nothing in this repository runs
+ * on. Which is why this asks about the UNIT rather than about pixels.
  */
 {
   const src = readFileSync(join(ENGINE, "design/src/tokens/ambience.ts"), "utf8");
   const reach = /export const REACH = "([^"]+)"/.exec(src);
   const frame = readFileSync(join(ENGINE, "design/src/frame/page.tsx"), "utf8");
-  const sized = /min-h-(dvh|screen|\[[^\]]+\])/.exec(code(frame));
-  if (!reach || !sized) {
+  const sized = /min-h-(svh|dvh|lvh|screen|\[[^\]]+\])/.exec(code(frame));
+  const unit = reach && /([a-z]+)$/.exec(reach[1]);
+  if (!reach || !sized || !unit) {
     fail("scene: cannot find the ground's reach or the frame's height — one of them moved.");
-  } else if (!reach[1].endsWith("dvh")) {
-    fail(`design/src/tokens/ambience.ts: REACH is "${reach[1]}" and the frame is `
-      + `min-h-${sized[1]}.\n`
-      + `       A ground in \`vh\` inside a frame in \`dvh\` overhangs by the height of a `
-      + `phone's browser chrome, and every page scrolls by that much over nothing.`);
-  } else if (sized[1] !== "dvh") {
+  } else if (unit[1] !== sized[1]) {
     fail(`design/src/frame/page.tsx: the frame is min-h-${sized[1]} while the ground reaches `
-      + `${reach[1]} — the two have to be one unit.`);
+      + `${reach[1]} — the two have to be one unit, or the ground overhangs the frame by `
+      + `the height of a phone's browser chrome.`);
+  } else if (sized[1] !== "svh") {
+    fail(`design/src/frame/page.tsx: the frame and the ground are both \`${sized[1]}\`, and `
+      + `the unit has to be \`svh\`.\n`
+      + `       \`dvh\` and \`lvh\` track the address bar, so the frame changes height while `
+      + `somebody is scrolling — and on a page a little over one screen tall that is a loop `
+      + `rather than a jump. \`svh\` never changes.`);
   } else {
-    ok(`reach: the ground (${reach[1]}) and the frame (min-h-${sized[1]}) are one unit`);
+    ok(`reach: the ground (${reach[1]}) and the frame (min-h-${sized[1]}) are one unit, and it is stable`);
+  }
+}
+
+/*
+  ⚠️ AND NOWHERE ELSE EITHER. The frame is not the only full-screen surface — a
+  door, a signpost and two waiting states each size themselves to the viewport,
+  and every one of them was `dvh` for the same reason the frame was: it is the
+  unit that reads as "the viewport" and it is the one that moves. Checking two
+  files by name would leave the other four, which is how this fault survived the
+  first fix.
+
+  ⚠️ AND THE UNIT USUALLY APPEARS WITH NO NUMBER IN FRONT OF IT. `min-h-dvh` is
+  the shape every one of those six files was written in; `h-[68dvh]` is the rare
+  one. A pattern anchored on a digit or a bracket reads the rare one and passes
+  over all six — which is what the first version of this block did, silently,
+  against the very files the fix had just touched.
+*/
+{
+  const DIRS = ["design/src", "one-space/src", "apps"];
+  /* Line comments as well as block ones: the paragraphs explaining WHY this
+     unit is refused are themselves full of the word. */
+  const prose = (src) => code(src).replace(/^\s*\/\/.*$/gm, "");
+  const hits = [];
+  for (const dir of DIRS) {
+    for (const file of filesIn(dir, /\.tsx?$/)) {
+      if (/\.test\.tsx?$/.test(file)) continue;
+      const src = prose(readFileSync(file, "utf8"));
+      for (const [whole] of src.matchAll(/[\w[.%-]*(?:dvh|lvh)\b/g)) {
+        hits.push(`${rel(file)} — \`${whole.trim()}\``);
+      }
+    }
+  }
+  if (hits.length) {
+    for (const at of hits) {
+      fail(`${at}: sized in a viewport unit that moves.\n`
+        + `       \`dvh\` and \`lvh\` follow the address bar, so anything measured in one `
+        + `changes height while somebody scrolls. \`svh\` is the viewport with the chrome `
+        + `shown, and it is the same unit the frame and the ground use.`);
+    }
+  } else {
+    ok(`viewport: every full-screen surface is sized in \`svh\``);
   }
 }
 
@@ -341,7 +393,7 @@ const DRAWN = [...filesIn("design/src"), ...filesIn("one-space/src")];
  *
  * The inline axis was found and clipped. The block axis was left open on purpose
  * — "so the page still scrolls the way it is supposed to" — and that reasoning
- * is wrong: the host is `min-h-dvh` and grows with its content, so nothing but
+ * is wrong: the host is `min-h-svh` and grows with its content, so nothing but
  * the ornament is ever outside it. Measured on the sign-in door at 412×830, the
  * document was 869 tall: 39px of scroll under a screen with nothing below the
  * fold, on every page in the product.

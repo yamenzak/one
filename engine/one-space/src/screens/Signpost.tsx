@@ -29,7 +29,7 @@ export function Signpost({ where }: { readonly where: Where }) {
   /* ⚠️ Not nothing. The redirect is a round trip on a slow connection, and a
      blank page for the length of it is indistinguishable from a broken one. */
   return (
-    <div className="min-h-dvh grid place-items-center">
+    <div className="min-h-svh grid place-items-center">
       <Working says="Taking you to the sign-in" />
     </div>
   );

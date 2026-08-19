@@ -136,12 +136,15 @@ export const MATTE = (() => {
  * crown draws a line across the page; one that lasts a screen and fades has
  * depth, and is gone by the time anybody has scrolled past it.
  *
- * ⚠️ `dvh`, AND IT IS THE SAME UNIT THE FRAME IS SIZED IN. `Page` is
- * `min-h-dvh`; this fills it and is `position: absolute` inside it, with only
+ * ⚠️ `svh`, AND IT IS THE SAME UNIT THE FRAME IS SIZED IN. `Page` is
+ * `min-h-svh`; this fills it and is `position: absolute` inside it, with only
  * `overflow-x: clip` above — so at `100vh` the ground stood taller than the
  * frame by exactly the height of a phone's browser chrome, hung past the bottom,
  * and made EVERY page in the product scrollable by that much with nothing to
  * scroll to. Two units for one viewport is the whole of it.
+ *
+ * ⚠️ AND IT IS NOT `dvh`, WHICH BOTH OF THEM WERE. `dvh` tracks the address bar,
+ * so the frame changed height under a finger that was scrolling — see `Page`.
  *
  * ⚠️ AND NO TEST COULD HAVE SEEN IT. Headless Chromium has no browser chrome, so
  * `100vh === 100dvh` there and the overflow is exactly zero — the fault only
@@ -149,7 +152,7 @@ export const MATTE = (() => {
  * `scripts/scene.test.mjs` asserts instead: not the pixels, but that the ground
  * and the frame are measured in the same unit.
  */
-export const REACH = "100dvh";
+export const REACH = "100svh";
 
 /** The layers of one ambience, innermost last, as `background-image` entries. */
 export type { SceneFamily, Sky };
@@ -447,7 +450,7 @@ export function ambienceStylesheet(): string {
        869 tall — 39px of scroll under a screen with nothing below the fold, on
        every page in the product. The reasoning for leaving the block axis alone
        was that the page still has to scroll; it does, and clipping does not stop
-       it. The host is `min-h-dvh` and GROWS with its content, so content is
+       it. The host is `min-h-svh` and GROWS with its content, so content is
        never outside the box — the only thing beyond it is the ornament.
 
        ⚠️ `clip`, NEVER `hidden`, AND THAT IS THE PART THAT IS ACTUALLY FRAGILE.
