@@ -213,13 +213,18 @@ export async function fileNote(
   if (!def) return 0;
   const title = say(def.summary, dispatch.values);
 
-  for (const one of told) {
-    await db.prepare(
-      `INSERT INTO inbox (id, tenant_id, account_id, type, title, body, link, tone, icon, at, seen_at)
-       VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, NULL)`)
-      .bind(newId("inb", now), dispatch.tenantId, one.accountId, def.id, title,
-        def.link, def.tone, def.icon, now.toISOString()).run();
-  }
+  /*
+    ⚠️ TOGETHER, AND THIS IS THE ONE THAT SCALES WITH A CUSTOMER. Telling a
+    workspace something is one insert per person told, and awaited in turn that
+    is a round trip per member — fine for the three-person workspace it was
+    written against, and a request that times out for the one with five hundred.
+    The number of people in a workspace is not ours to assume.
+  */
+  await Promise.all(told.map((one) => db.prepare(
+    `INSERT INTO inbox (id, tenant_id, account_id, type, title, body, link, tone, icon, at, seen_at)
+     VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, NULL)`)
+    .bind(newId("inb", now), dispatch.tenantId, one.accountId, def.id, title,
+      def.link, def.tone, def.icon, now.toISOString()).run()));
   return told.length;
 }
 

@@ -696,9 +696,26 @@ export async function performOperation(
     escape hatches are exactly the routes somebody behind the wall uses, and
     making them the slowest ones is the wrong way round.
   */
-  const owed = op.spec.beforeAccepting || !wiring.owed
-    ? []
-    : await wiring.owed(who, located);
+  /*
+    ⚠️ THREE INDEPENDENT QUESTIONS, ASKED TOGETHER. What this person still owes,
+    whether the deployment is closed, and what they may do here are answered by
+    three different tables and none of them is an input to the others — so
+    awaiting them in turn was three waits for one round trip's worth of work, in
+    front of every request the product makes.
+
+    ⚠️ AND THE ORDER THEY ARE *USED* IN IS UNCHANGED, which is the half that
+    matters. The kernel's gate order decides what a person is TOLD when more than
+    one thing is wrong — acceptance before maintenance before permission — and
+    that order is below, where the answers are read. Asking early is not deciding
+    early.
+  */
+  const [owed, care, permissions] = await Promise.all([
+    op.spec.beforeAccepting || !wiring.owed ? Promise.resolve([]) : wiring.owed(who, located),
+    maintenanceMode(wiring.directory),
+    /* ⚠️ Resolved for the app THIS operation belongs to (D15) — the flat set the
+       caller used to carry was whichever app was first on the tenant's list. */
+    who.permissionsIn(composed.app.id),
+  ]);
 
   /*
     ⚠️ MAINTENANCE IS ASKED HERE AND NOWHERE ELSE, so the agent door cannot
@@ -707,7 +724,6 @@ export async function performOperation(
     and the personal lane never reach this function — which is the exemption
     list, by construction rather than by remembering.
   */
-  const care = await maintenanceMode(wiring.directory);
   if (care === "full" || (care === "readonly" && op.kind === "write")) {
     return { kind: "refused", problem: problem(catalog, "platform.maintenance") };
   }
@@ -728,11 +744,9 @@ export async function performOperation(
 
   /* --- the gates, in the kernel's order ----------------------------------- */
 
-  /* ⚠️ Resolved for the app THIS operation belongs to (D15) — the flat set the
-     caller used to carry was whichever app was first on the tenant's list. */
   const caller: Caller = {
     signedIn: who.signedIn,
-    permissions: await who.permissionsIn(composed.app.id),
+    permissions,
     provenAt: who.provenAt,
   };
 

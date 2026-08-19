@@ -107,7 +107,28 @@ D32 and D34.
 
 ---
 
-## 6. When to re-question the architecture
+## 6. What is guarded, and where
+
+Three files, asking two different questions.
+
+| | Asks | Fails when |
+|---|---|---|
+| `apps/hello/test/request-cost.test.ts` | how many round trips a request costs, and how many WAIT | a chain grows — depth 7 for a list read, 4 for `me.who` |
+| `apps/hello/test/boot-cost.test.ts` | what a cold isolate pays before the first byte | the schema is asked per module again |
+| `scripts/runaway.test.mjs` | is anything UNBOUNDED | a poll, a retry with no ceiling, a paged walk with no ceiling, a cron finer than a quarter hour, a log per request, a query per row |
+
+⚠️ **The split is the useful part.** Something that costs twice as much is a
+performance question and belongs in the budget tests, where a number moves and
+somebody has to justify raising it. Something that costs *until it is stopped*
+belongs in `runaway`, where the answer is never a bigger number.
+
+⚠️ **And the budgets are ceilings, not targets.** A change that makes a request
+cheaper tightens them in the same commit; one that makes it dearer has to raise
+a number somebody will read in review.
+
+---
+
+## 7. When to re-question the architecture
 
 Not yet, and here is the test rather than an opinion. Re-open this when any of
 the following is true:

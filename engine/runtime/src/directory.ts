@@ -170,6 +170,28 @@ export async function presentationOf(db: Db, accountId: AccountId): Promise<Pres
   return asPresentation(row?.presentation_json ?? null);
 }
 
+/**
+ * WHAT AN ACCOUNT IS CALLED AND HOW IT READS DATES, IN ONE READ.
+ *
+ * ⚠️ TWO COLUMNS OF ONE ROW WERE FETCHED BY TWO QUERIES, IN SERIES, ON THE FIRST
+ * REQUEST EVERY VISIT MAKES. `accountName` and `presentationOf` each select a
+ * single field from `account` by its primary key — correct apart, and together
+ * two round trips to read one row. `me.who` is what the app asks before it can
+ * draw anything, so this was two of the six waits between opening the product
+ * and seeing it.
+ */
+export async function accountFace(
+  db: Db, accountId: AccountId,
+): Promise<{ name: string | null; presentation: Presentation }> {
+  const row = await db.prepare(`SELECT name, presentation_json FROM account WHERE id = ?`)
+    .bind(accountId).first<{ name: string | null; presentation_json: string | null }>();
+  return {
+    /* ⚠️ Blank is absent, not a name that prints as nothing — see `setAccountName`. */
+    name: row?.name?.trim() ? row.name : null,
+    presentation: asPresentation(row?.presentation_json ?? null),
+  };
+}
+
 export const asPresentation = (stored: string | null): Presentation => {
   if (!stored) return DEFAULT_PRESENTATION;
   try { return presentationFrom(JSON.parse(stored)); }
@@ -312,10 +334,12 @@ export async function createTenant(
       (id, slug, name, country, shard_id, residency, kind, legal_name, became_commercial_at, at, closed_at)
     VALUES (?, ?, ?, ?, ?, ?, 'personal', NULL, NULL, ?, NULL)`)
     .bind(id, wants.slug, wants.name, wants.country.toUpperCase(), shard.id, wants.where, at).run();
-  for (const app of wants.apps) {
-    await db.prepare(`INSERT INTO tenant_app (tenant_id, app_id, at, disabled_at) VALUES (?, ?, ?, NULL)`)
-      .bind(id, app, at).run();
-  }
+  /* ⚠️ TOGETHER. One insert per product, awaited in turn, is a wait per product
+     on the one request that creates a workspace — a cost that grows with the
+     catalogue rather than with anything the person did. */
+  await Promise.all(wants.apps.map((app) => db.prepare(
+    `INSERT INTO tenant_app (tenant_id, app_id, at, disabled_at) VALUES (?, ?, ?, NULL)`)
+    .bind(id, app, at).run()));
 
   /*
     ⚠️ THE WALLET EXISTS FROM THE FIRST MINUTE, and it is not a convenience.

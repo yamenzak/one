@@ -412,7 +412,7 @@ env or a binding.
 |---|---|---|---|
 | `schema` | the composed schema runner — declarations become tables | 7 | — |
 | `sql` | the one typed seam onto D1 | 5 | — |
-| `directory` | accounts, workspaces, placement, enablement, allowances | 32 | — |
+| `directory` | accounts, workspaces, placement, enablement, allowances | 33 | — |
 | `handles` | which binding holds which shard | 3 | — |
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
 | `identity` | sign-in codes, sessions, tokens, proof | 21 | — |
@@ -468,7 +468,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**399 of them**, 398 reached by something today.
+**400 of them**, 399 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -882,6 +882,7 @@ its own header, cited by other files, and doing nothing.
 | D34 | The prices are parsed from Google's own page, and a modality is a set | 0 |
 | D35 | A model answers more than one lane, and one task column could not say so | 0 |
 | D36 | The latency budget: how many round trips a screen costs | 0 |
+| D37 | Depth is the number, and unbounded is a different question from expensive | 0 |
 <!-- /generated -->
 
 ---

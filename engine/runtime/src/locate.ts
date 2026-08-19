@@ -68,9 +68,25 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
 
     const now = (deps.now?.() ?? new Date()).toISOString() as Instant;
     const db = deps.shardOf(tenant);
-    const apps = await deps.appsOf(tenant);
 
-    const charging = await deps.charging();
+    /*
+      ⚠️ TOGETHER, BECAUSE NONE OF THEM FEEDS THE OTHERS. Which products this
+      workspace has, whether the deployment charges, what its wallet holds and
+      what it has been flagged — four questions about the same tenant, awaited
+      one after the other, in front of every request this workspace makes. Four
+      waits for one round trip's worth of work.
+
+      ⚠️ AND THE ORDER OF THE CODE STOPS SAYING WHICH. `await` reads the same
+      whether a call needed the one before it or merely followed it, which is
+      why `apps/hello/test/request-cost.test.ts` measures the DEPTH rather than
+      trusting a reading of this file.
+    */
+    const [apps, charging, wallet, flags] = await Promise.all([
+      deps.appsOf(tenant),
+      deps.charging(),
+      walletOf(deps.directory, tenant.id),
+      deps.flags?.(tenant) ?? Promise.resolve({}),
+    ]);
     /*
       ⚠️ ONE RESOLUTION FOR THE WHOLE WORKSPACE, over the UNION of what the
       platform sells and what every enabled product declares. Resolving per app
@@ -79,8 +95,21 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
       were always going to agree, because there is one membership behind them.
     */
     const keys = entitlementKeys(apps);
-    const held = await heldBy(
-      deps.directory, tenant.id, { plans: deps.plans, keys }, now, charging);
+    /*
+      ⚠️ AND THESE TWO TOGETHER FOR THE SAME REASON. What the workspace holds is
+      a question for the directory and what it has used is a question for its
+      shard — two different databases, and neither answer is an input to the
+      other. Awaited in turn they were the last two waits of a locate that had
+      already made four.
+    */
+    const [held, used] = await Promise.all([
+      heldBy(deps.directory, tenant.id, { plans: deps.plans, keys }, now, charging),
+      /* ⚠️ SETTLED BEFORE THE GATE RUNS. The gate asks synchronously and a
+         database does not answer synchronously, so the counts are read here and
+         served from memory — which also means two gates in one request cannot
+         disagree about how many there are. */
+      countsFor(db, tenant.id, apps),
+    ]);
     const standing = held.standing;
 
     /*
@@ -109,8 +138,6 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
       }
       : standing;
 
-    const wallet = await walletOf(deps.directory, tenant.id);
-
     /*
       ⚠️ A METERED DEBT AN EMPTY WALLET CANNOT COVER STOPS THE WRITES, and it
       stops nothing else. Storage over the included amount is metered rather than
@@ -131,12 +158,6 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
             + "Adding credits makes it writable again. Nothing has been deleted.",
       }
       : settled;
-    /* ⚠️ SETTLED BEFORE THE GATE RUNS. The gate asks synchronously and a
-       database does not answer synchronously, so the counts are read here and
-       served from memory — which also means two gates in one request cannot
-       disagree about how many there are. */
-    const used = await countsFor(db, tenant.id, apps);
-
     return {
       tenantId: tenant.id,
       db,
@@ -154,7 +175,7 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
       residency: tenant.residency,
       standing: owing,
       entitlements: held.entitlements,
-      flags: (await deps.flags?.(tenant)) ?? {},
+      flags,
       balance: wallet.spendable,
       used,
     };
@@ -164,21 +185,49 @@ export function locator(deps: LocateDeps): (door: Door) => Promise<Located | nul
 async function prime(
   db: Db, tenantId: TenantId, apps: readonly AppSpec[], into: Map<string, number>,
 ): Promise<void> {
+  /*
+    ⚠️ EVERY COUNT AT ONCE. One query per quota'd collection plus one for the
+    roster, against one database, and not one of them is an input to another —
+    so awaited in turn they were a wait per collection, in front of every request
+    the app serves. A cost that grows with the size of the manifest is the kind
+    that is fine in the reference app and unusable in a real one.
+  */
+  const counting: Promise<{ key: string; n: number } | null>[] = [];
+
   for (const app of apps) {
     for (const c of app.collections) {
       if (!c.quota) continue;
-      try {
-        const row = await db.prepare(
-          `SELECT COUNT(*) AS n FROM ${tableFor(c)} WHERE tenant_id = ?`)
-          .bind(tenantId).first<{ n: number }>();
-        into.set(c.quota, (into.get(c.quota) ?? 0) + (row?.n ?? 0));
-      } catch { /* a shard that has not applied this app's schema yet */ }
+      const key = c.quota;
+      counting.push((async () => {
+        try {
+          const row = await db.prepare(
+            `SELECT COUNT(*) AS n FROM ${tableFor(c)} WHERE tenant_id = ?`)
+            .bind(tenantId).first<{ n: number }>();
+          return { key, n: row?.n ?? 0 };
+        } catch {
+          /* ⚠️ A shard that has not applied this app's schema yet — absent, not
+             zero-with-a-throw. */
+          return null;
+        }
+      })());
     }
+
+    /* ⚠️ SEATS ARE COUNTED FROM THE ROSTER RATHER THAN FROM A COLUMN, because
+       who holds one is a rule (`seatsUsed`) and a stored number would be a
+       second answer to it. */
     const seats = app.access.seats;
     if (seats?.entitlement) {
-      const members = await membersOf(db, tenantId);
-      into.set(seats.entitlement, seatsUsed(members, seats.counts));
+      const key = seats.entitlement;
+      counting.push((async () => {
+        try {
+          return { key, n: seatsUsed(await membersOf(db, tenantId), seats.counts) };
+        } catch { return null; }
+      })());
     }
+  }
+
+  for (const got of await Promise.all(counting)) {
+    if (got) into.set(got.key, (into.get(got.key) ?? 0) + got.n);
   }
 }
 

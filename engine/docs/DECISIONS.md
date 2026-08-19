@@ -1043,3 +1043,47 @@ correct, covered, and cheap in isolation; what was wrong was how many there were
 `apps/hello/test/boot-cost.test.ts` measures it, because the alternative is
 noticing in production, which is what happened.
 
+---
+
+## D37 — Depth is the number, and unbounded is a different question from expensive
+
+D36 fixed a cold start. Measuring what a WARM request costs found the same shape
+one layer in: a list read was **eleven round trips, every one waiting on the
+last**, and `me.who` — the read the app makes before it can draw anything — was
+seven. Nothing was slow. Nine correct questions were asked in a row.
+
+**What the count came down to, and how.** The locator asked five things about one
+tenant in series when four of them feed nothing; the gate phase asked what a
+person owes, whether the deployment is closed and what they may do, in turn, when
+none is an input to another; `whoIs` read a session and then the account it had
+just named; `me.who` read one account row twice, once for a name and once for a
+presentation. Now: 11 → 7 for a list, 7 → 4 for `me.who`.
+
+⚠️ **`await` READS THE SAME WHETHER OR NOT IT HAD TO WAIT**, which is why none of
+this was visible in review and why the guard measures DEPTH rather than counting
+queries. Four awaited together cost one wait; four awaited in turn cost four, and
+the source is nearly identical.
+
+⚠️ **And the log is the tool, not the number.** When a budget fails, printing the
+wave-numbered statements shows the chain that grew in one read — every fix above
+was found that way rather than by reasoning about the code.
+
+**The second guard asks a different question.** `runaway.test.mjs` is not about
+cost, it is about BOUNDS: a poll, a retry with no ceiling, a paged walk whose
+exit condition belongs to somebody else, a cron finer than a quarter hour, a log
+per request, a query per row. Every one is correct in isolation and becomes a
+fault only in the presence of something else — a component that remounts, an
+error that persists, a workspace with five hundred members — which is exactly
+what a unit test does not have.
+
+It found two real ones on its first run: an insert per recipient when telling a
+workspace something, and an insert per product when creating one. The first is
+the shape that matters, because the number of people in a workspace is not ours
+to assume.
+
+⚠️ **A guard that cannot be mutated into failing is not a guard.** The first
+version of the per-row check required a `{`, and a brace-less
+`for (const x of xs) await db.prepare(…)` walked straight through it. The
+false positive was as instructive: a query STARTED in a loop and awaited
+afterwards is the FIX, and reads almost identically to the fault.
+

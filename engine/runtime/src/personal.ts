@@ -27,6 +27,7 @@ import {
 import {
   accountName, appsOfTenant, becomeCommercial, closeTenant, createTenant, forgetInvitation,
   invitationsFor,
+  accountFace,
   liveAppsOfTenant, noteBelonging, presentationFrom, presentationOf, setAccountName, setPresentation,
   tenantBySlug, tenantsOf,
   upsertAccount, type TenantRow,
@@ -561,7 +562,17 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
       kind: "read", needs: "session", beforeAccepting: true,
       async run(ctx): Promise<unknown> {
         const accountId = ctx.session!.accountId;
-        const tenants = await tenantsOf(ctx.directory, accountId);
+        /*
+          ⚠️ THE ACCOUNT'S OWN FACTS AND ITS WORKSPACES ARE TWO QUESTIONS, NOT
+          TWO STEPS. Neither answer feeds the other, and this is the read the
+          product makes before it can draw anything — so awaiting them in turn
+          put a whole round trip between opening the app and knowing what to
+          show. See `accountFace` for the two reads that used to be under it.
+        */
+        const [face, tenants] = await Promise.all([
+          accountFace(ctx.directory, accountId),
+          tenantsOf(ctx.directory, accountId),
+        ]);
         const belongs = await Promise.all(tenants.map(async (t) => {
           /* ⚠️ WHAT IS ON, NOT WHAT WAS EVER ON. This is a person's own list of
              where they can go; a product switched off keeps its records and its
@@ -607,7 +618,7 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
              column existed, `upsertAccount` wrote `null` into it, and nothing
              answered it — so the account centre introduced somebody to
              themselves by their email address. */
-          name: await accountName(ctx.directory, accountId),
+          name: face.name,
           /* ⚠️ An account fact, not a workspace one — an operator stands
              outside every workspace, so no roster could answer it. */
           operator: deps.isOperator?.(ctx.email) === true,
@@ -618,7 +629,7 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
             the browser's convention and then rewritten in theirs — a flicker on
             every list, on every load, for everybody who set a preference.
           */
-          presentation: await presentationOf(ctx.directory, accountId),
+          presentation: face.presentation,
           tenants: belongs,
           /*
             ⚠️ WHAT THEY STILL OWE AN AGREEMENT TO, CARRIED BY THE ONE READ EVERY
@@ -1088,11 +1099,38 @@ export async function whoIs(
   directory: Db, id: string | null, now: Date,
 ): Promise<{ session: Session | null; email: string | null; accountId: AccountId | null }> {
   if (!id) return { session: null, email: null, accountId: null };
-  const session = await readSession(directory, id, now);
-  if (!session) return { session: null, email: null, accountId: null };
-  const row = await directory.prepare(`SELECT email FROM account WHERE id = ?`)
-    .bind(session.accountId).first<{ email: string }>();
-  return { session, email: row?.email ?? null, accountId: session.accountId };
+  /*
+    ⚠️ ONE QUERY, BECAUSE THIS RUNS IN FRONT OF EVERY SINGLE REQUEST. Reading the
+    session and then the account it belongs to is two round trips to learn one
+    thing — who is asking — and the second only ever fetches an email address off
+    a row the first already named. On a database that is not in the same building
+    that is a tenth of a second on every navigation, every save and every poll in
+    the product.
+
+    ⚠️ AND THE JOIN IS LEFT, so a session whose account is gone still reads as a
+    session with no email rather than as no session at all. The two are different
+    answers: one signs somebody out, the other shows a person with a missing
+    name, and only the second is true.
+  */
+  const row = await directory.prepare(
+    `SELECT s.id, s.account_id, s.expires_at, s.proven_at, s.ended_at, a.email`
+    + ` FROM session s LEFT JOIN account a ON a.id = s.account_id WHERE s.id = ?`)
+    .bind(id).first<{
+      id: string; account_id: string; expires_at: string;
+      proven_at: string | null; ended_at: string | null; email: string | null;
+    }>();
+
+  /* ⚠️ THE SAME THREE REFUSALS `readSession` MAKES, and they stay here rather
+     than being re-derived: ended, expired, or absent is nobody. */
+  if (!row || row.ended_at) return { session: null, email: null, accountId: null };
+  if (Date.parse(row.expires_at) < now.getTime()) {
+    return { session: null, email: null, accountId: null };
+  }
+  return {
+    session: { id: row.id, accountId: row.account_id as AccountId, provenAt: row.proven_at },
+    email: row.email ?? null,
+    accountId: row.account_id as AccountId,
+  };
 }
 
 export { appsOfTenant };
