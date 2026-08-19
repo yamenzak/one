@@ -2,22 +2,30 @@
  * WHICH MODEL AN ACTION RUNS ON, AND IN WHOSE WORDS (D19).
  *
  * ⚠️ TWO LEVELS, ONE DIRECTION. The app declares the action's prompt; the
- * OPERATOR may reword any of them for the whole deployment; a TENANT may
- * reword only what the app marked `brandable`, and only for itself. Narrowing
- * down the chain, never widening — the same shape the notification policy and
- * the flags already have, because it is the same question about the same kind
- * of authority.
+ * OPERATOR may reword any of them for the whole deployment; a TENANT may ADD to
+ * what the app marked `brandable`, and only for itself. Narrowing down the
+ * chain, never widening — the same shape the notification policy and the flags
+ * already have, because it is the same question about the same kind of
+ * authority.
  *
- * ⚠️ THE MODEL BINDING IS THE OPERATOR'S ALONE. Which row a lane runs on is a
- * cost and a capability decision about the deployment; a workspace choosing it
- * would be a workspace choosing what we pay. And a binding that no longer
+ * ⚠️ AND THE TENANT'S HALF IS AN ADDENDUM RATHER THAN A REPLACEMENT, which is
+ * what keeps the base instructions off the wire entirely. A replacement has to
+ * be seeded with the current text to be editable, so every prompt the deployment
+ * had would be shipped to the browser of anyone who could open the screen. See
+ * `composePrompt`.
+ *
+ * ⚠️ THE MODEL IS THE WORKSPACE'S CHOICE AND THE OPERATOR'S DEFAULT. It was the
+ * operator's alone, on the argument that a workspace choosing would be choosing
+ * what we pay — which stopped being true once every run is charged to that
+ * workspace's own wallet at the row's own multiplier. They are choosing what
+ * THEY pay, and the floor that keeps it safe is `MIN_MULTIPLIER`: a row at cost
+ * turns the freedom into a way to spend our money. A binding that no longer
  * resolves falls back to the lane's election rather than failing, or a model
- * retired by its provider takes every bound action down until somebody edits a
- * row.
+ * retired by its provider takes every action bound to it down.
  */
 
 import type { AiActionSpec, AppSpec, ModelRow, TenantId } from "@engine/kernel";
-import { boundModel, refusePrompt } from "@engine/kernel";
+import { boundModel, composePrompt, refusePrompt } from "@engine/kernel";
 import type { SchemaModule } from "./schema.js";
 import type { Db } from "./sql.js";
 
@@ -92,29 +100,43 @@ export async function word(
 
 export interface Running {
   readonly model: ModelRow | null;
+  /**
+   * ⚠️ THE COMPOSED INSTRUCTIONS, AND THIS FIELD MUST NOT REACH A BROWSER. It
+   * holds the app's or the operator's text, which is exactly what the addendum
+   * design exists to keep off the wire. Every reader that answers a screen sends
+   * `wordedBy` and `addendum` and never this.
+   */
   readonly prompt: string;
-  /** Where the wording came from, so a screen can say so. */
-  readonly wordedBy: "app" | "operator" | "tenant";
+  /** ⚠️ The workspace's own words, which ARE theirs to read back. */
+  readonly addendum: string | null;
+  /** Where the base wording came from, so a screen can say so. */
+  readonly wordedBy: "app" | "operator";
 }
 
 /**
  * ⚠️ ONE RESOLVER, AND EVERY READER USES IT — the run, the operator's screen
- * and the workspace's. The order is app → operator → tenant, and the tenant's
- * only applies where the app said it may: resolving that anywhere else is how
- * a screen comes to promise a wording the run does not use.
+ * and the workspace's. The base is the app's unless the operator replaced it;
+ * the workspace's own words are APPENDED, never substituted, and only where the
+ * app said they may be. Resolving that anywhere else is how a screen comes to
+ * promise a wording the run does not use.
  */
 export function running(
   def: AiActionSpec,
   rows: readonly ModelRow[],
   binding: Binding | undefined,
   tenantPrompt: string | undefined,
+  /** ⚠️ The workspace's choice, honoured only where the plan allows it. */
+  tenantModel?: string | null,
 ): Running {
-  const theirs = def.brandable && tenantPrompt?.trim() ? tenantPrompt : null;
-  const ours = binding?.prompt?.trim() ? binding.prompt : null;
+  const base = binding?.prompt?.trim() ? binding.prompt : def.prompt;
+  const theirs = def.brandable && tenantPrompt?.trim() ? tenantPrompt.trim() : null;
   return {
-    model: boundModel(rows, def.lane, binding?.model),
-    prompt: theirs ?? ours ?? def.prompt,
-    wordedBy: theirs ? "tenant" : ours ? "operator" : "app",
+    /* ⚠️ THEIRS FIRST, OURS SECOND, THE ELECTION LAST. A workspace's pick is a
+       pick; the operator's binding is what runs when they have not made one. */
+    model: boundModel(rows, def.lane, tenantModel ?? binding?.model),
+    prompt: composePrompt(base, theirs),
+    addendum: theirs,
+    wordedBy: binding?.prompt?.trim() ? "operator" : "app",
   };
 }
 

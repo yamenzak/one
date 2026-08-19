@@ -18,7 +18,10 @@ import {
   legalUrlOf, refuseLegal, missingDocuments, ropa, outstanding, type Acceptance,
 } from "../src/legal.js";
 import { passagesOf } from "../src/primitives.js";
-import { settle, estimate, plan, charged, refusePacks, unbounded, THINKING_HEADROOM } from "../src/credit.js";
+import {
+  settle, estimate, plan, chargedFor, priced, refusePacks, unbounded, THINKING_HEADROOM,
+  MILLI, DENSE, SPARSE, charsPerToken, milliFromUsd,
+} from "../src/credit.js";
 import { refuseTheme, refuseSurfaces, contrast, OURS } from "../src/brand.js";
 import { field, refuseField } from "../src/field.js";
 import { dueNow, nextRun, refuseJob, scheduleOk, stalled } from "../src/job.js";
@@ -282,7 +285,7 @@ describe("the record and the documents", () => {
 /* ---------------------------------------------------------------- credit --- */
 
 describe("what a call costs", () => {
-  const rate = { input: 1, output: 3, markup: 0.5 };
+  const rate = { meter: "token" as const, input: 1000, output: 3000, multiplier: 5 };
 
   /*
     ⚠️ THE CAP IS THE INVARIANT. Settlement charges `min(held, actual)`, so every
@@ -290,8 +293,19 @@ describe("what a call costs", () => {
     customer does not — silently, on every call, for ever.
   */
   it("never charges more than was held", () => {
-    expect(settle({ credits: 100, of: "x" }, 40)).toBe(40);
-    expect(settle({ credits: 100, of: "x" }, 400)).toBe(100);
+    expect(settle({ credits: 100, of: "x" }, 40_000)).toBe(40_000);
+    expect(settle({ credits: 100, of: "x" }, 400_000)).toBe(100_000);
+  });
+
+  /*
+    ⚠️ THE HOLD IS WHOLE CREDITS AND THE CHARGE IS MILLI, so the cap converts
+    rather than compares. Comparing them raw caps every charge at a thousandth of
+    the hold — which throws nowhere and simply makes everything free.
+  */
+  it("caps in the same unit it charges in", () => {
+    /* A hold of one credit must admit a charge of a whole credit's worth. */
+    expect(settle({ credits: 1, of: "x" }, MILLI)).toBe(MILLI);
+    expect(settle({ credits: 1, of: "x" }, MILLI + 1)).toBe(MILLI);
   });
 
   /*
@@ -300,7 +314,7 @@ describe("what a call costs", () => {
     the guess would always be free money in one direction.
   */
   it("charges the reserve when the provider reports nothing", () => {
-    expect(settle({ credits: 100, of: "x" }, null)).toBe(100);
+    expect(settle({ credits: 100, of: "x" }, null)).toBe(100 * MILLI);
   });
 
   /*
@@ -328,28 +342,72 @@ describe("what a call costs", () => {
   /*
     ⚠️ FOUR CHARACTERS PER TOKEN IS AN ENGLISH AVERAGE. Arabic runs nearer two,
     so a fixed four halves the estimate for a whole market — served at a loss,
-    with nothing reporting it.
+    with nothing reporting it. And it is DERIVED rather than passed, because a
+    constant somebody must remember to override is a constant nobody overrides.
   */
   it("costs a denser script more, not the same", () => {
-    const english = estimate({ promptChars: 4000, maxOutput: 100, charsPerUnit: 4 }, rate);
-    const arabic = estimate({ promptChars: 4000, maxOutput: 100, charsPerUnit: 2 }, rate);
+    const english = plan("x", "", "a".repeat(4000), rate, 100).reserve.credits;
+    const arabic = plan("x", "", "ع".repeat(4000), rate, 100).reserve.credits;
     expect(arabic).toBeGreaterThan(english);
+  });
+
+  it("reads the density off the text rather than a flag", () => {
+    expect(charsPerToken("plain ascii")).toBe(SPARSE);
+    expect(charsPerToken("عربي")).toBe(DENSE);
+    /* ⚠️ Mixed text is the common case and lands between, which is why this is
+       a share rather than a language guess. */
+    const mixed = charsPerToken("abcd" + "عربي");
+    expect(mixed).toBeGreaterThan(DENSE);
+    expect(mixed).toBeLessThan(SPARSE);
   });
 
   /* ⚠️ A model that thinks bills for tokens nobody requested and nobody sees. */
   it("widens for a model that thinks", () => {
-    const flat = estimate({ promptChars: 100, maxOutput: 10_000, charsPerUnit: 4 }, rate);
-    const thinking = estimate({ promptChars: 100, maxOutput: 10_000, charsPerUnit: 4, thinks: true }, rate);
+    const flat = estimate({ promptChars: 100, maxOutput: 10_000 }, rate);
+    const thinking = estimate({ promptChars: 100, maxOutput: 10_000, thinks: true }, rate);
     /* Output dominates here, so the headroom should show up almost undiluted. */
     expect(thinking / flat).toBeGreaterThan(THINKING_HEADROOM - 0.05);
+  });
+
+  /*
+    ⚠️ A LANE THAT DOES NOT COUNT TOKENS STILL GETS A RESERVE. An image request
+    is one unit in and n out; deriving that from a character count would budget
+    a picture by the length of the sentence that asked for it.
+  */
+  it("budgets a lane whose unit is not a token", () => {
+    /* ⚠️ Per THOUSAND units, like every rate here — a four-cent picture is four
+       thousand milli-credits each, so four million per thousand. The unit does
+       not change per meter; only what is being counted does. */
+    const perImage = { meter: "image" as const, input: 0, output: 4_000_000, multiplier: 5 };
+    const one = estimate({ promptChars: 20, maxOutput: 1, units: { input: 1, output: 1 } }, perImage);
+    const four = estimate({ promptChars: 20, maxOutput: 4, units: { input: 1, output: 4 } }, perImage);
+    expect(one).toBe(20);
+    expect(four).toBe(one * 4);
   });
 
   /* ⚠️ The reserve must cover the real charge at the same rate, or the cap eats
      the difference on every honest call. */
   it("holds enough for the answer it asked for", () => {
     const held = plan("x", "", "a".repeat(400), rate, 1000).reserve;
-    const real = charged({ input: 100, output: 1000 }, rate);
-    expect(held.credits).toBeGreaterThanOrEqual(real);
+    const real = chargedFor({ input: 100, output: 1000 }, rate);
+    expect(held.credits * MILLI).toBeGreaterThanOrEqual(real);
+  });
+
+  /*
+    ⚠️ THE PRICE FROM A REAL COST IS THE ONE FORMULA FOR EVERY LANE. Whoever
+    billed us counted in whatever unit that model bills in, so a price built on
+    their number needs no unit of its own and cannot disagree with the invoice.
+  */
+  it("prices from what it actually cost, at the multiplier", () => {
+    expect(priced(1_000, 5)).toBe(5_000);
+    /* $0.0003 of Gemini at 5× is 0.15 credits — a tenth of a cent and a half. */
+    expect(priced(milliFromUsd(0.0003), 5)).toBe(150);
+  });
+
+  /* ⚠️ A credit is a cent, and nothing else in the tree may decide that twice. */
+  it("converts dollars to milli-credits one way", () => {
+    expect(milliFromUsd(0.01)).toBe(MILLI);
+    expect(milliFromUsd(1)).toBe(100 * MILLI);
   });
 
   it("refuses credits that cost nothing and packs that hold none", () => {
@@ -403,7 +461,7 @@ describe("a workspace making it theirs", () => {
 
 describe("work nobody is waiting for", () => {
   const sweep = {
-    id: "dunning", label: "Dunning", why: "Climbs the ladder for unpaid workspaces.",
+    id: "dunning", label: "Dunning", meter: "token", why: "Climbs the ladder for unpaid workspaces.",
     schedule: "0 3 * * *", scope: "per-tenant" as const,
     onFail: { then: "tell" as const, notification: "ops.job_failed" },
     rerunnable: true as const,
@@ -542,7 +600,7 @@ describe("when a job is next due", () => {
 });
 
 const sweepDue = {
-  id: "x", label: "X", why: "For the schedule tests.",
+  id: "x", label: "X", meter: "token", why: "For the schedule tests.",
   schedule: "0 3 * * *", scope: "deployment" as const,
   onFail: { then: "park" as const },
   rerunnable: true as const,
@@ -553,10 +611,10 @@ const sweepDue = {
 
 describe("choosing a model", () => {
   const rows: ModelRow[] = [
-    { id: "@cf/x/aura", provider: "cf", task: "tts", label: "Aura", input: 0, output: 2,
-      markup: 0.3, enabled: true, maxOutput: 1000 },
-    { id: "gemini-tts", provider: "google", task: "speech", label: "Gemini voice", input: 0, output: 5,
-      markup: 0.3, enabled: true, maxOutput: 1000 },
+    { id: "@cf/x/aura", provider: "cf", task: "tts", label: "Aura", meter: "token", input: 0, output: 2,
+      multiplier: 5, enabled: true, maxOutput: 1000 },
+    { id: "gemini-tts", provider: "google", task: "speech", label: "Gemini voice", meter: "token", input: 0, output: 5,
+      multiplier: 5, enabled: true, maxOutput: 1000 },
   ];
 
   /*

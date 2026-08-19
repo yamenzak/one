@@ -92,15 +92,53 @@ if (!/boundModel\(rows, ask\.lane, ask\.model\)/.test(services)) {
   fail(`runtime/src/services.ts: the run no longer resolves the bound model — it\n` +
        `       runs on whatever the election picks while every screen reports the\n` +
        `       binding, so the bill stops matching what anybody was shown.`);
-} else if (!/theirs \?\? ours \?\? def\.prompt/.test(actions)) {
-  fail(`runtime/src/ai-actions.ts: the wording order is no longer app → operator →\n` +
-       `       tenant, so a screen and the run disagree about which words were used.`);
+} else if (!/composePrompt\(base, theirs\)/.test(actions)) {
+  /*
+    ⚠️ A WORKSPACE ADDS AND NEVER REPLACES, WHICH IS WHAT KEEPS THE BASE OFF THE
+    WIRE. It used to substitute — and a substitution has to be seeded with the
+    current text to be editable at all, so every prompt the deployment had was
+    shipped to the browser of anybody who could open the screen. Composition
+    needs no seed: the box starts empty.
+  */
+  fail(`runtime/src/ai-actions.ts: a workspace's wording no longer composes with\n` +
+       `       ours — so either the base has to be sent to a browser to be edited, or\n` +
+       `       our instructions are silently dropped from every run.`);
 } else if (!/def\.brandable && tenantPrompt/.test(actions)) {
   fail(`runtime/src/ai-actions.ts: a tenant's wording is applied without asking\n` +
        `       whether the app allows it — a row written before the app changed its\n` +
        `       mind would still be in force.`);
 } else {
-  ok(`resolution: one order, one bound model, and the run reads both`);
+  ok(`resolution: ours composed with theirs, one bound model, and the base stays here`);
+}
+
+/* ------------------------------------------------- and the base stays here --- */
+
+/**
+ * ⚠️ AN OPERATION THAT ANSWERS WITH THE PROMPT MUST BE THE OPERATOR'S.
+ * `Running.prompt` holds the app's or the operator's instructions, and sending
+ * it anywhere else publishes the one thing the addendum design exists to keep
+ * off the wire. The OPERATOR may read it — it is theirs, and they are the ones
+ * editing it. A workspace may not, which is why the addendum is a separate field.
+ *
+ * ⚠️ AND THIS IS ASKED OF EVERY OPERATION RATHER THAN OF A NAMED ONE. The check
+ * that names `op.ai` goes on passing the day somebody adds `op.ai.mine` — which
+ * is exactly the operation that would leak it.
+ */
+{
+  const ops = strip(readFileSync(join(ENGINE, "runtime/src/operator.ts"), "utf8"));
+  const blocks = [...ops.matchAll(/"(op\.[\w.]+)":\s*\{([\s\S]*?)\n    \},/g)];
+  const leaks = blocks.filter(([, , body]) =>
+    /\brunning\(/.test(body) && /\bprompt\b/.test(body) && !/doors:\s*\["operator"\]/.test(body));
+
+  if (!blocks.length) {
+    fail("runtime/src/operator.ts: no operations parsed — this check is passing over nothing.");
+  } else if (leaks.length) {
+    fail(`runtime/src/operator.ts: ${leaks.map((l) => l[1]).join(", ")} answers with a resolved\n` +
+         `       prompt and is not operator-only. That is our text on somebody else's\n` +
+         `       screen — send \`wordedBy\` and \`addendum\` instead.`);
+  } else {
+    ok(`privacy: ${blocks.length} operation(s), and the instructions leave only by the operator's door`);
+  }
 }
 
 /* ------------------------------------------------------------------ end --- */

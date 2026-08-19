@@ -12,6 +12,7 @@
  * change things, never the ability to read them, and never the ability to leave.
  */
 
+import { MILLI } from "@engine/kernel";
 import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { AppSpec, Instant, PlanSpec, TenantId } from "@engine/kernel";
@@ -144,11 +145,11 @@ describe("a workspace with two of our products", () => {
     const one = await reserve(directory(), tenantId, 300, "note.draft");
     expect(one).not.toBe("not_enough");
     if (one === "not_enough") return;
-    await settle(directory(), tenantId, one, 120, { appId: "hello" });
+    await settle(directory(), tenantId, one, 120 * MILLI, { appId: "hello" });
 
     const two = await reserve(directory(), tenantId, 400, "ledger.summarise");
     if (two === "not_enough") return;
-    await settle(directory(), tenantId, two, 400, { appId: "ledger" });
+    await settle(directory(), tenantId, two, 400 * MILLI, { appId: "ledger" });
 
     expect((await walletOf(directory(), tenantId)).balance).toBe(1000 - 120 - 400);
     const spent = await spentByApp(directory(), tenantId, daysAgo(1));
@@ -168,7 +169,7 @@ describe("holding and spending credits", () => {
     await topUp(directory(), tenantId, 500);
     const held = await reserve(directory(), tenantId, 100, "x");
     if (held === "not_enough") throw new Error("reserve refused");
-    expect(await settle(directory(), tenantId, held, 400)).toBe(100);
+    expect((await settle(directory(), tenantId, held, 400 * MILLI)).credits).toBe(100);
     expect((await walletOf(directory(), tenantId)).balance).toBe(400);
   });
 
@@ -178,7 +179,7 @@ describe("holding and spending credits", () => {
     await topUp(directory(), tenantId, 500);
     const held = await reserve(directory(), tenantId, 100, "x");
     if (held === "not_enough") throw new Error("reserve refused");
-    expect(await settle(directory(), tenantId, held, null)).toBe(100);
+    expect((await settle(directory(), tenantId, held, null)).credits).toBe(100);
   });
 
   /*
@@ -234,7 +235,7 @@ describe("the month's allowance, and what was bought", () => {
     await renewAllowance(directory(), tenantId, PLANS);
     const held = await reserve(directory(), tenantId, 400, "x");
     if (held === "not_enough") throw new Error("reserve refused");
-    await settle(directory(), tenantId, held, 400);
+    await settle(directory(), tenantId, held, 400 * MILLI);
 
     await renewAllowance(directory(), tenantId, PLANS);
     const said = await movements(directory(), tenantId);
@@ -269,7 +270,7 @@ describe("the month's allowance, and what was bought", () => {
 
     const held = await reserve(directory(), tenantId, 1_200, "x");
     if (held === "not_enough") throw new Error("reserve refused");
-    await settle(directory(), tenantId, held, 1_200);
+    await settle(directory(), tenantId, held, 1_200 * MILLI);
 
     /* 1,000 off the allowance, the remaining 200 off what was bought. */
     expect(await walletOf(directory(), tenantId))

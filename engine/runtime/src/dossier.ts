@@ -262,6 +262,15 @@ export const HOLDINGS: readonly HeldBy[] = [
     why: "a workspace's own sale, named by membership rather than by account" },
   { table: "ai_binding", person: [], why: "which model an action runs on" },
   { table: "ai_wording", person: [], why: "a workspace's own prompt letterheads", workspace: its() },
+  { table: "ai_model", person: [], why: "the deployment's model catalogue and its prices" },
+  /*
+    ⚠️ WHAT IT COST, NEVER WHAT WAS SAID. There is no prompt and no output on
+    this row, deliberately — a generation log carrying both is a permanent record
+    of everything every workspace has ever typed, read by nothing and deleted by
+    nobody. What is left is money, so it is the workspace's rather than any
+    person's, and it goes when the workspace does.
+  */
+  { table: "ai_run", person: [], why: "a workspace's own AI spending", workspace: its() },
 
   /* --- the vault: theirs, entirely --- */
   { table: "vault_subject", person: [theirs("subject_id")], workspace: its(),

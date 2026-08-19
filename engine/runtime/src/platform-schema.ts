@@ -20,6 +20,8 @@
  */
 
 import { AI_ACTION_SCHEMA } from "./ai-actions.js";
+import { MODEL_SCHEMA } from "./models.js";
+import { SPEND_SCHEMA } from "./spend.js";
 import { AUDIT_SCHEMA, REPLAY_SCHEMA } from "./audit.js";
 import { BILLING_SCHEMA } from "./billing.js";
 import { BRANDING_SCHEMA } from "./branding.js";
@@ -55,6 +57,18 @@ export const DIRECTORY_MODULES: readonly SchemaModule[] = [
      another shard entirely — see `push.ts`. */
   PUSH_SCHEMA,
   JOBS_SCHEMA, OPERATOR_SCHEMA, AI_ACTION_SCHEMA,
+  /* ⚠️ THE CATALOGUE IS THE DEPLOYMENT'S, LIKE THE PRICE LIST BELOW IT. One
+     answer to "which models may run here and at what margin", whatever shard a
+     workspace's records are on — a copy per shard would be a model enabled in
+     Frankfurt and absent in Virginia. */
+  MODEL_SCHEMA,
+  /* ⚠️ AND THE SPEND ROWS SIT BESIDE THE WALLET THEY DRAW FROM. A run recorded
+     on a shard and a balance in the directory is a statement no single query can
+     assemble — and it would come apart entirely for a workspace that moved. Note
+     the ALTER inside this module needs `billing_account`, so it must come after
+     `BILLING_SCHEMA`: the runner swallows an alter against a table that is not
+     there yet, and the carry column would silently never exist. */
+  SPEND_SCHEMA,
   /* ⚠️ IN THE DIRECTORY, BESIDE THE SUBSCRIPTIONS IT PRICES. There is one
      catalogue for the whole deployment — a copy per shard would be a plan edited
      in Frankfurt and not in Virginia, i.e. two prices for one product. */

@@ -48,6 +48,10 @@ import {
 } from "./wallet.js";
 import { compedSubscriptions } from "./billing.js";
 import { column, table, type Db } from "./sql.js";
+import { type LogReader } from "./gateway.js";
+import { listModels, type Account } from "./cloudflare.js";
+import { readCatalogue, syncModels } from "./models.js";
+import { inCredits, lossesIn, marginsSince, trueUp } from "./reconcile.js";
 
 export interface SweepDeps {
   readonly directory: Db;
@@ -111,6 +115,23 @@ export interface SweepDeps {
   readonly scheduleOf?: (jobId: string) => string | undefined;
   /** ⚠️ `onFail: tell` — where a failure is reported. */
   readonly tell?: (notification: string, detail: string) => Promise<void>;
+  /**
+   * ⚠️ THE ACCOUNT CREDENTIAL, WHICH IS NOT THE GATEWAY'S. This one reads the
+   * model catalogue; the gateway's runs models. A deployment holding only the
+   * second runs everything and syncs nothing, which is a working deployment on
+   * a catalogue that stops moving — so this is optional and its absence simply
+   * removes the job.
+   */
+  readonly account?: () => Account | null;
+  /** ⚠️ What a new catalogue row's margin is bound to — see `DEFAULT_MULTIPLIER`. */
+  readonly multiplier?: number;
+  /**
+   * ⚠️ WHERE A RUN'S REAL COST IS READ. Absent is a deployment that cannot check
+   * its own margin, which is worth knowing about rather than pretending away —
+   * the job simply is not in the book, and the console says the check is not
+   * running.
+   */
+  readonly logs?: () => LogReader | null;
   readonly now?: () => Date;
 }
 
@@ -376,6 +397,67 @@ export function platformJobs(deps: SweepDeps): JobBook {
         return { touched: out.did.length, detail: out.did.join("; ") || "nothing to do" };
       },
       { destroys: { floorDays: 30 }, budgetSeconds: 120 });
+  }
+
+  /*
+    ⚠️ THE CATALOGUE IS A FACT ABOUT THE WORLD AND THE WORLD DOES NOT ASK US. A
+    provider adds a model, retires one, or changes a price, and a deployment
+    reading a catalogue it synced once is selling last quarter's prices at this
+    quarter's cost. Daily is the cadence the prices actually move at.
+
+    ⚠️ AND IT WRITES ALL ROWS OR NONE — see `syncModels`. A partial catalogue
+    applied at 03:00 is a lane whose only enabled model vanished.
+  */
+  if (deps.account) {
+    const account = deps.account;
+    at("models", "Learn what the models cost",
+      "Discovers new models, retires gone ones, and refreshes every price.",
+      async () => {
+        const at = account();
+        if (!at) throw new Error("catalogue: no account token");
+        const answer = await listModels(at);
+        if (!answer.ok) throw new Error(`catalogue: ${answer.why}`);
+        const out = await syncModels(
+          deps.directory, readCatalogue(answer.value), deps.multiplier, now);
+        if (out.refused.length) throw new Error(`catalogue refused: ${out.refused.join(", ")}`);
+        return {
+          touched: out.added + out.priced + out.retired,
+          detail: `${out.added} new, ${out.priced} repriced, ${out.retired} retired`,
+        };
+      },
+      { budgetSeconds: 60 });
+  }
+
+  /*
+    ⚠️ THE ONE CHECK ON THE MONEY THAT IS NOT OUR OWN ARITHMETIC — see
+    `reconcile.ts`. It corrects each run against what the gateway says that run
+    cost, and then reports any workspace whose day cost more than it paid.
+
+    ⚠️ IT RUNS WHENEVER THE GATEWAY CAN BE READ, INCLUDING WITH NO ACCOUNT TOKEN.
+    The two credentials are different: syncing the catalogue needs the account,
+    reading a log needs only the gateway binding. A deployment that can run
+    models must be able to check what they cost.
+  */
+  if (deps.logs) {
+    const logs = deps.logs;
+    at("ai-costs", "Check what the AI really cost",
+      "Corrects every run against the gateway's own bill, and reports any workspace sold under cost.",
+      async () => {
+        const up = await trueUp(deps.directory, logs(), now);
+        const since = new Date(now.getTime() - 24 * 3_600_000).toISOString();
+        const losses = lossesIn(await marginsSince(deps.directory, since));
+        const said = `${up.corrected} of ${up.looked} corrected`
+          + (up.refundedMilli ? `, ${inCredits(up.refundedMilli)} credits returned` : "");
+        /* ⚠️ A LOSS IS A FAILED RUN, NOT A LINE IN A DETAIL NOBODY READS. The
+           job's own row is where an operator looks; making it green with the
+           bad news inside is the shape this whole module exists against. */
+        if (losses.length) {
+          throw new Error(`${said}; sold under cost to ${losses.length} workspace(s), `
+            + `worst ${losses[0]!.tenantId} short ${inCredits(losses[0]!.shortMilli)} credits`);
+        }
+        return { touched: up.corrected, detail: said };
+      },
+      { budgetSeconds: 120 });
   }
 
   return book;

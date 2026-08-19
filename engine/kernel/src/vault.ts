@@ -102,6 +102,29 @@ export type ReadRefusal =
   | "field_not_granted" | "unknown_field";
 
 /**
+ * WHY A LOOK WAS TURNED AWAY, IN THE SUBJECT'S OWN WORDS.
+ *
+ * ⚠️ THIS IS ON THE SCREEN A PERSON OPENS ABOUT THEIR OWN DATA, so `no_grant` is
+ * exactly the wrong thing to print there: it is our internal name for a state,
+ * shown to somebody who is trying to find out whether they were protected. The
+ * words are the answer to that question rather than a label for the branch.
+ *
+ * ⚠️ AND IT LIVES BESIDE THE SET IT NAMES. A screen keeping its own map is a map
+ * that silently loses a case the day a seventh refusal is added — where a record
+ * type here fails to compile.
+ */
+const WHY_REFUSED: Readonly<Record<ReadRefusal, string>> = {
+  no_consent: "you had not agreed to it",
+  no_grant: "they had no permission",
+  grant_expired: "their permission had run out",
+  outside_purpose: "it was for something you had not agreed to",
+  field_not_granted: "their permission did not cover it",
+  unknown_field: "there is no such record",
+};
+
+export const sayRefused = (why: ReadRefusal): string => WHY_REFUSED[why] ?? why;
+
+/**
  * Whether one read of one fact may happen.
  *
  * ⚠️ EVERY REFUSAL IS DISTINCT AND NONE OF THEM IS "NOT FOUND". A vault read

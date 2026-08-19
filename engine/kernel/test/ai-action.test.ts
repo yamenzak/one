@@ -23,14 +23,14 @@ const ACTION: AiActionSpec = {
 const SEALED: AiActionSpec = { ...ACTION, brandable: false };
 
 const rows: readonly ModelRow[] = [
-  { id: "@cf/meta/small", provider: "cf", task: "text-generation", label: "Small",
-    input: 1, output: 3, markup: 0.5, enabled: true, maxOutput: 1000 },
-  { id: "gemini-2.5-pro", provider: "google", task: "chat", label: "Pro",
-    input: 10, output: 30, markup: 0.5, enabled: true, maxOutput: 4000 },
-  { id: "@cf/meta/off", provider: "cf", task: "text-generation", label: "Off",
-    input: 1, output: 1, markup: 0.5, enabled: false, maxOutput: 1000 },
-  { id: "gemini-vision", provider: "google", task: "image-to-text", label: "Eyes",
-    input: 5, output: 5, markup: 0.5, enabled: true, maxOutput: 500 },
+  { id: "@cf/meta/small", provider: "cf", task: "text-generation", label: "Small", meter: "token",
+    input: 1, output: 3, multiplier: 5, enabled: true, maxOutput: 1000 },
+  { id: "gemini-2.5-pro", provider: "google", task: "chat", label: "Pro", meter: "token",
+    input: 10, output: 30, multiplier: 5, enabled: true, maxOutput: 4000 },
+  { id: "@cf/meta/off", provider: "cf", task: "text-generation", label: "Off", meter: "token",
+    input: 1, output: 1, multiplier: 5, enabled: false, maxOutput: 1000 },
+  { id: "gemini-vision", provider: "google", task: "image-to-text", label: "Eyes", meter: "token",
+    input: 5, output: 5, multiplier: 5, enabled: true, maxOutput: 500 },
 ];
 
 describe("whose words", () => {

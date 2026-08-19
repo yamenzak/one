@@ -961,6 +961,20 @@
         "onClose": "tenant_id: delete"
       },
       {
+        "table": "ai_model",
+        "export": null,
+        "why": "the deployment's model catalogue and its prices",
+        "onForget": [],
+        "onClose": null
+      },
+      {
+        "table": "ai_run",
+        "export": null,
+        "why": "a workspace's own AI spending",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
         "table": "plan_edit",
         "export": null,
         "why": "what the catalogue was edited to, and who edited it",

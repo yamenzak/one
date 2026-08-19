@@ -28,10 +28,10 @@ const ROOTS = { root: "one.test" };
 const sent: { to: string; code: string }[] = [];
 
 const MODELS: readonly ModelRow[] = [
-  { id: "@cf/meta/small", provider: "cf", task: "text-generation", label: "Small",
-    input: 1, output: 3, markup: 0.5, enabled: true, maxOutput: 1000 },
-  { id: "gemini-2.5-pro", provider: "google", task: "chat", label: "Pro",
-    input: 10, output: 30, markup: 0.5, enabled: true, maxOutput: 4000 },
+  { id: "@cf/meta/small", provider: "cf", task: "text-generation", label: "Small", meter: "token",
+    input: 1, output: 3, multiplier: 5, enabled: true, maxOutput: 1000 },
+  { id: "gemini-2.5-pro", provider: "google", task: "chat", label: "Pro", meter: "token",
+    input: 10, output: 30, multiplier: 5, enabled: true, maxOutput: 4000 },
 ];
 
 const app = () => serve({
@@ -208,17 +208,52 @@ describe("a workspace's own words", () => {
 describe("the one resolver", () => {
   const def = HELLO.operations.find((o) => o.id === "note.draft")!.ai!;
 
-  it("reads app, then operator, then tenant — and the tenant only where allowed", () => {
+  it("reads the app's words, then the operator's, and never loses either", () => {
     expect(running(def, MODELS, undefined, undefined).wordedBy).toBe("app");
     expect(running(def, MODELS, { app: "hello", action: "note.draft", model: null, prompt: "Ours." }, undefined))
       .toMatchObject({ prompt: "Ours.", wordedBy: "operator" });
-    expect(running(def, MODELS, { app: "hello", action: "note.draft", model: null, prompt: "Ours." }, "Theirs."))
-      .toMatchObject({ prompt: "Theirs.", wordedBy: "tenant" });
+  });
 
-    /* ⚠️ A sealed action ignores a tenant's wording wherever it came from —
-       resolved here, so a row written before the app changed its mind cannot
-       still be in force. */
+  /*
+    ⚠️ A WORKSPACE ADDS AND NEVER REPLACES, WHICH IS WHY THE BASE NEVER TRAVELS.
+    It used to substitute — and a substitution has to be seeded with the current
+    text to be editable at all, so every prompt the deployment had would be
+    shipped to the browser of anybody who could open the screen.
+  */
+  it("appends the workspace's words to ours rather than replacing them", () => {
+    const out = running(def, MODELS,
+      { app: "hello", action: "note.draft", model: null, prompt: "Ours." }, "Theirs.");
+    expect(out.prompt).toContain("Ours.");
+    expect(out.prompt).toContain("Theirs.");
+    /* ⚠️ AND THEIRS IS LAST, which is the only order that does anything: a model
+       follows the later instruction when two conflict, so an addendum put first
+       would be overridden by our own text and the setting would save and change
+       nothing. */
+    expect(out.prompt.indexOf("Theirs.")).toBeGreaterThan(out.prompt.indexOf("Ours."));
+    /* ⚠️ The base is still ours — `wordedBy` describes who wrote the letterhead,
+       and adding to it does not make it theirs. */
+    expect(out.wordedBy).toBe("operator");
+    expect(out.addendum).toBe("Theirs.");
+  });
+
+  /* ⚠️ A sealed action ignores a tenant's wording wherever it came from —
+     resolved here, so a row written before the app changed its mind cannot
+     still be in force. */
+  it("ignores an addendum on an action the app sealed", () => {
     const sealed = { ...def, brandable: false };
-    expect(running(sealed, MODELS, undefined, "Theirs.").wordedBy).toBe("app");
+    const out = running(sealed, MODELS, undefined, "Theirs.");
+    expect(out.prompt).not.toContain("Theirs.");
+    expect(out.addendum).toBe(null);
+  });
+
+  /*
+    ⚠️ THE WORKSPACE'S OWN PICK BEATS THE OPERATOR'S BINDING, because the run is
+    charged to their wallet at the row's own multiplier — so they are choosing
+    what THEY pay. The operator's binding is the default, not the ceiling.
+  */
+  it("runs the model the workspace chose over the one bound for them", () => {
+    const bound = { app: "hello", action: "note.draft", model: MODELS[0]!.id, prompt: null };
+    expect(running(def, MODELS, bound, undefined).model?.id).toBe(MODELS[0]!.id);
+    expect(running(def, MODELS, bound, undefined, MODELS[1]!.id).model?.id).toBe(MODELS[1]!.id);
   });
 });

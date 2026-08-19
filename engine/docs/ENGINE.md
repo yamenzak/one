@@ -311,6 +311,8 @@ before an app is resolved draws on them.
 | `maintenance` | — *the deployment's own switches* | — | kept |
 | `ai_binding` | — *which model an action runs on* | — | kept |
 | `ai_wording` | — *a workspace's own prompt letterheads* | — | `tenant_id: delete` |
+| `ai_model` | — *the deployment's model catalogue and its prices* | — | kept |
+| `ai_run` | — *a workspace's own AI spending* | — | `tenant_id: delete` |
 | `plan_edit` | — *what the catalogue was edited to, and who edited it* | — | kept |
 | `deployment_config` | — *what the deployment was told: its sender, and the account it charges through* | — | kept |
 | `stripe_event` | — *which payments arrived, and what each one was applied to* | — | kept |
@@ -368,7 +370,7 @@ and a manifest that does not compose refuses to boot.
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
 | `manifest` | the whole app, and the composition that refuses a broken one | 9 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 16 | — |
-| `credit` | metered work: the reserve, the rate, the ceiling | 7 | 1 |
+| `credit` | metered work: the reserve, the rate, the ceiling | 14 | — |
 | `dunning` | the ladder from past due to erased | 5 | — |
 | `package` | a priced bundle of timed grants | 8 | 1 |
 | `tenancy` | workspaces, kinds, shards, placement, standing | 12 | — |
@@ -378,17 +380,17 @@ and a manifest that does not compose refuses to boot.
 | `notify` | what somebody is told, through which channel, and who may narrow it | 12 | 1 |
 | `problem` | the one refusal shape, and the platform's own catalogue | 6 | — |
 | `tone` | the voice — the rules a written string has to pass | 1 | — |
-| `vault` | the facts that are not an app's to keep (D11) | 8 | — |
+| `vault` | the facts that are not an app's to keep (D11) | 9 | — |
 | `legal` | documents, purposes, sub-processors, the record of processing | 11 | — |
 | `guide` | help, onboarding, the milestones a workspace passes | 5 | — |
 | `job` | scheduled work, and the record that it ran | 7 | — |
 | `brand` | which surfaces a workspace may put its own mark on | 10 | 1 |
 | `mark` | the logo as geometry, so the browser and the Worker draw one shape | 7 | — |
-| `ai` | a generating action: its lane, its prompt, its ceiling | 11 | 1 |
+| `ai` | a generating action: its lane, its prompt, its ceiling | 16 | 1 |
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**246 of them**, 239 reached by something today.
+**259 of them**, 253 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -419,7 +421,7 @@ env or a binding.
 | `catalogue` | the price list an operator edits over the declaration, and what it holds for the people already on a tier | 8 | — |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
 | `inbox` | notifications: the policy, the audience, the read | 10 | — |
-| `services` | the lane out to a provider — AI and mail | 5 | 1 |
+| `services` | the lane out to a provider — AI and mail | 6 | 2 |
 | `stripe` | the card lane: a page Stripe owns, a signature that proves an event is theirs, and the ladder one moves | 11 | — |
 | `config` | what the deployment was told — the credentials it holds, encrypted under a key its database has never seen | 6 | — |
 | `mail` | a letter that leaves the process: the message written out, and the refusal to pretend one was sent | 3 | — |
@@ -432,6 +434,10 @@ env or a binding.
 | `icon` | the picture a business uploads, and where a public route can read it | 8 | — |
 | `raster` | a PNG drawn in a Worker, for the tabs and home screens an SVG cannot reach | 3 | — |
 | `ai-actions` | which model an action runs on, and in whose words | 7 | — |
+| `models` | the model catalogue — what exists, what it costs us, what a workspace pays | 10 | — |
+| `gateway` | the one door out to a model, and where a run's real cost is read | 6 | — |
+| `spend` | one row per run: where a workspace's credits went, and never what was said | 4 | — |
+| `reconcile` | the check on the money that is not our own arithmetic | 6 | — |
 | `operator` | the deployment looking at itself | 6 | — |
 | `deployment` | what is wrong with this deployment, asked at boot | 1 | — |
 | `mcp` | the agent door | 1 | — |
@@ -446,13 +452,13 @@ env or a binding.
 | `vault-ops` | consent, grants, who looked, the processing record, export and erasure | 1 | — |
 | `dossier` | everything we hold about one person, and everything of theirs we delete | 8 | — |
 | `legal` | who agreed to what version, and the wall until they have | 6 | — |
-| `cloudflare` | the one door out to the account — create, destroy, and add a binding | 7 | — |
+| `cloudflare` | the one door out to the account — create, destroy, and add a binding | 8 | — |
 | `storage` | files: the object, the row that knows its key, and the erasure of both | 7 | — |
 | `move` | a workspace's records change shard — the only way its jurisdiction can | 8 | — |
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**333 of them**, 331 reached by something today.
+**361 of them**, 358 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -871,8 +877,7 @@ nothing yet.
 | **23** — Mail that leaves the process — a letter, its variables, and a provider | `kernel/src/notify.ts` | 1 |
 | **24** — A workspace composes its own roles out of one app's keys | `kernel/src/access.ts` | 1 |
 | **27** — The AI lane runs — an action reaches a provider and the reserve settles | `kernel/src/ai.ts` | 1 |
-| **27** — The AI lane runs — an action reaches a provider and the reserve settles | `kernel/src/credit.ts` | 1 |
-| **27** — The AI lane runs — an action reaches a provider and the reserve settles | `runtime/src/services.ts` | 1 |
+| **27** — The AI lane runs — an action reaches a provider and the reserve settles | `runtime/src/services.ts` | 2 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `kernel/src/package.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `runtime/src/jobs.ts` | 1 |
 | **41** — A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have | `kernel/src/brand.ts` | 1 |

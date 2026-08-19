@@ -300,3 +300,31 @@ export async function verify(at: Account): Promise<Answer<{ readonly can: readon
   if (!can.length && !script.ok) return no("this token can read nothing — check it is for the right account");
   return yes({ can: script.ok ? [...can, "ai" as const, "do" as const] : can });
 }
+
+/* --------------------------------------------------------- model catalogue --- */
+
+/**
+ * EVERY MODEL THIS ACCOUNT CAN REACH.
+ *
+ * ⚠️ IT IS HERE BECAUSE THE ACCOUNT TOKEN IS. Every bound on that credential is
+ * written in this file — the retry rule, the failure that is a network fault
+ * rather than an absence, the refusal to act on a failed list — and a second
+ * caller elsewhere inherits none of them. `scripts/infra.test.mjs` fails on one.
+ *
+ * ⚠️ AND IT COVERS WORKERS AI AND THE THIRD PARTIES TOGETHER, which is the reason
+ * to read this rather than two vendors' own catalogues: one answer, one shape,
+ * and a model either of them adds is discovered the same day without anything
+ * here learning a new vendor.
+ */
+export async function listModels(at: Account): Promise<Answer<readonly CatalogueRow[]>> {
+  return call<readonly CatalogueRow[]>(at, "GET", "/ai/models/search?per_page=500&hide_experimental=true");
+}
+
+/** One row of the catalogue, reduced to what a price and a lane can be read from. */
+export interface CatalogueRow {
+  readonly id?: string;
+  readonly name?: string;
+  readonly description?: string;
+  readonly task?: { readonly name?: string } | string;
+  readonly properties?: readonly { readonly property_id?: string; readonly value?: unknown }[];
+}

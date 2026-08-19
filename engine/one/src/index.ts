@@ -37,6 +37,10 @@ import {
   operatorOps, permissionsResolver, personalOps, pusherOver, schemaFor, sendMail, serve,
   sessionIdFrom, shardFor, subscriptionFor, whoIs,
   type Bucket, type Db, type TenantRow,
+  configOf,
+  DEFAULT_MULTIPLIER,
+  type LogReader,
+  type GatewayAt,
 } from "@engine/runtime";
 import { hello } from "@engine/hello";
 
@@ -920,6 +924,14 @@ export interface Env {
    */
   readonly CF_API_TOKEN?: string;
   readonly CF_ACCOUNT_ID?: string;
+  /**
+   * ⚠️ WORKERS AI'S BINDING, AND IT IS HERE FOR ITS GATEWAY HANDLE RATHER THAN
+   * TO RUN ANYTHING. Every model call goes out over HTTP to the gateway's
+   * `/compat` endpoint — one shape for every provider — and this binding is how
+   * a run's real cost is read back out of the gateway's log afterwards. Absent
+   * is a deployment that can generate and cannot check its own margin.
+   */
+  readonly AI?: unknown;
   readonly [binding: string]: unknown;
 }
 
@@ -1012,6 +1024,8 @@ const missingConfig = (env: Env): readonly string[] =>
  */
 async function sweepDeps(env: Env): Promise<SweepDeps> {
   const directory = env.DIRECTORY as unknown as Db;
+  /* ⚠️ Read once per pass rather than per job — see `sweepWithOverrides`. */
+  const named = await configOf(directory, env.CONFIG_SECRET, "ai.gateway");
   return {
     directory,
     shardOf: async (tenantId) => {
@@ -1060,6 +1074,60 @@ async function sweepDeps(env: Env): Promise<SweepDeps> {
         },
       }
       : {}),
+    /* ⚠️ THE ACCOUNT TOKEN READS THE MODEL CATALOGUE, and it is the SAME
+       credential the reconciler holds rather than a second one — both are "this
+       deployment acting on its own Cloudflare account". The gateway's token is
+       a different thing entirely and lives in the config store. */
+    ...(env.CF_API_TOKEN && env.CF_ACCOUNT_ID
+      ? { account: () => ({ accountId: env.CF_ACCOUNT_ID!, token: env.CF_API_TOKEN!, script: "one" }) }
+      : {}),
+    /*
+      ⚠️ AND THE GATEWAY BINDING IS WHERE A RUN'S REAL COST IS READ. `env.AI` is
+      Workers AI's binding and `.gateway(name)` is the handle on the log — so a
+      deployment with the binding but no gateway NAME configured cannot check
+      anything, which is why the name is resolved rather than assumed.
+    */
+    ...(env.AI && named ? { logs: () => aiLogs(env, named) } : {}),
+    multiplier: DEFAULT_MULTIPLIER,
+  };
+}
+
+/**
+ * ⚠️ THE GATEWAY NAME IS CONFIGURATION AND THE BINDING IS NOT. A worker with
+ * `ai` in its config always has the binding; whether there is a GATEWAY to point
+ * it at is something an operator typed. With no name there is nothing to read a
+ * cost from, so the check is simply not in the book — which the console reports
+ * rather than a screen quietly showing a margin nobody is measuring.
+ */
+const aiLogs = (env: Env, gateway: string): LogReader | null => {
+  try {
+    return (env.AI as unknown as { gateway(id: string): LogReader }).gateway(gateway);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * WHERE EVERY MODEL CALL GOES, ASSEMBLED FROM WHAT THE DEPLOYMENT WAS TOLD.
+ *
+ * ⚠️ THE PROVIDER KEY IS KEYED BY THE PROVIDER'S OWN NAME, because that is what
+ * `/compat` addresses a model by. A map with our own spelling in it would be a
+ * key that is held, looked up under the wrong name, and never sent — and the
+ * symptom is every Gemini call falling through to unified billing and its fee,
+ * silently, with everything working.
+ */
+export async function gatewayAt(env: Env): Promise<GatewayAt | null> {
+  const directory = env.DIRECTORY as unknown as Db;
+  const secret = env.CONFIG_SECRET;
+  const [gateway, token, google] = await Promise.all([
+    configOf(directory, secret, "ai.gateway"),
+    configOf(directory, secret, "ai.gateway_token"),
+    configOf(directory, secret, "google.api_key"),
+  ]);
+  if (!gateway || !token || !env.CF_ACCOUNT_ID) return null;
+  return {
+    accountId: env.CF_ACCOUNT_ID, gateway, token,
+    ...(google ? { keys: { "google-ai-studio": google } } : {}),
   };
 }
 

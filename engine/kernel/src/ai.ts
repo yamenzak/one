@@ -21,6 +21,8 @@
  * Layer 2. Imports primitives.
  */
 
+import type { Meter } from "./credit.js";
+
 /* ------------------------------------------------------------------ lanes --- */
 
 /**
@@ -63,20 +65,68 @@ export interface ModelRow {
   readonly provider: string;
   readonly task: string;
   readonly label: string;
-  /** Credits per thousand units. */
+  /** What it is for, in the reader's words. From the catalogue, shown as-is. */
+  readonly about?: string;
+  /** ⚠️ What it BILLS by — see `Meter`. Not every model counts tokens. */
+  readonly meter: Meter;
+  /** ⚠️ MILLI-credits per thousand units, and this is our RAW COST. */
   readonly input: number;
   readonly output: number;
-  /** ⚠️ Per row. A global markup is one margin for twelve different costs. */
-  readonly markup: number;
+  /** ⚠️ Per row, and a MULTIPLIER — `5` is five times. See `Rate`. */
+  readonly multiplier: number;
   readonly enabled: boolean;
   readonly isDefault?: boolean;
   /** ⚠️ A model that thinks bills for tokens nobody requested — see `credit`. */
   readonly thinks?: boolean;
   readonly maxOutput: number;
+  /**
+   * ⚠️ GONE FROM THE PROVIDER'S CATALOGUE, KEPT IN OURS. A row deleted on the
+   * day a provider retires it takes every action bound to it down with it;
+   * retired, it stops being offered and `boundModel` degrades to the lane's
+   * election, which is what "nobody has chosen" already means.
+   */
+  readonly retired?: boolean;
 }
 
+/** ⚠️ What a workspace may be shown: no cost, no multiplier — see `priceFor`. */
+export interface ModelOffer {
+  readonly id: string;
+  readonly label: string;
+  readonly about?: string;
+  readonly lane: Lane;
+  readonly meter: Meter;
+  readonly thinks: boolean;
+  /** ⚠️ MILLI-credits per thousand units, AFTER the multiplier. What THEY pay. */
+  readonly input: number;
+  readonly output: number;
+}
+
+/**
+ * WHAT A MODEL COSTS THE PERSON CHOOSING IT.
+ *
+ * ⚠️ THE MULTIPLIER IS APPLIED HERE AND NEVER TRAVELS. A screen handed the raw
+ * cost and the multiplier can compute the margin, and one that renders both by
+ * accident publishes it. What a workspace is owed is the price; how it was
+ * arrived at is ours.
+ */
+export const priceFor = (row: ModelRow, lane: Lane): ModelOffer => ({
+  id: row.id,
+  label: row.label,
+  ...(row.about ? { about: row.about } : {}),
+  lane,
+  meter: row.meter,
+  thinks: !!row.thinks,
+  input: Math.round(row.input * row.multiplier),
+  output: Math.round(row.output * row.multiplier),
+});
+
+/** ⚠️ A retired row still RESOLVES and is never OFFERED — see `ModelRow`. */
 export const inLane = (rows: readonly ModelRow[], lane: Lane): readonly ModelRow[] =>
   rows.filter((r) => lanesFor(lane).includes(r.task));
+
+/** What a workspace may choose from: in the lane, enabled, and still sold. */
+export const offeredIn = (rows: readonly ModelRow[], lane: Lane): readonly ModelRow[] =>
+  inLane(rows, lane).filter((r) => r.enabled && !r.retired);
 
 /**
  * ⚠️ ONE DEFAULT PER LANE, AND THE ELECTION IS DETERMINISTIC. "Whichever row
@@ -84,7 +134,7 @@ export const inLane = (rows: readonly ModelRow[], lane: Lane): readonly ModelRow
  * feature uses changes without anybody editing anything.
  */
 export function defaultIn(rows: readonly ModelRow[], lane: Lane): ModelRow | null {
-  const usable = inLane(rows, lane).filter((r) => r.enabled);
+  const usable = offeredIn(rows, lane);
   return usable.find((r) => r.isDefault)
     ?? [...usable].sort((a, b) => (a.input + a.output) - (b.input + b.output) || (a.id < b.id ? -1 : 1))[0]
     ?? null;
@@ -124,10 +174,23 @@ export interface ToolEntry {
  * model's instructions, which is worse than rendering it to a person: nobody
  * sees it, and the answer is subtly wrong instead of visibly broken.
  *
- * ⚠️ `brandable` IS THE TENANT'S PERMISSION TO EDIT IT, and it is per action
+ * ⚠️ `brandable` IS THE TENANT'S PERMISSION TO ADD TO IT, and it is per action
  * rather than global. A studio's plan-draft tone is the studio's voice; a
  * lab-extraction prompt is not anybody's to edit, and the difference is a
  * product decision the app declares.
+ *
+ * ⚠️ A WORKSPACE ADDS AND NEVER REPLACES, WHICH IS WHY THE BASE NEVER TRAVELS.
+ * It was a replacement, and a replacement has to be seeded with the current text
+ * to be editable at all — so every prompt the deployment had was shipped to the
+ * browser of anybody who could open the screen. An addendum needs no seed: the
+ * box starts empty, what is typed is appended, and the instructions above it are
+ * never sent anywhere.
+ *
+ * ⚠️ HIDDEN IS NOT SECRET, AND SAYING OTHERWISE WOULD BE THE LIE. A model can be
+ * asked to repeat its own instructions, and no arrangement of prompts prevents
+ * that. What this stops is the base being PUBLISHED — read out of a network tab
+ * by anybody with the screen open. A prompt that must not be known to a customer
+ * is not a prompt.
  */
 export interface AiActionSpec {
   readonly lane: Lane;
@@ -141,9 +204,24 @@ export interface AiActionSpec {
    * is a token the platform pays for and the tenant does not.
    */
   readonly maxOutput: number;
-  /** Whether a workspace may put the prompt in its own words. */
+  /** Whether a workspace may add its own instructions after ours. */
   readonly brandable?: boolean;
 }
+
+/** ⚠️ A workspace's own words are shorter than ours by construction. */
+export const MAX_ADDENDUM = 2_000;
+
+/**
+ * THE INSTRUCTIONS AS THE MODEL RECEIVES THEM.
+ *
+ * ⚠️ OURS FIRST AND THEIRS LAST, WHICH IS THE ONLY ORDER THAT MEANS ANYTHING. A
+ * later instruction is the one a model follows when two conflict, so a workspace
+ * asking for a shorter answer gets a shorter answer — which is the feature. Put
+ * first, an addendum would be silently overridden by our own text and the
+ * setting would save and change nothing.
+ */
+export const composePrompt = (base: string, addendum?: string | null): string =>
+  addendum?.trim() ? `${base}\n\n${addendum.trim()}` : base;
 
 /** ⚠️ Enough for instructions, not for a corpus. */
 export const MAX_PROMPT = 8_000;
@@ -164,7 +242,11 @@ export function refusePrompt(
   const out: PromptRefusal[] = [];
   if (level === "tenant" && !def.brandable) out.push("not_theirs");
   if (!text.trim()) out.push("empty");
-  if (text.length > MAX_PROMPT) out.push("too_long");
+  /* ⚠️ THE CEILING IS THE AUTHORITY'S. A workspace adds to our instructions;
+     eight thousand characters of addition is not an addition, it is a second
+     prompt appended to the first — and it is charged to their reserve on every
+     single call. */
+  if (text.length > (level === "tenant" ? MAX_ADDENDUM : MAX_PROMPT)) out.push("too_long");
   if (namedIn(text).some((n) => !def.variables.includes(n))) out.push("unknown_variable");
   return out;
 }
@@ -208,7 +290,16 @@ export function boundModel(
 /* ------------------------------------------------------------------ rules --- */
 
 export type AiRefusal =
-  | "lane_with_no_model" | "two_defaults" | "priced_at_nothing" | "unknown_task";
+  | "lane_with_no_model" | "two_defaults" | "priced_at_nothing" | "unknown_task"
+  | "no_margin";
+
+/**
+ * ⚠️ THE FLOOR UNDER EVERY ROW A WORKSPACE MAY CHOOSE. A workspace picking its
+ * own model is safe for exactly one reason: every choice is charged to its own
+ * wallet at a margin. A row at or below cost turns that freedom into a way to
+ * spend our money, and the more attractive the model the faster.
+ */
+export const MIN_MULTIPLIER = 1;
 
 export interface AiProblem { readonly of: string; readonly why: AiRefusal; readonly detail: string }
 
@@ -225,12 +316,20 @@ export function refuseCatalogue(rows: readonly ModelRow[], needed: readonly Lane
 
   for (const r of rows) {
     if (!laneOf(r.task)) at(r.id, "unknown_task", `Its task, "${r.task}", maps to no lane, so nothing will ever select it`);
-    if (r.enabled && r.input <= 0 && r.output <= 0) {
+    if (!r.enabled || r.retired) continue;
+    if (r.input <= 0 && r.output <= 0) {
       at(r.id, "priced_at_nothing", "Enabled and priced at zero, so every call settles free");
+    }
+    /* ⚠️ AT COST IS A LOSS, because the reserve is a ceiling on revenue: the
+       charge can come in under the estimate and never over it. A multiplier of
+       one is a row that breaks even at best. */
+    if (r.multiplier <= MIN_MULTIPLIER) {
+      at(r.id, "no_margin",
+        `Enabled at ${r.multiplier}× cost, so every call on it is at best break-even`);
     }
   }
   for (const lane of needed) {
-    const usable = inLane(rows, lane).filter((r) => r.enabled);
+    const usable = offeredIn(rows, lane);
     if (!usable.length) at(lane, "lane_with_no_model", "An app asks for this lane and no enabled model answers");
     if (usable.filter((r) => r.isDefault).length > 1) {
       at(lane, "two_defaults", "Two rows claim the default, so which one runs depends on row order");

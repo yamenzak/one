@@ -66,6 +66,19 @@
   // is worse than a refusal, because the refusal is visible.
   "send_email": [{ "name": "SEND_EMAIL" }],
 
+  // ⚠️ BOUND FOR THE GATEWAY'S LOG, NOT TO RUN A MODEL. Every generation goes
+  // out over HTTP to AI Gateway's `/compat` endpoint — one shape for every
+  // provider, Cloudflare's own models included — and this binding exists so the
+  // cost of each call can be read back out of the gateway afterwards. That
+  // figure is the only number in the metering chain that is not our own
+  // arithmetic, which is what makes it worth a binding.
+  //
+  // ⚠️ IT COSTS NOTHING UNBOUND-BUT-UNUSED. No call is made through it unless a
+  // gateway NAME is configured, so a deployment that has not been told about a
+  // gateway simply never checks a margin — and the console says so rather than
+  // showing one nobody is measuring.
+  "ai": { "binding": "AI" },
+
   "d1_databases": [
     {
       "binding": "DIRECTORY",

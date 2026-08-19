@@ -34,7 +34,7 @@
  */
 
 import type { AppId, PlanSpec, TenantId } from "@engine/kernel";
-import { allowanceFor, newId, settle as settleAt, type Reserve } from "@engine/kernel";
+import { MILLI, allowanceFor, newId, settle as settleAt, type Reserve } from "@engine/kernel";
 import { MEMBERSHIP, subscriptionFor } from "./billing.js";
 import type { Db } from "./sql.js";
 
@@ -373,16 +373,34 @@ export async function reserve(
  * only ever charge less than the truth, so the guess would always be free money
  * in one direction.
  *
+ * ⚠️ THE CHARGE IS MILLI-CREDITS AND THE BALANCE IS WHOLE ONES. A credit is a
+ * cent and a small call costs a fraction of one, so rounding each call UP is a
+ * several-hundred-fold overcharge that also makes every call — trivial or
+ * enormous — read as "1 credit" on a statement. The whole credits come off the
+ * balance and the remainder is CARRIED in `spend_milli`, drawn the moment it
+ * fills. Rounding down instead would make every cheap call free while the meter
+ * reported perfect health.
+ *
  * ⚠️ THE ALLOWANCE IS SPENT FIRST, and it is not a preference. What expires at
  * the end of the month should be the thing that gets used; drawing from the
  * bought balance while an allowance sits there means the customer pays cash for
  * something they had already been given, and watches it lapse.
  */
 export async function settle(
-  db: Db, tenantId: TenantId, held: Reserve, actual: number | null,
+  db: Db, tenantId: TenantId, held: Reserve, actualMilli: number | null,
   opts: { readonly appId?: AppId; readonly ref?: string } = {}, now = new Date(),
-): Promise<number> {
-  const charged = settleAt(held, actual);
+): Promise<{ readonly milli: number; readonly credits: number }> {
+  const milli = settleAt(held, actualMilli);
+
+  /* ⚠️ THE CARRY IS READ AND WRITTEN AROUND THE DRAW, so two settlements on one
+     workspace cannot both see the same remainder and both convert it. The
+     increment is a statement of its own for that reason. */
+  await db.prepare(
+    `UPDATE billing_account SET spend_milli = COALESCE(spend_milli, 0) + ? WHERE tenant_id = ?`)
+    .bind(milli, tenantId).run();
+  const owed = (await db.prepare(`SELECT spend_milli FROM billing_account WHERE tenant_id = ?`)
+    .bind(tenantId).first<{ spend_milli: number | null }>())?.spend_milli ?? 0;
+  const charged = Math.floor(owed / MILLI);
 
   /*
     ⚠️ THE SPLIT IS COMPUTED IN SQL, IN ONE STATEMENT, for the same reason the
@@ -393,13 +411,47 @@ export async function settle(
   await db.prepare(
     `UPDATE billing_account SET
        held = MAX(0, held - ?),
+       spend_milli = MAX(0, COALESCE(spend_milli, 0) - ?),
        granted = MAX(0, COALESCE(granted, 0) - MIN(COALESCE(granted, 0), ?)),
        bought = MAX(0, COALESCE(bought, 0) - MAX(0, ? - COALESCE(granted, 0)))
      WHERE tenant_id = ?`)
-    .bind(held.credits, charged, charged, tenantId).run();
+    .bind(held.credits, charged * MILLI, charged, charged, tenantId).run();
 
   if (charged > 0) await record(db, tenantId, -charged, held.of, opts, now);
-  return charged;
+  return { milli, credits: charged };
+}
+
+/**
+ * GIVE BACK WHAT A LATER, TRUER PRICE SAYS WAS OVERCHARGED.
+ *
+ * ⚠️ THE TRUE-UP ONLY EVER MOVES ONE WAY. A run settles on what the response
+ * reported and is corrected when the gateway's own cost arrives — which is
+ * lower, because the fallback deliberately errs high. Allowing this to charge
+ * MORE would make a settled call re-openable, and a customer's balance would
+ * move for a run they finished with hours ago.
+ */
+export async function refundMilli(
+  db: Db, tenantId: TenantId, milli: number, reason: string, now = new Date(),
+): Promise<number> {
+  if (milli <= 0) return 0;
+  await db.prepare(
+    `UPDATE billing_account SET spend_milli = COALESCE(spend_milli, 0) - ? WHERE tenant_id = ?`)
+    .bind(milli, tenantId).run();
+
+  /* ⚠️ A NEGATIVE CARRY IS A WHOLE CREDIT OWED BACK, and it is put back on the
+     BOUGHT balance rather than the allowance: the allowance is set rather than
+     added, so a credit returned into it would vanish at the next renewal. */
+  const owed = (await db.prepare(`SELECT spend_milli FROM billing_account WHERE tenant_id = ?`)
+    .bind(tenantId).first<{ spend_milli: number | null }>())?.spend_milli ?? 0;
+  if (owed >= 0) return 0;
+
+  const back = Math.ceil(-owed / MILLI);
+  await db.prepare(
+    `UPDATE billing_account SET spend_milli = COALESCE(spend_milli, 0) + ?,`
+    + ` bought = COALESCE(bought, 0) + ? WHERE tenant_id = ?`)
+    .bind(back * MILLI, back, tenantId).run();
+  await record(db, tenantId, back, reason, {}, now);
+  return back;
 }
 
 /**
@@ -428,7 +480,10 @@ export async function release(db: Db, tenantId: TenantId, held: Reserve): Promis
  * would leave a wallet with money in it and a debt beside it, which reads to
  * everybody as a bug.
  */
-export const MILLI = 1000;
+/* ⚠️ THE KERNEL'S, RE-EXPORTED. It was declared here as well, and two constants
+   with one name is the shape where somebody edits the wrong one and every meter
+   quietly disagrees with every other by a factor of a thousand. */
+export { MILLI };
 
 export async function owe(
   db: Db, tenantId: TenantId, milli: number,

@@ -27,8 +27,10 @@
  * run where mocking is correct.
  */
 
-import type { AppId, Channel, Instant, Lane, ModelRow, TenantId } from "@engine/kernel";
-import { boundModel, plan as planRun, type Planned } from "@engine/kernel";
+import type { AppId, Channel, Instant, Lane, ModelRow, TenantId, Usage } from "@engine/kernel";
+import { boundModel, chargedFor, plan as planRun, type Planned } from "@engine/kernel";
+import { askModel, type Fetcher, type GatewayAt, type GatewayRefusal, type Answered } from "./gateway.js";
+import { recordRun, type Priced, type Recording } from "./spend.js";
 import { release, reserve, settle } from "./wallet.js";
 import type { Db } from "./sql.js";
 
@@ -51,18 +53,24 @@ export interface NotifyService {
 export interface Ask {
   readonly tenantId: TenantId;
   readonly appId: AppId;
+  /** ⚠️ Which operation, so a statement can say what the credits went on. */
+  readonly action: string;
   readonly lane: Lane;
   readonly system: string;
   readonly prompt: string;
   readonly maxOutput: number;
-  /** ⚠️ Arabic runs nearer two characters per token; English nearer four. */
-  readonly charsPerUnit?: number;
   /**
-   * ⚠️ THE OPERATOR'S BINDING FOR THIS ACTION, IF THERE IS ONE (D19). Resolved
-   * by the caller through `running`, because the binding also decides the
-   * PROMPT — and a run that resolved the model here while the prompt was
-   * resolved there is a run whose reserve is computed from one thing and whose
-   * instructions are another.
+   * ⚠️ WHAT A LANE COUNTS WHEN IT IS NOT CHARACTERS — images, seconds of audio.
+   * Absent, the density of the actual text decides, which is what `charsPerUnit`
+   * used to be told by hand and therefore was not.
+   */
+  readonly units?: Usage;
+  /**
+   * ⚠️ THE MODEL FOR THIS RUN, IF ONE WAS CHOSEN (D19). Resolved by the caller
+   * through `running`, because the same resolution decides the PROMPT — and a
+   * run that resolved the model here while the prompt was resolved there is a
+   * run whose reserve is computed from one thing and whose instructions are
+   * another.
    */
   readonly model?: string | null;
 }
@@ -70,7 +78,12 @@ export interface Ask {
 export interface Generated {
   readonly text: string;
   readonly model: string;
+  /** Whole credits actually taken off the balance by this run. */
   readonly charged: number;
+  /** ⚠️ What it really cost them, which is finer than a credit — see `settle`. */
+  readonly milli: number;
+  /** The spend row, so a caller can point at it. */
+  readonly runId: string;
 }
 
 export interface TellInput {
@@ -89,20 +102,39 @@ export interface MailInput {
 
 /* ------------------------------------------------------------------- lanes --- */
 
-export type AiRefusal = "no_model" | "not_enough_credits" | "provider_failed" | "mock_in_production";
+export type AiRefusal =
+  | "no_model" | "not_enough_credits" | "provider_failed" | "mock_in_production" | "no_key";
 
 /**
  * ⚠️ WHAT A MODEL IS ASKED THROUGH. Injected rather than imported, because the
  * provider is the one thing that genuinely differs between a deployment with
  * keys and a deployment without — and everything else here should not have to
  * know which it is.
+ *
+ * ⚠️ AND IT REPORTS A REFUSAL RATHER THAN THROWING. A throw here loses the
+ * reason: every failure becomes "provider_failed", so a missing key, a timeout
+ * and a model that does not exist are one message an operator cannot act on.
  */
 export interface Provider {
-  run(model: ModelRow, planned: Planned, maxOutput: number): Promise<{
-    readonly text: string;
-    readonly usage: { readonly input: number; readonly output: number } | null;
-  }>;
+  run(model: ModelRow, planned: Planned, maxOutput: number): Promise<Answered | GatewayRefusal>;
 }
+
+/**
+ * THE ONE PROVIDER, OVER THE GATEWAY.
+ *
+ * ⚠️ THE TAG IS WHAT MAKES THE MONEY CHECKABLE and it is attached here, once, so
+ * no caller can forget it. Without it the gateway's own billing is a single
+ * number for the deployment and cannot be compared against what any workspace
+ * was charged — which is the only independent check this system has.
+ */
+export const gatewayProvider = (
+  at: GatewayAt | null, tag: { readonly t: string; readonly a: string; readonly o: string },
+  fetcher?: Fetcher,
+): Provider => ({
+  run: (model, planned, maxOutput) =>
+    askModel(at, { model, system: planned.system, prompt: planned.prompt, maxOutput, tag },
+      fetcher ?? fetch),
+});
 
 export interface AiDeps {
   readonly directory: Db;
@@ -138,28 +170,65 @@ export async function generate(deps: AiDeps, ask: Ask): Promise<Generated | AiRe
   const model = boundModel(rows, ask.lane, ask.model);
   if (!model) return "no_model";
 
-  const rate = { input: model.input, output: model.output, markup: model.markup };
-  const planned = planRun(`${ask.appId}.${ask.lane}`, ask.system, ask.prompt, rate,
-    Math.min(ask.maxOutput, model.maxOutput),
-    { charsPerUnit: ask.charsPerUnit, thinks: model.thinks });
+  const rate = {
+    meter: model.meter, input: model.input, output: model.output, multiplier: model.multiplier,
+  };
+  const ceiling = Math.min(ask.maxOutput, model.maxOutput);
+  const planned = planRun(`${ask.appId}.${ask.lane}`, ask.system, ask.prompt, rate, ceiling,
+    { ...(ask.units ? { units: ask.units } : {}), ...(model.thinks ? { thinks: true } : {}) });
 
   const held = await reserve(deps.directory, ask.tenantId, planned.reserve.credits, planned.reserve.of);
   if (held === "not_enough") return "not_enough_credits";
 
-  try {
-    const out = await deps.provider.run(model, planned, Math.min(ask.maxOutput, model.maxOutput));
-    /* ⚠️ A missing usage report falls back to the RESERVE, never to a recount —
-       the cap means a recount can only ever charge less than the truth. */
-    const actual = out.usage
-      ? Math.ceil(((out.usage.input / 1000) * rate.input + (out.usage.output / 1000) * rate.output)
-        * (1 + rate.markup))
-      : null;
-    const charged = await settle(deps.directory, ask.tenantId, held, actual, { appId: ask.appId });
-    return { text: out.text, model: model.id, charged };
-  } catch {
+  const record = (it: Omit<Recording, "tenantId" | "appId" | "action" | "model" | "lane" | "held">) =>
+    recordRun(deps.directory, {
+      tenantId: ask.tenantId, appId: ask.appId, action: ask.action,
+      model: model.id, lane: ask.lane, held: held.credits, ...it,
+    });
+
+  /* ⚠️ A PROVIDER MAY REFUSE OR MAY THROW, AND BOTH RELEASE THE HOLD. The
+     gateway reports its refusals so an operator can act on the reason; a mock
+     outside development throws on purpose, and an unforeseen fault throws by
+     accident. Handling only the first leaves the credits held on the second —
+     a customer whose balance shrank and who got nothing. */
+  const out = await deps.provider.run(model, planned, ceiling)
+    .catch((why: unknown) => String(why instanceof Error ? why.message : why));
+
+  /* ⚠️ AND A FAILURE STILL WRITES A ROW. A failure with no row is a button that
+     did nothing and left no trace anybody in support can find. */
+  if (typeof out === "string") {
     await release(deps.directory, ask.tenantId, held);
-    return "provider_failed";
+    await record({ chargedMilli: 0, source: "reserve", ok: false, detail: out });
+    return out === "no_key" ? "no_key" : "provider_failed";
   }
+
+  /*
+    ⚠️ THREE PRICES, IN ORDER OF HOW MUCH THEY ARE WORTH BELIEVING.
+
+    A CACHED answer never reached a provider, so it cost nothing and is charged
+    nothing — a multiplier over a cost of zero is charging for a lookup.
+
+    A USAGE report is the provider's own count, priced at the rate the reserve
+    used, so the two can never disagree about what a token costs.
+
+    NEITHER falls back to the reserve rather than to a recount: because of the
+    cap, a recount can only ever charge less than the truth, so a guess is free
+    money in exactly one direction.
+  */
+  const chargedMilli = out.cached ? 0
+    : out.usage ? chargedFor(out.usage, rate)
+      : null;
+  const source: Priced = out.cached ? "cached" : out.usage ? "usage" : "reserve";
+
+  const paid = await settle(deps.directory, ask.tenantId, held, chargedMilli, { appId: ask.appId });
+  const runId = await record({
+    chargedMilli: paid.milli, source,
+    ...(out.usage ? { unitsIn: out.usage.input, unitsOut: out.usage.output } : {}),
+    ...(out.logId ? { logId: out.logId } : {}),
+    ok: true,
+  });
+
+  return { text: out.text, model: model.id, charged: paid.credits, milli: paid.milli, runId };
 }
 
 /**
@@ -174,7 +243,12 @@ export const mockProvider = (environment: string): Provider => ({
       throw new Error("the mock provider is development-only and this is not development");
     }
     const text = `[mock ${model.id}] ${planned.prompt.slice(0, 120)}`;
-    return { text, usage: { input: planned.prompt.length / 4, output: Math.min(40, maxOutput) } };
+    return {
+      text,
+      usage: { input: Math.ceil(planned.prompt.length / 4), output: Math.min(40, maxOutput) },
+      logId: null,
+      cached: false,
+    };
   },
 });
 

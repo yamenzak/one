@@ -19,7 +19,7 @@ import { SPACE } from "../tokens/metrics.js";
 import { Group } from "../parts/surfaces.js";
 import { Nothing } from "../parts/state.js";
 import { glyphOf } from "../frame/shell.js";
-import { sayMoment, type Instant } from "@engine/kernel";
+import { sayMoment, sayRefused, type Instant, type ReadRefusal } from "@engine/kernel";
 import { useShown } from "../parts/said.js";
 
 export interface ConsentProps {
@@ -104,8 +104,15 @@ export function WhoLooked({ looks }: { readonly looks: readonly Look[] }) {
         >
           {/* ⚠️ Refused attempts are shown too. "Did anybody try" is the question
               actually asked after something goes wrong. */}
+          {/* ⚠️ IN WORDS, NOT IN OUR NAME FOR THE BRANCH. This printed
+              `no_grant` to the person whose data it is — on the one screen
+              somebody opens to find out whether they were protected. */}
           {look.refused
-            ? <Chip color="warning" variant="soft"><Chip.Label>Refused — {look.refused}</Chip.Label></Chip>
+            ? (
+              <Chip color="warning" variant="soft">
+                <Chip.Label>Refused — {sayRefused(look.refused as ReadRefusal)}</Chip.Label>
+              </Chip>
+            )
             : null}
         </Group>
       ))}

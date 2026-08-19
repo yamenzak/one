@@ -10,7 +10,7 @@
 
 import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { PLATFORM_ROLES, type Channel, type ModelRow, type TenantId } from "@engine/kernel";
+import { MILLI, PLATFORM_ROLES, type Channel, type ModelRow, type TenantId } from "@engine/kernel";
 import {
   DIRECTORY_MODULES, SHARD_MODULES,
   BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA, MEMBERSHIP_SCHEMA,
@@ -19,8 +19,14 @@ import {
   MOCK_ALLOWED, availableChannels, generate, mockProvider, tell, type Db, type Provider,
   topUp, walletOf,
   type PushNote,
+  spendOf,
+  spendByAction,
 } from "@engine/runtime";
 import { HELLO } from "../src/index.js";
+
+/* ⚠️ A window rather than "everything", because the statement is always a period. */
+const daysAgo = (n: number): string =>
+  new Date(Date.now() - n * 86_400_000).toISOString();
 
 const directory = () => env.DIRECTORY as unknown as Db;
 const shard = () => env.SHARD_EU_2 as unknown as Db;
@@ -29,8 +35,8 @@ let tenantId = "" as TenantId;
 const EVERY: readonly Channel[] = ["inbox", "email", "push"];
 
 const MODELS: ModelRow[] = [
-  { id: "@cf/meta/small", provider: "cf", task: "text-generation", label: "Small",
-    input: 1, output: 3, markup: 0.5, enabled: true, isDefault: true, maxOutput: 1000 },
+  { id: "@cf/meta/small", provider: "cf", task: "text-generation", label: "Small", meter: "token",
+    input: 1, output: 3, multiplier: 5, enabled: true, isDefault: true, maxOutput: 1000 },
 ];
 
 beforeAll(async () => {
@@ -265,7 +271,7 @@ describe("generating something and charging for it", () => {
   });
 
   const ask = () => ({
-    tenantId, appId: "hello", lane: "text" as const,
+    tenantId, appId: "hello", action: "note.draft", lane: "text" as const,
     system: "S".repeat(2000), prompt: "write me a note", maxOutput: 500,
   });
 
@@ -277,12 +283,22 @@ describe("generating something and charging for it", () => {
   it("charges what the provider reported, never more than was held", async () => {
     await topUp(directory(), tenantId, 10_000);
     const out = await generate(deps({
-      async run() { return { text: "here you are", usage: { input: 600, output: 120 } }; },
+      async run() { return { text: "here you are", usage: { input: 600, output: 120 }, logId: null, cached: false }; },
     }), ask());
     expect(out).not.toBe("no_model");
     if (typeof out === "string") return;
     expect(out.text).toBe("here you are");
-    expect(out.charged).toBeGreaterThan(0);
+    /*
+      ⚠️ CHARGED IN MILLI, WHICH IS THE WHOLE POINT. This call costs a fraction
+      of a credit; rounding it up to one would be a several-hundred-fold
+      overcharge and would make every call, trivial or enormous, read as
+      "1 credit" on a statement. The whole credits come off the balance and the
+      remainder is carried.
+    */
+    expect(out.milli).toBeGreaterThan(0);
+    expect(out.charged).toBe(Math.floor(out.milli / MILLI));
+    /* ⚠️ And the hold is released either way — a settled call must never leave
+       credits held against work that finished. */
     expect((await walletOf(directory(), tenantId)).held).toBe(0);
   });
 
@@ -291,12 +307,53 @@ describe("generating something and charging for it", () => {
   it("charges the reserve when the provider reports nothing", async () => {
     await topUp(directory(), tenantId, 10_000);
     const out = await generate(deps({
-      async run() { return { text: "x", usage: null }; },
+      async run() { return { text: "x", usage: null, logId: null, cached: false }; },
     }), ask());
     if (typeof out === "string") return;
     /* The system prompt is 2,000 characters, so the reserve is far from trivial —
-       budgeting for the user's text alone would under-count every single call. */
-    expect(out.charged).toBeGreaterThan(1);
+       budgeting for the user's text alone would under-count every single call.
+       Falling back to it means the whole reserve, in milli. */
+    const reserved = (await spendOf(directory(), tenantId))[0]!;
+    expect(out.milli).toBe(reserved.held * MILLI);
+    expect(reserved.source).toBe("reserve");
+  });
+
+  /*
+    ⚠️ A CACHED ANSWER NEVER REACHED A PROVIDER, so it cost nothing and is
+    charged nothing. A multiplier over a cost of zero is charging for a lookup.
+  */
+  it("charges nothing for an answer the gateway had already", async () => {
+    await topUp(directory(), tenantId, 10_000);
+    const out = await generate(deps({
+      async run() { return { text: "again", usage: null, logId: "log_1", cached: true }; },
+    }), ask());
+    if (typeof out === "string") return;
+    expect(out.milli).toBe(0);
+    expect((await walletOf(directory(), tenantId)).balance).toBe(10_000);
+  });
+
+  /*
+    ⚠️ EVERY RUN LEAVES A ROW, INCLUDING A FAILED ONE — and it holds what the run
+    COST, never what was said. A failure with no row is a button that did nothing
+    and left no trace anybody in support can find; a row carrying the prompt is a
+    permanent record of everything every workspace ever typed.
+  */
+  it("records where the credits went, and never what was written", async () => {
+    await topUp(directory(), tenantId, 10_000);
+    await generate(deps({
+      async run() { return { text: "secret answer", usage: { input: 9, output: 9 }, logId: "log_2", cached: false }; },
+    }), ask());
+
+    const rows = await spendOf(directory(), tenantId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ appId: "hello", action: "note.draft", ok: true, source: "usage" });
+    expect(JSON.stringify(rows[0])).not.toContain("secret answer");
+    expect(JSON.stringify(rows[0])).not.toContain("write me a note");
+
+    /* ⚠️ And the grouping is the answer to "where did my credits go" — a list of
+       a hundred rows is a log, four lines naming the action is a statement. */
+    const by = await spendByAction(directory(), tenantId, daysAgo(1));
+    expect(by).toEqual([{ key: "hello.note.draft", runs: 1, chargedMilli: rows[0]!.chargedMilli }]);
   });
 
   /*
@@ -316,7 +373,7 @@ describe("generating something and charging for it", () => {
   it("refuses before calling anything when there is nothing to spend", async () => {
     let called = false;
     const out = await generate(deps({
-      async run() { called = true; return { text: "", usage: null }; },
+      async run() { called = true; return { text: "", usage: null, logId: null, cached: false }; },
     }), ask());
     expect(out).toBe("not_enough_credits");
     expect(called).toBe(false);
@@ -325,7 +382,7 @@ describe("generating something and charging for it", () => {
   it("refuses a lane no enabled model answers", async () => {
     await topUp(directory(), tenantId, 10_000);
     const out = await generate({
-      ...deps({ async run() { return { text: "", usage: null }; } }),
+      ...deps({ async run() { return { text: "", usage: null, logId: null, cached: false }; } }),
       models: async () => [],
     }, ask());
     expect(out).toBe("no_model");

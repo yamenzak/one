@@ -64,7 +64,7 @@ export interface CredentialDef {
    */
   readonly secret: boolean;
   /** ⚠️ Grouped in the console, so a lane's keys are set together or not at all. */
-  readonly lane: "email" | "stripe";
+  readonly lane: "email" | "stripe" | "ai";
 }
 
 const def = (d: CredentialDef): CredentialDef => d;
@@ -107,6 +107,15 @@ export const LANES: Readonly<Record<CredentialDef["lane"], LaneDef>> = {
     half: "A key with no signing secret takes money and never hears that it landed",
     off: "Nothing can be bought here yet",
   },
+  /* ⚠️ NOT `needed`, AND THAT IS A REAL DECISION. A deployment with no AI is a
+     deployment; every product here works without it and only the generating
+     actions go quiet. Marking it needed would put a permanent warning on a
+     console that is correctly configured. */
+  ai: {
+    id: "ai", name: "AI", needed: false,
+    half: "A gateway with no token refuses every call, so nothing generates",
+    off: "Nothing here can generate anything yet",
+  },
 };
 
 /**
@@ -135,6 +144,26 @@ export const CREDENTIALS: Readonly<Record<string, CredentialDef>> = {
     id: "stripe.webhook_secret", lane: "stripe", secret: true,
     label: "Webhook signing secret",
     said: "Without it every webhook is refused — an unsigned one is anybody claiming a payment landed.",
+  }),
+  "ai.gateway": def({
+    id: "ai.gateway", lane: "ai", secret: false,
+    label: "Gateway name",
+    said: "Which AI Gateway every call goes through. It is where the cost of each one is recorded.",
+  }),
+  "ai.gateway_token": def({
+    id: "ai.gateway_token", lane: "ai", secret: true,
+    label: "Gateway token",
+    said: "Authorises this deployment to use the gateway. Without it every call is refused.",
+  }),
+  /*
+    ⚠️ OUR OWN KEY, WHICH IS THE POINT. The gateway can hold a provider key for
+    us and bill the usage through Cloudflare — which adds a fee on every credit
+    purchase. Holding the key here means we pay the provider's own rate.
+  */
+  "google.api_key": def({
+    id: "google.api_key", lane: "ai", secret: true,
+    label: "Google AI key",
+    said: "Runs the Gemini models at Google's own rates. Without it only Cloudflare's own models answer.",
   }),
 };
 
