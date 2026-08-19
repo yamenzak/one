@@ -389,11 +389,31 @@ export function Jobs({ book, runs, missedMs, now }: JobsProps) {
            tests. */
         const quiet = quiet_.includes(job.id);
 
+        /*
+          ⚠️ WHAT HAPPENED IS THE SECOND LINE, AND WHAT IT IS FOR IS NOT ON THE
+          ROW AT ALL. `job.why` is a description — the thing DESIGN.md §1 calls a
+          symptom — and it was the line an operator's eye landed on, while the
+          one fact they opened the screen for sat right-aligned in a column
+          narrow enough to wrap a failure across three lines. The label says what
+          the job is; the row says whether it ran.
+
+          ⚠️ AND THE CADENCE IS THE CORNER. "Every day" is what makes "nothing
+          since Friday" mean something — without it, a silence is only alarming
+          if you already knew how often it should speak.
+        */
         return (
-          <ControlRow key={job.id} label={job.label} under={job.why}>
-            <span className={`${TYPE.note} text-end`} data-ink={last?.ok === false ? "danger" : "neutral"}>
-              {lastRun(shown, last, quiet)}
-            </span>
+          <ControlRow
+            key={job.id}
+            label={job.label}
+            under={
+              <span data-ink={last?.ok === false ? "danger" : quiet ? "warning" : "neutral"}>
+                {lastRun(shown, last, quiet)}
+              </span>
+            }
+          >
+            <Chip color="default" variant="soft">
+              <Chip.Label>{cadence(job.schedule)}</Chip.Label>
+            </Chip>
           </ControlRow>
         );
       })}
@@ -413,6 +433,19 @@ export function Jobs({ book, runs, missedMs, now }: JobsProps) {
  * three time zones away read a job's run at somebody else's midnight and had no
  * way to tell.
  */
+/**
+ * ⚠️ HOW OFTEN, FROM THE CRON, IN WORDS. Five fields is a thing operators read
+ * fluently and everybody else counts on their fingers — and it is the fact that
+ * turns "nothing since Friday" from a date into a problem.
+ */
+const cadence = (schedule: string): string => {
+  const [, hour, dom, , dow] = schedule.trim().split(/\s+/);
+  if (hour === "*") return "Hourly";
+  if (dow && dow !== "*") return "Weekly";
+  if (dom && dom !== "*") return "Monthly";
+  return "Daily";
+};
+
 const lastRun = (
   shown: Shown, last: JobsProps["runs"][number] | undefined, quiet: boolean,
 ): string => {
