@@ -59,8 +59,18 @@ export interface GroupProps {
    * find by looking.
    */
   readonly face?: FaceOf;
-  /** One line under the label, for a group whose consequence is not obvious. */
-  readonly under?: string;
+  /**
+   * One line under the label, for a group whose consequence is not obvious.
+   *
+   * ⚠️ A NODE, BECAUSE A CARD'S VERDICT IS THE ONE LINE THAT WEARS A TONE. It
+   * was a `string`, so the sentence that says a lane is half-configured or a
+   * store is draining had to be the same grey as every description on the
+   * screen — the ink is the only channel a monochrome product has for "this one
+   * is the problem", and a heading is exactly where it earns its keep. Still a
+   * LINE: it renders inside a `<p>`, so a block element here is invalid markup
+   * that browsers silently reparent.
+   */
+  readonly under?: React.ReactNode;
   /**
    * ONE ACTION AT THE FOOT OF THE CARD, AS A REAL BUTTON.
    *

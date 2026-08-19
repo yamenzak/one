@@ -70,6 +70,46 @@ export interface CredentialDef {
 const def = (d: CredentialDef): CredentialDef => d;
 
 /**
+ * A LANE IS SET WHOLE OR IT DOES NOT RUN, AND HALF-SET IS THE DANGEROUS ONE.
+ *
+ * ⚠️ THE CONSOLE CAN SEE WHICH ROWS ARE SET AND CANNOT KNOW WHAT THE COMBINATION
+ * DOES. Nothing configured is a deployment that has not started taking payments;
+ * half configured is one that takes them and never hears that they landed — the
+ * same two rows, opposite verdicts. So the sentence lives beside the keys, where
+ * whoever adds the third one is standing.
+ *
+ * ⚠️ KEYED BY THE LANE UNION, so a new lane is a compile failure here rather than
+ * a screen falling back to a sentence that says nothing about it.
+ */
+export interface LaneDef {
+  readonly id: CredentialDef["lane"];
+  readonly name: string;
+  /** What is true while some of it is set and some is not. */
+  readonly half: string;
+  /** What is true while none of it is. */
+  readonly off: string;
+  /**
+   * ⚠️ WHETHER "OFF" IS A PROBLEM OR A CHOICE. A deployment that takes no money
+   * is a deployment; one that sends no mail cannot let anybody in, because the
+   * sign-in code goes by post. Only the first is allowed to be quiet.
+   */
+  readonly needed: boolean;
+}
+
+export const LANES: Readonly<Record<CredentialDef["lane"], LaneDef>> = {
+  email: {
+    id: "email", name: "Email", needed: true,
+    half: "Mail needs both of these, so none is going out",
+    off: "No mail leaves here, so nobody can be sent a sign-in code",
+  },
+  stripe: {
+    id: "stripe", name: "Payments", needed: false,
+    half: "A key with no signing secret takes money and never hears that it landed",
+    off: "Nothing can be bought here yet",
+  },
+};
+
+/**
  * ⚠️ AN EXPLICIT REGISTRY, AND THE WRITE IS CHECKED AGAINST IT. A free-text key
  * store is one where a typo is a value that saves, reads back, and is looked for
  * under the name somebody meant — and the console could not render itself,

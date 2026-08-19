@@ -417,7 +417,7 @@ env or a binding.
 | `inbox` | notifications: the policy, the audience, the read | 10 | — |
 | `services` | the lane out to a provider — AI and mail | 5 | 1 |
 | `stripe` | the card lane: a page Stripe owns, a signature that proves an event is theirs, and the ladder one moves | 11 | — |
-| `config` | what the deployment was told — the credentials it holds, encrypted under a key its database has never seen | 5 | — |
+| `config` | what the deployment was told — the credentials it holds, encrypted under a key its database has never seen | 6 | — |
 | `mail` | a letter that leaves the process: the message written out, and the refusal to pretend one was sent | 3 | — |
 | `webpush` | the two specifications a notification travels on — VAPID, and the sealed body | 6 | — |
 | `push` | who has turned notifications on, on which device, at which door | 8 | — |
@@ -448,7 +448,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**321 of them**, 319 reached by something today.
+**322 of them**, 320 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

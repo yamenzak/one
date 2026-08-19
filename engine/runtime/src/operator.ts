@@ -45,7 +45,7 @@ import {
   addShard, appsOfTenant, commercialAllowance, commercialLeft, disableApp, enableApp,
   liveAppsOfTenant, setCommercialGrant, shards, tenantById, tenantBySlug,
 } from "./directory.js";
-import { CREDENTIALS, configState, setConfig } from "./config.js";
+import { CREDENTIALS, LANES, configState, setConfig } from "./config.js";
 import { parkedEvents } from "./stripe.js";
 import { runsOf } from "./jobs.js";
 import { makePushKeys, vapidOf } from "./push.js";
@@ -555,6 +555,10 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
         operator(ctx);
         return {
           items: await configState(ctx.directory, deps.configSecret),
+          /* ⚠️ THE LANES TRAVEL TOO, for the reason the definitions do: what a
+             half-set lane DOES is knowable here and nowhere else, and a screen
+             that inferred it would be a second copy of the rule. */
+          lanes: Object.values(LANES),
           /* ⚠️ Said once, here, rather than inferred per row by a screen: with
              no secret bound, every secret row is unwritable and the reason is
              the deployment's rather than the operator's. */
