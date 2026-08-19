@@ -131,17 +131,28 @@ if (!docks) ok(`dock: no screen pins its own action`);
  * A guard that cannot see the thing it forbids is worse than no guard, because
  * the green run is taken as evidence.
  */
+/*
+  ⚠️ AND IT RETURNS THE TAG'S OWN ATTRIBUTES, NOT ITS SUBTREE. `<Screen then={…}>`
+  puts an entire render prop inside the opening tag, so a `does=` on a CARD three
+  levels down was part of the head string and read as the screen's own primary —
+  which failed the settings rule on a screen whose only action is a card's foot.
+  The value of an attribute is skipped; what is kept is what is written at the
+  tag's own level.
+*/
 const openingTag = (src, from) => {
   let depth = 0, quote = "";
+  let flat = "";
   for (let i = from; i < src.length; i++) {
     const c = src[i];
-    if (quote) { if (c === quote && src[i - 1] !== "\\") quote = ""; continue; }
-    if (c === '"' || c === "'" || c === "`") { quote = c; continue; }
-    if (c === "{") depth++;
-    else if (c === "}") depth--;
-    else if (c === ">" && depth === 0) return src.slice(from, i + 1);
+    if (quote) { if (c === quote && src[i - 1] !== "\\") quote = ""; if (!depth) flat += c; continue; }
+    if (c === '"' || c === "'" || c === "`") { quote = c; if (!depth) flat += c; continue; }
+    if (c === "{") { depth++; if (depth === 1) flat += "{…}"; continue; }
+    if (c === "}") { depth--; continue; }
+    if (depth) continue;
+    if (c === ">") return flat + ">";
+    flat += c;
   }
-  return src.slice(from);
+  return flat;
 };
 
 /* ------------------------------------------------------------ one primary --- */

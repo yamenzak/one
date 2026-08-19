@@ -77,7 +77,7 @@ export function Switches() {
           */
           <Group
             label="Maintenance"
-            under="Ours, not theirs — nobody reading the notice did anything"
+            under="This is about us. Nobody reading the notice did anything"
           >
             {MODES.map((m) => (
               <ControlRow key={m.id} label={m.label} under={m.said}>

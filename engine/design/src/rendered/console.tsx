@@ -14,7 +14,7 @@
 
 import type { Allowance, EntitlementDef, FlagBook, FlagDef, PlanSpec } from "@engine/kernel";
 import * as React from "react";
-import { UNLIMITED, overdue, resolve, sayMoney, settableBy } from "@engine/kernel";
+import { UNLIMITED, overdue, resolve, sayDate, sayMoney, settableBy } from "@engine/kernel";
 import { Table } from "@heroui/react";
 import { Stack } from "../parts/arrange.js";
 import { AmountRow, Group, ToggleRow } from "../parts/surfaces.js";
@@ -44,6 +44,7 @@ export interface FlagConsoleProps {
 export function FlagConsole(props: FlagConsoleProps) {
   const { book, level, label, face, under, deployment, tenant, person, today, onSet } = props;
   const late = new Set(overdue(book, today as never));
+  const shown = useShown();
 
   return (
     /*
@@ -77,11 +78,18 @@ export function FlagConsole(props: FlagConsoleProps) {
                with no reason reads as broken. Reported, never enforced: taking a
                capability away on a date somebody typed a year ago is an outage
                nobody asked for. */
+            /* ⚠️ AND A RETIREMENT DATE IS SAID BEFORE IT PASSES, not only after.
+               `overdue` fires on the day it is missed, so a flag due to go in
+               three weeks read exactly like one with no end at all — and the
+               whole reason a `trying` flag carries a date is that somebody is
+               supposed to see it coming. */
             under={!mine
               ? "Switched off further up — only an operator can change it"
               : late.has(def.id)
                 ? "Past its retirement date — this should be the product now"
-                : def.why}
+                : def.retire
+                  ? `${def.why} · goes ${sayDate(shown, def.retire, "short")}`
+                  : def.why}
             value={on}
             isDisabled={!mine}
             onChange={(next) => onSet(def.id, next)}

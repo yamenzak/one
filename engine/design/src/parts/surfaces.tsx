@@ -1077,9 +1077,13 @@ export function NoteRow({ icon, face, children }: {
   readonly children: React.ReactNode;
 }) {
   return (
+    /* ⚠️ `note`, NOT `body`, BECAUSE IT IS ONE. At body size a note sits INSIDE
+       a card of rows whose own second lines are notes — so the explanation was
+       louder than the rows it explains, and a card ended in what reads as a
+       paragraph of prose. A note is the quiet line at the bottom. */
     <div data-row className={`flex items-start ${ROW.gap} ${ROW.pad}`}>
       <Lead icon={icon} face={face} />
-      <p className={TYPE.body}>{children}</p>
+      <p className={TYPE.note}>{children}</p>
     </div>
   );
 }

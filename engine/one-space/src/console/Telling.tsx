@@ -22,7 +22,9 @@
 
 import { useState } from "react";
 import { Button } from "@heroui/react";
-import { ControlRow, FieldRow, Group, NoteRow, Screen, TYPE, glyphOf, notice } from "@engine/design";
+import {
+  ControlRow, FieldRow, Group, NoteRow, Reveal, SPACE, Screen, TYPE, glyphOf, notice,
+} from "@engine/design";
 import { api } from "../api.js";
 import { useLoad } from "../centre/data.js";
 
@@ -58,7 +60,10 @@ export function Telling() {
       again={of.again}
       then={(push) => (
         <>
-          <Group label="Push notifications">
+          {/* ⚠️ UNLABELLED: the crown already says "Push notifications", and a
+              card repeating it is the same words twice on a screen with two
+              cards on it. */}
+          <Group>
             <FieldRow
               label="State"
               value={push.live ? "Live" : "Not set up"}
@@ -77,19 +82,23 @@ export function Telling() {
                   : undefined}
               />
             ) : null}
+            {/*
+              ⚠️ BEHIND A DISCLOSURE, BECAUSE IT IS EIGHTY-SEVEN CHARACTERS OF
+              BASE64. It is public by definition — it travels to every push
+              service on every send — and it is the one value somebody debugging
+              a device needs to compare, so it stays reachable. What it is not is
+              a FACT about this deployment: printed in full it was two wrapped
+              lines of monospace, taller than the two answers above it and the
+              first thing the eye landed on.
+
+              ⚠️ AND IT IS A ROW IN THIS CARD, NOT A CARD OF ITS OWN. One control
+              inside a card is a control with a box drawn round it (DESIGN.md
+              §4), and it read as a lonely button floating between two blocks.
+            */}
             {push.publicKey ? (
-              /*
-                ⚠️ SHOWN BECAUSE IT IS WHAT A BROWSER SUBSCRIBES WITH, and the
-                one value somebody debugging a device needs to compare. It is
-                public by definition — it travels to every push service on every
-                send.
-              */
-              <FieldRow
-                label="Public key"
-                /* ⚠️ `code`, because it IS one — 87 characters of base64url that
-                   somebody compares against a browser rather than reads. */
-                value={<span className={`break-all ${TYPE.code}`}>{push.publicKey}</span>}
-              />
+              <Reveal label="Public key">
+                <div className={`${SPACE.tight} ${TYPE.code} break-all`}>{push.publicKey}</div>
+              </Reveal>
             ) : null}
           </Group>
 
@@ -106,24 +115,23 @@ export function Telling() {
               </ControlRow>
             </Group>
           ) : (
-            <Group label="Replacing it">
+            /* ⚠️ THE CARD IS NAMED FOR WHAT IT DOES, and the action is its
+               foot. "Replacing it" is a heading about a heading; what somebody
+               is deciding is whether to replace the keypair, and the card that
+               asks is the card that says so. */
+            <Group
+              label="Replace the keypair"
+              under={`${push.devices} device${push.devices === 1 ? "" : "s"} would stop being reachable`}
+              does={
+                <Button variant="danger-soft" isDisabled={busy} onPress={() => void generate(true)}>
+                  {busy ? "Replacing…" : "Replace"}
+                </Button>
+              }
+            >
               <NoteRow>
                 A new key makes every subscribed device unreachable, permanently and
                 silently. Each person has to turn notifications on again.
               </NoteRow>
-              <ControlRow
-                label="Replace the keypair"
-                under={`${push.devices} device${push.devices === 1 ? "" : "s"} would be unsubscribed`}
-              >
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  isDisabled={busy}
-                  onPress={() => void generate(true)}
-                >
-                  {busy ? "Replacing…" : "Replace"}
-                </Button>
-              </ControlRow>
             </Group>
           )}
         </>
