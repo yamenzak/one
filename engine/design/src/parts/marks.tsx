@@ -272,3 +272,44 @@ export const AgreedMark = () => (
     />
   </svg>
 );
+
+/**
+ * A CATALOGUE IS REFRESHED — the arrows go round, once.
+ *
+ * ⚠️ NOT A SPINNER, AND THE DIFFERENCE MATTERS ON THIS ROW. A mark that keeps
+ * turning is a claim that something is still happening, and the thing this row
+ * starts takes minutes on a server nobody is watching. One turn says the work was
+ * asked for; the row's own label says whether it is running.
+ *
+ * ⚠️ AND IT IS DRAWN HERE RATHER THAN TAKEN FROM THE LIBRARY because it turns as
+ * a WHOLE — which means the mark itself is the moving part, and a mark whose
+ * motion is its own needs a `data-part` nothing downstream can renumber.
+ */
+export const RefreshMark = () => (
+  <Mark>
+    <g data-part="round">
+      <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+      <path d="M3 21v-5h5" />
+    </g>
+  </Mark>
+);
+
+/**
+ * A FLAG, AND IT LIFTS.
+ *
+ * ⚠️ THE CLOTH MOVES AND THE POLE DOES NOT, which is the same rule as the bell
+ * and the door: a flag drawn as one shape and nudged is a picture of a flag being
+ * carried. What a flag DOES is catch the air.
+ */
+export const FlagMark = () => (
+  <Mark>
+    <g data-part="pole">
+      <path d="M4 22V4" />
+    </g>
+    <g data-part="cloth">
+      <path d="M4 4h11.5a1 1 0 0 1 .8 1.6L14 9l2.3 3.4a1 1 0 0 1-.8 1.6H4" />
+    </g>
+  </Mark>
+);

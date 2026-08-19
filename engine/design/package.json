@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The browser half: the shell, the sky, and every screen the platform renders from a declaration. HeroUI v3, router-free — an app brings its own.",
+  "description": "The browser half: the shell, the sky, and every screen the platform renders from a declaration. HeroUI v3, router-free \u2014 an app brings its own.",
   "exports": {
     ".": "./src/index.ts",
     "./vite": "./vite.ts"
@@ -37,6 +37,7 @@
     "react-dom": "^19.2.0",
     "typescript": "^5.9.3",
     "vite": "^6.4.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "playwright": "^1.56.1"
   }
 }

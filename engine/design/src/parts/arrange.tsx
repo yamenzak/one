@@ -35,9 +35,23 @@ export type { Space, Width };
  * those, and it is why every layout here is flex or grid.
  */
 export function Stack(
-  { space = "snug", children }: { readonly space?: Space; readonly children?: React.ReactNode },
+  { space = "snug", blocks, children }: {
+    readonly space?: Space;
+    /**
+     * ⚠️ A SCREEN'S TOP-LEVEL BLOCKS, WHICH ARRIVE IN ORDER. Only `Screen` passes
+     * it: the stagger is positional CSS (`BLOCK_MOTION`), so what it counts is
+     * DOM siblings rather than React children — which is the whole reason a
+     * screen's rhythm survives being composed out of components. See `Arriving`.
+     */
+    readonly blocks?: boolean;
+    readonly children?: React.ReactNode;
+  },
 ) {
-  return <div className={`flex flex-col ${SPACE[space]}`}>{children}</div>;
+  return (
+    <div className={`flex flex-col ${SPACE[space]}`} {...(blocks ? { "data-blocks": "true" } : {})}>
+      {children}
+    </div>
+  );
 }
 
 /** ⚠️ Wraps by default. A row that cannot wrap is a row that overflows a phone. */

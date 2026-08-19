@@ -271,6 +271,43 @@ export const ARRIVE_MOTION = [
 ].join("\n");
 
 /**
+ * A SCREEN'S BLOCKS ARRIVE IN THE ORDER THEY ARE IN, AND THE DOM DECIDES WHAT
+ * THAT ORDER IS.
+ *
+ * ⚠️ THE STAGGER WAS AN INLINE DELAY PER WRAPPER AND IT WAS SILENTLY ABSENT ON
+ * NEARLY EVERY SCREEN. `Screen` wrapped each child it could count, and a `then`
+ * returning a COMPONENT — which is what every real screen does — is one child.
+ * So the delay landed on one wrapper and every block inside it arrived at once,
+ * along with the gap between them, which was zero. Positionally in CSS there is
+ * nothing to count and nothing to lose: `nth-child` reads the DOM, and fragments
+ * produce no DOM, so a block is a block however deeply it was composed.
+ *
+ * ⚠️ IT SETS THE DELAY VARIABLE RATHER THAN THE ANIMATION, so a block that
+ * already animates itself (`ARRIVE`, on every `Group`) keeps its own rule and
+ * only learns where it is in the queue. Two `animation` shorthands on one element
+ * is a fight the cascade settles arbitrarily; one variable is not.
+ *
+ * ⚠️ AND SIX, LIKE `arriveAt`. A list where every block arrives at once reads as
+ * a flash; one whose delay grows without limit makes the seventh block take most
+ * of a second, which reads as a slow page. Past the cap they land together,
+ * because by then the eye has stopped counting.
+ */
+export const BLOCK_MOTION = [
+  /* ⚠️ A block that does not animate itself still arrives — most do not. */
+  `[data-blocks] > *:not([data-arrive]) {`,
+  `  animation: enter var(--default-transition-duration) var(--ease-out-quart)`,
+  `    var(--tw-animation-delay, 0s) both;`,
+  `  --tw-enter-opacity: 0;`,
+  `  --tw-enter-translate-y: 0.5rem;`,
+  `}`,
+  ...[0, 1, 2, 3, 4, 5].map((i) =>
+    `[data-blocks] > *:nth-child(${i + 1}) { --tw-animation-delay: ${i * 40}ms; }`),
+  `[data-blocks] > *:nth-child(n+7) { --tw-animation-delay: 200ms; }`,
+  `@media (prefers-reduced-motion: reduce) { [data-blocks] > * { animation: none; } }`,
+  `[data-reduce-motion="true"] [data-blocks] > * { animation: none; }`,
+].join("\n");
+
+/**
  * THE DOOR'S ENTRANCE — the one sequence in the product that is allowed to be
  * an impression.
  *
@@ -356,11 +393,12 @@ export const GLYPH_MOTION = [
     stays. Each of these names a `data-part` we drew, so nothing here depends on
     the order lucide happens to put its paths in.
   */
+  /* ⚠️ FIVE SWINGS, DAMPED, AND THE AMPLITUDE IS THE PART THAT WAS WRONG. At
+     19 degrees over half a second the clapper reads as a bell being SHAKEN. */
   `@keyframes glyph-clapper {`,
-  `  0% { transform: rotate(0deg) }   18% { transform: rotate(19deg) }`,
-  `  38% { transform: rotate(-15deg) } 56% { transform: rotate(10deg) }`,
-  `  72% { transform: rotate(-6deg) }  86% { transform: rotate(3deg) }`,
-  `  100% { transform: rotate(0deg) }`,
+  `  0% { transform: rotate(0deg) }   20% { transform: rotate(-12deg) }`,
+  `  40% { transform: rotate(12deg) } 60% { transform: rotate(-8deg) }`,
+  `  80% { transform: rotate(8deg) }  100% { transform: rotate(0deg) }`,
   `}`,
   /* ⚠️ The body rocks a fraction of the clapper's arc — a bell held, not shaken. */
   `@keyframes glyph-body {`,
@@ -369,15 +407,17 @@ export const GLYPH_MOTION = [
   `  100% { transform: rotate(0deg) }`,
   `}`,
   /* A page turning: the days rise out and the next set rises in behind them. */
+  /* ⚠️ AND THE PAGE COMES BACK. Turning to the next set and STAYING there left
+     one calendar in the product showing different days from every other. */
   `@keyframes glyph-page-out {`,
   `  0% { transform: translateY(0); opacity: 1 }`,
-  `  45% { transform: translateY(-5px); opacity: 0 }`,
-  `  100% { transform: translateY(-5px); opacity: 0 }`,
+  `  30%, 70% { transform: translateY(-5px); opacity: 0 }`,
+  `  100% { transform: translateY(0); opacity: 1 }`,
   `}`,
   `@keyframes glyph-page-in {`,
-  `  0% { transform: translateY(5px); opacity: 0 }`,
-  `  45% { transform: translateY(5px); opacity: 0 }`,
-  `  100% { transform: translateY(0); opacity: 1 }`,
+  `  0%, 30% { transform: translateY(5px); opacity: 0 }`,
+  `  50% { transform: translateY(0); opacity: 1 }`,
+  `  70%, 100% { transform: translateY(5px); opacity: 0 }`,
   `}`,
   /* The arrow goes through the opening and comes back — the row is still there. */
   `@keyframes glyph-depart {`,
@@ -412,30 +452,46 @@ export const GLYPH_MOTION = [
   `  0% { transform: translate(0, 0) }   30% { transform: translate(-2.5px, 1px) }`,
   `  65% { transform: translate(2px, -1px) } 100% { transform: translate(0, 0) }`,
   `}`,
-  /* A mechanism turns, which is the one mark whose whole self moving IS its job. */
-  `@keyframes glyph-turn { to { transform: rotate(60deg) } }`,
-  `@keyframes glyph-flip { to { transform: rotateY(180deg) } }`,
-  /* Something catches the light. */
+  /*
+    ⚠️ EVERY ONE OF THESE ENDS WHERE IT STARTED, AND THAT IS THE RULE THE FIRST
+    SET BROKE. `glyph-turn` was `to { rotate(60deg) }` with `both`, so a cog that
+    had been pressed once sat permanently sixty degrees off-axis — beside three
+    other cogs that had not. A coin was left MIRRORED (`rotateY(180deg)`); a star
+    upside down. Nothing about it reads as an animation: it reads as an icon that
+    is wrong, and as a press that did something and will not do it again.
+
+    ⚠️ A PRESS IS A MOMENT, NOT A STATE CHANGE. The mark acknowledges and goes
+    back to being the mark. So a cog turns a WHOLE turn, a coin flips a whole
+    flip, and everything that leans returns — which is also what makes a second
+    press look like a second press.
+  */
+  `@keyframes glyph-turn { from { transform: rotate(0) } to { transform: rotate(360deg) } }`,
+  /* ⚠️ A WHOLE FLIP, so the face lands the way up it started. Half of one leaves
+     a coin mirrored, which is a different picture rather than a moved one. */
+  `@keyframes glyph-flip { from { transform: rotateY(0) } to { transform: rotateY(360deg) } }`,
+  /* Something catches the light, and then it is a star again. */
   `@keyframes glyph-twinkle {`,
-  `  0% { transform: rotate(0) scale(1) } 50% { transform: rotate(90deg) scale(1.16) }`,
-  `  100% { transform: rotate(180deg) scale(1) }`,
+  `  0% { transform: rotate(0) scale(1) }`,
+  `  45% { transform: rotate(14deg) scale(1.18) }`,
+  `  100% { transform: rotate(0) scale(1) }`,
   `}`,
-  /* A key turns in a lock, about its own bow rather than about the box. */
-  `@keyframes glyph-unlock {`,
-  `  0% { transform: rotate(0deg) } 55% { transform: rotate(-58deg) }`,
-  `  78% { transform: rotate(-50deg) } 100% { transform: rotate(-58deg) }`,
+  /* ⚠️ A PULSE THE WHOLE MARK MAKES, for what is being generated rather than
+     found. Kept small: this is the one character that plays while something is
+     working, so an amplitude that reads once reads badly forty times. */
+  `@keyframes glyph-spark {`,
+  `  0% { transform: scale(1); opacity: 1 }`,
+  `  40% { transform: scale(1.14); opacity: .55 }`,
+  `  100% { transform: scale(1); opacity: 1 }`,
   `}`,
-  /* The top plate lands, and the ones under it take the weight. */
-  `@keyframes glyph-land {`,
-  `  0% { transform: translateY(-5px); opacity: 0 }`,
-  `  45% { transform: translateY(0); opacity: 1 }`,
-  `  62% { transform: translateY(1px) }`,
-  `  100% { transform: translateY(0); opacity: 1 }`,
-  `}`,
-  /* A living thing acknowledges you. */
-  `@keyframes glyph-nod {`,
-  `  0% { transform: translateY(0) } 30% { transform: translateY(-3px) }`,
-  `  62% { transform: translateY(1px) } 100% { transform: translateY(0) }`,
+  /* ⚠️ A REFRESH GOES ROUND ONCE. Not a spinner: the mark says the work was
+     asked for, and how long it takes is the row's business. */
+  `@keyframes glyph-round { from { transform: rotate(0) } to { transform: rotate(360deg) } }`,
+  /* Cloth catching the air — it rises, ripples once and falls. */
+  `@keyframes glyph-lift {`,
+  `  0% { transform: translateY(0) skewY(0) }`,
+  `  35% { transform: translateY(-1.5px) skewY(-4deg) }`,
+  `  68% { transform: translateY(.5px) skewY(2deg) }`,
+  `  100% { transform: translateY(0) skewY(0) }`,
   `}`,
   /*
     ⚠️ THE MARK IS ITS OWN TRANSFORM CONTEXT, AND SO IS EVERY PART. Without
@@ -455,55 +511,74 @@ export const GLYPH_MOTION = [
     flicker, which is worse than nothing.
   */
   `[data-glyph="ring"][data-lively="true"] [data-part="clapper"] {`,
-  `  animation: glyph-clapper ${DURATION.stately} ${EASE.settle} both }`,
+  `  animation: glyph-clapper ${DURATION.stately} ${EASE.settle} backwards }`,
   `[data-glyph="ring"][data-lively="true"] [data-part="body"] {`,
-  `  animation: glyph-body ${DURATION.stately} ${EASE.settle} both }`,
+  `  animation: glyph-body ${DURATION.stately} ${EASE.settle} backwards }`,
   `[data-glyph="page"][data-lively="true"] [data-part="days"] {`,
-  `  animation: glyph-page-out ${DURATION.stately} ${EASE.travel} both }`,
+  `  animation: glyph-page-out ${DURATION.stately} ${EASE.travel} backwards }`,
   `[data-glyph="page"][data-lively="true"] [data-part="days-next"] {`,
-  `  animation: glyph-page-in ${DURATION.stately} ${EASE.travel} both }`,
+  `  animation: glyph-page-in ${DURATION.stately} ${EASE.travel} backwards }`,
   /* ⚠️ The next set is invisible until the mark is pressed, or a calendar sits
      with two rows of days printed over each other. */
   `[data-glyph="page"] [data-part="days-next"] { opacity: 0 }`,
   `[data-glyph="depart"][data-lively="true"] [data-part="arrow"] {`,
-  `  animation: glyph-depart ${DURATION.stately} ${EASE.travel} both }`,
+  `  animation: glyph-depart ${DURATION.stately} ${EASE.travel} backwards }`,
   `[data-glyph="take"][data-lively="true"] [data-part="post"] {`,
-  `  animation: glyph-arrive ${DURATION.stately} ${EASE.travel} both }`,
+  `  animation: glyph-arrive ${DURATION.stately} ${EASE.travel} backwards }`,
   `[data-glyph="take"][data-lively="true"] [data-part="tray"] {`,
-  `  animation: glyph-settle ${DURATION.stately} ${EASE.settle} both }`,
+  `  animation: glyph-settle ${DURATION.stately} ${EASE.settle} backwards }`,
   `[data-glyph="take"] [data-part="post"] { opacity: 0 }`,
   `[data-glyph="guard"][data-lively="true"] [data-part="tick"] {`,
-  `  animation: glyph-draw ${DURATION.stately} ${EASE.enter} both }`,
+  `  animation: glyph-draw ${DURATION.stately} ${EASE.enter} backwards }`,
   `[data-glyph="draw"][data-lively="true"] [data-part="tick"] {`,
-  `  animation: glyph-draw ${DURATION.moderate} ${EASE.enter} both }`,
+  `  animation: glyph-draw ${DURATION.moderate} ${EASE.enter} backwards }`,
   `[data-glyph="draw"][data-lively="true"] [data-part="tick-two"] {`,
-  `  animation: glyph-draw ${DURATION.moderate} ${EASE.enter} 140ms both }`,
+  `  animation: glyph-draw ${DURATION.moderate} ${EASE.enter} 140ms backwards }`,
   `[data-glyph="seek"][data-lively="true"] [data-part="lens"],`,
   `[data-glyph="seek"][data-lively="true"] [data-part="handle"] {`,
-  `  animation: glyph-sweep ${DURATION.stately} ${EASE.settle} both }`,
+  `  animation: glyph-sweep ${DURATION.stately} ${EASE.settle} backwards }`,
   /* ⚠️ THE BOW IS THE PIVOT, not the middle of the box — a key turned about its
      centre swings the blade through an arc no lock has. */
   `[data-glyph="unlock"] [data-part="key"] { transform-origin: 31% 74% }`,
   `[data-glyph="unlock"][data-lively="true"] [data-part="key"] {`,
-  `  animation: glyph-unlock ${DURATION.stately} ${EASE.settle} both }`,
+  `  animation: glyph-unlock ${DURATION.stately} ${EASE.settle} backwards }`,
   `[data-glyph="stack"][data-lively="true"] [data-part="plate"] {`,
-  `  animation: glyph-land ${DURATION.stately} ${EASE.settle} both }`,
+  `  animation: glyph-land ${DURATION.stately} ${EASE.settle} backwards }`,
   `[data-glyph="stack"][data-lively="true"] [data-part="under"] {`,
-  `  animation: glyph-settle ${DURATION.stately} ${EASE.settle} 90ms both }`,
+  `  animation: glyph-settle ${DURATION.stately} ${EASE.settle} 90ms backwards }`,
   /*
-    ⚠️ AND FOUR MARKS WHERE THE WHOLE SELF MOVING *IS* THE PURPOSE — a cog turns,
-    a coin flips, a star twinkles, a person nods. These are still lucide's, and
-    that is correct: drawing our own to move them the same way would be a bespoke
-    icon nobody could tell from the library's, which is cost with no picture.
+    ⚠️ AND SIX MARKS WHERE THE WHOLE SELF MOVING *IS* THE PURPOSE — a cog turns,
+    a coin flips, a star twinkles, a person nods, something is generated, a
+    catalogue is refreshed. These are still lucide's, and that is correct:
+    drawing our own to move them the same way would be a bespoke icon nobody
+    could tell from the library's, which is cost with no picture.
+
+    ⚠️ NONE OF THEM USES `both` ANY MORE, AND THAT IS THE FIX. `both` holds the
+    LAST keyframe after the animation ends, so a one-way rotation left the mark
+    rotated: a cog at sixty degrees, a coin mirrored, a star upside down, beside
+    identical marks that had not been pressed. Every keyframe returns to rest
+    now, so the fill mode has nothing to hold — and `backwards` alone is what
+    keeps the first frame from flashing.
   */
   `[data-glyph="turn"][data-lively="true"] {`,
-  `  animation: glyph-turn ${DURATION.stately} ${EASE.travel} both }`,
+  `  animation: glyph-turn ${DURATION.stately} ${EASE.travel} backwards }`,
   `[data-glyph="flip"][data-lively="true"] {`,
-  `  animation: glyph-flip ${DURATION.stately} ${EASE.travel} both }`,
+  `  animation: glyph-flip ${DURATION.stately} ${EASE.travel} backwards }`,
   `[data-glyph="twinkle"][data-lively="true"] {`,
-  `  animation: glyph-twinkle ${DURATION.stately} ${EASE.travel} both }`,
+  `  animation: glyph-twinkle ${DURATION.stately} ${EASE.settle} backwards }`,
   `[data-glyph="nod"][data-lively="true"] {`,
-  `  animation: glyph-nod ${DURATION.moderate} ${EASE.settle} both }`,
+  `  animation: glyph-nod ${DURATION.moderate} ${EASE.settle} backwards }`,
+  /* ⚠️ WHAT A MODEL MADE, AND ONLY THAT — see `LIVELY`. The one character
+     reserved to a meaning rather than to a shape. */
+  `[data-glyph="spark"][data-lively="true"] {`,
+  `  animation: glyph-spark ${DURATION.stately} ${EASE.settle} backwards }`,
+  `[data-glyph="round"][data-lively="true"] [data-part="round"] {`,
+  `  animation: glyph-round ${DURATION.stately} ${EASE.travel} backwards }`,
+  /* ⚠️ THE CLOTH, NOT THE POLE — a flag drawn as one shape and nudged is a
+     picture of a flag being carried. */
+  `[data-glyph="lift"] [data-part="cloth"] { transform-origin: left center }`,
+  `[data-glyph="lift"][data-lively="true"] [data-part="cloth"] {`,
+  `  animation: glyph-lift ${DURATION.stately} ${EASE.settle} backwards }`,
   `@media (prefers-reduced-motion: reduce) {`,
   `  [data-glyph], [data-glyph] [data-part] { animation: none !important }`,
   `}`,

@@ -108,7 +108,7 @@ export function Switches() {
         waiting={<RowsWaiting rows={3} />}
         again={flags.again}
         isNothing={(d) => d.apps.length === 0}
-        nothing={<Nothing icon={glyphOf("sparkle")} says="No product here declares a flag" />}
+        nothing={<Nothing icon={glyphOf("flag")} says="No product here declares a flag" />}
         then={(data) => (
           <Stack space="roomy">
             {data.apps.map((app) => (

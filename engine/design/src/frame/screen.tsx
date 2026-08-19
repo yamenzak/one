@@ -551,31 +551,39 @@ export function Screen<T = unknown>({
  * somebody who asked it to stop (`motion.ts`).
  */
 /**
- * ⚠️ FRAGMENTS ARE FLATTENED, AND SKIPPING THAT COSTS EVERY GAP ON THE SCREEN.
- * `then` naturally returns `<>…</>` — it is the shape the type asks for — and
- * `React.Children.toArray` counts that as ONE child. So the stack had a single
- * item, its `gap` applied between nothing, and three cards ran together with
- * their radii overlapping. Nothing throws, nothing warns, and it looks like a
- * z-index bug rather than a missing gap.
+ * WHERE A SCREEN'S BLOCKS GET THEIR AIR, AND WHY NOTHING COUNTS THEM.
+ *
+ * ⚠️ THIS USED TO WALK THE CHILDREN AND WRAP EACH ONE, AND IT COST EVERY GAP ON
+ * NEARLY EVERY SCREEN. `React.Children` can flatten a fragment written inline,
+ * so `then={() => <><Group/><Group/></>}` worked — and the moment `then` returns
+ * a COMPONENT that returns that fragment, which is what every real screen does,
+ * the walk sees one child. One wrapper, a gap applied between nothing, and the
+ * blocks inside it stacked at zero. Measured on the models screen: 0px where the
+ * scale says 24.
+ *
+ * ⚠️ AND IT CANNOT BE FIXED BY FLATTENING HARDER. A parent cannot look inside a
+ * component's return value without rendering it; `<Lanes/>` is opaque to
+ * `React.Children` by construction. Any rhythm that depends on counting React
+ * children is a rhythm one indirection away from being silently absent — which
+ * is exactly how this shipped, was fixed once for the inline case, and came
+ * straight back.
+ *
+ * ⚠️ SO THE RHYTHM IS THE DOM'S. Fragments produce no DOM nodes, so a component
+ * returning three sections puts three siblings in this container however deeply
+ * it is nested — and a `gap` on the container applies between them because they
+ * ARE siblings. Nothing counts anything, and there is no arrangement of
+ * components that can defeat it.
+ *
+ * ⚠️ THE STAGGER MOVED WITH IT, TO `nth-child`. It was an inline delay per
+ * wrapper, so it was lost on precisely the screens the gap was lost on — the
+ * same silence twice. `BLOCK_MOTION` sets the delay positionally, in CSS, on
+ * whatever the DOM actually holds.
  */
-const blocksIn = (node: React.ReactNode): React.ReactNode[] =>
-  React.Children.toArray(node).flatMap((child) =>
-    React.isValidElement(child) && child.type === React.Fragment
-      ? blocksIn((child.props as { readonly children?: React.ReactNode }).children)
-      : [child]);
-
 function Arriving({ space, children }: {
   readonly space: "snug" | "roomy";
   readonly children: React.ReactNode;
 }) {
-  const blocks = blocksIn(children).filter(Boolean);
-  return (
-    <Stack space={space}>
-      {blocks.map((child, i) => (
-        <div key={i} {...ARRIVE} style={arriveAt(i)}>{child}</div>
-      ))}
-    </Stack>
-  );
+  return <Stack space={space} blocks>{children}</Stack>;
 }
 
 /*

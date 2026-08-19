@@ -69,7 +69,7 @@ export function Ai({ onGo }: { readonly onGo: (to: Where) => void }) {
               {at.faults.map((f) => (
                 <NavRow
                   key={`${f.of}:${f.why}`}
-                  icon={glyphOf("sparkle")}
+                  icon={glyphOf("alert")}
                   label={f.of}
                   under={<span data-ink="danger">{f.detail}</span>}
                   onOpen={() => onGo({ at: "models" })}

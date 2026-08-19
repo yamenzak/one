@@ -62,7 +62,7 @@ export function Wording({ view, app, onGo }: {
       face={(a) => appFace(a.id, a.mark)}
       chosen={app}
       onChoose={onGo}
-      nothing={{ icon: glyphOf("sparkle"), says: "Nothing here is yours to reword" }}
+      nothing={{ icon: glyphOf("note"), says: "Nothing here is yours to reword" }}
       then={(a) => <AppWording app={a} />}
     />
   );
@@ -82,7 +82,7 @@ function AppWording({ app }: { readonly app: CentreApp }) {
       again={of.again}
       isNothing={(d) => d.items.length === 0}
       nothing={{
-        icon: glyphOf("sparkle"),
+        icon: glyphOf("note"),
         says: "Nothing here is yours to reword",
         under: `Every AI feature ${app.name} has uses the product's own words`,
       }}
@@ -116,24 +116,26 @@ function WordingRow({ app, line, onDone }: {
       label={line.summary}
       under={line.prompt ? "In your words" : "The product's own words"}
     >
-      <Stack space="snug">
-          <LongText
-            label="Instructions"
-            value={text}
-            onChange={setText}
-            help={`It may name ${line.variables.map((v) => `{${v}}`).join(", ")} and nothing else.`}
-          />
-          <Row>
-            <Button variant="primary" onPress={() => void save(text)}>Save</Button>
-            {line.prompt
-              ? (
-                <Button variant="ghost" onPress={() => { setText(line.declared); void save(null); }}>
-                  Use the product's words
-                </Button>
-              )
-              : null}
-          </Row>
-        </Stack>
+      {/* ⚠️ NO `Stack` — a card is already one. Nested, the card's own rhythm
+          applied to the stack and the stack's to its children, so these two sat
+          12 apart where every other card spaces its children 24. See
+          `design/test/rhythm.test.tsx`. */}
+      <LongText
+        label="Instructions"
+        value={text}
+        onChange={setText}
+        help={`It may name ${line.variables.map((v) => `{${v}}`).join(", ")} and nothing else.`}
+      />
+      <Row>
+        <Button variant="primary" onPress={() => void save(text)}>Save</Button>
+        {line.prompt
+          ? (
+            <Button variant="ghost" onPress={() => { setText(line.declared); void save(null); }}>
+              Use the product's words
+            </Button>
+          )
+          : null}
+      </Row>
     </Group>
   );
 }

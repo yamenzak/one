@@ -124,4 +124,139 @@ for (const file of [...filesIn("design/src"), ...filesIn("one-space/src"), ...fi
 }
 if (!stolen) ok(`no screen draws a registered mark itself (${looked} files, ${KNOWN.size} registered icons)`);
 
+/* ------------------------------------------------- and it comes back to rest --- */
+
+/**
+ * ⚠️ A PRESS IS A MOMENT, NOT A STATE CHANGE, AND THIS IS THE GUARD FOR THE ONE
+ * FAULT THAT MADE THE WHOLE VOCABULARY READ AS BROKEN. Every whole-mark character
+ * was `animation: … both`, and `both` HOLDS the last keyframe after the animation
+ * ends — so `glyph-turn`, which went `to { rotate(60deg) }`, left a cog sitting
+ * permanently sixty degrees off-axis. A coin was left mirrored (`rotateY(180deg)`),
+ * a star upside down. Beside three identical marks nobody had touched.
+ *
+ * ⚠️ AND THE SECOND PRESS LOOKED LIKE NOTHING HAPPENED, which is what was
+ * actually reported. The mark is already at the end state, so it re-runs an
+ * animation from 0 to a value it is showing.
+ *
+ * ⚠️ SO: THE LAST KEYFRAME OF EVERY GLYPH ANIMATION RESTORES THE RESTING STATE.
+ * Checked as `100%`/`to` matching the `0%`/`from`, because that is what "returns"
+ * means and it is the only part of it a reader can verify without a browser.
+ */
+{
+  const motion = readFileSync(join(ENGINE, "design/src/tokens/motion.ts"), "utf8");
+
+  /* ⚠️ `both` and `forwards` are the fill modes that HOLD. `backwards` only
+     affects the delay before it starts, which is what these want. */
+  const holds = [...motion.matchAll(/animation: (glyph-[\w-]+)[^`]*?\b(both|forwards)\b/g)];
+  if (holds.length) {
+    for (const [, name, mode] of holds) {
+      fail(`design/src/tokens/motion.ts: \`${name}\` is \`${mode}\`, so it HOLDS its last\n`
+        + `       frame. A mark left rotated, mirrored or scaled after one press is a mark\n`
+        + `       that now looks different from every other copy of itself on the screen —\n`
+        + `       and the next press animates to a value it is already showing.`);
+    }
+  } else {
+    ok(`resting: no glyph animation holds its last frame`);
+  }
+
+  /*
+    ⚠️ AND THE LAST KEYFRAME LEAVES NO TRANSFORM ON THE MARK. With the fill mode
+    fixed the element reverts to its base style when the animation ends, so a
+    final frame holding `rotate(60deg)` is a visible SNAP back to zero — the same
+    fault one property over, and the one a reader is most likely to reintroduce
+    by writing `to { transform: rotate(90deg) }` because it reads as "turn it".
+
+    ⚠️ A FULL TURN IS THE IDENTITY AND IS ALLOWED, which is exactly why `turn` and
+    `flip` are 360 rather than the 60 and 180 that shipped: they land where they
+    started, so there is nothing to snap back from.
+
+    ⚠️ WHAT IS *NOT* CHECKED IS THE FIRST FRAME AGAINST THE LAST, and the two
+    marks that proved it matter: `glyph-arrive` begins above and invisible and
+    ends in place and invisible, and `glyph-draw` begins undrawn and ends drawn
+    because DRAWN is the tick's resting state. A check comparing the two ends
+    would refuse both and be wrong about both.
+  */
+  const IDENTITY =
+    /^(none|translate[XY]?\(0(px)?(,\s*0(px)?)?\)|rotate[XYZ]?\(0(deg)?\)|rotate[XYZ]?\(360deg\)|scale\(1\)|skew[XY]?\(0(deg)?\)|\s)+$/;
+
+  /*
+    ⚠️ EACH BLOCK IS CUT AT THE NEXT `@keyframes`, NOT MATCHED WITH A LAZY
+    `[\s\S]*?`. The first version of this walk did the latter and attributed one
+    animation's last frame to the animation before it — so it reported two
+    failures that were the same correct keyframe read under two names, which is a
+    guard finding a bug in itself before it finds one in the code.
+  */
+  const blocks = motion.split("@keyframes ").slice(1);
+  let stuck = 0;
+  let landed = 0;
+
+  for (const raw of blocks) {
+    const name = /^(glyph-[\w-]+)/.exec(raw)?.[1];
+    if (!name) continue;
+    landed++;
+    /* Everything up to the rules — the last `100%` or `to` stop in this block. */
+    const body = raw.split("\n[data-glyph")[0];
+    const last = [...body.matchAll(/(?:100%|to)[^{]*\{([^}]*)\}/g)].at(-1)?.[1];
+    if (last === undefined) continue;
+    const move = /transform:\s*([^;}]*)/.exec(last)?.[1]?.trim();
+    if (move === undefined || IDENTITY.test(move)) continue;
+    /* ⚠️ AN INVISIBLE ELEMENT CANNOT SNAP, which is the one honest exemption and
+       it is about the RULE rather than about a mark. `glyph-page-in` ends where
+       it began — below and at zero opacity, mirroring the page going the other
+       way — and the resting style is that same zero. Nothing is on screen to
+       jump. Refusing it would be the check enforcing its own wording. */
+    if (/opacity:\s*0\b/.test(last)) continue;
+    stuck++;
+    fail(`design/src/tokens/motion.ts: \`${name}\` ends on \`${move}\`.\n`
+      + `       The animation does not hold its last frame, so when it finishes the mark\n`
+      + `       SNAPS back to zero. Land on the identity — a whole turn is 360, not 60.`);
+  }
+  if (!stuck) ok(`landing: all ${landed} glyph animation(s) end on the identity`);
+}
+
+/* ------------------------------------------------------ one mark, one meaning --- */
+
+/**
+ * ⚠️ A SPARKLE MEANS "A MODEL MADE THIS", AND FOR A WHILE IT MEANT FIVE THINGS.
+ * It was on a sync button, on a model FAULT, on a refusal to index, on a list of
+ * feature flags and on a screen about wording — so the rows that had nothing to
+ * do with generation claimed they did, and the ones that did say so said nothing,
+ * because the mark had stopped carrying a meaning.
+ *
+ * ⚠️ RESERVED RATHER THAN COUNTED, because "how many meanings does this mark
+ * serve" is not a question source can answer. The list can only SHRINK: a fifth
+ * caller is a deliberate edit here, in review, where somebody has to say what
+ * about it is generated.
+ */
+{
+  const RESERVED = "sparkle";
+  const MAY = new Set([
+    /* The AI area of the operator console, and the two screens inside it. */
+    "one-space/src/space/Console.tsx",
+    "one-space/src/console/Ai.tsx",
+    "one-space/src/console/Actions.tsx",
+    /* A note about what a DRAFT cost — the credits a model spent. */
+    "apps/hello/src/screens/Note.tsx",
+  ]);
+
+  let uses = 0;
+  let claimed = 0;
+  for (const file of [...filesIn("design/src"), ...filesIn("one-space/src"), ...filesIn("apps")]) {
+    if (/\.test\.tsx?$/.test(file)) continue;
+    const src = readFileSync(file, "utf8");
+    if (!new RegExp(`["'\`]${RESERVED}["'\`]`).test(src)) continue;
+    /* The scene family of the same name is a star in a sky, not a mark. */
+    if (/scene\//.test(rel(file))) continue;
+    uses++;
+    if (!MAY.has(rel(file))) {
+      claimed++;
+      fail(`${rel(file)}: names the reserved mark \`${RESERVED}\`.\n`
+        + `       It means "a model made this" and nothing else. A sync, a fault, a flag and\n`
+        + `       a screen about wording each have their own mark — give this one the mark\n`
+        + `       for what it actually is, or add the file here and say why.`);
+    }
+  }
+  if (!claimed) ok(`reserved: \`${RESERVED}\` is used in ${uses} place(s), all about generation`);
+}
+
 process.exit(bad ? 1 : 0);

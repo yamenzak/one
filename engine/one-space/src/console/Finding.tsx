@@ -65,7 +65,7 @@ export function Finding() {
               {at.refused.map((r) => (
                 <NavRow
                   key={`${r.app}:${r.collection}:${r.at}`}
-                  icon={glyphOf("sparkle")}
+                  icon={glyphOf("alert")}
                   label={`${r.app} · ${r.collection}`}
                   under={<span data-ink="danger">{r.why} · {sayMoment(shown, r.at as Instant)}</span>}
                 />

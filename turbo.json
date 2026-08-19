@@ -1,6 +1,14 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "stream",
+  // ⚠️ TURBO SANITISES THE ENVIRONMENT, AND THAT SILENTLY DISARMED A TEST SUITE.
+  // `@engine/design`'s rhythm harness measures real geometry in real Chromium;
+  // the browser lives at `PLAYWRIGHT_BROWSERS_PATH` in this image, and without
+  // the variable Playwright looks in its default cache, finds nothing, and the
+  // whole file fails to load. Run on its own filter it passed — which is the
+  // worst version of this: green where a person looks, red only in the run
+  // nobody reads to the bottom of.
+  "globalPassThroughEnv": ["PLAYWRIGHT_BROWSERS_PATH", "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -38,6 +46,16 @@
     // lying around. The suite was running against whatever SPA was last built,
     // which on a stale checkout is a different product than the one under test.
     "@engine/worker#test": {
+      "dependsOn": ["^build", "@engine/space#build"],
+      "outputs": ["coverage/**"]
+    },
+    // ⚠️ AND SO DOES THE DESIGN SYSTEM'S OWN SUITE, FOR A DIFFERENT REASON.
+    // `test/rhythm.test.tsx` measures spacing in real Chromium against the CSS
+    // that actually SHIPS — Tailwind emits only the classes it finds written
+    // down, so a stylesheet compiled for the harness would be a different
+    // stylesheet from the one the product serves, and a spacing rule verified
+    // against CSS nobody sends is worth nothing. It reads `one-space/dist`.
+    "@engine/design#test": {
       "dependsOn": ["^build", "@engine/space#build"],
       "outputs": ["coverage/**"]
     },

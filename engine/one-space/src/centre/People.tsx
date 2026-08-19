@@ -307,8 +307,9 @@ function AppHoldings({ app, member }: { readonly app: CentreApp; readonly member
       waiting={<RowsWaiting rows={1} />}
       again={held.again}
       then={(holdings) => (
+        /* ⚠️ NO `Stack` — a card is already one, and a second inside it is a
+           second inset and a second rhythm. See `test/rhythm.test.tsx`. */
         <Group label={`Packages in ${app.name}`}>
-          <Stack space="snug">
               {holdings.items.length === 0
                 ? (
                   <Nothing
@@ -351,7 +352,6 @@ function AppHoldings({ app, member }: { readonly app: CentreApp; readonly member
                   />
                 )
                 : null}
-            </Stack>
         </Group>
       )}
     />

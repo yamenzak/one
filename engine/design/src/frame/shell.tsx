@@ -27,14 +27,14 @@ import { Button, Separator } from "@heroui/react";
 import {
   Banknote, Bell, Building2, Calendar, CheckCheck, Circle, ClipboardList, Clock, Cog, Coins, Database,
   Boxes, ChartColumn, FileText, House, Inbox as InboxGlyph, Mail, NotebookPen, Package, Plus, Search,
-  Shield, Sparkles, Star, Sun, UserRound, Users,
+  Shield, Sparkles, Star, Sun, TriangleAlert, UserRound, Users,
 } from "lucide-react";
 /* ⚠️ OURS, BECAUSE THEIR MOTION IS INSIDE THEM — see `marks.tsx`. A bell rings
    by its clapper and a calendar turns its days over; neither is a transform on
    the outside, and lucide's path order is not something to build on. */
 import {
-  BellMark, CalendarMark, CheckMark, InboxMark, KeyMark, LayersMark, LeaveMark, SearchMark,
-  ShieldMark,
+  BellMark, CalendarMark, CheckMark, FlagMark, InboxMark, KeyMark, LayersMark, LeaveMark,
+  RefreshMark, SearchMark, ShieldMark,
 } from "../parts/marks.js";
 import { Page } from "./page.js";
 import { Island } from "./chrome.js";
@@ -98,6 +98,15 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
      the one menu where every other row has a mark — which is the failure this
      map's header describes, on the screen written after it. */
   key: <KeyMark />, layers: <LayersMark />,
+  /*
+    ⚠️ THREE MARKS THAT EXISTED ONLY AS A SPARKLE, WHICH IS HOW A SPARKLE CAME TO
+    MEAN FIVE THINGS. A sync button, a model fault, a refusal to index, a list of
+    flags and a screen about wording all drew the mark for "a model made this" —
+    so the one place it was RIGHT said nothing, and four rows claimed a meaning
+    they did not have. `glyphs.test.mjs` reserves it now.
+  */
+  refresh: <RefreshMark />, sync: <RefreshMark />,
+  alert: <TriangleAlert />, flag: <FlagMark />,
 };
 
 /**
@@ -126,10 +135,19 @@ export const LIVELY: Readonly<Record<string, string>> = {
   /* The whole mark moving IS the purpose. */
   settings: "turn", cog: "turn", clock: "turn",
   money: "flip", coins: "flip", bank: "flip", card: "flip",
-  star: "twinkle", sparkle: "twinkle", sun: "twinkle",
+  star: "twinkle", sun: "twinkle",
+  /* ⚠️ `spark`, NOT `twinkle`, AND THE SPLIT IS THE POINT. A star catches the
+     light; a sparkle is the one mark in this product that means "a model made
+     this", and a character of its own is what stops the two drifting into one. */
+  sparkle: "spark",
   people: "nod", users: "nod", person: "nod", home: "nod", house: "nod",
   /* A key turns in a lock, and a stack of plates settles when one lands. */
   key: "unlock", layers: "stack",
+  /* ⚠️ A REFRESH GOES ROUND ONCE — see `glyph-round`. Not a spinner: the mark
+     says the work was asked for, and how long it takes is the row's business. */
+  refresh: "round", sync: "round",
+  /* ⚠️ A FLAG LIFTS, and an alert is deliberately STILL — see `STILL`. */
+  flag: "lift",
 };
 
 /** ⚠️ Marks with no character, on purpose — see `LIVELY`. */
@@ -143,6 +161,15 @@ export const LIVELY: Readonly<Record<string, string>> = {
 export const STILL: readonly string[] = [
   "circle", "mail", "package", "note", "file", "list", "add", "apps", "product",
   "workspace", "database", "chart", "add", "plus",
+  /*
+    ⚠️ AN ALERT IS STILL, AND IT IS THE ONE ENTRY HERE THAT IS A DECISION RATHER
+    THAN A SHRUG. Every other mark on this list is a noun with no act of its own;
+    this one has an obvious act — a wobble, a flash — and giving it one would make
+    the mark for "something is wrong" the liveliest thing on a screen full of
+    things that are fine. It is already carrying a tone. Motion on top of that is
+    the interface raising its voice.
+  */
+  "alert",
 ];
 
 /**

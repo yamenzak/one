@@ -23,7 +23,7 @@
 
 import * as React from "react";
 import {
-  ActionRow, Group, NavRow, Row, Screen, Spacer, Stack, glyphOf, useShown,
+  ActionRow, FieldRow, Group, NavRow, Screen, glyphOf, useShown
 } from "@engine/design";
 import type { JobRun, JobShown } from "@engine/design";
 import { sayMoment, type Instant } from "@engine/kernel";
@@ -105,8 +105,14 @@ export function Gateway({ onGo }: { readonly onGo: (to: Where) => void }) {
             </Group>
 
             <Group label="The catalogue" under="What the models cost us, refreshed nightly">
+              {/* ⚠️ NO `Stack` HERE — A CARD IS ALREADY ONE. Wrapping the rows put
+                  a second rhythm inside the card: its own inset on top of the
+                  card's, so the first row sat 24 from the edge where every other
+                  card in the product puts it at 12, plus the stack's gap between
+                  every pair. That is the "double padding" this card was reported
+                  for, and `test/rhythm.test.tsx` measures it now. */}
               {sync ? (
-                <Stack space="tight">
+                <>
                   {/* ⚠️ THE ROW LEADS WHERE THE NUMBER SENDS SOMEBODY. "64 new"
                       is read as an invitation to go and look at them, and for a
                       while it was a chevron over nothing — the models are on
@@ -125,12 +131,12 @@ export function Gateway({ onGo }: { readonly onGo: (to: Where) => void }) {
                     deployment is in, and the one an operator opens this to fix.
                   */}
                   <ActionRow
-                    icon={glyphOf("sparkle")}
+                    icon={glyphOf("refresh")}
                     label={running === SYNC ? "Syncing" : "Sync now"}
                     under="Discovers every model and refreshes what each one costs"
                     onDo={() => void runNow(SYNC)}
                   />
-                </Stack>
+                </>
               ) : (
                 <NavRow
                   icon={glyphOf("bank")}
@@ -151,19 +157,15 @@ export function Gateway({ onGo }: { readonly onGo: (to: Where) => void }) {
               screen; repeating it here would be a second place to read a value
               that is edited in one.
             */}
+            {/* ⚠️ TWO FACTS, NOT A PARAGRAPH. This was a sentence explaining why
+                the check above can be answered per workspace — thirty words of
+                architecture under a heading, which DESIGN.md §1.1 rules out and
+                §2 rules out again ("a row's second line is a FACT, never an
+                explanation"). What it was actually saying is two values, and a
+                value belongs in the row that names it. */}
             <Group label="How a call is made">
-              <Stack space="tight">
-                <Row space="tight">
-                  <small data-ink="muted">Every provider</small>
-                  <Spacer />
-                  <small>one endpoint, one shape</small>
-                </Row>
-                <small data-ink="muted">
-                  Calls go out tagged with the workspace, the product and the action,
-                  which is what lets the check above be answered per workspace rather
-                  than as one number for the deployment.
-                </small>
-              </Stack>
+              <FieldRow label="Every provider" value="One endpoint, one shape" />
+              <FieldRow label="Every call" value="Tagged with the workspace, product and action" />
             </Group>
           </>
         );
