@@ -414,6 +414,15 @@ and cannot be. `docs/guards.json`, `docs/stages.json` and
 is prose because a decision's ARGUMENT is prose, and it is append-only: a
 decision is never edited in place, only superseded by a later one that says so.
 
+⚠️ **AND A `plan` IS THE ONE KIND THAT IS MEANT TO BE DELETED.** A stage large
+enough to need designing before it is built gets a document; the day it ships,
+what survives is the code, the guards, the decisions it added and the stage row
+— and the plan goes to `git log` with the rest of the working out. A finished
+plan left in the tree is a second, older answer to every question the code now
+answers, which is the failure a whole framework was deleted over. The one open
+now is [AI-PLAN.md](AI-PLAN.md) — the model catalogue, the run, the money and
+the search, for stage 27 and the stages it turned out to need.
+
 ### 5.6 Tests prove behaviour; guards prove shape
 
 A test asserts what the code does. A guard asserts what the code *is* — that
