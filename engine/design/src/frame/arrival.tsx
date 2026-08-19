@@ -267,7 +267,7 @@ export function Arrival({ name, claim, children, aside, sky, brand }: {
         {/* ⚠️ ONE THIRD DOWN, NOT HALF. Optically centred rather than
             arithmetically: a short block placed at exactly 50% reads as low,
             because the eye takes the middle of a page to be above its middle. */}
-        <div className={`min-h-svh flex flex-col justify-center md:justify-start ${DOOR_PAD}`}>
+        <div className={`min-h-dvh flex flex-col justify-center md:justify-start ${DOOR_PAD}`}>
           {/* ⚠️ FOUR BLOCKS, ARRIVING IN THE ORDER SOMEBODY READS THEM. The mark
               turns in first and everything else rises under it — see
               `DOOR_MOTION`. Staggering the name and the form separately from the

@@ -45,7 +45,7 @@ export function Product({ path, onGo, onOpenSpace, onOpenInbox }: {
   return (
     <Await
       of={of}
-      waiting={<div className="min-h-svh grid place-items-center"><Working says="Opening your workspace" /></div>}
+      waiting={<div className="min-h-dvh grid place-items-center"><Working says="Opening your workspace" /></div>}
       again={again}
       then={(view) => {
         const stop = parseStop(path, view.apps.map((a) => a.id));

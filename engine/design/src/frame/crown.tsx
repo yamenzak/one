@@ -28,7 +28,7 @@ import { MOTION, transition, useStill } from "../tokens/motion.js";
 import { Face, type FaceOf } from "../parts/face.js";
 import { Mark, type MarkOf } from "./arrival.js";
 import { Hint, Pip } from "../parts/beside.js";
-import { Band, useScrolled, type Bleed } from "./page.js";
+import { Band, type Bleed } from "./page.js";
 import { Spacer } from "../parts/arrange.js";
 
 export function LeaveChip({ leave = "back", label, onDo }: {
@@ -71,10 +71,14 @@ export function LeaveChip({ leave = "back", label, onDo }: {
  */
 function useScrolledPast(down = 56, up = 32): boolean {
   const [past, setPast] = React.useState(false);
-  /* ⚠️ THE FRAME SCROLLS, NOT THE WINDOW — see `useScrolled`. Read off `scrollY`
-     this reported zero for ever and the crown simply stopped collapsing, which
-     is a feature quietly not happening rather than anything that fails. */
-  useScrolled((top) => setPast((was) => (was ? top > up : top > down)));
+
+  React.useEffect(() => {
+    const onScroll = () => setPast((was) => (was ? scrollY > up : scrollY > down));
+    onScroll();
+    addEventListener("scroll", onScroll, { passive: true });
+    return () => removeEventListener("scroll", onScroll);
+  }, [down, up]);
+
   return past;
 }
 

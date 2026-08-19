@@ -22,7 +22,7 @@ import type { Width } from "../tokens/metrics.js";
 import { MOTION, transition, useStill } from "../tokens/motion.js";
 import { TYPE } from "../tokens/type.js";
 import { Pip } from "../parts/beside.js";
-import { Band, useScrolled } from "./page.js";
+import { Band } from "./page.js";
 
 /**
  * THE ACTION A WHOLE SCREEN EXISTS FOR, PINNED WHERE A THUMB IS.
@@ -383,15 +383,22 @@ export function Island({ items, here, onGo, act, only }: {
  */
 function useScrollingDown(threshold = 6, top = 24): boolean {
   const [down, setDown] = React.useState(false);
-  const last = React.useRef(0);
-  /* ⚠️ THE FRAME SCROLLS, NOT THE WINDOW — see `useScrolled`. */
-  useScrolled((y) => {
+
+  React.useEffect(() => {
     if (typeof matchMedia === "function"
       && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    if (y <= top) { setDown(false); last.current = y; return; }
-    if (Math.abs(y - last.current) < threshold) return;
-    setDown(y > last.current);
-    last.current = y;
-  });
+
+    let last = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (y <= top) { setDown(false); last = y; return; }
+      if (Math.abs(y - last) < threshold) return;
+      setDown(y > last);
+      last = y;
+    };
+    addEventListener("scroll", onScroll, { passive: true });
+    return () => removeEventListener("scroll", onScroll);
+  }, [threshold, top]);
+
   return down;
 }

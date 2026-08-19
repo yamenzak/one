@@ -267,7 +267,7 @@ export function App() {
         {/* ⚠️ THE RHYTHM IS `Center`'s, NOT A `gap-6` WRITTEN HERE. A frame
             picking its own spacing is the drift `metrics` exists to refuse, and
             this one was invisible while the class sat inside a ternary. */}
-        <div className="min-h-[68svh] flex items-center justify-center py-8">
+        <div className="min-h-[68dvh] flex items-center justify-center py-8">
           <Center space="roomy">
             {/*
               ⚠️ TWO STATES WORE ONE CAPTION, AND IT DESCRIBED NEITHER. `waiting`

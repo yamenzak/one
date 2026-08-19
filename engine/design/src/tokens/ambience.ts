@@ -136,15 +136,12 @@ export const MATTE = (() => {
  * crown draws a line across the page; one that lasts a screen and fades has
  * depth, and is gone by the time anybody has scrolled past it.
  *
- * ⚠️ `svh`, AND IT IS THE SAME UNIT THE FRAME IS SIZED IN. `Page` is
- * `min-h-svh`; this fills it and is `position: absolute` inside it, with only
+ * ⚠️ `dvh`, AND IT IS THE SAME UNIT THE FRAME IS SIZED IN. `Page` is
+ * `min-h-dvh`; this fills it and is `position: absolute` inside it, with only
  * `overflow-x: clip` above — so at `100vh` the ground stood taller than the
  * frame by exactly the height of a phone's browser chrome, hung past the bottom,
  * and made EVERY page in the product scrollable by that much with nothing to
  * scroll to. Two units for one viewport is the whole of it.
- *
- * ⚠️ AND IT IS NOT `dvh`, WHICH BOTH OF THEM WERE. `dvh` tracks the address bar,
- * so the frame changed height under a finger that was scrolling — see `Page`.
  *
  * ⚠️ AND NO TEST COULD HAVE SEEN IT. Headless Chromium has no browser chrome, so
  * `100vh === 100dvh` there and the overflow is exactly zero — the fault only
@@ -152,7 +149,7 @@ export const MATTE = (() => {
  * `scripts/scene.test.mjs` asserts instead: not the pixels, but that the ground
  * and the frame are measured in the same unit.
  */
-export const REACH = "100svh";
+export const REACH = "100dvh";
 
 /** The layers of one ambience, innermost last, as `background-image` entries. */
 export type { SceneFamily, Sky };
@@ -450,7 +447,7 @@ export function ambienceStylesheet(): string {
        869 tall — 39px of scroll under a screen with nothing below the fold, on
        every page in the product. The reasoning for leaving the block axis alone
        was that the page still has to scroll; it does, and clipping does not stop
-       it. The host is `min-h-svh` and GROWS with its content, so content is
+       it. The host is `min-h-dvh` and GROWS with its content, so content is
        never outside the box — the only thing beyond it is the ornament.
 
        ⚠️ `clip`, NEVER `hidden`, AND THAT IS THE PART THAT IS ACTUALLY FRAGILE.
@@ -459,27 +456,6 @@ export function ambienceStylesheet(): string {
        with `overflow: clip` a sticky crown holds at 0 after a 900px scroll; with
        `overflow: hidden` it rides away to -900. */
     `[data-sky] { position: relative; isolation: isolate; overflow: clip; --sky: 1; }`,
-    /*
-      ⚠️ AND THE FRAME IS THE ONE GROUND THAT SCROLLS, SO IT CANNOT BE `clip` ON
-      BOTH AXES. `Page` is exactly one viewport tall and the content moves inside
-      it — see the frame's own header for why the document must not be what
-      scrolls — and `overflow: clip` on the block axis would simply hide
-      everything below the fold. The inline axis still clips the drifting
-      ornament, which is what the rule above is for.
-
-      ⚠️ THE SPECIFICITY IS THE POINT OF THE SECOND ATTRIBUTE. `[data-sky]` and a
-      utility class weigh the same, so which one won would be decided by the
-      order two stylesheets happened to load in — and losing means a page that
-      renders one screen and refuses to scroll at all.
-
-      ⚠️ `overscroll-behavior` IS NOT DECORATION HERE. A flick at the top of a
-      scrollport chains to the document behind it, and on Android that arms
-      pull-to-refresh: the gesture somebody makes to scroll back up reloads the
-      application instead.
-    */
-    `[data-sky][data-port] {`,
-    `  overflow-x: clip; overflow-y: auto; overscroll-behavior-y: contain;`,
-    `}`,
     /*
       ⚠️ ONE MULTIPLIER PER THEME, AND IT IS DOWN TO ONE. This carried five —
       `--sky`, `--thread`, `--etch`, `--lumen`, `--field` — because twenty-four

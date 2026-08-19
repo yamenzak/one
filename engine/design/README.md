@@ -166,12 +166,12 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 |---|---|---|
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 57 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
-| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 54 |
+| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 53 |
 | `parts/` | rows, cards, lists, controls, the four outcomes | 135 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 51 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**337 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**336 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -193,7 +193,7 @@ there is no deep import, and a guard says so.
 - `frame/chrome.tsx` — `Docked`, `Island`
 - `frame/crown.tsx` — `Crown`, `CrownClaim`, `crownFor`, `CrownProps`, `CrownSocketProvider`, `LeaveChip`, `PageCrown`, `Slot`, `useCrownSocket`
 - `frame/overlay.tsx` — `Confirm`, `Dialog`, `Menu`, `MenuItem`, `notice`, `NoticeHost`, `Over`, `Peek`, `Tray`
-- `frame/page.tsx` — `Band`, `BandProps`, `Bleed`, `Page`, `PageProps`, `useNight`, `useScenery`, `useScrolled`
+- `frame/page.tsx` — `Band`, `BandProps`, `Bleed`, `Page`, `PageProps`, `useNight`, `useScenery`
 - `frame/reading.tsx` — `Reading`, `ReadingProvider`, `useReading`
 - `frame/screen.tsx` — `Act`, `Frame`, `Framed`, `Layout`, `LayoutProps`, `Screen`, `ScreenProps`, `Shape`, `Whichever`
 - `frame/shell.tsx` — `CrownInfo`, `Glyph`, `GLYPH_NAMES`, `glyphOf`, `LIVELY`, `reachable`, `Shell`, `ShellProps`, `STILL`
