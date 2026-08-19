@@ -143,6 +143,7 @@ they are in, leaving one, taking a copy, deleting themselves.
 | `me.leave` | write | session | *every door* |
 | `me.export` | read | session | *every door* |
 | `me.forget` | write | session + recent proof | *every door* |
+| `me.name` | write | session | *every door* |
 | `me.presentation` | write | session | *every door* |
 | `me.inbox` | read | session | *every door* |
 | `me.seen` | write | session | *every door* |
@@ -401,7 +402,7 @@ env or a binding.
 |---|---|---|---|
 | `schema` | the composed schema runner — declarations become tables | 7 | — |
 | `sql` | the one typed seam onto D1 | 4 | — |
-| `directory` | accounts, workspaces, placement, enablement, allowances | 29 | — |
+| `directory` | accounts, workspaces, placement, enablement, allowances | 32 | — |
 | `handles` | which binding holds which shard | 3 | — |
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
 | `identity` | sign-in codes, sessions, tokens, proof | 21 | — |
@@ -448,7 +449,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**322 of them**, 320 reached by something today.
+**325 of them**, 323 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

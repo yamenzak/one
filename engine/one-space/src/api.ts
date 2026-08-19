@@ -146,6 +146,12 @@ export interface Health {
 export interface Me {
   readonly accountId: string;
   readonly email: string | null;
+  /**
+   * ⚠️ OPTIONAL, AND THE EMAIL IS THE FALLBACK. Somebody signs in with an
+   * address and may never offer a name; the account centre said so by
+   * introducing everybody to themselves as `sam@example.com`.
+   */
+  readonly name?: string | null;
   /** ⚠️ An ACCOUNT fact — an operator stands outside every workspace (D18). */
   readonly operator?: boolean;
   readonly tenants: readonly Belonging[];

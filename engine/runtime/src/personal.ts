@@ -25,8 +25,9 @@ import {
   wouldStrand,
 } from "@engine/kernel";
 import {
-  appsOfTenant, becomeCommercial, closeTenant, createTenant, forgetInvitation, invitationsFor,
-  liveAppsOfTenant, noteBelonging, presentationFrom, presentationOf, setPresentation,
+  accountName, appsOfTenant, becomeCommercial, closeTenant, createTenant, forgetInvitation,
+  invitationsFor,
+  liveAppsOfTenant, noteBelonging, presentationFrom, presentationOf, setAccountName, setPresentation,
   tenantBySlug, tenantsOf,
   upsertAccount, type TenantRow,
 } from "./directory.js";
@@ -602,6 +603,11 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
         }));
         return {
           accountId, email: ctx.email,
+          /* ⚠️ WHAT THEY ARE CALLED, WHICH IS OPTIONAL AND WAS UNREADABLE. The
+             column existed, `upsertAccount` wrote `null` into it, and nothing
+             answered it — so the account centre introduced somebody to
+             themselves by their email address. */
+          name: await accountName(ctx.directory, accountId),
           /* ⚠️ An account fact, not a workspace one — an operator stands
              outside every workspace, so no roster could answer it. */
           operator: deps.isOperator?.(ctx.email) === true,
@@ -878,6 +884,21 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
      * ⚠️ AND IT IS `account`-DOORED LIKE THE REST OF `me.*`, ON PURPOSE: this
      * follows the person, so there is no workspace whose door should own it.
      */
+    /**
+     * ⚠️ A NAME IS OFFERED, NEVER DEMANDED. Sign-in is an email and a code; this
+     * exists so a roster, an invitation and a notification can say who somebody
+     * is rather than printing their address at them. Sending nothing clears it,
+     * which has to be as reachable as setting it.
+     */
+    "me.name": {
+      kind: "write", needs: "session",
+      async run(ctx, input): Promise<unknown> {
+        const name = await setAccountName(
+          ctx.directory, ctx.session!.accountId, String(input.name ?? ""));
+        return { name };
+      },
+    },
+
     "me.presentation": {
       kind: "write", needs: "session",
       async run(ctx, input): Promise<unknown> {

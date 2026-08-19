@@ -776,6 +776,55 @@ describe("leaving", () => {
   });
 });
 
+/* --------------------------------------------------------------------- name --- */
+
+/**
+ * WHAT SOMEBODY IS CALLED, WHICH THE COLUMN HELD AND NOTHING EVER WROTE.
+ *
+ * ⚠️ `account.name` WAS IN THE SCHEMA FROM THE FIRST COMMIT and `upsertAccount`
+ * passed `null` at the one call site there is — so it was a column written blank
+ * on every deployment, answered by no route, and the screen called "You"
+ * introduced everybody to themselves by their email address. That is the same
+ * absence as a capability with no route to reach it, one layer down.
+ */
+describe("what you are called", () => {
+  it("is absent until somebody offers one, and then it is what `me.who` answers", async () => {
+    const cookie = await signIn("sam@example.com");
+    const before = await (await get("setup", "/api/me.who", cookie)).json() as { name: string | null };
+    expect(before.name).toBe(null);
+
+    await post("setup", "/api/me.name", { name: "  Sam Okoro  " }, cookie);
+    const after = await (await get("setup", "/api/me.who", cookie)).json() as { name: string | null };
+    /* ⚠️ Trimmed, because a name pasted out of a mail client carries a space. */
+    expect(after.name).toBe("Sam Okoro");
+  });
+
+  /*
+    ⚠️ BLANK CLEARS RATHER THAN STORING `""`. An empty string reads back as a
+    name that is present and prints as nothing — a face with no initial and a
+    roster row with a gap where a person is.
+  */
+  it("clears back to nothing, which has to be as reachable as setting it", async () => {
+    const cookie = await signIn("sam@example.com");
+    await post("setup", "/api/me.name", { name: "Sam Okoro" }, cookie);
+    await post("setup", "/api/me.name", { name: "   " }, cookie);
+    const out = await (await get("setup", "/api/me.who", cookie)).json() as { name: string | null };
+    expect(out.name).toBe(null);
+  });
+
+  it("is capped, so a name cannot be a place to park a paragraph", async () => {
+    const cookie = await signIn("sam@example.com");
+    await post("setup", "/api/me.name", { name: "x".repeat(400) }, cookie);
+    const out = await (await get("setup", "/api/me.who", cookie)).json() as { name: string | null };
+    expect(out.name?.length).toBe(80);
+  });
+
+  it("is nobody else's to set", async () => {
+    const out = await post("setup", "/api/me.name", { name: "Somebody" });
+    expect(out.status).toBe(401);
+  });
+});
+
 /* --------------------------------------------------------------------- push --- */
 
 /**

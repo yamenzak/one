@@ -127,6 +127,43 @@ export async function upsertAccount(
  * path of `me.who`, which every door calls before it draws anything, so a parse
  * error here is a deployment where nobody can sign in.
  */
+/**
+ * WHAT SOMEBODY IS CALLED, WHICH THE COLUMN HELD AND NOTHING EVER WROTE.
+ *
+ * ⚠️ `account.name` HAS BEEN IN THE SCHEMA AND IN THE KERNEL'S `Account` SINCE
+ * the directory was written, and `upsertAccount` passed `null` at the one call
+ * site there is — so every account on every deployment had a name of `null`, no
+ * route answered it, and the screen called "You" introduced somebody to
+ * themselves by their email address. A column written blank forever and read by
+ * nothing is the same absence as a route nobody mounts.
+ *
+ * ⚠️ AND IT IS OPTIONAL, PERMANENTLY. Sign-in is an email and a code; a name is
+ * something a person may offer so that a roster and an invitation can say who
+ * they are. Demanding one would be collecting a fact we have no need of, on the
+ * one door that must stay open to somebody who has typed nothing yet.
+ */
+export const NAME_MAX = 80;
+
+export async function accountName(db: Db, accountId: AccountId): Promise<string | null> {
+  const row = await db.prepare(`SELECT name FROM account WHERE id = ?`)
+    .bind(accountId).first<{ name: string | null }>();
+  return row?.name?.trim() ? row.name : null;
+}
+
+/**
+ * ⚠️ BLANK CLEARS IT RATHER THAN STORING `""`. An empty string reads back as a
+ * name that is present and prints as nothing — a face with no initial, a roster
+ * row with a gap where a person is.
+ */
+export async function setAccountName(
+  db: Db, accountId: AccountId, name: string,
+): Promise<string | null> {
+  const want = name.trim().slice(0, NAME_MAX);
+  await db.prepare(`UPDATE account SET name = ? WHERE id = ?`)
+    .bind(want || null, accountId).run();
+  return want || null;
+}
+
 export async function presentationOf(db: Db, accountId: AccountId): Promise<Presentation> {
   const row = await db.prepare(`SELECT presentation_json FROM account WHERE id = ?`)
     .bind(accountId).first<{ presentation_json: string | null }>();

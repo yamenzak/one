@@ -58,7 +58,10 @@ export function SpaceHome({ person, onGo }: {
     <Stack space="roomy">
       <Identity
         face={person ? whoFace(person.accountId) : undefined}
-        name={person?.email ?? "You"}
+        /* ⚠️ THEIR NAME IF THEY GAVE ONE — see `You`, where it is set. The
+           address is the fallback rather than the answer: this is the first
+           screen anybody sees, and it greeted everybody with their own email. */
+        name={person?.name ?? person?.email ?? "You"}
         under={workspaces === null
           ? undefined
           : workspaces.length === 1 ? "1 workspace" : `${workspaces.length} workspaces`}

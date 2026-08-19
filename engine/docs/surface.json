@@ -565,6 +565,13 @@
       "proof": "recent"
     },
     {
+      "id": "me.name",
+      "kind": "write",
+      "needs": "session",
+      "doors": null,
+      "proof": null
+    },
+    {
       "id": "me.presentation",
       "kind": "write",
       "needs": "session",

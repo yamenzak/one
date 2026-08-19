@@ -18,13 +18,29 @@
  * account list, after a rule, and there is no reason to be different.
  */
 
-import { Group, Identity, NavRow, Place, Screen, glyphOf, whoFace } from "@engine/design";
+import { field } from "@engine/kernel";
+import {
+  EditRow, Group, Identity, NavRow, Place, Screen, glyphOf, whoFace,
+} from "@engine/design";
+import { api } from "../api.js";
 import { useSession } from "../session.js";
 import { SignOut } from "./SignOut.js";
 import { groundOf, nameOf, type Where } from "./where.js";
 
+/**
+ * ⚠️ A NAME IS OFFERED, NOT DEMANDED, AND IT IS 80 CHARACTERS. `holds: "identity"`
+ * is what puts it in the erasure walk and in the processing record without
+ * anybody remembering to — the field declares what it is and the rest follows.
+ */
+const NAME = field.text({
+  label: "Your name",
+  holds: "identity",
+  max: 80,
+  help: "What a roster, an invitation and a notification call you. Leave it blank to be your address.",
+});
+
 export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
-  const { me, where } = useSession();
+  const { me, where, refresh } = useSession();
   const person = me && me !== "nobody" ? me : null;
 
   return (
@@ -33,11 +49,37 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
        what the screen is FOR, and nobody opens their account to leave it. It is
        a card of its own, in the danger voice (DESIGN.md §5). */
     <Screen shape="detail">
+      {/* ⚠️ THE NAME IS THE HEADING AND THE ADDRESS IS ITS CAPTION — and when
+          there is no name, the address is the heading and nothing is repeated
+          under it. The column existed from the first commit, `upsertAccount`
+          wrote `null` into it at the one call site there is, and no route
+          answered it: a screen called "You" introduced everybody to themselves
+          by their email address. */}
       <Identity
         face={person ? whoFace(person.accountId) : undefined}
-        name={person?.email ?? "You"}
-        under={person?.operator ? "Operator" : undefined}
+        name={person?.name ?? person?.email ?? "You"}
+        under={[person?.name ? person.email : null, person?.operator ? "Operator" : null]
+          .filter(Boolean).join(" · ") || undefined}
       />
+
+      {/* ⚠️ ITS OWN CARD, BECAUSE A CARD HOLDS ONE KIND OF THING. A fact you can
+          change sitting as the first row of a menu makes the menu five
+          destinations and one setting, and the eye has to read each row to find
+          out which it is. A sheet rather than an inline field is the same rule
+          every settings surface here follows — `EditRow` is where it lives. */}
+      <Group>
+        <EditRow
+          spec={NAME}
+          name="name"
+          value={person?.name ?? ""}
+          onSave={async (next) => {
+            const out = await api.post("me.name", { name: String(next ?? "") });
+            if (!out.ok) return out.problem;
+            await refresh();
+            return null;
+          }}
+        />
+      </Group>
 
       <Group>
         {/* ⚠️ ON EVERY DOOR, AND THE SCOPE IS WHAT CHANGES. This was gated to a
