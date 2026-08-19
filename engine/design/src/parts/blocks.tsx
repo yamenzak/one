@@ -18,7 +18,7 @@ import {
 import { Check } from "lucide-react";
 import { passagesOf } from "@engine/kernel";
 import {
-  NUDGE, SPACE, WIDTH,
+  NUDGE, ROW, SPACE, WIDTH,
 } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 
@@ -161,7 +161,13 @@ export function Reveal({ label, children }: {
   return (
     <Disclosure>
       <Disclosure.Heading>
-        <Button slot="trigger" variant="ghost" fullWidth>
+        {/* ⚠️ `justify-between`, BECAUSE A FULL-WIDTH BUTTON CENTRES ITS CONTENT.
+            Measured: "Public key ⌄" sat in the middle of a card whose every
+            other row starts at the inset, so the one control on the card was
+            the one thing not aligned with anything. A disclosure reads as a
+            row — its name on the left, the way in on the right — which is what
+            the accordion beside it already does. */}
+        <Button slot="trigger" variant="ghost" fullWidth className={`justify-between ${ROW.flush}`}>
           {label}
           <Disclosure.Indicator />
         </Button>
