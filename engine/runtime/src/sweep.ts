@@ -492,10 +492,27 @@ export function platformJobs(deps: SweepDeps): JobBook {
            address — a vendor with no prefix here — and it is the difference
            between a catalogue that grew and one that changed shape. Counted
            silently, the second reads exactly like the first. */
+        /*
+          ⚠️ AND WHICH VENDORS IT SAW, BECAUSE "WHERE ARE THE GEMINI MODELS" IS A
+          QUESTION THIS LINE CAN ANSWER AND NOTHING ELSE CAN. Cloudflare's list
+          and Google's are two sources with two failure modes, and a total tells
+          neither apart from the other: a key that was never read, a vendor the
+          gateway has no lane for, and a catalogue that simply has fewer models
+          than somebody expected all show up as one number.
+        */
+        const seen = new Map<string, number>();
+        for (const f of found) seen.set(f.provider ?? "", (seen.get(f.provider ?? "") ?? 0) + 1);
+        const per = [...seen.entries()]
+          .filter(([vendor]) => vendor)
+          .sort((a, b) => b[1] - a[1])
+          .map(([vendor, n]) => `${vendor} ${n}`)
+          .join(", ");
+
         return {
           touched: out.added + out.priced + out.retired,
           detail: `${out.added} new, ${out.priced} repriced, ${out.retired} retired`
-            + (out.skipped ? `, ${out.skipped} unaddressable` : ""),
+            + (out.skipped ? `, ${out.skipped} unaddressable` : "")
+            + (per ? ` · ${per}` : ""),
         };
       },
       { budgetSeconds: 60 });

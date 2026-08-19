@@ -914,3 +914,25 @@ it was one scroll of sixty rows each carrying the vendor's marketing paragraph.
 Held as component state a lane could not be linked to, landed on, or gone back
 from — so the crown's arrow would leave the whole catalogue from inside one of
 its lanes.
+
+⚠️ **The docs were checked as a price source and they are not one.** Cloudflare
+publishes a unified catalogue at `/ai/models/` — 228 models, 84 it hosts and 144
+third-party — and each has a page carrying the context window, the request
+format, the licence and a description. The **price** on a third-party page is a
+LINK to the dashboard, not a number; the hosted models' pages carry real rates,
+which is where the `price` property the sync already reads comes from. So the
+docs improve discovery and answer nothing about what a partner model costs. The
+rate table stands until a priced source exists.
+
+⚠️ **And the same look found a live defect.** That unified catalogue names the
+vendor in the ID — `google/gemini-3.7-flash`, `openai/gpt-5` — while the vendor
+was being GUESSED from the model's spelling (`^gemini`), which tests a string
+beginning `google/` and matches nothing. Every third-party row the API returns
+would have resolved no provider and been dropped as unaddressable, silently, by
+the refusal added one commit earlier. `addressIn` reads the segment, maps it to
+the gateway's own slug — `google` is the company, `google-ai-studio` is the lane
+— and moves it OUT of the id, because `/compat` is addressed `{provider}/{model}`
+and it would otherwise be there twice. The useful consequence: Cloudflare's
+`google/gemini-3.7-flash` and Google's own `gemini-3.7-flash` become ONE row
+rather than two that disagree about what the same model costs.
+

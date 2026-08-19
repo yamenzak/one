@@ -13,7 +13,9 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { isAddressable, priceFrom, readCatalogue, refuseDiscovered } from "../src/models.js";
+import {
+  addressIn, isAddressable, priceFrom, readCatalogue, refuseDiscovered,
+} from "../src/models.js";
 
 describe("reading a price", () => {
   it("takes a bare number as it stands", () => {
@@ -131,10 +133,12 @@ describe("addressing a model", () => {
   });
 
   /* ⚠️ THE SAME RULE READ THE OTHER WAY, which is what makes it a rule about the
-     shape rather than about one vendor's field names. */
+     shape rather than about one vendor's field names. The vendor segment then
+     moves out of the id and into the provider — see `addressIn`. */
   it("takes the path out of `id` when `name` is a human title", () => {
     const found = at({ id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash" });
-    expect(found!.id).toBe("google/gemini-2.5-flash");
+    expect(found!.id).toBe("gemini-2.5-flash");
+    expect(found!.provider).toBe("google-ai-studio");
     expect(found!.name).toBe("Gemini 2.5 Flash");
   });
 
@@ -155,5 +159,74 @@ describe("addressing a model", () => {
   it("reports every fault it found rather than the first", () => {
     expect(refuseDiscovered([at({ id: "a-uuid-shaped-thing" })!]))
       .toEqual(["no_addressable_row", "no_priced_row"]);
+  });
+});
+
+/**
+ * A UNIFIED CATALOGUE NAMES ITS VENDOR IN THE ID, AND THE GUESS TABLE MISSED IT.
+ *
+ * ⚠️ CLOUDFLARE'S OWN LIST NOW CARRIES THIRD-PARTY MODELS AS `google/…`,
+ * `openai/…`, `anthropic/…` — 144 of them beside its 84 hosted ones. The vendor
+ * was being guessed from the model's SPELLING (`^gemini`), which tests a string
+ * beginning `google/` and matches nothing, so every one of those rows resolved
+ * no provider and was dropped as unaddressable. The provider is not a guess: it
+ * is the first segment.
+ *
+ * ⚠️ AND THE SEGMENT MOVES OUT OF THE ID. `/compat` is addressed
+ * `{provider}/{model}`, so leaving it in builds
+ * `google-ai-studio/google/gemini-3.7-flash`.
+ */
+describe("a vendor named in the id", () => {
+  const of = (id: string) => addressIn(id);
+
+  it("reads the vendor off the first segment, in the gateway's own spelling", () => {
+    /* ⚠️ `google` is the company; `google-ai-studio` is the gateway's lane. */
+    expect(of("google/gemini-3.7-flash")).toEqual({
+      provider: "google-ai-studio", model: "gemini-3.7-flash",
+    });
+    expect(of("anthropic/claude-4-opus").provider).toBe("anthropic");
+    /* ⚠️ xAI's company name and the gateway's lane are different words. */
+    expect(of("xai/grok-4").provider).toBe("grok");
+  });
+
+  /* ⚠️ Cloudflare's own rows carry no vendor — from its side they are its own. */
+  it("leaves a Cloudflare model whole", () => {
+    expect(of("@cf/meta/llama-3.1-8b-instruct")).toEqual({
+      provider: "workers-ai", model: "@cf/meta/llama-3.1-8b-instruct",
+    });
+  });
+
+  /*
+    ⚠️ THE TWO SOURCES LAND ON ONE ROW. Cloudflare says `google/gemini-3.7-flash`
+    and Google's own list says `gemini-3.7-flash`; if those stored separately the
+    catalogue would carry the same model twice, at two prices, with two switches.
+  */
+  it("agrees with a bare id from the vendor's own list", () => {
+    expect(of("google/gemini-3.7-flash")).toEqual(of("gemini-3.7-flash"));
+  });
+
+  /*
+    ⚠️ AND A VENDOR THE GATEWAY CANNOT REACH IS NOT HALF-ADDRESSED. Cloudflare
+    hosts models from vendors `/compat` has no lane for; keeping the model and
+    dropping the vendor would store a row that lists, prices, switches on, and
+    fails at the first call.
+  */
+  it("refuses a vendor the gateway has no lane for", () => {
+    expect(of("recraft/recraft-v3").provider).toBe("");
+    expect(of("alibaba/hh1-i2v").provider).toBe("");
+  });
+
+  it("carries the whole thing through the reader", () => {
+    const [found] = readCatalogue([{
+      id: "some-uuid", name: "google/gemini-3.7-flash",
+      task: { name: "Text Generation" },
+      properties: [{ property_id: "price", value: [
+        { unit: "per M input tokens", price: 0.3 },
+        { unit: "per M output tokens", price: 2.5 },
+      ] }],
+    }]);
+    expect(found!.id).toBe("gemini-3.7-flash");
+    expect(found!.provider).toBe("google-ai-studio");
+    expect(found!.usdPerMillionOut).toBe(2.5);
   });
 });

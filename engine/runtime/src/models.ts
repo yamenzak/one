@@ -400,10 +400,43 @@ const meterOf = (task: string): Meter =>
       : "token";
 
 /**
- * ⚠️ THE PROVIDER IS READ OFF THE ID BECAUSE THAT IS WHERE IT IS. `gemini-2.5-*`
- * is Google's, `grok-*` is xAI's — and a model whose vendor cannot be told from
- * its name is one `/compat` could not address anyway, so it is left unprefixed
- * and lands disabled with nothing bound to it.
+ * THE GATEWAY'S OWN NAME FOR A VENDOR, WHICH IS NOT ALWAYS THE VENDOR'S.
+ *
+ * ⚠️ `/compat` ADDRESSES `{provider}/{model}` AND THE PROVIDER HALF IS THE
+ * GATEWAY'S SLUG. Google AI Studio is `google-ai-studio`, xAI is `grok`. A
+ * catalogue that says `google` is naming the company; the gateway needs the
+ * lane, and the two differ often enough that guessing is how a whole vendor's
+ * models resolve to nothing.
+ *
+ * ⚠️ AND IT IS DELIBERATELY NOT EVERY VENDOR IN THE CATALOGUE. Cloudflare's
+ * unified list carries models it HOSTS from vendors the gateway has no lane for
+ * — Recraft, Alibaba, ByteDance, Pruna — and mapping those to an invented slug
+ * would produce rows that list, price and switch on, and fail at the first call.
+ * A vendor absent here is a row that is not stored, counted as unaddressable and
+ * reported by the sync, which is the difference between a catalogue that grew
+ * and one this deployment cannot reach.
+ */
+const GATEWAY: Readonly<Record<string, string>> = {
+  google: "google-ai-studio", "google-ai-studio": "google-ai-studio",
+  openai: "openai", anthropic: "anthropic",
+  xai: "grok", "x-ai": "grok", grok: "grok",
+  deepseek: "deepseek", mistral: "mistral", mistralai: "mistral",
+  groq: "groq", cohere: "cohere", perplexity: "perplexity-ai",
+  cerebras: "cerebras", elevenlabs: "elevenlabs", cartesia: "cartesia",
+};
+
+/**
+ * ⚠️ THE PROVIDER IS READ OFF THE ID BECAUSE THAT IS WHERE IT IS, and in the
+ * unified catalogue it is the FIRST SEGMENT: `google/gemini-3.7-flash`,
+ * `openai/gpt-5`. That is a fact about the id rather than a guess from its
+ * spelling, and reading it as a guess is what the table below was — it tests
+ * `^gemini` against a string beginning `google/`, matches nothing, and drops
+ * every third-party row as unaddressable.
+ *
+ * ⚠️ THE TABLE SURVIVES FOR A BARE ID, which is what Google's own API answers
+ * with (`gemini-2.5-flash`, no vendor segment). Both sources therefore land on
+ * the same `provider` + the same `id`, so a model discovered twice is ONE row
+ * rather than two that disagree about what it costs.
  */
 const PREFIXES: readonly (readonly [RegExp, string])[] = [
   [/^gemini|^gemma|^imagen|^veo|^lyria/, "google-ai-studio"],
@@ -415,8 +448,29 @@ const PREFIXES: readonly (readonly [RegExp, string])[] = [
   [/^llama|^qwen/, "groq"],
 ];
 
-const providerOf = (id: string): string =>
-  PREFIXES.find(([re]) => re.test(id))?.[1] ?? "";
+/**
+ * A CATALOGUE ID SPLIT INTO THE TWO HALVES `/compat` ADDRESSES.
+ *
+ * ⚠️ THE VENDOR SEGMENT IS REMOVED FROM THE MODEL, because the call is
+ * `{provider}/{model}` and leaving it in builds
+ * `google-ai-studio/google/gemini-3.7-flash`. Stripping it is also what makes
+ * the two sources agree: Cloudflare says `google/gemini-3.7-flash` and Google
+ * says `gemini-3.7-flash`, and both become the same row.
+ */
+export const addressIn = (id: string): { provider: string; model: string } => {
+  /* ⚠️ Cloudflare's own rows carry no vendor because from its side they are
+     simply its models. */
+  if (id.startsWith("@cf/")) return { provider: "workers-ai", model: id };
+  const cut = id.indexOf("/");
+  if (cut > 0) {
+    const vendor = GATEWAY[id.slice(0, cut).toLowerCase()];
+    /* ⚠️ A VENDOR THE GATEWAY HAS NO LANE FOR IS NOT HALF-ADDRESSED. Keeping
+       the model and dropping the vendor would store a row that looks complete
+       and cannot be called. */
+    return vendor ? { provider: vendor, model: id.slice(cut + 1) } : { provider: "", model: id };
+  }
+  return { provider: PREFIXES.find(([re]) => re.test(id))?.[1] ?? "", model: id };
+};
 
 /**
  * WHICH FIELD IS THE MODEL'S NAME, WHICH IS NOT THE FIELD CALLED `id`.
@@ -488,14 +542,16 @@ export const readCatalogue = (rows: readonly CatalogueRow[]): readonly Discovere
     .filter(({ id }) => !!id)
     .map(({ row, id }) => {
       const task = taskOf(row);
+      /* ⚠️ BOTH HALVES OF THE ONLY NAME THE ROW HAS — see `addressIn`. The
+         vendor segment moves OUT of the id, because `/compat` is addressed
+         `{provider}/{model}` and it would otherwise be there twice. */
+      const at = addressIn(id);
       return {
-        id,
-        name: titleOf(row, id),
+        id: at.model,
+        name: titleOf(row, at.model),
         ...(row.description ? { description: row.description } : {}),
         task,
-        /* ⚠️ THE PREFIX `/compat` NEEDS, and Cloudflare's own rows do not carry
-           one because from its side they are simply its models. */
-        provider: id.startsWith("@cf/") ? "workers-ai" : providerOf(id),
+        provider: at.provider,
         meter: meterOf(task),
         ...pricing(row),
         ...(propOf(row, "reasoning") ? { thinks: true } : {}),
