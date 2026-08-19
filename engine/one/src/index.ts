@@ -35,6 +35,7 @@ import {
   subscribe, topUp, verifySignature,
   webhookSecret,
   operatorOps, permissionsResolver, personalOps, pusherOver, schemaFor, sendMail, serve,
+  settleBindings,
   sessionIdFrom, shardFor, subscriptionFor, whoIs,
   type Bucket, type Db, type TenantRow,
   configOf,
@@ -1188,7 +1189,7 @@ const boot = (env: Env): Promise<void> => {
   */
   booted ??= (async () => {
     const directory = env.DIRECTORY as unknown as Db;
-    await applySchema(directory, DIRECTORY_MODULES);
+    const applied = [...await applySchema(directory, DIRECTORY_MODULES)];
     /*
       ⚠️ EVERY SHARD IN `SHARDS`, NOT ONE NAMED BINDING. This read
       `env.SHARD_EU_1` while `SHARDS` drove registration, so the second shard
@@ -1198,10 +1199,10 @@ const boot = (env: Env): Promise<void> => {
       "no such table". One list, walked.
     */
     for (const { id } of SHARDS) {
-      await applySchema(shardFor(env as never, id), [
+      applied.push(...await applySchema(shardFor(env as never, id), [
         ...Object.values(APPS).map((make) => schemaFor(make())),
         ...SHARD_MODULES,
-      ]);
+      ]));
     }
     /*
       ⚠️ THE SHARD THIS DEPLOYMENT BINDS IS DECLARED AT BOOT, IDEMPOTENTLY. The
@@ -1210,9 +1211,24 @@ const boot = (env: Env): Promise<void> => {
       is RIGHT THERE, bound and migrated. Both writes are upserts, so a
       thousand cold starts write what one did.
     */
-    for (const { id, where } of SHARDS) await addShard(directory, id, where, 10_000);
-    for (const { id: shard } of SHARDS) {
-      for (const id of Object.keys(APPS)) await noteShardApp(directory, shard, id as never);
+    /*
+      ⚠️ AND ONLY WHEN SOMETHING ACTUALLY CHANGED. These are upserts, so a
+      thousand cold starts write what one did — which is the property that makes
+      them safe and also the reason they were running on every one of them.
+      Two writes is the most expensive thing on this path: a read can be served
+      near the request and a write goes to the primary.
+
+      ⚠️ NOTHING RAN MEANS THIS EXACT CONFIGURATION HAS BOOTED BEFORE, so the
+      rows are there. A new shard in `SHARDS` brings a database with no modules
+      applied, so its schema DOES run and the registration runs with it; the
+      only case this skips is a row somebody deleted by hand, which
+      `deploymentFaults` reports on the same boot.
+    */
+    if (applied.some((a) => a.ran)) {
+      for (const { id, where } of SHARDS) await addShard(directory, id, where, 10_000);
+      for (const { id: shard } of SHARDS) {
+        for (const id of Object.keys(APPS)) await noteShardApp(directory, shard, id as never);
+      }
     }
 
     /*
@@ -1234,8 +1250,10 @@ const boot = (env: Env): Promise<void> => {
       this one is running that version. Nothing else in the system knows the
       difference between "we asked for it" and "it is there".
     */
-    for (const said of await observe(directory, env)) console.log(`[boot] ${said}`);
-    live = await liveBindings(directory, env);
+    /* ⚠️ ONE READ OF THE RESOURCE LEDGER, NOT TWO — see `settleBindings`. */
+    const settled = await settleBindings(directory, env);
+    for (const said of settled.said) console.log(`[boot] ${said}`);
+    live = settled.live;
 
     for (const fault of deploymentFaults({
       env,
@@ -1263,12 +1281,45 @@ const boot = (env: Env): Promise<void> => {
 
 /* ----------------------------------------------------------------- wiring --- */
 
+/**
+ * WHAT EVERY REQUEST NEEDS BEFORE IT CAN BE ROUTED, AND HOW OFTEN IT IS ASKED.
+ *
+ * ⚠️ THE HANDLER IS REBUILT PER REQUEST AND IT AWAITED TWO DATABASE READS TO DO
+ * IT — the gateway's configuration and the effective plan catalogue, one after
+ * the other, before the request had been looked at. That is two round trips in
+ * front of every navigation, every save and every poll in the product, buying
+ * two values that change when an operator edits them and at no other time.
+ *
+ * ⚠️ SO THEY ARE READ TOGETHER AND HELD BRIEFLY. Together is free and halves the
+ * wait. The hold is what removes it: a burst of requests — which is what opening
+ * a screen IS — pays for one read rather than one each.
+ *
+ * ⚠️ AND THE INVARIANT IS UNCHANGED, WHICH IS WHY A HOLD IS ALLOWED AT ALL. What
+ * must be true is that the gate, the shelf and the handler that prices something
+ * agree WITHIN one request; a snapshot satisfies that whether it was taken now
+ * or ten seconds ago. What is not allowed is two reads either side of a save
+ * inside one request, and there is still exactly one.
+ */
+/* ⚠️ SHORT ON PURPOSE. What this holds includes the PRICE CATALOGUE, so the
+   window is the length of time an operator's edit can be invisible to a
+   checkout. A burst of requests from one screen opening lands inside two
+   seconds; an operator's next action never does. Longer would buy very little
+   and would put a stale price on a real money path. */
+const A_MOMENT = 2_000;
+let held: { at: number; gateway: GatewayAt | null; sold: readonly PlanSpec[] } | null = null;
+
+const settings = async (env: Env, directory: Db, now: number) => {
+  if (held && now - held.at < A_MOMENT) return held;
+  const [gateway, sold] = await Promise.all([
+    gatewayAt(env),
+    effectivePlans(directory, PLANS, entitlementKeys(everyApp())),
+  ]);
+  held = { at: now, gateway, sold };
+  return held;
+};
+
 const handler = async (env: Env) => {
   const directory = env.DIRECTORY as unknown as Db;
-  /* ⚠️ WHERE A MODEL IS ASKED, RESOLVED ONCE PER REQUEST. Absent is a deployment
-     that has not been told about a gateway, and `ctx.generate` is then absent
-     too — a handler refuses on the seam rather than on a timeout. */
-  const gateway = await gatewayAt(env);
 
   /*
     ⚠️ WHAT IS ACTUALLY SOLD, RESOLVED ONCE PER REQUEST. `PLANS` is the
@@ -1281,7 +1332,7 @@ const handler = async (env: Env) => {
     handler that prices something must agree within one request — two reads
     either side of a save would price a checkout at one number and grant another.
   */
-  const sold = await effectivePlans(directory, PLANS, entitlementKeys(everyApp()));
+  const { gateway, sold } = await settings(env, directory, Date.now());
   const shardOf = (tenant: TenantRow) => shardFor(env as never, tenant.shardId);
 
   /**

@@ -466,9 +466,9 @@ env or a binding.
 | `storage` | files: the object, the row that knows its key, and the erasure of both | 7 | — |
 | `move` | a workspace's records change shard — the only way its jurisdiction can | 8 | — |
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
-| `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
+| `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**398 of them**, 397 reached by something today.
+**399 of them**, 398 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -881,6 +881,7 @@ its own header, cited by other files, and doing nothing.
 | D33 | A lane is an address, and a model we do not sell is not a fault | 0 |
 | D34 | The prices are parsed from Google's own page, and a modality is a set | 0 |
 | D35 | A model answers more than one lane, and one task column could not say so | 0 |
+| D36 | The latency budget: how many round trips a screen costs | 0 |
 <!-- /generated -->
 
 ---

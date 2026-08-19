@@ -149,21 +149,67 @@ export interface InboxView {
 
 /* ------------------------------------------------------------------ loads --- */
 
-/** One remote answer, with a way to ask again — the shape every screen reads. */
+/**
+ * WHAT WAS LAST TRUE, SO A SCREEN ALREADY VISITED DRAWS AT ONCE.
+ *
+ * ⚠️ WITHOUT IT EVERY NAVIGATION IS A BLANK SCREEN, INCLUDING GOING BACK. The
+ * answer is re-fetched from scratch each time the hook mounts, so returning to a
+ * list you were reading two seconds ago showed the skeleton again and waited on
+ * a round trip to redraw what the browser had just painted. That is most of what
+ * "every navigation takes time" is: not the request being slow, but nothing
+ * being shown while it happens.
+ *
+ * ⚠️ AND IT IS PER TAB, DELIBERATELY. A `Map` in the module lives as long as the
+ * page does and dies with it, so nothing here has to be invalidated on sign-out
+ * by hand — a reload is what ends a session, and a reload is what empties this.
+ */
+const held = new Map<string, unknown>();
+
+/** ⚠️ One key for one question, so two screens asking it share the answer. */
+const askedFor = (id: string, input?: Record<string, string>): string =>
+  `${id}:${JSON.stringify(input ?? {})}`;
+
+/**
+ * One remote answer, with a way to ask again — the shape every screen reads.
+ *
+ * ⚠️ IT SHOWS WHAT IT HAS AND THEN CATCHES UP. A screen that can be drawn is
+ * drawn; the request still goes out and the answer replaces it when it lands. So
+ * a revisit is instant and still correct, and a first visit is exactly what it
+ * was.
+ *
+ * ⚠️ AND `again` NO LONGER BLANKS THE SCREEN, which is what made every save look
+ * like a page reload. Re-reading after a write reset the state to `waiting`, so
+ * the list under the control somebody had just used vanished into a skeleton and
+ * came back a round trip later — with a long list, scrolled somewhere else. The
+ * data stays up while the new answer is on its way.
+ */
 export function useLoad<T>(id: string, input?: Record<string, string>): {
   readonly of: Loaded<T>;
   readonly again: () => void;
 } {
-  const [of, set] = useState<Loaded<T>>(waiting());
+  const key = askedFor(id, input);
+  const [of, set] = useState<Loaded<T>>(() =>
+    (held.has(key) ? ready(held.get(key) as T) : waiting()));
   const [tick, setTick] = useState(0);
-  const key = JSON.stringify(input ?? {});
 
   useEffect(() => {
     let live = true;
-    set(waiting());
+    /* ⚠️ ONLY WHERE THERE IS NOTHING TO SHOW. Blanking over an answer we already
+       hold is the reload this exists to end. */
+    set((was) => (was.status === "ready" ? was
+      : held.has(key) ? ready(held.get(key) as T) : waiting()));
+
     void api.get<T>(id, input).then((got) => {
       if (!live) return;
-      set(got.ok ? ready(got.value) : trouble(got.problem));
+      if (got.ok) { held.set(key, got.value); set(ready(got.value)); return; }
+      /*
+        ⚠️ A FAILED REFRESH OVER DATA WE HAVE IS NOT A REFUSAL SCREEN. Replacing
+        a list somebody is reading with "something went wrong" because a poll
+        lost the network takes the product away over a fault that has already
+        passed. A failure is only SHOWN while there is nothing to show — the same
+        rule every polling screen in this repository follows.
+      */
+      if (!held.has(key)) set(trouble(got.problem));
     });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -171,5 +217,16 @@ export function useLoad<T>(id: string, input?: Record<string, string>): {
 
   return { of, again: useCallback(() => setTick((n) => n + 1), []) };
 }
+
+/**
+ * ⚠️ WHAT A WRITE INVALIDATES, WHEN IT IS NOT WHAT THE WRITER IS LOOKING AT. A
+ * screen re-reads itself through `again`; this is for the answers ELSEWHERE that
+ * the same write changed — so the next screen to ask does not draw a remembered
+ * answer that is now wrong.
+ */
+export const forget = (id?: string): void => {
+  if (!id) { held.clear(); return; }
+  for (const key of [...held.keys()]) if (key.startsWith(`${id}:`)) held.delete(key);
+};
 
 export const useCentre = () => useLoad<CentreView>("centre.view");

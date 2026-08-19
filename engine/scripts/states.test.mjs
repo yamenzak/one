@@ -391,6 +391,46 @@ if (!unmarked) ok(`marks: every empty state wears its own noun, not the neutral 
   }
 }
 
+/* ---------------------------------------------------------------- re-read --- */
+
+/**
+ * ⚠️ A RE-READ MUST NOT BLANK A SCREEN THAT ALREADY HAS DATA. `again` is what a
+ * save calls, and resetting to `waiting` replaced the list under the control
+ * somebody had just used with a skeleton — for a round trip, from the top of a
+ * list they had scrolled. That is what "updating a field reloads the entire
+ * page" was, and it is invisible in every test that renders a screen once.
+ *
+ * ⚠️ AND THE CACHE IS THE OTHER HALF. Without one, every navigation — going BACK
+ * included — draws the skeleton and waits, so the product feels slow even where
+ * the request is fast.
+ */
+{
+  const data = readFileSync(join(ENGINE, "one-space/src/centre/data.tsx"), "utf8");
+  /* ⚠️ TO THE NEXT TOP-LEVEL DECLARATION, because the signature's own return
+     TYPE closes with `} {` in the first column — stopping at the first of those
+     matched four lines and checked none of the body. */
+  const hook = /export function useLoad[\s\S]*?(?=\n\/\*\*|\nexport |$)/.exec(data)?.[0] ?? "";
+
+  if (!hook) {
+    fail(`one-space/src/centre/data.tsx: no useLoad to check — every screen's
+       loading state comes through it, so a parser that cannot find it is
+       checking nothing.`);
+  } else if (!/held\.set\(/.test(hook) || !/held\.has\(/.test(hook)) {
+    fail(`one-space/src/centre/data.tsx: useLoad keeps no answer, so every
+       navigation redraws the skeleton and waits on a round trip to show what
+       the browser had just painted.`);
+  } else if (/set\(waiting\(\)\)/.test(hook)) {
+    fail(`one-space/src/centre/data.tsx: useLoad blanks to \`waiting\` on a
+       re-read. A save then replaces the list under the control somebody just
+       used with a skeleton, which is what reads as the page reloading.`);
+  } else if (!/was\.status === "ready" \? was/.test(hook)) {
+    fail(`one-space/src/centre/data.tsx: useLoad no longer holds a ready answer
+       across a re-read — see above.`);
+  } else {
+    ok(`re-read: a screen with data keeps it while the next answer is on its way`);
+  }
+}
+
 console.log(bad
   ? `\nstates: ${bad} finding(s) — surfaces that answer three questions with one sentence.`
   : `\nstates: four outcomes, shaped placeholders, three kinds of motion, one rhythm.`);

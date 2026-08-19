@@ -353,6 +353,43 @@ export async function apply(deps: ApplyDeps): Promise<Reconciled> {
  * patch that reported success and produced no usable binding — which is exactly
  * the failure this whole ladder was built to make visible.
  */
+/**
+ * ONE READ OF THE LEDGER, AND BOTH ANSWERS OUT OF IT.
+ *
+ * ⚠️ `observe` AND `liveBindings` EACH READ THE SAME TABLE, one after the other,
+ * on the way to answering the first request an isolate ever serves. Neither is
+ * expensive; the pair is one round trip that buys nothing, and this boot is a
+ * list of those.
+ *
+ * ⚠️ A ROW FLIPPED IN THIS PASS COUNTS AS LIVE, which is why they were in that
+ * order. The binding is in `env` right now — that is what the flip observed —
+ * so making the caller wait for a second read to admit it would be a resource
+ * that works and reads as absent for one isolate.
+ */
+export async function settleBindings(
+  db: Db, env: Readonly<Record<string, unknown>>, now = new Date(),
+): Promise<{ readonly said: readonly string[]; readonly live: ReadonlyMap<string, unknown> }> {
+  const said: string[] = [];
+  const live = new Map<string, unknown>();
+
+  for (const row of await resources(db)) {
+    const held = env[row.binding];
+    /* ⚠️ `bound` means asked for and not yet confirmed; an isolate that can SEE
+       the binding is the only thing that can confirm it. */
+    const became = row.state === "bound" && held !== undefined;
+    if (became) {
+      await setState(db, row.id, "live", { live_at: now.toISOString() });
+      said.push(`${row.binding} is live`);
+    }
+    /* ⚠️ AND ONLY `live` COUNTS. Handing out a merely-bound binding hands out
+       `undefined`, which reads as "this deployment has no bucket". */
+    if ((became || row.state === "live") && held !== undefined) {
+      live.set(bindingKey(row.appId, row.needId, row.residency), held);
+    }
+  }
+  return { said, live };
+}
+
 export async function observe(
   db: Db, env: Readonly<Record<string, unknown>>, now = new Date(),
 ): Promise<readonly string[]> {

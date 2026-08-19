@@ -1003,3 +1003,43 @@ a database that has already booted.
 ⚠️ **And it is not claimed for every model.** An embedder takes text and a voice
 model speaks it; claiming vision for those would elect one to read a photograph.
 
+---
+
+## D36 — The latency budget: how many round trips a screen costs
+
+The product was slow everywhere at once — seven seconds to open, a wait on every
+navigation, and a save that looked like a page reload — on a runtime whose whole
+selling point is that it is not. Nothing was broken. Four separate things were
+each individually reasonable and the total was unusable, which is the shape a
+performance fault takes when no single line is wrong.
+
+**A cold isolate spent about thirty sequential round trips before the first
+byte.** `applySchema` asked one SELECT per module to learn whether that module
+had changed — seventeen on the directory, eleven more on each shard — then two
+reads of the resource ledger, then two upserts to re-register a shard that was
+already registered. Every one is cheap near the database and none of them is
+near the database: at a hundred milliseconds each that is three seconds, and an
+isolate is evicted after seconds of quiet, so most visits paid it. Now: every
+stamp in ONE read per database, one read of the ledger instead of two, and the
+registration writes only when something actually changed.
+
+**Every request rebuilt the handler, and the handler awaited two reads to do
+it** — the gateway's configuration and the effective plan catalogue, one after
+the other, before the request had been looked at. They are read together now and
+held for two seconds. The window is short because what it holds includes a
+PRICE: a burst of requests from one screen opening lands inside two seconds and
+an operator's next action never does.
+
+**And the client showed nothing while it waited.** `useLoad` kept no answer, so
+every navigation — going back included — drew the skeleton and waited on a round
+trip to redraw what the browser had just painted; and `again`, which is what a
+save calls, reset to `waiting`, so the list under the control somebody had just
+used vanished and came back a round trip later from the top. It now shows what
+it has and catches up, and a failed refresh over data we hold is not a refusal
+screen — the same rule every polling surface here already follows.
+
+⚠️ **The count is the thing no behavioural test can see.** Each of those reads is
+correct, covered, and cheap in isolation; what was wrong was how many there were.
+`apps/hello/test/boot-cost.test.ts` measures it, because the alternative is
+noticing in production, which is what happened.
+

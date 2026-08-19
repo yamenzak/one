@@ -208,11 +208,32 @@ export async function applySchema(db: Db, modules: SchemaModules): Promise<reado
   await db.exec(MARKER.replace(/\n/g, " "));
   const out: Applied[] = [];
 
+  /*
+    ⚠️ EVERY STAMP IN ONE READ, AND THE ALTERNATIVE WAS THE SLOWEST THING THIS
+    DEPLOYMENT DID. Asked per module this is a SELECT per module — seventeen on
+    the directory and eleven more on each shard, in series, on the way to
+    answering the FIRST request an isolate ever serves. Nothing is wrong with any
+    one of them; it is thirty round trips to learn that nothing has changed, and
+    at a hundred milliseconds each that is the whole of "why does opening the app
+    take seven seconds".
+
+    ⚠️ AND IT IS THE SAME ANSWER. `_schema` holds one row per module and the
+    table is small by construction — one row per module this deployment has ever
+    applied — so reading all of it costs what reading one of them did.
+  */
+  const seenAll = new Map<string, string>();
+  try {
+    const rows = await db.prepare(`SELECT id, stamp FROM _schema`)
+      .all<{ id: string; stamp: string }>();
+    for (const row of rows.results) seenAll.set(row.id, row.stamp);
+  } catch { /* a database that has never booted — every module is new */ }
+
   for (const module of modules) {
     const stamp = stampOf(module);
-    const seen = await db.prepare(`SELECT stamp FROM _schema WHERE id = ?`)
-      .bind(module.id).first<{ stamp: string }>();
-    if (seen?.stamp === stamp) { out.push({ module: module.id, ran: false, added: [] }); continue; }
+    if (seenAll.get(module.id) === stamp) {
+      out.push({ module: module.id, ran: false, added: [] });
+      continue;
+    }
 
     /*
       ⚠️ REFUSED BEFORE ANY OF IT RUNS, AND THROWN RATHER THAN REPORTED. Every
