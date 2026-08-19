@@ -4,7 +4,9 @@ kind: standards
 
 **Why the engine is shaped this way, and how to add to it without breaking the
 property that makes it worth using.** [ENGINE.md](ENGINE.md) is what exists;
-this is everything a generator cannot derive.
+this is everything a generator cannot derive. [COST.md](COST.md) is what it
+costs to run, with the arithmetic shown — read it before optimising anything for
+money, and before fearing a bill.
 
 ⚠️ **THIS DOCUMENT IS WRITTEN FOR SOMEBODY WITH NO MEMORY OF WRITING IT.** That
 is not a style choice. The work is long, the context that holds it is finite, and
