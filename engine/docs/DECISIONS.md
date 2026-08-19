@@ -828,9 +828,16 @@ re-derives it.
 **Vectorize is not exposed.** AI Search is Vectorize with the ingestion pipeline
 attached and the storage included, so offering both is two answers to "how do I
 find something" — the thing D29's single declaration exists to prevent. **The
-trigger:** the first app that needs its own dimensions, its own embedding model,
-or vectors over something that is not text. None of those is expressible through
-`searchable`, and none is a stretch of it.
+trigger:** the first app that needs to supply its OWN vectors, or to search over
+something that is not text — an image embedding, a recommendation vector, a
+signal computed elsewhere. Neither is expressible through `searchable`, and
+neither is a stretch of it.
+
+⚠️ **The embedding model is NOT one of those triggers, and this paragraph said it
+was.** AI Search takes `--embedding-model` per instance, so choosing one is a
+setting rather than a reason to expose the layer underneath. A trigger that names
+something already supported is a trigger somebody satisfies and then builds the
+wrong thing.
 
 **The Agents SDK is not adopted, and D30 is why.** It was under consideration for
 streaming, and a plain Worker streams: a `ReadableStream` body and SSE is all a
