@@ -84,6 +84,29 @@ export interface Ctx {
    * disagree about what a workspace switched on.
    */
   readonly setting: (id: string) => Promise<unknown>;
+  /**
+   * ASK THE MODEL THIS OPERATION DECLARED (D19).
+   *
+   * ⚠️ THE HANDLER SUPPLIES VALUES AND NOTHING ELSE. Which model, whose words
+   * and what it costs are all resolved from the declaration, the operator's
+   * binding and the workspace's own choice — so a handler cannot name a model,
+   * cannot skip the reserve, and cannot send instructions nobody agreed to. The
+   * variables it fills are the ones the action declared; anything else was
+   * refused at the edit.
+   *
+   * ⚠️ AND IT IS ONLY HERE FOR AN OPERATION THAT DECLARED `ai`. Calling it from
+   * one that did not is a refusal rather than a run: an operation generating
+   * text it never said it would generate is one whose cost appears on a bill
+   * against an action nobody can find.
+   *
+   * ⚠️ IT REFUSES RATHER THAN THROWING, because every reason is one somebody can
+   * act on — no model in the lane, an empty wallet, a provider that would not
+   * answer — and a thrown error makes all three "something went wrong". A string
+   * IS the refusal; the kernel's own catalogue turns it into a sentence.
+   */
+  readonly generate?: (
+    values: Readonly<Record<string, string>>,
+  ) => Promise<{ readonly text: string; readonly credits: number } | string>;
   readonly fail: (
     code: string,
     values?: Record<string, string | number>,

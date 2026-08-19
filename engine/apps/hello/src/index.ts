@@ -212,10 +212,28 @@ const draft = operation<{ about: string }, { text: string }>({
     maxOutput: 800,
     brandable: true,
   },
-  async handler(_ctx, input) {
-    /* ⚠️ The handler does not choose a model and does not build the prompt —
-       the platform resolves both from the declaration and the binding. */
-    return { text: `Draft about ${input.about}` };
+  async handler(ctx, input) {
+    /*
+      ⚠️ THE HANDLER SUPPLIES VALUES AND NOTHING ELSE. Which model, whose words
+      and what it costs are resolved by the platform from the declaration above,
+      the operator's binding and this workspace's own choice — so this cannot
+      name a model, cannot skip the reserve and cannot send instructions nobody
+      agreed to.
+
+      ⚠️ AND ITS ABSENCE IS A REFUSAL RATHER THAN A STUB. A deployment with no
+      gateway configured cannot generate; answering with a plausible sentence
+      would be this product inventing content and charging nothing for it, which
+      is indistinguishable from working.
+    */
+    const c = ctx as {
+      generate?: (values: Readonly<Record<string, string>>) =>
+        Promise<{ readonly text: string; readonly credits: number } | string>;
+      fail: (code: string, values?: Record<string, string>, extra?: { ref?: string }) => never;
+    };
+    if (!c.generate) c.fail("platform.unavailable");
+    const out = await c.generate!({ about: input.about });
+    if (typeof out === "string") c.fail("platform.unavailable", {}, { ref: out });
+    return { text: (out as { text: string }).text };
   },
 });
 

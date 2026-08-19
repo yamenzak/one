@@ -222,6 +222,7 @@ if (what === "guards") {
     ["spend", "one row per run: where a workspace's credits went, and never what was said"],
     ["reconcile", "the check on the money that is not our own arithmetic"],
     ["ai-ops", "which model a workspace picked, and what it will cost them"],
+    ["ai-run", "the seam an operation generates through — values in, a metered answer out"],
     ["operator", "the deployment looking at itself"],
     ["deployment", "what is wrong with this deployment, asked at boot"],
     ["mcp", "the agent door"],

@@ -419,9 +419,9 @@ enough to need designing before it is built gets a document; the day it ships,
 what survives is the code, the guards, the decisions it added and the stage row
 — and the plan goes to `git log` with the rest of the working out. A finished
 plan left in the tree is a second, older answer to every question the code now
-answers, which is the failure a whole framework was deleted over. The one open
-now is [AI-PLAN.md](AI-PLAN.md) — the model catalogue, the run, the money and
-the search, for stage 27 and the stages it turned out to need.
+answers, which is the failure a whole framework was deleted over. There is no
+open plan; stage 27's became D24–D28 and `metering.test.mjs` on the day it
+shipped.
 
 ### 5.6 Tests prove behaviour; guards prove shape
 

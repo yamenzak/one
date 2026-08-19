@@ -45,6 +45,9 @@ import { iconOf } from "./icon.js";
 import { availableChannels, type Pusher } from "./services.js";
 import { settingsFor } from "./settings.js";
 import type { Db } from "./sql.js";
+import { generatorFor } from "./ai-run.js";
+import { gatewayProvider, type Provider } from "./services.js";
+import type { GatewayAt } from "./gateway.js";
 
 /* ------------------------------------------------------------------ seams --- */
 
@@ -168,6 +171,30 @@ export interface Wiring {
   readonly packs?: readonly PackDef[];
   /** ⚠️ What storage over a plan's included amount costs — see `PlatformCtx`. */
   readonly storageRate?: number;
+  /**
+   * ⚠️ WHERE A MODEL IS ASKED, AND ITS ABSENCE IS AN ANSWER. A deployment with
+   * no gateway configured cannot generate anything — so `ctx.generate` is absent
+   * rather than present and failing on every call, and a handler refuses on the
+   * seam instead of on a timeout.
+   *
+   * ⚠️ THE ADDRESS, NOT THE PROVIDER, AND THAT IS WHAT MAKES THE TAG UNFORGETTABLE.
+   * A provider handed in ready-made would carry whatever tag the deployment
+   * happened to build — or none. Built here, it carries the workspace, the
+   * product and the action every time, because this is the only place all three
+   * are known and there is no other constructor.
+   */
+  readonly gateway?: GatewayAt;
+  /**
+   * ⚠️ THE DEVELOPMENT LANE, AND IT IS NEVER THE FALLBACK IN PRODUCTION. A
+   * deployment with no gateway generates nothing; one running locally with no
+   * gateway can still exercise the whole chain, because the mock refuses on its
+   * own the moment `environment` is not development. Two independent guards on
+   * one switch, and the inner one is the load-bearing half — a console cannot
+   * reach it and neither can a misconfigured deploy.
+   */
+  readonly aiFallback?: Provider;
+  /** ⚠️ The one thing that decides whether a mock may run — see `services.ts`. */
+  readonly environment?: string;
 }
 
 /**
@@ -782,6 +809,36 @@ export async function performOperation(
     /* ⚠️ ONE READ PER REQUEST AT MOST, AND ONLY IF A HANDLER ASKS. Resolved for
        the app the operation belongs to, because a setting is that app's. */
     setting: async (id: string) => (await settings())[id],
+    /*
+      ⚠️ ONLY FOR AN OPERATION THAT DECLARED AN ACTION, and `generatorFor`
+      answers `undefined` otherwise — so `ctx.generate` is absent rather than
+      present-and-refusing. An operation generating text it never said it would
+      is one whose cost lands on a bill against an action nobody can find.
+
+      ⚠️ AND ONLY WHERE THE DEPLOYMENT CAN ACTUALLY ASK A MODEL. With no gateway
+      configured there is nothing to call, so the seam is absent and a handler
+      refuses on it rather than a provider timing out on every request.
+    */
+    ...(wiring.gateway || wiring.aiFallback
+      ? {
+        generate: generatorFor({
+          directory: wiring.directory,
+          db: located.db,
+          tenantId: located.tenantId as never,
+          app: composed.app,
+          operation: op.id,
+          /* ⚠️ THE REAL ONE WINS. A deployment holding both is one mid-setup,
+             and answering from a mock while a gateway is configured would be
+             fabricated output on a live product. */
+          provider: wiring.gateway
+            ? gatewayProvider(wiring.gateway, {
+              t: located.tenantId, a: composed.app.id, o: op.id,
+            })
+            : wiring.aiFallback!,
+          environment: wiring.environment ?? "",
+        }),
+      }
+      : {}),
     fail: (code, values, extra) => { throw new Refused(problem(catalog, code, values, extra)); },
   };
 

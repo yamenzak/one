@@ -41,6 +41,7 @@ import {
   DEFAULT_MULTIPLIER,
   type LogReader,
   type GatewayAt,
+  mockProvider,
 } from "@engine/runtime";
 import { hello } from "@engine/hello";
 
@@ -1234,6 +1235,10 @@ const boot = (env: Env): Promise<void> => {
 
 const handler = async (env: Env) => {
   const directory = env.DIRECTORY as unknown as Db;
+  /* ⚠️ WHERE A MODEL IS ASKED, RESOLVED ONCE PER REQUEST. Absent is a deployment
+     that has not been told about a gateway, and `ctx.generate` is then absent
+     too — a handler refuses on the seam rather than on a timeout. */
+  const gateway = await gatewayAt(env);
 
   /*
     ⚠️ WHAT IS ACTUALLY SOLD, RESOLVED ONCE PER REQUEST. `PLANS` is the
@@ -1365,6 +1370,30 @@ const handler = async (env: Env) => {
     */
     plans: sold, packs: PACKS, storageRate: STORAGE_CREDITS_PER_GB_MONTH,
     pusher: pusherOver(directory),
+
+    /*
+      ⚠️ HOW A MODEL IS ASKED, AND ITS ABSENCE IS AN ANSWER. With no gateway
+      configured there is nothing to call, so `ctx.generate` is absent and a
+      handler refuses on the seam — rather than every generating request timing
+      out against a URL that resolves to nothing.
+
+      ⚠️ THE TAG IS ATTACHED HERE AND NOWHERE ELSE, and it is what makes the
+      money checkable: the gateway's own billing is one number for the whole
+      deployment unless a call says which workspace, which product and which
+      action it was for.
+    */
+    ...(gateway ? { gateway } : {}),
+    /*
+      ⚠️ AND LOCALLY, WITH NO GATEWAY, THE MOCK — so `pnpm dev` exercises the
+      whole chain rather than refusing on a seam. It is `mockProvider`'s own
+      refusal that makes this safe rather than this condition: handed a
+      production environment it throws on the first call, which is what keeps a
+      misconfigured deploy from fabricating output and billing for it.
+    */
+    ...(!gateway && env.ENVIRONMENT === "development"
+      ? { aiFallback: mockProvider(env.ENVIRONMENT) }
+      : {}),
+    environment: env.ENVIRONMENT,
 
     ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
 

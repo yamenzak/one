@@ -587,3 +587,144 @@ that is not `customer`, or that can read a tenant-scoped collection; a workspace
 joinable by default; a ceiling enforced through seats; a join code that
 identifies a person, which is an invitation and already exists; a joined customer
 who cannot leave without asking the business.
+
+---
+
+## D24 — A model's PRICE is discovered nightly; whether it is sold, and at what margin, never is
+
+Which models exist and what a provider charges are facts about the world that
+change without asking us, so `models.sync` reads Cloudflare's own catalogue every
+day and writes ids, tasks, modalities and rates. Which of them this deployment
+SELLS, which one a lane elects, and what margin each carries are decisions
+somebody made — and the sync's `UPDATE` does not name those three columns.
+
+**The boundary is the column list, not a comment.** A nightly job that overwrote
+a decision would undo an operator silently, on a schedule, for ever, and the
+symptom is a model they switched off answering again the next morning.
+
+**A model that disappears is RETIRED, never deleted.** It is still bound to
+actions and still named on runs that already happened; deleting the row breaks
+the binding and orphans the history. Retired, it stops being offered and
+`boundModel` degrades to the lane's election — which is exactly what "nobody has
+chosen" already means.
+
+**And an empty answer is refused outright.** A catalogue API answering `200 []` —
+wrong token, changed path, a filter matching nothing — would retire every model
+this deployment has, in one pass, at 03:00. `refuseDiscovered` also refuses a
+catalogue in which nothing is priced, because a shape change that stops parsing
+lands every row at zero cost and every call after that settles free.
+
+**Therefore never:** a sync that writes `enabled`, `is_default` or `multiplier`;
+a delete where a retirement belongs; a partial catalogue applied; a rate table
+maintained by hand beside one that is synced.
+
+---
+
+## D25 — A workspace picks its own model, because it pays for it — and that is only safe above cost
+
+The model binding was the operator's alone, on the argument that a workspace
+choosing would be a workspace choosing what WE pay. That stopped being true when
+every run began settling against that workspace's own wallet at the row's own
+multiplier. They are choosing what THEY pay, and the whole model list is the
+product: cheap and fast, or slow and clever, on their credits.
+
+**The condition is a floor under the margin.** A reserve is a ceiling on revenue
+— the charge can come in under an estimate and never over it — so a row at one
+times cost breaks even at best, and a workspace is free to choose it as often as
+it likes. `MIN_MULTIPLIER` is checked at the write and reported by
+`refuseCatalogue`; a rule that is drawn and not enforced is a rule with a screen.
+
+**The price travels and the margin does not.** `priceFor` applies the multiplier
+and answers one number. A screen handed both the cost and the multiplier can
+compute the margin, and one that renders both by accident publishes it.
+
+**The operator's binding becomes the default rather than the ceiling.** Choosing
+nothing is the ordinary case; it resolves to whatever the deployment picked.
+
+**Therefore never:** a model id from a request body honoured without checking the
+lane offers it; a row sold at or below cost; a workspace-facing payload carrying
+`input`/`output` before the multiplier, or carrying the multiplier at all.
+
+---
+
+## D26 — A workspace ADDS to our instructions; it never replaces them, and it is never sent the base
+
+The tenant's wording used to substitute for ours. A substitution has to be seeded
+with the current text to be editable at all — so every prompt the deployment had
+was shipped to the browser of anybody who could open the screen. An addendum
+needs no seed: the box starts empty, what is typed is appended, and the
+instructions above it never leave the worker.
+
+**Ours first, theirs last, and the order is the feature.** A model follows the
+later instruction when two conflict, so a workspace asking for a shorter answer
+gets one. Put first, an addendum would be silently overridden and the setting
+would save and change nothing.
+
+**Hidden is not secret, and saying otherwise would be the lie.** A model can be
+asked to repeat its own instructions and no arrangement of prompts prevents that.
+What this stops is the base being PUBLISHED — read out of a network tab by
+anybody with the screen open. A prompt that must not be known to a customer is
+not a prompt.
+
+**Therefore never:** an operation outside the operator's door answering with a
+resolved prompt; a tenant addendum that replaces rather than appends; an
+addendum on an action the app did not mark `brandable`.
+
+---
+
+## D27 — The charge is built on what the call cost, and something outside our arithmetic checks it
+
+Every number in the metering chain is ours — the estimate, the rate table, the
+multiplier, the settle — and all four are derived from each other, so they would
+go on agreeing perfectly through a mistake they share. Cloudflare bills us from
+its own figures. That makes the gateway's cost the one independent authority on
+whether a run was sold above cost, and `ai-costs` is the job that asks it.
+
+**The cost is in the LOG, not the response.** There is no `cf-aig-cost` header;
+what comes back is a log id. So a run settles from the usage the provider
+reported and is TRUED UP against the gateway's own figure minutes later. The
+true-up only ever refunds — allowing it to charge more would re-open a settled
+call and move a balance for work somebody finished with hours ago.
+
+**Which is why the settle errs high on reasoning tokens.** Providers report them
+within `completion_tokens` or beside it and the payload is identical either way.
+Summing is safe because the reserve caps it and the true-up corrects it; reading
+only the plain figure is a permanent loss on every call to every reasoning model.
+
+**And a workspace sold under cost FAILS the job.** A green run with the bad news
+inside its detail is the shape every guard in this tree exists against.
+
+**The tag is what makes any of it answerable.** `cf-aig-metadata` carries the
+workspace, the product and the action, and it is attached in the one place a
+provider is constructed — so it cannot be forgotten. Without it the gateway's
+billing is one number for the deployment and comparable to nothing.
+
+**Therefore never:** settling from a rate table where a real cost is available; a
+true-up that charges; a call that goes out untagged; a margin check built from
+our own numbers on both sides.
+
+---
+
+## D28 — A charge is milli-credits; the balance is whole ones, and the remainder carries
+
+A credit is a cent and a small classification costs a fraction of one. Rounding
+each call up is a several-hundred-fold overcharge that also makes every call,
+trivial or enormous, read as "1 credit" on a statement — which breaks the price a
+workspace was shown before choosing a model. Rounding down makes every cheap call
+free while the meter reports perfect health.
+
+**So whole credits come off the balance and the remainder is carried**, drawn the
+moment it fills. This is the pattern the storage meter already had; one carry
+column serves both, because two would each sit under a whole credit indefinitely
+and a workspace running both would be charged for neither. WHAT it was spent on
+is the `ai_run` row's job.
+
+**And that row holds what it COST, never what was said.** No prompt, no output. A
+generation log carrying both is a permanent record of everything every workspace
+has ever typed, read by nothing and deleted by nobody — a liability the moment
+anybody copies the database. A failed run is recorded too, charged nothing: a
+failure with no row is a button that did nothing and left no trace.
+
+**Therefore never:** a per-call `Math.ceil` onto the balance; a second carry
+column; a prompt, an output or any input text on a spend row; a successful run
+with no row behind it.

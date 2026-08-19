@@ -388,11 +388,11 @@ and a manifest that does not compose refuses to boot.
 | `job` | scheduled work, and the record that it ran | 7 | — |
 | `brand` | which surfaces a workspace may put its own mark on | 10 | 1 |
 | `mark` | the logo as geometry, so the browser and the Worker draw one shape | 7 | — |
-| `ai` | a generating action: its lane, its prompt, its ceiling | 16 | 1 |
+| `ai` | a generating action: its lane, its prompt, its ceiling | 16 | — |
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**259 of them**, 253 reached by something today.
+**259 of them**, 254 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -423,7 +423,7 @@ env or a binding.
 | `catalogue` | the price list an operator edits over the declaration, and what it holds for the people already on a tier | 8 | — |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
 | `inbox` | notifications: the policy, the audience, the read | 10 | — |
-| `services` | the lane out to a provider — AI and mail | 6 | 2 |
+| `services` | the lane out to a provider — AI and mail | 6 | — |
 | `stripe` | the card lane: a page Stripe owns, a signature that proves an event is theirs, and the ladder one moves | 11 | — |
 | `config` | what the deployment was told — the credentials it holds, encrypted under a key its database has never seen | 6 | — |
 | `mail` | a letter that leaves the process: the message written out, and the refusal to pretend one was sent | 3 | — |
@@ -441,6 +441,7 @@ env or a binding.
 | `spend` | one row per run: where a workspace's credits went, and never what was said | 4 | — |
 | `reconcile` | the check on the money that is not our own arithmetic | 6 | — |
 | `ai-ops` | which model a workspace picked, and what it will cost them | 1 | — |
+| `ai-run` | the seam an operation generates through — values in, a metered answer out | 1 | — |
 | `operator` | the deployment looking at itself | 6 | — |
 | `deployment` | what is wrong with this deployment, asked at boot | 1 | — |
 | `mcp` | the agent door | 1 | — |
@@ -461,7 +462,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**362 of them**, 359 reached by something today.
+**363 of them**, 362 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -862,6 +863,11 @@ its own header, cited by other files, and doing nothing.
 | D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 9 |
 | D22 | Branding and the installable app belong to the workspace, never to one app inside it | 4 |
 | D23 | A stranger joins a workspace as a `customer`, and only ever as a `customer` | 0 |
+| D24 | A model's PRICE is discovered nightly; whether it is sold, and at what margin, never is | 0 |
+| D25 | A workspace picks its own model, because it pays for it — and that is only safe above cost | 0 |
+| D26 | A workspace ADDS to our instructions; it never replaces them, and it is never sent the base | 0 |
+| D27 | The charge is built on what the call cost, and something outside our arithmetic checks it | 0 |
+| D28 | A charge is milli-credits; the balance is whole ones, and the remainder carries | 0 |
 <!-- /generated -->
 
 ---
@@ -879,14 +885,12 @@ nothing yet.
 |---|---|---|
 | **23** — Mail that leaves the process — a letter, its variables, and a provider | `kernel/src/notify.ts` | 1 |
 | **24** — A workspace composes its own roles out of one app's keys | `kernel/src/access.ts` | 1 |
-| **27** — The AI lane runs — an action reaches a provider and the reserve settles | `kernel/src/ai.ts` | 1 |
-| **27** — The AI lane runs — an action reaches a provider and the reserve settles | `runtime/src/services.ts` | 2 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `kernel/src/package.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `runtime/src/jobs.ts` | 1 |
 | **41** — A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have | `kernel/src/brand.ts` | 1 |
 | **42** — A screen asks the gate before it draws a control, rather than after it is pressed | `kernel/src/gate.ts` | 1 |
 
-**9 declarations** are built and reached by nothing, each waiting on a
+**6 declarations** are built and reached by nothing, each waiting on a
 stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one
 that names no stage, so this list cannot grow by forgetting.
 <!-- /generated -->
@@ -922,7 +926,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 24 | A workspace composes its own roles out of one app's keys | **planned** |
 | 25 | Agreements — versioned documents, an acceptance per person per version, and the wall until there is one | shipped |
 | 26 | The vault is opened — consent, who looked, your data, and an erasure that shreds | shipped |
-| 27 | The AI lane runs — an action reaches a provider and the reserve settles | **planned** |
+| 27 | The AI lane runs — a catalogue that syncs itself, one door out to every provider, a charge built on what the call really cost, and a nightly check against the bill we are sent | shipped |
 | 28 | Notifications are filed — an event raised becomes a note in somebody's inbox | shipped |
 | 29 | The daily sweep — erasure happens on a clock, and every run is recorded | shipped |
 | 30 | A workspace's apps are turned on and off, and a workspace can move shard | shipped |
@@ -947,7 +951,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 49 | A stranger joins a workspace by themselves — a door the workspace opens, a role the app names, and a ceiling the plan sells (D23) | **planned** |
 | 50 | The interface speaks a second language — dictionaries, a language control, and the copy guard reading both | **planned** |
 
-**39 shipped, 11 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**40 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---
