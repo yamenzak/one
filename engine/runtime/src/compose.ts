@@ -31,6 +31,7 @@ import { settingOps } from "./settings.js";
 import { vaultOps } from "./vault-ops.js";
 import { mediaOps } from "./media-ops.js";
 import { moneyOps } from "./money-ops.js";
+import { aiOps } from "./ai-ops.js";
 import { centreOps } from "./centre-ops.js";
 
 /* ------------------------------------------------------------------ shape --- */
@@ -257,6 +258,10 @@ export function compose(app: AppSpec): Composed {
   for (const [id, resolved] of Object.entries(packageOps(app))) byId.set(id, resolved);
   for (const [id, resolved] of Object.entries(settingOps(app))) byId.set(id, resolved);
   for (const [id, resolved] of Object.entries(moneyOps(app))) byId.set(id, resolved);
+  /* ⚠️ ONLY WHERE THE APP DECLARES A GENERATING ACTION — `aiOps` returns nothing
+     otherwise. A product with nothing to generate should not answer two routes
+     about which model does it. */
+  for (const [id, resolved] of Object.entries(aiOps(app))) byId.set(id, resolved);
   for (const [id, resolved] of Object.entries(centreOps(app))) byId.set(id, resolved);
   /* ⚠️ ONLY WHERE THERE IS SOMETHING TO CONSENT TO. An app that declares no
      purposes and no vault fields would otherwise answer eight routes about

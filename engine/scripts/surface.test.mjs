@@ -59,7 +59,10 @@ const SURFACES = {
   meters: { file: "design/src/rendered/money.tsx", renders: "export function Wallet" },
   jobs: { file: "design/src/rendered/money.tsx", renders: "export function Jobs" },
 
-  lanes: { file: "design/src/rendered/ai.tsx", renders: "export function AiLanes" },
+  /* ⚠️ A REAL SCREEN NOW, NOT A COMPONENT NOTHING MOUNTED. `AiLanes` was
+     declared, exported and rendered by nobody — the exact shape this guard
+     exists to catch, sitting inside the guard's own registry as the answer. */
+  lanes: { file: "one-space/src/console/Models.tsx", renders: "export function Models" },
   vault: { file: "design/src/rendered/vault.tsx", renders: "export function MyData" },
   purposes: { file: "design/src/rendered/vault.tsx", renders: "export function ConsentSheet" },
   documents: { file: "design/src/rendered/legal.tsx", renders: "export function Documents" },

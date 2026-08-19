@@ -168,10 +168,10 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 53 |
 | `parts/` | rows, cards, lists, controls, the four outcomes | 135 |
-| `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
+| `rendered/` | whole surfaces drawn from a kernel declaration | 56 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**338 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**341 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -218,7 +218,7 @@ there is no deep import, and a guard says so.
 
 ### `rendered/`
 
-- `rendered/ai.tsx` — `AiLanes`, `LanesProps`
+- `rendered/ai.tsx` — `ModelLine`, `ModelLineProps`, `perMillion`, `Price`, `PriceProps`
 - `rendered/console.tsx` — `FlagConsole`, `FlagConsoleProps`, `saying`, `Shelf`, `ShelfProps`, `useMoney`
 - `rendered/edit.tsx` — `Edit`, `EditProps`, `EditRow`, `Refusal`, `refuse`, `Shown`
 - `rendered/field.tsx` — `Field`, `FieldProps`

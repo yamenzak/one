@@ -24,7 +24,8 @@ import type {
   AccountId, AppId, Allowance, AppSpec, FlagBook, JobBook, ModelRow, PlanSpec, TenantId,
 } from "@engine/kernel";
 import {
-  ALLOWANCE_KEY, KEEPS_RESIDENCY, LANES as LANE_NAMES, allowanceFor, entitlementKeys, inLane,
+  ALLOWANCE_KEY, KEEPS_RESIDENCY, LANES as LANE_NAMES, MIN_MULTIPLIER, allowanceFor,
+  entitlementKeys, inLane, laneOf,
   mayIsolate,
   sayKind,
   refuseCatalogue,
@@ -37,6 +38,7 @@ import { verify } from "./cloudflare.js";
 import { apply, plan, resources, wanted } from "./resources.js";
 import { beginMove } from "./move.js";
 import { actionsOf, bind, bindingsOf, running } from "./ai-actions.js";
+import { decideModel } from "./models.js";
 import { MEMBERSHIP, adjust, compPlan, subscriptionFor } from "./billing.js";
 import {
   catalogueProblems, editPlan, effectivePlans, onEachPlan, planEdits, resetPlan,
@@ -749,6 +751,86 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
         }
         await bind(ctx.directory, appId, actionId, change, ctx.now);
         return { app: appId, action: actionId };
+      },
+    },
+
+    /**
+     * THE CATALOGUE, AS THE OPERATOR SEES IT — with what each row costs US.
+     *
+     * ⚠️ THIS IS THE ONE READ THAT CARRIES BOTH THE COST AND THE MULTIPLIER, and
+     * it is operator-only for exactly that reason: the two of them together are
+     * the margin. What a workspace is shown is the PRICE, which is the product
+     * of the two and reveals neither.
+     */
+    "op.models": {
+      kind: "read", needs: "session", doors: ["operator"],
+      async run(ctx): Promise<unknown> {
+        operator(ctx);
+        const rows = await deps.models();
+        return {
+          /* ⚠️ EVERY ROW, RETIRED ONES INCLUDED. A model that disappeared from a
+             provider's catalogue is still bound to actions and still named on
+             old runs; hiding it makes "why is this action on a model I cannot
+             find" unanswerable. */
+          models: rows.map((m) => ({
+            id: m.id, provider: m.provider, task: m.task, label: m.label,
+            about: m.about ?? null, meter: m.meter,
+            input: m.input, output: m.output, multiplier: m.multiplier,
+            enabled: m.enabled, isDefault: !!m.isDefault, thinks: !!m.thinks,
+            maxOutput: m.maxOutput, retired: !!m.retired,
+            /* ⚠️ Which of OUR lanes it answers, resolved once here — a screen
+               matching provider task names would be a second alias table. */
+            lane: laneOf(m.task),
+          })),
+          /* ⚠️ The catalogue's own faults, on the screen that can fix them. */
+          /* ⚠️ Asked of the lanes the APPS actually declare — a fault about a
+             lane nothing uses is noise on a screen whose whole job is signal. */
+          /* ⚠️ WHETHER THE SUBJECT IS A LANE OR A MODEL, because they are named
+             differently and only this layer knows which. A lane is one of ours
+             and is said in words; a model's id is the provider's own path and
+             has to stay exactly as the provider spells it. */
+          faults: refuseCatalogue(rows,
+            [...new Set(every().flatMap((a) => actionsOf(a).map((x) => x.ai.lane)))])
+            .map((f) => ({
+              of: f.of, why: f.why, detail: f.detail,
+              lane: (LANE_NAMES as readonly string[]).includes(f.of),
+            })),
+          floor: MIN_MULTIPLIER,
+        };
+      },
+    },
+
+    /**
+     * ⚠️ THE OPERATOR'S HALF, AND THE SYNC NEVER TOUCHES THESE THREE. Whether a
+     * model is sold here, which one a lane elects, and at what margin are
+     * decisions; everything else on the row is discovered nightly.
+     */
+    "op.model.decide": {
+      kind: "write", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const id = String(input.model ?? "");
+        const change: {
+          enabled?: boolean; isDefault?: boolean; multiplier?: number;
+        } = {};
+        if (typeof input.enabled === "boolean") change.enabled = input.enabled;
+        if (typeof input.isDefault === "boolean") change.isDefault = input.isDefault;
+        if (input.multiplier !== undefined) {
+          const n = Number(input.multiplier);
+          /* ⚠️ AT COST IS A LOSS, because the reserve is a ceiling on revenue:
+             the charge can come in under the estimate and never over it. A row
+             at one times cost breaks even at best, and a workspace is free to
+             choose it as often as it likes. */
+          if (!Number.isFinite(n) || n <= MIN_MULTIPLIER) {
+            return ctx.fail("platform.invalid", {}, { fields: { multiplier:
+              `Above ${MIN_MULTIPLIER}× cost. At cost, every call on this model loses money.` } });
+          }
+          change.multiplier = n;
+        }
+        if (!await decideModel(ctx.directory, id, change, ctx.now)) {
+          return ctx.fail("platform.not_found");
+        }
+        return { ok: true };
       },
     },
 

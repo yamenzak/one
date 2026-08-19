@@ -1,93 +1,104 @@
 /**
- * WHICH MODEL ANSWERS WHICH LANE, AND WHAT IT COSTS.
+ * A MODEL, DRAWN — for the operator who sets the margin and the workspace that
+ * pays it.
  *
- * ⚠️ AN APP DECLARES LANES, NOT MODELS. `text`, `vision`, `speech` — what a
- * product needs is a capability; which model provides it is a decision the
- * deployment makes and changes. This screen is where those two meet, and it is
- * the only place a person can see that a lane an app asks for has nothing
- * enabled behind it.
+ * ⚠️ TWO AUDIENCES, ONE COMPONENT, AND THE DIFFERENCE IS ONE PROP. What a model
+ * is called, what it is good at, whether it thinks — the same facts either way.
+ * What differs is the PRICE: the operator sees what it costs us and the margin
+ * over it; a workspace sees the product of the two, which reveals neither. A
+ * second component for the second audience is how a margin ends up on a screen
+ * anybody can open.
  *
- * ⚠️ A LANE WITH NO MODEL IS THE FAILURE WORTH RENDERING. Every call into it
- * refuses, for ever, and the refusal reads to the customer as a feature that is
- * broken rather than one nobody switched on.
- *
- * ⚠️ AND ONE LANE HAS TWO PROVIDER NAMES. Cloudflare calls it `tts`, Google
- * calls it `speech`; a selector matching on one name cannot see the other's
- * models, and the app then reports that no voice is available while four are
- * enabled. `inLane` is what this reads, so the screen and the selector cannot
- * disagree.
+ * ⚠️ AND THE ID IS SHOWN AS THE PROVIDER SPELLS IT. `@cf/meta/llama-3.3-70b` is
+ * what the call is addressed to; a tidier name over a hidden path is how a
+ * catalogue comes to disagree with itself about which model ran.
  */
 
-import type { Lane, ModelRow } from "@engine/kernel";
-import { defaultIn, inLane } from "@engine/kernel";
-import { Card, Chip, Switch, Label } from "@heroui/react";
-import { SPACE } from "../tokens/metrics.js";
-import { Group } from "../parts/surfaces.js";
+import type * as React from "react";
+import { Chip } from "@heroui/react";
+import { Cluster, Row, Spacer, Stack } from "../parts/arrange.js";
 
-export interface LanesProps {
-  /** What the app asked for. */
-  readonly lanes: readonly Lane[];
-  readonly models: readonly ModelRow[];
-  readonly onEnable: (modelId: string, on: boolean) => void;
+/** ⚠️ Milli-credits per thousand units — the unit the whole meter speaks. */
+const MILLI = 1000;
+
+/**
+ * WHAT A THOUSAND UNITS COSTS, IN CREDITS, READABLY.
+ *
+ * ⚠️ A CREDIT IS A CENT AND A THOUSAND TOKENS IS A FRACTION OF ONE, so the
+ * honest figure has three decimals and reads as noise. Per MILLION is the unit
+ * every published price list already uses, which makes ours comparable to the
+ * one somebody just looked at.
+ */
+export const perMillion = (milliPerThousand: number): string => {
+  const credits = (milliPerThousand * 1000) / MILLI;
+  return credits >= 100 ? String(Math.round(credits))
+    : credits >= 1 ? credits.toFixed(1)
+      : credits.toFixed(2);
+};
+
+export interface PriceProps {
+  readonly input: number;
+  readonly output: number;
+  /** What the numbers are per — "token", "image", "second". */
+  readonly meter: string;
 }
 
-export function AiLanes({ lanes, models, onEnable }: LanesProps) {
+/** ⚠️ In and out, together, because one without the other is not a price. */
+export function Price({ input, output, meter }: PriceProps) {
+  const per = meter === "token" ? "1M tokens" : meter === "image" ? "1k images" : "1k seconds";
   return (
-    <div className={`flex flex-col ${SPACE.snug}`}>
-      {lanes.map((lane) => {
-        const rows = inLane(models, lane);
-        const chosen = defaultIn(models, lane);
+    <Chip color="default" variant="soft">
+      <Chip.Label>
+        <span className="tabular-nums">{perMillion(input)}</span>
+        {" in · "}
+        <span className="tabular-nums">{perMillion(output)}</span>
+        {` out · ${per}`}
+      </Chip.Label>
+    </Chip>
+  );
+}
 
-        return (
-          <Group
-            key={lane}
-            label={lane}
-            under={chosen ? `${chosen.label} answers this` : "Nothing answers this"}
-          >
-            <div className={`flex flex-col ${SPACE.snug}`}>
-                {/* ⚠️ Said plainly, because every call into it refuses for ever. */}
-                {!chosen
-                  ? (
-                    <Chip color="danger" variant="primary">
-                      <Chip.Label>This app asks for {lane} and no enabled model answers it</Chip.Label>
-                    </Chip>
-                  )
-                  : null}
+export interface ModelLineProps {
+  readonly label: string;
+  readonly id: string;
+  readonly about?: string | null;
+  readonly meter: string;
+  readonly input: number;
+  readonly output: number;
+  readonly thinks?: boolean;
+  readonly retired?: boolean;
+  /** The operator's controls, or nothing at all for a workspace. */
+  readonly controls?: React.ReactNode;
+}
 
-                {rows.map((model) => (
-                  <div key={model.id} className={`flex items-center justify-between ${SPACE.snug}`}>
-                    <div className="flex flex-col">
-                      <strong>{model.label}</strong>
-                      {/* ⚠️ The id IS the provider path, so what is shown is what
-                          is called — a friendly name over a hidden path is how a
-                          catalogue comes to disagree with itself. */}
-                      <small>{model.id}</small>
-                    </div>
-                    <div className={`flex items-center ${SPACE.snug}`}>
-                      <Chip color="default" variant="soft">
-                        <Chip.Label>in {model.input} / out {model.output} per 1k</Chip.Label>
-                      </Chip>
-                      {model.thinks
-                        ? (
-                          <Chip color="warning" variant="soft">
-                            <Chip.Label>Thinks — bills for tokens nobody asked for</Chip.Label>
-                          </Chip>
-                        )
-                        : null}
-                      <Switch
-                        isSelected={model.enabled}
-                        onChange={(on) => onEnable(model.id, on)}
-                      >
-                        <Switch.Control><Switch.Thumb /></Switch.Control>
-                        <Switch.Content><Label>{model.enabled ? "On" : "Off"}</Label></Switch.Content>
-                      </Switch>
-                    </div>
-                  </div>
-                ))}
-              </div>
-          </Group>
-        );
-      })}
-    </div>
+export function ModelLine({
+  label, id, about, meter, input, output, thinks, retired, controls,
+}: ModelLineProps) {
+  return (
+    <Stack space="tight">
+      <Row space="tight">
+        <Stack space="tight">
+          <strong>{label}</strong>
+          <small data-ink="muted">{id}</small>
+        </Stack>
+        <Spacer />
+        {controls}
+      </Row>
+      {about ? <small data-ink="muted">{about}</small> : null}
+      <Cluster space="tight">
+        <Price input={input} output={output} meter={meter} />
+        {/* ⚠️ Worth its own mark: a thinking model bills for tokens nobody asked
+            for and nobody sees, which is why the reserve widens for one. */}
+        {thinks
+          ? <Chip color="warning" variant="soft"><Chip.Label>Thinks</Chip.Label></Chip>
+          : null}
+        {/* ⚠️ RETIRED IS SHOWN RATHER THAN HIDDEN. A model gone from a provider's
+            catalogue is still named on old runs and may still be bound; hiding it
+            makes "why is this on a model I cannot find" unanswerable. */}
+        {retired
+          ? <Chip color="danger" variant="soft"><Chip.Label>Gone from the provider</Chip.Label></Chip>
+          : null}
+      </Cluster>
+    </Stack>
   );
 }

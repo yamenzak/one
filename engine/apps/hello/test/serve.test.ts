@@ -159,6 +159,12 @@ describe("what the manifest produced", () => {
       "GET /api/check-in.read",
       "GET /api/check-in.team",
       "POST /api/check-in.update",
+      /* ⚠️ ONE PAIR PER PRODUCT THAT GENERATES — `aiOps` answers nothing for an
+         app with no action, so these appear the day a manifest declares one and
+         not before. Named for the product, because the model a workspace picks
+         is picked per action of one product rather than deployment-wide. */
+      "POST /api/hello.ai.choose",
+      "GET /api/hello.ai.mine",
       "GET /api/inbox.list",
       "POST /api/inbox.policy",
       "POST /api/inbox.preference",

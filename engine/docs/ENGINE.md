@@ -186,6 +186,8 @@ live inside workspaces and an operator stands outside all of them.
 | `op.flag.set` | write |
 | `op.ai` | read |
 | `op.ai.bind` | write |
+| `op.models` | read |
+| `op.model.decide` | write |
 | `op.jobs` | read |
 | `op.job.run` | write |
 | `op.job.schedule` | write |
@@ -438,6 +440,7 @@ env or a binding.
 | `gateway` | the one door out to a model, and where a run's real cost is read | 6 | — |
 | `spend` | one row per run: where a workspace's credits went, and never what was said | 4 | — |
 | `reconcile` | the check on the money that is not our own arithmetic | 6 | — |
+| `ai-ops` | which model a workspace picked, and what it will cost them | 1 | — |
 | `operator` | the deployment looking at itself | 6 | — |
 | `deployment` | what is wrong with this deployment, asked at boot | 1 | — |
 | `mcp` | the agent door | 1 | — |
@@ -458,7 +461,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 8 | — |
 
-**361 of them**, 358 reached by something today.
+**362 of them**, 359 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

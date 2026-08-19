@@ -128,7 +128,20 @@ export type Where =
    * catalogue comes to be a year out of date.
    */
   | { readonly at: "catalogue" }
+  /**
+   * ⚠️ AI IS AN AREA NOW, NOT A SCREEN, AND THAT IS WHAT WAS WRONG WITH IT. One
+   * page carried four subjects — a deployment-wide catalogue fault, a product
+   * picker, a per-action binding and a prompt editor — stacked, because each had
+   * arrived one at a time. They are four questions asked by different people on
+   * different days, so they are four destinations (DESIGN.md §3).
+   */
+  | { readonly at: "ai" }
+  /** Which models this deployment sells, at what margin. */
+  | { readonly at: "models" }
+  /** Per product: what answers each action, and whose words it uses. */
   | { readonly at: "actions"; readonly app?: string }
+  /** The gateway itself: where calls go, and whether the margin holds. */
+  | { readonly at: "gateway" }
   | { readonly at: "switches" }
   | { readonly at: "works" }
   | { readonly at: "ground" }
@@ -188,8 +201,14 @@ export const atWorkspaceScreen = (
  */
 export const atConsoleScreen = (
   where: Where,
-): where is Extract<Where, { readonly at: ConsolePart }> =>
-  (OF_CONSOLE as readonly string[]).includes(where.at);
+): where is Extract<Where, { readonly at: ConsolePart | AiPart }> =>
+  (OF_CONSOLE as readonly string[]).includes(where.at)
+  /* ⚠️ AND EVERYTHING INSIDE THE AI AREA, because a sub-page is still the
+     operator's side — the material, the crown and the guard that every console
+     row leads somewhere all read this. Listing only the top level made the three
+     AI screens address themselves as a WORKSPACE's, which resolves to
+     `/w/undefined/models` and renders nothing. */
+  || (OF_AI as readonly string[]).includes(where.at);
 
 /**
  * ⚠️ WHAT SOMEBODY COMES BACK TO, AND WHAT THEY SET UP ONCE. Six rows in one
@@ -199,7 +218,16 @@ export const atConsoleScreen = (
  * between them is the whole of the explanation.
  */
 export const OFTEN: readonly WorkspacePart[] = ["people", "money"];
-export const OF_CONSOLE = ["tenants", "catalogue", "actions", "keys", "switches", "telling", "works", "ground", "footing"] as const;
+export const OF_CONSOLE = ["tenants", "catalogue", "ai", "keys", "switches", "telling", "works", "ground", "footing"] as const;
+
+/**
+ * ⚠️ AND WHAT IS INSIDE THE AI AREA. Listed here rather than inside the screen
+ * for the reason every other list in this file is: an address is a fact about
+ * the address, and a screen keeping its own copy is a second answer to "what is
+ * behind this" the day one of them changes.
+ */
+export const OF_AI = ["models", "actions", "gateway"] as const;
+export type AiPart = typeof OF_AI[number];
 
 export type WorkspacePart = typeof OF_WORKSPACE[number];
 export type ConsolePart = typeof OF_CONSOLE[number];
@@ -233,6 +261,8 @@ const isWorkspacePart = (v: string): v is WorkspacePart =>
   (OF_WORKSPACE as readonly string[]).includes(v);
 const isConsolePart = (v: string): v is ConsolePart =>
   (OF_CONSOLE as readonly string[]).includes(v);
+
+const isAiPart = (v: string): v is AiPart => (OF_AI as readonly string[]).includes(v);
 
 /**
  * ⚠️ WHETHER AN ADDRESS IS THE OPERATOR'S SIDE, DERIVED FROM `OF_CONSOLE` RATHER
@@ -302,8 +332,19 @@ export function parseWhere(path: string): Where {
     if (part === undefined) return { at: "console" };
     if (!isConsolePart(part)) return { at: "console" };
     if (part === "tenants" && tail[1]) return { at: "tenant", id: tail[1] };
-    const app = tail[1];
-    return app && part === "actions" ? { at: part, app } : { at: part };
+    /*
+      ⚠️ ONE AREA NESTS, AND IT NESTS IN THE ADDRESS RATHER THAN IN A SCREEN.
+      `/console/ai` is the index and `/console/ai/models` is one of its
+      destinations — so a sub-page is a real address somebody can bookmark, land
+      on, and go back from, which is what makes the crown's back arrow mean
+      "up to AI" rather than "out of the console".
+    */
+    if (part === "ai" && tail[1]) {
+      const inner = tail[1];
+      if (!isAiPart(inner)) return { at: "ai" };
+      return inner === "actions" && tail[2] ? { at: inner, app: tail[2] } : { at: inner };
+    }
+    return { at: part };
   }
 
   return { at: "home" };
@@ -323,7 +364,8 @@ export function pathOf(where: Where): string {
     case "workspaces": return `${SPACE}/workspaces`;
     case "workspace": return `${SPACE}/w/${where.slug}`;
     case "console": return `${SPACE}/console`;
-    case "actions": return `${SPACE}/console/actions${where.app ? `/${where.app}` : ""}`;
+    case "actions": return `${SPACE}/console/ai/actions${where.app ? `/${where.app}` : ""}`;
+    case "models": case "gateway": return `${SPACE}/console/ai/${where.at}`;
     case "tenant": return `${SPACE}/console/tenants/${where.id}`;
     case "plan": return `${SPACE}/w/${where.slug}/plan`;
     /* ⚠️ THE PAGE IS IN THE ADDRESS TOO. Settings descend, and an area that only
@@ -426,7 +468,10 @@ export const nameOf = (where: Where): string => {
     case "tenants": return "Workspaces";
     case "catalogue": return "Price list";
     case "tenant": return "Workspace";
-    case "actions": return "AI actions";
+    case "ai": return "AI";
+    case "models": return "Models";
+    case "actions": return "Actions";
+    case "gateway": return "Gateway";
     case "switches": return "Switches";
     case "works": return "Nightly work";
     case "ground": return "Shards";

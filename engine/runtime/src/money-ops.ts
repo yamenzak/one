@@ -18,6 +18,7 @@ import { MEMBERSHIP, billFor, mixedCurrencies, subscriptionFor } from "./billing
 import { startCheckout, startTopUp } from "./stripe.js";
 import { armAutoTopUp, autoTopUpOf, movements, spentByApp, walletOf } from "./wallet.js";
 import { bytesUsed } from "./storage.js";
+import { spendByAction, spendOf } from "./spend.js";
 import type { PlatformCtx } from "./member-ops.js";
 import type { Resolved } from "./compose.js";
 
@@ -64,6 +65,23 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       */
       const since = new Date(ctx.now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const spent = await spentByApp(ctx.directory, ctx.tenantId as TenantId, since);
+
+      /*
+        ⚠️ AND WHICH ACTION, NOT ONLY WHICH PRODUCT. "You spent 400 credits on
+        Hello" is a heading, not an answer — the question is always about a
+        thing somebody pressed. This is the same read one level finer, and it
+        travels here for the reason the rest of it does: a screen that fetches
+        the explanation separately shows the number first and the explanation
+        second, if at all.
+
+        ⚠️ AND `costMilli` IS STRIPPED. What a run cost US is the other half of
+        the margin; a statement carrying both publishes it.
+      */
+      const ai = {
+        byAction: await spendByAction(ctx.directory, ctx.tenantId as TenantId, since),
+        runs: (await spendOf(ctx.directory, ctx.tenantId as TenantId, { since, limit: 50 }))
+          .map(({ costMilli: _cost, logId: _log, ...shown }) => shown),
+      };
       const statement = await movements(ctx.directory, ctx.tenantId as TenantId);
       /* ⚠️ AND WHAT THE STANDING INSTRUCTION IS, INCLUDING WHY IT LAST FAILED.
          A decline is answered by a bank and nobody is present to see it, so this
@@ -102,6 +120,7 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         armed,
         storage,
         spent,
+        ai,
         statement,
         mixed: mixedCurrencies(bill.lines),
       };

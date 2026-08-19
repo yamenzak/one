@@ -24,6 +24,9 @@ import { Group, NavRow, Screen, glyphOf } from "@engine/design";
 import { useSession } from "../session.js";
 import { useLoad } from "../centre/data.js";
 import { Actions } from "../console/Actions.js";
+import { Ai } from "../console/Ai.js";
+import { Gateway } from "../console/Gateway.js";
+import { Models } from "../console/Models.js";
 import { Catalogue } from "../console/Catalogue.js";
 import { Footing } from "../console/Footing.js";
 import { Ground } from "../console/Ground.js";
@@ -32,7 +35,7 @@ import { Switches } from "../console/Switches.js";
 import { Telling } from "../console/Telling.js";
 import { Tenants } from "../console/Tenants.js";
 import { Works } from "../console/Works.js";
-import { OF_CONSOLE, nameOf, type ConsolePart, type Where } from "./where.js";
+import { OF_CONSOLE, nameOf, type AiPart, type ConsolePart, type Where } from "./where.js";
 
 /**
  * ⚠️ THE ADDRESS GRAMMAR'S LIST, NEVER A SECOND ONE. This file had its own — six
@@ -50,7 +53,7 @@ export type ConsolePartId = ConsolePart;
 const GLYPH: Readonly<Record<ConsolePartId, string>> = {
   tenants: "workspace",
   catalogue: "bank",
-  actions: "sparkle",
+  ai: "sparkle",
   keys: "key",
   switches: "settings",
   telling: "bell",
@@ -197,12 +200,15 @@ export function ConsoleHome({ onGo }: { readonly onGo: (to: Where) => void }) {
 
 /** ⚠️ The bodies are the ones that already existed — this is only the seam. */
 export function ConsolePart({ part, app, onGo }: {
-  readonly part: ConsolePartId;
+  readonly part: ConsolePartId | AiPart;
   readonly app?: string;
   readonly onGo: (to: Where) => void;
 }) {
   switch (part) {
     case "tenants": return <Tenants onGo={(id) => onGo({ at: "tenant", id })} />;
+    case "ai": return <Ai onGo={onGo} />;
+    case "models": return <Models />;
+    case "gateway": return <Gateway />;
     case "actions":
       return <Actions app={app} onGo={(id) => onGo({ at: "actions", app: id })} />;
     case "catalogue": return <Catalogue />;

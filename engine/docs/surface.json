@@ -719,6 +719,14 @@
       "kind": "write"
     },
     {
+      "id": "op.models",
+      "kind": "read"
+    },
+    {
+      "id": "op.model.decide",
+      "kind": "write"
+    },
+    {
       "id": "op.jobs",
       "kind": "read"
     },
