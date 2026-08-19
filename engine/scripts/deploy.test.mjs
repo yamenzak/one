@@ -33,6 +33,15 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = join(HERE, "..");
 const ROOT = join(ENGINE, "..");
 
+/** ⚠️ Ordinary top-level config, which binds nothing and calls no account. */
+const TOP = new Set([
+  "$schema", "name", "main", "compatibility_date", "compatibility_flags",
+  "workers_dev", "preview_urls", "account_id", "keep_vars", "minify",
+  "upload_source_maps", "directory", "binding", "not_found_handling",
+  "run_worker_first", "enabled", "head_sampling_rate", "new_sqlite_classes",
+  "new_classes", "tag", "crons", "logpush", "limits", "dev", "port", "local_protocol",
+]);
+
 let bad = 0;
 const fail = (m) => { console.error(`BAD  ${m}`); bad++; };
 const ok = (m) => console.log(`ok   ${m}`);
@@ -335,6 +344,68 @@ const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/
   } else {
     ok("rollback: the previous version is recorded, the boot is checked, and a failed check "
       + "puts it back and verifies");
+  }
+}
+
+/* --------------------------------------------------- what a binding costs --- */
+
+/**
+ * A BINDING KIND NOBODY DECIDED TO ADD.
+ *
+ * ⚠️ EVERY BINDING IN THIS FILE IS RESOLVED BY WRANGLER AT DEPLOY TIME, and a
+ * kind the deploy token cannot read fails the DEPLOY rather than the feature.
+ * `ai_search_namespaces` was added in an ordinary feature commit and four
+ * commits then shipped nothing at all — the search work, the streaming work and
+ * two rounds of unrelated fixes — while every guard and every test stayed green:
+ *
+ *     ✘ A request to the Cloudflare API (/accounts/…/ai-search/namespaces/default)
+ *       failed. Authentication error [code: 10000]
+ *
+ * ⚠️ AND `--dry-run` DOES NOT CATCH IT — measured. It lists the binding and
+ * exits without calling the account, so the one check anybody reaches for
+ * passes. There is no local test for the permission; what IS checkable is that
+ * the SET of kinds is deliberate, so adding one is an edit somebody makes here,
+ * on purpose, with a reason beside it.
+ *
+ * ⚠️ THE LIST MAY ONLY SHRINK WITHOUT ARGUMENT. Growing it is the review this
+ * exists to force: a new kind is a new way for one missing permission to stop
+ * every product from shipping.
+ */
+{
+  const KNOWN = new Map([
+    ["ai", "Workers AI — bound for the gateway's log, and it needs no account call"],
+    ["assets", "the SPA this worker serves"],
+    ["send_email", "the sender, onboarded per zone by hand"],
+    ["d1_databases", "the directory and every shard"],
+    ["vars", "plain configuration"],
+    ["observability", "logs"],
+    ["migrations", "durable object classes"],
+    ["durable_objects", "the classes above"],
+    ["triggers", "the cron the job runner reads"],
+    ["placement", "smart placement"],
+  ]);
+
+  const raw = readFileSync(join(ROOT, "engine", "one", "wrangler.jsonc"), "utf8")
+    /* ⚠️ COMMENTS STRIPPED FIRST. This file explains itself at length, and the
+       kind it explains NOT having is named in the prose — so a guard reading
+       the comments would report the one binding that is deliberately absent. */
+    .replace(/^\s*\/\/.*$/gm, "");
+
+  /* ⚠️ TOP LEVEL ONLY — exactly one indent. A `database_name` inside a D1 entry
+     is part of a binding this guard has already accepted; matching at any depth
+     would report every field of every one of them. */
+  const kinds = [...raw.matchAll(/^ {2}"([a-z_0-9$]+)"\s*:/gm)].map((m) => m[1]);
+  const strangers = [...new Set(kinds)].filter((k) => !KNOWN.has(k) && !TOP.has(k));
+
+  if (!kinds.length) {
+    fail("deploy: read no keys out of engine/one/wrangler.jsonc — this check sees nothing.");
+  } else if (strangers.length) {
+    fail(`deploy: engine/one/wrangler.jsonc binds ${strangers.join(", ")}, which this guard does\n`
+      + "       not know about. Every binding here is resolved by wrangler during `deploy`, so a\n"
+      + "       kind the token cannot read fails the whole deploy — every product, not this one.\n"
+      + "       Add it to KNOWN with the reason it is worth that, in a commit of its own.");
+  } else {
+    ok(`bindings: ${new Set(kinds).size} key(s), every binding kind one somebody chose`);
   }
 }
 

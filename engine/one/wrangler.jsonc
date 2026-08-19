@@ -79,17 +79,35 @@
   // showing one nobody is measuring.
   "ai": { "binding": "AI" },
 
-  // ⚠️ A NAMESPACE, NOT AN INSTANCE, AND THAT IS WHY IT IS ONE LINE FOR EVERY
-  // PRODUCT. An instance binding would have to be added, deployed and named per
-  // app — so shipping a searchable collection would mean editing this file,
-  // which is the infrastructure work the whole framework exists to delete. The
-  // namespace binding takes the instance name at the call, and the name is
-  // derived from the deployment and the app (`instanceFor`).
+  // ⚠️ THE SEARCH NAMESPACE IS DELIBERATELY NOT BOUND HERE, AND THE REASON IS AN
+  // OUTAGE THIS FILE CAUSED. `ai_search_namespaces` was added, and wrangler
+  // RESOLVES that binding against the account during `deploy` — so a token
+  // without the AI Search permission failed the whole deploy, not the feature:
   //
-  // ⚠️ AND THE INSTANCES THEMSELVES ARE MADE BY THE JOB, not declared here. It
-  // holds the account token, it already lists-before-creates, and a product
-  // that becomes searchable is then a manifest change with no deploy step.
-  "ai_search_namespaces": [{ "binding": "AI_SEARCH", "namespace": "default" }],
+  //     ✘ [ERROR] A request to the Cloudflare API
+  //       (/accounts/…/ai-search/namespaces/default) failed.
+  //       Authentication error [code: 10000]
+  //
+  // Four commits shipped nothing while every other capability was fine. A
+  // binding hand-written here is resolved at deploy time by definition, so it
+  // can only ever fail in the one place a failure costs the most.
+  //
+  // ⚠️ AND THE FEATURE DEGRADES HONESTLY WITHOUT IT, which is what makes leaving
+  // it out the right call rather than a retreat. The index JOB needs no binding
+  // — it holds the account token and uses the items API — so records are still
+  // marked and carried. Only the QUERY needs this, and with no `AI_SEARCH` in
+  // the env `ctx.find` is absent and the generated find operation says search is
+  // not on here. See `serve.ts`.
+  //
+  // ⚠️ AND `--dry-run` DOES NOT CATCH IT — measured. It lists the binding and
+  // exits without ever calling the account, so the one check anybody would
+  // reach for passes while the real deploy fails. There is no local test for
+  // this; the deploy IS the test.
+  //
+  // To turn querying on: give the deploy token AI Search read, then restore
+  // `"ai_search_namespaces": [{ "binding": "AI_SEARCH", "namespace": "default" }]`
+  // in a commit of its OWN — so if the token is still wrong, the only thing that
+  // does not ship is the binding.
 
   "d1_databases": [
     {
