@@ -297,8 +297,25 @@ export async function verify(at: Account): Promise<Answer<{ readonly can: readon
     if ((await listRemote(at, kind)).ok) can.push(kind);
   }
   const script = await bindings(at);
+
+  /*
+    ⚠️ `ai` IS PROBED, NOT INFERRED FROM THE SCRIPT. It was granted whenever the
+    worker's settings could be read — two unrelated permissions — so this
+    reported a token as able to reach Workers AI while the nightly catalogue sync
+    failed on it with an authentication error. An operator reading the console
+    was told the credential was fine by the one screen whose job is to say
+    whether it is, which is worse than saying nothing.
+
+    ⚠️ AND THE REAL CALL IS THE ONLY HONEST PROBE. Workers AI Read is its own
+    permission and a token can hold every other one without it — which is the
+    ordinary shape of a token minted for deploys.
+  */
+  if ((await listModels(at)).ok) can.push("ai");
+  /* ⚠️ A durable object is part of the script, so this one IS the script's. */
+  if (script.ok) can.push("do");
+
   if (!can.length && !script.ok) return no("this token can read nothing — check it is for the right account");
-  return yes({ can: script.ok ? [...can, "ai" as const, "do" as const] : can });
+  return yes({ can });
 }
 
 /* --------------------------------------------------------- model catalogue --- */

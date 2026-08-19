@@ -425,7 +425,22 @@ export function platformJobs(deps: SweepDeps): JobBook {
         const at = account();
         if (!at) throw new Error("catalogue: no account token");
         const answer = await listModels(at);
-        if (!answer.ok) throw new Error(`catalogue: ${answer.why}`);
+        /*
+          ⚠️ THE REASON NAMES THE CREDENTIAL, BECAUSE THERE ARE TWO AND THEY LOOK
+          ALIKE. The gateway token on the Keys screen authenticates calls THROUGH
+          the gateway; this reads the model catalogue off the account and is the
+          deployment's own `CF_API_TOKEN`. An operator who had just set the first
+          one read "catalogue: Authentication error" and reasonably concluded the
+          value they had pasted was wrong — the message named neither which token
+          nor what it needed, so the one screen that could end the guess started
+          it instead.
+        */
+        if (!answer.ok) {
+          throw new Error(`catalogue: ${answer.why}. This is the deployment's own Cloudflare `
+            + `account token, which needs the Workers AI Read permission — not the gateway `
+            + `token under Keys, which is a different credential and is used for running `
+            + `models rather than listing them.`);
+        }
         const out = await syncModels(
           deps.directory, readCatalogue(answer.value), deps.multiplier, now);
         if (out.refused.length) throw new Error(`catalogue refused: ${out.refused.join(", ")}`);
