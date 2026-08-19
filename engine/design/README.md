@@ -167,11 +167,11 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 57 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 56 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 138 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 141 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 55 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**346 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**349 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -212,6 +212,7 @@ there is no deep import, and a guard says so.
 - `parts/logo.tsx` — `Lockup`, `LockupProps`
 - `parts/permission.tsx` — `Permission`, `PermissionRow`, `PermissionRowProps`
 - `parts/pick-file.tsx` — `PickFile`, `PickFileProps`
+- `parts/recall.tsx` — `Block`, `ShapeWaiting`, `useRecalledShape`
 - `parts/said.tsx` — `Amount`, `Clock`, `Dated`, `machineHere`, `Num`, `Presenting`, `Size`, `useAmount`, `useDay`, `useDays`, `useFigures`, `useShown`, `When`
 - `parts/settle.tsx` — `SettledProps`, `SettledSwitch`
 - `parts/state.tsx` — `Await`, `AwaitProps`, `ChartWaiting`, `FigureWaiting`, `FormWaiting`, `Loaded`, `Nothing`, `nothingIn`, `ready`, `RowsWaiting`, `TableWaiting`, `TextWaiting`, `TilesWaiting`, `trouble`, `Trouble`, `waiting`, `Working`

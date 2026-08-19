@@ -44,6 +44,7 @@ import type { Sky } from "../tokens/ambience.js";
 import type { Density } from "../scene/index.js";
 import { Await, Nothing, RowsWaiting, FigureWaiting, FormWaiting, TextWaiting, TilesWaiting, nothingIn, type Loaded } from "../parts/state.js";
 import { Stack } from "../parts/arrange.js";
+import { ShapeWaiting, useRecalledShape } from "../parts/recall.js";
 import {
   NUDGE, PAD, SAFE_BOTTOM, SCREEN_TITLE_PAD, SPACE, WHOLE,
 } from "../tokens/metrics.js";
@@ -366,6 +367,16 @@ export function Screen<T = unknown>({
   const preset = SHAPES[shape];
   /* ⚠️ A refusal offers nothing to act on, so the primary stands down with it. */
   const where = refused ? "no" : shows(of, isNothing);
+  /*
+    ⚠️ THE SKELETON IS THIS SCREEN AS IT WAS LAST TIME, WHERE THERE IS A LAST
+    TIME. A shape's own placeholder stands in for every screen that names the
+    shape, so a page of three headed cards waits behind one un-headed card of
+    four rows — the fault a skeleton exists to prevent, wearing its clothes.
+    `useRecalledShape` measures what was actually drawn and hands it back on the
+    next visit; the preset is what a screen nobody has opened yet still gets.
+    See `parts/recall.tsx`.
+  */
+  const recalled = useRecalledShape(where === "act");
   const frame = React.useContext(FrameContext);
   /* ⚠️ THE HERO IS THE PAGE'S SUBJECT, AND ONLY `Layout` CAN HAVE SAID SO. A
      screen cannot ask for one: the title card and the sky under it are two
@@ -395,7 +406,7 @@ export function Screen<T = unknown>({
       <Await
         of={of}
         again={again}
-        waiting={waiting ?? preset.waiting()}
+        waiting={waiting ?? (recalled ? <ShapeWaiting blocks={recalled} /> : preset.waiting())}
         isNothing={isNothing}
         nothing={nothing
           ? (
