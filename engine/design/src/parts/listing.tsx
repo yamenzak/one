@@ -92,6 +92,11 @@ export interface ListingProps<T> {
    * ⚠️ WHAT A ROW MATCHES ON, AND ABSENT MEANS NO SEARCH AT ALL. A short list
    * with a search box is furniture; the field appears only where the caller has
    * said what would be typed.
+   *
+   * ⚠️ AND SUPPLYING IT IS PERMISSION RATHER THAN AN INSTRUCTION. The field is
+   * drawn only once the list is longer than one page — a caller cannot know how
+   * many rows a deployment will have, and every one of them would otherwise
+   * ship a search box over the three rows it has on the first day.
    */
   readonly find?: {
     readonly of: (row: T) => string;
@@ -119,8 +124,16 @@ export function Listing<T>(
         /* ⚠️ MATCHED FOLDED AND TRIMMED, because nobody types a workspace's
            capitalisation and half of them are pasted with a space on the end. */
         const want = looking.trim().toLowerCase();
-        const found = want && find
-          ? rows.filter((r) => find.of(r).toLowerCase().includes(want))
+        /* ⚠️ AND THE FIELD ONLY APPEARS ONCE THERE IS SOMETHING TO FIND. A
+           labelled search box over five rows is a control taller than two of
+           the rows it filters, at the top of a screen where everything is
+           already visible — furniture, which is what this prop's own comment
+           refuses one line up. The floor is a page: below it the list IS the
+           answer, above it somebody is scrolling or paging for a name they
+           already know. */
+        const finding = find && rows.length > pageSize ? find : undefined;
+        const found = want && finding
+          ? rows.filter((r) => finding.of(r).toLowerCase().includes(want))
           : rows;
         const sorter = order ? cols.find((c) => c.id === order.id)?.by : undefined;
         const sorted = sorter
@@ -137,10 +150,10 @@ export function Listing<T>(
              own edge and the whole screen scrolled sideways, while the
              `ScrollContainer` that exists to prevent exactly that sat there
              with nothing to do. */
-          <div className={`flex min-w-0 flex-col ${find ? SPACE.snug : ""}`}>
-            {find ? (
+          <div className={`flex min-w-0 flex-col ${finding ? SPACE.snug : ""}`}>
+            {finding ? (
               <TextInput
-                label={find.label ?? "Find one"}
+                label={finding.label ?? "Find one"}
                 value={looking}
                 onChange={(v) => { setLooking(v); setPage(1); }}
                 before={glyphOf("search")}
@@ -227,7 +240,7 @@ export function Listing<T>(
                 what is true when the deployment HAS none; this is what is true
                 when the words do not match, and answering the first with the
                 second tells somebody their workspaces are gone. */}
-            {find && want && sorted.length === 0 ? (
+            {finding && want && sorted.length === 0 ? (
               <Nothing icon={glyphOf("search")} says="Nothing matches that" />
             ) : null}
           </div>
