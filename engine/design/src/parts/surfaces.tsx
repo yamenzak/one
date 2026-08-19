@@ -661,22 +661,38 @@ export function ToggleRow({ icon, face, label, under, value, onChange, isDisable
        and the restyle guard is right to refuse it. */
     <div data-row className={`flex w-full ${ROW.pad} ${ROW.tap} items-center`}>
     <Switch
-      /* ⚠️ `justify-between` IS THE WHOLE FIX. Without it the content takes the
-         full width and the control wraps to a second line — which reads as a
-         broken row rather than as a switch. That is what it looked like the
-         first time it was RENDERED rather than described. */
-      className={`w-full flex-row justify-between items-center ${ROW.gap}`}
+      className="w-full"
       isSelected={value}
       isDisabled={isDisabled}
       onChange={onChange}
     >
-      <Switch.Content className="grow">
-        <span className={`flex items-center ${ROW.gap}`}>
+      {/*
+        ⚠️ THE WHOLE ROW IS `Switch.Content`, AND THAT IS WHAT MAKES THE ROW
+        PRESSABLE. It renders the `<label>` carrying the input; anything outside
+        it — including the track, which is where everybody aims — is a picture.
+        See `SettledSwitch` for the shape and why the library's own anatomy
+        snippet is wrong.
+
+        ⚠️ `justify-between` MOVED HERE WITH IT. On the root it laid out the
+        content and the control as two children; the control is one child now, so
+        the row's two ends are inside. Without it the text takes the full width
+        and the switch wraps to a second line, which reads as a broken row.
+
+        ⚠️ AND THE TEXT IS NOT WRAPPED IN A `<Label>` any more — a `<label>`
+        inside the content's own `<label>` is invalid, and the inner one takes
+        presses that belong to the row.
+      */}
+      <Switch.Content className={`w-full flex-row justify-between items-center ${ROW.gap}`}>
+        {/* ⚠️ `min-w-0 grow` SO A LONG LABEL TRUNCATES RATHER THAN PUSHING THE
+            SWITCH OFF THE ROW. A flex child's default minimum is its content, so
+            without it the text refuses to shrink and the control is what gives
+            way — which on a phone is the whole point of the row. */}
+        <span className={`flex min-w-0 grow items-center ${ROW.gap}`}>
           <Lead icon={icon} face={face} />
-          <Label><Body label={label} under={under} /></Label>
+          <Body label={label} under={under} />
         </span>
+        <Switch.Control><Switch.Thumb /></Switch.Control>
       </Switch.Content>
-      <Switch.Control><Switch.Thumb /></Switch.Control>
     </Switch>
     </div>
   );

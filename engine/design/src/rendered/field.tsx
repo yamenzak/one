@@ -68,16 +68,24 @@ export function Field({ name, spec, value, onChange, disabled, set, bare, error 
     case "bool":
       return (
         <Switch
+          /* ⚠️ A COLUMN, BECAUSE THE TAIL IS UNDERNEATH RATHER THAN BESIDE. The
+             root is a row by default, which put the help text and the refusal in
+             line with the switch and pushed the whole field sideways. */
+          className="flex-col items-start"
           isSelected={value === true}
           isDisabled={disabled || pending}
           isInvalid={invalid}
           onChange={(next) => onChange(next)}
         >
-          <Switch.Control><Switch.Thumb /></Switch.Control>
+          {/* ⚠️ THE CONTROL IS INSIDE THE CONTENT — see `SettledSwitch`. And the
+              help and the refusal are SIBLINGS of it, which is what the library
+              asks for: they are not part of the thing you press, and inside the
+              label a refusal becomes another target that toggles the switch. */}
           <Switch.Content>
-            <Label>{label}</Label>
-            {tail}
+            <Switch.Control><Switch.Thumb /></Switch.Control>
+            {label}
           </Switch.Content>
+          {tail}
         </Switch>
       );
 

@@ -14,7 +14,7 @@
  */
 
 import type { Disclosure } from "@engine/kernel";
-import { Button, Chip, Separator, Switch, Label } from "@heroui/react";
+import { Button, Chip, Separator, Switch } from "@heroui/react";
 import { SPACE } from "../tokens/metrics.js";
 import { Group } from "../parts/surfaces.js";
 import { Nothing } from "../parts/state.js";
@@ -45,8 +45,12 @@ export function ConsentSheet({ shown, given, onChange }: ConsentProps) {
                   isDisabled={required}
                   onChange={(next) => onChange(purpose.id, next)}
                 >
-                  <Switch.Control><Switch.Thumb /></Switch.Control>
-                  <Switch.Content><Label>Allowed</Label></Switch.Content>
+                  {/* ⚠️ Inside the content, which is the control — see
+                      `SettledSwitch`. Beside it the track is a picture. */}
+                  <Switch.Content>
+                    <Switch.Control><Switch.Thumb /></Switch.Control>
+                    Allowed
+                  </Switch.Content>
                 </Switch>
                 {/* ⚠️ Said, not merely disabled: a switch that cannot move with
                     no reason beside it reads as broken. */}

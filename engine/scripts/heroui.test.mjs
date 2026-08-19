@@ -799,6 +799,53 @@ if (!uneven) ok(`peers: ${EQUALS.length} group(s) of equals share their width`);
   if (!bad) ok(`collection: ${tables} table(s), each inside the collection it needs`);
 }
 
+/* ------------------------------------------------------------------ press --- */
+
+/**
+ * ⚠️ `Switch.Control` OUTSIDE `Switch.Content` DRAWS A PERFECT SWITCH THAT DOES
+ * NOTHING WHERE PEOPLE PRESS IT. `Switch.Content` renders react-aria's
+ * `SwitchButton` — the `<label>` carrying the hidden `<input role="switch">` —
+ * and the control and the thumb are plain spans with no behaviour of their own.
+ * Beside it they are a picture: pressing the track is inert, pressing the word
+ * works, and the control reads as broken to everybody who aims at the obvious
+ * target.
+ *
+ * ⚠️ AND THE LIBRARY'S OWN "ANATOMY" SNIPPET SHOWS THEM AS SIBLINGS. Every
+ * runnable example on the same page nests them and the source says so in a
+ * comment, but the anatomy is the part somebody copies — so this shipped in four
+ * components at once, each one built by reading the documentation.
+ *
+ * ⚠️ THE RENDER TEST IS `design/test/switch.test.tsx` AND IT IS THE REAL ONE;
+ * this is the cheap net over every file, including the ones that compose a
+ * `Switch` by hand rather than reaching for a component that already got it
+ * right.
+ */
+{
+  let switches = 0;
+  let loose = 0;
+  for (const file of FILES) {
+    const src = readFileSync(file, "utf8");
+    if (!/<Switch\.Control\b/.test(src)) continue;
+    switches++;
+    /* Every `Switch.Control` must open after a `Switch.Content` opens and before
+       that content closes. Anything else is the sibling shape. */
+    for (const at of [...src.matchAll(/<Switch\.Control\b/g)].map((m) => m.index)) {
+      const opened = src.lastIndexOf("<Switch.Content", at);
+      const closed = src.lastIndexOf("</Switch.Content>", at);
+      if (opened < 0 || closed > opened) {
+        const line = src.slice(0, at).split("\n").length;
+        loose++;
+        fail(`${rel(file)}:${line}: <Switch.Control> outside <Switch.Content>.\n` +
+             `       The content is the pressable label; beside it the track is a picture — ` +
+             `pressing the switch does nothing and only the word works.`);
+      }
+    }
+  }
+  /* ⚠️ Only when THIS check is clean — a confident line under a finding of its
+     own is how a guard comes to be read as passing. */
+  if (!loose) ok(`press: ${switches} file(s) composing a Switch, every track inside the control`);
+}
+
 console.log(bad
   ? `\nheroui: ${bad} finding(s) — a screen branding will not reach.`
   : `\nheroui: components as they ship, themed through tokens.`);

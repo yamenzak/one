@@ -22,7 +22,7 @@
  */
 
 import * as React from "react";
-import { Label, Switch } from "@heroui/react";
+import { Switch } from "@heroui/react";
 import { notice } from "../frame/overlay.js";
 
 export interface SettledProps {
@@ -35,13 +35,21 @@ export interface SettledProps {
 }
 
 /**
- * ⚠️ THE WORD IS NOT DECORATION — `Switch.Content` IS WHERE THE INPUT LIVES.
- * HeroUI renders the control's hidden `<input type="checkbox" role="switch">`
- * inside its content slot, so a switch written without one is two styled spans:
- * it draws correctly, it is in the markup, it has no input, and no press of it
- * does anything. Every test that renders a screen to a string still passed,
- * because what was missing is exactly the thing markup assertions do not look
- * for.
+ * ⚠️ `Switch.Content` IS THE WHOLE CONTROL, AND EVERYTHING ELSE GOES INSIDE IT.
+ * It renders React Aria's `SwitchButton` — a `<label>` carrying the hidden
+ * `<input role="switch">` — and `Switch.Control`/`Switch.Thumb` are plain spans
+ * with no behaviour of their own. Outside it they are a picture of a switch:
+ * pressing the track does nothing and pressing the word works, which is a
+ * control that reads as broken to everybody who aims at the obvious target.
+ *
+ * ⚠️ THE LIBRARY'S PUBLISHED "ANATOMY" SNIPPET SHOWS THEM AS SIBLINGS AND IT IS
+ * WRONG. Every runnable example on the same page nests them, and the source says
+ * so in a comment on `SwitchContent`. It cost four components here, all built
+ * from that snippet, all of them drawing perfectly.
+ *
+ * ⚠️ AND THE WORD IS BARE TEXT, NOT A `<Label>`. `SwitchButton` already IS the
+ * label, so a `<Label>` inside it is a `<label>` inside a `<label>` — invalid,
+ * and the second one is another element that steals the press.
  *
  * ⚠️ SO THERE IS A DEFAULT RATHER THAN AN OPTIONAL SLOT. A caller who wants no
  * word cannot have one — a switch with no accessible name is unusable to anybody
@@ -78,9 +86,11 @@ export function SettledSwitch({ value, onSet, isDisabled, says }: SettledProps) 
 
   return (
     <Switch isSelected={shown} isDisabled={isDisabled || busy} onChange={(on) => void flip(on)}>
-      <Switch.Control><Switch.Thumb /></Switch.Control>
-      {/* ⚠️ ALWAYS RENDERED — it carries the input. See `STATE`. */}
-      <Switch.Content><Label>{(says ?? STATE)(shown)}</Label></Switch.Content>
+      {/* ⚠️ THE CONTROL IS INSIDE THE CONTENT, NOT BESIDE IT — see `STATE`. */}
+      <Switch.Content>
+        <Switch.Control><Switch.Thumb /></Switch.Control>
+        {(says ?? STATE)(shown)}
+      </Switch.Content>
     </Switch>
   );
 }
