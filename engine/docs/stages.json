@@ -278,6 +278,12 @@
       "status": "shipped",
       "title": "The words arrive as they are written — one metered run, streamed, and the charge rides the last token",
       "ends": "`ctx.stream` answers with an SSE `Response` from the same reserve, model and words `ctx.generate` uses; `generateStream` holds the same four bounds; a cancelled stream settles at the reserve and is corrected by the nightly check; `metering.test.mjs` asks the streaming lane every question it asks the other."
+    },
+    {
+      "n": 53,
+      "status": "planned",
+      "title": "A workspace asks to change its jurisdiction, and the ask is the only thing that is new",
+      "ends": "A workspace with `tenant:manage` can request a residency change from its own settings; the request is recorded and answered by an operator rather than granted, because Cloudflare fixes a database's jurisdiction at creation and the move is `op.tenant.move`'s `into` either way. `operator.test.mjs` sees the read behind the operator's queue of them, and nothing in the request path can begin a move by itself."
     }
   ]
 }

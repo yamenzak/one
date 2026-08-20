@@ -985,8 +985,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 50 | The interface speaks a second language — dictionaries, a language control, and the copy guard reading both | **planned** |
 | 51 | A collection says `searchable` and becomes findable — the write marks, a pass carries, erasure removes, and one filter is the boundary | shipped |
 | 52 | The words arrive as they are written — one metered run, streamed, and the charge rides the last token | shipped |
+| 53 | A workspace asks to change its jurisdiction, and the ask is the only thing that is new | **planned** |
 
-**42 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**42 shipped, 11 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

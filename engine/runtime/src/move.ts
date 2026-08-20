@@ -8,6 +8,15 @@
  * for ever, not until somebody builds the setting. A residency dropdown would be
  * a field the storage layer refuses to honour, silently.
  *
+ * DEFER(engine-53) stage:53 — AND THE ASK IS THE HALF THAT IS MISSING. A move is
+ * `op.tenant.move`, operator-only, so a workspace that wants its records in the
+ * EU has no way to say so from inside the product — it emails somebody, and
+ * whether that reaches a queue is a matter of habit. What is deferred is the
+ * REQUEST, not the move: the move stays the operator's because the copy is real
+ * work against a database whose jurisdiction cannot be edited, and a control
+ * that appeared to change it would be exactly the silent lie the paragraph above
+ * refuses.
+ *
  * ⚠️ THE WORKSPACE IS READ-ONLY WHILE IT MOVES, and that is the correctness
  * property rather than a courtesy. A copy taken from a live database loses every
  * row written after the table was read — silently, with no error, and the loss
