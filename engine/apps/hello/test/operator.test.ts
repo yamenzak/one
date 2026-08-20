@@ -428,6 +428,83 @@ describe("what the console can change", () => {
     expect(under.items).toEqual([]);
   });
 
+  /*
+    ⚠️ THE ORDINARY WAY A FEATURE SHIPS, END TO END. We give it to a WORKSPACE;
+    the workspace hands it to some of its own staff. The platform had the first
+    half and nowhere for the second, so a customer given a feature could only
+    give it to everybody at once or to nobody.
+  */
+  it("lets a workspace give a feature to one of its own people", async () => {
+    const flag = "note-search";
+    const eastgate = (await tenantBySlug(directory(), "eastgate"))!.id;
+    const offered = async (cookie: string) => {
+      const v = await (await get("eastgate", "/api/centre.view", cookie)).json() as
+        { apps: { screens: { route: string }[] }[] };
+      return !!v.apps[0]?.screens.some((s) => s.route === "/search");
+    };
+
+    /* A second person on this workspace's roster. */
+    expect((await post("eastgate", "/api/member.invite",
+      { email: "kim@example.com", platformRole: "customer", appRoles: { hello: "reader" } },
+      owner)).status).toBe(200);
+    const kim = await signIn("kim@example.com");
+
+    /* ⚠️ WE RELEASE IT TO THE WORKSPACE. Not to everybody — the deployment
+       switch stays as declared, which is what leaves room for this at all. */
+    expect((await post("admin", "/api/op.flag.set",
+      { id: flag, on: true, tenant: eastgate }, ops)).status).toBe(200);
+    expect(await offered(owner)).toBe(true);
+    expect(await offered(kim)).toBe(true);
+
+    /* ⚠️ AND THE WORKSPACE HOLDS ONE OF ITS OWN PEOPLE BACK. */
+    const roster = await (await get("eastgate", `/api/flag.people?id=${flag}`, owner)).json() as
+      { workspace: boolean; items: { accountId: string; email: string }[] };
+    expect(roster.workspace).toBe(true);
+    const theirs = roster.items.find((m) => m.email === "kim@example.com")!;
+    expect((await post("eastgate", "/api/flag.person",
+      { id: flag, person: theirs.accountId, on: false }, owner)).status).toBe(200);
+
+    expect(await offered(kim)).toBe(false);
+    /* ⚠️ AND NOBODY ELSE MOVED. A decision about one person is about one. */
+    expect(await offered(owner)).toBe(true);
+
+    /* ⚠️ CLEARING RETURNS THEM TO THE WORKSPACE rather than to the opposite. */
+    expect((await post("eastgate", "/api/flag.person",
+      { id: flag, person: theirs.accountId, on: null }, owner)).status).toBe(200);
+    expect(await offered(kim)).toBe(true);
+  });
+
+  /*
+    ⚠️ AND IT IS THIS PERSON IN THIS WORKSPACE, NEVER THIS PERSON. Early access
+    at one workspace is not early access at another — the workspace decided it,
+    for somebody on its own roster. Keyed by account alone it would follow them.
+  */
+  it("keeps one workspace's decision out of another", async () => {
+    const flag = "note-search";
+    const eastgate = (await tenantBySlug(directory(), "eastgate"))!.id;
+    expect((await post("setup", "/api/me.tenant.create",
+      { slug: "westgate", name: "Westgate", country: "DE" }, owner)).status).toBe(200);
+    const westgate = (await tenantBySlug(directory(), "westgate"))!.id;
+
+    for (const at of [eastgate, westgate]) {
+      expect((await post("admin", "/api/op.flag.set", { id: flag, on: true, tenant: at }, ops))
+        .status).toBe(200);
+    }
+    const roster = await (await get("eastgate", `/api/flag.people?id=${flag}`, owner)).json() as
+      { items: { accountId: string; email: string }[] };
+    const sam = roster.items[0]!;
+    expect((await post("eastgate", "/api/flag.person",
+      { id: flag, person: sam.accountId, on: false }, owner)).status).toBe(200);
+
+    const seen = async (slug: string) => {
+      const v = await (await get(slug, "/api/centre.view", owner)).json() as
+        { apps: { screens: { route: string }[] }[] };
+      return !!v.apps[0]?.screens.some((s) => s.route === "/search");
+    };
+    expect(await seen("eastgate")).toBe(false);
+    expect(await seen("westgate")).toBe(true);
+  });
+
   /* ⚠️ WHAT THE CONSOLE HAS TO BE ABLE TO SAY. A flag off at the deployment and
      on for eleven workspaces draws the same row as one nobody has touched, so
      the screen reports "off" about a feature eleven customers are using. */
@@ -438,6 +515,21 @@ describe("what the console can change", () => {
     const seen = await (await get("admin", "/api/op.flags", ops)).json() as
       { tried: Record<string, { on: number; off: number }> };
     expect(seen.tried["note-search"]).toEqual({ on: 1, off: 0 });
+  });
+
+  /* ⚠️ EVERY DECLARED FLAG REACHES THE SCREEN, WITH THE WORDS ITS AUTHOR WROTE.
+     The console draws a book it is handed; a book that arrived without its
+     labels would render a run of blank rows, and the reason is what stops a
+     flag from becoming one nobody dares delete. */
+  it("carries every flag a product declares, and what each is for", async () => {
+    const seen = await (await get("admin", "/api/op.flags", ops)).json() as
+      { apps: { id: string; book: Record<string, { label: string; why: string }> }[] };
+    const hello = seen.apps.find((a) => a.id === "hello")!;
+    const declared = Object.values(HELLO.flags ?? {});
+    expect(declared.length).toBeGreaterThan(0);
+    for (const f of declared) {
+      expect(hello.book[f.id]).toMatchObject({ label: f.label, why: f.why });
+    }
   });
 
   it("switches a declared flag and refuses one nothing declares", async () => {

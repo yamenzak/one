@@ -321,6 +321,11 @@ function Inside({ where, onGo }: {
         slug={where.slug}
         app={"app" in where ? where.app : undefined}
         area={"area" in where ? where.area : undefined}
+        /* ⚠️ WHICH FEATURE, on the one screen that is about a single one. Read
+           off the address the same way the product and the area are, so the
+           dispatcher stays a function of the parsed `Where` rather than of the
+           union's shape. */
+        id={"id" in where ? where.id : undefined}
         onGo={onGo}
       />
     );

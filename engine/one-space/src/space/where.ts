@@ -123,6 +123,12 @@ export type Where =
    * it all existed while the half that names the decision-maker did nothing.
    */
   | { readonly at: "trying"; readonly slug: string; readonly app?: string }
+  /**
+   * ⚠️ ONE FEATURE THIS WORKSPACE HAS, AND WHO IN IT HAS IT. The list can say
+   * "on, and two people differ"; only this can say WHICH two, and undoing a
+   * decision made three weeks ago is impossible without their names.
+   */
+  | { readonly at: "tried"; readonly slug: string; readonly id: string }
   | { readonly at: "console" }
   | { readonly at: "tenants" }
   /**
@@ -218,7 +224,7 @@ export const OF_WORKSPACE = ["people", "money", "packages", "settings", "brand",
  * it is reached from Money, per product. One list is what a workspace offers;
  * this is what the dispatcher must handle, and they are not the same question.
  */
-export const OF_WORKSPACE_SCREEN = [...OF_WORKSPACE, "plan"] as const;
+export const OF_WORKSPACE_SCREEN = [...OF_WORKSPACE, "plan", "tried"] as const;
 
 export type WorkspaceScreen = typeof OF_WORKSPACE_SCREEN[number];
 
@@ -360,6 +366,12 @@ export function parseWhere(path: string): Where {
          the screen it wants is exactly this one. */
       return { at: "plan", slug };
     }
+    /* ⚠️ ABOVE `isWorkspacePart`, LIKE `plan`, AND FOR THE SAME REASON. It is
+       answered by the workspace dispatcher but it is not a ROW on the workspace
+       screen — it is reached from "Try things early", per feature. Below the
+       guard it would never parse, and the address would silently resolve to the
+       workspace instead. */
+    if (part === "tried" && tail[2]) return { at: "tried", slug, id: tail[2] };
     if (!isWorkspacePart(part)) return { at: "workspace", slug };
     /* ⚠️ A THIRD SEGMENT IS THE PRODUCT, on the two screens that have one per
        product. Anywhere else it is noise and the screen is the answer. */
@@ -436,6 +448,7 @@ export function pathOf(where: Where): string {
       return `${SPACE}/w/${where.slug}/wording${where.app ? `/${where.app}` : ""}`;
     case "trying":
       return `${SPACE}/w/${where.slug}/trying${where.app ? `/${where.app}` : ""}`;
+    case "tried": return `${SPACE}/w/${where.slug}/tried/${where.id}`;
     /*
       ⚠️ DECIDED BY SHAPE, NEVER BY A SECOND LIST. Seven console parts were
       written out here beside the `OF_CONSOLE` they came from — so the eighth
@@ -495,6 +508,7 @@ export function above(where: Where): Where | null {
           : { at: "workspace", slug: where.slug };
     case "wording": case "trying":
       return where.app ? { at: where.at, slug: where.slug } : { at: "workspace", slug: where.slug };
+    case "tried": return { at: "trying", slug: where.slug };
     /* ⚠️ THE SAME SHAPE TEST AS `pathOf`, and for the same reason — a console
        screen with no slug went "up" to a workspace that does not exist. */
     default:
@@ -525,6 +539,8 @@ export const nameOf = (where: Where): string => {
     case "brand": return "Brand";
     case "wording": return "In your words";
     case "trying": return "Try things early";
+    /* ⚠️ The feature names itself — this function holds no manifest. */
+    case "tried": return "Who has this";
     case "console": return "Operator";
     /*
       ⚠️ THE CONSOLE MAY USE A TECHNICAL WORD AND MAY NOT USE A DIFFERENT WORD

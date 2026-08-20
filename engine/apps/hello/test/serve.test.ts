@@ -164,6 +164,11 @@ describe("what the manifest produced", () => {
          declares one that says `setBy: "tenant"`. Without these two, that word
          meant nothing: the kernel resolved a level nobody could set. */
       "GET /api/flag.list",
+      /* ⚠️ AND THE PER-PERSON PAIR, which is the second half of how a feature
+         ships: we release it to a workspace, the workspace hands it to some of
+         its own staff. */
+      "GET /api/flag.people",
+      "POST /api/flag.person",
       "POST /api/flag.set",
       /* ⚠️ ONE PAIR PER PRODUCT THAT GENERATES — `aiOps` answers nothing for an
          app with no action, so these appear the day a manifest declares one and

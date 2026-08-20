@@ -30,7 +30,7 @@ import {
 import { compose, type Composed, type Resolved as ResolvedOp } from "./compose.js";
 import { switchesFor } from "./flags.js";
 
-const NO_SWITCHES = { deployment: {}, tenant: {} } as const;
+const NO_SWITCHES = { deployment: {}, tenant: {}, person: {} } as const;
 
 /**
  * ⚠️ WHETHER ANY PRODUCT HERE HAS A SWITCH AT ALL, so a deployment with none
@@ -727,8 +727,17 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
       chains off (see above) — so both run beside the identity rather than after
       the whole of `locate`. `apps/hello/test/request-cost.test.ts` measures it.
     */
+    /*
+      ⚠️ AND IT WAITS FOR THE IDENTITY, BECAUSE THE THIRD LEVEL IS A PERSON. A
+      workspace decides which of ITS OWN members get a feature it has been given,
+      so the row is keyed by workspace and account and the read cannot start
+      before both are known. It is still ONE query, and it runs beside the rest
+      of `locate` rather than after it — the identity is already in flight above.
+    */
     const switching = declaresAFlag(wiring)
-      ? locating.where.then((w) => (w ? switchesFor(wiring.directory, w.tenantId) : NO_SWITCHES))
+      ? Promise.all([locating.where, identifying]).then(([w, who]) => (w
+        ? switchesFor(wiring.directory, w.tenantId, who.accountId)
+        : NO_SWITCHES))
       : Promise.resolve(NO_SWITCHES);
 
     /*
@@ -838,6 +847,7 @@ export async function performOperation(
   switches?: Promise<{
     readonly deployment: Readonly<Record<string, boolean>>;
     readonly tenant: Readonly<Record<string, boolean>>;
+    readonly person: Readonly<Record<string, boolean>>;
   }>,
 ): Promise<Performed> {
   const { composed, op } = found;
@@ -918,7 +928,7 @@ export async function performOperation(
   const flags = resolveFlags(
     located.apps.map((id) => wiring.apps[id]?.().flags ?? {}),
     await (switches ?? (declaresAFlag(wiring)
-      ? switchesFor(wiring.directory, located.tenantId)
+      ? switchesFor(wiring.directory, located.tenantId, who.accountId)
       : NO_SWITCHES)),
   );
 

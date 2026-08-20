@@ -212,6 +212,12 @@ export const HOLDINGS: readonly HeldBy[] = [
      being tried at Eastgate, which is a fact about the workspace rather than
      about any person in it, and the workspace's own erasure takes it. */
   { table: "tenant_flag", person: [], why: "which workspaces hold an exception to a switch" },
+  /* ⚠️ SOMEBODY IS IN THIS ONE. It is a workspace's decision ABOUT a member —
+     "Eastgate gave this person the new editor early" — so the account is the
+     subject and both walks have to see it. It goes when the belonging does
+     (`forgetBelonging`), because a decision about a membership outlives nothing. */
+  { table: "person_flag", person: [theirs("account_id")], workspace: its(),
+    label: "Features a workspace gave you early, or held back from you" },
   /* ⚠️ NOBODY IS IN IT, AND THAT IS WORTH SAYING RATHER THAN ASSUMING. The
      sender address is ours, and every secret in the table is ciphertext under a
      key this database has never held — see `config.ts`. */

@@ -38,7 +38,7 @@ all of it is refused, gated, audited and erasable on the same terms as everythin
 an app writes itself.
 
 <!-- generated: node scripts/inventory.mjs surface -->
-**29 operations for declaring nothing.** A roster, an inbox and its
+**31 operations for declaring nothing.** A roster, an inbox and its
 two-level policy, the workspace's brand, the package rail it sells with, its
 settings, its bill, and the one bootstrap read every screen stands on.
 
@@ -66,6 +66,8 @@ settings, its bill, and the one bootstrap read every screen stands on.
 | `ai.wording` | read | *the session* |
 | `ai.word` | write | *the session* |
 | `flag.list` | read | *the session* |
+| `flag.people` | read | *the session* |
+| `flag.person` | write | *the session* |
 | `flag.set` | write | *the session* |
 | `setting.write` | write | *the session* |
 | `money.view` | read | `billing:read` |
@@ -316,6 +318,7 @@ before an app is resolved draws on them.
 | `job_schedule` | Nightly work you rescheduled | `by: anonymise` | kept |
 | `deployment_flag` | — *the deployment's own switches* | — | kept |
 | `tenant_flag` | — *which workspaces hold an exception to a switch* | — | kept |
+| `person_flag` | Features a workspace gave you early, or held back from you | `account_id: delete` | `tenant_id: delete` |
 | `maintenance` | — *the deployment's own switches* | — | kept |
 | `ai_binding` | — *which model an action runs on* | — | kept |
 | `ai_wording` | — *a workspace's own prompt letterheads* | — | `tenant_id: delete` |
@@ -419,7 +422,7 @@ env or a binding.
 | `directory` | accounts, workspaces, placement, enablement, allowances | 33 | — |
 | `handles` | which binding holds which shard | 3 | — |
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
-| `flags` | what somebody switched, per deployment and per workspace | 7 | — |
+| `flags` | what somebody switched, per deployment and per workspace | 10 | — |
 | `identity` | sign-in codes, sessions, tokens, proof | 21 | — |
 | `membership` | the roster and what each member may do | 12 | — |
 | `compose` | a manifest becomes a live surface of operations | 2 | — |
@@ -473,7 +476,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**406 of them**, 405 reached by something today.
+**409 of them**, 408 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

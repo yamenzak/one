@@ -19,7 +19,7 @@ import {
   type Channel, type PlanSpec,
 } from "@engine/kernel";
 import {
-  FlagConsole, Guide, NotificationPolicy, Settings, Shelf, Shell, settingsShown, policyShown,
+  Guide, NotificationPolicy, Settings, Shelf, Shell, settingsShown, policyShown,
 } from "@engine/design";
 import { HELLO } from "../src/index.js";
 
@@ -103,17 +103,11 @@ describe("everything hello declares reaches a screen", () => {
     for (const t of types) expect(out).toContain(t.label);
   });
 
-  it("renders every flag it declared", () => {
-    const flags = Object.values(HELLO.flags ?? {});
-    expect(flags.length).toBeGreaterThan(0);
-    const out = html(
-      <FlagConsole
-        book={HELLO.flags ?? {}} level="operator" deployment={{}} today="2026-08-14"
-        onSet={() => {}}
-      />,
-    );
-    for (const f of flags) expect(out).toContain(f.label);
-  });
+  /* ⚠️ THE FLAGS' OWN TEST MOVED, because the component it drew is deleted —
+     two screens draw flags now and both are in the space rather than in the
+     shared package. "Every declared flag reaches a surface" is asserted where
+     the surface is: `operator.test.ts` reads `op.flags` and checks the book
+     travels whole, label and reason included. */
 
   /* ⚠️ THE CATALOGUE IS THE DEPLOYMENT'S, so the shelf is fed one rather than
      reading an app's — a product has no plans of its own since the membership

@@ -20,7 +20,10 @@
 import type { AppSpec, TenantId } from "@engine/kernel";
 import { PUBLIC, checkSome, disclose, refusePrompt, resolve, valueOf } from "@engine/kernel";
 import { actionsOf, word, wordingOf } from "./ai-actions.js";
-import { deploymentFlags, setTenantFlag, tenantFlags } from "./flags.js";
+import {
+  deploymentFlags, flagCounts, flagPeople, setPersonFlag, setTenantFlag, tenantFlags,
+} from "./flags.js";
+import { memberFor, membersOf } from "./membership.js";
 import type { PlatformCtx } from "./member-ops.js";
 import type { Resolved } from "./compose.js";
 import type { SchemaModule } from "./schema.js";
@@ -174,10 +177,16 @@ export function settingOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       narrowing algebra existed with one caller, in a browser, drawing a switch
       on the operator's screen.
 
-      ⚠️ AND IT LISTS ONLY WHAT THIS CALLER MAY SET, resolved by the same
-      function the screen uses. A flag the deployment has switched off is not
-      offered — `off` above is absorbing, so a control for it would change
-      nothing, which is worse than an absent one.
+      ⚠️ AND IT LISTS EVERYTHING THIS WORKSPACE CAN DO ANYTHING ABOUT, which is
+      wider than what it can TOGGLE. It filtered on `setBy !== "operator"` and
+      that was the wrong question: a flag only we may switch, released to this
+      workspace, is one the workspace can still hand to some of its own people —
+      and that is the ordinary way a feature ships. `mayChoose` carries the
+      narrower answer to the row that needs it.
+
+      ⚠️ A FLAG THE DEPLOYMENT HAS SWITCHED OFF IS NOT OFFERED. `off` above is
+      absorbing, so every control for it would change nothing, which is worse
+      than an absent one.
     */
     "flag.list": op("flag.list", "read", "What this workspace can try early.",
       async (ctx, input) => {
@@ -187,13 +196,20 @@ export function settingOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         const book = target.flags ?? {};
         const mine = await tenantFlags(ctx.directory, ctx.tenantId);
         const above = await deploymentFlags(ctx.directory);
+        const people = await flagCounts(ctx.directory, ctx.tenantId);
         return {
           items: Object.values(book)
-            .filter((def) => def.setBy !== "operator" && above[def.id] !== false)
+            .filter((def) => above[def.id] !== false)
             .map((def) => ({
               id: def.id,
               label: def.label,
               why: def.why,
+              /* ⚠️ WHETHER THE WORKSPACE MAY MOVE THE WORKSPACE SWITCH, which is
+                 not whether it may do anything at all — see above. */
+              mayChoose: def.setBy !== "operator",
+              /* ⚠️ HOW MANY OF ITS OWN PEOPLE IT HAS DECIDED FOR, so a row can
+                 say "on, and two people differ" rather than just "on". */
+              people: people[def.id] ?? 0,
               /* ⚠️ WHAT IS TRUE NOW, from the same walk the gate makes. A screen
                  computing its own would answer differently for a flag nobody has
                  touched, which is most of them. */
@@ -207,6 +223,93 @@ export function settingOps(app: AppSpec): Readonly<Record<string, Resolved>> {
               chosen: mine[def.id] ?? null,
             })),
         };
+      }),
+
+    /*
+      ⚠️ THE ROSTER, WITH WHAT EACH PERSON HAS — the half that makes this the way
+      a feature is normally released. We give the feature to a WORKSPACE; the
+      workspace decides which of its own people get it. Without this the second
+      half of that sentence had nowhere to happen.
+    */
+    "flag.people": op("flag.people", "read", "Who in this workspace has this.",
+      async (ctx, input) => {
+        if (!ctx.accountId) return ctx.fail("platform.unauthorized");
+        const target = targetOf(ctx, input);
+        if (!target) return ctx.fail("platform.not_found");
+        const def = (target.flags ?? {})[String(input.id ?? "")];
+        if (!def) return ctx.fail("platform.not_found");
+
+        const [above, mine, theirs, roster] = await Promise.all([
+          deploymentFlags(ctx.directory),
+          tenantFlags(ctx.directory, ctx.tenantId),
+          flagPeople(ctx.directory, ctx.tenantId, def.id),
+          membersOf(ctx.db, ctx.tenantId as TenantId),
+        ]);
+        /* ⚠️ WHAT THE WORKSPACE ITSELF HAS, so a row can say whether a person is
+           being given something early or held back from something everybody
+           else has. Both are real and they read differently. */
+        const forAll = resolve(def, {
+          ...(above[def.id] !== undefined ? { deployment: above[def.id] } : {}),
+          ...(mine[def.id] !== undefined ? { tenant: mine[def.id] } : {}),
+        });
+        return {
+          /* ⚠️ THE FEATURE NAMES ITSELF, because the page holds no manifest. The
+             centre is one bundle for every product, so the alternative is
+             sending every flag book to every workspace on the one read every
+             screen stands on — for a label and a sentence this screen needs and
+             no other does. */
+          label: def.label,
+          why: def.why,
+          workspace: forAll,
+          items: roster
+            /* ⚠️ AN UNCLAIMED INVITATION HAS NO ACCOUNT, and a row keyed by one
+               would be a decision about nobody. */
+            .filter((m) => m.accountId)
+            .map((m) => ({
+              accountId: m.accountId,
+              email: m.email,
+              chosen: theirs[m.accountId] ?? null,
+              on: resolve(def, {
+                ...(above[def.id] !== undefined ? { deployment: above[def.id] } : {}),
+                ...(mine[def.id] !== undefined ? { tenant: mine[def.id] } : {}),
+                ...(theirs[m.accountId] !== undefined ? { person: theirs[m.accountId] } : {}),
+              }),
+            })),
+        };
+      }),
+
+    "flag.person": op("flag.person", "write", "Give one person this, or hold them back.",
+      async (ctx, input) => {
+        if (!ctx.accountId) return ctx.fail("platform.unauthorized");
+        const target = targetOf(ctx, input);
+        if (!target) return ctx.fail("platform.not_found");
+        const def = (target.flags ?? {})[String(input.id ?? "")];
+        if (!def) return ctx.fail("platform.not_found");
+        const at = String(input.person ?? "").trim();
+        if (!at) return ctx.fail("platform.invalid");
+
+        /*
+          ⚠️ DECIDING FOR SOMEBODY ELSE IS WORKSPACE AUTHORITY; deciding for
+          YOURSELF is allowed only where the flag says a person may. That is the
+          whole of `setBy` on this door — one is an admin distributing what the
+          workspace was given, the other is somebody opting themselves in.
+        */
+        const own = at === ctx.accountId;
+        if (!own || def.setBy !== "person") {
+          const held = await ctx.permissionsIn(target.id);
+          if (!held.has("member:manage")) return ctx.fail("platform.forbidden");
+        }
+        /* ⚠️ ON THIS WORKSPACE'S OWN ROSTER, or a workspace could hand a feature
+           to an account it has nothing to do with. */
+        const member = await memberFor(ctx.db, ctx.tenantId as TenantId, at as never);
+        if (!member) return ctx.fail("platform.not_found");
+        /* ⚠️ REFUSED UNDER A KILL SWITCH rather than stored and ignored. */
+        if ((await deploymentFlags(ctx.directory))[def.id] === false) {
+          return ctx.fail("platform.not_found");
+        }
+        const on = input.on === null ? null : input.on === true;
+        await setPersonFlag(ctx.directory, ctx.tenantId, at, def.id, on, ctx.now);
+        return { id: def.id, person: at, on };
       }),
 
     "flag.set": op("flag.set", "write", "Decide a switch for this workspace.",

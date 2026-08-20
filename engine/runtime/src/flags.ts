@@ -32,20 +32,60 @@ import type { Db } from "./sql.js";
  * the deployments using a feature pay is the only kind worth adding.
  */
 export async function switchesFor(
-  db: Db, tenantId: string,
+  db: Db, tenantId: string, accountId?: string | null,
 ): Promise<{
   readonly deployment: Readonly<Record<string, boolean>>;
   readonly tenant: Readonly<Record<string, boolean>>;
+  readonly person: Readonly<Record<string, boolean>>;
 }> {
+  /*
+    ⚠️ THREE LEVELS, STILL ONE TRIP. The person's rows are keyed by workspace AND
+    account, so they join this statement rather than needing one of their own —
+    and a caller with no account (a public read) binds a value nothing matches
+    instead of branching, which keeps the query one shape.
+  */
   const rows = await db.prepare(
     `SELECT 'all' AS lvl, id, on_flag FROM deployment_flag
      UNION ALL
-     SELECT 'one' AS lvl, id, on_flag FROM tenant_flag WHERE tenant_id = ?`)
-    .bind(tenantId).all<{ lvl: string; id: string; on_flag: number }>();
+     SELECT 'one' AS lvl, id, on_flag FROM tenant_flag WHERE tenant_id = ?1
+     UNION ALL
+     SELECT 'me' AS lvl, id, on_flag FROM person_flag
+      WHERE tenant_id = ?1 AND account_id = ?2`)
+    .bind(tenantId, accountId ?? "").all<{ lvl: string; id: string; on_flag: number }>();
   const deployment: Record<string, boolean> = {};
   const tenant: Record<string, boolean> = {};
-  for (const r of rows.results) (r.lvl === "all" ? deployment : tenant)[r.id] = !!r.on_flag;
-  return { deployment, tenant };
+  const person: Record<string, boolean> = {};
+  const at = { all: deployment, one: tenant, me: person } as const;
+  for (const r of rows.results) {
+    (at[r.lvl as keyof typeof at] ?? deployment)[r.id] = !!r.on_flag;
+  }
+  return { deployment, tenant, person };
+}
+
+/** ⚠️ `null` clears, for the same reason it does one level up. */
+export async function setPersonFlag(
+  db: Db, tenantId: string, accountId: string, id: string, on: boolean | null,
+  now = new Date(),
+): Promise<void> {
+  if (on === null) {
+    await db.prepare(`DELETE FROM person_flag WHERE tenant_id = ? AND account_id = ? AND id = ?`)
+      .bind(tenantId, accountId, id).run();
+    return;
+  }
+  await db.prepare(
+    `INSERT INTO person_flag (tenant_id, account_id, id, on_flag, at) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(tenant_id, account_id, id) DO UPDATE SET on_flag = excluded.on_flag, at = excluded.at`)
+    .bind(tenantId, accountId, id, on ? 1 : 0, now.toISOString()).run();
+}
+
+/** ⚠️ Who in this workspace holds a row for one flag, so the screen can undo it. */
+export async function flagPeople(
+  db: Db, tenantId: string, id: string,
+): Promise<Readonly<Record<string, boolean>>> {
+  const rows = await db.prepare(
+    `SELECT account_id, on_flag FROM person_flag WHERE tenant_id = ? AND id = ?`)
+    .bind(tenantId, id).all<{ account_id: string; on_flag: number }>();
+  return Object.fromEntries(rows.results.map((r) => [r.account_id, !!r.on_flag]));
 }
 
 /** ⚠️ The deployment's own answer. `off` here is absorbing — see `resolve`. */
@@ -150,4 +190,19 @@ export async function flagHolders(
   return rows.results.map((r) => ({
     id: r.id, name: r.name, slug: r.slug, on: !!r.on_flag,
   }));
+}
+
+/**
+ * ⚠️ HOW MANY PEOPLE THIS WORKSPACE HAS DECIDED FOR, PER FLAG. A row saying "on"
+ * over a workspace where four people are held back is a row that is true and
+ * misleading — the count is what makes the exception visible from the list
+ * rather than only from inside.
+ */
+export async function flagCounts(
+  db: Db, tenantId: string,
+): Promise<Readonly<Record<string, number>>> {
+  const rows = await db.prepare(
+    `SELECT id, COUNT(*) AS n FROM person_flag WHERE tenant_id = ? GROUP BY id`)
+    .bind(tenantId).all<{ id: string; n: number }>();
+  return Object.fromEntries(rows.results.map((r) => [r.id, r.n]));
 }

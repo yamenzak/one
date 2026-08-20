@@ -21,6 +21,7 @@ import { Packages } from "../centre/Packages.js";
 import { Plan } from "../centre/Plan.js";
 import { SettingsArea } from "../centre/SettingsArea.js";
 import { Trust } from "../centre/Trust.js";
+import { Tried } from "../centre/Tried.js";
 import { Trying } from "../centre/Trying.js";
 import { Wording } from "../centre/Wording.js";
 import { Notices } from "../centre/Notices.js";
@@ -36,13 +37,15 @@ import { useSession } from "../session.js";
  */
 export type Part = WorkspaceScreen;
 
-export function WorkspacePart({ part, slug, app, area, onGo }: {
+export function WorkspacePart({ part, slug, app, area, id, onGo }: {
   readonly part: Part;
   readonly slug: string;
   /** Which product, on the two screens that have one per product. */
   readonly app?: string;
   /** Which page of a product's settings — they descend (DESIGN.md §3). */
   readonly area?: string;
+  /** Which feature, on the one screen that is about a single one. */
+  readonly id?: string;
   readonly onGo: (to: Where) => void;
 }) {
   const { where } = useSession();
@@ -81,7 +84,11 @@ export function WorkspacePart({ part, slug, app, area, onGo }: {
     case "notices": return <Notices view={view} />;
     case "trust": return <Trust view={view} where={where} />;
     case "trying":
-      return <Trying view={view} app={app} />;
+      return <Trying view={view} app={app} slug={slug} onGo={onGo} />;
+    case "tried":
+      /* ⚠️ WITHOUT ONE THERE IS NO SCREEN, and the honest answer is the
+         workspace rather than a page about no feature. */
+      return id ? <Tried view={view} id={id} /> : null;
     case "wording":
       return (
         <Wording

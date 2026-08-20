@@ -49,7 +49,16 @@ const SURFACES = {
      it descends from — see `Settings`. */
   settingAreas: { file: "design/src/rendered/settings.tsx", renders: "areasOn(book, areas, level)" },
   notifications: { file: "design/src/rendered/policy.tsx", renders: "export function NotificationPolicy" },
-  flags: { file: "design/src/rendered/console.tsx", renders: "export function FlagConsole" },
+  /*
+    ⚠️ TWO SCREENS DRAW FLAGS AND NEITHER IS IN THE SHARED PACKAGE, WHICH IS THE
+    POINT OF NAMING THE FILE HERE. It was `FlagConsole` — one component general
+    over the three levels — and when both surfaces were built properly neither
+    wanted it: the operator's is a LIST that descends, because a switch has three
+    states and a list of exceptions; the workspace's is a toggle for what it may
+    change beside a row leading to its own people. This names the workspace's,
+    because that is the one a PRODUCT's declaration reaches.
+  */
+  flags: { file: "one-space/src/centre/Trying.tsx", renders: "export function Trying" },
   plans: { file: "design/src/rendered/console.tsx", renders: "export function Shelf" },
   entitlements: { file: "design/src/rendered/console.tsx", renders: "export function Shelf" },
   whitelabel: { file: "design/src/tokens/theme.ts", renders: "export function brandCss" },

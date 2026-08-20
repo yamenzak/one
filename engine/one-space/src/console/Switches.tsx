@@ -38,7 +38,9 @@ interface FlagsAnswer {
   readonly tried: Readonly<Record<string, { readonly on: number; readonly off: number }>>;
 }
 
-const ONE = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+/** ⚠️ The verb agrees too — "11 workspaces differs" is a sentence nobody wrote. */
+const SOME = (n: number, one: string, many: string) =>
+  `${n} ${n === 1 ? one : many} ${n === 1 ? "differs" : "differ"}`;
 
 /**
  * ⚠️ ONE LINE, AND IT IS THE MOST ALARMING TRUE THING. A row carrying the stage,
@@ -47,7 +49,7 @@ const ONE = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : ma
  * exception beats the plain state, because that is the order somebody would want
  * to be told.
  */
-function saying(
+export function saying(
   def: FlagDef,
   at: boolean | undefined,
   tried: { readonly on: number; readonly off: number } | undefined,
@@ -58,7 +60,7 @@ function saying(
     : at === false ? "Off for everybody"
       : def.fallback ? "On unless a workspace says otherwise" : "Off unless a workspace says so";
   const some = (tried?.on ?? 0) + (tried?.off ?? 0);
-  return some ? `${state} · ${ONE(some, "workspace", "workspaces")} differs` : state;
+  return some ? `${state} · ${SOME(some, "workspace", "workspaces")}` : state;
 }
 
 export function Switches({ onGo }: { readonly onGo: (to: Where) => void }) {

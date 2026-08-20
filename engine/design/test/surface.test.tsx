@@ -2,7 +2,7 @@
  * WHAT A PERSON IS OFFERED, AND WHAT THEY ARE NOT.
  *
  * ⚠️ EVERY ASSERTION HERE IS ABOUT A SCREEN NOBODY WROTE. The settings screens,
- * the notification policy, the flag console and the plan shelf are rendered from
+ * the notification policy and the plan shelf are rendered from
  * the declarations — so what these prove is the autodiscovery rule in both
  * directions: everything declared reaches a surface, and nothing appears that a
  * person could press to no effect.
@@ -19,7 +19,7 @@ import { area, field, flag, notification, setting, type Channel, type FieldSpec 
 import { Settings, settingsShown } from "../src/rendered/settings.js";
 import { Shown } from "../src/rendered/edit.js";
 import { NotificationPolicy, policyShown } from "../src/rendered/policy.js";
-import { FlagConsole, Shelf, saying } from "../src/rendered/console.js";
+import { Shelf, saying } from "../src/rendered/console.js";
 import { Storage, Wallet } from "../src/rendered/money.js";
 import { Shell, reachable } from "../src/frame/shell.js";
 import { ControlRow, Group, NavRow, ToggleRow } from "../src/parts/surfaces.js";
@@ -253,43 +253,16 @@ describe("the notification policy screen", () => {
   });
 });
 
-/* ----------------------------------------------------------------- flags --- */
-
-describe("the flag console", () => {
-  const book = {
-    "note-search": flag({
-      id: "note-search", label: "Search", why: "Being tried before everybody gets it.",
-      stage: "trying", fallback: false, setBy: "tenant", retire: "2026-01-01" as never,
-    }),
-  };
-
-  /*
-    ⚠️ THE DEPLOYMENT'S `off` IS ABSORBING, AND THE SCREEN SAYS WHY THE SWITCH IS
-    DEAD. A kill switch a tenant can beat does not work on the only day it is
-    used.
-  */
-  it("locks a tenant out of a switch we have turned off, and says so", () => {
-    const out = html(
-      <FlagConsole
-        book={book} level="tenant" deployment={{ "note-search": false }}
-        today="2025-06-01" onSet={() => {}}
-      />,
-    );
-    expect(out).toContain("only an operator can change it");
-  });
-
-  /* ⚠️ Reported, never enforced. Withholding a capability on a date somebody
-     typed a year ago is an outage nobody asked for. */
-  it("reports an overdue flag without switching it off", () => {
-    const out = html(
-      <FlagConsole
-        book={book} level="operator" deployment={{ "note-search": true }}
-        today="2026-06-01" onSet={() => {}}
-      />,
-    );
-    expect(out).toContain("Past its retirement date");
-  });
-});
+/*
+  ⚠️ THE FLAG SUITE IS GONE WITH `FlagConsole`, AND BOTH BEHAVIOURS ARE STILL
+  CHECKED. It drew a book of flags as a run of toggles, and when the two surfaces
+  that show flags were built properly neither wanted that shape — the operator's
+  is a LIST that descends, the workspace's is a toggle beside a row leading to its
+  own people. The kill switch's absorbing `off` is now `flag.list` answering with
+  nothing at all rather than a row explaining why it is dead, asserted and
+  mutation-tested in `apps/hello/test/operator.test.ts`; the overdue wording is
+  the switch list's second line, in `one-space/test/where.test.ts`.
+*/
 
 /* ----------------------------------------------------------------- shelf --- */
 

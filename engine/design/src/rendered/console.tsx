@@ -23,82 +23,16 @@ import { SPACE } from "../tokens/metrics.js";
 import { Reveal } from "../parts/blocks.js";
 import { useShown } from "../parts/said.js";
 
-/* ------------------------------------------------------------------ flags --- */
-
-export interface FlagConsoleProps {
-  readonly book: FlagBook;
-  /** Where this console sits. A tenant may not set an operator's switch. */
-  readonly level: "operator" | "tenant" | "person";
-  /** The group's heading, and what these switches are, in a line. */
-  readonly label?: string;
-  /** ⚠️ Whose switches these are — a product, drawn beside the heading. */
-  readonly face?: FaceOf;
-  readonly under?: string;
-  readonly deployment: Readonly<Record<string, boolean>>;
-  readonly tenant?: Readonly<Record<string, boolean>>;
-  readonly person?: Readonly<Record<string, boolean>>;
-  readonly today: string;
-  readonly onSet: (id: string, on: boolean) => void;
-}
-
-export function FlagConsole(props: FlagConsoleProps) {
-  const { book, level, label, face, under, deployment, tenant, person, today, onSet } = props;
-  const late = new Set(overdue(book, today as never));
-  const shown = useShown();
-
-  return (
-    /*
-      ⚠️ A FLAG IS A ROW WITH A SWITCH ON IT — which is `ToggleRow`, and which is
-      what every other switch in this product already is. Each flag was a `Card`
-      with a title, a description and a content area holding the switch and up to
-      three chips; the switch rendered its own word UNDER itself, so a list of
-      four flags was four cards deep and each said "Off" in a place nothing else
-      does.
-
-      ⚠️ AND THE STAGE, THE LOCK AND THE RETIREMENT ARE ONE LINE, NOT THREE CHIPS.
-      Only one of them is ever the thing worth knowing, and it is always the most
-      alarming one that is true — so the row says that and the rest is noise it
-      does not need to carry.
-    */
-    <Group label={label} face={face} under={under}>
-      {Object.values(book).map((def: FlagDef) => {
-        const switches = {
-          deployment: deployment[def.id],
-          tenant: tenant?.[def.id],
-          person: person?.[def.id],
-        };
-        const on = resolve(def, switches);
-        const mine = settableBy(def, switches).includes(level);
-
-        return (
-          <ToggleRow
-            key={def.id}
-            label={def.label}
-            /* ⚠️ Says WHY it cannot be changed here, because a disabled control
-               with no reason reads as broken. Reported, never enforced: taking a
-               capability away on a date somebody typed a year ago is an outage
-               nobody asked for. */
-            /* ⚠️ AND A RETIREMENT DATE IS SAID BEFORE IT PASSES, not only after.
-               `overdue` fires on the day it is missed, so a flag due to go in
-               three weeks read exactly like one with no end at all — and the
-               whole reason a `trying` flag carries a date is that somebody is
-               supposed to see it coming. */
-            under={!mine
-              ? "Switched off further up — only an operator can change it"
-              : late.has(def.id)
-                ? "Past its retirement date — this should be the product now"
-                : def.retire
-                  ? `${def.why} · goes ${sayDate(shown, def.retire, "short")}`
-                  : def.why}
-            value={on}
-            isDisabled={!mine}
-            onChange={(next) => onSet(def.id, next)}
-          />
-        );
-      })}
-    </Group>
-  );
-}
+/*
+  ⚠️ `FlagConsole` WAS HERE AND IS GONE, AND THE GUARD IS WHY. It drew a book of
+  flags as a run of toggles with the three-level algebra resolved per row — and
+  when the two surfaces that show flags were built properly, neither wanted that
+  shape. The operator's is a LIST that descends, because a switch has three
+  states and a list of exceptions; the workspace's is a toggle for what it may
+  change and a row leading to its people for what it may only share. A component
+  general enough for both was general enough for neither, and `showcase` reported
+  it as shipped and drawn by nothing twice before it was deleted.
+*/
 
 /* ------------------------------------------------------------------ shelf --- */
 

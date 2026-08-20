@@ -275,11 +275,36 @@ describe("a switch that is ours", () => {
     expect(resolve(trial, { deployment: true, tenant: true, person: false })).toBe(false);
   });
 
-  /* ⚠️ A person may not set an operator's flag — otherwise "operator" is a
-     label on a screen rather than an authority. */
-  it("ignores a person's opinion about a switch that is not theirs", () => {
+  /*
+    ⚠️ A STORED VALUE IS HONOURED AT EVERY LEVEL, WHOEVER THE FLAG SAYS MAY SET
+    IT. This asserted the opposite and the opposite is what broke releasing a
+    feature: `resolve` discarded a workspace's row for a flag declaring
+    `setBy: "operator"`, so a switch only WE control — which is most of them —
+    could not be given to one customer at a time. That is the ordinary way a
+    feature ships: to a workspace, then to more.
+
+    ⚠️ WHO MAY WRITE IS A DIFFERENT QUESTION AND `settableBy` IS WHERE IT LIVES.
+    A row exists only because somebody entitled to write it did; asking again
+    while reading throws away decisions that were correctly made.
+  */
+  it("honours a workspace's row for a switch only we may set", () => {
     const ours = { ...trial, setBy: "operator" as const };
-    expect(resolve(ours, { deployment: true, tenant: false, person: false })).toBe(true);
+    expect(resolve(ours, { tenant: true })).toBe(true);
+    expect(resolve(ours, { deployment: true, tenant: false })).toBe(false);
+    /* ⚠️ And nobody below the operator may WRITE one. */
+    expect(settableBy(ours)).toEqual(["operator"]);
+  });
+
+  /*
+    ⚠️ AND A PERSON'S ROW IS THIS PERSON IN THIS WORKSPACE. Early access at one
+    workspace is not early access at another — the workspace decided it, for
+    somebody on its own roster. Keyed by account alone it would follow them into
+    every other workspace they belong to.
+  */
+  it("lets a workspace give one of its own people a feature the rest do not have", () => {
+    expect(resolve(trial, { tenant: true, person: false })).toBe(false);
+    expect(resolve({ ...trial, fallback: false }, { tenant: false, person: true })).toBe(false);
+    expect(resolve(trial, { person: true })).toBe(true);
   });
 
   /*

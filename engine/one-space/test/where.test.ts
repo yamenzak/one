@@ -12,6 +12,7 @@ import {
   SPACE, OF_AI, OF_CONSOLE, OF_WORKSPACE, above, groundOf, inSpace, isConsole, nameOf,
   parseWhere, partsFor, pathOf,
 } from "../src/space/where.js";
+import { saying } from "../src/console/Switches.js";
 import { LANES } from "@engine/kernel";
 
 describe("what belongs to OneSpace", () => {
@@ -252,5 +253,48 @@ describe("one lane of the catalogue", () => {
   it("is named by the lane rather than by its key", () => {
     expect(nameOf({ at: "models", lane: "text" })).toBe("Text");
     expect(nameOf({ at: "models" })).toBe("Models");
+  });
+});
+
+/* ------------------------------------------------------------- a switch --- */
+
+/**
+ * ⚠️ WHAT A SWITCH ROW SAYS, AND IT CARRIES ONE FACT OF FOUR. The stage, the
+ * state, the exception count and the retirement date are each true and only one
+ * of them is ever the thing worth knowing — so the row says the most alarming
+ * true one and the reader is not left to work out which mattered.
+ *
+ * ⚠️ AND THE OVERDUE LINE MOVED HERE FROM `FlagConsole`, which is deleted. A
+ * flag past its date is REPORTED, never enforced: withholding a capability
+ * because of a date somebody typed a year ago is an outage nobody asked for.
+ */
+describe("what a switch's row says", () => {
+  const def = {
+    id: "note-search", label: "Search", why: "Being tried before it goes to everybody.",
+    stage: "trying" as const, fallback: false, setBy: "tenant" as const,
+  };
+
+  it("says the retirement first, because it outranks every other true thing", () => {
+    expect(saying(def, true, { on: 4, off: 0 }, true))
+      .toBe("Past its retirement date — this should be the product now");
+  });
+
+  /* ⚠️ THREE STATES, AND THE MIDDLE ONE IS WHERE A TRIAL LIVES. "Off" and "off
+     unless a workspace says so" are different facts and the second is the one
+     that leaves room for a customer to be given the feature. */
+  it("tells an unset switch apart from one we have turned off", () => {
+    expect(saying(def, undefined, undefined, false)).toBe("Off unless a workspace says so");
+    expect(saying({ ...def, fallback: true }, undefined, undefined, false))
+      .toBe("On unless a workspace says otherwise");
+    expect(saying(def, false, undefined, false)).toBe("Off for everybody");
+  });
+
+  /* ⚠️ AND "ON FOR EVERYBODY" OVER ELEVEN EXCEPTIONS IS TRUE AND MISLEADING. */
+  it("counts the workspaces that differ", () => {
+    expect(saying(def, true, { on: 1, off: 0 }, false)).toBe("On for everybody · 1 workspace differs");
+    /* ⚠️ AND THE VERB AGREES. "11 workspaces differs" is a sentence nobody wrote
+       and it is what a bare count-plus-suffix produces. */
+    expect(saying(def, true, { on: 4, off: 7 }, false))
+      .toBe("On for everybody · 11 workspaces differ");
   });
 });

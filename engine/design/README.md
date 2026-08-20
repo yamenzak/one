@@ -168,10 +168,10 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 56 |
 | `parts/` | rows, cards, lists, controls, the four outcomes | 148 |
-| `rendered/` | whole surfaces drawn from a kernel declaration | 55 |
+| `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**366 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**364 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -224,7 +224,7 @@ there is no deep import, and a guard says so.
 ### `rendered/`
 
 - `rendered/ai.tsx` — `ModelLine`, `ModelLineProps`, `per`, `perMillion`
-- `rendered/console.tsx` — `FlagConsole`, `FlagConsoleProps`, `saying`, `Shelf`, `ShelfProps`, `useMoney`
+- `rendered/console.tsx` — `saying`, `Shelf`, `ShelfProps`, `useMoney`
 - `rendered/edit.tsx` — `Edit`, `EditProps`, `EditRow`, `Refusal`, `refuse`, `Shown`
 - `rendered/field.tsx` — `Field`, `FieldProps`
 - `rendered/guide.tsx` — `Guide`, `GuideProps`, `Help`, `HelpProps`, `Milestones`, `MilestonesProps`

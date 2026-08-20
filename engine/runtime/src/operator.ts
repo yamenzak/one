@@ -75,6 +75,13 @@ export const OPERATOR_SCHEMA: SchemaModule = {
        once, which is what `trying` means and what the deployment level alone
        cannot express. */
     `CREATE TABLE IF NOT EXISTS tenant_flag (tenant_id TEXT NOT NULL, id TEXT NOT NULL, on_flag INTEGER NOT NULL, at TEXT NOT NULL, PRIMARY KEY (tenant_id, id));`,
+    /* ⚠️ ONE PERSON IN ONE WORKSPACE, AND THE TENANT IN THE KEY IS LOAD-BEARING.
+       This is the workspace choosing which of its own members get a feature it
+       has been given — so the same account, in somebody else's workspace, is
+       somebody else's member and inherits nothing. Keyed by account alone, one
+       workspace's decision would follow a person into every other workspace they
+       belong to. */
+    `CREATE TABLE IF NOT EXISTS person_flag (tenant_id TEXT NOT NULL, account_id TEXT NOT NULL, id TEXT NOT NULL, on_flag INTEGER NOT NULL, at TEXT NOT NULL, PRIMARY KEY (tenant_id, account_id, id));`,
     /* ⚠️ One row, and the primary key says so — two maintenance modes at once
        is two answers to "may this request run". */
     `CREATE TABLE IF NOT EXISTS maintenance (id TEXT PRIMARY KEY CHECK (id = 'the'), mode TEXT NOT NULL, at TEXT NOT NULL);`,

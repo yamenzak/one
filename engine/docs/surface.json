@@ -304,6 +304,18 @@
         "path": "/api/flag.list"
       },
       {
+        "id": "flag.people",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/flag.people"
+      },
+      {
+        "id": "flag.person",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/flag.person"
+      },
+      {
         "id": "flag.set",
         "kind": "write",
         "method": "POST",
@@ -980,6 +992,15 @@
         "why": "which workspaces hold an exception to a switch",
         "onForget": [],
         "onClose": null
+      },
+      {
+        "table": "person_flag",
+        "export": "Features a workspace gave you early, or held back from you",
+        "why": null,
+        "onForget": [
+          "account_id: delete"
+        ],
+        "onClose": "tenant_id: delete"
       },
       {
         "table": "maintenance",

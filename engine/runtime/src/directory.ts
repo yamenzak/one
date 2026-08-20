@@ -560,6 +560,14 @@ export async function membersOfTenant(db: Db, tenantId: TenantId): Promise<reado
 export async function forgetBelonging(db: Db, accountId: AccountId, tenantId: TenantId): Promise<void> {
   await db.prepare(`DELETE FROM belongs WHERE account_id = ? AND tenant_id = ?`)
     .bind(accountId, tenantId).run();
+  /*
+    ⚠️ AND WHAT THIS WORKSPACE DECIDED ABOUT THEM GOES WITH THE BELONGING. The
+    row says "Eastgate gave this person the new editor early" — a fact about a
+    membership, so it is meaningless the moment the membership ends and would sit
+    there being applied again if they were ever invited back.
+  */
+  await db.prepare(`DELETE FROM person_flag WHERE account_id = ? AND tenant_id = ?`)
+    .bind(accountId, tenantId).run();
 }
 
 /**
