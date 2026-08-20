@@ -236,15 +236,15 @@ export const TRAVEL_MOTION = [
     keep in step, for a parallax nobody asked for.
 
     ⚠️ ONLY THE OLD PICTURE FADES, AND THAT IS WHAT MAKES IT A DISSOLVE RATHER
-    THAN A DIP. Fading both — one out, one in — leaves the screen showing a
-    fraction of each for the whole transition, and two half-transparent pictures
-    over a dark page do not add up to one opaque one. Measured on a phone at
-    390: mean brightness fell 28% within 40ms of the press, sat a fifth below the
-    page for a quarter of a second, and jumped back the moment the snapshots were
-    thrown away. That is the flash, and no easing pairing fixes it — it is
-    arithmetic. The new snapshot is a whole opaque page, so leaving it at full
-    strength UNDER the old one dissolves between two complete pictures and every
-    intermediate frame is as bright as both ends.
+    THAN A DIP. The two snapshots are stacked and blended `normal`, so between
+    them they show `old + new(1 - old)` of what they paint — which reaches full
+    strength only when ONE of them is fully opaque. Fading both means neither
+    ever is: a classic pair passing through 0.5 and 0.5 leaves a QUARTER of the
+    page washed out, for the whole transition. Measured on a phone at 390: mean
+    brightness fell 28% within 40ms of the press, sat a fifth below the page for
+    a quarter of a second, and jumped back the moment the snapshots were thrown
+    away. No easing pairing fixes it — it is arithmetic, and the fix has to be
+    that one side stays at 1.
 
     ⚠️ THE `animation: none` ON THE ARRIVING SIDE IS THE LOAD-BEARING HALF. With
     no rule at all the browser applies its OWN fade-in, which is precisely the
