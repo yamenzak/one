@@ -153,6 +153,45 @@ describe("moving a workspace's records", () => {
   });
 
   /*
+    ⚠️ AND THE JURISDICTION MOVES WITH THE RECORDS, WHICH IT DID NOT. `move.ts`
+    called a move "the only way its jurisdiction can ever change" and nothing in
+    it ever wrote `residency` — so a workspace copied into another regime went on
+    being addressed as the old one: the wrong bucket for its files, the wrong
+    answer on its own Data & Trust screen, and a promise broken by the migration
+    meant to keep it.
+
+    ⚠️ AND AN ORDINARY MOVE LEAVES IT ALONE. Rebalancing between two shards in
+    one jurisdiction is most moves, and one that quietly rewrote the column would
+    be the same fault pointing the other way.
+  */
+  it("carries the jurisdiction only when the move was asked to", async () => {
+    await addShard(directory(), "global-1", "global", 100);
+    await noteShardApp(directory(), "global-1", "hello" as never);
+
+    await beginMove(directory(), id as never, "eu-2");
+    await carryRows(one(), two(), id as never, [app()]);
+    await finishMove(directory(), one(), two(), id as never, [app()]);
+    expect((await tenantById(directory(), id as never))?.residency).toBe("eu");
+  });
+
+  it("writes the new jurisdiction when the move was into one", async () => {
+    await addShard(directory(), "global-1", "global", 100);
+    await noteShardApp(directory(), "global-1", "hello" as never);
+
+    /* ⚠️ THE TARGET IS IN THE JURISDICTION BEING MOVED INTO, and a first draft of
+       this test moved to an EU shard "into global" — refused, correctly. The
+       shard's own jurisdiction is the promise; `into` says the change is
+       deliberate, not that it can be pretended. */
+    expect(await beginMove(directory(), id as never, "global-1", new Date(), "global")).toBeNull();
+    await carryRows(one(), two(), id as never, [app()]);
+    expect(await finishMove(directory(), one(), two(), id as never, [app()])).toBeNull();
+
+    const tenant = await tenantById(directory(), id as never);
+    expect(tenant?.residency).toBe("global");
+    expect(tenant?.shardId).toBe("global-1");
+  });
+
+  /*
     ⚠️ AND THE SOURCE IS NOT EMPTIED. A move that deleted it is unrecoverable the
     moment the copy turns out to have been wrong — which is a thing you learn
     afterwards or not at all.

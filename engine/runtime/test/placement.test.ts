@@ -300,6 +300,53 @@ describe("switching a product on", () => {
     if (typeof made === "string") throw new Error(made);
     expect(await mayMove(directory(), made.tenant.id, "global-1")).toBe("wrong_residency");
   });
+
+  /*
+    ⚠️ AND ALLOWS IT WHEN THE CHANGE IS THE POINT OF THE MOVE. `wrong_residency`
+    above is the protection against a workspace quietly ending up under a regime
+    nobody promised it; asked for by name it is the only way a jurisdiction ever
+    changes at all, because Cloudflare fixes a database's at creation.
+
+    ⚠️ THIS FILE'S OWN HEADER LISTED "a residency promise broken by a rebalance"
+    as a failure it exists to catch, and the case it could not catch was the
+    opposite one: a promise that could never be KEPT, because `move.ts` claimed
+    to be how jurisdiction changes and nothing in it ever wrote the column.
+  */
+  it("allows a move that is deliberately into another jurisdiction", async () => {
+    await addShard(directory(), "eu-1", "eu", 100);
+    await addShard(directory(), "global-1", "global", 100);
+    for (const s of ["eu-1", "global-1"]) await noteShardApp(directory(), s, "notes");
+    const made = await createTenant(directory(), {
+      slug: "acme", name: "Acme", country: "DE", where: "eu", apps: ["notes"],
+    });
+    if (typeof made === "string") throw new Error(made);
+    expect(await mayMove(directory(), made.tenant.id, "global-1", "global")).toBe(null);
+  });
+
+  /*
+    ⚠️ A DEDICATED SHARD TAKES ITS OWN TENANT, which is the whole of isolation and
+    was refused. `refusePlacement` was asked on behalf of nobody, so the shard
+    reserved FOR this workspace answered `someone_elses` about it — dedicate then
+    move is the only isolation flow there is, and its second step refused its
+    first step's own result.
+  */
+  it("lets a workspace move onto the shard reserved for it, and nobody else onto it", async () => {
+    await addShard(directory(), "eu-1", "eu", 100);
+    await noteShardApp(directory(), "eu-1", "notes");
+    await noteShardApp(directory(), "eu-2", "notes");
+    const mine = await createTenant(directory(), {
+      slug: "acme", name: "Acme", country: "DE", where: "eu", apps: ["notes"],
+    });
+    const theirs = await createTenant(directory(), {
+      slug: "other", name: "Other", country: "DE", where: "eu", apps: ["notes"],
+    });
+    if (typeof mine === "string") throw new Error(mine);
+    if (typeof theirs === "string") throw new Error(theirs);
+
+    await addShard(directory(), "eu-2", "eu", 100, mine.tenant.id);
+    expect(await mayMove(directory(), mine.tenant.id, "eu-2")).toBe(null);
+    expect(await mayMove(directory(), theirs.tenant.id, "eu-2")).toBe("someone_elses");
+  });
 });
 
 /* ------------------------------------------------------------- membership --- */

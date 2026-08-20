@@ -27,7 +27,7 @@
  * vault, with every count reporting success.
  */
 
-import type { AppSpec, TenantId } from "@engine/kernel";
+import type { AppSpec, Residency, TenantId } from "@engine/kernel";
 import { DRAIN_DAYS, eraseBy } from "@engine/kernel";
 import { HOLDINGS, tablesIn } from "./dossier.js";
 import { tenantById } from "./directory.js";
@@ -46,6 +46,14 @@ export const MOVE_SCHEMA: SchemaModule = {
     `CREATE TABLE IF NOT EXISTS move (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, from_shard TEXT NOT NULL, to_shard TEXT NOT NULL, state TEXT NOT NULL, detail TEXT, at TEXT NOT NULL, moved_at TEXT, drain_after TEXT, gone_at TEXT);`,
     `CREATE INDEX IF NOT EXISTS ix_move_state ON move (state);`,
   ],
+  /*
+    ⚠️ THE JURISDICTION THIS MOVE IS INTO, ON THE ROW, BECAUSE THE FLIP HAPPENS
+    LATER AND ELSEWHERE. Copying is one pass and `finishMove` is another — often
+    another day — so a target residency held only by the caller is one nothing
+    remembers by the time it has to be written. `NULL` is the ordinary move,
+    which changes nothing about where the records are kept.
+  */
+  columns: { move: { into_residency: "TEXT" } },
 };
 
 /* ------------------------------------------------------------- what moves --- */
@@ -111,19 +119,32 @@ export type BeginRefusal = MoveRefusal | "already_moving" | "same_shard";
  */
 export async function beginMove(
   directory: Db, tenantId: TenantId, toShard: string, now = new Date(),
+  /**
+   * ⚠️ A JURISDICTION CHANGE IS ASKED FOR, NEVER INFERRED FROM THE TARGET. Left
+   * out, a shard in another jurisdiction is refused as `wrong_residency` — which
+   * is the protection, because the accident this prevents is a workspace quietly
+   * ending up under a regime nobody promised it. Passed, it is the thing
+   * somebody decided to do, and `finishMove` writes it.
+   *
+   * ⚠️ AND IT IS THE ONLY WAY RESIDENCY EVER CHANGES. Cloudflare fixes a D1
+   * database's and an R2 bucket's jurisdiction at creation, so there is no
+   * setting to build — see the header.
+   */
+  into?: Residency,
 ): Promise<BeginRefusal | null> {
   const tenant = await tenantById(directory, tenantId);
   if (!tenant) return "no_such_tenant";
   if (tenant.shardId === toShard) return "same_shard";
   if (tenant.movingTo) return "already_moving";
 
-  const refused = await mayMove(directory, tenantId, toShard);
+  const refused = await mayMove(directory, tenantId, toShard, into);
   if (refused) return refused;
 
   await directory.prepare(
-    `INSERT INTO move (id, tenant_id, from_shard, to_shard, state, at)
-     VALUES (?, ?, ?, ?, 'copying', ?)`)
-    .bind(`mov_${tenantId}_${toShard}`, tenantId, tenant.shardId, toShard, now.toISOString())
+    `INSERT INTO move (id, tenant_id, from_shard, to_shard, state, at, into_residency)
+     VALUES (?, ?, ?, ?, 'copying', ?, ?)`)
+    .bind(`mov_${tenantId}_${toShard}`, tenantId, tenant.shardId, toShard, now.toISOString(),
+      into ?? null)
     .run();
   await directory.prepare(`UPDATE tenant SET moving_to = ? WHERE id = ?`)
     .bind(toShard, tenantId).run();
@@ -260,8 +281,24 @@ export async function finishMove(
   const tenant = await tenantById(directory, tenantId);
   if (!tenant?.movingTo) return ["nothing is moving"];
 
-  await directory.prepare(`UPDATE tenant SET shard_id = ?, moving_to = NULL WHERE id = ?`)
-    .bind(tenant.movingTo, tenantId).run();
+  /*
+    ⚠️ AND THE JURISDICTION MOVES WITH THE RECORDS, WHICH IT DID NOT. This
+    file's own header called a move "the only way its jurisdiction can ever
+    change" and nothing here ever wrote `residency` — so the sentence was false
+    in the one place it was checkable. A workspace copied into an EU shard went
+    on being addressed as `global`: the wrong bucket for its files, the wrong
+    answer on its own Data & Trust screen, and a promise broken by the migration
+    that was supposed to keep it.
+  */
+  const row = await directory.prepare(
+    `SELECT into_residency FROM move WHERE tenant_id = ? AND state = 'copying'`)
+    .bind(tenantId).first<{ into_residency: string | null }>();
+  const into = row?.into_residency as Residency | null | undefined;
+
+  await directory.prepare(into
+    ? `UPDATE tenant SET shard_id = ?, moving_to = NULL, residency = ? WHERE id = ?`
+    : `UPDATE tenant SET shard_id = ?, moving_to = NULL WHERE id = ?`)
+    .bind(...(into ? [tenant.movingTo, into, tenantId] : [tenant.movingTo, tenantId])).run();
 
   /* ⚠️ THE SOURCE ROWS DRAIN, THEY ARE NOT DELETED HERE. A move that emptied the
      source is unrecoverable the moment the copy turns out to have been wrong —

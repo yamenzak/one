@@ -602,12 +602,31 @@ export type MoveRefusal = "no_such_tenant" | "no_such_shard" | ReturnType<typeof
    request after a move that reported success. */
 export async function mayMove(
   db: Db, tenantId: TenantId, toShard: string,
+  /**
+   * ⚠️ THE JURISDICTION THIS MOVE IS INTO, AND ITS ABSENCE IS THE PROTECTION.
+   * Left out, `where` is the one the workspace is already in, so a shard in
+   * another jurisdiction is refused — which is what stops a workspace quietly
+   * ending up under a regime nobody promised it. Passed, the change is the point
+   * of the move rather than a mismatch in it.
+   */
+  into?: Residency,
 ): Promise<MoveRefusal | null> {
   const tenant = await tenantById(db, tenantId);
   if (!tenant) return "no_such_tenant";
   const shard = (await shards(db)).find((s) => s.id === toShard);
   if (!shard) return "no_such_shard";
-  return refusePlacement(shard, { where: tenant.residency, apps: await appsOfTenant(db, tenantId) });
+  return refusePlacement(shard, {
+    where: into ?? tenant.residency,
+    apps: await appsOfTenant(db, tenantId),
+    /*
+      ⚠️ WHO IS ARRIVING, AND WITHOUT IT ISOLATION CANNOT COMPLETE. A dedicated
+      shard refuses everybody who is not its tenant — so asking on behalf of
+      nobody made it refuse ITS OWN tenant as `someone_elses`, and dedicate-then-
+      move, the only isolation flow there is, had its second step refusing its
+      first step's result. The rule was right; the question was asked wrong.
+    */
+    tenantId,
+  });
 }
 
 /* ----------------------------------------------------------- invitations --- */

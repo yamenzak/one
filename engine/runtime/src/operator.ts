@@ -1250,15 +1250,28 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
         const tenant = await tenantBySlug(ctx.directory, String(input.slug ?? ""));
         if (!tenant) return ctx.fail("platform.not_found");
 
+        /*
+          ⚠️ A JURISDICTION CHANGE IS TYPED OUT, NOT INFERRED FROM THE SHARD. The
+          same press otherwise means two different things depending on where the
+          target happens to be — an ordinary rebalance and a change of legal
+          regime — and only one of them is something to do by accident.
+        */
+        const into = String(input.into ?? "").trim();
+        if (into && into !== "eu" && into !== "global") return ctx.fail("platform.invalid");
+
         const refused = await beginMove(
-          ctx.directory, tenant.id, String(input.shard ?? ""), ctx.now);
+          ctx.directory, tenant.id, String(input.shard ?? ""), ctx.now,
+          into ? (into as Residency) : undefined);
         if (refused) {
           /* ⚠️ THE REASON REACHES THE OPERATOR. "Cannot move" over a shard whose
              schema is missing the app is a sentence somebody can act on; a bare
              409 is one they open a ticket about. */
           return ctx.fail("platform.conflict", { why: refused });
         }
-        return { slug: tenant.slug, to: String(input.shard), state: "copying" };
+        return {
+          slug: tenant.slug, to: String(input.shard), state: "copying",
+          ...(into ? { into } : {}),
+        };
       },
     },
 
