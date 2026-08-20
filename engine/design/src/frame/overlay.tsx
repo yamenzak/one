@@ -7,8 +7,11 @@
  *            share — where the screen behind is still the subject.
  *   Dialog   holds the middle. For a MOMENT of its own — a form, a result —
  *            where the screen behind stops mattering until this is done.
- *   Confirm  a question with two buttons. For an action that cannot be taken
- *            back; the destructive wording is on the button, not the title.
+ *   Confirm  a question with two buttons, on a sheet like everything else. For
+ *            an action that cannot be taken back; the destructive wording is on
+ *            the button, not the title. It is a `Drawer` carrying
+ *            `role="alertdialog"` — the presentation the rest of the product
+ *            uses, with the announcement a warning needs.
  *   Menu     actions behind an ellipsis. For the second tier — everything a
  *            row can do that did not earn a place on its face.
  *
@@ -24,7 +27,7 @@
  */
 
 import * as React from "react";
-import { AlertDialog, Button, Drawer, Dropdown, Label, Modal, Popover, Toast } from "@heroui/react";
+import { Button, Drawer, Dropdown, Label, Modal, Popover, Toast } from "@heroui/react";
 
 /* ------------------------------------------------------------------- tray --- */
 
@@ -160,25 +163,47 @@ export function Confirm({ trigger, title, children, act, cancel = "Cancel" }: {
   readonly cancel?: string;
 }) {
   return (
-    <AlertDialog>
+    /*
+      ⚠️ A SHEET, LIKE EVERY OTHER INTERRUPTION IN THIS PRODUCT. It was an
+      `AlertDialog` — a box in the middle of the screen — while `Tray` slid up
+      from the edge, so the one moment a person has to read carefully was the one
+      moment the product moved differently. On a phone that is the difference
+      between a control under the thumb and a control at the top of the reach.
+
+      ⚠️ AND IT KEEPS `role="alertdialog"`, WHICH IS NOT COSMETIC. That role is
+      what makes a screen reader announce the question rather than wait to be
+      asked, and it is the reason `AlertDialog` existed here. Dropping it to gain
+      the sheet would trade a real affordance for a visual one — react-aria's
+      `Dialog` takes the role as a prop, so there is nothing to trade.
+    */
+    <Drawer>
       {trigger}
-      <AlertDialog.Backdrop>
-        <AlertDialog.Container>
-          <AlertDialog.Dialog>
-            <AlertDialog.Header>
-              <AlertDialog.Heading>{title}</AlertDialog.Heading>
-            </AlertDialog.Header>
-            <AlertDialog.Body>{children}</AlertDialog.Body>
-            <AlertDialog.Footer>
+      <Drawer.Backdrop>
+        <Drawer.Content>
+          <Drawer.Dialog role="alertdialog">
+            <Drawer.Handle />
+            <Drawer.Header>
+              <Drawer.Heading>{title}</Drawer.Heading>
+            </Drawer.Header>
+            <Drawer.Body>{children}</Drawer.Body>
+            {/* ⚠️ THE WAY OUT FIRST AND THE ACT LAST, WHICH IS THE FOOTER'S OWN
+                GRAMMAR. `Drawer.Footer` lays its actions in a row — measured,
+                both buttons come back on one line — so this is the ordinary
+                left-to-right reading where the destructive one is arrived at
+                rather than landed on. A first draft stacked them and had to
+                force the footer into a column, which is restyling a component
+                behind the theme's back (D7) to solve a problem it does not
+                have. */}
+            <Drawer.Footer>
               <Button slot="close" variant="tertiary">{cancel}</Button>
               <Button slot="close" variant={act.tone ?? "danger"} onPress={act.onDo}>
                 {act.label}
               </Button>
-            </AlertDialog.Footer>
-          </AlertDialog.Dialog>
-        </AlertDialog.Container>
-      </AlertDialog.Backdrop>
-    </AlertDialog>
+            </Drawer.Footer>
+          </Drawer.Dialog>
+        </Drawer.Content>
+      </Drawer.Backdrop>
+    </Drawer>
   );
 }
 

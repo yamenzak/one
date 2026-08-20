@@ -36,8 +36,9 @@ import { subscribeDevice, unsubscribeDevice, vapidOf } from "./push.js";
 import { dossierOf, forgetPerson, forgetWorkspace, type Place } from "./dossier.js";
 import { erase } from "./records.js";
 import {
-  endEverySession, endSession, forgetCode, issueCode, mintToken, noteProof, readSession,
-  revokeToken, spendCode, startSession, tokensOf, type Session,
+  askForExport, endEverySession, endSession, exportAllowedAt, forgetCode, forgetExport,
+  issueCode, mintToken, noteProof, readSession,
+  revokeToken, spendCode, spendExport, startSession, tokensOf, type Session,
 } from "./identity.js";
 import { claimInvitations, found, memberFor, membersOf } from "./membership.js";
 import { inboxOf, markSeen, unseenCount } from "./inbox.js";
@@ -166,6 +167,24 @@ export interface IdentityDeps {
    * that appears to work and cannot be used — so a failure here is a refusal.
    */
   readonly deliver: (to: string, code: string) => Promise<void>;
+  /**
+   * ⚠️ AND THE LETTER THAT CARRIES A COPY'S LINK, WHICH IS A DIFFERENT LETTER.
+   * A sign-in code is six digits in the body; this is an address somebody
+   * follows, on a deployment that may not be the one they are reading the mail
+   * on. Folding it into `deliver` would mean one function whose second argument
+   * is sometimes a code and sometimes a URL, and one caller getting that wrong
+   * is a person mailed their own export token as though it were a sign-in code.
+   *
+   * ⚠️ REQUIRED, LIKE `deliver`. Optional, a deployment that forgot it would
+   * take the ask, hold the weekly cap and send nothing — the shape where the
+   * screen says "check your email" over a letter that was never written.
+   *
+   * ⚠️ IT TAKES THE TOKEN AND THE DEPLOYMENT BUILDS THE ADDRESS, because a
+   * `Door` carries no host on the account side — and the deployment is the one
+   * thing that knows its own roots. An operation guessing an origin is how a
+   * letter comes to link somewhere nobody is served.
+   */
+  readonly deliverExport: (to: string, token: string) => Promise<void>;
   /** Which role a workspace's founder gets. Derived from the app, not named. */
   readonly appId: string;
   /**
@@ -799,10 +818,94 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
       somebody the encrypted bytes of their own health record satisfies a walk
       and not a person — `vault.export` decrypts, at the workspace that holds it.
     */
+    /*
+      ⚠️ THE COPY IS ASKED FOR AND ARRIVES BY POST, WHICH IT DID NOT. The screen
+      used to fetch the dossier and save it from the browser, so the most
+      complete object this deployment can produce about one person came out of an
+      open tab with nothing but a session behind it. Sending a link to the
+      registered address moves the proof from "somebody is signed in here" to
+      "somebody holds that mailbox" — the same proof signing in required in the
+      first place.
+
+      ⚠️ AND THE LETTER CARRIES A LINK, NEVER THE DATA. Mail is unencrypted at
+      rest in a mailbox and in transit between two servers we do not own;
+      attaching somebody's whole record to one would be a disclosure by design,
+      and `buildMime` cannot attach anything anyway.
+
+      ⚠️ THE REFUSAL SAYS WHEN, NOT NO — see `EXPORT_EVERY_MS` for why there is a
+      cap at all. "You asked recently" with no date is a person pressing again
+      tomorrow to find out.
+    */
+    "me.export.ask": {
+      kind: "write", needs: "session", beforeAccepting: true,
+      async run(ctx): Promise<unknown> {
+        const to = ctx.email;
+        /* ⚠️ THE REGISTERED ADDRESS, NEVER ONE FROM THE BODY. Taking a
+           destination from the caller would make this endpoint a way to have
+           somebody else's records posted anywhere. */
+        if (!to) return ctx.fail("platform.unauthorized");
+
+        const asked = await askForExport(ctx.directory, ctx.session!.accountId, ctx.now);
+        if ("nextAt" in asked) return ctx.fail("platform.too_many", { retryAfter: asked.nextAt });
+
+        /* ⚠️ A SEND THAT FAILED MUST NOT HOLD THE WEEK — the same rule the
+           sign-in code follows one screen up, and the same fix: the row is
+           written before the send is attempted, so it is withdrawn when the
+           send throws or the person waits seven days for a letter nobody
+           wrote. */
+        try {
+          await deps.deliverExport(to, asked.id);
+        } catch (why) {
+          await forgetExport(ctx.directory, asked.id);
+          const ref = newId("err", ctx.now);
+          console.error(`[me.export.ask] ${ref} could not deliver:`, why);
+          return ctx.fail("platform.unavailable", { ref }, { ref });
+        }
+        return { sentTo: to, expiresAt: asked.expiresAt };
+      },
+    },
+
+    /*
+      ⚠️ EVERY PLACE THEY COULD BE, NOT THE PLACES SOMEBODY REMEMBERED. The walk
+      is `dossierOf` over the directory and every shard holding a workspace they
+      belong to, driven by a ledger a guard checks against the schema — so a
+      table added next year is a red gate rather than a row quietly missing from
+      an answer that says "everything we hold".
+
+      ⚠️ AND IT IS OPEN BEFORE THEY HAVE AGREED TO ANYTHING. Holding the terms
+      over somebody is fair; holding their data over them is not, and a wall
+      nobody can leave through is a hostage.
+
+      ⚠️ THE VAULT'S CIPHERTEXT IS IN THE COPY AND IS NOT THE ANSWER. Handing
+      somebody the encrypted bytes of their own health record satisfies a walk
+      and not a person — `vault.export` decrypts, at the workspace that holds it.
+
+      ⚠️ AND IT NOW TAKES A TOKEN, WHICH IS THE HALF THAT CAME BY POST. A session
+      alone is no longer enough: the walk runs when somebody holds both, and the
+      token is spent in the same statement that checks it (see `spendExport`), so
+      two tabs racing cannot both collect.
+    */
     "me.export": {
+      kind: "write", needs: "session", beforeAccepting: true,
+      async run(ctx, input): Promise<unknown> {
+        const token = String(input.take ?? "");
+        /* ⚠️ ONE REFUSAL FOR MISSING, WRONG, SPENT, EXPIRED AND SOMEBODY
+           ELSE'S. Distinguishing them here tells whoever is holding a token
+           they should not have which of those it is. */
+        if (!token || !await spendExport(ctx.directory, token, ctx.session!.accountId, ctx.now)) {
+          return ctx.fail("platform.not_found");
+        }
+        return dossierOf(await everywhere(ctx), ctx.session!.accountId, ctx.email, ctx.now);
+      },
+    },
+
+    /* ⚠️ WHETHER THE BUTTON MAY BE PRESSED, SO THE SCREEN CAN SAY SO BEFORE IT IS.
+       A cap discovered only by pressing is a refusal where an explanation
+       belongs. */
+    "me.export.when": {
       kind: "read", needs: "session", beforeAccepting: true,
       async run(ctx): Promise<unknown> {
-        return dossierOf(await everywhere(ctx), ctx.session!.accountId, ctx.email, ctx.now);
+        return { nextAt: await exportAllowedAt(ctx.directory, ctx.session!.accountId, ctx.now) };
       },
     },
 

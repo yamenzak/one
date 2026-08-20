@@ -20,11 +20,17 @@ import { fileURLToPath } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENTRY = join(HERE, "opening.mount.tsx");
 
-let made: string | null = null;
+const made = new Map<string, string>();
 
-/** ⚠️ Built once for the file — the bundle does not change between tests. */
-export async function harness(): Promise<string> {
-  if (made) return made;
+/**
+ * ⚠️ Built once per ENTRY — the bundle does not change between tests, and a
+ * second caller wanting a different component must not be handed the first
+ * one's. The cache was a single `string` while there was one mount file; a
+ * second one silently got the curtain.
+ */
+export async function harness(entry: string = ENTRY): Promise<string> {
+  const held = made.get(entry);
+  if (held) return held;
   const out = await build({
     logLevel: "silent",
     /* ⚠️ THE SAME JSX SETTING `vitest.config.ts` USES. Vite's esbuild handles
@@ -41,11 +47,18 @@ export async function harness(): Promise<string> {
     define: { "process.env.NODE_ENV": JSON.stringify("development") },
     build: {
       write: false,
-      lib: { entry: ENTRY, formats: ["iife"], name: "Harness", fileName: () => "h.js" },
+      lib: { entry, formats: ["iife"], name: "Harness", fileName: () => "h.js" },
     },
   });
   const chunks = Array.isArray(out) ? out[0]! : out;
-  made = (chunks as { output: { code?: string }[] }).output
+  const code = (chunks as { output: { code?: string }[] }).output
     .map((o) => o.code ?? "").join("\n");
-  return made;
+  made.set(entry, code);
+  return code;
 }
+
+/** The mount files this package drives in a browser, by name. */
+export const MOUNT = {
+  opening: ENTRY,
+  confirm: join(HERE, "confirm.mount.tsx"),
+} as const;

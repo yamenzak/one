@@ -12,18 +12,26 @@
  * Holding the terms over a person is fair; holding their data over them is not,
  * so the acceptance wall offers this screen's two acts by name.
  *
- * ⚠️ THE COPY IS A DOWNLOAD THE PAGE MAKES, NOT A LINK. It is assembled from the
- * answer already in hand — a second address would be a second authorisation
- * question about the most complete object this deployment can produce.
+ * ⚠️ THE COPY IS ASKED FOR AND ARRIVES BY POST, WHICH IT DID NOT. This screen
+ * used to fetch the dossier and save it straight out of the browser — so the
+ * most complete object this deployment can produce about one person came out of
+ * an open tab, with a session as the whole of the access control. The ask now
+ * sends a link to the registered address; following it, signed in, is what
+ * hands the file over. Both halves are needed and neither is enough.
+ *
+ * ⚠️ AND BOTH ACTS ASK TWICE. Deleting always did; taking a copy did not, and it
+ * is the act that posts a link to somebody's whole record — one stray press on a
+ * shared laptop and it is in a mailbox, having spent the week's only ask.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@heroui/react";
 import {
   Confirm, Group, NoteRow, Screen, notice, useShown,
 } from "@engine/design";
-import { dayIn, type Instant, type Problem } from "@engine/kernel";
+import { dayIn, sayDate, type Instant, type Problem } from "@engine/kernel";
 import { api } from "../api.js";
+import { claimFromUrl } from "../nav.js";
 import { useSession } from "../session.js";
 import { Trouble } from "@engine/design";
 
@@ -44,28 +52,73 @@ export function Data() {
   const { leave } = useSession();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<Problem | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const [took, setTook] = useState<Dossier | null>(null);
+  /* ⚠️ `null` UNTIL IT IS KNOWN, never `false`. A button that says "you asked
+     recently" for the length of a round trip is a wrong answer wearing a loading
+     state's excuse — and one that says the opposite is worse. */
+  const [nextAt, setNextAt] = useState<string | null | undefined>(undefined);
 
-  const copy = async () => {
-    setBusy(true);
-    setProblem(null);
-    const out = await api.get<Dossier>("me.export");
-    setBusy(false);
-    if (!out.ok) { setProblem(out.problem); return; }
-    setTook(out.value);
+  const askWhen = async () => {
+    const out = await api.get<{ nextAt: string | null }>("me.export.when");
+    if (out.ok) setNextAt(out.value.nextAt);
+  };
 
+  /* ⚠️ THE DOWNLOAD IS A SAVE THE PAGE MAKES FROM AN ANSWER IN HAND. A second
+     address to fetch it from would be a second authorisation question about the
+     most complete object this deployment can produce. */
+  const save = (data: Dossier) => {
     /* ⚠️ Revoked on the next tick rather than left to the collector — a blob URL
        held open is the whole export sitting in memory for the life of the tab. */
     const url = URL.createObjectURL(
-      new Blob([JSON.stringify(out.value, null, 2)], { type: "application/json" }));
+      new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
     const a = document.createElement("a");
     a.href = url;
     /* ⚠️ THE DAY IN THE FILENAME IS THEIRS, not UTC's. A file saved at 23:30 in
        Berlin named with yesterday's date is a file somebody cannot find. */
-    a.download = `your-data-${dayIn(reader, out.value.at as Instant)}.json`;
+    a.download = `your-data-${dayIn(reader, data.at as Instant)}.json`;
     a.click();
     setTimeout(() => { URL.revokeObjectURL(url); }, 0);
-    notice.ok("Copy downloaded.");
+  };
+
+  /*
+    ⚠️ THE LINK IS SPENT ON ARRIVAL, WHICH IS WHY THIS RUNS ON MOUNT. Somebody
+    following it from their mail has already decided; asking them to press again
+    on landing would be a second confirmation of a thing they confirmed in the
+    letter, and the token is single-use either way.
+  */
+  useEffect(() => {
+    void askWhen();
+    /* ⚠️ READ ONCE AND TAKEN OUT OF THE ADDRESS — see `claimFromUrl`. Left
+       there it is a single-use secret in history, in a bookmark and in the next
+       screenshot, and the router owns the address. */
+    const take = claimFromUrl("take");
+    if (!take) return;
+    setBusy(true);
+    void api.post<Dossier>("me.export", { take }).then((out) => {
+      setBusy(false);
+      if (!out.ok) {
+        /* ⚠️ ONE REFUSAL FOR EXPIRED, SPENT AND WRONG — see `me.export`. What a
+           person can DO about all three is the same, so the sentence is about
+           asking again rather than about which it was. */
+        setProblem(out.problem);
+        return;
+      }
+      setTook(out.value);
+      save(out.value);
+      notice.ok("Copy downloaded.");
+    });
+  }, []);
+
+  const ask = async () => {
+    setBusy(true);
+    setProblem(null);
+    const out = await api.post<{ sentTo: string }>("me.export.ask", {});
+    setBusy(false);
+    if (!out.ok) { setProblem(out.problem); void askWhen(); return; }
+    setSentTo(out.value.sentTo);
+    void askWhen();
+    notice.ok(`Link sent to ${out.value.sentTo}.`);
   };
 
   const destroy = async () => {
@@ -83,6 +136,8 @@ export function Data() {
     location.assign("/");
   };
 
+  const waiting = typeof nextAt === "string";
+
   return (
     <Screen shape="detail">
       {problem ? <Trouble problem={problem} /> : null}
@@ -99,15 +154,35 @@ export function Data() {
       <Group
         label="Take a copy"
         under="Everything we hold about you, as one file"
-        does={(
-          <Button variant="secondary" isDisabled={busy} onPress={() => { void copy(); }}>
-            {busy ? "Gathering…" : "Download it"}
-          </Button>
-        )}
+        does={waiting
+          /* ⚠️ DISABLED WITH THE DATE ON IT, NOT HIDDEN. A control that vanishes
+             for a week is a feature somebody concludes was removed. */
+          ? (
+            <Button variant="secondary" isDisabled>
+              {`Ask again ${sayDate(reader, nextAt as Instant)}`}
+            </Button>
+          )
+          : (
+            <Confirm
+              trigger={(
+                <Button slot="trigger" variant="secondary" isDisabled={busy || nextAt === undefined}>
+                  {busy ? "Working…" : "Email me a link"}
+                </Button>
+              )}
+              title="Email your copy?"
+              act={{ label: "Send the link", tone: "primary", onDo: () => { void ask(); } }}
+            >
+              We will post a link to your registered address. It works once, expires in
+              a day, and you will need to be signed in to follow it — so the file only
+              reaches somebody who holds both your mailbox and your account. You can ask
+              again in a week.
+            </Confirm>
+          )}
       >
         <NoteRow>
           Your account, every workspace you are in, and your own records in each.
         </NoteRow>
+        {sentTo ? <NoteRow>{`Sent to ${sentTo}. Check your email.`}</NoteRow> : null}
         {took ? (
           /* ⚠️ WHAT WAS LOOKED IN, NOT ONLY WHAT WAS FOUND. The empty places are
              the half that makes the count mean something. */
@@ -135,7 +210,7 @@ export function Data() {
         under="This cannot be undone"
         does={(
           <Confirm
-            trigger={<Button variant="danger-soft">Delete my account</Button>}
+            trigger={<Button slot="trigger" variant="danger-soft">Delete my account</Button>}
             title="Delete everything?"
             act={{ label: "Delete", onDo: () => { void destroy(); } }}
           >

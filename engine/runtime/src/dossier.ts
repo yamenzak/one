@@ -129,6 +129,11 @@ export const HOLDINGS: readonly HeldBy[] = [
   { table: "session", person: [theirs("account_id")], label: "Where you have been signed in" },
   { table: "api_token", person: [theirs("account_id")], label: "The access tokens you minted" },
   { table: "code", person: [theirs("email")], by: "email", label: "Sign-in codes sent to you" },
+  /* ⚠️ THE ASKING IS HELD, THE COPY IS NOT — see `data_export`. The row is a
+     token and two timestamps, so what this line puts in somebody's own export is
+     the dates they asked on, which is exactly the audit trail they are owed. */
+  { table: "data_export", person: [theirs("account_id")],
+    label: "When you asked for a copy of your data" },
   { table: "invited", person: [theirs("email")], by: "email", workspace: its(),
     label: "Invitations sent to you" },
   /*

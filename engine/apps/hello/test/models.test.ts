@@ -103,6 +103,7 @@ const app = () => serve({
     ...personalOps({
       secret: "test-secret", appId: "hello",
       deliver: async (to, code) => { sent.push({ to, code }); },
+      deliverExport: async () => undefined,
     }),
     ...operatorOps({
       apps: { hello },

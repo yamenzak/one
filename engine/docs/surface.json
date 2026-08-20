@@ -588,7 +588,21 @@
       "proof": null
     },
     {
+      "id": "me.export.ask",
+      "kind": "write",
+      "needs": "session",
+      "doors": null,
+      "proof": null
+    },
+    {
       "id": "me.export",
+      "kind": "write",
+      "needs": "session",
+      "doors": null,
+      "proof": null
+    },
+    {
+      "id": "me.export.when",
       "kind": "read",
       "needs": "session",
       "doors": null,
@@ -910,6 +924,15 @@
       {
         "table": "api_token",
         "export": "The access tokens you minted",
+        "why": null,
+        "onForget": [
+          "account_id: delete"
+        ],
+        "onClose": null
+      },
+      {
+        "table": "data_export",
+        "export": "When you asked for a copy of your data",
         "why": null,
         "onForget": [
           "account_id: delete"

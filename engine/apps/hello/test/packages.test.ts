@@ -40,6 +40,7 @@ const app = () => serve({
   personal: personalOps({
     secret: "test-secret", appId: "hello",
     deliver: async (to, code) => { sent.push({ to, code }); },
+    deliverExport: async () => undefined,
   }),
   locate: asLocating(async (door) => {
     if (door.kind !== "tenant" || !door.slug) return null;

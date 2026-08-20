@@ -35,6 +35,7 @@ const app = () => serve({
   personal: personalOps({
     secret: "test-secret", appId: "hello",
     deliver: async (to, code) => { sent.push({ to, code }); },
+    deliverExport: async () => undefined,
   }),
   /* ⚠️ The deployment's catalogue — one membership, one list. */
   plans: [

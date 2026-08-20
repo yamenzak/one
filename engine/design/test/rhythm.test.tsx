@@ -21,7 +21,7 @@
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  ActionRow, Group, NavRow, Screen, Stack,
+  ActionRow, Group, NavRow, Reveal, Screen, Stack,
 } from "../src/index.js";
 import { PHONE, html, pageFor, stylesheet } from "./rhythm.harness.js";
 
@@ -176,5 +176,96 @@ describe("a card's inset", () => {
     expect(seen.rows[0]!.top - card.top,
       "if this is 12 the fault is gone and this test should be deleted")
       .toBe(ROW_PAD * 2);
+  });
+});
+
+/**
+ * A DISCLOSURE IS A ROW, AND THE CARD HAD NO WAY TO KNOW IT.
+ *
+ * ⚠️ THE FILL IS WHAT A PERSON SEES, AND IT WAS THE WRONG SIZE IN BOTH
+ * DIRECTIONS. `Reveal` composed a bare `Button slot="trigger"` with nothing but
+ * `justify-between` and `px-0`, so it kept `.button`'s own `h-10 md:h-9` — a
+ * 40px hover slab in a column of 64px rows — and without `ROW.press` the fill
+ * stopped at the content box instead of bleeding to the card's edge. Reported as
+ * "the public key button's hover has no padding", which is what a short fill
+ * floating inside a card looks like.
+ *
+ * ⚠️ AND WITHOUT `data-row` THE CARD WRAPPED IT IN `CARD_OTHERS`, adding a
+ * row's inset OUTSIDE a control that already had one — the double padding two
+ * describes up, arriving by a different route.
+ *
+ * ⚠️ MEASURED AGAINST THE ROW BESIDE IT RATHER THAN AGAINST A NUMBER. A
+ * disclosure that merely looks reasonable is how the two drift; the assertion
+ * that holds is that they are the SAME control.
+ */
+describe("a disclosure inside a card", () => {
+  /* ⚠️ A ONE-LINE ROW, BECAUSE A DISCLOSURE IS ONE LINE. `ROW.tap` is a MINIMUM:
+     a row carrying an `under` grows to 72 and a fold-out cannot, so measuring
+     the two against each other with a second line on one of them asserts a
+     difference that is correct. The first draft of this test did exactly that
+     and failed on the fixed code — the specimen was wrong, not the component. */
+  const both = (
+    <Group label="Push" under="what it is">
+      <NavRow label="A row" onOpen={() => {}} />
+      <Reveal label="Public key"><div>a key</div></Reveal>
+    </Group>
+  );
+
+  it("presses exactly like the row beside it", async () => {
+    const page = await browser.newPage({ viewport: { width: PHONE.width, height: PHONE.height } });
+    try {
+      await page.setContent(pageFor(html(screenOf(() => both)), css));
+      const seen = await page.evaluate(() => {
+        const box = (el: Element | null) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return { w: Math.round(r.width), h: Math.round(r.height), left: Math.round(r.left) };
+        };
+        return {
+          /* ⚠️ The BUTTONS, because the fill is the button's box — the row's
+             outer marker and the disclosure's are different elements. */
+          row: box(document.querySelector("button[data-row]")),
+          fold: box(document.querySelector("[data-slot='disclosure'] button")),
+          card: box(document.querySelector(".card")),
+        };
+      });
+      expect(seen.row, "the row").not.toBeNull();
+      expect(seen.fold, "the disclosure's trigger").not.toBeNull();
+
+      /* ⚠️ SAME HEIGHT: `.button`'s 40 against the row's 64 was the complaint. */
+      expect(seen.fold!.h, "a fold-out is as tall as a row").toBe(seen.row!.h);
+      /* ⚠️ SAME WIDTH AND SAME LEFT EDGE: `ROW.press` bleeds the fill out over
+         the card's gutter, so both reach the card's edge rather than one of
+         them floating inside it. */
+      expect(seen.fold!.w, "and as wide").toBe(seen.row!.w);
+      expect(seen.fold!.left, "and starts where it starts").toBe(seen.row!.left);
+      expect(seen.fold!.w, "which is the card's full width").toBe(seen.card!.w);
+    } finally { await page.close(); }
+  });
+
+  /* ⚠️ AND THE CARD TREATS IT AS A ROW, which is what stops `CARD_OTHERS`
+     wrapping a second inset round a control that has its own. */
+  it("is marked as a row, so the card adds no inset of its own", async () => {
+    const page = await browser.newPage({ viewport: { width: PHONE.width, height: PHONE.height } });
+    try {
+      await page.setContent(pageFor(html(screenOf(() => both)), css));
+      const seen = await page.evaluate(() => {
+        const fold = document.querySelector("[data-slot='disclosure']");
+        const card = document.querySelector(".card");
+        const trigger = fold?.querySelector("button");
+        return {
+          marked: fold?.hasAttribute("data-row") ?? false,
+          /* The gap the card puts above the disclosure's own control. */
+          slack: fold && trigger
+            ? Math.round(trigger.getBoundingClientRect().top - fold.getBoundingClientRect().top)
+            : -1,
+          cardBottom: card ? Math.round(card.getBoundingClientRect().bottom) : 0,
+          foldBottom: fold ? Math.round(fold.getBoundingClientRect().bottom) : 0,
+        };
+      });
+      expect(seen.marked, "`data-row` goes on the OUTERMOST element — the card's selector matches a direct child").toBe(true);
+      expect(seen.slack, "no inset between the disclosure and its own trigger").toBe(0);
+      expect(seen.cardBottom - seen.foldBottom, "the card's own inset, once").toBe(ROW_PAD);
+    } finally { await page.close(); }
   });
 });

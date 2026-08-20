@@ -1637,6 +1637,38 @@ const handler = async (env: Env) => {
              while nothing was ever delivered. */
           if (why) throw new Error(`mail refused: ${why}`);
         },
+        /*
+          ⚠️ THE LINK IS BUILT HERE BECAUSE ONLY THE DEPLOYMENT KNOWS ITS ROOT.
+          An operation has a `Door`, and on the account side a door carries no
+          host — so a letter whose address was guessed in the runtime would point
+          somewhere nobody is served, and the person following it would meet a
+          404 holding the one token they get this week.
+
+          ⚠️ AND IT IS THE `id.` DOOR, NOT WHEREVER THEY ASKED FROM. The account
+          centre is one address across every workspace and product (D20); posting
+          somebody back to the workspace they happened to have open would put a
+          personal act inside a business's walls.
+        */
+        deliverExport: async (to, token) => {
+          const url = `https://id.${env.ROOT}/space/data?take=${encodeURIComponent(token)}`;
+          const why = await sendMail({
+            directory,
+            ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
+            ...(mailBinding ? { binding: mailBinding } : {}),
+            environment: env.ENVIRONMENT,
+          }, {
+            to,
+            subject: "Your copy is ready",
+            /* ⚠️ WHAT IT IS, HOW LONG IT LASTS, AND WHAT TO DO IF IT WAS NOT
+               THEM — in that order, because the third line is the one that
+               matters to the only person who did not expect this letter. */
+            text: `Open this to download everything we hold about you:\n\n${url}\n\n`
+              + `The link works once and expires in a day. You will need to be signed in.\n\n`
+              + `If you did not ask for this, ignore it — nothing is sent anywhere `
+              + `and nothing changes.`,
+          });
+          if (why) throw new Error(`mail refused: ${why}`);
+        },
         /* ⚠️ The same allow-list the console is behind (D18) — OneSpace draws
            the operator's place from this, and a place drawn over nothing is a
            promise the next screen takes back. */

@@ -146,7 +146,9 @@ they are in, leaving one, taking a copy, deleting themselves.
 | `me.tenant.create` | write | session | `setup` `account` |
 | `me.tenant.commercial` | write | session | `setup` `account` `tenant` |
 | `me.leave` | write | session | *every door* |
-| `me.export` | read | session | *every door* |
+| `me.export.ask` | write | session | *every door* |
+| `me.export` | write | session | *every door* |
+| `me.export.when` | read | session | *every door* |
 | `me.forget` | write | session + recent proof | *every door* |
 | `me.name` | write | session | *every door* |
 | `me.presentation` | write | session | *every door* |
@@ -308,6 +310,7 @@ before an app is resolved draws on them.
 | `session` | Where you have been signed in | `account_id: delete` | kept |
 | `code` | Sign-in codes sent to you | `email: delete` | kept |
 | `api_token` | The access tokens you minted | `account_id: delete` | kept |
+| `data_export` | When you asked for a copy of your data | `account_id: delete` | kept |
 | `billing_account` | — *a workspace's own account with us* | — | `tenant_id: delete` |
 | `subscription` | — *a workspace's own plan* | — | `tenant_id: delete` |
 | `credit_ledger` | — *a workspace's own spending* | — | `tenant_id: delete` |
@@ -424,7 +427,7 @@ env or a binding.
 | `handles` | which binding holds which shard | 4 | — |
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
 | `flags` | what somebody switched, per deployment and per workspace | 10 | — |
-| `identity` | sign-in codes, sessions, tokens, proof | 21 | — |
+| `identity` | sign-in codes, sessions, tokens, proof | 27 | — |
 | `membership` | the roster and what each member may do | 12 | — |
 | `compose` | a manifest becomes a live surface of operations | 2 | — |
 | `serve` | the one path every request ends in — both doors | 6 | — |
@@ -477,7 +480,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**415 of them**, 414 reached by something today.
+**421 of them**, 420 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

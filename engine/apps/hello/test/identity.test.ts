@@ -33,6 +33,8 @@ const SECRET = "test-secret";
 
 /** ⚠️ What a deployment's mailer would do. A failure here is a refusal, not a shrug. */
 const sent: { to: string; code: string }[] = [];
+/** ⚠️ The export links posted, which are a different letter than a code. */
+const posted: { to: string; token: string }[] = [];
 
 /**
  * ⚠️ THE VAULT SECRET IS A PARAMETER SO THE ABSENT CASE CAN BE DRIVEN. A
@@ -59,6 +61,14 @@ const app = (vaultSecret: string | null = "test-vault-secret") => serve({
     deliver: async (to, code) => {
       if (mailBroken) throw new Error("no email provider is configured");
       sent.push({ to, code });
+    },
+    /* ⚠️ THE TOKEN IS CAPTURED, NOT THE URL. The address is the deployment's to
+       build (`IdentityDeps.deliverExport`), so what the runtime hands over is
+       the one thing it owns — and a test asserting a hostname here would be
+       asserting its own fixture. */
+    deliverExport: async (to, token) => {
+      if (mailBroken) throw new Error("no email provider is configured");
+      posted.push({ to, token });
     },
   }),
   locate: asLocating(async (door) => {
@@ -139,10 +149,12 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   sent.length = 0;
+  posted.length = 0;
   for (const t of ["membership", "custom_role", "note", "check_in", "audit", "replay", "inbox"]) {
     await shard().exec(`DELETE FROM ${t};`);
   }
-  for (const t of ["invited", "belongs", "tenant_app", "tenant", "session", "code", "account"]) {
+  for (const t of ["invited", "belongs", "tenant_app", "tenant", "session", "code", "account",
+    "data_export"]) {
     await directory().exec(`DELETE FROM ${t};`);
   }
 });
@@ -1061,5 +1073,117 @@ describe("the inbox across every workspace", () => {
     const out = await get("northwind", "/api/me.inbox", cookie).then((r) => r.json()) as
       { items: { id: string }[] };
     expect(out.items.map((n) => n.id)).toEqual(["inb_b"]);
+  });
+});
+
+/* ------------------------------------------------------------- a copy of it --- */
+
+/**
+ * TAKING A COPY OF EVERYTHING WE HOLD, WHICH IS NOW ASKED FOR AND POSTED.
+ *
+ * ⚠️ THE OLD SHAPE HANDED IT OVER TO A SESSION AND NOTHING ELSE. The most
+ * complete object this deployment can produce about one person came out of a
+ * signed-in tab on one press — so an unlocked laptop was the whole of the
+ * access control. The proof is now control of the registered mailbox, which is
+ * the same proof signing in asked for in the first place.
+ */
+describe("asking for a copy of your data", () => {
+  it("sends a link to the registered address, and hands nothing over yet", async () => {
+    const cookie = await signIn("sam@example.com");
+
+    const asked = await post("setup", "/api/me.export.ask", {}, cookie);
+    expect(asked.status).toBe(200);
+    expect(await asked.json()).toMatchObject({ sentTo: "sam@example.com" });
+
+    /* ⚠️ A LETTER WENT, AND IT CARRIES A TOKEN RATHER THAN THE RECORDS. Mail is
+       unencrypted at rest in a mailbox; an attachment here would be a
+       disclosure by design. */
+    expect(posted.map((p) => p.to)).toEqual(["sam@example.com"]);
+    expect(posted[0]!.token).toMatch(/^exp_/);
+
+    /* ⚠️ AND THE SESSION ALONE STILL GETS NOTHING, which is the whole change. */
+    const bare = await post("setup", "/api/me.export", {}, cookie);
+    expect(bare.status).toBe(404);
+  });
+
+  it("hands the copy over to somebody holding both the session and the link", async () => {
+    const cookie = await signIn("sam@example.com");
+    await post("setup", "/api/me.export.ask", {}, cookie);
+
+    const got = await post("setup", "/api/me.export", { take: posted[0]!.token }, cookie);
+    expect(got.status).toBe(200);
+    const dossier = await got.json() as { held: unknown[]; lookedAndEmpty: unknown[] };
+    /* ⚠️ The walk itself is `dossier.test.mjs`'s subject; what matters here is
+       that the token opened it and that it is the real answer. */
+    expect(dossier.held.length + dossier.lookedAndEmpty.length).toBeGreaterThan(0);
+  });
+
+  /* ⚠️ ONCE. A link that survived its use is a link in a mailbox that keeps
+     working — and the check is in the UPDATE rather than around it, so two tabs
+     racing cannot both pass it. */
+  it("spends the link, so the second attempt gets nothing", async () => {
+    const cookie = await signIn("sam@example.com");
+    await post("setup", "/api/me.export.ask", {}, cookie);
+    const token = posted[0]!.token;
+
+    expect((await post("setup", "/api/me.export", { take: token }, cookie)).status).toBe(200);
+    expect((await post("setup", "/api/me.export", { take: token }, cookie)).status).toBe(404);
+  });
+
+  /* ⚠️ AND IT IS NOT A BEARER TOKEN. Somebody else's link is worth nothing even
+     to a signed-in account — the account is in the `WHERE`, so a stranger's
+     token is indistinguishable from one that does not exist. */
+  it("is worth nothing to anybody but the account that asked", async () => {
+    const mine = await signIn("sam@example.com");
+    await post("setup", "/api/me.export.ask", {}, mine);
+    const token = posted[0]!.token;
+
+    const theirs = await signIn("kim@example.com");
+    expect((await post("setup", "/api/me.export", { take: token }, theirs)).status).toBe(404);
+    /* ⚠️ And it is still there for its owner — a refused attempt must not spend
+       somebody else's week. */
+    expect((await post("setup", "/api/me.export", { take: token }, mine)).status).toBe(200);
+  });
+
+  /*
+    ⚠️ ONE A WEEK, AND THE REFUSAL SAYS WHEN. GDPR Art. 12(5) allows refusing a
+    request that is excessive "in particular because of its repetitive
+    character", and Art. 12(3) gives a month to answer — so seven days on the
+    SELF-SERVE lane is far inside both. What it must never do is refuse without
+    a date, which is a person pressing again tomorrow to find out.
+  */
+  it("allows one a week, and says when the next one may be asked for", async () => {
+    const cookie = await signIn("sam@example.com");
+    expect((await post("setup", "/api/me.export.ask", {}, cookie)).status).toBe(200);
+
+    const again = await post("setup", "/api/me.export.ask", {}, cookie);
+    expect(again.status).toBe(429);
+    const { problem } = await again.json() as { problem: { code: string; detail?: string } };
+    expect(problem.code).toBe("platform.too_many");
+
+    /* ⚠️ And the screen can ask BEFORE pressing, so the cap is an explanation
+       rather than a refusal somebody discovers. */
+    const when = await get("setup", "/api/me.export.when", cookie);
+    const { nextAt } = await when.json() as { nextAt: string | null };
+    expect(nextAt).toBeTruthy();
+    expect(Date.parse(nextAt!) - Date.now()).toBeGreaterThan(6 * 24 * 60 * 60 * 1000);
+
+    /* ⚠️ ONE letter, not two. A refused ask that still posted would be this
+       endpoint working as a way to mail somebody repeatedly. */
+    expect(posted.length).toBe(1);
+  });
+
+  /* ⚠️ A LETTER THAT NEVER LEFT MUST NOT HOLD THE WEEK — the same rule the
+     sign-in code follows, and the same fix: the row is written before the send
+     is attempted, so it is withdrawn when the send throws. */
+  it("withdraws the ask it never posted", async () => {
+    const cookie = await signIn("sam@example.com");
+    mailBroken = true;
+    const failed = await post("setup", "/api/me.export.ask", {}, cookie);
+    expect(failed.status).toBe(503);
+    mailBroken = false;
+
+    /* ⚠️ Not "you asked recently" — nothing was ever delivered. */
+    expect((await post("setup", "/api/me.export.ask", {}, cookie)).status).toBe(200);
   });
 });

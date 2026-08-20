@@ -33,6 +33,25 @@ const at = (path: string, cookie: string, init: RequestInit = {}) =>
 
 interface Held { of: string; table: string; where: string; rows: unknown[] }
 
+/**
+ * ASK FOR A COPY THE WAY A PERSON DOES, THEN FOLLOW THE LINK THEY WERE POSTED.
+ *
+ * ⚠️ THE TOKEN IS READ OUT OF THE DATABASE, WHICH IS THE POINT RATHER THAN A
+ * SHORTCUT. `me.export.ask` deliberately does not return it — the whole change
+ * is that possession of the mailbox is what opens the file — so a test that
+ * could get it from the response would be testing a design nobody shipped. This
+ * is the same shape the E2E suite uses for a sign-in code.
+ */
+const copyFor = async (cookie: string): Promise<Response> => {
+  const asked = await at("/api/me.export.ask", cookie,
+    { method: "POST", body: "{}", headers: { cookie } });
+  expect(asked.status, "asking for a copy").toBe(200);
+  const row = await directory().prepare(
+    `SELECT id FROM data_export ORDER BY at DESC LIMIT 1`).first<{ id: string }>();
+  return at("/api/me.export", cookie,
+    { method: "POST", body: JSON.stringify({ take: row!.id }), headers: { cookie } });
+};
+
 beforeAll(async () => {
   await booted(asDevEnv);
   await addShard(directory(), "eu-1", "eu", 100);
@@ -79,7 +98,7 @@ describe("what a person can take with them, and what they can destroy", () => {
   /* ------------------------------------------------------------- the copy --- */
 
   it("hands over every table that names them, from every database", async () => {
-    const out = await at("/api/me.export", cookie, { headers: { cookie } });
+    const out = await copyFor(cookie);
     expect(out.status).toBe(200);
     const said = await out.json() as { held: Held[]; lookedAndEmpty: string[] };
 
@@ -110,8 +129,7 @@ describe("what a person can take with them, and what they can destroy", () => {
     const spec = APPS.hello!().collections.find((c) => c.id === "note")!;
     await put(shard(), spec, tenantId, { title: "The company's" }, me);
 
-    const said = await (await at("/api/me.export", cookie, { headers: { cookie } })).json() as
-      { held: Held[] };
+    const said = await (await copyFor(cookie)).json() as { held: Held[] };
     expect(said.held.map((h) => h.table)).not.toContain("note");
   });
 

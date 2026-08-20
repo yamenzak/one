@@ -48,6 +48,7 @@ const app = () => serve({
     ...personalOps({
       secret: "test-secret", appId: "hello",
       deliver: async (to, code) => { sent.push({ to, code }); },
+      deliverExport: async () => undefined,
     }),
   },
   /* ⚠️ THE REAL LOCATOR. A hand-written one would measure the test's own

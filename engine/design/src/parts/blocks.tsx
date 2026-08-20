@@ -153,26 +153,61 @@ export function PageTabs({ tabs, value, onChange, label }: {
  * looking like a rendering fault. A `Button` is `inline-flex items-center`, the
  * auto margin resolves, and the row is a row. The fix is the documented
  * composition, not a class of ours (D7).
+ *
+ * ⚠️ AND IT WEARS THE ROW GRAMMAR, WHICH IT DID NOT — so the card could not tell
+ * it was a row and it did not press like one. Measured against `NavRow` in the
+ * same card: the row's trigger came out `h-auto … px-0 -mx-4
+ * w-[calc(100%+2rem)] px-4 min-h-16` and this one `full-width justify-between
+ * px-0`. Three consequences, all visible at once on the push-key card:
+ *
+ *   — `.button` is `h-10 md:h-9`, so the fill was a 36px slab in a column of
+ *     64px rows: a hover state visibly shorter than everything around it, which
+ *     is what reads as "no padding".
+ *   — Without `ROW.press` the fill stopped at the content box instead of
+ *     bleeding to the card's edge, so it floated inside the card with no
+ *     relationship to it (see the token).
+ *   — Without `data-row` on the OUTERMOST element the card applied
+ *     `CARD_OTHERS` — a `py-3` wrapped round the trigger AND its content, which
+ *     is the gap re-added outside the thing that already had it.
+ *
+ * ⚠️ THE MARKER GOES ON `Disclosure`, NOT ON THE BUTTON, and that is the whole
+ * reason it was missing. `CARD_OTHERS` matches a DIRECT child of the card, and
+ * the direct child here is the disclosure — the button is one level in, where
+ * the selector cannot see it.
  */
 export function Reveal({ label, children }: {
   readonly label: string;
   readonly children: React.ReactNode;
 }) {
   return (
-    <Disclosure>
+    <Disclosure data-row>
       <Disclosure.Heading>
         {/* ⚠️ `justify-between`, BECAUSE A FULL-WIDTH BUTTON CENTRES ITS CONTENT.
             Measured: "Public key ⌄" sat in the middle of a card whose every
             other row starts at the inset, so the one control on the card was
             the one thing not aligned with anything. A disclosure reads as a
             row — its name on the left, the way in on the right — which is what
-            the accordion beside it already does. */}
-        <Button slot="trigger" variant="ghost" fullWidth className={`justify-between ${ROW.flush}`}>
+            the accordion beside it already does.
+
+            ⚠️ AND THE REST IS EXACTLY WHAT `NavRow` WEARS. Not `fullWidth`:
+            `ROW.press` sets an explicit width that `button--full-width` would
+            win against on the same property, leaving the row shifted left
+            rather than widened — which is the fault the token's own header
+            records. */}
+        <Button
+          slot="trigger"
+          variant="ghost"
+          className={`justify-between ${ROW.free} ${ROW.wrap} ${ROW.flush} ${ROW.press} ${ROW.tap}`}
+        >
           {label}
           <Disclosure.Indicator />
         </Button>
       </Disclosure.Heading>
-      <Disclosure.Content>{children}</Disclosure.Content>
+      {/* ⚠️ THE CONTENT CARRIES THE ROW'S OWN AIR. The trigger's height is the
+          row's; what folds out is a child of the same card and would otherwise
+          sit hard against whatever follows it — the disclosure took its spacing
+          from `CARD_OTHERS`, and `data-row` above is what just stopped that. */}
+      <Disclosure.Content className={ROW.pad}>{children}</Disclosure.Content>
     </Disclosure>
   );
 }

@@ -48,6 +48,25 @@ export const IDENTITY_SCHEMA: SchemaModule = {
     `CREATE TABLE IF NOT EXISTS api_token (id TEXT PRIMARY KEY, account_id TEXT NOT NULL, label TEXT NOT NULL, hash TEXT NOT NULL, at TEXT NOT NULL, expires_at TEXT NOT NULL, last_used_at TEXT, revoked_at TEXT);`,
     `CREATE INDEX IF NOT EXISTS ix_api_token_hash ON api_token (hash);`,
     `CREATE INDEX IF NOT EXISTS ix_api_token_account ON api_token (account_id);`,
+    /*
+      ⚠️ A COPY OF EVERYTHING WE HOLD IS ASKED FOR HERE AND COLLECTED LATER, and
+      the gap between the two is the whole security of it. The screen used to
+      assemble the file from an answer already in the browser, so anybody sitting
+      at an unlocked, signed-in tab could take the most complete object this
+      deployment can produce. Now the ask sends a letter, and the letter is what
+      proves control of the address.
+
+      ⚠️ IT IS ITS OWN TABLE AND NOT THE `code` ONE, DELIBERATELY. A sign-in code
+      and an export link are both one-time secrets mailed to an address, which is
+      exactly why sharing a table is dangerous: one lookup that forgot to check
+      which kind it had would turn a leaked export link into a way in.
+
+      ⚠️ AND IT HOLDS NO DATA. The row is a token, a clock and who asked; the
+      dossier is walked again when the link is spent, so a copy of somebody's
+      whole record is never sitting in a table waiting to be read.
+    */
+    `CREATE TABLE IF NOT EXISTS data_export (id TEXT PRIMARY KEY, account_id TEXT NOT NULL, at TEXT NOT NULL, expires_at TEXT NOT NULL, taken_at TEXT);`,
+    `CREATE INDEX IF NOT EXISTS ix_data_export_account ON data_export (account_id, at);`,
   ],
 };
 
@@ -341,4 +360,105 @@ export function sessionIdFrom(request: Request): string | null {
     if (name === SESSION_COOKIE) return rest.join("=") || null;
   }
   return null;
+}
+
+/* --------------------------------------------------------- a copy, asked --- */
+
+/**
+ * ⚠️ ONE SELF-SERVE COPY A WEEK, AND THE NUMBER HAS A REASON. GDPR Art. 12(5)
+ * lets a controller refuse or charge for a request that is "manifestly unfounded
+ * or excessive, in particular because of its repetitive character", and Art.
+ * 12(3) gives a month to answer one. Seven days is far inside that month and far
+ * outside the repetition the article is about.
+ *
+ * ⚠️ AND IT IS A CAP ON THE BUTTON, NEVER ON THE RIGHT. Somebody who asks by
+ * writing to us is exercising Art. 15 and gets an answer; this is the automated
+ * lane, and an automated lane that could be pulled hourly is a way to make a
+ * deployment assemble everything it holds about somebody, over and over, from a
+ * tab left open on a borrowed laptop.
+ */
+export const EXPORT_EVERY_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * ⚠️ AND THE LINK OUTLIVES THE LETTER BY LESS THAN A DAY. It is the most
+ * complete object this deployment can produce about one person, so the window in
+ * which a forwarded or breached mailbox is worth anything has to be short — long
+ * enough to read the letter on a phone and open it on a laptop, and no longer.
+ */
+export const EXPORT_LINK_MS = 24 * 60 * 60 * 1000;
+
+export interface ExportAsk {
+  readonly id: string;
+  readonly expiresAt: string;
+}
+
+/**
+ * ASK FOR A COPY. Refuses with the moment the next one may be asked for, so the
+ * caller can say WHEN rather than "no".
+ *
+ * ⚠️ THE TOKEN IS `crypto.randomUUID`, NOT AN ORDINARY ID. `newId` is sortable
+ * and time-prefixed by design, which is right for a row somebody may quote in
+ * support and wrong for the one thing here that is a secret.
+ */
+export async function askForExport(
+  db: Db, accountId: string, now = new Date(),
+): Promise<ExportAsk | { readonly nextAt: string }> {
+  const last = await db.prepare(
+    `SELECT at FROM data_export WHERE account_id = ? ORDER BY at DESC LIMIT 1`)
+    .bind(accountId).first<{ at: string }>();
+  if (last) {
+    const next = Date.parse(last.at) + EXPORT_EVERY_MS;
+    if (now.getTime() < next) return { nextAt: new Date(next).toISOString() };
+  }
+
+  const id = `exp_${crypto.randomUUID()}`;
+  const expiresAt = new Date(now.getTime() + EXPORT_LINK_MS).toISOString();
+  await db.prepare(
+    `INSERT INTO data_export (id, account_id, at, expires_at, taken_at) VALUES (?, ?, ?, ?, NULL)`)
+    .bind(id, accountId, now.toISOString(), expiresAt).run();
+  return { id, expiresAt };
+}
+
+/**
+ * SPEND THE LINK — once, before it expires, and only by the account that asked.
+ *
+ * ⚠️ ALL THREE ARE CHECKED IN THE STATEMENT RATHER THAN AFTER IT. Read the row,
+ * decide, then write, and two requests arriving together both read an unspent
+ * token and both pass. `UPDATE … WHERE taken_at IS NULL` makes the database
+ * settle it: the second one changes no rows and is refused.
+ *
+ * ⚠️ AND THE ACCOUNT IS IN THE `WHERE`, so a token belonging to somebody else is
+ * indistinguishable from one that does not exist — which is the answer it should
+ * give.
+ */
+export async function spendExport(
+  db: Db, id: string, accountId: string, now = new Date(),
+): Promise<boolean> {
+  const out = await db.prepare(
+    `UPDATE data_export SET taken_at = ?
+      WHERE id = ? AND account_id = ? AND taken_at IS NULL AND expires_at > ?`)
+    .bind(now.toISOString(), id, accountId, now.toISOString()).run();
+  return (out.meta?.changes ?? 0) > 0;
+}
+
+/** When this account may ask again, or `null` if it may ask now. */
+export async function exportAllowedAt(
+  db: Db, accountId: string, now = new Date(),
+): Promise<string | null> {
+  const last = await db.prepare(
+    `SELECT at FROM data_export WHERE account_id = ? ORDER BY at DESC LIMIT 1`)
+    .bind(accountId).first<{ at: string }>();
+  if (!last) return null;
+  const next = Date.parse(last.at) + EXPORT_EVERY_MS;
+  return now.getTime() < next ? new Date(next).toISOString() : null;
+}
+
+/**
+ * ⚠️ AN ASK WHOSE LETTER NEVER LEFT MUST NOT HOLD THE WEEK. The row is written
+ * before the send is attempted — it has to be, or a link could be delivered that
+ * we never recorded — so a send that fails would otherwise cost somebody seven
+ * days of waiting for a letter nobody wrote. Same shape as `forgetCode`.
+ */
+export async function forgetExport(db: Db, id: string): Promise<void> {
+  await db.prepare(`DELETE FROM data_export WHERE id = ?`).bind(id).run();
 }

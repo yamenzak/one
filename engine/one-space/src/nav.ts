@@ -25,6 +25,29 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { travel, type Way } from "@engine/design";
 import { inSpace } from "./space/where.js";
 
+/**
+ * TAKE A ONE-TIME SECRET OUT OF THE ADDRESS, ONCE.
+ *
+ * ⚠️ IT IS HERE BECAUSE THE ADDRESS IS THIS MODULE'S, and that is the guard's
+ * own argument rather than a rule being satisfied. A screen that rewrites the
+ * location is a screen the router does not know has moved — and this one has to
+ * rewrite it, because the alternative is a single-use token for somebody's whole
+ * record left sitting in history, in a bookmark and in the next screenshot.
+ *
+ * ⚠️ AND IT IS `replaceState`, NEVER A TRAVEL. Nothing is being navigated to:
+ * the same screen stays on the same address with one parameter gone, so a
+ * transition would animate a move that did not happen and a new entry would put
+ * the secret back on the next press of Back.
+ */
+export function claimFromUrl(name: string): string | null {
+  const here = new URL(location.href);
+  const value = here.searchParams.get(name);
+  if (!value) return null;
+  here.searchParams.delete(name);
+  history.replaceState(history.state, "", here.toString());
+  return value;
+}
+
 export interface Travel {
   readonly path: string;
   /** Where the page under OneSpace is — never a OneSpace address. */

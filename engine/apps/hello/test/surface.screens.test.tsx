@@ -158,6 +158,7 @@ function build() {
     },
     personal: Object.entries(personalOps({
       secret: "probe", appId: "probe", deliver: async () => {},
+      deliverExport: async () => {},
     })).map(([id, op]) => ({
       id, kind: op.kind, needs: op.needs,
       doors: op.doors ? [...op.doors] : null,
