@@ -126,7 +126,13 @@ jobs:
       #
       # ⚠️ CHROMIUM ONLY. Nothing here opens Firefox or WebKit, and installing
       # three browsers is ~400 MB and a minute for two that no test names.
+      # ⚠️ ASKED FROM THE PACKAGE THAT DEPENDS ON IT. pnpm's store is isolated, so
+      # `require("playwright/…")` from the repo root throws — the step would fail
+      # the job, and reading the RANGE out of `package.json` instead would be
+      # worse: `^1.56.1` does not change on a patch bump, which is precisely the
+      # upgrade that moves the browser's directory.
       - id: playwright
+        working-directory: engine/design
         run: echo "at=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
       # ⚠️ KEYED ON PLAYWRIGHT'S OWN VERSION, because the download directory is
       # `chromium_headless_shell-<build>` and the build is decided by the library.
