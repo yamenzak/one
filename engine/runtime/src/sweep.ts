@@ -34,7 +34,7 @@ import { UNLIMITED, isSearchable } from "@engine/kernel";
 
 import { erase, readOne } from "./records.js";
 import {
-  addShard, closeTenant, forgetBelonging, membersOfTenant, shards, tenantById, waitingAlone,
+  closeTenant, dedicateShard, forgetBelonging, membersOfTenant, shards, tenantById, waitingAlone,
 } from "./directory.js";
 import { forgetWorkspace } from "./dossier.js";
 import { bytesUsed, eraseObjects, type Bucket, type Where } from "./storage.js";
@@ -442,8 +442,7 @@ export function platformJobs(deps: SweepDeps): JobBook {
           countOn: async (shardId) => (await deps.directory.prepare(
             `SELECT COUNT(*) AS n FROM tenant WHERE shard_id = ? AND closed_at IS NULL`)
             .bind(shardId).first<{ n: number }>())?.n ?? 1,
-          reserve: (id, where, ceiling, forTenant) =>
-            addShard(deps.directory, id, where, ceiling, forTenant, now),
+          reserve: (id, forTenant) => dedicateShard(deps.directory, id, forTenant),
           now,
         });
         return { touched: said.length, detail: said.join("; ") || "no empty shard yet" };

@@ -370,9 +370,13 @@ export async function isolateWaiting(deps: {
   readonly shards: readonly Shard[];
   /** ⚠️ How many workspaces are on each — an empty one is the only candidate. */
   readonly countOn: (shardId: string) => Promise<number>;
-  readonly reserve: (
-    shardId: string, where: Residency, ceiling: number, forTenant: TenantId,
-  ) => Promise<void>;
+  /**
+   * ⚠️ THE PROMISE ONLY — see `dedicateShard`. It used to take the shard's whole
+   * shape and re-register it, which is how registering came to be able to erase
+   * a dedication: one function wrote both, so every caller that meant one of
+   * them wrote the other by omission.
+   */
+  readonly reserve: (shardId: string, forTenant: TenantId) => Promise<void>;
   readonly now?: Date;
 }): Promise<readonly string[]> {
   const said: string[] = [];
@@ -395,7 +399,7 @@ export async function isolateWaiting(deps: {
     if (!free) continue;
 
     used.add(free.id);
-    await deps.reserve(free.id, free.where, free.ceiling, want.id);
+    await deps.reserve(free.id, want.id);
     const refused = await beginMove(deps.directory, want.id, free.id, deps.now ?? new Date());
     said.push(refused
       ? `${want.id} could not move to ${free.id}: ${refused}`

@@ -245,14 +245,58 @@ export async function setPresentation(
 
 /* ----------------------------------------------------------------- shards --- */
 
+/**
+ * REGISTER A SHARD, IDEMPOTENTLY — WHAT THE DEPLOYMENT DECLARES ABOUT IT.
+ *
+ * ⚠️ IT DOES NOT TOUCH `dedicated_to`, AND THAT PARAMETER IS GONE RATHER THAN
+ * DEFAULTED. It used to take one, defaulting to `null`, and the upsert wrote it —
+ * so the boot's own re-registration (`addShard(directory, id, where, 10_000)`,
+ * every shard, every cold start where any schema module ran) SET THE PROMISE
+ * BACK TO NOBODY. A workspace that paid for a database of its own kept it until
+ * the next schema bump, then quietly shared it: `placeOn` saw an empty
+ * non-dedicated shard and put strangers on it. Nothing threw, both workspaces
+ * worked perfectly, and the boot that erased it was the same boot that ADOPTED
+ * the shard isolation had just built.
+ *
+ * ⚠️ SO THE PROMISE HAS ITS OWN WRITERS — `dedicateShard` and `releaseShard`.
+ * A default argument is not a decision anybody makes; it is one every caller
+ * makes by not thinking about it.
+ */
 export async function addShard(
-  db: Db, id: string, where: Residency, ceiling: number,
-  dedicatedTo: TenantId | null = null, now = new Date(),
+  db: Db, id: string, where: Residency, ceiling: number, now = new Date(),
 ): Promise<void> {
-  await db.prepare(`INSERT INTO shard (id, residency, ceiling, dedicated_to, at) VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET residency = excluded.residency, ceiling = excluded.ceiling,
-      dedicated_to = excluded.dedicated_to`)
-    .bind(id, where, ceiling, dedicatedTo, now.toISOString()).run();
+  await db.prepare(`INSERT INTO shard (id, residency, ceiling, dedicated_to, at) VALUES (?, ?, ?, NULL, ?)
+    ON CONFLICT(id) DO UPDATE SET residency = excluded.residency, ceiling = excluded.ceiling`)
+    .bind(id, where, ceiling, now.toISOString()).run();
+}
+
+/**
+ * ⚠️ THE ISOLATION PROMISE, WRITTEN IN ONE PLACE. From here on the shard takes
+ * this workspace and nobody else — `refusePlacement` keeps it in both
+ * directions, and the only other writer is the release below.
+ */
+export async function dedicateShard(
+  db: Db, shardId: string, tenantId: TenantId,
+): Promise<void> {
+  await db.prepare(`UPDATE shard SET dedicated_to = ? WHERE id = ?`)
+    .bind(tenantId, shardId).run();
+}
+
+/**
+ * GIVE THE SHARD BACK WHEN THE WORKSPACE IS GONE.
+ *
+ * ⚠️ NOTHING DID THIS, AND THE DATABASE WAS LOST FOR EVER. A shard dedicated to
+ * a closed workspace takes nobody — correctly — so `shardsWanted` does not count
+ * it as room and the deployment builds another one instead. Every business that
+ * ever bought isolation and left cost a permanent database.
+ *
+ * ⚠️ BY TENANT RATHER THAN BY SHARD, because the caller closing a workspace
+ * knows who left and would otherwise have to go looking for which shard was
+ * theirs — a lookup that is the whole reason to forget this.
+ */
+export async function releaseShard(db: Db, tenantId: TenantId): Promise<void> {
+  await db.prepare(`UPDATE shard SET dedicated_to = NULL WHERE dedicated_to = ?`)
+    .bind(tenantId).run();
 }
 
 /**
@@ -561,6 +605,10 @@ export async function noteBelonging(
 export async function closeTenant(db: Db, tenantId: TenantId, now = new Date()): Promise<void> {
   await db.prepare(`UPDATE tenant SET closed_at = ? WHERE id = ? AND closed_at IS NULL`)
     .bind(now.toISOString(), tenantId).run();
+  /* ⚠️ AND THE SHARD THEY HAD TO THEMSELVES GOES BACK IN THE POOL — see
+     `releaseShard`. Left dedicated, it takes nobody for ever, so the deployment
+     builds another database rather than using the empty one it already owns. */
+  await releaseShard(db, tenantId);
 }
 
 export async function membersOfTenant(db: Db, tenantId: TenantId): Promise<readonly AccountId[]> {

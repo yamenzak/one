@@ -15,7 +15,7 @@ import { applySchema } from "../src/schema.js";
 import type { Db } from "../src/sql.js";
 import { DIRECTORY_MODULES, SHARD_MODULES } from "../src/platform-schema.js";
 import {
-  addShard, askAlone, createTenant, noteShardApp, shards, tenantById, waitingAlone,
+  addShard, askAlone, createTenant, dedicateShard, noteShardApp, shards, tenantById, waitingAlone,
 } from "../src/directory.js";
 import {
   beginMove, carried, carryRows, finishMove, isolateWaiting, reapMoved, unmatched,
@@ -214,8 +214,7 @@ describe("moving a workspace's records", () => {
       countOn: async (shardId) => (await directory().prepare(
         `SELECT COUNT(*) AS n FROM tenant WHERE shard_id = ? AND closed_at IS NULL`)
         .bind(shardId).first<{ n: number }>())?.n ?? 1,
-      reserve: (s, where, ceiling, forTenant) =>
-        addShard(directory(), s, where, ceiling, forTenant),
+      reserve: (s, forTenant) => dedicateShard(directory(), s, forTenant),
     });
     expect(said).toEqual([`${id} is moving to eu-2`]);
 
@@ -259,8 +258,7 @@ describe("moving a workspace's records", () => {
       countOn: async (shardId) => (await directory().prepare(
         `SELECT COUNT(*) AS n FROM tenant WHERE shard_id = ? AND closed_at IS NULL`)
         .bind(shardId).first<{ n: number }>())?.n ?? 1,
-      reserve: (s, where, ceiling, forTenant) =>
-        addShard(directory(), s, where, ceiling, forTenant),
+      reserve: (s, forTenant) => dedicateShard(directory(), s, forTenant),
     });
     expect(said).toEqual([]);
     expect((await shards(directory())).find((s) => s.id === "eu-2")?.dedicatedTo).toBeUndefined();

@@ -12,7 +12,8 @@ import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { collection, field, operation, type AppSpec, type AnyOperation } from "@engine/kernel";
 import {
-  DIRECTORY_SCHEMA, addShard, appsOfTenant, createTenant, disableApp, enableApp,
+  DIRECTORY_SCHEMA, addShard, appsOfTenant, closeTenant, createTenant, dedicateShard, disableApp,
+  enableApp,
   liveAppsOfTenant, mayMove,
   noteBelonging, noteShardApp, shards, tenantBySlug, tenantsOf, upsertAccount,
 } from "../src/directory.js";
@@ -343,9 +344,65 @@ describe("switching a product on", () => {
     if (typeof mine === "string") throw new Error(mine);
     if (typeof theirs === "string") throw new Error(theirs);
 
-    await addShard(directory(), "eu-2", "eu", 100, mine.tenant.id);
+    await addShard(directory(), "eu-2", "eu", 100);
+    await dedicateShard(directory(), "eu-2", mine.tenant.id);
     expect(await mayMove(directory(), mine.tenant.id, "eu-2")).toBe(null);
     expect(await mayMove(directory(), theirs.tenant.id, "eu-2")).toBe("someone_elses");
+  });
+
+  /*
+    ⚠️ AND REGISTERING A SHARD DOES NOT ERASE THE PROMISE, WHICH IT DID. The boot
+    re-registers every shard it can place on — `addShard(directory, id, where,
+    10_000)`, every cold start where any schema module ran — and `addShard` took
+    a `dedicatedTo` that DEFAULTED TO NULL and wrote it. So a workspace that paid
+    for a database of its own kept it until the next schema bump and then quietly
+    shared it: `placeOn` saw an empty undedicated shard and put strangers there.
+
+    Nothing threw. Both workspaces worked perfectly. And the boot that erased the
+    promise was the same boot that ADOPTED the shard isolation had just built, so
+    the failure arrived with the feature.
+  */
+  it("keeps the promise when the deployment registers the shard again", async () => {
+    await addShard(directory(), "eu-1", "eu", 100);
+    for (const s of ["eu-1", "eu-2"]) await noteShardApp(directory(), s, "notes");
+    const mine = await createTenant(directory(), {
+      slug: "acme", name: "Acme", country: "DE", where: "eu", apps: ["notes"],
+    });
+    if (typeof mine === "string") throw new Error(mine);
+
+    await addShard(directory(), "eu-2", "eu", 100);
+    await dedicateShard(directory(), "eu-2", mine.tenant.id);
+
+    /* ⚠️ EXACTLY WHAT THE BOOT DOES, ceiling and all. */
+    await addShard(directory(), "eu-2", "eu", 10_000);
+
+    const after = (await shards(directory())).find((s) => s.id === "eu-2");
+    expect(after?.dedicatedTo).toBe(mine.tenant.id);
+    /* ⚠️ The ceiling IS the deployment's to declare, so that one does move. */
+    expect(after?.ceiling).toBe(10_000);
+  });
+
+  /*
+    ⚠️ AND IT GOES BACK IN THE POOL WHEN THEY LEAVE, WHICH NOTHING DID. A shard
+    dedicated to a closed workspace takes nobody — correctly — so `shardsWanted`
+    does not count it as room and the deployment builds ANOTHER database rather
+    than using the empty one it already owns. Every business that ever bought
+    isolation and left cost a permanent database, and the count only ever grew.
+  */
+  it("gives the shard back when the workspace closes", async () => {
+    await addShard(directory(), "eu-1", "eu", 100);
+    await noteShardApp(directory(), "eu-1", "notes");
+    const mine = await createTenant(directory(), {
+      slug: "acme", name: "Acme", country: "DE", where: "eu", apps: ["notes"],
+    });
+    if (typeof mine === "string") throw new Error(mine);
+
+    await addShard(directory(), "eu-2", "eu", 100);
+    await dedicateShard(directory(), "eu-2", mine.tenant.id);
+    await closeTenant(directory(), mine.tenant.id);
+
+    expect((await shards(directory())).find((s) => s.id === "eu-2")?.dedicatedTo)
+      .toBeUndefined();
   });
 });
 

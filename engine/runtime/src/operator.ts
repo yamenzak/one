@@ -51,7 +51,7 @@ import {
 } from "./catalogue.js";
 import { autoTopUpOf, movements, renewAllowance, spentByApp, topUp, walletOf } from "./wallet.js";
 import {
-  addShard, appsOfTenant, commercialAllowance, commercialLeft, disableApp, enableApp,
+  appsOfTenant, commercialAllowance, commercialLeft, dedicateShard, disableApp, enableApp,
   liveAppsOfTenant, setCommercialGrant, shards, tenantById, tenantBySlug, waitingAlone,
 } from "./directory.js";
 import { CREDENTIALS, LANES, configState, setConfig } from "./config.js";
@@ -1146,7 +1146,7 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
           .bind(shardId, tenant.id).first<{ n: number }>();
         if ((strangers?.n ?? 0) > 0) return ctx.fail("platform.conflict");
 
-        await addShard(ctx.directory, found.id, found.where, found.ceiling, tenant.id, ctx.now);
+        await dedicateShard(ctx.directory, found.id, tenant.id);
         return { shard: found.id, slug: tenant.slug };
       },
     },
