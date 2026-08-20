@@ -77,8 +77,40 @@ const ENV = {
 const ctx = { waitUntil: () => {} };
 
 const HUNG = "hung" as const;
+/**
+ * ⚠️ THE NUMBER IS NOT PART OF THE ASSERTION, AND TREATING IT AS ONE MADE THIS
+ * FILE FLAKY. The database here NEVER answers, so a request that waits for one
+ * waits forever: anything that comes back AT ALL is the pass, and a millisecond
+ * and a minute say exactly the same thing. The bound exists only so a failure
+ * reads as "the page waited for the database" instead of hanging until vitest
+ * gives up with no explanation.
+ *
+ * ⚠️ SO IT IS FAR ABOVE ANYTHING THE MACHINE CAN DO, because what it was
+ * actually racing was the isolate's own work rather than the handler's. Each
+ * test resets the module registry, so the route's chunk is transformed on the
+ * way in — and under a full workspace run in parallel that alone blew through
+ * 250ms. Three failures in one afternoon, none of them on this file's subject.
+ * A tighter bound does not test anything more; it only teaches the next person
+ * to re-run instead of to look.
+ *
+ * ⚠️ AND THE NUMBER THAT ACTUALLY FIRED WAS NOT THIS ONE — WHICH IS WHY
+ * WIDENING THIS ALONE FIXED NOTHING. The failures landed at 5.0s against a 2s
+ * bound, because most of that time is spent BEFORE the race starts: the
+ * transform is in `cold()`, and vitest's own default per-test timeout is five
+ * seconds. A
+ * bound inside the test cannot rescue a test the runner has already abandoned,
+ * so both numbers have to move, and this one has to stay under the other.
+ */
+
+/**
+ * ⚠️ ABOVE `within`, SO THE FAILURE THAT ARRIVES IS THE ONE WITH THE SENTENCE ON
+ * IT. If the runner gives up first, all anybody gets is "test timed out" against
+ * a file whose whole subject is what a request waits for — which reads as the
+ * fault it is looking for and is not.
+ */
+const SLOW = 60_000;
 const within = async (
-  work: Promise<Response>, ms = 250,
+  work: Promise<Response>, ms = 20_000,
 ): Promise<Response | typeof HUNG> =>
   Promise.race([
     work,
@@ -106,7 +138,7 @@ describe("a request that reads no table", () => {
     const res = await at("/settings/notifications");
     expect(res, "the page waited for the database").not.toBe(HUNG);
     expect((res as Response).status).toBe(200);
-  });
+  }, SLOW);
 
   /* ⚠️ AND THE PROBE. `/health` is four fields read off the hostname — it is the
      request behind "Finding this place", and it needs no table at all. */
@@ -114,7 +146,7 @@ describe("a request that reads no table", () => {
     const res = await at("/health");
     expect(res, "the probe waited for the database").not.toBe(HUNG);
     expect(await (res as Response).json()).toMatchObject({ ok: true, door: "account" });
-  });
+  }, SLOW);
 });
 
 describe("a request that reads a table", () => {
@@ -149,5 +181,9 @@ describe("a request that reads a table", () => {
     expect(asked, "the request never read the catalogue").toBeGreaterThan(-1);
     expect(asked, `catalogue read at ${asked}, schema still running at ${done}`)
       .toBeGreaterThan(done);
-  });
+    /* ⚠️ Its own bound stays three seconds — this one WANTS the request to stall,
+       and what it reads afterwards is the ORDER of what was said, not the time.
+       The runner still has to be told to wait, because the transform in front of
+       it is the same one. */
+  }, SLOW);
 });
