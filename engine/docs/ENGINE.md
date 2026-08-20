@@ -385,7 +385,7 @@ and a manifest that does not compose refuses to boot.
 | `credit` | metered work: the reserve, the rate, the ceiling | 14 | — |
 | `dunning` | the ladder from past due to erased | 5 | — |
 | `package` | a priced bundle of timed grants | 8 | 1 |
-| `tenancy` | workspaces, kinds, shards, placement, standing | 12 | — |
+| `tenancy` | workspaces, kinds, shards, placement, standing | 14 | — |
 | `door` | the five doors, and which host is which | 2 | — |
 | `setting` | a switch a workspace owns, and the page it lives on | 9 | — |
 | `flag` | a switch WE own, with a date it stops being one | 8 | — |
@@ -402,7 +402,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**264 of them**, 259 reached by something today.
+**266 of them**, 261 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -420,7 +420,7 @@ env or a binding.
 | `schema` | the composed schema runner — declarations become tables | 7 | — |
 | `sql` | the one typed seam onto D1 | 5 | — |
 | `directory` | accounts, workspaces, placement, enablement, allowances | 33 | — |
-| `handles` | which binding holds which shard | 3 | — |
+| `handles` | which binding holds which shard | 4 | — |
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
 | `flags` | what somebody switched, per deployment and per workspace | 10 | — |
 | `identity` | sign-in codes, sessions, tokens, proof | 21 | — |
@@ -476,7 +476,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**409 of them**, 408 reached by something today.
+**410 of them**, 409 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

@@ -43,3 +43,35 @@ export function shardFor(env: Env, shardId: string): Db {
  */
 export const unbound = (env: Env, shardIds: readonly string[]): readonly string[] =>
   shardIds.filter((id) => !env[bindingFor(id)]);
+
+/* ------------------------------------------------------------- adoption --- */
+
+/**
+ * THE SHARDS THE RECONCILER BUILT, READY TO BE PLACED ON.
+ *
+ * ⚠️ THIS IS THE LAST LINK, AND WITHOUT IT THE LADDER ENDS IN A DATABASE NOBODY
+ * USES. `apply` creates the D1 and patches the binding; `observe` sees it and
+ * marks it live — and then nothing. A shard with no directory row is not in
+ * `placeOn`'s list, so no workspace is ever put on it and the deployment goes on
+ * refusing signups with the capacity it just paid for sitting empty beside it.
+ *
+ * ⚠️ AND ONLY WHAT THIS ISOLATE CAN SEE. A binding arrives with a new version of
+ * the worker, so an isolate running the old one reads `undefined` — registering
+ * from that would put a shard in the directory that `shardFor` throws on, for
+ * every workspace `placeOn` then sends to it. `live` plus a visible binding is
+ * the pair, and neither half is enough.
+ */
+export const grownShards = (
+  made: readonly {
+    readonly appId: string; readonly needId: string; readonly name: string;
+    readonly binding: string; readonly residency: string | null; readonly state: string;
+  }[],
+  env: Env,
+): readonly { readonly id: string; readonly where: string }[] => {
+  const at = "-shard-";
+  return made
+    .filter((r) => r.appId === "platform" && r.needId === "shard" && r.state === "live")
+    .filter((r) => r.name.includes(at) && r.residency && env[r.binding])
+    .map((r) => ({ id: r.name.slice(r.name.indexOf(at) + at.length), where: r.residency as string }))
+    .filter((s) => s.id.length > 0);
+};

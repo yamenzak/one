@@ -9,8 +9,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  allowanceLeft, mayBecome, mayBrand, mayIsolate, placeOn, refuseCommercial,
-  refusePlacement, type Enablement, type Shard,
+  HEADROOM, allowanceLeft, mayBecome, mayBrand, mayIsolate, placeOn, refuseCommercial,
+  refusePlacement, shardsWanted, type Enablement, type Shard,
 } from "../src/tenancy.js";
 import type { AppId, Instant, TenantId } from "../src/primitives.js";
 
@@ -187,5 +187,55 @@ describe("a shard somebody paid to have to themselves", () => {
       { where: "eu", apps: ["hello"], tenantId: mine });
     /* ⚠️ The emptiest eligible shard — and the empty one is not eligible. */
     expect(chosen?.id).toBe("shared");
+  });
+});
+
+/* ------------------------------------------------------------- headroom --- */
+
+/*
+  ⚠️ RUNNING OUT OF ROOM IS A CLOSED FRONT DOOR, and that is the failure this
+  rule exists to prevent. `placeOn` returns null when every eligible shard is at
+  its ceiling and `createTenant` refuses with `nowhere_to_put_it` — so the
+  failure mode of SUCCESS is that nobody new can sign up, discovered by whoever
+  tried to.
+*/
+describe("wanting the next shard before the last one fills", () => {
+  const at = (over: Partial<Shard>): Shard => ({
+    id: "eu-1", where: "eu", apps: ["hello" as never], tenants: 0, ceiling: 100, ...over,
+  });
+
+  it("wants nothing while there is room", () => {
+    expect(shardsWanted([at({ tenants: 10 })], ["eu"])).toEqual([]);
+  });
+
+  /* ⚠️ BEFORE IT IS FULL, NOT WHEN IT IS. Creating, binding and rolling out a
+     database takes minutes; a rule that reacted at a hundred percent would start
+     building capacity at the moment there was none. */
+  it("wants one once the last shard is inside the margin", () => {
+    expect(shardsWanted([at({ tenants: 100 * (1 - HEADROOM) + 1 })], ["eu"]))
+      .toEqual([{ id: "eu-2", where: "eu" }]);
+  });
+
+  /*
+    ⚠️ A DEDICATED SHARD IS NOT CAPACITY. It belongs to one workspace and will
+    never take another, so counting it as room is how a deployment concludes it
+    has plenty while having none — and the more customers pay for isolation, the
+    more confidently wrong the count gets.
+  */
+  it("does not count a dedicated shard as room", () => {
+    const shards = [at({ tenants: 100 }), at({ id: "eu-2", tenants: 0, dedicatedTo: "t_x" as never })];
+    expect(shardsWanted(shards, ["eu"])).toEqual([{ id: "eu-3", where: "eu" }]);
+  });
+
+  /* ⚠️ AND THE ORDINAL IS NEVER REUSED. A `SHARD_EU_2` that once existed and was
+     drained is not a name to hand to a different database. */
+  it("takes the next ordinal past every shard it has seen", () => {
+    const shards = [at({ id: "eu-3", tenants: 100 }), at({ id: "eu-1", tenants: 100 })];
+    expect(shardsWanted(shards, ["eu"])).toEqual([{ id: "eu-4", where: "eu" }]);
+  });
+
+  it("answers per jurisdiction, because a shard in one is no room in the other", () => {
+    expect(shardsWanted([at({ tenants: 100 })], ["eu", "global"]))
+      .toEqual([{ id: "eu-2", where: "eu" }, { id: "global-1", where: "global" }]);
   });
 });

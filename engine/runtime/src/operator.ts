@@ -1167,7 +1167,8 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
         operator(ctx);
         const at = deps.account?.() ?? null;
         const have = await resources(ctx.directory);
-        const want = wanted(deps.deployment ?? "one", every(), deps.serves ?? []);
+        const want = wanted(deps.deployment ?? "one", every(), deps.serves ?? [],
+          await shards(ctx.directory));
         return {
           /* ⚠️ Never the token itself, and never a prefix of it. */
           configured: !!at,
@@ -1209,6 +1210,7 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
           directory: ctx.directory, at,
           deployment: deps.deployment ?? "one",
           apps: every(), serves: deps.serves ?? [], now: () => ctx.now,
+          shards: () => shards(ctx.directory),
         });
       },
     },

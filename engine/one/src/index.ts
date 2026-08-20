@@ -27,9 +27,10 @@ import {
   DIRECTORY_MODULES, SHARD_MODULES,
   NOBODY, accountOfToken, addShard, applySchema, appsOfTenant, bearerFrom, acceptanceScope,
   liveAppsOfTenant,
-  deploymentFaults, effectivePlans, healthOf, isPlatformPath, locator,
+  deploymentFaults, effectivePlans, grownShards, healthOf, isPlatformPath, locator,
+  resources,
   accept, bindingKey, jobBookFor, liveBindings, memberFor, noteShardApp, observe, owedBy,
-  runnerFor, schedulesOf, sweep, type SweepDeps,
+  runnerFor, schedulesOf, shards, sweep, type SweepDeps,
   tenantById, tenantBySlug,
   applyEvent, becomeCommercial, markCancelled, markPaid, markPastDue, renewAllowance, stripeKey,
   subscribe, topUp, verifySignature,
@@ -1099,6 +1100,10 @@ async function sweepDeps(env: Env): Promise<SweepDeps> {
           deployment: DEPLOYMENT,
           apps: Object.values(APPS).map((make) => make()),
           serves: [...new Set(SHARD_RESIDENCY)],
+          /* ⚠️ WHAT THE DIRECTORY PLACES ON, so the nightly pass builds the next
+             shard before the current one fills rather than letting the front
+             door close. See `shardsWanted`. */
+          shards: () => shards(directory),
         },
       }
       : {}),
@@ -1198,7 +1203,21 @@ const boot = (env: Env): Promise<void> => {
       the FIRST new workspace lands on it and every request it makes answers
       "no such table". One list, walked.
     */
-    for (const { id } of SHARDS) {
+    /*
+      ⚠️ THE SEED SHARDS PLUS THE ONES THE RECONCILER HAS SINCE BUILT. `SHARDS` is
+      what ships in `wrangler.jsonc`; capacity beyond it is created by `apply`,
+      bound by `patchBindings` and marked live by `observe` — and until this list
+      included them, that whole ladder ended in a database nothing placed on.
+      A deployment that ran out of room refused signups with the shard it had
+      just built sitting empty beside it.
+    */
+    const placeable = [
+      ...SHARDS,
+      ...grownShards(await resources(directory), env as never)
+        .filter((g) => !SHARDS.some((s) => s.id === g.id))
+        .map((g) => ({ id: g.id, where: g.where as Residency })),
+    ];
+    for (const { id } of placeable) {
       applied.push(...await applySchema(shardFor(env as never, id), [
         ...Object.values(APPS).map((make) => schemaFor(make())),
         ...SHARD_MODULES,
@@ -1225,8 +1244,8 @@ const boot = (env: Env): Promise<void> => {
       `deploymentFaults` reports on the same boot.
     */
     if (applied.some((a) => a.ran)) {
-      for (const { id, where } of SHARDS) await addShard(directory, id, where, 10_000);
-      for (const { id: shard } of SHARDS) {
+      for (const { id, where } of placeable) await addShard(directory, id, where, 10_000);
+      for (const { id: shard } of placeable) {
         for (const id of Object.keys(APPS)) await noteShardApp(directory, shard, id as never);
       }
     }

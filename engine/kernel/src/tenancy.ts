@@ -377,6 +377,55 @@ export function placeOn(shards: readonly Shard[], wants: Placing): Shard | null 
   return able.reduce((best, s) => (s.tenants < best.tenants ? s : best));
 }
 
+/* ------------------------------------------------------------- headroom --- */
+
+/**
+ * ⚠️ THE NEXT SHARD IS WANTED BEFORE THE LAST ONE IS FULL, and the margin is the
+ * whole point. A database is created, bound, rolled out and only THEN visible to
+ * an isolate — a ladder measured in minutes at best — so a rule that reacted at
+ * a hundred percent would start building capacity at the moment there was none,
+ * and every signup in between is refused. Twenty percent is the room that
+ * conversion takes place in.
+ */
+export const HEADROOM = 0.2;
+
+/**
+ * WHICH SHARDS A DEPLOYMENT SHOULD HAVE, GIVEN WHAT IT HAS.
+ *
+ * ⚠️ WITHOUT THIS, RUNNING OUT OF ROOM IS A CLOSED FRONT DOOR. `placeOn` returns
+ * `null` when every eligible shard is at its ceiling and `createTenant` refuses
+ * with `nowhere_to_put_it` — so the failure mode of success is that nobody new
+ * can sign up, discovered by whoever tried.
+ *
+ * ⚠️ A DEDICATED SHARD IS NOT CAPACITY. It belongs to one workspace and will
+ * never take another, so counting it as room is how a deployment concludes it
+ * has plenty while having none — the more customers who pay for isolation, the
+ * more confidently wrong the count gets.
+ *
+ * ⚠️ AND IT NAMES THE SHARD IT WANTS, because a want with no name cannot be
+ * matched against what exists — which is how a reconciler creates the same
+ * database on every pass. Ordinals are per jurisdiction and never reused: a
+ * `SHARD_EU_2` that once existed and was drained is not a name to hand to a
+ * different database.
+ */
+export function shardsWanted(
+  shards: readonly Shard[], serves: readonly Residency[],
+): readonly { readonly id: string; readonly where: Residency }[] {
+  const out: { id: string; where: Residency }[] = [];
+  for (const where of serves) {
+    const here = shards.filter((s) => s.where === where);
+    /* ⚠️ Every shard ever seen here decides the next ordinal, dedicated ones
+       included — the name has to be unused, not merely unused BY CAPACITY. */
+    const used = here.map((s) => Number(s.id.slice(where.length + 1)))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    const shared = here.filter((s) => s.dedicatedTo === undefined);
+    const roomy = shared.some((s) => s.tenants <= s.ceiling * (1 - HEADROOM));
+    if (roomy) continue;
+    out.push({ id: `${where}-${Math.max(0, ...used) + 1}`, where });
+  }
+  return out;
+}
+
 
 /* ------------------------------------------------------------- standing --- */
 

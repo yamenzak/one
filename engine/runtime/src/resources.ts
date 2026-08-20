@@ -27,11 +27,12 @@
  * is never something the sweep deletes at three in the morning.
  */
 
-import type { AppSpec, NeedDef, Residency, ResourceKind, ResourceState } from "@engine/kernel";
+import type { AppSpec, NeedDef, Residency, ResourceKind, ResourceState, Shard } from "@engine/kernel";
 import {
   DRAIN_DAYS, IS_CREATED, KEEPS_RESIDENCY, LIVE_STATES,
-  bindingName, dayOf, instant, needsOf, newId, resourceName,
+  bindingName, dayOf, instant, needsOf, newId, resourceName, shardsWanted,
 } from "@engine/kernel";
+import { bindingFor } from "./handles.js";
 import type { Account, WireBinding } from "./cloudflare.js";
 import { create, destroy, listRemote, patchBindings } from "./cloudflare.js";
 import type { SchemaModule } from "./schema.js";
@@ -111,10 +112,47 @@ export interface Want {
  * exist in the EU — a shape a product can see, refuse against and explain,
  * rather than a sentence in a privacy notice that is not true.
  */
+/**
+ * ⚠️ THE PLATFORM'S OWN NEED, AND IT IS NOT AN APP'S. A shard holds every
+ * workspace's records for a jurisdiction, so its holding is whatever the worst
+ * app stores — `sensitive`, necessarily, and therefore one database per
+ * jurisdiction IN that jurisdiction. Declared here rather than in a manifest
+ * because no product asks for it: it is what the deployment stands on.
+ */
+const SHARD_NEED: NeedDef = {
+  id: "shard", kind: "d1", perResidency: true, holds: "sensitive",
+  why: "Holds the records of every workspace placed in this jurisdiction.",
+};
+
+/**
+ * ⚠️ THE NAME AND THE BINDING ARE THE SHARD'S OWN, NOT `resourceName`'s. A shard
+ * is addressed by `bindingFor` on every request — `SHARD_EU_1`, derived from the
+ * id the directory places tenants on — so a resource named by the app-shaped
+ * rule would create a database under one name and be read under another. That is
+ * `undefined` at the first request and nothing at all before it.
+ */
+const shardWant = (deployment: string, id: string, where: Residency): Want => ({
+  kind: "d1", appId: "platform", need: SHARD_NEED,
+  name: `${deployment}-shard-${id}`, binding: bindingFor(id), residency: where,
+});
+
 export function wanted(
   deployment: string, apps: readonly AppSpec[], serves: readonly Residency[],
+  /**
+   * ⚠️ WHAT THE DIRECTORY ALREADY PLACES ON, so capacity can be wanted before it
+   * runs out. Absent, this reconciles the apps' stores and nothing else — which
+   * is what it did, and why a full deployment turned away signups rather than
+   * building the next database.
+   */
+  shards: readonly Shard[] = [],
 ): readonly Want[] {
   const out: Want[] = [];
+  /*
+    ⚠️ THE SHARDS FIRST, because a shard is what everything else is placed on and
+    a plan read by a person should say so before it lists a product's buckets.
+  */
+  for (const s of shards) out.push(shardWant(deployment, s.id, s.where));
+  for (const s of shardsWanted(shards, serves)) out.push(shardWant(deployment, s.id, s.where));
   for (const app of apps) {
     /* ⚠️ `needsOf`, NOT `app.needs` — a media field implies a bucket nobody
        declared, and reading the raw declaration provisions nothing for it. */
@@ -195,6 +233,15 @@ export interface ApplyDeps {
   readonly deployment: string;
   readonly apps: readonly AppSpec[];
   readonly serves: readonly Residency[];
+  /**
+   * ⚠️ WHAT THE DIRECTORY PLACES ON, AND IT IS REQUIRED. A deployment running out
+   * of room has to build the next database rather than turn away signups, and an
+   * optional dependency is one somebody forgets — which here degrades in silence:
+   * `shardsWanted` would see an empty list for ever, want the first shard for
+   * ever, find it already made, and do nothing while the deployment fills up.
+   * That is the shape this whole change exists to remove.
+   */
+  readonly shards: () => Promise<readonly Shard[]>;
   readonly now?: () => Date;
 }
 
@@ -235,7 +282,7 @@ export async function apply(deps: ApplyDeps): Promise<Reconciled> {
   const did: string[] = [];
   const refused: string[] = [];
 
-  const want = wanted(deps.deployment, deps.apps, deps.serves);
+  const want = wanted(deps.deployment, deps.apps, deps.serves, await deps.shards());
   const have = await resources(deps.directory);
   const steps = plan(want, have, now);
 
