@@ -16,17 +16,23 @@
  * arc rides the O's own stroke instead, so what turns is the mark, and the name
  * is doing the work rather than being decorated.
  *
- * ⚠️ AND IT SAYS SOMETHING DIFFERENT EVERY TIME. A wait is the one screen where
- * a person has nothing to do, which is exactly where a product either has a
- * personality or is furniture. The lines are the DEPLOYMENT's, handed in — this
- * package draws for every app and has no voice of its own — and one is chosen
- * per mount rather than cycled: a line that changes while you are reading it is
- * the screen telling you how long you have been here.
+ * ⚠️ AND IT TALKS WHILE YOU WAIT. A wait is the one screen where a person has
+ * nothing to do, which is exactly where a product either has a personality or is
+ * furniture. The lines are the DEPLOYMENT's, handed in — this package draws for
+ * every app and has no voice of its own — shuffled once and then read in order,
+ * so a long boot is a sequence rather than one sentence going stale and a short
+ * one still opens somewhere different.
+ *
+ * ⚠️ EACH GOES ALL THE WAY OUT BEFORE THE NEXT COMES IN, which is the difference
+ * between a title card and a caption changing. See `SAID` for the two beats and
+ * `OPENING_MOTION` for the fade; the swap happens while the line is at zero, so
+ * two sentences are never on the screen together.
  */
 
 import * as React from "react";
 import { GRAIN, GRAIN_OPACITY } from "../tokens/ambience.js";
 import { CURTAIN } from "../tokens/ground.js";
+import { SAID, useStillness } from "../tokens/motion.js";
 import { WIDTH } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
 import { Center } from "./arrange.js";
@@ -177,17 +183,66 @@ export interface OpeningProps {
  * touch drags the curtain and reveals the empty document behind it. Nothing is
  * behind this: it covers, and it takes the safe areas with it.
  */
+/**
+ * ⚠️ SHUFFLED ONCE, THEN READ IN ORDER — not a fresh random pick per turn. Two
+ * draws from sixty repeat about one time in eight, and a wait that shows the
+ * same sentence twice in ten seconds looks broken rather than random. Walking a
+ * shuffled deck cannot repeat until it has been all the way round.
+ *
+ * ⚠️ AND THE SHUFFLE IS WHY IT IS STILL DIFFERENT EVERY VISIT. A fixed order
+ * would make the first three lines the only three most people ever read.
+ */
+const shuffled = (lines: readonly string[]): readonly string[] => {
+  const deck = [...lines];
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j]!, deck[i]!];
+  }
+  return deck;
+};
+
 export function Opening({ says, name = "One" }: OpeningProps) {
+  const still = useStillness();
   /*
-    ⚠️ CHOSEN ONCE PER MOUNT, IN THE INITIALISER. Picking during render gives a
-    different line on every re-render — and this screen re-renders whenever the
-    session resolves a step, so the line would flicker through three of them on
-    the way to the app. An effect would be worse again: the first paint would
-    have no line at all, and the space it will occupy would then open under the
-    name.
+    ⚠️ THE DECK IS BUILT IN THE INITIALISER, ONCE. Shuffling during render gives
+    a different order on every re-render — and this screen re-renders whenever
+    the session resolves a step, so the line would jump through three of them on
+    the way to the app.
   */
-  const [line] = React.useState(() =>
-    says && says.length ? says[Math.floor(Math.random() * says.length)] : undefined);
+  const [deck] = React.useState(() => shuffled(says ?? []));
+  const [at, setAt] = React.useState(0);
+  const [gone, setGone] = React.useState(false);
+
+  /*
+    ⚠️ OUT, SWAP, IN — three beats from two timers, and the swap happens while
+    the line is at zero. A cross-dissolve would put two sentences on the screen
+    together for a third of a second, which on a dark ground reads as a smear and
+    is long enough to start reading the wrong one.
+
+    ⚠️ AND IT DOES NOT RUN AT ALL FOR SOMEBODY WHO ASKED FOR LESS MOTION. Taking
+    the transition away and leaving the cycle is worse than either: a sentence
+    REPLACED with no fade is a harder cut than the fade it was meant to spare
+    them. One line, held, is the honest answer.
+
+    ⚠️ NOR WITH ONE LINE TO SAY. A fade out and back to the same words is a
+    screen blinking at you.
+  */
+  React.useEffect(() => {
+    if (still || deck.length < 2) return undefined;
+    const leave = setTimeout(() => setGone(true), SAID.hold);
+    return () => clearTimeout(leave);
+  }, [still, deck.length, at]);
+
+  React.useEffect(() => {
+    if (!gone) return undefined;
+    const arrive = setTimeout(() => {
+      setAt((was) => (was + 1) % deck.length);
+      setGone(false);
+    }, SAID.fade);
+    return () => clearTimeout(arrive);
+  }, [gone, deck.length]);
+
+  const line = deck[at];
 
   const [first, ...rest] = [...name];
 
@@ -239,11 +294,34 @@ export function Opening({ says, name = "One" }: OpeningProps) {
         {line
           ? (
             <p
-              className={`${TYPE.note} ${WIDTH.door} text-center text-balance`}
-              /* ⚠️ THE COLOUR IS WRITTEN OUT BECAUSE THE CURTAIN IS NOT THEMED.
-                 `TYPE.note` carries `text-muted`, which on a light-theme device
-                 resolves to a dark grey — correct on a page, invisible here. */
-              style={{ color: shade(CURTAIN.said) }}
+              data-said={gone ? "gone" : "here"}
+              className={`${TYPE.note} ${WIDTH.door} grid place-items-center text-center text-balance`}
+              style={{
+                /* ⚠️ THE COLOUR IS WRITTEN OUT BECAUSE THE CURTAIN IS NOT THEMED.
+                   `TYPE.note` carries `text-muted`, which on a light-theme device
+                   resolves to a dark grey — correct on a page, invisible here. */
+                color: shade(CURTAIN.said),
+                /*
+                  ⚠️ TWO LINES OF ROOM, ALWAYS, AND IT IS WHAT KEEPS THE NAME
+                  STILL. A box sized to its contents changes height when a line
+                  that wraps follows one that does not — and `Center` centres the
+                  column, so half of that change moves the LOGO, which is the one
+                  thing on this screen the eye is resting on.
+
+                  ⚠️ NOTHING WRAPS TODAY, AND THAT IS EXACTLY WHY THIS IS HERE.
+                  Measured: all sixty of One's lines are one line at 320. So the
+                  screen works without this, and "every line must be short enough
+                  to fit a phone" becomes a requirement nobody wrote down — held
+                  up only by the next person's luck. Two lines of room costs a
+                  fixed twenty pixels and makes the sixty-first line free.
+
+                  ⚠️ `lh` RATHER THAN A GUESS AT THE LINE HEIGHT. It is this
+                  element's own computed line box, so the reservation stays right
+                  if the note's size or leading ever changes; a hardcoded rem is
+                  correct once.
+                */
+                minHeight: "2lh",
+              }}
             >
               {line}
             </p>

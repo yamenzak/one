@@ -212,6 +212,50 @@ export function useStill(at: React.RefObject<HTMLElement | null>): boolean {
 }
 
 /**
+ * WHETHER THIS PERSON WANTS LESS MOTION — BOTH SIGNALS, WATCHED.
+ *
+ * ⚠️ IT IS HERE RATHER THAN IN `frame/`, BECAUSE THE THINGS THAT NEED IT ARE NOT
+ * ALL FRAMES. `Page` asks so it can bake a still world; the opening asks so it
+ * can hold one line instead of cycling them. A hook about a PREFERENCE living
+ * beside one of its callers is how a `parts/` file comes to import a `frame/`
+ * one, which is the direction that eventually closes a cycle.
+ *
+ * ⚠️ AND IT EXISTS AT ALL BECAUSE A SCENE'S MARKS BEAT IN SMIL, WHICH IS THE ONLY THING
+ * THAT REPAINTS INSIDE A `<pattern>`. Everything else in this system answers
+ * `prefers-reduced-motion` and a `data-reduce-motion` ancestor through CSS, for
+ * free; a beat cannot, so the drawing is made without one instead. That means
+ * the answer has to be known at RENDER, and it has to be watched — somebody who
+ * turns motion off in the product's own settings must not have to reload to be
+ * believed.
+ *
+ * ⚠️ AND IT IS READ SYNCHRONOUSLY. Starting at `false` and correcting in an
+ * effect would render one moving world and then throw it away, which is a second
+ * two-hundred-kilobyte string built for nothing on the slowest device.
+ */
+export function useStillness(): boolean {
+  const read = () => {
+    if (typeof document === "undefined") return false;
+    const asked = typeof matchMedia === "function"
+      && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    /* ⚠️ The in-app switch can only make it MORE still — see `useStill`. */
+    return asked || document.documentElement.getAttribute("data-reduce-motion") === "true";
+  };
+  const [still, setStill] = React.useState(read);
+  React.useEffect(() => {
+    const on = new MutationObserver(() => setStill(read()));
+    on.observe(document.documentElement, {
+      attributes: true, attributeFilter: ["data-reduce-motion"],
+    });
+    const media = typeof matchMedia === "function"
+      ? matchMedia("(prefers-reduced-motion: reduce)") : null;
+    const again = () => setStill(read());
+    media?.addEventListener("change", again);
+    return () => { on.disconnect(); media?.removeEventListener("change", again); };
+  }, []);
+  return still;
+}
+
+/**
  * ⚠️ A NAMED INTENT, NOT A DURATION AND A CURVE AT EVERY CALL SITE. `enter`,
  * `exit`, `press`, `travel` and `drift` are the whole vocabulary; a screen that
  * needs a sixth is a screen that should say why.
@@ -651,6 +695,28 @@ export const GLYPH_MOTION = [
  * not a broken one, which is what stopping a travelling arc leaves. Something
  * that holds still has to still be a thing.
  */
+/**
+ * ⚠️ HOW LONG A LINE STAYS UP, AND HOW LONG IT TAKES TO GO. Numbers rather than
+ * CSS strings, because the curtain has to run the same two beats from a timer —
+ * a hold that a stylesheet cannot express and a fade that it can. Written twice
+ * they drift, and the symptom is a line that starts leaving before the one
+ * before it has gone.
+ *
+ * ⚠️ THE HOLD IS FOR READING, NOT FOR PACING. Nine words is about a second and a
+ * half at a glance; under two seconds the line is a ticker and somebody feels
+ * hurried on the one screen where they have nothing to do. Three and a bit
+ * leaves a beat after the sentence has landed, which is the difference between
+ * a caption changing and a title card.
+ *
+ * ⚠️ AND THE FADE IS `stately`, the longest curve in the scale. This is the one
+ * place that is an impression rather than a step, so the number that is a tax
+ * everywhere else is the point here.
+ */
+export const SAID = {
+  hold: 3200,
+  fade: 560,
+} as const;
+
 export const OPENING_MOTION = [
   /* ⚠️ `pathLength` MAKES THIS 100 THE WHOLE OUTLINE, so the keyframe is a
      percentage and not a perimeter — see `RUN`. */
@@ -658,12 +724,31 @@ export const OPENING_MOTION = [
   `[data-opening="arc"] {`,
   `  animation: opening-turn ${DURATION.turn} ${EASE.steady} infinite;`,
   `}`,
+  /*
+    ⚠️ THE LINE GOES ALL THE WAY OUT BEFORE THE NEXT ONE COMES IN, and that is
+    the whole difference between a title card and a caption changing. A
+    cross-dissolve puts two sentences on the screen at once for a third of a
+    second — legible enough to start reading the wrong one — and on a dark ground
+    the overlap reads as a smear. Out, a beat of nothing, in.
+
+    ⚠️ AND THE TEXT IS SWAPPED WHILE IT IS AT ZERO, so there is no frame where
+    the old words and the new ones are both drawn.
+  */
+  `[data-said] {`,
+  `  transition: opacity ${DURATION.stately} ${EASE.plain};`,
+  `}`,
+  `[data-said="gone"] { opacity: 0 }`,
   /* ⚠️ STILL A LETTER WHEN IT STOPS. Hiding the arc and lifting the ring is one
      swap, so there is no moment where the O is both faint and broken. */
   `@media (prefers-reduced-motion: reduce) {`,
   `  [data-opening="arc"] { animation: none; opacity: 0 }`,
   `  [data-opening="ring"] { opacity: 1 }`,
+  /* ⚠️ AND THE LINE STOPS CHANGING AT ALL — see `Opening`. The transition going
+     is not enough on its own: a sentence REPLACED without a fade is a harder cut
+     than the fade it was meant to spare somebody. */
+  `  [data-said] { transition: none }`,
   `}`,
   `[data-reduce-motion="true"] [data-opening="arc"] { animation: none; opacity: 0 }`,
   `[data-reduce-motion="true"] [data-opening="ring"] { opacity: 1 }`,
+  `[data-reduce-motion="true"] [data-said] { transition: none }`,
 ].join("\n");

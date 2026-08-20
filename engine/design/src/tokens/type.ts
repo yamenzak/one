@@ -77,11 +77,14 @@ export const TYPE = {
    * here would make the first thing anybody sees the one place the wordmark
    * disagrees with itself.
    *
-   * ⚠️ AND IT IS SIZED FOR A PHONE FIRST, because the curtain is full-bleed and
-   * a name that fills the width of a 390 has nowhere to breathe. Just under half
-   * leaves the ring, the word and the line reading as one object.
+   * ⚠️ AND IT IS THE LARGEST TYPE IN THE PRODUCT, WHICH IS THE POINT. Every other
+   * role here is sized to be read on the way to something; this one is the thing.
+   * At the size it started — just over two rem on a phone — the name read as a
+   * label on a dark page rather than as a title card, which is what "bigger
+   * logo" meant. Half the width of a 390 leaves the ring, the word and the line
+   * reading as one object with air around them.
    */
-  opening: "font-mark text-[2.25rem] md:text-[3.25rem] font-light tracking-[-0.045em] leading-none",
+  opening: "font-mark text-[3.5rem] md:text-[5.5rem] font-light tracking-[-0.045em] leading-none",
   /** What this screen is. One per screen, at the top. */
   title: "font-mark text-[1.75rem] font-semibold tracking-[-0.025em] leading-tight text-balance",
   /** What this part of the screen is. */

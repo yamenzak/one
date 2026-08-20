@@ -12,7 +12,7 @@ import type { Sky, World } from "../tokens/ambience.js";
 import { skyWorld, worldCss } from "../tokens/ambience.js";
 import { BAND_PAD, GUTTER, NAV_SPACE, SAFE_TOP, WIDTH } from "../tokens/metrics.js";
 import type { Width } from "../tokens/metrics.js";
-import { transition } from "../tokens/motion.js";
+import { transition, useStillness } from "../tokens/motion.js";
 import type { Density } from "../scene/index.js";
 
 /* ------------------------------------------------------------------ bleed --- */
@@ -269,44 +269,6 @@ function useHemOnScroll(at = 8): void {
       root.style.removeProperty("--hem-top");
     };
   }, [at]);
-}
-
-/**
- * WHETHER THIS PERSON WANTS LESS MOTION — BOTH SIGNALS, WATCHED.
- *
- * ⚠️ IT EXISTS BECAUSE A SCENE'S MARKS BEAT IN SMIL, AND SMIL IS THE ONLY THING
- * THAT REPAINTS INSIDE A `<pattern>`. Everything else in this system answers
- * `prefers-reduced-motion` and a `data-reduce-motion` ancestor through CSS, for
- * free; a beat cannot, so the drawing is made without one instead. That means
- * the answer has to be known at RENDER, and it has to be watched — somebody who
- * turns motion off in the product's own settings must not have to reload to be
- * believed.
- *
- * ⚠️ AND IT IS READ SYNCHRONOUSLY. Starting at `false` and correcting in an
- * effect would render one moving world and then throw it away, which is a second
- * two-hundred-kilobyte string built for nothing on the slowest device.
- */
-export function useStillness(): boolean {
-  const read = () => {
-    if (typeof document === "undefined") return false;
-    const asked = typeof matchMedia === "function"
-      && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    /* ⚠️ The in-app switch can only make it MORE still — see `useStill`. */
-    return asked || document.documentElement.getAttribute("data-reduce-motion") === "true";
-  };
-  const [still, setStill] = React.useState(read);
-  React.useEffect(() => {
-    const on = new MutationObserver(() => setStill(read()));
-    on.observe(document.documentElement, {
-      attributes: true, attributeFilter: ["data-reduce-motion"],
-    });
-    const media = typeof matchMedia === "function"
-      ? matchMedia("(prefers-reduced-motion: reduce)") : null;
-    const again = () => setStill(read());
-    media?.addEventListener("change", again);
-    return () => { on.disconnect(); media?.removeEventListener("change", again); };
-  }, []);
-  return still;
 }
 
 /**

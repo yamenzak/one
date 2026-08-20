@@ -18,9 +18,10 @@
 import { chromium, type Browser } from "playwright";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { OPENING_MOTION } from "../src/index.js";
+import { OPENING_MOTION, SAID } from "../src/index.js";
 import { Opening } from "../src/parts/opening.js";
 import { TYPE } from "../src/tokens/type.js";
+import { harness } from "./opening.harness.js";
 import { stylesheet } from "./rhythm.harness.js";
 
 let browser: Browser;
@@ -144,4 +145,104 @@ describe("what it says", () => {
     expect(html).toContain("One");
     expect(html, "an empty line still took its space").not.toContain("max-w-sm");
   });
+});
+
+/* ------------------------------------------------------------ what it says --- */
+
+/**
+ * ⚠️ MOUNTED FOR REAL, BECAUSE THE CYCLE IS ONLY IN A BROWSER. Every assertion
+ * above this point reads a first frame, and a first frame is identical in a
+ * version that advances and one that never does. What is under test here is
+ * three beats from two timers — the hold, the fade out, the swap while nothing
+ * is on the screen — and none of them exist in a rendered string.
+ */
+describe("the line, while you wait", () => {
+  const LINES = ["Counting to one", "Polishing the counters", "Winding the clock"];
+
+  const mounted = async (lines: readonly string[] = LINES, extra = "") => {
+    const code = await harness();
+    const p = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await p.setContent(
+      `<!doctype html><html data-theme="dark" ${extra}><head><meta charset="utf-8">`
+      + `<style>${css}</style><style>${OPENING_MOTION}</style>`
+      + `<style>html,body{margin:0}</style></head><body>`
+      + `<script type="application/json" id="lines">${JSON.stringify(lines)}</script>`
+      + `<div id="root"></div><script>${code}</script></body></html>`,
+    );
+    await p.waitForFunction(() => document.querySelector("[data-said]") !== null);
+    return p;
+  };
+
+  const said = (p: Awaited<ReturnType<typeof mounted>>) =>
+    p.evaluate(() => {
+      const el = document.querySelector("[data-said]") as HTMLElement;
+      return { text: el.textContent, state: el.dataset["said"], opacity: getComputedStyle(el).opacity };
+    });
+
+  it("moves on to the next line, and leaves before the next arrives", async () => {
+    const p = await mounted();
+    const first = await said(p);
+    expect(first.state, "it starts already leaving").toBe("here");
+
+    /* ⚠️ Sampled in the middle of the fade, which is the frame a cross-dissolve
+       would have two sentences in. */
+    await p.waitForTimeout(SAID.hold + SAID.fade / 2);
+    const leaving = await said(p);
+    expect(leaving.state, "the line never leaves").toBe("gone");
+    expect(leaving.text, "the words changed before they had faded out")
+      .toBe(first.text);
+    expect(Number(leaving.opacity), "it swaps at full strength — two lines at once")
+      .toBeLessThan(0.9);
+
+    await p.waitForTimeout(SAID.fade);
+    const next = await said(p);
+    await p.close();
+    expect(next.state).toBe("here");
+    expect(next.text, "the same line came back").not.toBe(first.text);
+    expect(LINES).toContain(next.text);
+  }, 60_000);
+
+  /*
+    ⚠️ AND IT HOLDS ONE LINE FOR SOMEBODY WHO ASKED FOR LESS MOTION. Taking the
+    fade away and leaving the cycle is the worst of the three: a sentence
+    REPLACED with no transition is a harder cut than the fade it was meant to
+    spare them.
+  */
+  it("says one thing and stops, when asked for less motion", async () => {
+    const p = await mounted(LINES, `data-reduce-motion="true"`);
+    const first = await said(p);
+    await p.waitForTimeout(SAID.hold + SAID.fade * 2);
+    const later = await said(p);
+    await p.close();
+    expect(later.text, "it kept cycling for somebody who asked it not to").toBe(first.text);
+    expect(later.state).toBe("here");
+  }, 60_000);
+
+  /*
+    ⚠️ AND THE NAME DOES NOT MOVE WHILE THE LINES DO, which is asserted with a
+    line that WRAPS. Every one of One's sixty fits on one line at 320 today —
+    measured — so a fixture of real copy proves nothing at all here: the room is
+    reserved precisely so that "they all happen to be short" is not a rule
+    somebody has to know. The long one below is what the sixty-first could be.
+  */
+  it("keeps the name still when a line under it wraps", async () => {
+    const p = await mounted([
+      "Counting to one",
+      "Threading a needle that is rather longer than the ones before it",
+    ]);
+    const where = () => p.evaluate(() =>
+      document.querySelector("[aria-label='One']")!.getBoundingClientRect().top);
+    const lines = () => p.evaluate(() => {
+      const el = document.querySelector("[data-said]") as HTMLElement;
+      return Math.round(el.getBoundingClientRect().height
+        / parseFloat(getComputedStyle(el).lineHeight));
+    });
+    const before = await where();
+    await p.waitForTimeout(SAID.hold + SAID.fade * 2);
+    const after = await where();
+    const tall = await lines();
+    await p.close();
+    expect(tall, "the fixture does not wrap, so this proves nothing").toBeGreaterThan(1);
+    expect(after, "the name moved when the line under it wrapped").toBe(before);
+  }, 60_000);
 });
