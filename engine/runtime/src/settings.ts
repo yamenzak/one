@@ -18,11 +18,14 @@
  */
 
 import type { AppSpec, TenantId } from "@engine/kernel";
-import { PUBLIC, checkSome, disclose, refusePrompt, resolve, valueOf } from "@engine/kernel";
+import {
+  PUBLIC, checkSome, disclose, mayIsolate, refusePrompt, resolve, valueOf,
+} from "@engine/kernel";
 import { actionsOf, word, wordingOf } from "./ai-actions.js";
 import {
   deploymentFlags, flagCounts, flagPeople, setPersonFlag, setTenantFlag, tenantFlags,
 } from "./flags.js";
+import { askAlone, tenantById } from "./directory.js";
 import { memberFor, membersOf } from "./membership.js";
 import type { PlatformCtx } from "./member-ops.js";
 import type { Resolved } from "./compose.js";
@@ -334,6 +337,38 @@ export function settingOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         const on = input.on === null ? null : input.on === true;
         await setTenantFlag(ctx.directory, ctx.tenantId, def.id, on, ctx.now);
         return { id: def.id, on };
+      }),
+
+    /*
+      ⚠️ ASKING FOR A DATABASE OF YOUR OWN, WHICH NOTHING COULD DO. `mayIsolate`
+      has always said a business MAY ask and `Placing.alone` has always been
+      "asked, never inferred from the kind" — and there was no asker, so the
+      parameter was never set by anything and isolation meant an operator
+      reserving an empty shard by hand.
+
+      ⚠️ IT RECORDS AN INTENT AND PROMISES NOTHING IMMEDIATE. A database has to be
+      created, bound, rolled out and copied onto; the nightly pass does each in
+      turn. Answering as though it were done would be a screen that says a
+      workspace is isolated while its records are still beside everybody else's.
+    */
+    "tenant.alone": op("tenant.alone", "write", "Ask for a database of your own.",
+      async (ctx, input) => {
+        if (!ctx.accountId) return ctx.fail("platform.unauthorized");
+        const tenant = await tenantById(ctx.directory, ctx.tenantId as TenantId);
+        if (!tenant) return ctx.fail("platform.not_found");
+        /* ⚠️ THE KIND IS THE GATE AND THE PRICE, which is the decision already
+           written in `entitlement.ts`: pricing isolation on `kind` means the gate
+           and the price agree by construction, where an entitlement for it would
+           be a second answer that can disagree. */
+        if (!mayIsolate(tenant.kind)) {
+          return ctx.fail("platform.commercial_required", { workspace: tenant.name });
+        }
+        const held = await ctx.permissionsIn(null);
+        if (!held.has("tenant:manage")) return ctx.fail("platform.forbidden");
+
+        const yes = input.on !== false;
+        await askAlone(ctx.directory, tenant.id, yes);
+        return { asked: yes };
       }),
 
     "setting.write": op("setting.write", "write", "Change a setting.",

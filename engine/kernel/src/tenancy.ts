@@ -410,19 +410,42 @@ export const HEADROOM = 0.2;
  */
 export function shardsWanted(
   shards: readonly Shard[], serves: readonly Residency[],
+  /**
+   * ⚠️ WHO HAS ASKED FOR A DATABASE OF THEIR OWN AND HAS NOT GOT ONE. Isolation
+   * is a shard that has to EXIST before anybody can be moved onto it, so the
+   * ask is a reason to build one exactly as running low is — and without this,
+   * `Placing.alone` was a parameter nothing set and isolation was an operator
+   * reserving an empty shard by hand, on a deployment that had no way to make
+   * one empty.
+   */
+  alone: readonly { readonly where: Residency }[] = [],
 ): readonly { readonly id: string; readonly where: Residency }[] {
   const out: { id: string; where: Residency }[] = [];
-  for (const where of serves) {
+  const taken = new Map<Residency, number>();
+  /* ⚠️ Every shard ever seen in a jurisdiction decides its next ordinal,
+     dedicated ones included — the name has to be unused, not merely unused BY
+     CAPACITY. */
+  for (const where of new Set([...serves, ...alone.map((a) => a.where)])) {
     const here = shards.filter((s) => s.where === where);
-    /* ⚠️ Every shard ever seen here decides the next ordinal, dedicated ones
-       included — the name has to be unused, not merely unused BY CAPACITY. */
     const used = here.map((s) => Number(s.id.slice(where.length + 1)))
       .filter((n) => Number.isFinite(n) && n > 0);
-    const shared = here.filter((s) => s.dedicatedTo === undefined);
-    const roomy = shared.some((s) => s.tenants <= s.ceiling * (1 - HEADROOM));
-    if (roomy) continue;
-    out.push({ id: `${where}-${Math.max(0, ...used) + 1}`, where });
+    taken.set(where, Math.max(0, ...used));
   }
+  const next = (where: Residency): { id: string; where: Residency } => {
+    const n = (taken.get(where) ?? 0) + 1;
+    taken.set(where, n);
+    return { id: `${where}-${n}`, where };
+  };
+
+  for (const where of serves) {
+    const shared = shards.filter((s) => s.where === where && s.dedicatedTo === undefined);
+    if (shared.some((s) => s.tenants <= s.ceiling * (1 - HEADROOM))) continue;
+    out.push(next(where));
+  }
+  /* ⚠️ ONE EACH, AND THEY DO NOT SHARE. Two workspaces asking for isolation want
+     two databases; a rule that built one and dedicated it to the first would
+     leave the second waiting for ever with nothing reporting why. */
+  for (const a of alone) out.push(next(a.where));
   return out;
 }
 

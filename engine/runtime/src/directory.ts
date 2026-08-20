@@ -67,6 +67,15 @@ export const DIRECTORY_SCHEMA: SchemaModule = {
        is to search every shard for a row that is usually not there. */
     `CREATE TABLE IF NOT EXISTS invited (email TEXT NOT NULL, tenant_id TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (email, tenant_id));`,
   ],
+  /*
+    ⚠️ THE ASK, WHICH IS NOT THE SAME AS THE PROMISE. `shard.dedicated_to` is the
+    promise KEPT — a database reserved for one workspace. This is the workspace
+    saying it wants one, and the two are days apart: a shard has to be created,
+    bound, rolled out and moved onto before the promise exists. Without the ask
+    stored, `Placing.alone` was a parameter nothing ever set, and isolation was
+    an operator typing two commands in the right order.
+  */
+  columns: { tenant: { wants_alone: "INTEGER" } },
 };
 
 /* ------------------------------------------------------------------- rows --- */
@@ -82,6 +91,8 @@ export interface TenantRow {
   readonly legalName: string | null;
   /** ⚠️ The shard it is being copied to, while it is. Read-only until it clears. */
   readonly movingTo: string | null;
+  /** ⚠️ Asked for a database of its own. The promise is `Shard.dedicatedTo`. */
+  readonly wantsAlone: boolean;
   readonly closedAt: string | null;
 }
 
@@ -98,6 +109,7 @@ const asTenant = (r: Record<string, unknown>): TenantRow => ({
   kind: (r.kind as Kind | null) ?? "personal",
   legalName: (r.legal_name as string | null) ?? null,
   movingTo: (r.moving_to as string | null) ?? null,
+  wantsAlone: !!(r.wants_alone as number | null),
   closedAt: (r.closed_at as string | null) ?? null,
 });
 
@@ -355,7 +367,7 @@ export async function createTenant(
     tenant: {
       id, slug: wants.slug, name: wants.name, country: wants.country.toUpperCase(),
       shardId: shard.id, residency: wants.where,
-      kind: "personal", legalName: null, movingTo: null, closedAt: null,
+      kind: "personal", legalName: null, movingTo: null, wantsAlone: false, closedAt: null,
     },
     shard,
   };
@@ -580,6 +592,46 @@ export async function tenantsOf(db: Db, accountId: AccountId): Promise<readonly 
     SELECT t.* FROM tenant t JOIN belongs b ON b.tenant_id = t.id
     WHERE b.account_id = ? AND t.closed_at IS NULL ORDER BY t.at`).bind(accountId).all();
   return rows.results.map(asTenant);
+}
+
+/* --------------------------------------------------------------- alone --- */
+
+/**
+ * A WORKSPACE ASKS FOR A DATABASE OF ITS OWN.
+ *
+ * ⚠️ THE ASK IS STORED AND THE REST IS AUTOMATIC, which is the whole change.
+ * `Placing.alone` has always been "asked, never inferred from the kind" — and
+ * nothing ever asked, so isolation was an operator reserving an empty shard by
+ * hand and then remembering to move the workspace onto it. Two commands, in the
+ * right order, on a shard that had to already exist.
+ *
+ * ⚠️ WHO MAY ASK IS THE CALLER'S TO CHECK, and `mayIsolate` is the rule. Asked
+ * here it would be a second answer to a question the gate already answers, and
+ * the two would disagree the day one of them changed.
+ */
+export async function askAlone(
+  db: Db, tenantId: TenantId, yes: boolean,
+): Promise<void> {
+  await db.prepare(`UPDATE tenant SET wants_alone = ? WHERE id = ?`)
+    .bind(yes ? 1 : 0, tenantId).run();
+}
+
+/**
+ * WHO HAS ASKED AND IS STILL WAITING.
+ *
+ * ⚠️ NOT ON A DEDICATED SHARD YET, which is what makes this the work list rather
+ * than a report. A workspace already moved has had its promise kept; leaving it
+ * here would make the reconciler build a second database for it every night.
+ */
+export async function waitingAlone(
+  db: Db,
+): Promise<readonly { readonly id: TenantId; readonly where: Residency }[]> {
+  const rows = await db.prepare(`
+    SELECT t.id AS id, t.residency AS residency FROM tenant t
+     WHERE t.wants_alone = 1 AND t.closed_at IS NULL
+       AND NOT EXISTS (SELECT 1 FROM shard s WHERE s.dedicated_to = t.id)
+     ORDER BY t.at`).all<{ id: string; residency: string }>();
+  return rows.results.map((r) => ({ id: r.id as TenantId, where: r.residency as Residency }));
 }
 
 /* ---------------------------------------------------------------- moving --- */

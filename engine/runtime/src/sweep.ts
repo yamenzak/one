@@ -33,14 +33,16 @@ import type {
 import { UNLIMITED, isSearchable } from "@engine/kernel";
 
 import { erase, readOne } from "./records.js";
-import { closeTenant, forgetBelonging, membersOfTenant, tenantById } from "./directory.js";
+import {
+  addShard, closeTenant, forgetBelonging, membersOfTenant, shards, tenantById, waitingAlone,
+} from "./directory.js";
 import { forgetWorkspace } from "./dossier.js";
 import { bytesUsed, eraseObjects, type Bucket, type Where } from "./storage.js";
 import { forgetBranding } from "./branding.js";
 import { forgetIcon } from "./icon.js";
 import { dueForErasure, run, runDue, type RunnerDeps } from "./jobs.js";
 import { apply, type ApplyDeps } from "./resources.js";
-import { carryObjects, carryRows, finishMove, reapMoved } from "./move.js";
+import { carryObjects, carryRows, finishMove, isolateWaiting, reapMoved } from "./move.js";
 import { chargeOffSession, type StripeDeps } from "./stripe.js";
 import {
   collectOwed, dueForAllowance, dueForTopUp, noteTopUpAttempt, noteTopUpFailed, owe,
@@ -415,6 +417,37 @@ export function platformJobs(deps: SweepDeps): JobBook {
         return { touched: out.did.length, detail: out.did.join("; ") || "nothing to do" };
       },
       { destroys: { floorDays: 30 }, budgetSeconds: 120 });
+
+    /*
+      ⚠️ AND THE SHARD BUILT FOR A WORKSPACE IS GIVEN TO IT, IN THE SAME PASS.
+      The reconciler above creates it because somebody asked to be alone;
+      without this it stays empty for ever and the ask is a row nothing acts on.
+      Reserving and beginning the move is the whole remaining step — the carry,
+      the verification and the flip are already below.
+
+      ⚠️ AFTER the reconciler, because the shard it needs is one that pass made.
+      A `live` binding takes a rollout, so the shard is usually adopted on the
+      NEXT night rather than this one, and that is fine: this is a reconciler,
+      not a script.
+    */
+    at("isolating", "Give a workspace the database it asked for",
+      "Reserves an empty shard for each workspace waiting on one, and starts the move.",
+      async () => {
+        const waiting = await waitingAlone(deps.directory);
+        if (!waiting.length) return { touched: 0, detail: "nobody is waiting" };
+        const said = await isolateWaiting({
+          directory: deps.directory,
+          waiting,
+          shards: await shards(deps.directory),
+          countOn: async (shardId) => (await deps.directory.prepare(
+            `SELECT COUNT(*) AS n FROM tenant WHERE shard_id = ? AND closed_at IS NULL`)
+            .bind(shardId).first<{ n: number }>())?.n ?? 1,
+          reserve: (id, where, ceiling, forTenant) =>
+            addShard(deps.directory, id, where, ceiling, forTenant, now),
+          now,
+        });
+        return { touched: said.length, detail: said.join("; ") || "no empty shard yet" };
+      });
   }
 
   /*

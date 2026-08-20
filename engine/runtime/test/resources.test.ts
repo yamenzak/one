@@ -30,6 +30,9 @@ const roomy = (where: "eu" | "global" = "eu") => async () => [{
   id: `${where}-1`, where, apps: [] as never[], tenants: 0, ceiling: 100,
 }];
 
+/** Nobody has asked for a database of their own — the case every test but one is in. */
+const nobody = async () => [];
+
 /** ⚠️ The seed shard as Cloudflare already holds it — see `cloudflare`. */
 const seeded = (where: "eu" | "global" = "eu"): readonly Made[] =>
   [{ kind: "d1", name: `one-shard-${where}-1`, jurisdiction: where === "eu" ? "eu" : null }];
@@ -139,6 +142,7 @@ describe("what the deployment makes for itself", () => {
     const cf = cloudflare({ has: seeded() });
     const out = await apply({
       directory: db(), at: cf.at, deployment: "one", apps: [app({})], serves: ["eu"],
+      alone: nobody,
       shards: async () => [{
         id: "eu-1", where: "eu", apps: [] as never[], tenants: 100, ceiling: 100,
       }],
@@ -160,16 +164,46 @@ describe("what the deployment makes for itself", () => {
     for (let i = 0; i < 2; i++) {
       await apply({
         directory: db(), at: cf.at, deployment: "one",
-        apps: [app({})], serves: ["eu"], shards: roomy(),
+        apps: [app({})], serves: ["eu"], shards: roomy(), alone: nobody,
       });
     }
     expect(cf.made).toEqual([]);
   });
 
+  /*
+    ⚠️ AND SOMEBODY ASKING TO BE ALONE IS A REASON TO BUILD ONE, EVEN WITH ROOM
+    TO SPARE. Isolation is a shard that has to exist before anybody can be moved
+    onto it, and the two conditions are unrelated: a deployment with every shard
+    half empty has nowhere to put a workspace that paid not to share. Without
+    this the ask sat in a column, the nightly pass reported success, and nothing
+    was ever built.
+  */
+  it("builds a database for a workspace that asked to be alone", async () => {
+    const cf = cloudflare({ has: seeded() });
+    await apply({
+      directory: db(), at: cf.at, deployment: "one", apps: [app({})], serves: ["eu"],
+      shards: roomy(), alone: async () => [{ where: "eu" as const }],
+    });
+    /* ⚠️ Its own name past every shard seen, dedicated ones included — a name
+       reused is a second, empty database under an address already in use. */
+    expect(cf.made).toEqual([{ kind: "d1", name: "one-shard-eu-2", jurisdiction: "eu" }]);
+  });
+
+  /* ⚠️ AND TWO ASKS ARE TWO DATABASES. One built and handed to the first would
+     leave the second waiting for ever, with the pass reporting it did its job. */
+  it("builds one for each workspace waiting, not one between them", async () => {
+    const cf = cloudflare({ has: seeded() });
+    await apply({
+      directory: db(), at: cf.at, deployment: "one", apps: [app({})], serves: ["eu"],
+      shards: roomy(), alone: async () => [{ where: "eu" as const }, { where: "eu" as const }],
+    });
+    expect(cf.made.map((m) => m.name)).toEqual(["one-shard-eu-2", "one-shard-eu-3"]);
+  });
+
   it("creates what a manifest declares, in the jurisdiction it was promised", async () => {
     const cf = cloudflare({ has: seeded() });
     const out = await apply({
-      directory: db(), at: cf.at, deployment: "one", shards: roomy(),
+      directory: db(), at: cf.at, deployment: "one", shards: roomy(), alone: nobody,
       apps: [app(covers)], serves: ["eu"],
     });
 
@@ -189,7 +223,7 @@ describe("what the deployment makes for itself", () => {
   */
   it("makes nothing the second time", async () => {
     const cf = cloudflare({ has: seeded() });
-    const once = { directory: db(), at: cf.at, deployment: "one", shards: roomy(),
+    const once = { directory: db(), at: cf.at, deployment: "one", shards: roomy(), alone: nobody,
       apps: [app(covers)], serves: ["eu" as const] };
     await apply(once);
     await apply(once);
@@ -204,7 +238,7 @@ describe("what the deployment makes for itself", () => {
   it("makes nothing at all when it could not see what exists", async () => {
     const cf = cloudflare({ failList: true, has: seeded() });
     const out = await apply({
-      directory: db(), at: cf.at, deployment: "one", shards: roomy(),
+      directory: db(), at: cf.at, deployment: "one", shards: roomy(), alone: nobody,
       apps: [app(covers)], serves: ["eu"],
     });
     expect(cf.made).toEqual([]);
@@ -220,7 +254,7 @@ describe("what the deployment makes for itself", () => {
   it("refuses to provision what cannot keep the promise it was made under", async () => {
     const cf = cloudflare({ has: seeded() });
     const out = await apply({
-      directory: db(), at: cf.at, deployment: "one", shards: roomy(), serves: ["eu"],
+      directory: db(), at: cf.at, deployment: "one", shards: roomy(), alone: nobody, serves: ["eu"],
       apps: [app({
         jobs: { id: "jobs", kind: "queue", holds: "contact", why: "send later", perResidency: true },
       })],
@@ -234,7 +268,7 @@ describe("what the deployment makes for itself", () => {
     const open = cloudflare({ has: seeded("global") });
     await apply({
       directory: db(), at: open.at, deployment: "one", serves: ["global"],
-      shards: roomy("global"),
+      shards: roomy("global"), alone: nobody,
       apps: [app({
         jobs: { id: "jobs", kind: "queue", holds: "contact", why: "send later", perResidency: true },
       })],
@@ -250,7 +284,7 @@ describe("what the deployment makes for itself", () => {
   it("never removes or repoints a binding it did not add", async () => {
     const cf = cloudflare({ has: seeded() });
     await apply({
-      directory: db(), at: cf.at, deployment: "one", shards: roomy(),
+      directory: db(), at: cf.at, deployment: "one", shards: roomy(), alone: nobody,
       apps: [app(covers)], serves: ["eu"],
     });
     expect(cf.bound()).toContainEqual({ type: "d1", name: "DIRECTORY" });
@@ -265,7 +299,7 @@ describe("what the deployment makes for itself", () => {
   it("does not call a binding live until an isolate can see it", async () => {
     const cf = cloudflare({ has: seeded() });
     await apply({
-      directory: db(), at: cf.at, deployment: "one", shards: roomy(),
+      directory: db(), at: cf.at, deployment: "one", shards: roomy(), alone: nobody,
       apps: [app(covers)], serves: ["eu"],
     });
     expect((await resources(db()))[0]?.state).toBe("bound");
@@ -284,12 +318,12 @@ describe("what the deployment makes for itself", () => {
     const queue = {
       jobs: { id: "jobs", kind: "queue" as const, holds: "none" as const, why: "send later" },
     };
-    await apply({ directory: db(), at: cf.at, deployment: "one", shards: roomy(),
+    await apply({ directory: db(), at: cf.at, deployment: "one", shards: roomy(), alone: nobody,
       apps: [app(queue)], serves: ["eu"] });
     expect(cf.made).toHaveLength(1);
 
     /* The need disappears. */
-    const gone = { directory: db(), at: cf.at, deployment: "one", shards: roomy(),
+    const gone = { directory: db(), at: cf.at, deployment: "one", shards: roomy(), alone: nobody,
       apps: [app({})], serves: ["eu" as const] };
     await apply(gone);
     expect(cf.made).toHaveLength(1);
@@ -315,7 +349,7 @@ describe("what the deployment makes for itself", () => {
     const queue = {
       jobs: { id: "jobs", kind: "queue" as const, holds: "none" as const, why: "send later" },
     };
-    const on = { directory: db(), at: cf.at, deployment: "one", shards: roomy(),
+    const on = { directory: db(), at: cf.at, deployment: "one", shards: roomy(), alone: nobody,
       apps: [app(queue)], serves: ["eu" as const] };
     await apply(on);
     await apply({ ...on, apps: [app({})] });
@@ -348,6 +382,7 @@ describe("resolving a binding when the deployment serves more than one", () => {
          in the other — a deployment promising both with a database in only one
          correctly builds the second, which is not what this test is about. */
       shards: async () => [...await roomy()(), ...await roomy("global")()],
+      alone: nobody,
       apps: [app(covers)], serves: ["eu", "global"],
     });
     expect(cf.made.map((m) => m.name).sort())

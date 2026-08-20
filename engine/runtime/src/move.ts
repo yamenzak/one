@@ -27,7 +27,7 @@
  * vault, with every count reporting success.
  */
 
-import type { AppSpec, Residency, TenantId } from "@engine/kernel";
+import type { AppSpec, Residency, Shard, TenantId } from "@engine/kernel";
 import { DRAIN_DAYS, eraseBy } from "@engine/kernel";
 import { HOLDINGS, tablesIn } from "./dossier.js";
 import { tenantById } from "./directory.js";
@@ -340,4 +340,66 @@ export async function reapMoved(
     cleared++;
   }
   return cleared;
+}
+
+/* ------------------------------------------------------------- isolating --- */
+
+/**
+ * A WORKSPACE THAT ASKED TO BE ALONE GETS THE EMPTY SHARD THAT WAS BUILT FOR IT.
+ *
+ * ⚠️ THIS IS THE STEP THAT MADE ISOLATION A PRODUCT RATHER THAN A PROCEDURE.
+ * Every other piece already existed: `mayIsolate` says who may ask,
+ * `Shard.dedicatedTo` is the promise, `refusePlacement` keeps it in both
+ * directions, `beginMove` and the nightly carry do the migration. What there was
+ * no path for was ASKING — `Placing.alone` was a parameter nothing ever set, so
+ * isolation meant an operator reserving an empty shard by hand and remembering
+ * to move the workspace onto it, on a deployment with no way to make one empty.
+ *
+ * ⚠️ AN EMPTY SHARD, AND EMPTY IS THE WHOLE CONDITION. Dedicating one that has
+ * strangers on it breaks the isolation somebody paid for — silently, because
+ * both workspaces go on working perfectly — and there is nothing downstream that
+ * would ever notice.
+ *
+ * ⚠️ AND IT DEDICATES BEFORE IT MOVES. The reverse order has a window in which
+ * the workspace is on a shard nothing has reserved, so an ordinary placement
+ * could put somebody else there while the copy is still running.
+ */
+export async function isolateWaiting(deps: {
+  readonly directory: Db;
+  readonly waiting: readonly { readonly id: TenantId; readonly where: Residency }[];
+  readonly shards: readonly Shard[];
+  /** ⚠️ How many workspaces are on each — an empty one is the only candidate. */
+  readonly countOn: (shardId: string) => Promise<number>;
+  readonly reserve: (
+    shardId: string, where: Residency, ceiling: number, forTenant: TenantId,
+  ) => Promise<void>;
+  readonly now?: Date;
+}): Promise<readonly string[]> {
+  const said: string[] = [];
+  const used = new Set<string>();
+  for (const want of deps.waiting) {
+    /* ⚠️ EVERY CANDIDATE, NOT THE FIRST ONE. A deployment's shards are ordered by
+       name, so the first non-dedicated one in a jurisdiction is almost always the
+       busy original — and a version of this that tested only that one gave up on
+       the workspace entirely while the empty shard built for it sat beside it. */
+    let free: Shard | undefined;
+    for (const s of deps.shards) {
+      if (s.where !== want.where || s.dedicatedTo !== undefined || used.has(s.id)) continue;
+      /* ⚠️ Asked of the DIRECTORY rather than trusted from the shard row, because
+         `Shard.tenants` is a count taken when the list was read and this decides
+         whether somebody's isolation is real. */
+      if (await deps.countOn(s.id) > 0) continue;
+      free = s;
+      break;
+    }
+    if (!free) continue;
+
+    used.add(free.id);
+    await deps.reserve(free.id, free.where, free.ceiling, want.id);
+    const refused = await beginMove(deps.directory, want.id, free.id, deps.now ?? new Date());
+    said.push(refused
+      ? `${want.id} could not move to ${free.id}: ${refused}`
+      : `${want.id} is moving to ${free.id}`);
+  }
+  return said;
 }

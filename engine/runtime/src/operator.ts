@@ -52,7 +52,7 @@ import {
 import { autoTopUpOf, movements, renewAllowance, spentByApp, topUp, walletOf } from "./wallet.js";
 import {
   addShard, appsOfTenant, commercialAllowance, commercialLeft, disableApp, enableApp,
-  liveAppsOfTenant, setCommercialGrant, shards, tenantById, tenantBySlug,
+  liveAppsOfTenant, setCommercialGrant, shards, tenantById, tenantBySlug, waitingAlone,
 } from "./directory.js";
 import { CREDENTIALS, LANES, configState, setConfig } from "./config.js";
 import { parkedEvents } from "./stripe.js";
@@ -1211,6 +1211,11 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
           deployment: deps.deployment ?? "one",
           apps: every(), serves: deps.serves ?? [], now: () => ctx.now,
           shards: () => shards(ctx.directory),
+          /* ⚠️ THE SAME TWO REASONS TO BUILD A DATABASE THE NIGHTLY PASS HAS.
+             Left out, this button reconciled everything EXCEPT the shard
+             somebody paid to be alone on — and it would have reported success,
+             which is the failure this whole path is built to avoid. */
+          alone: () => waitingAlone(ctx.directory),
         });
       },
     },

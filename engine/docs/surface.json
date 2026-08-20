@@ -322,6 +322,12 @@
         "path": "/api/flag.set"
       },
       {
+        "id": "tenant.alone",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/tenant.alone"
+      },
+      {
         "id": "setting.write",
         "kind": "write",
         "method": "POST",

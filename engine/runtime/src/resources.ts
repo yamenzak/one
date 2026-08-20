@@ -145,6 +145,8 @@ export function wanted(
    * building the next database.
    */
   shards: readonly Shard[] = [],
+  /** ⚠️ Workspaces waiting on a database of their own — see `shardsWanted`. */
+  alone: readonly { readonly where: Residency }[] = [],
 ): readonly Want[] {
   const out: Want[] = [];
   /*
@@ -152,7 +154,9 @@ export function wanted(
     a plan read by a person should say so before it lists a product's buckets.
   */
   for (const s of shards) out.push(shardWant(deployment, s.id, s.where));
-  for (const s of shardsWanted(shards, serves)) out.push(shardWant(deployment, s.id, s.where));
+  for (const s of shardsWanted(shards, serves, alone)) {
+    out.push(shardWant(deployment, s.id, s.where));
+  }
   for (const app of apps) {
     /* ⚠️ `needsOf`, NOT `app.needs` — a media field implies a bucket nobody
        declared, and reading the raw declaration provisions nothing for it. */
@@ -242,6 +246,17 @@ export interface ApplyDeps {
    * That is the shape this whole change exists to remove.
    */
   readonly shards: () => Promise<readonly Shard[]>;
+  /**
+   * ⚠️ WHO HAS ASKED TO BE ALONE AND IS STILL WAITING — see `waitingAlone`. An
+   * isolation request is a reason to build a database exactly as running low is,
+   * and it has to be built before anybody can be moved onto it.
+   *
+   * ⚠️ REQUIRED, FOR THE SAME REASON `shards` IS. Left optional, a deployment
+   * that did not pass it would reconcile perfectly and never build an isolation
+   * shard — the ask sitting in a column, the nightly pass reporting success, and
+   * nothing anywhere saying which of the two halves was missing.
+   */
+  readonly alone: () => Promise<readonly { readonly where: Residency }[]>;
   readonly now?: () => Date;
 }
 
@@ -282,7 +297,8 @@ export async function apply(deps: ApplyDeps): Promise<Reconciled> {
   const did: string[] = [];
   const refused: string[] = [];
 
-  const want = wanted(deps.deployment, deps.apps, deps.serves, await deps.shards());
+  const want = wanted(deps.deployment, deps.apps, deps.serves,
+    await deps.shards(), await deps.alone());
   const have = await resources(deps.directory);
   const steps = plan(want, have, now);
 

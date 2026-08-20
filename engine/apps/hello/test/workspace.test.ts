@@ -400,6 +400,34 @@ describe("a database of one workspace's own", () => {
     const tenant = (await tenantBySlug(directory(), SLUG))!;
     expect(seen.items.find((s) => s.id === "eu-1")?.dedicatedTo).toBe(tenant.id);
   });
+
+  /*
+    ⚠️ AND A BUSINESS ASKS FOR IT ITSELF, which is what turned isolation from a
+    procedure into a product. Every other piece was already here — `mayIsolate`
+    said who may ask, `refusePlacement` kept the promise both ways, the nightly
+    carry did the migration — and nothing SET the parameter, so being alone meant
+    an operator building a database by hand and remembering to move somebody onto
+    it.
+  */
+  it("is asked for by the workspace, and refused to one that is not a business", async () => {
+    const cookie = await workspace();
+
+    const no = await post(SLUG, "/api/tenant.alone", { on: true }, cookie);
+    expect(no.status).toBe(402);
+    expect((await no.json() as { problem: { code: string } }).problem.code)
+      .toBe("platform.commercial_required");
+
+    await comp(1);
+    await post("setup", "/api/me.tenant.commercial", { slug: SLUG, legalName: "H GmbH" }, cookie);
+    expect((await post(SLUG, "/api/tenant.alone", { on: true }, cookie)).status).toBe(200);
+
+    /* ⚠️ RECORDED, NOT DONE. A database has to be created, bound, rolled out and
+       copied onto; answering as though the ask were the outcome is a screen that
+       calls a workspace isolated while its records sit beside everybody else's. */
+    const tenant = (await tenantBySlug(directory(), SLUG))!;
+    expect(tenant.wantsAlone).toBe(true);
+    expect(tenant.shardId).toBe("eu-1");
+  });
 });
 
 /**

@@ -38,7 +38,7 @@ all of it is refused, gated, audited and erasable on the same terms as everythin
 an app writes itself.
 
 <!-- generated: node scripts/inventory.mjs surface -->
-**31 operations for declaring nothing.** A roster, an inbox and its
+**32 operations for declaring nothing.** A roster, an inbox and its
 two-level policy, the workspace's brand, the package rail it sells with, its
 settings, its bill, and the one bootstrap read every screen stands on.
 
@@ -69,6 +69,7 @@ settings, its bill, and the one bootstrap read every screen stands on.
 | `flag.people` | read | *the session* |
 | `flag.person` | write | *the session* |
 | `flag.set` | write | *the session* |
+| `tenant.alone` | write | *the session* |
 | `setting.write` | write | *the session* |
 | `money.view` | read | `billing:read` |
 | `money.checkout` | write | `billing:manage` |
@@ -419,7 +420,7 @@ env or a binding.
 |---|---|---|---|
 | `schema` | the composed schema runner — declarations become tables | 7 | — |
 | `sql` | the one typed seam onto D1 | 5 | — |
-| `directory` | accounts, workspaces, placement, enablement, allowances | 33 | — |
+| `directory` | accounts, workspaces, placement, enablement, allowances | 35 | — |
 | `handles` | which binding holds which shard | 4 | — |
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
 | `flags` | what somebody switched, per deployment and per workspace | 10 | — |
@@ -472,11 +473,11 @@ env or a binding.
 | `legal` | who agreed to what version, and the wall until they have | 6 | — |
 | `cloudflare` | the one door out to the account — create, destroy, and add a binding | 11 | — |
 | `storage` | files: the object, the row that knows its key, and the erasure of both | 7 | — |
-| `move` | a workspace's records change shard — the only way its jurisdiction can | 8 | — |
+| `move` | a workspace's records change shard — the only way its jurisdiction can | 9 | — |
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**410 of them**, 409 reached by something today.
+**413 of them**, 412 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 

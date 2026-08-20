@@ -30,7 +30,7 @@ import {
   deploymentFaults, effectivePlans, grownShards, healthOf, isPlatformPath, locator,
   resources,
   accept, bindingKey, jobBookFor, liveBindings, memberFor, noteShardApp, observe, owedBy,
-  runnerFor, schedulesOf, shards, sweep, type SweepDeps,
+  runnerFor, schedulesOf, shards, sweep, waitingAlone, type SweepDeps,
   tenantById, tenantBySlug,
   applyEvent, becomeCommercial, markCancelled, markPaid, markPastDue, renewAllowance, stripeKey,
   subscribe, topUp, verifySignature,
@@ -1104,6 +1104,10 @@ async function sweepDeps(env: Env): Promise<SweepDeps> {
              shard before the current one fills rather than letting the front
              door close. See `shardsWanted`. */
           shards: () => shards(directory),
+          /* ⚠️ AND WHO IS WAITING ON ONE OF THEIR OWN — see `waitingAlone`. An
+             isolation request is a reason to build a database exactly as
+             running low is. */
+          alone: () => waitingAlone(directory),
         },
       }
       : {}),

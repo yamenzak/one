@@ -219,6 +219,11 @@ describe("what the manifest produced", () => {
       "POST /api/package.revoke",
       "GET /api/setting.read",
       "POST /api/setting.write",
+      /* ⚠️ ASKING FOR A DATABASE OF ITS OWN, which is the half of isolation that
+         did not exist. `mayIsolate` said who may ask and `Placing.alone` was the
+         parameter — and nothing set it, so being alone meant an operator making
+         a database by hand and remembering to move somebody onto it. */
+      "POST /api/tenant.alone",
       /* ⚠️ AND THE VAULT'S EIGHT, BECAUSE THIS APP DECLARES A SPECIAL CATEGORY.
          An app that declares none gets none of them — a consent sheet with
          nothing on it reads as a product that asked and was told yes. */

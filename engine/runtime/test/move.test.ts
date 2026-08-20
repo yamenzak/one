@@ -14,8 +14,12 @@ import type { AppSpec } from "@engine/kernel";
 import { applySchema } from "../src/schema.js";
 import type { Db } from "../src/sql.js";
 import { DIRECTORY_MODULES, SHARD_MODULES } from "../src/platform-schema.js";
-import { addShard, createTenant, noteShardApp, tenantById } from "../src/directory.js";
-import { beginMove, carried, carryRows, finishMove, reapMoved, unmatched } from "../src/move.js";
+import {
+  addShard, askAlone, createTenant, noteShardApp, shards, tenantById, waitingAlone,
+} from "../src/directory.js";
+import {
+  beginMove, carried, carryRows, finishMove, isolateWaiting, reapMoved, unmatched,
+} from "../src/move.js";
 import { locator } from "../src/locate.js";
 
 const directory = () => env.DIRECTORY as unknown as Db;
@@ -189,6 +193,77 @@ describe("moving a workspace's records", () => {
     const tenant = await tenantById(directory(), id as never);
     expect(tenant?.residency).toBe("global");
     expect(tenant?.shardId).toBe("global-1");
+  });
+
+  /*
+    ⚠️ ISOLATION, END TO END, AND EVERY PIECE OF IT EXISTED BUT ONE. `mayIsolate`
+    said who may ask, `Shard.dedicatedTo` was the promise, `refusePlacement` kept
+    it in both directions, `beginMove` and the nightly carry did the migration —
+    and `Placing.alone` was a parameter NOTHING EVER SET. So isolation meant an
+    operator reserving an empty shard by hand and remembering to move the
+    workspace onto it, on a deployment that had no way to make one empty.
+  */
+  it("gives a workspace that asked the empty shard built for it", async () => {
+    await askAlone(directory(), id as never, true);
+    expect((await waitingAlone(directory())).map((w) => w.id)).toEqual([id]);
+
+    const said = await isolateWaiting({
+      directory: directory(),
+      waiting: await waitingAlone(directory()),
+      shards: await shards(directory()),
+      countOn: async (shardId) => (await directory().prepare(
+        `SELECT COUNT(*) AS n FROM tenant WHERE shard_id = ? AND closed_at IS NULL`)
+        .bind(shardId).first<{ n: number }>())?.n ?? 1,
+      reserve: (s, where, ceiling, forTenant) =>
+        addShard(directory(), s, where, ceiling, forTenant),
+    });
+    expect(said).toEqual([`${id} is moving to eu-2`]);
+
+    /* ⚠️ RESERVED BEFORE THE MOVE, because the reverse order leaves a window in
+       which an ordinary placement could put somebody else on it while the copy
+       is still running. */
+    expect((await shards(directory())).find((s) => s.id === "eu-2")?.dedicatedTo).toBe(id);
+    expect((await tenantById(directory(), id as never))?.movingTo).toBe("eu-2");
+
+    /* ⚠️ AND THE REST IS THE ORDINARY MOVE — the nightly carries, verifies and
+       flips it, which is why this is a product rather than a procedure. */
+    await carryRows(one(), two(), id as never, [app()]);
+    expect(await finishMove(directory(), one(), two(), id as never, [app()])).toBeNull();
+    expect((await tenantById(directory(), id as never))?.shardId).toBe("eu-2");
+
+    /* ⚠️ Once kept, the promise stops being a request — otherwise the reconciler
+       builds a second database for the same workspace every night. */
+    expect(await waitingAlone(directory())).toEqual([]);
+  });
+
+  /*
+    ⚠️ AND A SHARD WITH STRANGERS ON IT IS NEVER DEDICATED. Doing so breaks the
+    isolation somebody paid for silently: both workspaces go on working
+    perfectly, and nothing downstream would ever notice.
+  */
+  it("will not hand over a shard somebody else is on", async () => {
+    const other = await createTenant(directory(), {
+      slug: "nearby", name: "Nearby", country: "DE", where: "eu", apps: ["hello" as never],
+    });
+    if (typeof other === "string") throw new Error(other);
+    /* ⚠️ `placeOn` spreads to the emptiest, so the second workspace lands on the
+       other shard — which is exactly the one this workspace would be given. */
+    await directory().prepare(`UPDATE tenant SET shard_id = 'eu-2' WHERE id = ?`)
+      .bind(other.tenant.id).run();
+
+    await askAlone(directory(), id as never, true);
+    const said = await isolateWaiting({
+      directory: directory(),
+      waiting: await waitingAlone(directory()),
+      shards: await shards(directory()),
+      countOn: async (shardId) => (await directory().prepare(
+        `SELECT COUNT(*) AS n FROM tenant WHERE shard_id = ? AND closed_at IS NULL`)
+        .bind(shardId).first<{ n: number }>())?.n ?? 1,
+      reserve: (s, where, ceiling, forTenant) =>
+        addShard(directory(), s, where, ceiling, forTenant),
+    });
+    expect(said).toEqual([]);
+    expect((await shards(directory())).find((s) => s.id === "eu-2")?.dedicatedTo).toBeUndefined();
   });
 
   /*
