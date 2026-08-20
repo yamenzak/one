@@ -284,6 +284,30 @@
       "status": "planned",
       "title": "A workspace asks to change its jurisdiction, and the ask is the only thing that is new",
       "ends": "A workspace with `tenant:manage` can request a residency change from its own settings; the request is recorded and answered by an operator rather than granted, because Cloudflare fixes a database's jurisdiction at creation and the move is `op.tenant.move`'s `into` either way. `operator.test.mjs` sees the read behind the operator's queue of them, and nothing in the request path can begin a move by itself."
+    },
+    {
+      "n": 54,
+      "status": "planned",
+      "title": "A collection's `offline` policy reaches the browser — a write survives no signal, and a read answers without one",
+      "ends": "`offline` is read by the runtime and by the browser rather than only declared: `queue` holds a write until there is a connection and replays it once, `cache` answers a read from what was last seen and says how old it is, and `none` is honest about failing. `scripts/declared.test.mjs` fails on any field of a kernel declaration that no lane reads, which is the check that would have found this one."
+    },
+    {
+      "n": 55,
+      "status": "planned",
+      "title": "A collection narrows to part of a workspace — a location grant, and one filter the platform composes",
+      "ends": "`within: { column, tree }` on a `CollectionSpec` makes the generated verbs answer only what the caller's location grants reach, composed in the one function that owns the boundary exactly as `subject` scope is; no grants means the whole workspace; a notification's audience narrows the same way; and a guard refuses a handler composing that filter itself."
+    },
+    {
+      "n": 56,
+      "status": "planned",
+      "title": "A family takes a hue — one declared per product, never written at a call site",
+      "ends": "`tint` carries more than one hue, each declared once in `scene/tint.ts` as a constraint on the family, chosen by name rather than by value; `scene.test.mjs` still refuses a colour written into a screen; and two products wearing the family are visibly different and neither is nameable."
+    },
+    {
+      "n": 57,
+      "status": "planned",
+      "title": "Records move between workspaces — a garage becomes a business and its history goes with it",
+      "ends": "A workspace's records can be handed to another workspace the same account can already reach, with the ledger's provenance carried rather than restamped, refused where the destination's apps do not cover the source's collections, and audited on both sides. Until it exists the only path is an export and an import, which loses who did what and when."
     }
   ]
 }

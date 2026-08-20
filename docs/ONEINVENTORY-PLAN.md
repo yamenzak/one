@@ -893,6 +893,45 @@ missing.
 list can only shrink. A `Viewfinder` in hello is a note carrying a scanned
 reference — which is the kind of thing that has to be arranged, not waived.
 
+### 10.9a The ground, and where amber is allowed to land
+
+**Most of it is not chosen.** `worldFor` reads the kind off the face: a product
+is a SYSTEM, so OneInventory's baseline material is `loops`, seeded
+`${appId}|${route}` by the Shell — every screen its own world inside the
+product's material, with nobody picking anything. What a manifest chooses is
+only the handful of screens that NAME a ground, and `plain` stays the default,
+because ambience everywhere is ambience nowhere.
+
+| Screen | `sky` | Why |
+|---|---|---|
+| **Scan** | `glow` | pure light, no marks. A viewfinder over a marked field is noise, and the camera *is* the content |
+| **A location** | `etch`, seeded on the location id | every shelf its own ruled world, for free. This is the seed doing exactly what it is for |
+| **Reports** | `etch` | ruled geometry, which AMBIENCE.md points at monitoring — and a shelf grid is what `etch` draws anyway |
+| **Getting started** | `glow` | an arrival is the case the family exists for |
+| everything else | `plain` | a form never earns a ground, and neither does a list |
+
+**Amber lands in exactly two places, and neither of them is a state.**
+
+1. **The mark.** `#f59e0b` in the beak, drawn through `appFace(id, mark)`. A
+   product's glyph is the one place a product may carry a colour in a
+   monochrome interface.
+2. **`tint`, once it carries more than one hue** — engine stage 56. AMBIENCE.md
+   already names this as the one mechanism in the scene engine with no code and
+   states its trigger in writing: *"the moment a second consumer of one family
+   wants to differ, that is the change."* OneInventory is that consumer. The hue
+   stays declared once in `scene/tint.ts` as a constraint on the family, chosen
+   by NAME; a colour written at a call site is what `scene.test.mjs` refuses,
+   and it should keep refusing it.
+
+⚠️ **AMBER IS THE WARNING TONE'S NEIGHBOUR, AND THIS IS AN APP WHOSE COMMONEST
+STATE IS "EXPIRING SOON".** Two meanings in one hue is a real risk here and it
+does not bite, for a reason the tree already demonstrates: `tint` carries a
+GREEN while `success` is green, and they never collide because **one is a ground
+and the other is ink on a value**. Amber has to respect the same line — barely
+nameable, in the ground and the mark; the tone stays in `TONE_CSS`, on the
+number. A brand hue that reaches `data-ink` would make a healthy shelf and an
+expiring one the same picture.
+
 ### 10.10 What it costs, and the two numbers to watch
 
 Nothing in this design bills by time or by connection. **No Durable Object, no
@@ -913,24 +952,28 @@ The same guard refuses the poll a "live count" screen would reach for.
 
 ### 10.11 What the engine owes this app, honestly
 
-Five things, each named rather than assumed.
+Seven things, each named rather than assumed, and **each is now a row in
+`engine/docs/stages.json` rather than a sentence here** — a gap recorded only in
+prose is a gap nobody can enumerate.
 
-| | State | Consequence if it does not land |
+| | Stage | Consequence if it does not land |
 |---|---|---|
-| **`offline`** | ⚠️ **declared in `kernel/src/collection.ts`, set by `hello`, and read by NOTHING.** Measured: `grep -rln offline --include=*.ts --include=*.tsx engine/` returns two files, both declarations | §7.1 rule 5 fails. The back of an old factory has no signal and that is exactly where the stock is. **This is the one that blocks a real customer** |
-| **`within`** — location narrowing | does not exist. 10.4 has the shape | multi-site is one workspace seeing everything. A nuisance at four sites, unusable at forty |
-| **Stage 24** — composed roles | planned, reached by nothing | profiles seed settings only and every screen is visible. Degrades correctly |
-| **Stage 23** — mail | planned | no expiry digest, no reorder email. The inbox and push still work |
-| **Stage 42** — the gate asked before a control is drawn | planned | a control is drawn and then refuses. Ugly, not wrong |
+| **`offline`** | **54**, and it carries the `DEFER(engine-54)` marker on the declaration itself | §7.1 rule 5 fails. The back of an old factory has no signal and that is exactly where the stock is. **This is the one that blocks a real customer** |
+| **`within`** — location narrowing | **55** | multi-site is one workspace seeing everything. A nuisance at four sites, unusable at forty |
+| **A family takes a hue** | **56** | amber lives only in the mark. Correct, and less than §10.9a describes |
+| **Records move between workspaces** | **57** | "I started in my garage and it is a business now" is an export and an import, which loses who did what and when |
+| Composed roles | **24** — planned already | profiles seed settings only and every screen is visible. Degrades correctly |
+| Mail | **23** — planned already | no expiry digest, no reorder email. The inbox and push still work |
+| The gate asked before a control is drawn | **42** — planned already | a control is drawn and then refuses. Ugly, not wrong |
 
 ⚠️ **THE FIRST ROW IS THE FINDING, AND IT IS EXACTLY THE CLASS BUILDING.md §2 IS
-ABOUT.** `offline: "queue"` is a declaration that compiles, is set by the
-reference app, is documented as a capability — and no code reads it. It is not
-in ENGINE.md §12's list because it carries no `DEFER` marker, which means the
-capability guard has nothing to find. **Adding the marker and the stage is the
-first commit of this build**, before any OneInventory file exists, because a
-declaration that reaches no surface is the failure this framework exists to
-prevent and this one has been sitting in the reference app.
+ABOUT.** `offline: "queue"` compiled, was set by the reference app, was
+documented as a capability — and no code read it. It was absent from ENGINE.md
+§12 because it carried no `DEFER` marker, so the capability guard had nothing to
+find: that guard asks whether a MODULE is mounted, and this is one level down, a
+FIELD nothing consults. Stage 54's exit criterion is therefore the guard as much
+as the feature — `declared.test.mjs`, which fails on any field of a kernel
+declaration that no lane reads.
 
 ### 10.12 The guards this app adds
 

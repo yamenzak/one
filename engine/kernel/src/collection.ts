@@ -55,7 +55,17 @@ export interface CollectionSpec {
   readonly permission: string;
   /** ⚠️ Absent means no history. Present means every version is kept. */
   readonly versioned?: boolean;
-  /** How a phone treats it with no signal. */
+  /**
+   * How a phone treats it with no signal.
+   *
+   * DEFER(engine-54) stage:54 — declared, set by the reference app, and read by
+   * NOTHING. A field a manifest can set and no lane consults is the failure this
+   * framework is a catalogue of, one level below the ones the capability guard
+   * can see: there is no route to mount and no schema to apply, so nothing goes
+   * red. It is here rather than in a sentence because a deferral has to be
+   * findable, and the stage's own exit criterion is the guard that would have
+   * found it.
+   */
   readonly offline?: "cache" | "queue" | "none";
   /**
    * ⚠️ WHICH OF ITS OWN FIELDS ARE FINDABLE BY MEANING, AND NOTHING ELSE. Naming

@@ -989,8 +989,12 @@ that names no stage, so this list cannot grow by forgetting.
 | 51 | A collection says `searchable` and becomes findable — the write marks, a pass carries, erasure removes, and one filter is the boundary | shipped |
 | 52 | The words arrive as they are written — one metered run, streamed, and the charge rides the last token | shipped |
 | 53 | A workspace asks to change its jurisdiction, and the ask is the only thing that is new | **planned** |
+| 54 | A collection's `offline` policy reaches the browser — a write survives no signal, and a read answers without one | **planned** |
+| 55 | A collection narrows to part of a workspace — a location grant, and one filter the platform composes | **planned** |
+| 56 | A family takes a hue — one declared per product, never written at a call site | **planned** |
+| 57 | Records move between workspaces — a garage becomes a business and its history goes with it | **planned** |
 
-**42 shipped, 11 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**42 shipped, 15 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---
