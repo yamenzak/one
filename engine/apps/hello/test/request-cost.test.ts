@@ -130,15 +130,25 @@ describe("what a read costs", () => {
       is not a slow query; it is a tenth question added to the nine already
       asked, by somebody who could not see the other nine.
 
-      ⚠️ TEN QUERIES, THREE WAITS — and the gap between those two numbers is the
-      whole point of measuring depth rather than trips. It was eleven waits, then
-      seven, then three: the workspace lookup, the identity and the maintenance
-      switch all start together now (`Locating`), so the only things left in a
-      line are the three that genuinely feed each other — which workspace this
-      is, then what it holds and who is on its roster, then the answer.
+      ⚠️ ELEVEN QUERIES, THREE WAITS — and the gap between those two numbers is
+      the whole point of measuring depth rather than trips. It was eleven waits,
+      then seven, then three: the workspace lookup, the identity and the
+      maintenance switch all start together now (`Locating`), so the only things
+      left in a line are the three that genuinely feed each other — which
+      workspace this is, then what it holds and who is on its roster, then the
+      answer.
+
+      ⚠️ THE ELEVENTH IS THE FLAG STORE, AND IT WAS TEN. Raised on purpose: what
+      somebody switched has to be read for the gate and the surface to agree
+      about it, and it was read by nothing at all — the console wrote rows only
+      the console read back, so a flag switched on changed nothing anywhere with
+      every suite green. It is ONE query rather than two (both levels in a single
+      statement, `switchesFor`), it starts beside the identity so it adds no
+      DEPTH, and a deployment whose products declare no flag never runs it. This
+      app declares one, so this measurement pays for it.
     */
     expect(at.depth, `depth ${at.depth}, trips ${at.trips}`).toBeLessThanOrEqual(3);
-    expect(at.trips, `depth ${at.depth}, trips ${at.trips}`).toBeLessThanOrEqual(10);
+    expect(at.trips, `depth ${at.depth}, trips ${at.trips}`).toBeLessThanOrEqual(11);
   });
 
   /* ⚠️ AND A SECOND READ IS NOT DEARER THAN THE FIRST. Anything held per

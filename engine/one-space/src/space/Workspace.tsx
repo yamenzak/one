@@ -40,6 +40,7 @@ const GLYPH: Readonly<Record<WorkspacePart, string>> = {
   notices: "bell",
   trust: "trust",
   wording: "note",
+  trying: "flag",
 };
 
 export function OneWorkspace({ slug, onGo }: {

@@ -78,6 +78,41 @@ export function resolve(def: FlagDef, switches: Switches = {}): boolean {
   return on;
 }
 
+/**
+ * EVERY DECLARED FLAG, ANSWERED ONCE, FOR ONE REQUEST.
+ *
+ * ⚠️ ONE RESOLUTION OR THE SCREEN AND THE ROUTE DISAGREE. A gate reading the
+ * stored rows directly and a nav filtering on `fallback` are two answers to
+ * "is this on", and they differ on exactly the case that matters: a flag
+ * nobody has switched, where the row is absent and the fallback is `true`. The
+ * product then offers a destination its own route refuses.
+ *
+ * ⚠️ AND IT IS EVERY DECLARED FLAG, NOT EVERY STORED ROW. An unset flag has no
+ * row and still has an answer — its `fallback` — so a map built from the store
+ * is missing precisely the flags nobody has touched, which is most of them.
+ */
+export const resolveFlags = (
+  books: readonly FlagBook[],
+  switches: {
+    readonly deployment?: Readonly<Record<string, boolean>>;
+    readonly tenant?: Readonly<Record<string, boolean>>;
+    readonly person?: Readonly<Record<string, boolean>>;
+  } = {},
+): Readonly<Record<string, boolean>> => {
+  const out: Record<string, boolean> = {};
+  for (const book of books) {
+    for (const def of Object.values(book)) {
+      out[def.id] = resolve(def, {
+        ...(switches.deployment?.[def.id] !== undefined
+          ? { deployment: switches.deployment[def.id] } : {}),
+        ...(switches.tenant?.[def.id] !== undefined ? { tenant: switches.tenant[def.id] } : {}),
+        ...(switches.person?.[def.id] !== undefined ? { person: switches.person[def.id] } : {}),
+      });
+    }
+  }
+  return out;
+};
+
 /** ⚠️ What a screen shows beside the switch: who can still change it from here. */
 export const settableBy = (def: FlagDef, switches: Switches = {}): readonly SetBy[] => {
   if (switches.deployment === false) return ["operator"];

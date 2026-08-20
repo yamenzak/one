@@ -35,6 +35,11 @@ import {
 import type { Residency } from "@engine/kernel";
 import type { Account } from "./cloudflare.js";
 import { verify } from "./cloudflare.js";
+/* ⚠️ The store is its own module — `locate` reads it on every request and must
+   not drag this file's graph in front of one. See `flags.ts`. */
+import {
+  deploymentFlags, flagExceptions, flagHolders, setDeploymentFlag, setTenantFlag,
+} from "./flags.js";
 import { apply, plan, resources, wanted } from "./resources.js";
 import { beginMove } from "./move.js";
 import { actionsOf, bind, bindingsOf, running } from "./ai-actions.js";
@@ -64,6 +69,12 @@ export const OPERATOR_SCHEMA: SchemaModule = {
   id: "operator",
   statements: [
     `CREATE TABLE IF NOT EXISTS deployment_flag (id TEXT PRIMARY KEY, on_flag INTEGER NOT NULL, at TEXT NOT NULL);`,
+    /* ⚠️ ONE WORKSPACE'S ANSWER TO ONE FLAG, and it may only ever NARROW what
+       the deployment allows — see `resolve`. The row exists so a feature can be
+       tried on the workspaces that asked for it rather than on everybody at
+       once, which is what `trying` means and what the deployment level alone
+       cannot express. */
+    `CREATE TABLE IF NOT EXISTS tenant_flag (tenant_id TEXT NOT NULL, id TEXT NOT NULL, on_flag INTEGER NOT NULL, at TEXT NOT NULL, PRIMARY KEY (tenant_id, id));`,
     /* ⚠️ One row, and the primary key says so — two maintenance modes at once
        is two answers to "may this request run". */
     `CREATE TABLE IF NOT EXISTS maintenance (id TEXT PRIMARY KEY CHECK (id = 'the'), mode TEXT NOT NULL, at TEXT NOT NULL);`,
@@ -71,21 +82,6 @@ export const OPERATOR_SCHEMA: SchemaModule = {
 };
 
 /* ------------------------------------------------------------------ store --- */
-
-export async function deploymentFlags(db: Db): Promise<Readonly<Record<string, boolean>>> {
-  const rows = await db.prepare(`SELECT id, on_flag FROM deployment_flag`)
-    .all<{ id: string; on_flag: number }>();
-  return Object.fromEntries(rows.results.map((r) => [r.id, !!r.on_flag]));
-}
-
-export async function setDeploymentFlag(
-  db: Db, id: string, on: boolean, now = new Date(),
-): Promise<void> {
-  await db.prepare(
-    `INSERT INTO deployment_flag (id, on_flag, at) VALUES (?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET on_flag = excluded.on_flag, at = excluded.at`)
-    .bind(id, on ? 1 : 0, now.toISOString()).run();
-}
 
 export type MaintenanceMode = "off" | "readonly" | "full";
 
@@ -623,7 +619,7 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
 
     "op.flags": {
       kind: "read", needs: "session", doors: ["operator"],
-      async run(ctx): Promise<unknown> {
+      async run(ctx, input): Promise<unknown> {
         operator(ctx);
         /* ⚠️ THE APP'S IDENTITY TRAVELS WITH ITS BOOK, and it did not: this
            answered a map keyed by app id, so the console had nothing to head a
@@ -634,7 +630,42 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
         const apps = every()
           .filter((a) => a.flags && Object.keys(a.flags).length)
           .map((a) => ({ id: a.id, name: a.name, mark: a.mark, book: a.flags as FlagBook }));
-        return { apps, deployment: await deploymentFlags(ctx.directory) };
+        /* ⚠️ THE EXCEPTIONS TRAVEL WITH THE SWITCHES, because "on for everybody"
+           and "on for everybody except these four" are the same row on the
+           screen and different facts. A console showing only the deployment
+           level cannot show that a flag it reports as off is on for eleven
+           workspaces. */
+        const [deployment, tried] = await Promise.all([
+          deploymentFlags(ctx.directory), flagExceptions(ctx.directory),
+        ]);
+        return { apps, deployment, tried };
+      },
+    },
+
+    /*
+      ⚠️ ONE FLAG, WITH THE WORKSPACES THAT HOLD AN EXCEPTION TO IT BY NAME. The
+      list screen can say "on for eleven"; only this one can say WHICH eleven,
+      and undoing an exception is impossible without that.
+    */
+    "op.flag": {
+      kind: "read", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const id = String(input.id ?? "");
+        const app = every().find((a) => a.flags && id in a.flags);
+        if (!app) return ctx.fail("platform.not_found");
+        const [deployment, holders] = await Promise.all([
+          deploymentFlags(ctx.directory), flagHolders(ctx.directory, id),
+        ]);
+        return {
+          def: (app.flags as FlagBook)[id],
+          app: { id: app.id, name: app.name, mark: app.mark },
+          /* ⚠️ THREE STATES, AND `null` IS ONE OF THEM. No row means the flag
+             follows its own declaration, which is where a trial lives — see
+             `setDeploymentFlag`. */
+          deployment: deployment[id] ?? null,
+          holders,
+        };
       },
     },
 
@@ -646,8 +677,24 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
         /* ⚠️ A switch nothing declares is a switch that does nothing — refused
            rather than stored, or the console fills with rows that lie. */
         if (!every().some((a) => a.flags && id in a.flags)) return ctx.fail("platform.not_found");
-        await setDeploymentFlag(ctx.directory, id, input.on === true, ctx.now);
-        return { id, on: input.on === true };
+        /*
+          ⚠️ ONE OPERATION FOR BOTH LEVELS, because they are one decision made at
+          two widths — "try this on Eastgate" and "give it to everybody" — and
+          two operations would be two audit trails for a question somebody asks
+          in one sitting. Which level is the presence of a workspace.
+        */
+        /* ⚠️ `null` CLEARS AT EITHER LEVEL, and both need it. A workspace
+           exception that can only be set is a workspace held off a shipped
+           feature for ever; a deployment switch that can only be set means one
+           press of "off" — which is ABSORBING — ends every trial permanently. */
+        const on = input.on === null ? null : input.on === true;
+        const at = String(input.tenant ?? "").trim();
+        if (at) {
+          await setTenantFlag(ctx.directory, at, id, on, ctx.now);
+          return { id, tenant: at, on };
+        }
+        await setDeploymentFlag(ctx.directory, id, on, ctx.now);
+        return { id, on };
       },
     },
 

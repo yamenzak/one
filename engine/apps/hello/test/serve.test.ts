@@ -160,6 +160,11 @@ describe("what the manifest produced", () => {
       "GET /api/check-in.read",
       "GET /api/check-in.team",
       "POST /api/check-in.update",
+      /* ⚠️ THE WORKSPACE'S OWN SIDE OF A FLAG, and it is here because this app
+         declares one that says `setBy: "tenant"`. Without these two, that word
+         meant nothing: the kernel resolved a level nobody could set. */
+      "GET /api/flag.list",
+      "POST /api/flag.set",
       /* ⚠️ ONE PAIR PER PRODUCT THAT GENERATES — `aiOps` answers nothing for an
          app with no action, so these appear the day a manifest declares one and
          not before. Named for the product, because the model a workspace picks

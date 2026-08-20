@@ -44,6 +44,7 @@ const GLYPH: Readonly<Record<ConsolePartId, string>> = {
   ai: "sparkle",
   keys: "key",
   switches: "settings",
+  maintenance: "power",
   telling: "bell",
   works: "clock",
   ground: "database",
@@ -112,7 +113,7 @@ const saidOf = (part: ConsolePartId, at: Attention | null): React.ReactNode => {
     /* ⚠️ THE ONE THAT IS NOT A COUNT. Leaving the doors shut is the mistake
        nobody makes deliberately and everybody makes once, and it is the only
        item here that is withholding the product from everybody right now. */
-    case "switches": return at.maintenance === "readonly" ? needing("Writes are held")
+    case "maintenance": return at.maintenance === "readonly" ? needing("Writes are held")
       : at.maintenance === "full" ? needing("Every door but this one is shut", "danger")
         : undefined;
     default: return undefined;
@@ -212,6 +213,18 @@ export function ConsolePart(props: {
   return (
     <React.Suspense fallback={<Working says="Opening the console" />}>
       <Parts {...props} />
+    </React.Suspense>
+  );
+}
+
+/** ⚠️ The same chunk, so opening one flag from the list costs no second fetch. */
+const OneSwitch = React.lazy(() => import("../console/parts.js")
+  .then((m) => ({ default: m.Switch })));
+
+export function ConsoleSwitch({ id }: { readonly id: string }) {
+  return (
+    <React.Suspense fallback={<Working says="Opening the console" />}>
+      <OneSwitch id={id} />
     </React.Suspense>
   );
 }

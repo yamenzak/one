@@ -27,7 +27,7 @@ import { Button, Separator } from "@heroui/react";
 import {
   Banknote, Bell, Building2, Calendar, CheckCheck, Circle, ClipboardList, Clock, Cog, Coins, Database,
   Boxes, ChartColumn, FileText, House, Inbox as InboxGlyph, Mail, NotebookPen, Package, Plus, Search,
-  Shield, Sparkles, Star, Sun, TriangleAlert, UserRound, Users,
+  Power, Shield, Sparkles, Star, Sun, TriangleAlert, UserRound, Users,
 } from "lucide-react";
 /* ⚠️ OURS, BECAUSE THEIR MOTION IS INSIDE THEM — see `marks.tsx`. A bell rings
    by its clapper and a calendar turns its days over; neither is a transform on
@@ -107,6 +107,12 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
   */
   refresh: <RefreshMark />, sync: <RefreshMark />,
   alert: <TriangleAlert />, flag: <FlagMark />,
+  /* ⚠️ THE DEPLOYMENT'S OWN SWITCH, AND IT IS NOT A COG. Maintenance shares no
+     subject with settings: one is what a person configures, the other is us
+     withholding the whole product from everybody at once. They wore the same
+     mark while they shared a screen, which is the screen split reaching the
+     one place a reader looks first. */
+  power: <Power />,
 };
 
 /**
@@ -161,6 +167,14 @@ export const LIVELY: Readonly<Record<string, string>> = {
 export const STILL: readonly string[] = [
   "circle", "mail", "package", "note", "file", "list", "add", "apps", "product",
   "workspace", "database", "chart", "add", "plus",
+  /*
+    ⚠️ `power` IS STILL FOR `alert`'S REASON, AND IT IS THE SAME DECISION. This
+    is the mark on the row that shuts every door — it is already the only item on
+    the console menu that can be carrying a danger tone. A character on top would
+    make the outage the liveliest thing on a menu of things that are fine, which
+    is the interface raising its voice.
+  */
+  "power",
   /*
     ⚠️ AN ALERT IS STILL, AND IT IS THE ONE ENTRY HERE THAT IS A DECISION RATHER
     THAN A SHRUG. Every other mark on this list is a noun with no act of its own;

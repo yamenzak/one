@@ -48,8 +48,6 @@ export interface LocateDeps {
    * keypair has a paragraph about.
    */
   readonly charging: () => Promise<boolean>;
-  /** Flags resolved for this workspace. Absent is the declaration's fallback. */
-  readonly flags?: (tenant: TenantRow) => Promise<Readonly<Record<string, boolean>>>;
   readonly now?: () => Date;
 }
 
@@ -113,12 +111,12 @@ async function everything(
       why `apps/hello/test/request-cost.test.ts` measures the DEPTH rather than
       trusting a reading of this file.
     */
-    const [apps, charging, wallet, flags] = await Promise.all([
+    const [apps, charging, wallet] = await Promise.all([
       deps.appsOf(tenant),
       deps.charging(),
       walletOf(deps.directory, tenant.id),
-      deps.flags?.(tenant) ?? Promise.resolve({}),
     ]);
+
     /*
       ⚠️ ONE RESOLUTION FOR THE WHOLE WORKSPACE, over the UNION of what the
       platform sells and what every enabled product declares. Resolving per app
@@ -207,7 +205,15 @@ async function everything(
       residency: tenant.residency,
       standing: owing,
       entitlements: held.entitlements,
-      flags,
+      /*
+        ⚠️ THE ROWS, NOT THE ANSWER — resolution is `serve`'s, once, over the
+        books. It was here for an afternoon and that was wrong in the one
+        direction that matters: a deployment or a test wiring its own `locate`
+        supplies no switches, and an unresolved absence reads as "every flag
+        off" — including the ones whose declared fallback is ON. Doing the
+        arithmetic where nothing can skip it means a missing store gives every
+        flag what its own declaration says.
+      */
       balance: wallet.spendable,
       used,
     };

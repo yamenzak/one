@@ -25,11 +25,24 @@ import type { Resolved } from "./compose.js";
 /** The declarative slice of one app the page may hold. */
 const publicFace = (
   a: AppSpec, permissions: readonly string[], roles: readonly string[],
+  flags: Readonly<Record<string, boolean>>,
 ) => ({
   id: a.id,
   name: a.name,
   mark: a.mark,
-  screens: a.screens,
+  /*
+    ⚠️ A SCREEN BEHIND A SWITCH THAT IS OFF DOES NOT TRAVEL. It used to travel
+    whole: a manifest could put a screen behind a flag, the declaration refused
+    to be anything else, and the surface sent every one of them — so the nav
+    offered `/search` to everybody while the flag it named changed nothing. A
+    screen the page never receives is a screen with no nav row, no route and no
+    way to reach it by typing, which is the same three answers the gate gives.
+
+    ⚠️ AND IT IS FILTERED HERE RATHER THAN IN THE PAGE. The client would have to
+    be trusted with it, and a client that forgets draws a destination the server
+    refuses — the failure this whole seam exists to make impossible (D15).
+  */
+  screens: a.screens.filter((s) => !s.flag || flags[s.flag] === true),
   settings: a.settings ?? {},
   notifications: a.notifications ?? {},
   documents: a.documents ?? {},
@@ -76,6 +89,7 @@ export function centreOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           a,
           [...(await ctx.permissionsIn(a.id))],
           Object.keys(await rolesFor(ctx.db, ctx.tenantId as TenantId, a.id, a.access.roles)),
+          ctx.flags,
         )));
 
       return {

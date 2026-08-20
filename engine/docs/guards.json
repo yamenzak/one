@@ -2629,6 +2629,15 @@
       "impl": "scripts/enforced.mjs",
       "proves": "draws the interface and carries no",
       "fails": "DESIGN.md §8 typed by hand and five guards missing from it — the sharpest being `metrics`, which holds card padding, the spacing scale, the page gutter and the floor under a pressable row, so the section answering “is spacing enforced?” did not mention the guard enforcing spacing"
+    },
+    {
+      "id": "a-gate-is-never-handed-a-constant",
+      "protects": "D12",
+      "stage": "0",
+      "status": "live",
+      "impl": "scripts/gates.test.mjs",
+      "proves": "never fills",
+      "fails": "a gate whose input nothing supplies — `flags: located.flags ?? {}` where no deployment ever set it, so every request carried an empty map, the console wrote rows only the console read back, and switching a flag changed nothing anywhere with every suite green"
     }
   ]
 }

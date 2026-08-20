@@ -298,6 +298,18 @@
         "path": "/api/ai.word"
       },
       {
+        "id": "flag.list",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/flag.list"
+      },
+      {
+        "id": "flag.set",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/flag.set"
+      },
+      {
         "id": "setting.write",
         "kind": "write",
         "method": "POST",
@@ -714,6 +726,10 @@
       "kind": "read"
     },
     {
+      "id": "op.flag",
+      "kind": "read"
+    },
+    {
       "id": "op.flag.set",
       "kind": "write"
     },
@@ -955,6 +971,13 @@
         "table": "deployment_flag",
         "export": null,
         "why": "the deployment's own switches",
+        "onForget": [],
+        "onClose": null
+      },
+      {
+        "table": "tenant_flag",
+        "export": null,
+        "why": "which workspaces hold an exception to a switch",
         "onForget": [],
         "onClose": null
       },

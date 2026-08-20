@@ -193,6 +193,7 @@ if (what === "guards") {
     ["directory", "accounts, workspaces, placement, enablement, allowances"],
     ["handles", "which binding holds which shard"],
     ["locate", "who is asking, where they are, and what they hold"],
+    ["flags", "what somebody switched, per deployment and per workspace"],
     ["identity", "sign-in codes, sessions, tokens, proof"],
     ["membership", "the roster and what each member may do"],
     ["compose", "a manifest becomes a live surface of operations"],

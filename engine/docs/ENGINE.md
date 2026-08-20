@@ -38,7 +38,7 @@ all of it is refused, gated, audited and erasable on the same terms as everythin
 an app writes itself.
 
 <!-- generated: node scripts/inventory.mjs surface -->
-**27 operations for declaring nothing.** A roster, an inbox and its
+**29 operations for declaring nothing.** A roster, an inbox and its
 two-level policy, the workspace's brand, the package rail it sells with, its
 settings, its bill, and the one bootstrap read every screen stands on.
 
@@ -65,6 +65,8 @@ settings, its bill, and the one bootstrap read every screen stands on.
 | `setting.read` | read | *the session* |
 | `ai.wording` | read | *the session* |
 | `ai.word` | write | *the session* |
+| `flag.list` | read | *the session* |
+| `flag.set` | write | *the session* |
 | `setting.write` | write | *the session* |
 | `money.view` | read | `billing:read` |
 | `money.checkout` | write | `billing:manage` |
@@ -183,6 +185,7 @@ live inside workspaces and an operator stands outside all of them.
 | `op.config` | read |
 | `op.config.set` | write |
 | `op.flags` | read |
+| `op.flag` | read |
 | `op.flag.set` | write |
 | `op.ai` | read |
 | `op.ai.bind` | write |
@@ -312,6 +315,7 @@ before an app is resolved draws on them.
 | `job_run` | Nightly work you started by hand | `by: anonymise` | kept |
 | `job_schedule` | Nightly work you rescheduled | `by: anonymise` | kept |
 | `deployment_flag` | — *the deployment's own switches* | — | kept |
+| `tenant_flag` | — *which workspaces hold an exception to a switch* | — | kept |
 | `maintenance` | — *the deployment's own switches* | — | kept |
 | `ai_binding` | — *which model an action runs on* | — | kept |
 | `ai_wording` | — *a workspace's own prompt letterheads* | — | `tenant_id: delete` |
@@ -381,7 +385,7 @@ and a manifest that does not compose refuses to boot.
 | `tenancy` | workspaces, kinds, shards, placement, standing | 12 | — |
 | `door` | the five doors, and which host is which | 2 | — |
 | `setting` | a switch a workspace owns, and the page it lives on | 9 | — |
-| `flag` | a switch WE own, with a date it stops being one | 7 | — |
+| `flag` | a switch WE own, with a date it stops being one | 8 | — |
 | `notify` | what somebody is told, through which channel, and who may narrow it | 12 | 1 |
 | `problem` | the one refusal shape, and the platform's own catalogue | 6 | — |
 | `tone` | the voice — the rules a written string has to pass | 1 | — |
@@ -395,7 +399,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**263 of them**, 258 reached by something today.
+**264 of them**, 259 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -415,6 +419,7 @@ env or a binding.
 | `directory` | accounts, workspaces, placement, enablement, allowances | 33 | — |
 | `handles` | which binding holds which shard | 3 | — |
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
+| `flags` | what somebody switched, per deployment and per workspace | 7 | — |
 | `identity` | sign-in codes, sessions, tokens, proof | 21 | — |
 | `membership` | the roster and what each member may do | 12 | — |
 | `compose` | a manifest becomes a live surface of operations | 2 | — |
@@ -448,7 +453,7 @@ env or a binding.
 | `ai-run` | the seam an operation generates through — values in, a metered answer out | 2 | — |
 | `search` | what is findable: the ledger a write leaves, and the pass that carries it | 17 | — |
 | `search-ops` | the find operation a searchable collection gets, with its boundary already in it | 1 | — |
-| `operator` | the deployment looking at itself | 6 | — |
+| `operator` | the deployment looking at itself | 4 | — |
 | `deployment` | what is wrong with this deployment, asked at boot | 1 | — |
 | `mcp` | the agent door | 1 | — |
 | `member-ops` | the roster's own operations | 1 | — |
@@ -468,7 +473,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**401 of them**, 400 reached by something today.
+**406 of them**, 405 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -840,6 +845,7 @@ its own header, cited by other files, and doing nothing.
 | `an-edit-is-a-diff-not-a-copy` | D12 | a plan whose trial cannot be turned off, and untouched fields frozen at whatever they were on the day somebody edited the price — a zero read as an absence is the whole difference between a diff and a copy |
 | `an-edited-price-reaches-the-whole-product` | D12 | the price list edited on one screen and read from the code everywhere else — the gate, the bill and the checkout resolving against a catalogue nobody can see, which is a screen promising what a route refuses |
 | `every-design-guard-is-named-in-the-design-language` | D12 | DESIGN.md §8 typed by hand and five guards missing from it — the sharpest being `metrics`, which holds card padding, the spacing scale, the page gutter and the floor under a pressable row, so the section answering “is spacing enforced?” did not mention the guard enforcing spacing |
+| `a-gate-is-never-handed-a-constant` | D12 | a gate whose input nothing supplies — `flags: located.flags ?? {}` where no deployment ever set it, so every request carried an empty map, the console wrote rows only the console read back, and switching a flag changed nothing anywhere with every suite green |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -858,7 +864,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 111 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 112 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |

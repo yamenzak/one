@@ -21,6 +21,7 @@ import { Packages } from "../centre/Packages.js";
 import { Plan } from "../centre/Plan.js";
 import { SettingsArea } from "../centre/SettingsArea.js";
 import { Trust } from "../centre/Trust.js";
+import { Trying } from "../centre/Trying.js";
 import { Wording } from "../centre/Wording.js";
 import { Notices } from "../centre/Notices.js";
 import { Brand } from "../centre/Brand.js";
@@ -79,6 +80,8 @@ export function WorkspacePart({ part, slug, app, area, onGo }: {
     case "brand": return <Brand name={view.tenant.name} slug={slug} />;
     case "notices": return <Notices view={view} />;
     case "trust": return <Trust view={view} where={where} />;
+    case "trying":
+      return <Trying view={view} app={app} />;
     case "wording":
       return (
         <Wording

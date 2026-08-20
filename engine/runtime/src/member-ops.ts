@@ -52,6 +52,14 @@ export interface PlatformCtx extends Ctx {
   readonly appOf: (appId: string) => AppSpec | null;
   /** Which products this workspace has switched on. */
   readonly enabledApps: readonly string[];
+  /**
+   * ⚠️ EVERY DECLARED FLAG, ALREADY RESOLVED — the SAME map the gate read for
+   * this request (`resolveFlags`, once, in the locator). A surface that resolved
+   * its own would be a second answer to "is this on", and the two differ on
+   * exactly the flag nobody has touched: the store has no row, the fallback says
+   * yes, and the product then offers a destination its own route refuses.
+   */
+  readonly flags: Readonly<Record<string, boolean>>;
   readonly email: string | null;
   readonly allowance: (key: string) => Allowance;
   /**

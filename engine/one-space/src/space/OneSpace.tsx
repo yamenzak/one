@@ -37,7 +37,7 @@ import { WorkspacePart } from "./Part.js";
 import { Preferences } from "../centre/Preferences.js";
 import { Formats } from "./Formats.js";
 import { Agreed } from "./Agreed.js";
-import { ConsoleHome, ConsolePart, ConsoleTenant } from "./Console.js";
+import { ConsoleHome, ConsolePart, ConsoleSwitch, ConsoleTenant } from "./Console.js";
 import { InboxScreen } from "../centre/InboxScreen.js";
 import { Data } from "./Data.js";
 import { TellingMe } from "./TellingMe.js";
@@ -355,6 +355,7 @@ function Inside({ where, onGo }: {
     case "workspace": return <OneWorkspace slug={where.slug} onGo={onGo} />;
     case "console": return <ConsoleHome onGo={onGo} />;
     case "tenant": return <ConsoleTenant id={where.id} />;
+    case "switch": return <ConsoleSwitch id={where.id} />;
     /* ⚠️ Home is drawn by the frame above — it is the only screen with no title
        of its own, because the lockup IS its title. */
     case "home": return null;

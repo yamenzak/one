@@ -116,6 +116,13 @@ export type Where =
   | { readonly at: "notices"; readonly slug: string }
   /** What its AI features say on its behalf, where the product allows editing. */
   | { readonly at: "wording"; readonly slug: string; readonly app?: string }
+  /**
+   * ⚠️ WHAT THIS WORKSPACE HAS AGREED TO TRY EARLY. A flag declaring
+   * `setBy: "tenant"` says the workspace may decide for itself, and there was
+   * nowhere for it to say so — the algebra, the store and the operator's view of
+   * it all existed while the half that names the decision-maker did nothing.
+   */
+  | { readonly at: "trying"; readonly slug: string; readonly app?: string }
   | { readonly at: "console" }
   | { readonly at: "tenants" }
   /**
@@ -159,6 +166,22 @@ export type Where =
   /** What is findable: what is indexed, what is waiting, what the index refused. */
   | { readonly at: "finding" }
   | { readonly at: "switches" }
+  /**
+   * ⚠️ SEPARATE FROM `switches`, AND THE SPLIT IS NOT TIDINESS. Maintenance is
+   * about US — an outage somebody declared, withholding the whole product from
+   * everybody at once — and a flag is a product decision about one feature. They
+   * shared a screen, so the switch that shuts every door sat above a list of
+   * things being tried, at the same weight, reachable by the same accident.
+   */
+  | { readonly at: "maintenance" }
+  /**
+   * ⚠️ ONE FLAG, ON ITS OWN PAGE, BECAUSE A SWITCH HAS THREE STATES AND A LIST OF
+   * EXCEPTIONS. "Following its declaration", "on for everybody" and "off for
+   * everybody" are not a toggle — and the middle one is where a trial lives,
+   * because the deployment's `off` is absorbing. Crammed into a row, the third
+   * state is unreachable and no workspace can ever be given the feature early.
+   */
+  | { readonly at: "switch"; readonly id: string }
   | { readonly at: "works" }
   | { readonly at: "ground" }
   | { readonly at: "footing" }
@@ -178,7 +201,7 @@ export type Where =
   | { readonly at: "telling" };
 
 /** Every screen a workspace has, in the order its own screen lists them. */
-export const OF_WORKSPACE = ["people", "money", "packages", "settings", "brand", "notices", "wording", "trust"] as const;
+export const OF_WORKSPACE = ["people", "money", "packages", "settings", "brand", "notices", "wording", "trying", "trust"] as const;
 
 /**
  * EVERY SCREEN THAT IS ANSWERED BY `WorkspacePart`, DERIVED.
@@ -228,7 +251,7 @@ export const atConsoleScreen = (
  * between them is the whole of the explanation.
  */
 export const OFTEN: readonly WorkspacePart[] = ["people", "money"];
-export const OF_CONSOLE = ["tenants", "catalogue", "ai", "keys", "switches", "telling", "works", "ground", "footing"] as const;
+export const OF_CONSOLE = ["tenants", "catalogue", "ai", "keys", "switches", "maintenance", "telling", "works", "ground", "footing"] as const;
 
 /**
  * ⚠️ AND WHAT IS INSIDE THE AI AREA. Listed here rather than inside the screen
@@ -279,7 +302,7 @@ export const partsFor = (role: string | null): readonly WorkspacePart[] => {
   /* ⚠️ `brand` is here because it is what a business's own customers see — a
      staff member changing the colour on every screen in the workspace is not a
      staff decision. */
-  const OWNED: readonly WorkspacePart[] = ["money", "packages", "wording", "notices", "brand"];
+  const OWNED: readonly WorkspacePart[] = ["money", "packages", "wording", "trying", "notices", "brand"];
   return OF_WORKSPACE.filter((p) => runs || !OWNED.includes(p));
 };
 
@@ -341,7 +364,7 @@ export function parseWhere(path: string): Where {
     /* ⚠️ A THIRD SEGMENT IS THE PRODUCT, on the two screens that have one per
        product. Anywhere else it is noise and the screen is the answer. */
     const app = tail[2];
-    if (app && part === "wording") return { at: part, slug, app };
+    if (app && (part === "wording" || part === "trying")) return { at: part, slug, app };
     /* ⚠️ A FOURTH SEGMENT IS THE PAGE. Settings descend — a product has areas
        and an area is a page — and the area has to be in the address or going
        back from one lands outside the whole surface. */
@@ -357,6 +380,7 @@ export function parseWhere(path: string): Where {
     if (part === undefined) return { at: "console" };
     if (!isConsolePart(part)) return { at: "console" };
     if (part === "tenants" && tail[1]) return { at: "tenant", id: tail[1] };
+    if (part === "switches" && tail[1]) return { at: "switch", id: tail[1] };
     /*
       ⚠️ ONE AREA NESTS, AND IT NESTS IN THE ADDRESS RATHER THAN IN A SCREEN.
       `/console/ai` is the index and `/console/ai/models` is one of its
@@ -400,6 +424,7 @@ export function pathOf(where: Where): string {
       return `${SPACE}/console/ai/models${where.lane ? `/${where.lane}` : ""}`;
     case "gateway": case "finding": return `${SPACE}/console/ai/${where.at}`;
     case "tenant": return `${SPACE}/console/tenants/${where.id}`;
+    case "switch": return `${SPACE}/console/switches/${where.id}`;
     case "plan": return `${SPACE}/w/${where.slug}/plan`;
     /* ⚠️ THE PAGE IS IN THE ADDRESS TOO. Settings descend, and an area that only
        lived in the parser is one somebody can reach and never link to — and
@@ -409,6 +434,8 @@ export function pathOf(where: Where): string {
         where.app && where.area ? `/${where.area}` : ""}`;
     case "wording":
       return `${SPACE}/w/${where.slug}/wording${where.app ? `/${where.app}` : ""}`;
+    case "trying":
+      return `${SPACE}/w/${where.slug}/trying${where.app ? `/${where.app}` : ""}`;
     /*
       ⚠️ DECIDED BY SHAPE, NEVER BY A SECOND LIST. Seven console parts were
       written out here beside the `OF_CONSOLE` they came from — so the eighth
@@ -460,12 +487,13 @@ export function above(where: Where): Where | null {
     case "gateway": case "finding": return { at: "ai" };
     case "actions": return where.app ? { at: "actions" } : { at: "ai" };
     case "tenant": return { at: "tenants" };
+    case "switch": return { at: "switches" };
     case "plan": return { at: "money", slug: where.slug };
     case "settings":
       return where.area ? { at: "settings", slug: where.slug, app: where.app }
         : where.app ? { at: "settings", slug: where.slug }
           : { at: "workspace", slug: where.slug };
-    case "wording":
+    case "wording": case "trying":
       return where.app ? { at: where.at, slug: where.slug } : { at: "workspace", slug: where.slug };
     /* ⚠️ THE SAME SHAPE TEST AS `pathOf`, and for the same reason — a console
        screen with no slug went "up" to a workspace that does not exist. */
@@ -496,6 +524,7 @@ export const nameOf = (where: Where): string => {
     case "trust": return "Data & Trust";
     case "brand": return "Brand";
     case "wording": return "In your words";
+    case "trying": return "Try things early";
     case "console": return "Operator";
     /*
       ⚠️ THE CONSOLE MAY USE A TECHNICAL WORD AND MAY NOT USE A DIFFERENT WORD
@@ -520,6 +549,10 @@ export const nameOf = (where: Where): string => {
     case "gateway": return "Gateway";
     case "finding": return "Finding things";
     case "switches": return "Switches";
+    case "maintenance": return "Maintenance";
+    /* ⚠️ The flag's own label is not here — it is declared by the app, and this
+       function has no manifest. The screen names itself; see `Switch.tsx`. */
+    case "switch": return "Switch";
     case "works": return "Nightly work";
     case "ground": return "Shards";
     case "telling": return "Push notifications";

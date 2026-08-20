@@ -889,6 +889,7 @@ Some of this is guarded and some is judgement. What is checked today:
 - `doors` — a screen the account door renders decides for itself which door it is on, in its own file.
 - `edit` — outside a form, a generic surface shows a value and a way to change it, never the control itself.
 - `face` — one resolver draws every face, and a seed is an identity rather than a label.
+- `gates` — a gate the kernel can apply is never handed a constant — every input the check reads is resolved per request.
 - `glyphs` — every mark in the registry is animated or deliberately still, and no screen draws a registered mark itself.
 - `ground` — no borders, no shadows, one monochrome interface and one coloured data.
 - `heroui` — no component is restyled — layout utilities and tokens only.

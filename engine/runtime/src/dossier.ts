@@ -208,6 +208,10 @@ export const HOLDINGS: readonly HeldBy[] = [
   { table: "move", person: [],
     why: "where a workspace's records were carried from, and what is left to clear" },
   { table: "deployment_flag", person: [], why: "the deployment's own switches" },
+  /* ⚠️ A WORKSPACE ID AND A BOOLEAN. Nobody is in it — the row says a feature is
+     being tried at Eastgate, which is a fact about the workspace rather than
+     about any person in it, and the workspace's own erasure takes it. */
+  { table: "tenant_flag", person: [], why: "which workspaces hold an exception to a switch" },
   /* ⚠️ NOBODY IS IN IT, AND THAT IS WORTH SAYING RATHER THAN ASSUMING. The
      sender address is ours, and every secret in the table is ciphertext under a
      key this database has never held — see `config.ts`. */

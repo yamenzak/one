@@ -28,6 +28,8 @@ import { Catalogue } from "./Catalogue.js";
 import { Footing } from "./Footing.js";
 import { Ground } from "./Ground.js";
 import { Keys } from "./Keys.js";
+import { Maintenance } from "./Maintenance.js";
+import { Switch } from "./Switch.js";
 import { Switches } from "./Switches.js";
 import { Telling } from "./Telling.js";
 import { Tenants } from "./Tenants.js";
@@ -52,7 +54,8 @@ export function ConsoleParts({ part, app, lane, onGo }: {
     case "actions":
       return <Actions app={app} onGo={(id) => onGo({ at: "actions", app: id })} />;
     case "catalogue": return <Catalogue />;
-    case "switches": return <Switches />;
+    case "switches": return <Switches onGo={onGo} />;
+    case "maintenance": return <Maintenance />;
     case "telling": return <Telling />;
     case "works": return <Works />;
     case "ground": return <Ground />;
@@ -80,3 +83,8 @@ export function ConsoleParts({ part, app, lane, onGo }: {
  * it back in the bundle every visitor downloads, which is what this file is for.
  */
 export { OneTenant };
+
+/** ⚠️ THE SAME CHUNK AGAIN, and for the same reason as `OneTenant`: a flag is
+    opened from the switch list and from nowhere else, so a separate chunk would
+    be a second fetch between two screens somebody opens in one gesture. */
+export { Switch };

@@ -1,23 +1,29 @@
 /**
- * SWITCHES — our own flags, and the one that closes every door.
+ * SWITCHES — our own flags, per product, one row each.
  *
- * ⚠️ MAINTENANCE IS ABOUT US, AND THE COPY HAS TO SAY SO. Nobody reading the
- * notice did anything and nobody can pay to end it — so the screen names what
- * it withholds and from whom, rather than offering a mode picker with three
- * words in it.
+ * ⚠️ A FLAG IS OUR DECISION AND AN ENTITLEMENT IS THEIR PURCHASE. A customer
+ * told to upgrade for something we have turned off has been sold something that
+ * does not exist, so an unset flag answers "no such thing" and never "pay us".
  *
- * ⚠️ AND `readonly` IS THE ONE WORTH REACHING FOR. Reads keep serving, so
- * people find their records where they left them; only the writes wait.
+ * ⚠️ MAINTENANCE USED TO BE ON THIS SCREEN AND IS ITS OWN NOW. It is not a
+ * product decision about one feature — it is us withholding everything from
+ * everybody, which is an incident rather than a Tuesday. Sharing a page put the
+ * two at one weight and made the screen open with a paragraph explaining which
+ * half you were looking at, which is the tell (DESIGN.md §7).
+ *
+ * ⚠️ AND A SWITCH IS NO LONGER A TOGGLE HERE, BECAUSE IT HAS THREE STATES. On for
+ * everybody, off for everybody, and — the one a trial needs — following its own
+ * declaration while named workspaces hold an exception. A toggle can say two of
+ * those, so the third was unreachable and no customer could ever be given a
+ * feature early. Each flag descends to its own page (DESIGN.md §3).
  */
 
-import { Button } from "@heroui/react";
 import {
-  Await, ControlRow, FlagConsole, Group, NoteRow, Nothing, RowsWaiting, Screen, Stack,
-  TYPE, appFace, glyphOf, notice, useDay,
+  Await, Group, NavRow, Nothing, RowsWaiting, Screen, appFace, glyphOf, useDay,
 } from "@engine/design";
-import type { FlagBook } from "@engine/kernel";
-import { instant } from "@engine/kernel";
-import { api } from "../api.js";
+import type { FlagBook, FlagDef } from "@engine/kernel";
+import { instant, overdue } from "@engine/kernel";
+import type { Where } from "../space/where.js";
 import { useLoad } from "../centre/data.js";
 
 interface FlagsAnswer {
@@ -28,85 +34,44 @@ interface FlagsAnswer {
     readonly book: FlagBook;
   }[];
   readonly deployment: Readonly<Record<string, boolean>>;
+  /** How many workspaces hold an exception — see `flagExceptions`. */
+  readonly tried: Readonly<Record<string, { readonly on: number; readonly off: number }>>;
 }
 
-const MODES: readonly { readonly id: "off" | "readonly" | "full"; readonly label: string; readonly said: string }[] = [
-  { id: "off", label: "Open", said: "Everything is serving" },
-  { id: "readonly", label: "Reading only", said: "Writes wait; nobody is signed out" },
-  { id: "full", label: "Closed", said: "Every door but this one is withheld" },
-];
+const ONE = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-export function Switches() {
+/**
+ * ⚠️ ONE LINE, AND IT IS THE MOST ALARMING TRUE THING. A row carrying the stage,
+ * the state and the exception count in three chips is three facts of which one
+ * matters, and the reader has to work out which. Past its date beats an
+ * exception beats the plain state, because that is the order somebody would want
+ * to be told.
+ */
+function saying(
+  def: FlagDef,
+  at: boolean | undefined,
+  tried: { readonly on: number; readonly off: number } | undefined,
+  late: boolean,
+): string {
+  if (late) return "Past its retirement date — this should be the product now";
+  const state = at === true ? "On for everybody"
+    : at === false ? "Off for everybody"
+      : def.fallback ? "On unless a workspace says otherwise" : "Off unless a workspace says so";
+  const some = (tried?.on ?? 0) + (tried?.off ?? 0);
+  return some ? `${state} · ${ONE(some, "workspace", "workspaces")} differs` : state;
+}
+
+export function Switches({ onGo }: { readonly onGo: (to: Where) => void }) {
   /* ⚠️ THE OPERATOR'S OWN DAY, NOT UTC'S. A flag scheduled to end "today" is
      read against the day the person reading it is having. */
   const today = useDay(instant());
   const flags = useLoad<FlagsAnswer>("op.flags");
-  const care = useLoad<{ mode: string }>("op.maintenance");
-
-  const set = async (id: string, on: boolean) => {
-    const out = await api.post("op.flag.set", { id, on });
-    if (!out.ok) { notice.fail(out.problem.title); return; }
-    notice.ok(on ? "On for the whole deployment." : "Off for the whole deployment.");
-    flags.again();
-  };
-
-  const mode = async (next: string) => {
-    const out = await api.post("op.maintenance.set", { mode: next });
-    if (!out.ok) { notice.fail(out.problem.title); return; }
-    notice.ok(next === "off" ? "Everything is serving again." : "Saved. Every door reads it on the next request.");
-    care.again();
-  };
 
   return (
-    /* ⚠️ `settings` — two independent controls, each saving the moment it is
-       pressed, and no submit anywhere. The shape refuses a primary outright. */
-    <Screen shape="settings" under="What is switched on, and for whom">
-      {/* ⚠️ The crown already says "Switches" — see `OneSpace.tsx`. This screen drew
-          it a second time over the flags, four lines under the first. */}
-      <Await
-        of={care.of}
-        waiting={<RowsWaiting rows={1} />}
-        again={care.again}
-        then={(now) => (
-          /*
-            ⚠️ THREE STATES ARE THREE ROWS, AND THE ONE IN FORCE IS MARKED. It
-            was a `Card` holding three sentences with a button under each — so
-            the choice read as three separate decisions rather than as one
-            setting with three values, and the current one wore a green chip on
-            a monochrome product for a state that is neither good nor bad.
-          */
-          <Group
-            label="Maintenance"
-            under="This is about us. Nobody reading the notice did anything"
-          >
-            {MODES.map((m) => (
-              <ControlRow key={m.id} label={m.label} under={m.said}>
-                {m.id === now.mode
-                  ? <span className={TYPE.note}>In force</span>
-                  : (
-                    <Button
-                      /* ⚠️ Closing every door is the one that gets the red. */
-                      variant={m.id === "full" ? "danger-soft" : "secondary"}
-                      onPress={() => void mode(m.id)}
-                    >
-                      Switch
-                    </Button>
-                  )}
-              </ControlRow>
-            ))}
-            {/* ⚠️ THE EXEMPTIONS ARE THE FEATURE, so they are stated where the
-                switch is rather than in a description above it. */}
-            <NoteRow>
-              The operator door, signing in and leaving always keep working, whatever this is set to.
-            </NoteRow>
-          </Group>
-        )}
-      />
-
+    /* ⚠️ `list` — every row leads somewhere and nothing is set from here. */
+    <Screen shape="list" under="What is switched on, and for whom">
       <Await
         of={flags.of}
-        /* ⚠️ A nested `Await` has no screen behind it, so nothing remembers its
-           shape — the placeholder is the author's, and it has to be. */
         waiting={<RowsWaiting rows={3} />}
         again={flags.again}
         isNothing={(d) => d.apps.length === 0}
@@ -115,18 +80,23 @@ export function Switches() {
           /* ⚠️ NO `Stack` — see `Keys.tsx`. The screen's own rhythm is the DOM's,
              so a column here collapses every product into one block. */
           <>
-            {data.apps.map((app) => (
-              <FlagConsole
-                key={app.id}
-                book={app.book}
-                level="operator"
-                face={appFace(app.id, app.mark)}
-                label={app.name}
-                deployment={data.deployment}
-                today={today}
-                onSet={(id, on) => void set(id, on)}
-              />
-            ))}
+            {data.apps.map((app) => {
+              const late = new Set(overdue(app.book, today as never));
+              return (
+                <Group key={app.id} label={app.name} face={appFace(app.id, app.mark)}>
+                  {Object.values(app.book).map((def) => (
+                    <NavRow
+                      key={def.id}
+                      icon={glyphOf("flag")}
+                      label={def.label}
+                      under={saying(def, data.deployment[def.id], data.tried[def.id],
+                        late.has(def.id))}
+                      onOpen={() => onGo({ at: "switch", id: def.id })}
+                    />
+                  ))}
+                </Group>
+              );
+            })}
           </>
         )}
       />

@@ -332,6 +332,114 @@ describe("what the console can change", () => {
 
   /* ⚠️ A switch nothing declares is a switch that does nothing — refused, or
      the console fills with rows that lie. */
+  /*
+    ⚠️ THE WHOLE PATH, BECAUSE EVERY PIECE OF IT WAS GREEN WHILE NONE OF IT
+    WORKED. The kernel resolved, the console wrote, the manifest refused a flag
+    nothing was behind — and no request ever read the store, so switching a flag
+    changed nothing anywhere. Unit tests on `resolve` passed. The console's own
+    round trip passed. What nobody asserted is the only thing that matters: does
+    pressing the switch change what a person is served.
+
+    ⚠️ SO IT ASSERTS THE SURFACE, NOT THE STORE. `centre.view` is what the page
+    is drawn from, so a screen behind a flag either arrives or does not — the
+    same question the gate answers for the route, from the same resolved map.
+  */
+  it("a switch changes what a workspace is served, at either level", async () => {
+    const offered = async () => {
+      const v = await (await get("eastgate", "/api/centre.view", owner)).json() as
+        { apps: { screens: { route: string }[] }[] };
+      return !!v.apps[0]?.screens.some((s) => s.route === "/search");
+    };
+    const flag = "note-search";
+    const eastgate = (await tenantBySlug(directory(), "eastgate"))!.id;
+    const set = (body: Record<string, unknown>) =>
+      post("admin", "/api/op.flag.set", { id: flag, ...body }, ops);
+
+    /* ⚠️ `note-search` declares `fallback: false`, so untouched is withheld. */
+    expect(await offered()).toBe(false);
+
+    expect((await set({ on: true })).status).toBe(200);
+    expect(await offered()).toBe(true);
+
+    /* ⚠️ A WORKSPACE MAY NARROW WHAT THE DEPLOYMENT ALLOWS. */
+    expect((await set({ on: false, tenant: eastgate })).status).toBe(200);
+    expect(await offered()).toBe(false);
+
+    /* ⚠️ AND CLEARING ITS ROW RETURNS IT TO THE LEVEL ABOVE — `null`, not
+       `false`. Without the clear, trying a feature on ten workspaces leaves ten
+       permanent exceptions nobody remembers making. */
+    expect((await set({ on: null, tenant: eastgate })).status).toBe(200);
+    expect(await offered()).toBe(true);
+
+    /*
+      ⚠️ THE DEPLOYMENT'S `off` IS ABSORBING, WHICH IS WHAT MAKES IT A KILL
+      SWITCH — and it is why the deployment level must be clearable too. One
+      press of off would otherwise end every trial permanently: no workspace can
+      hold what the deployment has refused.
+    */
+    expect((await set({ on: false })).status).toBe(200);
+    expect((await set({ on: true, tenant: eastgate })).status).toBe(200);
+    expect(await offered()).toBe(false);
+
+    expect((await set({ on: null })).status).toBe(200);
+    expect(await offered()).toBe(true);
+  });
+
+  /*
+    ⚠️ `setBy: "tenant"` WAS A WORD, AND THIS IS WHAT MAKES IT A CAPABILITY. The
+    kernel's `resolve` has always narrowed at three levels, `settableBy` has
+    always said who may change one — and the only caller either ever had was a
+    browser drawing a switch on the operator's screen. A workspace could not set
+    the level the declaration says is theirs.
+  */
+  it("lets a workspace decide a switch that is theirs, and refuses one that is not", async () => {
+    const offered = async () => {
+      const v = await (await get("eastgate", "/api/centre.view", owner)).json() as
+        { apps: { screens: { route: string }[] }[] };
+      return !!v.apps[0]?.screens.some((s) => s.route === "/search");
+    };
+
+    /* ⚠️ Offered, because `note-search` says `setBy: "tenant"` and the
+       deployment has not decided. */
+    const mine = await (await get("eastgate", "/api/flag.list", owner)).json() as
+      { items: { id: string; on: boolean; chosen: boolean | null }[] };
+    expect(mine.items.map((f) => f.id)).toEqual(["note-search"]);
+    expect(mine.items[0]).toMatchObject({ on: false, chosen: null });
+
+    expect((await post("eastgate", "/api/flag.set",
+      { id: "note-search", on: true }, owner)).status).toBe(200);
+    expect(await offered()).toBe(true);
+
+    /*
+      ⚠️ AND THE DEPLOYMENT'S `off` REFUSES THE WRITE RATHER THAN STORING IT. A
+      row written under a kill switch is a decision the product never honours,
+      and the workspace would have been told it worked.
+    */
+    expect((await post("admin", "/api/op.flag.set", { id: "note-search", on: false }, ops))
+      .status).toBe(200);
+    expect((await post("eastgate", "/api/flag.set",
+      { id: "note-search", on: true }, owner)).status).toBe(404);
+    expect(await offered()).toBe(false);
+
+    /* ⚠️ AND IT IS NOT EVEN OFFERED while the deployment says no — a control
+       that cannot change anything is worse than an absent one. */
+    const under = await (await get("eastgate", "/api/flag.list", owner)).json() as
+      { items: unknown[] };
+    expect(under.items).toEqual([]);
+  });
+
+  /* ⚠️ WHAT THE CONSOLE HAS TO BE ABLE TO SAY. A flag off at the deployment and
+     on for eleven workspaces draws the same row as one nobody has touched, so
+     the screen reports "off" about a feature eleven customers are using. */
+  it("reports how many workspaces hold an exception", async () => {
+    const eastgate = (await tenantBySlug(directory(), "eastgate"))!.id;
+    await post("admin", "/api/op.flag.set",
+      { id: "note-search", on: true, tenant: eastgate }, ops);
+    const seen = await (await get("admin", "/api/op.flags", ops)).json() as
+      { tried: Record<string, { on: number; off: number }> };
+    expect(seen.tried["note-search"]).toEqual({ on: 1, off: 0 });
+  });
+
   it("switches a declared flag and refuses one nothing declares", async () => {
     expect((await post("admin", "/api/op.flag.set", { id: "note-search", on: true }, ops)).status).toBe(200);
     const seen = await (await get("admin", "/api/op.flags", ops)).json() as

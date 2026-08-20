@@ -25,9 +25,30 @@ import type {
 } from "@engine/kernel";
 import {
   IN_GOOD_STANDING, LEGAL_INDEX, LEGAL_PATH, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, check, doorFor,
-  newId, passagesOf, problem,
+  newId, passagesOf, problem, resolveFlags,
 } from "@engine/kernel";
 import { compose, type Composed, type Resolved as ResolvedOp } from "./compose.js";
+import { switchesFor } from "./flags.js";
+
+const NO_SWITCHES = { deployment: {}, tenant: {} } as const;
+
+/**
+ * ⚠️ WHETHER ANY PRODUCT HERE HAS A SWITCH AT ALL, so a deployment with none
+ * pays nothing for the mechanism. Reading the store on every request took an
+ * ordinary list from ten queries to eleven, and a deployment whose apps declare
+ * no flags would have paid that for a map that can only ever be empty.
+ *
+ * ⚠️ ASKED OF THE WIRING RATHER THAN OF THE WORKSPACE, because it decides
+ * whether to START the read — which happens beside the identity, before the
+ * workspace's own app list is known. Broader than it needs to be by exactly the
+ * apps this workspace has switched off, which costs a query nobody notices and
+ * is the direction that cannot be wrong.
+ */
+const declaresAFlag = (wiring: Wiring): boolean =>
+  Object.values(wiring.apps).some((make) => {
+    const book = make().flags;
+    return !!book && Object.keys(book).length > 0;
+  });
 import { tell } from "./dispatch.js";
 import { answerMcp } from "./mcp.js";
 import type { PlatformCtx } from "./member-ops.js";
@@ -445,7 +466,6 @@ export interface Located {
    */
   readonly residency?: string;
   readonly entitlements?: Parameters<typeof check>[0]["entitlements"];
-  readonly flags?: Readonly<Record<string, boolean>>;
   readonly balance?: number;
   readonly used?: (key: string) => number;
 }
@@ -692,6 +712,24 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
     const locating = wiring.locate(door);
     const identifying = wiring.identify?.(request, locating.where) ?? Promise.resolve(NOBODY);
     const caring = maintenanceMode(wiring.directory);
+    /*
+      ⚠️ THE SWITCHES ARE READ HERE, WHERE NOTHING CAN BYPASS THEM. This was a
+      field on `Located` and then a dependency of `locator`, and both were the
+      same hole one step apart: `locate` is a WIRING SEAM — every test supplies
+      its own, and so may a deployment — so anything read only in there is read
+      only by whoever remembered. The console wrote rows that only the console
+      read back, a flag switched on changed nothing anywhere, and every suite was
+      green. These two tables are the platform's own, in the platform's own
+      directory, so there was never a decision for an app to make.
+
+      ⚠️ AND IT COSTS NO DEPTH. The deployment's rows need nothing; the
+      workspace's need `where`, which is the SAME promise `identify` already
+      chains off (see above) — so both run beside the identity rather than after
+      the whole of `locate`. `apps/hello/test/request-cost.test.ts` measures it.
+    */
+    const switching = declaresAFlag(wiring)
+      ? locating.where.then((w) => (w ? switchesFor(wiring.directory, w.tenantId) : NO_SWITCHES))
+      : Promise.resolve(NO_SWITCHES);
 
     /*
       ⚠️ A REFUSAL STILL SETTLES WHAT IT STARTED. Every path below can return
@@ -736,8 +774,9 @@ export function serve(wiring: Wiring): (request: Request) => Promise<Response> {
       wiring, located, who, { composed, op }, input,
       request.headers.get("idempotency-key"), now,
       { origin: url.origin, slug: door.kind === "tenant" ? door.slug : null },
-      /* ⚠️ Started at the top of the request — see there. */
+      /* ⚠️ Both started at the top of the request — see there. */
       caring,
+      switching,
     );
     switch (outcome.kind) {
       case "replay": return json(outcome.answer, 200, { "idempotent-replay": "true" });
@@ -787,6 +826,19 @@ export async function performOperation(
    * door — it is asked here, which is where it always was.
    */
   care?: Promise<MaintenanceMode>,
+  /**
+   * ⚠️ THE SAME BARGAIN AS `care`, AND FOR THE SAME REASON. What somebody
+   * switched is two rows and nobody's input, so the HTTP path starts them beside
+   * the identity and hands the promise down; the agent door, which has no such
+   * moment, asks here. What must never happen is either of them going through
+   * `locate` — that is a wiring seam every test replaces, so a read placed there
+   * is a read only whoever remembered performs, and the switch silently does
+   * nothing.
+   */
+  switches?: Promise<{
+    readonly deployment: Readonly<Record<string, boolean>>;
+    readonly tenant: Readonly<Record<string, boolean>>;
+  }>,
 ): Promise<Performed> {
   const { composed, op } = found;
   const catalog = composed.catalog;
@@ -855,6 +907,21 @@ export async function performOperation(
     provenAt: who.provenAt,
   };
 
+  /*
+    ⚠️ ONE RESOLUTION, AND EVERYTHING DOWNSTREAM READS IT. The gate below and the
+    `flags` on the ctx are the same object, so a screen the surface offers and a
+    route the gate refuses cannot come apart — which they will the moment two
+    places each read the store and decide for themselves. The books come from the
+    products this workspace has on, so a flag another product declares is not in
+    the map at all and its operations are simply not here.
+  */
+  const flags = resolveFlags(
+    located.apps.map((id) => wiring.apps[id]?.().flags ?? {}),
+    await (switches ?? (declaresAFlag(wiring)
+      ? switchesFor(wiring.directory, located.tenantId)
+      : NO_SWITCHES)),
+  );
+
   const refused = check({
     op: op.spec,
     caller,
@@ -862,7 +929,7 @@ export async function performOperation(
     kind: located.kind ?? "personal",
     ...(located.name ? { workspace: located.name } : {}),
     entitlements: located.entitlements ?? [],
-    flags: located.flags ?? {},
+    flags,
     used: located.used ?? (() => 0),
     /* ⚠️ SUPPLIED BY THE LOCATOR, so a deployment that cannot answer refuses
        rather than waving everybody through — an absent list here means "this
@@ -900,6 +967,8 @@ export async function performOperation(
     permissionsIn: who.permissionsIn,
     appOf: (appId) => wiring.apps[appId]?.() ?? null,
     enabledApps: located.apps,
+    /* ⚠️ THE SAME MAP `check` WAS HANDED, above. */
+    flags,
     email: who.email ?? null,
     /*
       ⚠️ THE SEAM TO THE VAULT, AND IT IS ABSENT WHEN NO SECRET IS BOUND. A

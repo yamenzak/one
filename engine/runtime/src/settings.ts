@@ -18,8 +18,9 @@
  */
 
 import type { AppSpec, TenantId } from "@engine/kernel";
-import { PUBLIC, checkSome, disclose, refusePrompt, valueOf } from "@engine/kernel";
+import { PUBLIC, checkSome, disclose, refusePrompt, resolve, valueOf } from "@engine/kernel";
 import { actionsOf, word, wordingOf } from "./ai-actions.js";
+import { deploymentFlags, setTenantFlag, tenantFlags } from "./flags.js";
 import type { PlatformCtx } from "./member-ops.js";
 import type { Resolved } from "./compose.js";
 import type { SchemaModule } from "./schema.js";
@@ -163,6 +164,73 @@ export function settingOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         }
         await word(ctx.db, ctx.tenantId as TenantId, target.id, action.id, text, ctx.now);
         return { action: action.id };
+      }),
+
+    /*
+      ⚠️ THE WORKSPACE'S SIDE OF THE FLAG, AND WITHOUT IT `setBy` IS A WORD. A
+      flag declaring `setBy: "tenant"` says a workspace may decide for itself —
+      the kernel resolves it, the store holds it, the operator can see it — and
+      there was nowhere for a workspace to say so. `settableBy` and the whole
+      narrowing algebra existed with one caller, in a browser, drawing a switch
+      on the operator's screen.
+
+      ⚠️ AND IT LISTS ONLY WHAT THIS CALLER MAY SET, resolved by the same
+      function the screen uses. A flag the deployment has switched off is not
+      offered — `off` above is absorbing, so a control for it would change
+      nothing, which is worse than an absent one.
+    */
+    "flag.list": op("flag.list", "read", "What this workspace can try early.",
+      async (ctx, input) => {
+        if (!ctx.accountId) return ctx.fail("platform.unauthorized");
+        const target = targetOf(ctx, input);
+        if (!target) return ctx.fail("platform.not_found");
+        const book = target.flags ?? {};
+        const mine = await tenantFlags(ctx.directory, ctx.tenantId);
+        const above = await deploymentFlags(ctx.directory);
+        return {
+          items: Object.values(book)
+            .filter((def) => def.setBy !== "operator" && above[def.id] !== false)
+            .map((def) => ({
+              id: def.id,
+              label: def.label,
+              why: def.why,
+              /* ⚠️ WHAT IS TRUE NOW, from the same walk the gate makes. A screen
+                 computing its own would answer differently for a flag nobody has
+                 touched, which is most of them. */
+              on: resolve(def, {
+                ...(above[def.id] !== undefined ? { deployment: above[def.id] } : {}),
+                ...(mine[def.id] !== undefined ? { tenant: mine[def.id] } : {}),
+              }),
+              /* ⚠️ WHETHER THIS WORKSPACE HAS DECIDED, which is not the same as
+                 what is on. `null` is following the deployment, and the row says
+                 so rather than showing a switch that looks set by somebody. */
+              chosen: mine[def.id] ?? null,
+            })),
+        };
+      }),
+
+    "flag.set": op("flag.set", "write", "Decide a switch for this workspace.",
+      async (ctx, input) => {
+        if (!ctx.accountId) return ctx.fail("platform.unauthorized");
+        const target = targetOf(ctx, input);
+        if (!target) return ctx.fail("platform.not_found");
+        const def = (target.flags ?? {})[String(input.id ?? "")];
+        /* ⚠️ An operator's switch does not exist on this door, and saying
+           otherwise would confirm the name. */
+        if (!def || def.setBy === "operator") return ctx.fail("platform.not_found");
+        /* ⚠️ WORKSPACE AUTHORITY, because this decides for everybody in it. */
+        const held = await ctx.permissionsIn(target.id);
+        if (!held.has("tenant:manage")) return ctx.fail("platform.forbidden");
+        /* ⚠️ REFUSED WHILE THE DEPLOYMENT SAYS NO, rather than stored and
+           ignored. `off` above is absorbing, so a row written here would be a
+           decision the product never honours — and the workspace would have been
+           told it worked. */
+        if ((await deploymentFlags(ctx.directory))[def.id] === false) {
+          return ctx.fail("platform.not_found");
+        }
+        const on = input.on === null ? null : input.on === true;
+        await setTenantFlag(ctx.directory, ctx.tenantId, def.id, on, ctx.now);
+        return { id: def.id, on };
       }),
 
     "setting.write": op("setting.write", "write", "Change a setting.",
