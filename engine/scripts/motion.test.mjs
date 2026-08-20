@@ -1,6 +1,8 @@
 /**
  * MOTION AND TYPE COME FROM THE LIBRARY, NOT FROM A SCREEN (D7).
  *
+ * @design one set of curves and roles, reduced motion answered both ways, and no pinned element whose travel changes the page's height.
+ *
  * ⚠️ THE FAILURE IS NOT THAT ANY ONE VALUE IS WRONG. `200ms ease-in-out` is
  * perfectly defensible; so is `180ms cubic-bezier(.32,.72,0,1)`. What is not
  * defensible is thirty screens each choosing, because the product then has no

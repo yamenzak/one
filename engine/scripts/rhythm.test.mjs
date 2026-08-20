@@ -1,6 +1,8 @@
 /**
  * ONE RHYTHM PER CONTAINER (DESIGN.md §4, §6).
  *
+ * @design one rhythm per container, and a screen's is the DOM's rather than a walk over React children.
+ *
  * ⚠️ THE MEASURED HALF OF THIS IS `design/test/rhythm.test.tsx`, WHICH RENDERS IN
  * A BROWSER AND ASSERTS PIXELS. This is the cheap net over the source, and the
  * two exist for different reasons: the geometry test proves the LIBRARY spaces a

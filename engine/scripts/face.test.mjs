@@ -1,6 +1,8 @@
 /**
  * EVERY FACE COMES FROM THE ONE RESOLVER.
  *
+ * @design one resolver draws every face, and a seed is an identity rather than a label.
+ *
  * ⚠️ THE DEFECT THIS CATCHES IS INVISIBLE ON THE SCREEN THAT HAS IT. A roster
  * that draws its own `<Avatar>` looks correct — a plate, an initial, the right
  * size. What is wrong is elsewhere: the same person is a picture in the crown, a

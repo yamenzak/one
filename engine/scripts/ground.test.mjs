@@ -1,6 +1,8 @@
 /**
  * NO BORDERS, NO SHADOWS, AND A GROUND THAT MAKES THAT POSSIBLE (D7).
  *
+ * @design no borders, no shadows, one monochrome interface and one coloured data.
+ *
  * ⚠️ THE BAN AND THE PALETTE ARE ONE RULE, WHICH IS WHY THEY ARE ONE GUARD. A
  * border and a shadow are both ways of saying "this is a separate thing", and a
  * design needs one way — using both, or either on some surfaces and not others,

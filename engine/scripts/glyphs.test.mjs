@@ -1,6 +1,8 @@
 /**
  * A MARK THAT HAS A CHARACTER IS NEVER DRAWN WITHOUT IT.
  *
+ * @design every mark in the registry is animated or deliberately still, and no screen draws a registered mark itself.
+ *
  * ⚠️ AN ANIMATED BELL AND A STILL ONE ARE THE SAME PICTURE UNTIL SOMEBODY
  * TOUCHES THEM, which is what makes this worth a guard rather than a review
  * note. Two screens imported `BellRing` straight from lucide and drew a mark

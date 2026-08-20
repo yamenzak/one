@@ -1,6 +1,8 @@
 /**
  * THE SCENE ENGINE'S FOUR PROMISES.
  *
+ * @design seeded, compositor-only, masked rather than washed, sized by area, bound rather than built.
+ *
  * ⚠️ EACH ONE IS A THING THAT CANNOT BE SEEN IN A SCREENSHOT AND CANNOT BE
  * CAUGHT AT RUNTIME. A world seeded from a clock looks perfect until somebody
  * reloads; a layer animated on the wrong property looks identical and costs a

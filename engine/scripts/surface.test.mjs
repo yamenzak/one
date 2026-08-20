@@ -1,6 +1,8 @@
 /**
  * EVERY DECLARATION REACHES A SURFACE (D12).
  *
+ * @design every declaration reaches a screen, and every field kind has a control.
+ *
  * ⚠️ THIS IS THE FAILURE THE WHOLE FRAMEWORK EXISTS TO PREVENT, and it is the
  * one that never goes red on its own. A previous platform shipped it
  * repeatedly: a notification registry with sixteen dispatch sites and no bell; a

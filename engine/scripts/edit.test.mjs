@@ -1,6 +1,8 @@
 /**
  * ONE WAY TO CHANGE ONE FACT (D7).
  *
+ * @design outside a form, a generic surface shows a value and a way to change it, never the control itself.
+ *
  * ⚠️ THE RULE IS EASY TO STATE AND INVISIBLE TO BREAK: outside a form, a
  * generic surface shows a value and a way to change it, never the control
  * itself. Dropping a `<Field>` into a row typechecks, renders, and looks

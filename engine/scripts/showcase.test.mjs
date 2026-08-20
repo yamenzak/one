@@ -1,6 +1,8 @@
 /**
  * EVERY COMPONENT THIS PACKAGE SHIPS IS DRAWN SOMEWHERE, OR IT IS NOT SHIPPED.
  *
+ * @design everything this package ships is drawn somewhere, or the reason it is not is written down.
+ *
  * ⚠️ AN EXPORT NOBODY RENDERS IS THE ONE DEFECT NO OTHER GUARD CAN SEE, because
  * it is an ABSENCE. It typechecks. It has unit tests. Its own file is beautiful.
  * And the first person to reach for it finds out it renders a nested button, or

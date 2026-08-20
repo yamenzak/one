@@ -1,6 +1,8 @@
 /**
  * THE PRODUCT TALKS ONE WAY, AND A SCRIPT SAYS SO.
  *
+ * @design one voice — label length, description length, sentence case, full stops.
+ *
  * ⚠️ A STYLE GUIDE NOBODY CAN RUN LASTS UNTIL THE FIRST HURRIED SCREEN. Every
  * rule applied here is `refuseCopy` in the kernel — the same function a screen
  * could call — run over the strings apps actually write: a collection's labels,

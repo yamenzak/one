@@ -839,6 +839,7 @@ its own header, cited by other files, and doing nothing.
 | `an-unservable-catalogue-falls-back-to-the-code` | D12 | one stale row taking the whole deployment down — every gate, price and standing resolves against this list, and an edit written against last month's declaration can stop merging into a valid one with nobody having done anything |
 | `an-edit-is-a-diff-not-a-copy` | D12 | a plan whose trial cannot be turned off, and untouched fields frozen at whatever they were on the day somebody edited the price — a zero read as an absence is the whole difference between a diff and a copy |
 | `an-edited-price-reaches-the-whole-product` | D12 | the price list edited on one screen and read from the code everywhere else — the gate, the bill and the checkout resolving against a catalogue nobody can see, which is a screen promising what a route refuses |
+| `every-design-guard-is-named-in-the-design-language` | D12 | DESIGN.md §8 typed by hand and five guards missing from it — the sharpest being `metrics`, which holds card padding, the spacing scale, the page gutter and the floor under a pressable row, so the section answering “is spacing enforced?” did not mention the guard enforcing spacing |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -857,7 +858,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 110 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 111 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |

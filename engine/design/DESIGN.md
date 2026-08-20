@@ -467,10 +467,19 @@ skeleton exists to prevent: the content lands and every block is somewhere else.
 **So it is measured.** `useRecalledShape` reads the real DOM after the real
 render — per top-level block, the heading's height, the row count and the
 block's height — keeps it under the address, and draws that on the next visit.
-Nothing is declared per screen and nothing is generated from source: a
-declaration goes stale the first time a card is added, and no script can predict
-how a component composes. The first visit still falls back to the shape's own
-placeholder, and that is the honest limit of it.
+Nothing is declared per screen and nothing is derived from source: a declaration
+goes stale the first time a card is added, and no script can predict how a
+component composes.
+
+**And the FIRST visit is measured too, somewhere else.** `shots.mjs` already
+drives every surface in a real browser holding real data, so it reads back what
+`useRecalledShape` measured and writes `one-space/src/shapes.ts`. A screen
+nobody has opened on this device starts from what that screen actually drew
+rather than from its shape's generic preset, and `recall` still replaces it on
+the first render after arrival — so a screen changed since the harness last ran
+costs one frame of slightly-wrong bars, never a wrong drawing that persists. A
+key holding a generated id is a failure: an address is starred at the varying
+segment (`/space/w/*/brand`) or it matches nothing on anybody else's account.
 
 - **The heading is a HEIGHT, never a boolean.** A name with a line under it and
   a name without are twenty pixels apart, and a bar drawn at the wrong one moves
@@ -479,6 +488,66 @@ placeholder, and that is the honest limit of it.
   Everything inside is an approximation, and approximations compose into a
   column sixty pixels short — which is the jump again, arriving by way of the
   fix.
+
+### A component draws its own placeholder
+
+`recall` is for the PAGE. Inside it, the pieces draw themselves: a component
+under `Waiting` returns its own bars, from its own container, its own classes and
+its own tokens, in its own file. Nothing is passed down — the flag is read from
+context, because a prop means every list, row and grid on a waiting screen has to
+be handed the same value by whoever composed it, which is twenty places to forget.
+
+**A skeleton written BESIDE a component is a copy of its measurements, and copies
+drift.** Both of the ones this replaced had. `TilesWaiting` laid its grid out at
+`minmax(min(8rem, 100%), 1fr)` against `TileGrid`'s `min(6rem, 45%)`: measured at
+390 with six tiles, the real thing is 236px in three columns and the placeholder
+was 360px in two — half a screen taller, in the wrong shape, so the page jumped
+124px when the content landed. That is the whole fault a skeleton exists to
+prevent, wearing the fix's clothes. `RowsWaiting` was 24px short over three rows
+because a bar drawn at `h-4` is shorter than the line box it stands in; a bar is
+`1lh` now, which is the line it actually sits in and stays right if a role's size
+ever changes.
+
+- **The count is the one thing bones cannot know**, so it is the only thing
+  passed as data. What is IN each item is the component's business; how many
+  there are is the caller's.
+- **A screen's placeholder is then composition, not a drawing.** Wrapping a real
+  tree in `Waiting` gives back that tree's layout with every leaf as bones — the
+  spacing, the widths and the wrapping are the screen's own, which is exactly
+  what nobody can copy correctly by hand.
+- ⚠️ **It is not a way to draw a screen with no data.** Half a screen's structure
+  is a function of what it fetched — rows come from a `map`, blocks from a
+  condition — so a real tree rendered with nothing is a shorter, emptier page
+  than the real one. That is the jump again. Pieces get bones; the page gets
+  `recall`.
+
+`design/test/bones.test.tsx` measures the pair in a browser at two widths and
+fails on a difference in height OR in `gridTemplateColumns` — the column count is
+the half a height check misses, and it is the half that was wrong.
+
+### Three kinds of motion, and a product with a fourth has none
+
+Everything that moves in this product is one of exactly three things, and the
+list is closed:
+
+| Kind | What it is | Where it comes from |
+|---|---|---|
+| **Arriving** | content entering a screen | HeroUI's `enter` keyframe |
+| **Changing** | a value, a state, an open/close | a transition on a `MOTION` token |
+| **Waiting** | the answer is not here yet | the library's `Skeleton` / `Spinner` |
+
+A fourth is not built deliberately. It accretes one defensible `animation:` at a
+time — each correct where it was written, and together a jungle nobody chose. So
+the three are the vocabulary and a screen writes none of them: `motion.ts`,
+`ambience.ts` and `charts.tsx` are the only files that may define a keyframe, and
+the `states` guard fails on an `animation:` anywhere else.
+
+Every keyframe is switched off both ways under `prefers-reduced-motion` — not
+softened, answered — and no pinned element may travel in a way that changes the
+page's height. Both are `motion`'s.
+
+⚠️ **AND A TRANSITION IS THE ARRIVAL, NOT A FOURTH THING ON TOP OF IT.** See
+below: while a page is travelling, nothing inside it arrives separately.
 
 ### Going from one screen to the next
 
@@ -813,42 +882,40 @@ Before a screen is done, look at a screenshot of it at phone width and answer:
 
 Some of this is guarded and some is judgement. What is checked today:
 
-- `tone` — label length, description length, sentence case, full stops.
-- `heroui` — no component is restyled; layout utilities only.
-- `states` — four outcomes, shaped skeletons, one rhythm.
-- `surface` — every declaration reaches a screen; every field kind a control.
-- `shape` — no screen draws its own crown or pins its own action; at most one
-  primary per screen; a `settings` screen carries none.
-- `face` — one resolver draws every face; a seed is an identity, not a label;
-  and every glyph a declaration names exists, because an icon is a STRING in a
-  manifest and a name nobody mapped draws a neutral circle.
-- `edit` — outside a form, a generic surface shows a value and a way to change
-  it, never the control itself; the sheet keeps the draft on a refusal.
-- `problem` — every refusal comes from a catalogue; a refusal naming an input is
-  rendered on that input; interpolated values are supplied where it is raised.
-- `descend` — **§3, for the one surface nobody writes**. A settings page is a
-  declared destination (a mark, a line saying what is behind it, an explicit
-  order); a level lists its pages rather than stacking them; and an authority is
-  a screen rather than a tab.
-- `cards` — only `surfaces.tsx` builds a `<Card`, and every one of them names
-  `CARD_ROWS`, so a card's inset is one number rather than a component's opinion.
-- `attrs` — every `data-` attribute the markup stamps is read by a selector, a
-  Tailwind variant or a DOM query. An attribute nothing reads is a decision that
-  never reaches a screen, and it looks identical to one that does.
-- `glyphs` — every mark in the registry is animated or deliberately still, and
-  no screen draws a registered mark itself.
-- `present` — one file builds an `Intl`; nothing slices an instant into a day;
-  no surface pins a locale; and no screen prints a stored date as it is stored.
-- `motion` — one set of curves and roles, reduced motion answered, and no pinned
-  element whose travel changes the page's height.
-- `travel` — one mechanism moves the page: nothing writes history outside the
-  router, both directions and both worlds have a rule, and the ambience family
-  is read from what was mounted rather than declared by a router.
-- `rhythm` — no second rhythm inside one container, and a screen's own is the
-  DOM's rather than a walk over React children.
-- `doors` — a screen the account door renders decides for itself which door it
-  is on, in its own file. A helper somewhere in the import closure satisfying the
-  check is not a weaker check; it is no check.
+<!-- generated: node scripts/enforced.mjs -->
+- `attrs` — every `data-` attribute the markup stamps is read by a selector, a Tailwind variant or a DOM query.
+- `cards` — only `surfaces.tsx` builds a `<Card`, and every one names `CARD_ROWS`, so a card's inset is one number rather than a component's opinion.
+- `descend` — a settings page is a declared destination, a level lists its pages rather than stacking them, and an authority is a screen rather than a tab.
+- `doors` — a screen the account door renders decides for itself which door it is on, in its own file.
+- `edit` — outside a form, a generic surface shows a value and a way to change it, never the control itself.
+- `face` — one resolver draws every face, and a seed is an identity rather than a label.
+- `glyphs` — every mark in the registry is animated or deliberately still, and no screen draws a registered mark itself.
+- `ground` — no borders, no shadows, one monochrome interface and one coloured data.
+- `heroui` — no component is restyled — layout utilities and tokens only.
+- `metrics` — one source for every measurement: no screen picks its own padding, gap or tap target, and a pressable row has a floor under it.
+- `motion` — one set of curves and roles, reduced motion answered both ways, and no pinned element whose travel changes the page's height.
+- `present` — one formatter, one store, and every reader is the person reading.
+- `problem` — every refusal comes from a catalogue, and one naming an input is rendered on that input.
+- `rhythm` — one rhythm per container, and a screen's is the DOM's rather than a walk over React children.
+- `scene` — seeded, compositor-only, masked rather than washed, sized by area, bound rather than built.
+- `shape` — every screen declares one, the shape places the action, and no screen draws its own crown or pins its own dock.
+- `showcase` — everything this package ships is drawn somewhere, or the reason it is not is written down.
+- `space` — one API door, one door classifier, and no screen that is never drawn.
+- `states` — four outcomes, a placeholder the component draws itself, three kinds of motion, one rhythm.
+- `surface` — every declaration reaches a screen, and every field kind has a control.
+- `tone` — one voice — label length, description length, sentence case, full stops.
+- `travel` — the route decides the direction and the world decides the gesture; nothing else moves the page.
+<!-- /generated -->
+
+⚠️ **THAT LIST IS GENERATED, AND IT IS GENERATED BECAUSE IT HAD DRIFTED.** It was
+typed by hand for months and five guards were missing from it — the sharpest
+being `metrics`, which holds card padding, the spacing scale, the page gutter and
+the floor under a pressable row. So the section answering "is spacing enforced?"
+did not mention the guard enforcing spacing, and somebody reading it to decide
+whether they could pick their own padding would have concluded that they could.
+Each sentence now lives in its own guard's header as an `@design` line, so adding
+a guard and describing it are one edit in one file, and a guard that draws the
+interface and carries no line REFUSES to generate rather than being left out.
 
 What is **not** checked, and is therefore on the person writing the screen:
 placement, density, whether a screen is doing two jobs, and whether the reader

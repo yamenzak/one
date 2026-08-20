@@ -1,6 +1,8 @@
 /**
  * ONE PAGE, ONE THING (D12, DESIGN.md §3).
  *
+ * @design a settings page is a declared destination, a level lists its pages rather than stacking them, and an authority is a screen rather than a tab.
+ *
  * ⚠️ THE RULE HAD BEEN WRITTEN DOWN FOR MONTHS AND WAS BROKEN BY THE SURFACE
  * THAT MOST NEEDED IT. §3 asks what a control CHANGES and answers that a screen
  * where one changes a price, one changes a person's access and one changes a

@@ -1,6 +1,8 @@
 /**
  * NO HEROUI COMPONENT IS RESTYLED (D7).
  *
+ * @design no component is restyled — layout utilities and tokens only.
+ *
  * ⚠️ CONSISTENCY THAT IS MAINTAINED BY CARE LASTS UNTIL THE FIRST HURRIED SCREEN.
  * The library is used as it ships and themed through tokens, so a workspace's
  * brand is a handful of variable values and every component adapts — but only

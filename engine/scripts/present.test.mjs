@@ -1,6 +1,8 @@
 /**
  * NOTHING FORMATS A VALUE FOR A PERSON EXCEPT THE ONE MODULE THAT KNOWS THEM.
  *
+ * @design one formatter, one store, and every reader is the person reading.
+ *
  * ⚠️ THE FAULT THIS CATCHES IS NOT UNTIDINESS, IT IS THE PRODUCT BEING WRONG
  * ABOUT A FACT. `toLocaleDateString("en-US")` in one screen and
  * `Intl.NumberFormat("en")` in another mean a reader in Berlin gets American

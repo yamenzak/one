@@ -1,6 +1,8 @@
 /**
  * THE SPACE'S THREE RULES, EACH GUARDING A FAILURE THAT LOOKS LIKE SUCCESS.
  *
+ * @design one API door, one door classifier, and no screen that is never drawn.
+ *
  * ⚠️ ONE DOOR TO THE API. A previous product had 167 bare `fetch` calls and no
  * hook for an expired session, so a dead cookie did not LOOK dead: the shell
  * stayed mounted, every screen rendered whatever empty state its failed load

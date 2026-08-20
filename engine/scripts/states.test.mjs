@@ -1,6 +1,8 @@
 /**
  * EVERY SURFACE HAS FOUR OUTCOMES, AND MOST PRODUCTS SHIP TWO (D7).
  *
+ * @design four outcomes, a placeholder the component draws itself, three kinds of motion, one rhythm.
+ *
  * ⚠️ WAITING, NOTHING, TROUBLE AND THE CONTENT. The two that get skipped are
  * always the same two, and the reason is that nobody sees them: in development
  * the request is instant and it succeeds. What ships is a screen that renders

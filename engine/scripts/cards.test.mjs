@@ -1,6 +1,8 @@
 /**
  * A CARD IS ONE SHAPE, AND ONLY ONE FILE MAY BUILD ONE.
  *
+ * @design only `surfaces.tsx` builds a `<Card`, and every one names `CARD_ROWS`, so a card's inset is one number rather than a component's opinion.
+ *
  * ⚠️ THIS IS THE GUARD FOR A CLASS THAT HAS ALREADY COST THREE PASSES. The
  * library's `Card` is importable from anywhere and looks finished the moment it
  * is on screen — a rounded surface with the right colour — so a screen needing

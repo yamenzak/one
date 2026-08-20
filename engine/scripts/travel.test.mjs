@@ -1,6 +1,8 @@
 /**
  * GOING SOMEWHERE IS ONE MECHANISM, AND NOTHING ELSE MAY MOVE THE PAGE.
  *
+ * @design the route decides the direction and the world decides the gesture; nothing else moves the page.
+ *
  * ⚠️ THE FAULT THIS REFUSES IS A SECOND ROUTER, and it is the ordinary way a
  * transition system dies. `travel()` takes the picture before the swap and
  * compares the world after it (`design/src/frame/travel.ts`); a screen that
@@ -136,12 +138,36 @@ const filesIn = (dir, match) => {
     chart draws itself, a mark plays its character — each correct alone, and all
     of them firing on top of a page transition is four entrances for one press.
     Reported as "so much going on", which is what it was.
+
+    ⚠️ EVERY SELECTOR `HELD` NAMES, NOT THE FIRST ONE. This pinned
+    `[data-blocks] > *` alone while its own message named three, so deleting the
+    `[data-arrive]` rule — which puts every mark's character back on top of the
+    transition, i.e. the reported symptom exactly — left the guard green. The
+    list is read from `HELD` instead, so the CSS that holds and the release that
+    finishes it are checked against ONE definition and a fourth thing added to
+    either is owed by the other.
   */
-  if (!/\[data-travel\] \[data-blocks\] > \*/.test(src) || !/animation: none !important/.test(src)) {
-    fail(`design/src/frame/travel.ts: a travelling page lets its content arrive too.\n`
-      + `       The transition IS the arrival. A block stagger, a chart draw and a glyph`
-      + ` character\n       running under it are three more entrances nobody asked for,`
-      + ` and together they are\n       what "the animations race" means.`);
+  const held = src.match(/const HELD = `([^`]+)`/)?.[1];
+  if (!held) {
+    fail(`design/src/frame/travel.ts: no \`HELD\` to read.\n`
+      + `       It is the one list of what a transition holds still, and both the CSS and\n`
+      + `       \`land()\` are checked against it. Without it neither can be checked at all.`);
+  } else {
+    for (const one of held.split(",").map((s) => s.trim()).filter(Boolean)) {
+      const rule = new RegExp(
+        `:root\\[data-travel\\]\\s+${one.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*[,{]`,
+      );
+      if (!rule.test(src)) {
+        fail(`design/src/frame/travel.ts: \`${one}\` is held but never silenced.\n`
+          + `       The transition IS the arrival. A block stagger, a chart draw and a glyph\n`
+          + `       character running under it are more entrances nobody asked for, and\n`
+          + `       together they are what "the animations race" means.`);
+      }
+    }
+    if (!/animation: none !important/.test(src)) {
+      fail(`design/src/frame/travel.ts: the hold is not \`animation: none !important\`.\n`
+        + `       A screen's own arrival rule is as specific and would win.`);
+    }
   }
 
   /*

@@ -1,6 +1,8 @@
 /**
  * AN ATTRIBUTE NOTHING READS IS A DECISION THAT NEVER REACHES A SCREEN.
  *
+ * @design every `data-` attribute the markup stamps is read by a selector, a Tailwind variant or a DOM query.
+ *
  * ⚠️ THIS IS WRITTEN AFTER `data-tone`, WHICH WAS SET IN SEVEN PLACES AND STYLED
  * IN NONE. A job's last run, a wallet row's amount, a figure's good-or-bad, a
  * card, a page and a band all stamped it; no stylesheet in the product had a

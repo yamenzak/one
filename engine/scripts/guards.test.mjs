@@ -87,14 +87,34 @@ ok(`binding: ${live.length} live guard(s) bound to a real assertion`);
  * nothing ran and nothing knew about.
  */
 const scripts = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).scripts;
+
+/**
+ * ⚠️ A DOCUMENT'S GENERATED BLOCK IS ALSO A COMMAND CI RUNS, and reading only
+ * the gate misses it. `docs.test.mjs` executes every `<!-- generated: … -->`
+ * command and reports a REFUSAL as that document's failure, so a generator that
+ * refuses fails the gate exactly as a named guard does — `enforced.mjs` is one,
+ * and it is what stops DESIGN.md §8 from silently omitting a guard again.
+ * Without this the registry would have called it uninvoked and the only ways out
+ * would be running it twice or not registering it at all.
+ */
+const generators = ["docs", "design"].flatMap((dir) =>
+  readdirSync(join(ENGINE, dir))
+    .filter((f) => f.endsWith(".md"))
+    .flatMap((f) => [...readFileSync(join(ENGINE, dir, f), "utf8")
+      .matchAll(/<!--\s*generated:\s*(.+?)\s*-->/g)].map((m) => m[1])));
+
 const commands = [
   scripts["engine:gate"] ?? "", scripts["engine:test"] ?? "", scripts["engine:typecheck"] ?? "",
   readFileSync(join(ENGINE, "scripts/gate.mjs"), "utf8"),
+  ...generators,
 ].join(" ");
 for (const g of live) {
   /* A vitest file is reached by `engine:test`; an .mjs guard has to be named. */
   const stem = g.impl.replace(/^scripts\//, "").replace(/\.test\.mjs$/, "");
-  if (g.impl.endsWith(".mjs") && !commands.includes(`engine/${g.impl}`) && !commands.includes(`"${stem}"`)) {
+  /* ⚠️ `g.impl` ON ITS OWN, because a generated block names the path from the
+     engine directory (`node scripts/enforced.mjs`) rather than from the root. */
+  if (g.impl.endsWith(".mjs") && !commands.includes(`engine/${g.impl}`)
+      && !commands.includes(g.impl) && !commands.includes(`"${stem}"`)) {
     fail(`${g.id}: ${g.impl} is not named by engine:gate, so it never runs`);
   }
 }

@@ -2620,6 +2620,15 @@
       "impl": "apps/hello/test/operator.test.ts",
       "proves": "edits a plan, holds everybody on it, and puts it back",
       "fails": "the price list edited on one screen and read from the code everywhere else — the gate, the bill and the checkout resolving against a catalogue nobody can see, which is a screen promising what a route refuses"
+    },
+    {
+      "id": "every-design-guard-is-named-in-the-design-language",
+      "protects": "D12",
+      "stage": "0",
+      "status": "live",
+      "impl": "scripts/enforced.mjs",
+      "proves": "draws the interface and carries no",
+      "fails": "DESIGN.md §8 typed by hand and five guards missing from it — the sharpest being `metrics`, which holds card padding, the spacing scale, the page gutter and the floor under a pressable row, so the section answering “is spacing enforced?” did not mention the guard enforcing spacing"
     }
   ]
 }

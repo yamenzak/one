@@ -1,6 +1,8 @@
 /**
  * A SCREEN THE ACCOUNT DOOR RENDERS MUST KNOW WHICH DOOR IT IS ON.
  *
+ * @design a screen the account door renders decides for itself which door it is on, in its own file.
+ *
  * ⚠️ THE ACCOUNT DOOR HAS NO TENANCY, SO A MEMBER OPERATION 404s THERE — and a
  * screen that calls one anyway does not look broken, it looks EMPTY. "How you
  * are told" shipped on `id.` calling `centre.view` and `inbox.settings`: the

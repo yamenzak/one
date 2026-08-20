@@ -1,6 +1,8 @@
 /**
  * EVERY REFUSAL COMES FROM A CATALOGUE (D5).
  *
+ * @design every refusal comes from a catalogue, and one naming an input is rendered on that input.
+ *
  * ⚠️ A HAND-BUILT REFUSAL IS THE EASIEST WRONG THING IN THIS TREE TO WRITE. The
  * shape is six obvious fields, it typechecks, it renders, and every one of the
  * six is a decision somebody made alone: the wording, the status, the tone,

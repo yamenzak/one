@@ -1,6 +1,8 @@
 /**
  * A SCREEN NAMES A SHAPE, AND EVERYTHING ELSE FOLLOWS FROM IT.
  *
+ * @design every screen declares one, the shape places the action, and no screen draws its own crown or pins its own dock.
+ *
  * ⚠️ THE FAULT THIS GUARDS AGAINST IS THE ONE THE PRESET SYSTEM EXISTS FOR, AND
  * IT COMES BACK BY ADDITION RATHER THAN BY EDIT. Nobody rewrites a screen to
  * hand-build its layout again; somebody writes the TWENTY-FIRST screen, does not

@@ -1,6 +1,8 @@
 /**
  * ONE FILE HOLDS EVERY MEASUREMENT, AND NOTHING ELSE WRITES ONE.
  *
+ * @design one source for every measurement: no screen picks its own padding, gap or tap target, and a pressable row has a floor under it.
+ *
  * ⚠️ THIS IS THE GUARD THAT WOULD HAVE PREVENTED THE MESS IT WAS WRITTEN AFTER.
  * A `SPACE` scale existed and was used by the layout; the ROWS then padded
  * themselves `py-1`, `py-2` and `py-3` — each defensible on its own, and the
