@@ -110,6 +110,21 @@ const filesIn = (dir, match) => {
       + `       as a decision rather than as an omission.`);
   }
 
+  /*
+    ⚠️ AND THE ROOT HAS TO BE NAMEABLE, WHICH IS THE RULE THE WHOLE SYSTEM SAT
+    ON FOR A DAY WITHOUT IT. `@heroui/styles` ships
+    `:root { view-transition-name: none }` so its toast queue does not capture
+    the page; with no name there is no `root` group, so every rule above matches
+    an element that was never created and a page change is a hard cut. It ran,
+    it was measured in a browser, and it animated nothing.
+  */
+  if (!/:root\[data-travel\] \{ view-transition-name: root/.test(src)) {
+    fail(`design/src/frame/travel.ts: the root is never given a transition name.\n`
+      + `       The component library takes it away deliberately, so without this every\n`
+      + `       animation above is attached to a group the browser does not create — and\n`
+      + `       nothing fails: the transition starts, captures nothing, and cuts.`);
+  }
+
   /* ⚠️ BOTH OPT-OUTS BEFORE THE TRANSITION STARTS, not only in the stylesheet.
      A view transition that is skipped costs nothing; one that is started and
      then has its animations removed still freezes the page for its duration. */

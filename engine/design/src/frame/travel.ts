@@ -155,6 +155,35 @@ export const TRAVEL_MOTION = [
     stacking model to keep in step with the first. What is here instead is one
     picture crossing into the next, which cannot come apart.
   */
+  /*
+    ⚠️ AND THE FIRST RULE GIVES THE ROOT ITS NAME BACK, WITHOUT WHICH NONE OF THE
+    REST EXISTS. `@heroui/styles` ships `:root { view-transition-name: none }` —
+    correct for the library, whose own toast queue runs a view transition and
+    does not want the whole page captured every time something is announced. The
+    consequence for us is total and silent: with no name on the root there is no
+    `root` GROUP in the transition tree, so `startViewTransition` runs, captures
+    nothing, and the swap is a hard cut. Every rule below matches an element that
+    was never created.
+
+    ⚠️ ONLY WHILE TRAVELLING, WHICH IS WHAT MAKES BOTH THINGS TRUE AT ONCE.
+    `travel()` stamps `data-travel` before it starts, so the root is nameable for
+    the length of a page change and nameless for everything else — a toast still
+    animates its own element against a page the transition never captured.
+
+    ⚠️ AND IT IS OUTSIDE THE MOTION QUERY ON PURPOSE. This is a structural
+    declaration about what the transition tree CONTAINS, not an animation; a
+    reduced-motion reader never reaches it because `travel()` refuses before
+    starting, and burying it under a media query would make the whole system
+    depend on a rule that reads as decoration.
+
+    ⚠️ MEASURED, AGAINST THE STYLESHEET THAT SHIPS. The first version of this
+    file was verified in a real browser on a page carrying `TRAVEL_MOTION` and
+    four tokens — which is not the page the product serves, and the rule that
+    breaks it was in the half I left out. `test/travelling.test.tsx` loads the
+    built stylesheet now, exactly like the geometry suites do.
+  */
+  `:root[data-travel] { view-transition-name: root; }`,
+
   `@media (prefers-reduced-motion: no-preference) {`,
 
   /* ------------------------------------------------ within one world --- */
