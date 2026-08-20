@@ -144,12 +144,21 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.at }}
+      # ⚠️ AND THE INSTALL RUNS THERE TOO, FOR THE SAME REASON THE VERSION DOES.
+      # `pnpm exec playwright` from the repo ROOT is `Command "playwright" not
+      # found` on a runner — playwright is a dependency of one workspace member,
+      # so it is in that member's `.bin` and not the root's. It happens to
+      # resolve on some local layouts, which is what made this look fine before
+      # it ran. The browser still lands in `~/.cache/ms-playwright` whatever the
+      # working directory, so the cache above still matches.
       - if: steps.browsers.outputs.cache-hit != 'true'
+        working-directory: engine/design
         run: pnpm exec playwright install --with-deps chromium
       # ⚠️ THE SYSTEM LIBRARIES ARE NOT IN THE CACHED DIRECTORY, so a hit
       # restores the browser and none of what it links against. Idempotent and
       # a few seconds where the image already has them, which it usually does.
       - if: steps.browsers.outputs.cache-hit == 'true'
+        working-directory: engine/design
         run: pnpm exec playwright install-deps chromium
 
       - run: pnpm engine:gate
