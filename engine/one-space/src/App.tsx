@@ -22,10 +22,11 @@
 
 import * as React from "react";
 import {
-  Band, Center, Crown, Layout, NoticeHost, ONE_FACE, Shell, Spacer, Trouble, Working,
+  Band, Center, Crown, Layout, NoticeHost, ONE_FACE, Opening, Shell, Spacer, Trouble,
   whoFace,
 } from "@engine/design";
 
+import { OPENING_LINES } from "./opening.js";
 import { useSession } from "./session.js";
 import { useTravel } from "./nav.js";
 import type { Face } from "./door.js";
@@ -224,6 +225,22 @@ export function App() {
     product's name on the screen twice and the raw hostname under it, which is
     the first thing anybody ever sees of this product.
   */
+  /*
+    ⚠️ THE CURTAIN IS THE WHOLE SCREEN, AND IT IS NOT INSIDE THE FRAME BELOW. The
+    wait used to mount the deployment's entire chrome — a crown naming One, a
+    reading band, a generated sky — around eleven words, so the first thing
+    anybody saw was a page that had started building itself and stopped. Nothing
+    on it was knowable yet: the door was not classified, so the crown could not
+    say where this was, and the sky was a decision about a place we had not
+    identified.
+
+    ⚠️ AND IT SAYS ONE THING NOW, NOT TWO. "Finding this place" and "Checking who
+    you are" were an honest split and a distinction nobody outside this file can
+    act on — two captions for one moment, each describing a step of a boot the
+    person watching did not ask about.
+  */
+  if (screen === "waiting") return <Opening says={OPENING_LINES} />;
+
   if (screen === "signpost" && where) return <><NoticeHost /><Signpost where={where} /></>;
   if (screen === "sign-in") return <><NoticeHost /><SignIn lead={LEAD[face ?? ""]} /></>;
   if (screen === "new-workspace" && where) {
@@ -277,9 +294,6 @@ export function App() {
               A person watching a slow boot was reading an explanation of work
               that was not being done.
             */}
-            {screen === "waiting"
-              ? <Working says={face === null ? "Finding this place" : "Checking who you are"} />
-              : null}
             {screen === "stuck" && stuck ? <Trouble problem={stuck} /> : null}
             {screen === "elsewhere" && where ? <Elsewhere where={where} kind={where.kind} /> : null}
           </Center>

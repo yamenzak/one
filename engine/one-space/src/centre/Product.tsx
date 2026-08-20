@@ -18,10 +18,11 @@
  */
 
 import {
-  Await, Band, Crown, Face, Layout, Shell, Spacer, TYPE, Working, placeFace, whoFace,
+  Await, Band, Crown, Face, Layout, Opening, Shell, Spacer, TYPE, placeFace, whoFace,
 } from "@engine/design";
 import type { ScreenSpec } from "@engine/kernel";
 import { Button } from "@heroui/react";
+import { OPENING_LINES } from "../opening.js";
 import { useSession } from "../session.js";
 import { AppSurface } from "./AppSurface.js";
 import { Choose } from "./Choose.js";
@@ -45,7 +46,7 @@ export function Product({ path, onGo, onOpenSpace, onOpenInbox }: {
   return (
     <Await
       of={of}
-      waiting={<div className="min-h-dvh grid place-items-center"><Working says="Opening your workspace" /></div>}
+      waiting={<Opening says={OPENING_LINES} />}
       again={again}
       then={(view) => {
         const stop = parseStop(path, view.apps.map((a) => a.id));

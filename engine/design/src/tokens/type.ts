@@ -66,6 +66,22 @@ export const TYPE = {
    */
   lockupFamily: "font-mark font-light tracking-[-0.04em]",
   lockupMember: "font-mark font-bold tracking-[-0.04em]",
+  /**
+   * THE NAME ON THE CURTAIN, WHICH IS THE ONE PLACE IT IS ALONE ON THE SCREEN.
+   *
+   * ⚠️ LIGHT, NOT BOLD, AND THAT IS THE WHOLE DIFFERENCE FROM `wordmark`. A
+   * workspace's name over its own planet is competing with a picture and has to
+   * hold; the opening has nothing else on it at all, and weight there reads as
+   * volume rather than as presence. `One` is the FAMILY half of the lockup, and
+   * the family half has been light since the lockup was drawn — setting it bold
+   * here would make the first thing anybody sees the one place the wordmark
+   * disagrees with itself.
+   *
+   * ⚠️ AND IT IS SIZED FOR A PHONE FIRST, because the curtain is full-bleed and
+   * a name that fills the width of a 390 has nowhere to breathe. Just under half
+   * leaves the ring, the word and the line reading as one object.
+   */
+  opening: "font-mark text-[2.25rem] md:text-[3.25rem] font-light tracking-[-0.045em] leading-none",
   /** What this screen is. One per screen, at the top. */
   title: "font-mark text-[1.75rem] font-semibold tracking-[-0.025em] leading-tight text-balance",
   /** What this part of the screen is. */

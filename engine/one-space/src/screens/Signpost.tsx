@@ -18,8 +18,9 @@
  */
 
 import { useEffect } from "react";
-import { Working } from "@engine/design";
+import { Opening } from "@engine/design";
 import { accountUrl, here, type Where } from "../door.js";
+import { OPENING_LINES } from "../opening.js";
 
 export function Signpost({ where }: { readonly where: Where }) {
   useEffect(() => {
@@ -27,10 +28,11 @@ export function Signpost({ where }: { readonly where: Where }) {
   }, [where]);
 
   /* ⚠️ Not nothing. The redirect is a round trip on a slow connection, and a
-     blank page for the length of it is indistinguishable from a broken one. */
-  return (
-    <div className="min-h-dvh grid place-items-center">
-      <Working says="Taking you to the sign-in" />
-    </div>
-  );
+     blank page for the length of it is indistinguishable from a broken one.
+
+     ⚠️ AND IT IS THE SAME CURTAIN THE BOOT DRAWS, which is what makes the hop
+     invisible: this screen exists for the length of one redirect, so anything
+     that differed from what was on the screen a moment ago would read as a
+     flash between two products. */
+  return <Opening says={OPENING_LINES} />;
 }

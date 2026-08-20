@@ -164,22 +164,22 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 <!-- generated: node scripts/inventory.mjs vocabulary -->
 | Home | What it is for | Ships |
 |---|---|---|
-| `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 61 |
+| `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 65 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 57 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 141 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 143 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 55 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**354 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**360 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
 
-- `tokens/ambience.ts` — `ambienceStylesheet`, `FADE`, `MATTE`, `ON_SCENE`, `REACH`, `skyWorld`, `World`, `worldCss`
+- `tokens/ambience.ts` — `ambienceStylesheet`, `FADE`, `GRAIN`, `GRAIN_OPACITY`, `MATTE`, `ON_SCENE`, `REACH`, `skyWorld`, `World`, `worldCss`
 - `tokens/appearance.ts` — `Appearance`, `APPEARANCE_KEY`, `APPEARANCE_SCRIPT`, `APPEARANCES`, `applyAppearance`, `preferred`, `remember`, `resolve`, `stored`
-- `tokens/ground.ts` — `CONTROL_TINT`, `FOCUS`, `GROUND`, `GROUND_CSS`, `GROUND_TINT`, `MIN_DELTA`, `TINT`
-- `tokens/motion.ts` — `ARRIVE`, `ARRIVE_MARK`, `ARRIVE_MOTION`, `ARRIVE_RISE`, `arriveAt`, `BEAT`, `BLOCK_MOTION`, `DOOR_MOTION`, `doorAt`, `Duration`, `DURATION`, `Ease`, `EASE`, `EASE_SPLINE`, `GLYPH_MOTION`, `Intent`, `MOTION`, `REDUCED`, `transition`, `TURN`, `TURN_AT`, `turns`, `useStill`
+- `tokens/ground.ts` — `CONTROL_TINT`, `CURTAIN`, `FOCUS`, `GROUND`, `GROUND_CSS`, `GROUND_TINT`, `MIN_DELTA`, `TINT`
+- `tokens/motion.ts` — `ARRIVE`, `ARRIVE_MARK`, `ARRIVE_MOTION`, `ARRIVE_RISE`, `arriveAt`, `BEAT`, `BLOCK_MOTION`, `DOOR_MOTION`, `doorAt`, `Duration`, `DURATION`, `Ease`, `EASE`, `EASE_SPLINE`, `GLYPH_MOTION`, `Intent`, `MOTION`, `OPENING_MOTION`, `REDUCED`, `transition`, `TURN`, `TURN_AT`, `turns`, `useStill`
 - `tokens/theme.ts` — `brandCss`, `brandCssFor`, `colorFor`, `readable`, `TONE_CSS`
 - `tokens/type.ts` — `FACE_CSS`, `FACE_STACK`, `MARK_STACK`, `MONO_STACK`, `Role`, `ROLES`, `sentence`, `text`, `TYPE`
 
@@ -210,6 +210,7 @@ there is no deep import, and a guard says so.
 - `parts/heads.tsx` — `Balance`, `distinguishing`, `Figure`, `Prose`, `Section`, `SectionTitle`, `Title`
 - `parts/listing.tsx` — `Col`, `Listing`, `ListingProps`, `Paged`
 - `parts/logo.tsx` — `Lockup`, `LockupProps`
+- `parts/opening.tsx` — `Opening`, `OpeningProps`
 - `parts/permission.tsx` — `Permission`, `PermissionRow`, `PermissionRowProps`
 - `parts/pick-file.tsx` — `PickFile`, `PickFileProps`
 - `parts/recall.tsx` — `Block`, `ShapeWaiting`, `useRecalledShape`

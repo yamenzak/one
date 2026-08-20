@@ -56,14 +56,22 @@ const NOISE = [
   "%3C/svg%3E",
 ].join("");
 
-const GRAIN = `url("data:image/svg+xml,${NOISE}")`;
+/**
+ * ⚠️ EXPORTED, BECAUSE THE CURTAIN HAS THE SAME PROBLEM AND MUST NOT GROW A
+ * SECOND ANSWER TO IT. A large smooth gradient BANDS on an 8-bit display —
+ * measured on the opening as visible rings around the name — and this is already
+ * the fix, tuned, in the file that owns what a ground is made of. A second noise
+ * source is a second grain: different frequency, different weight, and the two
+ * visibly different on the two screens that sit next to each other in a boot.
+ */
+export const GRAIN = `url("data:image/svg+xml,${NOISE}")`;
 
 /**
  * ⚠️ AND IT IS APPLIED BY OPACITY AND A BLEND, NOT BY A COLOUR. Noise painted as
  * a colour is a texture; noise blended at two percent is a rounding error in the
  * gradient underneath it, which is all dither ever needs to be.
  */
-const GRAIN_OPACITY = "calc(var(--sky, 1) * 0.035)";
+export const GRAIN_OPACITY = "calc(var(--sky, 1) * 0.035)";
 
 /**
  * ⚠️ THE MASK IS WHY IT READS AS DEPTH RATHER THAN AS A PANEL. Without it every

@@ -54,3 +54,4 @@ export * from "./rendered/vault.js";
 export * from "./rendered/legal.js";
 export * from "./parts/credits.js";
 export * from "./parts/logo.js";
+export * from "./parts/opening.js";

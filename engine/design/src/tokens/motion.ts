@@ -78,6 +78,18 @@ export const DURATION = {
    * somebody sees once and a tax on something done all day.
    */
   page: "440ms",
+  /**
+   * ⚠️ ONE TURN OF SOMETHING THAT TURNS UNTIL IT STOPS, WHICH IS A DIFFERENT
+   * KIND OF NUMBER FROM EVERY ONE ABOVE. The rest of this scale describes a
+   * movement with an END somebody is waiting for; a spinner's period describes a
+   * TEMPO somebody watches for as long as the wait lasts, and the two want
+   * opposite things. Fast reads as urgent, which on a five-second boot is the
+   * product looking anxious about itself; slow enough to follow with the eye
+   * reads as composure. Measured against the usual 1s: at 2.2s a single arc
+   * travels about a fifth of the ring per second, which is the pace of something
+   * turning rather than something spinning.
+   */
+  turn: "2200ms",
   ambient: "24s",
 } as const;
 
@@ -606,4 +618,52 @@ export const GLYPH_MOTION = [
   `}`,
   `[data-reduce-motion="true"] [data-glyph],`,
   `[data-reduce-motion="true"] [data-glyph] [data-part] { animation: none !important }`,
+].join("\n");
+
+/* ----------------------------------------------------------------- opening --- */
+
+/**
+ * THE CURTAIN — the one screen that is nothing but the name and a wait.
+ *
+ * ⚠️ THE LETTER TURNS, NOT A SPINNER BESIDE IT. `One` begins with a closed round
+ * counter, which is already the shape every loading indicator in software is
+ * drawn as — so the mark does not need one added, it needs one revealed. What
+ * moves is a bright run of the O's own stroke; the letter stays a letter, and
+ * the wait is expressed by the word rather than announced next to it.
+ *
+ * ⚠️ THE DASH TRAVELS, THE SHAPE DOES NOT. A rotation is what a round spinner
+ * does and it is wrong here: the O is an ELLIPSE (see `parts/opening.tsx`, where
+ * the measurements are), and an ellipse turned through 360 degrees is a bowl
+ * tumbling — a letter falling over rather than a letter with a highlight going
+ * round it. Offsetting the dash moves the visible run along an outline that
+ * stays exactly where it was.
+ *
+ * ⚠️ ONE ANIMATION, LINEAR, FOREVER. Every alternative is the same mistake: an
+ * eased offset looks like it is catching on something, a pulsing opacity is a
+ * second thing moving, and a dash that lengthens and shortens is the browser's
+ * own spinner wearing our letter. A constant travel is the only one that
+ * survives being watched for eight seconds, which is the state this screen is
+ * FOR — and the ellipse eases it anyway, because the same length of dash covers
+ * the flat top faster than the tight sides.
+ *
+ * ⚠️ AND UNDER EITHER REDUCED-MOTION SETTING THE O IS SIMPLY AN O. The arc is
+ * hidden and the ring behind it comes up to full ink — a complete letterform,
+ * not a broken one, which is what stopping a travelling arc leaves. Something
+ * that holds still has to still be a thing.
+ */
+export const OPENING_MOTION = [
+  /* ⚠️ `pathLength` MAKES THIS 100 THE WHOLE OUTLINE, so the keyframe is a
+     percentage and not a perimeter — see `RUN`. */
+  `@keyframes opening-turn { to { stroke-dashoffset: -100 } }`,
+  `[data-opening="arc"] {`,
+  `  animation: opening-turn ${DURATION.turn} ${EASE.steady} infinite;`,
+  `}`,
+  /* ⚠️ STILL A LETTER WHEN IT STOPS. Hiding the arc and lifting the ring is one
+     swap, so there is no moment where the O is both faint and broken. */
+  `@media (prefers-reduced-motion: reduce) {`,
+  `  [data-opening="arc"] { animation: none; opacity: 0 }`,
+  `  [data-opening="ring"] { opacity: 1 }`,
+  `}`,
+  `[data-reduce-motion="true"] [data-opening="arc"] { animation: none; opacity: 0 }`,
+  `[data-reduce-motion="true"] [data-opening="ring"] { opacity: 1 }`,
 ].join("\n");

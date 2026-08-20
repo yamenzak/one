@@ -150,13 +150,20 @@ describe("what the screens actually put on the page", () => {
     ⚠️ THE ROOT IS NOT A SCREEN, AND THIS IS WHAT THAT MEANS. It offered two
     buttons to two other pages — one of which everybody arriving wanted — so it
     was a step whose entire content was pointing at the next step. It travels
-    now, and what it renders while travelling is a reason, not a blank page:
-    the redirect is a round trip, and nothing on screen for the length of it is
+    now, and what it renders while travelling is not a blank page: the redirect
+    is a round trip, and nothing on screen for the length of it is
     indistinguishable from a page that failed.
+
+    ⚠️ AND IT IS THE SAME CURTAIN THE BOOT DRAWS, which is what makes the hop
+    invisible. This test used to name the caption this screen wrote for itself —
+    a good assertion about a screen that should never have had a voice of its
+    own: it exists for one redirect, and anything that differed from what was on
+    the screen a moment ago read as a flash between two products.
   */
-  it("asks the root for nothing and says where it is going", () => {
+  it("asks the root for nothing and holds the curtain while it goes", () => {
     const out = html(<Signpost where={WHERE} />);
-    expect(out).toContain("Taking you to the sign-in");
+    expect(out, "the redirect shows a blank page").toContain(`aria-label="One"`);
+    expect(out, "the curtain says nothing at all").toContain("data-opening");
     expect(out).not.toContain("Start a workspace");
   });
 

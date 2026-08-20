@@ -180,6 +180,48 @@ for (const file of SOURCES) {
   }
 }
 
+/* ---------------------------------------------------------- what waits says --- */
+
+/**
+ * ⚠️ AND SIXTY STRINGS IN AN ARRAY, WHICH THE WALK ABOVE CANNOT SEE. Every rule
+ * so far is keyed on a PROP NAME — `label="…"`, `under: "…"` — because that is
+ * what says which voice applies. The curtain's lines are bare members of a list,
+ * so the one screen every single person meets before anything else could say
+ * anything at all, in any voice, and nothing in this file would have looked.
+ *
+ * ⚠️ THEY ARE `empty`: twelve words, no exclamation mark, none of the padding.
+ * The voice fits because an empty state and a wait are the same job — the
+ * product has nothing to show and is saying so in a person's words rather than
+ * the machine's.
+ *
+ * ⚠️ FOUND BY ITS EXPORT, NOT BY ITS PATH. A file moved is a check that silently
+ * stops running; a named export that disappears is a check that fails.
+ */
+{
+  const holds = SOURCES.filter((f) => /OPENING_LINES/.test(readFileSync(f, "utf8")))
+    .filter((f) => /export const OPENING_LINES/.test(readFileSync(f, "utf8")));
+  if (!holds.length) {
+    fail(`no file exports \`OPENING_LINES\` — the curtain's copy is unchecked, and it is\n`
+      + `       the first thing anybody reads.`);
+  }
+  for (const file of holds) {
+    const name = rel(file);
+    const lines = [...strip(readFileSync(file, "utf8")).matchAll(/"([^"\\]{2,})"/g)]
+      .map((m) => m[1]);
+    if (lines.length < 10) {
+      fail(`${name}: ${lines.length} line(s) — a wait that says the same thing every time\n`
+        + `       stops being read inside a week.`);
+    }
+    for (const text of lines) {
+      checked++;
+      for (const why of refuseCopy("empty", text)) {
+        found++;
+        fail(`${name}: "${text}"\n       ${why.rule} — ${why.why}`);
+      }
+    }
+  }
+}
+
 if (!found) ok(`copy: ${checked} written string(s), all in one voice`);
 
 /**

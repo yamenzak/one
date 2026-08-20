@@ -94,6 +94,40 @@ export const TINT = { light: 5, dark: 8 } as const;
 export const GROUND_TINT = { light: 9, dark: 6 } as const;
 
 /**
+ * THE CURTAIN — the ground of the opening, and the one surface in the product
+ * that is the same on every device.
+ *
+ * ⚠️ IT DOES NOT FOLLOW THE THEME, AND THAT IS THE DECISION RATHER THAN AN
+ * OVERSIGHT. Every other surface here belongs to a ladder that answers to light
+ * or dark because somebody is going to WORK on it for an hour. The opening is
+ * not worked on: it is a held moment before the product exists, closer to the
+ * black a film leads with than to a page — and a curtain that is white on one
+ * phone and black on the next is not one moment, it is two.
+ *
+ * ⚠️ AND IT IS A GRADIENT RATHER THAN A FLAT FILL, WHICH IS THE WHOLE OF WHY IT
+ * READS AS DEPTH. Flat black is a screen that is off; a ground that is faintly
+ * lighter where the name sits puts the name IN something. The lift is small on
+ * purpose — nine hundredths of lightness across the whole viewport is under the
+ * banding threshold of an 8-bit panel at this size, and twice that is a visible
+ * halo.
+ *
+ * ⚠️ ZERO CHROMA, LIKE EVERY OTHER VALUE HERE. A full-bleed gradient is the
+ * first place a hue nobody chose shows up, and it is the first thing anybody
+ * sees of the product.
+ */
+export const CURTAIN = {
+  /** Behind the name. */
+  centre: 0.115,
+  /** The corners. Not pure black: an OLED panel switches those pixels off, and
+      the edge of the gradient then reads as a hole rather than as a shadow. */
+  edge: 0.025,
+  /** The name itself, and the one thing on the curtain at full strength. */
+  ink: 0.97,
+  /** The line under it — present, and clearly the second thing. */
+  said: 0.62,
+} as const;
+
+/**
  * ⚠️ A CONTROL IS NEVER GREYER THAN THE GROUND UNDER IT, and in light it was —
  * which is the other half of why the hero's chips looked DIRTY rather than
  * merely faint. The page carries 9% of the brand and the control carried 5%, so
