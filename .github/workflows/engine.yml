@@ -116,6 +116,36 @@ jobs:
           key: turbo-${{ runner.os }}-${{ github.sha }}
           restore-keys: turbo-${{ runner.os }}-
 
+      # ⚠️ THREE SUITES MEASURE REAL GEOMETRY IN REAL CHROMIUM, AND CI HAD NONE.
+      # `design/test/rhythm`, `sky` and `waiting` render the shipped stylesheet
+      # in a browser and assert pixels — spacing, and whether a ground actually
+      # moves — because no static check can see either. They ran on a sandbox
+      # that happens to carry browsers and failed at LAUNCH the first time they
+      # reached a runner: `Executable doesn't exist`, on the whole file, so all
+      # fourteen tests in them counted as skipped rather than failed.
+      #
+      # ⚠️ CHROMIUM ONLY. Nothing here opens Firefox or WebKit, and installing
+      # three browsers is ~400 MB and a minute for two that no test names.
+      - id: playwright
+        run: echo "at=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+      # ⚠️ KEYED ON PLAYWRIGHT'S OWN VERSION, because the download directory is
+      # `chromium_headless_shell-<build>` and the build is decided by the library.
+      # A cache keyed on the lockfile would hit after an upgrade and restore a
+      # browser at the wrong path — which is the same error as no cache at all,
+      # arriving after a green run rather than on the first one.
+      - uses: actions/cache@v4
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.at }}
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      # ⚠️ THE SYSTEM LIBRARIES ARE NOT IN THE CACHED DIRECTORY, so a hit
+      # restores the browser and none of what it links against. Idempotent and
+      # a few seconds where the image already has them, which it usually does.
+      - if: steps.browsers.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
       - run: pnpm engine:gate
       - run: pnpm engine:typecheck
 

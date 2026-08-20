@@ -133,6 +133,53 @@ for (const [f] of [...names].map(([n, file]) => [file, n])) {
   }
 }
 
+/**
+ * A SUITE THAT LAUNCHES A BROWSER NEEDS ONE INSTALLED, AND CI HAD NONE.
+ *
+ * Three `@engine/design` suites measure real geometry in real Chromium —
+ * spacing, and whether a ground actually moves — because no static check can
+ * see either. They passed for a week on a sandbox image that happens to carry
+ * browsers, and failed at LAUNCH the first time they reached a runner:
+ * `Executable doesn't exist at …/chromium_headless_shell-1194`, on the whole
+ * file, so every test in them counted as skipped rather than failed.
+ *
+ * ⚠️ THE POINT IS THAT THE TWO HALVES ARE CHECKED TOGETHER. A workflow that
+ * installs a browser nothing uses is a wasted minute; a suite that needs one
+ * nobody installs is a suite that cannot run — and this repository's whole
+ * argument for measuring in a browser is that the measurement HAPPENS.
+ */
+{
+  const root = new URL("../../", import.meta.url).pathname;
+  /* ⚠️ Walked rather than listed: a fourth browser suite is asked the same
+     question the day it is written. */
+  const uses = [];
+  const walk = (at) => {
+    for (const e of readdirSync(at, { withFileTypes: true })) {
+      if (e.name === "node_modules" || e.name === "dist" || e.name === ".git") continue;
+      const full = join(at, e.name);
+      if (e.isDirectory()) { walk(full); continue; }
+      if (!/\.(m?[jt]sx?)$/.test(e.name)) continue;
+      const src = readFileSync(full, "utf8");
+      if (/from "playwright"|require\("playwright"\)/.test(src)) {
+        uses.push(full.slice(root.length));
+      }
+    }
+  };
+  walk(join(root, "engine"));
+
+  if (uses.length) {
+    const engine = readFileSync(join(DIR, "engine.yml"), "utf8");
+    if (!/playwright install/.test(engine)) {
+      console.error(
+        `BAD  engine.yml installs no browser, and ${uses.length} suite(s) launch one:\n`
+        + uses.map((u) => `       ${u}`).join("\n")
+        + `\n       Every test in them fails at launch and is reported as SKIPPED, which is`
+        + `\n       the whole file being unrunnable wearing a passing suite's clothes.`);
+      bad++;
+    }
+  }
+}
+
 if (bad) {
   console.error(`\n${bad} problem(s). A broken workflow does not fail — it does not run.`);
   process.exit(1);
