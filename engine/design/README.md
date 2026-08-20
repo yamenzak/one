@@ -164,14 +164,14 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 <!-- generated: node scripts/inventory.mjs vocabulary -->
 | Home | What it is for | Ships |
 |---|---|---|
-| `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 57 |
+| `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 61 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
-| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 56 |
+| `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 57 |
 | `parts/` | rows, cards, lists, controls, the four outcomes | 141 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 55 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**349 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**354 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -179,7 +179,7 @@ there is no deep import, and a guard says so.
 - `tokens/ambience.ts` — `ambienceStylesheet`, `FADE`, `MATTE`, `ON_SCENE`, `REACH`, `skyWorld`, `World`, `worldCss`
 - `tokens/appearance.ts` — `Appearance`, `APPEARANCE_KEY`, `APPEARANCE_SCRIPT`, `APPEARANCES`, `applyAppearance`, `preferred`, `remember`, `resolve`, `stored`
 - `tokens/ground.ts` — `CONTROL_TINT`, `FOCUS`, `GROUND`, `GROUND_CSS`, `GROUND_TINT`, `MIN_DELTA`, `TINT`
-- `tokens/motion.ts` — `ARRIVE`, `ARRIVE_MARK`, `ARRIVE_MOTION`, `ARRIVE_RISE`, `arriveAt`, `BEAT`, `BLOCK_MOTION`, `DOOR_MOTION`, `doorAt`, `Duration`, `DURATION`, `Ease`, `EASE`, `GLYPH_MOTION`, `Intent`, `MOTION`, `REDUCED`, `transition`, `useStill`
+- `tokens/motion.ts` — `ARRIVE`, `ARRIVE_MARK`, `ARRIVE_MOTION`, `ARRIVE_RISE`, `arriveAt`, `BEAT`, `BLOCK_MOTION`, `DOOR_MOTION`, `doorAt`, `Duration`, `DURATION`, `Ease`, `EASE`, `EASE_SPLINE`, `GLYPH_MOTION`, `Intent`, `MOTION`, `REDUCED`, `transition`, `TURN`, `TURN_AT`, `turns`, `useStill`
 - `tokens/theme.ts` — `brandCss`, `brandCssFor`, `colorFor`, `readable`, `TONE_CSS`
 - `tokens/type.ts` — `FACE_CSS`, `FACE_STACK`, `MARK_STACK`, `MONO_STACK`, `Role`, `ROLES`, `sentence`, `text`, `TYPE`
 
@@ -193,7 +193,7 @@ there is no deep import, and a guard says so.
 - `frame/chrome.tsx` — `Docked`, `Island`
 - `frame/crown.tsx` — `Crown`, `CrownClaim`, `crownFor`, `CrownProps`, `CrownSocketProvider`, `LeaveChip`, `PageCrown`, `Slot`, `useCrownSocket`
 - `frame/overlay.tsx` — `Confirm`, `Dialog`, `Menu`, `MenuItem`, `notice`, `NoticeHost`, `Over`, `Peek`, `Tray`
-- `frame/page.tsx` — `Band`, `BandProps`, `Bleed`, `Page`, `PageProps`, `useNight`, `useScenery`
+- `frame/page.tsx` — `Band`, `BandProps`, `Bleed`, `Page`, `PageProps`, `useNight`, `useScenery`, `useStillness`
 - `frame/reading.tsx` — `Reading`, `ReadingProvider`, `useReading`
 - `frame/screen.tsx` — `Act`, `Frame`, `Framed`, `Layout`, `LayoutProps`, `Screen`, `ScreenProps`, `Shape`, `Whichever`
 - `frame/shell.tsx` — `CrownInfo`, `Glyph`, `GLYPH_NAMES`, `glyphOf`, `LIVELY`, `reachable`, `Shell`, `ShellProps`, `STILL`

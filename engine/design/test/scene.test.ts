@@ -18,7 +18,7 @@
 import { describe, expect, it } from "vitest";
 import { FAMILIES, render, type Family, type Palette } from "../src/scene/index.js";
 import { BEAT } from "../src/tokens/motion.js";
-import { ambienceStylesheet } from "../src/tokens/ambience.js";
+import { ambienceStylesheet, worldCss } from "../src/tokens/ambience.js";
 
 /* ⚠️ Two real colours, because `color-mix` with a bad operand is dropped by the
    browser rather than reported, and a slot filled with `undefined` is exactly
@@ -220,27 +220,42 @@ describe("every family", () => {
 describe("the ambience engine's own motion", () => {
   const css = ambienceStylesheet();
 
-  it("animates nothing a compositor cannot", () => {
-    const blocks = [...css.matchAll(/@keyframes\s+[\w-]+\s*\{([\s\S]*?)\n?\s*\}\s*(?=@|\.|\[|$)/g)];
-    /* ⚠️ Finding none is a failure, not a pass — it is what the guard did. */
-    expect(blocks.length).toBeGreaterThan(0);
+  /*
+    ⚠️ THE STYLESHEET ANIMATES NOTHING, AND THAT IS THE RULE NOW. It carried two
+    full-viewport animations — a drift on the ground and a float on the field —
+    and both were faults of a different kind each. The float resampled a field of
+    HAIRLINES at sub-pixel offsets every frame: measured off a recording of a
+    screen with nothing happening, the background strobed between four discrete
+    brightness levels, eleven levels frame to frame, which is what "the ambience
+    flickers" was. The drift was cheaper to look at and dearer to run: the grain
+    over it uses `mix-blend-mode`, and a blended layer cannot be composited apart
+    from what it blends with, so a wash sliding two percent over twenty-four
+    seconds dragged a viewport-sized stack onto the main thread at 60fps.
 
-    const animated = new Set<string>();
-    for (const [, body] of blocks) {
-      for (const [, prop] of (body ?? "").matchAll(/([a-z-]+)\s*:/g)) animated.add(prop as string);
-    }
-    expect(animated.size).toBeGreaterThan(0);
-    expect([...animated].sort()).toEqual(["opacity", "transform"]);
+    ⚠️ SO THE ONLY THING THAT MOVES IN A SCENE IS A MARK, INSIDE ITS OWN TILE.
+    That is SMIL — the only thing that repaints inside a `<pattern>` — and it
+    redraws the pattern rather than resampling a picture of it.
+  */
+  it("animates nothing at all, because a scene's motion is in its drawing", () => {
+    expect(css).not.toMatch(/@keyframes/);
+    expect(css).not.toMatch(/\banimation\s*:/);
   });
 
   /*
-    ⚠️ AND EVERY ONE OF THEM STANDS DOWN WHEN SOMEBODY HAS ASKED IT TO. For some
-    people this is not a preference — a drifting ground that keeps drifting for
-    somebody who turned motion off where they could see the switch is the one
-    failure in this engine that reaches past taste.
+    ⚠️ AND THE DRAWING STANDS DOWN WHEN SOMEBODY HAS ASKED IT TO. For some people
+    this is not a preference. SMIL cannot be switched off by CSS — that is the
+    price of it being the only thing that works — so the elements are simply not
+    emitted, and the check is over the STRING rather than over a rule.
   */
-  it("stops for anybody who asked it to", () => {
-    expect(css).toContain("prefers-reduced-motion");
-    expect(css).toContain('[data-reduce-motion="true"]');
+  it("draws no beat at all for somebody who asked for less motion", () => {
+    const world = { deep: "#101010", lit: "#b0b0b0", seed: "asked" };
+    const moving = worldCss({ family: "loops", ...world }, { night: true, density: "rich" });
+    const held = worldCss(
+      { family: "loops", ...world }, { night: true, density: "rich", still: true });
+    expect(moving.field, "nothing beats at all — the table is gone").toContain("<animate");
+    expect(held.field, "a beat survives the one signal that must switch it off")
+      .not.toContain("<animate");
+    /* ⚠️ The same marks, drawn: it is the motion that goes, not the world. */
+    expect(held.field.length).toBeGreaterThan(moving.field.length * 0.5);
   });
 });

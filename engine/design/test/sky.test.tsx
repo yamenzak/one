@@ -49,10 +49,10 @@ const TILE = { width: 1400, height: 1000 } as const;
  */
 const WATCH = 9_000;
 
-const shot = async (family: string): Promise<{ moved: boolean }> => {
+const shot = async (family: string, still = false): Promise<{ moved: boolean }> => {
   const made = worldCss(
     { family: family as never, deep: "#101010", lit: "#b0b0b0", seed: "measured" },
-    { night: true, density: "rich" },
+    { night: true, density: "rich", still },
   );
   const page = await browser.newPage({ viewport: { ...TILE } });
   try {
@@ -90,5 +90,17 @@ describe("a world that declares motion", () => {
     const { moved } = await shot(family);
     expect(moved, `${family} draws the same pixels ${WATCH / 1000}s apart — its beats are inert`)
       .toBe(true);
+  }, 60_000);
+
+  /*
+    ⚠️ AND IT IS COMPLETELY STILL WHEN SOMEBODY ASKS FOR THAT, which no media
+    query can deliver here. A beat is SMIL — the only thing that repaints inside
+    a `<pattern>` — and SMIL cannot be switched off by CSS, so the drawing is
+    made without one instead (`render`). That is a claim about a STRING, and the
+    only honest way to check it is the same two screenshots.
+  */
+  it.each(BEATING)("and holds completely still when asked: %s", async (family) => {
+    const { moved } = await shot(family, true);
+    expect(moved, `${family} keeps moving for somebody who asked it not to`).toBe(false);
   }, 60_000);
 });

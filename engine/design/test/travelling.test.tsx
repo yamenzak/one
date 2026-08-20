@@ -39,16 +39,27 @@ it("the shipped stylesheet still takes the root's transition name away", () => {
   expect(css).toContain("view-transition-name:none");
 });
 
-/** One page change, driven the way `travel()` drives it. */
+/**
+ * One page change, driven the way `travel()` drives it.
+ *
+ * ⚠️ THE PAGE CARRIES A BLOCK COLUMN AND A BLOCK THAT WANTS TO ARRIVE, because
+ * both halves of the answer are about them: the column is what slides, and its
+ * children are what must NOT — a page transition and a per-block stagger firing
+ * together is two entrances for one press.
+ */
 const travelled = async (
   attrs: { readonly travel: string; readonly world: string },
-): Promise<readonly string[]> => {
+): Promise<{ readonly root: string; readonly column: string; readonly block: string }> => {
   const page = await browser.newPage({ viewport: { width: PHONE.width, height: PHONE.height } });
   try {
     await page.setContent(
       `<!doctype html><html data-theme="dark"><head><meta charset="utf-8">`
-      + `<style>${css}</style><style>${TRAVEL_MOTION}</style></head>`
-      + `<body><main id="screen">before</main></body></html>`,
+      + `<style>${css}</style>`
+      /* ⚠️ A stand-in for the arrival every screen's blocks run on mount. */
+      + `<style>@keyframes stagger { from { opacity: 0 } to { opacity: 1 } }`
+      + ` [data-blocks] > * { animation: stagger 300ms both; }</style>`
+      + `<style>${TRAVEL_MOTION}</style></head>`
+      + `<body><main data-blocks><section id="one">before</section></main></body></html>`,
     );
     return await page.evaluate(async (at: { travel: string; world: string }) => {
       const root = document.documentElement;
@@ -57,43 +68,61 @@ const travelled = async (
         startViewTransition: (c: () => void) => { readonly ready: Promise<void> };
       }).startViewTransition;
       const run = go.call(document, () => {
-        document.getElementById("screen")!.textContent = "after";
+        document.getElementById("one")!.textContent = "after";
         root.setAttribute("data-world", at.world);
       });
       await run.ready;
-      /* ⚠️ The animations on the PSEUDO tree, which is the only place the answer
-         lives — a group that was never created simply has none. */
-      return document.getAnimations()
-        .filter((a) => (a.effect as KeyframeEffect | null)?.pseudoElement?.includes("view-transition"))
-        .map((a) => `${(a.effect as KeyframeEffect).pseudoElement}: `
-          + `${(a as unknown as { animationName: string }).animationName}`);
+      const named = (a: Animation) => (a as unknown as { animationName: string }).animationName;
+      const all = document.getAnimations();
+      return {
+        /* ⚠️ The pseudo tree — a group that was never created simply has none. */
+        root: all
+          .filter((a) => (a.effect as KeyframeEffect | null)?.pseudoElement?.includes("view-transition"))
+          .map((a) => `${(a.effect as KeyframeEffect).pseudoElement}: ${named(a)}`).join(" | "),
+        column: (document.querySelector("[data-blocks]") as Element)
+          .getAnimations().map(named).join(" "),
+        block: (document.getElementById("one") as Element)
+          .getAnimations().map(named).join(" "),
+      };
     }, attrs);
   } finally { await page.close(); }
 };
 
 describe("a page change", () => {
   /*
-    ⚠️ THE ASSERTION IS THAT OUR KEYFRAMES ARE ON THE ROOT'S OWN PSEUDOS. Not
-    that a transition "ran" — one runs either way, which is exactly why this was
-    invisible. What was missing is the group it had to run ON.
+    ⚠️ THE WORLD CROSS-FADES IN PLACE AND THE COLUMN SLIDES. Not "a transition
+    ran" — one runs either way, which is exactly why an inert system was
+    invisible for a day. What is asserted is which element carries which half.
   */
-  it("slides forward, within one world", async () => {
+  it("dissolves the world and slides the column, going forward", async () => {
     const on = await travelled({ travel: "forward", world: "same" });
-    expect(on.join(" | ")).toContain("view-transition-old(root): travel-out-forward");
-    expect(on.join(" | ")).toContain("view-transition-new(root): travel-in-forward");
+    expect(on.root).toContain("view-transition-old(root): travel-out");
+    expect(on.root).toContain("view-transition-new(root): travel-in");
+    expect(on.column).toBe("travel-column-forward");
   }, 60_000);
 
-  it("slides the other way, going back", async () => {
+  it("slides the column the other way, going back", async () => {
     const on = await travelled({ travel: "back", world: "same" });
-    expect(on.join(" | ")).toContain("view-transition-old(root): travel-out-back");
-    expect(on.join(" | ")).toContain("view-transition-new(root): travel-in-back");
+    expect(on.column).toBe("travel-column-back");
   }, 60_000);
 
-  /* ⚠️ A different material does not slide — it opens. The second mechanism,
-     and the one a router never has to know about. */
+  /* ⚠️ A different material does not slide — it opens, and the column stands
+     down with it. A place has no direction. */
   it("opens rather than sliding, into another world", async () => {
     const on = await travelled({ travel: "forward", world: "new" });
-    expect(on.join(" | ")).toContain("view-transition-old(root): travel-out-away");
-    expect(on.join(" | ")).toContain("view-transition-new(root): travel-in-near");
+    expect(on.root).toContain("view-transition-old(root): travel-away");
+    expect(on.root).toContain("view-transition-new(root): travel-near");
+    expect(on.column, "the column does not slide into a different place").toBe("");
+  }, 60_000);
+
+  /*
+    ⚠️ AND NOTHING INSIDE THE COLUMN ARRIVES SEPARATELY. This is the whole of
+    "one engine": the blocks' own stagger, a chart drawing itself and a mark
+    playing its character are each correct on mount and are four entrances at
+    once on top of a page change.
+  */
+  it("stands every entrance inside it down, so there is one movement", async () => {
+    const on = await travelled({ travel: "forward", world: "same" });
+    expect(on.block, "a block still running its own arrival during a travel").toBe("");
   }, 60_000);
 });

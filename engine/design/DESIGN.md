@@ -497,10 +497,26 @@ not slide at all, it opens on a scale, because a place has no direction.
 - **The world is read off the DOM**, before the swap and again after it. Written
   as a prop, every router would have to know every ambience family — and a
   family nobody added to that list would transition wrongly, silently.
+- **The world cross-fades in place and only the column slides**, which is what
+  makes it continuous: two screens of one family are two seeds of one material,
+  so dissolving one into the other while the column moves over it reads as the
+  same place from a different position. Translating the root moved the ground
+  with the page, which is the same picture sliding.
 - **It is the browser's own view transition**, which is the only way the screen
   somebody is LEAVING exists at all: React has replaced it before any animation
   could run, and keeping the old tree mounted means a second copy of a screen,
   its scene and its requests for a quarter of a second.
+- ⚠️ **THE ROOT HAS TO BE GIVEN ITS NAME BACK.** `@heroui/styles` ships
+  `:root { view-transition-name: none }` so its toast queue does not capture the
+  page. With no name there is no `root` group at all — the transition runs,
+  captures nothing, and the swap is a hard cut, with every rule attached to an
+  element the browser never created. `:root[data-travel]` names it for the length
+  of a page change and leaves it nameless otherwise.
+- ⚠️ **AND WHILE A PAGE IS TRAVELLING, NOTHING INSIDE IT ARRIVES SEPARATELY.**
+  This is the whole of "one engine". The block stagger, a chart drawing itself
+  and a mark playing its character are each correct on mount and are four
+  entrances at once on top of a transition. The transition IS the arrival: what
+  moves is the content column, once, as one thing.
 
 ### Within the shape
 

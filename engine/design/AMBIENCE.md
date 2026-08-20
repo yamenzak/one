@@ -226,37 +226,54 @@ weave under the setting that asks for calm.
   `<pattern>` now, so the browser still lays out two elements whatever it
   contains, and the beats are ordinary rules in `ambienceStylesheet`. That also
   deleted the two-bake requirement.
-- ⚠️ **AND THE BEAT IS ON A RENDERED LAYER, NOT ON A MARK — WHICH IS THE SECOND
-  HALF OF THE SAME FAULT.** Making the field an element was necessary and not
-  sufficient: the marks live inside a `<pattern>`, and **Chromium rasterises a
-  pattern's tile once and paints the cache**, so an animation declared in there
-  is created, is reported by `getAnimations()`, and repaints nothing. Measured by
-  screenshot rather than by API — byte-identical pictures a second and a half
-  apart, on every family. `render` splits the marks into one pattern and one
-  `<rect>` per beat now, and the class goes on the rect. Everything on one beat
-  pulses together, which is not a loss: they shared a delay already.
+- ⚠️ **AND A BEAT IS SMIL, WHICH IS THE ONLY THING THAT ANIMATES INSIDE A
+  PATTERN.** Making the field an element was necessary and not sufficient: the
+  marks live inside a `<pattern>`, and **Chromium rasterises a pattern's tile
+  once and paints the cache** — a CSS animation declared in there is created, is
+  reported by `getAnimations()`, and repaints nothing. Measured three ways: a CSS
+  keyframe on a `<g>` in a pattern never moves; `<animate>` and
+  `<animateTransform>` in the same place both do. What it costs is that reduced
+  motion is decided at RENDER rather than by a media query, so `useStillness`
+  reads both signals and the elements are simply not emitted.
+- ⚠️ **THE ANSWER IN BETWEEN MADE THE SKY PULSE, AND THAT IS THE LESSON.**
+  Splitting the marks into one rendered `<rect>` per beat put the animation
+  somewhere CSS could reach — and faded *a fifth of the sky at once*. Reported as
+  "the ambience flickers", correctly. A beat belongs to a MARK; a beat applied to
+  everything wearing it at the same time is the page throbbing.
 - ⚠️ **A THIRD THING WAS WRONG AND IT HID BOTH OF THEM.** The in-app opt-out was
-  written as one ancestor and a comma-separated list —
-  `[data-reduce-motion="true"] .q-medium, .q-large, …` — and a descendant
-  combinator binds to the FIRST selector only, so six of the seven beats were
-  `animation: none` for everybody, unconditionally, from the day the line was
-  written. Every guard in the repository checked that motion had been DECLARED.
-  `design/test/sky.test.tsx` takes two screenshots and compares them.
-- **A beat animates opacity and nothing else.** How far it dips is the beat's
-  (`BEAT.dip`), because `1 → .3` is right for a star and is the whole page
-  throbbing when the mark is a fifth of the screen wide. The two lattice beats
-  used to be a quarter TURN, which is the better idea and cannot survive a beat
-  that runs on the whole group: rotating a field wider than it is tall leaves two
-  bare corners. A slow shallow fade of a share of the lattice says the same
-  thing — the pattern was different when you looked back.
-- ⚠️ **AND EVERY FAMILY MOVES, INCLUDING THE ONES WITH NO MARK TO HANG A BEAT
-  ON.** `cloth` draws its whole field in one stroke, so it had none at all — and
-  it is the material under most of the product. `one-float` drifts the field
-  against the ground, at a fraction of the distance and out of phase, which is
-  the parallax that makes a ground read as material rather than as a picture.
-  The ground's own drift travelled half a percent before this: four pixels, over
-  twenty-four seconds. An ambience has to be noticeable if you watch it and
-  invisible if you do not, and only the second half was ever true.
+  one ancestor and a comma-separated list — `[data-reduce-motion="true"]
+  .q-medium, .q-large, …` — and a descendant combinator binds to the FIRST
+  selector only, so six of the seven beats were `animation: none` for everybody,
+  unconditionally, from the day the line was written. Every guard in the
+  repository checked that motion had been DECLARED. `design/test/sky.test.tsx`
+  takes two screenshots and compares them.
+- **A beat is a fade OR a turn, and the turn is what a lattice has.** A field of
+  interlocking arcs has no brightness to give — what it has is ORIENTATION, and
+  rotating **one tile** by a quarter re-routes every curve running through it.
+  Hold, turn, hold: a tile that sits still for four fifths of its cycle and turns
+  in the rest is a pattern that was different when you looked back.
+
+### Nothing else in a scene moves, and that is the performance rule
+
+**The stylesheet declares no animation at all.** It carried two full-viewport
+ones and each was a fault of a different kind.
+
+- **The field's drift resampled hairlines.** `cloth` is a field of one-pixel
+  strokes; translating and scaling it by fractions of a pixel redraws every one
+  of them every frame. Measured off a recording of a screen with nothing
+  happening: the background strobed between four discrete brightness levels, up
+  to eleven levels frame to frame. That is what "the ambience flickers" was.
+- **The ground's drift was cheap to look at and dear to run.** The grain above it
+  uses `mix-blend-mode`, and a blended layer cannot be composited apart from what
+  it blends with — so a wash sliding two percent over twenty-four seconds dragged
+  a viewport-sized stack onto the main thread and re-blended it sixty times a
+  second. The choice was between the dither and the drift and it went to the
+  dither: the grain is what stops a large gradient banding, and `overlay` is what
+  makes noise dither rather than wash.
+
+So **the only thing that moves in a scene is a mark, inside its own tile** —
+which redraws the pattern rather than resampling a picture of it.
+
 - ⚠️ **A light is not a hue.** Turn a hue up and you get more of that hue; turn a
   real source up and it goes toward WHITE. `moods` picks faces from twelve
   saturated colours, and mixing one straight into a dark teal ground gives

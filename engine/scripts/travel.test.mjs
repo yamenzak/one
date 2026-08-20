@@ -96,12 +96,17 @@ const filesIn = (dir, match) => {
 {
   const src = read("design/src/frame/travel.ts");
   const need = [
-    ["forward", `[data-travel]::view-transition-old(root)`],
-    ["forward", `[data-travel]::view-transition-new(root)`],
-    ["back", `[data-travel="back"]::view-transition-old(root)`],
-    ["back", `[data-travel="back"]::view-transition-new(root)`],
-    ["a new world", `[data-world="new"]::view-transition-old(root)`],
-    ["a new world", `[data-world="new"]::view-transition-new(root)`],
+    /* The world, which cross-fades in place whichever way somebody is going. */
+    ["the world leaving", `[data-travel]::view-transition-old(root)`],
+    ["the world arriving", `[data-travel]::view-transition-new(root)`],
+    /* The direction, which the CONTENT carries — the outgoing page is a flat
+       picture and cannot be taken apart, so what slides is what is arriving. */
+    ["the column going forward", `:root[data-travel] [data-blocks] {`],
+    ["the column going back", `:root[data-travel="back"] [data-blocks] {`],
+    /* A different material does not slide; it opens, and the column stands down. */
+    ["a new world leaving", `[data-world="new"]::view-transition-old(root)`],
+    ["a new world arriving", `[data-world="new"]::view-transition-new(root)`],
+    ["a new world holding the column still", `[data-world="new"] [data-blocks] { animation: none`],
   ];
   const missing = need.filter(([, sel]) => !src.includes(sel));
   for (const [what, sel] of missing) {
@@ -123,6 +128,20 @@ const filesIn = (dir, match) => {
       + `       The component library takes it away deliberately, so without this every\n`
       + `       animation above is attached to a group the browser does not create — and\n`
       + `       nothing fails: the transition starts, captures nothing, and cuts.`);
+  }
+
+  /*
+    ⚠️ AND NOTHING INSIDE THE PAGE ARRIVES SEPARATELY WHILE IT IS TRAVELLING.
+    This is the whole of "one engine". A screen's blocks stagger in on mount, a
+    chart draws itself, a mark plays its character — each correct alone, and all
+    of them firing on top of a page transition is four entrances for one press.
+    Reported as "so much going on", which is what it was.
+  */
+  if (!/\[data-travel\] \[data-blocks\] > \*/.test(src) || !/animation: none !important/.test(src)) {
+    fail(`design/src/frame/travel.ts: a travelling page lets its content arrive too.\n`
+      + `       The transition IS the arrival. A block stagger, a chart draw and a glyph`
+      + ` character\n       running under it are three more entrances nobody asked for,`
+      + ` and together they are\n       what "the animations race" means.`);
   }
 
   /* ⚠️ BOTH OPT-OUTS BEFORE THE TRANSITION STARTS, not only in the stylesheet.

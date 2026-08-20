@@ -68,6 +68,16 @@ export const DURATION = {
    * curve is an impression rather than a delay.
    */
   stately: "560ms",
+  /**
+   * ⚠️ A FIFTH ENTRY, AND A PAGE IS WHAT IT IS FOR. This scale was four for a
+   * long time and a page change borrowed `moderate` — 260ms, which is the pace
+   * of a control settling under a finger. Reported as "the transitions are
+   * there, just too fast", and correctly: the largest thing on the screen
+   * moving at the speed of a chip reads as a flicker rather than as travel.
+   * `stately` is the other direction — half a second is right for a door
+   * somebody sees once and a tax on something done all day.
+   */
+  page: "440ms",
   ambient: "24s",
 } as const;
 
@@ -113,22 +123,31 @@ export const REDUCED = { "data-reduce-motion": "true" } as const;
  * pulsed like a warning light.
  */
 /**
- * ⚠️ EVERY BEAT IS A FADE, AND TWO OF THEM USED TO BE A TURN. The turn was the
- * better idea on paper: a lattice of interlocking arcs has no brightness to
- * give, and rotating a tile by a quarter re-routes every curve through it, so
- * the field re-draws itself without a mark appearing or disappearing. It cannot
- * survive where a beat actually has to run — on the whole GROUP at once, rather
- * than on one tile (`render`) — because rotating a field that is wider than it
- * is tall leaves two bare corners. A slow, shallow fade of a share of the
- * lattice says the same thing: the lines that were there are the lines that are
- * there, at a different weight, and the pattern was different when you looked
- * back.
+ * ⚠️ A BEAT IS A FADE **OR** A TURN, AND THE TURN IS WHAT A LATTICE HAS. A field
+ * of interlocking arcs has no brightness to give — what it has is ORIENTATION,
+ * and rotating ONE TILE by a quarter re-routes every curve running through it:
+ * the lines that met now miss and two others join, so the field re-draws itself
+ * without a single mark appearing or disappearing.
  *
- * ⚠️ THE TWO LATTICE BEATS ARE MEASURED IN MINUTES AND BARELY MOVE. A quarter
- * of a screen of ruled line-work dipping to a third is the page flickering; the
- * dips here are the shallowest in the table for exactly that reason, and the
- * periods are long enough that nobody watching sees a cycle.
+ * ⚠️ ONE TILE, NEVER THE FIELD. Turning a whole layer is a picture rotating, and
+ * fading a whole layer is the page throbbing — both were tried and both were
+ * reported as the ambience flickering. A beat belongs to a MARK, which is why it
+ * is SMIL (`render`).
  */
+/**
+ * ⚠️ HOLD, TURN, HOLD — never a continuous spin, and this is the rhythm the
+ * lattice beats got back. A tile turning steadily is a spinning graphic and the
+ * eye locks onto it; a tile that sits still for four fifths of its cycle and
+ * turns in the remaining fifth is a pattern that was different when you looked
+ * back. It is expressed as SMIL values because SMIL is the only thing that
+ * repaints inside a `<pattern>` (`render`).
+ */
+export const TURN = "0;0;90;90;180;180;270;270;360;360";
+export const TURN_AT = "0;0.17;0.23;0.42;0.48;0.67;0.73;0.92;0.98;1";
+
+/** ⚠️ The library's own ease, as a spline — SMIL cannot name a CSS easing. */
+export const EASE_SPLINE = "0.4 0 0.2 1 ";
+
 export const BEAT = {
   /* A sky's three: small, sharp marks, so they may go most of the way out. */
   medium: { period: "5.2s", delay: "2s", dip: 0.3 },
@@ -138,9 +157,12 @@ export const BEAT = {
   swell: { period: "13s", delay: "0s", dip: 0.62 },
   breathe: { period: "19s", delay: "6.5s", dip: 0.78 },
   /* A lattice's two. Minutes, not seconds, and hardly a dip — see above. */
-  quarter: { period: "47s", delay: "0s", dip: 0.72 },
-  half: { period: "71s", delay: "17s", dip: 0.8 },
+  quarter: { period: "47s", delay: "0s", turn: true },
+  half: { period: "71s", delay: "17s", turn: true },
 } as const;
+
+/** ⚠️ Every beat is one or the other, and `render` asks which. */
+export const turns = (beat: keyof typeof BEAT): boolean => "turn" in BEAT[beat];
 
 /**
  * WHETHER MOTION IS SWITCHED OFF FOR THIS ELEMENT.

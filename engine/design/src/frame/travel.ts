@@ -146,17 +146,7 @@ const SHIFT = "1.75rem";
  */
 export const TRAVEL_MOTION = [
   /*
-    ⚠️ THE PAGE IS THE ONE GROUP, AND THERE IS DELIBERATELY NOT A SECOND. Naming
-    an element inside the page lifts it into a group of its own — which is how
-    the world would hold still while the content slides past it, and it is not
-    free: a named group paints ABOVE the root's picture, so the field that sits
-    at `z-index: -1` behind every screen would spend the whole transition on TOP
-    of it. Reordering the pseudo tree to put it back is possible and is a second
-    stacking model to keep in step with the first. What is here instead is one
-    picture crossing into the next, which cannot come apart.
-  */
-  /*
-    ⚠️ AND THE FIRST RULE GIVES THE ROOT ITS NAME BACK, WITHOUT WHICH NONE OF THE
+    ⚠️ THE FIRST RULE GIVES THE ROOT ITS NAME BACK, WITHOUT WHICH NONE OF THE
     REST EXISTS. `@heroui/styles` ships `:root { view-transition-name: none }` —
     correct for the library, whose own toast queue runs a view transition and
     does not want the whole page captured every time something is announced. The
@@ -169,47 +159,86 @@ export const TRAVEL_MOTION = [
     `travel()` stamps `data-travel` before it starts, so the root is nameable for
     the length of a page change and nameless for everything else — a toast still
     animates its own element against a page the transition never captured.
-
-    ⚠️ AND IT IS OUTSIDE THE MOTION QUERY ON PURPOSE. This is a structural
-    declaration about what the transition tree CONTAINS, not an animation; a
-    reduced-motion reader never reaches it because `travel()` refuses before
-    starting, and burying it under a media query would make the whole system
-    depend on a rule that reads as decoration.
-
-    ⚠️ MEASURED, AGAINST THE STYLESHEET THAT SHIPS. The first version of this
-    file was verified in a real browser on a page carrying `TRAVEL_MOTION` and
-    four tokens — which is not the page the product serves, and the rule that
-    breaks it was in the half I left out. `test/travelling.test.tsx` loads the
-    built stylesheet now, exactly like the geometry suites do.
   */
   `:root[data-travel] { view-transition-name: root; }`,
 
+  /*
+    ⚠️ AND WHILE A PAGE IS TRAVELLING, NOTHING INSIDE IT ARRIVES SEPARATELY. This
+    is the whole of "one engine". A screen's blocks stagger in on mount
+    (`BLOCK_MOTION`), a chart draws itself, a mark plays its character — all
+    correct in isolation, and all of them firing at once ON TOP of a page
+    transition is four overlapping entrances for one press. Reported as "so much
+    going on", which is exactly what it is.
+
+    ⚠️ THE TRANSITION IS THE ARRIVAL. What moves during a travel is the content
+    column, once, as one thing; what the blocks do is nothing, and they are
+    already in place when it lands.
+  */
+  `:root[data-travel] [data-blocks] > *,`,
+  `:root[data-travel] [data-arrive],`,
+  `:root[data-travel] [data-draw="true"] { animation: none !important; }`,
+
   `@media (prefers-reduced-motion: no-preference) {`,
 
-  /* ------------------------------------------------ within one world --- */
+  /* ---------------------------------------------- the world, and the page --- */
   /*
-    ⚠️ THE WORLD DISSOLVES AND THE PAGE SLIDES, AND THEY ARE THE SAME PICTURE.
-    Two screens of one family are two SEEDS of one material — the same lines,
-    the same light, a different arrangement — so a cross-fade between them reads
-    as the same place from a different position rather than as a scene change.
-    That is what makes travelling inside an area feel continuous, and it costs
-    nothing, because the two grounds were already going to be different.
+    ⚠️ THE WORLD CROSS-FADES IN PLACE AND ONLY THE CONTENT SLIDES, WHICH IS THE
+    SCENE CONTINUING. Two screens of one family are two SEEDS of one material —
+    the same lines, the same light, a different arrangement — so dissolving one
+    into the other while the column moves over it reads as the same place from a
+    different position rather than as a scene change. Translating the root moved
+    the ground with the page, which is the same picture sliding: correct, and not
+    continuous.
+
+    ⚠️ AND IT IS THE ROOT THAT FADES RATHER THAN A GROUP OF ITS OWN. Naming the
+    field lifts it into a separate group, and a named group paints ABOVE the
+    root's picture — measured: the sky covers the whole screen for the length of
+    the transition. `z-index` on the group puts it back, and then the root's own
+    snapshot hides it wherever the page has a background. Two stacking models to
+    keep in step, for a parallax nobody asked for.
   */
-  `  @keyframes travel-out-forward {`,
-  `    from { opacity: 1; transform: translateX(0); }`,
-  `    to { opacity: 0; transform: translateX(-${SHIFT}); }`,
+  `  @keyframes travel-out {`,
+  `    from { opacity: 1; }`,
+  `    to { opacity: 0; }`,
   `  }`,
-  `  @keyframes travel-in-forward {`,
-  `    from { opacity: 0; transform: translateX(${SHIFT}); }`,
-  `    to { opacity: 1; transform: translateX(0); }`,
+  `  @keyframes travel-in {`,
+  `    from { opacity: 0; }`,
+  `    to { opacity: 1; }`,
   `  }`,
-  `  @keyframes travel-out-back {`,
-  `    from { opacity: 1; transform: translateX(0); }`,
-  `    to { opacity: 0; transform: translateX(${SHIFT}); }`,
+  `  :root[data-travel]::view-transition-old(root) {`,
+  `    animation: travel-out ${DURATION.moderate} ${EASE.exit} both;`,
   `  }`,
-  `  @keyframes travel-in-back {`,
-  `    from { opacity: 0; transform: translateX(-${SHIFT}); }`,
-  `    to { opacity: 1; transform: translateX(0); }`,
+  `  :root[data-travel]::view-transition-new(root) {`,
+  `    animation: travel-in ${DURATION.page} ${EASE.travel} both;`,
+  `  }`,
+
+  /* ------------------------------------------------------- and the column --- */
+  /*
+    ⚠️ THE DIRECTION IS CARRIED BY THE CONTENT, ON THE REAL DOM. The outgoing
+    page is a flat picture and cannot be taken apart, so what slides is the
+    arriving column — which is also the half the eye follows, because it is the
+    half becoming solid.
+
+    ⚠️ THE DISTANCE IS FIXED RATHER THAN A SHARE OF THE SCREEN. A page sliding by
+    a percentage of its own width is a nudge on a phone and a lurch on a desktop
+    from one declaration, and "this came from over there" does not get bigger
+    with the monitor. Every motion spec worth copying uses an absolute distance.
+  */
+  `  @keyframes travel-column-forward {`,
+  `    from { opacity: 0; transform: translate3d(${SHIFT}, 0, 0); }`,
+  `    to { opacity: 1; transform: translate3d(0, 0, 0); }`,
+  `  }`,
+  `  @keyframes travel-column-back {`,
+  `    from { opacity: 0; transform: translate3d(-${SHIFT}, 0, 0); }`,
+  `    to { opacity: 1; transform: translate3d(0, 0, 0); }`,
+  `  }`,
+  `  :root[data-travel] [data-blocks] {`,
+  `    animation: travel-column-forward ${DURATION.page} ${EASE.travel} both;`,
+  `    will-change: transform;`,
+  `  }`,
+  `  :root[data-travel="back"] [data-blocks] {`,
+  `    animation: travel-column-back ${DURATION.page} ${EASE.travel} both;`,
+  `    will-change: transform;`,
   `  }`,
 
   /* ------------------------------------------------ into another world --- */
@@ -220,64 +249,36 @@ export const TRAVEL_MOTION = [
     is somewhere else. So the old picture recedes and the new one OPENS — a
     scale, a longer curve, and no direction at all, because a place has none.
   */
-  /*
-    ⚠️ AND IT READS LONGER WITHOUT BEING LONGER, WHICH IS THE ONLY HONEST WAY TO
-    DO IT. The obvious way to make an arrival feel weightier is to give it the
-    stately curve, and that is a real half-second in front of somebody several
-    times a session — a page change is not a door. The opacity lands at three
-    fifths and the scale keeps going, so the screen is solid early and is still
-    settling: the whole gesture is over in the same time as a slide, and it is
-    plainly a different one.
-  */
-  `  @keyframes travel-out-away {`,
+  `  @keyframes travel-away {`,
   `    from { opacity: 1; transform: scale(1); }`,
-  `    to { opacity: 0; transform: scale(1.04); }`,
+  `    to { opacity: 0; transform: scale(1.03); }`,
   `  }`,
-  `  @keyframes travel-in-near {`,
-  `    from { opacity: 0; transform: scale(0.965); }`,
+  `  @keyframes travel-near {`,
+  `    from { opacity: 0; transform: scale(0.98); }`,
   `    60% { opacity: 1; }`,
   `    to { opacity: 1; transform: scale(1); }`,
-  `  }`,
-
-  /* ⚠️ `both`, because a view-transition picture exists before its animation
-     starts and after it ends — without it the first and last frames are the
-     un-animated state, which is a flash at each end. */
-  `  :root[data-travel]::view-transition-old(root) {`,
-  `    animation: travel-out-forward ${DURATION.quick} ${EASE.exit} both;`,
-  `  }`,
-  `  :root[data-travel]::view-transition-new(root) {`,
-  `    animation: travel-in-forward ${DURATION.moderate} ${EASE.travel} both;`,
-  `  }`,
-  /* ⚠️ THE WHOLE SHORTHAND, NOT `animation-name`. Overriding the name alone is
-     shorter and correct, and it makes the rule invisible to the guard that
-     refuses a keyframe nothing switches off — a keyframe reachable only through
-     a property nobody greps for is exactly the shape that guard exists to find,
-     so the honest fix is to write it where it can be seen. */
-  `  :root[data-travel="back"]::view-transition-old(root) {`,
-  `    animation: travel-out-back ${DURATION.quick} ${EASE.exit} both;`,
-  `  }`,
-  `  :root[data-travel="back"]::view-transition-new(root) {`,
-  `    animation: travel-in-back ${DURATION.moderate} ${EASE.travel} both;`,
   `  }`,
   /*
     ⚠️ THE WORLD WINS OVER THE DIRECTION, IN BOTH DIRECTIONS OF TRAVEL. Going
     back OUT of an area is as much a change of place as going into one, so
     `data-world="new"` overrides the slide whichever way somebody is heading —
-    which is why these two rules come last and name only the animation.
+    which is why these rules come last, and why the column stands down with them.
   */
   `  :root[data-world="new"]::view-transition-old(root) {`,
-  `    animation: travel-out-away ${DURATION.quick} ${EASE.exit} both;`,
+  `    animation: travel-away ${DURATION.moderate} ${EASE.exit} both;`,
   `  }`,
   `  :root[data-world="new"]::view-transition-new(root) {`,
-  `    animation: travel-in-near ${DURATION.moderate} ${EASE.enter} both;`,
+  `    animation: travel-near ${DURATION.stately} ${EASE.enter} both;`,
   `  }`,
+  `  :root[data-world="new"] [data-blocks] { animation: none; }`,
   `}`,
   /*
     ⚠️ THE IN-APP SWITCH, AND IT HAS TO BE HERE AS WELL AS IN `travel()`. The
     function checks it before starting, which covers every navigation the router
     makes; this covers a transition already in flight when somebody flips it,
-    and it costs one rule.
+    and it costs three rules.
   */
   `[data-reduce-motion="true"]::view-transition-old(root),`,
   `[data-reduce-motion="true"]::view-transition-new(root) { animation: none; }`,
+  `[data-reduce-motion="true"] [data-blocks] { animation: none; }`,
 ].join("\n");

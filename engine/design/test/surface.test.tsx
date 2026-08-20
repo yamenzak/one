@@ -706,22 +706,25 @@ describe("a workspace's branding", () => {
     const css = ambienceStylesheet();
 
     /*
-      ⚠️ ONE DRIFT FOR EVERY GROUND, AND ONE SET OF NUMBERS. There was a table of
-      per-ambience drift, which is one more thing to tune per world and one more
-      place to forget an opt-out; a scene varies by seed instead.
+      ⚠️ AND NOW NOTHING IN IT MOVES AT ALL. This asserted a drift keyframe, its
+      overscan and its opt-out; all three are gone, and for two different
+      reasons. The BEATS left because a mark lives inside a `<pattern>` and
+      Chromium rasterises a pattern's tile once — a CSS animation in there is
+      created, is reported by `getAnimations()`, and repaints nothing. The DRIFT
+      left because the grain above it uses `mix-blend-mode`, and a blended layer
+      cannot be composited apart from what it blends with: animating underneath
+      it re-blends a viewport-sized stack on the main thread sixty times a
+      second, for a wash sliding two percent over twenty-four seconds.
+
+      ⚠️ THE SCENE STILL MOVES — in SMIL, inside the tile, where it redraws the
+      pattern rather than resampling the picture of it. `test/sky.test.tsx`
+      photographs that; this is what stops the stylesheet growing a second answer
+      beside it.
     */
     expect(css).toContain("[data-sky]:not([data-sky=\"plain\"])::before {");
-    expect(css).toContain("animation: one-drift");
-    expect(css).toContain(
-      "[data-reduce-motion=\"true\"] [data-sky]:not([data-sky=\"plain\"])::before { animation: none; }",
-    );
-
-    /* ⚠️ The overscan rule: translating a layer that exactly covers its box
-       uncovers an edge, so every scale in the drift is past 1.1. */
-    const scales = [...css.matchAll(/@keyframes one-drift \{[\s\S]*?\n\}/g)]
-      .flatMap((m) => [...m[0].matchAll(/scale\(([\d.]+)\)/g)].map((x) => Number(x[1])));
-    expect(scales.length).toBeGreaterThan(1);
-    for (const at of scales) expect(at).toBeGreaterThanOrEqual(1.1);
+    expect(css, "the ambience stylesheet declares a keyframe again").not.toMatch(/@keyframes/);
+    expect(css, "the ambience stylesheet animates something again")
+      .not.toMatch(/\banimation\s*:/);
 
     /*
       ⚠️ AND THE HOST CLIPS THAT OVERSCAN, WHICH NOTHING DID. A `scale(1.14)`
@@ -752,62 +755,25 @@ describe("a workspace's branding", () => {
     expect(css).not.toContain("[data-sky] { position: relative; isolation: isolate; overflow: hidden");
     expect(css).not.toContain("[data-sky] { position: relative; isolation: isolate; overflow-x: clip");
 
-    /* ⚠️ ONE drift keyframe, and it takes its numbers in — not one per
-       ambience. Twenty-four grounds move; there is one rule for all of them. */
-    expect(css).toContain("@keyframes one-drift {");
-    expect([...css.matchAll(/@keyframes one-drift/g)]).toHaveLength(1);
-
     /*
-      ⚠️ AND ONE KEYFRAME PER BEAT, WHICH IS A DIFFERENT RULE WITH THE SAME
-      SHAPE. A beat's DIP is the beat's — a star may go most of the way out, a
-      bloom a fifth of the way — so these cannot share one, and the count is
-      bounded by the table rather than by how many scenes exist.
+      ⚠️ AND NOW NOTHING IN IT MOVES AT ALL. This asserted a drift keyframe and a
+      beat rule per entry in the table; both are gone, and each for its own
+      reason. The BEATS left because a mark lives inside a `<pattern>` and
+      Chromium rasterises a pattern's tile once — a CSS animation in there is
+      created, reported by `getAnimations()`, and repaints nothing. The DRIFT
+      left because the grain above it uses `mix-blend-mode`, and a blended layer
+      cannot be composited apart from what it blends with, so animating
+      underneath it re-blends a viewport-sized stack on the main thread sixty
+      times a second for a wash sliding two percent.
 
-      ⚠️ THE BEATS LIVE HERE AT ALL BECAUSE A PICTURE CANNOT CARRY THEM. The
-      field used to declare its own `<style>` inside an SVG served as
-      `background-image`, and Chromium renders those STATICALLY — so every star
-      in the product was frozen, with nothing failing. A live element and a rule
-      in this stylesheet is what makes the motion real, and it is also what makes
-      both opt-outs reach it.
+      ⚠️ THE SCENE STILL MOVES — in SMIL, inside the tile, where it redraws the
+      pattern rather than resampling the picture of it. `test/sky.test.tsx`
+      photographs that; this is what keeps the stylesheet from growing a second
+      answer beside it.
     */
-    const beats = Object.keys(BEAT);
-    expect(beats.length).toBeGreaterThan(0);
-    /* ⚠️ `drift` is the ground's and `float` is the field's — the two whole-layer
-       animations, which are not beats and are counted separately. */
-    expect([...css.matchAll(/@keyframes one-(?!drift|float)/g)]).toHaveLength(beats.length);
-    for (const beat of beats) {
-      expect(css, `${beat} has no keyframe`).toContain(`@keyframes one-${beat} {`);
-      expect(css, `${beat} is not offered to the system preference`)
-        .toContain(`.q-${beat} { animation: one-${beat}`);
-      /*
-        ⚠️ ITS OWN COMPLETE SELECTOR, AND THIS IS THE ASSERTION THAT MATTERS.
-        The opt-out was one ancestor followed by a comma-separated list —
-        `[data-reduce-motion="true"] .q-medium, .q-large, …` — and a descendant
-        combinator binds to the FIRST selector only, so six of the seven beats
-        were `animation: none` for EVERYBODY, unconditionally, from the day the
-        line was written. The old assertion here compared the whole line to the
-        same `join(", ")` that produced it, which is a test agreeing with the
-        bug. Asking per beat is what makes it a check.
-      */
-      expect(css, `${beat}'s opt-out is a bare selector in a list — it applies to everyone`)
-        .toContain(`[data-reduce-motion="true"] .q-${beat} {`);
-    }
-
-    /* ⚠️ The field is an ELEMENT, and it wears the same matte the ground does —
-       two halves of one world receding differently is a visible edge exactly
-       where content sits. */
-    expect(css).toContain("[data-field] {");
-    expect(css).toMatch(/\[data-field\] \{[^}]*mask-image/);
-    /*
-      ⚠️ AND IT MOVES, AGAINST THE GROUND. A family that draws its whole field in
-      one stroke has nowhere to hang a beat — `cloth`, which is the material
-      under most of the product, had none at all — so the layer's own drift is
-      the motion every world is guaranteed. `test/sky.test.tsx` measures that it
-      paints; this is what keeps the rule from being deleted as redundant.
-    */
-    expect(css).toContain("@keyframes one-float {");
-    expect(css).toMatch(/\[data-field\] \{[^}]*animation: one-float/);
-    expect(css).toContain(`[data-reduce-motion="true"] [data-field] { animation: none; }`);
+    expect(css, "the ambience stylesheet declares a keyframe again").not.toMatch(/@keyframes/);
+    expect(css, "the ambience stylesheet animates something again")
+      .not.toMatch(/\banimation\s*:/);
   });
 
   /**

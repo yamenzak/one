@@ -41,7 +41,7 @@
  */
 
 /* ⚠️ The pace and the curve are the vocabulary's, not this file's — see `DRIFT`. */
-import { BEAT, DURATION, EASE, transition } from "./motion.js";
+import { DURATION, EASE, transition } from "./motion.js";
 import {
   DENSITY, FAMILIES, render, type Density, type SceneFamily, type Sky,
 } from "../scene/index.js";
@@ -333,10 +333,15 @@ const halo = (colour: string): string => {
  * first one to do it is a page a workspace's branding no longer reaches (D7).
  */
 export function worldCss(
-  world: World, at: { readonly night: boolean; readonly density: Density },
+  world: World,
+  at: { readonly night: boolean; readonly density: Density; readonly still?: boolean },
 ): { readonly css: Readonly<Record<string, string>>; readonly field: string } {
+  /* ⚠️ `still` IS IN THE KEY, because it changes the DRAWING rather than a rule.
+     A beat is SMIL and SMIL cannot be switched off by CSS, so a world rendered
+     for somebody who wants less motion is a different string — and a cache that
+     did not know that would hand it the moving one. */
   const key = `${world.family}|${world.seed}|${world.deep}|${world.lit}`
-    + `|${at.night ? "n" : "d"}|${at.density}`;
+    + `|${at.night ? "n" : "d"}|${at.density}|${at.still ? "s" : "m"}`;
   let made = skies.get(key);
   if (!made) {
     made = render({
@@ -344,6 +349,7 @@ export function worldCss(
       seed: world.seed,
       palette: { deep: world.deep, lit: world.lit },
       density: DENSITY[at.density],
+      still: at.still === true,
     });
     skies.set(key, made);
   }
@@ -379,49 +385,19 @@ export function worldCss(
  */
 export function ambienceStylesheet(): string {
   /*
-    ⚠️ THE BEATS ARE THE STYLESHEET'S NOW, AND THAT IS THE HALF THAT MAKES THEM
-    RUN. They used to be a `<style>` element inside the field's own SVG, which is
-    the right design for a picture and the wrong one for a picture nothing
-    animates: an SVG used as `background-image` is rendered statically by
-    Chromium, so a star that declared a twinkle simply never twinkled. The field
-    is a live element now, so the page's own CSS reaches it — one definition
-    rather than one per scene, and both opt-outs for free.
+    ⚠️ THE BEATS ARE NOT HERE ANY MORE, AND THAT IS NOT A SIMPLIFICATION — IT IS
+    THE ONLY PLACE THEY WORK. A mark lives inside a `<pattern>`, and Chromium
+    rasterises a pattern's tile once and paints the cache: a CSS animation
+    declared in there is created, is reported by `getAnimations()`, and repaints
+    nothing. SMIL in the same place does repaint, measured three ways, so the
+    beat travels with the drawing (`render`) and this file no longer knows the
+    word. What it costs is that reduced motion is decided at RENDER rather than
+    by a media query, which `useScenery` does from both signals.
 
-    ⚠️ AND THE `.q-` CLASS IS ON A RENDERED LAYER, NEVER ON A MARK. It was on
-    the mark — one `<g>` per placement inside the `<pattern>` — and the whole
-    system was inert for as long as it existed: Chromium rasterises a pattern's
-    tile ONCE and paints the cache, so an animation declared inside one is
-    created, is reported by `getAnimations()`, and never repaints. Measured by
-    screenshot rather than by API: identical pixels a second and a half apart,
-    on every family. `render` splits the marks by beat and gives each group its
-    own layer, so what carries the class is an element the page actually draws.
-
-    ⚠️ ONE KEYFRAME PER BEAT, BECAUSE THE DIP IS THE BEAT'S. A single shared
-    `1 → .3` is right for a star and is the whole page throbbing when the mark is
-    a fifth of the screen wide — see `BEAT`.
+    ⚠️ AND THE ANSWER IN BETWEEN MADE THE SKY PULSE. Splitting the marks into one
+    rendered layer per beat put the animation somewhere CSS could reach — and
+    faded a fifth of the sky at once. "The ambience flickers" was exactly right.
   */
-  const names = Object.keys(BEAT) as (Extract<keyof typeof BEAT, string>)[];
-  const beats = [
-    `@media (prefers-reduced-motion: no-preference) {`,
-    ...names.flatMap((b) => [
-      `@keyframes one-${b} { 0%, 100% { opacity: 1 } 50% { opacity: ${BEAT[b].dip} } }`,
-      `.q-${b} { animation: one-${b} ${BEAT[b].period} ${EASE.plain} infinite ${BEAT[b].delay}; }`,
-    ]),
-    `}`,
-    /*
-      ⚠️ THE IN-APP SWITCH, FOR WHOM THIS IS NOT A PREFERENCE — see `REDUCED`.
-
-      ⚠️ AND THE ANCESTOR IS REPEATED ON EVERY SELECTOR, WHICH IT WAS NOT. This
-      was one `[data-reduce-motion="true"]` followed by a comma-separated list,
-      and a descendant combinator binds to the FIRST selector only — so six of
-      the seven beats were `animation: none` for EVERYBODY, unconditionally,
-      from the day the line was written. It was invisible because the beats were
-      inside a `<pattern>` and none of them painted either: two faults stacked,
-      each of them the reason nobody could see the other.
-    */
-    ...names.map((b) => `[data-reduce-motion="true"] .q-${b} { animation: none; }`),
-  ];
-
   /*
     ⚠️ THE FIELD IS AN ELEMENT AND IT WEARS THE SAME MATTE THE GROUND DOES. Two
     layers of one world receding differently would put a visible edge exactly
@@ -436,35 +412,28 @@ export function ambienceStylesheet(): string {
     `  ${MATTE};`,
     `}`,
     /*
-      ⚠️ THE FIELD DRIFTS TOO, AGAINST THE GROUND, AND WITHOUT THIS HALF OF THE
-      FAMILIES DO NOT MOVE AT ALL. A beat is carried by a placed MARK, so a
-      family that draws its whole field in one stroke — `cloth`, which is the
-      material under every workspace and account screen in the product — has
-      nowhere to put one and was completely still. Measured: one animation on
-      the page, the ground's, and its whole travel was four pixels.
-      ⚠️ AND TWO LAYERS MOVING TOGETHER IS NOT DEPTH, IT IS ONE LAYER. What makes
-      a ground read as material rather than as a picture is the marks moving
-      ACROSS the light behind them — so this runs the other way, at a fraction of
-      the distance, and the two are out of phase by a negative delay rather than
-      by a second period nobody would be able to name.
-      ⚠️ SCALED, BECAUSE TRANSLATING SOMETHING THAT EXACTLY COVERS ITS BOX
-      UNCOVERS AN EDGE. The overscan is what there is to move — the same reason
-      the ground is at 1.1.
+      ⚠️ THE FIELD DOES NOT MOVE, AND IT DID FOR ONE DAY. It drifted against the
+      ground on the theory that two layers at different rates read as depth,
+      which is true of photographs and false of HAIRLINES: `cloth` is a field of
+      one-pixel strokes, and translating and scaling it by fractions of a pixel
+      resamples every one of them on every frame. Measured off the recording, on
+      a screen with nothing happening — the background strobed between four
+      discrete brightness levels, up to eleven levels frame to frame. That is
+      what "the ambience flickers" was.
+
+      ⚠️ SO THE GROUND DRIFTS AND THE FIELD BEATS, and that is the whole division.
+      A gradient can be resampled all day because it has no edges to alias; marks
+      have edges, so they move by ROTATING IN PLACE inside the tile (`render`),
+      which redraws the pattern rather than resampling the picture of it.
+
+      ⚠️ AND ONE FULL-VIEWPORT LAYER ANIMATES INSTEAD OF TWO. On a phone the
+      second one was not free: a masked, blended, viewport-sized surface
+      re-rasterised at 60fps beside another one is most of a frame budget spent
+      on something nobody is looking at.
     */
-    `@keyframes one-float {`,
-    `  from { transform: translate3d(1.2%, 0.8%, 0) scale(1.05); }`,
-    `  to { transform: translate3d(-1.2%, -0.8%, 0) scale(1.08); }`,
-    `}`,
-    `@media (prefers-reduced-motion: no-preference) {`,
-    `  [data-field] {`,
-    `    animation: one-float ${DURATION.ambient} ${EASE.plain} infinite alternate;`,
-    /* ⚠️ NEGATIVE, SO IT STARTS PART-WAY THROUGH RATHER THAN WAITING. A positive
-       delay would hold the field still for nine seconds after every page load,
-       which is most of the time anybody spends on a screen. */
-    `    animation-delay: -9s;`,
-    `  }`,
-    `}`,
-    `[data-reduce-motion="true"] [data-field] { animation: none; }`,
+    /* ⚠️ AND NO `will-change` HERE. Nothing animates this element any more, and a
+       promotion hint on a viewport-sized masked layer is a permanent compositing
+       layer held in memory for a movement that does not happen. */
   ];
 
   return [
@@ -502,7 +471,6 @@ export function ambienceStylesheet(): string {
       ⚠️ Both selector forms, because the stamp may be on the host or an ancestor.
     */
     `[data-theme="light"] [data-sky], [data-theme="light"][data-sky] { --sky: 0.55; }`,
-    ...beats,
     ...field,
     /*
       ⚠️ ONE RULE FOR EVERY GROUND. `--world-ground` is set on the element by
@@ -533,24 +501,26 @@ export function ambienceStylesheet(): string {
       switch. For some people this is not a preference.
     */
     /*
-      ⚠️ AND THE DISTANCE IS THE PART THAT WAS WRONG. This drifted half a percent
-      each way — four pixels on a phone, across twenty-four seconds, which is a
-      quarter of a pixel a second. It is not a subtle animation, it is an absent
-      one: measured on the screens people actually look at, the page held
-      completely still. The rule an ambience has to satisfy is that it is
-      noticeable if you watch it and invisible if you do not, and only the first
-      half of that was ever tested.
+      ⚠️ THE GROUND DOES NOT DRIFT, AND REMOVING THAT IS THE PERFORMANCE FIX.
+      `mix-blend-mode` on the grain below blends it with its backdrop, and a
+      blended layer cannot be composited apart from what it blends with — so an
+      animating gradient underneath drags the whole viewport-sized stack onto the
+      main thread and re-blends it sixty times a second, for a wash sliding two
+      percent over twenty-four seconds. On a phone that is most of a frame budget
+      spent on the least perceptible motion in the product.
+
+      ⚠️ AND THE CHOICE WAS BETWEEN THE DITHER AND THE DRIFT, so it went to the
+      dither. The grain is not decoration: a large smooth gradient BANDS on an
+      8-bit display, and the banding is the clearest tell of a cheap background —
+      `overlay` is what makes noise dither rather than wash, and at three percent
+      `normal` would lift every dark in the picture. What the world loses is a
+      movement nobody could see; what it keeps is the reason it looks lit.
+
+      ⚠️ SO THE ONLY THING THAT MOVES IN A SCENE IS A MARK. It rotates or breathes
+      inside its own tile, which redraws the pattern rather than resampling a
+      picture of it — see `render`. That is also the motion somebody asked for:
+      the tiles, not the wash.
     */
-    `@keyframes one-drift {`,
-    `  from { transform: translate3d(-2.4%, -1.6%, 0) scale(1.1); }`,
-    `  to { transform: translate3d(2.4%, 1.6%, 0) scale(1.18); }`,
-    `}`,
-    `@media (prefers-reduced-motion: no-preference) {`,
-    `  [data-sky]:not([data-sky="plain"])::before {`,
-    `    animation: one-drift ${DURATION.ambient} ${EASE.plain} infinite alternate;`,
-    `  }`,
-    `}`,
-    `[data-reduce-motion="true"] [data-sky]:not([data-sky="plain"])::before { animation: none; }`,
     `[data-sky]:not([data-sky="plain"])::before,`,
     `[data-sky]:not([data-sky="plain"])::after {`,
     `  content: ""; position: absolute; top: 0; left: 0; right: 0;`,

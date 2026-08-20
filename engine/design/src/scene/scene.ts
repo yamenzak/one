@@ -32,7 +32,7 @@
  * still visibly there at the edges. `scripts/scene.test.mjs` refuses the wash.
  */
 
-import { BEAT } from "../tokens/motion.js";
+import { BEAT, TURN, TURN_AT, EASE_SPLINE, turns } from "../tokens/motion.js";
 
 /* ------------------------------------------------------------------ seeds --- */
 
@@ -266,6 +266,15 @@ export interface Scene {
    * see `DENSITY`.
    */
   readonly density?: number;
+  /**
+   * ⚠️ WHETHER THE MARKS BEAT AT ALL, DECIDED BY THE CALLER AND NOT BY A MEDIA
+   * QUERY. A beat is SMIL, because SMIL is the only thing that repaints inside a
+   * `<pattern>` — and SMIL cannot be switched off by CSS. So the two signals a
+   * person can give are read where React can see them (`useScenery`) and the
+   * animation is simply not emitted. A picture that never moves is the correct
+   * answer to "less motion", and it costs less than one that does.
+   */
+  readonly still?: boolean;
 }
 
 /**
@@ -325,37 +334,56 @@ export interface Rendered {
 export function render(scene: Scene): Rendered {
   const { family, palette } = scene;
   const density = scene.density ?? 1;
+  const still = scene.still === true;
   const r = prng(hash(`${family.id}|${scene.seed}`));
 
   const want = family.tile ?? { w: 1400, h: 1000 };
 
-  /*
-    ⚠️ THE MARKS ARE KEPT IN GROUPS BY BEAT, WHICH IS THE WHOLE FIX. Every mark
-    is still emitted exactly once and the tile is still one pattern's worth of
-    drawing per group, so this costs a `<pattern>` and a `<rect>` per beat — at
-    most three in any family here — and it buys a beat that paints. Everything
-    on one beat pulsing together is not a loss: they shared a delay already, so
-    they were always in phase by construction.
-  */
-  const groups = new Map<string, string[]>();
-  const push = (beat: string | null, svg: string) => {
-    const key = beat ?? "";
-    const held = groups.get(key);
-    if (held) held.push(svg); else groups.set(key, [svg]);
-  };
-  const count = () => [...groups.values()].reduce((n, g) => n + g.length, 0);
+  const marks: string[] = [];
 
   /*
-    ⚠️ THE BEAT IS NOT ON THE MARK, AND FOR THREE YEARS' WORTH OF COMMITS IT WAS.
-    A mark lives inside the `<pattern>`, and Chromium rasterises a pattern's tile
-    ONCE and paints that cache — so an animation declared in there is created,
-    is reported by `getAnimations()`, and never repaints anything. Measured by
-    screenshot rather than by API: byte-identical pictures a second and a half
-    apart, on every family that had one. What carries a beat now is the LAYER
-    (below): the marks are split into one pattern per beat, and the `<rect>` that
-    paints each is a rendered element the page's own CSS can reach.
+    ⚠️ THE BEAT IS SMIL, AND IT IS THE ONLY THING THAT ANIMATES INSIDE A PATTERN.
+    Measured three ways: a CSS keyframe on a `<g>` inside a `<pattern>` never
+    repaints — Chromium rasterises the tile once and paints the cache, so the
+    animation is created, `getAnimations()` reports it, and the picture is
+    byte-identical a second later. `<animate>` and `<animateTransform>` in the
+    same place both repaint. That is the whole reason this is not CSS.
+
+    ⚠️ AND THE ANSWER BEFORE THIS ONE MADE THE FIELD PULSE. Splitting the marks
+    into one layer per beat put the animation on a rendered `<rect>`, which does
+    run — and fades a FIFTH OF THE SKY AT ONCE. Reported as "the ambience
+    flickers", correctly: a beat is a mark breathing, and a beat applied to
+    everything wearing it at the same time is the page throbbing.
+
+    ⚠️ SO REDUCED MOTION IS DECIDED HERE, AT RENDER, RATHER THAN IN A MEDIA
+    QUERY. SMIL cannot be switched off by CSS — which is the price — so `still`
+    is read from both signals by the caller and the elements are simply not
+    emitted. `useScenery` re-renders when either changes.
+
+    ⚠️ THE BEAT GETS ITS OWN `<g>`, NESTED INSIDE THE PLACEMENT. In SVG the
+    `transform` attribute is one value, so a turn animating it would REPLACE the
+    translate that put the mark where it belongs — every turning tile would snap
+    to the origin and orbit it. Two elements, one for where it is and one for
+    what it does.
   */
-  const placed = (at: string, body: string) => `<g transform="${at}">${body}</g>`;
+  const placed = (at: string, beat: keyof typeof BEAT | null, body: string) => {
+    if (!beat || still) return `<g transform="${at}">${body}</g>`;
+    const b = BEAT[beat];
+    /* ⚠️ A NEGATIVE OFFSET, SO A MARK IS PART-WAY THROUGH RATHER THAN WAITING.
+       A positive `begin` holds every mark at rest for its whole delay after the
+       page loads, which is most of the time anybody spends on a screen. */
+    const begin = `-${b.delay}`;
+    return `<g transform="${at}"><g>${
+      turns(beat)
+        ? `<animateTransform attributeName="transform" type="rotate" additive="sum"`
+          + ` values="${TURN}" keyTimes="${TURN_AT}" dur="${b.period}" begin="${begin}"`
+          + ` repeatCount="indefinite" calcMode="spline"`
+          + ` keySplines="${EASE_SPLINE.repeat(TURN.split(";").length - 1).trim()}"/>`
+        : `<animate attributeName="opacity" values="1;${(b as { dip: number }).dip};1"`
+          + ` dur="${b.period}" begin="${begin}" repeatCount="indefinite"`
+          + ` calcMode="spline" keySplines="${EASE_SPLINE}${EASE_SPLINE.trim()}"/>`
+    }${body}</g></g>`;
+  };
 
   /* ⚠️ THE SHARE IS DRAWN PER INSTANCE, from the same stream, so which marks
      move is part of the world rather than a second decision. */
@@ -390,12 +418,12 @@ export function render(scene: Scene): Rendered {
         const beat = beatOf(v);
         const at = `translate(${+(ix * cell).toFixed(1)} ${+(iy * cell).toFixed(1)})`
           + ` scale(${+cell.toFixed(2)})`;
-        push(beat, placed(at, v.draw(palette, r)));
+        marks.push(placed(at, beat, v.draw(palette, r)));
       }
     }
   }
 
-  if (family.drawn) push(null, family.drawn(palette, r, tile));
+  if (family.drawn) marks.push(family.drawn(palette, r, tile));
 
   const megapixels = (tile.w * tile.h) / 1_000_000;
   for (const speck of family.specks ?? []) {
@@ -403,7 +431,7 @@ export function render(scene: Scene): Rendered {
     for (const [x, y] of scatter(r, tile.w, tile.h, count)) {
       const v = pick(r, speck.variants);
       const beat = beatOf(v);
-      push(beat, placed(`translate(${x} ${y})`, v.draw(palette, r)));
+      marks.push(placed(`translate(${x} ${y})`, beat, v.draw(palette, r)));
     }
   }
 
@@ -420,41 +448,19 @@ export function render(scene: Scene): Rendered {
   const scoped = (svg: string) =>
     svg.replace(/\bid="([\w-]+)"/g, `id="${ns}-$1"`).replace(/url\(#([\w-]+)\)/g, `url(#${ns}-$1)`);
 
-  const any = count() > 0;
-  const shared = any && family.defs ? `<defs>${family.defs(palette)}</defs>` : "";
-
-  /*
-    ⚠️ ONE PATTERN AND ONE RECT PER BEAT, AND THE STILL MARKS ARE ONE OF THEM.
-    The rects are stacked in the order the groups were filled, which is the order
-    the family declares them, so a lattice still sits under its specks.
-
-    ⚠️ `userSpaceOnUse` AND THE TILE IS IN CSS PIXELS. A pattern in object units
-    would resize with the viewport, so the same world would be a different
-    constellation on a phone and on a laptop — which is what a stretched sky
-    looks like, and the reason the old background version pinned an explicit
-    `background-size`.
-  */
-  const layers = [...groups.entries()].map(([beat, held], i) => ({
-    beat,
-    pattern: `<pattern id="tile${i}" width="${tile.w}" height="${tile.h}"`
-      + ` patternUnits="userSpaceOnUse">${held.join("")}</pattern>`,
-    rect: `<rect${beat ? ` class="q-${beat}"` : ""}`
-      + ` width="100%" height="100%" fill="url(#tile${i})"/>`,
-  }));
+  const shared = marks.length && family.defs ? `<defs>${family.defs(palette)}</defs>` : "";
+  const body = scoped(`${shared}${marks.join("")}`);
 
   return {
-    /*
-      ⚠️ SCOPED IN ONE PASS, OVER EVERYTHING. The first version of this split
-      scoped the shared defs and left the patterns alone — so a mark referring to
-      a gradient by `url(#l)` pointed at an id that had just been renamed, and
-      every family whose marks take a gradient (`aura`, `blobs`) drew NOTHING.
-      It fails silently, in both directions: the picture is empty rather than
-      wrong, and the pattern ids are unqualified so two worlds on one page take
-      each other's marks. One string, one rewrite, nothing to keep in step.
-    */
-    field: any
-      ? scoped(`${shared}<defs>${layers.map((l) => l.pattern).join("")}</defs>`
-        + layers.map((l) => l.rect).join(""))
+    /* ⚠️ `userSpaceOnUse` AND THE TILE IS IN CSS PIXELS. A pattern in object
+       units would resize with the viewport, so the same world would be a
+       different constellation on a phone and on a laptop — which is what a
+       stretched sky looks like, and the reason the old background version pinned
+       an explicit `background-size`. */
+    field: marks.length
+      ? `<defs><pattern id="${ns}-tile" width="${tile.w}" height="${tile.h}"`
+        + ` patternUnits="userSpaceOnUse">${body}</pattern></defs>`
+        + `<rect width="100%" height="100%" fill="url(#${ns}-tile)"/>`
       : "",
     ground: family.ground(palette, prng(hash(`${family.id}|ground|${scene.seed}`))).join(", "),
     veil: family.veil?.(palette) ?? "",
