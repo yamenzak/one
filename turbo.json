@@ -26,7 +26,7 @@
     // package dependency, so nothing in the graph connects the two. Without the
     // edge the suite boots Miniflare against a missing directory and aborts
     // reporting "no tests" — a PASS-shaped result. That is what turned the merge
-    // adding `apps/tessa-app` red, and it is why both CI workflows also build
+    // adding a second app's SPA red, and it is why both CI workflows also build
     // every SPA explicitly.
     //
     // Declaring it here is what makes a bare `turbo run test` correct, and — the
@@ -63,10 +63,6 @@
       "dependsOn": ["^build", "@kova/app#build"],
       "outputs": ["coverage/**"]
     },
-    "@4dl/tessa#test": {
-      "dependsOn": ["^build", "@tessa/app#build"],
-      "outputs": ["coverage/**"]
-    },
     "@4dl/template#test": {
       // The template serves `apps/_template-app/dist` too, and gets the same
       // hand-declared edge as the three products — because the whole point of a
@@ -81,7 +77,7 @@
       // binding, and an `assets.directory` is a filesystem path, not a package
       // dependency — turbo cannot infer this edge. Without the build, Miniflare
       // aborts and reports "no tests", which reads as a pass. Declaring it by
-      // hand is the same fix `@kova/api` and `@4dl/tessa` needed.
+      // hand is the same fix `@kova/api` needed.
       "dependsOn": ["^build", "@scena/app#build"],
       "outputs": ["coverage/**"]
     },
@@ -95,7 +91,7 @@
       // the player itself, inside its webServer command, because `VITE_API_BASE`
       // has to be baked in at build time and has to name the port that suite
       // owns. A turbo-built player would carry the production origin.
-      "dependsOn": ["@kova/app#build", "@tessa/app#build", "@scena/app#build"],
+      "dependsOn": ["@kova/app#build", "@scena/app#build"],
       "cache": false,
       // Turbo filters the environment. Playwright locates its browsers through
       // PLAYWRIGHT_BROWSERS_PATH (pre-set on CI images and sandboxes); stripped,
@@ -127,17 +123,6 @@
       this ran after the UI work; the pictures were not stale, they did not
       exist.
     */
-    /*
-      Tessa's worker serves `apps/tessa-app/dist` through an `assets` binding —
-      the same unpronounceable edge as the others, and the same consequence: a
-      stale `dist` here does not fail, it photographs the PREVIOUS design under
-      the current shot ids. The generic `shots` task above names Kova's SPA only.
-    */
-    "@tessa/e2e#shots": {
-      "dependsOn": ["@tessa/app#build"],
-      "cache": false,
-      "passThroughEnv": ["PLAYWRIGHT_*", "CI", "E2E_SERVER_LOGS", "NODE_OPTIONS"]
-    },
     "@scena/e2e#shots": {
       "dependsOn": ["@scena/app#build", "@scena/player#build"],
       "cache": false,

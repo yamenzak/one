@@ -1,17 +1,17 @@
 {
   "$comment": [
-    "THE APP REGISTRY — every deployable thing in this monorepo, declared once.",
+    "THE APP REGISTRY \u2014 every deployable thing in this monorepo, declared once.",
     "",
     "CI, deploys and provisioning all read this file instead of hard-coding app",
     "names. That is not tidiness: every deployment problem in this repo so far",
     "was a per-app step somebody forgot to duplicate. Tessa's SPA build was",
-    "missing from CI, so its whole test suite reported 'no tests' — a PASS-shaped",
-    "result — and the merge that added it went red on main. A second provisioning",
+    "missing from CI, so its whole test suite reported 'no tests' \u2014 a PASS-shaped",
+    "result \u2014 and the merge that added it went red on main. A second provisioning",
     "workflow was copied from the first and drifted. Neither could happen if the",
     "workflows derived the app list rather than repeating it.",
     "",
     "`apps-manifest.test.mjs` fails if any directory under apps/ has a",
-    "wrangler.jsonc and is not listed here, so a NEW app cannot be forgotten —",
+    "wrangler.jsonc and is not listed here, so a NEW app cannot be forgotten \u2014",
     "which is the actual failure mode, since nobody forgets the app they are",
     "currently working on.",
     "",
@@ -19,13 +19,13 @@
     "  id         short name, used in workflow inputs and job names",
     "  dir        the worker's directory (holds wrangler.jsonc)",
     "  spa        workspace package whose `build` must run BEFORE tests and",
-    "             deploy — the worker serves it through an `assets` binding, and",
+    "             deploy \u2014 the worker serves it through an `assets` binding, and",
     "             Miniflare aborts the suite when the directory is missing.",
     "             null for a worker that serves no SPA.",
     "  deploy     whether `deploy.yml` ships it",
     "  provision  the Cloudflare resources it binds. Omit for an app with none.",
     "  email      the display name for its transactional sender. The ADDRESS is",
-    "             always noreply@4dl.app — one verified sender for the platform,",
+    "             always noreply@4dl.app \u2014 one verified sender for the platform,",
     "             so a new app inherits a working one instead of a plausible-",
     "             looking dead one.",
     "  e2e        workspace package running its Playwright suite, or null",
@@ -33,14 +33,17 @@
     "`sharedConfig` below is the one resource that is NOT per-app: a single KV",
     "namespace bound with the SAME id into every worker, holding the credentials",
     "the whole platform shares (see packages/core/src/config.ts). Provisioning",
-    "creates it once — whichever app runs first — and binds the id it finds into",
+    "creates it once \u2014 whichever app runs first \u2014 and binds the id it finds into",
     "every app after that. `binding` is the name every worker's Env expects, and",
     "`title` is what the namespace is called on Cloudflare; the workflow matches",
     "it as a SUFFIX, because `wrangler kv namespace create` prefixes the worker",
     "name onto whatever title it is given."
   ],
   "defaultEmailAddress": "noreply@4dl.app",
-  "sharedConfig": { "binding": "PLATFORM_CONFIG", "title": "4dl-platform-config" },
+  "sharedConfig": {
+    "binding": "PLATFORM_CONFIG",
+    "title": "4dl-platform-config"
+  },
   "apps": [
     {
       "id": "kova",
@@ -49,18 +52,14 @@
       "spa": "@kova/app",
       "e2e": "@kova/e2e",
       "deploy": true,
-      "provision": { "d1": "kova", "kv": "CACHE", "r2": "kova-media" },
-      "email": { "name": "Kova" }
-    },
-    {
-      "id": "tessa",
-      "name": "Tessa",
-      "dir": "apps/tessa",
-      "spa": "@tessa/app",
-      "e2e": "@tessa/e2e",
-      "deploy": true,
-      "provision": { "d1": "tessa", "kv": "CACHE", "r2": "tessa-media" },
-      "email": { "name": "Tessa" }
+      "provision": {
+        "d1": "kova",
+        "kv": "CACHE",
+        "r2": "kova-media"
+      },
+      "email": {
+        "name": "Kova"
+      }
     },
     {
       "id": "scena",
@@ -69,8 +68,14 @@
       "spa": "@scena/app",
       "e2e": "@scena/e2e",
       "deploy": true,
-      "provision": { "d1": "scena", "kv": "PAIRING", "r2": "scena-media" },
-      "email": { "name": "Scena" }
+      "provision": {
+        "d1": "scena",
+        "kv": "PAIRING",
+        "r2": "scena-media"
+      },
+      "email": {
+        "name": "Scena"
+      }
     },
     {
       "$comment": [
@@ -78,7 +83,7 @@
         "",
         "A screen is a DEVICE: one pinned URL, Service-Worker-cached, running for",
         "months without a network. It must not share an origin with the dashboard",
-        "— a tenant subdomain would give every studio's screens a different",
+        "\u2014 a tenant subdomain would give every studio's screens a different",
         "address, so re-pairing would orphan the cache and custom domains would",
         "multiply certificates by the size of the fleet. It resolves NO tenant",
         "from its host; the tenant arrives from the pairing claim.",
@@ -97,7 +102,7 @@
       "$comment": [
         "`preCommands` is how a marketing site gets its `dist`, and without it",
         "this app CANNOT deploy: the deploy job builds `spa` and nothing else,",
-        "`spa` is null here (there is no SPA — the generator prewrites HTML),",
+        "`spa` is null here (there is no SPA \u2014 the generator prewrites HTML),",
         "and `wrangler deploy` then dies on the missing `assets.directory`.",
         "Kova's `www` has carried this line since it shipped; Scena arrived",
         "without it and failed its first deploy on exactly that."

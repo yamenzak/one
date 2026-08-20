@@ -42,6 +42,15 @@ OWN provider**; Stripe Connect is gone. Package manager: **pnpm** (Node ≥22).
 
 ## Layout
 
+⚠️ **TESSA IS GONE, DELETED WHOLE ON 2026-08-20.** `apps/tessa`, `apps/tessa-app`,
+`apps/tessa-e2e`, `packages/tessa-domain` and `TESSA.md` no longer exist, and it
+is out of `apps.json` and `turbo.json`. It is being replaced by **OneInventory**,
+the first app on One — general-purpose inventory, with the clinic demoted from
+premise to profile. **What Tessa was, what it learned, and which of its ideas
+generalise is [docs/TESSA-AS-BUILT.md](docs/TESSA-AS-BUILT.md)** — read that
+rather than `git log`. Prose below that still names Tessa is describing incidents
+that happened; the code it refers to is in history.
+
 ```
 apps/
   api/   # THE worker — Hono router + TenantBillingDO; serves the app SPA
