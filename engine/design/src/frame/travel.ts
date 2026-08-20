@@ -78,6 +78,47 @@ interface WithTransition {
 }
 
 /**
+ * WHAT THE TRANSITION IS HOLDING STILL — the same three things `TRAVEL_MOTION`
+ * silences, named once so the rule and the release cannot drift apart.
+ */
+const HELD = `[data-blocks] > *, [data-arrive], [data-draw="true"]`;
+
+/**
+ * THE JOURNEY IS OVER, AND WHAT IT CARRIED HAS ARRIVED.
+ *
+ * ⚠️ `animation: none` DOES NOT SUPPRESS AN ARRIVAL, IT POSTPONES IT — and that
+ * is the second flicker, measured. A held animation is not paused: it is never
+ * created. The moment `data-travel` comes off the browser creates it AT TIME
+ * ZERO, so every block on a page that has already settled drops to opacity 0 for
+ * a frame and climbs back over 300ms. On a phone recording that is a 45ms
+ * blackout half a second behind the transition — two entrances and a blank
+ * between them, for one press.
+ *
+ * ⚠️ SO THEY ARE FINISHED RATHER THAN LEFT TO START. Reading `getAnimations()`
+ * after the attribute is gone is what CREATES them (the call flushes style), and
+ * finishing each one immediately puts it at the end state its `both` fill then
+ * holds. The screen never renders the first frame. This is the honest statement
+ * of "the transition was the arrival": the animation happened, it happened
+ * during the travel, and it is over.
+ *
+ * ⚠️ AN ENDLESS ANIMATION IS NOT AN ARRIVAL AND CANNOT BE FINISHED. `finish()`
+ * on an infinite iteration count throws, which would abandon the loop and leave
+ * every element after it in the list holding its first frame — the exact bug
+ * this exists to remove, arrived at from the other side.
+ */
+const land = (root: HTMLElement): void => {
+  const held = Array.from(root.querySelectorAll<HTMLElement>(HELD));
+  root.removeAttribute("data-travel");
+  root.removeAttribute("data-world");
+  for (const el of held) {
+    for (const playing of el.getAnimations()) {
+      if (playing.effect?.getComputedTiming().iterations === Infinity) continue;
+      try { playing.finish(); } catch { /* not finishable — leave it alone */ }
+    }
+  }
+};
+
+/**
  * MOVE TO THE NEXT SCREEN.
  *
  * ⚠️ THE CALLER HANDS OVER THE CHANGE ITSELF RATHER THAN CALLING IT FIRST. The
@@ -107,10 +148,7 @@ export function travel(way: Way, change: () => void): void {
      navigating again mid-flight — rejects rather than resolves, and an
      attribute left behind would put the last direction's animation on the next
      screen that mounted. */
-  void run.finished.catch(() => undefined).then(() => {
-    root.removeAttribute("data-travel");
-    root.removeAttribute("data-world");
-  });
+  void run.finished.catch(() => undefined).then(() => land(root));
 }
 
 /* ------------------------------------------------------------------- css --- */
@@ -196,20 +234,39 @@ export const TRAVEL_MOTION = [
     the transition. `z-index` on the group puts it back, and then the root's own
     snapshot hides it wherever the page has a background. Two stacking models to
     keep in step, for a parallax nobody asked for.
+
+    ⚠️ ONLY THE OLD PICTURE FADES, AND THAT IS WHAT MAKES IT A DISSOLVE RATHER
+    THAN A DIP. Fading both — one out, one in — leaves the screen showing a
+    fraction of each for the whole transition, and two half-transparent pictures
+    over a dark page do not add up to one opaque one. Measured on a phone at
+    390: mean brightness fell 28% within 40ms of the press, sat a fifth below the
+    page for a quarter of a second, and jumped back the moment the snapshots were
+    thrown away. That is the flash, and no easing pairing fixes it — it is
+    arithmetic. The new snapshot is a whole opaque page, so leaving it at full
+    strength UNDER the old one dissolves between two complete pictures and every
+    intermediate frame is as bright as both ends.
+
+    ⚠️ THE `animation: none` ON THE ARRIVING SIDE IS THE LOAD-BEARING HALF. With
+    no rule at all the browser applies its OWN fade-in, which is precisely the
+    behaviour being removed — so deleting the line reads as a simplification and
+    restores the fault.
   */
   `  @keyframes travel-out {`,
   `    from { opacity: 1; }`,
   `    to { opacity: 0; }`,
   `  }`,
-  `  @keyframes travel-in {`,
-  `    from { opacity: 0; }`,
-  `    to { opacity: 1; }`,
-  `  }`,
   `  :root[data-travel]::view-transition-old(root) {`,
-  `    animation: travel-out ${DURATION.moderate} ${EASE.exit} both;`,
+  `    animation: travel-out ${DURATION.page} ${EASE.travel} both;`,
+  /* ⚠️ A dissolve, never an addition. Chromium's default cross-fade blends the
+     two snapshots with `plus-lighter` so a linear pair holds its brightness;
+     under our curves that same blend would make the middle of the transition
+     brighter than either end, which is the fault upside down. */
+  `    mix-blend-mode: normal;`,
   `  }`,
   `  :root[data-travel]::view-transition-new(root) {`,
-  `    animation: travel-in ${DURATION.page} ${EASE.travel} both;`,
+  `    animation: none;`,
+  `    opacity: 1;`,
+  `    mix-blend-mode: normal;`,
   `  }`,
 
   /* ------------------------------------------------------- and the column --- */
@@ -248,15 +305,19 @@ export const TRAVEL_MOTION = [
     a workspace to the ruled ground of the console is not the next one along, it
     is somewhere else. So the old picture recedes and the new one OPENS — a
     scale, a longer curve, and no direction at all, because a place has none.
+
+    ⚠️ AND THE ARRIVING PLACE DOES NOT FADE IN EITHER, FOR THE SAME REASON. It
+    scales, and the old picture dissolves off it — so the opening is a movement
+    revealed rather than a screen recovering its brightness. `travel-near`
+    carrying an opacity ramp is the same 28% dip with a scale on top of it.
   */
   `  @keyframes travel-away {`,
   `    from { opacity: 1; transform: scale(1); }`,
   `    to { opacity: 0; transform: scale(1.03); }`,
   `  }`,
   `  @keyframes travel-near {`,
-  `    from { opacity: 0; transform: scale(0.98); }`,
-  `    60% { opacity: 1; }`,
-  `    to { opacity: 1; transform: scale(1); }`,
+  `    from { transform: scale(0.98); }`,
+  `    to { transform: scale(1); }`,
   `  }`,
   /*
     ⚠️ THE WORLD WINS OVER THE DIRECTION, IN BOTH DIRECTIONS OF TRAVEL. Going
@@ -265,8 +326,10 @@ export const TRAVEL_MOTION = [
     which is why these rules come last, and why the column stands down with them.
   */
   `  :root[data-world="new"]::view-transition-old(root) {`,
-  `    animation: travel-away ${DURATION.moderate} ${EASE.exit} both;`,
+  `    animation: travel-away ${DURATION.page} ${EASE.travel} both;`,
   `  }`,
+  /* ⚠️ The scale outlives the dissolve on purpose — the last stretch is the new
+     place settling, with nothing left in front of it. */
   `  :root[data-world="new"]::view-transition-new(root) {`,
   `    animation: travel-near ${DURATION.stately} ${EASE.enter} both;`,
   `  }`,

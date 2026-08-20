@@ -96,7 +96,7 @@ const filesIn = (dir, match) => {
 {
   const src = read("design/src/frame/travel.ts");
   const need = [
-    /* The world, which cross-fades in place whichever way somebody is going. */
+    /* The world, which dissolves in place whichever way somebody is going. */
     ["the world leaving", `[data-travel]::view-transition-old(root)`],
     ["the world arriving", `[data-travel]::view-transition-new(root)`],
     /* The direction, which the CONTENT carries — the outgoing page is a flat
@@ -142,6 +142,21 @@ const filesIn = (dir, match) => {
       + `       The transition IS the arrival. A block stagger, a chart draw and a glyph`
       + ` character\n       running under it are three more entrances nobody asked for,`
       + ` and together they are\n       what "the animations race" means.`);
+  }
+
+  /*
+    ⚠️ AND THE HOLD IS RELEASED BY FINISHING WHAT IT HELD, NOT BY LETTING GO.
+    `animation: none` does not suspend an arrival, it destroys it — so removing
+    `data-travel` makes the browser build it again at time zero and a page that
+    has already landed blanks for a frame and staggers back in. Two entrances
+    and a blank between them, for one press. A `removeAttribute` on its own is
+    the shorter code, it is what was there, and it looks completely correct.
+  */
+  if (!/getAnimations\(\)/.test(src) || !/\.finish\(\)/.test(src)) {
+    fail(`design/src/frame/travel.ts: releases the page without finishing what it held.\n`
+      + `       Lifting \`animation: none\` restarts every held arrival AT ZERO, so the\n`
+      + `       screen blanks for a frame once the transition has already landed — the\n`
+      + `       second flash, and the one nothing in a stylesheet can show.`);
   }
 
   /* ⚠️ BOTH OPT-OUTS BEFORE THE TRANSITION STARTS, not only in the stylesheet.
