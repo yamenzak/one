@@ -41,6 +41,7 @@ import { ARRIVE, arriveAt } from "../tokens/motion.js";
    would get the picture and none of what the engine learns next. */
 import { useScenery } from "../frame/page.js";
 import type { Sky } from "../scene/index.js";
+import { useBones } from "./bones.js";
 import { Face, type FaceOf } from "./face.js";
 import { Hint } from "./beside.js";
 import { Tally } from "./tally.js";
@@ -502,8 +503,11 @@ interface RowBase {
  * it read as amateur without being nameable. `justify-start` on the button is
  * not enough: the block itself has to align its own lines.
  */
+/* ⚠️ `label` IS A NODE SO THE PLACEHOLDER CAN BE THE SAME BODY. A row's bones
+   used to rebuild this span — and picked `SPACE.tight` where this uses
+   `SPACE.hair`, which is the copying mistake one level further down. */
 const Body = ({ label, under }: {
-  readonly label: string; readonly under?: React.ReactNode;
+  readonly label: React.ReactNode; readonly under?: React.ReactNode;
 }) => (
   <span className={`flex min-w-0 grow flex-col items-start text-left ${SPACE.hair}`}>
     <span className={TYPE.label}>{label}</span>
@@ -583,7 +587,42 @@ export interface NavRowProps extends RowBase {
  */
 export function NavRow({ icon, face, label, under, aside, onOpen, opens, isDisabled }: NavRowProps) {
   const leads = !!onOpen || !!opens;
-  const inside = (
+  /*
+    ⚠️ THE ROW'S OWN BOX, WITH BARS IN IT. The placeholder this replaced wrote
+    `ROW.gap ROW.tap ROW.pad` out for itself and came to 72px against this row's
+    80 — 24px short over three rows, which is a list that shifts up when it
+    lands. Sharing the element rather than the class names is what makes that
+    impossible rather than unlikely.
+  */
+  const bones = useBones();
+  /*
+    ⚠️ THE ROW'S OWN SPAN, ITS OWN `Lead` AND ITS OWN `Body` — bars instead of
+    words, and nothing else different. Every version of this that rebuilt the
+    structure got a number wrong: the placeholder it replaced wrote out
+    `ROW.gap ROW.pad ROW.tap` and came 8px short a row, and the first attempt at
+    this one rebuilt `Body` and picked `SPACE.tight` where `Body` uses
+    `SPACE.hair`. There is no amount of care that fixes copying; there is only
+    not copying.
+
+    ⚠️ AND A BAR IS `1lh`, WHICH IS THE LINE IT SITS IN. A fixed `h-4` is
+    shorter than a line of `TYPE.label` and a fixed `h-3` than one of
+    `TYPE.note` — 8px a row, on every list. `lh` is the element's own computed
+    line box, so it stays right if a role's size or leading ever changes.
+  */
+  const inside = bones
+    ? (
+      <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
+        {/* ⚠️ THE LEAD'S OWN BOX, NOT A CIRCLE THE RIGHT SIZE. `LEAD` is what
+            `Lead` wears, so the bones lead cannot be a different diameter than
+            the glyph it stands in for. */}
+        {icon || face ? <Skeleton className={LEAD} /> : null}
+        <Body
+          label={<Skeleton className="block h-[1lh] w-2/5 rounded-full" />}
+          under={under ? <Skeleton className="block h-[1lh] w-3/5 rounded-full" /> : undefined}
+        />
+      </span>
+    )
+    : (
     <span className={`flex w-full items-center ${ROW.gap} ${ROW.pad} ${ROW.tap}`}>
       <Lead icon={icon} face={face} />
       <Body label={label} under={under} />
@@ -970,18 +1009,35 @@ export function QuickActions({ actions }: {
  * across" needs a breakpoint for every width it does not fit, and is wrong on
  * the first device nobody tested.
  */
+/**
+ * ⚠️ ONE GRID, NAMED, BECAUSE THE PLACEHOLDER USED TO WRITE ITS OWN. `TilesWaiting`
+ * laid out at `minmax(min(8rem, 100%), 1fr)` against this `min(6rem, 45%)`, so
+ * six tiles measured 236px in three columns and waited behind 360px in two —
+ * half a screen taller, in the wrong shape, and the page jumped 124px when the
+ * content landed. Two copies of a grid is two grids.
+ */
+const TILES = "repeat(auto-fit, minmax(min(6rem, 45%), 1fr))";
+
 export function TileGrid({ tiles }: {
   readonly tiles: readonly {
     readonly id: string; readonly label: string;
     readonly icon: React.ReactNode; readonly onOpen: () => void;
   }[];
 }) {
+  /* ⚠️ THE SAME CONTAINER, SO THE COLUMNS CANNOT DISAGREE. What a placeholder
+     has to get right is where the content will BE, and for a grid that is the
+     column count — which is a property of this element and nothing else. */
+  const bones = useBones();
   return (
     <div
       className={`grid ${SPACE.snug}`}
-      style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(6rem, 45%), 1fr))" }}
+      style={{ gridTemplateColumns: TILES }}
     >
-      {tiles.map((t) => (
+      {bones
+        ? tiles.map((t) => (
+          <Skeleton key={t.id} className={`${TILE.tall} w-full rounded-2xl`} />
+        ))
+        : tiles.map((t) => (
         <Button
           key={t.id}
           /* ⚠️ `tertiary` — the glyph is never brand-coloured. See QuickActions. */
@@ -996,7 +1052,7 @@ export function TileGrid({ tiles }: {
              wide, in a grid that had already made room for three identical
              ones. A row of tiles at three widths is the same fault as a crown of
              lozenges: the container was right and nothing filled it. */
-          className={`w-full flex-col h-28 ${SPACE.tight}`}
+          className={`w-full flex-col ${TILE.tall} ${SPACE.tight}`}
           onPress={t.onOpen}
         >
           {/* ⚠️ THE MARK CARRIES THE TILE. A 16px glyph in a 96px square is a
@@ -1009,7 +1065,7 @@ export function TileGrid({ tiles }: {
               a grid of grey words under marks nobody can name. */}
           <span className={TYPE.label}>{t.label}</span>
         </Button>
-      ))}
+        ))}
     </div>
   );
 }

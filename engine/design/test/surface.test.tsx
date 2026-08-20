@@ -25,7 +25,7 @@ import { Shell, reachable } from "../src/frame/shell.js";
 import { ControlRow, Group, NavRow, ToggleRow } from "../src/parts/surfaces.js";
 import { SettledSwitch } from "../src/parts/settle.js";
 import { ModelLine } from "../src/rendered/ai.js";
-import { CONTROL_SHARE } from "../src/tokens/metrics.js";
+import { CONTROL_SHARE, WHOLE } from "../src/tokens/metrics.js";
 import { crownFor } from "../src/frame/crown.js";
 import { brandCss, brandCssFor, readable, colorFor } from "../src/tokens/theme.js";
 import { ambienceStylesheet, skyWorld, worldCss } from "../src/tokens/ambience.js";
@@ -1057,7 +1057,21 @@ describe("the screen shapes", () => {
     frame rather than in any screen, so no screen could be blamed for it.
   */
   it("centres an empty screen and a refusal, and never a skeleton", () => {
-    const centred = /justify-center/;
+    /*
+      ⚠️ THE FRAME'S OWN CENTRING, NOT THE WORD ANYWHERE ON THE PAGE. A bare
+      `/justify-center/` reads any descendant that happens to centre something
+      inside itself — and one does: the bones lead wears `LEAD`, which centres a
+      glyph in a 40px circle. So the skeleton half of this test started failing
+      on a class that says nothing about where the content sits. `WHOLE` is the
+      container the frame reaches for, so that is what is matched.
+    */
+    const centred = new RegExp(WHOLE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    /* ⚠️ AND THE TOKEN'S MEANING IS PINNED SEPARATELY, or this is a tautology.
+       Building the regex from `WHOLE` asserts the frame reaches for that
+       container; it cannot also assert the container centres, because a `WHOLE`
+       edited to `justify-start` would move both sides of the comparison and the
+       test would still pass over a page that no longer centres anything. */
+    expect(WHOLE).toContain("justify-center");
 
     const wait = html(
       <Screen shape="list" title="People" of={waiting<string[]>()} then={() => null} />,

@@ -157,16 +157,35 @@ if (!seeded) ok(`seeds: no collection starts as a fact it has not learned`);
 /**
  * ⚠️ A SKELETON IS THE GEOMETRY OF WHAT IS COMING, AND A GENERIC ONE IS WORSE
  * THAN A BLANK. Its whole value is that nothing moves when the content lands;
- * get the box wrong and you have added a jump that would not have happened. So
- * each placeholder is built from the SAME metric as the component it stands in
- * for, and this asserts the pairing — a row skeleton that stops naming `ROW.tap`
- * is a list that resizes, silently, on every load.
+ * get the box wrong and you have added a jump that would not have happened.
+ *
+ * ⚠️ THERE ARE TWO WAYS TO BE RIGHT ABOUT THAT AND ONLY ONE OF THEM HOLDS. A
+ * placeholder can NAME the same metric as the component it stands in for, which
+ * is a copy that agrees today; or it can BE that component in bones mode, which
+ * cannot disagree. `TilesWaiting` was the first kind and had already drifted —
+ * `minmax(min(8rem, 100%), 1fr)` against `TileGrid`'s `min(6rem, 45%)`, so six
+ * tiles measured 236px in three columns and waited behind 360px in two. The
+ * metric it named was still correct; the geometry around it was not, which is
+ * the whole reason a matched string is a weak proxy.
  */
 const STATE = readFileSync(join(ENGINE, "design/src/parts/state.tsx"), "utf8");
+
+/**
+ * ⚠️ COMPOSED: the placeholder renders the real component under `Waiting`, so
+ * there is no second geometry to keep in step. What this asserts is only that it
+ * still does — a rewrite back to hand-drawn bars would pass every other check
+ * here and reintroduce exactly the drift above. The SIZES are asserted by
+ * `design/test/bones.test.tsx`, which measures both in a browser at two widths;
+ * a string cannot do that and should not pretend to.
+ */
+const COMPOSED = [
+  ["RowsWaiting", /<(Group|NavRow)\b/, "`Group`/`NavRow`"],
+  ["TilesWaiting", /<TileGrid\b/, "`TileGrid`"],
+];
+
+/** ⚠️ DRAWN: no component owns these shapes yet, so the named metric is all there is. */
 const SHAPED = [
-  ["RowsWaiting", /ROW\.tap/, "the row height rows actually are"],
   ["ChartWaiting", /aspect-\[320\/120\]/, "the chart frame's own aspect"],
-  ["TilesWaiting", /h-28/, "the tile height `TileGrid` draws"],
   ["TextWaiting", /w-\[55%\]/, "a short last line, which is what makes prose read as prose"],
 ];
 /*
@@ -180,19 +199,37 @@ const blockOf = (name) =>
   STATE.split(/\nexport /).find((b) => b.startsWith(`function ${name}(`)) ?? "";
 
 let shapeless = 0;
+const missing = (name) => {
+  shapeless++;
+  fail(`state.tsx: no \`${name}\` to check — if a shape is gone, drop its row here on purpose.`);
+};
+
+for (const [name, draws, what] of COMPOSED) {
+  const block = blockOf(name);
+  if (!block) missing(name);
+  else if (!draws.test(block)) {
+    shapeless++;
+    fail(`state.tsx: \`${name}\` no longer draws ${what} (D7).\n` +
+         `       It has gone back to drawing its own bars, which is a second copy of a\n` +
+         `       geometry that already drifted once. Render the component under \`Waiting\`\n` +
+         `       and let it draw its own bones.`);
+  }
+}
+
 for (const [name, needs, what] of SHAPED) {
   const block = blockOf(name);
-  if (!block) {
-    shapeless++;
-    fail(`state.tsx: no \`${name}\` to check — if a shape is gone, drop its row here on purpose.`);
-  } else if (!needs.test(block)) {
+  if (!block) missing(name);
+  else if (!needs.test(block)) {
     shapeless++;
     fail(`state.tsx: \`${name}\` no longer uses ${what}.\n` +
          `       A placeholder at a different size than its content is a layout that jumps\n` +
          `       when the data lands, which is worse than one that was briefly blank.`);
   }
 }
-if (!shapeless) ok(`shaped: ${SHAPED.length} skeleton(s), each the geometry of its content`);
+if (!shapeless) {
+  ok(`shaped: ${COMPOSED.length} skeleton(s) drawn by the component itself, ` +
+     `${SHAPED.length} by their own metric`);
+}
 
 /* ------------------------------------------------------------ the arrival --- */
 
@@ -258,6 +295,49 @@ for (const entry of filesIn("one-space/src", /^main\.tsx$/)) {
   }
 }
 if (!unmounted) ok(`mounted: all ${exported.size} shared stylesheet(s) reach the document`);
+
+/* -------------------------------------------------------------- the seed --- */
+
+/**
+ * ⚠️ A GENERATED FILE NOBODY READS IS THE SHAPE THIS REPOSITORY KEEPS SHIPPING.
+ * `shapes.ts` is written by the harness that photographs the product — every
+ * number in it measured off a real screen — and it does nothing at all unless
+ * the app hands it to `seedShapes` at boot. Nothing fails if it does not: every
+ * screen falls back to its preset, which is what happened before the file
+ * existed, so the only symptom is a first visit that is worse than it looks in
+ * the diff.
+ *
+ * ⚠️ AND THE KEYS ARE CHECKED FOR A NAME THAT LEAKED. The harness makes a
+ * workspace called for the clock and stars that segment out; if it ever stops,
+ * the seed is full of addresses nobody will have — coverage on paper and a miss
+ * on every lookup. A digit-tailed segment is what that looks like.
+ */
+{
+  const seeds = filesIn("one-space/src").concat(filesIn("apps"))
+    .filter((f) => /export const SHAPES\b/.test(readFileSync(f, "utf8")));
+  for (const file of seeds) {
+    const name = rel(file);
+    /* ⚠️ THE APPS ONLY, AND THE FIRST VERSION OF THIS CHECKED THE WHOLE TREE —
+       which the DEFINITION of `seedShapes` satisfies, so the guard passed while
+       nothing called it. A check a definition can answer is a check about
+       spelling. */
+    const reached = filesIn("one-space/src").concat(filesIn("apps"))
+      .some((f) => /(?<!export function )\bseedShapes\s*\(/.test(readFileSync(f, "utf8")));
+    if (!reached) {
+      fail(`${name}: measured, generated, and handed to nobody.\n`
+        + `       Nothing calls \`seedShapes\`, so every screen still waits behind its\n`
+        + `       shape's preset and the file is a diff that changed no pixels.`);
+    }
+    for (const [, key] of readFileSync(file, "utf8").matchAll(/^\s+"([^"]+)":/gm)) {
+      if (/\/[a-z-]*\d{3,}(?:\/|$)/.test(key)) {
+        fail(`${name}: "${key}" carries a name from the run that generated it.\n`
+          + `       No person will ever have that address, so the entry is a lookup that\n`
+          + `       always misses. The varying segment is starred — see \`varying\`.`);
+      }
+    }
+  }
+  if (seeds.length) ok(`seed: ${seeds.length} generated shape map(s), reached and addressable`);
+}
 
 /* ------------------------------------------------------------- the frames --- */
 

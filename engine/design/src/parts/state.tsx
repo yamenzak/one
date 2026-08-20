@@ -29,7 +29,9 @@ import type { Problem } from "@engine/kernel";
 import { TYPE } from "../tokens/type.js";
 import { EMPTY_PAD, EMPTY_READ, NUDGE, PAD, ROW, SPACE } from "../tokens/metrics.js";
 import { ARRIVE } from "../tokens/motion.js";
-import { Group } from "./surfaces.js";
+import { Waiting, blanks } from "./bones.js";
+import { whoFace } from "./face.js";
+import { Group, NavRow, TileGrid } from "./surfaces.js";
 
 /* ----------------------------------------------------------------- loaded --- */
 
@@ -363,23 +365,40 @@ export function Working({ says }: { readonly says?: string }) {
  * fourth kind of motion in a system that has three.
  */
 
-/** ⚠️ `ROW.tap` — the same 64px a real row is, so a list does not resize. */
+/**
+ * ⚠️ REAL ROWS IN A REAL CARD, DRAWN AS BONES — not a copy of their measurements.
+ * This wrote `ROW.gap ROW.tap ROW.pad` out for itself and came to 72px against a
+ * `NavRow`'s 80: measured, 24px short over three rows, so every list shifted up
+ * when it landed. The row's geometry is the row's, and the only thing left here
+ * is how many of them and whether they have a face.
+ */
+const BONE_FACE = whoFace("bone");
+/*
+  ⚠️ NEVER RENDERED, AND NOT BLANK EITHER. Under `Waiting` a row draws bars and
+  reads only whether there IS a second line and a face — so an empty string is
+  falsy and quietly asks for a ONE-line row, which is 8px shorter than the two
+  this has always drawn. Measured as 24px missing over three rows, by the check
+  that exists for exactly this.
+*/
+const SOME = "…";
+/** ⚠️ A handler a placeholder can never reach — nothing under `Waiting` is pressable. */
+const NOTHING = () => undefined;
+
 export function RowsWaiting({ rows = 3, lead = true }: {
   readonly rows?: number;
   readonly lead?: boolean;
 }) {
   return (
-    <Group>
-      {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className={`flex items-center ${ROW.gap} ${ROW.tap} ${ROW.pad}`}>
-          {lead ? <Skeleton className="size-10 shrink-0 rounded-full" /> : null}
-          <div className={`flex min-w-0 grow flex-col ${SPACE.tight}`}>
-            <Skeleton className="h-4 w-2/5 rounded-full" />
-            <Skeleton className="h-3 w-3/5 rounded-full" />
-          </div>
-        </div>
-      ))}
-    </Group>
+    <Waiting>
+      <Group>
+        {blanks(rows).map((b) => (
+          /* ⚠️ A SEED THAT DRAWS NOTHING, because the row only asks whether
+             there IS a face — under `Waiting` it is a circle, and the drawing
+             behind it is never rendered. */
+          <NavRow key={b.id} label={SOME} under={SOME} face={lead ? BONE_FACE : undefined} />
+        ))}
+      </Group>
+    </Waiting>
   );
 }
 
@@ -414,17 +433,24 @@ export function ChartWaiting() {
   );
 }
 
-/** ⚠️ `h-28`, which is what `TileGrid` draws. */
+/**
+ * ⚠️ THE REAL GRID, DRAWN AS BONES. This wrote its own
+ * `minmax(min(8rem, 100%), 1fr)` against `TileGrid`'s `min(6rem, 45%)`, so six
+ * tiles measured 236px in three columns and waited behind 360px in two — half a
+ * screen taller, in the wrong shape, and the page jumped 124px on landing. The
+ * columns are a property of the container, so the container is shared.
+ */
 export function TilesWaiting({ tiles = 4 }: { readonly tiles?: number }) {
+  /* ⚠️ THE GRID'S PROPS STAY REQUIRED, AND THE PLACEHOLDER FILLS THEM. Making
+     `label`, `icon` and `onOpen` optional so this could omit them would loosen
+     a real component's contract for the sake of its own stand-in — and the next
+     caller to forget a label would typecheck. */
   return (
-    <div
-      className={`grid ${SPACE.snug}`}
-      style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(8rem, 100%), 1fr))" }}
-    >
-      {Array.from({ length: tiles }, (_, i) => (
-        <Skeleton key={i} className="h-28 w-full rounded-2xl" />
-      ))}
-    </div>
+    <Waiting>
+      <TileGrid
+        tiles={blanks(tiles).map((b) => ({ ...b, label: "", icon: null, onOpen: NOTHING }))}
+      />
+    </Waiting>
   );
 }
 

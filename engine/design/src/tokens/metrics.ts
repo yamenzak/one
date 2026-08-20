@@ -143,6 +143,13 @@ export const CONTROL_SHARE = "max-w-[45%]" as const;
 export const TILE = {
   panel: "size-20 rounded-[1.25rem] text-4xl font-semibold",
   chip: "size-8 rounded-[0.5rem] text-sm font-semibold",
+  /**
+   * ⚠️ THE HEIGHT OF A TILE IN `TileGrid`, AND ITS PLACEHOLDER'S. Two elements
+   * are drawn at it — the tile and the bones it waits behind — so it is a
+   * number reviewed once here rather than a literal in each, which is what a
+   * placeholder drifting from its content looks like at the start.
+   */
+  tall: "h-28",
 } as const;
 
 /**

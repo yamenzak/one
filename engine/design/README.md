@@ -167,11 +167,11 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 67 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 56 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 143 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 148 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 55 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**361 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**366 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -204,6 +204,7 @@ there is no deep import, and a guard says so.
 - `parts/arrange.tsx` — `Center`, `Cluster`, `Columns`, `Grid`, `Rail`, `Row`, `Spacer`, `Stack`
 - `parts/beside.tsx` — `Hint`, `Pip`
 - `parts/blocks.tsx` — `Crumbs`, `Document`, `Faq`, `Gauge`, `Hotkey`, `Moment`, `PageTabs`, `Reveal`, `Step`, `Steps`, `TabSpec`, `Timeline`
+- `parts/bones.tsx` — `blanks`, `useBones`, `Waiting`
 - `parts/credits.tsx` — `Credits`, `CreditsProps`
 - `parts/face.tsx` — `appFace`, `Face`, `FaceKind`, `FaceOf`, `FaceProps`, `FaceSize`, `faceUri`, `ONE_FACE`, `Orb`, `placeFace`, `whoFace`, `worldFor`
 - `parts/forms.tsx` — `Agree`, `Choice`, `CodeEntry`, `DateInput`, `Dates`, `Dial`, `LongText`, `Lookup`, `MoneyInput`, `NumberInput`, `NumberInputProps`, `OneOf`, `Option`, `PeriodId`, `PeriodInput`, `PERIODS`, `Picks`, `Said`, `SearchInput`, `SecretInput`, `Segmented`, `spanOf`, `Tags`, `Tail`, `TextInput`, `TextInputProps`, `TimeInput`
@@ -213,7 +214,7 @@ there is no deep import, and a guard says so.
 - `parts/opening.tsx` — `Opening`, `OpeningProps`
 - `parts/permission.tsx` — `Permission`, `PermissionRow`, `PermissionRowProps`
 - `parts/pick-file.tsx` — `PickFile`, `PickFileProps`
-- `parts/recall.tsx` — `Block`, `ShapeWaiting`, `useRecalledShape`
+- `parts/recall.tsx` — `Block`, `seedShapes`, `shapeFor`, `ShapeWaiting`, `useRecalledShape`
 - `parts/said.tsx` — `Amount`, `Clock`, `Dated`, `machineHere`, `Num`, `Presenting`, `Size`, `useAmount`, `useDay`, `useDays`, `useFigures`, `useShown`, `When`
 - `parts/settle.tsx` — `SettledProps`, `SettledSwitch`
 - `parts/state.tsx` — `Await`, `AwaitProps`, `ChartWaiting`, `FigureWaiting`, `FormWaiting`, `Loaded`, `Nothing`, `nothingIn`, `ready`, `RowsWaiting`, `TableWaiting`, `TextWaiting`, `TilesWaiting`, `trouble`, `Trouble`, `waiting`, `Working`

@@ -24,7 +24,7 @@
  * produces convincing photographs of the previous design.
  */
 
-import { mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 /* ⚠️ node:http, not fetch — undici REFUSES a `host` header and silently sends
@@ -51,6 +51,11 @@ const playwright = async () => {
 const PORT = Number(process.argv[2] ?? 8099);
 const LOG = process.argv[3] ?? "/tmp/wone.log";
 const OUT = process.argv[4] ?? "/tmp/shots";
+/*
+  ⚠️ AND THE SEED, WHICH IS THE OTHER THING THIS RUN PRODUCES. Photographs are
+  for a person; the geometry is for the product — see `SEED` at the bottom.
+*/
+const SEED = join(dirname(fileURLToPath(import.meta.url)), "..", "one-space", "src", "shapes.ts");
 mkdirSync(OUT, { recursive: true });
 
 /* ⚠️ A FRESH PERSON AND A FRESH WORKSPACE EVERY RUN, so the script is
@@ -95,19 +100,49 @@ const get = (host, path, cookie) => new Promise((resolve, reject) => {
   req.end();
 });
 
+/**
+ * ⚠️ READ OUT OF THE LETTER, NOT OUT OF A LOG LINE ABOUT ONE. This matched
+ * `[sign-in] <email> → 123456`, which the mailer stopped printing when mail
+ * moved behind one sender — so every run of this script died at the first step
+ * with "no code was logged — is ENVIRONMENT=development?", which is a question
+ * about the config and the config was fine. What is printed now is the letter
+ * itself (`runtime/src/mail.ts`), and the subject line carries the code.
+ *
+ * ⚠️ AND IT IS MATCHED ON THE ADDRESS AND THE SUBJECT TOGETHER. A run makes a
+ * fresh person every time, so a log with yesterday's sign-ins in it has several
+ * six-digit numbers in it and only one of them is ours.
+ */
 const codeFor = (email) => {
-  const lines = readFileSync(LOG, "utf8").split("\n").filter((l) => l.includes(`[sign-in] ${email}`));
-  const last = lines.at(-1);
-  return last?.match(/→\s*(\d{6})/)?.[1] ?? null;
+  const said = readFileSync(LOG, "utf8").split("\n")
+    .filter((l) => l.includes(`to=${email}`) && l.includes("sign-in code"));
+  /* ⚠️ ANCHORED ON THE SUBJECT, BECAUSE THE ADDRESS HAS DIGITS IN IT TOO. A run
+     makes a fresh person named for the clock — `sam+1787228440869@example.com` —
+     and a bare six-digit match takes the first six of the timestamp. It reports
+     as a 401 two steps later, about a code that was read from the wrong half of
+     the line. */
+  return said.at(-1)?.match(/subject="(\d{6}) is your sign-in code"/)?.[1] ?? null;
 };
 
 const cookieOf = (out) => out.cookies.map((c) => c.split(";")[0]).join("; ");
 
 console.log("signing in as", EMAIL);
 await call("id.localhost", "/api/me.code", { email: EMAIL });
-await new Promise((r) => setTimeout(r, 400));
-const code = codeFor(EMAIL);
-if (!code) throw new Error("no code was logged — is ENVIRONMENT=development?");
+/* ⚠️ POLLED, NOT SLEPT. The worker's log is written by another process and
+   flushed when it feels like it; a fixed wait was long enough on the machine it
+   was written on and short enough here that the code arrived after the script
+   had given up — which reports as `401 NO COOKIE` two steps later, about a code
+   that was never read. */
+let code = null;
+for (let i = 0; i < 40 && !code; i++) {
+  code = codeFor(EMAIL);
+  if (!code) await new Promise((r) => setTimeout(r, 250));
+}
+if (!code) {
+  throw new Error(`no sign-in code for ${EMAIL} in ${LOG}.\n`
+    + `  The development mailer prints the letter it would have sent; if there is`
+    + ` no [mail] line at all,\n  ENVIRONMENT is not development. If there is one`
+    + ` and this still failed, its shape has changed — see codeFor.`);
+}
 
 const exchanged = await call("id.localhost", "/api/me.session", { email: EMAIL, code });
 const cookie = cookieOf(exchanged);
@@ -186,6 +221,25 @@ const b = await chromium.launch({
   args: ["--host-resolver-rules=MAP *.localhost 127.0.0.1"],
 });
 
+/* ⚠️ ONE ENTRY PER PATH, AND THE LAST WRITER WINS — the light pass measures the
+   same screens as the dark one and gets the same numbers, because nothing here
+   is sized by the theme. */
+const shapes = new Map();
+
+/**
+ * ⚠️ THE WORKSPACE IN THE ADDRESS IS A NAME, NOT A SCREEN, AND WITHOUT THIS THE
+ * SEED FOR EVERY WORKSPACE SCREEN IS DEAD ON ARRIVAL. Each run makes a workspace
+ * called for the clock, so `/space/w/northwind61586/brand` is a key no person
+ * will ever have — and the entry sits in the file looking like coverage.
+ *
+ * ⚠️ AND IT IS RIGHT BEYOND THE HARNESS: two workspaces' brand screens are the
+ * same screen, so starring the slug is what lets the SECOND workspace somebody
+ * opens be exact on its first visit rather than starting over. The generator
+ * decides what varies because the generator is the one that knows; `recall` only
+ * has to understand that a starred segment matches any one segment.
+ */
+const varying = (path) => path.split("/").map((seg) => (seg === SLUG ? "*" : seg)).join("/");
+
 for (const scheme of ["dark", "light"]) {
   for (const shot of SHOTS) {
     const c = await b.newContext({
@@ -218,8 +272,68 @@ for (const scheme of ["dark", "light"]) {
       .catch((e) => console.log(` [shot:${shot.id}]`, e.message.slice(0, 60)));
     const text = (await p.innerText("body").catch(() => "")).slice(0, 130).replace(/\n+/g, " / ");
     console.log(`${out}  "${text}"`);
+    /*
+      ⚠️ THE PRODUCT'S OWN MEASUREMENT, READ BACK — NOT A SECOND ONE WRITTEN
+      HERE. `useRecalledShape` has already measured this screen and put it in
+      session storage under `one.shape.<path>`; re-implementing the same walk in
+      this script would be two definitions of "the shape of a screen", and the
+      one nobody runs is the one that drifts. Whatever the component stores is
+      exactly what is seeded, by construction.
+    */
+    for (const [path, blocks] of Object.entries(await p.evaluate(() => {
+      const out = {};
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key?.startsWith("one.shape.")) {
+          try { out[key.slice("one.shape.".length)] = JSON.parse(sessionStorage.getItem(key)); }
+          catch { /* somebody else's key */ }
+        }
+      }
+      return out;
+    }).catch(() => ({})))) shapes.set(varying(path), blocks);
     await c.close();
   }
 }
 await b.close();
+
+/* ------------------------------------------------------------ the seed --- */
+
+/**
+ * ⚠️ WHAT A SCREEN LOOKS LIKE BEFORE ANYBODY HAS SEEN IT. `recall` is exact from
+ * the second visit and has nothing to go on for the first — and because it keeps
+ * what it measures in SESSION storage, "the first visit" is the first visit in
+ * every tab, not once ever. This is that first visit, measured here, from the
+ * real screens with real data in them.
+ *
+ * ⚠️ AND A STALE SEED IS SAFE IN A WAY MOST GENERATED THINGS ARE NOT. It is used
+ * for one paint and then replaced by what the screen actually drew, so a screen
+ * that changed since the last run waits behind slightly-wrong bars for a frame
+ * instead of the generic preset's very-wrong ones. It degrades to today.
+ */
+const sorted = [...shapes.entries()].sort(([a], [b]) => a.localeCompare(b));
+writeFileSync(SEED, [
+  "/**",
+  " * WHAT EACH SCREEN MEASURED, SO THE FIRST VISIT IS NOT A GUESS.",
+  " *",
+  " * ⚠️ GENERATED — `node engine/scripts/shots.mjs`. Every number here was read",
+  " * off a real screen, in a real browser, holding real data: the harness that",
+  " * photographs the product also reads back what `useRecalledShape` measured,",
+  " * so this file and the runtime cannot disagree about what a shape is.",
+  " *",
+  " * ⚠️ AND IT IS ONLY THE FIRST PAINT. `recall` replaces every one of these with",
+  " * what the screen actually drew, on the first render after it arrives — so a",
+  " * screen that has changed since this was generated costs one frame of",
+  " * slightly-wrong bars rather than the generic preset's very-wrong ones.",
+  " */",
+  "",
+  'import type { Block } from "@engine/design";',
+  "",
+  "export const SHAPES: Readonly<Record<string, readonly Block[]>> = {",
+  ...sorted.map(([path, blocks]) =>
+    `  ${JSON.stringify(path)}: ${JSON.stringify(blocks)},`),
+  "};",
+  "",
+].join("\n"));
+console.log(`seeded ${sorted.length} screen(s) -> ${SEED}`);
+
 console.log("done");

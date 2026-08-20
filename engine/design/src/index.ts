@@ -18,6 +18,7 @@ export * from "./parts/surfaces.js";
 export * from "./parts/pick-file.js";
 export * from "./parts/permission.js";
 export * from "./parts/state.js";
+export * from "./parts/bones.js";
 export * from "./parts/recall.js";
 export * from "./parts/settle.js";
 export * from "./frame/screen.js";

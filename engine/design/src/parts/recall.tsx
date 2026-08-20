@@ -17,10 +17,11 @@
  * real render is exact by construction and cannot go stale: what is remembered
  * is what was drawn.
  *
- * ⚠️ AND IT IS THE FIRST VISIT THAT IS THE HONEST LIMIT. Nothing has been drawn
- * yet, so there is nothing to remember and the screen falls back to its shape's
- * own skeleton — the behaviour that shipped before this file. Every visit after
- * that, including the cold boot after a reload, is exact.
+ * ⚠️ AND THE FIRST VISIT WAS THE HONEST LIMIT — nothing has been drawn, so there
+ * is nothing to remember. It is SEEDED now: the harness that photographs the
+ * real product reads back what this file stored and ships it as `SHAPES`, so a
+ * screen nobody has opened in this tab still waits behind its own geometry
+ * rather than its shape's generic one. See `seedShapes`.
  */
 
 import * as React from "react";
@@ -106,13 +107,91 @@ const keep = (key: string, blocks: readonly Block[]): void => {
   try { sessionStorage.setItem(AT + key, JSON.stringify(blocks)); } catch { /* full */ }
 };
 
+/**
+ * WHAT THE SCREENS MEASURED BEFORE ANYBODY OPENED THEM.
+ *
+ * ⚠️ THE FIRST VISIT WAS THE HONEST LIMIT AND IT IS A BIGGER ONE THAN IT SOUNDS.
+ * What is kept lives in SESSION storage — per tab, deliberately, so it never
+ * becomes a stale artefact somebody has to clear — which means "the first visit"
+ * is the first visit in every tab and after every cold boot, not once ever. That
+ * is precisely the moment a skeleton earns its keep, and it was the moment with
+ * nothing behind it.
+ *
+ * ⚠️ SO THE DEPLOYMENT HANDS ITS OWN MEASUREMENTS IN, ONCE, AT BOOT. Not a
+ * default baked in here: this package draws for every app, and one product's
+ * screen shapes shipped to another is worse than no seed at all. The map comes
+ * from the harness that photographs the real product (`scripts/shots.mjs`),
+ * which reads back exactly what `useRecalledShape` stored — so the seed and the
+ * runtime cannot disagree about what a shape is.
+ *
+ * ⚠️ AND IT IS THE WEAKEST CLAIM IN THE CHAIN, WHICH IS WHY IT IS LAST. What
+ * this tab measured beats what some browser measured at build time, always: the
+ * seed answers only when there is nothing else, and it is replaced by the real
+ * geometry on the first render after the screen arrives.
+ */
+let seeded: Readonly<Record<string, readonly Block[]>> = {};
+
+export function seedShapes(shapes: Readonly<Record<string, readonly Block[]>>): void {
+  seeded = shapes;
+}
+
+/**
+ * ⚠️ A STARRED SEGMENT MATCHES ANY ONE SEGMENT, AND THAT IS THE WHOLE PATTERN
+ * LANGUAGE. Half the addresses in a product have a NAME in them — a workspace, a
+ * record — and the screen is the same screen whichever one it is. Without this
+ * the seed for every such screen is a key nobody will ever have, sitting in the
+ * file looking like coverage; with it, the second workspace somebody opens is
+ * exact on its first visit rather than starting over.
+ *
+ * ⚠️ THE GENERATOR DECIDES WHAT VARIES, NOT THIS. Which segment is a name is a
+ * fact about an app's routes, and this package has no route table and is not
+ * getting one — it only has to understand a star. See `varying` in the harness.
+ *
+ * ⚠️ AND AN EXACT KEY ALWAYS WINS. A pattern is a generalisation, so a screen
+ * that measured itself under its own full address is the better answer whenever
+ * there is one.
+ */
+/*
+  ⚠️ EXPORTED SO IT CAN BE CHECKED WITHOUT A BROWSER. Everything around it needs
+  a `location` and a render; this is the whole of the decision and it is pure, so
+  it is the one piece worth taking a dependency on being right.
+*/
+export const shapeFor = (
+  seeds: Readonly<Record<string, readonly Block[]>>, key: string,
+): readonly Block[] | undefined => {
+  const exact = seeds[key];
+  if (exact) return exact;
+  const want = key.split("/");
+  for (const [pattern, blocks] of Object.entries(seeds)) {
+    if (!pattern.includes("*")) continue;
+    const has = pattern.split("/");
+    if (has.length !== want.length) continue;
+    if (has.every((seg, i) => seg === "*" || seg === want[i])) return blocks;
+  }
+  return undefined;
+};
+
 const recall = (key: string): readonly Block[] | null => {
-  try {
-    const held = sessionStorage.getItem(AT + key);
-    if (!held) return null;
-    const read = JSON.parse(held) as readonly Block[];
-    return Array.isArray(read) && read.length ? read.slice(0, MOST_BLOCKS) : null;
-  } catch { return null; }
+  const held = (() => {
+    try { return sessionStorage.getItem(AT + key); } catch { return null; }
+  })();
+  if (held) {
+    try {
+      const read = JSON.parse(held) as readonly Block[];
+      if (Array.isArray(read) && read.length) return read.slice(0, MOST_BLOCKS);
+    } catch { /* somebody else's key, or a half-written one */ }
+  }
+  /* ⚠️ CLAMPED LIKE EVERYTHING ELSE READ FROM OUTSIDE. A seed is a file some
+     other version of the app generated, and a block count out of range is a page
+     of ten thousand skeleton rows rather than a bug to trust. */
+  const born = shapeFor(seeded, key);
+  return Array.isArray(born) && born.length
+    ? born.slice(0, MOST_BLOCKS).map((b) => ({
+      head: clamp(b.head, TALLEST),
+      rows: clamp(b.rows, MOST_ROWS),
+      height: clamp(b.height, TALLEST),
+    }))
+    : null;
 };
 
 /**
