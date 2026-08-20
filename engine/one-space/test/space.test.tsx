@@ -17,6 +17,11 @@ import { Signpost } from "../src/screens/Signpost.js";
 import { Elsewhere } from "../src/screens/Elsewhere.js";
 import { Editor } from "../src/centre/Brand.js";
 import { subjectOf } from "../src/space/OneSpace.js";
+/* ⚠️ The three screens the deployment's own infrastructure is read on — see
+   the last describe in this file. */
+import { Shards } from "../src/console/Shards.js";
+import { Stores } from "../src/console/Stores.js";
+import { Pass } from "../src/console/Pass.js";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node);
 
@@ -355,5 +360,29 @@ describe("whose screen this is", () => {
      from nothing would be a different person's light for one frame. */
   it("has no subject for the account before anybody is known", () => {
     expect(subjectOf({ at: "home" } as never, null)).toBeUndefined();
+  });
+});
+
+/**
+ * THE THREE INFRASTRUCTURE SCREENS DRAW SOMETHING BEFORE THEIR DATA ARRIVES.
+ *
+ * ⚠️ ONE SCREEN BECAME THREE, AND A SPLIT IS WHERE JSX BREAKS. The inventory
+ * page held four subjects — capacity, stores, the plan, and a move in flight —
+ * and each half moved to the page it belongs on. What a compiler cannot see is
+ * a card left outside the fragment it was cut from or a hook called under a
+ * branch: both render nothing, and a blank screen and a screen still loading
+ * are the same picture (this file's own header).
+ *
+ * ⚠️ RENDERED WITH NO ANSWER, WHICH IS THE STATE THAT SHIPS FIRST. `useLoad`
+ * starts at `waiting` and its effect never runs here, so what this draws is the
+ * skeleton every operator sees for the length of a round trip.
+ */
+describe("the screens the deployment's own infrastructure is read on", () => {
+  it("each mount and draw their waiting state", () => {
+    for (const [name, Screen] of [
+      ["shards", Shards], ["stores", Stores], ["pass", Pass],
+    ] as const) {
+      expect(html(<Screen />).length, name).toBeGreaterThan(0);
+    }
   });
 });

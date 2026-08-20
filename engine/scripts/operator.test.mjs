@@ -13,7 +13,7 @@
  * D12 failure, invisibly, for agents only.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -128,6 +128,55 @@ if (!/maintenanceMode\(wiring\.directory\)/.test(serve)) {
            `       and identically to one that genuinely has nothing.`);
     } else {
       ok(`wired: the deployment supplies all ${declared.length} of the console's dependencies`);
+    }
+  }
+}
+
+/* ---------------------------------------------------------------- surface --- */
+
+/**
+ * ⚠️ EVERY OPERATOR READ IS DRAWN BY A SCREEN, AND ONE WAS NOT. `op.infra.verify`
+ * — the one call that answers whether the account token can actually do what the
+ * next pass needs — was declared, door-guarded, tested and asked by nothing, so a
+ * token missing a permission stayed knowable in one request and unknown until the
+ * pass half ran and reported the rest as an outage.
+ *
+ * ⚠️ READS ONLY, DELIBERATELY. A write is reached from a button whose screen this
+ * cannot see the shape of; a read exists to be shown, so a read nothing names is
+ * a question the console can ask and has no place to put the answer. That is this
+ * repository's most-repeated defect — a capability finished everywhere but the
+ * surface — and it is invisible because every suite passes.
+ */
+{
+  const reads = [...RAW.matchAll(/"(op\.[a-z.]+)":\s*\{\s*\n?\s*kind:\s*"read"/g)].map((m) => m[1]);
+  const space = join(ENGINE, "one-space/src");
+  const seen = [];
+  const walk = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/\.tsx?$/.test(p)) seen.push(readFileSync(p, "utf8"));
+    }
+  };
+  walk(space);
+  const hay = seen.join("\n");
+
+  /* ⚠️ A FLOOR ON THE COUNT, because the regex is the thing most likely to break:
+     a changed declaration shape parses zero reads and the check passes loudest
+     exactly when it has stopped working. */
+  if (reads.length < 12) {
+    fail(`runtime/src/operator.ts: only ${reads.length} read operation(s) parsed —\n` +
+         `       the declaration has changed shape, and a read with no screen would\n` +
+         `       now pass unnoticed.`);
+  } else {
+    const unread = reads.filter((id) => !hay.includes(`"${id}"`));
+    if (unread.length) {
+      fail(`one-space/src: nothing asks ${unread.join(", ")}.\n` +
+           `       A read exists to be shown, so one no screen names is an answer the\n` +
+           `       console can fetch and has nowhere to put — finished everywhere but\n` +
+           `       the surface, with every suite green.`);
+    } else {
+      ok(`shown: all ${reads.length} operator read(s) are asked by a screen`);
     }
   }
 }

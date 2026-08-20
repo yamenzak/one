@@ -51,8 +51,8 @@ import {
 /**
  * ⚠️ THIS IS NOT WHAT STOPS A BLANK SCREEN, AND IT SAID IT WAS. The old comment
  * claimed the guard reading this list is why an address always has a branch —
- * and the guard checks that a name appears HERE, which `brand` and `footing`
- * both did while the dispatch below drew neither. A list agreeing with a list
+ * and the guard checks that a name appears HERE, which `brand` and the stores
+ * screen both did while the dispatch below drew neither. A list agreeing with a list
  * proves the two lists agree.
  *
  * ⚠️ THE `never` ASSERTION AT THE END OF `Inside` IS WHAT STOPS IT NOW, because
@@ -332,7 +332,7 @@ function Inside({ where, onGo }: {
   }
 
   /* ⚠️ AND THE OPERATOR'S SIDE THE SAME WAY, which had the same hole: five of
-     the six console parts were named here and `footing` was the sixth. */
+     the six console parts were named here and the stores screen was the sixth. */
   if (atConsoleScreen(where)) {
     return (
       <ConsolePart

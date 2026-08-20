@@ -15,7 +15,8 @@
  * ⚠️ AND THE `never` AT THE END IS THE WHOLE SAFETY OF THE ADDRESS GRAMMAR. A
  * part with no branch must be a BUILD failure — without it the switch returns
  * `undefined`, React renders nothing, and the row leads to an empty screen with
- * every suite green. That is precisely how `/space/console/footing` shipped once.
+ * every suite green. That is precisely how `/space/console/stores` shipped once,
+ * under the name it had then.
  */
 
 import type * as React from "react";
@@ -25,8 +26,9 @@ import { Finding } from "./Finding.js";
 import { Gateway } from "./Gateway.js";
 import { Models } from "./Models.js";
 import { Catalogue } from "./Catalogue.js";
-import { Footing } from "./Footing.js";
-import { Ground } from "./Ground.js";
+import { Pass } from "./Pass.js";
+import { Shards } from "./Shards.js";
+import { Stores } from "./Stores.js";
 import { Keys } from "./Keys.js";
 import { Maintenance } from "./Maintenance.js";
 import { Switch } from "./Switch.js";
@@ -58,14 +60,16 @@ export function ConsoleParts({ part, app, lane, onGo }: {
     case "maintenance": return <Maintenance />;
     case "telling": return <Telling />;
     case "works": return <Works />;
-    case "ground": return <Ground />;
+    case "shards": return <Shards />;
     case "keys": return <Keys />;
-    case "footing": return <Footing />;
+    case "stores": return <Stores />;
+    case "pass": return <Pass />;
     /*
       ⚠️ A MISSING BRANCH IS A BUILD FAILURE, NOT A BLANK PAGE. Without this the
       switch simply returns `undefined` for a part nobody wrote a case for, React
       renders nothing, and the row leads to an empty screen with every suite
-      green — which is precisely how `/space/console/footing` shipped once. Same
+      green — which is precisely how the stores screen shipped once, under the
+      name it had then. Same
       assertion `Inside` makes over the whole address grammar.
     */
     default: {

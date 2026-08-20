@@ -729,6 +729,7 @@ its own header, cited by other files, and doing nothing.
 | `a-cross-app-operation-names-its-target` | D15 | the second product's packages and settings are unreachable for ever, because the route resolves whichever app is first on the tenant's list |
 | `the-console-is-on-the-operator-door-and-asks-who-is-there` | D18 | the deployment's own console answers at a workspace's address, or admits anybody holding a session, and looks exactly like working software |
 | `maintenance-is-asked-in-the-one-operation-path` | D18 | a closed deployment serves right through the agent door, or an unprovisioned switch refuses every request over our own missing row |
+| `every-operator-read-is-drawn-by-a-screen` | D18 | a question the console can ask with nowhere to put the answer - finished everywhere but the surface, with every suite green |
 | `an-app-names-a-lane-never-a-model` | D19 | a deployment decision shipped through a product release — wrong the day the provider retires the row, and different in every app, with nothing failing |
 | `an-edited-prompt-is-bounded-at-both-levels` | D19 | a variable nothing offers is sent to a model as a literal brace, and the answer comes back subtly wrong with nobody the wiser |
 | `the-run-and-the-screens-read-one-resolution` | D19 | the bill stops matching what anybody was shown, because the run used a different model or different words than the console reported |
@@ -874,7 +875,7 @@ its own header, cited by other files, and doing nothing.
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
 | D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 4 |
 | D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 4 |
-| D18 | The operator stands outside every workspace, and the console is a door rather than a role | 7 |
+| D18 | The operator stands outside every workspace, and the console is a door rather than a role | 8 |
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 3 |
 | D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 3 |
 | D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 9 |

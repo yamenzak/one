@@ -1551,6 +1551,15 @@
       "fails": "a closed deployment serves right through the agent door, or an unprovisioned switch refuses every request over our own missing row"
     },
     {
+      "id": "every-operator-read-is-drawn-by-a-screen",
+      "protects": "D18",
+      "stage": "15",
+      "status": "live",
+      "impl": "scripts/operator.test.mjs",
+      "proves": "shown:",
+      "fails": "a question the console can ask with nowhere to put the answer - finished everywhere but the surface, with every suite green"
+    },
+    {
       "id": "an-app-names-a-lane-never-a-model",
       "protects": "D19",
       "stage": "16",

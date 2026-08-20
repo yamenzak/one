@@ -54,8 +54,8 @@ describe("every address in OneSpace has a branch", () => {
   /*
     ⚠️ THIS TEST DID NOT CATCH THE THING IT WAS WRITTEN FOR, TWICE. It compares
     what the parser produces against a hand-written list of screen names — and
-    `brand` and `footing` were both on that list while the dispatch drew neither,
-    so `/space/w/<slug>/brand` and `/space/console/footing` rendered a blank page
+    `brand` and the stores screen were both on that list while the dispatch drew
+    neither, so `/space/w/<slug>/brand` and the console's own store list rendered a blank page
     with every suite green. A list agreeing with a list proves the two lists
     agree; it says nothing about the code.
 

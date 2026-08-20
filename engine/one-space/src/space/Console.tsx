@@ -47,8 +47,9 @@ const GLYPH: Readonly<Record<ConsolePartId, string>> = {
   maintenance: "power",
   telling: "bell",
   works: "clock",
-  ground: "database",
-  footing: "layers",
+  shards: "database",
+  stores: "layers",
+  pass: "list",
 };
 
 /**
@@ -108,7 +109,7 @@ const saidOf = (part: ConsolePartId, at: Attention | null): React.ReactNode => {
       ? needing(`${ONE(at.parked, "payment", "payments")} could not be placed`) : undefined;
     case "tenants": return at.pastDue
       ? needing(`${ONE(at.pastDue, "workspace", "workspaces")} behind on payment`) : undefined;
-    case "footing": return at.draining
+    case "stores": return at.draining
       ? needing(`${ONE(at.draining, "store", "stores")} counting down to deletion`) : undefined;
     /* ⚠️ THE ONE THAT IS NOT A COUNT. Leaving the doors shut is the mistake
        nobody makes deliberately and everybody makes once, and it is the only

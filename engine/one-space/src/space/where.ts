@@ -189,8 +189,33 @@ export type Where =
    */
   | { readonly at: "switch"; readonly id: string }
   | { readonly at: "works" }
-  | { readonly at: "ground" }
-  | { readonly at: "footing" }
+  /**
+   * ⚠️ WHERE THE WORKSPACES ARE, AND WHO IS MOVING BETWEEN. Capacity and a move
+   * in flight are one subject read two ways — a shard is full BECAUSE of who is
+   * on it, and a move is the only thing that changes that — so a bar and the
+   * copy currently running under it belong on the same page.
+   *
+   * ⚠️ IT WAS `ground`, AND THE NAME NAMED NOTHING. `one-space/src/Ground.tsx`
+   * is the design test ground; `console/Ground.tsx` was the shard map, and the
+   * two are unrelated. A grep for either found both.
+   */
+  | { readonly at: "shards" }
+  /**
+   * ⚠️ WHAT EXISTS, AND WHAT DELIBERATELY DOES NOT. The inventory and the
+   * withheld list are the same subject from both sides: a need dropped because
+   * its store cannot be held to a jurisdiction is a store that will never be in
+   * the list above it, and read apart it is a product that mysteriously does
+   * less in Europe.
+   */
+  | { readonly at: "stores" }
+  /**
+   * ⚠️ AND WHAT WOULD CHANGE, ON ITS OWN PAGE, BECAUSE IT IS THE ONE THAT ACTS.
+   * It was a fourth card under the inventory — a plan with a primary button in
+   * it, read after two lists of things that are simply true. Reading what a pass
+   * would destroy has to cost nothing and be findable on purpose, which is what
+   * an address gives it.
+   */
+  | { readonly at: "pass" }
   /**
    * ⚠️ WHAT THE DEPLOYMENT WAS TOLD — the sender it mails from, the account it
    * charges through. Without a screen these are values only a deploy can change,
@@ -240,8 +265,8 @@ export const atWorkspaceScreen = (
 
 /**
  * ⚠️ THE SAME QUESTION FOR THE OPERATOR'S SIDE, and it had the same hole one
- * screen over: the dispatch named five console parts and `footing` was the
- * sixth, so the screen that reports what the deployment stands on was built,
+ * screen over: the dispatch named five console parts and the stores screen was
+ * the sixth, so the screen that reports what the deployment stands on was built,
  * routed, registered — and drew nothing at its own address.
  */
 export const atConsoleScreen = (
@@ -257,7 +282,7 @@ export const atConsoleScreen = (
  * between them is the whole of the explanation.
  */
 export const OFTEN: readonly WorkspacePart[] = ["people", "money"];
-export const OF_CONSOLE = ["tenants", "catalogue", "ai", "keys", "switches", "maintenance", "telling", "works", "ground", "footing"] as const;
+export const OF_CONSOLE = ["tenants", "catalogue", "ai", "keys", "switches", "maintenance", "telling", "works", "shards", "stores", "pass"] as const;
 
 /**
  * ⚠️ AND WHAT IS INSIDE THE AI AREA. Listed here rather than inside the screen
@@ -570,9 +595,13 @@ export const nameOf = (where: Where): string => {
        function has no manifest. The screen names itself; see `Switch.tsx`. */
     case "switch": return "Switch";
     case "works": return "Nightly work";
-    case "ground": return "Shards";
+    case "shards": return "Shards";
     case "telling": return "Push notifications";
-    case "footing": return "What it runs on";
+    /* ⚠️ WHAT THEY ARE, NOT WHAT THEY ARE FOR. "What it runs on" was one screen
+       holding four subjects, and the title had to be vague enough to cover all
+       of them — which is the tell. */
+    case "stores": return "Stores";
+    case "pass": return "The next pass";
     case "keys": return "Keys";
   }
 };
