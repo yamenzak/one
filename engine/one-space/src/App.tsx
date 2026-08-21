@@ -22,19 +22,17 @@
 
 import * as React from "react";
 import {
-  Band, Center, Crown, Layout, NoticeHost, ONE_FACE, Opening, Shell, Spacer, Trouble,
-  whoFace,
+  NoticeHost, Opening,
 } from "@engine/design";
 
 import { OPENING_LINES } from "./opening.js";
 import { useSession } from "./session.js";
 import { useTravel } from "./nav.js";
-import type { Face } from "./door.js";
+import { signpostUrl, type Face } from "./door.js";
 import { Product } from "./centre/Product.js";
 import { OneSpace } from "./space/OneSpace.js";
 import { SPACE, inSpace, pathOf } from "./space/where.js";
 import { Agreements } from "./screens/Agreements.js";
-import { Elsewhere } from "./screens/Elsewhere.js";
 import { NewWorkspace } from "./screens/NewWorkspace.js";
 import { SignIn } from "./screens/SignIn.js";
 import { Signpost } from "./screens/Signpost.js";
@@ -111,6 +109,31 @@ export function pickScreen(
   not already know. The account door says nothing at all, because "Sign in" over
   an email field is already the whole sentence.
 */
+/*
+  ⚠️ WHAT THIS ADDRESS IS, WHEN IT IS NOT THIS BUNDLE'S. Served by this worker
+  and drawn by something else: the operator console and a workspace's own product
+  are their own surfaces, a paired device is not a browser's business, and an
+  unknown label is served by nothing at all — which is this deployment's 404.
+
+  ⚠️ THE HEADING IS THE SAME SENTENCE EVERY TIME AND THE LINE UNDER IT IS NOT.
+  What a person needs first is that they are not where they meant to be; WHICH of
+  the four it is only matters to somebody who is going to do something about it,
+  and that is the second line.
+*/
+export const ELSEWHERE_SAYS: Readonly<Record<string, string>> = {
+  operator: "Not this page",
+  tenant: "Not this page",
+  device: "Not this page",
+  none: "Nothing is here",
+};
+
+export const ELSEWHERE_UNDER: Readonly<Record<string, string>> = {
+  operator: "This is the operator console's door, and its screens are not part of OneSpace",
+  tenant: "This is a workspace's own address, and its product draws these screens",
+  device: "This address belongs to a paired device, and there is nothing here for a browser",
+  none: "Nothing is served at this address",
+};
+
 const LEAD: Readonly<Record<string, string>> = {
   create: "A workspace belongs to somebody",
   centre: "to open this workspace",
@@ -241,65 +264,81 @@ export function App() {
   */
   if (screen === "waiting") return <Opening says={OPENING_LINES} />;
 
+  /*
+    ⚠️ EVERY WAY THIS DOES NOT BECOME A PRODUCT WEARS THE CURTAIN, and until it
+    did they were cards on a half-built page. A boot that threw drew the whole
+    chrome — a crown naming the deployment, a generated sky, a reading band —
+    around a grey notice reading "One could not start", which is a page that
+    began assembling itself and stopped: the exact thing `Opening`'s own header
+    describes removing from the wait, still shipping on the screen a person is
+    most likely to be looking at when something is wrong.
+
+    ⚠️ SAME CURTAIN, NOT A SECOND ONE. A wait and a fault are the same moment
+    from outside — the product is not there — so the only thing that changes is
+    how it ends: the arc stops travelling, the O closes, and the line says why
+    instead of passing the time.
+  */
+  if (screen === "stuck" && stuck) {
+    return (
+      <Opening
+        stopped={{
+          says: stuck.title,
+          ...(stuck.detail ? { under: stuck.detail } : {}),
+          /* ⚠️ RELOADING IS THE ONLY HONEST OFFER. Whatever this was happened
+             before the app existed, so there is no state to retry from and
+             nothing here knows what to fix. */
+          offer: { label: "Try again", onDo: () => { location.reload(); } },
+        }}
+      />
+    );
+  }
+
+  /*
+    ⚠️ AND A DOOR THIS BUNDLE IS NOT IS THE SAME SCREEN, INCLUDING THE 404. An
+    address nothing is served at, an operator console, a workspace's own product
+    — from here they are all "this is not the page for this address", which is
+    the curtain with a way back rather than a card floating on a sky.
+  */
+  if (screen === "elsewhere" && where) {
+    return (
+      <Opening
+        stopped={{
+          says: ELSEWHERE_SAYS[where.kind] ?? ELSEWHERE_SAYS.none!,
+          under: ELSEWHERE_UNDER[where.kind] ?? ELSEWHERE_UNDER.none!,
+          offer: {
+            label: `Go to ${where.root}`,
+            onDo: () => { location.assign(signpostUrl(where, location)); },
+          },
+        }}
+      />
+    );
+  }
+
   if (screen === "signpost" && where) return <><NoticeHost /><Signpost where={where} /></>;
   if (screen === "sign-in") return <><NoticeHost /><SignIn lead={LEAD[face ?? ""]} /></>;
   if (screen === "new-workspace" && where) {
     return <><NoticeHost /><NewWorkspace where={where} /></>;
   }
 
-  return (
-    /*
-      ⚠️ THE DEPLOYMENT'S OWN WORLD, ON THE DOOR THAT IS THE DEPLOYMENT. Every
-      other subject in this product has a face and a ground from it — a workspace
-      is a planet on its own sky, a person is their own aura — and ONE was the
-      one identity standing on a named material like any other screen. It is
-      `blobs`: shapes with no grid at all, because the deployment is the thing
-      every workspace and every product is INSIDE, and a lattice or a horizon
-      would put it beside them instead.
+  /*
+    ⚠️ AND THE STATE THAT CANNOT HAPPEN GETS THE CURTAIN TOO. `pickScreen`
+    answers every combination, so nothing should reach this — and "nothing should
+    reach this" is how a blank page ships, which is why it was already answered
+    rather than left to fall through. What it answered WITH was the deployment's
+    whole chrome around two conditionals that are both handled above now: a page
+    assembling itself around nothing at all.
 
-      ⚠️ AND ITS TWO COLOURS ARE THE THEME'S, not a picture's. ONE's mark is
-      drawn rather than generated, so there is nothing to read — `worldFor` hands
-      the family `var(--background)` and `var(--brand)`, which is why that family
-      draws in ink and lets the ground carry the hue (`Family.ink`).
-    */
-    <Layout subject={ONE_FACE}>
-      <NoticeHost />
-      {/* ⚠️ THE LEAD IS THE ACCOUNT AND THERE IS NOWHERE FOR IT TO GO — this
-          IS OneSpace, so the face is a face rather than a button (`who` with no
-          `onOpen`). The email it used to carry as an `aside` is what the face
-          says now; the address under the name is the deployment's. */}
-      <Crown
-        who={me && me !== "nobody"
-          ? { name: me.email ?? "You", face: whoFace(me.accountId) }
-          : undefined}
-        name="One"
-        /* ⚠️ THE ONLY CROWN THAT WEARS THE LOGO, and the mark rather than the
-           lockup — the name is already beside it. Every other crown in the
-           product names a workspace, where our mark would sit over somebody
-           else's brand. */
-        mark="one"
-        width="read"
-      />
-      <Band width="read">
-        {/* ⚠️ THE RHYTHM IS `Center`'s, NOT A `gap-6` WRITTEN HERE. A frame
-            picking its own spacing is the drift `metrics` exists to refuse, and
-            this one was invisible while the class sat inside a ternary. */}
-        <div className="min-h-[68dvh] flex items-center justify-center py-8">
-          <Center space="roomy">
-            {/*
-              ⚠️ TWO STATES WORE ONE CAPTION, AND IT DESCRIBED NEITHER. `waiting`
-              is either "the door is not classified yet" or "the session is not
-              resolved yet"; it said "Getting your workspaces" for both, which is
-              a third thing that happens later and only for somebody signed in.
-              A person watching a slow boot was reading an explanation of work
-              that was not being done.
-            */}
-            {screen === "stuck" && stuck ? <Trouble problem={stuck} /> : null}
-            {screen === "elsewhere" && where ? <Elsewhere where={where} kind={where.kind} /> : null}
-          </Center>
-        </div>
-      </Band>
-      <Spacer />
-    </Layout>
+    ⚠️ IT NAMES ITSELF AS OURS. There is no instruction to give somebody here
+    because there is nothing they did and nothing they can do; what an honest
+    screen owes is that this is our fault and a way back to a page that works.
+  */
+  return (
+    <Opening
+      stopped={{
+        says: "This is not a screen",
+        under: "Something here is wrong on our side, and nothing you did caused it",
+        offer: { label: "Try again", onDo: () => { location.reload(); } },
+      }}
+    />
   );
 }

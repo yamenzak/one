@@ -99,7 +99,7 @@ for (const file of FILES) {
   const line = src.slice(0, hits[0].index).split("\n").length;
   fail(`${rel(file)}:${line} builds a Card (${hits.length}×).\n`
     + `       Use \`Group\` — heading, world, foot slot, and the product's inset.\n`
-    + `       A centred panel is \`Sheet\`; a destination is \`Place\`.\n`
+    + `       A centred panel is a \`Group\` inside a \`Center\`; a destination is \`Place\`.\n`
     + `       \`<Card>\` itself belongs to ${HOME} and nowhere else.`);
 }
 if (bad === 0) ok(`no Card built outside ${HOME} (${looked} files)`);

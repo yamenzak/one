@@ -168,12 +168,12 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 67 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 58 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 162 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 161 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 | `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | internal |
 
-**380 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**379 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -222,7 +222,7 @@ there is no deep import, and a guard says so.
 - `parts/said.tsx` — `Amount`, `Clock`, `Dated`, `machineHere`, `Num`, `Presenting`, `Size`, `Unit`, `useAmount`, `useDay`, `useDays`, `useFigures`, `useShown`, `When`
 - `parts/settle.tsx` — `SettledProps`, `SettledSwitch`
 - `parts/state.tsx` — `Await`, `AwaitProps`, `both`, `ChartWaiting`, `FigureWaiting`, `FormWaiting`, `Loaded`, `Nothing`, `nothingIn`, `ready`, `RowsWaiting`, `TableWaiting`, `TextWaiting`, `TilesWaiting`, `trouble`, `Trouble`, `waiting`, `Working`
-- `parts/surfaces.tsx` — `ActionRow`, `AmountRow`, `BrandTile`, `ControlRow`, `CopyRow`, `FieldRow`, `Group`, `GroupProps`, `Identity`, `Money`, `NavRow`, `NavRowProps`, `NoteRow`, `OfferRow`, `PersonRow`, `Place`, `QuickActions`, `SeeAll`, `Sheet`, `StepRow`, `Swatch`, `TileGrid`, `ToggleRow`
+- `parts/surfaces.tsx` — `ActionRow`, `AmountRow`, `BrandTile`, `ControlRow`, `CopyRow`, `FieldRow`, `Group`, `GroupProps`, `Identity`, `Money`, `NavRow`, `NavRowProps`, `NoteRow`, `OfferRow`, `PersonRow`, `Place`, `QuickActions`, `SeeAll`, `StepRow`, `Swatch`, `TileGrid`, `ToggleRow`
 - `parts/tally.tsx` — `Tally`, `TallyProps`
 - `parts/viewfinder.tsx` — `Viewfinder`, `ViewfinderProps`
 

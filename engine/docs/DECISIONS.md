@@ -1383,3 +1383,35 @@ what is still below the fold is on its way under the nav.
 sixth item in the bar; a fifth slot labelled "More"; a hem that is opaque with
 nothing behind it; or a hem that eases its very first answer, which is an
 interface visibly undoing itself in front of somebody who has just arrived.
+
+## D47 — One screen draws every moment One cannot show you a screen
+
+**A deployment has four ways of having nothing to render, and they were four
+screens.** One is starting; one stopped starting; the host is not a workspace;
+the route is not a screen. The first was the curtain — the wordmark, the turning
+O, a line that changes — and the other three were plain centred text, each with
+its own spacing, its own weight, its own idea of where the message sits. Nobody
+ever saw two of them together, which is why they drifted for as long as they did.
+
+**They are one component with a `stopped`, and the difference is the ring.** While
+One is starting the ring turns and the line rotates through what is being done;
+when it has stopped the ring COMPLETES and the line is replaced by the statement.
+Same gradient, same grain, same wordmark, same place on the page — so the four
+moments read as one product having four things to say rather than four screens
+built by four people.
+
+**The completed ring is the whole of the state change, and that is deliberate.**
+An error page that arrives with an alarm on it makes somebody's ordinary
+mistyped URL feel like a fault they caused. The curtain stops, says the thing in
+one line, and offers the one action there is — try again, go to the signpost, or
+nothing at all when there is nothing to offer.
+
+**And a stopped curtain is `role="alert"` rather than `role="status"`**, because
+it is the end of the wait rather than a report on it.
+
+**Therefore never:** a standard page with its own layout; an error state that
+keeps a spinner turning behind it, which says the wait is continuing when it has
+ended; an apology or a fault code on a page a person reached by typing; a
+"contact support" with no address behind it; or a third component that means
+"a centred panel" — that is a `Group` inside a `Center`, which is why `Sheet` is
+gone.

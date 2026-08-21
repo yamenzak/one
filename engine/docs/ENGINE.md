@@ -959,6 +959,7 @@ its own header, cited by other files, and doing nothing.
 | D44 | The sender is the deployment's, the reply and the words are the workspace's | 0 |
 | D45 | A membership is narrowed to part of a workspace, and one filter applies everywhere | 1 |
 | D46 | Five is what a phone's bar holds, not what an app may have | 0 |
+| D47 | One screen draws every moment One cannot show you a screen | 0 |
 <!-- /generated -->
 
 ---
@@ -1061,8 +1062,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 72 | An operation's declared input is checked at the door, and `now` is one type | shipped |
 | 73 | The other half of OneInventory, driven — and the quarantine that was a badge on a screen | shipped |
 | 74 | The foot of a phone is a vignette, and everywhere an app declares is reachable from it | shipped |
+| 75 | A raw ALTER is a 503 on every door, and every standard page wears the curtain | shipped |
 
-**64 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**65 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

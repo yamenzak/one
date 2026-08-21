@@ -30,12 +30,13 @@
  */
 
 import * as React from "react";
+import { Button } from "@heroui/react";
 import { GRAIN, GRAIN_OPACITY } from "../tokens/ambience.js";
 import { CURTAIN } from "../tokens/ground.js";
 import { SAID, useStillness } from "../tokens/motion.js";
 import { WIDTH } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
-import { Center } from "./arrange.js";
+import { Center, Stack } from "./arrange.js";
 
 /* ------------------------------------------------------------------ the O --- */
 
@@ -112,7 +113,7 @@ const SWEEP = 25;
  * "logo with a spinner in it" gets wrong. The arc is a highlight travelling
  * around a letter that is always fully drawn.
  */
-function TurningO() {
+function TurningO({ done = false }: { readonly done?: boolean }) {
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
@@ -139,24 +140,30 @@ function TurningO() {
         marginInlineEnd: `${O.after}em`,
       }}
     >
+      {/* ⚠️ AT REST THE RING IS THE WHOLE LETTER, at full strength and with no
+          arc over it. The dimmed ring exists to be the TRACK an arc runs on;
+          left dim under a stopped screen it reads as a letter that failed to
+          draw, and left there WITH the arc it reads as a page that has hung. */}
       <ellipse
         data-opening="ring"
         cx={W / 2}
         cy={H / 2}
         rx={(W - S) / 2}
         ry={(H - S) / 2}
-        opacity={0.26}
+        opacity={done ? 1 : 0.26}
       />
-      <ellipse
-        data-opening="arc"
-        cx={W / 2}
-        cy={H / 2}
-        rx={(W - S) / 2}
-        ry={(H - S) / 2}
-        pathLength={RUN}
-        strokeLinecap="round"
-        strokeDasharray={`${SWEEP} ${RUN - SWEEP}`}
-      />
+      {done ? null : (
+        <ellipse
+          data-opening="arc"
+          cx={W / 2}
+          cy={H / 2}
+          rx={(W - S) / 2}
+          ry={(H - S) / 2}
+          pathLength={RUN}
+          strokeLinecap="round"
+          strokeDasharray={`${SWEEP} ${RUN - SWEEP}`}
+        />
+      )}
     </svg>
   );
 }
@@ -175,6 +182,31 @@ export interface OpeningProps {
   readonly says?: readonly string[];
   /** The name on the curtain. Its first letter is the one that turns. */
   readonly name?: string;
+  /**
+   * THE CURTAIN THAT DOES NOT LIFT — a fault, a door that is not this one, an
+   * address nothing is served at.
+   *
+   * ⚠️ IT IS THIS COMPONENT RATHER THAN A SECOND ONE, AND THAT IS THE WHOLE
+   * POINT. These are the same moment as a wait: the product is not there. Drawn
+   * separately they were a card on a half-built page — a crown naming the
+   * deployment, a generated sky, and a notice in the middle of it — which is a
+   * page that started building itself and stopped, which is exactly what the
+   * paragraphs at the top of this file describe removing from the wait. The two
+   * cannot drift while they are one curtain.
+   *
+   * ⚠️ AND THE LETTER FINISHES. While something is happening the arc travels
+   * round the O; when it stops, the ring is simply an O — complete, still, and
+   * the sentence beneath it says why. A spinner frozen mid-turn is the picture
+   * of a page that has hung, which is the one thing a stated failure must not
+   * look like.
+   */
+  readonly stopped?: {
+    readonly says: string;
+    /** One line under it — what this is, or what to do about it. */
+    readonly under?: string;
+    /** ⚠️ The way on, where there is one. A curtain with no way out is a trap. */
+    readonly offer?: { readonly label: string; readonly onDo: () => void };
+  };
 }
 
 /**
@@ -201,7 +233,7 @@ const shuffled = (lines: readonly string[]): readonly string[] => {
   return deck;
 };
 
-export function Opening({ says, name = "One" }: OpeningProps) {
+export function Opening({ says, name = "One", stopped }: OpeningProps) {
   const still = useStillness();
   /*
     ⚠️ THE DECK IS BUILT IN THE INITIALISER, ONCE. Shuffling during render gives
@@ -209,7 +241,7 @@ export function Opening({ says, name = "One" }: OpeningProps) {
     the session resolves a step, so the line would jump through three of them on
     the way to the app.
   */
-  const [deck] = React.useState(() => shuffled(says ?? []));
+  const [deck] = React.useState(() => (stopped ? [] : shuffled(says ?? [])));
   const [at, setAt] = React.useState(0);
   const [gone, setGone] = React.useState(false);
 
@@ -260,7 +292,16 @@ export function Opening({ says, name = "One" }: OpeningProps) {
       /* ⚠️ ONE ANNOUNCEMENT, AND IT IS THE LINE. A screen reader hearing the
          name of the product every time a wait begins learns nothing; what it
          needs is that something is happening, which `status` says. */
-      role="status"
+      role={stopped ? "alert" : "status"}
+      /*
+        ⚠️ THE CURTAIN IS A DARK ISLAND AND IT SAYS SO. It does not follow the
+        theme (`CURTAIN`) — a held moment before the product exists is one moment
+        or it is two — so anything themed inside it has to be told, or a control
+        resolves against a light page's tokens and comes out as a pale button on
+        near-black. Stamping the ground is the whole fix, and it is what the
+        two hand-written colours above are working around.
+      */
+      data-theme="dark"
     >
       {/*
         ⚠️ THE DITHER, AND IT IS THE AMBIENCE'S OWN. A gradient this large and
@@ -285,7 +326,7 @@ export function Opening({ says, name = "One" }: OpeningProps) {
           name and the line is the scale's and not this file's opinion. */}
       <Center space="roomy">
         <p className={TYPE.opening} aria-label={name}>
-          <TurningO />
+          <TurningO done={Boolean(stopped)} />
           {/* ⚠️ THE FIRST LETTER IS DROPPED, NOT HIDDEN. Left in place under the
               ring it is a second O showing through the counter at every weight
               the font falls back to. */}
@@ -327,6 +368,60 @@ export function Opening({ says, name = "One" }: OpeningProps) {
             </p>
           )
           : null}
+        {/*
+          ⚠️ THE STOPPED CURTAIN'S OWN WORDS, IN THE SLOT THE ROTATING LINE USES.
+          Same place, same width, same measure — so a wait that ends in a fault
+          replaces one sentence with another rather than rebuilding the screen
+          under somebody's eyes.
+
+          ⚠️ THE FIRST LINE TAKES THE CURTAIN'S INK, NOT ITS GREY. A wait's
+          caption is the second thing on the screen and is drawn as one; a
+          statement of what went wrong is the reason the screen exists.
+        */}
+        {/* ⚠️ A `Stack`, NOT A SECOND `Center`. `Center` carries `grow`, so one
+            nested inside another takes every spare pixel of the curtain and
+            pushes the name to the top with the sentence stranded halfway down —
+            which is the layout, not the copy, and it photographs as a screen
+            that has come apart. */}
+        {stopped ? (
+          <Stack space="snug">
+            {/* ⚠️ Centred here rather than by the Stack, which is a column of
+                blocks and does not align them. */}
+            <p
+              className={`${TYPE.label} ${WIDTH.door} self-center text-center text-balance`}
+              style={{ color: shade(CURTAIN.ink) }}
+            >
+              {stopped.says}
+            </p>
+            {stopped.under ? (
+              <p
+                className={`${TYPE.note} ${WIDTH.door} self-center text-center text-balance`}
+                style={{ color: shade(CURTAIN.said) }}
+              >
+                {stopped.under}
+              </p>
+            ) : null}
+            {/*
+              ⚠️ THE CONTROL IS DRAWN HERE RATHER THAN TAKEN FROM THE LIBRARY,
+              and it is the same reason the line's colour is written out: the
+              curtain is not themed, so a `primary` resolves against tokens that
+              belong to a page this screen is not on — measured, it comes out as
+              a light button on a light theme's palette over a near-black ground.
+              A hairline in the curtain's own ink is the whole design.
+            */}
+            {/* ⚠️ THE LIBRARY'S CONTROL, ON A GROUND THAT DECLARES ITS THEME
+                (D7). Hand-drawn here it was a raw element with its own border
+                and its own padding — three rules broken to work around a ground
+                that had simply never been stamped. */}
+            {stopped.offer ? (
+              <span className="self-center">
+                <Button variant="secondary" onPress={stopped.offer.onDo}>
+                  {stopped.offer.label}
+                </Button>
+              </span>
+            ) : null}
+          </Stack>
+        ) : null}
       </Center>
     </div>
   );

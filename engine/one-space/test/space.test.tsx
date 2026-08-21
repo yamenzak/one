@@ -10,11 +10,11 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { pickScreen, type Screen } from "../src/App.js";
+import { ELSEWHERE_SAYS, ELSEWHERE_UNDER, pickScreen, type Screen } from "../src/App.js";
 import { accountUrl, faceFor, setupUrl, signpostUrl, tenantUrl, type DoorKind, type Where } from "../src/door.js";
 import { COUNTRIES, byName, nameOf } from "../src/countries.js";
+import { Opening } from "@engine/design";
 import { Signpost } from "../src/screens/Signpost.js";
-import { Elsewhere } from "../src/screens/Elsewhere.js";
 import { Editor } from "../src/centre/Brand.js";
 import { subjectOf } from "../src/space/OneSpace.js";
 /* ⚠️ The three screens the deployment's own infrastructure is read on — see
@@ -172,19 +172,41 @@ describe("what the screens actually put on the page", () => {
     expect(out).not.toContain("Start a workspace");
   });
 
-  /* ⚠️ Every door the OneSpace is not gets a sentence of its own. A shared "not
-     found" tells a person nothing about whether they are in the wrong place or
-     the product is broken. */
-  it("says something specific for every door it is not", () => {
+  /*
+    ⚠️ EVERY DOOR THE ONESPACE IS NOT GETS A SENTENCE OF ITS OWN, AND ALL FOUR
+    WEAR THE CURTAIN. A shared "not found" tells a person nothing about whether
+    they are in the wrong place or the product is broken — and a card floating on
+    a half-built page tells them the product is broken whatever it says, which is
+    what these four were before the curtain took them.
+  */
+  it("says something specific for every door it is not, on the curtain", () => {
     for (const kind of ["operator", "tenant", "device", "none"] as const) {
-      const out = html(<Elsewhere where={WHERE} kind={kind} />);
-      expect(out, kind).toContain("one.4dl.app");
-      expect(out.length, kind).toBeGreaterThan(100);
+      const out = html(
+        <Opening stopped={{ says: ELSEWHERE_SAYS[kind]!, under: ELSEWHERE_UNDER[kind]! }} />,
+      );
+      expect(out, kind).toContain("data-opening");
+      /* ⚠️ THROUGH THE SAME ESCAPE THE RENDERER USES. Three of the four lines
+         carry an apostrophe, and `renderToStaticMarkup` writes it as an entity —
+         so a raw comparison passes on one kind and fails on the rest, which
+         reads as a copy bug rather than as a test one. */
+      expect(out, kind).toContain(ELSEWHERE_UNDER[kind]!.replace(/'/g, "&#x27;"));
     }
     /* And they are not all the same sentence. */
-    const said = new Set(["operator", "tenant", "device", "none"].map(
-      (k) => html(<Elsewhere where={WHERE} kind={k as DoorKind} />)));
-    expect(said.size).toBe(4);
+    expect(new Set(Object.values(ELSEWHERE_UNDER)).size).toBe(4);
+  });
+
+  /*
+    ⚠️ AND THE STOPPED CURTAIN CLOSES ITS O. While something is happening the arc
+    travels round the letter; a screen that has stopped and still shows a
+    travelling arc is the picture of a page that has hung, which is the one thing
+    a stated failure must not look like.
+  */
+  it("closes the letter when the curtain has stopped", () => {
+    const waiting = html(<Opening says={["Counting to one"]} />);
+    const halted = html(<Opening stopped={{ says: "One could not start" }} />);
+    expect(waiting).toContain(`data-opening="arc"`);
+    expect(halted).not.toContain(`data-opening="arc"`);
+    expect(halted).toContain(`data-opening="ring"`);
   });
 });
 
