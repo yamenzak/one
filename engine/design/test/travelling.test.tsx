@@ -29,7 +29,7 @@
 import { chromium, type Browser, type Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BLOCK_MOTION, TRAVEL_MOTION } from "../src/index.js";
-import { PHONE, stylesheet } from "./rhythm.harness.js";
+import { PHONE, stylesheet } from "../src/measure/index.js";
 
 let browser: Browser;
 let css: string;

@@ -41,6 +41,67 @@
 @source "../../design/src";
 
 /*
+  ⚠️ THE TOUCH TARGET IS A FLOOR, AND IT HAS TO BE ONE HERE OR IT IS NOWHERE.
+  `@engine/design`'s `ROW.tap` says 44px is the size below which a control is
+  measurably harder to hit — on a mouse as well as a finger — and every ROW in
+  this product obeys it. A BUTTON did not: the library ships 40px, 36 above the
+  breakpoint and 32 for `sm`, so the rule the tokens state was true of the rows
+  and false of the controls, in a product used one-handed while the other hand
+  holds a box.
+
+  ⚠️ IT IS ONE RULE HERE RATHER THAN A CLASS ON SIXTY-FOUR CALL SITES. A screen
+  writing its own height is exactly what `metrics.ts` exists to stop, and a
+  floor somebody has to remember is a floor the next screen is missing. This is
+  also not a restyle: `heroui.test.mjs` puts sizing in the LAYOUT allow-list on
+  purpose — where a thing sits is the caller's, what it looks like is the
+  library's — and nothing here touches a colour, a radius or a border.
+
+  ⚠️ AND AN ICON-ONLY BUTTON KEEPS ITS SQUARE. Its width is set to match the
+  height the library gave it, so raising only the height turns every one of them
+  into an oval.
+
+  ⚠️ THE LIST IS THE LIBRARY'S VOCABULARY, AND IT IS NOT A DENY-LIST. Every
+  class here is something a person presses — a button, a segmented option, a
+  select and a combo box — and a control the library adds tomorrow is not
+  covered. That is what the geometry sweep is for: it measures every pressable
+  thing on every screen, so a new one arrives as a red test rather than as a
+  small control nobody notices.
+
+  ⚠️ IT IS A FLOOR AND NOT A CEILING, WHICH IS WHY IT IS IN A LAYER. Unlayered
+  it sits after Tailwind's utilities at the same specificity, so it WINS — and a
+  row that asked for `min-h-16` came out 44px, which is the opposite of what this
+  rule is for. `components` loses to `utilities`, so anything that asked for more
+  keeps it and only what asked for nothing is raised.
+
+  ⚠️ TWO CONTROLS ARE DELIBERATELY ABSENT, and the reason is in `measuring.tsx`:
+  a tag's remove cross and a search field's clear sit INSIDE a control that is
+  already a target, and their size is the chip's. They need a hit area larger
+  than the glyph, which is a design decision rather than a number.
+
+  ⚠️ HEIGHT ONLY, EXCEPT WHERE THE SHAPE IS SQUARE. A combo box's chevron is
+  24px wide inside a field that is the real horizontal target, and widening it
+  to 44 would eat the field it belongs to. A number field's − and + are square
+  and get both, because on a receiving screen they are the two controls somebody
+  presses more than anything else in the product.
+
+  `apps/inventory/test/geometry.screens.test.tsx` measures this in a browser
+  across every screen the product has, which is what stops it being deleted by
+  somebody who cannot see what it was for.
+*/
+@layer components {
+  .button,
+  .toggle-button,
+  .select__trigger,
+  .combo-box__trigger,
+  .color-picker__trigger,
+  .number-field__decrement-button,
+  .number-field__increment-button { min-height: 44px; }
+  .button--icon-only,
+  .number-field__decrement-button,
+  .number-field__increment-button { min-width: 44px; }
+}
+
+/*
   ⚠️ THE AMBIENCE IS `@engine/design`'s `SKY_MOTION`, INJECTED BY `main.tsx` — not
   written here. It carried a hand-rolled `@keyframes` for exactly as long as
   nobody looked: a running animation is the one thing HeroUI's reduced-motion

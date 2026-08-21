@@ -16,6 +16,13 @@
  * which a control is measurably harder to hit, and it is a floor on a MOUSE too:
  * a 32px row is a row people miss on a laptop, not just on a phone. Every
  * pressable thing here is at least `ROW.tap`.
+ *
+ * ⚠️ THE SENTENCE ABOVE WAS TRUE OF THE ROWS AND FALSE OF THE BUTTONS, and only
+ * a browser could say so — the library ships 40px, 36 above the breakpoint and
+ * 32 for `sm`, and none of that is written in any file here. The floor is one
+ * CSS rule in `one-space/src/styles.css`, because a class on every call site is
+ * what this file exists to prevent, and it is measured across every screen of a
+ * real product rather than asserted.
  */
 
 /* ------------------------------------------------------------------- rows --- */

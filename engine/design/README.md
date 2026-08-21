@@ -141,6 +141,7 @@ An engine takes a DECLARATION and produces a result nobody hand-assembles.
 | `parts/` | rows, cards, lists, controls, the four outcomes | Could an app of any kind use it without explaining? |
 | `rendered/` | surfaces drawn from a kernel declaration | Does it take a *book* and draw the whole thing? |
 | `chart/` | the data vocabulary | Does it show a number as a shape? |
+| `measure/` | what a screen actually lays out, in a browser | Does it draw nothing and only report? |
 
 **`rendered/` is the one worth understanding.** Nobody wrote the settings
 screen, the notification policy, the flag console or the plan shelf — each takes
@@ -170,6 +171,7 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `parts/` | rows, cards, lists, controls, the four outcomes | 155 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
+| `measure/` | what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with | internal |
 
 **371 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.

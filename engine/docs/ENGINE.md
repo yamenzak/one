@@ -888,6 +888,9 @@ its own header, cited by other files, and doing nothing.
 | `a-checklist-is-ticked-by-what-happened` | D12 | three unticked steps for ever, shown to a workspace that finished all three last week — and a screen ticking them instead would leave them undone for anybody who did the same thing from the API or from a second screen |
 | `a-congratulation-is-said-once` | D12 | recognition repeated on every load, which is not recognition but furniture — and then the one that matters is not read either |
 | `a-step-only-the-clock-can-complete-is-refused` | D12 | a checklist item nobody can take, passing composition because a nightly sweep does raise the event — the tally counts what people did, so the step sits unticked with nothing anywhere saying why |
+| `no-screen-pushes-the-page-sideways` | D7 | a screen a phone scrolls horizontally, which no source-reading check can see — the width is a computed value produced by a stylesheet, a flex container and four components that each did something defensible |
+| `every-control-is-big-enough-for-a-finger` | D7 | `ROW.tap` calling 44px non-negotiable while every button ships 40, 36 above the breakpoint and 32 for `sm` — the rule true of the rows and false of the things people press, in a product used one-handed |
+| `the-reference-app-is-measured-too` | D7 | a layout fault in the app every new screen is tried in first, which is then copied into a product before anything measures it |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -901,7 +904,7 @@ its own header, cited by other files, and doing nothing.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 3 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 13 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 5 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 59 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 62 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |

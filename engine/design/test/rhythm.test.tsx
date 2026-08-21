@@ -23,7 +23,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   ActionRow, Group, NavRow, Reveal, Screen, Stack,
 } from "../src/index.js";
-import { PHONE, html, pageFor, stylesheet } from "./rhythm.harness.js";
+import { PHONE, html, pageFor, stylesheet } from "../src/measure/index.js";
 
 /* ------------------------------------------------------------- the scale --- */
 

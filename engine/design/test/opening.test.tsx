@@ -22,7 +22,7 @@ import { OPENING_MOTION, SAID } from "../src/index.js";
 import { Opening } from "../src/parts/opening.js";
 import { TYPE } from "../src/tokens/type.js";
 import { harness } from "./opening.harness.js";
-import { stylesheet } from "./rhythm.harness.js";
+import { stylesheet } from "../src/measure/index.js";
 
 let browser: Browser;
 let css: string;

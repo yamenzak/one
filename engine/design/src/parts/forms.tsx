@@ -526,7 +526,7 @@ export function Segmented({ value, onChange, options, ...p }: Omit<Said, "help" 
          appear. Below `sm` the group fills and the segments share it; from `sm`
          it goes back to being content-sized, because a filter stretched across a
          desktop panel is a control pretending to be a toolbar. */
-      className="w-full sm:w-auto"
+      className="w-full flex-wrap sm:w-auto sm:flex-nowrap"
     >
       {options.map((o, i) => (
         <ToggleButton key={o.id} id={o.id} className="grow basis-0 sm:grow-0 sm:basis-auto">

@@ -59,6 +59,22 @@
       "dependsOn": ["^build", "@engine/space#build"],
       "outputs": ["coverage/**"]
     },
+    // ⚠️ AND A PRODUCT'S OWN GEOMETRY SWEEP, FOR THE SAME REASON ONE LEVEL UP.
+    // `apps/inventory` measures every screen it declares against the shipped
+    // stylesheet, so it reads `one-space/dist` exactly as the design suite does
+    // — and without this edge it measures whichever build happened to be lying
+    // around, which on a stale checkout is a different product.
+    "@engine/inventory#test": {
+      "dependsOn": ["^build", "@engine/space#build"],
+      "outputs": ["coverage/**"]
+    },
+    // The reference app runs the same sweep over its own routes, so it needs
+    // the same stylesheet — one guard asked of one product is the one that gets
+    // waived.
+    "@engine/hello#test": {
+      "dependsOn": ["^build", "@engine/space#build"],
+      "outputs": ["coverage/**"]
+    },
     "@kova/api#test": {
       "dependsOn": ["^build", "@kova/app#build"],
       "outputs": ["coverage/**"]

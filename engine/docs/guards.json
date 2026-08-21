@@ -2899,6 +2899,33 @@
       "impl": "kernel/test/declarations.test.ts",
       "proves": "refuses a step only a job can complete",
       "fails": "a checklist item nobody can take, passing composition because a nightly sweep does raise the event — the tally counts what people did, so the step sits unticked with nothing anywhere saying why"
+    },
+    {
+      "id": "no-screen-pushes-the-page-sideways",
+      "protects": "D7",
+      "stage": "19",
+      "status": "live",
+      "impl": "apps/inventory/test/geometry.screens.test.tsx",
+      "proves": "does not push the page sideways",
+      "fails": "a screen a phone scrolls horizontally, which no source-reading check can see — the width is a computed value produced by a stylesheet, a flex container and four components that each did something defensible"
+    },
+    {
+      "id": "every-control-is-big-enough-for-a-finger",
+      "protects": "D7",
+      "stage": "19",
+      "status": "live",
+      "impl": "apps/inventory/test/geometry.screens.test.tsx",
+      "proves": "is big enough for a finger",
+      "fails": "`ROW.tap` calling 44px non-negotiable while every button ships 40, 36 above the breakpoint and 32 for `sm` — the rule true of the rows and false of the things people press, in a product used one-handed"
+    },
+    {
+      "id": "the-reference-app-is-measured-too",
+      "protects": "D7",
+      "stage": "19",
+      "status": "live",
+      "impl": "apps/hello/test/geometry.screens.test.tsx",
+      "proves": "does not push the page sideways on ${name}",
+      "fails": "a layout fault in the app every new screen is tried in first, which is then copied into a product before anything measures it"
     }
   ]
 }

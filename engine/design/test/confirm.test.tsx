@@ -15,7 +15,7 @@
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { MOUNT, harness } from "./opening.harness.js";
-import { PHONE, stylesheet } from "./rhythm.harness.js";
+import { PHONE, stylesheet } from "../src/measure/index.js";
 
 let browser: Browser;
 let css: string;

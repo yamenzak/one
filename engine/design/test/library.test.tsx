@@ -171,12 +171,19 @@ describe("a period", () => {
     inside a 390px screen — so it ran past the edge with its last segment cut
     off, over the panel's own title, in the one place a filter is most likely to
     appear. Dropping `w-full` or `basis-0` restores exactly that.
+
+    ⚠️ AND `flex-wrap`, WHICH ONLY A BROWSER COULD SAY WAS MISSING. `basis-0`
+    lets the segments share the width down to their MIN-CONTENT and no further:
+    a button ships `whitespace-nowrap`, so five labels plus their padding still
+    came to more than a phone's column and the control overran by two pixels.
+    Wrapping puts the odd one on a second row, which is also the right reading —
+    `Dates` is the escape from the named periods rather than one of them.
   */
   it("fills a narrow container and lets the segments share it", () => {
     const html = renderToStaticMarkup(
       <PeriodInput value="month" today="2026-08-16" onChange={nothing} />,
     );
-    expect(html).toContain("w-full sm:w-auto");
+    expect(html).toContain("w-full flex-wrap sm:w-auto sm:flex-nowrap");
     expect(html).toContain("grow basis-0 sm:grow-0 sm:basis-auto");
   });
 

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "OneInventory \u2014 everything, counted. General-purpose inventory: the boxes in a basement, a clinic's stock room, a hospital's wards and a factory's stores, on one model with the setting demoted from premise to profile.",
+  "description": "OneInventory — everything, counted. General-purpose inventory: the boxes in a basement, a clinic's stock room, a hospital's wards and a factory's stores, on one model with the setting demoted from premise to profile.",
   "exports": {
     ".": "./src/index.ts",
     "./screens": "./src/screens/index.tsx",
@@ -29,6 +29,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.0"
+    "@types/react-dom": "^19.2.0",
+    "playwright": "^1.56.1"
   }
 }

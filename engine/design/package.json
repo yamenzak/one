@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./vite": "./vite.ts",
-    "./labels": "./src/parts/labels.tsx"
+    "./labels": "./src/parts/labels.tsx",
+    "./measuring": "./src/measure/index.tsx"
   },
   "types": "./src/index.ts",
   "scripts": {

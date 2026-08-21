@@ -27,7 +27,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Group, NavRow, TileGrid } from "../src/parts/surfaces.js";
 import { RowsWaiting, TilesWaiting } from "../src/parts/state.js";
-import { stylesheet } from "./rhythm.harness.js";
+import { stylesheet } from "../src/measure/index.js";
 
 let browser: Browser;
 let css: string;

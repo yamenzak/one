@@ -69,6 +69,7 @@ if (what === "guards") {
     ["parts", "rows, cards, lists, controls, the four outcomes"],
     ["rendered", "whole surfaces drawn from a kernel declaration"],
     ["chart", "the data vocabulary — a number as a shape"],
+    ["measure", "what a screen actually lays out, in a real browser — the harness every app sweeps its own screens with"],
   ];
   const DECL = /^export\s+(?:declare\s+)?(?:async\s+)?(function|const|let|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/gm;
   const walk = (dir, out = []) => {

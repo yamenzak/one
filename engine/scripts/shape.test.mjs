@@ -261,9 +261,15 @@ if (!leaked) ok(`comments: none renders as text`);
  * file with no answer is one whose author did not ask.
  *
  * ⚠️ THE BARREL IS THE ONE EXCEPTION, because it is the package's public surface
- * and belongs to none of the five.
+ * and belongs to none of them.
+ *
+ * ⚠️ AND `measure` IS THE SIXTH, ADDED WHEN A FILE ARRIVED THAT WAS NONE OF THE
+ * FIVE. It answers a question none of the others do — what does a screen
+ * actually lay out, in a browser — and it is the package's only export that
+ * draws nothing. Putting it in `parts` would have been the classification a
+ * flat package comes back through.
  */
-const HOMES = ["tokens", "frame", "parts", "rendered", "chart"];
+const HOMES = ["tokens", "frame", "parts", "rendered", "chart", "measure"];
 const loose = readdirSync(join(ENGINE, "design/src"), { withFileTypes: true })
   .filter((e) => e.isFile() && /\.tsx?$/.test(e.name) && e.name !== "index.ts")
   .map((e) => e.name);

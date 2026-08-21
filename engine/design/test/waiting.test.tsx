@@ -18,7 +18,7 @@
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Group, NavRow, Screen, ShapeWaiting, Stat, Grid, type Block } from "../src/index.js";
-import { PHONE, html, pageFor, stylesheet } from "./rhythm.harness.js";
+import { PHONE, html, pageFor, stylesheet } from "../src/measure/index.js";
 
 let browser: Browser;
 let css: string;
