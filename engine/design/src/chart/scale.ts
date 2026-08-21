@@ -121,6 +121,28 @@ export function band(width: number, count: number, cap = 24, pad = 0.3): {
   return { step, thick, offset: (step - thick) / 2 };
 }
 
+/**
+ * A CATEGORY LABEL CUT TO THE WIDTH IT HAS.
+ *
+ * ⚠️ AN SVG `<text>` DOES NOT WRAP AND DOES NOT ELLIPSISE, so a label wider than
+ * its band is drawn in full, over its neighbours, and a row of names becomes an
+ * unreadable smear that still looks deliberate. Cutting is the honest degrade —
+ * and needing to cut is the sign the chart should have been turned sideways,
+ * where category names run along the axis they read in.
+ *
+ * ⚠️ THE WIDTH IS ESTIMATED, WHICH IS FINE FOR THIS AND FOR NOTHING ELSE. There
+ * is no measurement available in a pure render, so the ratio is the average
+ * advance of the interface face; it is used to decide how much of a name to
+ * show, never to place a mark.
+ */
+const PER_EM = 0.575;
+
+export const clipTo = (label: string, width: number, size = 8): string => {
+  const fits = Math.floor(width / (size * PER_EM));
+  if (fits <= 1) return "";
+  return label.length <= fits ? label : `${label.slice(0, fits - 1).trimEnd()}…`;
+};
+
 /* -------------------------------------------------------------------- path --- */
 
 /** A point placed in a box, in SVG user units with y already flipped. */

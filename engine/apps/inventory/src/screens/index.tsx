@@ -262,8 +262,12 @@ const REPORTED: Reported = {
   ],
   daily: Array.from({ length: 30 }, (_, i) => ({
     day: `2026-07-${String(23 + i).padStart(2, "0")}`,
-    /* ⚠️ Quiet weekends, because the gaps are the shape of a working month. */
-    quantity: i % 7 === 5 || i % 7 === 6 ? 0 : 20 + ((i * 7) % 23),
+    /* ⚠️ QUIET WEEKENDS AND A WEEKDAY THAT DRIFTS, because the gaps are the
+       shape of a working month and the days between them are not noise. A
+       modulo scattered the weekdays across the full range, which drew a
+       sawtooth — and a chart that looks like a rendering fault is a poor
+       photograph of a chart that works. */
+    quantity: i % 7 === 5 || i % 7 === 6 ? 0 : 26 + Math.round(9 * Math.sin(i / 2.6)),
   })),
 };
 

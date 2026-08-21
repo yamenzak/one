@@ -29,7 +29,7 @@ import {
   AXIS, DATA, GRID, QUIET, SEPARATOR, assign, emphasis, magnitude, polarity, pole, seriesColour,
 } from "./palette.js";
 import {
-  type Point, type Span, areaPath, band, barPath, barPathX, extent, linePath, norm, place, stack, stackSpan, ticks,
+  type Point, type Span, areaPath, band, barPath, barPathX, clipTo, extent, linePath, norm, place, stack, stackSpan, ticks,
 } from "./scale.js";
 import { useFigures } from "../parts/said.js";
 
@@ -305,11 +305,17 @@ export function ColumnChart({ describes, data, subject }: {
                 ? magnitude(0.35 + 0.65 * norm(d.value, y))
                 : emphasis(i === subject)}
             />
+            {/* ⚠️ CUT TO THE BAND RATHER THAN OVERLAPPING THE NEXT ONE. SVG
+                text neither wraps nor ellipsises, so a label wider than its
+                column draws straight over its neighbour and two names read as
+                one — which is not a legibility question, it is a chart stating
+                something false. A label that has to be cut is the sign this
+                should be turned sideways, and cutting says so. */}
             <text
               x={i * step + step / 2} y={PLOT.h + 12} textAnchor="middle"
               className={TYPE.note} fill="currentColor" style={{ fontSize: 8 }}
             >
-              {d.label}
+              {clipTo(d.label, step)}
             </text>
           </g>
         );
@@ -319,6 +325,10 @@ export function ColumnChart({ describes, data, subject }: {
 }
 
 /* ------------------------------------------------------------------- bars --- */
+
+/** The gutter the category names sit in, and the room the tip values need. */
+const NAMES = 80;
+const VALUES = 40;
 
 /**
  * THE SAME JOB, TURNED SIDEWAYS, AND IT IS THE RIGHT DEFAULT MORE OFTEN.
@@ -335,24 +345,33 @@ export function BarChart({ describes, data, subject }: {
   const x = extent(data.map((d) => d.value));
   const { step, thick, offset } = band(H, data.length, 20);
   const rows = data.length * step;
+  /* ⚠️ THE THREE WIDTHS ADD UP TO THE VIEWBOX, AND THEY DID NOT. The track was
+     `PLOT.w - 40` — a figure carried over from the upright form, whose padding
+     is on the other axis — so the longest bar ended at 322 in a 320-wide box and
+     the value that rides its tip was drawn off the canvas. The subject bar is by
+     definition the longest one, which is to say the number this chart is most
+     about was the one it never showed. */
+  const track = W - NAMES - VALUES;
 
   return (
     <figure className={`flex w-full flex-col ${SPACE.tight}`}>
       <svg viewBox={`0 0 ${W} ${Math.max(H, rows)}`} className="w-full" role="img" aria-label={describes}>
         <title>{describes}</title>
         {data.map((d, i) => {
-          const w = norm(d.value, x) * (PLOT.w - 40);
+          const w = Math.max(1, norm(d.value, x) * track);
           return (
             <g key={d.label}>
+              {/* ⚠️ CUT TO ITS COLUMN. A name wider than the gutter runs under
+                  the bars, where it reads as a mark rather than as a word. */}
               <text
                 x={0} y={i * step + step / 2 + 3}
                 className={TYPE.note} fill="currentColor" style={{ fontSize: 9 }}
               >
-                {d.label}
+                {clipTo(d.label, NAMES - 6, 9)}
               </text>
               <path
                 {...draw}
-                d={barPathX(80, i * step + offset, Math.max(1, w), thick)}
+                d={barPathX(NAMES, i * step + offset, w, thick)}
                 fill={subject === undefined
                   ? magnitude(0.35 + 0.65 * norm(d.value, x))
                   : emphasis(i === subject)}
@@ -361,7 +380,7 @@ export function BarChart({ describes, data, subject }: {
                   AXIS. Direct labels before gridlines; gridlines before a second
                   axis — and here the first of those is enough. */}
               <text
-                x={80 + Math.max(1, w) + 6} y={i * step + step / 2 + 3}
+                x={NAMES + w + 6} y={i * step + step / 2 + 3}
                 className={TYPE.note} fill="currentColor" style={{ fontSize: 9 }}
               >
                 {say.compact(d.value)}
@@ -450,11 +469,17 @@ export function DivergingChart({ describes, data }: {
               d={barPath(i * step + offset, Math.min(top, zero), thick, h, 4, d.value >= 0)}
               fill={pole(d.value)}
             />
+            {/* ⚠️ CUT TO THE BAND RATHER THAN OVERLAPPING THE NEXT ONE. SVG
+                text neither wraps nor ellipsises, so a label wider than its
+                column draws straight over its neighbour and two names read as
+                one — which is not a legibility question, it is a chart stating
+                something false. A label that has to be cut is the sign this
+                should be turned sideways, and cutting says so. */}
             <text
               x={i * step + step / 2} y={PLOT.h + 12} textAnchor="middle"
               className={TYPE.note} fill="currentColor" style={{ fontSize: 8 }}
             >
-              {d.label}
+              {clipTo(d.label, step)}
             </text>
           </g>
         );

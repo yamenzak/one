@@ -21,8 +21,8 @@
  */
 
 import {
-  AmountRow, ChartPanel, ColumnChart, Group, Hero, LineChart, NoteRow, Num,
-  Screen, Section, Segmented, Stat, StatRow, glyphOf, type Loaded,
+  AmountRow, BarChart, ChartPanel, Group, Hero, LineChart, NoteRow, Num,
+  Screen, Segmented, Stat, StatRow, glyphOf, type Loaded,
 } from "@engine/design";
 
 /** Everything one period answers — see `stock.report`, which reads it once. */
@@ -136,10 +136,14 @@ export function Reports({ title, of, span, onSpan, again, onOpen }: ReportsProps
             />
           </ChartPanel>
 
-          <ChartPanel label="What went most" under="The ten biggest, by quantity">
+          <ChartPanel label="What went most" under="Biggest first, by quantity">
             {said.used.length
               ? (
-                <ColumnChart
+                /* ⚠️ SIDEWAYS, BECAUSE THESE LABELS ARE PRODUCT NAMES. A
+                   column chart gives each category the width of one bar for a
+                   name like "Fire extinguisher, CO₂ 5 kg", and the four here
+                   ran into each other at 390. See `BarChart`. */
+                <BarChart
                   describes="The products that left the shelves most"
                   data={said.used.slice(0, TOP).map((one) => ({
                     label: one.name, value: one.quantity,
@@ -157,59 +161,55 @@ export function Reports({ title, of, span, onSpan, again, onOpen }: ReportsProps
             confused with each other; netted, it is a shelf that is two out and
             looks fine.
           */}
-          <Section label="What the numbers were wrong by">
-            <Group>
-              {said.losses.slice(0, TOP).map((one) => (
-                <AmountRow
-                  key={one.product}
-                  label={one.name}
-                  under={one.found
-                    ? `${one.lost} short · ${one.found} over`
-                    : "short"}
-                  amount={<span data-ink="danger"><Num value={one.lost} /></span>}
-                  onOpen={() => { onOpen(one.product); }}
-                />
-              ))}
-              {said.losses.length
-                ? null
-                : <NoteRow>Every count agreed with the record</NoteRow>}
-            </Group>
-          </Section>
+          <Group label="What the numbers were wrong by">
+            {said.losses.slice(0, TOP).map((one) => (
+              <AmountRow
+                key={one.product}
+                label={one.name}
+                under={one.found
+                  ? `${one.lost} short · ${one.found} over`
+                  : "short"}
+                amount={<span data-ink="danger"><Num value={one.lost} /></span>}
+                onOpen={() => { onOpen(one.product); }}
+              />
+            ))}
+            {said.losses.length
+              ? null
+              : <NoteRow>Every count agreed with the record</NoteRow>}
+          </Group>
 
           {/*
             ⚠️ SOONEST TO RUN OUT AT THE TOP, WHICH IS THE ORDER A BUYER WORKS IN
             — and it is the operation's ordering rather than this screen's, so a
             list and a notification cannot disagree about what is urgent.
           */}
-          <Section label="What to buy">
-            <Group>
-              {said.buy.map((one) => (
-                <AmountRow
-                  key={one.product}
-                  label={one.name}
-                  /* ⚠️ WHO TO RING IS ON THE ROW, because this list is only a
-                     report until somebody can act on a line without leaving it
-                     — and the answer is a fact about the product, not something
-                     to go and look up per line. */
-                  under={(
-                    <span data-ink={one.why === "runs out first" ? "warning" : undefined}>
-                      {[sayCover(one.cover), one.why, one.supplier].filter(Boolean).join(" · ")}
-                    </span>
-                  )}
-                  amount={<Num value={one.order} />}
-                  aside={<span>{one.unit}</span>}
-                  onOpen={() => { onOpen(one.product); }}
-                />
-              ))}
-              {said.buy.length
-                ? null
-                : (
-                  <NoteRow icon={glyphOf("check")}>
-                    Everything lasts longer than a delivery takes
-                  </NoteRow>
+          <Group label="What to buy">
+            {said.buy.map((one) => (
+              <AmountRow
+                key={one.product}
+                label={one.name}
+                /* ⚠️ WHO TO RING IS ON THE ROW, because this list is only a
+                   report until somebody can act on a line without leaving it —
+                   and the answer is a fact about the product, not something to
+                   go and look up per line. */
+                under={(
+                  <span data-ink={one.why === "runs out first" ? "warning" : undefined}>
+                    {[sayCover(one.cover), one.why, one.supplier].filter(Boolean).join(" · ")}
+                  </span>
                 )}
-            </Group>
-          </Section>
+                amount={<Num value={one.order} />}
+                aside={<span>{one.unit}</span>}
+                onOpen={() => { onOpen(one.product); }}
+              />
+            ))}
+            {said.buy.length
+              ? null
+              : (
+                <NoteRow icon={glyphOf("check")}>
+                  Everything lasts longer than a delivery takes
+                </NoteRow>
+              )}
+          </Group>
         </>
       )}
       nothing={{ icon: glyphOf("chart"), says: "Nothing to report yet" }}

@@ -74,6 +74,17 @@ export interface GroupProps {
    */
   readonly under?: React.ReactNode;
   /**
+   * ONE SMALL ANNOTATION AT THE FAR END OF THE HEADING ROW — a delta, a count, a
+   * period picker.
+   *
+   * ⚠️ IT WRAPS RATHER THAN SHRINKING. A slot beside a heading is `shrink-0` in
+   * every first draft, and the first real filter put in one — a five-segment
+   * period — then held its full width at 390, ran past the screen edge and cut
+   * its last segment off. A slot that only works while it is empty is not a
+   * slot, so the row wraps and a wide aside takes the line under the heading.
+   */
+  readonly aside?: React.ReactNode;
+  /**
    * ONE ACTION AT THE FOOT OF THE CARD, AS A REAL BUTTON.
    *
    * ⚠️ A CARD WITH SOMETHING TO DO ABOUT IT IS A SHAPE THE VOCABULARY DID NOT
@@ -141,7 +152,7 @@ export interface GroupProps {
  */
 const InCard = React.createContext(false);
 
-export function Group({ label, under, face, at, sky, seedling, does, children }: GroupProps) {
+export function Group({ label, under, face, aside, at, sky, seedling, does, children }: GroupProps) {
   /* ⚠️ CALLED BEFORE THE BRANCH, because it is a hook — and its answer is
      discarded when nested, which is correct: a world belongs to the card, and
      the card here is somebody else's. */
@@ -163,10 +174,13 @@ export function Group({ label, under, face, at, sky, seedling, does, children }:
   if (nested) {
     return (
       <>
-        {label ? (
-          <div className={`flex flex-col ${SPACE.hair} ${ROW.pad}`}>
-            <h3 className={TYPE.group}>{label}</h3>
-            {under ? <p className={TYPE.note}>{under}</p> : null}
+        {label || aside ? (
+          <div className={`flex flex-wrap items-baseline justify-between ${ROW.gap} ${ROW.pad}`}>
+            <div className={`flex min-w-0 flex-col ${SPACE.hair}`}>
+              {label ? <h3 className={TYPE.group}>{label}</h3> : null}
+              {under ? <p className={TYPE.note}>{under}</p> : null}
+            </div>
+            {aside}
           </div>
         ) : null}
         {children}
@@ -187,17 +201,23 @@ export function Group({ label, under, face, at, sky, seedling, does, children }:
       className={`flex flex-col ${HEAD_GAP}`}
       style={{ ...(at === undefined ? undefined : arriveAt(at)), ...own.css }}
     >
-      {label ? (
+      {label || aside ? (
         /* ⚠️ THE MARK IS BESIDE THE HEADING BLOCK, NOT ABOVE IT, so the label
            and its line under stay one thing and the mark reads as belonging to
            both. `chip` because a heading is not a row — a 40px plate here would
-           be taller than the two lines beside it. */
-        <div className={`flex items-center ${ROW.gap}`}>
-          {face ? <Face of={face} name={label} size="chip" /> : null}
-          <div className={`flex min-w-0 flex-col ${SPACE.hair}`}>
-            <h2 className={TYPE.group}>{label}</h2>
-            {under ? <p className={TYPE.note}>{under}</p> : null}
+           be taller than the two lines beside it.
+
+           ⚠️ AND THE ROW WRAPS, so the aside takes the line under a heading it
+           cannot fit beside rather than pushing it off the screen. */
+        <div className={`flex flex-wrap items-center justify-between ${ROW.gap}`}>
+          <div className={`flex min-w-0 items-center ${ROW.gap}`}>
+            {face && label ? <Face of={face} name={label} size="chip" /> : null}
+            <div className={`flex min-w-0 flex-col ${SPACE.hair}`}>
+              {label ? <h2 className={TYPE.group}>{label}</h2> : null}
+              {under ? <p className={TYPE.note}>{under}</p> : null}
+            </div>
           </div>
+          {aside}
         </div>
       ) : null}
       {/* ⚠️ THE WORLD GOES ON THE CARD ITSELF, not on a wrapper — the layers are

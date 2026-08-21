@@ -13,12 +13,12 @@
 
 import * as React from "react";
 import { TYPE } from "../tokens/type.js";
-import { PAD, SPACE } from "../tokens/metrics.js";
-import { ARRIVE, arriveAt } from "../tokens/motion.js";
+import { SPACE } from "../tokens/metrics.js";
 import { Tally } from "../parts/tally.js";
 import { Sparkline } from "./charts.js";
 import { type Point, compactLike } from "./scale.js";
 import { useFigures, useShown } from "../parts/said.js";
+import { Group } from "../parts/surfaces.js";
 
 /* ------------------------------------------------------------------ delta --- */
 
@@ -215,39 +215,34 @@ export function Meter({ label, value, limit, unit = "", suffix = "" }: {
 /* ------------------------------------------------------------------ panel --- */
 
 /**
- * ⚠️ A CHART GOES IN A CARD LIKE ANYTHING ELSE, and this is that card with its
- * heading. It exists so a chart never carries its own padding — the double
- * padding a card and a component both supply is the same fault the row shapes
- * had, and a chart is the most likely thing to repeat it because it arrives with
- * a viewBox and looks like it should own its own margins.
+ * ⚠️ A CHART GOES IN A CARD LIKE ANYTHING ELSE, AND THAT CARD IS `Group`. This
+ * said so in its own header while rendering a bare padded `<section>`, so on a
+ * screen mixing the two — which every reports screen is — the cards sat on a
+ * surface and the charts sat on the page's ground beside them, inset from the
+ * gutter by padding with nothing under it. Its heading was a fourth rank BELOW
+ * the card label's, so a chart read as a sub-item of the block above it.
+ *
+ * ⚠️ IT IS A THIN WRAPPER RATHER THAN A SECOND IMPLEMENTATION, so the inset, the
+ * arrival, the nesting stand-down and the world all stay in one place — the
+ * double padding a card and a chart both supply is the fault a chart is most
+ * likely to repeat, because it arrives with a viewBox and looks like it should
+ * own its own margins.
  */
 export function ChartPanel({ label, under, aside, at, children }: {
   readonly label: string;
   readonly under?: string;
-  /** A range picker, a filter — one row, above the plot. */
+  /** A range picker, a filter, a delta — the far end of the heading row. */
   readonly aside?: React.ReactNode;
   /** ⚠️ Its place in a sequence of blocks — see `Group.at`. */
   readonly at?: number;
   readonly children: React.ReactNode;
 }) {
+  /* ⚠️ THE PANEL ARRIVES AND THE MARKS DRAW. Two animations on one card would be
+     a jungle in miniature; they are sequenced instead — the card eases in on the
+     library's `enter`, and `data-draw` reveals the marks inside it. */
   return (
-    /* ⚠️ THE PANEL ARRIVES AND THE MARKS DRAW. Two animations on one card would
-       be a jungle in miniature; they are sequenced instead — the panel eases in
-       on the library's `enter`, and `data-draw` reveals the marks inside it. */
-    <section {...ARRIVE} style={at === undefined ? undefined : arriveAt(at)} className={`flex flex-col ${SPACE.snug} ${PAD}`}>
-      {/* ⚠️ THE ASIDE TAKES ITS OWN ROW ON A PHONE, AND THAT IS NOT A REFINEMENT.
-          Beside the heading it is `shrink-0`, so the first real filter put in
-          this slot — a five-segment period — held its full width at 390 and ran
-          past the screen edge, over the panel's own title, with the last segment
-          cut off. A slot that only works while it is empty is not a slot. */}
-      <div className={`flex flex-col sm:flex-row sm:items-start sm:justify-between ${SPACE.snug}`}>
-        <div className={`flex min-w-0 flex-col ${SPACE.hair}`}>
-          <h3 className={TYPE.label}>{label}</h3>
-          {under ? <p className={TYPE.note}>{under}</p> : null}
-        </div>
-        {aside ? <div className="sm:shrink-0">{aside}</div> : null}
-      </div>
+    <Group label={label} under={under} aside={aside} at={at}>
       {children}
-    </section>
+    </Group>
   );
 }
