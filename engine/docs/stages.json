@@ -217,8 +217,9 @@
     },
     {
       "n": 41,
-      "status": "planned",
-      "title": "A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have"
+      "status": "shipped",
+      "title": "A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have",
+      "ends": "A workspace's brand reaches the two surfaces the deployment actually has, and only where the workspace asked for them. The editor stored the picks and NOTHING read them: the tile was painted from `mayBrand` alone — so a business that turned `app-icons` off still installed as itself — and no screen wore the theme at all. Being entitled to brand and asking to brand HERE are two questions, and reading only the first is what made every switch on that screen save and change nothing. `centre.view` now answers with the theme or with nothing, and `paintFor` reads the pick; the intersection is resolved where the surface is SERVED rather than where it is drawn, because every screen deciding for itself is how one product ends up branded and the next one beside it is not. On the page it is a second style element appended after the boot's — at equal specificity source order decides, and absent means EMPTY rather than untouched, or the last workspace's colours survive a switch."
     },
     {
       "n": 42,

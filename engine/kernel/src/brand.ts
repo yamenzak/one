@@ -118,11 +118,24 @@ export const brandableOn = (def: WhitelabelDef, allowed: boolean): readonly Surf
  * this per screen is how one product ends up branded and the next one beside it
  * is not, on the same workspace, with nobody able to say why.
  */
-/* DEFER(engine-41) stage:41 — NOTHING PAINTS A SURFACE YET. The editor stores
-   which surfaces a workspace picked and `brand.read` answers what its products
-   offer, but no screen, letter or sign-in page reads the picks to decide whether
-   to wear the brand — so the switches save and change nothing. This is the
-   intersection that decision needs. */
+/*
+  ⚠️ THE INTERSECTION IS RESOLVED WHERE THE SURFACE IS SERVED, NOT WHERE IT IS
+  DRAWN. `centre.view` answers with the theme or with nothing; the tile resolves
+  its own paint the same way. Sending the theme and the picks separately would
+  make every screen in every product decide for itself whether to wear them —
+  which is how one product ends up branded and the next one beside it is not, on
+  the same workspace, with nobody able to say why.
+
+  ⚠️ AND `app-icons` IS THE WORKSPACE'S PICK ALONE. A home-screen tile belongs to
+  no product, so there is no app to ask whether it has one; this function is for
+  the surfaces a PRODUCT owns.
+
+  DEFER(engine-23) stage:23 — and none of those exists yet. `shell` is the
+  platform's and `app-icons` is the workspace's, both resolved where they are
+  served; `email` is the first surface an APP owns, and nothing sends a letter.
+  `documents` and `public` have nothing to draw either. This is the intersection
+  the day one of them does.
+*/
 export const brandedSurfaces = (
   def: WhitelabelDef, branding: Branding | null, allowed: boolean,
 ): readonly Surface[] =>

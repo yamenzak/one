@@ -895,6 +895,8 @@ its own header, cited by other files, and doing nothing.
 | `the-gate-answers-before-a-control-is-drawn` | D15 | a primary action drawn, pressed and answered 402 — the refusal landing as a toast over whatever the person just filled in, and the work gone |
 | `an-act-names-the-operation-it-calls` | D15 | one act with no `op`, which renders and works on every tier that happens to be allowed and gives the one that is not the old behaviour with nothing saying so |
 | `a-blocked-control-says-which-gate-stopped-it` | D7 | one sentence for all nine gates, which is a boolean wearing a name — "you cannot yet" and "your plan does not include this" are different controls |
+| `a-brand-reaches-only-the-surfaces-it-was-asked-to` | D22 | every switch on the branding screen saving and changing nothing — the tile painted from the entitlement alone, so a business that turned its icon off still installed as itself |
+| `the-screens-wear-the-brand-where-the-shell-was-picked` | D22 | a theme applied to every screen of a workspace that asked for it on none — or, the way it actually was, applied to none of them at all |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -923,7 +925,7 @@ its own header, cited by other files, and doing nothing.
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 4 |
 | D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 3 |
 | D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 9 |
-| D22 | Branding and the installable app belong to the workspace, never to one app inside it | 4 |
+| D22 | Branding and the installable app belong to the workspace, never to one app inside it | 6 |
 | D23 | A stranger joins a workspace as a `customer`, and only ever as a `customer` | 0 |
 | D24 | A model's PRICE is discovered nightly; whether it is sold, and at what margin, never is | 0 |
 | D25 | A workspace picks its own model, because it pays for it — and that is only safe above cost | 0 |
@@ -960,10 +962,10 @@ nothing yet.
 <!-- generated: node scripts/inventory.mjs waiting -->
 | Waiting on | Where | How many |
 |---|---|---|
+| **23** — Mail that leaves the process — a letter, its variables, and a provider | `kernel/src/brand.ts` | 1 |
 | **23** — Mail that leaves the process — a letter, its variables, and a provider | `kernel/src/notify.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `kernel/src/package.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `runtime/src/jobs.ts` | 1 |
-| **41** — A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have | `kernel/src/brand.ts` | 1 |
 
 **4 declarations** are built and reached by nothing, each waiting on a
 stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one
@@ -1015,7 +1017,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 38 | A notification leaves the process — Web Push written out rather than depended on, a subscription filed under the door it was made at so it wears that workspace's own icon, and a keypair the console generates and never accepts | shipped |
 | 39 | The documentation is two generated pages — what exists, derived from the engine; and how to add to it, which no generator can derive | shipped |
 | 40 | An app ships a screen — a product's browser half is a chunk of its own, loaded when its workspace opens it, drawing that workspace's own records through the door it is handed | shipped |
-| 41 | A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have | **planned** |
+| 41 | A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have | shipped |
 | 42 | A screen asks the gate before it draws a control, rather than after it is pressed | shipped |
 | 43 | Hello's remaining screens reach the workspace's own records — the report against its target, and writing a note | **planned** |
 | 44 | A one-off purchase — a credit pack, and becoming a business — through the same checkout | shipped |
@@ -1049,7 +1051,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 72 | An operation's declared input is checked at the door, and `now` is one type | shipped |
 | 73 | The other half of OneInventory, driven — and the quarantine that was a badge on a screen | shipped |
 
-**60 shipped, 13 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**61 shipped, 12 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

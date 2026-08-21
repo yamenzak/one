@@ -639,18 +639,17 @@ export const HELLO: AppSpec = defineApp({
       fallback: 20, needs: "tenant:manage",
       help: "What Reports measures a week against.",
     },
-    /* ⚠️ A COLOUR SETTING IS THE ONE THAT PROVES `Field` PICKS A CONTROL RATHER
-       THAN A TEXT BOX. It fell through to `text` once, and a workspace's colour
-       was a field holding `#2563eb` to be typed correctly by somebody who
-       already knew hex. */
-    /* DEFER(engine-41) stage:41 — nothing paints a workspace's own colour yet:
-       the tokens every surface mixes with are set once at boot, and no screen
-       reads a stored accent to override them. */
-    "notes.accent": {
-      id: "notes.accent", level: "tenant", area: "appearance",
-      field: field.colour({ label: "Colour", holds: "none" }),
-      fallback: "#3f7d58", needs: "tenant:manage",
-    },
+    /*
+      ⚠️ THERE IS NO PER-APP COLOUR HERE, AND THERE WAS. `notes.accent` was
+      declared, rendered and saved for as long as nothing painted a workspace's
+      own colour — a control somebody pressed and believed, which is worse than
+      a feature that is absent. Stage 41 gave the paint its real home: a colour
+      belongs to the WORKSPACE and never to one app, because a business running
+      three of our products has one identity and an accent per app would give it
+      three with two of them stale (`brand.ts`). `field.colour` picking a
+      control rather than a text box is proved where the control is, in
+      `design/test/surface.test.tsx`.
+    */
     /* DEFER(engine-23) stage:23 — nothing sends a letter, so there is no reply
        for an address to go to. Declared with the lane rather than after it, so
        the field kind is exercised by the ground. */

@@ -76,7 +76,21 @@ interface Paint {
  * installs with one colour behind the splash and another on the icon.
  */
 export function paintFor(of: Installable): Paint {
-  const theirs = mayBrand(of.kind) ? of.branding : null;
+  /*
+    ⚠️ MAY BRAND AND ASKED TO, WHICH ARE TWO QUESTIONS. `mayBrand` says a
+    business is entitled to its own identity; the SURFACE list says where it
+    wanted it. The tile used to read only the first, so a workspace that turned
+    `app-icons` off in its own settings still installed as itself — a switch
+    that saved and changed nothing, in the one place branding was applied at all.
+
+    ⚠️ AND IT IS THE WORKSPACE'S PICK ALONE, NOT AN INTERSECTION. The icon is the
+    workspace's home screen tile rather than any product's screen, so there is no
+    app to ask whether it has one — `brandedSurfaces` is for the surfaces a
+    PRODUCT owns.
+  */
+  const theirs = mayBrand(of.kind) && of.branding?.surfaces.includes("app-icons")
+    ? of.branding
+    : null;
   return {
     ground: theirs?.theme.ground ?? OUR_GROUND,
     ink: theirs?.theme.ink ?? OUR_INK,

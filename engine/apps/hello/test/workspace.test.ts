@@ -242,6 +242,19 @@ describe("becoming a business", () => {
     expect((await post(SLUG, "/api/brand.write",
       { theme: READABLE, surfaces: ["shell", "email"] }, cookie)).status).toBe(200);
     expect((await brandingOf(directory(), row.id))?.theme.ground).toBe("#101014");
+
+    /*
+      ⚠️ AND THE SURFACE IT ASKED FOR IS THE ONE IT GETS. `shell` is picked, so
+      the boot read carries the theme and every screen under this workspace wears
+      it; `app-icons` is NOT, so the tile stays ours. A switch that saved and
+      changed nothing is what this pair exists to catch — and it was the state of
+      the whole feature until the picks were read. The TILE's half of the same
+      claim is beside its own test, below.
+    */
+    const view = await (await get(SLUG, "/api/centre.view", cookie)).json() as
+      { tenant: { theme?: { ground?: string } } };
+    expect(view.tenant.theme?.ground).toBe("#101014");
+
   });
 
   /* ⚠️ ONE WAY, AND THERE IS NO OPERATION FOR THE OTHER DIRECTION. Asserted by
@@ -311,9 +324,16 @@ describe("a business's own identity", () => {
     expect(no.status).toBe(400);
   });
 
+  /*
+    ⚠️ AND `app-icons` IS PICKED, WHICH IS THE POINT OF THE PICK. This asked for
+    `shell` alone and expected the tile to be theirs — pinning the fault rather
+    than the rule, for as long as nothing read the surface list. Being entitled
+    to brand and asking to brand HERE are two questions.
+  */
   it("reaches the installed tile, which is where somebody looks for it", async () => {
     const cookie = await asBusiness();
-    await post(SLUG, "/api/brand.write", { theme: READABLE, surfaces: ["shell"] }, cookie);
+    await post(SLUG, "/api/brand.write",
+      { theme: READABLE, surfaces: ["shell", "app-icons"] }, cookie);
 
     const manifest = await (await get(SLUG, "/manifest.webmanifest")).json() as
       { name: string; theme_color: string };
@@ -325,6 +345,32 @@ describe("a business's own identity", () => {
     const icon = await (await get(SLUG, "/icon.svg")).text();
     expect(icon).toContain("#101014");
     expect(icon).toContain(">H<");
+  });
+
+  /*
+    ⚠️ AND NOT PICKING IT LEAVES OURS, which is the half that makes the switch a
+    switch. A check that only ever saw the picked case would pass on a feature
+    wired to nothing — which is what this was.
+  */
+  it("leaves the tile ours where the workspace did not ask for it", async () => {
+    const cookie = await asBusiness();
+    await post(SLUG, "/api/brand.write", { theme: READABLE, surfaces: ["shell"] }, cookie);
+
+    const icon = await (await get(SLUG, "/icon.svg")).text();
+    expect(icon).toContain("◇");
+    expect(icon).not.toContain("#101014");
+  });
+
+  /* ⚠️ AND THE SCREENS THE OTHER WAY ROUND. A workspace that branded its tile
+     and not its shell works in ours — same rule, same list, the other entry. */
+  it("leaves the screens ours where the workspace did not ask for them", async () => {
+    const cookie = await asBusiness();
+    await post(SLUG, "/api/brand.write",
+      { theme: READABLE, surfaces: ["app-icons"] }, cookie);
+
+    const view = await (await get(SLUG, "/api/centre.view", cookie)).json() as
+      { tenant: { theme?: unknown } };
+    expect(view.tenant.theme).toBeUndefined();
   });
 
   /* ⚠️ PUBLIC BY CONSTRUCTION, because a phone fetches a manifest with no

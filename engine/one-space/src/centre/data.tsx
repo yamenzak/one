@@ -12,9 +12,9 @@
 import { useCallback, useEffect, useState } from "react";
 import type {
   AreaBook, DocumentBook, Gate, GuideBook, Instant, MilestoneBook, NotificationBook, Offline,
-  Outcome, ScreenSpec, SettingBook, NeedBook, SubProcessorBook,
+  Outcome, ScreenSpec, SettingBook, NeedBook, SubProcessorBook, Theme,
 } from "@engine/kernel";
-import { notice, ready, trouble, waiting, type Loaded } from "@engine/design";
+import { brandCss, notice, ready, trouble, waiting, type Loaded } from "@engine/design";
 import { api, whenWritten } from "../api.js";
 
 /* ----------------------------------------------------------------- shapes --- */
@@ -62,6 +62,16 @@ export interface CentreView {
     readonly name: string;
     readonly slug: string;
     readonly kind?: "personal" | "commercial";
+    /**
+     * ⚠️ WHAT THIS WORKSPACE LOOKS LIKE, WHERE IT MAY AND ASKED TO. The
+     * intersection is the server's — a page that got the theme and the picks
+     * separately would be every surface deciding for itself whether to wear it.
+     * Absent means ours, which is what a personal workspace and an un-branded
+     * business both get.
+     */
+    readonly theme?: Theme;
+    /** ⚠️ `false` takes our mark off. Ours to answer, never a product's. */
+    readonly ourMark?: boolean;
   };
   readonly you: {
     readonly accountId: string;
@@ -257,7 +267,39 @@ export const forget = (id?: string): void => {
   for (const key of [...held.keys()]) if (key.startsWith(`${id}:`)) held.delete(key);
 };
 
-export const useCentre = () => useLoad<CentreView>("centre.view");
+/**
+ * ⚠️ AND WEARING THE WORKSPACE'S OWN COLOURS IS PART OF READING IT. Every screen
+ * under a workspace goes through this hook, so the paint is applied here rather
+ * than by a component somebody has to remember to mount — the fault that
+ * produces is one product branded and the next one beside it not, on the same
+ * workspace.
+ */
+export const useCentre = () => {
+  const held = useLoad<CentreView>("centre.view");
+  const theme = held.of.status === "ready" ? held.of.data.tenant.theme : undefined;
+  useEffect(() => { wear(theme); }, [theme]);
+  return held;
+};
+
+/**
+ * THE WORKSPACE'S OWN TOKENS, IN A STYLE ELEMENT OF THEIR OWN.
+ *
+ * ⚠️ A SECOND ELEMENT, APPENDED AFTER THE BOOT'S. The deployment's own brand is
+ * written once at boot; a tenant's has to win, and at equal specificity that is
+ * decided by source order. Rewriting the boot element instead would put the two
+ * in one string, where changing the tenant's means re-emitting ours.
+ *
+ * ⚠️ AND ABSENT MEANS EMPTY, NOT UNTOUCHED. Leaving the last workspace's colours
+ * behind after a switch is the sharpest version of this fault: somebody looking
+ * at their own records through a competitor's palette.
+ */
+const wear = (theme: Theme | undefined): void => {
+  const id = "workspace-brand";
+  const held = document.getElementById(id)
+    ?? Object.assign(document.createElement("style"), { id });
+  held.textContent = theme ? brandCss(theme) : "";
+  if (!held.isConnected) document.head.append(held);
+};
 
 /**
  * WHAT A WRITE SAYS, AND WHAT IT MAKES STALE — installed once, here.

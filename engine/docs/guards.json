@@ -2962,6 +2962,24 @@
       "impl": "design/test/surface.test.tsx",
       "proves": "says something else when a different gate stopped it",
       "fails": "one sentence for all nine gates, which is a boolean wearing a name — \"you cannot yet\" and \"your plan does not include this\" are different controls"
+    },
+    {
+      "id": "a-brand-reaches-only-the-surfaces-it-was-asked-to",
+      "protects": "D22",
+      "stage": "41",
+      "status": "live",
+      "impl": "apps/hello/test/workspace.test.ts",
+      "proves": "leaves the tile ours where the workspace did not ask for it",
+      "fails": "every switch on the branding screen saving and changing nothing — the tile painted from the entitlement alone, so a business that turned its icon off still installed as itself"
+    },
+    {
+      "id": "the-screens-wear-the-brand-where-the-shell-was-picked",
+      "protects": "D22",
+      "stage": "41",
+      "status": "live",
+      "impl": "apps/hello/test/workspace.test.ts",
+      "proves": "leaves the screens ours where the workspace did not ask for them",
+      "fails": "a theme applied to every screen of a workspace that asked for it on none — or, the way it actually was, applied to none of them at all"
     }
   ]
 }

@@ -137,11 +137,25 @@ const closureOf = (entry) => {
  * graph in a guard is a second compiler nobody asked for.
  */
 const WRAPS = new Map();
+/**
+ * ⚠️ AND WHICH FILE DEFINED IT, because "not a call site" is a fact about the
+ * FILE and was being enforced against a LINE. A one-line wrapper was dropped by
+ * matching the line its literal sat on; the day one grew a body — an effect, a
+ * memo, anything — the literal moved to a line of its own, the drop stopped
+ * happening, and every screen in the SPA was suddenly reported as calling the
+ * operation that wrapper wraps. The rule never changed; the formatting did.
+ */
+const WRAPPED_IN = new Map();
 const wrappersIn = (file) => {
   const src = strip(readFileSync(file, "utf8"));
+  /* ⚠️ A SHORT BODY, NOT A SINGLE LINE. Bounded so a lazy match cannot run past
+     the next export and attribute its operation to the wrong helper. */
   for (const m of src.matchAll(
-    /export\s+(?:const|function)\s+(\w+)[^\n]*?(?:useLoad|api\.(?:get|post))\s*(?:<[^>]*>)?\s*\(\s*"([a-z]+\.[a-z.]+)"/g)) {
-    if (MEMBER.has(m[2])) WRAPS.set(m[1], m[2]);
+    /export\s+(?:const|function)\s+(\w+)[\s\S]{0,200}?(?:useLoad|api\.(?:get|post))\s*(?:<[^>]*>)?\s*\(\s*"([a-z]+\.[a-z.]+)"/g)) {
+    if (!MEMBER.has(m[2])) continue;
+    WRAPS.set(m[1], m[2]);
+    if (!WRAPPED_IN.has(file)) WRAPPED_IN.set(file, new Set());
+    WRAPPED_IN.get(file).add(m[2]);
   }
 };
 
@@ -160,16 +174,16 @@ for (const f of allSpaFiles(SPA)) wrappersIn(f);
 const CALLS = /(?:useLoad|api\.(?:get|post))\s*(?:<[^>]*>)?\s*\(\s*"([a-z]+\.[a-z.]+)"/g;
 
 const namesIn = (file) => {
-  const src = strip(readFileSync(file, "utf8"));
+  const body = strip(readFileSync(file, "utf8"));
   const out = [];
-  /* ⚠️ A WRAPPER'S OWN DEFINITION IS NOT A CALL SITE, and dropping the line it
-     is on is what makes that true for the literal as well as for the name. Left
+  const src = body;
+  /* ⚠️ A WRAPPER'S OWN DEFINITION IS NOT A CALL SITE — see `WRAPPED_IN`. Left
      in, `data.tsx` reports every operation it wraps and the guard blames the
      library rather than whoever used it. */
-  const body = src.split("\n")
-    .filter((line) => !/export\s+(?:const|function)\s+\w+[^\n]*(?:useLoad|api\.(?:get|post))/.test(line))
-    .join("\n");
-  for (const m of body.matchAll(CALLS)) if (MEMBER.has(m[1])) out.push(m[1]);
+  const mine = WRAPPED_IN.get(file) ?? new Set();
+  for (const m of body.matchAll(CALLS)) {
+    if (MEMBER.has(m[1]) && !mine.has(m[1])) out.push(m[1]);
+  }
   for (const [helper, op] of WRAPS) {
     if (new RegExp(`export\\s+(?:const|function)\\s+${helper}\\b`).test(src)) continue;
     if (new RegExp(`\\b${helper}\\s*\\(`).test(body)) out.push(op);

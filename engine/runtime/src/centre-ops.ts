@@ -16,7 +16,8 @@
  */
 
 import type { Allowance, AnyOperation, AppSpec, Gate, TenantId } from "@engine/kernel";
-import { PUBLIC, included, offlineBook, outcomeBook, sellableKeys } from "@engine/kernel";
+import { PUBLIC, included, mayBrand, offlineBook, outcomeBook, sellableKeys } from "@engine/kernel";
+import { brandingOf } from "./branding.js";
 import { tenantById } from "./directory.js";
 import { memberFor, rolesFor } from "./membership.js";
 import type { PlatformCtx } from "./member-ops.js";
@@ -131,8 +132,22 @@ export function centreOps(app: AppSpec): Readonly<Record<string, Resolved>> {
       const ctx = bare as PlatformCtx;
       if (!ctx.accountId) return (ctx.fail as (c: string) => never)("platform.unauthorized");
 
-      const tenant = await tenantById(ctx.directory, ctx.tenantId as TenantId);
-      const member = await memberFor(ctx.db, ctx.tenantId as TenantId, ctx.accountId as never);
+      const [tenant, member, branding] = await Promise.all([
+        tenantById(ctx.directory, ctx.tenantId as TenantId),
+        memberFor(ctx.db, ctx.tenantId as TenantId, ctx.accountId as never),
+        /* ⚠️ THE DIRECTORY, NOT THE SHARD. A workspace's identity is read on
+           the pre-auth doors and before any shard is located — see
+           `BRANDING_SCHEMA`'s place in `DIRECTORY_MODULES`. */
+        brandingOf(ctx.directory, ctx.tenantId as TenantId),
+      ]);
+      /* ⚠️ ENTITLED TO ONE, AND ASKED FOR IT ON THIS SURFACE. `mayBrand` says a
+         business may have an identity at all; the surface list says where it
+         wanted it, and reading only the first is how a switch comes to save and
+         change nothing. */
+      const theirs = mayBrand(tenant?.kind ?? "personal")
+        && branding?.surfaces.includes("shell")
+        ? branding
+        : null;
 
       const apps = await Promise.all(ctx.enabledApps
         .map((id) => ctx.appOf(id))
@@ -159,6 +174,21 @@ export function centreOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           name: tenant?.name ?? "",
           slug: tenant?.slug ?? "",
           kind: tenant?.kind ?? "personal",
+          /*
+            ⚠️ THE THEME ONLY WHERE THE WORKSPACE MAY BRAND AND ASKED TO, and the
+            intersection is resolved HERE rather than on the page. Sending the
+            theme with the picks beside it would make every surface in every
+            product decide for itself whether to wear it — which is how one
+            product ends up branded and the next one beside it is not, on the
+            same workspace, with nobody able to say why.
+
+            ⚠️ ABSENT MEANS OURS. A page handed nothing paints nothing, which is
+            what a personal workspace and an un-branded business both get.
+          */
+          ...(theirs ? { theme: theirs.theme } : {}),
+          /* ⚠️ WHETHER OUR MARK COMES OFF, which is a different transaction from
+             putting theirs on — and ours to answer rather than a product's. */
+          ...(theirs?.ourMark === false ? { ourMark: false } : {}),
         },
         you: {
           accountId: ctx.accountId,
