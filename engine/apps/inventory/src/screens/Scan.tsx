@@ -28,9 +28,10 @@
 
 import * as React from "react";
 import {
-  Await, FieldRow, Group, Lookup, NoteRow, RowsWaiting, Screen, Section,
-  TextInput, Viewfinder, type Loaded,
+  Await, FieldRow, Group, Lookup, NoteRow, PickFile, RowsWaiting, Screen, Section,
+  TextInput, Viewfinder, asDataUrl, glyphOf, type Loaded,
 } from "@engine/design";
+import { Button } from "@heroui/react";
 
 /** What `code.resolve` answered — the app's shape, narrowed at the point of use. */
 export interface Seen {
@@ -50,6 +51,26 @@ export interface Seen {
   readonly needs: string;
 }
 
+/**
+ * WHAT A MODEL THINKS A THING IS — a suggestion, and the screen says so.
+ *
+ * ⚠️ NOTHING HERE IS RECORDED UNTIL SOMEBODY PRESSES. A model fills anything and
+ * commits nothing that carries consequence: this is a form that arrived filled
+ * in, and the person adding the product is the one who agrees to it.
+ */
+export interface Guess {
+  readonly name: string;
+  readonly brand: string;
+  readonly category: string;
+  readonly unit: string;
+  readonly pack: number;
+  readonly tracking: string;
+  /** ⚠️ Why that rung — what makes it a suggestion rather than a magic answer. */
+  readonly why: string;
+  readonly storage: string;
+  readonly hazards: readonly string[];
+}
+
 export interface ScanProps {
   readonly title?: string;
   /** The last thing scanned. `null` before anything has been. */
@@ -64,6 +85,18 @@ export interface ScanProps {
   readonly again: () => void;
   /** The camera stands down without the screen unmounting. */
   readonly paused?: boolean;
+  /**
+   * ⚠️ WHAT A MODEL MADE OF IT. `null` until somebody asks — this is never
+   * fetched on arrival, because a question costs credits and nobody asked one.
+   */
+  readonly guess: Loaded<Guess | null>;
+  /** Ask what the scanned code is. Absent where the deployment cannot ask. */
+  readonly onIdentify?: () => void;
+  /** A photograph of a label, as a `data:` URL. */
+  readonly onLabel?: (image: string) => void;
+  /** Record the suggestion as a new product, with this code attached to it. */
+  readonly onAdd: (of: Guess) => void;
+  readonly busy?: boolean;
 }
 
 /* ⚠️ THE KIND, IN WORDS SOMEBODY DID NOT HAVE TO LEARN. `gs1` on a screen is the
@@ -78,8 +111,20 @@ const OURS: Readonly<Record<string, string>> = {
   location: "a place", batch: "a batch", unit: "one object", product: "a product",
 };
 
+/* ⚠️ THE RUNG IN WORDS, AND WHY IT MATTERS THAT IT IS NOT THE COLUMN'S SPELLING.
+   "batched" is what the database holds; "Kept per delivery" is what somebody
+   agrees or disagrees with, and this row exists to be disagreed with. */
+const RUNG: Readonly<Record<string, string>> = {
+  listed: "Listed — never counted",
+  counted: "Counted — a number per place",
+  batched: "Batched — deliveries kept apart",
+  itemised: "Itemised — one of a kind",
+  assembled: "Assembled from other things",
+};
+
 export function Scan({
   title, of, products, onRead, onOpen, onPlace, onLearn, again, paused,
+  guess, onIdentify, onLabel, onAdd, busy,
 }: ScanProps) {
   /*
     ⚠️ THE FIELD IS ALWAYS ON THE SCREEN, NOT BEHIND THE CAMERA'S FAILURE. Two
@@ -105,25 +150,37 @@ export function Scan({
   const [attachTo, setAttachTo] = React.useState<string | null>(null);
 
   const seen = of.status === "ready" ? of.data : null;
+  const said = guess.status === "ready" ? guess.data : null;
 
   /*
     ⚠️ ONE ACT, CHOSEN BY WHAT WAS SCANNED. `undefined` while there is nothing to
     do about anything — a docked button that does nothing is the one control on
     the screen somebody will press first.
+
+    ⚠️ AND A SUGGESTION TAKES THE DOCK WHEN THERE IS ONE, because it is then the
+    thing on the screen: a filled-in product waiting for somebody to agree with
+    it. Attaching the code to something that already exists is still there, in
+    the card, for the case where the guess is wrong.
   */
-  const does = !seen
-    ? undefined
-    : seen.ours === "location"
-      ? { label: "Go to this place", onDo: () => { onPlace(seen.value); } }
-      : seen.ours
-        ? undefined
-        : seen.found
-          ? { label: "Open it", onDo: () => { onOpen(seen.product); } }
-          : {
-            label: "Attach this code",
-            onDo: () => { if (attachTo) onLearn(attachTo); },
-            disabled: !attachTo,
-          };
+  const does = said?.name
+    ? {
+      label: "Add it",
+      onDo: () => { onAdd(said); },
+      disabled: busy === true,
+    }
+    : !seen
+      ? undefined
+      : seen.ours === "location"
+        ? { label: "Go to this place", onDo: () => { onPlace(seen.value); } }
+        : seen.ours
+          ? undefined
+          : seen.found
+            ? { label: "Open it", onDo: () => { onOpen(seen.product); } }
+            : {
+              label: "Attach this code",
+              onDo: () => { if (attachTo) onLearn(attachTo); },
+              disabled: !attachTo,
+            };
 
   return (
     <Screen shape="detail" title={title} does={does}>
@@ -189,6 +246,19 @@ export function Scan({
                     options={products}
                     placeholder="Find the product"
                   />
+                  {/*
+                    ⚠️ THE ANSWER TO THE ONBOARDING TAX, AND IT IS A BUTTON
+                    RATHER THAN AUTOMATIC. Asking costs credits, and asking on
+                    every unknown scan would spend them on the codes somebody was
+                    only checking. A press is what says the question is wanted.
+                  */}
+                  {onIdentify
+                    ? (
+                      <Button variant="secondary" isDisabled={busy} onPress={onIdentify}>
+                        Ask what it is
+                      </Button>
+                    )
+                    : null}
                 </Group>
               </Section>
             );
@@ -221,6 +291,89 @@ export function Scan({
             </Group>
           );
         }}
+      />
+
+      {/*
+        ⚠️ THE PATH FOR EVERYTHING WITH NO BARCODE, OR ONE THAT WILL NOT SCAN,
+        which in a workshop or a kitchen is most of it. It reads the words, the
+        pack size and the pictograms — and the pictograms are the fact no
+        catalogue lookup carries and nobody ever types in.
+      */}
+      {onLabel
+        ? (
+          <Section label="No barcode?">
+            <Group>
+              <PickFile
+                accept={["image/*"]}
+                /* ⚠️ A PHONE PHOTOGRAPH IS FOUR MEGABYTES AND A MODEL DOES NOT
+                   NEED MORE. The ceiling is here rather than at the door because
+                   a file refused after it was uploaded is a wait somebody sat
+                   through for nothing. */
+                most={6 * 1024 * 1024}
+                says="Photograph the label"
+                under="It reads the name, the size and the hazard symbols"
+                label="Choose a photo"
+                busy={busy}
+                onPick={(bytes, file) => { onLabel(asDataUrl(bytes, file.type)); }}
+              />
+            </Group>
+          </Section>
+        )
+        : null}
+
+      {/*
+        ⚠️ A SUGGESTION, AND THE SCREEN SAYS SO IN THE HEADING. Every field below
+        arrived from a model; nothing is recorded until the docked act is
+        pressed. A card headed with the product's name and no other signal is a
+        card people read as a record that already exists.
+      */}
+      <Await
+        of={guess}
+        again={again}
+        waiting={<RowsWaiting rows={4} lead={false} />}
+        then={(got) => (got?.name
+          ? (
+            <Section label="What it looks like">
+              <Group>
+                <NoteRow icon={glyphOf("sparkle")}>
+                  Filled in by a model. Check it before you add it
+                </NoteRow>
+                <FieldRow label="Name" value={got.name} />
+                {got.brand ? <FieldRow label="Brand" value={got.brand} /> : null}
+                {got.category ? <FieldRow label="Category" value={got.category} /> : null}
+                {got.unit ? <FieldRow label="Counted in" value={got.unit} /> : null}
+                {got.pack > 1
+                  ? <FieldRow label="This one holds" value={`${got.pack} ${got.unit}`} />
+                  : null}
+                {/* ⚠️ THE RUNG WITH ITS REASON UNDER IT. "Batched" on its own is
+                    a magic answer; "batched — it has an expiry date" is one
+                    somebody agrees with, or does not, in half a second. */}
+                {got.tracking
+                  ? (
+                    <FieldRow
+                      label="Tracked as"
+                      value={RUNG[got.tracking] ?? got.tracking}
+                      under={got.why || undefined}
+                    />
+                  )
+                  : null}
+                {got.storage ? <FieldRow label="How to store it" value={got.storage} /> : null}
+                {/* ⚠️ HAZARDS ARE SHOWN AND NEVER FILLED IN. A wrong class on a
+                    printed label is a legal document that is wrong, and the
+                    person who printed it answers for it. */}
+                {got.hazards.length
+                  ? (
+                    <NoteRow icon={glyphOf("alert")}>
+                      <span data-ink="warning">
+                        It may be {got.hazards.join(", ").toLowerCase()} — check the label
+                      </span>
+                    </NoteRow>
+                  )
+                  : null}
+              </Group>
+            </Section>
+          )
+          : null)}
       />
     </Screen>
   );

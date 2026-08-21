@@ -23,20 +23,22 @@ import * as React from "react";
 import { ready, type Loaded } from "@engine/design";
 import { INVENTORY } from "../index.js";
 import { LINES, PLACES, EMPTY_PLACE, type Line, type Place } from "./sample.js";
+import { Ask, type Answer } from "./Ask.js";
 import { Count, type Change, type Counted, type Uncovered } from "./Count.js";
 import { Item, type Kept } from "./Item.js";
 import { Kit, type Member, type Missing } from "./Kit.js";
 import { Receive } from "./Receive.js";
-import { Scan, type Seen } from "./Scan.js";
+import { Scan, type Guess, type Seen } from "./Scan.js";
 import { Start } from "./Start.js";
 import { Stock } from "./Stock.js";
 import { Thing, type Batch, type Movement } from "./Thing.js";
 import { Where } from "./Where.js";
 
-export { Count, Item, Kit, Receive, Scan, Start, Stock, Thing, Where };
+export { Ask, Count, Item, Kit, Receive, Scan, Start, Stock, Thing, Where };
 export * from "./sample.js";
 export type {
-  Batch, Change, Counted, Kept, Member, Missing, Movement, Seen, Uncovered,
+  Answer, Batch, Change, Counted, Guess, Kept, Member, Missing, Movement, Seen,
+  Uncovered,
 };
 
 const nothing = () => undefined;
@@ -178,6 +180,30 @@ const MISSING: readonly Missing[] = [
   { product: "t-forceps", name: "Forceps, 14 cm", want: 2, have: 1 },
 ];
 
+/**
+ * ⚠️ WHAT A MODEL MADE OF A CODE NOBODY HAD SEEN, with the rung and its REASON,
+ * because that pair is the whole claim: a suggestion somebody agrees with in
+ * half a second, or does not. A guess with no reason on it is a magic answer.
+ */
+const GUESSED: Guess = {
+  name: "Isopropanol 99%, 1 L", brand: "Fisher", category: "Solvents",
+  unit: "bottle", pack: 1, tracking: "batched",
+  why: "It carries an expiry date and a flammable pictogram",
+  storage: "Keep below 25°C, away from ignition sources",
+  hazards: ["Flammable liquid", "Serious eye irritation"],
+};
+
+/**
+ * ⚠️ AN ANSWER THAT NAMES A PLACE, which is the whole difference between asking
+ * in words and searching. And it read fewer lines than the workspace holds — the
+ * bound is the state worth photographing, because an answer that does not say it
+ * is bounded is "you have none" over a shelf that has some.
+ */
+const ANSWERED: Answer = {
+  answer: "Yes — 6 rolls of masking tape on the Bench, and 4 more in Rack A · A2.",
+  looked: 2,
+};
+
 /** ⚠️ Everything at or below a place, which is what a tree row promises. */
 const under = (places: readonly Place[], here: string | null): ReadonlySet<string> => {
   const held = new Set<string>();
@@ -266,10 +292,30 @@ export function InventoryScreen({ route, onGo }: {
           title={title}
           of={ready(SCANNED)}
           products={LINES.map((l) => ({ id: l.product, label: l.name }))}
+          /* ⚠️ THE SUGGESTION IS ON THE GROUND, because it is the state worth
+             looking at: a code nobody has seen, filled in by a model, waiting
+             for somebody to agree with it. `null` would photograph as the
+             screen before anybody pressed anything. */
+          guess={ready(GUESSED)}
           onRead={nothing}
           onOpen={() => go("/thing")}
           onPlace={() => go("/where")}
           onLearn={nothing}
+          onIdentify={nothing}
+          onLabel={nothing}
+          onAdd={nothing}
+          again={nothing}
+        />
+      );
+    /* ⚠️ ANSWERED RATHER THAN EMPTY, and the answer names a place — which is the
+       whole difference between this and a search box. */
+    case "/ask":
+      return (
+        <Ask
+          title={title}
+          of={ready(ANSWERED)}
+          lines={LINES.length}
+          onAsk={nothing}
           again={nothing}
         />
       );

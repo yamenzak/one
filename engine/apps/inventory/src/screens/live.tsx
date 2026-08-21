@@ -27,7 +27,8 @@ import { Count, type Change, type Counted, type Uncovered } from "./Count.js";
 import { Item, SAID, type Kept } from "./Item.js";
 import { Kit, KIT_SAID, type Member, type Missing } from "./Kit.js";
 import { Receive } from "./Receive.js";
-import { Scan, type Seen } from "./Scan.js";
+import { Ask, type Answer } from "./Ask.js";
+import { Scan, type Guess, type Seen } from "./Scan.js";
 import { Stock } from "./Stock.js";
 import { Thing, type Batch, type Movement, type Piece } from "./Thing.js";
 import { Where } from "./Where.js";
@@ -66,7 +67,10 @@ export interface Mounting {
 }
 
 type Row = Record<string, unknown>;
-type Answer<T> = { ok: true; value: T } | { ok: false; problem: Problem };
+/* ⚠️ `Got` RATHER THAN `Answer`, because `Answer` is what the Ask screen calls
+   the thing a model said. Two meanings of one word in one file is a rename
+   waiting to pick the wrong one. */
+type Got<T> = { ok: true; value: T } | { ok: false; problem: Problem };
 
 /* ------------------------------------------------------------------ reads --- */
 
@@ -77,7 +81,7 @@ type Answer<T> = { ok: true; value: T } | { ok: false; problem: Problem };
  * and a FAILED load draws the same thing. `waiting()` has no data to seed it
  * with, which is what makes that unwriteable rather than discouraged.
  */
-function useAsked<T>(run: () => Promise<Answer<T>>, on: readonly unknown[] = []) {
+function useAsked<T>(run: () => Promise<Got<T>>, on: readonly unknown[] = []) {
   const [of, set] = React.useState<Loaded<T>>(waiting());
   const [tick, again] = React.useReducer((n: number) => n + 1, 0);
 
@@ -468,10 +472,19 @@ const WHERE = (api: Door) => function WhereHere({ go, at }: Mounted) {
 const SCAN = (api: Door) => function ScanHere({ go }: Mounted) {
   const [of, set] = React.useState<Loaded<Seen | null>>(ready(null));
   const [last, setLast] = React.useState("");
+  /* ⚠️ `null` UNTIL SOMEBODY ASKS, AND NEVER FETCHED ON ARRIVAL. A question
+     costs credits; asking one on every unknown scan would spend them on the
+     codes somebody was only checking. */
+  const [guess, setGuess] = React.useState<Loaded<Guess | null>>(ready(null));
+  const [busy, setBusy] = React.useState(false);
   const kinds = useAsked<{ items: readonly Row[] }>(() => api.get("product.list"));
 
   const resolve = React.useCallback((raw: string) => {
     setLast(raw);
+    /* ⚠️ THE OLD SUGGESTION GOES WITH THE OLD CODE. A card describing the last
+       thing scanned, over the next thing scanned, is the wrong product filled in
+       and one press from being recorded. */
+    setGuess(ready(null));
     set(waiting());
     void api.get<Seen>("code.resolve", {
       raw,
@@ -498,11 +511,60 @@ const SCAN = (api: Door) => function ScanHere({ go }: Mounted) {
     ? kinds.of.data.items.map((row) => ({ id: text(row.id), label: text(row.name) }))
     : [];
 
+  /* ⚠️ ONE SHAPE FOR BOTH LANES, because a barcode and a photograph answer the
+     same question and the screen draws one card either way. */
+  const guessing = (op: string, input: unknown) => {
+    setBusy(true);
+    setGuess(waiting());
+    void api.post<Guess>(op, input).then((got) => {
+      setBusy(false);
+      setGuess(got.ok ? ready(got.value) : trouble(got.problem));
+    });
+  };
+
   return (
     <Scan
       title={nameOf("/scan")}
       of={of}
       products={products}
+      guess={guess}
+      busy={busy}
+      onIdentify={() => {
+        const seen = of.status === "ready" ? of.data : null;
+        if (seen) guessing("product.identify", { code: seen.value });
+      }}
+      onLabel={(image) => { guessing("product.read", { image }); }}
+      onAdd={(said) => {
+        setBusy(true);
+        /* ⚠️ THE PRODUCT FIRST, THE CODE SECOND, AND THE SECOND ONLY IF THE
+           FIRST LANDED. A code attached to a product that was never created
+           names nothing for ever, and the next scan of it resolves to a row the
+           catalogue does not have. */
+        void api.post<{ id: string }>("product.create", {
+          name: said.name,
+          brand: said.brand,
+          category: said.category,
+          unit: said.unit || "item",
+          tracking: said.tracking || "counted",
+          storage: said.storage,
+        }).then(async (made) => {
+          if (!made.ok) { setBusy(false); setGuess(trouble(made.problem)); return; }
+          if (last) {
+            await api.post("code.learn", {
+              raw: last, year: new Date().getFullYear(), product: made.value.id,
+              /* ⚠️ HOW IT WAS LEARNED, RECORDED. A code a model suggested and a
+                 code somebody typed deserve different amounts of trust the day
+                 two of them disagree. */
+              source: "ai-assisted",
+              ...(said.pack > 1 ? { pack: said.pack } : {}),
+            });
+          }
+          setBusy(false);
+          setGuess(ready(null));
+          kinds.again();
+          go(`/thing/${made.value.id}`);
+        });
+      }}
       onRead={resolve}
       onOpen={(product) => go(`/thing/${product}`)}
       /* ⚠️ THE LABEL'S OWN CODE, NOT A ROW ID. The place screen resolves it —
@@ -977,6 +1039,41 @@ const stateOf = (v: unknown): KitState =>
   STATES.includes(v as KitState) ? (v as KitState) : "open";
 
 /**
+ * ASKING IN WORDS.
+ *
+ * ⚠️ NOTHING IS ASKED ON ARRIVAL, and that is the whole shape of this container.
+ * Every other screen here fetches when it mounts; a question costs credits, so
+ * this one holds `null` until somebody presses — and an effect would ask one on
+ * every render of a screen nobody typed into.
+ */
+const ASK = (api: Door) => function AskHere() {
+  const [of, set] = React.useState<Loaded<Answer | null>>(ready(null));
+  const [last, setLast] = React.useState("");
+  const today = dayHere();
+  /* ⚠️ HOW MANY LINES THE WORKSPACE HOLDS, so the screen can say when the
+     answer read fewer. A bound nobody is told about is "you have none" over a
+     shelf that has some. */
+  const stock = useAsked<{ items: readonly Row[] }>(() => api.get("stock.list"));
+
+  const ask = (question: string) => {
+    setLast(question);
+    set(waiting());
+    void api.post<Answer>("stock.ask", { question, today })
+      .then((got) => { set(got.ok ? ready(got.value) : trouble(got.problem)); });
+  };
+
+  return (
+    <Ask
+      title={nameOf("/ask")}
+      of={of}
+      lines={stock.of.status === "ready" ? stock.of.data.items.length : 0}
+      onAsk={ask}
+      again={() => { if (last) ask(last); }}
+    />
+  );
+};
+
+/**
  * ⚠️ THE GUIDE IS TICKED BY EVENTS THIS WORKSPACE HAS ACTUALLY RAISED, and until
  * the platform answers that question the honest state is nothing crossed off —
  * never a step ticked because a screen guessed.
@@ -1013,6 +1110,7 @@ export function mount({ register, api }: Mounting): void {
     ["/scan", SCAN(api)],
     ["/receive", RECEIVE(api)],
     ["/count", COUNT(api)],
+    ["/ask", ASK(api)],
     ["/item", ITEM(api)],
     ["/kit", KIT(api)],
     ["/start", START()],

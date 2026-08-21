@@ -239,6 +239,16 @@ if (!stolen) ok(`no screen draws a registered mark itself (${looked} files, ${KN
     "one-space/src/console/Actions.tsx",
     /* A note about what a DRAFT cost — the credits a model spent. */
     "apps/hello/src/screens/Note.tsx",
+    /*
+      ⚠️ ONEINVENTORY'S THREE, AND ALL THREE MEAN EXACTLY WHAT THE MARK MEANS.
+      `Ask` is a screen whose entire content a model wrote, so its nav entry
+      carries it; `Scan` heads the suggestion card with it, because a filled-in
+      product one press from being recorded has to say where the filling came
+      from. The manifest names it for the nav.
+    */
+    "apps/inventory/src/index.ts",
+    "apps/inventory/src/screens/Ask.tsx",
+    "apps/inventory/src/screens/Scan.tsx",
   ]);
 
   let uses = 0;

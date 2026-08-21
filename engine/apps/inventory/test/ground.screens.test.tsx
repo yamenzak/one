@@ -21,7 +21,9 @@ import {
   type Seen, type Uncovered,
 } from "../src/screens/index.js";
 import { LINES, PLACES, EMPTY_PLACE } from "../src/screens/sample.js";
+import { Ask, type Answer } from "../src/screens/Ask.js";
 import { Item, type Kept } from "../src/screens/Item.js";
+import type { Guess } from "../src/screens/Scan.js";
 import { Kit, type Member, type Missing } from "../src/screens/Kit.js";
 
 const html = (route: string) => renderToStaticMarkup(<InventoryScreen route={route} />);
@@ -142,24 +144,32 @@ describe("the location tree", () => {
  * teaches the catalogue, so a screen that treated it as a failure would make the
  * product's main gesture look broken on the day somebody starts.
  */
-describe("the scan screen", () => {
-  const seen = (of: Partial<Seen>): Seen => ({
-    found: false, kind: "gtin", value: "05000112637922", ours: "",
-    product: "", name: "", tracking: "", unit: "", pack: 1,
-    lot: "", expiry: "", needs: "", ...of,
-  });
+/* ⚠️ MODULE SCOPE, because two suites drive this screen: what a scan resolved to,
+   and what a model made of one. Two copies of the harness is two places to keep
+   the prop list right. */
+const seen = (of: Partial<Seen>): Seen => ({
+  found: false, kind: "gtin", value: "05000112637922", ours: "",
+  product: "", name: "", tracking: "", unit: "", pack: 1,
+  lot: "", expiry: "", needs: "", ...of,
+});
 
-  const drawn = (of: Seen | null) => renderToStaticMarkup(
-    <Scan
-      of={ready(of)}
-      products={[{ id: "t-glove", label: "Nitrile gloves, blue" }]}
-      onRead={() => undefined}
-      onOpen={() => undefined}
-      onPlace={() => undefined}
-      onLearn={() => undefined}
-      again={() => undefined}
-    />,
-  );
+const drawn = (of: Seen | null, guess: Guess | null = null) => renderToStaticMarkup(
+  <Scan
+    of={ready(of)}
+    products={[{ id: "t-glove", label: "Nitrile gloves, blue" }]}
+    guess={ready(guess)}
+    onRead={() => undefined}
+    onOpen={() => undefined}
+    onPlace={() => undefined}
+    onLearn={() => undefined}
+    onIdentify={() => undefined}
+    onLabel={() => undefined}
+    onAdd={() => undefined}
+    again={() => undefined}
+  />,
+);
+
+describe("the scan screen", () => {
 
   it("asks what an unknown code is, rather than refusing it", () => {
     const out = drawn(seen({}));
@@ -605,5 +615,111 @@ describe("one kit", () => {
     const out = drawn({ state: "broken", members: [CLAMP] });
     expect(out).not.toContain("Break it up");
     expect(out).not.toContain("Take out");
+  });
+});
+
+
+/**
+ * WHAT A MODEL SUGGESTED, AND THAT IT IS A SUGGESTION.
+ *
+ * ⚠️ A FILLED-IN CARD IS INDISTINGUISHABLE FROM A RECORD unless the screen says
+ * otherwise, and this one is one press from becoming a record. The rung without
+ * its reason is a magic answer; a hazard filled in rather than shown is a legal
+ * document nobody checked. Neither is visible to a compiler — both render
+ * perfectly well.
+ */
+describe("what a model made of a scan", () => {
+  const GUESS: Guess = {
+    name: "Isopropanol 99%, 1 L", brand: "Fisher", category: "Solvents",
+    unit: "bottle", pack: 1, tracking: "batched",
+    why: "It carries an expiry date and a flammable pictogram",
+    storage: "Keep below 25°C", hazards: ["Flammable liquid"],
+  };
+
+  const unknown = seen({});
+
+  it("says the card was filled in by a model", () => {
+    const out = drawn(unknown, GUESS);
+    expect(out).toContain("Filled in by a model");
+    expect(out).toContain("Isopropanol 99%, 1 L");
+  });
+
+  /* ⚠️ THE RUNG CARRIES ITS REASON. "Batched" alone is something somebody
+     accepts because the app said so; with the reason it is something they
+     agree with, or spot as wrong. */
+  it("says why it picked that rung", () => {
+    expect(drawn(unknown, GUESS)).toContain("It carries an expiry date");
+    expect(drawn(unknown, GUESS)).toContain("Batched");
+  });
+
+  /* ⚠️ A HAZARD IS SHOWN AND NEVER FILLED. A wrong class on a printed label is
+     a legal document that is wrong, and the person who printed it answers for
+     it — so the row hedges, and says to check. */
+  it("hedges the hazards and points at the label", () => {
+    const out = drawn(unknown, GUESS);
+    expect(out).toContain("check the label");
+    expect(out).toContain('data-ink="warning"');
+  });
+
+  /* ⚠️ THE SUGGESTION TAKES THE DOCK, because it is then the thing on the
+     screen — and attaching the code to something that already exists stays in
+     the card for when the guess is wrong. */
+  it("offers to add it, rather than to attach the code", () => {
+    expect(drawn(unknown, GUESS)).toContain("Add it");
+    expect(drawn(unknown, null)).toContain("Attach this code");
+  });
+
+  /* ⚠️ AND ASKING IS A PRESS RATHER THAN AUTOMATIC. A question costs credits,
+     and asking one on every unknown scan spends them on the codes somebody was
+     only checking. */
+  it("offers to ask, and asks nothing by itself", () => {
+    const out = drawn(unknown, null);
+    expect(out).toContain("Ask what it is");
+    expect(out).not.toContain("Filled in by a model");
+  });
+});
+
+/**
+ * ASKING IN WORDS, AND THE BOUND ON WHAT IT READ.
+ *
+ * ⚠️ A BOUNDED SUMMARY THAT DOES NOT SAY IT IS BOUNDED IS THE WORST ANSWER THIS
+ * SCREEN COULD GIVE. "You have none" over a shelf that has some, because the two
+ * hundred lines the model was shown did not include it — confident, wrong, and
+ * with nothing on the screen to suggest otherwise.
+ */
+describe("asking in words", () => {
+  const drawnAsk = (of: Answer | null, lines: number) => renderToStaticMarkup(
+    <Ask of={ready(of)} lines={lines} onAsk={() => undefined} again={() => undefined} />,
+  );
+
+  it("shows the answer", () => {
+    expect(drawnAsk({ answer: "Yes — 6 rolls on the Bench.", looked: 40 }, 40))
+      .toContain("6 rolls on the Bench");
+  });
+
+  it("says so when it read fewer lines than the workspace holds", () => {
+    const out = drawnAsk({ answer: "I cannot see any.", looked: 200 }, 4_000);
+    expect(out).toContain("Read ");
+    expect(out).toContain('data-ink="warning"');
+    /* ⚠️ GROUPED, BECAUSE IT IS A NUMBER SOMEBODY COMPARES. "200 of your 4000"
+       puts two figures in two number systems on one line, which is the one
+       place a reader compares hardest. */
+    expect(out).toContain(">4,000<");
+    expect(out).not.toContain("4000 lines");
+  });
+
+  /* ⚠️ AND SAYS NOTHING WHERE IT READ EVERYTHING. On a workspace of forty lines
+     the bound is invisible, and mentioning it is noise on every answer. */
+  it("says nothing about a bound it did not reach", () => {
+    expect(drawnAsk({ answer: "Yes.", looked: 40 }, 40)).not.toContain("of your");
+  });
+
+  /* ⚠️ NOTHING ASKED YET IS A BEGINNING, NOT AN EMPTY STATE. The examples are
+     the whole content of the screen at that moment — and pressing one asks it,
+     because an example somebody has to retype is one they ignore. */
+  it("offers what people ask rather than an empty state", () => {
+    const out = drawnAsk(null, 40);
+    expect(out).toContain("Do we have any blue resin");
+    expect(out).toContain("The answer will appear here");
   });
 });

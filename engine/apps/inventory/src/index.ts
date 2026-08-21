@@ -2798,6 +2798,16 @@ export const INVENTORY: AppSpec = defineApp({
     { id: "kit", route: "/kit", label: "A kit", nav: "none", icon: "layers",
       permission: "stock:read" },
     /* ⚠️ `glow` — pure light, no marks, which is what an arrival wants. */
+    /* ⚠️ ITS OWN DESTINATION RATHER THAN A SECOND FIELD ON `Scan`. Both screens
+       are "tell me about this" and the gestures could not be less alike: one is
+       a camera and one is a sentence, and a screen with a code box beside a
+       question box is a screen where half the questions are scanned.
+
+       ⚠️ AND `sparkle`, WHICH IS RESERVED FOR EXACTLY THIS. It is the one mark
+       in the product that means a model made something, and this is the one
+       surface whose whole content a model made. */
+    { id: "ask", route: "/ask", label: "Ask", nav: "secondary", icon: "sparkle",
+      permission: "stock:read", sky: "glow" },
     { id: "start", route: "/start", label: "Getting started", nav: "secondary", icon: "star",
       permission: "product:read", sky: "glow" },
   ],

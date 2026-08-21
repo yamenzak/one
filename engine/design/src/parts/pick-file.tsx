@@ -153,3 +153,24 @@ export function PickFile({
     </div>
   );
 }
+
+/**
+ * A PICKED FILE AS A `data:` URL.
+ *
+ * ⚠️ IT IS HERE BECAUSE `PickFile` HANDS BACK BYTES, and every caller that wants
+ * to show or send a photograph needs the same six lines. Written per screen they
+ * are written six ways, and one of the six spreads the array into
+ * `String.fromCharCode` — which is correct on a favicon and throws on a
+ * photograph, because the argument list of a call is bounded and a two-megabyte
+ * image is two million arguments.
+ */
+export function asDataUrl(bytes: ArrayBuffer, type: string): string {
+  const of = new Uint8Array(bytes);
+  /* ⚠️ CHUNKED FOR THE REASON ABOVE. 8k at a time is comfortably inside every
+     engine's argument limit and costs nothing measurable. */
+  let raw = "";
+  for (let at = 0; at < of.length; at += 8_192) {
+    raw += String.fromCharCode(...of.subarray(at, at + 8_192));
+  }
+  return `data:${type || "application/octet-stream"};base64,${btoa(raw)}`;
+}
