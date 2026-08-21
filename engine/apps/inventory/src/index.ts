@@ -25,6 +25,10 @@ import { CODE_KINDS, readScan, stillNeeded, unread } from "./code.js";
 import { settleCount, type Change } from "./count.js";
 import { guessedIn, notedIn, readJson, type Noted } from "./reading.js";
 import {
+  RUNS, VERDICTS, landResult, mayLift, mayRelease, reachedIn, refuseRun,
+  type Late, type Run, type RunAct, type Verdict,
+} from "./release.js";
+import {
   KITS, LIVES, checkKit, refuseAct, refuseKitAct, shelfStep, wantsIn,
   type Act, type KitState, type Life, type Short,
 } from "./items.js";
@@ -100,6 +104,11 @@ const product = collection({
     /* ⚠️ Days after opening, which is one of three clocks that can end a
        batch — see `effectiveExpiry`. */
     openDays: field.number({ label: "Days once opened", holds: "none", min: 0, max: 3_650 }),
+    /* ⚠️ THE THIRD CLOCK'S LENGTH, AND IT IS THE PRODUCT'S FOR THE SAME REASON
+       `openDays` IS. "Sterile for 90 days" is a fact about the wrapping and the
+       method, not about one tray — two runs of the same thing disagreeing about
+       it is two answers to one question. */
+    processDays: field.number({ label: "Days once processed", holds: "none", min: 0, max: 3_650 }),
     /*
       ⚠️ SOMETHING RECEIVED BEFORE ANYBODY SAID WHAT IT WAS. The worst outcome in
       this product is a delivery that went unrecorded because a form demanded a
@@ -263,6 +272,26 @@ const batch = collection({
     /* ⚠️ WHEN IT ARRIVED, which is not an expiry and is not decoration: two lots
        with the same printed date are used oldest-received first. */
     received: field.day({ label: "Received", holds: "none" }),
+    /*
+      ⚠️ THE THIRD CLOCK, AND IT IS STAMPED BY A RELEASE RATHER THAN BY A RUN
+      FINISHING. "Sterile for 90 days from processing" counts from the moment a
+      qualified person said the run was good — a machine's own end time would
+      start a shelf life on evidence nobody had read.
+
+      ⚠️ AND IT IS CLEARED WHEN A QUARANTINE IS LIFTED. A lifted item is unfrozen
+      and NOT released; leaving the stamp on would make a tray whose steriliser
+      failed read as sterile for ninety days.
+    */
+    processed: field.day({ label: "Processed", holds: "none" }),
+    /*
+      ⚠️ FROZEN, AND IT IS THE ONE FLAG THAT REFUSES A TAKE. A quarantine nothing
+      enforces is a badge on a screen: the shelf still hands the box over, the
+      person still uses it, and the record says it was held the whole time. See
+      `stockMove`.
+    */
+    standing: field.enum({
+      label: "Standing", holds: "none", values: ["ok", "held"],
+    }),
     note: field.long({ label: "Note", holds: "none", max: 2_000 }),
   },
 });
@@ -383,6 +412,128 @@ const kit = collection({
     /* ⚠️ WHEN SOMEBODY CLAIMED IT WAS COMPLETE. The audit row says who; this is
        what a person reads on the tray's own screen. */
     built: field.day({ label: "Built", holds: "none" }),
+    note: field.long({ label: "Note", holds: "none", max: 2_000 }),
+  },
+});
+
+/**
+ * ONE RUN OVER A SET OF THINGS, PRODUCING EVIDENCE, ENDING IN A NAMED RELEASE.
+ *
+ * ⚠️ THAT SENTENCE IS STERILISATION, CALIBRATION, HEAT TREATMENT, CURING, A QA
+ * HOLD, A COLD-CHAIN REVIEW AND A CLEANING VALIDATION, and it is one shape. A
+ * previous product built it for clinics and could only ever sell it to clinics;
+ * the only thing that made it clinical was the word on the screen.
+ *
+ * ⚠️ AND `ended` IS NOT `released`. A machine finishing its cycle is a fact about
+ * a machine; "this may be used" is a judgement somebody puts their name to after
+ * reading the printout. Collapsing the two makes the green light the
+ * qualification — see `refuseRun`.
+ */
+const process = collection({
+  id: "process",
+  label: { one: "Run", many: "Runs" },
+  scope: { of: "tenant" },
+  permission: "process",
+  retention: null,
+  onClose: { then: "purge" },
+  offline: "queue",
+  /* ⚠️ NOT DELETABLE, EVER. Evidence somebody released against is the record of
+     why they were entitled to; a run that can be removed is a release with
+     nothing behind it. */
+  without: ["create", "update", "delete"],
+  searchable: ["kind", "note"],
+  fields: {
+    /* ⚠️ THE WORKSPACE'S OWN WORD FOR THE RUN — "Autoclave 134°C", "Annual
+       calibration", "Post-cure". Free text because the list is the customer's,
+       and an enum here is the clinical assumption coming back in. */
+    kind: field.text({ label: "What kind of run", required: true, holds: "none", max: 120 }),
+    /* Which machine, oven, bath or bench. */
+    machine: field.text({ label: "Machine", holds: "none", max: 120 }),
+    state: field.enum({
+      label: "Standing", required: true, holds: "none", values: [...RUNS],
+    }),
+    started: field.day({ label: "Started", required: true, holds: "none" }),
+    /* ⚠️ AN INSTANT, NOT A DAY. A cycle is minutes long and two runs of one
+       machine in an afternoon are two records somebody has to tell apart. */
+    ended: field.instant({ label: "Finished", holds: "none" }),
+    released: field.instant({ label: "Released", holds: "none" }),
+    /* ⚠️ WHAT THE EVIDENCE WAS. A printout reference, an indicator lot, a
+       certificate number — the thing somebody would go and look at. */
+    evidence: field.text({ label: "Evidence", holds: "none", max: 200 }),
+    note: field.long({ label: "Note", holds: "none", max: 2_000 }),
+  },
+});
+
+/**
+ * ONE THING A RUN COVERED, AND WHAT THE RUN DECIDED ABOUT IT.
+ *
+ * ⚠️ THE VERDICT IS PER ITEM RATHER THAN PER RUN, because a recall reaches some
+ * of what a run covered and not the rest — the boxes still on a shelf freeze,
+ * and the ones already used are gone. A verdict stored only on the run would
+ * make those two the same row.
+ */
+const processItem = collection({
+  id: "process-item",
+  label: { one: "In the run", many: "In the run" },
+  scope: { of: "tenant" },
+  permission: "process",
+  retention: null,
+  onClose: { then: "purge" },
+  offline: "queue",
+  without: ["create", "update", "delete"],
+  fields: {
+    process: field.ref({ label: "Run", required: true, holds: "none", to: "process" }),
+    batch: field.ref({ label: "Batch", required: true, holds: "none", to: "batch" }),
+    verdict: field.enum({
+      label: "Verdict", required: true, holds: "none", values: [...VERDICTS],
+    }),
+    /* ⚠️ WHY IT WAS LIFTED, WHERE IT WAS. A quarantine lifted with no reason is
+       a freeze somebody undid and nobody can account for. */
+    reason: field.text({ label: "Why", holds: "none", max: 200 }),
+  },
+});
+
+/**
+ * A CONSUMING CONTEXT THAT REFERENCES SOMETHING OUTSIDE THE SYSTEM.
+ *
+ * ⚠️ A PATIENT CASE, A WORK ORDER, A BUILD NUMBER, A SERVICE CALL, A COOK, A ROOM
+ * TURNAROUND — one shape, and what makes it general is that the reference is a
+ * LABEL the workspace chose rather than a record this app holds. The moment it
+ * became a patient it stopped being sellable to a factory.
+ *
+ * ⚠️ AND IT HAS NO LINE TABLE, DELIBERATELY. What a job consumed is already in
+ * the ledger, against this job's id — so the trace is a QUERY rather than a
+ * second copy, and a job correct on Tuesday acquires a concern on Thursday
+ * without anything about the job changing. A status stored at close time cannot
+ * do that, which is the whole reason to read it backwards. See `job.trace`.
+ */
+const job = collection({
+  id: "job",
+  label: { one: "Job", many: "Jobs" },
+  scope: { of: "tenant" },
+  permission: "process",
+  retention: null,
+  onClose: { then: "purge" },
+  offline: "queue",
+  without: ["create", "update", "delete"],
+  searchable: ["ref", "label"],
+  fields: {
+    /*
+      ⚠️ SOMEBODY ELSE'S NUMBER, AND IT IS `contact` BECAUSE IT MAY NAME A PERSON.
+      A work order is a string; a case number in a clinic is a person by another
+      name, and the app cannot tell which it has been given. Declaring it as a
+      holding is what puts it in the processing record, the export and the
+      retention clock — and it is NOT a vault field, because putting the custody
+      machinery in front of a work-order number would make the ordinary case the
+      expensive one.
+    */
+    ref: field.text({ label: "Reference", required: true, holds: "contact", max: 120 }),
+    label: field.text({ label: "What it is", holds: "none", max: 200 }),
+    state: field.enum({
+      label: "Standing", required: true, holds: "none", values: ["open", "closed"],
+    }),
+    opened: field.day({ label: "Opened", required: true, holds: "none" }),
+    closed: field.day({ label: "Closed", holds: "none" }),
     note: field.long({ label: "Note", holds: "none", max: 2_000 }),
   },
 });
@@ -651,9 +802,20 @@ async function stockMove(
   */
   if (batch) {
     const of = await db.prepare(
-      `SELECT product FROM batch WHERE id = ? AND tenant_id = ?`)
-      .bind(batch, ctx.tenantId).first<{ product: string }>();
+      `SELECT product, standing FROM batch WHERE id = ? AND tenant_id = ?`)
+      .bind(batch, ctx.tenantId).first<{ product: string; standing: string | null }>();
     if (!of || of.product !== input.product) ctx.fail("platform.not_found");
+    /*
+      ⚠️ A QUARANTINE THAT DOES NOT REFUSE A TAKE IS A BADGE ON A SCREEN. The
+      shelf still hands the box over, the person still uses it, and the record
+      says it was held the whole time — which is worse than not holding it,
+      because somebody read the badge and believed it.
+
+      ⚠️ AND ONLY A TAKE. Correcting a frozen line, receiving more of the lot and
+      undoing a mis-scan all have to stay possible: freezing stock must not
+      freeze the ability to keep an honest record of it.
+    */
+    if (of.standing === "held" && move === "taken") ctx.fail("inventory.held");
   }
 
   const held = await db.prepare(
@@ -2648,6 +2810,577 @@ const askInWords = operation<
   },
 });
 
+/* -------------------------------------------------------------- the rail --- */
+
+interface Running { id: string; state: Run; }
+
+const runIn = async (c: Ctx, id: string): Promise<Running> => {
+  const of = await (c.db as Db).prepare(
+    `SELECT id, state FROM process WHERE id = ? AND tenant_id = ?`)
+    .bind(id, c.tenantId).first<Running>();
+  if (!of) return c.fail("platform.not_found");
+  return of;
+};
+
+/* ⚠️ ONE REFUSAL SHAPE FOR EVERY ACT ON A RUN, and the sentence comes from the
+   pure rule — two spellings of "it has not finished yet" is how a screen and a
+   door come to disagree about what is possible. */
+const refuseOn = (c: Ctx, state: Run, act: RunAct): void => {
+  const why = refuseRun(state, act);
+  if (why) c.fail("inventory.wrongRun", { why });
+};
+
+/** ⚠️ Every batch a run covered, with what is still on a shelf to freeze. */
+const membersOf = async (c: Ctx, run: string) => {
+  const rows = await (c.db as Db).prepare(
+    `SELECT i.batch AS batch, i.verdict AS verdict,
+            COALESCE((SELECT SUM(s.quantity) FROM stock s WHERE s.batch = i.batch), 0) AS quantity
+       FROM process_item i
+      WHERE i.tenant_id = ? AND i.process = ?`)
+    .bind(c.tenantId, run)
+    .all<{ batch: string; verdict: Verdict; quantity: number }>();
+  return rows.results;
+};
+
+const openRun = operation<
+  { kind: string; machine?: string; day: string }, { id: string }
+>({
+  id: "process.open",
+  kind: "write",
+  summary: "Start a run",
+  input: {
+    kind: field.text({ label: "What kind of run", required: true, holds: "none", max: 120 }),
+    machine: field.text({ label: "Machine", holds: "none", max: 120 }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+  },
+  output: { id: field.text({ label: "Run", holds: "none" }) },
+  permission: "process:run",
+  entitlement: "processes",
+  idempotency: { mode: "key" },
+  emits: ["process.opened"],
+  outcome: { message: "Started.", tone: "success", invalidates: ["process.list"] },
+  audit: (input) => ({ subject: input.kind, verb: "started a run of" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const id = newId("prc", new Date(c.now));
+    await (c.db as Db).prepare(
+      `INSERT INTO process (id, tenant_id, kind, machine, state, started, at, by)
+        VALUES (?, ?, ?, ?, 'open', ?, ?, ?)`)
+      .bind(id, c.tenantId, input.kind, input.machine ?? null, input.day, c.now,
+        c.accountId ?? null).run();
+    return { id };
+  },
+});
+
+const loadRun = operation<{ process: string; batch: string }, { items: number }>({
+  id: "process.put",
+  kind: "write",
+  summary: "Put something into a run",
+  input: {
+    process: field.text({ label: "Run", required: true, holds: "none" }),
+    batch: field.text({ label: "Batch", required: true, holds: "none" }),
+  },
+  output: { items: field.number({ label: "In the run", holds: "none" }) },
+  permission: "process:run",
+  entitlement: "processes",
+  idempotency: { mode: "key" },
+  emits: ["process.loaded"],
+  outcome: { message: "In.", tone: "success", invalidates: ["process.list"] },
+  fails: ["platform.not_found", "inventory.wrongRun"],
+  audit: (input) => ({ subject: input.process, verb: "loaded" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const run = await runIn(c, input.process);
+    refuseOn(c, run.state, "put");
+
+    const held = await db.prepare(
+      `SELECT id FROM batch WHERE id = ? AND tenant_id = ?`)
+      .bind(input.batch, c.tenantId).first<{ id: string }>();
+    if (!held) return c.fail("platform.not_found");
+
+    await db.prepare(
+      `INSERT INTO process_item (id, tenant_id, process, batch, verdict, at, by)
+        VALUES (?, ?, ?, ?, 'pending', ?, ?)
+        ON CONFLICT (id) DO NOTHING`)
+      .bind(`pri_${run.id}_${input.batch}`, c.tenantId, run.id, input.batch, c.now,
+        c.accountId ?? null).run();
+
+    return { items: (await membersOf(c, run.id)).length };
+  },
+});
+
+/**
+ * ⚠️ ENDING IS A FACT ABOUT A MACHINE AND NOTHING ELSE. It records that the cycle
+ * finished and it releases nothing — the gap between here and `process.release`
+ * is where a qualified person reads the printout, and a product without the gap
+ * has decided that a green light is a qualification.
+ */
+const endRun = operation<
+  { process: string; evidence?: string }, { state: string }
+>({
+  id: "process.end",
+  kind: "write",
+  summary: "Record that a run finished",
+  input: {
+    process: field.text({ label: "Run", required: true, holds: "none" }),
+    evidence: field.text({ label: "Evidence", holds: "none", max: 200 }),
+  },
+  output: { state: field.text({ label: "Standing", holds: "none" }) },
+  permission: "process:run",
+  entitlement: "processes",
+  idempotency: { mode: "key" },
+  emits: ["process.ended"],
+  outcome: { message: "Finished.", tone: "success", invalidates: ["process.list"] },
+  fails: ["platform.not_found", "inventory.wrongRun"],
+  audit: (input) => ({ subject: input.process, verb: "finished" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const run = await runIn(c, input.process);
+    refuseOn(c, run.state, "end");
+
+    await (c.db as Db).prepare(
+      `UPDATE process SET state = 'ended', ended = ?, evidence = COALESCE(?, evidence),
+              edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ? AND state = 'open'`)
+      .bind(c.now, input.evidence?.trim() || null, c.now, c.accountId ?? null,
+        run.id, c.tenantId).run();
+
+    /* ⚠️ SAID PLAINLY, BECAUSE THE SCREEN HAS TO SAY IT. A run that finished and
+       reads as done is the failure this whole rail exists to prevent. */
+    return { state: "ended" };
+  },
+});
+
+/**
+ * THE RELEASE — a person, a name, a time.
+ *
+ * ⚠️ IT IS `process:release` AND NOT `process:run`, WHICH IS THE POINT. The
+ * person loading the autoclave and the person qualified to say its output may be
+ * used are frequently not the same person, and where they are, that is the
+ * workspace's decision to make by granting both. Sharing one permission takes
+ * the decision away and calls it simplicity.
+ *
+ * ⚠️ AND ONLY A PENDING ITEM IS RELEASED — see `mayRelease`. A failed one has to
+ * be run again and a lifted one is a failed one somebody unfroze; either
+ * reaching `released` through this door would be the quarantine ladder run
+ * backwards, which is the one direction it may never go.
+ */
+const releaseRun = operation<
+  { process: string; day: string }, { released: number }
+>({
+  id: "process.release",
+  kind: "write",
+  summary: "Release what a run produced",
+  input: {
+    process: field.text({ label: "Run", required: true, holds: "none" }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+  },
+  output: { released: field.number({ label: "Released", holds: "none" }) },
+  permission: "process:release",
+  entitlement: "processes",
+  idempotency: { mode: "key" },
+  emits: ["process.released"],
+  outcome: { message: "Released.", tone: "success", invalidates: ["process.list", "batch.due"] },
+  fails: ["platform.not_found", "inventory.wrongRun"],
+  audit: (input) => ({ subject: input.process, verb: "released" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const run = await runIn(c, input.process);
+    refuseOn(c, run.state, "release");
+
+    const members = await membersOf(c, run.id);
+    let released = 0;
+    for (const item of members) {
+      if (!mayRelease(item.verdict)) continue;
+      await db.prepare(
+        `UPDATE process_item SET verdict = 'released', edited_at = ?, edited_by = ?
+          WHERE tenant_id = ? AND process = ? AND batch = ? AND verdict = 'pending'`)
+        .bind(c.now, c.accountId ?? null, c.tenantId, run.id, item.batch).run();
+      /* ⚠️ THE THIRD CLOCK STARTS HERE AND NOT WHEN THE MACHINE STOPPED. "Sterile
+         for ninety days from processing" counts from the moment somebody read the
+         evidence and said yes. */
+      await db.prepare(
+        `UPDATE batch SET processed = ?, standing = 'ok', edited_at = ?, edited_by = ?
+          WHERE id = ? AND tenant_id = ?`)
+        .bind(input.day, c.now, c.accountId ?? null, item.batch, c.tenantId).run();
+      released++;
+    }
+
+    await db.prepare(
+      `UPDATE process SET state = 'released', released = ?, edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ? AND state = 'ended'`)
+      .bind(c.now, c.now, c.accountId ?? null, run.id, c.tenantId).run();
+
+    return { released };
+  },
+});
+
+/**
+ * ⚠️ FAILING FREEZES WHAT THE RUN COVERED, and the freeze is what makes it more
+ * than a status. A tray whose steriliser failed and that the shelf still hands
+ * over is a tray somebody uses — see `stockMove`, which refuses a take from a
+ * held batch.
+ */
+const failRun = operation<
+  { process: string; reason: string }, { frozen: number }
+>({
+  id: "process.fail",
+  kind: "write",
+  summary: "Fail a run and freeze what it covered",
+  input: {
+    process: field.text({ label: "Run", required: true, holds: "none" }),
+    reason: field.text({ label: "Why", required: true, holds: "none", max: 200 }),
+  },
+  output: { frozen: field.number({ label: "Frozen", holds: "none" }) },
+  permission: "process:release",
+  entitlement: "processes",
+  idempotency: { mode: "key" },
+  emits: ["process.failed"],
+  outcome: { message: "Failed.", tone: "warning", invalidates: ["process.list", "stock.list"] },
+  fails: ["platform.not_found", "platform.invalid", "inventory.wrongRun"],
+  audit: (input) => ({ subject: input.process, verb: "failed" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const run = await runIn(c, input.process);
+    refuseOn(c, run.state, "fail");
+    if (!input.reason.trim()) {
+      return c.fail("platform.invalid", {}, { fields: { reason: "Say what went wrong" } });
+    }
+    return { frozen: await freeze(c, run.id, input.reason.trim(), "failed") };
+  },
+});
+
+/**
+ * ⚠️ A RECALL FREEZES WHAT IT CAN REACH AND NAMES WHAT IT CANNOT. The report that
+ * lists four frozen boxes and says nothing about the six already used has told
+ * somebody the problem is solved — and those six are the entire reason the
+ * recall is happening.
+ */
+const recallRun = operation<
+  { process: string; reason: string }, { frozen: number; gone: readonly string[] }
+>({
+  id: "process.recall",
+  kind: "write",
+  summary: "Call back what a run released",
+  input: {
+    process: field.text({ label: "Run", required: true, holds: "none" }),
+    reason: field.text({ label: "Why", required: true, holds: "none", max: 200 }),
+  },
+  output: {
+    frozen: field.number({ label: "Frozen", holds: "none" }),
+    /* ⚠️ NAMED, NOT COUNTED. "Six could not be reached" is a number; the lots
+       are what somebody rings a customer about. */
+    gone: field.json({ label: "Could not be reached", holds: "none" }),
+  },
+  permission: "process:release",
+  entitlement: "processes",
+  idempotency: { mode: "key" },
+  emits: ["process.recalled"],
+  outcome: { message: "Called back.", tone: "danger", invalidates: ["process.list", "stock.list"] },
+  fails: ["platform.not_found", "platform.invalid", "inventory.wrongRun"],
+  audit: (input) => ({ subject: input.process, verb: "recalled" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const run = await runIn(c, input.process);
+    refuseOn(c, run.state, "recall");
+    if (!input.reason.trim()) {
+      return c.fail("platform.invalid", {}, { fields: { reason: "Say what went wrong" } });
+    }
+    const reach = reachedIn(await membersOf(c, run.id));
+    const frozen = await freeze(c, run.id, input.reason.trim(), "recalled");
+    return { frozen, gone: reach.gone };
+  },
+});
+
+/**
+ * ⚠️ ONE FREEZE FOR BOTH DOORS. Failing and recalling differ in WHEN they happen
+ * and in what they mean; what they do to the shelf is identical, and two copies
+ * of it is two chances for one of them to stop holding stock.
+ */
+async function freeze(c: Ctx, run: string, reason: string, to: Run): Promise<number> {
+  const db = c.db as Db;
+  const members = await membersOf(c, run);
+  let frozen = 0;
+  for (const item of members) {
+    await db.prepare(
+      `UPDATE process_item SET verdict = 'failed', reason = ?, edited_at = ?, edited_by = ?
+        WHERE tenant_id = ? AND process = ? AND batch = ?`)
+      .bind(reason, c.now, c.accountId ?? null, c.tenantId, run, item.batch).run();
+    /* ⚠️ AND THE STAMP COMES OFF. A batch frozen by a failed run that kept its
+       `processed` date would go on reading as released for the length of the
+       shelf life somebody has just withdrawn. */
+    const out = await db.prepare(
+      `UPDATE batch SET standing = 'held', processed = NULL, edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ?`)
+      .bind(c.now, c.accountId ?? null, item.batch, c.tenantId).run();
+    if (out.meta?.changes) frozen++;
+  }
+  await db.prepare(
+    `UPDATE process SET state = ?, edited_at = ?, edited_by = ?
+      WHERE id = ? AND tenant_id = ?`)
+    .bind(to, c.now, c.accountId ?? null, run, c.tenantId).run();
+  return frozen;
+}
+
+/**
+ * LIFTING A QUARANTINE.
+ *
+ * ⚠️ IT LIFTS TO "NEEDS WORK" AND NEVER TO "GOOD TO GO". The thing is unfrozen —
+ * holding stock frozen for ever because a form cannot be completed is how a rule
+ * gets worked around — and it is still not released: the verdict becomes
+ * `lifted` and the processed stamp stays off. A tray whose steriliser failed is
+ * not sterile because somebody pressed a button.
+ */
+const liftHold = operation<
+  { process: string; batch: string; reason: string }, { verdict: string }
+>({
+  id: "process.lift",
+  kind: "write",
+  summary: "Lift a quarantine, without releasing it",
+  input: {
+    process: field.text({ label: "Run", required: true, holds: "none" }),
+    batch: field.text({ label: "Batch", required: true, holds: "none" }),
+    reason: field.text({ label: "Why", required: true, holds: "none", max: 200 }),
+  },
+  output: { verdict: field.text({ label: "Verdict", holds: "none" }) },
+  permission: "process:release",
+  entitlement: "processes",
+  idempotency: { mode: "key" },
+  emits: ["process.lifted"],
+  outcome: { message: "Unfrozen.", tone: "warning", invalidates: ["process.list", "stock.list"] },
+  fails: ["platform.not_found", "platform.invalid", "inventory.wrongRun"],
+  audit: (input) => ({ subject: input.batch, verb: "unfroze" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    if (!input.reason.trim()) {
+      return c.fail("platform.invalid", {}, { fields: { reason: "Say why it is being unfrozen" } });
+    }
+
+    const item = await db.prepare(
+      `SELECT verdict FROM process_item
+        WHERE tenant_id = ? AND process = ? AND batch = ?`)
+      .bind(c.tenantId, input.process, input.batch).first<{ verdict: Verdict }>();
+    if (!item) return c.fail("platform.not_found");
+    if (!mayLift(item.verdict)) {
+      return c.fail("inventory.wrongRun", { why: "That one is not frozen" });
+    }
+
+    await db.prepare(
+      `UPDATE process_item SET verdict = 'lifted', reason = ?, edited_at = ?, edited_by = ?
+        WHERE tenant_id = ? AND process = ? AND batch = ? AND verdict = 'failed'`)
+      .bind(input.reason.trim(), c.now, c.accountId ?? null, c.tenantId,
+        input.process, input.batch).run();
+    /* ⚠️ UNFROZEN AND NOT RELEASED — `processed` stays null, so every clock that
+       reads it still says this was never processed. */
+    await db.prepare(
+      `UPDATE batch SET standing = 'ok', edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ?`)
+      .bind(c.now, c.accountId ?? null, input.batch, c.tenantId).run();
+
+    return { verdict: "lifted" };
+  },
+});
+
+/**
+ * A RESULT THAT ARRIVED AFTERWARDS.
+ *
+ * ⚠️ A LATE RESULT THAT CONTRADICTS AN EARLIER ONE IS REFUSED, NEVER APPLIED. A
+ * "pass" landing on a failed run un-fails something somebody already acted on; a
+ * "pass" landing on a recalled one erases the evidence the recall was justified
+ * by. What a contradiction means is that two facts disagree and a person has to
+ * look — so this refuses, and says which two.
+ *
+ * ⚠️ AND A LATE FAILURE ON A RELEASED RUN IS NOT A CONTRADICTION, IT IS A RECALL.
+ * That is the ordinary case the whole rail is built for: the cycle looked fine,
+ * the indicator says otherwise at twenty-four hours, and everything that went out
+ * has to be called back.
+ */
+const lateResult = operation<
+  { process: string; said: Late; reason?: string }, { did: string; frozen: number }
+>({
+  id: "process.result",
+  kind: "write",
+  summary: "Record a result that arrived after the run",
+  input: {
+    process: field.text({ label: "Run", required: true, holds: "none" }),
+    said: field.text({ label: "It says", required: true, holds: "none" }),
+    reason: field.text({ label: "Why", holds: "none", max: 200 }),
+  },
+  output: {
+    did: field.text({ label: "What happened", holds: "none" }),
+    frozen: field.number({ label: "Frozen", holds: "none" }),
+  },
+  permission: "process:release",
+  entitlement: "processes",
+  idempotency: { mode: "key" },
+  emits: ["process.result", "process.recalled"],
+  outcome: { message: "Recorded.", tone: "warning", invalidates: ["process.list", "stock.list"] },
+  fails: ["platform.not_found", "platform.invalid", "inventory.contradicts"],
+  audit: (input) => ({ subject: input.process, verb: "recorded a result for" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const run = await runIn(c, input.process);
+    const said: Late = input.said === "failed" ? "failed" : "passed";
+    const landing = landResult(run.state, said);
+
+    if (landing === "refused") {
+      return c.fail("inventory.contradicts", { was: run.state, said });
+    }
+    /* ⚠️ "SAME" IS NOT A NO-OP DRESSED AS SUCCESS — it is a result agreeing with
+       what is already recorded, which is the commonest late result there is and
+       is worth answering plainly rather than refusing. */
+    if (landing === "same") return { did: "same", frozen: 0 };
+
+    const why = input.reason?.trim() || `A late result said ${said}`;
+    return { did: landing, frozen: await freeze(c, run.id, why, landing === "recall" ? "recalled" : "failed") };
+  },
+});
+
+/* --------------------------------------------------------------- the job --- */
+
+const openJob = operation<
+  { ref: string; label?: string; day: string }, { id: string }
+>({
+  id: "job.open",
+  kind: "write",
+  summary: "Open a job",
+  input: {
+    ref: field.text({ label: "Reference", required: true, holds: "contact", max: 120 }),
+    label: field.text({ label: "What it is", holds: "none", max: 200 }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+  },
+  output: { id: field.text({ label: "Job", holds: "none" }) },
+  permission: "process:run",
+  entitlement: "jobs",
+  idempotency: { mode: "key" },
+  emits: ["job.opened"],
+  outcome: { message: "Opened.", tone: "success", invalidates: ["job.list"] },
+  audit: (input) => ({ subject: input.ref, verb: "opened a job for" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const id = newId("job", new Date(c.now));
+    await (c.db as Db).prepare(
+      `INSERT INTO job (id, tenant_id, ref, label, state, opened, at, by)
+        VALUES (?, ?, ?, ?, 'open', ?, ?, ?)`)
+      .bind(id, c.tenantId, input.ref, input.label ?? null, input.day, c.now,
+        c.accountId ?? null).run();
+    return { id };
+  },
+});
+
+const closeJob = operation<{ job: string; day: string }, { state: string }>({
+  id: "job.close",
+  kind: "write",
+  summary: "Close a job",
+  input: {
+    job: field.text({ label: "Job", required: true, holds: "none" }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+  },
+  output: { state: field.text({ label: "Standing", holds: "none" }) },
+  permission: "process:run",
+  entitlement: "jobs",
+  idempotency: { mode: "key" },
+  emits: ["job.closed"],
+  outcome: { message: "Closed.", tone: "success", invalidates: ["job.list"] },
+  fails: ["platform.not_found"],
+  audit: (input) => ({ subject: input.job, verb: "closed" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const out = await (c.db as Db).prepare(
+      `UPDATE job SET state = 'closed', closed = ?, edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ? AND state = 'open'`)
+      .bind(input.day, c.now, c.accountId ?? null, input.job, c.tenantId).run();
+    /* ⚠️ CLOSING A CLOSED JOB IS NOT AN ERROR, it is somebody pressing twice —
+       but a job that never existed is an address that names nothing. */
+    if (!out.meta?.changes) {
+      const held = await (c.db as Db).prepare(
+        `SELECT id FROM job WHERE id = ? AND tenant_id = ?`)
+        .bind(input.job, c.tenantId).first<{ id: string }>();
+      if (!held) return c.fail("platform.not_found");
+    }
+    return { state: "closed" };
+  },
+});
+
+/**
+ * WHAT A JOB CONSUMED, AND WHETHER ANY OF IT IS NOW IN DOUBT.
+ *
+ * ⚠️ IT READS BACKWARDS AND IT IS DERIVED AT READ TIME, which is the whole reason
+ * this is a query rather than a stored status. A job correct on Tuesday acquires
+ * a concern on Thursday without anything about the job changing — a recall lands
+ * on a lot it used — and a status written when the job closed can never learn
+ * that. This joins to what the batches say NOW.
+ */
+interface Consumed {
+  movement: string; product: string; name: string; quantity: number;
+  batch: string; lot: string; at: string; doubt: string;
+}
+
+const traceJob = operation<
+  { job: string }, { items: readonly Consumed[]; doubted: number }
+>({
+  id: "job.trace",
+  kind: "read",
+  summary: "What a job used, and what is now in doubt",
+  input: { job: field.text({ label: "Job", required: true, holds: "none" }) },
+  output: {
+    items: field.json({ label: "What it used", holds: "none" }),
+    doubted: field.number({ label: "In doubt", holds: "none" }),
+  },
+  permission: "process:read",
+  entitlement: "jobs",
+  idempotency: { mode: "none" },
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const rows = await (c.db as Db).prepare(
+      /*
+        ⚠️ THE LEDGER IS THE LINE TABLE. Every take against this job already
+        named it in `against`, so a second table of job lines would be a copy
+        that can disagree with the history — and the history is what an audit
+        reads.
+      */
+      `SELECT l.id AS movement, l.product AS product, l.delta AS delta, l.at AS at,
+              COALESCE(l.batch, '') AS batch, COALESCE(b.lot, '') AS lot,
+              COALESCE(b.standing, '') AS standing, p.name AS name,
+              COALESCE((SELECT i.verdict FROM process_item i
+                         WHERE i.tenant_id = l.tenant_id AND i.batch = l.batch
+                         ORDER BY i.at DESC LIMIT 1), '') AS verdict
+         FROM ledger l
+         JOIN product p ON p.id = l.product
+         LEFT JOIN batch b ON b.id = l.batch
+        WHERE l.tenant_id = ? AND l.against = ? AND l.move = 'taken'
+        ORDER BY l.at DESC`)
+      .bind(c.tenantId, input.job)
+      .all<{ movement: string; product: string; delta: number; at: string;
+        batch: string; lot: string; standing: string; name: string; verdict: string }>();
+
+    const items = rows.results.map((row): Consumed => ({
+      movement: row.movement,
+      product: row.product,
+      name: row.name,
+      quantity: Math.abs(row.delta),
+      batch: row.batch,
+      lot: row.lot,
+      at: row.at,
+      /*
+        ⚠️ THE DOUBT IS COMPUTED HERE, FROM WHAT IS TRUE NOW. A lot frozen since
+        the job closed is a concern; one a run failed and somebody unfroze is a
+        different concern, and both are the reason this read exists.
+      */
+      doubt: row.standing === "held"
+        ? "held"
+        : row.verdict === "failed" || row.verdict === "lifted"
+          ? "not released"
+          : "",
+    }));
+
+    return { items, doubted: items.filter((i) => i.doubt).length };
+  },
+});
+
 /**
  * WHAT A NEW PRODUCT STARTS AS — the workspace's answer, not the form's.
  *
@@ -2708,6 +3441,15 @@ export const INVENTORY: AppSpec = defineApp({
       */
       "stock:move", "stock:adjust",
       "ledger:read",
+      /*
+        ⚠️ RUNNING A PROCESS AND RELEASING WHAT IT PRODUCED ARE DIFFERENT GRANTS,
+        and it is the same rule as taking against correcting one level up. The
+        person loading the autoclave and the person qualified to say its output
+        may be used on somebody are frequently not the same person; where they
+        are, the workspace grants both — sharing one permission takes that
+        decision away and calls it simplicity.
+      */
+      "process:read", "process:run", "process:release",
     ],
     roles: {
       /* ⚠️ The one who looks after the stock: receives, corrects, edits the
@@ -2715,11 +3457,19 @@ export const INVENTORY: AppSpec = defineApp({
       keeper: [
         "product:read", "product:write", "location:read", "location:write",
         "stock:read", "stock:move", "stock:adjust", "ledger:read",
+        "process:read", "process:run", "process:release",
       ],
       /* ⚠️ THE COMMON ROLE, and the reason the split above exists. Most people
          in most workspaces only ever take things. */
-      user: ["product:read", "location:read", "stock:read", "stock:move"],
-      viewer: ["product:read", "location:read", "stock:read", "ledger:read"],
+      /* ⚠️ RUNS BUT DOES NOT RELEASE. Loading a machine is ordinary work; saying
+         its output may be used is the judgement the rail exists for. */
+      user: [
+        "product:read", "location:read", "stock:read", "stock:move",
+        "process:read", "process:run",
+      ],
+      viewer: [
+        "product:read", "location:read", "stock:read", "ledger:read", "process:read",
+      ],
     },
     founding: "keeper",
     /* ⚠️ Seats count PLATFORM staff — a person is on the team or they are not,
@@ -2742,15 +3492,31 @@ export const INVENTORY: AppSpec = defineApp({
   entitlements: {
     products: { label: "Products", withheld: "quota" },
     locations: { label: "Locations", withheld: "quota" },
+    /*
+      ⚠️ `gate` RATHER THAN `quota`, BECAUSE THESE ARE CAPABILITIES AND NOT
+      COUNTS. A workspace either does regulated runs or it does not, and there is
+      no number of sterilisation cycles that makes sense as a monthly allowance.
+
+      ⚠️ AND ADDING THEM IS A RED BUILD UNTIL EVERY TIER PRICES THEM. That is the
+      feature: a key no plan mentions resolves to `false` for everybody, so the
+      capability is built, gated, and sold to nobody — silently, on every tier.
+    */
+    processes: { label: "Runs and releases", withheld: "gate" },
+    jobs: { label: "Jobs", withheld: "gate" },
   },
 
-  collections: [product, code, location, batch, unit, kit, count, tally, stock, ledger],
+  collections: [
+    product, code, location, batch, unit, kit, process, processItem, job,
+    count, tally, stock, ledger,
+  ],
   operations: [
     receive, take, adjust, arrive, undo, starts, resolve, learn, open, due,
     openCount, tallyUp, differs, closeCount,
     issue, giveBack, serve, retire, dueService,
     assemble, putIn, takeOut, checking, build, breakUp,
     identify, readLabel, readNote, askInWords,
+    openRun, loadRun, endRun, releaseRun, failRun, recallRun, liftHold, lateResult,
+    openJob, closeJob, traceJob,
   ],
 
   /*
@@ -2959,6 +3725,39 @@ export const INVENTORY: AppSpec = defineApp({
       a tray recorded as sterile in March must never be the same record as one
       assembled in August.
     */
+    /*
+      ⚠️ ONE REFUSAL FOR EVERY ACT A RUN'S STANDING FORBIDS. Releasing something
+      that has not finished, failing something already decided, recalling a run
+      that released nothing — three mistakes with three fixes, so the WHY is the
+      variable and the shape is one.
+    */
+    "inventory.wrongRun": {
+      status: 409, retryable: false, tone: "warning",
+      title: "Not at this point in the run",
+      detail: "{why}.",
+    },
+    /*
+      ⚠️ A LATE RESULT THAT CONTRADICTS AN EARLIER ONE IS REFUSED, NEVER APPLIED,
+      and this is the rule the whole record exists to protect. A pass landing on
+      a failed run un-fails something somebody already acted on; one landing on a
+      recalled run erases the evidence the recall was justified by. Two facts
+      disagree, and a person has to look at both.
+    */
+    "inventory.contradicts": {
+      status: 409, retryable: false, tone: "danger",
+      title: "That contradicts what is recorded",
+      detail: "The run is {was} and this result says {said}. Nothing was changed.",
+    },
+    /*
+      ⚠️ A QUARANTINE THAT DOES NOT REFUSE A TAKE IS A BADGE ON A SCREEN. The
+      shelf hands the box over, somebody uses it, and the record says it was held
+      the whole time — which is worse than not holding it at all.
+    */
+    "inventory.held": {
+      status: 409, retryable: false, tone: "danger",
+      title: "That lot is frozen",
+      detail: "A run it was in was failed or called back. It cannot be used.",
+    },
     "inventory.wrongKit": {
       status: 409, retryable: false, tone: "warning",
       title: "Not while it is where it is",

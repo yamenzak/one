@@ -2757,6 +2757,15 @@
       "fails": "an expiry read off a blurred label committed as a fact — a perfectly valid date that nothing anywhere will ever question"
     },
     {
+      "id": "a-quarantine-lifts-to-needs-work-and-never-to-good-to-go",
+      "protects": "D12",
+      "stage": "66",
+      "status": "live",
+      "impl": "scripts/release-ladder.test.mjs",
+      "proves": "without checking it was pending",
+      "fails": "a tray whose steriliser failed reading as released for the length of its shelf life, and being used on somebody"
+    },
+    {
       "id": "a-movement-refuses-rather-than-landing-on-zero",
       "protects": "D12",
       "stage": "60",
