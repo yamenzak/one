@@ -62,6 +62,10 @@ const SURFACES = {
   plans: { file: "design/src/rendered/console.tsx", renders: "export function Shelf" },
   entitlements: { file: "design/src/rendered/console.tsx", renders: "export function Shelf" },
   whitelabel: { file: "design/src/tokens/theme.ts", renders: "export function brandCss" },
+  /* ⚠️ ON THE ROSTER, BESIDE THE ROLE, because "what may they do" and "where do
+     they do it" are two halves of one answer about one person (D45). A separate
+     screen would be a second place to look for somebody's access. */
+  reach: { file: "one-space/src/centre/People.tsx", renders: "function AppWhere" },
   guide: { file: "design/src/rendered/guide.tsx", renders: "export function Guide" },
   milestones: { file: "design/src/rendered/guide.tsx", renders: "export function Milestones" },
   help: { file: "design/src/rendered/guide.tsx", renders: "export function Help" },

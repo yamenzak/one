@@ -113,6 +113,13 @@
       "retryable": false
     },
     {
+      "code": "platform.out_of_reach",
+      "status": 403,
+      "title": "That is not one of your {places}",
+      "tone": "warning",
+      "retryable": false
+    },
+    {
       "code": "platform.proof_required",
       "status": 401,
       "title": "Confirm it is you",
@@ -176,6 +183,20 @@
         "kind": "write",
         "method": "POST",
         "path": "/api/member.role",
+        "permission": "member:manage"
+      },
+      {
+        "id": "member.places",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/member.places",
+        "permission": "member:manage"
+      },
+      {
+        "id": "member.reach",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/member.reach",
         "permission": "member:manage"
       },
       {

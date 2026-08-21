@@ -121,6 +121,18 @@ export const PLATFORM_PROBLEMS: ProblemCatalog = {
     title: "This is for business workspaces",
     detail: "Make {workspace} a business to use it.",
   },
+  /*
+    ⚠️ NOT `forbidden`, AND THE DIFFERENCE IS WHAT SOMEBODY DOES NEXT. Forbidden
+    is about the person — they do not have the permission, and no amount of
+    walking to another shelf changes it. This is about the PLACE: they may do
+    this, somewhere else, and the sentence that helps is the one naming where
+    they work.
+  */
+  "platform.out_of_reach": {
+    status: 403, retryable: false, tone: "warning",
+    title: "That is not one of your {places}",
+    detail: "Ask somebody who runs this workspace to add it.",
+  },
   "platform.proof_required": {
     status: 401, retryable: true, tone: "info",
     title: "Confirm it is you",

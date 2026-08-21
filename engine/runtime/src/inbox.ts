@@ -186,6 +186,16 @@ export async function audienceFor(
   dispatch: Dispatch,
   available: readonly Channel[],
 ): Promise<readonly Told[]> {
+  /*
+    ⚠️ THE AUDIENCE IS A PERMISSION AND NOT A REACH, WHICH IS DELIBERATE (D45).
+    Somebody narrowed to one site cannot READ another site's rows, and it does
+    not follow that they should not be TOLD: every note this platform's products
+    raise today is a workspace-wide summary — "three things expiring", "a run
+    needs releasing" — and narrowing a count to a place would report a smaller
+    number as if it were the whole one. A note ABOUT a place is the case that
+    would want it, and no product declares one; the day one does, it is a field
+    on `Dispatch` rather than a rule written here.
+  */
   const def = book[dispatch.type];
   if (!def) return [];
 

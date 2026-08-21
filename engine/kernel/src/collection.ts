@@ -71,6 +71,20 @@ export interface CollectionSpec {
    * un-indexed later — so what leaves is named, one field at a time, in review.
    */
   readonly searchable?: readonly string[];
+  /**
+   * WHICH OF ITS OWN FIELDS SAYS WHERE THE RECORD IS.
+   *
+   * ⚠️ A COLLECTION THAT HAS ONE AND DOES NOT SAY SO IS THE WHOLE FAILURE. A
+   * member narrowed to one site reads every site's rows of it, the list is
+   * complete and confident, and nothing anywhere refuses — see `reach.ts`. On
+   * the places collection itself this is `"id"`: a place is the thing being
+   * reached, so its own identifier is what the grant names.
+   *
+   * ⚠️ AND ABSENT IS A REAL ANSWER, NOT AN OVERSIGHT. What a thing IS — a
+   * product, a supplier, a document template — belongs to the whole workspace
+   * wherever anybody stands. Only what is somewhere is narrowed.
+   */
+  readonly reachBy?: string;
   /** ⚠️ Which operations the collection does NOT get. See `operationsFor`. */
   readonly without?: readonly CrudVerb[];
 }

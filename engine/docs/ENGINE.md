@@ -38,7 +38,7 @@ all of it is refused, gated, audited and erasable on the same terms as everythin
 an app writes itself.
 
 <!-- generated: node scripts/inventory.mjs surface -->
-**37 operations for declaring nothing.** A roster, an inbox and its
+**39 operations for declaring nothing.** A roster, an inbox and its
 two-level policy, the workspace's brand, the package rail it sells with, its
 settings, its bill, and the one bootstrap read every screen stands on.
 
@@ -47,6 +47,8 @@ settings, its bill, and the one bootstrap read every screen stands on.
 | `member.list` | read | `member:read` |
 | `member.invite` | write | `member:manage` |
 | `member.role` | write | `member:manage` |
+| `member.places` | read | `member:manage` |
+| `member.reach` | write | `member:manage` |
 | `inbox.list` | read | *the session* |
 | `inbox.seen` | write | *the session* |
 | `inbox.preference` | write | *the session* |
@@ -285,6 +287,7 @@ it. A caller's job is to show it, never to invent one from a status code.
 | `platform.quota_reached` | 402 | Your plan includes {limit}, and {used} are in use | — |
 | `platform.payment_required` | 402 | This needs a plan that includes it | — |
 | `platform.commercial_required` | 402 | This is for business workspaces | — |
+| `platform.out_of_reach` | 403 | That is not one of your {places} | — |
 | `platform.proof_required` | 401 | Confirm it is you | yes |
 | `platform.must_accept` | 451 | There is something to agree to first | — |
 | `platform.read_only` | 402 | This workspace is read-only | — |
@@ -391,6 +394,7 @@ and a manifest that does not compose refuses to boot.
 | `collection` | what a thing an app keeps is — and the six operations it gets for free | 18 | — |
 | `operation` | one declaration carrying every cross-cutting concern (D12) | 10 | — |
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
+| `reach` | how far one person works inside a workspace — where, as against what (D45) | 4 | — |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | — |
 | `manifest` | the whole app, and the composition that refuses a broken one | 13 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 17 | — |
@@ -414,7 +418,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**278 of them**, 277 reached by something today.
+**282 of them**, 281 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -436,16 +440,17 @@ env or a binding.
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
 | `flags` | what somebody switched, per deployment and per workspace | 10 | — |
 | `identity` | sign-in codes, sessions, tokens, proof | 27 | — |
-| `membership` | the roster and what each member may do | 15 | — |
+| `membership` | the roster and what each member may do | 16 | — |
 | `compose` | a manifest becomes a live surface of operations | 2 | — |
 | `serve` | the one path every request ends in — both doors | 6 | — |
-| `records` | the generated reads and writes behind a collection | 7 | — |
+| `records` | the generated reads and writes behind a collection | 8 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
 | `billing` | plans, subscriptions, the bill, the ladder | 15 | — |
 | `wallet` | OneWallet: the allowance, what was bought, and reserve → settle → release | 22 | — |
 | `catalogue` | the price list an operator edits over the declaration, and what it holds for the people already on a tier | 8 | — |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
 | `inbox` | notifications: the policy, the audience, the read | 14 | — |
+| `reach` | the grant resolved for one request, and the subtree it covers | 2 | — |
 | `services` | the lane out to a provider — AI and mail | 8 | — |
 | `stripe` | the card lane: a page Stripe owns, a signature that proves an event is theirs, and the ladder one moves | 11 | — |
 | `config` | what the deployment was told — the credentials it holds, encrypted under a key its database has never seen | 6 | — |
@@ -489,7 +494,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**436 of them**, 435 reached by something today.
+**440 of them**, 439 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -873,6 +878,7 @@ its own header, cited by other files, and doing nothing.
 | `every-design-guard-is-named-in-the-design-language` | D12 | DESIGN.md §8 typed by hand and five guards missing from it — the sharpest being `metrics`, which holds card padding, the spacing scale, the page gutter and the floor under a pressable row, so the section answering “is spacing enforced?” did not mention the guard enforcing spacing |
 | `a-gate-is-never-handed-a-constant` | D12 | a gate whose input nothing supplies — `flags: located.flags ?? {}` where no deployment ever set it, so every request carried an empty map, the console wrote rows only the console read back, and switching a flag changed nothing anywhere with every suite green |
 | `a-balance-moves-in-one-place-and-the-history-moves-with-it` | D12 | a number the ledger cannot rebuild — the balance is plausible, the screen redraws, and every report over that line stops adding up, permanently |
+| `a-narrowed-collection-is-narrowed-by-every-statement` | D45 | the generated CRUD narrows and the app's own forty statements do not — the list a person opens shows one site, every route under it answers for all of them, and nothing fails anywhere |
 | `an-objects-standing-changes-only-where-the-shelf-changes-with-it` | D12 | a shelf that goes on claiming a drill which is in somebody's van, so every count afterwards "finds" it missing and corrects a number that was right |
 | `a-model-fills-anything-and-commits-nothing` | D19 | an expiry read off a blurred label committed as a fact — a perfectly valid date that nothing anywhere will ever question |
 | `what-a-count-found-missing-is-still-counted-as-gone` | D12 | a recorded share that reads a hundred per cent for ever — the flattering direction, with every test green, because nothing else connects the id a count mints to the prefix the report reads |
@@ -951,6 +957,7 @@ its own header, cited by other files, and doing nothing.
 | D42 | The route decides the direction, the world decides the gesture | 0 |
 | D43 | The skeleton is the screen somebody saw last time | 0 |
 | D44 | The sender is the deployment's, the reply and the words are the workspace's | 0 |
+| D45 | A membership is narrowed to part of a workspace, and one filter applies everywhere | 1 |
 <!-- /generated -->
 
 ---
@@ -1033,7 +1040,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 52 | The words arrive as they are written — one metered run, streamed, and the charge rides the last token | shipped |
 | 53 | A workspace asks to change its jurisdiction, and the ask is the only thing that is new | **planned** |
 | 54 | A collection's `offline` policy reaches the browser — a write survives no signal, and a read answers without one | shipped |
-| 55 | A collection narrows to part of a workspace — a location grant, and one filter the platform composes | **planned** |
+| 55 | A collection narrows to part of a workspace — a location grant, and one filter the platform composes | shipped |
 | 56 | A family takes a hue — one declared per product, never written at a call site | **planned** |
 | 57 | Records move between workspaces — a garage becomes a business and its history goes with it | **planned** |
 | 58 | An operation's ceiling is in force — calls per minute, per caller, refused rather than declared | **planned** |
@@ -1053,7 +1060,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 72 | An operation's declared input is checked at the door, and `now` is one type | shipped |
 | 73 | The other half of OneInventory, driven — and the quarantine that was a badge on a screen | shipped |
 
-**62 shipped, 11 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**63 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

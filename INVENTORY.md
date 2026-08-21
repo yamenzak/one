@@ -191,6 +191,15 @@ person pressing the button (`refuseRole`'s `beyond_you`).
 Five entitlements: `products` and `locations` are counted; `processes`, `jobs`
 and `imports` are gates.
 
+**And a person can be narrowed to part of the workspace** (engine 55, D45). A
+membership names the locations somebody works in; a grant to a site covers every
+aisle, rack and bin under it, including ones added later. `null` — which is every
+membership until somebody is narrowed — is the whole workspace, so a business
+with one site never meets the concept. Five collections say where their records
+are (`stock`, `ledger`, `unit`, `kit`, `count`, plus `location` by its own id),
+and `reach.test.mjs` fails on any statement over one of them that neither carries
+the filter nor states why it is wide.
+
 **And a gate reaches the nav, not only the operation.** Four screens name the
 capabilities they are for — `/work` (runs *or* work orders), `/run`, `/case`,
 `/import` — and one the plan does not include never leaves the server, so it has
@@ -303,8 +312,9 @@ and only a request can tell them apart.
 `one-planner` (the preview is the commit), `label-once` (a code is minted once),
 `inferred-consumption` (a count's correction is recognised as consumption),
 `job-tells` (a job that says it tells people tells people), `input-checked` (an
-operation's declared input is enforced at the door) — plus every platform guard
-in `pnpm engine:gate`.
+operation's declared input is enforced at the door), `reach` (a collection that
+says where its records are is narrowed by every statement, not only by the
+generated ones) — plus every platform guard in `pnpm engine:gate`.
 
 ---
 

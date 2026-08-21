@@ -2739,6 +2739,15 @@
       "fails": "a number the ledger cannot rebuild — the balance is plausible, the screen redraws, and every report over that line stops adding up, permanently"
     },
     {
+      "id": "a-narrowed-collection-is-narrowed-by-every-statement",
+      "protects": "D45",
+      "stage": "55",
+      "status": "live",
+      "impl": "scripts/reach.test.mjs",
+      "proves": "without narrowing to the caller's own",
+      "fails": "the generated CRUD narrows and the app's own forty statements do not — the list a person opens shows one site, every route under it answers for all of them, and nothing fails anywhere"
+    },
+    {
       "id": "an-objects-standing-changes-only-where-the-shelf-changes-with-it",
       "protects": "D12",
       "stage": "64",

@@ -28,8 +28,9 @@ import {
 import { tableFor } from "@engine/kernel";
 import type { Db } from "./sql.js";
 import {
-  MOST_ROWS, list, patch, put, readOne, type VaultSeam, type WriteRefusal,
+  MOST_ROWS, drop, list, patch, put, readOne, type VaultSeam, type WriteRefusal,
 } from "./records.js";
+import { reachingBy } from "./reach.js";
 import { memberOps } from "./member-ops.js";
 import { packageOps } from "./packages.js";
 import { settingOps } from "./settings.js";
@@ -87,6 +88,21 @@ export interface Ctx {
    * to prevent.
    */
   readonly vault?: VaultSeam;
+  /**
+   * HOW FAR THIS CALLER REACHES INSIDE THE WORKSPACE (`reach.ts`).
+   *
+   * ⚠️ `null` IS THE WHOLE WORKSPACE, WHICH IS EVERY PRODUCT THAT DECLARES NO
+   * REACH AND EVERY MEMBER NOBODY HAS NARROWED. An array is the places this
+   * person works in, with everything nested under a granted place already
+   * spread into it — so a handler compares, and never walks.
+   *
+   * ⚠️ THE GENERATED CRUD APPLIES IT BY ITSELF; A HANDWRITTEN HANDLER MUST ASK.
+   * That asymmetry is the whole risk of this feature and it is why
+   * `scripts/reach.test.mjs` exists: a bespoke handler querying a table whose
+   * collection declares `reachBy`, without this in the statement, is a screen
+   * that narrows and a route that does not.
+   */
+  readonly reach: readonly string[] | null;
   /**
    * ⚠️ WHAT THIS WORKSPACE HAS SWITCHED ON, RESOLVED THROUGH THE ONE RESOLVER.
    * A setting no handler can read is a switch that changes nothing — somebody
@@ -198,7 +214,9 @@ export interface Composed {
 const scopeOf = (spec: CollectionSpec, ctx: Ctx): string =>
   eraseBy(spec)?.of === "subject" ? (ctx.accountId ?? "") : ctx.tenantId;
 
-function crudFor(spec: CollectionSpec, verb: CrudVerb, appId: string): Resolved {
+function crudFor(
+  spec: CollectionSpec, verb: CrudVerb, appId: string, places = "places",
+): Resolved {
   const id = `${spec.id}.${verb}`;
   const kind = verb === "list" || verb === "read" ? "read" as const : "write" as const;
 
@@ -258,8 +276,17 @@ function crudFor(spec: CollectionSpec, verb: CrudVerb, appId: string): Resolved 
  * the edit sheet reads, so the sentence appears under the input that caused it
  * rather than over the whole form.
  */
-function refuse(ctx: Pick<Ctx, "fail">, done: WriteRefusal, spec: CollectionSpec): never {
+function refuse(
+  ctx: Pick<Ctx, "fail">, done: WriteRefusal, spec: CollectionSpec, places = "places",
+): never {
   if (done.why === "not_found") ctx.fail("platform.not_found");
+  /* ⚠️ NOT `not_found`, AND NOT `invalid`. The record's workspace is the
+     caller's and the PLACE is not theirs — so the honest sentence names the
+     thing they work in, and the field it names is the one they picked. */
+  if (done.why === "out_of_reach") {
+    ctx.fail("platform.out_of_reach", { places },
+      { fields: { [spec.reachBy ?? "id"]: "You do not work there." } });
+  }
   const named = done.why === "vault_only"
     ? Object.keys(spec.fields).filter((f) => spec.fields[f]?.vault)
     : [];
@@ -271,6 +298,11 @@ function refuse(ctx: Pick<Ctx, "fail">, done: WriteRefusal, spec: CollectionSpec
 
   const run = async (ctx: Ctx, input: Record<string, unknown>): Promise<unknown> => {
     const scope = scopeOf(spec, ctx);
+    /* ⚠️ APPLIED BY THE GENERATED PATH ITSELF, so a collection that says where
+       its records are is narrowed on every one of its five operations with
+       nothing for an app to remember. What is NOT automatic is a handwritten
+       handler over the same table — see `Ctx.reach`. */
+    const reaching = reachingBy(spec.reachBy, ctx.reach);
     switch (verb) {
       case "list": {
         /*
@@ -288,16 +320,17 @@ function refuse(ctx: Pick<Ctx, "fail">, done: WriteRefusal, spec: CollectionSpec
           ...(input.where && typeof input.where === "object"
             ? { where: input.where as Record<string, unknown> }
             : {}),
-        });
+        }, reaching);
       }
       case "read": {
-        const row = await readOne(ctx.db, spec, scope, String(input.id ?? ""));
+        const row = await readOne(ctx.db, spec, scope, String(input.id ?? ""), reaching);
         if (!row) ctx.fail("platform.not_found");
         return row;
       }
       case "create": {
-        const done = await put(ctx.db, spec, scope, input, ctx.accountId, new Date(ctx.now), ctx.vault);
-        if ("why" in done) refuse(ctx, done, spec);
+        const done = await put(ctx.db, spec, scope, input, ctx.accountId, new Date(ctx.now),
+          ctx.vault, reaching);
+        if ("why" in done) refuse(ctx, done, spec, places);
         /* ⚠️ MARKED HERE RATHER THAN IN THE JOB, because only the write knows a
            write happened. A job that scanned for un-indexed rows would have to
            read every record of every searchable collection every night to find
@@ -312,8 +345,8 @@ function refuse(ctx: Pick<Ctx, "fail">, done: WriteRefusal, spec: CollectionSpec
            this operation used to be the read WITHOUT the write: it answered 200
            with the id and changed nothing. */
         const done = await patch(ctx.db, spec, scope, String(input.id ?? ""),
-          input, ctx.accountId, new Date(ctx.now), ctx.vault);
-        if ("why" in done) refuse(ctx, done, spec);
+          input, ctx.accountId, new Date(ctx.now), ctx.vault, reaching);
+        if ("why" in done) refuse(ctx, done, spec, places);
         /* ⚠️ RE-INDEXED ON EVERY EDIT, INCLUDING ONE THAT CHANGED NOTHING — see
            `noteWritten`. An index that only tracked edits it could prove were
            relevant is one that silently drifts. */
@@ -321,13 +354,13 @@ function refuse(ctx: Pick<Ctx, "fail">, done: WriteRefusal, spec: CollectionSpec
         return done;
       }
       case "delete": {
-        /* ⚠️ Read first, in the caller's own scope: a delete that trusted the id
-           alone would remove somebody else's record on a guessed id. */
-        const row = await readOne(ctx.db, spec, scope, String(input.id ?? ""));
-        if (!row) ctx.fail("platform.not_found");
-        await ctx.db.prepare(
-          `DELETE FROM ${tableFor(spec)} WHERE id = ? AND ${eraseBy(spec)?.column ?? "id"} = ?`)
-          .bind(String(input.id), scope).run();
+        /* ⚠️ ONE STATEMENT, SCOPED AND REACHED IN ITS OWN `WHERE` — see `drop`.
+           A read to check ownership followed by a delete leaves a window between
+           them, and it was the one verb whose statement carried the scope and
+           not the reach. */
+        if (!await drop(ctx.db, spec, scope, String(input.id ?? ""), reaching)) {
+          ctx.fail("platform.not_found");
+        }
         /* ⚠️ MARKED GONE, NOT FORGOTTEN. The ledger row is the only handle on the
            item in the index — dropping it here would leave a deleted record
            findable by meaning with nothing anywhere pointing at it. */
@@ -379,7 +412,10 @@ export function compose(app: AppSpec): Composed {
   for (const spec of app.collections) {
     for (const opId of operationsFor(spec)) {
       const verb = opId.slice(spec.id.length + 1) as CrudVerb;
-      byId.set(opId, crudFor(spec, verb, app.id));
+      /* ⚠️ THE PRODUCT'S OWN WORD FOR A PLACE, so the refusal reads "that is not
+         one of your sites" rather than naming a concept nobody outside this
+         codebase has heard of. */
+      byId.set(opId, crudFor(spec, verb, app.id, app.reach?.label.many.toLowerCase() ?? "places"));
     }
   }
   /* ⚠️ THE ROSTER IS THE PLATFORM'S AND EVERY APP HAS IT (see `member-ops.ts`).

@@ -26,11 +26,12 @@ import { LEAST_SIDE, MOST_BYTES, MOST_SIDE, forgetIcon, hasIcon, setIcon } from 
 import { noteInvitation, tenantById } from "./directory.js";
 import { inboxOf, markSeen, policyOf, preferenceOf, setPolicy, setPreference, unseenCount } from "./inbox.js";
 import {
-  customRolesOf, dropRole, invite, membersOf, remove, rolesFor, saveRole, setAppRole,
-  setPlatformRole,
+  customRolesOf, dropRole, invite, memberFor, membersOf, remove, rolesFor, saveRole, setAppRole,
+  setPlatformRole, setReach,
 } from "./membership.js";
+import { reachIn } from "./reach.js";
 import type { Ctx, Resolved } from "./compose.js";
-import type { Db } from "./sql.js";
+import { column, table, type Db } from "./sql.js";
 import type { Found } from "./search.js";
 import type { Bucket } from "./storage.js";
 
@@ -219,6 +220,10 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           accountId: m.accountId,
           email: m.email, platformRole: m.platformRole, appRoles: m.appRoles,
           accepted: m.acceptedAt !== null,
+          /* ⚠️ WHERE EACH OF THEM WORKS, so the roster can say it without a
+             read per person. An app ABSENT from this book is the whole
+             workspace, which is what almost every row says. */
+          reach: m.reach,
         })),
       })),
 
@@ -293,6 +298,110 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         return { id: memberId };
       },
       { why: "It changes what somebody may do, which only a person weighs." }),
+
+    /*
+      ⚠️ WHERE SOMEBODY WORKS, WHICH IS NOT WHAT THEY MAY DO (`reach.ts`). A
+      permission applies wherever they are; this says where. Folded into the
+      role it would be a key per site per verb, and adding a fifth site would be
+      a code change.
+
+      ⚠️ AND IT IS BOUNDED BY THE CALLER'S OWN REACH — see `setReach`. Without
+      that, narrowing a colleague is how a manager kept out of one site grants
+      themselves it, one membership at a time.
+    */
+    /*
+      ⚠️ THE PLACES A GRANT CAN NAME, SO THE ROSTER HAS SOMETHING TO OFFER. They
+      are rows the workspace already keeps — its own locations, its own branches —
+      read here rather than from the app's own list operation, because the roster
+      is the platform's screen and must not know which product it is narrowing.
+
+      ⚠️ NARROWED BY THE CALLER'S OWN REACH, which is the same bound `member.reach`
+      enforces at the write. A picker offering a site the write would refuse is a
+      screen promising what a route does not keep — and here it would be worse
+      than that: it is the escalation path, drawn as a control.
+    */
+    "member.places": op("member.places", "read", "member:manage",
+      "The parts of this workspace somebody can be narrowed to.",
+      async (ctx, input) => {
+        const named = input.app === undefined ? app.id : String(input.app);
+        const target = named === app.id ? app : ctx.appOf(named);
+        if (!target || !ctx.enabledApps.includes(named)) return ctx.fail("platform.not_found");
+        if (!target.reach) return { label: null, items: [] };
+
+        const places = target.collections.find((c) => c.id === target.reach!.of);
+        if (!places) return { label: null, items: [] };
+        /* ⚠️ THE FIRST TEXT FIELD IS THE NAME, DERIVED RATHER THAN NAMED HERE. A
+           `name` column required by convention is a convention an app can break
+           silently; the declaration already says which of its fields a person
+           reads first. */
+        const shown = Object.entries(places.fields)
+          .find(([, f]) => f.kind === "text")?.[0] ?? "id";
+        const me = ctx.accountId
+          ? await memberFor(ctx.db, ctx.tenantId as TenantId, ctx.accountId as never)
+          : null;
+        const bound = await reachIn(ctx.db, target, me?.reach);
+
+        const rows = await ctx.db.prepare(
+          `SELECT id, ${column(shown)} AS name${
+            target.reach.nests ? `, ${column(target.reach.nests)} AS within` : ""}
+             FROM ${table(places.id)} WHERE tenant_id = ?`)
+          .bind(ctx.tenantId).all<{ id: string; name: string | null; within?: string | null }>();
+
+        return {
+          label: target.reach.label,
+          items: (rows.results ?? [])
+            .filter((r) => bound === null || bound.includes(r.id))
+            .map((r) => ({
+              id: r.id,
+              name: r.name || r.id,
+              ...(r.within ? { within: r.within } : {}),
+            })),
+        };
+      }),
+
+    "member.reach": op("member.reach", "write", "member:manage",
+      "Say which parts of the workspace somebody works in.",
+      async (ctx, input) => {
+        /* ⚠️ THE TARGET APP IS AN INPUT — same reason as the settings rail: every
+           composition carries these ids and the route resolves whichever app is
+           first, so binding the composing app could never answer for the second
+           product. */
+        const named = input.app === undefined ? app.id : String(input.app);
+        const target = named === app.id ? app : ctx.appOf(named);
+        if (!target || !ctx.enabledApps.includes(named)) return ctx.fail("platform.not_found");
+        /* ⚠️ A PRODUCT THAT DECLARES NO REACH HAS NOTHING TO NARROW, and storing
+           a grant against it would be a row nothing ever reads — the
+           declaration-with-no-consequence shape this framework is a catalogue
+           of. */
+        if (!target.reach) return ctx.fail("platform.invalid");
+
+        const places = input.places === null || input.places === undefined
+          ? null
+          : (Array.isArray(input.places) ? input.places.map(String) : []);
+
+        /* ⚠️ THE CALLER'S OWN REACH IN THE TARGET APP, READ HERE RATHER THAN
+           TAKEN FROM `ctx`. `ctx.reach` is resolved for the app this OPERATION
+           was composed under, which is not necessarily the one being narrowed —
+           and bounding a grant with the wrong product's answer is the
+           escalation D15 exists to close. */
+        const me = ctx.accountId
+          ? await memberFor(ctx.db, ctx.tenantId as TenantId, ctx.accountId as never)
+          : null;
+        const bound = await reachIn(ctx.db, target, me?.reach);
+
+        const out = await setReach(ctx.db, ctx.tenantId as TenantId, String(input.id ?? ""),
+          target.id, places, bound);
+        if (out === "no_such_member") return ctx.fail("platform.not_found");
+        if (out === "beyond_you") {
+          return ctx.fail("platform.forbidden", {}, {
+            fields: {
+              places: `You cannot hand out ${target.reach.label.many.toLowerCase()} you do not work in.`,
+            },
+          });
+        }
+        return { id: String(input.id ?? "") };
+      },
+      { why: "It changes where somebody may work, which only a person weighs." }),
 
     /* ------------------------------------------------------------ inbox --- */
 

@@ -30,11 +30,14 @@ import { PLATFORM_ROLES, sayDate, type Instant } from "@engine/kernel";
 import { Button, Card, Chip } from "@heroui/react";
 import {
   Await, Choice, Confirm, FieldRow, Group, Listing, Menu, NavRow, NoteRow, Nothing, Picks,
-  RowsWaiting, Screen, Stack, TextInput, Tray,
+  RowsWaiting, Screen, Stack, TextInput, ToggleRow, Tray,
   glyphOf, notice, sentence, useMoney, useShown, whoFace,
 } from "@engine/design";
 import { api } from "../api.js";
-import { useLoad, type CentreApp, type CentreView, type HoldingLine, type MemberLine, type PackageLine } from "./data.js";
+import {
+  useLoad, type CentreApp, type CentreView, type HoldingLine, type MemberLine, type PackageLine,
+  type PlaceLine,
+} from "./data.js";
 
 const ROLE_SAID: Readonly<Record<string, string>> = {
   owner: "Runs everything, including the bill.",
@@ -282,6 +285,7 @@ function MemberActions({ view, member, onDone, onClose }: {
             placeholder="Not a user"
           />
         ))}
+        <Where view={view} member={member} onDone={onDone} />
         <Holdings view={view} member={member} />
         <Confirm
           trigger={<Button variant="danger-soft">Remove from the workspace</Button>}
@@ -292,6 +296,98 @@ function MemberActions({ view, member, onDone, onClose }: {
         </Confirm>
       </Stack>
     </Tray>
+  );
+}
+
+/* ------------------------------------------------------------------- where --- */
+
+/**
+ * WHERE IN THE WORKSPACE THIS PERSON WORKS.
+ *
+ * ⚠️ A PRODUCT THAT IS NOT NARROWED BY ANYTHING DRAWS NOTHING HERE, and that is
+ * every product but one. `member.places` answers with no label where the app
+ * declared no reach, so a business with one site never meets the concept and the
+ * roster does not grow a card explaining it.
+ *
+ * ⚠️ "EVERYWHERE" IS A ROW RATHER THAN AN EMPTY SET OF TICKS. Nothing ticked
+ * means nowhere, which is a real answer somebody may mean; the default is the
+ * whole workspace, and the two have to be two different presses or clearing the
+ * list would silently take somebody's access away.
+ */
+function Where({ view, member, onDone }: {
+  readonly view: CentreView;
+  readonly member: MemberLine;
+  readonly onDone: () => void;
+}) {
+  return (
+    <>
+      {view.apps.map((app) => (
+        <AppWhere key={app.id} app={app} member={member} onDone={onDone} />
+      ))}
+    </>
+  );
+}
+
+function AppWhere({ app, member, onDone }: {
+  readonly app: CentreApp;
+  readonly member: MemberLine;
+  readonly onDone: () => void;
+}) {
+  const of = useLoad<{
+    label: { one: string; many: string } | null;
+    items: readonly PlaceLine[];
+  }>("member.places", { app: app.id });
+
+  const held = member.reach[app.id];
+
+  const save = async (places: readonly string[] | null) => {
+    const out = await api.post("member.reach", { app: app.id, id: member.id, places });
+    if (!out.ok) {
+      notice.fail(out.problem.fields?.places ?? out.problem.title);
+      return;
+    }
+    notice.ok(places === null ? "They work everywhere here." : "Saved.");
+    onDone();
+  };
+
+  return (
+    <Await
+      of={of.of}
+      again={of.again}
+      /* ⚠️ SILENT WHERE THERE IS NOTHING TO NARROW BY — a heading over an empty
+         card is a feature this workspace does not have, explained. */
+      waiting={null}
+      isNothing={(d) => d.label === null}
+      nothing={null}
+      then={(data) => (
+        <Group
+          label={`Where in ${app.name}`}
+          under={held === undefined
+            ? "Everywhere"
+            : `${held.length} of ${data.items.length} ${data.label!.many.toLowerCase()}`}
+        >
+          {/* ⚠️ THE WAY BACK TO EVERYWHERE IS ITS OWN CONTROL — see the header.
+              Untick-everything means nowhere, which is a different answer. */}
+          <ToggleRow
+            label="Everywhere here"
+            under={`They reach every ${data.label!.one.toLowerCase()} this workspace has, including new ones`}
+            value={held === undefined}
+            onChange={(on) => void save(on ? null : [])}
+          />
+          {held === undefined
+            ? null
+            : (
+              <Picks
+                label={data.label!.many}
+                value={held}
+                onChange={(ids) => void save(ids)}
+                help={`A ${data.label!.one.toLowerCase()} covers everything inside it`}
+                options={data.items.map((one) => ({ id: one.id, label: one.name }))}
+              />
+            )}
+        </Group>
+      )}
+    />
   );
 }
 

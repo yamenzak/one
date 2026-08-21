@@ -25,7 +25,7 @@
  */
 
 import type {
-  AccountId, Grant, Membership, RoleRefusal, RoleRegistry, TenantId,
+  AccountId, Grant, Membership, ReachBook, RoleRefusal, RoleRegistry, TenantId,
 } from "@engine/kernel";
 import {
   PLATFORM_ROLES, canAssign, newId, permissionsFor, refuseRole, registryWith, seatsUsed,
@@ -42,6 +42,15 @@ export const MEMBERSHIP_SCHEMA: SchemaModule = {
     `CREATE TABLE IF NOT EXISTS membership (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, account_id TEXT, email TEXT NOT NULL, platform_role TEXT NOT NULL, app_roles_json TEXT, grants_json TEXT, revoked_json TEXT, at TEXT NOT NULL, accepted_at TEXT, removed_at TEXT);`,
     `CREATE UNIQUE INDEX IF NOT EXISTS ix_membership_one ON membership (tenant_id, email);`,
     `CREATE INDEX IF NOT EXISTS ix_membership_account ON membership (tenant_id, account_id);`,
+    /* ⚠️ ADDED RATHER THAN PUT IN THE CREATE, because the table exists on every
+       deployment that has ever run. A column inside a `CREATE TABLE IF NOT
+       EXISTS` is a column no live database ever gets.
+
+       ⚠️ AND NULL IS THE WHOLE WORKSPACE (`reachOf`). Every membership that
+       predates this keeps exactly what it had, which is the only migration a
+       narrowing feature may have — the other direction takes access away from
+       people who never asked for it. */
+    `ALTER TABLE membership ADD COLUMN reach_json TEXT;`,
     /* ⚠️ A custom role composes ONE app's keys — see `CustomRole`. */
     `CREATE TABLE IF NOT EXISTS custom_role (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, app TEXT NOT NULL, name TEXT NOT NULL, permissions_json TEXT NOT NULL, at TEXT NOT NULL);`,
     `CREATE INDEX IF NOT EXISTS ix_custom_role_tenant ON custom_role (tenant_id, app);`,
@@ -54,6 +63,13 @@ export interface MemberRow extends Membership {
   readonly id: string;
   readonly email: string;
   readonly acceptedAt: string | null;
+  /**
+   * ⚠️ WHERE IN THE WORKSPACE THIS PERSON WORKS, PER PRODUCT (`reach.ts`). An
+   * app ABSENT from this book is the whole workspace; an app present with an
+   * empty list is nowhere. Read it through `reachOf` rather than by hand — the
+   * two answers are one keystroke apart and one of them widens.
+   */
+  readonly reach: ReachBook;
 }
 
 const asMember = (r: Record<string, unknown>): MemberRow => ({
@@ -64,6 +80,9 @@ const asMember = (r: Record<string, unknown>): MemberRow => ({
   platformRole: r.platform_role as string,
   appRoles: JSON.parse((r.app_roles_json as string | null) ?? "{}") as Record<string, string>,
   grants: JSON.parse((r.grants_json as string | null) ?? "[]") as Grant[],
+  /* ⚠️ `{}` RATHER THAN `null`, so `reachOf` reads an ABSENT app as the whole
+     workspace and an empty array as nowhere — see `reach.ts`. */
+  reach: JSON.parse((r.reach_json as string | null) ?? "{}") as Record<string, string[]>,
   revoked: JSON.parse((r.revoked_json as string | null) ?? "[]") as string[],
   acceptedAt: (r.accepted_at as string | null) ?? null,
 });
@@ -246,7 +265,7 @@ export async function invite(
   return {
     id, tenantId, accountId: "" as AccountId, email: input.email,
     platformRole: input.platformRole, appRoles: input.appRoles,
-    grants: [], revoked: [], acceptedAt: null,
+    grants: [], revoked: [], reach: {}, acceptedAt: null,
   };
 }
 
@@ -286,7 +305,7 @@ export async function found(
       now.toISOString(), now.toISOString()).run();
   return {
     id, tenantId, accountId, email, platformRole: "owner", appRoles,
-    grants: [], revoked: [], acceptedAt: now.toISOString(),
+    grants: [], revoked: [], reach: {}, acceptedAt: now.toISOString(),
   };
 }
 
@@ -362,6 +381,43 @@ export async function setAppRole(
   const next = { ...target.appRoles };
   if (role === null) delete next[appId]; else next[appId] = role;
   await db.prepare(`UPDATE membership SET app_roles_json = ? WHERE id = ?`)
+    .bind(JSON.stringify(next), memberId).run();
+  return null;
+}
+
+/* ------------------------------------------------------------------ reach --- */
+
+/**
+ * NARROW SOMEBODY TO PART OF THE WORKSPACE, OR WIDEN THEM BACK TO ALL OF IT.
+ *
+ * ⚠️ `null` PUTS THEM BACK TO THE WHOLE WORKSPACE and an empty array narrows
+ * them to nowhere. Both are things somebody means; collapsing them would make
+ * "clear this" and "they work at no site yet" the same press, and one of them
+ * widens access.
+ *
+ * ⚠️ AND IT IS BOUNDED BY THE CALLER'S OWN REACH. Somebody who works at two
+ * sites may hand out those two and no others — otherwise narrowing a manager is
+ * a way for that manager to grant themselves the site they were kept out of, one
+ * colleague at a time. `null` on the caller's side is the whole workspace and
+ * bounds nothing, which is the owner's case.
+ */
+export type ReachRefusal = "no_such_member" | "beyond_you";
+
+export async function setReach(
+  db: Db, tenantId: TenantId, memberId: string, appId: string,
+  places: readonly string[] | null,
+  by: readonly string[] | null,
+): Promise<null | ReachRefusal> {
+  const members = await membersOf(db, tenantId);
+  const target = members.find((m) => m.id === memberId);
+  if (!target) return "no_such_member";
+  if (by !== null && (places === null || places.some((p) => !by.includes(p)))) {
+    return "beyond_you";
+  }
+
+  const next: Record<string, readonly string[]> = { ...target.reach };
+  if (places === null) delete next[appId]; else next[appId] = [...new Set(places)];
+  await db.prepare(`UPDATE membership SET reach_json = ? WHERE id = ?`)
     .bind(JSON.stringify(next), memberId).run();
   return null;
 }

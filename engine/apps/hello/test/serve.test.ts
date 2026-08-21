@@ -196,6 +196,11 @@ describe("what the manifest produced", () => {
       "POST /api/media.upload",
       "POST /api/member.invite",
       "GET /api/member.list",
+      /* ⚠️ AND THE PAIR THAT SAYS WHERE SOMEBODY WORKS (D45). Mounted for every
+         app, and answering with no places where a product declares no reach —
+         which is this one, and almost every one. */
+      "GET /api/member.places",
+      "POST /api/member.reach",
       "POST /api/member.remove",
       "POST /api/member.role",
       "POST /api/money.auto",

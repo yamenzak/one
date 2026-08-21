@@ -14,7 +14,7 @@
  */
 
 import {
-  area, collection, defineApp, field, job as declareJob, newId, operation, setting,
+  area, collection, defineApp, field, inReach, job as declareJob, newId, operation, setting,
   type AppSpec,
 } from "@engine/kernel";
 import {
@@ -192,6 +192,10 @@ const location = collection({
   quota: "locations",
   offline: "queue",
   searchable: ["name"],
+  /* ⚠️ A PLACE IS THE THING BEING REACHED, so its own id is what a grant names —
+     and a member narrowed to two sites sees those two and everything under
+     them, which is what makes the picker on the roster honest. */
+  reachBy: "id",
   fields: {
     name: field.text({ label: "Name", required: true, holds: "none", max: 120 }),
     /* ⚠️ A NODE POINTS AT ITS PARENT, WHICH IS THE SAME COLLECTION. A tree needs
@@ -421,6 +425,7 @@ const unit = collection({
      NAME. Ours is scanned, never typed; theirs is read off a plate by somebody
      on the phone to a supplier. */
   searchable: ["serial"],
+  reachBy: "location",
   fields: {
     product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
     /* ⚠️ WHERE IT LIVES WHEN IT IS OURS AND ON A SHELF. It keeps its place while
@@ -489,6 +494,7 @@ const kit = collection({
   onClose: { then: "purge" },
   offline: "queue",
   without: ["create", "update", "delete"],
+  reachBy: "location",
   fields: {
     product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
     location: field.ref({ label: "Where", holds: "none", to: "location" }),
@@ -652,6 +658,7 @@ const count = collection({
   /* ⚠️ Opened and closed by their own operations — a session that could be
      created by hand is a session with no shelf and no clock on it. */
   without: ["create", "update", "delete"],
+  reachBy: "location",
   fields: {
     location: field.ref({ label: "Where", required: true, holds: "none", to: "location" }),
     /* ⚠️ EMPTY MEANS OPEN. A separate status column would be a second answer to
@@ -718,6 +725,7 @@ const stock = collection({
   onClose: { then: "purge" },
   offline: "cache",
   without: ["create", "update", "delete"],
+  reachBy: "location",
   fields: {
     product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
     location: field.ref({ label: "Location", required: true, holds: "none", to: "location" }),
@@ -764,6 +772,7 @@ const ledger = collection({
   /* ⚠️ Readable and nothing else — see `stock`. The history is written by the
      one function that also moves the balance, in the same statement. */
   without: ["create", "update", "delete"],
+  reachBy: "location",
   fields: {
     move: field.enum({ label: "What happened", required: true, holds: "none", values: [...MOVES] }),
     product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
@@ -819,6 +828,51 @@ interface Ctx {
     extra?: { fields?: Record<string, string>; ref?: string },
   ): never;
   setting(id: string): Promise<unknown>;
+  /**
+   * ⚠️ WHICH LOCATIONS THIS PERSON WORKS IN, OR `null` FOR ALL OF THEM. Resolved
+   * by the platform from the membership, with everything nested under a granted
+   * location already spread into it — see `@engine/kernel`'s `reach.ts`.
+   */
+  readonly reach: readonly string[] | null;
+}
+
+/* ------------------------------------------------------------------ reach --- */
+
+/**
+ * IS THIS SHELF ONE OF THEIRS?
+ *
+ * ⚠️ THE ONE PLACE THIS PRODUCT ASKS, AND EVERY HANDLER THAT TAKES A LOCATION
+ * CALLS IT. The generated CRUD narrows itself; a handwritten handler does not,
+ * and this product has forty statements of its own over the five collections
+ * that say where a record is. Written out per handler, one of them is eventually
+ * missed — and a missed one is a person moving another site's stock with the
+ * list in front of them showing none of it.
+ */
+function mine(c: Ctx, location: string | null | undefined): void {
+  if (!inReach(c.reach, location ?? null)) {
+    c.fail("platform.out_of_reach", { places: "locations" });
+  }
+}
+
+/**
+ * THE SAME QUESTION AS A FRAGMENT, FOR A READ ACROSS THE WHOLE WORKSPACE.
+ *
+ * ⚠️ AN EMPTY REACH IS `1 = 0` RATHER THAN NOTHING. Somebody narrowed to no
+ * locations reads nothing; an `IN ()` is a syntax error and an omitted clause
+ * turns "nowhere" into "everywhere", which is the one direction a mistake here
+ * must never take.
+ *
+ * ⚠️ AND THE COLUMN IS NAMED BY THE CALLER because the five tables spell it the
+ * same and one of them does not: `location` everywhere, `id` on `location`
+ * itself, where the place IS the row.
+ */
+function only(c: Ctx, column = "location"): { sql: string; bound: readonly string[] } {
+  if (c.reach === null) return { sql: "", bound: [] };
+  if (!c.reach.length) return { sql: " AND 1 = 0", bound: [] };
+  return {
+    sql: ` AND ${column} IN (${c.reach.map(() => "?").join(", ")})`,
+    bound: c.reach,
+  };
 }
 
 const moveInput = {
@@ -866,6 +920,11 @@ async function stockMove(
   ctx: Ctx, move: Move, input: MoveInput,
 ): Promise<{ id: string; quantity: number; movement: string }> {
   const db = ctx.db as Db;
+  /* ⚠️ ASKED HERE, WHICH IS WHY IT IS ASKED ONCE. Every take, receive,
+     correction, decant, transfer and undo in this product moves a balance
+     through this function, so the shelf a person is allowed to touch is decided
+     in one place rather than in fourteen handlers. */
+  mine(ctx, input.location);
   const step = applyMove(move, input.quantity);
 
   /*
@@ -1422,6 +1481,10 @@ const arrive = operation<
   async handler(ctx, input) {
     const c = ctx as Ctx;
     const db = c.db as Db;
+    /* ⚠️ BEFORE ANYTHING IS WRITTEN, and `stockMove`'s own check at the end is
+       not enough: an itemised delivery mints its rows first, so a refusal there
+       would leave forty labelled objects on a shelf the person cannot see. */
+    mine(c, input.location);
     const of = readScan(input.raw, yearIn(input.year));
     if (unread(of)) {
       return c.fail("inventory.unreadable", {}, { fields: { raw: WHY[of.why] } });
@@ -1572,6 +1635,12 @@ const undo = operation<{ movement: string; day: string }, Moved>({
     const c = ctx as Ctx;
     const db = c.db as Db;
 
+    /* ⚠️ THE LEDGER READS HERE ARE NOT NARROWED, and the two conditions below
+       are why: an undo has to be YOUR OWN movement and the last one on that
+       line, so a narrowed member cannot reach somebody else's work at another
+       site by guessing an id. What they can reach — their own movement on a
+       shelf they have since been taken off — is refused by `stockMove`, with
+       the sentence that names the place rather than the record. */
     const of = await db.prepare(
       `SELECT move, product, location, batch, delta, at, by FROM ledger
         WHERE id = ? AND tenant_id = ?`)
@@ -1653,6 +1722,10 @@ const openCount = operation<
       `SELECT id FROM location WHERE id = ? AND tenant_id = ?`)
       .bind(input.location, c.tenantId).first<{ id: string }>();
     if (!where) return c.fail("platform.not_found");
+    /* ⚠️ AFTER "does it exist" AND BEFORE ANYTHING ELSE. Opening a count on
+       another site's aisle would lock it for the person who actually works
+       there, which is the refusal that reads as a bug rather than as a rule. */
+    mine(c, input.location);
 
     const busy = await db.prepare(
       `SELECT id, at FROM count
@@ -1705,9 +1778,14 @@ async function tallyItem(
   c: Ctx, session: string, code: string,
 ): Promise<{ product: string; quantity: number }> {
   const db = c.db as Db;
+  /* ⚠️ NARROWED, LIKE `itemIn`. A count session is already on a shelf the
+     caller reaches; scanning an object from another site into it would file a
+     tally against a rack they cannot see. */
+  const near = only(c, "location");
   const of = await db.prepare(
-    `SELECT id, product, batch, life FROM unit WHERE tenant_id = ? AND code = ?`)
-    .bind(c.tenantId, code)
+    `SELECT id, product, batch, life FROM unit
+      WHERE tenant_id = ? AND code = ?${near.sql}`)
+    .bind(c.tenantId, code, ...near.bound)
     .first<{ id: string; product: string; batch: string | null; life: Life }>();
   if (!of) return c.fail("platform.not_found");
   if (of.life !== "held") {
@@ -1765,8 +1843,12 @@ const tallyUp = operation<
     const db = c.db as Db;
 
     const session = await db.prepare(
-      `SELECT closed FROM count WHERE id = ? AND tenant_id = ?`)
-      .bind(input.count, c.tenantId).first<{ closed: string | null }>();
+      /* ⚠️ NARROWED HERE, WHICH IS WHERE A SESSION ID FIRST BECOMES A SHELF. A
+         narrowed member handed another site's session id would otherwise be
+         counting a rack they cannot see, and every tally they wrote would land
+         on it. */
+      `SELECT closed FROM count WHERE id = ? AND tenant_id = ?${only(c).sql}`)
+      .bind(input.count, c.tenantId, ...only(c).bound).first<{ closed: string | null }>();
     if (!session) return c.fail("platform.not_found");
     /* ⚠️ A CLOSED SESSION IS REFUSED RATHER THAN REOPENED. Its differences have
        already become corrections in the history; adding to it afterwards would
@@ -1856,6 +1938,10 @@ const tallyUp = operation<
  * how a screen comes to promise what a handler does not deliver.
  */
 async function differences(c: Ctx, session: string, location: string) {
+  /* ⚠️ NOT NARROWED, because the shelf is the argument: every caller reads the
+     session first, through a statement that IS narrowed, and hands its location
+     in. Filtering again here would be asking the same question twice and
+     answering it from a set the caller cannot influence. */
   const db = c.db as Db;
   const found = await db.prepare(
     `SELECT product, batch, quantity FROM tally WHERE tenant_id = ? AND count = ?`)
@@ -1885,8 +1971,8 @@ const differs = operation<{ count: string }, { items: readonly Change[] }>({
     const c = ctx as Ctx;
     const db = c.db as Db;
     const session = await db.prepare(
-      `SELECT location FROM count WHERE id = ? AND tenant_id = ?`)
-      .bind(input.count, c.tenantId).first<{ location: string }>();
+      `SELECT location FROM count WHERE id = ? AND tenant_id = ?${only(c).sql}`)
+      .bind(input.count, c.tenantId, ...only(c).bound).first<{ location: string }>();
     if (!session) return c.fail("platform.not_found");
     return { items: await differences(c, input.count, session.location) };
   },
@@ -1932,8 +2018,9 @@ const closeCount = operation<
     const db = c.db as Db;
 
     const session = await db.prepare(
-      `SELECT location, closed FROM count WHERE id = ? AND tenant_id = ?`)
-      .bind(input.count, c.tenantId).first<{ location: string; closed: string | null }>();
+      `SELECT location, closed FROM count WHERE id = ? AND tenant_id = ?${only(c).sql}`)
+      .bind(input.count, c.tenantId, ...only(c).bound)
+      .first<{ location: string; closed: string | null }>();
     if (!session) return c.fail("platform.not_found");
     if (session.closed) return c.fail("inventory.closed");
 
@@ -2014,10 +2101,15 @@ interface Item {
  */
 const itemIn = async (c: Ctx, of: string): Promise<Item> => {
   const db = c.db as Db;
+  /* ⚠️ NARROWED HERE, WHICH IS THE ONE PLACE A LABEL BECOMES AN OBJECT. Every
+     issue, return, service and retirement in this product resolves through this
+     function, so a member narrowed to one site cannot reach another site's
+     drill by scanning a code somebody read out to them. */
+  const near = only(c, "location");
   const held = await db.prepare(
     `SELECT id, product, location, batch, life, kit, services FROM unit
-      WHERE tenant_id = ? AND (id = ? OR code = ?)`)
-    .bind(c.tenantId, of, of).first<Item>();
+      WHERE tenant_id = ? AND (id = ? OR code = ?)${near.sql}`)
+    .bind(c.tenantId, of, of, ...near.bound).first<Item>();
   if (!held) return c.fail("platform.not_found");
   return held;
 };
@@ -2107,6 +2199,9 @@ const issue = operation<
       return c.fail("platform.invalid", {}, { fields: { holder: "Say who has it" } });
     }
 
+    /* ⚠️ THE UPDATE BELOW IS NOT NARROWED and does not need to be: `itemIn` is,
+       so `of` is already an object on a shelf this person works on, and the
+       statement is keyed on its id. */
     return actOnItem(c, of, "issue", input.day, null, () => db.prepare(
       `UPDATE unit SET life = 'issued', holder = ?, issued = ?, edited_at = ?, edited_by = ?
         WHERE id = ? AND tenant_id = ? AND life = 'held'`)
@@ -2149,6 +2244,11 @@ const giveBack = operation<
         `SELECT id FROM location WHERE id = ? AND tenant_id = ?`)
         .bind(back, c.tenantId).first<{ id: string }>();
       if (!where) return c.fail("platform.not_found");
+      /* ⚠️ AND IT HAS TO BE ONE OF THEIRS. Taking something back onto a shelf
+         the person cannot see is how an object leaves their reach with nothing
+         saying it did — they hand it in, it vanishes from their screen, and
+         nobody can explain where it went. */
+      mine(c, back);
     }
 
     return actOnItem(c, of, "return", input.day, back, () => db.prepare(
@@ -2201,6 +2301,7 @@ const serve = operation<
          written. Two people recording the same machine's service is rare and a
          read-then-write loses one of them silently, which is the class of bug
          this file refuses everywhere else. */
+      /* ⚠️ NOT NARROWED — `itemIn` was, so this is keyed on a reached row. */
       `UPDATE unit SET services = COALESCE(services, 0) + 1, due = ?, note = COALESCE(?, note),
               edited_at = ?, edited_by = ?
         WHERE id = ? AND tenant_id = ? AND life <> 'retired'`)
@@ -2250,7 +2351,9 @@ const retire = operation<
 
     return actOnItem(c, of, "retire", input.day, null, () => db.prepare(
       /* ⚠️ AND IT LEAVES ITS KIT. A tray holding a condemned instrument that
-         still reads complete is the one outcome the kit check exists for. */
+         still reads complete is the one outcome the kit check exists for.
+
+         ⚠️ NOT NARROWED — `itemIn` was, so this is keyed on a reached row. */
       `UPDATE unit SET life = 'retired', retired = ?, kit = NULL, note = ?,
               edited_at = ?, edited_by = ?
         WHERE id = ? AND tenant_id = ? AND life = 'held'`)
@@ -2292,8 +2395,9 @@ const dueService = operation<{ today: string }, { items: readonly Serviceable[] 
       `SELECT u.id AS id, u.code AS code, u.serial AS serial, u.due AS due,
               u.product AS product, p.name AS name
          FROM unit u JOIN product p ON p.id = u.product
-        WHERE u.tenant_id = ? AND u.due IS NOT NULL AND u.life <> 'retired'`)
-      .bind(c.tenantId)
+        WHERE u.tenant_id = ? AND u.due IS NOT NULL AND u.life <> 'retired'${
+          only(c, "u.location").sql}`)
+      .bind(c.tenantId, ...only(c, "u.location").bound)
       .all<{ id: string; code: string | null; serial: string | null; due: string;
         product: string; name: string }>();
 
@@ -2321,9 +2425,12 @@ interface Kit {
 }
 
 const kitIn = async (c: Ctx, id: string): Promise<Kit> => {
+  /* ⚠️ THE SAME CHOKEPOINT ONE COLLECTION OVER — see `itemIn`. */
+  const near = only(c, "location");
   const of = await (c.db as Db).prepare(
-    `SELECT id, product, location, state, recipe FROM kit WHERE id = ? AND tenant_id = ?`)
-    .bind(id, c.tenantId).first<Kit>();
+    `SELECT id, product, location, state, recipe FROM kit
+      WHERE id = ? AND tenant_id = ?${near.sql}`)
+    .bind(id, c.tenantId, ...near.bound).first<Kit>();
   if (!of) return c.fail("platform.not_found");
   return of;
 };
@@ -2335,6 +2442,9 @@ const kitIn = async (c: Ctx, id: string): Promise<Kit> => {
 async function weighKit(c: Ctx, of: Kit) {
   const db = c.db as Db;
   const members = await db.prepare(
+    /* ⚠️ NOT NARROWED, AND THAT IS DELIBERATE. The kit was reached; what is IN
+       it is a fact about the kit, and hiding a member because it is recorded on
+       another shelf would report the set as short when it is complete. */
     `SELECT u.id AS id, u.product AS product, u.code AS code, p.name AS name
        FROM unit u JOIN product p ON p.id = u.product
       WHERE u.tenant_id = ? AND u.kit = ?`)
@@ -2415,6 +2525,11 @@ const assemble = operation<
       });
     }
 
+    /* ⚠️ A KIT IS STARTED SOMEWHERE, AND SOMEWHERE HAS TO BE ONE OF THEIRS.
+       Left off, a narrowed member could open a tray on another site's bench and
+       then never see it again. */
+    if (input.location) mine(c, input.location);
+
     const id = newId("kit", new Date(c.now));
     await db.prepare(
       `INSERT INTO kit (id, tenant_id, product, location, code, state, recipe, at, by)
@@ -2463,6 +2578,9 @@ const putIn = operation<{ kit: string; unit: string }, { members: number }>({
     if (item.kit && item.kit !== of.id) return c.fail("inventory.inKit");
     if (item.kit === of.id) return { members: await memberCount(c, of.id) };
 
+    /* ⚠️ NOT NARROWED — both halves already are. `kitIn` reached the tray and
+       `itemIn` reached the object, so this statement is keyed on two rows the
+       caller has been shown. */
     await db.prepare(
       `UPDATE unit SET kit = ?, edited_at = ?, edited_by = ?
         WHERE id = ? AND tenant_id = ? AND kit IS NULL AND life = 'held'`)
@@ -2473,6 +2591,9 @@ const putIn = operation<{ kit: string; unit: string }, { members: number }>({
 });
 
 const memberCount = async (c: Ctx, kitId: string): Promise<number> => {
+  /* ⚠️ NOT NARROWED, for the reason `weighKit` gives: what is IN a tray is a
+     fact about the tray, and a count that hid a member recorded on another shelf
+     would report a complete set as short. The tray itself was reached. */
   const of = await (c.db as Db).prepare(
     `SELECT COUNT(*) AS n FROM unit WHERE tenant_id = ? AND kit = ?`)
     .bind(c.tenantId, kitId).first<{ n: number }>();
@@ -2508,6 +2629,8 @@ const takeOut = operation<{ kit: string; unit: string }, { members: number }>({
     const why = refuseKitAct(of.state, "take");
     if (why) return c.fail("inventory.wrongKit", { why });
 
+    /* ⚠️ NOT NARROWED — `kitIn` reached the tray, and taking a member out of it
+       is an act on the tray. */
     await db.prepare(
       `UPDATE unit SET kit = NULL, edited_at = ?, edited_by = ?
         WHERE id = ? AND tenant_id = ? AND kit = ?`)
@@ -2586,6 +2709,7 @@ const build = operation<{ kit: string; day: string }, { stray: number }>({
       return c.fail("inventory.incomplete", { missing: String(short.length) });
     }
 
+    /* ⚠️ NOT NARROWED — `kitIn` was, and this is keyed on the row it returned. */
     await db.prepare(
       `UPDATE kit SET state = 'built', built = ?, edited_at = ?, edited_by = ?
         WHERE id = ? AND tenant_id = ? AND state = 'open'`)
@@ -2621,6 +2745,8 @@ const breakUp = operation<{ kit: string }, { released: number }>({
     if (why) return c.fail("inventory.wrongKit", { why });
 
     const released = await memberCount(c, of.id);
+    /* ⚠️ NOT NARROWED — `kitIn` was, and breaking a tray releases every member
+       of it wherever each one is recorded. */
     await db.prepare(
       `UPDATE unit SET kit = NULL, edited_at = ?, edited_by = ?
         WHERE tenant_id = ? AND kit = ?`)
@@ -2901,9 +3027,9 @@ const askInWords = operation<
          JOIN product p ON p.id = s.product
          JOIN location l ON l.id = s.location
          LEFT JOIN batch b ON b.id = s.batch
-        WHERE s.tenant_id = ? AND s.quantity > 0
+        WHERE s.tenant_id = ? AND s.quantity > 0${only(c, "s.location").sql}
         ORDER BY p.name LIMIT ?`)
-      .bind(c.tenantId, HOW_MUCH)
+      .bind(c.tenantId, ...only(c, "s.location").bound, HOW_MUCH)
       .all<{ name: string; place: string; quantity: number; lot: string | null;
         printed: string | null }>();
 
@@ -2950,11 +3076,16 @@ const refuseOn = (c: Ctx, state: Run, act: RunAct): void => {
 /** ⚠️ Every batch a run covered, with what is still on a shelf to freeze. */
 const membersOf = async (c: Ctx, run: string) => {
   const rows = await (c.db as Db).prepare(
+    /* ⚠️ THE QUANTITY IS WHAT THEY CAN REACH, not what the workspace holds. A
+       run may cover a lot that is on four sites; showing somebody the total is
+       showing them stock they cannot see, and the number they would act on is
+       the one on their own shelves. */
     `SELECT i.batch AS batch, i.verdict AS verdict,
-            COALESCE((SELECT SUM(s.quantity) FROM stock s WHERE s.batch = i.batch), 0) AS quantity
+            COALESCE((SELECT SUM(s.quantity) FROM stock s
+                       WHERE s.batch = i.batch${only(c, "s.location").sql}), 0) AS quantity
        FROM process_item i
       WHERE i.tenant_id = ? AND i.process = ?`)
-    .bind(c.tenantId, run)
+    .bind(...only(c, "s.location").bound, c.tenantId, run)
     .all<{ batch: string; verdict: Verdict; quantity: number }>();
   return rows.results;
 };
@@ -3505,9 +3636,10 @@ const traceJob = operation<
          FROM ledger l
          JOIN product p ON p.id = l.product
          LEFT JOIN batch b ON b.id = l.batch
-        WHERE l.tenant_id = ? AND l.against = ? AND l.move = 'taken'
+        WHERE l.tenant_id = ? AND l.against = ? AND l.move = 'taken'${
+          only(c, "l.location").sql}
         ORDER BY l.at DESC`)
-      .bind(c.tenantId, input.job)
+      .bind(c.tenantId, input.job, ...only(c, "l.location").bound)
       .all<{ movement: string; product: string; delta: number; at: string;
         batch: string; lot: string; standing: string; name: string; verdict: string }>();
 
@@ -3751,8 +3883,12 @@ const doImport = operation<
     /* ⚠️ THE PLACES BY NAME, read once. A sheet naming a shelf that does not
        exist is a refusal rather than a shelf invented from a typo — a location
        tree with "Sote room" in it is a tree nobody trusts. */
-    const places = await db.prepare(`SELECT id, name FROM location WHERE tenant_id = ?`)
-      .bind(c.tenantId).all<{ id: string; name: string }>();
+    /* ⚠️ ONLY THE ONES THEY REACH, so an import naming another site's shelf is
+       refused by the same sentence a misspelt one is — rather than quietly
+       writing four hundred lines onto a rack the importer cannot see. */
+    const places = await db.prepare(
+      `SELECT id, name FROM location WHERE tenant_id = ?${only(c, "id").sql}`)
+      .bind(c.tenantId, ...only(c, "id").bound).all<{ id: string; name: string }>();
     const placeOf = new Map(places.results.map((r) => [String(r.name).toLowerCase(), String(r.id)]));
 
     /* ⚠️ A SUPPLIER IS LEARNED WHERE A SHELF IS REFUSED, and the asymmetry is the
@@ -3925,9 +4061,12 @@ const report = operation<{ from: string; to: string }, Reported>({
        cut on the server's calendar puts a shift that ended at 01:00 into the
        wrong month for half the world — see `ledger.day`. */
     const moves = await db.prepare(
+      /* ⚠️ NARROWED, LIKE EVERY OTHER READ. A report is the one place a whole
+         workspace's numbers are added up, so it is the read a narrowed member
+         most wants and the one a filter is easiest to leave off. */
       `SELECT move, product, delta, day, against FROM ledger
-        WHERE tenant_id = ? AND day >= ? AND day <= ?`)
-      .bind(c.tenantId, input.from, input.to)
+        WHERE tenant_id = ? AND day >= ? AND day <= ?${only(c).sql}`)
+      .bind(c.tenantId, input.from, input.to, ...only(c).bound)
       .all<{ move: string; product: string; delta: number; day: string; against: string | null }>();
 
     const entries = moves.results.map((row) => ({
@@ -3958,9 +4097,12 @@ const report = operation<{ from: string; to: string }, Reported>({
     const supplied = new Map(from.results.map((row) => [String(row.id), row]));
 
     const balances = await db.prepare(
+      /* ⚠️ THE SAME NARROWING AS THE MOVEMENTS ABOVE, and the pair has to agree:
+         usage from one site divided by a balance across four is a days-of-cover
+         figure that is wrong in the direction that reads as "plenty". */
       `SELECT product, SUM(quantity) AS onHand FROM stock
-        WHERE tenant_id = ? GROUP BY product`)
-      .bind(c.tenantId).all<{ product: string; onHand: number }>();
+        WHERE tenant_id = ?${only(c).sql} GROUP BY product`)
+      .bind(c.tenantId, ...only(c).bound).all<{ product: string; onHand: number }>();
     const onHand = new Map(balances.results.map((row) => [String(row.product), Number(row.onHand)]));
 
     const used = usageIn(entries);
@@ -4252,7 +4394,13 @@ const expirySweep = declareJob({
     const units = await db.prepare(
       /* ⚠️ RETIRED ONES ARE OUT, exactly as `unit.due` leaves them out. A
          condemned machine is never due for service, and a note about one is a
-         note that cannot be acted on. */
+         note that cannot be acted on.
+
+         ⚠️ AND IT IS NOT NARROWED, BECAUSE A JOB HAS NO CALLER. The night sweep
+         runs for the workspace rather than for a person, so there is nobody to
+         narrow to — and a service that came due at the site nobody was awake for
+         is exactly the one that has to be raised. Who is TOLD is the
+         notification's own audience question, one layer up. */
       `SELECT u.due AS due, p.name AS name
          FROM unit u JOIN product p ON p.id = u.product
         WHERE u.tenant_id = ? AND u.due IS NOT NULL AND u.life <> 'retired'`)
@@ -4434,6 +4582,24 @@ export const INVENTORY: AppSpec = defineApp({
     platform's and it is a METER — the plan's amount is where it starts, not
     where the product stops.
   */
+  /*
+    ⚠️ A BUSINESS IS NOT ALWAYS ONE PLACE, AND THIS IS THE PRODUCT WHERE THAT
+    BITES FIRST. A goods-in person at the second site could see, move and count
+    the first site's stock — nothing refused, nothing logged, and the app looked
+    like it was working. `reach` narrows a membership to part of the workspace,
+    and here the parts are the locations a workspace already keeps rather than a
+    second list somebody has to keep in step.
+
+    ⚠️ AND IT NESTS, WHICH IS THE WHOLE OF WHY IT IS USABLE. A grant to Northgate
+    reaches every aisle, rack and bin under it — including the ones added next
+    week — so narrowing somebody is one press rather than four hundred.
+  */
+  reach: {
+    of: "location",
+    nests: "within",
+    label: { one: "Location", many: "Locations" },
+  },
+
   entitlements: {
     products: { label: "Products", withheld: "quota" },
     locations: { label: "Locations", withheld: "quota" },

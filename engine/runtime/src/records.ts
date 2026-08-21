@@ -18,6 +18,7 @@ import type { CollectionSpec } from "@engine/kernel";
 import { checkAll, checkSome, eraseBy, newId, vaultKeyFor } from "@engine/kernel";
 import { noteScopeGone } from "./search.js";
 import { column, table, type Db } from "./sql.js";
+import type { Reaching } from "./reach.js";
 
 export interface Written {
   readonly id: string;
@@ -32,7 +33,15 @@ export interface Written {
 export type WriteRefusal =
   | { readonly why: "invalid"; readonly detail: string }
   | { readonly why: "not_found"; readonly detail?: string }
-  | { readonly why: "vault_only"; readonly detail: string };
+  | { readonly why: "vault_only"; readonly detail: string }
+  /**
+   * ⚠️ ITS OWN REFUSAL, BECAUSE IT IS ITS OWN THING TO DO NEXT. "Not found" is
+   * what a caller gets for a record outside their scope, and it is right there —
+   * the id belongs to another workspace and saying so tells them it exists. This
+   * is different: the record is their workspace's and the PLACE is not theirs,
+   * so the person can be told which sites they work in and ask for another.
+   */
+  | { readonly why: "out_of_reach"; readonly detail: string };
 
 /**
  * ⚠️ A VAULT-BACKED VALUE NEVER REACHES A PRODUCT COLUMN, AND THIS IS THE ONLY
@@ -77,9 +86,17 @@ export async function put(
   by: string | null = null,
   now = new Date(),
   vault?: VaultSeam,
+  reaching: Reaching | null = null,
 ): Promise<Written | WriteRefusal> {
   const checked = checkAll(spec.fields, values);
   if (!checked.ok) return { why: "invalid", detail: checked.why };
+
+  /* ⚠️ A RECORD IS PUT SOMEWHERE, AND SOMEWHERE HAS TO BE INSIDE THE REACH. A
+     narrowed member creating a row at another site is the same leak as reading
+     one, arriving from the other direction — and it is the direction a filter on
+     the read alone does not touch. */
+  const away = outOfReach(reaching, checked.values);
+  if (away) return away;
 
   const erase = eraseBy(spec);
   const held = vaultBacked(spec, checked.values);
@@ -147,6 +164,7 @@ export async function patch(
   by: string | null = null,
   now = new Date(),
   vault?: VaultSeam,
+  reaching: Reaching | null = null,
 ): Promise<Written | WriteRefusal> {
   const erase = eraseBy(spec);
   const { id: _ignored, ...rest } = values;
@@ -156,6 +174,13 @@ export async function patch(
 
   const checked = checkSome(spec.fields, wanted);
   if (!checked.ok) return { why: "invalid", detail: checked.why };
+
+  /* ⚠️ AND MOVING A RECORD OUT OF YOUR REACH IS REFUSED TOO. The `WHERE` below
+     asks whether the row is theirs NOW; this asks where they are putting it, and
+     without it a narrowed member can push a record to a site they cannot see —
+     which loses it, from their side, permanently. */
+  const away = outOfReach(reaching, checked.values);
+  if (away) return away;
 
   const held = vaultBacked(spec, checked.values);
   if (held.length && !vault) {
@@ -178,14 +203,19 @@ export async function patch(
      and answering "nothing to do" would make a no-op indistinguishable from a
      refusal. */
   const sets = [...names.map((n) => `${column(n)} = ?`), `edited_at = ?`, `edited_by = ?`];
+  /* ⚠️ IN THE `WHERE`, LIKE THE SCOPE, AND FOR THE SAME REASON. A read to check
+     the place followed by a write leaves a window between them; in the statement
+     the row is either inside the caller's reach or not updated. */
+  const near = within(reaching);
   const bound = [
     ...names.map((n) => normalise(checked.values[n])),
-    now.toISOString(), by, id, ...(erase ? [scope] : []),
+    now.toISOString(), by, id, ...(erase ? [scope] : []), ...near.bound,
   ];
 
   const done = await db.prepare(
     `UPDATE ${table(spec.id)} SET ${sets.join(", ")}
-     WHERE id = ?${erase ? ` AND ${column(erase.column)} = ?` : ""}`).bind(...bound).run();
+     WHERE id = ?${erase ? ` AND ${column(erase.column)} = ?` : ""}${near.sql}`)
+    .bind(...bound).run();
 
   /* ⚠️ Reported, not assumed. A statement that matched no row is a record that
      is not the caller's, and answering 200 to it says an edit landed on
@@ -193,6 +223,48 @@ export async function patch(
   if (!done.meta?.changes) return { why: "not_found" };
   return { id };
 }
+
+/**
+ * THE PART OF EVERY STATEMENT THAT SAYS "AND ONLY WHERE THEY WORK".
+ *
+ * ⚠️ ONE BUILDER, USED BY THE READ AND THE WRITE ALIKE, because a filter written
+ * twice is a filter that narrows a list and lets an update through. `null` is
+ * the whole workspace and contributes nothing to the statement, which is what
+ * makes this cost nothing in every product that never declared a reach.
+ *
+ * ⚠️ AND AN EMPTY SET IS `1 = 0` RATHER THAN NOTHING. Somebody narrowed to no
+ * places reaches nothing; an empty `IN ()` is a syntax error in SQLite, and
+ * omitting the clause would turn "nowhere" into "everywhere" — the one direction
+ * a mistake here must never go.
+ */
+/**
+ * WHETHER A WRITE IS PUTTING A RECORD SOMEWHERE THE CALLER DOES NOT WORK.
+ *
+ * ⚠️ A VALUE THE WRITE DOES NOT MENTION IS NOT CHECKED, and that is right for
+ * both verbs. A create leaves the column null — a record that is nowhere is in
+ * nobody's way — and an update that does not touch the place is asking about a
+ * row whose place the `WHERE` already tested.
+ */
+const outOfReach = (
+  reaching: Reaching | null, values: Record<string, unknown>,
+): WriteRefusal | null => {
+  if (!reaching) return null;
+  const to = values[reaching.column];
+  if (to === undefined || to === null) return null;
+  if (reaching.values.includes(String(to))) return null;
+  return { why: "out_of_reach", detail: String(to) };
+};
+
+const within = (
+  reaching: Reaching | null,
+): { readonly sql: string; readonly bound: readonly unknown[] } => {
+  if (!reaching) return { sql: "", bound: [] };
+  if (!reaching.values.length) return { sql: " AND 1 = 0", bound: [] };
+  return {
+    sql: ` AND ${column(reaching.column)} IN (${reaching.values.map(() => "?").join(", ")})`,
+    bound: reaching.values,
+  };
+};
 
 /** ⚠️ Booleans are integers in SQLite and JSON is text. Everything else is itself. */
 const normalise = (value: unknown): unknown => {
@@ -203,12 +275,15 @@ const normalise = (value: unknown): unknown => {
 
 export async function readOne(
   db: Db, spec: CollectionSpec, scope: string, id: string,
+  reaching: Reaching | null = null,
 ): Promise<Record<string, unknown> | null> {
   const erase = eraseBy(spec);
+  const near = within(reaching);
   const sql = erase
-    ? `SELECT * FROM ${table(spec.id)} WHERE id = ? AND ${column(erase.column)} = ?`
-    : `SELECT * FROM ${table(spec.id)} WHERE id = ?`;
-  const row = await db.prepare(sql).bind(...(erase ? [id, scope] : [id])).first();
+    ? `SELECT * FROM ${table(spec.id)} WHERE id = ? AND ${column(erase.column)} = ?${near.sql}`
+    : `SELECT * FROM ${table(spec.id)} WHERE id = ?${near.sql}`;
+  const row = await db.prepare(sql)
+    .bind(...(erase ? [id, scope] : [id]), ...near.bound).first();
   return row ?? null;
 }
 
@@ -289,14 +364,19 @@ const narrow = (
  */
 export async function list(
   db: Db, spec: CollectionSpec, scope: string, asking: Asking = {},
+  reaching: Reaching | null = null,
 ): Promise<Listed> {
   const erase = eraseBy(spec);
   const want = Math.min(MOST_ROWS, Math.max(1, Math.trunc(asking.limit ?? 50)));
   const filter = narrow(spec, asking.where);
+  /* ⚠️ THE COUNT CARRIES IT TOO, which is the half a filter applied to the page
+     alone would miss — "12 of 400" over a shelf holding twelve is a number that
+     makes somebody go looking for records they will never be shown. */
+  const near = within(reaching);
 
   const scoped = erase ? `${column(erase.column)} = ?` : "1 = 1";
-  const where = `${scoped}${filter.sql}`;
-  const bound = [...(erase ? [scope] : []), ...filter.bound];
+  const where = `${scoped}${filter.sql}${near.sql}`;
+  const bound = [...(erase ? [scope] : []), ...filter.bound, ...near.bound];
 
   /* ⚠️ A PIPE, BECAUSE NEITHER HALF CAN CONTAIN ONE. An instant is ISO text and
      an id is a prefix and alphanumerics; a separator either of them could hold
@@ -334,6 +414,30 @@ export async function list(
     total: Number(counted?.n ?? items.length),
     next: more && last ? `${String(last.at)}|${String(last.id)}` : null,
   };
+}
+
+/**
+ * REMOVE A RECORD, IN THE CALLER'S OWN SCOPE AND INSIDE THEIR REACH.
+ *
+ * ⚠️ IT LIVES HERE BECAUSE THE OTHER FOUR STATEMENTS DO. Written at the call
+ * site it was the one of the five that carried the scope and not the reach — a
+ * narrowed member could not read a row at another site and could delete it, on a
+ * guessed id, which is the worst of the five to get wrong.
+ *
+ * ⚠️ AND IT REPORTS WHETHER IT MATCHED. A delete that matched nothing answering
+ * 200 says a record was removed when it was somebody else's and is still there.
+ */
+export async function drop(
+  db: Db, spec: CollectionSpec, scope: string, id: string,
+  reaching: Reaching | null = null,
+): Promise<boolean> {
+  const erase = eraseBy(spec);
+  const near = within(reaching);
+  const done = await db.prepare(
+    `DELETE FROM ${table(spec.id)} WHERE id = ?${
+      erase ? ` AND ${column(erase.column)} = ?` : ""}${near.sql}`)
+    .bind(id, ...(erase ? [scope] : []), ...near.bound).run();
+  return !!done.meta?.changes;
 }
 
 /* ----------------------------------------------------------------- erase --- */

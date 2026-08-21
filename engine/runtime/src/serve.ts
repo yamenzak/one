@@ -21,7 +21,8 @@
 
 import type {
   AnyOperation, AppSpec, Ask, Caller, CollectionSpec, DeploymentLegal, DocumentBook, DocumentDef,
-  Door, Kind, PackDef, PlanSpec, Problem, Resolved as _Resolved, Roots, Standing, TenantId,
+  Door, Kind, PackDef, PlanSpec, Problem, ReachBook, Resolved as _Resolved, Roots, Standing,
+  TenantId,
 } from "@engine/kernel";
 import {
   IN_GOOD_STANDING, LEGAL_INDEX, LEGAL_PATH, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, blockedBy, check,
@@ -65,6 +66,7 @@ import { keep } from "./vault.js";
 import { iconPng, iconSvg, webManifest, type Installable, type Installer } from "./installable.js";
 import { iconOf } from "./icon.js";
 import { mailedAs } from "./inbox.js";
+import { reachIn } from "./reach.js";
 import { availableChannels, type Mailer, type Pusher } from "./services.js";
 import { settingsFor } from "./settings.js";
 import type { Db } from "./sql.js";
@@ -93,6 +95,16 @@ export interface Who {
   readonly signedIn: boolean;
   readonly provenAt: string | null;
   readonly permissionsIn: (appId: string | null) => Promise<ReadonlySet<string>>;
+  /**
+   * WHERE IN THE WORKSPACE THIS PERSON WORKS, PER PRODUCT (`reach.ts`).
+   *
+   * ⚠️ IT COMES FROM THE MEMBERSHIP THE IDENTITY ALREADY READ, and is here for
+   * that reason: re-reading the roster to answer it would put a query in front
+   * of every request in every product, to answer a question most of them never
+   * ask. Absent — and an app absent FROM it — is the whole workspace, which is
+   * the default and every membership that predates the column.
+   */
+  readonly reach?: ReachBook;
 }
 
 const NONE: ReadonlySet<string> = new Set();
@@ -989,6 +1001,13 @@ export async function performOperation(
     db: located.db,
     tenantId: located.tenantId,
     accountId: who.accountId,
+    /*
+      ⚠️ HOW FAR THIS PERSON REACHES, RESOLVED ONCE PER REQUEST AND ONLY WHERE
+      SOMEBODY IS ACTUALLY NARROWED. A product that declares no reach, and a
+      member nobody narrowed, both answer `null` before any query is made — so
+      the whole feature costs nothing until a business buys the thing it is for.
+    */
+    reach: await reachIn(located.db, composed.app, who.reach),
     /* ⚠️ THE INSTANT AS A STRING, WHICH IS THE ONLY SHAPE A HANDLER CAN WRITE.
        `now` is a `Date` in here because the bookkeeping below does arithmetic
        with it; what crosses into an app is the ISO text, the same as a job's. */

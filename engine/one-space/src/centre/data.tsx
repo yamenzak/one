@@ -91,6 +91,21 @@ export interface MemberLine {
   readonly platformRole: string;
   readonly appRoles: Readonly<Record<string, string>>;
   readonly accepted: boolean;
+  /**
+   * ⚠️ WHERE THEY WORK, PER PRODUCT (`reach.ts`). An app ABSENT from this book is
+   * the whole workspace — which is what almost every row says, and what every
+   * membership that predates the column says. An app present with an empty list
+   * is nowhere.
+   */
+  readonly reach: Readonly<Record<string, readonly string[]>>;
+}
+
+/** One part of a workspace somebody can be narrowed to — see `member.places`. */
+export interface PlaceLine {
+  readonly id: string;
+  readonly name: string;
+  /** Its parent, where the places nest. A grant to a parent covers this. */
+  readonly within?: string;
 }
 
 export interface PackageLine {

@@ -21,11 +21,17 @@ export default defineConfig({
     ⚠️ AND `entryUnder` IS A CEILING SOMEBODY HAS TO RAISE. The entry chunk is
     what every visitor downloads on every door before anything is drawn; it
     reached 407 kB without any one commit being at fault, which is how weight
-    always arrives. 376 kB today; a screen that would push it over belongs
-    behind a dynamic import (`src/console/parts.tsx` is the pattern), and a number
-    raised here is a number somebody reads in review.
+    always arrives. A screen that would push it over belongs behind a dynamic
+    import (`src/console/parts.tsx` is the pattern), and a number raised here is
+    a number somebody reads in review.
+
+    ⚠️ RAISED TO 392 FOR THE ROSTER'S PLACES PICKER (D45). Where somebody works
+    is answered beside their role, in the tray a roster row opens — the same
+    person, the same question — and the alternative was a lazy boundary inside a
+    sheet that is already open, which trades 600 bytes for a spinner in the
+    middle of a form.
   */
-  plugins: [react(), tailwindcss(), design({ entryUnder: 390 })],
+  plugins: [react(), tailwindcss(), design({ entryUnder: 392 })],
   server: {
     /*
       ⚠️ EVERY DOOR IS A SUBDOMAIN, SO THE DEV SERVER HAS TO ANSWER TO ALL OF

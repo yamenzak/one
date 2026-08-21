@@ -1295,3 +1295,48 @@ never declares reaching the send — it is refused where the template is SAVED,
 which is the last moment it is somebody's mistake rather than somebody's mail; a
 failed send that takes the rest of the audience down with it, or that is logged
 with the letter's body in it.
+
+---
+
+## D45 — A membership is narrowed to part of a workspace, and one filter applies everywhere
+
+A workspace is not always one place. A membership may be narrowed to some of its
+places — for OneInventory, to locations — and the narrowing applies to every read
+and every write of every collection that says where its records are. `null` is
+the whole workspace and stays the default; an empty list is nowhere.
+Decided 2026-08-21.
+
+**Why.** The goods-in person at the second site could see, move and count the
+first site's stock. Nothing refused, nothing logged, and the product looked like
+it was working — which is the class this framework exists to make impossible, not
+a feature request. A business with four branches is the ordinary customer for an
+inventory product, and a roster that cannot say "you work here" sells them one
+branch's software four times.
+
+**Reach is not a permission and the two must not be merged.** A permission says
+WHAT somebody may do and applies wherever they are; reach says WHERE, and applies
+to everything they may do. Folded into one set, "count stock at Site B" becomes a
+key per site per verb — and adding a fifth site becomes a code change.
+
+**ONE DIMENSION PER PRODUCT.** A business is narrowed by one thing — a site, a
+branch, a clinic — and two would make every question about somebody's access a
+matrix nobody can answer at a roster screen. A product that needs a second is a
+product whose second dimension is a role, which it already has.
+
+**The grant names a NODE and the filter covers its subtree.** A grant to a
+warehouse reaches every aisle and bin under it, including the ones added next
+week — so narrowing somebody is one press rather than four hundred, and the walk
+happens at the read rather than being frozen into the stored grant.
+
+**And the guard is the load-bearing half.** The generated CRUD narrows itself;
+the forty statements an app writes by hand do not, and that asymmetry is the
+whole risk. `scripts/reach.test.mjs` fails on any statement over a narrowed table
+that neither carries the filter nor sits in a declaration that asks — with an
+exemption written as a sentence beside the query, never as a list in the guard.
+
+**Therefore never:** a reach folded into the permission set; a second dimension;
+a grant stored as the flat set of leaves it covered on the day it was made; an
+empty grant read as "no narrowing"; a collection that carries a place and does
+not declare it (composition refuses one); a handwritten statement over a narrowed
+table with neither the filter nor a stated reason; and a screen that narrows a
+list while the route under it answers for the whole workspace.

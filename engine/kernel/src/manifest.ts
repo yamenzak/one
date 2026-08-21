@@ -50,6 +50,8 @@ import { deadLinks, unaddressable, unraisable } from "./notify.js";
 import type { AnyOperation } from "./operation.js";
 import { refuseOperation, unreachable, unrecordedWrites } from "./operation.js";
 import type { ProblemCatalog } from "./problem.js";
+import type { ReachDef } from "./reach.js";
+import { refuseReach } from "./reach.js";
 import { PLATFORM_PROBLEMS, redefined, unknownProblems } from "./problem.js";
 import type { AreaBook, SettingBook } from "./setting.js";
 import { refuseSettings } from "./setting.js";
@@ -146,6 +148,13 @@ export interface AppSpec {
    * `infra.ts`.
    */
   readonly needs?: NeedBook;
+  /**
+   * ⚠️ HOW FAR ONE PERSON'S REACH GOES INSIDE A WORKSPACE (`reach.ts`). Absent
+   * means a workspace is one place and everybody in it reaches all of it, which
+   * is true of most products and must stay the default — a business with one
+   * site never meets this concept.
+   */
+  readonly reach?: ReachDef;
   readonly meters?: MeterBook;
   readonly lanes?: readonly Lane[];
   readonly whitelabel?: WhitelabelDef;
@@ -601,6 +610,17 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
      is whether the app contradicts itself. */
   for (const p of refuseNeeds(spec.needs ?? {}, [])) {
     at(`need ${p.of}`, `${p.why}: ${p.detail}`);
+  }
+
+  /*
+    ⚠️ AND HOW FAR A PERSON REACHES, WHICH FAILS OPEN IN EVERY DIRECTION. A
+    collection that says where its records are, in a product that never declared
+    what a place IS, reads as narrowed and is not; a `reachBy` naming a field
+    that does not exist narrows by a column that is not there. Both compose,
+    both serve, and both leave one site's stock readable from another.
+  */
+  for (const p of refuseReach(spec.reach, spec.collections)) {
+    at(`reach ${p.of}`, p.why);
   }
 
   for (const id of unbounded(spec.meters ?? {})) {

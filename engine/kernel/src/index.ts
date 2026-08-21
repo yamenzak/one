@@ -18,6 +18,7 @@ export * from "./field.js";
 export * from "./collection.js";
 export * from "./operation.js";
 export * from "./access.js";
+export * from "./reach.js";
 export * from "./package.js";
 export * from "./entitlement.js";
 export * from "./gate.js";

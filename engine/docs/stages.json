@@ -296,9 +296,9 @@
     },
     {
       "n": 55,
-      "status": "planned",
+      "status": "shipped",
       "title": "A collection narrows to part of a workspace — a location grant, and one filter the platform composes",
-      "ends": "`within: { column, tree }` on a `CollectionSpec` makes the generated verbs answer only what the caller's location grants reach, composed in the one function that owns the boundary exactly as `subject` scope is; no grants means the whole workspace; a notification's audience narrows the same way; and a guard refuses a handler composing that filter itself."
+      "ends": "`reach` on an `AppSpec` names the collection whose rows are the places and the field they nest by; `reachBy` on a collection names the field that says where one record is. A membership carries the places somebody works in, per app; a grant to a site covers everything under it, resolved at the read rather than frozen into the grant; and `null` — every membership until somebody is narrowed — is the whole workspace. The five generated verbs filter and refuse by themselves, `member.places` and `member.reach` are the roster's read and write, bounded by the granter's own reach, and `scripts/reach.test.mjs` fails on any statement over a narrowed table that neither carries the filter nor states why it is wide. The AUDIENCE of a notification is deliberately not narrowed — see `audienceFor`."
     },
     {
       "n": 56,

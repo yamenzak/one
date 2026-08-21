@@ -1911,6 +1911,11 @@ const handler = async (env: Env) => {
            `located.apps[0]`, so a role in the second product granted nothing. */
         permissionsIn: permissionsResolver(located.db, located.tenantId as never, member,
           (appId) => APPS[appId]?.().access.roles ?? null, now),
+        /* ⚠️ FROM THE MEMBERSHIP THE ROSTER READ ONE LINE UP, never re-read. It
+           is one column of a row this request already has, and a second query
+           for it would be paid by every request in every product to answer a
+           question most of them never ask. */
+        ...(member ? { reach: member.reach } : {}),
       };
     },
   });
