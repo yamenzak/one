@@ -40,6 +40,11 @@ import { Reports, type Reported, type Span } from "./Reports.js";
 import { Thing, type Batch, type Movement, type Piece } from "./Thing.js";
 import { Where } from "./Where.js";
 import { Start } from "./Start.js";
+/* ⚠️ `Seen` IS TAKEN BY THE SCAN SCREEN, so the import's is renamed at the door.
+   Two meanings of one word in one file is a rename waiting to pick the wrong
+   one — the same reason `Got` is not called `Answer` above. */
+import { Import, MAPPABLE, type Done, type Seen as Seeing } from "./Import.js";
+import { NOBODY, Suppliers, type Supplier as SupplierLine } from "./Suppliers.js";
 import type { Line, Place, Tracking } from "./sample.js";
 
 /* ------------------------------------------------------------------ seams --- */
@@ -1611,6 +1616,156 @@ const LABELS = (api: Door) => function LabelsHere() {
 };
 
 /**
+ * IMPORT — the paste, the mapping, the preview, the write.
+ *
+ * ⚠️ THE PREVIEW AND THE COMMIT SEND THE SAME TWO THINGS, and that is what makes
+ * the screen's promise true. `product.preview` and `product.import` share one
+ * planner on the server; this container's job is to make sure the text and the
+ * mapping that reach the second are the ones the first was asked about, which is
+ * why the mapping is re-sent rather than remembered anywhere.
+ *
+ * ⚠️ AND THE MAPPING IS A DIFF THE PERSON OWNS. The guess arrives with the
+ * preview; every correction is kept locally and merged over it, so re-previewing
+ * after a change does not throw the change away.
+ */
+const IMPORT = (api: Door) => function ImportHere() {
+  const today = dayHere();
+  const [text, setText] = React.useState("");
+  const [seen, setSeen] = React.useState<Seeing | null>(null);
+  const [said, setSaid] = React.useState<Record<string, number>>({});
+  const [done, setDone] = React.useState<Done | null>(null);
+  const [busy, setBusy] = React.useState(false);
+
+  /* ⚠️ THE WORKSPACE'S OWN WORDS ON THE MAPPING LABELS. A clinic mapping a
+     column called "Shelf" is mapping somebody else's product — and the vocabulary
+     is asked for rather than copied here, so it cannot drift from `words.ts`. */
+  const starts = useAsked<{ words: { place: string } }>(() => api.get("product.start"));
+  const place = starts.of.status === "ready" ? starts.of.data.words.place : "Location";
+
+  const fields = React.useMemo(() => MAPPABLE.map((one) => (
+    one.id === "location" ? { id: one.id, label: place } : one
+  )), [place]);
+
+  const see = (columns: Record<string, number>) => {
+    setBusy(true);
+    void api.post<Seeing>("product.preview", { text, columns }).then((got) => {
+      setBusy(false);
+      if (!got.ok) return;
+      setSeen(got.value);
+    });
+  };
+
+  return (
+    <Import
+      title={nameOf("/import")}
+      text={text}
+      onText={setText}
+      seen={seen}
+      fields={fields}
+      /* ⚠️ THE GUESS UNDER THE CORRECTIONS, in that order — the door merges the
+         same way, so what is drawn is what will happen. */
+      columns={{ ...(seen?.columns ?? {}), ...said }}
+      onColumn={(field, at) => {
+        const next = { ...said, [field]: at };
+        setSaid(next);
+        /* ⚠️ RE-PREVIEWED ON EVERY CHANGE, because the counts are the answer to
+           the change. A mapping edited against a stale tally is a person reading
+           the consequences of the previous decision. */
+        see(next);
+      }}
+      done={done}
+      busy={busy}
+      onSee={() => { see(said); }}
+      onImport={() => {
+        setBusy(true);
+        void api.post<Done>("product.import", {
+          text, day: today, columns: { ...(seen?.columns ?? {}), ...said },
+        }).then((got) => {
+          setBusy(false);
+          if (!got.ok) return;
+          setDone(got.value);
+        });
+      }}
+      onAgain={() => { setText(""); setSeen(null); setSaid({}); setDone(null); }}
+    />
+  );
+};
+
+/**
+ * SUPPLIERS — who things come from.
+ *
+ * ⚠️ THE PRODUCT COUNT IS JOINED HERE rather than answered by the door, for the
+ * reason this whole file exists: `product.list` is already read by half the
+ * product, and a `supplier.count` operation would be a query language with extra
+ * steps. It is the one fact that says whether a row is still worth keeping.
+ */
+const SUPPLIERS = (api: Door) => function SuppliersHere() {
+  const rows = useAsked<{ items: readonly Row[] }>(() => api.get("supplier.list"));
+  const kinds = useAsked<{ items: readonly Row[] }>(() => api.get("product.list"));
+  const lead = useAsked<{ leadDays: number }>(() => api.get("product.start"));
+  const [editing, setEditing] = React.useState<SupplierLine | null>(null);
+  const [busy, setBusy] = React.useState(false);
+
+  const per = new Map<string, number>();
+  if (kinds.of.status === "ready") {
+    for (const one of kinds.of.data.items) {
+      const from = text(one.supplier);
+      if (from) per.set(from, (per.get(from) ?? 0) + 1);
+    }
+  }
+
+  const items: Loaded<readonly SupplierLine[]> = rows.of.status === "ready"
+    ? ready(rows.of.data.items.map((row): SupplierLine => ({
+      id: text(row.id),
+      name: text(row.name),
+      contact: text(row.contact),
+      email: text(row.email),
+      phone: text(row.phone),
+      account: text(row.account),
+      /* ⚠️ `null` RATHER THAN ZERO where nobody said — see `Supplier`. A
+         supplier who has not been asked how long they take is not one who
+         delivers this afternoon. */
+      leadDays: row.leadDays === null || row.leadDays === undefined
+        ? null
+        : num(row.leadDays),
+      note: text(row.note),
+      products: per.get(text(row.id)) ?? 0,
+    })))
+    : rows.of;
+
+  return (
+    <Suppliers
+      title={nameOf("/suppliers")}
+      of={items}
+      standingDays={lead.of.status === "ready" ? num(lead.of.data.leadDays) : 0}
+      editing={editing}
+      busy={busy}
+      again={() => { rows.again(); kinds.again(); }}
+      onOpen={setEditing}
+      onNew={() => { setEditing(NOBODY); }}
+      onClose={() => { setEditing(null); }}
+      onSave={(of) => {
+        setBusy(true);
+        const body = {
+          name: of.name, contact: of.contact, email: of.email, phone: of.phone,
+          account: of.account, note: of.note,
+          /* ⚠️ ABSENT RATHER THAN NULL where nobody said, because an absent
+             field is what the collection writer leaves alone. */
+          ...(of.leadDays === null ? {} : { leadDays: of.leadDays }),
+        };
+        void api.post(of.id ? "supplier.update" : "supplier.create",
+          of.id ? { id: of.id, ...body } : body).then((got) => {
+          setBusy(false);
+          if (!got.ok) return;
+          setEditing(null);
+          rows.again();
+        });
+      }}
+    />
+  );
+};
+
+/**
  * ⚠️ THE GUIDE IS TICKED BY EVENTS THIS WORKSPACE HAS ACTUALLY RAISED, and until
  * the platform answers that question the honest state is nothing crossed off —
  * never a step ticked because a screen guessed.
@@ -1668,6 +1823,8 @@ export function mount({ register, api }: Mounting): void {
     ["/due", DUE(api)],
     ["/labels", LABELS(api)],
     ["/reports", REPORTS(api)],
+    ["/import", IMPORT(api)],
+    ["/suppliers", SUPPLIERS(api)],
     ["/start", START(api)],
   ];
   for (const [route, screen] of screens) {

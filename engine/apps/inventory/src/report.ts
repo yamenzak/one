@@ -159,6 +159,15 @@ export interface Stocked {
   readonly par: number;
   /** What left over the period, from `usageIn`. */
   readonly used: number;
+  /**
+   * ⚠️ WHO IT COMES FROM, AND HOW LONG THEY TAKE — the two facts that turn "buy
+   * 90" into an order somebody can place. Absent falls back to the workspace's
+   * own lead time, which is the slowest supplier it has: using that for
+   * everybody orders everything three weeks early, and a shelf full of stock
+   * ordered too soon is money on a shelf.
+   */
+  readonly supplier?: string;
+  readonly leadDays?: number | null;
 }
 
 export interface Buy {
@@ -170,6 +179,8 @@ export interface Buy {
   readonly order: number;
   /** ⚠️ Why it is on the list, so nobody has to work the arithmetic out. */
   readonly why: "runs out first" | "below the line";
+  /** ⚠️ Who to ring. Empty where nobody was named. */
+  readonly supplier: string;
 }
 
 /**
@@ -188,15 +199,24 @@ export interface Buy {
  * ⚠️ A PRODUCT THAT NEVER MOVES IS NOT ORDERED. Zero consumption gives infinite
  * cover, which is the honest answer: whatever is on the shelf will still be
  * there. It appears only if it is under a par level somebody deliberately set.
+ *
+ * ⚠️ AND THE LEAD TIME IS THE SUPPLIER'S WHERE THERE IS ONE. The workspace's own
+ * number is the slowest supplier it has; applying it to a next-day consumable
+ * orders three weeks of stock every time one dips, and applying the FAST one to
+ * everybody is the same mistake pointed the other way. `leadDays` on the row is
+ * the fact; the argument is the fallback.
  */
 export function reorder(
   rows: readonly Stocked[], overDays: number, leadDays: number,
 ): readonly Buy[] {
   const days = Math.max(1, Math.trunc(overDays));
-  const lead = Math.max(0, Math.trunc(leadDays));
+  const standing = Math.max(0, Math.trunc(leadDays));
   const out: Buy[] = [];
 
   for (const row of rows) {
+    const lead = row.leadDays === null || row.leadDays === undefined
+      ? standing
+      : Math.max(0, Math.trunc(row.leadDays));
     const perDay = row.used / days;
     const cover = perDay > 0 ? row.onHand / perDay : Infinity;
     /* ⚠️ WHAT WILL BE GONE BY THE TIME IT ARRIVES, PLUS WHAT SHOULD STILL BE
@@ -213,6 +233,7 @@ export function reorder(
          about the lead time and is the one somebody acts on today; "below the
          line" is a standing preference and can wait for the next order. */
       why: perDay > 0 && cover < lead ? "runs out first" : "below the line",
+      supplier: row.supplier ?? "",
     });
   }
 

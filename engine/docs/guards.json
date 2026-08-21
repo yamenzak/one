@@ -2763,7 +2763,7 @@
       "status": "live",
       "impl": "scripts/inferred-consumption.test.mjs",
       "proves": "recognises",
-      "fails": "a recorded share that reads a hundred per cent for ever \u2014 the flattering direction, with every test green, because nothing else connects the id a count mints to the prefix the report reads"
+      "fails": "a recorded share that reads a hundred per cent for ever — the flattering direction, with every test green, because nothing else connects the id a count mints to the prefix the report reads"
     },
     {
       "id": "a-label-is-minted-once-and-never-re-issued",
@@ -2771,7 +2771,7 @@
       "stage": "69",
       "status": "live",
       "impl": "scripts/label-once.test.mjs",
-      "proves": "UPDATE \u2026 SET code",
+      "proves": "UPDATE … SET code",
       "fails": "the sticker somebody put on a shelf in March resolves to nothing, and the count that walks past it finds an unlabelled place"
     },
     {
@@ -2818,6 +2818,15 @@
       "impl": "apps/inventory/test/ledger.test.ts",
       "proves": "takes the earliest clock, and says which it was",
       "fails": "a shelf that says “expires Tuesday” and cannot say why, which is a shelf nobody acts on"
+    },
+    {
+      "id": "the-preview-and-the-commit-are-the-same-function",
+      "protects": "D12",
+      "stage": "71",
+      "status": "live",
+      "impl": "scripts/one-planner.test.mjs",
+      "proves": "does not call",
+      "fails": "a screen that says “412 new, 3 updated” over a write that walks the same spreadsheet a second time and does something else — identical until the day it is not, and on that day nothing throws"
     }
   ]
 }

@@ -116,7 +116,7 @@ const PLANS: readonly PlanSpec[] = [
     said: "Read and export what is here. Nothing new can be added.",
     price: 0, currency: "USD", credits: 0,
     includes: { seats: 1, storage: GB, domains: 0, notes: 0, publishing: false,
-      products: 0, locations: 0, processes: false, jobs: false },
+      products: 0, locations: 0, processes: false, jobs: false, imports: false },
   },
   {
     id: "solo", name: "Solo", kind: "personal", order: 1, trialDays: 14,
@@ -129,29 +129,36 @@ const PLANS: readonly PlanSpec[] = [
       opens one tier up rather than four — because the single-chair clinic that
       sterilises is exactly the customer a Studio-only gate would exclude.
     */
+    /*
+      ⚠️ AND AN IMPORT OPENS AT THE FLOOR RATHER THAN AT A TIER THAT PAYS FOR IT.
+      Everybody arrives holding a spreadsheet, and a paid plan whose first
+      instruction is "now type in your four hundred products" is a plan somebody
+      cancels in the trial. It is off on the parking row for the same reason
+      everything else is: that row adds nothing.
+    */
     includes: { seats: 1, storage: 10 * GB, domains: 0, notes: -1, publishing: true,
-      products: 200, locations: 25, processes: false, jobs: true },
+      products: 200, locations: 25, processes: false, jobs: true, imports: true },
   },
   {
     id: "plus", name: "Plus", kind: "personal", order: 2, trialDays: 14,
     said: "Room to work, and somebody beside you.",
     price: 2500, currency: "USD", credits: 4_000,
     includes: { seats: 2, storage: 50 * GB, domains: 0, notes: -1, publishing: true,
-      products: 1_000, locations: 100, processes: true, jobs: true },
+      products: 1_000, locations: 100, processes: true, jobs: true, imports: true },
   },
   {
     id: "studio", name: "Studio", kind: "commercial", order: 3, trialDays: 14,
     said: "A business: your own name on it, your own address, your own database.",
     price: 4900, currency: "USD", credits: 7_500,
     includes: { seats: 5, storage: 250 * GB, domains: 1, notes: -1, publishing: true,
-      products: 10_000, locations: 1_000, processes: true, jobs: true },
+      products: 10_000, locations: 1_000, processes: true, jobs: true, imports: true },
   },
   {
     id: "company", name: "Company", kind: "commercial", order: 4, trialDays: 14,
     said: "A team, and the room a team needs.",
     price: 19900, currency: "USD", credits: 40_000,
     includes: { seats: 25, storage: 2048 * GB, domains: 3, notes: -1, publishing: true,
-      products: -1, locations: -1, processes: true, jobs: true },
+      products: -1, locations: -1, processes: true, jobs: true, imports: true },
   },
 ];
 

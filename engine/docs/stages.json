@@ -133,7 +133,7 @@
       "n": 24,
       "status": "shipped",
       "title": "A workspace composes its own roles out of one app's keys",
-      "ends": "`custom_role` was applied, read by `permissionsFor` and written by nothing \u2014 a table, a resolver and a refusal rule with no way to reach any of them. `role.list`, `role.save` and `role.remove` are the three that make it real. `beyond_you` is the one to read twice: a workspace composing a role out of keys its author does not hold is the shortest path from \u201cI can manage people\u201d to \u201cI can do anything\u201d \u2014 make the role, assign it to yourself \u2014 and `saveRole` is the only writer that reaches the check. A role somebody still holds may not be deleted: the registry would stop carrying it, `permissionsFor` would resolve it to nothing, and they would keep their seat and be able to do nothing at all with no screen saying why."
+      "ends": "`custom_role` was applied, read by `permissionsFor` and written by nothing — a table, a resolver and a refusal rule with no way to reach any of them. `role.list`, `role.save` and `role.remove` are the three that make it real. `beyond_you` is the one to read twice: a workspace composing a role out of keys its author does not hold is the shortest path from “I can manage people” to “I can do anything” — make the role, assign it to yourself — and `saveRole` is the only writer that reaches the check. A role somebody still holds may not be deleted: the registry would stop carrying it, `permissionsFor` would resolve it to nothing, and they would keep their seat and be able to do nothing at all with no screen saying why."
     },
     {
       "n": 25,
@@ -349,20 +349,20 @@
     {
       "n": 68,
       "status": "shipped",
-      "title": "A night\u2019s work can tell somebody \u2014 a job raises events, and the nightly sweep uses it",
-      "ends": "`JobCtx` carries `tell` and `setting`, so a per-tenant job reaches the same inbox a request does \u2014 the same audience-by-permission, the same channel resolution, the same workspace numbers \u2014 and `eventsOf` counts a job\u2019s `emits`, so a notification about something nobody was present for composes. The runner refuses an undeclared event and `refuseJob` refuses `emits` on a deployment-scope job, because a note is filed in a workspace. OneInventory\u2019s expiry sweep is the first: it tells about CROSSINGS rather than states \u2014 `crossedOn` is arithmetic, so nothing is remembered, a repeat run names the same batches, and nobody is told the same thing every morning for a month. `job-tells.test.mjs` fails on a job that declares an event and never raises it."
+      "title": "A night’s work can tell somebody — a job raises events, and the nightly sweep uses it",
+      "ends": "`JobCtx` carries `tell` and `setting`, so a per-tenant job reaches the same inbox a request does — the same audience-by-permission, the same channel resolution, the same workspace numbers — and `eventsOf` counts a job’s `emits`, so a notification about something nobody was present for composes. The runner refuses an undeclared event and `refuseJob` refuses `emits` on a deployment-scope job, because a note is filed in a workspace. OneInventory’s expiry sweep is the first: it tells about CROSSINGS rather than states — `crossedOn` is arithmetic, so nothing is remembered, a repeat run names the same batches, and nobody is told the same thing every morning for a month. `job-tells.test.mjs` fails on a job that declares an event and never raises it."
     },
     {
       "n": 69,
       "status": "shipped",
-      "title": "Labels \u2014 a QR from nothing, a printable sheet, and the decant label a hazard needs",
-      "ends": "`@engine/design` draws a QR itself (ISO/IEC 18004, byte mode, level M, versions 1\u201310) \u2014 hand-written, and only defensible because `qr.test.ts` DECODES what it produces with a reader that shares no code with it: unmasks, reads the format bits back, de-interleaves, checks every Reed-Solomon syndrome is zero, parses the payload. One symbology for everything we print, because two encoders are two ways for a tag to come out unscannable. `LabelSheet`/`Label`/`LabelText` are the one place in the system measured in millimetres, because a label has a physical size and a screen does not. OneInventory declares a GHS classification on a product and prints the decant label a decanted bottle legally needs \u2014 signal word, hazards, statements verbatim \u2014 says plainly that the diamond is not the regulated pictogram, and reports a classification that contradicts itself where the label is printed rather than refusing it. Printing a place or a product MINTS its code, and `label-once.test.mjs` fails on any statement that could re-issue one."
+      "title": "Labels — a QR from nothing, a printable sheet, and the decant label a hazard needs",
+      "ends": "`@engine/design` draws a QR itself (ISO/IEC 18004, byte mode, level M, versions 1–10) — hand-written, and only defensible because `qr.test.ts` DECODES what it produces with a reader that shares no code with it: unmasks, reads the format bits back, de-interleaves, checks every Reed-Solomon syndrome is zero, parses the payload. One symbology for everything we print, because two encoders are two ways for a tag to come out unscannable. `LabelSheet`/`Label`/`LabelText` are the one place in the system measured in millimetres, because a label has a physical size and a screen does not. OneInventory declares a GHS classification on a product and prints the decant label a decanted bottle legally needs — signal word, hazards, statements verbatim — says plainly that the diamond is not the regulated pictogram, and reports a classification that contradicts itself where the label is printed rather than refusing it. Printing a place or a product MINTS its code, and `label-once.test.mjs` fails on any statement that could re-issue one."
     },
     {
       "n": 70,
       "status": "shipped",
-      "title": "Reports \u2014 what went, what was wrong, what to buy, and how much of it anybody wrote down",
-      "ends": "Every figure is derived from the ledger and nothing is stored, because a correction made in March changes what February consumed and a stored number never learns that. One operation answers all four, so a screen cannot show a month\u2019s usage beside a fortnight\u2019s losses. The HERO is the recorded share \u2014 the number that makes the product look bad, and the only one that says whether the others mean anything. Short and over stay apart, because netting them off draws a shelf that is wildly wrong as a shelf that is fine. What to buy is ordered by what runs out FIRST against the workspace\u2019s own lead time, never by what is smallest \u2014 which is how a store room runs out of the thing that takes a month to get. `inferred-consumption.test.mjs` fails if the id a count mints and the prefix the report reads ever drift apart, or if a close stops naming its session."
+      "title": "Reports — what went, what was wrong, what to buy, and how much of it anybody wrote down",
+      "ends": "Every figure is derived from the ledger and nothing is stored, because a correction made in March changes what February consumed and a stored number never learns that. One operation answers all four, so a screen cannot show a month’s usage beside a fortnight’s losses. The HERO is the recorded share — the number that makes the product look bad, and the only one that says whether the others mean anything. Short and over stay apart, because netting them off draws a shelf that is wildly wrong as a shelf that is fine. What to buy is ordered by what runs out FIRST against the workspace’s own lead time, never by what is smallest — which is how a store room runs out of the thing that takes a month to get. `inferred-consumption.test.mjs` fails if the id a count mints and the prefix the report reads ever drift apart, or if a close stops naming its session."
     },
     {
       "n": 67,
@@ -387,6 +387,12 @@
       "status": "planned",
       "title": "The guide and the milestones are ticked by what a workspace has actually done",
       "ends": "An operation answers which declared events this workspace has raised and how many times, so `Guide` crosses off a step because the thing it describes happened and `Milestones` reaches fifty when fifty were added. Until then the books render and nothing can ever be ticked: every workspace sees the same unstarted checklist for ever, including the one that finished it before opening the screen."
+    },
+    {
+      "n": 71,
+      "status": "shipped",
+      "title": "The spreadsheet somebody already has — the import, and the supplier it names",
+      "ends": "Nobody types in eight hundred products, so a paste of a stock list is the difference between a trial and a workspace. Quotes are parsed rather than stripped, the separator is read off the heading and a European decimal is not a thousands separator — each of those is a catalogue that looks complete and is wrong. The mapping is GUESSED and then SHOWN, editable, because a guess that puts the supplier's name in the product name for eight hundred rows is only catchable before it happens; every refused row comes back with its line number and its reason rather than being dropped. `one-planner.test.mjs` fails if the preview and the commit ever stop being one function — two walks of one sheet agree until the day they do not, and on that day nothing throws. A supplier is the last step of the reorder report's own workflow: it can say what to buy and, without this, not who to ring — and its own lead time beats the workspace's, which is the slowest supplier a place has."
     }
   ]
 }

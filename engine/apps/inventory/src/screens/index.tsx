@@ -40,6 +40,8 @@ import { Start } from "./Start.js";
 import { Stock } from "./Stock.js";
 import { Thing, type Batch, type Movement } from "./Thing.js";
 import { Where } from "./Where.js";
+import { Import, MAPPABLE, type Seen as Seeing } from "./Import.js";
+import { Suppliers, type Supplier } from "./Suppliers.js";
 
 export {
   Ask, Case, Count, Due, Item, Kit, Labels, Receive, Reports, Run, Scan, Start, Stock,
@@ -250,11 +252,13 @@ const REPORTED: Reported = {
   ],
   /* ⚠️ THE FAST ONE FIRST EVEN THOUGH IT HAS MORE ON THE SHELF, which is the
      ordering the whole reorder report turns on. */
+  /* ⚠️ ONE WITH A SUPPLIER AND ONE WITHOUT, because "who to ring" has to look
+     right on a row where nobody has said. */
   buy: [
     { product: "p-glove", name: "Nitrile gloves, M", onHand: 64, cover: 3,
-      order: 90, why: "runs out first", unit: "box" },
+      order: 90, why: "runs out first", unit: "box", supplier: "Medline" },
     { product: "p-ext", name: "Fire extinguisher, CO₂ 5 kg", onHand: 1, cover: Infinity,
-      order: 3, why: "below the line", unit: "item" },
+      order: 3, why: "below the line", unit: "item", supplier: "" },
   ],
   daily: Array.from({ length: 30 }, (_, i) => ({
     day: `2026-07-${String(23 + i).padStart(2, "0")}`,
@@ -262,6 +266,50 @@ const REPORTED: Reported = {
     quantity: i % 7 === 5 || i % 7 === 6 ? 0 : 20 + ((i * 7) % 23),
   })),
 };
+
+/**
+ * ⚠️ A PREVIEW WITH ALL THREE VERDICTS IN IT, AND A REFUSAL THAT IS NOT THE LAST
+ * ROW. The whole reason this screen exists is that an import can be wrong in a
+ * way that looks like success — a ground showing four clean new products
+ * photographs the case nobody needed a preview for.
+ *
+ * ⚠️ AND THE MAPPING IS DELIBERATELY IMPERFECT. `supplier` is unmapped because
+ * the sheet has no such column, which is what the "Leave it out" option looks
+ * like when it is the honest answer rather than a correction.
+ */
+const SEEN_SHEET: Seeing = {
+  header: ["product name", "brand", "ean", "qty", "shelf"],
+  columns: { name: 0, brand: 1, code: 2, quantity: 3, location: 4 },
+  tally: { new: 2, update: 1, refused: 1 },
+  rows: [
+    { line: 2, verdict: "new", why: "", name: "Nitrile gloves, M", code: "5012345678900",
+      location: "Store room", supplier: "Medline", quantity: 40 },
+    { line: 3, verdict: "update", why: "", name: "Isopropanol 99%", code: "5012345678917",
+      location: "Cabinet 2", supplier: "", quantity: 6 },
+    /* ⚠️ THE ONE THAT MATTERS: a quantity with nowhere to put it. Imported
+       anyway it would be a product created without its stock, and half an import
+       is worse than none. */
+    { line: 4, verdict: "refused", why: "A quantity with no place", name: "Masking tape",
+      code: "", location: "", supplier: "", quantity: 12 },
+    { line: 5, verdict: "new", why: "", name: "Cutting fluid, 5 L", code: "",
+      location: "Bay 1", supplier: "", quantity: 4 },
+  ],
+};
+
+/**
+ * ⚠️ ONE WITH A LEAD TIME AND ONE WITHOUT, because the row has to read right in
+ * both — a supplier nobody has asked how long they take falls back to the
+ * workspace's number, and the list is where somebody notices they should ask.
+ */
+const SUPPLYING: readonly Supplier[] = [
+  { id: "s-1", name: "Medline", contact: "Dana", email: "orders@medline.example",
+    phone: "+49 30 1234 5678", account: "MED-4471", leadDays: 3, note: "",
+    products: 42 },
+  { id: "s-2", name: "Kaufmann Chemie", contact: "", email: "", phone: "+49 89 22 33 44",
+    account: "", leadDays: 21, note: "Solvents only", products: 8 },
+  { id: "s-3", name: "The hardware shop on the corner", contact: "", email: "",
+    phone: "", account: "", leadDays: null, note: "", products: 1 },
+];
 
 /**
  * ⚠️ A CLASSIFIED SUBSTANCE AND AN ORDINARY ONE, because the decant label has to
@@ -662,6 +710,41 @@ export function InventoryScreen({ route, onGo }: {
           back={() => go("/work")}
           onClose={nothing}
           onOpenProduct={() => go("/thing")}
+        />
+      );
+    /* ⚠️ THE MIDDLE STEP, WHICH IS THE ONLY ONE WORTH PHOTOGRAPHING. A paste box
+       is a paste box; the mapping over a preview with a refusal in it is the
+       screen — and it is what somebody has to be able to read at a glance. */
+    case "/import":
+      return (
+        <Import
+          title={title}
+          text="product name,brand,ean,qty,shelf"
+          onText={nothing}
+          seen={SEEN_SHEET}
+          fields={MAPPABLE}
+          columns={SEEN_SHEET.columns}
+          onColumn={nothing}
+          done={null}
+          busy={false}
+          onSee={nothing}
+          onImport={nothing}
+          onAgain={nothing}
+        />
+      );
+    case "/suppliers":
+      return (
+        <Suppliers
+          title={title}
+          of={ready(SUPPLYING)}
+          standingDays={7}
+          editing={null}
+          busy={false}
+          again={nothing}
+          onOpen={nothing}
+          onNew={nothing}
+          onClose={nothing}
+          onSave={nothing}
         />
       );
     case "/start":

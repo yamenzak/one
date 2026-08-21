@@ -207,6 +207,45 @@ describe("what to buy", () => {
   it("survives a period of no days", () => {
     expect(() => reorder([{ product: "p", onHand: 1, par: 0, used: 5 }], 0, 7)).not.toThrow();
   });
+
+  /*
+    ⚠️ THE SUPPLIER'S OWN LEAD TIME BEATS THE WORKSPACE'S, and this is why the
+    collection exists. The workspace's number is the slowest supplier it has:
+    applied to a next-day consumable it orders a month of stock every time one
+    dips, which is money sitting on a shelf. Both rows below are ten a day with
+    three days left, and the only difference between them is who they come from.
+  */
+  it("orders on the supplier's own lead time where there is one", () => {
+    const out = reorder([
+      { product: "slow", onHand: 30, par: 0, used: 300, leadDays: 28 },
+      { product: "quick", onHand: 30, par: 0, used: 300, leadDays: 1 },
+    ], 30, 28);
+    const by = new Map(out.map((one) => [one.product, one]));
+    expect(by.get("slow")?.order).toBe(250);
+    /* ⚠️ Ten for the day it takes, less the thirty already there: nothing. */
+    expect(by.get("quick")).toBeUndefined();
+  });
+
+  /*
+    ⚠️ AND ABSENT FALLS BACK RATHER THAN MEANING TODAY. A supplier nobody asked
+    how long they take is not a supplier who delivers this afternoon — read as
+    zero, every product they supply drops off the reorder list until the shelf is
+    empty.
+  */
+  it("falls back to the workspace's lead time, never to none", () => {
+    const rows = [{ product: "p", onHand: 30, par: 0, used: 300 }];
+    expect(reorder(rows, 30, 7)[0]?.order).toBe(40);
+    expect(reorder([{ ...rows[0]!, leadDays: null }], 30, 7)[0]?.order).toBe(40);
+  });
+
+  /* ⚠️ AND WHO TO RING TRAVELS WITH THE ROW. A reorder list that can say what to
+     buy and not who from is a list somebody finishes in a different app. */
+  it("carries the supplier through to the line", () => {
+    const out = reorder([
+      { product: "p", onHand: 0, par: 4, used: 0, supplier: "Ansell" },
+    ], 30, 7);
+    expect(out[0]?.supplier).toBe("Ansell");
+  });
 });
 
 /* --------------------------------------------------------------------- days --- */

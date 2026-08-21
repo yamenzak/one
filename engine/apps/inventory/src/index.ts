@@ -26,6 +26,7 @@ import {
    and a contradiction reported where nothing prints is a warning nobody sees. */
 import { SIGNALS } from "./hazard.js";
 import { PROFILES, wordsFor, type Words } from "./words.js";
+import { columnsFor, planIn, readSheet, tallyIn, type Planned } from "./sheet.js";
 import { dailyIn, lossesIn, reorder, toldIn, usageIn } from "./report.js";
 import { CODE_KINDS, readScan, stillNeeded, unread } from "./code.js";
 import { settleCount, type Change } from "./count.js";
@@ -147,6 +148,11 @@ const product = collection({
       after itself, and this is what makes that row FINDABLE rather than a
       silent pile of numbered things nobody ever looks at.
     */
+    /* ⚠️ WHO IT USUALLY COMES FROM, which is what turns "buy 90" into an order.
+       One rather than many: a product with three suppliers has a purchasing
+       decision behind it, and a list here would be a list nothing chooses
+       from. */
+    supplier: field.ref({ label: "Usually from", holds: "none", to: "supplier" }),
     unnamed: field.bool({ label: "Not named yet", holds: "none" }),
     /*
       ⚠️ WHAT ONE OF THESE IS SUPPOSED TO CONTAIN — the standard tray, the
@@ -199,6 +205,55 @@ const location = collection({
        manufacturer — and prefixed so the scanner knows instantly which kind of
        code it is holding. */
     code: field.text({ label: "Label", holds: "none", max: 64 }),
+    note: field.long({ label: "Note", holds: "none", max: 2_000 }),
+  },
+});
+
+/**
+ * WHO IT COMES FROM.
+ *
+ * ⚠️ A LIST RATHER THAN AN ADVISOR, and that is the whole of what was missing.
+ * The reorder report can already say what to buy and how long it lasts; without
+ * this it cannot say who to ring, so the last step of the one workflow the
+ * report exists for happens in somebody's head or in a different app.
+ *
+ * ⚠️ AND `leadDays` IS HERE AS WELL AS IN THE SETTINGS, because the workspace's
+ * number is the slowest supplier it has and using it for everybody orders
+ * everything three weeks early. Absent falls back to the setting — which is what
+ * makes adding a supplier an improvement rather than a prerequisite.
+ *
+ * ⚠️ NO PRICES. What a workspace pays is a commercial relationship this product
+ * has no business holding, and the moment it does, an import, an export and a
+ * screen all carry it — see the code book's own line about a moat and a
+ * disclosure.
+ */
+const supplier = collection({
+  id: "supplier",
+  label: { one: "Supplier", many: "Suppliers" },
+  scope: { of: "tenant" },
+  permission: "product",
+  retention: null,
+  onClose: { then: "purge" },
+  offline: "cache",
+  searchable: ["name"],
+  fields: {
+    name: field.text({ label: "Name", required: true, holds: "none", max: 200 }),
+    /*
+      ⚠️ A PERSON'S NAME AND A WAY TO REACH THEM, AND THEY ARE DECLARED AS WHAT
+      THEY ARE. `holds` is not documentation — it is what the processing record
+      is generated from and what the export collects, and a contact filed as
+      `none` is a disclosure that is wrong in the direction nobody checks.
+    */
+    contact: field.text({ label: "Who to ask for", holds: "identity", max: 120 }),
+    email: field.email({ label: "Email", holds: "contact" }),
+    phone: field.text({ label: "Phone", holds: "contact", max: 40 }),
+    /* ⚠️ WHAT THEY CALL US, which is what goes on an order and is the one thing
+       nobody can look up. */
+    account: field.text({ label: "Our account", holds: "none", max: 64 }),
+    /* ⚠️ THEIRS, OVERRIDING THE WORKSPACE'S — see the header. Empty falls back
+       to the setting rather than to zero, which would order everything the day
+       it dipped. */
+    leadDays: field.number({ label: "A delivery takes", holds: "none", min: 0, max: 365 }),
     note: field.long({ label: "Note", holds: "none", max: 2_000 }),
   },
 });
@@ -3440,7 +3495,7 @@ const traceJob = operation<
  */
 const starts = operation<
   Record<string, never>,
-  { tracking: string; unit: string; profile: string; words: Words }
+  { tracking: string; unit: string; profile: string; leadDays: number; words: Words }
 >({
   id: "product.start",
   kind: "read",
@@ -3456,6 +3511,10 @@ const starts = operation<
       answer, and the mapping stays in `words.ts` where it can be tested.
     */
     profile: field.text({ label: "What this is for", holds: "none" }),
+    /* ⚠️ THE WORKSPACE'S OWN LEAD TIME, so a supplier's blank one can say what
+       it falls back TO. A screen that showed an empty box with no number beside
+       it would leave a person guessing whether blank meant "today". */
+    leadDays: field.number({ label: "A delivery takes", holds: "none" }),
     words: field.json({ label: "What things are called", holds: "none" }),
   },
   permission: "product:write",
@@ -3470,11 +3529,261 @@ const starts = operation<
     return {
       tracking: String(await c.setting("inventory.default_tracking")),
       unit: String(await c.setting("inventory.default_unit")),
+      leadDays: Number(await c.setting("inventory.lead_days")),
       profile,
       /* ⚠️ A PROFILE A LATER BUILD REMOVED READS AS THE PLAIN ONE, never as a
          screen with `undefined` where its headings go. */
       words: wordsFor(profile),
     };
+  },
+});
+
+/* ------------------------------------------------------------- the import --- */
+
+/**
+ * ⚠️ ONE PLANNER, TWO OPERATIONS, AND THE SECOND RE-RUNS THE FIRST. What the
+ * preview promises and what the button does have to be the same function — the
+ * count session already learned this, and an import is the same shape with eight
+ * hundred rows instead of one shelf. A second implementation would be a screen
+ * that says "12 new, 3 updated" over a write that does something else.
+ *
+ * ⚠️ AND THE CORRECTED MAPPING GOES THROUGH THE SAME DOOR. `said` is whatever
+ * the mapping screen sent — an opaque blob off the wire — and `columnsFor` is
+ * the one place it is made safe. A handler that merged it itself would be the
+ * second implementation this function exists to prevent, one field further in.
+ */
+async function planImport(c: Ctx, text: string, said?: unknown) {
+  const db = c.db as Db;
+  const sheet = readSheet(text);
+  const columns = columnsFor(sheet.header, said);
+
+  /* ⚠️ EVERY NAME AND EVERY CODE THE WORKSPACE HAS, read once. Asked per row
+     this is two queries times eight hundred, which is an import that times out
+     on exactly the file size it exists for. */
+  const kinds = await db.prepare(`SELECT id, name FROM product WHERE tenant_id = ?`)
+    .bind(c.tenantId).all<{ id: string; name: string }>();
+  const codes = await db.prepare(`SELECT value, product FROM code WHERE tenant_id = ?`)
+    .bind(c.tenantId).all<{ value: string; product: string }>();
+
+  const known = {
+    byName: Object.fromEntries(kinds.results.map((r) => [String(r.name).toLowerCase(), String(r.id)])),
+    byCode: Object.fromEntries(codes.results.map((r) => [String(r.value), String(r.product)])),
+  };
+  return { sheet, columns, planned: planIn(sheet, columns, known) };
+}
+
+/**
+ * WHAT THIS SPREADSHEET WOULD DO.
+ *
+ * ⚠️ A PREVIEW IS NOT A COURTESY HERE. A column mapping this gets wrong puts a
+ * supplier's name in the product name for eight hundred rows, and the only place
+ * anybody could notice is before it happens. The guess is worth making because
+ * it is right most of the time; the preview is what makes being wrong
+ * survivable.
+ */
+const seeImport = operation<
+  { text: string; columns?: unknown },
+  {
+    columns: Readonly<Record<string, number>>; header: readonly string[];
+    tally: Readonly<Record<string, number>>; rows: readonly Planned[];
+  }
+>({
+  id: "product.preview",
+  kind: "read",
+  summary: "What this spreadsheet would do",
+  input: {
+    text: field.long({ label: "Rows", required: true, holds: "none", max: 400_000 }),
+    /* ⚠️ WHAT SOMEBODY CORRECTED THE GUESS TO, and absent is the guess itself —
+       which is what makes the first ask a paste rather than a form. */
+    columns: field.json({ label: "Which column is which", holds: "none" }),
+  },
+  output: {
+    header: field.json({ label: "Headings", holds: "none" }),
+    columns: field.json({ label: "Which column is which", holds: "none" }),
+    tally: field.json({ label: "How many of each", holds: "none" }),
+    rows: field.json({ label: "Row by row", holds: "none" }),
+  },
+  permission: "product:write",
+  entitlement: "imports",
+  idempotency: { mode: "none" },
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const out = await planImport(c, input.text, input.columns);
+    return {
+      header: out.sheet.header,
+      columns: out.columns,
+      tally: tallyIn(out.planned),
+      /* ⚠️ EVERY ROW, INCLUDING THE REFUSED ONES. An import that quietly skipped
+         eleven of eight hundred is discovered months later by somebody looking
+         for one of them. */
+      rows: out.planned,
+    };
+  },
+});
+
+/**
+ * AND DOING IT.
+ *
+ * ⚠️ THE STOCK GOES THROUGH THE CHOKEPOINT LIKE EVERYTHING ELSE. An import that
+ * wrote `stock` itself would be a second place a balance can change, and the
+ * ledger would stop being the whole story on the very rows a workspace has the
+ * least other record of. `imported` is what `capture` says, which is why that
+ * column exists.
+ *
+ * ⚠️ AND A REFUSED ROW IS REPORTED, NEVER APPLIED. Half an import is worse than
+ * none: the catalogue looks done and the missing ones are invisible.
+ */
+const doImport = operation<
+  { text: string; day: string; columns?: unknown },
+  {
+    made: number; changed: number; received: number; learned: number;
+    refused: readonly string[];
+  }
+>({
+  id: "product.import",
+  kind: "write",
+  summary: "Bring a spreadsheet in",
+  input: {
+    text: field.long({ label: "Rows", required: true, holds: "none", max: 400_000 }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+    /* ⚠️ THE SAME MAPPING THE PREVIEW WAS SHOWN WITH. Sent again rather than
+       remembered: a server-side draft would be a second copy of what is about
+       to happen, and the two would differ the moment somebody opened the screen
+       twice. */
+    columns: field.json({ label: "Which column is which", holds: "none" }),
+  },
+  output: {
+    made: field.number({ label: "Added", holds: "none" }),
+    changed: field.number({ label: "Changed", holds: "none" }),
+    received: field.number({ label: "Put on a shelf", holds: "none" }),
+    learned: field.number({ label: "Suppliers added", holds: "none" }),
+    refused: field.json({ label: "Refused", holds: "none" }),
+  },
+  /* ⚠️ `stock:adjust` RATHER THAN `stock:move`, because an import that carries
+     quantities SETS numbers rather than moving them — and the product's sharpest
+     access rule is that taking and correcting are different grants. */
+  permission: "stock:adjust",
+  entitlement: "imports",
+  idempotency: { mode: "key" },
+  emits: ["product.created", "stock.received"],
+  outcome: {
+    message: "Imported.", tone: "success",
+    invalidates: ["product.list", "stock.list", "code.list"],
+  },
+  fails: ["platform.invalid", "platform.quota_reached", "inventory.short", "inventory.moved"],
+  audit: () => ({ subject: "a spreadsheet", verb: "imported" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const { planned } = await planImport(c, input.text, input.columns);
+    if (!planned.length) {
+      return c.fail("platform.invalid", {}, { fields: { text: "Nothing to import" } });
+    }
+
+    const fallbackUnit = String(await c.setting("inventory.default_unit"));
+    const tracking = String(await c.setting("inventory.default_tracking"));
+    /* ⚠️ THE PLACES BY NAME, read once. A sheet naming a shelf that does not
+       exist is a refusal rather than a shelf invented from a typo — a location
+       tree with "Sote room" in it is a tree nobody trusts. */
+    const places = await db.prepare(`SELECT id, name FROM location WHERE tenant_id = ?`)
+      .bind(c.tenantId).all<{ id: string; name: string }>();
+    const placeOf = new Map(places.results.map((r) => [String(r.name).toLowerCase(), String(r.id)]));
+
+    /* ⚠️ A SUPPLIER IS LEARNED WHERE A SHELF IS REFUSED, and the asymmetry is the
+       point. A place is physical — it has a code stuck to it and a tree above
+       it, and one invented from a typo is a location nobody can walk to. A
+       supplier is a name and a phone number: a duplicate is untidy and a missing
+       one is the reorder report unable to say who to ring, which is the whole
+       reason the collection exists. */
+    const suppliers = await db.prepare(`SELECT id, name FROM supplier WHERE tenant_id = ?`)
+      .bind(c.tenantId).all<{ id: string; name: string }>();
+    const supplierOf = new Map(
+      suppliers.results.map((r) => [String(r.name).toLowerCase(), String(r.id)]));
+
+    let made = 0;
+    let changed = 0;
+    let received = 0;
+    let learned = 0;
+    const refused: string[] = [];
+
+    for (const row of planned) {
+      if (row.verdict === "refused") { refused.push(`Line ${row.line}: ${row.why}`); continue; }
+
+      const where = row.location ? placeOf.get(row.location.toLowerCase()) : undefined;
+      if (row.quantity !== null && !where) {
+        refused.push(`Line ${row.line}: no place called "${row.location}"`);
+        continue;
+      }
+
+      let from: string | null = null;
+      if (row.supplier) {
+        const key = row.supplier.toLowerCase();
+        from = supplierOf.get(key) ?? null;
+        if (!from) {
+          from = newId("sup", new Date(c.now));
+          await db.prepare(
+            `INSERT INTO supplier (id, tenant_id, name, at, by) VALUES (?, ?, ?, ?, ?)`)
+            .bind(from, c.tenantId, row.supplier, c.now, c.accountId ?? null).run();
+          supplierOf.set(key, from);
+          learned++;
+        }
+      }
+
+      let product = row.product;
+      if (!product) {
+        product = newId("prd", new Date(c.now));
+        await db.prepare(
+          `INSERT INTO product (id, tenant_id, name, brand, category, tracking, unit, par,
+                                supplier, at, by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .bind(product, c.tenantId, row.name || row.code, row.brand, row.category,
+            tracking, row.unit || fallbackUnit, row.par, from, c.now,
+            c.accountId ?? null).run();
+        made++;
+      } else {
+        /* ⚠️ ONLY WHAT THE SHEET ACTUALLY SAID. `COALESCE` on an empty string
+           would blank a brand somebody typed because a column was absent — an
+           import that quietly erases is worse than one that refuses. */
+        await db.prepare(
+          `UPDATE product SET
+             brand = CASE WHEN ? = '' THEN brand ELSE ? END,
+             category = CASE WHEN ? = '' THEN category ELSE ? END,
+             unit = CASE WHEN ? = '' THEN unit ELSE ? END,
+             par = COALESCE(?, par),
+             supplier = COALESCE(?, supplier),
+             edited_at = ?, edited_by = ?
+           WHERE id = ? AND tenant_id = ?`)
+          .bind(row.brand, row.brand, row.category, row.category, row.unit, row.unit,
+            row.par, from, c.now, c.accountId ?? null, product, c.tenantId).run();
+        changed++;
+      }
+
+      /* ⚠️ THE CODE IS LEARNED RATHER THAN OVERWRITTEN, through the same rule
+         `code.learn` follows: one code names one product, and a second owner is
+         refused rather than replaced. `DO NOTHING` is that refusal, quietly,
+         which is right for a bulk paste — the row is reported below. */
+      if (row.code) {
+        const out = await db.prepare(
+          `INSERT INTO code (id, tenant_id, value, product, kind, pack, at, by)
+            VALUES (?, ?, ?, ?, 'other', 1, ?, ?)
+            ON CONFLICT (tenant_id, value) DO NOTHING`)
+          .bind(newId("cod", new Date(c.now)), c.tenantId, row.code, product, c.now,
+            c.accountId ?? null).run();
+        if ((out.meta?.changes ?? 0) === 0) {
+          refused.push(`Line ${row.line}: "${row.code}" already names something else`);
+        }
+      }
+
+      if (row.quantity !== null && where) {
+        await stockMove(c, "received", {
+          product, location: where, quantity: row.quantity, day: input.day,
+          capture: "imported", reason: "Imported",
+        });
+        received++;
+      }
+    }
+
+    return { made, changed, received, learned, refused };
   },
 });
 
@@ -3550,11 +3859,23 @@ const report = operation<{ from: string; to: string }, Reported>({
        would make the browser join four lists against a catalogue it may only
        hold fifty rows of. */
     const kinds = await db.prepare(
-      `SELECT id, name, unit, par FROM product WHERE tenant_id = ?`)
+      `SELECT id, name, unit, par, supplier FROM product WHERE tenant_id = ?`)
       .bind(c.tenantId)
-      .all<{ id: string; name: string; unit: string; par: number | null }>();
+      .all<{
+        id: string; name: string; unit: string; par: number | null;
+        supplier: string | null;
+      }>();
     const named = new Map(kinds.results.map((row) => [String(row.id), row]));
     const nameOf = (id: string) => String(named.get(id)?.name ?? "—");
+
+    /* ⚠️ WHO TO RING, AND HOW LONG THEY TAKE — the two facts that turn "buy 90"
+       into an order. Read whole rather than joined per row: a workspace has tens
+       of suppliers and hundreds of products, and the alternative is a query per
+       line of a report drawn on every visit. */
+    const from = await db.prepare(
+      `SELECT id, name, leadDays FROM supplier WHERE tenant_id = ?`)
+      .bind(c.tenantId).all<{ id: string; name: string; leadDays: number | null }>();
+    const supplied = new Map(from.results.map((row) => [String(row.id), row]));
 
     const balances = await db.prepare(
       `SELECT product, SUM(quantity) AS onHand FROM stock
@@ -3577,12 +3898,20 @@ const report = operation<{ from: string; to: string }, Reported>({
         from the movements alone can never mention one.
       */
       buy: reorder(
-        kinds.results.map((row) => ({
-          product: String(row.id),
-          onHand: onHand.get(String(row.id)) ?? 0,
-          par: Number(row.par ?? 0),
-          used: perProduct.get(String(row.id)) ?? 0,
-        })),
+        kinds.results.map((row) => {
+          const of = row.supplier ? supplied.get(String(row.supplier)) : undefined;
+          return {
+            product: String(row.id),
+            onHand: onHand.get(String(row.id)) ?? 0,
+            par: Number(row.par ?? 0),
+            used: perProduct.get(String(row.id)) ?? 0,
+            supplier: String(of?.name ?? ""),
+            /* ⚠️ THEIRS WHERE THEY SAID, THE WORKSPACE'S OTHERWISE — and `null`
+               rather than `0`, because a supplier who has not been asked how
+               long they take is not a supplier who delivers today. */
+            leadDays: of?.leadDays ?? null,
+          };
+        }),
         days, lead,
       ).map((one) => ({
         ...one, name: nameOf(one.product),
@@ -3975,10 +4304,18 @@ export const INVENTORY: AppSpec = defineApp({
     */
     processes: { label: "Runs and releases", withheld: "gate" },
     jobs: { label: "Jobs", withheld: "gate" },
+    /*
+      ⚠️ A GATE, BECAUSE IT IS A CAPABILITY AND NOT A COUNT. Nobody types in
+      eight hundred products, and a product without an import is one that is
+      evaluated for an afternoon and abandoned — which makes this the key that
+      decides whether a workspace ever arrives, rather than one that meters what
+      they do after.
+    */
+    imports: { label: "Import a spreadsheet", withheld: "gate" },
   },
 
   collections: [
-    product, code, location, batch, unit, kit, process, processItem, job,
+    product, supplier, code, location, batch, unit, kit, process, processItem, job,
     count, tally, stock, ledger,
   ],
   operations: [
@@ -3989,7 +4326,7 @@ export const INVENTORY: AppSpec = defineApp({
     identify, readLabel, readNote, askInWords,
     openRun, loadRun, endRun, releaseRun, failRun, recallRun, liftHold, lateResult,
     openJob, closeJob, traceJob,
-    labelPlaces, labelThings, report,
+    labelPlaces, labelThings, report, seeImport, doImport,
   ],
 
   /*
@@ -4103,6 +4440,26 @@ export const INVENTORY: AppSpec = defineApp({
       permission: "ledger:read", sky: "etch" },
     { id: "ask", route: "/ask", label: "Ask", nav: "secondary", icon: "sparkle",
       permission: "stock:read", sky: "glow" },
+    /*
+      ⚠️ A DESTINATION RATHER THAN A STEP IN A WIZARD, and it is the screen that
+      decides whether a workspace ever exists. Nobody types in eight hundred
+      products; every real customer arrives holding a spreadsheet, and one they
+      can only bring in during the first five minutes is one most of them will
+      bring in never.
+
+      ⚠️ `product:write` RATHER THAN `stock:adjust`, WHICH THE OPERATION ASKS FOR.
+      Importing a catalogue is a catalogue act; importing QUANTITIES sets
+      balances, and the write cannot know which it is until it has read the
+      sheet. Every role that holds one of the two holds the other, so the split
+      is a statement about the act rather than a door somebody is caught behind.
+    */
+    { id: "import", route: "/import", label: "Import", nav: "secondary", icon: "add",
+      permission: "product:write" },
+    /* ⚠️ THE LAST STEP OF THE REORDER REPORT'S OWN WORKFLOW. That screen can say
+       what to buy and how long the shelf lasts; without this it cannot say who
+       to ring, and the decision it worked out is finished somewhere else. */
+    { id: "supplier", route: "/suppliers", label: "Suppliers", nav: "secondary",
+      icon: "box", permission: "product:write" },
     { id: "start", route: "/start", label: "Getting started", nav: "secondary", icon: "star",
       permission: "product:read", sky: "glow" },
   ],

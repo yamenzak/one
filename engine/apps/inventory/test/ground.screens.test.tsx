@@ -32,6 +32,8 @@ import { Kit, type Member, type Missing } from "../src/screens/Kit.js";
 import { Due, sayDays, type Dated } from "../src/screens/Due.js";
 import { Labels, type Labelled } from "../src/screens/Labels.js";
 import { Reports, sayCover, type Reported } from "../src/screens/Reports.js";
+import { Import, MAPPABLE, type Done, type Seen as Seeing } from "../src/screens/Import.js";
+import { Suppliers, type Supplier } from "../src/screens/Suppliers.js";
 
 const html = (route: string) => renderToStaticMarkup(<InventoryScreen route={route} />);
 
@@ -1214,7 +1216,7 @@ describe("the reports", () => {
     losses: [{ product: "p-screw", name: "Screws, M4 × 20", lost: 40, found: 38 }],
     buy: [{
       product: "p-glove", name: "Nitrile gloves, M", onHand: 64, cover: 3,
-      order: 90, why: "runs out first", unit: "box",
+      order: 90, why: "runs out first", unit: "box", supplier: "Medline",
     }],
     daily: [{ day: "2026-08-20", quantity: 12 }, { day: "2026-08-21", quantity: 0 }],
   };
@@ -1302,5 +1304,168 @@ describe("the reports", () => {
     });
     expect(out).toContain("Nitrile gloves, M");
     expect(out).not.toContain("Nothing to report yet");
+  });
+});
+
+/* ------------------------------------------------------------------ import --- */
+
+describe("the import", () => {
+  const SEEN: Seeing = {
+    header: ["product name", "brand", "ean", "qty", "shelf"],
+    columns: { name: 0, brand: 1, code: 2, quantity: 3, location: 4 },
+    tally: { new: 2, update: 1, refused: 1 },
+    rows: [
+      { line: 2, verdict: "new", why: "", name: "Nitrile gloves, M", code: "5012345678900",
+        location: "Store room", supplier: "Medline", quantity: 40 },
+      { line: 3, verdict: "update", why: "", name: "Isopropanol 99%", code: "",
+        location: "Cabinet 2", supplier: "", quantity: 6 },
+      { line: 4, verdict: "refused", why: "A quantity with no place", name: "Masking tape",
+        code: "", location: "", supplier: "", quantity: 12 },
+      { line: 5, verdict: "new", why: "", name: "Cutting fluid, 5 L", code: "",
+        location: "Bay 1", supplier: "", quantity: 4 },
+    ],
+  };
+
+  const importing = (seen: Seeing | null = SEEN, done: Done | null = null) =>
+    renderToStaticMarkup(
+      <Import
+        title="Import"
+        text="product name,brand,ean,qty,shelf"
+        onText={() => undefined}
+        seen={seen}
+        fields={MAPPABLE}
+        columns={seen?.columns ?? {}}
+        onColumn={() => undefined}
+        done={done}
+        busy={false}
+        onSee={() => undefined}
+        onImport={() => undefined}
+        onAgain={() => undefined}
+      />,
+    );
+
+  /*
+    ⚠️ THE BUTTON SAYS WHAT PRESSING IT DOES, WITH THE NUMBER IN IT. "Import" is
+    a control somebody presses to find out; "Import 3 products" is a decision
+    they have already made by the time their thumb lands — which is the whole
+    difference between a preview and a confirmation dialogue.
+  */
+  it("names the number in the button", () => {
+    expect(importing()).toContain("Import 3 products");
+  });
+
+  /* ⚠️ AND WITH NOTHING TO DO IT SAYS SO RATHER THAN OFFERING THE PRESS. */
+  it("refuses to offer an import of nothing", () => {
+    const out = importing({ ...SEEN, tally: { new: 0, update: 0, refused: 4 } });
+    expect(out).toContain("Nothing to import");
+  });
+
+  /*
+    ⚠️ EVERY REFUSED ROW IS NAMED WITH ITS LINE NUMBER, WHICH IS THE POINT OF THE
+    SCREEN. An import that quietly skipped eleven of eight hundred is discovered
+    months later by somebody looking for one of them, with no record anywhere of
+    what happened — and the line number is what makes it fixable in the file
+    somebody still has open.
+  */
+  it("names a refused row, its line and its reason", () => {
+    const out = importing();
+    expect(out).toContain("Line 4");
+    expect(out).toContain("A quantity with no place");
+  });
+
+  /* ⚠️ AND THE MAPPING IS ON THE SCREEN BEFORE THE ROWS. A guess that put the
+     supplier's name in the product name is only catchable here. */
+  it("shows the mapping it guessed", () => {
+    const out = importing();
+    expect(out).toContain("Which column is which");
+    expect(out).toContain("product name");
+  });
+
+  /* ⚠️ THE PASTE STEP IS THE PASTE STEP. Before a preview there is nothing to
+     map and no rows to show, and drawing either would be a form full of empty
+     controls. */
+  it("shows only the box before anything has been read", () => {
+    const out = importing(null);
+    expect(out).toContain("Paste them here");
+    expect(out).not.toContain("Which column is which");
+  });
+
+  /*
+    ⚠️ THE REFUSALS SURVIVE THE SUCCESS SCREEN. A green "412 imported" with
+    eleven rows silently missing is the exact failure this whole path exists to
+    prevent, and the last screen is where somebody would stop reading.
+  */
+  it("still names what was refused after the import ran", () => {
+    const out = importing(SEEN, {
+      made: 2, changed: 1, received: 3, learned: 1,
+      refused: ['Line 4: no place called "Bay 9"'],
+    });
+    expect(out).toContain("1 row was not imported");
+    /* ⚠️ Compared without the quotes, which `renderToStaticMarkup` escapes. */
+    expect(out).toContain("Line 4: no place called");
+    expect(out).toContain("Bay 9");
+    expect(out).toContain("One supplier was added");
+  });
+});
+
+/* --------------------------------------------------------------- suppliers --- */
+
+describe("the suppliers", () => {
+  const ROWS: readonly Supplier[] = [
+    { id: "s-1", name: "Medline", contact: "Dana", email: "", phone: "+49 30 1234",
+      account: "MED-4471", leadDays: 3, note: "", products: 42 },
+    { id: "s-2", name: "The hardware shop", contact: "", email: "", phone: "",
+      account: "", leadDays: null, note: "", products: 1 },
+  ];
+
+  const listing = (rows: readonly Supplier[] = ROWS) =>
+    renderToStaticMarkup(
+      <Suppliers
+        title="Suppliers"
+        of={ready(rows)}
+        standingDays={7}
+        editing={null}
+        busy={false}
+        again={() => undefined}
+        onOpen={() => undefined}
+        onNew={() => undefined}
+        onClose={() => undefined}
+        onSave={() => undefined}
+      />,
+    );
+
+  /*
+    ⚠️ HOW LONG THEY TAKE IS THE FIRST FACT ON THE ROW, because it is the one the
+    reorder report reads. A list ordered around names and phone numbers is an
+    address book; this is the thing that decides when to order.
+  */
+  it("leads with how long a delivery takes", () => {
+    expect(listing()).toContain("3 days");
+  });
+
+  /*
+    ⚠️ AND A BLANK ONE SAYS WHAT IT FALLS BACK TO. Read as "today" — which is how
+    an empty number field is read by everybody — every product they supply drops
+    off the reorder list until the shelf is empty.
+  */
+  it("says what a blank lead time falls back to", () => {
+    /* ⚠️ The apostrophe is escaped in the markup, so the assertion stops
+       short of it — the sentence, not the entity. */
+    expect(listing()).toContain("7 days (the workspace");
+  });
+
+  /* ⚠️ AND HOW MANY PRODUCTS NAME THEM, because a supplier nothing comes from is
+     a row to delete and there is no other way to tell. */
+  it("says how many products come from them", () => {
+    const out = listing();
+    expect(out).toContain("42 products");
+    expect(out).toContain("1 product");
+  });
+
+  /* ⚠️ AN EMPTY LIST POINTS AT THE IMPORT, because a workspace that has just
+     arrived has a spreadsheet with a supplier column in it and no idea that
+     bringing it in fills this screen. */
+  it("points an empty list at the import", () => {
+    expect(listing([])).toContain("import a spreadsheet");
   });
 });

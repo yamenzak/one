@@ -36,6 +36,8 @@ export interface Reported {
   readonly buy: readonly {
     readonly product: string; readonly name: string; readonly onHand: number;
     readonly cover: number; readonly order: number; readonly why: string; readonly unit: string;
+    /** ⚠️ Who to ring. Empty where nobody was named. */
+    readonly supplier: string;
   }[];
   readonly daily: readonly { readonly day: string; readonly quantity: number }[];
 }
@@ -185,9 +187,13 @@ export function Reports({ title, of, span, onSpan, again, onOpen }: ReportsProps
                 <AmountRow
                   key={one.product}
                   label={one.name}
+                  /* ⚠️ WHO TO RING IS ON THE ROW, because this list is only a
+                     report until somebody can act on a line without leaving it
+                     — and the answer is a fact about the product, not something
+                     to go and look up per line. */
                   under={(
                     <span data-ink={one.why === "runs out first" ? "warning" : undefined}>
-                      {sayCover(one.cover)} · {one.why}
+                      {[sayCover(one.cover), one.why, one.supplier].filter(Boolean).join(" · ")}
                     </span>
                   )}
                   amount={<Num value={one.order} />}
