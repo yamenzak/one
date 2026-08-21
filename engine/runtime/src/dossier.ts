@@ -137,6 +137,23 @@ export const HOLDINGS: readonly HeldBy[] = [
   { table: "invited", person: [theirs("email")], by: "email", workspace: its(),
     label: "Invitations sent to you" },
   /*
+    ⚠️ BY EMAIL, BECAUSE A GIFT CAN PREDATE THE ACCOUNT — see `give`. The rows
+    written before somebody signed in carry a null id, so a sweep keyed on the id
+    would leave exactly the gifts made to the person the feature exists for, and
+    would look like a clean erasure while doing it.
+
+    ⚠️ AND IT IS THEIRS TO TAKE. What a deployment gave somebody, on what terms
+    and with what reason typed against it, is a fact about them — withholding it
+    from their own copy while keeping it in ours is the asymmetry this ledger
+    exists to refuse.
+
+    ⚠️ NO WORKSPACE COLUMN: a gift is made to a PERSON. It survives every
+    workspace they founded on it, which is what makes "they were given three and
+    closed two" answerable.
+  */
+  { table: "given", person: [theirs("email")], by: "email",
+    label: "What you were given" },
+  /*
     ⚠️ AN ACCEPTANCE GOES WITH THE ACCOUNT, AND THE ARGUMENT FOR KEEPING IT DOES
     NOT SURVIVE ITS OWN LOGIC. It is kept to prove somebody agreed; unnamed it
     proves nothing about anybody, so an anonymised copy is retention with no

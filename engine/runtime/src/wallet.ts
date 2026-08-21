@@ -144,6 +144,10 @@ async function record(
 export async function grantAllowance(
   db: Db, tenantId: TenantId, credits: number, now = new Date(),
 ): Promise<void> {
+  /* ⚠️ THE ROW IS ENSURED — see `topUp`, which carries the argument. An `UPDATE`
+     matching nothing writes a ledger line saying the allowance arrived and moves
+     no balance, and the two disagreeing is the state nobody can reconstruct. */
+  await openAccount(db, tenantId, undefined, now);
   const before = await walletOf(db, tenantId);
   if (before.granted > 0) {
     await record(db, tenantId, -before.granted, LEDGER.expired, {}, now);
@@ -199,6 +203,14 @@ export async function topUp(
   opts: { readonly appId?: AppId; readonly ref?: string } = {}, now = new Date(),
 ): Promise<void> {
   if (credits <= 0) return;
+  /* ⚠️ THE ROW IS ENSURED, BECAUSE AN `UPDATE` THAT MATCHES NOTHING IS SILENT.
+     `createTenant` opens the account, so every workspace made through the door
+     has one — and a workspace that reached this any other way would get a ledger
+     line saying credits arrived and a balance that never moved. The record and
+     the cache disagreeing is the one state nobody can reconstruct, and it would
+     be reached exactly by the paths that skip the ordinary founding: a gift
+     applied by an operator, a migration, a repair. */
+  await openAccount(db, tenantId, undefined, now);
   await record(db, tenantId, credits, reason, opts, now);
   await db.prepare(`UPDATE billing_account SET bought = COALESCE(bought, 0) + ? WHERE tenant_id = ?`)
     .bind(credits, tenantId).run();

@@ -17,12 +17,12 @@
  */
 
 import type {
-  AccountId, AppId, CommercialAllowance, Kind, Presentation, PresentationRefusal,
-  Residency, Shard, TenantId,
+  AccountId, AppId, CommercialAllowance, Gift, GiftKind, Kind, Presentation,
+  PresentationRefusal, Residency, Shard, TenantId,
 } from "@engine/kernel";
 import {
-  DEFAULT_PRESENTATION, allowanceLeft, mayBecome, newAccountId, newTenantId, placeOn,
-  refuseCommercial, refusePlacement, refusePresentation,
+  DEFAULT_PRESENTATION, allowanceLeft, giftIsLive, giftedWorkspaces, mayBecome, newAccountId,
+  newId, newTenantId, placeOn, refuseCommercial, refusePlacement, refusePresentation,
 } from "@engine/kernel";
 import { openAccount } from "./wallet.js";
 import type { SchemaModule } from "./schema.js";
@@ -66,6 +66,30 @@ export const DIRECTORY_SCHEMA: SchemaModule = {
        somebody who belongs to nothing yet — and the only other way to answer it
        is to search every shard for a row that is usually not there. */
     `CREATE TABLE IF NOT EXISTS invited (email TEXT NOT NULL, tenant_id TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (email, tenant_id));`,
+    /*
+      ⚠️ WHAT AN OPERATOR GAVE SOMEBODY, AND IT IS A LEDGER RATHER THAN A STATE —
+      see `Gift`. A comped plan and a topped-up wallet are both already writable
+      one workspace at a time, and both leave the WORKSPACE changed with nothing
+      anywhere saying who decided or why. The row is the decision; the plan and
+      the credits are what it produces.
+
+      ⚠️ AND IT IS APPEND-ONLY. `spent` counts up as workspaces are founded on it
+      and `stopped_at` ends it; nothing deletes, because "what were they given"
+      has to stay answerable after the gift is over — which is exactly when
+      somebody asks.
+
+      ⚠️ THE ACCOUNT IS NAMED BY ID AND BY EMAIL, DELIBERATELY. A gift can be
+      made to somebody who has not signed in yet, and there is no account row to
+      point at until they do. The id is filled when they arrive; the email is
+      what the operator typed and is what `giftsFor` falls back to.
+    */
+    `CREATE TABLE IF NOT EXISTS given (`
+    + `id TEXT PRIMARY KEY, account_id TEXT, email TEXT NOT NULL, kind TEXT NOT NULL, `
+    + `plan_id TEXT, credits INTEGER NOT NULL DEFAULT 0, workspaces INTEGER NOT NULL DEFAULT 1, `
+    + `spent INTEGER NOT NULL DEFAULT 0, until TEXT, why TEXT NOT NULL, by TEXT NOT NULL, `
+    + `at TEXT NOT NULL, stopped_at TEXT);`,
+    `CREATE INDEX IF NOT EXISTS ix_given_email ON given (email, at);`,
+    `CREATE INDEX IF NOT EXISTS ix_given_account ON given (account_id, at);`,
   ],
   /*
     ⚠️ THE ASK, WHICH IS NOT THE SAME AS THE PROMISE. `shard.dedicated_to` is the
@@ -124,6 +148,13 @@ export async function upsertAccount(
   const id = newAccountId(now);
   await db.prepare(`INSERT INTO account (id, email, name, at) VALUES (?, ?, ?, ?)`)
     .bind(id, email, name, at).run();
+  /* ⚠️ A GIFT MADE BEFORE THEY ARRIVED IS CLAIMED HERE. An operator gives to an
+     ADDRESS — that is the whole point, it is how a demo account and a friend
+     both start — so the rows are written with no account to point at and are
+     adopted the moment one exists. Without this the id stays null for ever and
+     every read keyed on it answers nothing about the person it was for. */
+  await db.prepare(`UPDATE given SET account_id = ? WHERE email = ? AND account_id IS NULL`)
+    .bind(id, email).run();
   return id;
 }
 
@@ -451,6 +482,153 @@ export async function setCommercialGrant(
     .bind(Math.max(0, Math.trunc(granted)), accountId).run();
 }
 
+/* --------------------------------------------------------------- the gift --- */
+
+interface GiftRow {
+  readonly id: string; readonly account_id: string | null; readonly email: string;
+  readonly kind: string; readonly plan_id: string | null; readonly credits: number;
+  readonly workspaces: number; readonly spent: number; readonly until: string | null;
+  readonly why: string; readonly by: string; readonly at: string;
+  readonly stopped_at: string | null;
+}
+
+const asGift = (r: GiftRow): Gift => ({
+  id: r.id, kind: r.kind as GiftKind, planId: r.plan_id, credits: r.credits,
+  workspaces: r.workspaces, spent: r.spent, until: r.until,
+  why: r.why, by: r.by, at: r.at, stoppedAt: r.stopped_at,
+});
+
+/**
+ * ⚠️ BY EMAIL, NOT BY ACCOUNT ID, AND THAT IS THE WHOLE REASON A GIFT CAN BE
+ * MADE BEFORE SOMEBODY SIGNS UP. "Give my friend a workspace at Max" is said
+ * about an address; the account row appears when they first ask for a code. A
+ * lookup keyed on the id would answer nothing for exactly the person the feature
+ * was built for, and the operator would have to remember to come back.
+ *
+ * ⚠️ EMAIL IS THE KEY AND THE ID IS AN INDEX. `account.email` is UNIQUE, so the
+ * address identifies one person for as long as the account exists; the id is
+ * stamped on arrival so a later change of address cannot orphan what was given.
+ */
+export async function giftsFor(db: Db, email: string): Promise<readonly Gift[]> {
+  const rows = await db.prepare(
+    `SELECT id, account_id, email, kind, plan_id, credits, workspaces, spent, until,`
+    + ` why, by, at, stopped_at FROM given WHERE email = ? ORDER BY at DESC`)
+    .bind(email.trim().toLowerCase()).all<GiftRow>();
+  return rows.results.map(asGift);
+}
+
+export interface Giving {
+  readonly email: string;
+  readonly kind: GiftKind;
+  readonly planId?: string | null;
+  readonly credits?: number;
+  readonly workspaces?: number;
+  readonly until?: string | null;
+  readonly why: string;
+  /** ⚠️ The operator's own address. See `Gift.by`. */
+  readonly by: string;
+}
+
+/**
+ * ⚠️ THE ACCOUNT IS LOOKED UP AND NOT REQUIRED. A gift to somebody who has never
+ * signed in is the common case — it is how a demo account and a friend both
+ * start — so the id is filled if there is one and left null if there is not.
+ */
+export async function give(db: Db, it: Giving, now = new Date()): Promise<Gift> {
+  const email = it.email.trim().toLowerCase();
+  const found = await db.prepare(`SELECT id FROM account WHERE email = ?`)
+    .bind(email).first<{ id: string }>();
+  const id = newId("gift", now);
+  /* ⚠️ CREDITS COUNT AS ONE WORKSPACE'S WORTH, so `spent < workspaces` is the
+     one arithmetic that answers "is there anything left in this" for both
+     kinds — see `giftIsLive`. */
+  const workspaces = it.kind === "credits" ? 1 : Math.max(1, Math.trunc(it.workspaces ?? 1));
+  await db.prepare(
+    `INSERT INTO given (id, account_id, email, kind, plan_id, credits, workspaces, spent,`
+    + ` until, why, by, at, stopped_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, NULL)`)
+    .bind(id, found?.id ?? null, email, it.kind, it.planId ?? null,
+      Math.max(0, Math.trunc(it.credits ?? 0)), workspaces,
+      it.until ?? null, it.why.trim(), it.by, now.toISOString()).run();
+  return {
+    id, kind: it.kind, planId: it.planId ?? null, credits: Math.max(0, Math.trunc(it.credits ?? 0)),
+    workspaces, spent: 0, until: it.until ?? null, why: it.why.trim(), by: it.by,
+    at: now.toISOString(), stoppedAt: null,
+  };
+}
+
+/**
+ * ⚠️ ENDING ONE IS A STAMP, NEVER A DELETE. What somebody was given and then had
+ * withdrawn is the version of the story both sides remember differently, and it
+ * is the one a deleted row cannot settle.
+ *
+ * ⚠️ AND IT DOES NOT REACH BACK. A workspace already founded on a gift keeps its
+ * plan — stopping it stops what is LEFT, which is the same rule the commercial
+ * allowance follows and for the same reason: you cannot un-give a business
+ * somebody has been running.
+ */
+export async function stopGift(db: Db, id: string, now = new Date()): Promise<boolean> {
+  const done = await db.prepare(
+    `UPDATE given SET stopped_at = ? WHERE id = ? AND stopped_at IS NULL`)
+    .bind(now.toISOString(), id).run();
+  return (done.meta?.changes ?? 0) > 0;
+}
+
+/**
+ * SPEND ONE OF A GIFT'S WORKSPACES.
+ *
+ * ⚠️ THE `WHERE` CARRIES THE COUNT, so two workspaces founded at once cannot
+ * both spend the last one. The read-then-write shape passes every test and
+ * hands out one extra exactly when somebody is in a hurry.
+ *
+ * ⚠️ AND IT ANSWERS WHETHER IT LANDED. A caller that assumed it did would comp a
+ * workspace onto a plan the gift no longer covers — which is a free tier given
+ * away with nothing recording that it was.
+ */
+export async function spendGift(db: Db, id: string): Promise<boolean> {
+  const done = await db.prepare(
+    `UPDATE given SET spent = spent + 1
+     WHERE id = ? AND stopped_at IS NULL AND spent < workspaces`).bind(id).run();
+  return (done.meta?.changes ?? 0) > 0;
+}
+
+/**
+ * ⚠️ THE OLDEST LIVE ONE, because a gift with a term should be spent before an
+ * open-ended one — otherwise the thing that expires sits unused and the operator
+ * who set a date watches it lapse while the person is on the gift that never
+ * ends.
+ */
+export async function nextGift(
+  db: Db, email: string, kind: GiftKind, now: string,
+): Promise<Gift | null> {
+  const gifts = await giftsFor(db, email);
+  const live = gifts.filter((g) => g.kind === kind && giftIsLive(g, now));
+  if (!live.length) return null;
+  const dated = live.filter((g) => g.until).sort((a, b) => (a.until! < b.until! ? -1 : 1));
+  return dated[0] ?? live[live.length - 1]!;
+}
+
+/**
+ * ⚠️ WHAT THE ACCOUNT ROW SAYS PLUS WHAT IS STILL WAITING IN A GIFT, and the two
+ * are added rather than compared. A plan gift confers the right to found the
+ * workspace it is for; counting only `commercial_granted` would refuse somebody
+ * the very workspace an operator just gave them, which is the failure this whole
+ * stage exists to remove.
+ */
+export async function commercialAllowanceFor(
+  db: Db, accountId: AccountId, now: string,
+): Promise<CommercialAllowance> {
+  const bare = await commercialAllowance(db, accountId);
+  /* ⚠️ THE ADDRESS IS READ HERE RATHER THAN PASSED IN. A caller handing over an
+     id and an email is a caller that can hand over two that do not belong to
+     each other — and the wrong pair reads as an allowance somebody else was
+     given, on the door that decides whether they may open a business. */
+  const who = await db.prepare(`SELECT email FROM account WHERE id = ?`)
+    .bind(accountId).first<{ email: string }>();
+  if (!who) return bare;
+  const gifts = await giftsFor(db, who.email);
+  return { ...bare, granted: bare.granted + giftedWorkspaces(gifts, now) };
+}
+
 export type BecomeRefusal = "no_such_tenant" | "already" | "legal_name" | "unpaid";
 
 /**
@@ -484,8 +662,12 @@ export async function becomeCommercial(
   if (!tenant || tenant.closedAt) return "no_such_tenant";
   if (!mayBecome(tenant.kind, "commercial")) return "already";
 
+  /* ⚠️ THE GIFT COUNTS, WHICH IS THE WHOLE OF WHY THIS IS NOT
+     `commercialAllowance`. An operator giving somebody a workspace at a
+     commercial tier and this door refusing them is the failure that lane exists
+     to remove — and it would refuse silently, as "no allowance left". */
   const allowance = founder
-    ? await commercialAllowance(db, founder)
+    ? await commercialAllowanceFor(db, founder, now.toISOString())
     : { granted: 0, used: 0 };
   const refusal = refuseCommercial(tenant, { ...ask, allowance });
   if (refusal) return refusal;

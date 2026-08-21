@@ -19,15 +19,17 @@
  * out rather than the only one.
  */
 
-import type { AccountId, AppSpec, DocumentBook, Door, TenantId } from "@engine/kernel";
+import type {
+  AccountId, AppId, AppSpec, DocumentBook, Door, PlanSpec, TenantId,
+} from "@engine/kernel";
 import {
-  foundingAppRole, legalUrlOf, newId, permissionsFor, residencyFor, slugOk, slugTaken,
-  wouldStrand,
+  foundingAppRole, giftIsLive, legalUrlOf, newId, permissionsFor, residencyFor, slugOk,
+  slugTaken, wouldStrand,
 } from "@engine/kernel";
 import {
   accountName, appsOfTenant, becomeCommercial, closeTenant, createTenant, forgetInvitation,
   invitationsFor,
-  accountFace,
+  accountFace, giftsFor,
   liveAppsOfTenant, noteBelonging, presentationFrom, presentationOf, setAccountName, setPresentation,
   tenantBySlug, tenantsOf,
   upsertAccount, type TenantRow,
@@ -41,6 +43,7 @@ import {
   revokeToken, spendCode, spendExport, startSession, tokensOf, type Session,
 } from "./identity.js";
 import { claimInvitations, found, memberFor, membersOf } from "./membership.js";
+import { applyGifts } from "./gifts.js";
 import { inboxOf, markSeen, unseenCount } from "./inbox.js";
 import { acceptancesOf } from "./legal.js";
 import { eraseObjects, type Bucket, type Where } from "./storage.js";
@@ -205,6 +208,15 @@ export interface IdentityDeps {
   readonly needsAttention?: (
     directory: Db, tenantId: TenantId, appId: string,
   ) => Promise<boolean>;
+  /**
+   * ⚠️ THE DEPLOYMENT'S CATALOGUE, FOR THE GIFT A FOUNDING SPENDS. Absent is a
+   * deployment that sells nothing, where a plan gift can be recorded and cannot
+   * be applied — which is honest, and is the state of every test run and of a
+   * self-host before its first plan is declared. A required parameter would be
+   * satisfied with `() => []` by whoever was in a hurry, and that reads exactly
+   * like a catalogue with nothing in it.
+   */
+  readonly plans?: () => readonly PlanSpec[];
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -588,9 +600,17 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
           put a whole round trip between opening the app and knowing what to
           show. See `accountFace` for the two reads that used to be under it.
         */
-        const [face, tenants] = await Promise.all([
+        /*
+          ⚠️ AND WHAT IS WAITING FOR THEM, ON THE READ EVERY DOOR ALREADY MAKES.
+          A gift is made to an address before the person signs in, so the first
+          thing they should see is that it is there — asked separately it would
+          arrive after the screen, and the one moment it is worth saying is the
+          moment they land with nothing.
+        */
+        const [face, tenants, gifts] = await Promise.all([
           accountFace(ctx.directory, accountId),
           tenantsOf(ctx.directory, accountId),
+          giftsFor(ctx.directory, ctx.email ?? ""),
         ]);
         const belongs = await Promise.all(tenants.map(async (t) => {
           /* ⚠️ WHAT IS ON, NOT WHAT WAS EVER ON. This is a person's own list of
@@ -651,6 +671,23 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
           presentation: face.presentation,
           tenants: belongs,
           /*
+            ⚠️ WHAT IS WAITING, NOT WHAT WAS EVER GIVEN. A gift spent last month
+            is a fact for the console; what the person needs is the one still
+            live, and only while it is — a row saying "a workspace at Max is
+            waiting" over a workspace they already made on it is the interface
+            asking them to do something twice.
+
+            ⚠️ AND `by` AND `why` DO NOT TRAVEL. Which operator decided and what
+            they typed into the reason are ours; what the person is owed is what
+            they have. The console reads the whole row.
+          */
+          waiting: gifts
+            .filter((g) => giftIsLive(g, ctx.now.toISOString()))
+            .map((g) => ({
+              id: g.id, kind: g.kind, planId: g.planId, credits: g.credits,
+              left: g.workspaces - g.spent, until: g.until,
+            })),
+          /*
             ⚠️ WHAT THEY STILL OWE AN AGREEMENT TO, CARRIED BY THE ONE READ EVERY
             DOOR MAKES BEFORE IT DRAWS ANYTHING. The wall has to be known before
             the page is chosen: asked afterwards, somebody sees the product for
@@ -702,7 +739,18 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
         await found(ctx.shardOf(made.tenant), made.tenant.id, accountId,
           ctx.email ?? "", { [deps.appId]: role }, ctx.now);
         await noteBelonging(ctx.directory, accountId, made.tenant.id, ctx.now);
-        return { slug: made.tenant.slug, id: made.tenant.id };
+        /*
+          ⚠️ AND ANYTHING WAITING FOR THIS ADDRESS LANDS NOW. An operator gives a
+          gift days before the person signs in; the workspace they then make is
+          the one it was for, and a plan that arrived on tomorrow's sweep would
+          be reported as broken on the day it was received.
+
+          ⚠️ IT IS THE ORDINARY CASE THAT NOTHING IS WAITING, so this answers an
+          empty list rather than refusing. See `applyGifts`.
+        */
+        const given = await applyGifts(
+          ctx.directory, made.tenant.id, ctx.email ?? "", deps.plans?.() ?? [], ctx.now);
+        return { slug: made.tenant.slug, id: made.tenant.id, given };
       },
     },
 
@@ -764,7 +812,14 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
         if (done === "already") return ctx.fail("platform.conflict");
         if (done === "legal_name") return ctx.fail("platform.invalid");
         if (done === "unpaid") return ctx.fail("platform.payment_required");
-        return { slug: done.slug, kind: done.kind, legalName: done.legalName };
+        /* ⚠️ THE SECOND PLACE A GIFT LANDS, AND IT IS THE SAME FUNCTION. A gift
+           of a COMMERCIAL plan cannot be applied at founding — the workspace is
+           personal until this moment, and a commercial plan on a personal
+           workspace is a tier the kind gates refuse. So it is applied the
+           instant the workspace becomes what the gift was for. */
+        const given = await applyGifts(
+          ctx.directory, tenant.id, ctx.email ?? "", deps.plans?.() ?? [], ctx.now);
+        return { slug: done.slug, kind: done.kind, legalName: done.legalName, given };
       },
     },
 

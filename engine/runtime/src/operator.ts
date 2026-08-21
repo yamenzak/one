@@ -21,11 +21,11 @@
  */
 
 import type {
-  AccountId, AppId, Allowance, AppSpec, FlagBook, JobBook, ModelRow, PlanSpec, TenantId,
+  AccountId, AppId, Allowance, AppSpec, FlagBook, GiftKind, JobBook, ModelRow, PlanSpec, TenantId,
 } from "@engine/kernel";
 import {
   ALLOWANCE_KEY, KEEPS_RESIDENCY, LANES as LANE_NAMES, MIN_MULTIPLIER, allowanceFor,
-  entitlementKeys, inLane, isSearchable, laneOf,
+  entitlementKeys, giftOver, inLane, isSearchable, laneOf,
   mayIsolate,
   sayKind,
   refuseCatalogue,
@@ -51,9 +51,12 @@ import {
 } from "./catalogue.js";
 import { autoTopUpOf, movements, renewAllowance, spentByApp, topUp, walletOf } from "./wallet.js";
 import {
-  appsOfTenant, commercialAllowance, commercialLeft, dedicateShard, disableApp, enableApp,
-  liveAppsOfTenant, setCommercialGrant, shards, tenantById, tenantBySlug, waitingAlone,
+  appsOfTenant, commercialAllowance, commercialAllowanceFor, commercialLeft, dedicateShard,
+  disableApp, enableApp, give, giftsFor, liveAppsOfTenant, setCommercialGrant, shards,
+  stopGift, tenantById, tenantBySlug, tenantsOf, waitingAlone,
 } from "./directory.js";
+import { memberFor } from "./membership.js";
+import { applyGifts } from "./gifts.js";
 import { CREDENTIALS, LANES, configState, setConfig } from "./config.js";
 import { parkedEvents } from "./stripe.js";
 import { runJob, runsOf, schedulesOf, setSchedule, type RunnerDeps } from "./jobs.js";
@@ -565,6 +568,266 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
           email, granted: allowance.granted, used: allowance.used,
           left: commercialLeft(allowance),
         };
+      },
+    },
+
+    /* -------------------------------------------------------- the people --- */
+
+    /**
+     * EVERYBODY WHO HAS EVER SIGNED IN HERE.
+     *
+     * ⚠️ THE CONSOLE COULD SEE EVERY WORKSPACE AND NOBODY IN ONE. A person is
+     * the subject of half the support this deployment will ever do — who are
+     * they, where do they belong, what were they promised — and the only way to
+     * answer any of it was to know a workspace first and read its roster. So
+     * "give my friend a workspace" began by typing an address into a form on a
+     * screen that listed no addresses, with no way to tell a typo from somebody
+     * who had not signed up yet.
+     *
+     * ⚠️ AND THE COUNTS TRAVEL WITH THE ROW. How many workspaces somebody is in
+     * and whether anything is waiting for them are the two facts that decide
+     * which name an operator opens; fetched per row afterwards they would be one
+     * round trip per person on the screen somebody lands on.
+     */
+    "op.accounts": {
+      kind: "read", needs: "session", doors: ["operator"],
+      async run(ctx): Promise<unknown> {
+        operator(ctx);
+        const rows = await ctx.directory.prepare(
+          `SELECT a.id, a.email, a.name, a.at, a.commercial_granted AS granted,
+                  (SELECT COUNT(*) FROM belongs b JOIN tenant t ON t.id = b.tenant_id
+                    WHERE b.account_id = a.id AND t.closed_at IS NULL) AS workspaces
+           FROM account a ORDER BY a.at DESC LIMIT 500`)
+          .all<{
+            id: string; email: string; name: string | null; at: string;
+            granted: number; workspaces: number;
+          }>();
+
+        /* ⚠️ EVERY GIFT ON THE DEPLOYMENT IN ONE READ, matched to the rows here
+           rather than asked per person. A ledger this size is one statement; a
+           walk over five hundred accounts is five hundred. */
+        const gifts = await ctx.directory.prepare(
+          `SELECT email, kind, plan_id, credits, workspaces, spent, until, stopped_at
+           FROM given`).all<{
+            email: string; kind: string; plan_id: string | null; credits: number;
+            workspaces: number; spent: number; until: string | null; stopped_at: string | null;
+          }>();
+        const now = ctx.now.toISOString();
+        const waiting = new Map<string, number>();
+        for (const g of gifts.results) {
+          const live = !g.stopped_at && g.spent < g.workspaces && (!g.until || g.until > now);
+          if (live) waiting.set(g.email, (waiting.get(g.email) ?? 0) + 1);
+        }
+
+        return {
+          items: rows.results.map((r) => ({
+            id: r.id, email: r.email, name: r.name, at: r.at,
+            workspaces: r.workspaces,
+            granted: r.granted,
+            /* ⚠️ HOW MANY GIFTS ARE STILL LIVE, not how many were ever made. A
+               person given three things a year ago and holding none today is
+               not somebody an operator needs to open. */
+            waiting: waiting.get(r.email) ?? 0,
+            /* ⚠️ AN ACCOUNT FACT AND NOT A ROLE — an operator is outside every
+               workspace, so no roster could answer it. It is here because the
+               list of everybody is exactly where somebody checks who else can
+               open this console. */
+            operator: deps.isOperator(r.email),
+          })),
+        };
+      },
+    },
+
+    /**
+     * ONE PERSON — where they belong, and what they have been given.
+     *
+     * ⚠️ THE ROLE IS READ FROM EACH WORKSPACE'S OWN SHARD, because that is where
+     * it lives (D5). The directory's `belongs` is an index and never a grant, so
+     * reading a role from it would be reading a fact it does not hold — and the
+     * screen would confidently print `member` for an owner.
+     */
+    "op.account": {
+      kind: "read", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const email = String(input.email ?? "").trim().toLowerCase();
+        if (!email) return ctx.fail("platform.invalid");
+
+        const row = await ctx.directory.prepare(
+          `SELECT id, email, name, at, commercial_granted AS granted FROM account WHERE email = ?`)
+          .bind(email).first<{
+            id: string; email: string; name: string | null; at: string; granted: number;
+          }>();
+
+        const now = ctx.now.toISOString();
+        const gifts = (await giftsFor(ctx.directory, email))
+          .map((g) => ({ ...g, over: giftOver(g, now) }));
+
+        /*
+          ⚠️ AN ADDRESS WITH NO ACCOUNT IS A REAL ANSWER, NOT A 404. A gift is
+          made to somebody who has not signed in yet — that is how a demo account
+          and a friend both start — so the screen has to be able to show what is
+          waiting for an address nobody has claimed. Refusing here would make the
+          gift invisible until the person arrived, which is exactly when nobody
+          is looking.
+        */
+        if (!row) {
+          return {
+            account: null, email, tenants: [], gifts,
+            commercial: { granted: 0, used: 0, left: 0 },
+          };
+        }
+
+        const accountId = row.id as AccountId;
+        const tenants = await tenantsOf(ctx.directory, accountId);
+        const belongs = await Promise.all(tenants.map(async (t) => {
+          const [member, sub] = await Promise.all([
+            memberFor(ctx.shardOf(t), t.id, accountId),
+            subscriptionFor(ctx.directory, t.id, MEMBERSHIP),
+          ]);
+          return {
+            id: t.id, slug: t.slug, name: t.name, kind: t.kind,
+            /* ⚠️ WHAT THEY ARE IN IT, which is the fact an operator is looking
+               for — "they say they cannot invite anybody" is answered by this
+               column and by nothing else on the screen. */
+            role: member?.platformRole ?? null,
+            planId: sub?.planId ?? null,
+            status: sub?.status ?? null,
+            /* ⚠️ Given or bought, on the row, for the reason `op.tenants` gives:
+               the two look identical and only one has an invoice behind it. */
+            compedAt: sub?.compedAt ?? null,
+          };
+        }));
+
+        const allowance = await commercialAllowanceFor(ctx.directory, accountId, now);
+        return {
+          account: { id: row.id, email: row.email, name: row.name, at: row.at },
+          email,
+          tenants: belongs,
+          gifts,
+          /* ⚠️ WHAT THEY MAY OPEN, INCLUDING WHAT A GIFT CONFERS. The bare count
+             alone would say `0` for somebody an operator just gave a workspace
+             at Max, on the screen the operator is standing on. */
+          commercial: {
+            granted: allowance.granted, used: allowance.used,
+            left: commercialLeft(allowance),
+            bare: row.granted,
+          },
+          plans: await sold(ctx),
+        };
+      },
+    },
+
+    /**
+     * GIVE SOMEBODY SOMETHING NOBODY IS PAYING FOR.
+     *
+     * ⚠️ ONE VERB FOR A CASH CUSTOMER, A FRIEND, A DEMO AND A DEPLOYMENT WITH NO
+     * STRIPE KEYS. All four are "this person has X and no card was involved", and
+     * the four built separately are three that go unrecorded — the money did not
+     * move through us, so the only trace would be whatever somebody typed in a
+     * support thread.
+     *
+     * ⚠️ IT IS MADE TO AN ADDRESS, NOT TO AN ACCOUNT. Somebody who has never
+     * signed in has no account row to point at, and that is the commonest case
+     * this exists for; the id is stamped when they first ask for a code.
+     *
+     * ⚠️ AND THE REASON IS REQUIRED, exactly as `op.tenant.comp`'s is. This is
+     * the write that hands out value for nothing, and a row with nothing
+     * explaining it is the one nobody can reconstruct.
+     */
+    "op.account.give": {
+      kind: "write", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const email = String(input.email ?? "").trim().toLowerCase();
+        const kind = String(input.kind ?? "") as GiftKind;
+        const why = String(input.why ?? "").trim();
+        if (!email || !why || (kind !== "plan" && kind !== "credits")) {
+          return ctx.fail("platform.invalid");
+        }
+
+        /* ⚠️ EMPTY IS OPEN-ENDED AND IS THE COMMON CASE — see `Gift.until`. A
+           date in the past would be a gift that was never live, which is a
+           mistyped year rather than a decision. */
+        const until = String(input.until ?? "").trim() || null;
+        if (until && until <= ctx.now.toISOString()) return ctx.fail("platform.invalid");
+
+        if (kind === "credits") {
+          const credits = Math.trunc(Number(input.credits ?? 0));
+          if (!(credits > 0)) return ctx.fail("platform.invalid");
+          const made = await give(ctx.directory,
+            { email, kind, credits, until, why, by: ctx.email ?? "" }, ctx.now);
+          return { gift: made };
+        }
+
+        /* ⚠️ THE PLAN IS RESOLVED FROM THE CATALOGUE, never taken from the body.
+           An id naming no plan this deployment sells would be a workspace comped
+           onto nothing, and the refusal would arrive a week later as an empty
+           entitlement set. */
+        const planId = String(input.plan ?? "");
+        const plan = (await sold(ctx)).find((p) => p.id === planId);
+        if (!plan) return ctx.fail("platform.invalid");
+        const workspaces = Math.trunc(Number(input.workspaces ?? 1));
+        if (!(workspaces > 0)) return ctx.fail("platform.invalid");
+
+        const made = await give(ctx.directory,
+          { email, kind, planId: plan.id, workspaces, until, why, by: ctx.email ?? "" },
+          ctx.now);
+        return { gift: made };
+      },
+    },
+
+    /**
+     * PUT A WAITING GIFT ONTO A WORKSPACE THEY ALREADY HAVE.
+     *
+     * ⚠️ WITHOUT THIS, A GIFT LANDS ONLY ON A WORKSPACE FOUNDED AFTER IT. That
+     * is the right default and it is the wrong ONLY path: half of what this
+     * exists for is a customer already using the product who has just paid cash,
+     * and telling them to open a second workspace to receive what they paid for
+     * is the product meeting the shape of our ledger.
+     *
+     * ⚠️ AND IT IS THE SAME FUNCTION FOUNDING CALLS. Two implementations of
+     * "spend this gift" is how one of them forgets to mark it spent — which is a
+     * gift that can be applied to every workspace on the deployment.
+     */
+    "op.account.give.apply": {
+      kind: "write", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const email = String(input.email ?? "").trim().toLowerCase();
+        const tenantId = String(input.tenant ?? "") as TenantId;
+        if (!email || !tenantId) return ctx.fail("platform.invalid");
+
+        const plans = await sold(ctx);
+        const done = await applyGifts(ctx.directory, tenantId, email, plans, ctx.now);
+        /* ⚠️ AN EMPTY ANSWER IS A REFUSAL HERE AND NOT AT A FOUNDING, and the
+           difference is who pressed. Nothing waiting is the ordinary case when
+           somebody makes a workspace; it is a mistake when an operator has just
+           pressed a button labelled with what they are giving. */
+        if (!done.length) return ctx.fail("platform.invalid");
+        return { tenant: tenantId, applied: done };
+      },
+    },
+
+    /**
+     * ⚠️ END WHAT IS LEFT, NEVER TAKE BACK WHAT WAS SPENT. A workspace already
+     * founded on a gift keeps its plan — you cannot un-give a business somebody
+     * has been running — so this stops the remainder and leaves the row, which
+     * is what makes "they were given three and I stopped it after two"
+     * answerable afterwards.
+     */
+    "op.account.give.stop": {
+      kind: "write", needs: "session", doors: ["operator"],
+      async run(ctx, input): Promise<unknown> {
+        operator(ctx);
+        const id = String(input.gift ?? "").trim();
+        if (!id) return ctx.fail("platform.invalid");
+        /* ⚠️ ANSWERED WITH WHETHER IT LANDED. A second press on a slow
+           connection finds it already stopped, which is not a failure and must
+           not be reported as one — but a screen told nothing would redraw as
+           though the first press had not happened. */
+        const stopped = await stopGift(ctx.directory, id, ctx.now);
+        return { gift: id, stopped };
       },
     },
 

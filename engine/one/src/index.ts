@@ -1766,6 +1766,11 @@ const handler = async (env: Env) => {
            paying carries a badge; one on every row is texture. */
         needsAttention: async (db, tenantId, appId) =>
           (await subscriptionFor(db, tenantId, appId))?.status === "past_due",
+        /* ⚠️ THE CATALOGUE, SO A FOUNDING CAN SPEND A GIFT. The plan an operator
+           gave somebody is comped onto the workspace they make, and comping onto
+           an id with no plan behind it is an empty entitlement set — so the
+           application resolves the plan from here rather than from the row. */
+        plans: () => PLANS,
       }),
       /*
         ⚠️ THE OPERATOR OPERATIONS RIDE THE PERSONAL LANE, on the operator door

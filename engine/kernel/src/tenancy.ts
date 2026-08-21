@@ -227,6 +227,94 @@ export interface CommercialAllowance {
 export const allowanceLeft = (a: CommercialAllowance): number =>
   Math.max(0, a.granted - a.used);
 
+/* --------------------------------------------------------------- the gift --- */
+
+/**
+ * SOMETHING AN OPERATOR GAVE A PERSON THAT NOBODY PAID FOR.
+ *
+ * ⚠️ A CASH CUSTOMER, A FRIEND, A DEMO AND A DEPLOYMENT WITH NO STRIPE KEYS ARE
+ * ONE MECHANISM. All four are "this person has X and no card was involved", and
+ * building them separately is how three of them end up unrecorded — the money
+ * did not move through us, so the only trace is whatever somebody typed.
+ *
+ * ⚠️ SO IT IS A ROW BEFORE IT IS A CAPABILITY. The gift is what is written; the
+ * plan on the workspace and the credits in the wallet are what it PRODUCES. The
+ * other order — comp the workspace and remember why in a support thread — is the
+ * state this replaces, and it cannot answer "what has this person been given"
+ * from anywhere.
+ */
+export type GiftKind = "plan" | "credits";
+
+export interface Gift {
+  readonly id: string;
+  readonly kind: GiftKind;
+  /** The plan a founded workspace lands on. Empty for a gift of credits. */
+  readonly planId: string | null;
+  /** How many credits. Zero for a gift of a plan. */
+  readonly credits: number;
+  /**
+   * ⚠️ HOW MANY WORKSPACES IT COVERS, WHICH IS WHY A PLAN GIFT IS A COUNT AND
+   * NOT A FLAG. "You are on Max" cannot be taken back from a workspace already
+   * founded on it; "you may found two more at Max" simply runs out — the same
+   * argument `CommercialAllowance` is built on, one level up.
+   */
+  readonly workspaces: number;
+  /** How many of them have been founded. */
+  readonly spent: number;
+  /**
+   * ⚠️ NULL IS OPEN-ENDED AND IS THE COMMON CASE. Friends and family have no
+   * term; a year of cash and a fortnight of demo do. One optional date covers
+   * all three, and a required one would make the commonest gift a lie somebody
+   * has to type a far-future date into.
+   */
+  readonly until: string | null;
+  /** ⚠️ REQUIRED. The one write in the system that hands out value for nothing. */
+  readonly why: string;
+  /** ⚠️ WHICH OPERATOR. A gift nobody signed is a gift nobody can ask about. */
+  readonly by: string;
+  readonly at: string;
+  /** ⚠️ When an operator ended it early — see `giftIsLive`. */
+  readonly stoppedAt: string | null;
+}
+
+/**
+ * ⚠️ STOPPED, LAPSED OR SPENT — three ways to be over, and a screen that knew
+ * only one of them. A gift is live while an operator has not ended it, its date
+ * has not passed, and it has workspaces left to cover; every caller asking two
+ * of the three is a caller that hands out one more than was agreed.
+ *
+ * ⚠️ AND A GIFT OF CREDITS IS SPENT THE MOMENT IT LANDS, which is why `spent`
+ * is compared against `workspaces` rather than against a kind. Credits are
+ * written with `workspaces: 1`, so one arithmetic answers both.
+ */
+export const giftIsLive = (g: Gift, now: string): boolean =>
+  !g.stoppedAt && g.spent < g.workspaces && (!g.until || g.until > now);
+
+/**
+ * ⚠️ WHY IT IS NOT LIVE, BECAUSE "no" IS NOT AN ANSWER SOMEBODY CAN ACT ON. An
+ * operator looking at a person who says they were promised something needs to
+ * read which of the three happened; a boolean sends them to the database.
+ */
+export type GiftOver = "stopped" | "lapsed" | "spent" | null;
+
+export const giftOver = (g: Gift, now: string): GiftOver =>
+  g.stoppedAt ? "stopped"
+    : g.until && g.until <= now ? "lapsed"
+      : g.spent >= g.workspaces ? "spent"
+        : null;
+
+/**
+ * ⚠️ A PLAN GIFT CONFERS THE RIGHT TO FOUND, so it is counted with the bare
+ * allowance rather than beside it. Left separate, an operator giving somebody a
+ * workspace at Max would have to ALSO remember to raise their commercial count
+ * — and forgetting is a person told they may not open the thing they were just
+ * given.
+ */
+export const giftedWorkspaces = (gifts: readonly Gift[], now: string): number =>
+  gifts
+    .filter((g) => g.kind === "plan" && giftIsLive(g, now))
+    .reduce((n, g) => n + (g.workspaces - g.spent), 0);
+
 /* ------------------------------------------------------ becoming commercial --- */
 
 /**
