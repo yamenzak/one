@@ -327,6 +327,21 @@ export const allowanceOf = (resolved: readonly Resolved[], key: string): Allowan
   resolved.find((r) => r.key === key)?.value ?? false;
 
 /**
+ * WHETHER A PLAN INCLUDES A CAPABILITY AT ALL — the question a gate asks, and
+ * the question a screen asks before it offers a destination.
+ *
+ * ⚠️ ONE FUNCTION, BECAUSE THE TWO WALKS MUST NOT DISAGREE. A nav that hides
+ * what the gate would allow costs a customer a feature they paid for; a nav that
+ * offers what the gate refuses is a promise the product does not keep. Written
+ * out twice they agree until one of them is edited, and the symptom is a
+ * destination somebody was offered and cannot use.
+ *
+ * ⚠️ AND `0` IS NOT INCLUDED WHILE `-1` IS. A ceiling of none and a ceiling of
+ * unlimited are both numbers; only the sign tells them apart.
+ */
+export const included = (allowed: Allowance): boolean => allowed !== false && allowed !== 0;
+
+/**
  * ⚠️ `-1` IS UNLIMITED AND `0` IS NONE, and conflating them is how an unlimited
  * plan comes to refuse the first write. `false` is none as well — an off
  * capability has no room in it.

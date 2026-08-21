@@ -191,6 +191,13 @@ person pressing the button (`refuseRole`'s `beyond_you`).
 Five entitlements: `products` and `locations` are counted; `processes`, `jobs`
 and `imports` are gates.
 
+**And a gate reaches the nav, not only the operation.** Four screens name the
+capabilities they are for — `/work` (runs *or* work orders), `/run`, `/case`,
+`/import` — and one the plan does not include never leaves the server, so it has
+no nav row, no route and no way in by typing. Runs open at Plus, work orders and
+the import at Solo, so a garage gets four primary destinations and a clinic gets
+five.
+
 ---
 
 ## Part II — how it is built
@@ -339,7 +346,3 @@ difference between a screen that is hidden and a screen that is not reachable.
   own.
 - **The getting-started guide cannot be ticked**, because nothing answers which
   declared events a workspace has raised. `DEFER(engine-63)`.
-- **A screen can be gated on a permission and not on an entitlement**, so `/work`
-  is drawn for anybody holding `process:read` even on a plan without runs. The
-  operations behind it refuse correctly and the screen reports the refusal.
-  `DEFER(engine-67)`.

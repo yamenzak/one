@@ -485,3 +485,50 @@ describe("what another workspace can see", () => {
     expect((await res.json() as { items: unknown[] }).items).toEqual([]);
   });
 });
+
+/*
+  ⚠️ WHAT THE PLAN OPENS, AND THIS WORKSPACE IS ON `solo` — work orders, no
+  release rail. The nav is the only place a customer learns which half of this
+  product they bought, and it learns it from `centre.view`: a screen the page
+  never receives has no row, no route and no way in by typing.
+
+  ⚠️ ASSERTED AGAINST THE TIER RATHER THAN AGAINST A LIST OF SCREENS. The
+  question is "does the door reflect the plan", so the fixture is the plan; the
+  companion suite runs the same product on `studio` and gets the run rail.
+*/
+describe("what the plan opens", () => {
+  const screensOf = async (): Promise<readonly { id: string; features?: string[] }[]> => {
+    const res = await at("/api/centre.view", { headers: { cookie } });
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      apps: { id: string; screens: { id: string; features?: string[] }[] }[];
+    };
+    const mine = body.apps.find((a) => a.id === "inventory");
+    expect(mine, JSON.stringify(body.apps.map((a) => a.id))).toBeDefined();
+    return mine!.screens;
+  };
+
+  it("withholds the run rail, which this tier did not buy", async () => {
+    const ids = (await screensOf()).map((s) => s.id);
+    expect(ids).not.toContain("run");
+  });
+
+  /* ⚠️ AND WITHHOLDS NEITHER OF THE TWO IT DID. `/work` is about runs AND jobs,
+     so gating it on runs alone would have taken the work orders with it — which
+     is the whole reason a screen names a LIST rather than a key. */
+  it("keeps the work orders, and the page that lists them", async () => {
+    const ids = (await screensOf()).map((s) => s.id);
+    expect(ids).toContain("case");
+    expect(ids).toContain("work");
+    expect(ids).toContain("import");
+  });
+
+  /* ⚠️ AND EVERY SCREEN WITHOUT A GATE STILL TRAVELS. A filter that quietly
+     dropped an ungated screen would pass both assertions above. */
+  it("leaves every ungated screen alone", async () => {
+    const ids = new Set((await screensOf()).map((s) => s.id));
+    for (const s of APPS.inventory!().screens) {
+      if (!s.features) expect(ids.has(s.id), s.id).toBe(true);
+    }
+  });
+});

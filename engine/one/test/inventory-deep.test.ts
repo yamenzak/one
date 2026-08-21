@@ -502,3 +502,21 @@ describe("what the night tells somebody", () => {
     expect(runs.results.at(-1)?.detail ?? "").not.toContain("refused:");
   });
 });
+
+/*
+  ⚠️ THE SAME QUESTION AS `inventory.test.ts`, ON THE TIER ABOVE. That suite runs
+  on `solo` and is withheld the run rail; this one runs on `studio` and is not.
+  Two workspaces, one worker, one manifest — the only thing that differs is what
+  was bought, which is the whole claim.
+*/
+describe("what the plan opens", () => {
+  it("hands the run rail to a workspace that bought it", async () => {
+    const res = await at("/api/centre.view", { headers: { cookie } });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { apps: { id: string; screens: { id: string }[] }[] };
+    const ids = (body.apps.find((a) => a.id === "inventory")?.screens ?? []).map((s) => s.id);
+    expect(ids).toContain("run");
+    expect(ids).toContain("work");
+    expect(ids).toContain("case");
+  });
+});

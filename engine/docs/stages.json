@@ -366,9 +366,9 @@
     },
     {
       "n": 67,
-      "status": "planned",
+      "status": "shipped",
       "title": "A screen can be gated on an entitlement, the way an operation already is",
-      "ends": "`ScreenSpec.entitlement` is read by `reachable`, so a destination on a plan the workspace does not hold is not drawn — the same rule `commercial` and `flag` already get. The boot read carries each app's RESOLVED entitlement values beside its permissions, because the chrome decides what to offer before any operation is called. Until then a product can only gate such a screen by permission, and somebody on a plan without the capability sees the destination, opens it, and is refused by the first operation behind it — which is the promise-the-product-does-not-keep that the nav filter exists to prevent."
+      "ends": "`ScreenSpec.features` names the capabilities a screen is FOR, and the boot read withholds the screen unless the plan includes one of them — so a destination the workspace did not buy has no nav row, no route and no way in by typing, which is the same three answers a flag already gave. It is asked on the SERVER rather than in the chrome: the page holds no plan, and giving it one would be a second round trip on the read every screen stands on plus a second opinion about what was bought. ANY rather than ALL, because a page carrying runs and work orders is worth opening on a tier that has only work orders. Composition refuses a screen gated on a key nothing sells, and deliberately does NOT count a screen as enforcement — hiding a nav row leaves the operations behind it callable, so a key whose only mention is a screen is still sold and withheld by nothing."
     },
     {
       "n": 62,

@@ -33,7 +33,7 @@
  * Layer 3. Imports primitives, problem, operation, entitlement, access.
  */
 
-import { allowanceOf, withinQuota, type Resolved } from "./entitlement.js";
+import { allowanceOf, included, withinQuota, type Resolved } from "./entitlement.js";
 import type { AnyOperation, Gate } from "./operation.js";
 import { GATE_ORDER, PUBLIC } from "./operation.js";
 import type { Problem, ProblemCatalog } from "./problem.js";
@@ -159,8 +159,9 @@ export function check(ask: Ask): Refused | null {
       }
       case "entitlement": {
         if (!op.entitlement) break;
-        const allowed = allowanceOf(ask.entitlements, op.entitlement);
-        if (allowed === false || allowed === 0) return no("entitlement", "platform.payment_required");
+        if (!included(allowanceOf(ask.entitlements, op.entitlement))) {
+          return no("entitlement", "platform.payment_required");
+        }
         break;
       }
       case "flag": {

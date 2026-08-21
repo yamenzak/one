@@ -71,6 +71,27 @@ export interface ScreenSpec {
   readonly permission: string;
   /** ⚠️ A screen only a business has. Same rule as an operation's — see there. */
   readonly commercial?: true;
+  /**
+   * WHAT THIS SCREEN IS FOR — and the plan has to include at least one of them.
+   *
+   * ⚠️ AN ENTITLEMENT, NOT A PERMISSION, AND THE TWO ANSWER DIFFERENT QUESTIONS.
+   * A permission is what this person may do in a workspace that has the feature;
+   * this is whether the workspace has it at all. Gating a whole regulated half of
+   * a product on a role means an owner sees it wherever they are — including on
+   * a tier that never bought it.
+   *
+   * ⚠️ ANY, NOT ALL, BECAUSE A SCREEN IS OFTEN ABOUT MORE THAN ONE THING. A page
+   * carrying runs and work orders is worth opening on a plan that has only work
+   * orders; requiring both would withhold a screen half of which was paid for.
+   * A screen about exactly one capability names exactly one, and reads the same.
+   *
+   * ⚠️ AND HIDING A SCREEN IS NOT WITHHOLDING A CAPABILITY. The operations behind
+   * it carry their own `entitlement`, and they are what actually refuses; this
+   * only stops the product offering a door somebody cannot walk through. A key
+   * named HERE and nowhere else still fails composition as sold and unenforced,
+   * which is the correct answer — an API is a door too.
+   */
+  readonly features?: readonly string[];
   /** A screen behind one of our switches. */
   readonly flag?: string;
   /** The ambience. Derived from theme tokens, so branding reaches it (D7). */
@@ -480,6 +501,27 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
   }
   for (const key of named) {
     if (key && !(key in holdable)) at("entitlement", `"${key}" is enforced and nothing sells it`);
+  }
+  /*
+    ⚠️ A SCREEN'S OWN KEY IS CHECKED AND DELIBERATELY NOT COUNTED. Checked
+    because gating a destination on something no plan sells hides it from
+    everybody forever; not counted because HIDING A SCREEN IS NOT WITHHOLDING A
+    CAPABILITY — the operations behind it are still a door, and a key whose only
+    enforcement is a missing nav row is a feature anybody can still call.
+  */
+  for (const s of spec.screens) {
+    for (const key of s.features ?? []) {
+      if (!(key in holdable)) {
+        at(`screen ${s.id}`, `is gated on "${key}" and nothing sells it`);
+      }
+    }
+    /* ⚠️ AND AN EMPTY LIST IS NOT "NO GATE", IT IS A GATE NOTHING SATISFIES —
+       any-of over nothing is false. Declared that way the screen would be
+       invisible on every tier, which reads at the call site as if it were open
+       to all of them. */
+    if (s.features && s.features.length === 0) {
+      at(`screen ${s.id}`, "names an empty feature list, which no plan can satisfy");
+    }
   }
 
   /* --- what a person is told --------------------------------------------- */

@@ -388,7 +388,7 @@ and a manifest that does not compose refuses to boot.
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
 | `manifest` | the whole app, and the composition that refuses a broken one | 12 | — |
-| `entitlement` | what a plan includes, and the allowance algebra over it | 16 | — |
+| `entitlement` | what a plan includes, and the allowance algebra over it | 17 | — |
 | `credit` | metered work: the reserve, the rate, the ceiling | 15 | — |
 | `dunning` | the ladder from past due to erased | 5 | — |
 | `package` | a priced bundle of timed grants | 8 | 1 |
@@ -409,7 +409,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**275 of them**, 271 reached by something today.
+**276 of them**, 272 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -879,6 +879,9 @@ its own header, cited by other files, and doing nothing.
 | `the-preview-and-the-commit-are-the-same-function` | D12 | a screen that says “412 new, 3 updated” over a write that walks the same spreadsheet a second time and does something else — identical until the day it is not, and on that day nothing throws |
 | `what-an-operation-declared-about-its-input-is-enforced` | D12 | a required field arriving as `undefined`, reaching a statement, and the caller being told “Type 'undefined' not supported” in a 503 that names a value rather than a field |
 | `the-screen-index-names-every-screen-and-every-line-it-gives-is-real` | D12 | “looking for the file that draws a screen? Part III” sending somebody to the wrong file with confidence, which costs more than grepping would have |
+| `a-screen-is-offered-only-on-a-plan-that-includes-it` | D17 | a nav slot spent on a destination the plan does not include, whose only answer when pressed is the refusal its own operations raise — and there are five of them |
+| `a-screen-cannot-be-gated-on-a-key-no-plan-sells` | D12 | a screen absent on every tier with the declaration reading as though it were there, which produces no complaint from anybody |
+| `hiding-a-screen-is-not-withholding-a-capability` | D12 | an entitlement sold, gated by a missing nav row and by nothing else, so every operation behind it stays callable by anybody who knows the name |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -897,12 +900,12 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 132 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 134 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
 | D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 4 |
-| D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 5 |
+| D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 6 |
 | D18 | The operator stands outside every workspace, and the console is a door rather than a role | 8 |
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 4 |
 | D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 3 |
@@ -1026,7 +1029,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 68 | A night’s work can tell somebody — a job raises events, and the nightly sweep uses it | shipped |
 | 69 | Labels — a QR from nothing, a printable sheet, and the decant label a hazard needs | shipped |
 | 70 | Reports — what went, what was wrong, what to buy, and how much of it anybody wrote down | shipped |
-| 67 | A screen can be gated on an entitlement, the way an operation already is | **planned** |
+| 67 | A screen can be gated on an entitlement, the way an operation already is | shipped |
 | 62 | A list narrows and pages — the generated read answers past the first fifty, and says how many there are | shipped |
 | 64 | Itemised things — one object for its whole life, and the kits composed of them | shipped |
 | 63 | The guide and the milestones are ticked by what a workspace has actually done | **planned** |
@@ -1034,7 +1037,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 72 | An operation's declared input is checked at the door, and `now` is one type | shipped |
 | 73 | The other half of OneInventory, driven — and the quarantine that was a badge on a screen | shipped |
 
-**57 shipped, 16 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**58 shipped, 15 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

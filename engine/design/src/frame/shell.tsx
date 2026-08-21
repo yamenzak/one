@@ -324,6 +324,13 @@ export interface ShellProps {
  * personal workspace — every declaration correct, every test green, the
  * mechanism absent. Absent kind reads as `personal`, which withholds rather than
  * offers.
+ *
+ * ⚠️ AND `feature` IS ASKED BEFORE THE SCREEN TRAVELS, NOT HERE. What a plan
+ * includes is the server's answer — the chrome holds no plan, and giving it one
+ * would mean a second round trip on the read every screen stands on, plus a
+ * second opinion about what a workspace bought. A screen the page never receives
+ * has no nav row, no route and no way in by typing, which is a stronger answer
+ * than a filter here could give (`publicFace`).
  */
 export const reachable = (
   screens: readonly ScreenSpec[],

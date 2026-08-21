@@ -15,8 +15,8 @@
  * allow, because both read the same sets.
  */
 
-import type { AppSpec, TenantId } from "@engine/kernel";
-import { PUBLIC, offlineBook, outcomeBook, sellableKeys } from "@engine/kernel";
+import type { Allowance, AppSpec, TenantId } from "@engine/kernel";
+import { PUBLIC, included, offlineBook, outcomeBook, sellableKeys } from "@engine/kernel";
 import { tenantById } from "./directory.js";
 import { memberFor, rolesFor } from "./membership.js";
 import type { PlatformCtx } from "./member-ops.js";
@@ -26,6 +26,7 @@ import type { Resolved } from "./compose.js";
 const publicFace = (
   a: AppSpec, permissions: readonly string[], roles: readonly string[],
   flags: Readonly<Record<string, boolean>>,
+  allowance: (key: string) => Allowance,
 ) => ({
   id: a.id,
   name: a.name,
@@ -42,7 +43,16 @@ const publicFace = (
     be trusted with it, and a client that forgets draws a destination the server
     refuses — the failure this whole seam exists to make impossible (D15).
   */
-  screens: a.screens.filter((s) => !s.flag || flags[s.flag] === true),
+  /*
+    ⚠️ AND NEITHER DOES A SCREEN THE PLAN DOES NOT INCLUDE. Same three answers,
+    for the reason a flag gives them: a screen the page never receives has no nav
+    row, no route and no way in by typing. What differs is who it is about — a
+    flag is ours and a feature is theirs — and that difference belongs in the
+    MONEY area, which sells the plan, rather than in a nav row that offers a
+    destination and then apologises.
+  */
+  screens: a.screens.filter((s) => (!s.flag || flags[s.flag] === true)
+    && (!s.features || s.features.some((k) => included(allowance(k))))),
   settings: a.settings ?? {},
   notifications: a.notifications ?? {},
   documents: a.documents ?? {},
@@ -106,6 +116,10 @@ export function centreOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           [...(await ctx.permissionsIn(a.id))],
           Object.keys(await rolesFor(ctx.db, ctx.tenantId as TenantId, a.id, a.access.roles)),
           ctx.flags,
+          /* ⚠️ THE SAME RESOLVER THE GATE READ FOR THIS REQUEST. A surface
+             resolving its own plan would be a second answer to what a workspace
+             bought, and the two differ on exactly the key nobody has touched. */
+          ctx.allowance,
         )));
 
       return {

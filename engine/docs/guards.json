@@ -2845,6 +2845,33 @@
       "impl": "scripts/screen-index.test.mjs",
       "proves": "which is not a declaration",
       "fails": "“looking for the file that draws a screen? Part III” sending somebody to the wrong file with confidence, which costs more than grepping would have"
+    },
+    {
+      "id": "a-screen-is-offered-only-on-a-plan-that-includes-it",
+      "protects": "D17",
+      "stage": "67",
+      "status": "live",
+      "impl": "one/test/inventory.test.ts",
+      "proves": "withholds the run rail, which this tier did not buy",
+      "fails": "a nav slot spent on a destination the plan does not include, whose only answer when pressed is the refusal its own operations raise — and there are five of them"
+    },
+    {
+      "id": "a-screen-cannot-be-gated-on-a-key-no-plan-sells",
+      "protects": "D12",
+      "stage": "67",
+      "status": "live",
+      "impl": "kernel/test/manifest.test.ts",
+      "proves": "refuses a screen gated on an entitlement nothing sells",
+      "fails": "a screen absent on every tier with the declaration reading as though it were there, which produces no complaint from anybody"
+    },
+    {
+      "id": "hiding-a-screen-is-not-withholding-a-capability",
+      "protects": "D12",
+      "stage": "67",
+      "status": "live",
+      "impl": "kernel/test/manifest.test.ts",
+      "proves": "does not let a screen stand in for a gate",
+      "fails": "an entitlement sold, gated by a missing nav row and by nothing else, so every operation behind it stays callable by anybody who knows the name"
     }
   ]
 }

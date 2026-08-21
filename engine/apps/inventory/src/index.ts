@@ -4509,18 +4509,27 @@ export const INVENTORY: AppSpec = defineApp({
       work orders, a clinic releasing sterilisation loads — and nobody storing
       paint in a garage.
 
-      DEFER(engine-67) stage:67 — a screen can be gated on a permission and not on
-      an ENTITLEMENT, so this is drawn for anybody holding `process:read` even on
-      a plan that does not include runs. The operations behind it refuse
-      correctly and the screen reports the refusal, which is honest and is still
-      a destination somebody was offered and cannot use.
+      ⚠️ SO IT IS GATED ON THE PLAN AND NOT ONLY ON THE ROLE. `process:read` says
+      this person may see runs in a workspace that does them; `processes` says
+      the workspace does them at all. On the role alone an owner was offered a
+      fifth primary destination wherever they were — including on a tier that
+      never bought runs — and the screen's only answer was to report the refusal
+      its own operations raised. A nav slot is the scarcest thing this product
+      has (five, D10), and spending one on an apology is the worst use of it.
+
+      ⚠️ AND IT NAMES BOTH KEYS, BECAUSE IT IS ABOUT BOTH. A run is a batch
+      passing through a machine and a job is a context consuming one; the tier
+      that has work orders and no release rail is a real customer, and gating
+      this page on runs alone would take their work orders with it. The two
+      screens beneath name one key each, because each is about one thing — and
+      they are gated at all because a detail screen is reachable by typing.
     */
     { id: "work", route: "/work", label: "Work", nav: "primary", icon: "list",
-      permission: "process:read" },
+      permission: "process:read", features: ["processes", "jobs"] },
     { id: "run", route: "/run", label: "A run", nav: "none", icon: "check",
-      permission: "process:read" },
+      permission: "process:read", features: ["processes"] },
     { id: "case", route: "/case", label: "A job", nav: "none", icon: "note",
-      permission: "process:read" },
+      permission: "process:read", features: ["jobs"] },
     /* ⚠️ `etch` — ruled geometry, which is what a shelf is. Seeded on the
        location, so every shelf in the workspace has a ground of its own. */
     { id: "location", route: "/where", label: "A location", nav: "none", icon: "pin",
@@ -4598,7 +4607,7 @@ export const INVENTORY: AppSpec = defineApp({
       is a statement about the act rather than a door somebody is caught behind.
     */
     { id: "import", route: "/import", label: "Import", nav: "secondary", icon: "add",
-      permission: "product:write" },
+      permission: "product:write", features: ["imports"] },
     /* ⚠️ THE LAST STEP OF THE REORDER REPORT'S OWN WORKFLOW. That screen can say
        what to buy and how long the shelf lasts; without this it cannot say who
        to ring, and the decision it worked out is finished somewhere else. */

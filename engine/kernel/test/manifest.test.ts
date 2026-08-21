@@ -349,6 +349,38 @@ describe("a declaration that reaches no surface", () => {
     expect(whyOf(app({ operations: [{ ...stub, entitlement: "ghosts" } as AnyOperation] })))
       .toContain("is enforced and nothing sells it");
   });
+
+  /*
+    ⚠️ AND A SCREEN GATED ON A KEY NO PLAN SELLS IS A DESTINATION NOBODY EVER
+    SEES. It fails in the direction that produces no complaint — the screen is
+    simply absent, on every tier, and the declaration reads as if it were there.
+  */
+  it("refuses a screen gated on an entitlement nothing sells", () => {
+    expect(whyOf(app({
+      screens: [{ ...app().screens[0]!, features: ["ghosts"] }],
+    }))).toContain(`is gated on "ghosts" and nothing sells it`);
+  });
+
+  /* ⚠️ Any-of over nothing is false, so an empty list is a gate no plan can
+     satisfy — which at the call site reads like no gate at all. */
+  it("refuses a screen that names an empty feature list", () => {
+    expect(whyOf(app({
+      screens: [{ ...app().screens[0]!, features: [] }],
+    }))).toContain("no plan can satisfy");
+  });
+
+  /*
+    ⚠️ AND A SCREEN DOES NOT COUNT AS ENFORCEMENT. Hiding a nav row leaves the
+    operations behind it callable, so a key whose only mention is a screen is
+    still sold and withheld by nothing — which is what this asserts, in the
+    direction that keeps the other check honest.
+  */
+  it("does not let a screen stand in for a gate", () => {
+    expect(whyOf(app({
+      entitlements: { extras: { label: "Extras", withheld: "gate" } },
+      screens: [{ ...app().screens[0]!, features: ["extras"] }],
+    }))).toContain("is sold and nothing withholds it");
+  });
 });
 
 /* ---------------------------------------------------------------- surface --- */
