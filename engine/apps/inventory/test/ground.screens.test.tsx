@@ -1352,13 +1352,13 @@ describe("the import", () => {
     difference between a preview and a confirmation dialogue.
   */
   it("names the number in the button", () => {
-    expect(importing()).toContain("Import 3 products");
+    expect(importing()).toContain("Import 3");
   });
 
   /* ⚠️ AND WITH NOTHING TO DO IT SAYS SO RATHER THAN OFFERING THE PRESS. */
   it("refuses to offer an import of nothing", () => {
     const out = importing({ ...SEEN, tally: { new: 0, update: 0, refused: 4 } });
-    expect(out).toContain("Nothing to import");
+    expect(out).toContain("Nothing to do");
   });
 
   /*

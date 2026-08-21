@@ -263,6 +263,19 @@ export interface Geometry {
     /** ⚠️ What the library calls it — see `tooSmall` for the one thing it is for. */
     readonly kind: string;
   }[];
+  /**
+   * ⚠️ TEXT THE LAYOUT CUT OFF, AND WHERE. Truncation is often the right answer
+   * — a product name in a row has to end somewhere — and never the right answer
+   * for a control, where the words ARE what the press does. "Import 3 …" is a
+   * button nobody can act on with confidence, and it looks deliberate.
+   *
+   * `where` is the nearest ancestor that marks a region: the island, the nav,
+   * the crown. An app asserts about the regions where cutting is never allowed
+   * rather than about the whole page.
+   */
+  readonly cut: readonly {
+    readonly text: string; readonly by: number; readonly where: string;
+  }[];
 }
 
 /**
@@ -349,7 +362,29 @@ export async function geometryOf(
           };
         })
         .filter((t) => t.width > 0 && t.height > 0);
-      return { spill, worst, targets };
+      /* ⚠️ ELLIPSIS ONLY, NOT EVERY OVERFLOW. A scroller's content is wider than
+         its box on purpose, and a clipped decoration is not text somebody was
+         meant to read; what this is looking for is the layout deciding, on its
+         own, that some of the words go. */
+      const cut = (Array.prototype.slice.call(document.querySelectorAll("body *")) as Element[])
+        .filter((el) => {
+          const style = getComputedStyle(el);
+          if (style.textOverflow !== "ellipsis") return false;
+          return el.scrollWidth > el.clientWidth + 1;
+        })
+        .map((el) => {
+          const marked = el.closest("[data-island], [data-hem], [data-crown], nav");
+          return {
+            text: (el.textContent ?? "").trim().slice(0, 40),
+            by: el.scrollWidth - el.clientWidth,
+            where: marked
+              ? (marked.getAttribute("data-island") ? "island"
+                : marked.getAttribute("data-crown") ? "crown"
+                  : marked.tagName === "NAV" ? "nav" : "hem")
+              : "",
+          };
+        });
+      return { spill, worst, targets, cut };
     }, viewport.width);
   } finally {
     await page.close();

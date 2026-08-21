@@ -42,6 +42,7 @@ import { ARRIVE, arriveAt } from "../tokens/motion.js";
 import { useScenery } from "../frame/page.js";
 import type { Sky } from "../scene/index.js";
 import { useBones } from "./bones.js";
+import { NamedAlready } from "./forms.js";
 import { Face, type FaceOf } from "./face.js";
 import { Hint } from "./beside.js";
 import { Tally } from "./tally.js";
@@ -773,7 +774,12 @@ export function ControlRow({ icon, face, label, under, wide, children }: RowBase
           under its floor — measured as heights of 64, 100, 67 and 100 in one
           card on a phone, and 64, 64, 67, 64 on the desktop it was built on. See
           `CONTROL_SHARE`. */}
-      <span className={wide ? "w-full" : `shrink-0 ${CONTROL_SHARE}`}>{children}</span>
+      {/* ⚠️ THE CONTROL DOES NOT SAY THE NAME AGAIN — see `NamedAlready`. This
+          row IS the label, so a control rendering its own put every field's name
+          on the screen twice. */}
+      <span className={wide ? "w-full" : `shrink-0 ${CONTROL_SHARE}`}>
+        <NamedAlready>{children}</NamedAlready>
+      </span>
     </div>
   );
 }

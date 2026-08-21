@@ -61,6 +61,33 @@ const said = (p: Said) => ({
   isInvalid: p.error !== undefined,
 });
 
+/* ------------------------------------------------------------ named twice --- */
+
+/**
+ * ⚠️ A ROW THAT ALREADY PRINTED THE NAME, so the control inside it must not
+ * print it again. `ControlRow` exists precisely to put a label beside a control,
+ * and every control here renders its own — so the pair reads "Name / Name",
+ * "Brand / Brand", "Barcode / Barcode" down a card, which on the import screen
+ * was seven fields each named twice.
+ *
+ * ⚠️ A CONTEXT RATHER THAN A PROP, BECAUSE THE DEFAULT HAS TO REACH THE CONTROL.
+ * A `hideLabel` on every call site is a thing to remember at every call site,
+ * and the one somebody forgets looks exactly like a screen nobody has opened.
+ *
+ * ⚠️ AND HIDDEN, NEVER DROPPED. The label is what a screen reader announces the
+ * control as; removing it leaves a select somebody navigating by keyboard cannot
+ * identify, which is a worse fault than the one this fixes and an invisible one.
+ */
+const Named = React.createContext(false);
+
+export function NamedAlready({ children }: { readonly children: React.ReactNode }) {
+  return <Named.Provider value>{children}</Named.Provider>;
+}
+
+function Naming({ children }: { readonly children: React.ReactNode }) {
+  return <Label className={React.useContext(Named) ? "sr-only" : undefined}>{children}</Label>;
+}
+
 /**
  * The help line and the refusal, in that order, wherever the control puts its tail.
  *
@@ -144,7 +171,7 @@ export function TextInput({
       {...said(p)}
       isDisabled={p.disabled === true || pending}
     >
-      <Label>{p.label}</Label>
+      <Naming>{p.label}</Naming>
       {before || after ? (
         <InputGroup>
           {before ? <InputGroup.Prefix>{before}</InputGroup.Prefix> : null}
@@ -173,7 +200,7 @@ export function SecretInput({ set, onChange, ...p }: Said & {
       {...said(p)}
       isDisabled={p.disabled === true || pending}
     >
-      <Label>{p.label}</Label>
+      <Naming>{p.label}</Naming>
       <Input placeholder={set ? "Stored. Type to replace it." : undefined} autoComplete="off" />
       <Tail help={p.help} error={p.error} />
     </TextField>
@@ -188,7 +215,7 @@ export function LongText({ value, onChange, placeholder, ...p }: Said & {
   const pending = value === undefined;
   return (
     <TextField value={value ?? ""} onChange={onChange} {...said(p)} isDisabled={p.disabled === true || pending}>
-      <Label>{p.label}</Label>
+      <Naming>{p.label}</Naming>
       <TextArea placeholder={placeholder} />
       <Tail help={p.help} error={p.error} />
     </TextField>
@@ -237,7 +264,7 @@ export function NumberInput({ value, onChange, min, max, step, format, ...p }: N
       {...said(p)}
       isDisabled={p.disabled === true || pending}
     >
-      <Label>{p.label}</Label>
+      <Naming>{p.label}</Naming>
       {/*
         ⚠️ `h-auto`, BECAUSE THE GROUP IS SHORTER THAN WHAT IS INSIDE IT ON A
         PHONE. HeroUI's group is a hard `h-9` with `overflow-hidden`, and its
@@ -319,7 +346,7 @@ export function Dial({ value, onChange, min = 0, max = 100, step = 1, format, ..
       formatOptions={format}
       isDisabled={p.disabled === true || pending}
     >
-      <Label>{p.label}</Label>
+      <Naming>{p.label}</Naming>
       <Slider.Output />
       <Slider.Track>
         <Slider.Fill />
@@ -347,7 +374,7 @@ export function Choice({ value, onChange, options, placeholder, ...p }: Said & {
       {...said(p)}
       isDisabled={p.disabled === true || pending}
     >
-      <Label>{p.label}</Label>
+      <Naming>{p.label}</Naming>
       <Select.Trigger>
         <Select.Value />
         <Select.Indicator />
@@ -390,7 +417,7 @@ export function Lookup({ value, onChange, options, placeholder, name, autoFocus,
       {...said(p)}
       isDisabled={p.disabled === true || pending}
     >
-      <Label>{p.label}</Label>
+      <Naming>{p.label}</Naming>
       <ComboBox.InputGroup>
         <Input autoFocus={autoFocus} placeholder={placeholder ?? "Type to search"} />
         <ComboBox.Trigger />
@@ -448,7 +475,7 @@ export function Picks({ value, onChange, options, ...p }: Said & {
       {...said(p)}
       isDisabled={p.disabled === true || pending}
     >
-      <Label>{p.label}</Label>
+      <Naming>{p.label}</Naming>
       {p.help ? <Description>{p.help}</Description> : null}
       {options.map((o) => (
         <Checkbox key={o.id} value={o.id}>
@@ -479,7 +506,7 @@ export function OneOf({ value, onChange, options, ...p }: Said & {
       {...said(p)}
       isDisabled={p.disabled === true || pending}
     >
-      <Label>{p.label}</Label>
+      <Naming>{p.label}</Naming>
       {p.help ? <Description>{p.help}</Description> : null}
       {options.map((o) => (
         <Radio key={o.id} value={o.id}>
@@ -555,7 +582,7 @@ export function Tags({ items, onRemove, ...p }: Omit<Said, "error"> & {
       aria-label={p.label}
       onRemove={onRemove ? (keys) => { for (const k of keys) onRemove(String(k)); } : undefined}
     >
-      <Label>{p.label}</Label>
+      <Naming>{p.label}</Naming>
       <TagGroup.List>
         {items.map((o) => (
           <Tag key={o.id} id={o.id} textValue={o.label}>
@@ -583,7 +610,7 @@ export function DateInput({ onChange, ...p }: Said & {
 }) {
   return (
     <DateField onChange={(v) => onChange(v ? v.toString() : null)} {...said(p)}>
-      <Label>{p.label}</Label>
+      <Naming>{p.label}</Naming>
       <DateField.Group>
         <DateField.Input>
           {(segment) => <DateField.Segment segment={segment} />}
@@ -600,7 +627,7 @@ export function TimeInput({ onChange, ...p }: Said & {
 }) {
   return (
     <TimeField onChange={(v) => onChange(v ? v.toString() : null)} {...said(p)}>
-      <Label>{p.label}</Label>
+      <Naming>{p.label}</Naming>
       <TimeField.Group>
         <TimeField.Input>
           {(segment) => <TimeField.Segment segment={segment} />}

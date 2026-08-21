@@ -157,9 +157,14 @@ export function Import({
         : seen
           ? {
             op: "product.import",
+            /* ⚠️ THE COUNT AND THE VERB, AND NOTHING ELSE. The island leaves
+               the primary about a hundred pixels on a phone, so "Import 3
+               products" came out "Import 3 …" — the number, which is the whole
+               reason it is on the button, cut off after it. The noun is on the
+               screen twice already. */
             label: seen.tally.new + seen.tally.update === 0
-              ? "Nothing to import"
-              : `Import ${seen.tally.new + seen.tally.update} products`,
+              ? "Nothing to do"
+              : `Import ${seen.tally.new + seen.tally.update}`,
             icon: glyphOf("check"),
             onDo: onImport,
             disabled: busy || seen.tally.new + seen.tally.update === 0,

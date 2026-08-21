@@ -131,3 +131,22 @@ describe("the measurements bite", () => {
     expect(seen.spill).toBe(0);
   }, 30_000);
 });
+
+/*
+  ⚠️ AND NOTHING IN THE CHROME IS CUT OFF. Truncation is often right — a product
+  name in a row has to end somewhere — and never right in the island, where the
+  words ARE what the press does. "Import 3 …" is a control nobody can act on with
+  confidence and it looks entirely deliberate, so nothing anywhere reports it:
+  the label is a string in a manifest, the button is the library's, and the
+  ellipsis is the layout's own decision taken at 390 pixels.
+*/
+describe("what the chrome says", () => {
+  for (const route of INVENTORY_ROUTES) {
+    it(`says all of it: ${route}`, async () => {
+      const seen = await at(route, PHONE);
+      const chrome = seen.cut.filter((one) => one.where !== "");
+      expect(chrome, chrome.map((c) => `${c.where}: "${c.text}" cut by ${c.by}px`).join(", "))
+        .toEqual([]);
+    }, 30_000);
+  }
+});

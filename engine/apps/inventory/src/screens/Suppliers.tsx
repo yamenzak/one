@@ -81,7 +81,12 @@ export function Suppliers({
         under="Who things come from, and how long they take"
         of={of}
         again={again}
-        does={{ op: "supplier.create", label: "Add a supplier", icon: glyphOf("add"), onDo: onNew }}
+        /* ⚠️ TWO WORDS, BECAUSE THE ISLAND HAS ROOM FOR TWO. Five nav glyphs
+           at a finger's floor leave the primary about a hundred pixels on a
+           390px phone; "Add a supplier" came out "Add a supplie…", which is a
+           control nobody can act on with confidence and looks deliberate. The
+           screen is already called Suppliers. */
+        does={{ op: "supplier.create", label: "Add one", icon: glyphOf("add"), onDo: onNew }}
         isNothing={(rows) => rows.length === 0}
         nothing={{
           icon: glyphOf("box"),

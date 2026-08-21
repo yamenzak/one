@@ -17,10 +17,9 @@
 
 import * as React from "react";
 import {
-  Await, Group, NoteRow, Num, Screen, Section, TextInput, TextWaiting, glyphOf,
+  ActionRow, Await, Group, NoteRow, Num, Screen, Section, TextInput, TextWaiting, glyphOf,
   type Loaded,
 } from "@engine/design";
-import { Button } from "@heroui/react";
 
 /** What one question came back as. */
 export interface Answer {
@@ -120,10 +119,14 @@ export function Ask({ title, of, lines, onAsk, again }: AskProps) {
         <Group>
           {LIKE.map((words) => (
             /* ⚠️ PRESSING ONE ASKS IT. An example somebody has to retype is an
-               example somebody reads and ignores. */
-            <Button key={words} variant="ghost" onPress={() => { ask(words); }}>
-              {words}
-            </Button>
+               example somebody reads and ignores.
+
+               ⚠️ AND IT IS A ROW, NOT A BUTTON IN A CARD. A bare `Button` here
+               brings none of a row's grammar — measured, its text sat 32px in
+               where every other row in the product sits at 16, and it carried
+               no floor under its height. `ActionRow` is the shape for an item
+               in a list that DOES something rather than going somewhere. */
+            <ActionRow key={words} label={words} onDo={() => { ask(words); }} />
           ))}
         </Group>
       </Section>

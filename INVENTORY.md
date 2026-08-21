@@ -261,6 +261,7 @@ the `settings` guard enforces).
 | `apps/inventory/test/ground.screens.test.tsx` | every declared screen renders, and says the true thing — 97 |
 | `apps/inventory/test/geometry.screens.test.tsx` | every declared screen MEASURED, in real Chromium, in the frame, at a phone and a desk — 56 |
 | `apps/inventory/test/acts.screens.test.tsx` | every primary action names the operation it calls, and it is real — 31 |
+| `apps/inventory/test/hazard.screens.test.tsx` | every hazard name, whole and inside its diamond, measured in a browser — 3 |
 | `one/test/inventory.test.ts` | the golden path through the **real worker** — 16 |
 | `one/test/inventory-deep.test.ts` | batches, items, kits, the rail, the night — 19 |
 
@@ -322,7 +323,7 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 | `/due` | Running out | secondary | `stock:read` | `screens/Due.tsx:78` | `screens/live.tsx:1415` |
 | `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:248` | `screens/live.tsx:1478` |
 | `/reports` | Reports | secondary | `ledger:read` | `screens/Reports.tsx:78` | `screens/live.tsx:1478` |
-| `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:55` | `screens/live.tsx:1130` |
+| `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:54` | `screens/live.tsx:1130` |
 | `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1587` |
 | `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:73` | `screens/live.tsx:1714` |
 | `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:49` | `screens/live.tsx:1785` |
