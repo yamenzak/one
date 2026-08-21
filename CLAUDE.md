@@ -44,12 +44,19 @@ OWN provider**; Stripe Connect is gone. Package manager: **pnpm** (Node ≥22).
 
 ⚠️ **TESSA IS GONE, DELETED WHOLE ON 2026-08-20.** `apps/tessa`, `apps/tessa-app`,
 `apps/tessa-e2e`, `packages/tessa-domain` and `TESSA.md` no longer exist, and it
-is out of `apps.json` and `turbo.json`. It is being replaced by **OneInventory**,
-the first app on One — general-purpose inventory, with the clinic demoted from
-premise to profile. **What Tessa was, what it learned, and which of its ideas
-generalise is [docs/TESSA-AS-BUILT.md](docs/TESSA-AS-BUILT.md)** — read that
-rather than `git log`. Prose below that still names Tessa is describing incidents
-that happened; the code it refers to is in history.
+is out of `apps.json` and `turbo.json`. It was replaced by **OneInventory**, which
+is built and lives in `engine/apps/inventory` — general-purpose inventory, with
+the clinic demoted from premise to profile. **What Tessa was, what it learned,
+and which of its ideas generalise is
+[docs/TESSA-AS-BUILT.md](docs/TESSA-AS-BUILT.md)** — read that rather than
+`git log`. Prose below that still names Tessa is describing incidents that
+happened; the code it refers to is in history.
+
+**Everything OneInventory is lives in [INVENTORY.md](INVENTORY.md)**: Part I the
+product, Part II how it is built, **Part III the screen index** — every surface
+mapped to `file:line`. **Looking for the file that draws a screen? Part III**, and
+update it in the same commit as any screen you add or move. It is the second app
+on OneEngine and the first one built on it rather than migrated onto it.
 
 ```
 apps/

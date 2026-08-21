@@ -2836,6 +2836,15 @@
       "impl": "scripts/input-checked.test.mjs",
       "proves": "checkAll(op.spec.input",
       "fails": "a required field arriving as `undefined`, reaching a statement, and the caller being told “Type 'undefined' not supported” in a 503 that names a value rather than a field"
+    },
+    {
+      "id": "the-screen-index-names-every-screen-and-every-line-it-gives-is-real",
+      "protects": "D12",
+      "stage": "73",
+      "status": "live",
+      "impl": "scripts/screen-index.test.mjs",
+      "proves": "which is not a declaration",
+      "fails": "“looking for the file that draws a screen? Part III” sending somebody to the wrong file with confidence, which costs more than grepping would have"
     }
   ]
 }
