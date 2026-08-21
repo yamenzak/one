@@ -26,12 +26,12 @@ import { LINES, PLACES, EMPTY_PLACE, type Line, type Place } from "./sample.js";
 import { Scan, type Seen } from "./Scan.js";
 import { Start } from "./Start.js";
 import { Stock } from "./Stock.js";
-import { Thing, type Movement } from "./Thing.js";
+import { Thing, type Batch, type Movement } from "./Thing.js";
 import { Where } from "./Where.js";
 
 export { Scan, Start, Stock, Thing, Where };
 export * from "./sample.js";
-export type { Movement, Seen };
+export type { Batch, Movement, Seen };
 
 const nothing = () => undefined;
 
@@ -80,6 +80,22 @@ const HISTORY: readonly Movement[] = [
     who: "Dana", where: "A1", capture: "scanned" },
   { id: "m1", move: "received", delta: 860, at: "2026-07-19T10:15:00.000Z",
     who: "Dana", where: "A1", capture: "ai-assisted" },
+];
+
+/**
+ * ⚠️ THREE DELIVERIES OF ONE PRODUCT, AND ALL THREE STANDINGS AT ONCE. A list
+ * where everything is fine photographs as a list nobody needs; what this screen
+ * has to survive is the box that went out last week sitting above the one that
+ * goes next Tuesday — and the one whose 2028 date is beaten by having been
+ * opened, which is the case a person does not expect.
+ */
+const BATCHES: readonly Batch[] = [
+  { id: "b3", lot: "A5B7", on: "2026-08-14", by: "printed", standing: "gone",
+    days: -7, opened: false },
+  { id: "b1", lot: "C0921", on: "2026-08-25", by: "opened", standing: "soon",
+    days: 4, opened: true },
+  { id: "b2", lot: "C1144", on: "2027-03-31", by: "printed", standing: "fine",
+    days: 222, opened: false },
 ];
 
 /** ⚠️ Everything at or below a place, which is what a tree row promises. */
@@ -147,9 +163,11 @@ export function InventoryScreen({ route, onGo }: {
         <Thing
           line={LINES[0] as Line}
           history={ready(HISTORY)}
+          batches={BATCHES}
           again={nothing}
           back={() => go("/")}
           onTake={nothing}
+          onOpen={nothing}
         />
       );
     /* ⚠️ THE GROUND SHOWS THE ANSWER RATHER THAN THE CAMERA'S FIRST SECOND. A

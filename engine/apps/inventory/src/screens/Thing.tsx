@@ -13,9 +13,10 @@
  */
 
 import {
-  Group, NoteRow, Screen, Section, Timeline, glyphOf, useShown,
+  AmountRow, Group, NoteRow, Screen, Section, Timeline, glyphOf, useShown,
   type Loaded, type Moment,
 } from "@engine/design";
+import { Button } from "@heroui/react";
 import { sayDate, type Instant } from "@engine/kernel";
 import type { Line } from "./sample.js";
 
@@ -31,13 +32,58 @@ export interface Movement {
   readonly capture: string;
 }
 
+/**
+ * ONE DELIVERY, WITH ITS ARITHMETIC ALREADY DONE — see `batch.due`.
+ *
+ * ⚠️ THE SCREEN DOES NOT WORK THIS OUT. Which clock won and how near it is are
+ * decided where the workspace's own threshold can be read, so a floor user and
+ * a manager see the same list rather than the screen guessing at thirty days.
+ */
+export interface Batch {
+  readonly id: string;
+  readonly lot: string;
+  readonly on: string;
+  readonly by: string;
+  readonly standing: string;
+  readonly days: number;
+  /** Whether the second clock has already been started. */
+  readonly opened: boolean;
+}
+
 export interface ThingProps {
   readonly line: Line;
   readonly history: Loaded<readonly Movement[]>;
+  /** ⚠️ Empty for anything that is not `batched` — most products. */
+  readonly batches: readonly Batch[];
   readonly again: () => void;
   readonly back: () => void;
   readonly onTake: () => void;
+  readonly onOpen: (batch: string) => void;
 }
+
+/*
+  ⚠️ WHICH CLOCK RAN OUT FIRST, IN WORDS. "printed" is the column's spelling; a
+  person reads "on the box". Saying it is the point of the row — a shelf that
+  says "expires Tuesday" and cannot say why is a shelf nobody trusts, and the
+  answer surprises people often enough to matter.
+*/
+const BY: Readonly<Record<string, string>> = {
+  printed: "the date on the box",
+  opened: "when it was opened",
+  processed: "when it was processed",
+};
+
+/* ⚠️ HOW NEAR, IN THE ONE CHANNEL A MONOCHROME INTERFACE HAS LEFT. */
+const INK: Readonly<Record<string, "danger" | "warning" | undefined>> = {
+  gone: "danger", soon: "warning", fine: undefined,
+};
+
+/** ⚠️ Signed, and said the way somebody would say it out loud. */
+const saysDays = (days: number): string =>
+  days < 0 ? `${Math.abs(days)} days ago`
+    : days === 0 ? "today"
+      : days === 1 ? "tomorrow"
+        : `in ${days} days`;
 
 /* ⚠️ THE VERB, NOT THE KEY. `adjusted` is what the column holds and "Corrected"
    is what a person reads — a wire value printed on a screen is the database's
@@ -54,7 +100,9 @@ const CAPTURED: Readonly<Record<string, string>> = {
   imported: "imported",
 };
 
-export function Thing({ line, history, again, back, onTake }: ThingProps) {
+export function Thing({
+  line, history, batches, again, back, onTake, onOpen,
+}: ThingProps) {
   /* ⚠️ THE READER'S OWN CONVENTIONS. A stored instant printed as it is stored is
      the database's spelling shown to somebody who told us how they write a
      date. */
@@ -87,6 +135,37 @@ export function Thing({ line, history, again, back, onTake }: ThingProps) {
               )
               : null}
           </Group>
+
+          {/* ⚠️ BEFORE THE HISTORY, BECAUSE IT IS ABOUT WHAT HAPPENS NEXT. The
+              history explains a number; this is the thing somebody has to act
+              on, and a list nobody scrolls to is a list nobody acts on. */}
+          {batches.length
+            ? (
+              <Section label="Deliveries">
+                <Group>
+                  {batches.map((b) => (
+                    <AmountRow
+                      key={b.id}
+                      label={b.lot ? `Lot ${b.lot}` : "No lot number"}
+                      /* ⚠️ WHICH CLOCK, ON EVERY ROW. It is the difference
+                         between a date somebody believes and one they check. */
+                      under={BY[b.by] ?? b.by}
+                      amount={<span data-ink={INK[b.standing]}>{saysDays(b.days)}</span>}
+                      /* ⚠️ OPENING IS OFFERED ONCE AND THEN SAID. A second
+                         opening would restart a shelf life, which the operation
+                         refuses — so the control disappears rather than
+                         becoming a button that argues. */
+                      aside={b.opened ? undefined : (
+                        <Button size="sm" variant="ghost" onPress={() => { onOpen(b.id); }}>
+                          Opened
+                        </Button>
+                      )}
+                    />
+                  ))}
+                </Group>
+              </Section>
+            )
+            : null}
 
           <Section label="History">
             {moves.length

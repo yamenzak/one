@@ -10,7 +10,9 @@
 
 import { describe, expect, it } from "vitest";
 import { dayPlus, type Day } from "@engine/kernel";
-import { applyMove, effectiveExpiry, promotes, refuseMove } from "../src/ledger.js";
+import {
+  applyMove, daysLeft, effectiveExpiry, promotes, refuseMove, standingOf,
+} from "../src/ledger.js";
 
 /* ⚠️ The kernel's day arithmetic, asserted here because this app is the reason
    it exists — a shelf life is the case that made a whole-day error expensive. */
@@ -110,5 +112,67 @@ describe("when a batch ends", () => {
       processed: { on: "2026-08-20", days: 30 },
     });
     expect(found).toEqual({ on: "2026-09-19", by: "processed" });
+  });
+});
+
+/**
+ * WHERE A BATCH STANDS TODAY.
+ *
+ * ⚠️ EVERY ONE OF THESE IS A DAY OUT RATHER THAN A CRASH, and a day is the whole
+ * question: a box that expired this morning shown as "expires tomorrow" is a box
+ * somebody uses. The arithmetic is on the CALENDAR — both ends are midnight UTC
+ * — because subtracting two instants across a clock change is 23 or 25 hours and
+ * `Math.floor` of that is off by one, twice a year, in the direction nobody
+ * checks.
+ */
+describe("where a batch stands", () => {
+  const TODAY = "2026-08-21";
+
+  it("counts the days either way round", () => {
+    expect(daysLeft("2026-08-25", TODAY)).toBe(4);
+    expect(daysLeft("2026-08-17", TODAY)).toBe(-4);
+    expect(daysLeft(TODAY, TODAY)).toBe(0);
+  });
+
+  /* ⚠️ ACROSS A MONTH, A YEAR AND A LEAP DAY, because those are the three places
+     a naive subtraction and a calendar disagree. */
+  it("counts across a month, a year and a leap day", () => {
+    expect(daysLeft("2026-09-01", "2026-08-21")).toBe(11);
+    expect(daysLeft("2027-01-01", "2026-12-25")).toBe(7);
+    expect(daysLeft("2028-03-01", "2028-02-28")).toBe(2);
+  });
+
+  /*
+    ⚠️ A BOX THAT EXPIRES TODAY HAS NOT EXPIRED. Every regime that governs one
+    says the date on the label is the last good day — and telling somebody it has
+    gone while the box in their hand says otherwise is how an app stops being
+    believed about the ones that really have.
+  */
+  it("calls today soon rather than gone", () => {
+    expect(standingOf(TODAY, TODAY, 30)).toBe("soon");
+    expect(standingOf("2026-08-20", TODAY, 30)).toBe("gone");
+  });
+
+  /* ⚠️ THE THRESHOLD IS THE WORKSPACE'S — three days for a kitchen, ninety for a
+     pharmacy. Fixed at thirty, two of those read a useless list. */
+  it("takes the workspace's own idea of soon", () => {
+    expect(standingOf("2026-09-15", TODAY, 30)).toBe("soon");
+    expect(standingOf("2026-09-15", TODAY, 7)).toBe("fine");
+    expect(standingOf("2026-08-23", TODAY, 3)).toBe("soon");
+  });
+
+  /*
+    ⚠️ AND THE OPENED CLOCK IS THE ONE THAT SURPRISES PEOPLE. A box printed 2028
+    that somebody opened last month is out next week, and a product that only
+    read the printed date would say it was fine for two more years.
+  */
+  it("lets an opened box beat a printed date two years out", () => {
+    const found = effectiveExpiry({
+      printed: "2028-06-30",
+      opened: { on: "2026-07-24", days: 28 },
+    });
+    expect(found?.on).toBe("2026-08-21");
+    expect(found?.by).toBe("opened");
+    expect(standingOf(found?.on ?? "", TODAY, 30)).toBe("soon");
   });
 });

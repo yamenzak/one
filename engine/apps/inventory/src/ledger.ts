@@ -13,7 +13,7 @@
  * has to re-implement to stay ahead of.
  */
 
-import { dayPlus, type Day } from "@engine/kernel";
+import { dayPlus, daysBetween, type Day } from "@engine/kernel";
 
 /* ------------------------------------------------------------------ ladder --- */
 
@@ -126,3 +126,31 @@ export const effectiveExpiry = (
      one a person can check against the box in their hand is the one to name. */
   return runs.sort((a, b) => (a.on < b.on ? -1 : a.on > b.on ? 1 : 0))[0]!;
 };
+
+/**
+ * WHERE A BATCH STANDS TODAY — gone, going, or fine.
+ *
+ * ⚠️ "TODAY" IS THE DEVICE'S LOCAL DAY, NEVER THE SERVER'S. A shelf life is
+ * counted in calendar days where the shelf is: a server in another timezone
+ * calls a box expired the evening before it is, or — the direction that
+ * matters — calls an expired box current for another few hours.
+ *
+ * ⚠️ AND `soon` IS A NUMBER THE WORKSPACE CHOOSES, because it is a decision
+ * about a business rather than about a date. A kitchen wants three days; a
+ * pharmacy wants ninety; a workshop counting solvents wants a month. Fixed at
+ * thirty, two of those three read a useless list.
+ */
+export type Standing = "gone" | "soon" | "fine";
+
+export const standingOf = (on: string, today: string, warnDays: number): Standing => {
+  const left = daysBetween(today as Day, on as Day);
+  /* ⚠️ ZERO IS `soon`, NOT `gone`. A box that expires TODAY is still usable
+     today in every regime that governs one — and telling somebody it has gone
+     while the date on it says otherwise is how an app stops being believed. */
+  if (left < 0) return "gone";
+  return left <= warnDays ? "soon" : "fine";
+};
+
+/** ⚠️ Signed, because "four days ago" and "in four days" are one question. */
+export const daysLeft = (on: string, today: string): number =>
+  daysBetween(today as Day, on as Day);

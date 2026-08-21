@@ -71,6 +71,27 @@ export const dayPlus = (day: Day, days: number): Day => {
 };
 
 /**
+ * HOW MANY DAYS FROM ONE CALENDAR DATE TO ANOTHER — `dayPlus`'s inverse.
+ *
+ * ⚠️ SUBTRACTING TWO INSTANTS IS OFF BY ONE TWICE A YEAR, and in the direction
+ * that matters: a shelf life measured across a clock change is 23 or 25 hours,
+ * `Math.floor` of that is a day short or a day long, and the reading somebody
+ * gets is "expires tomorrow" for something that expired this morning. Both ends
+ * are midnight UTC here, so the difference is exact by construction.
+ *
+ * ⚠️ AND IT IS SIGNED. Negative is the past, which is the answer a shelf label
+ * needs — "four days ago" and "in four days" are the same question and only one
+ * of them is a problem.
+ */
+export const daysBetween = (from: Day, to: Day): number => {
+  const at = (day: Day): number => {
+    const [y, m, d] = day.split("-").map(Number);
+    return Date.UTC(y ?? 0, (m ?? 1) - 1, d ?? 1);
+  };
+  return Math.round((at(to) - at(from)) / 86_400_000);
+};
+
+/**
  * ⚠️ SORTABLE, AND THAT IS THE WHOLE REASON IT IS NOT `randomUUID`. A v4 uuid is
  * random in its high bits, so a table keyed on it inserts into the middle of the
  * index for ever and a list ordered by id is ordered by nothing. This is time

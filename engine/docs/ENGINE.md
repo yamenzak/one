@@ -376,7 +376,7 @@ and a manifest that does not compose refuses to boot.
 <!-- generated: node scripts/inventory.mjs declares -->
 | Module | What it is for | Ships | Waiting |
 |---|---|---|---|
-| `primitives` | ids, days, instants, slugs — the words everything else is spelled in | 11 | — |
+| `primitives` | ids, days, instants, slugs — the words everything else is spelled in | 12 | — |
 | `present` | how a date, a number, a price and a measurement are written for one reader | 17 | — |
 | `infra` | what a product needs underneath it, and what each kind can promise | 11 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 8 | — |
@@ -406,7 +406,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**273 of them**, 268 reached by something today.
+**274 of them**, 269 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 

@@ -204,3 +204,42 @@ describe("the scan screen", () => {
     expect(drawn(null)).toContain('name="code"');
   });
 });
+
+/**
+ * THE DELIVERIES ON A PRODUCT'S SCREEN.
+ *
+ * ⚠️ THE ROW SAYS WHICH CLOCK RAN OUT, and that is the whole point of it. A
+ * shelf that says "expires Tuesday" and cannot say why is a shelf nobody trusts
+ * — and the surprising case is real: a box printed 2028 that somebody opened
+ * last month is out next week, and a screen showing only the printed date would
+ * call it fine for two more years.
+ */
+describe("a batched product's deliveries", () => {
+  const out = renderToStaticMarkup(<InventoryScreen route="/thing" />);
+
+  it("says which clock ran out on every row", () => {
+    expect(out).toContain("the date on the box");
+    expect(out).toContain("when it was opened");
+  });
+
+  it("says how near in words, either side of today", () => {
+    expect(out).toContain("7 days ago");
+    expect(out).toContain("in 4 days");
+  });
+
+  /* ⚠️ THE INK IS THE ONE CHANNEL LEFT — a chip beside the figure would be a
+     second thing to read saying what the first already says. */
+  it("puts what is gone and what is going in the value's own ink", () => {
+    expect(out).toContain('data-ink="danger"');
+    expect(out).toContain('data-ink="warning"');
+  });
+
+  /*
+    ⚠️ AND OPENING IS OFFERED ONCE. A second opening restarts a shelf life —
+    the most dangerous write in this product — so the control disappears rather
+    than becoming a button that argues.
+  */
+  it("offers to record an opening only where one has not happened", () => {
+    expect(out.match(/>Opened</g)?.length).toBe(2);
+  });
+});

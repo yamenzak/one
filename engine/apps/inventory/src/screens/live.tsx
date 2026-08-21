@@ -24,7 +24,7 @@ import type { Problem } from "@engine/kernel";
 import { INVENTORY } from "../index.js";
 import { Scan, type Seen } from "./Scan.js";
 import { Stock } from "./Stock.js";
-import { Thing, type Movement } from "./Thing.js";
+import { Thing, type Batch, type Movement } from "./Thing.js";
 import { Where } from "./Where.js";
 import { Start } from "./Start.js";
 import type { Line, Place, Tracking } from "./sample.js";
@@ -118,6 +118,18 @@ function useWorld(api: Door) {
 /* ------------------------------------------------------------- the shapes --- */
 
 const text = (v: unknown): string => (v === null || v === undefined ? "" : String(v));
+
+/**
+ * ⚠️ THE DEVICE'S OWN CALENDAR DAY, AND IT IS THE ONE PLACE THIS APP READS A
+ * CLOCK. Everything downstream takes a `Day` — a shelf life is counted where the
+ * shelf is — so the reading happens here, once, rather than in four containers
+ * that would each pick a different way of truncating it.
+ */
+const dayHere = (): string => {
+  const at = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+};
 const num = (v: unknown): number => (typeof v === "number" ? v : Number(v ?? 0));
 
 const TRACKING: readonly Tracking[] = ["listed", "counted", "batched", "itemised", "assembled"];
@@ -268,6 +280,15 @@ const STOCK = (api: Door) => function StockHere({ go }: Mounted) {
 const THING = (api: Door) => function ThingHere({ go, at }: Mounted) {
   const id = at[0] ?? "";
   const world = useWorld(api);
+  /*
+    ⚠️ THE DEVICE'S OWN DAY, SENT WITH THE ASK. A shelf life is counted in local
+    days: the server has no way to know what day it is where somebody is
+    standing, and its own calendar would call a box expired the evening before
+    it is — or, west of Greenwich, current for another few hours after it is not.
+  */
+  const today = dayHere();
+  const dated = useAsked<{ items: readonly Row[] }>(
+    () => api.get("batch.due", { product: id, today }), [id, today]);
   /* ⚠️ THE WHOLE HISTORY, FILTERED HERE — see the DEFER above. The generated
      list cannot be asked for one product's movements. */
   const history = useAsked<{ items: readonly Row[] }>(() => api.get("ledger.list"));
@@ -305,13 +326,39 @@ const THING = (api: Door) => function ThingHere({ go, at }: Mounted) {
     );
   }
 
+  /* ⚠️ THE ARITHMETIC IS ALREADY DONE — see `batch.due`. The screen renders what
+     it was told rather than working out which clock won, because the threshold
+     for "soon" is a setting a person on the floor cannot read. */
+  const batches: readonly Batch[] = dated.of.status === "ready"
+    ? dated.of.data.items.map((row): Batch => ({
+      id: text(row.id),
+      lot: text(row.lot),
+      on: text(row.on),
+      by: text(row.by),
+      standing: text(row.standing),
+      days: num(row.days),
+      opened: text(row.by) === "opened",
+    }))
+    : [];
+
   return (
     <Thing
       line={line.status === "ready" && line.data ? line.data : EMPTY_LINE}
       history={moves}
-      again={() => { world.again(); history.again(); }}
+      batches={batches}
+      again={() => { world.again(); history.again(); dated.again(); }}
       back={() => go("/")}
+      /* ⚠️ NOT WIRED YET, AND SAYING SO IS THE HONEST STATE. Taking stock is its
+         own screen with a quantity and a place in it (OI-6). */
       onTake={() => undefined}
+      onOpen={(batch) => {
+        void api.post("batch.open", { batch, day: today }).then((got) => {
+          /* ⚠️ RE-READ RATHER THAN PATCHED. Opening moves the clock, and the
+             clock is what the row is about — so what comes back is the new
+             answer rather than this screen's guess at it. */
+          if (got.ok) dated.again();
+        });
+      }}
     />
   );
 };

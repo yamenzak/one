@@ -17,7 +17,10 @@ import {
   area, collection, defineApp, field, operation, setting,
   type AppSpec,
 } from "@engine/kernel";
-import { LADDER, MOVES, applyMove, refuseMove, type Move } from "./ledger.js";
+import {
+  LADDER, MOVES, applyMove, daysLeft, effectiveExpiry, refuseMove, standingOf,
+  type Move,
+} from "./ledger.js";
 import { CODE_KINDS, readScan, stillNeeded, unread } from "./code.js";
 
 /* ------------------------------------------------------------ collections --- */
@@ -195,6 +198,51 @@ const code = collection({
 });
 
 /**
+ * ONE DELIVERY OF ONE PRODUCT, KEPT APART FROM THE NEXT.
+ *
+ * ⚠️ A BATCH EXISTS ONLY WHERE IT EARNS ITS KEEP — a product promoted to
+ * `batched` — and that is the ladder doing its work. Screws do not have lots;
+ * vaccines, resins, reagents and anything with a date printed on it do, and
+ * mixing two deliveries into one number is how the wrong one gets used first.
+ *
+ * ⚠️ AND THE EXPIRY IS THREE CLOCKS RATHER THAN A DATE. What the manufacturer
+ * printed, what happens N days after somebody opens it, and what happens N days
+ * after a process — whichever runs out first is what governs, and the read says
+ * WHICH. A shelf that says "expires Tuesday" and cannot say why is a shelf
+ * nobody trusts. See `effectiveExpiry`.
+ */
+const batch = collection({
+  id: "batch",
+  label: { one: "Batch", many: "Batches" },
+  scope: { of: "tenant" },
+  permission: "product",
+  retention: null,
+  onClose: { then: "purge" },
+  offline: "queue",
+  /* ⚠️ THE LOT IS SEARCHABLE BECAUSE A RECALL ARRIVES AS ONE. A notice names a
+     lot number and nothing else, and the question is always "have we got any". */
+  searchable: ["lot"],
+  fields: {
+    product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
+    /* ⚠️ THE MANUFACTURER'S OWN, EXACTLY AS PRINTED. It is what a recall names
+       and what somebody reads off the box, so normalising the case or trimming a
+       leading zero would make the two disagree at the worst moment. */
+    lot: field.text({ label: "Lot", holds: "none", max: 64 }),
+    /* ⚠️ A DAY, NEVER AN INSTANT — a shelf life has no time of day, and an
+       instant would put one in. */
+    printed: field.day({ label: "Expires", holds: "none" }),
+    /* ⚠️ THE SECOND CLOCK STARTS HERE, and only once — see `batch.open`. The
+       days it runs for are the PRODUCT's (`openDays`), because "use within 28
+       days of opening" is a fact about the substance rather than the delivery. */
+    opened: field.day({ label: "Opened", holds: "none" }),
+    /* ⚠️ WHEN IT ARRIVED, which is not an expiry and is not decoration: two lots
+       with the same printed date are used oldest-received first. */
+    received: field.day({ label: "Received", holds: "none" }),
+    note: field.long({ label: "Note", holds: "none", max: 2_000 }),
+  },
+});
+
+/**
  * WHAT IS ACTUALLY THERE — a projection, never a record somebody writes.
  *
  * ⚠️ NO `create`, NO `update`, NO `delete`, AND THAT IS WHAT MAKES THE LEDGER
@@ -216,6 +264,17 @@ const stock = collection({
   fields: {
     product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
     location: field.ref({ label: "Location", required: true, holds: "none", to: "location" }),
+    /*
+      ⚠️ PART OF WHAT MAKES A LINE A LINE, AND EMPTY FOR MOST OF THEM. A batched
+      product's balance is per delivery — two lots on one shelf are two numbers,
+      because they expire on different days and the older one goes first. A
+      counted product has one number per shelf and this is blank.
+
+      ⚠️ WHICH MEANS THE KEY IS THREE COLUMNS, NOT TWO. `stockMove` reads and
+      writes on (product, location, batch); a two-column key would silently merge
+      a new delivery into the old one's row and lose the older lot's date.
+    */
+    batch: field.ref({ label: "Batch", holds: "none", to: "batch" }),
     quantity: field.number({ label: "How many", required: true, holds: "none", min: 0 }),
     /* ⚠️ WHEN THIS LINE LAST MOVED, WHICH IS HOW A RECORD ADMITS IT MAY BE
        FICTION. "Last seen four months ago" is the app being honest about a
@@ -252,6 +311,10 @@ const ledger = collection({
     move: field.enum({ label: "What happened", required: true, holds: "none", values: [...MOVES] }),
     product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
     location: field.ref({ label: "Location", required: true, holds: "none", to: "location" }),
+    /* ⚠️ WHICH DELIVERY MOVED, WHERE THERE IS ONE. A recall names a lot and asks
+       where it went; a history that only recorded the product could answer where
+       the PRODUCT went, which is every shelf in the building. */
+    batch: field.ref({ label: "Batch", holds: "none", to: "batch" }),
     /* ⚠️ SIGNED: what the balance moved BY, not what it became. A ledger of
        resulting balances cannot be replayed, cannot be summed, and cannot answer the
        question it exists for — how did we get here. */
@@ -305,11 +368,16 @@ const moveInput = {
   capture: field.text({ label: "Recorded by", required: true, holds: "none" }),
   reason: field.text({ label: "Why", holds: "none" }),
   against: field.text({ label: "Against", holds: "none" }),
+  /* ⚠️ WHICH DELIVERY MOVED. Absent for everything that is not `batched`, and
+     part of the line's identity where it is present — see `stockMove`. */
+  batch: field.text({ label: "Batch", holds: "none" }),
 } as const;
 
 interface MoveInput {
   product: string; location: string; quantity: number;
   day: string; capture: string; reason?: string; against?: string;
+  /** ⚠️ Which delivery. Absent for everything that is not `batched`. */
+  batch?: string;
 }
 
 /**
@@ -334,9 +402,38 @@ async function stockMove(ctx: Ctx, move: Move, input: MoveInput): Promise<{ id: 
   const db = ctx.db as Db;
   const step = applyMove(move, input.quantity);
 
+  /*
+    ⚠️ THE KEY IS THREE COLUMNS, AND THE THIRD IS EMPTY FOR MOST LINES. A batched
+    product's balance is per delivery: two lots on one shelf are two numbers,
+    because they expire on different days and the older one goes first. Keyed on
+    two, a new delivery would land on the old one's row and the older lot's date
+    would vanish with it.
+
+    ⚠️ AND IT IS `IS ?` RATHER THAN `= ?`, which is the whole reason this reads
+    the way it does. In SQL `NULL = NULL` is not true, so an unbatched line —
+    every line of every counted product — would never match its own row: the
+    read finds nothing, the insert runs, and one shelf slowly grows a row per
+    movement, each holding part of the number.
+  */
+  const batch = input.batch ?? null;
+  /*
+    ⚠️ A NAMED BATCH IS CHECKED, AND CHECKED AGAINST THIS PRODUCT. `stockMove`
+    writes the column itself rather than going through the generated create, so
+    nothing else validates the reference — an id that does not exist would make a
+    balance line pointing at nothing, and one belonging to ANOTHER product would
+    put this delivery's quantity under that product's expiry date.
+  */
+  if (batch) {
+    const of = await db.prepare(
+      `SELECT product FROM batch WHERE id = ? AND tenant_id = ?`)
+      .bind(batch, ctx.tenantId).first<{ product: string }>();
+    if (!of || of.product !== input.product) ctx.fail("platform.not_found");
+  }
+
   const held = await db.prepare(
-    `SELECT id, quantity FROM stock WHERE tenant_id = ? AND product = ? AND location = ?`)
-    .bind(ctx.tenantId, input.product, input.location)
+    `SELECT id, quantity FROM stock
+      WHERE tenant_id = ? AND product = ? AND location = ? AND batch IS ?`)
+    .bind(ctx.tenantId, input.product, input.location, batch)
     .first<{ id: string; quantity: number }>();
 
   const was = held?.quantity ?? 0;
@@ -344,7 +441,7 @@ async function stockMove(ctx: Ctx, move: Move, input: MoveInput): Promise<{ id: 
   if (why) ctx.fail("inventory.short", {}, { fields: { quantity: why } });
 
   const now = was + step;
-  const id = held?.id ?? `stk_${input.product}_${input.location}`;
+  const id = held?.id ?? `stk_${input.product}_${input.location}_${batch ?? ""}`;
 
   if (held) {
     /* ⚠️ COMPARE-AND-SET. A zero-change update means somebody else moved this
@@ -358,18 +455,19 @@ async function stockMove(ctx: Ctx, move: Move, input: MoveInput): Promise<{ id: 
     if (!out.meta?.changes) ctx.fail("inventory.moved");
   } else {
     await db.prepare(
-      `INSERT INTO stock (id, tenant_id, product, location, quantity, seen, at, by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(id, ctx.tenantId, input.product, input.location, now, ctx.now, ctx.now,
+      `INSERT INTO stock (id, tenant_id, product, location, batch, quantity, seen, at, by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, ctx.tenantId, input.product, input.location, batch, now, ctx.now, ctx.now,
         ctx.accountId ?? null).run();
   }
 
   await db.prepare(
     `INSERT INTO ledger
-      (id, tenant_id, move, product, location, delta, day, reason, capture, against, at, by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(`led_${ctx.now}_${id}`, ctx.tenantId, move, input.product, input.location, step,
-      input.day, input.reason ?? null, input.capture, input.against ?? null,
+      (id, tenant_id, move, product, location, batch, delta, day, reason, capture,
+       against, at, by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(`led_${ctx.now}_${id}`, ctx.tenantId, move, input.product, input.location, batch,
+      step, input.day, input.reason ?? null, input.capture, input.against ?? null,
       ctx.now, ctx.accountId ?? null).run();
 
   return { id, quantity: now };
@@ -397,7 +495,7 @@ const receive = operation<MoveInput, { id: string; quantity: number }>({
   idempotency: { mode: "key" },
   emits: ["stock.received"],
   outcome: { message: "Received.", tone: "success", invalidates: ["stock.list", "ledger.list"] },
-  fails: ["inventory.short", "inventory.moved"],
+  fails: ["inventory.short", "inventory.moved", "platform.not_found"],
   /* ⚠️ THE AUDIT ROW IS WHAT SURVIVES THE PROJECTION. A balance is rebuilt from
      the ledger; who moved it is the platform's record of the request, and both
      name the same product so a suspicious line can be read from either side. */
@@ -415,7 +513,7 @@ const take = operation<MoveInput, { id: string; quantity: number }>({
   idempotency: { mode: "key" },
   emits: ["stock.taken"],
   outcome: { message: "Taken.", tone: "success", invalidates: ["stock.list", "ledger.list"] },
-  fails: ["inventory.short", "inventory.moved"],
+  fails: ["inventory.short", "inventory.moved", "platform.not_found"],
   audit: (input) => ({ subject: input.product, verb: "took" }),
   handler: (ctx, input) => stockMove(ctx as Ctx, "taken", input),
 });
@@ -436,7 +534,7 @@ const adjust = operation<MoveInput, { id: string; quantity: number }>({
   idempotency: { mode: "key" },
   emits: ["stock.adjusted"],
   outcome: { message: "Corrected.", tone: "warning", invalidates: ["stock.list", "ledger.list"] },
-  fails: ["inventory.short", "inventory.moved", "platform.invalid"],
+  fails: ["inventory.short", "inventory.moved", "platform.invalid", "platform.not_found"],
   audit: (input) => ({ subject: input.product, verb: "corrected" }),
   handler: (ctx, input) => {
     const c = ctx as Ctx;
@@ -444,6 +542,135 @@ const adjust = operation<MoveInput, { id: string; quantity: number }>({
       c.fail("platform.invalid", {}, { fields: { reason: "Say what was wrong" } });
     }
     return stockMove(c, "adjusted", input);
+  },
+});
+
+/* ------------------------------------------------------------ the clocks --- */
+
+/**
+ * OPENING A CONTAINER STARTS THE SECOND CLOCK, AND IT HAPPENS ONCE.
+ *
+ * ⚠️ AN OPERATION RATHER THAN AN EDIT, because opening twice must be REFUSED.
+ * "Use within 28 days of opening" counted from the second opening is a shelf
+ * life somebody extended by pressing a button — the most dangerous write in this
+ * product, and the one a generated `batch.update` would allow without a word.
+ *
+ * ⚠️ AND THE DAY COMES FROM THE DEVICE. A shelf life is counted in local days:
+ * a server truncating to its own calendar lands the end of it a day early east
+ * of Greenwich (safe) and a day late west of it (not).
+ */
+const open = operation<{ batch: string; day: string }, { on: string }>({
+  id: "batch.open",
+  kind: "write",
+  summary: "Record that a container was opened",
+  input: {
+    batch: field.text({ label: "Batch", required: true, holds: "none" }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+  },
+  output: { on: field.day({ label: "Opened", holds: "none" }) },
+  permission: "stock:move",
+  idempotency: { mode: "key" },
+  emits: ["batch.opened"],
+  outcome: { message: "Opened.", tone: "success", invalidates: ["batch.list", "batch.due"] },
+  fails: ["platform.not_found", "inventory.opened"],
+  audit: (input) => ({ subject: input.batch, verb: "opened" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const held = await db.prepare(
+      `SELECT opened FROM batch WHERE id = ? AND tenant_id = ?`)
+      .bind(input.batch, c.tenantId).first<{ opened: string | null }>();
+    if (!held) return c.fail("platform.not_found");
+    /* ⚠️ REFUSED RATHER THAN IGNORED. Answering 200 and changing nothing is the
+       same picture as succeeding, so the person who opened the wrong box would
+       never learn that the right one is still sealed. */
+    if (held.opened) return c.fail("inventory.opened", { on: held.opened });
+
+    await db.prepare(
+      `UPDATE batch SET opened = ?, edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ? AND opened IS NULL`)
+      .bind(input.day, c.now, c.accountId ?? null, input.batch, c.tenantId).run();
+
+    return { on: input.day };
+  },
+});
+
+/**
+ * WHAT RUNS OUT, WHEN, AND WHICH CLOCK SAYS SO.
+ *
+ * ⚠️ THE ARITHMETIC IS DONE HERE BECAUSE THE THRESHOLD IS THE WORKSPACE'S. How
+ * many days counts as "soon" is a decision about a business — three for a
+ * kitchen, ninety for a pharmacy — and it is a `tenant:manage` setting, so a
+ * person on the floor cannot read it. A screen doing this sum would either
+ * hard-code a number or show everybody the same wrong list.
+ *
+ * ⚠️ AND IT REPORTS WHICH CLOCK WON RATHER THAN ONLY THE DATE. A shelf that says
+ * "expires Tuesday" and cannot say why is a shelf nobody trusts — and the answer
+ * is genuinely surprising often enough to matter: a box with a 2028 date on it
+ * that was opened last month is out next week.
+ */
+interface Due {
+  id: string; product: string; name: string; lot: string;
+  on: string; by: string; standing: string; days: number;
+}
+
+const due = operation<{ product?: string; today: string }, { items: readonly Due[] }>({
+  id: "batch.due",
+  kind: "read",
+  summary: "What runs out, and which clock says so",
+  input: {
+    product: field.text({ label: "Product", holds: "none" }),
+    /* ⚠️ THE DEVICE'S OWN DAY — see `standingOf`. */
+    today: field.day({ label: "Today", required: true, holds: "none" }),
+  },
+  /* ⚠️ `json`, BECAUSE A ROW HERE IS A SHAPE RATHER THAN A SENTENCE. Declared as
+     text it would typecheck, serialise, and describe the wrong thing to the
+     agent surface and to anything else reading the declaration. */
+  output: { items: field.json({ label: "Batches", holds: "none" }) },
+  permission: "stock:read",
+  idempotency: { mode: "none" },
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const warn = Math.trunc(Number(await c.setting("inventory.warn_days"))) || 30;
+
+    const rows = await db.prepare(
+      `SELECT b.id AS id, b.product AS product, b.lot AS lot, b.printed AS printed,
+              b.opened AS opened, p.name AS name, p.openDays AS openDays
+         FROM batch b JOIN product p ON p.id = b.product
+        WHERE b.tenant_id = ?${input.product ? " AND b.product = ?" : ""}`)
+      .bind(...(input.product ? [c.tenantId, input.product] : [c.tenantId]))
+      .all<{ id: string; product: string; lot: string | null; printed: string | null;
+        opened: string | null; name: string; openDays: number | null }>();
+
+    const items: Due[] = [];
+    for (const row of rows.results) {
+      const ends = effectiveExpiry({
+        printed: row.printed,
+        /* ⚠️ THE DAYS ARE THE PRODUCT'S, NOT THE DELIVERY'S. "Use within 28 days
+           of opening" is a fact about the substance; putting it on the batch
+           would let two deliveries of one thing disagree about it. */
+        opened: row.opened && row.openDays
+          ? { on: row.opened, days: row.openDays }
+          : null,
+      });
+      /* ⚠️ A BATCH WITH NO CLOCK AT ALL IS LEFT OUT RATHER THAN SHOWN AS FINE. A
+         lot somebody recorded with no date is a gap in the data, and a list of
+         what runs out is the wrong place to report one — it would sit at the
+         bottom for ever looking like the safest thing in the building. */
+      if (!ends) continue;
+      items.push({
+        id: row.id, product: row.product, name: row.name, lot: row.lot ?? "",
+        on: ends.on, by: ends.by,
+        standing: standingOf(ends.on, input.today, warn),
+        days: daysLeft(ends.on, input.today),
+      });
+    }
+
+    /* ⚠️ SOONEST FIRST, WHICH IS THE ONLY ORDER THIS LIST HAS. Anything else
+       makes somebody scan it for the number that matters. */
+    items.sort((a, b) => a.days - b.days);
+    return { items };
   },
 });
 
@@ -743,8 +970,8 @@ export const INVENTORY: AppSpec = defineApp({
     locations: { label: "Locations", withheld: "quota" },
   },
 
-  collections: [product, code, location, stock, ledger],
-  operations: [receive, take, adjust, starts, resolve, learn],
+  collections: [product, code, location, batch, stock, ledger],
+  operations: [receive, take, adjust, starts, resolve, learn, open, due],
 
   /*
     ⚠️ THE SCREENS THIS STAGE ACTUALLY HAS. A declared screen with nothing
@@ -814,6 +1041,17 @@ export const INVENTORY: AppSpec = defineApp({
       row it read first — a wrong product, confidently, for ever. The code on the
       shelf did not change, so one of the two answers is a mistake to look at.
     */
+    /*
+      ⚠️ OPENING A CONTAINER STARTS A CLOCK, AND IT MAY ONLY START ONCE. A second
+      opening counted from today is a shelf life somebody extended by pressing a
+      button — so the refusal names the day it was actually opened, which is the
+      fact that settles whether this is the box they meant.
+    */
+    "inventory.opened": {
+      status: 409, retryable: false, tone: "warning",
+      title: "That one is already open",
+      detail: "It was opened on {on}. Opening it again would extend its shelf life.",
+    },
     "inventory.taken": {
       status: 409, retryable: false, tone: "warning",
       title: "That code belongs to something else",
@@ -853,6 +1091,22 @@ export const INVENTORY: AppSpec = defineApp({
       field: field.enum({ label: "New products are", holds: "none", values: [...LADDER] }),
       fallback: "counted", needs: "tenant:manage",
       help: "Whoever adds one can still change it.",
+    }),
+    /*
+      ⚠️ HOW MANY DAYS COUNTS AS "SOON", AND IT IS A DECISION ABOUT A BUSINESS
+      RATHER THAN ABOUT A DATE. A kitchen wants three days; a pharmacy wants
+      ninety; a workshop counting solvents wants a month. Fixed at thirty, two of
+      those three read a list that is useless in opposite directions.
+
+      ⚠️ AND IT IS READ BY `batch.due` RATHER THAN BY THE SCREEN. It needs
+      `tenant:manage`, so somebody on the floor cannot see it — a screen doing
+      this sum would hard-code a number or show everybody the same wrong list.
+    */
+    "inventory.warn_days": setting({
+      id: "inventory.warn_days", level: "tenant", area: "stock",
+      field: field.number({ label: "Tell me this many days before", holds: "none", min: 0, max: 3_650 }),
+      fallback: 30, needs: "tenant:manage",
+      help: "A kitchen wants three. A pharmacy wants ninety.",
     }),
     "inventory.default_unit": setting({
       id: "inventory.default_unit", level: "tenant", area: "stock",
