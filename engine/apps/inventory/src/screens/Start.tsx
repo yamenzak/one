@@ -26,11 +26,24 @@ import { INVENTORY } from "../index.js";
  * yet, and the decision is per PRODUCT, so there would be nothing for a press to
  * change.
  */
-const LADDER: readonly { readonly id: string; readonly label: string; readonly under: string }[] = [
-  { id: "listed", label: "Listed", under: "A thing you keep and never count — a ladder, a drill, a monitor" },
-  { id: "counted", label: "Counted", under: "A number per place, and where most things start" },
-  { id: "batched", label: "Batched", under: "Deliveries kept apart, because one of them expires first" },
-  { id: "itemised", label: "Itemised", under: "One object with a serial number and a service date of its own" },
+/*
+  ⚠️ A MARK EACH, AND THEY ARE THE MARKS THE REST OF THE PRODUCT ALREADY USES
+  FOR THE SAME NOUNS. Four rungs under one `box` is four identical glyphs down
+  the side of the one block that exists to tell them apart — the neutral circle's
+  failure with an extra step. A kit is `layers` and an item is `tag` in the
+  manifest's own screen list, so a batch and an itemised thing wear those here.
+*/
+const LADDER: readonly {
+  readonly id: string; readonly label: string; readonly icon: string; readonly under: string;
+}[] = [
+  { id: "listed", label: "Listed", icon: "list",
+    under: "A thing you keep and never count — a ladder, a drill, a monitor" },
+  { id: "counted", label: "Counted", icon: "box",
+    under: "A number per place, and where most things start" },
+  { id: "batched", label: "Batched", icon: "layers",
+    under: "Deliveries kept apart, because one of them expires first" },
+  { id: "itemised", label: "Itemised", icon: "tag",
+    under: "One object with a serial number and a service date of its own" },
 ];
 
 export function Start({ title, said, done, counts, already, held, onGo }: {
@@ -79,7 +92,7 @@ export function Start({ title, said, done, counts, already, held, onGo }: {
         <Section label="How much to track">
           <Stack space="roomy">
             {LADDER.map((rung) => (
-              <StepRow key={rung.id} icon={glyphOf("box")} label={rung.label} under={rung.under} />
+              <StepRow key={rung.id} icon={glyphOf(rung.icon)} label={rung.label} under={rung.under} />
             ))}
           </Stack>
         </Section>

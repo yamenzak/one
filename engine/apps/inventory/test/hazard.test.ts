@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import {
   CODES, GHS, SIGNALS, hazardContradictions, hazardOf, hazardsIn, isHazardous, signalIn,
 } from "../src/hazard.js";
+import { inTwo } from "../src/screens/Labels.js";
 
 describe("the nine", () => {
   /*
@@ -120,5 +121,35 @@ describe("whether a thing needs a label of its own", () => {
     expect(isHazardous(["GHS02"], "")).toBe(true);
     expect(isHazardous([], "warning")).toBe(true);
     expect(isHazardous([], "")).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------ the diamond --- */
+
+/**
+ * ⚠️ EVERY NAME THE REGISTRY HOLDS, BECAUSE THE GROUND DRAWS TWO. Both of them
+ * are single words, so a diamond that printed only a phrase's FIRST word — "Gas"
+ * for "Gas under pressure", "Acutely" for "Acutely toxic" — looked identical on
+ * every screen anybody had photographed. The rendered sweep cannot see this; the
+ * registry can.
+ */
+describe("a hazard name broken for the diamond", () => {
+  for (const one of GHS) {
+    it(`is still the whole name: ${one.says}`, () => {
+      expect(inTwo(one.says).join(" ")).toBe(one.says);
+    });
+  }
+
+  /* ⚠️ AT MOST TWO, because a diamond has room for two and the arithmetic that
+     sizes the type assumes it. */
+  it("never runs to a third line", () => {
+    for (const one of GHS) expect(inTwo(one.says).length).toBeLessThanOrEqual(2);
+  });
+
+  /* ⚠️ AND BALANCED, or the split is a line break rather than a fit: "Gas" over
+     "under pressure" is one short line and one that still does not fit. */
+  it("balances the two", () => {
+    const [a, b] = inTwo("Gas under pressure");
+    expect([a, b]).toEqual(["Gas under", "pressure"]);
   });
 });

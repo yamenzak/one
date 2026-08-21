@@ -13,11 +13,11 @@
 
 import type { GuideBook, HelpBook, MilestoneBook } from "@engine/kernel";
 import { progressOf, reached, remaining } from "@engine/kernel";
-import { Button, Card, Chip, ProgressBar } from "@heroui/react";
+import { Card, Chip, ProgressBar } from "@heroui/react";
 import { colorFor } from "../tokens/theme.js";
-import { SPACE } from "../tokens/metrics.js";
+import { NUDGE, ROW, SPACE } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
-import { Group, NoteRow } from "../parts/surfaces.js";
+import { Group, NavRow, NoteRow } from "../parts/surfaces.js";
 
 export interface GuideProps {
   readonly book: GuideBook;
@@ -35,21 +35,34 @@ export function Guide({ book, events, held, onGo }: GuideProps) {
   if (!left.length) return null;
 
   return (
-    <Group label="Getting started" under={`${done.done.length} of ${done.total} done`}>
-      <div className={`flex flex-col ${SPACE.snug}`}>
+    /*
+      ⚠️ UNLABELLED, BECAUSE THE SCREEN AROUND IT ALREADY SAID WHAT THIS IS. It
+      carried "Getting started" of its own, under a section heading, on a screen
+      whose title was also "Getting started" — three headings for one card. A
+      shared component naming itself in English is the same fault twice over:
+      product vocabulary in a package that has none, and a word the caller is
+      better placed to choose.
+    */
+    <Group>
+      <div className={`flex flex-col ${ROW.pad}`}>
+        <span className={`flex items-baseline justify-between ${ROW.gap}`}>
+          <span className={TYPE.label}>{done.done.length} of {done.total} done</span>
+        </span>
+        <span className={NUDGE.under}>
           <ProgressBar value={done.done.length} maxValue={Math.max(1, done.total)}>
             <ProgressBar.Track><ProgressBar.Fill /></ProgressBar.Track>
           </ProgressBar>
-          {left.map((step) => (
-            <div key={step.id} className={`flex items-center justify-between ${SPACE.snug}`}>
-              <div className="flex flex-col">
-                <strong>{step.label}</strong>
-                <small>{step.why}</small>
-              </div>
-              <Button variant="secondary" onPress={() => onGo(step.link)}>Do it</Button>
-            </div>
-          ))}
-        </div>
+        </span>
+      </div>
+      {/* ⚠️ THE WHOLE ROW GOES, NOT A BUTTON ON THE END OF IT. A step was a
+          heading, a sentence and a 32px "Do it" — three quarters of the row
+          inert, and the one part that was not sat under the floor a finger
+          needs. A step IS a destination, so it is the row every destination in
+          this product wears. */}
+      {left.map((step) => (
+        <NavRow key={step.id} label={step.label} under={step.why}
+          onOpen={() => onGo(step.link)} />
+      ))}
     </Group>
   );
 }

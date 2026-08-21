@@ -320,12 +320,12 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 | `/run` | A run | none | `process:read` | `screens/Run.tsx:68` | `screens/live.tsx:1275` |
 | `/case` | A job | none | `process:read` | `screens/Case.tsx:58` | `screens/live.tsx:1332` |
 | `/due` | Running out | secondary | `stock:read` | `screens/Due.tsx:78` | `screens/live.tsx:1415` |
-| `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:183` | `screens/live.tsx:1478` |
+| `/labels` | Labels | secondary | `location:read` | `screens/Labels.tsx:248` | `screens/live.tsx:1478` |
 | `/reports` | Reports | secondary | `ledger:read` | `screens/Reports.tsx:78` | `screens/live.tsx:1478` |
 | `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:55` | `screens/live.tsx:1130` |
 | `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1587` |
 | `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:73` | `screens/live.tsx:1714` |
-| `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:36` | `screens/live.tsx:1785` |
+| `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:49` | `screens/live.tsx:1785` |
 
 ### The surfaces that are not routes
 

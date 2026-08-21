@@ -90,12 +90,73 @@ const SAID_SIGNAL: Readonly<Record<string, string>> = {
 };
 
 /**
+ * ⚠️ AT MOST TWO LINES, BALANCED, BECAUSE A DIAMOND IS WIDEST AT ITS MIDDLE. A
+ * phrase set on one line runs out through the red border — the shape narrows to
+ * nothing at both points — and a hazard name a reader cannot finish is the one
+ * thing this label exists to say.
+ */
+export const inTwo = (phrase: string): readonly string[] => {
+  const words = phrase.split(" ");
+  if (words.length < 2) return words;
+  let at = 1;
+  let closest = Number.POSITIVE_INFINITY;
+  for (let cut = 1; cut < words.length; cut++) {
+    const gap = Math.abs(
+      words.slice(0, cut).join(" ").length - words.slice(cut).join(" ").length);
+    if (gap < closest) { closest = gap; at = cut; }
+  }
+  return [words.slice(0, at).join(" "), words.slice(at).join(" ")];
+};
+
+/**
+ * THE LARGEST TYPE THAT STAYS INSIDE THE RED BORDER.
+ *
+ * ⚠️ A RHOMBUS IS NOT A BOX, WHICH IS THE WHOLE ARITHMETIC. It narrows to
+ * nothing at both points, so what a line has to satisfy is
+ * `|x−50| + |y−50| ≤ 39` at each CORNER of the drawn text — the widest word that
+ * fits the square runs out through the border, and a second line has less room
+ * than the first because it sits further from the middle.
+ *
+ * ⚠️ THE THREE RATIOS ARE MEASURED, NOT ASSUMED, and `hazard.screens.test.tsx`
+ * is what measures them: it lays every hazard the product knows out in a real
+ * browser and reads the box back. A guess at how wide a bold sans runs is a
+ * guess that holds for the word it was checked against.
+ */
+/** How wide a character runs, in ems, in the face this label prints in. */
+const RUNS = 0.75;
+/** Half the height a line is drawn at, in ems. */
+const TALL = 0.6;
+/** Line to line, in ems. */
+const LEAD = 1.15;
+/** The white inside the border, from the middle, in the units it is drawn in. */
+const INSIDE = 39;
+
+const fits = (lines: readonly string[]): number => {
+  const widest = Math.max(...lines.map((line) => line.length));
+  const out = (lines.length - 1) / 2 * LEAD;
+  return Math.min(16, INSIDE / (RUNS * widest / 2 + out + TALL));
+};
+
+/**
  * ⚠️ THE DIAMOND IS DRAWN, THE PICTOGRAM IS NOT — see the header. A red-bordered
  * square on its point with the hazard named inside it is what GHS labelling
  * looks like at a glance and makes no claim to be the artwork.
+ *
+ * ⚠️ AND IT IS THE WHOLE NAME. It was the first word, which is not a shorter way
+ * of saying the same thing: "Gas under pressure" became "Gas", "Acutely toxic"
+ * became "Acutely" and "Health hazard" became "Health" — three diamonds on a
+ * real container naming no hazard at all, which is worse than an empty one
+ * because it reads as information.
+ *
+ * ⚠️ THE TYPE IS SIZED TO THE LONGEST LINE rather than fixed. A fixed size fits
+ * the word it was chosen for and overruns every longer one, and the overrun is
+ * invisible until somebody prints a solvent.
  */
 function Diamond({ code }: { readonly code: string }) {
   const of = hazardOf(code);
+  const says = of?.says ?? code;
+  const lines = inTwo(says);
+  const size = fits(lines);
   return (
     <span
       style={{
@@ -103,14 +164,18 @@ function Diamond({ code }: { readonly code: string }) {
         width: "11mm", height: "11mm", flex: "0 0 auto",
       }}
     >
-      <svg viewBox="0 0 100 100" width="11mm" height="11mm" role="img" aria-label={of?.says ?? code}>
+      <svg viewBox="0 0 100 100" width="11mm" height="11mm" role="img" aria-label={says}>
         <path d="M50 4 96 50 50 96 4 50Z" fill="#fff" stroke="#d40000" strokeWidth="10" />
-        <text
-          x="50" y="54" textAnchor="middle" dominantBaseline="middle"
-          fontSize="17" fontFamily="system-ui, sans-serif" fontWeight="700" fill="#000"
-        >
-          {(of?.says ?? code).split(" ")[0]}
-        </text>
+        {lines.map((line, i) => (
+          <text
+            key={line}
+            x="50" y={50 + (i - (lines.length - 1) / 2) * size * 1.15}
+            textAnchor="middle" dominantBaseline="middle"
+            fontSize={size} fontFamily="system-ui, sans-serif" fontWeight="700" fill="#000"
+          >
+            {line}
+          </text>
+        ))}
       </svg>
     </span>
   );

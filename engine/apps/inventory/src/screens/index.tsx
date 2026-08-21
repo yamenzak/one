@@ -320,7 +320,12 @@ const SUPPLYING: readonly Supplier[] = [
 const TO_LABEL: readonly Labelled[] = [
   {
     id: "p-ipa", name: "Isopropanol 99%", code: "ONE-P-7QP2XL9", under: "Reagent grade",
-    hazards: ["GHS02", "GHS07"], signal: "danger",
+    /* ⚠️ THREE, AND ONE OF THEM IS A PHRASE. Every hazard on this bottle was a
+       single word, so a diamond printing only a name's FIRST word looked correct
+       on the one screen anybody photographs — and "Gas under pressure" would
+       have read "Gas" on a real cylinder. GHS08 is the phrase, and isopropanol
+       genuinely carries it. */
+    hazards: ["GHS02", "GHS07", "GHS08"], signal: "danger",
     hazardText: "Highly flammable liquid and vapour. Causes serious eye irritation.",
     precautions: "Keep away from heat. Wear eye protection. IF IN EYES: rinse cautiously.",
   },

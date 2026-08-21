@@ -5032,8 +5032,6 @@ export const INVENTORY: AppSpec = defineApp({
   },
 
   help: {
-    "about-tracking": { id: "about-tracking", title: "How much to track", screen: "stock",
-      body: "Start everything at counted — a number per place. Promote a product to batched when a delivery's expiry matters." },
     "about-places": { id: "about-places", title: "Places", screen: "location",
       body: "A place can sit inside another, as deep as your building goes. Label them and the camera moves itself." },
     "about-corrections": { id: "about-corrections", title: "Corrections", screen: "stock",
