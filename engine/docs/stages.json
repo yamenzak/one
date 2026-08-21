@@ -326,6 +326,24 @@
       "status": "shipped",
       "title": "OneInventory exists — the model, the one chokepoint that moves a balance, and the arithmetic under both",
       "ends": "The manifest composes and the deployment prices every key it declares; `product`, `location`, `stock` and `ledger` are collections with the balance and the history opted out of every generated write; `stock.receive`, `stock.take` and `stock.adjust` go through one function that writes the event and the projection in one batch and refuses rather than clamping; and `ledger-chokepoint.test.mjs` fails on a second place that writes either table."
+    },
+    {
+      "n": 61,
+      "status": "shipped",
+      "title": "A product's screens reach each other — the route is the app's, the prefix is the platform's",
+      "ends": "A mounted screen is handed `go`, which takes the app's OWN route; `routeIn` adds the workspace prefix for the nav and for a row inside a screen alike, so the two are one address rather than two copies of one expression. Until it existed an app's list could not open the record it listed, and the only way it could have was by writing the centre's address scheme into a product."
+    },
+    {
+      "n": 62,
+      "status": "planned",
+      "title": "A list narrows and pages — the generated read answers past the first fifty, and says how many there are",
+      "ends": "The generated `list` takes a filter over declared fields, a cursor and a count, so a screen can ask for one shelf's lines and for the next page of them; the browser is told the total rather than inferring it from a full page. Until then every list in every product is the fifty most recent rows of a whole collection, silently — a workspace with two hundred products sees fifty and nothing says so, which is the failure class this repo's guards exist to refuse."
+    },
+    {
+      "n": 63,
+      "status": "planned",
+      "title": "The guide and the milestones are ticked by what a workspace has actually done",
+      "ends": "An operation answers which declared events this workspace has raised and how many times, so `Guide` crosses off a step because the thing it describes happened and `Milestones` reaches fifty when fifty were added. Until then the books render and nothing can ever be ticked: every workspace sees the same unstarted checklist for ever, including the one that finished it before opening the screen."
     }
   ]
 }

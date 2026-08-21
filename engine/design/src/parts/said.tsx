@@ -254,6 +254,24 @@ export function Num({ value, places, plain }: {
   return plain ? <>{says}</> : <span className={TYPE.figures}>{says}</span>;
 }
 
+/**
+ * THE WORD A NUMBER IS COUNTED IN — the workspace's own, beside the figure.
+ *
+ * ⚠️ IT IS NOT INFLECTED, AND THAT IS THE DECISION RATHER THAN AN OMISSION. The
+ * word is whatever somebody typed — `glove`, `box`, `kg`, `ea` — so pluralising
+ * it means guessing: naive rules give "boxs", better rules give "kgs", and a
+ * measurement abbreviation is never pluralised in any of them. Every inventory
+ * and every invoice in the world prints the unit uninflected for this reason.
+ *
+ * ⚠️ AND IT IS MUTED AND SHRINK-PROOF, because it sits after a figure in a row
+ * that packs everything right. Passed as a bare string it inherits the row's own
+ * size and weight, so a column of quantities reads as "1,200 glove" in the same
+ * ink as the number — the unit competing with the value it qualifies.
+ */
+export function Unit({ of }: { readonly of: string }) {
+  return of ? <span className={`shrink-0 ${TYPE.note}`}>{of}</span> : null;
+}
+
 /*
   ⚠️ THERE IS NO `<Money>` HERE, AND THAT IS DELIBERATE. `surfaces.tsx` already
   owns the one typographic device money needs — the fraction set smaller than the

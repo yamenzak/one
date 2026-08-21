@@ -27,7 +27,7 @@ import { useSession } from "../session.js";
 import { AppSurface } from "./AppSurface.js";
 import { Choose } from "./Choose.js";
 import { useCentre, useLoad, type InboxView } from "./data.js";
-import { parseStop } from "./route.js";
+import { parseStop, routeIn } from "./route.js";
 
 export function Product({ path, onGo, onOpenSpace, onOpenInbox }: {
   readonly path: string;
@@ -90,8 +90,11 @@ export function Product({ path, onGo, onOpenSpace, onOpenInbox }: {
           );
         }
 
+        /* ⚠️ THE SAME FUNCTION THE SURFACE HANDS AN APP (`routeIn`), so a screen
+           reached from the bar and the same screen reached from a row inside it
+           are one address. These were two copies of one expression. */
         const screens: readonly ScreenSpec[] = app.screens.map((s) => ({
-          ...s, route: `/${app.id}${s.route === "/" ? "" : s.route}`,
+          ...s, route: routeIn(app.id, s.route),
         }));
 
         return (
@@ -121,7 +124,7 @@ export function Product({ path, onGo, onOpenSpace, onOpenInbox }: {
             onOpenInbox={onOpenInbox}
             onOpenSpace={onOpenSpace}
           >
-            <AppSurface app={app} route={route} />
+            <AppSurface app={app} route={route} onGo={onGo} />
           </Shell>
         );
       }}

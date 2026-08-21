@@ -248,8 +248,15 @@ const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "");
       for (const m of src.matchAll(/glyphOf\("([\w-]+)"\)/g)) used.set(m[1], rel(at));
     }
   };
-  for (const root of ["apps/hello/src", "one-space/src", "design/src"]) {
-    walk(join(ENGINE, root));
+  /* ⚠️ EVERY APP, DERIVED — never a list beside this one. This walk named
+     `apps/hello/src` by hand, so the second product's whole primary nav was
+     invisible to it: four screens, a settings area and two milestones all
+     naming marks the map does not have, on a guard whose own comment says this
+     has happened twice. A narrow check is the one that gets waived. */
+  const roots = readdirSync(join(ENGINE, "apps")).map((name) => `apps/${name}/src`);
+  for (const root of [...roots, "one-space/src", "design/src"]) {
+    const at = join(ENGINE, root);
+    if (existsSync(at)) walk(at);
   }
 
   const strays = [...used].filter(([name]) => !known.has(name));

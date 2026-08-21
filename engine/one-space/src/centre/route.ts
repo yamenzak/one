@@ -45,4 +45,23 @@ export function parseStop(path: string, apps: readonly string[]): Stop {
 }
 
 export const pathFor = (stop: Stop): string =>
-  stop.kind === "choose" ? "/" : `/${stop.app}${stop.route === "/" ? "" : stop.route}`;
+  stop.kind === "choose" ? "/" : routeIn(stop.app, stop.route);
+
+/**
+ * A PRODUCT'S OWN ROUTE, AS AN ADDRESS IN THE WORKSPACE.
+ *
+ * ⚠️ THE PREFIX IS THE PLATFORM'S AND AN APP MUST NEVER WRITE IT. A screen that
+ * says `/inventory/thing` has learned where the centre mounted it, and the day
+ * products are addressed differently every list in every app opens a page that
+ * does not exist. `AppScreen.go` takes the app's own route and this adds the
+ * rest.
+ *
+ * ⚠️ AND THE ROOT IS THE APP ITSELF, NEVER `/<app>/`. A trailing slash is a
+ * different string to `parseStop` and to every router — so the one route every
+ * app has is the one most likely to be got wrong, which is why this expression
+ * is a function rather than three copies. It was already two: the nav built its
+ * destinations with it and the surface built `go` with it, character for
+ * character, on either side of a file boundary.
+ */
+export const routeIn = (appId: string, route: string): string =>
+  `/${appId}${route === "/" ? "" : route}`;

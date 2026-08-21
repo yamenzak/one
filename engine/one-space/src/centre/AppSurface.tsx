@@ -12,6 +12,8 @@
 import * as React from "react";
 import { Group, NoteRow, RowsWaiting, Section, Stack, appFace } from "@engine/design";
 import { screensOf } from "../apps.js";
+import { routeIn } from "./route.js";
+import { beneath, screenFor } from "@engine/kernel";
 import type { CentreApp } from "./data.js";
 
 /**
@@ -27,7 +29,30 @@ import type { CentreApp } from "./data.js";
  * would make the one legal caller unable to satisfy it. What crosses the seam is
  * data; the narrowing is the app's, right at the point it uses one.
  */
-export interface AppScreen { readonly app: unknown }
+export interface AppScreen {
+  readonly app: unknown;
+  /**
+   * ⚠️ HOW A PRODUCT REACHES ITS OWN OTHER SCREENS, and it takes the app's OWN
+   * route — `/thing`, not `/inventory/thing`. The prefix is the platform's
+   * business: a product that wrote its own would be a product that knows where
+   * the centre mounted it, and the day that changes every list in every app
+   * opens a page that does not exist.
+   *
+   * ⚠️ AND IT IS A PROP RATHER THAN PART OF `mount`. `mount` runs once when the
+   * chunk arrives; navigation belongs to whatever is rendering NOW, and a
+   * function captured at load time would go on driving a router that has since
+   * been replaced.
+   */
+  readonly go: (route: string) => void;
+  /**
+   * ⚠️ WHAT THIS SCREEN'S ADDRESS SAYS IT IS ABOUT — the segments past the
+   * screen's own route. `/thing/t-glove` arrives here as `["t-glove"]`, which is
+   * what makes a detail screen linkable, reloadable and something support can
+   * ask somebody to open. Held in component state instead, a list and the record
+   * it opened share one address and the back button leaves the product.
+   */
+  readonly at: readonly string[];
+}
 
 const MOUNTS = new Map<string, React.ComponentType<AppScreen>>();
 
@@ -35,9 +60,11 @@ export const mountScreen = (
   appId: string, route: string, screen: React.ComponentType<AppScreen>,
 ): void => { MOUNTS.set(`${appId}${route}`, screen); };
 
-export function AppSurface({ app, route }: {
+export function AppSurface({ app, route, onGo }: {
   readonly app: CentreApp;
   readonly route: string;
+  /** Takes a WHOLE path — the centre's own address, prefix and all. */
+  readonly onGo: (path: string) => void;
 }) {
   /*
     ⚠️ THE PRODUCT'S OWN CHUNK IS ASKED FOR HERE, because this is the first place
@@ -57,12 +84,25 @@ export function AppSurface({ app, route }: {
     return () => { live = false; };
   }, [app.id]);
 
-  const declared = app.screens.find((s) => s.route === route)
+  /* ⚠️ THE MOST SPECIFIC DECLARED SCREEN THE ADDRESS IS UNDER — see `screenFor`.
+     An exact match meant `/thing/t-glove` fell through to the app's root, so
+     every detail screen in every product drew the list it was opened from. */
+  const declared = screenFor(app.screens, route)
     ?? app.screens.find((s) => s.route === "/")
     ?? app.screens[0];
 
+  /* ⚠️ THE PREFIX IS ADDED HERE AND NOWHERE ELSE — see `AppScreen.go`. It is the
+     same shape `Product` gives the nav, so a screen reached from a row and the
+     same screen reached from the bar are one address. */
+  const go = React.useCallback(
+    (to: string) => onGo(routeIn(app.id, to)),
+    [app.id, onGo],
+  );
+
   const Mounted = declared && asked ? MOUNTS.get(`${app.id}${declared.route}`) : undefined;
-  if (Mounted) return <Mounted app={app} />;
+  if (Mounted) {
+    return <Mounted app={app} go={go} at={beneath(declared?.route ?? "/", route)} />;
+  }
   if (!asked) return <RowsWaiting />;
 
   return (

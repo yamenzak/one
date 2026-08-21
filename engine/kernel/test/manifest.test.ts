@@ -9,7 +9,9 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { defineApp, refuseApp, type AppSpec } from "../src/manifest.js";
+import {
+  beneath, defineApp, isUnder, refuseApp, screenFor, type AppSpec,
+} from "../src/manifest.js";
 import { operationsFor } from "../src/collection.js";
 import { collection } from "../src/collection.js";
 import { field } from "../src/field.js";
@@ -377,5 +379,65 @@ describe("what an app answers on", () => {
     const on = roster.collections.flatMap(operationsFor);
     expect(on).not.toContain("note.create");
     expect(on).toContain("note.update");
+  });
+});
+
+/**
+ * A SCREEN'S ADDRESS CARRIES WHAT IT IS ABOUT.
+ *
+ * ⚠️ THREE FUNCTIONS, TWO PACKAGES, ONE ANSWER. The Shell decides which nav item
+ * is lit and the surface decides which screen is drawn, and before this they
+ * each did it with `route === here` — so opening a record left the bar with
+ * nothing marked AND drew the list the record was opened from. Two bugs, one
+ * cause, and neither is visible without a router.
+ *
+ * ⚠️ AND THE ROOT IS THE TRAP. `/` is a prefix of every path there is, so a rule
+ * written as `startsWith` alone makes the root screen answer for every detail
+ * screen declared beside it.
+ */
+describe("which screen an address belongs to", () => {
+  const SCREENS = [
+    { route: "/", id: "stock" },
+    { route: "/thing", id: "product" },
+    { route: "/thing/history", id: "history" },
+    { route: "/where", id: "location" },
+  ] as const;
+
+  it("is under a screen at its own address and beneath it", () => {
+    expect(isUnder("/thing", "/thing")).toBe(true);
+    expect(isUnder("/thing", "/thing/t-glove")).toBe(true);
+    /* ⚠️ A SIBLING WHOSE NAME STARTS THE SAME IS NOT BENEATH IT. `/things` is a
+       different screen, and a bare `startsWith` would hand it this one's id. */
+    expect(isUnder("/thing", "/things")).toBe(false);
+    expect(isUnder("/thing", "/where")).toBe(false);
+  });
+
+  it("never treats the root as a prefix of everything", () => {
+    expect(isUnder("/", "/")).toBe(true);
+    expect(isUnder("/", "/thing")).toBe(false);
+    expect(screenFor(SCREENS, "/thing/t-glove")?.id).toBe("product");
+  });
+
+  it("answers with the most specific screen rather than the first", () => {
+    expect(screenFor(SCREENS, "/thing/history/t-glove")?.id).toBe("history");
+    expect(screenFor(SCREENS, "/thing")?.id).toBe("product");
+    expect(screenFor(SCREENS, "/")?.id).toBe("stock");
+  });
+
+  it("has no screen for an address no declaration covers", () => {
+    expect(screenFor(SCREENS, "/nowhere")).toBeUndefined();
+  });
+
+  it("hands a screen the segments past its own route", () => {
+    expect(beneath("/thing", "/thing/t-glove")).toEqual(["t-glove"]);
+    expect(beneath("/thing", "/thing")).toEqual([]);
+    expect(beneath("/", "/")).toEqual([]);
+    /* ⚠️ MORE THAN ONE, because a screen may be about more than one thing — a
+       product ON a shelf is both, and a single `id` would have grown a query
+       string, which is the one part of an address nothing here parses. */
+    expect(beneath("/thing", "/thing/t-glove/p-a1")).toEqual(["t-glove", "p-a1"]);
+    /* ⚠️ Nothing at all for an address this screen does not own, rather than a
+       confident slice of somebody else's path. */
+    expect(beneath("/thing", "/where/p-a1")).toEqual([]);
   });
 });

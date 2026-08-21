@@ -607,13 +607,31 @@ importers:
 
   engine/apps/inventory:
     dependencies:
+      '@engine/design':
+        specifier: workspace:*
+        version: link:../../design
       '@engine/kernel':
         specifier: workspace:*
         version: link:../../kernel
       '@engine/runtime':
         specifier: workspace:*
         version: link:../../runtime
+      '@heroui/react':
+        specifier: ^3.0.5
+        version: 3.2.4(@react-aria/i18n@3.13.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@react-aria/ssr@3.10.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@react-aria/utils@3.34.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@react-spectrum/provider@3.11.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-aria-components@1.20.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-aria@3.51.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(tailwindcss@4.3.2)
+      react:
+        specifier: ^19.2.0
+        version: 19.2.7
     devDependencies:
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.2.0
+        version: 19.2.3(@types/react@19.2.17)
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.7(react@19.2.7)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -728,6 +746,9 @@ importers:
       '@engine/hello':
         specifier: workspace:*
         version: link:../apps/hello
+      '@engine/inventory':
+        specifier: workspace:*
+        version: link:../apps/inventory
       '@engine/kernel':
         specifier: workspace:*
         version: link:../kernel

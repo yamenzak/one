@@ -144,6 +144,54 @@ export const PRIMARY_MAX = 5;
 export const primaryOf = (screens: readonly ScreenSpec[]): readonly ScreenSpec[] =>
   screens.filter((s) => s.nav === "primary");
 
+/* --------------------------------------------------------------- address --- */
+
+/**
+ * WHETHER A PATH IS THIS SCREEN'S OWN ADDRESS OR SOMETHING BENEATH IT.
+ *
+ * ⚠️ A DETAIL SCREEN IS ABOUT SOMETHING, AND WHAT IT IS ABOUT LIVES IN THE
+ * ADDRESS. `/thing/t-glove` is the product screen showing one product — so it is
+ * linkable, reloadable, and something support can ask somebody to open. Held in
+ * component state instead, a list and the record it opened share one address and
+ * the back button leaves the product.
+ *
+ * ⚠️ AND THE ROOT IS NEVER A PREFIX OF ANYTHING. `/` would otherwise match every
+ * path in the app, so the root screen would answer for a detail screen declared
+ * beside it — with the nav highlighting the root while a different screen is on
+ * the page.
+ */
+export const isUnder = (route: string, path: string): boolean =>
+  path === route || (route !== "/" && path.startsWith(`${route}/`));
+
+/**
+ * WHICH DECLARED SCREEN A PATH BELONGS TO — the most specific one.
+ *
+ * ⚠️ LONGEST WINS, WHICH IS NOT A PREFERENCE. `/thing` and `/thing/history`
+ * both match `/thing/history/t-glove`, and answering with the shorter one draws
+ * a different screen from the one somebody linked to. Declaration order is
+ * whatever an author happened to type, so it cannot be the tie-break.
+ */
+export const screenFor = <T extends { readonly route: string }>(
+  screens: readonly T[], path: string,
+): T | undefined =>
+  screens
+    .filter((s) => isUnder(s.route, path))
+    .sort((a, b) => b.route.length - a.route.length)[0];
+
+/**
+ * WHAT A SCREEN'S ADDRESS SAYS IT IS ABOUT — the segments past its own route.
+ *
+ * ⚠️ AN ARRAY RATHER THAN AN `id`, because a screen may be about more than one
+ * thing (a product on a shelf is both), and because a screen that took a single
+ * id would grow a second parameter as a query string — which is the one part of
+ * an address nothing here parses.
+ */
+export const beneath = (route: string, path: string): readonly string[] => {
+  if (!isUnder(route, path)) return [];
+  const rest = route === "/" ? path.slice(1) : path.slice(route.length + 1);
+  return rest ? rest.split("/").filter(Boolean) : [];
+};
+
 /* --------------------------------------------------------------- derived --- */
 
 /**

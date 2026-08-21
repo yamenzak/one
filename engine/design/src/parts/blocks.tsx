@@ -21,6 +21,7 @@ import {
   NUDGE, ROW, SPACE, WIDTH,
 } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
+import { NavRow } from "./surfaces.js";
 
 /* ------------------------------------------------------------------ steps --- */
 
@@ -346,5 +347,104 @@ export function Hotkey({ keys }: { readonly keys: readonly string[] }) {
           : <Kbd.Content key={k}>{k}</Kbd.Content>;
       })}
     </Kbd>
+  );
+}
+
+/* ------------------------------------------------------------------- tree --- */
+
+/** One node of a hierarchy, as a database hands it over: flat, with a parent. */
+export interface Branch {
+  readonly id: string;
+  readonly label: string;
+  /** A fact about it — a count, a state, a date. Never an explanation. */
+  readonly under?: string;
+  /** ⚠️ The parent's id. Absent is a root, which is what makes this flat list a
+      tree without a second table and without anybody nesting it by hand. */
+  readonly of?: string | null;
+  readonly aside?: React.ReactNode;
+}
+
+export interface TreeProps {
+  readonly nodes: readonly Branch[];
+  /** Where the reader is. Absent is the top. */
+  readonly here?: string | null;
+  readonly onGo: (id: string | null) => void;
+  /** ⚠️ What the top of the trail is called — a workspace, a library, a site. */
+  readonly root?: string;
+  readonly nothing?: React.ReactNode;
+}
+
+/**
+ * A HIERARCHY, DESCENDED RATHER THAN EXPANDED.
+ *
+ * ⚠️ AN INDENTED TREE IS A DESKTOP CONTROL, AND THIS PRODUCT IS HELD IN ONE
+ * HAND. Six levels at the 24px a level needs is 144 pixels of a 390-pixel screen
+ * gone before a word is drawn — so the deepest rows, which are the ones actually
+ * holding anything, get the narrowest column. Every phone that has ever shown a
+ * filesystem shows one level and a way back, and it is not a compromise: it is
+ * the shape DESIGN.md §3 already asks for. Descend, do not cram.
+ *
+ * ⚠️ SO THE TRAIL IS THE HALF THAT MAKES IT WORK. Somebody four levels down with
+ * no trail is somebody who has to go back four times to find out where they are;
+ * `Crumbs` earns its row here exactly as its own header describes.
+ *
+ * ⚠️ AND THE NESTING IS DERIVED FROM THE PARENT POINTER, NEVER PASSED IN. A
+ * caller that had to build the nesting would build it slightly differently in
+ * every screen that shows one — and the flat list with a parent column is what a
+ * table gives back, so nesting it is work done twice to be undone.
+ */
+export function Tree({ nodes, here = null, onGo, root = "All", nothing }: TreeProps) {
+  const under = nodes.filter((n) => (n.of ?? null) === here);
+
+  /* ⚠️ WALKED UPWARDS FROM WHERE YOU ARE, and bounded by the node count. A cycle
+     in the data — which a self-referencing table permits — would otherwise hang
+     the screen rather than draw a wrong trail. */
+  const trail: Branch[] = [];
+  let at = here;
+  for (let step = 0; step < nodes.length && at; step++) {
+    const found = nodes.find((n) => n.id === at);
+    if (!found) break;
+    trail.unshift(found);
+    at = found.of ?? null;
+  }
+
+  return (
+    <div className={`flex flex-col ${SPACE.snug}`}>
+      {/* ⚠️ ONLY WHERE THERE IS SOMEWHERE TO GO BACK TO. At the top the trail is
+          one word, which is a row spent saying what the screen's own title
+          already says. */}
+      {trail.length
+        ? (
+          <Crumbs
+            trail={[
+              { label: root, onGo: () => onGo(null) },
+              ...trail.map((n, i) => ({
+                label: n.label,
+                /* ⚠️ The last one is where you are, so it goes nowhere. A
+                   breadcrumb that navigates to the current page is a control
+                   that appears to do nothing. */
+                ...(i < trail.length - 1 ? { onGo: () => onGo(n.id) } : {}),
+              })),
+            ]}
+          />
+        )
+        : null}
+
+      {under.length
+        ? under.map((n) => (
+          <NavRow
+            key={n.id}
+            label={n.label}
+            under={n.under}
+            aside={n.aside}
+            /* ⚠️ A LEAF STILL OPENS. What is inside a shelf is not another
+               shelf, and a row that stops being pressable at the bottom of the
+               tree is a screen where the thing somebody came for is the one row
+               they cannot reach. */
+            onOpen={() => onGo(n.id)}
+          />
+        ))
+        : nothing}
+    </div>
   );
 }

@@ -13,7 +13,7 @@
  */
 
 import * as React from "react";
-import { PRIMARY_MAX } from "@engine/kernel";
+import { PRIMARY_MAX, isUnder } from "@engine/kernel";
 import { Button } from "@heroui/react";
 import {
   GUTTER, ICON, ISLAND_HERE, ISLAND_ITEM, ISLAND_PAD, PAD, ROW, SAFE_BOTTOM, SPACE, WIDTH,
@@ -250,7 +250,11 @@ export function Island({ items, here, onGo, act, only }: {
         {shown.map((item) => {
           /* ⚠️ OPEN ONLY WHEN THERE IS NO ACT — see `act`. The bar carries one
              word, and when a screen has something to do it is that. */
-          const isHere = item.route === here;
+          /* ⚠️ THE SCREEN THE ADDRESS IS UNDER, NOT THE ONE IT EQUALS. A detail
+             screen carries what it is about (`/thing/t-glove`), and an exact
+             match left the bottom bar with nothing marked the moment anybody
+             opened a record — on the one control that answers "where am I". */
+          const isHere = isUnder(item.route, here);
           const open = isHere && !act;
           return (
             <Button

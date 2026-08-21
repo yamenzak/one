@@ -47,10 +47,21 @@ export interface Door {
     { ok: true; value: T } | { ok: false; problem: Problem }>;
 }
 
+/**
+ * ⚠️ WHAT A MOUNTED SCREEN IS HANDED. `go` takes this app's OWN route — the
+ * centre adds the prefix, so a product never learns where it was mounted.
+ */
+export interface Mounted {
+  readonly app: unknown;
+  readonly go: (route: string) => void;
+  /** The segments past this screen's own route — what the address is about. */
+  readonly at: readonly string[];
+}
+
 export interface Mounting {
   readonly register: (
     appId: string, route: string,
-    screen: React.ComponentType<{ readonly app: unknown }>,
+    screen: React.ComponentType<Mounted>,
   ) => void;
   readonly api: Door;
 }
@@ -137,7 +148,7 @@ function useDensity(api: Door) {
   return valueOf(def, stored) as "comfortable" | "compact";
 }
 
-const LIST = (api: Door) => function NotesHere() {
+const LIST = (api: Door) => function NotesHere({ go }: Mounted) {
   const { of, again } = useAsked<{ items: readonly Record<string, unknown>[] }>(
     () => api.get("note.list"));
   const density = useDensity(api);
@@ -152,11 +163,15 @@ const LIST = (api: Door) => function NotesHere() {
       of={rows}
       again={again}
       density={density}
-      /* ⚠️ NOT WIRED YET, AND SAYING SO IS THE HONEST STATE. Writing a note is
-         its own screen with its own container; a button that silently does
-         nothing is the defect this whole file exists to avoid. */
-      onNew={() => undefined}
-      onOpen={() => undefined}
+      /* ⚠️ THE ROUTE IS THIS APP'S OWN, NEVER `/hello/write`. The centre adds
+         its prefix (`AppScreen.go`), so a product cannot hard-code where it was
+         mounted — and the day that address changes, nothing here has to. */
+      onNew={() => go("/write")}
+      /* ⚠️ WHAT THE SCREEN IS ABOUT GOES IN THE ADDRESS — see `beneath`. A note
+         opened into component state shares one address with the list it came
+         from: nobody can link to it, a reload loses it, and the back button
+         leaves the product rather than going up one level. */
+      onOpen={(note) => go(`/note/${note.id}`)}
     />
   );
 };
@@ -169,6 +184,6 @@ const LIST = (api: Door) => function NotesHere() {
 export function mount({ register, api }: Mounting): void {
   const declared = new Set((HELLO.screens ?? []).map((s) => s.route));
   if (declared.has("/")) {
-    register(HELLO.id, "/", LIST(api) as React.ComponentType<{ readonly app: unknown }>);
+    register(HELLO.id, "/", LIST(api));
   }
 }

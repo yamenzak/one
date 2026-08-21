@@ -3,23 +3,32 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "OneInventory — everything, counted. General-purpose inventory: the boxes in a basement, a clinic's stock room, a hospital's wards and a factory's stores, on one model with the setting demoted from premise to profile.",
+  "description": "OneInventory \u2014 everything, counted. General-purpose inventory: the boxes in a basement, a clinic's stock room, a hospital's wards and a factory's stores, on one model with the setting demoted from premise to profile.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./screens": "./src/screens/index.tsx",
+    "./live": "./src/screens/live.tsx"
   },
   "types": "./src/index.ts",
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run && vitest run --config vitest.screens.config.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
     "clean": "rm -rf .turbo *.tsbuildinfo"
   },
   "dependencies": {
     "@engine/kernel": "workspace:*",
-    "@engine/runtime": "workspace:*"
+    "@engine/runtime": "workspace:*",
+    "@engine/design": "workspace:*",
+    "@heroui/react": "^3.0.5",
+    "react": "^19.2.0"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.0"
   }
 }

@@ -125,9 +125,6 @@ const ELSEWHERE = {
   Steps: "a progress row is for a sequence of PAGES. Every flow in this deployment " +
     "is one page, and putting it on hello's form printed the three step labels " +
     "directly above three section headings reading exactly the same words",
-  Crumbs: "its own header: crumbs earn their row at three levels or more. A note " +
-    "has one ancestor, and the crown's back button is what says so — inventing a " +
-    "middle level to give a component somewhere to live is how chrome accumulates",
   SecretInput: "nothing an APP stores is a credential — the kernel has no `secret` " +
     "field kind, and the keys an operator pastes are the console's, which is OneSpace's",
 

@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { parseStop, pathFor } from "../src/centre/route.js";
+import { parseStop, pathFor, routeIn } from "../src/centre/route.js";
 import { SPACE_SCREENS } from "../src/space/OneSpace.js";
 import { OF_CONSOLE, OF_WORKSPACE, parseWhere, pathOf } from "../src/space/where.js";
 
@@ -84,5 +84,39 @@ describe("every address in OneSpace has a branch", () => {
         ? parseWhere(pathOf({ at, slug: "northwind" } as never)).at
         : parseWhere(pathOf({ at } as never)).at));
     for (const at of SPACE_SCREENS) expect(produced, at).toContain(at);
+  });
+});
+
+/**
+ * A PRODUCT'S SCREENS REACH EACH OTHER, AND THE PREFIX IS THE PLATFORM'S.
+ *
+ * ⚠️ AN APP MUST NEVER KNOW WHERE IT WAS MOUNTED. A screen writing
+ * `/inventory/thing` has learned the centre's address scheme, and the day
+ * products are addressed differently every list in every app opens a page that
+ * does not exist. `AppScreen.go` takes the app's OWN route and `routeIn` adds
+ * the rest — for the nav and for a row inside a screen alike, which is why it is
+ * one function: it was two copies of one expression on either side of a file
+ * boundary.
+ */
+describe("an app's own route as an address", () => {
+  it("adds the product's prefix and nothing else", () => {
+    expect(routeIn("inventory", "/thing")).toBe("/inventory/thing");
+    expect(routeIn("hello", "/write")).toBe("/hello/write");
+  });
+
+  /* ⚠️ THE ROOT IS THE APP ITSELF. A trailing slash is a different string to
+     every router and to `parseStop`, so the one route every app has is the one
+     most likely to be got wrong. */
+  it("leaves no trailing slash on the route every app has", () => {
+    expect(routeIn("inventory", "/")).toBe("/inventory");
+  });
+
+  /* ⚠️ AND IT IS THE INVERSE OF THE PARSE, which is what makes a screen reached
+     from a row and the same screen reached from the bar one address. */
+  it("round-trips through the parser", () => {
+    for (const route of ["/", "/thing", "/where", "/start"]) {
+      expect(parseStop(routeIn("hello", route), APPS))
+        .toEqual({ kind: "app", app: "hello", route });
+    }
   });
 });

@@ -22,11 +22,11 @@
 
 import * as React from "react";
 import type { Kind, ScreenSpec } from "@engine/kernel";
-import { PRIMARY_MAX, isBusiness, primaryOf } from "@engine/kernel";
+import { PRIMARY_MAX, isBusiness, primaryOf, screenFor } from "@engine/kernel";
 import { Button, Separator } from "@heroui/react";
 import {
   Banknote, Bell, Building2, Calendar, CheckCheck, Circle, ClipboardList, Clock, Cog, Coins, Database,
-  Boxes, ChartColumn, FileText, House, Inbox as InboxGlyph, Mail, NotebookPen, Package, Plus, Search,
+  Boxes, ChartColumn, FileText, House, Inbox as InboxGlyph, Mail, MapPin, NotebookPen, Package, Plus, Search,
   Power, Shield, Sparkles, Star, Sun, TriangleAlert, UserRound, Users,
 } from "lucide-react";
 /* ⚠️ OURS, BECAUSE THEIR MOTION IS INSIDE THEM — see `marks.tsx`. A bell rings
@@ -63,6 +63,11 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
      The crown drew `Boxes` inline for "Your products" while every other surface
      that meant the same thing fell through to the neutral circle. */
   apps: <Boxes />, product: <Boxes />,
+  /* ⚠️ A THING ON A SHELF AND THE SHELF IT IS ON — the two nouns an inventory
+     says on every screen it has, and both drew the neutral circle. `product` is
+     the CATALOGUE entry (a stack of them); `box` is one object somebody picks
+     up, and `pin` is where it lives. */
+  box: <Package />, pin: <MapPin />,
   money: <Coins />, coins: <Coins />, bank: <Banknote />,
   settings: <Cog />, cog: <Cog />,
   trust: <ShieldMark />, shield: <ShieldMark />,
@@ -167,6 +172,13 @@ export const LIVELY: Readonly<Record<string, string>> = {
 export const STILL: readonly string[] = [
   "circle", "mail", "package", "note", "file", "list", "add", "apps", "product",
   "workspace", "database", "chart", "add", "plus",
+  /*
+    ⚠️ A BOX AND A PLACE ARE NOUNS LIKE THE REST OF THIS LIST, and the pin is the
+    one worth arguing about — a pin obviously drops. It is still anyway, because
+    in an inventory the mark for a location is on nearly every row of nearly every
+    screen: a character there is a list that twitches wherever a thumb lands.
+  */
+  "box", "pin",
   /*
     ⚠️ `power` IS STILL FOR `alert`'S REASON, AND IT IS THE SAME DECISION. This
     is the mark on the row that shuts every door — it is already the only item on
@@ -330,7 +342,11 @@ export function Shell(props: ShellProps) {
      it did not compose must not draw a sixth either. */
   const primary = primaryOf(mine).slice(0, PRIMARY_MAX);
   const secondary = mine.filter((s) => s.nav === "secondary");
-  const at = mine.find((s) => s.route === here);
+  /* ⚠️ THE SCREEN THE ADDRESS BELONGS TO, NOT THE ONE IT EQUALS. A detail screen
+     carries what it is about (`/thing/t-glove`), so an exact match left the nav
+     with nothing selected and the page with no title the moment anybody opened a
+     record — see `screenFor`. */
+  const at = screenFor(mine, here);
 
   /*
     ⚠️ THE PRODUCT'S OWN GROUND, WHERE A SCREEN HAS NOT NAMED ONE — and from the
@@ -463,7 +479,7 @@ export function Shell(props: ShellProps) {
           {primary.map((s) => (
             <Button
               key={s.id}
-              variant={s.route === here ? "primary" : "ghost"}
+              variant={s.route === at?.route ? "primary" : "ghost"}
               onPress={() => onGo(s.route)}
             >
               {s.label}
@@ -473,7 +489,7 @@ export function Shell(props: ShellProps) {
           {secondary.map((s) => (
             <Button
               key={s.id}
-              variant={s.route === here ? "secondary" : "ghost"}
+              variant={s.route === at?.route ? "secondary" : "ghost"}
               onPress={() => onGo(s.route)}
             >
               {s.label}

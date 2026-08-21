@@ -384,7 +384,7 @@ and a manifest that does not compose refuses to boot.
 | `operation` | one declaration carrying every cross-cutting concern (D12) | 10 | — |
 | `access` | permissions, roles, and what an app may never claim | 15 | 1 |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
-| `manifest` | the whole app, and the composition that refuses a broken one | 9 | — |
+| `manifest` | the whole app, and the composition that refuses a broken one | 12 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 16 | — |
 | `credit` | metered work: the reserve, the rate, the ceiling | 14 | — |
 | `dunning` | the ladder from past due to erased | 5 | — |
@@ -406,7 +406,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**270 of them**, 265 reached by something today.
+**273 of them**, 268 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -1009,8 +1009,11 @@ that names no stage, so this list cannot grow by forgetting.
 | 58 | An operation's ceiling is in force — calls per minute, per caller, refused rather than declared | **planned** |
 | 59 | A write says it worked — the sentence the operation declared, and the reads it made stale | shipped |
 | 60 | OneInventory exists — the model, the one chokepoint that moves a balance, and the arithmetic under both | shipped |
+| 61 | A product's screens reach each other — the route is the app's, the prefix is the platform's | shipped |
+| 62 | A list narrows and pages — the generated read answers past the first fifty, and says how many there are | **planned** |
+| 63 | The guide and the milestones are ticked by what a workspace has actually done | **planned** |
 
-**45 shipped, 15 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**46 shipped, 17 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

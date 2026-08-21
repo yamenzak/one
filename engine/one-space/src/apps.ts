@@ -48,6 +48,7 @@ export interface Mounting {
  */
 const LOADERS: Readonly<Record<string, () => Promise<{ mount: (at: Mounting) => void }>>> = {
   hello: () => import("@engine/hello/live"),
+  inventory: () => import("@engine/inventory/live"),
 };
 
 /**
