@@ -23,6 +23,7 @@ import {
 } from "./ledger.js";
 import { CODE_KINDS, readScan, stillNeeded, unread } from "./code.js";
 import { settleCount, type Change } from "./count.js";
+import { guessedIn, notedIn, readJson, type Noted } from "./reading.js";
 import {
   KITS, LIVES, checkKit, refuseAct, refuseKitAct, shelfStep, wantsIn,
   type Act, type KitState, type Life, type Short,
@@ -569,7 +570,14 @@ interface Ctx {
   readonly tenantId: string;
   readonly accountId?: string;
   readonly now: string;
-  fail(code: string, values?: Record<string, string>, extra?: { fields?: Record<string, string> }): never;
+  /* ⚠️ `ref` IS THE REASON A REFUSAL CAN BE ACTED ON. A provider that has no key
+     and one that timed out are one sentence to the person and two different
+     jobs for whoever configured the deployment. */
+  fail(
+    code: string,
+    values?: Record<string, string>,
+    extra?: { fields?: Record<string, string>; ref?: string },
+  ): never;
   setting(id: string): Promise<unknown>;
 }
 
@@ -2350,6 +2358,296 @@ const breakUp = operation<{ kit: string }, { released: number }>({
   },
 });
 
+/* --------------------------------------------------------------------- ai --- */
+
+/**
+ * ⚠️ AI MAY FILL ANYTHING AND MAY COMMIT NOTHING THAT CARRIES CONSEQUENCE, and
+ * every action below is a READ dressed as a spend. None of them writes a row:
+ * they answer, a screen fills a form, and a person presses the button that
+ * writes. Expiry, quantity, lot, hazard class — each is a number somebody acts
+ * on, and a model that could set one directly is a model that empties a shelf
+ * because a photograph was blurred.
+ *
+ * ⚠️ AND `scripts/ai-commits.test.mjs` KEEPS THAT STRUCTURAL. The rule is one
+ * sentence and it survives exactly as long as everybody remembers it; the guard
+ * is what makes the next generating action have to be written the same way.
+ *
+ * ⚠️ NONE OF THEM NAMES A MODEL (D19). The app says what KIND of work this is;
+ * the operator binds a row from the enabled catalogue; the lane's own election
+ * answers when nobody has. A model id here is a deployment decision shipped
+ * through a release, and it is wrong the day a provider retires the row.
+ */
+
+/** ⚠️ The seam the platform supplies for an operation that declared an action. */
+interface Generating {
+  generate?: (
+    values: Readonly<Record<string, string>>, look?: { image?: string },
+  ) => Promise<{ readonly text: string; readonly credits: number } | string>;
+}
+
+/**
+ * ⚠️ ONE REFUSAL FOR "THERE IS NO MODEL TO ASK", and its absence is a REFUSAL
+ * rather than a stub. A deployment with no gateway configured cannot generate;
+ * answering with a plausible product record would be this app inventing a
+ * catalogue entry, charging nothing for it, and being indistinguishable from
+ * working.
+ */
+async function asked(
+  c: Ctx & Generating, values: Readonly<Record<string, string>>, image?: string,
+): Promise<string> {
+  if (!c.generate) return c.fail("platform.unavailable");
+  const out = await c.generate(values, image ? { image } : undefined);
+  if (typeof out === "string") return c.fail("platform.unavailable", {}, { ref: out });
+  return out.text;
+}
+
+const guessedOut = {
+  name: field.text({ label: "Name", holds: "none" }),
+  brand: field.text({ label: "Brand", holds: "none" }),
+  category: field.text({ label: "Category", holds: "none" }),
+  unit: field.text({ label: "Counted in", holds: "none" }),
+  pack: field.number({ label: "How many it holds", holds: "none" }),
+  tracking: field.text({ label: "Tracked as", holds: "none" }),
+  /* ⚠️ THE REASON TRAVELS WITH THE RUNG. "Batched" on its own is a magic guess;
+     "batched — it has an expiry date" is something somebody agrees with in half
+     a second, and disagrees with just as fast. */
+  why: field.text({ label: "Why", holds: "none" }),
+  storage: field.text({ label: "How to store it", holds: "none" }),
+  handling: field.text({ label: "How to handle it", holds: "none" }),
+  hazards: field.json({ label: "Hazards", holds: "none" }),
+} as const;
+
+type Guessing = ReturnType<typeof guessedIn>;
+
+/**
+ * A BARCODE, AND WHAT THE THING BEHIND IT PROBABLY IS.
+ *
+ * ⚠️ THE ONBOARDING TAX IS WHY PEOPLE ABANDON INVENTORY APPS, and this is the
+ * whole answer to it. Eight hundred products typed in by hand is a project
+ * nobody finishes; one scan that comes back named, categorised and with a rung
+ * suggested is a catalogue built by the work rather than before it.
+ */
+const identify = operation<{ code: string }, Guessing>({
+  id: "product.identify",
+  kind: "write",
+  summary: "Say what a barcode probably is",
+  input: { code: field.text({ label: "Code", required: true, holds: "none", max: 64 }) },
+  output: guessedOut,
+  permission: "product:write",
+  /* ⚠️ NOT idempotent by key: two people scanning the same box a week apart are
+     two questions, and the second may get a better answer from a better model.
+     What must not repeat is the WRITE, and this writes nothing. */
+  idempotency: { mode: "none" },
+  fails: ["platform.unavailable"],
+  audit: (input) => ({ subject: input.code, verb: "asked about" }),
+  ai: {
+    lane: "text",
+    prompt: "You identify retail and trade products from their barcode numbers."
+      + " The code is {code}."
+      + " Answer with JSON only: name, brand, category, unit, pack, tracking, why."
+      + " `unit` is the word one of them is counted in — glove, box, kg."
+      + " `pack` is how many base units the barcoded item holds; 1 if it is a single."
+      + " `tracking` is one of: listed, counted, batched, itemised."
+      + " Use batched if it has a printed expiry or is hazardous or controlled;"
+      + " itemised if it is durable equipment with a serial; counted otherwise;"
+      + " listed for a fixture or a tool that never moves."
+      + " `why` is one short clause saying why that rung — it is read by a person."
+      + " If you do not recognise the code, answer with empty strings rather than"
+      + " inventing a product.",
+    variables: ["code"],
+    maxOutput: 400,
+  },
+  async handler(ctx, input) {
+    const c = ctx as Ctx & Generating;
+    return guessedIn(readJson(await asked(c, { code: input.code })));
+  },
+});
+
+/**
+ * A PHOTOGRAPH OF A LABEL, AND THE PRODUCT RECORD IN IT.
+ *
+ * ⚠️ THIS IS THE PATH FOR EVERYTHING WITH NO BARCODE, OR ONE THAT WILL NOT SCAN,
+ * which in a workshop or a kitchen is most of it. It reads the words, the pack
+ * size and the pictograms — and the pictograms are why it is worth the vision
+ * lane at all: a GHS diamond is a fact about a substance that no catalogue
+ * lookup will tell you and nobody types in.
+ *
+ * ⚠️ THE HAZARDS ARE SUGGESTED, NEVER FILLED. A wrong hazard class on a printed
+ * label is a legal document that is wrong, and the person who printed it is the
+ * one who answers for it.
+ */
+const readLabel = operation<{ image: string; hint?: string }, Guessing>({
+  id: "product.read",
+  kind: "write",
+  summary: "Read a product record off a photograph of its label",
+  input: {
+    /* ⚠️ A `data:` URL rather than a media key, because this happens BEFORE
+       there is a product to hang an upload on — and asking somebody to create
+       the record first is asking them to type in what the photograph says. */
+    image: field.text({ label: "Photo", required: true, holds: "none", max: 8_000_000 }),
+    hint: field.text({ label: "What it is", holds: "none", max: 200 }),
+  },
+  output: guessedOut,
+  permission: "product:write",
+  idempotency: { mode: "none" },
+  fails: ["platform.unavailable", "platform.invalid"],
+  audit: () => ({ subject: "a label", verb: "read" }),
+  ai: {
+    lane: "vision",
+    prompt: "You read product labels. Answer with JSON only: name, brand,"
+      + " category, unit, pack, tracking, why, storage, handling, hazards."
+      + " `pack` is the quantity printed on the label — 100 pcs is 100."
+      + " `tracking` is one of: listed, counted, batched, itemised; use batched if"
+      + " the label carries an expiry date or a hazard pictogram."
+      + " `storage` and `handling` are the label's own instructions, shortened."
+      + " `hazards` is a list of the GHS classes the pictograms show, named."
+      + " Read only what is on the label. Where it does not say, answer with an"
+      + " empty string — a guess about a hazard is worse than a blank."
+      + " The person adding it said: {hint}",
+    variables: ["hint"],
+    maxOutput: 700,
+  },
+  async handler(ctx, input) {
+    const c = ctx as Ctx & Generating;
+    /* ⚠️ REFUSED HERE RATHER THAN SENT. A string that is not a picture costs a
+       reserve, a round trip and a confidently wrong answer about nothing. */
+    if (!input.image.startsWith("data:image/")) {
+      return c.fail("platform.invalid", {}, { fields: { image: "That is not a photo" } });
+    }
+    return guessedIn(readJson(await asked(c, { hint: input.hint ?? "" }, input.image)));
+  },
+});
+
+/**
+ * A PHOTOGRAPH OF A DELIVERY NOTE, AND THE LINES ON IT.
+ *
+ * ⚠️ ONE PHOTOGRAPH INSTEAD OF THIRTY SCANS, at a goods-in desk, which is where
+ * the time actually goes. And EVERY LINE IS CONFIRMED: a quantity read off a
+ * creased page is exactly the consequence §6.2 refuses to commit, so this
+ * answers a list and the person receiving presses the button that moves stock.
+ */
+const readNote = operation<{ image: string }, { lines: readonly Noted[] }>({
+  id: "stock.note",
+  kind: "write",
+  summary: "Read the lines off a photograph of a delivery note",
+  input: {
+    image: field.text({ label: "Photo", required: true, holds: "none", max: 8_000_000 }),
+  },
+  output: { lines: field.json({ label: "Lines", holds: "none" }) },
+  permission: "stock:move",
+  idempotency: { mode: "none" },
+  fails: ["platform.unavailable", "platform.invalid"],
+  audit: () => ({ subject: "a delivery note", verb: "read" }),
+  ai: {
+    lane: "vision",
+    prompt: "You read delivery notes and packing lists. Answer with JSON only:"
+      + " a list of lines, each with code, name, quantity, lot, expiry."
+      + " `code` is the supplier's article number or barcode if the page shows one."
+      + " `quantity` is the number delivered, in whatever unit the line names."
+      + " `expiry` is YYYY-MM-DD, and empty unless the page gives a full date."
+      + " Skip totals, headings and anything you cannot read. Do not infer a"
+      + " quantity from a price. An empty list is a correct answer.",
+    variables: [],
+    /* ⚠️ A PAGE OF LINES IS THE LARGEST ANSWER THIS APP ASKS FOR, and the
+       ceiling is what the reserve is computed from. Set too low the answer is
+       truncated mid-line and the last delivery row is silently lost. */
+    maxOutput: 2_000,
+  },
+  async handler(ctx, input) {
+    const c = ctx as Ctx & Generating;
+    if (!input.image.startsWith("data:image/")) {
+      return c.fail("platform.invalid", {}, { fields: { image: "That is not a photo" } });
+    }
+    return { lines: notedIn(readJson(await asked(c, {}, input.image))) };
+  },
+});
+
+/**
+ * ASKING IN WORDS.
+ *
+ * ⚠️ IT REPLACES NAVIGATION FOR PEOPLE WHO WILL NOT LEARN NAVIGATION, which in
+ * this product is most of them. "Do we have blue resin", "what expires this
+ * month", "where is the torque wrench" — three questions that are three screens
+ * and a filter each, asked the way somebody would ask a colleague.
+ *
+ * ⚠️ THE STOCK GOES IN THE PROMPT, AND THAT IS WHAT MAKES IT ANSWERABLE. A model
+ * with no workspace in front of it can only answer about products in general;
+ * one holding the lines answers about this shelf. It is also why the summary is
+ * BOUNDED and says so — a reserve is computed from what is sent, and a
+ * workspace with four thousand lines would otherwise pay for all of them on
+ * every question.
+ */
+const HOW_MUCH = 200;
+
+const askInWords = operation<
+  { question: string; today: string }, { answer: string; looked: number }
+>({
+  id: "stock.ask",
+  kind: "write",
+  summary: "Answer a question about the stock, in words",
+  input: {
+    question: field.text({ label: "Question", required: true, holds: "none", max: 500 }),
+    today: field.day({ label: "Today", required: true, holds: "none" }),
+  },
+  output: {
+    answer: field.text({ label: "Answer", holds: "none" }),
+    /* ⚠️ HOW MANY LINES IT ACTUALLY SAW. A bounded summary that does not say it
+       is bounded is an answer of "we have none" over a shelf that has some. */
+    looked: field.number({ label: "Lines read", holds: "none" }),
+  },
+  permission: "stock:read",
+  idempotency: { mode: "none" },
+  fails: ["platform.unavailable"],
+  audit: (input) => ({ subject: input.question, verb: "asked" }),
+  ai: {
+    lane: "text",
+    prompt: "You answer questions about what a workspace has in stock."
+      + " Today is {today}. Here is what it holds, one line per row as"
+      + " product · place · quantity · lot · expiry:\n{stock}\n"
+      + " Answer the question in one or two short sentences, naming the place."
+      + " If the lines do not say, answer that you cannot see it rather than"
+      + " guessing. The question is: {question}",
+    variables: ["question", "today", "stock"],
+    maxOutput: 500,
+    /* ⚠️ BRANDABLE, BECAUSE THIS ONE IS A VOICE. A workspace that wants shorter
+       answers, or answers in German, is asking for something about itself —
+       unlike reading a hazard pictogram, which is nobody's to reword. */
+    brandable: true,
+  },
+  async handler(ctx, input) {
+    const c = ctx as Ctx & Generating;
+    const db = c.db as Db;
+
+    const rows = await db.prepare(
+      `SELECT p.name AS name, l.name AS place, s.quantity AS quantity,
+              b.lot AS lot, b.printed AS printed
+         FROM stock s
+         JOIN product p ON p.id = s.product
+         JOIN location l ON l.id = s.location
+         LEFT JOIN batch b ON b.id = s.batch
+        WHERE s.tenant_id = ? AND s.quantity > 0
+        ORDER BY p.name LIMIT ?`)
+      .bind(c.tenantId, HOW_MUCH)
+      .all<{ name: string; place: string; quantity: number; lot: string | null;
+        printed: string | null }>();
+
+    const stock = rows.results.map((row) => [
+      row.name, row.place, String(row.quantity), row.lot ?? "", row.printed ?? "",
+    ].join(" · ")).join("\n");
+
+    const answer = await asked(c, {
+      question: input.question,
+      today: input.today,
+      /* ⚠️ SAID RATHER THAN LEFT BLANK. A model handed nothing answers "you have
+         nothing", which over an empty summary of a full warehouse is the most
+         confident wrong answer this product could give. */
+      stock: stock || "(nothing on any shelf)",
+    });
+
+    return { answer, looked: rows.results.length };
+  },
+});
+
 /**
  * WHAT A NEW PRODUCT STARTS AS — the workspace's answer, not the form's.
  *
@@ -2452,6 +2750,7 @@ export const INVENTORY: AppSpec = defineApp({
     openCount, tallyUp, differs, closeCount,
     issue, giveBack, serve, retire, dueService,
     assemble, putIn, takeOut, checking, build, breakUp,
+    identify, readLabel, readNote, askInWords,
   ],
 
   /*
@@ -2762,6 +3061,35 @@ export const INVENTORY: AppSpec = defineApp({
   /* ⚠️ WHICH SURFACES THIS APP HAS, AND NOT WHO MAY PAINT THEM. The brand is the
      WORKSPACE's and reaches every app under it (D22). */
   whitelabel: { surfaces: ["shell"] },
+
+  /*
+    ⚠️ THE CEILING THE RESERVE IS COMPUTED FROM, ONE PER ACTION. A meter with no
+    ceiling reserves nothing and settles at whatever arrived — and `settle` caps
+    the charge at the hold, so every token an estimate fails to anticipate is a
+    token the platform pays for and the workspace does not.
+
+    ⚠️ AND THE PICTURE IS THE BIGGEST INPUT IN THE WHOLE PRODUCT. A photograph of
+    a delivery note costs more to look at than every instruction wrapped around
+    it, which is why `TOKENS_PER_IMAGE` exists rather than a character count.
+  */
+  meters: {
+    "product.identify": {
+      id: "product.identify", label: "Identify a barcode", lane: "text", maxOutput: 400,
+    },
+    "product.read": {
+      id: "product.read", label: "Read a label", lane: "vision", maxOutput: 700,
+    },
+    "stock.note": {
+      id: "stock.note", label: "Read a delivery note", lane: "vision", maxOutput: 2_000,
+    },
+    "stock.ask": {
+      id: "stock.ask", label: "Ask about the stock", lane: "text", maxOutput: 500,
+    },
+  },
+  /* ⚠️ TWO LANES, AND `vision` IS THE ONE THAT EARNS THE CAMERA. A label with no
+     barcode and a delivery note are most of what arrives in a workshop or a
+     kitchen, and neither is reachable by any other path in this product. */
+  lanes: ["text", "vision"],
 });
 
 /* ⚠️ A THUNK, BECAUSE COMPOSITION IS LAZY (D4). Exporting the composed surface

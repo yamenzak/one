@@ -334,6 +334,12 @@
       "ends": "A mounted screen is handed `go`, which takes the app's OWN route; `routeIn` adds the workspace prefix for the nav and for a row inside a screen alike, so the two are one address rather than two copies of one expression. Until it existed an app's list could not open the record it listed, and the only way it could have was by writing the centre's address scheme into a product."
     },
     {
+      "n": 65,
+      "status": "shipped",
+      "title": "A model can be shown something — the vision lane carries a picture, and the reserve counts it",
+      "ends": "`Ask.image` reaches the compat endpoint as a content part rather than being dropped, so `lane: \"vision\"` is a capability and not a name; `TOKENS_PER_IMAGE` puts the picture in the reserve, whether or not the units were counted by hand, because the settle cap makes an under-count permanently ours. And `ai-commits.test.mjs` fails on any operation that generates AND writes — a model fills anything, and a person commits."
+    },
+    {
       "n": 62,
       "status": "planned",
       "title": "A list narrows and pages — the generated read answers past the first fifty, and says how many there are",

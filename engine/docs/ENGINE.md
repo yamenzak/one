@@ -386,7 +386,7 @@ and a manifest that does not compose refuses to boot.
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
 | `manifest` | the whole app, and the composition that refuses a broken one | 12 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 16 | — |
-| `credit` | metered work: the reserve, the rate, the ceiling | 14 | — |
+| `credit` | metered work: the reserve, the rate, the ceiling | 15 | — |
 | `dunning` | the ladder from past due to erased | 5 | — |
 | `package` | a priced bundle of timed grants | 8 | 1 |
 | `tenancy` | workspaces, kinds, shards, placement, standing | 14 | — |
@@ -406,7 +406,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**274 of them**, 269 reached by something today.
+**275 of them**, 270 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -865,6 +865,7 @@ its own header, cited by other files, and doing nothing.
 | `a-gate-is-never-handed-a-constant` | D12 | a gate whose input nothing supplies — `flags: located.flags ?? {}` where no deployment ever set it, so every request carried an empty map, the console wrote rows only the console read back, and switching a flag changed nothing anywhere with every suite green |
 | `a-balance-moves-in-one-place-and-the-history-moves-with-it` | D12 | a number the ledger cannot rebuild — the balance is plausible, the screen redraws, and every report over that line stops adding up, permanently |
 | `an-objects-standing-changes-only-where-the-shelf-changes-with-it` | D12 | a shelf that goes on claiming a drill which is in somebody's van, so every count afterwards "finds" it missing and corrects a number that was right |
+| `a-model-fills-anything-and-commits-nothing` | D19 | an expiry read off a blurred label committed as a fact — a perfectly valid date that nothing anywhere will ever question |
 | `a-movement-refuses-rather-than-landing-on-zero` | D12 | a mis-scan, a wrong shelf or a count that was already wrong is silently absorbed, and the only evidence any of them happened is gone |
 | `a-shelf-life-is-counted-in-local-days` | D12 | stock expires a day late west of Greenwich — the direction that matters, on medicine and food |
 | `an-expiry-says-which-clock-ended-it` | D12 | a shelf that says “expires Tuesday” and cannot say why, which is a shelf nobody acts on |
@@ -893,7 +894,7 @@ its own header, cited by other files, and doing nothing.
 | D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 4 |
 | D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 5 |
 | D18 | The operator stands outside every workspace, and the console is a door rather than a role | 8 |
-| D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 3 |
+| D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 4 |
 | D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 3 |
 | D21 | A workspace is personal or commercial, and that is what it IS rather than what it bought | 9 |
 | D22 | Branding and the installable app belong to the workspace, never to one app inside it | 4 |
@@ -1011,11 +1012,12 @@ that names no stage, so this list cannot grow by forgetting.
 | 59 | A write says it worked — the sentence the operation declared, and the reads it made stale | shipped |
 | 60 | OneInventory exists — the model, the one chokepoint that moves a balance, and the arithmetic under both | shipped |
 | 61 | A product's screens reach each other — the route is the app's, the prefix is the platform's | shipped |
+| 65 | A model can be shown something — the vision lane carries a picture, and the reserve counts it | shipped |
 | 62 | A list narrows and pages — the generated read answers past the first fifty, and says how many there are | **planned** |
 | 64 | Itemised things — one object for its whole life, and the kits composed of them | shipped |
 | 63 | The guide and the milestones are ticked by what a workspace has actually done | **planned** |
 
-**47 shipped, 17 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**48 shipped, 17 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

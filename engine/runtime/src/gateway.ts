@@ -45,7 +45,26 @@ export interface RunAsk {
   readonly maxOutput: number;
   /** ⚠️ Three, and the gateway allows five. See the header. */
   readonly tag: { readonly t: string; readonly a: string; readonly o: string };
+  /**
+   * ⚠️ A PICTURE TO LOOK AT, AS A `data:` URL, and it is what makes the vision
+   * lane more than a name. Without it an app could declare `lane: "vision"`,
+   * compose, price a meter and pass every guard — and the model would receive
+   * the words alone and answer confidently about an image nobody sent it.
+   */
+  readonly image?: string;
 }
+
+/**
+ * ⚠️ THE USER TURN IS A STRING UNTIL THERE IS SOMETHING TO SEE, and that is not
+ * tidiness. Providers accept a bare string for text and a list of parts for
+ * anything else; sending the list shape for every call would put an app's
+ * ordinary text through the path that exists for pictures, on every provider,
+ * including the ones that read it less well.
+ */
+const said = (prompt: string, image?: string): unknown =>
+  (image
+    ? [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: image } }]
+    : prompt);
 
 export interface Answered {
   readonly text: string;
@@ -157,7 +176,7 @@ export async function askModel(
         max_tokens: ask.maxOutput,
         messages: [
           { role: "system", content: ask.system },
-          { role: "user", content: ask.prompt },
+          { role: "user", content: said(ask.prompt, ask.image) },
         ],
       }),
     });
@@ -244,7 +263,7 @@ export async function askModelStream(
         stream_options: { include_usage: true },
         messages: [
           { role: "system", content: ask.system },
-          { role: "user", content: ask.prompt },
+          { role: "user", content: said(ask.prompt, ask.image) },
         ],
       }),
     });

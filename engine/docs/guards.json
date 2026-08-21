@@ -2748,6 +2748,15 @@
       "fails": "a shelf that goes on claiming a drill which is in somebody's van, so every count afterwards \"finds\" it missing and corrects a number that was right"
     },
     {
+      "id": "a-model-fills-anything-and-commits-nothing",
+      "protects": "D19",
+      "stage": "65",
+      "status": "live",
+      "impl": "scripts/ai-commits.test.mjs",
+      "proves": "generates AND writes",
+      "fails": "an expiry read off a blurred label committed as a fact — a perfectly valid date that nothing anywhere will ever question"
+    },
+    {
       "id": "a-movement-refuses-rather-than-landing-on-zero",
       "protects": "D12",
       "stage": "60",

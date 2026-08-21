@@ -112,7 +112,25 @@ export interface Shape {
   readonly units?: Usage;
   /** ⚠️ A model that thinks bills for tokens nobody asked for and nobody sees. */
   readonly thinks?: boolean;
+  /**
+   * ⚠️ HOW MANY PICTURES ARE BEING LOOKED AT, because none of them is in the
+   * character count. A photograph of a delivery note costs more input than the
+   * whole instruction around it, and a reserve computed from the text alone
+   * budgets for a fraction of the call — which the settle cap then turns into
+   * tokens the platform pays for and the workspace does not.
+   */
+  readonly images?: number;
 }
+
+/**
+ * ⚠️ WHAT ONE PICTURE COSTS TO LOOK AT, AND IT IS DELIBERATELY GENEROUS.
+ * Providers price an image by its tiles, so the true number is between about two
+ * hundred and two thousand tokens depending on how big it arrives — and the two
+ * directions are not symmetrical. Over-reserving holds a few credits for the
+ * length of one call and releases them at settle; under-reserving is capped by
+ * `settle` and paid for by us, silently, on every call for ever.
+ */
+export const TOKENS_PER_IMAGE = 2_000;
 
 /** ⚠️ Room for reasoning nobody requested. Measured, not chosen for tidiness. */
 export const THINKING_HEADROOM = 1.4;
@@ -146,7 +164,14 @@ export function estimate(shape: Shape, rate: Rate): number {
     output: shape.maxOutput,
   };
   const output = shape.thinks ? Math.ceil(counted.output * THINKING_HEADROOM) : counted.output;
-  const milli = (counted.input / 1000) * rate.input + (output / 1000) * rate.output;
+  /*
+    ⚠️ ADDED WHETHER OR NOT THE UNITS WERE GIVEN, and that is the safe direction
+    rather than an oversight. A caller who counted its pictures already is
+    over-reserved by one image and gets it back at settle; a caller who did not
+    would be under-reserved by the largest single input in the whole request.
+  */
+  const input = counted.input + Math.max(0, Math.trunc(shape.images ?? 0)) * TOKENS_PER_IMAGE;
+  const milli = (input / 1000) * rate.input + (output / 1000) * rate.output;
   /* ⚠️ THE RESERVE IS WHOLE CREDITS BECAUSE A BALANCE IS. Rounding UP here is a
      hold that is slightly too large, released the moment it settles; rounding
      down is a hold that does not cover the call. */
@@ -172,12 +197,18 @@ export function plan(
   prompt: string,
   rate: Rate,
   maxOutput: number,
-  opts: { readonly units?: Usage; readonly thinks?: boolean } = {},
+  opts: {
+    readonly units?: Usage;
+    readonly thinks?: boolean;
+    /** ⚠️ How many pictures go with the words — see `Shape.images`. */
+    readonly images?: number;
+  } = {},
 ): Planned {
   const chars = system.length + prompt.length;
   const credits = estimate({
     promptChars: chars,
     maxOutput,
+    images: opts.images,
     /* ⚠️ THE DENSITY IS TAKEN FROM THE TEXT BEING SENT, here, once — the only
        place that holds both the system half and the prompt half at the same
        time. A caller passing it separately is a caller that can pass one text's

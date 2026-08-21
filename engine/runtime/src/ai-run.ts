@@ -44,11 +44,18 @@ export interface RunAt {
  */
 export function generatorFor(at: RunAt): ((
   values: Readonly<Record<string, string>>,
+  /**
+   * ⚠️ A PICTURE, SEPARATE FROM THE VALUES, AND THE SPLIT IS THE POINT. Values
+   * fill declared `{placeholders}`; an image is not a placeholder and folding it
+   * in would put a megabyte of base64 into the prompt text — where the reserve
+   * would count it as characters, at the wrong rate, in the wrong direction.
+   */
+  look?: { readonly image?: string },
 ) => Promise<{ readonly text: string; readonly credits: number } | AiRefusal>) | undefined {
   const action = actionsOf(at.app).find((a) => a.id === at.operation);
   if (!action) return undefined;
 
-  return async (values) => {
+  return async (values, look) => {
     const rows = await modelsOf(at.directory);
     const bound = (await bindingsOf(at.directory, at.app.id)).find((b) => b.action === action.id);
     const theirs = await wordingOf(at.db, at.tenantId, at.app.id);
@@ -73,6 +80,7 @@ export function generatorFor(at: RunAt): ((
          reaching a model is an instruction nobody wrote. */
       prompt: sayPrompt(placeholders(action.ai.variables), values),
       maxOutput: action.ai.maxOutput,
+      ...(look?.image ? { image: look.image } : {}),
     });
 
     if (typeof out === "string") return out;
@@ -96,11 +104,12 @@ export function generatorFor(at: RunAt): ((
  */
 export function streamerFor(at: StreamAt): ((
   values: Readonly<Record<string, string>>,
+  look?: { readonly image?: string },
 ) => Promise<Response | AiRefusal>) | undefined {
   const action = actionsOf(at.app).find((a) => a.id === at.operation);
   if (!action) return undefined;
 
-  return async (values) => {
+  return async (values, look) => {
     const rows = await modelsOf(at.directory);
     const bound = (await bindingsOf(at.directory, at.app.id)).find((b) => b.action === action.id);
     const theirs = await wordingOf(at.db, at.tenantId, at.app.id);
@@ -120,6 +129,7 @@ export function streamerFor(at: StreamAt): ((
       system: now.prompt,
       prompt: sayPrompt(placeholders(action.ai.variables), values),
       maxOutput: action.ai.maxOutput,
+      ...(look?.image ? { image: look.image } : {}),
     });
 
     if (typeof out === "string") return out;

@@ -329,6 +329,32 @@ describe("what a call costs", () => {
   });
 
   /*
+    ⚠️ AND A PICTURE IS IN THE RESERVE, because none of it is in the character
+    count. A photograph of a delivery note is the largest single input a vision
+    request carries — larger than every instruction around it — so a reserve
+    computed from the words alone budgets for a fraction of the call, and
+    `settle`'s cap turns the rest into tokens the platform pays for.
+  */
+  it("budgets for the picture as well as the words", () => {
+    const looking = plan("x", "S", "read this", rate, 100, { images: 1 });
+    const reading = plan("x", "S", "read this", rate, 100);
+    expect(looking.reserve.credits).toBeGreaterThan(reading.reserve.credits);
+  });
+
+  /*
+    ⚠️ AND IT IS ADDED EVEN WHERE THE UNITS WERE COUNTED BY HAND, which is the
+    safe direction rather than an oversight. A caller who counted its own picture
+    is over-reserved by one image and gets it back at settle; a caller who did
+    not would be under-reserved by the largest thing in the request, permanently.
+  */
+  it("counts the picture whether or not the units were given", () => {
+    const units = { input: 100, output: 100 };
+    const looking = plan("x", "S", "p", rate, 100, { units, images: 1 });
+    const reading = plan("x", "S", "p", rate, 100, { units });
+    expect(looking.reserve.credits).toBeGreaterThan(reading.reserve.credits);
+  });
+
+  /*
     ⚠️ AND THEY LEAVE TOGETHER. A caller that computes the prompt and the reserve
     separately can hand a different text to each — unit tests on the two halves
     pass while it does, which is what the defect WAS.
