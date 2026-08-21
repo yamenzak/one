@@ -2757,6 +2757,15 @@
       "fails": "an expiry read off a blurred label committed as a fact — a perfectly valid date that nothing anywhere will ever question"
     },
     {
+      "id": "what-a-count-found-missing-is-still-counted-as-gone",
+      "protects": "D12",
+      "stage": "70",
+      "status": "live",
+      "impl": "scripts/inferred-consumption.test.mjs",
+      "proves": "recognises",
+      "fails": "a recorded share that reads a hundred per cent for ever \u2014 the flattering direction, with every test green, because nothing else connects the id a count mints to the prefix the report reads"
+    },
+    {
       "id": "a-label-is-minted-once-and-never-re-issued",
       "protects": "D12",
       "stage": "69",

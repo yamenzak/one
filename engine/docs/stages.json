@@ -358,6 +358,12 @@
       "ends": "`@engine/design` draws a QR itself (ISO/IEC 18004, byte mode, level M, versions 1\u201310) \u2014 hand-written, and only defensible because `qr.test.ts` DECODES what it produces with a reader that shares no code with it: unmasks, reads the format bits back, de-interleaves, checks every Reed-Solomon syndrome is zero, parses the payload. One symbology for everything we print, because two encoders are two ways for a tag to come out unscannable. `LabelSheet`/`Label`/`LabelText` are the one place in the system measured in millimetres, because a label has a physical size and a screen does not. OneInventory declares a GHS classification on a product and prints the decant label a decanted bottle legally needs \u2014 signal word, hazards, statements verbatim \u2014 says plainly that the diamond is not the regulated pictogram, and reports a classification that contradicts itself where the label is printed rather than refusing it. Printing a place or a product MINTS its code, and `label-once.test.mjs` fails on any statement that could re-issue one."
     },
     {
+      "n": 70,
+      "status": "shipped",
+      "title": "Reports \u2014 what went, what was wrong, what to buy, and how much of it anybody wrote down",
+      "ends": "Every figure is derived from the ledger and nothing is stored, because a correction made in March changes what February consumed and a stored number never learns that. One operation answers all four, so a screen cannot show a month\u2019s usage beside a fortnight\u2019s losses. The HERO is the recorded share \u2014 the number that makes the product look bad, and the only one that says whether the others mean anything. Short and over stay apart, because netting them off draws a shelf that is wildly wrong as a shelf that is fine. What to buy is ordered by what runs out FIRST against the workspace\u2019s own lead time, never by what is smallest \u2014 which is how a store room runs out of the thing that takes a month to get. `inferred-consumption.test.mjs` fails if the id a count mints and the prefix the report reads ever drift apart, or if a close stops naming its session."
+    },
+    {
       "n": 67,
       "status": "planned",
       "title": "A screen can be gated on an entitlement, the way an operation already is",

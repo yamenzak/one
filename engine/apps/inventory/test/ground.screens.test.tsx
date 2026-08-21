@@ -31,6 +31,7 @@ import { Work, type Jobs, type Runs } from "../src/screens/Work.js";
 import { Kit, type Member, type Missing } from "../src/screens/Kit.js";
 import { Due, sayDays, type Dated } from "../src/screens/Due.js";
 import { Labels, type Labelled } from "../src/screens/Labels.js";
+import { Reports, sayCover, type Reported } from "../src/screens/Reports.js";
 
 const html = (route: string) => renderToStaticMarkup(<InventoryScreen route={route} />);
 
@@ -1203,5 +1204,103 @@ describe("the label sheet", () => {
   it("says that printing is what mints a label", () => {
     expect(sheet([PLAIN], "tag", "place")).toContain("gets one when you print");
     expect(sheet([PLAIN], "tag", "item")).not.toContain("gets one when you print");
+  });
+});
+
+describe("the reports", () => {
+  const SAID: Reported = {
+    told: { recorded: 610, inferred: 390, share: 0.61 },
+    used: [{ product: "p-glove", name: "Nitrile gloves, M", quantity: 640 }],
+    losses: [{ product: "p-screw", name: "Screws, M4 × 20", lost: 40, found: 38 }],
+    buy: [{
+      product: "p-glove", name: "Nitrile gloves, M", onHand: 64, cover: 3,
+      order: 90, why: "runs out first", unit: "box",
+    }],
+    daily: [{ day: "2026-08-20", quantity: 12 }, { day: "2026-08-21", quantity: 0 }],
+  };
+
+  const reporting = (said: Reported = SAID) =>
+    renderToStaticMarkup(
+      <Reports
+        title="Reports"
+        of={ready(said)}
+        span="month"
+        onSpan={() => undefined}
+        again={() => undefined}
+        onOpen={() => undefined}
+      />,
+    );
+
+  /*
+    ⚠️ THE HERO IS THE NUMBER THAT MAKES THE PRODUCT LOOK BAD, and that is the
+    decision this screen is built on. How much left is a fact about the business;
+    how much of it anybody wrote down is a fact about whether these figures mean
+    anything at all — and only one of those two changes what somebody does on
+    Monday.
+  */
+  it("leads with how much of what left was actually recorded", () => {
+    const out = reporting();
+    expect(out).toContain("Recorded");
+    expect(out).toContain("61");
+    /* ⚠️ AND SAYS WHAT THE REST WAS, because a percentage on its own is a score
+       and nobody knows what to do with a score. */
+    expect(out).toContain("a count found it missing");
+  });
+
+  /* ⚠️ A PERIOD WITH NOTHING IN IT SAYS SO RATHER THAN SHOWING A ZERO. "61% of
+     nothing" is a sentence that means nothing. */
+  it("says plainly when nothing left the shelves", () => {
+    const out = reporting({
+      ...SAID, told: { recorded: 0, inferred: 0, share: 0 }, used: [],
+    });
+    expect(out).toContain("Nothing left the shelves in this period");
+  });
+
+  /*
+    ⚠️ SHORT AND OVER STAY APART. A shelf that is forty short and thirty-eight
+    over is a shelf somebody is counting badly, or two products being confused
+    with each other; netted, it is a shelf that is two out and looks fine.
+  */
+  it("keeps what was short apart from what was over", () => {
+    const out = reporting();
+    expect(out).toContain("40 short · 38 over");
+  });
+
+  /*
+    ⚠️ THE REORDER ROW SAYS HOW LONG IT LASTS, NOT HOW LITTLE IS LEFT. A product
+    with two weeks of stock and a three-week lead time is gone before the order
+    lands, and the row has to be readable as that rather than as a quantity.
+  */
+  it("says how long a thing lasts and why it is on the list", () => {
+    const out = reporting();
+    expect(out).toContain("3 days left");
+    expect(out).toContain("runs out first");
+  });
+
+  /* ⚠️ AND A THING THAT NEVER MOVES READS AS "NOT MOVING" RATHER THAN "∞". An
+     infinity symbol is showing somebody a division rather than an answer. */
+  it("says a dormant thing is not moving", () => {
+    expect(sayCover(Infinity)).toBe("Not moving");
+    expect(sayCover(0.4)).toBe("Gone today");
+    expect(sayCover(12.9)).toBe("12 days left");
+  });
+
+  /* ⚠️ NOTHING TO BUY IS A REAL ANSWER AND IT IS THE GOOD ONE. An absent section
+     is indistinguishable from one that failed to load. */
+  it("says so when everything lasts", () => {
+    expect(reporting({ ...SAID, buy: [] }))
+      .toContain("Everything lasts longer than a delivery takes");
+  });
+
+  /* ⚠️ AND A QUIET PERIOD IS NOT AN EMPTY SCREEN. The reorder list reads the par
+     levels rather than the movements, so there is still something to say — and
+     "nothing moved" is itself the answer somebody came for. */
+  it("draws itself over a period where nothing happened", () => {
+    const out = reporting({
+      told: { recorded: 0, inferred: 0, share: 0 }, used: [], losses: [],
+      buy: SAID.buy, daily: [],
+    });
+    expect(out).toContain("Nitrile gloves, M");
+    expect(out).not.toContain("Nothing to report yet");
   });
 });

@@ -25,6 +25,7 @@ import {
    reading and the precedence rules are the SCREEN's — a label is printed there,
    and a contradiction reported where nothing prints is a warning nobody sees. */
 import { SIGNALS } from "./hazard.js";
+import { dailyIn, lossesIn, reorder, toldIn, usageIn } from "./report.js";
 import { CODE_KINDS, readScan, stillNeeded, unread } from "./code.js";
 import { settleCount, type Change } from "./count.js";
 import { guessedIn, notedIn, readJson, type Noted } from "./reading.js";
@@ -3460,6 +3461,127 @@ const starts = operation<Record<string, never>, { tracking: string; unit: string
   },
 });
 
+/* ------------------------------------------------------------ the reports --- */
+
+/**
+ * WHAT THE HISTORY ADDS UP TO — one ask, because a figure screen is one screen.
+ *
+ * ⚠️ FOUR ANSWERS IN ONE ROUND TRIP, AND THAT IS NOT A CONVENIENCE. Consumption,
+ * shrinkage, how much of it was actually recorded and what to buy are four
+ * readings of the SAME movements over the SAME period; four operations would
+ * read the ledger four times and — worse — could be given four different
+ * periods, so a screen could show a month's usage beside a fortnight's losses
+ * with nothing anywhere saying they disagreed.
+ *
+ * ⚠️ AND EVERY NUMBER IS DERIVED. There is no report table: a correction made in
+ * March changes what February consumed, and a stored figure never learns that.
+ */
+interface Reported {
+  told: { recorded: number; inferred: number; share: number };
+  used: readonly { product: string; name: string; quantity: number }[];
+  losses: readonly { product: string; name: string; lost: number; found: number }[];
+  buy: readonly {
+    product: string; name: string; onHand: number; cover: number;
+    order: number; why: string; unit: string;
+  }[];
+  daily: readonly { day: string; quantity: number }[];
+}
+
+const report = operation<{ from: string; to: string }, Reported>({
+  id: "stock.report",
+  kind: "read",
+  summary: "What went, what was wrong, and what to buy",
+  input: {
+    from: field.day({ label: "From", required: true, holds: "none" }),
+    to: field.day({ label: "To", required: true, holds: "none" }),
+  },
+  output: {
+    told: field.json({ label: "How it was recorded", holds: "none" }),
+    used: field.json({ label: "What left", holds: "none" }),
+    losses: field.json({ label: "What was wrong", holds: "none" }),
+    buy: field.json({ label: "What to buy", holds: "none" }),
+    daily: field.json({ label: "A day at a time", holds: "none" }),
+  },
+  /*
+    ⚠️ `ledger:read`, WHICH IS THE HISTORY'S OWN GRANT AND NOT `stock:read`. Every
+    figure here is a reading of the movements — who took what, and what somebody
+    corrected — and a person who may see a balance has not necessarily been given
+    the record of how it got there.
+  */
+  permission: "ledger:read",
+  idempotency: { mode: "none" },
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const lead = Math.trunc(Number(await c.setting("inventory.lead_days"))) || 7;
+
+    /* ⚠️ BOUNDED BY THE DAY COLUMN, WHICH IS THE DEVICE'S LOCAL DATE. A report
+       cut on the server's calendar puts a shift that ended at 01:00 into the
+       wrong month for half the world — see `ledger.day`. */
+    const moves = await db.prepare(
+      `SELECT move, product, delta, day, against FROM ledger
+        WHERE tenant_id = ? AND day >= ? AND day <= ?`)
+      .bind(c.tenantId, input.from, input.to)
+      .all<{ move: string; product: string; delta: number; day: string; against: string | null }>();
+
+    const entries = moves.results.map((row) => ({
+      move: String(row.move), product: String(row.product),
+      delta: Number(row.delta), day: String(row.day), against: String(row.against ?? ""),
+    }));
+
+    /* ⚠️ ONE LOOKUP FOR EVERY NAME ON THE SCREEN. A report that answered with ids
+       would make the browser join four lists against a catalogue it may only
+       hold fifty rows of. */
+    const kinds = await db.prepare(
+      `SELECT id, name, unit, par FROM product WHERE tenant_id = ?`)
+      .bind(c.tenantId)
+      .all<{ id: string; name: string; unit: string; par: number | null }>();
+    const named = new Map(kinds.results.map((row) => [String(row.id), row]));
+    const nameOf = (id: string) => String(named.get(id)?.name ?? "—");
+
+    const balances = await db.prepare(
+      `SELECT product, SUM(quantity) AS onHand FROM stock
+        WHERE tenant_id = ? GROUP BY product`)
+      .bind(c.tenantId).all<{ product: string; onHand: number }>();
+    const onHand = new Map(balances.results.map((row) => [String(row.product), Number(row.onHand)]));
+
+    const used = usageIn(entries);
+    const perProduct = new Map(used.map((one) => [one.product, one.quantity]));
+    const days = Math.max(1, dayCount(input.from, input.to));
+
+    return {
+      told: toldIn(entries),
+      used: used.map((one) => ({ ...one, name: nameOf(one.product) })),
+      losses: lossesIn(entries).map((one) => ({ ...one, name: nameOf(one.product) })),
+      /*
+        ⚠️ EVERY PRODUCT IS WEIGHED, NOT ONLY THE ONES THAT MOVED. A par level is
+        a standing statement that something must be on the shelf whether or not
+        it moves — a fire extinguisher, a spare fuse — and a reorder list built
+        from the movements alone can never mention one.
+      */
+      buy: reorder(
+        kinds.results.map((row) => ({
+          product: String(row.id),
+          onHand: onHand.get(String(row.id)) ?? 0,
+          par: Number(row.par ?? 0),
+          used: perProduct.get(String(row.id)) ?? 0,
+        })),
+        days, lead,
+      ).map((one) => ({
+        ...one, name: nameOf(one.product),
+        unit: String(named.get(one.product)?.unit ?? "item"),
+      })),
+      daily: dailyIn(entries, input.from, input.to),
+    };
+  },
+});
+
+/* ⚠️ INCLUSIVE OF BOTH ENDS, because "the first to the seventh" is seven days to
+   everybody who is not a computer — and a rate divided by six would report
+   consumption about seventeen per cent high. */
+const dayCount = (from: string, to: string): number =>
+  Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+
 /* ------------------------------------------------------------- the labels --- */
 
 /**
@@ -3788,7 +3910,7 @@ export const INVENTORY: AppSpec = defineApp({
     identify, readLabel, readNote, askInWords,
     openRun, loadRun, endRun, releaseRun, failRun, recallRun, liftHold, lateResult,
     openJob, closeJob, traceJob,
-    labelPlaces, labelThings,
+    labelPlaces, labelThings, report,
   ],
 
   /*
@@ -3888,6 +4010,18 @@ export const INVENTORY: AppSpec = defineApp({
     */
     { id: "labels", route: "/labels", label: "Labels", nav: "secondary", icon: "tag",
       permission: "location:read" },
+    /*
+      ⚠️ `etch` — RULED GEOMETRY, WHICH IS WHAT A SHELF IS. The ambience families
+      point monitoring at it, and a shelf grid is what it draws anyway; a report
+      screen is the one surface in this product where a ground is doing something
+      rather than decorating.
+
+      ⚠️ AND `ledger:read`, WHICH THE COMMON ROLE DOES NOT HOLD. Every figure here
+      reads the record of who took what — a person who may see a balance has not
+      necessarily been given the history behind it, and the nav is what says so.
+    */
+    { id: "reports", route: "/reports", label: "Reports", nav: "secondary", icon: "chart",
+      permission: "ledger:read", sky: "etch" },
     { id: "ask", route: "/ask", label: "Ask", nav: "secondary", icon: "sparkle",
       permission: "stock:read", sky: "glow" },
     { id: "start", route: "/start", label: "Getting started", nav: "secondary", icon: "star",
@@ -4141,6 +4275,20 @@ export const INVENTORY: AppSpec = defineApp({
       field: field.number({ label: "Tell me before a service", holds: "none", min: 0, max: 3_650 }),
       fallback: 30, needs: "tenant:manage",
       help: "An annual inspection wants booking weeks out.",
+    }),
+    /*
+      ⚠️ HOW LONG A DELIVERY TAKES, AND IT IS THE WHOLE REORDER REPORT. "Is it
+      low" is the wrong question: a product with two weeks of stock and a
+      three-week lead time is out before the order lands, and one with two days
+      and a next-day supplier is fine. Without this number the list is ordered by
+      how little is left, which is how a store room runs out of the one thing
+      that takes a month to get.
+    */
+    "inventory.lead_days": setting({
+      id: "inventory.lead_days", level: "tenant", area: "stock",
+      field: field.number({ label: "A delivery takes", holds: "none", min: 0, max: 365 }),
+      fallback: 7, needs: "tenant:manage",
+      help: "Days from ordering to it arriving. Use the slowest supplier you have.",
     }),
     "inventory.default_unit": setting({
       id: "inventory.default_unit", level: "tenant", area: "stock",

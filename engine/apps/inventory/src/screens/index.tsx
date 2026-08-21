@@ -29,6 +29,7 @@ import { Run, type Covered } from "./Run.js";
 import { Work, type Jobs, type Runs } from "./Work.js";
 import { Due, type Dated } from "./Due.js";
 import { Labels, type Labelled } from "./Labels.js";
+import { Reports, type Reported } from "./Reports.js";
 import { Count, type Change, type Counted, type Uncovered } from "./Count.js";
 import { Item, type Kept } from "./Item.js";
 import { Kit, type Member, type Missing } from "./Kit.js";
@@ -40,8 +41,8 @@ import { Thing, type Batch, type Movement } from "./Thing.js";
 import { Where } from "./Where.js";
 
 export {
-  Ask, Case, Count, Due, Item, Kit, Labels, Receive, Run, Scan, Start, Stock, Thing,
-  Where, Work,
+  Ask, Case, Count, Due, Item, Kit, Labels, Receive, Reports, Run, Scan, Start, Stock,
+  Thing, Where, Work,
 };
 export * from "./sample.js";
 export type {
@@ -225,6 +226,41 @@ const NOTED: readonly Noted[] = [
     lot: "C0921", expiry: "2028-01-31" },
   { code: "", name: "Screws, M4 × 20", quantity: 2, lot: "", expiry: "" },
 ];
+
+/**
+ * ⚠️ SIXTY-ONE PER CENT RECORDED, WHICH IS A REAL WORKSPACE AND NOT A GOOD ONE.
+ * A ground at a hundred per cent would photograph the one month nobody needs a
+ * report for — and the whole reason this figure leads the screen is that it is
+ * the number an inventory product is never willing to show.
+ */
+const REPORTED: Reported = {
+  told: { recorded: 610, inferred: 390, share: 0.61 },
+  used: [
+    { product: "p-glove", name: "Nitrile gloves, M", quantity: 640 },
+    { product: "p-ipa", name: "Isopropanol 99%", quantity: 210 },
+    { product: "p-tape", name: "Masking tape, 50 mm", quantity: 96 },
+    { product: "p-oil", name: "Cutting fluid, 5 L", quantity: 54 },
+  ],
+  /* ⚠️ ONE SHELF SHORT AND ONE BOTH WAYS, because a report that netted the two
+     directions off would draw the second as almost fine. */
+  losses: [
+    { product: "p-glove", name: "Nitrile gloves, M", lost: 84, found: 0 },
+    { product: "p-screw", name: "Screws, M4 × 20", lost: 40, found: 38 },
+  ],
+  /* ⚠️ THE FAST ONE FIRST EVEN THOUGH IT HAS MORE ON THE SHELF, which is the
+     ordering the whole reorder report turns on. */
+  buy: [
+    { product: "p-glove", name: "Nitrile gloves, M", onHand: 64, cover: 3,
+      order: 90, why: "runs out first", unit: "box" },
+    { product: "p-ext", name: "Fire extinguisher, CO₂ 5 kg", onHand: 1, cover: Infinity,
+      order: 3, why: "below the line", unit: "item" },
+  ],
+  daily: Array.from({ length: 30 }, (_, i) => ({
+    day: `2026-07-${String(23 + i).padStart(2, "0")}`,
+    /* ⚠️ Quiet weekends, because the gaps are the shape of a working month. */
+    quantity: i % 7 === 5 || i % 7 === 6 ? 0 : 20 + ((i * 7) % 23),
+  })),
+};
 
 /**
  * ⚠️ A CLASSIFIED SUBSTANCE AND AN ORDINARY ONE, because the decant label has to
@@ -532,6 +568,22 @@ export function InventoryScreen({ route, onGo }: {
       exists is the bottle somebody poured solvent into, and a fixture without a
       signal word and two diamonds teaches nothing about the label that matters.
     */
+    /*
+      ⚠️ A MONTH WHERE THE SYSTEM IS ONLY PARTLY BEING USED, because that is the
+      state this screen exists to make visible. A ground showing a perfect
+      hundred per cent photographs the one case nobody needs a report for.
+    */
+    case "/reports":
+      return (
+        <Reports
+          title={title}
+          of={ready(REPORTED)}
+          span="month"
+          onSpan={nothing}
+          again={nothing}
+          onOpen={() => go("/thing")}
+        />
+      );
     case "/labels":
       return (
         <Labels

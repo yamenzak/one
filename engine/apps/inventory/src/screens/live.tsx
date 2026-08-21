@@ -20,7 +20,7 @@
 
 import * as React from "react";
 import { ready, trouble, waiting, type Loaded } from "@engine/design";
-import type { Problem } from "@engine/kernel";
+import { dayPlus, type Day, type Problem } from "@engine/kernel";
 import { INVENTORY } from "../index.js";
 import { hazardsIn, signalIn } from "../hazard.js";
 import { coverage, stuttering } from "../count.js";
@@ -36,6 +36,7 @@ import { Scan, type Guess, type Seen } from "./Scan.js";
 import { Stock } from "./Stock.js";
 import { Due, type Dated } from "./Due.js";
 import { Labels, type Labelled, type Subject, type Template } from "./Labels.js";
+import { Reports, type Reported, type Span } from "./Reports.js";
 import { Thing, type Batch, type Movement, type Piece } from "./Thing.js";
 import { Where } from "./Where.js";
 import { Start } from "./Start.js";
@@ -1442,6 +1443,45 @@ const DUE = (api: Door) => function DueHere({ go }: Mounted) {
 };
 
 /**
+ * REPORTS — one ask, because a figure screen is one screen.
+ *
+ * ⚠️ THE ARITHMETIC IS THE OPERATION'S, DOWN TO THE ORDERING. What runs out
+ * first is a question about the workspace's own lead time, which is a
+ * `tenant:manage` setting a person on the floor cannot read — a container
+ * sorting this list would either hard-code a number or show everybody the same
+ * wrong order.
+ *
+ * ⚠️ AND THE PERIOD IS COUNTED IN THE DEVICE'S OWN DAYS. The ledger's `day` is
+ * the local date where the shelf is; a range cut on the server's calendar puts a
+ * shift that ended at 01:00 into the wrong month for half the world.
+ */
+const SPAN_DAYS: Readonly<Record<Span, number>> = { week: 7, month: 30, quarter: 90 };
+
+const REPORTS = (api: Door) => function ReportsHere({ go }: Mounted) {
+  const [span, setSpan] = React.useState<Span>("month");
+  const today = dayHere();
+  /* ⚠️ THE KERNEL'S CALENDAR ARITHMETIC, not a subtraction on an instant. Thirty
+     days back across a clock change is 29 or 31 by the millisecond, and a report
+     silently covering the wrong period is one nobody can catch by looking. */
+  const from = React.useMemo(
+    () => dayPlus(today as Day, -(SPAN_DAYS[span] - 1)), [today, span]);
+
+  const said = useAsked<Reported>(
+    () => api.get("stock.report", { from, to: today }), [from, today]);
+
+  return (
+    <Reports
+      title={nameOf("/reports")}
+      of={said.of}
+      span={span}
+      onSpan={setSpan}
+      again={said.again}
+      onOpen={(product) => go(`/thing/${product}`)}
+    />
+  );
+};
+
+/**
  * LABELS — the sheet, and the codes it mints on the way to the printer.
  *
  * ⚠️ PRINTING IS WHAT MINTS A CODE, so the button is a WRITE before it is a
@@ -1615,6 +1655,7 @@ export function mount({ register, api }: Mounting): void {
     ["/kit", KIT(api)],
     ["/due", DUE(api)],
     ["/labels", LABELS(api)],
+    ["/reports", REPORTS(api)],
     ["/start", START()],
   ];
   for (const [route, screen] of screens) {
