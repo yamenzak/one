@@ -407,6 +407,12 @@
       "status": "shipped",
       "title": "The other half of OneInventory, driven — and the quarantine that was a badge on a screen",
       "ends": "Deliveries and the two expiry clocks, itemised objects and their life, kits and their recipes, the release ladder and the nightly sweep are all executed against a real database through the real door now, in `inventory-deep.test.ts`. It found the one that matters most: loading something into a run did not HOLD it. `freeze` set `standing = 'held'` on a failed or recalled run — the states where somebody has already noticed — and nothing held what was merely waiting to be signed for. So a tray whose cycle had ended and which no qualified person had released could be taken off the shelf and used on somebody, while the screen showed \"waiting to be released\". The gap between a machine finishing and a person signing for what came out of it is what this product has instead of deciding that a green light is a qualification, and until this stage the gap was a label. `process.put` holds; `process.release` stamps `ok`; `process.lift` unfreezes one item with a reason; receiving more of a held lot stays possible, because a quarantine is about what may LEAVE."
+    },
+    {
+      "n": 74,
+      "status": "shipped",
+      "title": "The foot of a phone is a vignette, and everywhere an app declares is reachable from it",
+      "ends": "`--hem-bottom` was written by nobody, so the bottom vignette fell to its default of 1 on every screen: fully opaque, with the world's marks stopping dead at its top edge, which is a bar by the definition the top hem's own paragraphs give. Both hems ask the same question now — is anything actually behind this — and the easing is armed a frame after the first answer so a screen that arrives with nothing behind its nav is drawn that way rather than fading out of a hem it never should have had. And `nav: \"secondary\"` was drawn in the desktop rail and nowhere else, so an app declaring twelve destinations offered five to a phone and seven had no gesture at all. The bar's fifth slot is the way to the rest: a destination rather than a menu, wearing the app's mark, opening to say WHICH place somebody is in when they are inside one. `phoneNav` is the split as one function so the invariant — every declared destination in exactly one of the two lists — is something a test can ask about, and `design/test/reachable.test.tsx` asks it. D46."
     }
   ]
 }

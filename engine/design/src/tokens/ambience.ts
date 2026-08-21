@@ -280,11 +280,19 @@ const hemStop = (pct: number): string =>
  * one of them read a card through the title — the fault is not how strong it is,
  * it is that it was on when it had no work to do.
  *
- * ⚠️ THE BOTTOM ONE IS ALWAYS ON, AND THAT IS NOT AN INCONSISTENCY. "Is anything
- * behind the crown" is exactly `scrollY > 0`; "is anything behind the nav" is
- * not answerable from the scroll position, because a page shorter than the
- * viewport can still end underneath it. A cheap precise question at one end and
- * no such question at the other.
+ * ⚠️ BOTH ENDS ASK THE SAME QUESTION, AND FOR A LONG TIME ONLY ONE OF THEM ASKED
+ * IT. "Is anything behind the crown" is `scrollY > 0`; "is anything behind the
+ * nav" is how much page is still below the fold — one subtraction, and until it
+ * was written the bottom hem fell to its default of 1 on every screen. Opaque,
+ * always, with the field's marks stopping dead at its top edge: a bar, by the
+ * definition three paragraphs up.
+ *
+ * ⚠️ AND THE TRANSITION IS NOT THERE UNTIL THE FIRST ANSWER IS IN. `opacity`
+ * transitions from the CSS default, so a page that mounts already knowing there
+ * is nothing behind its nav would FADE the hem out over a third of a second —
+ * an interface visibly undoing itself in front of somebody who has just arrived.
+ * `data-hems` is stamped a frame after the first read, so arriving is instant
+ * and every answer after it is eased.
  */
 const hem = (edge: "top" | "bottom") => {
   const far = edge === "top" ? "bottom" : "top";
@@ -318,9 +326,16 @@ const hem = (edge: "top" | "bottom") => {
       one that cannot let a card read through a title.
     */
     `  opacity: var(--hem-${edge}, 1);`,
+    `}`,
     /* ⚠️ `moderate`, not `quick` — the hem arriving is ambient rather than a
        response to a press, and at the pace of a control it reads as a flicker
-       on the first few pixels of a scroll. */
+       on the first few pixels of a scroll.
+
+       ⚠️ AND IT IS A SECOND RULE, GATED ON `data-hems`, so the FIRST answer
+       lands without one. `Page` stamps the root a frame after it reads, which
+       means a screen that arrives with nothing behind its nav is drawn that way
+       rather than fading out of a hem it never should have had. */
+    `[data-hems] [data-hem="${edge}"]::before {`,
     `  transition: ${transition("opacity", "moderate")};`,
     `}`,
   ];

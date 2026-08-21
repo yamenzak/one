@@ -38,6 +38,8 @@ import {
 } from "../parts/marks.js";
 import { Page } from "./page.js";
 import { Island } from "./chrome.js";
+import { Tray } from "./overlay.js";
+import { Group, NavRow } from "../parts/surfaces.js";
 import {
   Crown, CrownSocketProvider, crownFor, type CrownClaim, type Slot,
 } from "./crown.js";
@@ -343,6 +345,29 @@ export const reachable = (
     && (!s.commercial || isBusiness(kind))
     && (!s.flag || flags[s.flag] === true));
 
+/**
+ * WHAT THE PHONE'S BAR HOLDS, AND WHAT THE SHEET BEHIND IT HOLDS.
+ *
+ * ⚠️ A FUNCTION RATHER THAN TWO LINES INSIDE THE SHELL, because the invariant is
+ * the whole point and an invariant inside a render is one nothing can ask about.
+ * Every screen with a nav tier is in exactly one of the two lists — which is
+ * what stopped being true when `secondary` was drawn in the desktop rail alone,
+ * and an app with twelve destinations offered five of them to a phone.
+ *
+ * ⚠️ THE BAR KEEPS ALL FIVE WHERE THERE IS NOTHING TO HOLD. The fifth slot is
+ * spent on the way to everywhere else only when there IS an everywhere else, so
+ * an app of four destinations is untouched by any of this.
+ */
+export function phoneNav(mine: readonly ScreenSpec[]): {
+  readonly bar: readonly ScreenSpec[];
+  readonly rest: readonly ScreenSpec[];
+} {
+  const primary = primaryOf(mine).slice(0, PRIMARY_MAX);
+  const secondary = mine.filter((s) => s.nav === "secondary");
+  const bar = primary.slice(0, PRIMARY_MAX - (secondary.length ? 1 : 0));
+  return { bar, rest: [...primary.slice(bar.length), ...secondary] };
+}
+
 export function Shell(props: ShellProps) {
   const {
     screens, here, held, flags, kind, crown, onGo, onSwitchApp, onOpenInbox, onOpenSpace, children,
@@ -353,6 +378,20 @@ export function Shell(props: ShellProps) {
      it did not compose must not draw a sixth either. */
   const primary = primaryOf(mine).slice(0, PRIMARY_MAX);
   const secondary = mine.filter((s) => s.nav === "secondary");
+
+  /*
+    ⚠️ WHAT THE BAR CANNOT HOLD, AND UNTIL THIS EXISTED IT WAS NOWHERE ON A
+    PHONE. `secondary` was drawn in the rail below and by nothing above it, so
+    an app declaring twelve destinations offered five to anybody holding one —
+    and the other seven had no gesture at all. It rendered correctly, tested
+    green, and read as a design decision rather than as an omission.
+
+    ⚠️ THE FIFTH NAV SLOT HOLDS THEM, so the last primary is in here too — see
+    `Island.more`. The order is the rail's: what did not fit, then the second
+    tier, which is how the same product reads on both halves of the breakpoint.
+  */
+  const [elsewhere, setElsewhere] = React.useState(false);
+  const { bar: inBar, rest } = phoneNav(mine);
   /* ⚠️ THE SCREEN THE ADDRESS BELONGS TO, NOT THE ONE IT EQUALS. A detail screen
      carries what it is about (`/thing/t-glove`), so an exact match left the nav
      with nothing selected and the page with no title the moment anybody opened a
@@ -428,9 +467,27 @@ export function Shell(props: ShellProps) {
           `md:hidden` already, so exactly one of the two is ever on screen.
         */
         act={claim?.does}
-        items={primary.map((s) => ({
+        items={inBar.map((s) => ({
           id: s.id, label: s.label, route: s.route, icon: glyphOf(s.icon ?? s.id),
         }))}
+        /*
+          ⚠️ NAMED BY WHERE YOU ARE WHEN YOU ARE IN IT, and by the app when you
+          are not. A person on Reports reads "Reports" in the bar rather than a
+          bar with nothing marked — which is what "where am I" costs if the
+          fifth item is a button called More.
+        */
+        {...(rest.length
+          ? {
+            more: {
+              label: at && rest.some((s) => s.id === at.id) ? at.label : crown.appName,
+              icon: glyphOf(at && rest.some((s) => s.id === at.id)
+                ? (at.icon ?? at.id)
+                : "apps"),
+              onOpen: () => { setElsewhere(true); },
+              here: Boolean(at && rest.some((s) => s.id === at.id)),
+            },
+          }
+          : {})}
       />}
     >
       {/*
@@ -507,6 +564,36 @@ export function Shell(props: ShellProps) {
             </Button>
           ))}
         </nav>
+
+        {/*
+          ⚠️ THE PHONE'S OTHER HALF OF THAT RAIL, AND IT IS THE SAME LIST IN THE
+          SAME ORDER. A sheet whose contents were chosen separately would be a
+          second navigation model, and the two would drift the first time
+          somebody added a screen.
+
+          ⚠️ IT IS MOUNTED AT ANY WIDTH BECAUSE NOTHING OPENS IT ABOVE `md` —
+          the trigger is inside the nav, which is `md:hidden` already. A second
+          `md:hidden` here would be a breakpoint asserted in two places, which
+          is how the two come to disagree.
+
+          ⚠️ AND EVERY ROW SAYS WHERE IT GOES RATHER THAN WHAT IT IS FOR. These
+          are the app's own screen labels, unedited — the sheet is a map, and a
+          map that renames places is a worse map.
+        */}
+        {rest.length ? (
+          <Tray title={crown.appName} isOpen={elsewhere} onOpenChange={setElsewhere}>
+            <Group>
+              {rest.map((s) => (
+                <NavRow
+                  key={s.id}
+                  icon={glyphOf(s.icon ?? s.id)}
+                  label={s.label}
+                  onOpen={() => { setElsewhere(false); onGo(s.route); }}
+                />
+              ))}
+            </Group>
+          </Tray>
+        ) : null}
 
         {/* ⚠️ NO `NAV_SPACE` HERE ANY MORE — `Page` adds it, because `Page` is
             what was handed the nav and therefore what knows there is one to

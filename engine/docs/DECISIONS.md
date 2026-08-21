@@ -1340,3 +1340,46 @@ empty grant read as "no narrowing"; a collection that carries a place and does
 not declare it (composition refuses one); a handwritten statement over a narrowed
 table with neither the filter nor a stated reason; and a screen that narrows a
 list while the route under it answers for the whole workspace.
+
+## D46 — Five is what a phone's bar holds, not what an app may have
+
+**A phone has two edges and an app has as many destinations as it has.** The
+ceiling on the nav (D10) is a fact about thumbs: past five items a bottom bar
+stops being tappable. It was read for a long time as a fact about PRODUCTS —
+which it never was, and the difference was invisible because the desktop rail
+drew everything and nobody looked at the other half.
+
+**An app declaring twelve screens offered five of them to a phone.** `secondary`
+was rendered in the rail and by nothing above it, so seven of OneInventory's
+destinations — the reorder list, the label sheet, the reports, the question box,
+the importer, the suppliers, the guide — had no gesture at all on the device the
+product is used on. Every suite green. A rail that is correct and a bar that is
+correct, and between them a third of the product unreachable.
+
+**The fifth slot holds everywhere else, and it is a destination rather than a
+menu.** It wears the app's own mark; when somebody is inside one of the places it
+holds it OPENS and says which — so the bar still answers "where am I" from every
+screen in the app. A button called More cannot do that, and reads as an admission
+the nav ran out of room.
+
+**It costs the fifth primary rather than adding a sixth item.** Five is the
+ceiling, so the way to seven more destinations has to come out of it. The
+displaced primary is in the sheet at the head of the list, before the second
+tier, because that is the rail's order and one product must not read as two.
+
+**And an app that fits is untouched.** The slot is spent only where there is
+something to spend it on, so a product with four destinations keeps four and a
+product with five and no second tier keeps five.
+
+**The vignette is the other half of the same complaint.** `--hem-bottom` was
+written by nobody and fell to its default of 1, so the foot of every screen was a
+fully opaque strip with the world's marks stopping dead at its top edge — a bar,
+by the definition the TOP hem's own paragraphs give. The top one had been fixed
+by asking whether anything is behind it; the bottom one was left because the
+question was thought unanswerable from a scroll position. It is one subtraction:
+what is still below the fold is on its way under the nav.
+
+**Therefore never:** a destination an app declares that a phone cannot reach; a
+sixth item in the bar; a fifth slot labelled "More"; a hem that is opaque with
+nothing behind it; or a hem that eases its very first answer, which is an
+interface visibly undoing itself in front of somebody who has just arrived.

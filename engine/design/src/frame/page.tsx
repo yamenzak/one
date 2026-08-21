@@ -193,10 +193,10 @@ export function Page(
     theme actually is here (`ThemeProvider` writes `data-theme` on the root) and
     a first render that guessed wrong would swap the sky one frame later.
   */
-  /* ⚠️ THE PAGE OWNS IT BECAUSE THE PAGE OWNS THE CROWN'S ROOM — see
-     `useHemOnScroll`. Every address goes through here, so one listener covers
-     every crown in the product and no crown has to remember. */
-  useHemOnScroll();
+  /* ⚠️ THE PAGE OWNS IT BECAUSE THE PAGE OWNS THE ROOM AT BOTH ENDS — see
+     `useHems`. Every address goes through here, so one listener covers every
+     crown and every nav in the product and neither has to remember. */
+  useHems();
   /* ⚠️ ONE PATH FOR BOTH. A subject's world and a named sky differ only in where
      the family and the two colours came from — everything after that is the same
      engine, which is what "one engine powers every scene" has to mean. */
@@ -228,8 +228,8 @@ export function Page(
 }
 
 /**
- * THE TOP HEM ARRIVES WITH THE FIRST SCROLL, AND THAT IS THE DIFFERENCE BETWEEN
- * A VIGNETTE AND A BAR.
+ * A HEM ARRIVES WHEN THERE IS SOMETHING BEHIND IT, AND THAT IS THE DIFFERENCE
+ * BETWEEN A VIGNETTE AND A BAR.
  *
  * ⚠️ THE HEM IS OPAQUE AGAINST THE WORLD, NOT ONLY AGAINST CONTENT. It has to be
  * — four weaker strengths were shot and every one let a card's text read through
@@ -248,25 +248,67 @@ export function Page(
  * ⚠️ AND THE THRESHOLD IS NOT ZERO. A rubber band, a focus scroll, an image
  * settling — anything that moves the page by a pixel would otherwise flicker the
  * hem on and off under somebody's hands.
+ *
+ * ⚠️ THE BOTTOM ONE IS THE SAME QUESTION ASKED DOWNWARDS, AND IT USED TO BE
+ * ASKED BY NOBODY. `--hem-bottom` was written nowhere, so it fell to its default
+ * of 1 and the foot of every phone was a fully opaque strip with the world's
+ * pattern stopping dead at its top edge — which is a bar, exactly as the
+ * paragraphs above say about the top one. The note that stood here claimed "is
+ * anything behind the nav" was not answerable from the scroll position. It is:
+ * anything still below the fold is on its way under the nav, and at the end of
+ * the page there is nothing left to dissolve. One subtraction, the same
+ * listener, and the five glyphs stand on the world instead of on a slab.
+ *
+ * ⚠️ A PAGE SHORTER THAN THE VIEWPORT ANSWERS `false`, WHICH IS CORRECT AND IS
+ * THE COMMON CASE. Every layout that mounts a nav reserves its height
+ * (`NAV_SPACE`), so a short page's content ends ABOVE the nav and there is
+ * genuinely nothing behind it.
  */
-function useHemOnScroll(at = 8): void {
+function useHems(at = 8): void {
   React.useEffect(() => {
     const root = document.documentElement;
-    let on: boolean | null = null;
+    /* ⚠️ ONE LISTENER FOR BOTH, and each edge remembers its own last answer —
+       so a scroll in the middle of a long page writes nothing at all. */
+    let top: boolean | null = null;
+    let foot: boolean | null = null;
     const read = () => {
       const now = scrollY > at;
-      if (now === on) return;
-      on = now;
-      root.style.setProperty("--hem-top", now ? "1" : "0");
+      if (now !== top) {
+        top = now;
+        root.style.setProperty("--hem-top", now ? "1" : "0");
+      }
+      /* ⚠️ THE SAME SLACK AT THIS END. A document one subpixel taller than the
+         viewport — which rounding produces on its own — would otherwise sit
+         permanently hemmed with nothing under it. */
+      const left = document.documentElement.scrollHeight - (scrollY + innerHeight);
+      const under = left > at;
+      if (under !== foot) {
+        foot = under;
+        root.style.setProperty("--hem-bottom", under ? "1" : "0");
+      }
     };
     read();
+    /* ⚠️ THE EASING IS TURNED ON AFTER THE FIRST ANSWER, NOT BEFORE IT — see the
+       `data-hems` rule in `ambienceStylesheet`. Without this a screen arriving
+       with nothing behind its nav visibly fades the hem away in front of
+       somebody who has just got there, because `opacity` transitions from the
+       stylesheet's own default. */
+    const armed = requestAnimationFrame(() => { root.dataset.hems = "on"; });
     addEventListener("scroll", read, { passive: true });
+    /* ⚠️ AND A RESIZE MOVES THE BOTTOM ANSWER WITHOUT A SCROLL. A sheet opening,
+       a keyboard arriving, a list finishing its load: the page gets taller under
+       a finger that never moved, and only this end of it notices. */
+    addEventListener("resize", read);
     return () => {
+      cancelAnimationFrame(armed);
       removeEventListener("scroll", read);
+      removeEventListener("resize", read);
+      delete root.dataset.hems;
       /* ⚠️ Cleared rather than left at whatever it was, because the property is
          on the ROOT and outlives this page — a screen that unmounted while
          scrolled would hand the next one a hem it never asked for. */
       root.style.removeProperty("--hem-top");
+      root.style.removeProperty("--hem-bottom");
     };
   }, [at]);
 }

@@ -295,6 +295,15 @@ dress one:**
   and the island over five destinations. Used where an address is one of a
   product's screens.
 
+**Five is what the island HOLDS, not what a product may have (D46).** An app with
+more destinations than that spends the fifth slot on the way to the rest: a
+destination-shaped item wearing the app's own mark, which opens and says WHICH
+place you are in when you are inside one — so the bar answers "where am I" from
+every screen rather than going blank past the fourth. It is never labelled More.
+Read the rule as a fact about thumbs, because that is all it ever was; read it as
+a fact about products and a third of an app ends up reachable on a desktop alone,
+which is what happened.
+
 Both render `Page`. Neither wraps the other, and an address gets one of them —
 which is why a full-screen modal is a `Layout` with no nav rather than a Shell
 with its nav suppressed. Suppression is where a nav that should not be there
