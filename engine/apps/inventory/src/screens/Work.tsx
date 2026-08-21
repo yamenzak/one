@@ -12,7 +12,7 @@
  */
 
 import {
-  Group, NavRow, NoteRow, Screen, Section, glyphOf, type Loaded,
+  Group, NavRow, NoteRow, Screen, Section, When, glyphOf, type Loaded,
 } from "@engine/design";
 
 /** One run, as a list needs it. */
@@ -94,6 +94,7 @@ export function Work({ title, of, jobs, again, onRun, onJob, onStart }: WorkProp
                       key={run.id}
                       label={run.kind}
                       under={[run.machine, `${run.items} in it`].filter(Boolean).join(" · ")}
+                      aside={<When at={run.started} />}
                       onOpen={() => { onRun(run.id); }}
                     />
                   ))}
@@ -113,6 +114,7 @@ export function Work({ title, of, jobs, again, onRun, onJob, onStart }: WorkProp
                       {SAID_RUN[run.state]}{run.machine ? ` · ${run.machine}` : ""}
                     </span>
                   )}
+                  aside={<When at={run.started} />}
                   onOpen={() => { onRun(run.id); }}
                 />
               ))}
@@ -139,6 +141,7 @@ export function Work({ title, of, jobs, again, onRun, onJob, onStart }: WorkProp
                       </span>
                     )
                     : job.state === "closed" ? `Closed · ${job.ref}` : job.ref}
+                  aside={<When at={job.opened} />}
                   onOpen={() => { onJob(job.id); }}
                 />
               ))}

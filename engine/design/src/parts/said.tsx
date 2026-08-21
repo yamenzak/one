@@ -267,9 +267,17 @@ export function Num({ value, places, plain }: {
  * that packs everything right. Passed as a bare string it inherits the row's own
  * size and weight, so a column of quantities reads as "1,200 glove" in the same
  * ink as the number — the unit competing with the value it qualifies.
+ *
+ * ⚠️ IT CLAIMS A COLUMN, WHICH IS THE HALF THAT WAS MISSING. In a row that packs
+ * everything right, a figure's position is decided by the width of whatever
+ * follows it — so a stock list whose units were `glove`, `tin`, `box`, `item`
+ * and `ream` put every one of its quantities at a different x. Nothing is
+ * misaligned by much and nothing is aligned at all, which is the state a column
+ * of numbers is least useful in. A minimum width makes the units a column too,
+ * and a longer word than the minimum simply takes the space it needs.
  */
 export function Unit({ of }: { readonly of: string }) {
-  return of ? <span className={`shrink-0 ${TYPE.note}`}>{of}</span> : null;
+  return of ? <span className={`min-w-10 shrink-0 ${TYPE.note}`}>{of}</span> : null;
 }
 
 /*

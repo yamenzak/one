@@ -18,7 +18,7 @@ import {
   type Loaded,
 } from "@engine/design";
 import { Button } from "@heroui/react";
-import { sayDate, type Instant } from "@engine/kernel";
+import { sayDate, sayMoment, type Instant } from "@engine/kernel";
 
 /** One thing a job consumed. */
 export interface Used {
@@ -114,9 +114,13 @@ export function Case({
                 without one is TITLED by it — so the row was the heading said a
                 second time, either way, three lines below itself. */}
             <FieldRow label="Standing" value={state === "closed" ? "Closed" : "Open"} />
-            <FieldRow label="Opened" value={sayDate(shown, opened as Instant, "short")} />
+            {/* ⚠️ WITH THE HOUR, BECAUSE A JOB OPENS AND CLOSES ON ONE DAY. Most
+                of them do — a service, a cook, a case — so a date alone printed
+                the same value twice, three lines apart, on the screen somebody
+                opens to find out how long it took. */}
+            <FieldRow label="Opened" value={sayMoment(shown, opened as Instant, "short")} />
             {closed
-              ? <FieldRow label="Closed" value={sayDate(shown, closed as Instant, "short")} />
+              ? <FieldRow label="Closed" value={sayMoment(shown, closed as Instant, "short")} />
               : null}
             {/* ⚠️ SAID WHERE IT IS TRUE, because "nothing is in doubt" is a real
                 answer to the question somebody came with — and an absent section

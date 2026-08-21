@@ -467,7 +467,10 @@ export const HELLO: AppSpec = defineApp({
        morning it was written: a brand belongs to the WORKSPACE and is edited in
        the hub, once, for every app under it. An app declaring one is how a
        business with three products gets three of them. */
-    { id: "shared", route: "/shared", label: "Shared", nav: "secondary", icon: "star",
+    /* ⚠️ ITS OWN MARK. This wore `star`, which is Getting started's and is in
+       the same nav; the registry had no share mark at all, so one was added
+       rather than a second screen borrowing a neighbour's. */
+    { id: "shared", route: "/shared", label: "Shared", nav: "secondary", icon: "share",
       permission: "note:read", commercial: true },
     /* ⚠️ Behind one of our switches, which is what makes the flag mean anything:
        a flag no screen and no operation is behind changes nothing when pressed. */

@@ -179,7 +179,7 @@ if (!stolen) ok(`no screen draws a registered mark itself (${looked} files, ${KN
     would refuse both and be wrong about both.
   */
   const IDENTITY =
-    /^(none|translate[XY]?\(0(px)?(,\s*0(px)?)?\)|rotate[XYZ]?\(0(deg)?\)|rotate[XYZ]?\(360deg\)|scale\(1\)|skew[XY]?\(0(deg)?\)|\s)+$/;
+    /^(none|translate[XY]?\(0(px)?(,\s*0(px)?)?\)|rotate[XYZ]?\(0(deg)?\)|rotate[XYZ]?\(360deg\)|scale[XY]?\(1\)|skew[XY]?\(0(deg)?\)|\s)+$/;
 
   /*
     ⚠️ EACH BLOCK IS CUT AT THE NEXT `@keyframes`, NOT MATCHED WITH A LAZY
@@ -271,6 +271,58 @@ if (!stolen) ok(`no screen draws a registered mark itself (${looked} files, ${KN
     }
   }
   if (!claimed) ok(`reserved: \`${RESERVED}\` is used in ${uses} place(s), all about generation`);
+}
+
+/* --------------------------------------------------------------- distinct --- */
+
+/** Every app's manifest, which is where a screen declares its mark. */
+const apps = readdirSync(join(ENGINE, "apps"), { withFileTypes: true })
+  .filter((d) => d.isDirectory())
+  .map((d) => [d.name, join(ENGINE, "apps", d.name, "src", "index.ts")]);
+
+/**
+ * ⚠️ NO TWO NAV-VISIBLE SCREENS OF ONE APP WEAR THE SAME MARK. The bar's whole
+ * job is answering "where am I" and "where can I go" without words — two
+ * identical glyphs in it defeat both, and the person pressing one of them cannot
+ * know which they got. OneInventory shipped two: `Receive` and `Import` were
+ * both `add`, so the phone bar drew a plus at slot three and another at slot
+ * five; `Stock` and `Suppliers` were both `box`.
+ *
+ * ⚠️ IT IS ONLY THE NAV-VISIBLE ONES, and that is the whole subtlety. A detail
+ * screen never appears beside anything — a product's own page may wear `box`
+ * while Stock does, because the two are never in one row of marks. Refusing
+ * every reuse would push apps toward marks that fit worse for no gain.
+ *
+ * ⚠️ AND IT IS DERIVED FROM THE MANIFEST, so app number three is asked the same
+ * question on the day it is registered rather than the day somebody photographs
+ * its nav.
+ */
+{
+  const screens = /\{\s*id:\s*["'`]([\w-]+)["'`][^}]*?\}/g;
+  let clashed = 0;
+  let checked = 0;
+  for (const [name, file] of apps) {
+    let src = "";
+    try { src = strip(readFileSync(file, "utf8")); } catch { continue; }
+    const seen = new Map();
+    for (const [whole, id] of src.matchAll(screens)) {
+      const nav = /nav:\s*["'`](\w+)["'`]/.exec(whole);
+      if (!nav || nav[1] === "none") continue;
+      const route = /route:\s*["'`][^"'`]*["'`]/.test(whole);
+      if (!route) continue;
+      const icon = /icon:\s*["'`]([\w-]+)["'`]/.exec(whole);
+      const mark = icon ? icon[1] : id;
+      checked++;
+      const already = seen.get(mark);
+      if (already) {
+        clashed++;
+        fail(`apps/${name}: \`${already}\` and \`${id}\` are both in the nav and both wear \`${mark}\`.\n`
+          + `       Two identical marks in one bar cannot say which is which. Give one of them\n`
+          + `       its own — \`GLYPH_NAMES\` in ${HOME} is the list.`);
+      } else seen.set(mark, id);
+    }
+  }
+  if (!clashed) ok(`distinct: ${checked} nav destination(s) across ${apps.length} app(s), no mark used twice in one bar`);
 }
 
 process.exit(bad ? 1 : 0);

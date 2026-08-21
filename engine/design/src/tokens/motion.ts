@@ -504,6 +504,12 @@ export const GLYPH_MOTION = [
   `  55% { transform: translateX(-7px); opacity: 0 }`,
   `  100% { transform: translateX(0); opacity: 1 }`,
   `}`,
+  /* The line reaches the other two; what is shared does not move. */
+  `@keyframes glyph-reach {`,
+  `  0% { transform: scaleX(0.2); opacity: 0.3 }`,
+  `  60% { transform: scaleX(1); opacity: 1 }`,
+  `  100% { transform: scaleX(1); opacity: 1 }`,
+  `}`,
   /* Something lands in the tray, and the tray takes the weight. */
   `@keyframes glyph-arrive {`,
   `  0% { transform: translateY(-4px); opacity: 0 }`,
@@ -599,6 +605,9 @@ export const GLYPH_MOTION = [
   /* ⚠️ The next set is invisible until the mark is pressed, or a calendar sits
      with two rows of days printed over each other. */
   `[data-glyph="page"] [data-part="days-next"] { opacity: 0 }`,
+  `[data-glyph="reach"][data-lively="true"] [data-part="link"] {`,
+  `  transform-origin: 6px 12px;`,
+  `  animation: glyph-reach ${DURATION.moderate} ${EASE.travel} backwards }`,
   `[data-glyph="depart"][data-lively="true"] [data-part="arrow"] {`,
   `  animation: glyph-depart ${DURATION.stately} ${EASE.travel} backwards }`,
   `[data-glyph="take"][data-lively="true"] [data-part="post"] {`,

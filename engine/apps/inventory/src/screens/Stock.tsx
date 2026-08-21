@@ -140,7 +140,9 @@ export function Stock({
                 /* ⚠️ THE UNIT IS ON EVERY ROW OF THIS LIST, which is what makes
                    it an `aside` rather than a `mark` — a marker is by definition
                    the exception, and one that appeared on every row would push
-                   every amount left by its own width. */
+                   every amount left by its own width. Being on every row is not
+                   enough on its own: `glove`, `tin` and `ream` are three widths,
+                   so `Unit` claims a column of its own. */
                 aside={<Unit of={line.unit} />}
                 onOpen={() => onOpen(line)}
               />
@@ -155,7 +157,10 @@ export function Stock({
             {more
               ? (
                 <ActionRow
-                  icon={glyphOf("box")}
+                  /* ⚠️ NO GLYPH, BECAUSE NOTHING ABOVE IT HAS ONE. A box plate
+                     at the foot of six product rows that carry no mark reads as
+                     a seventh product — and the glyph it wore was the PRODUCT
+                     glyph, so it said the one thing this row is not. */
                   label="Show more"
                   under={`${figures.grouped(lines.length)} of ${figures.grouped(total)}`}
                   onDo={onMore}

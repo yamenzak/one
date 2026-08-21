@@ -120,6 +120,30 @@ export const LeaveMark = () => (
 );
 
 /**
+ * SHARING IS THE LINE REACHING THE OTHER TWO.
+ *
+ * ⚠️ THE NODES STAY PUT AND THE CONNECTION IS WHAT HAPPENS. Moving the dots
+ * would be a picture of things being handed over, which is not what sharing is
+ * — the thing stays where it is and becomes reachable from elsewhere. The two
+ * far nodes light as the line arrives at them.
+ */
+export const ShareMark = () => (
+  <Mark>
+    <g data-part="here">
+      <circle cx="6" cy="12" r="3" />
+    </g>
+    <g data-part="link">
+      <path d="m8.6 10.5 6.8-3.4" />
+      <path d="m8.6 13.5 6.8 3.4" />
+    </g>
+    <g data-part="them">
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="18" cy="19" r="3" />
+    </g>
+  </Mark>
+);
+
+/**
  * AN INBOX TAKES SOMETHING IN.
  *
  * ⚠️ SOMETHING ARRIVES; THE TRAY DOES NOT JUMP. The tray was translating down as

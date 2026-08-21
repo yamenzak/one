@@ -21,7 +21,7 @@ import {
   NUDGE, ROW, SPACE, WIDTH,
 } from "../tokens/metrics.js";
 import { TYPE } from "../tokens/type.js";
-import { NavRow } from "./surfaces.js";
+import { Group, NavRow } from "./surfaces.js";
 
 /* ------------------------------------------------------------------ steps --- */
 
@@ -430,20 +430,29 @@ export function Tree({ nodes, here = null, onGo, root = "All", nothing }: TreePr
         )
         : null}
 
+      {/* ⚠️ THE ROWS ARE IN A CARD LIKE EVERY OTHER ROW. They were bare, and a
+          tree is by definition drawn above a list of what is in the branch —
+          so a stock screen put the same row grammar on the page's ground and
+          on a surface, one under the other. The crumbs stay OUTSIDE it: a trail
+          is where you are rather than a thing you are looking at. */}
       {under.length
-        ? under.map((n) => (
-          <NavRow
-            key={n.id}
-            label={n.label}
-            under={n.under}
-            aside={n.aside}
-            /* ⚠️ A LEAF STILL OPENS. What is inside a shelf is not another
-               shelf, and a row that stops being pressable at the bottom of the
-               tree is a screen where the thing somebody came for is the one row
-               they cannot reach. */
-            onOpen={() => onGo(n.id)}
-          />
-        ))
+        ? (
+          <Group>
+            {under.map((n) => (
+              <NavRow
+                key={n.id}
+                label={n.label}
+                under={n.under}
+                aside={n.aside}
+                /* ⚠️ A LEAF STILL OPENS. What is inside a shelf is not another
+                   shelf, and a row that stops being pressable at the bottom of
+                   the tree is a screen where the thing somebody came for is the
+                   one row they cannot reach. */
+                onOpen={() => onGo(n.id)}
+              />
+            ))}
+          </Group>
+        )
         : nothing}
     </div>
   );

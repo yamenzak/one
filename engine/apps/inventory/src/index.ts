@@ -4772,13 +4772,18 @@ export const INVENTORY: AppSpec = defineApp({
       sheet. Every role that holds one of the two holds the other, so the split
       is a statement about the act rather than a door somebody is caught behind.
     */
-    { id: "import", route: "/import", label: "Import", nav: "secondary", icon: "add",
+    /* ⚠️ `file` RATHER THAN `add`, WHICH RECEIVE ALREADY HAS. Two nav-visible
+       screens of one app wearing one mark is a bar that cannot answer where you
+       are — and this is a spreadsheet, not a plus. */
+    { id: "import", route: "/import", label: "Import", nav: "secondary", icon: "file",
       permission: "product:write", features: ["imports"] },
     /* ⚠️ THE LAST STEP OF THE REORDER REPORT'S OWN WORKFLOW. That screen can say
        what to buy and how long the shelf lasts; without this it cannot say who
        to ring, and the decision it worked out is finished somewhere else. */
     { id: "supplier", route: "/suppliers", label: "Suppliers", nav: "secondary",
-      icon: "box", permission: "product:write" },
+      /* ⚠️ NOT `box` — that is Stock's, and both are in the nav. A supplier is
+         somebody you ring rather than something on a shelf. */
+      icon: "people", permission: "product:write" },
     { id: "start", route: "/start", label: "Getting started", nav: "secondary", icon: "star",
       permission: "product:read", sky: "glow" },
   ],

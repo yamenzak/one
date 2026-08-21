@@ -34,7 +34,7 @@ import {
    the outside, and lucide's path order is not something to build on. */
 import {
   BellMark, CalendarMark, CheckMark, FlagMark, InboxMark, KeyMark, LayersMark, LeaveMark,
-  RefreshMark, SearchMark, ShieldMark,
+  RefreshMark, SearchMark, ShareMark, ShieldMark,
 } from "../parts/marks.js";
 import { Page } from "./page.js";
 import { Island } from "./chrome.js";
@@ -105,6 +105,11 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
      out was the one row in the account centre with an empty lead, which reads
      as a row that failed to load rather than as a different kind of thing. */
   leave: <LeaveMark />,
+  /* ⚠️ THE VOCABULARY HAD NO SHARE MARK, and the app that needed one reached for
+     `star` and then for `people` — both already in its own nav. A gap in the
+     registry is answered by adding to it, never by a second screen wearing
+     somebody else's mark. */
+  share: <ShareMark />,
   /* ⚠️ TWO OF THE OPERATOR CONSOLE'S OWN NINE ROWS DREW THE NEUTRAL CIRCLE, on
      the one menu where every other row has a mark — which is the failure this
      map's header describes, on the screen written after it. */
@@ -145,7 +150,7 @@ export const LIVELY: Readonly<Record<string, string>> = {
   bell: "ring", "bell-ring": "ring",
   inbox: "take",
   calendar: "page",
-  leave: "depart",
+  leave: "depart", share: "reach",
   trust: "guard", shield: "guard",
   check: "draw",
   search: "seek",

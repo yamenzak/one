@@ -530,12 +530,12 @@ export function OneOf({ value, onChange, options, ...p }: Said & {
  * always selected: a segmented control with nothing chosen is a question the
  * screen is asking itself.
  */
-export function Segmented({ value, onChange, options, ...p }: Omit<Said, "help" | "error"> & {
+export function Segmented({ value, onChange, options, ...p }: Omit<Said, "error"> & {
   readonly value: string;
   readonly onChange: (id: string) => void;
   readonly options: readonly Option[];
 }) {
-  return (
+  const group = (
     <ToggleButtonGroup
       aria-label={p.label}
       selectionMode="single"
@@ -560,7 +560,7 @@ export function Segmented({ value, onChange, options, ...p }: Omit<Said, "help" 
          card, with the library's own `justify-center` then floating four
          segments in the middle of a thousand pixels of nothing. The intent
          above was written and did not happen. */
-      className="w-full flex-wrap sm:w-auto sm:flex-nowrap sm:self-start"
+      className="w-full flex-wrap sm:w-auto sm:flex-nowrap"
     >
       {options.map((o, i) => (
         <ToggleButton key={o.id} id={o.id} className="grow basis-0 sm:grow-0 sm:basis-auto">
@@ -569,6 +569,23 @@ export function Segmented({ value, onChange, options, ...p }: Omit<Said, "help" 
         </ToggleButton>
       ))}
     </ToggleButtonGroup>
+  );
+
+  /* ⚠️ THE LABEL IS DRAWN, AND IT WAS THE ONE CONTROL HERE THAT DROPPED IT. Every
+     other control in this file renders `Naming`; this one put `p.label` in an
+     `aria-label` and nowhere else, so a screen with TWO of them one above the
+     other — the label sheet picks a subject and then a kind — showed two rows of
+     unnamed buttons and the words the author wrote reached nobody looking at it.
+
+     ⚠️ AND `NamedAlready` STILL HIDES IT, which is what makes drawing it safe
+     rather than a regression on every row that already prints the name. Same
+     context, same rule, same as its nine neighbours. */
+  return (
+    <div className={`flex w-full flex-col ${SPACE.tight} sm:w-auto sm:self-start`}>
+      <Naming>{p.label}</Naming>
+      {group}
+      <Tail help={p.help} />
+    </div>
   );
 }
 
