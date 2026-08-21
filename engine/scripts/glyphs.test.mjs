@@ -249,6 +249,8 @@ if (!stolen) ok(`no screen draws a registered mark itself (${looked} files, ${KN
     "apps/inventory/src/index.ts",
     "apps/inventory/src/screens/Ask.tsx",
     "apps/inventory/src/screens/Scan.tsx",
+    /* And `Receive`, over the lines a model read off a photographed page. */
+    "apps/inventory/src/screens/Receive.tsx",
   ]);
 
   let uses = 0;

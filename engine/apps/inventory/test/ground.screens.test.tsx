@@ -24,6 +24,7 @@ import { LINES, PLACES, EMPTY_PLACE } from "../src/screens/sample.js";
 import { Ask, type Answer } from "../src/screens/Ask.js";
 import { Item, type Kept } from "../src/screens/Item.js";
 import type { Guess } from "../src/screens/Scan.js";
+import { keyOf, type Noted } from "../src/screens/Receive.js";
 import { Kit, type Member, type Missing } from "../src/screens/Kit.js";
 
 const html = (route: string) => renderToStaticMarkup(<InventoryScreen route={route} />);
@@ -281,14 +282,21 @@ describe("receiving", () => {
 
   const drawn = (place: { id: string; name: string } | null, of: Seen | null) =>
     renderToStaticMarkup(
-      <Receive
-        place={place}
-        seen={of}
-        onRead={() => undefined}
-        onForget={() => undefined}
-        onReceive={() => undefined}
-      />,
-    );
+    <Receive
+      place={place}
+      seen={of}
+      /* ⚠️ NO NOTE HERE. This suite is about the scan-and-quantity flow; the
+         photographed page is its own suite with its own harness. */
+      note={ready(null)}
+      done={new Set()}
+      onRead={() => undefined}
+      onForget={() => undefined}
+      onReceive={() => undefined}
+      onNote={() => undefined}
+      onLine={() => undefined}
+      again={() => undefined}
+    />,
+  );
 
   /* ⚠️ THE SHELF FIRST, BECAUSE EVERYTHING AFTER IT LANDS THERE. A session with
      no place is a session about to put twenty things nowhere. */
@@ -721,5 +729,85 @@ describe("asking in words", () => {
     const out = drawnAsk(null, 40);
     expect(out).toContain("Do we have any blue resin");
     expect(out).toContain("The answer will appear here");
+  });
+});
+
+
+/**
+ * A DELIVERY NOTE IS A WORKLIST, NOT A WRITE.
+ *
+ * ⚠️ ONE PHOTOGRAPH INSTEAD OF THIRTY SCANS is the whole value at a goods-in
+ * desk — and a quantity read off a creased page is exactly the consequence a
+ * model may not commit. So the lines FILL the row above and the ordinary act
+ * records them: every line confirmed, by a gesture somebody already knows.
+ *
+ * ⚠️ AND THE TICK IS THE POINT OF THE LIST. Thirty lines with no record of which
+ * are done is a page somebody loses their place in, and then works through
+ * twice — which is a doubled delivery, silently, in the direction nobody checks.
+ */
+describe("a photographed delivery note", () => {
+  const LINES: readonly Noted[] = [
+    { code: "05000112637922", name: "Nitrile gloves, blue", quantity: 8,
+      lot: "A5B7", expiry: "2027-03-31" },
+    { code: "", name: "Masking tape, 50 mm", quantity: 12, lot: "", expiry: "" },
+  ];
+
+  const AT = { id: "p-a1", name: "Rack A · A1" };
+
+  /* ⚠️ ITS OWN HARNESS, because the module-scope `drawn` draws the SCAN screen —
+     two suites, two screens, and one name for both is a test that passes while
+     asserting about the wrong page. */
+  const receiving = (
+    place: { id: string; name: string } | null,
+    note: readonly Noted[] | null,
+    done: ReadonlySet<string> = new Set(),
+  ) => renderToStaticMarkup(
+    <Receive
+      place={place}
+      seen={null}
+      note={ready(note)}
+      done={done}
+      onRead={() => undefined}
+      onForget={() => undefined}
+      onReceive={() => undefined}
+      onNote={() => undefined}
+      onLine={() => undefined}
+      again={() => undefined}
+    />,
+  );
+
+  it("lists what it read, and says a model read it", () => {
+    const out = receiving(AT, LINES);
+    expect(out).toContain("Nitrile gloves, blue");
+    expect(out).toContain("Masking tape, 50 mm");
+    expect(out).toContain("Read by a model");
+  });
+
+  it("offers each line to the row above rather than recording it", () => {
+    const out = receiving(AT, LINES);
+    expect(out.match(/Use it/g)?.length).toBe(2);
+  });
+
+  /* ⚠️ A LINE ALREADY RECORDED IS TICKED AND OFFERS NOTHING. A button that
+     would receive it a second time is the doubled delivery this list exists to
+     prevent. */
+  it("ticks what has been added, and stops offering it", () => {
+    const out = receiving(AT, LINES, new Set([keyOf(LINES[0] as Noted)]));
+    expect(out).toContain("Added");
+    expect(out.match(/Use it/g)?.length).toBe(1);
+  });
+
+  /* ⚠️ AN EMPTY LIST IS A CORRECT ANSWER — a photograph of a wall, or a page
+     nothing could be read off. Saying so beats a card that is simply absent. */
+  it("says when nothing could be read off the page", () => {
+    expect(receiving(AT, [])).toContain("Nothing could be read off that");
+  });
+
+  /* ⚠️ AND IT IS ABSENT UNTIL THERE IS A SHELF, for the reason everything else
+     on this screen is: a session with no place is about to put a whole
+     delivery nowhere. */
+  it("is not offered before a shelf is scanned", () => {
+    expect(receiving(null, null)).not.toContain("Photograph the delivery note");
+    expect(receiving(AT, null)).toContain("Photograph the delivery note");
   });
 });

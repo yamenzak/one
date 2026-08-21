@@ -26,7 +26,7 @@ import { coverage, stuttering } from "../count.js";
 import { Count, type Change, type Counted, type Uncovered } from "./Count.js";
 import { Item, SAID, type Kept } from "./Item.js";
 import { Kit, KIT_SAID, type Member, type Missing } from "./Kit.js";
-import { Receive } from "./Receive.js";
+import { Receive, keyOf, type Noted } from "./Receive.js";
 import { Ask, type Answer } from "./Ask.js";
 import { Scan, type Guess, type Seen } from "./Scan.js";
 import { Stock } from "./Stock.js";
@@ -600,6 +600,16 @@ const RECEIVE = (api: Door) => function ReceiveHere() {
      is a round trip in front of a button whose whole value is being instant. */
   const [undoable, setUndoable] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
+  /* ⚠️ `null` UNTIL A PAGE IS PHOTOGRAPHED. Reading one costs credits, so this
+     is never asked for on arrival. */
+  const [note, setNote] = React.useState<Loaded<readonly Noted[] | null>>(ready(null));
+  /* ⚠️ WHICH LINES HAVE BEEN RECORDED, HELD HERE. It is a property of this
+     session working through this page, not of the workspace — and the ledger
+     cannot answer it, because a line and a movement are not the same shape. */
+  const [done, setDone] = React.useState<ReadonlySet<string>>(new Set());
+  /* ⚠️ THE LINE THE ROW WAS FILLED FROM, so recording it can tick the right one
+     — the row itself carries no memory of where its numbers came from. */
+  const from = React.useRef<Noted | null>(null);
   const today = dayHere();
 
   const places = world.places.status === "ready" && world.stock.status === "ready"
@@ -624,12 +634,51 @@ const RECEIVE = (api: Door) => function ReceiveHere() {
       });
   }, [api, places]);
 
+  const readNote = (image: string) => {
+    setBusy(true);
+    setNote(waiting());
+    setDone(new Set());
+    void api.post<{ lines: readonly Noted[] }>("stock.note", { image }).then((got) => {
+      setBusy(false);
+      setNote(got.ok ? ready(got.value.lines) : trouble(got.problem));
+    });
+  };
+
   return (
     <Receive
       title={nameOf("/receive")}
       place={place}
       seen={seen}
       busy={busy}
+      note={note}
+      done={done}
+      again={() => { world.again(); }}
+      onNote={readNote}
+      onLine={(line) => {
+        /*
+          ⚠️ THE LINE FILLS THE ROW RATHER THAN RECORDING ITSELF. What a model
+          read off a creased page is a suggestion until somebody agrees with it,
+          and the gesture they agree with it by is the one they already use.
+
+          ⚠️ AND A LINE WITH NO CODE IS RECEIVED AGAINST ITS OWN DESCRIPTION.
+          The supplier's words are the best name anybody has for it today; the
+          product lands `unnamed` and the first real scan of its barcode is an
+          unknown code, learnable onto that row. Refusing the line instead would
+          lose the delivery, which is the worst outcome this product has.
+        */
+        from.current = line;
+        const raw = line.code || line.name;
+        setLast(raw);
+        setSeen({
+          found: false, kind: line.code ? "gtin" : "other", value: raw, ours: "",
+          product: "", name: line.name, tracking: "", unit: "", pack: 1,
+          lot: line.lot, expiry: line.expiry,
+          /* ⚠️ WHAT THE PAGE DID NOT SAY, ASKED FOR. A note that gave a lot and
+             no date is a batch with no expiry unless the person is asked. */
+          needs: [line.lot ? "" : "lot", line.expiry ? "" : "expiry"]
+            .filter(Boolean).join(","),
+        });
+      }}
       onRead={read}
       onForget={() => { setSeen(null); }}
       onUndo={undoable
@@ -659,6 +708,14 @@ const RECEIVE = (api: Door) => function ReceiveHere() {
         }).then((got) => {
           setBusy(false);
           if (!got.ok) return;
+          /* ⚠️ THE LINE IS TICKED ONLY WHERE THE WRITE LANDED. A worklist that
+             crossed a line off on the press rather than on the answer is a page
+             somebody works through twice. */
+          if (from.current) {
+            const at = keyOf(from.current);
+            setDone((was) => new Set([...was, at]));
+            from.current = null;
+          }
           /* ⚠️ CLEARED SO THE NEXT SCAN STARTS CLEAN. A screen still showing the
              last thing is a screen where somebody presses "Add it" twice. */
           setSeen(null);

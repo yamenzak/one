@@ -27,7 +27,7 @@ import { Ask, type Answer } from "./Ask.js";
 import { Count, type Change, type Counted, type Uncovered } from "./Count.js";
 import { Item, type Kept } from "./Item.js";
 import { Kit, type Member, type Missing } from "./Kit.js";
-import { Receive } from "./Receive.js";
+import { Receive, keyOf, type Noted } from "./Receive.js";
 import { Scan, type Guess, type Seen } from "./Scan.js";
 import { Start } from "./Start.js";
 import { Stock } from "./Stock.js";
@@ -37,8 +37,8 @@ import { Where } from "./Where.js";
 export { Ask, Count, Item, Kit, Receive, Scan, Start, Stock, Thing, Where };
 export * from "./sample.js";
 export type {
-  Answer, Batch, Change, Counted, Guess, Kept, Member, Missing, Movement, Seen,
-  Uncovered,
+  Answer, Batch, Change, Counted, Guess, Kept, Member, Missing, Movement, Noted,
+  Seen, Uncovered,
 };
 
 const nothing = () => undefined;
@@ -204,6 +204,20 @@ const ANSWERED: Answer = {
   looked: 2,
 };
 
+/**
+ * ⚠️ A DELIVERY NOTE AS A MODEL READ IT, and not a tidy one. A page carries lines
+ * with a lot and a date, lines with neither, and lines whose code nobody here has
+ * ever seen — and the screen has to be readable with all three on it at once.
+ */
+const NOTED: readonly Noted[] = [
+  { code: "05000112637922", name: "Nitrile gloves, blue", quantity: 8,
+    lot: "A5B7", expiry: "2027-03-31" },
+  { code: "", name: "Masking tape, 50 mm", quantity: 12, lot: "", expiry: "" },
+  { code: "04012345678901", name: "Isopropanol 99%, 1 L", quantity: 4,
+    lot: "C0921", expiry: "2028-01-31" },
+  { code: "", name: "Screws, M4 × 20", quantity: 2, lot: "", expiry: "" },
+];
+
 /** ⚠️ Everything at or below a place, which is what a tree row promises. */
 const under = (places: readonly Place[], here: string | null): ReadonlySet<string> => {
   const held = new Set<string>();
@@ -329,10 +343,17 @@ export function InventoryScreen({ route, onGo }: {
           title={title}
           place={{ id: "p-a1", name: "Rack A · A1" }}
           seen={SCANNED}
+          /* ⚠️ A NOTE HALF WORKED THROUGH, which is the state worth looking at:
+             one line ticked, three to go. A fresh list photographs as a list. */
+          note={ready(NOTED)}
+          done={new Set([keyOf(NOTED[0] as Noted)])}
           onRead={nothing}
           onForget={nothing}
           onReceive={nothing}
           onUndo={nothing}
+          onNote={nothing}
+          onLine={nothing}
+          again={nothing}
         />
       );
     case "/count":
