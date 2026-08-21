@@ -206,6 +206,7 @@ if (what === "guards") {
     ["wallet", "OneWallet: the allowance, what was bought, and reserve → settle → release"],
     ["catalogue", "the price list an operator edits over the declaration, and what it holds for the people already on a tier"],
     ["packages", "granting, revoking and expiring a bought bundle"],
+    ["gifts", "what an operator gave somebody, put onto a workspace — the one path founding and the console both call"],
     ["inbox", "notifications: the policy, the audience, the read"],
     ["reach", "the grant resolved for one request, and the subtree it covers"],
     ["services", "the lane out to a provider — AI and mail"],

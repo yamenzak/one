@@ -103,7 +103,12 @@ export async function applyPlanGift(
      switched on, so the row is filed under no app — and this took the caller's
      app id for one draft, which comped a row `renewAllowance` then could not
      find: the plan landed, the allowance was zero, and nothing failed. */
-  await compPlan(db, tenantId, MEMBERSHIP, plan.id, now);
+  /* ⚠️ AND THE GIFT'S TERM GOES ONTO THE SUBSCRIPTION. The gift's own date
+     decides whether it may still be SPENT; the workspace it was spent on needs
+     to know when its tier ends, and the nightly pass reads it from there — see
+     `sweepAllowances`. Left off, a year of cash would be a tier kept for ever
+     because nothing was watching. */
+  await compPlan(db, tenantId, MEMBERSHIP, plan.id, now, gift.until);
   await renewAllowance(db, tenantId, plans, now);
   return { gift: { ...gift, spent: gift.spent + 1 }, planId: plan.id, credits: plan.credits };
 }

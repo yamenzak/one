@@ -401,7 +401,7 @@ and a manifest that does not compose refuses to boot.
 | `credit` | metered work: the reserve, the rate, the ceiling | 15 | — |
 | `dunning` | the ladder from past due to erased | 5 | — |
 | `package` | a priced bundle of timed grants | 8 | 1 |
-| `tenancy` | workspaces, kinds, shards, placement, standing | 14 | — |
+| `tenancy` | workspaces, kinds, shards, placement, standing | 17 | — |
 | `door` | the five doors, and which host is which | 2 | — |
 | `setting` | a switch a workspace owns, and the page it lives on | 9 | — |
 | `flag` | a switch WE own, with a date it stops being one | 8 | — |
@@ -418,7 +418,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**282 of them**, 281 reached by something today.
+**285 of them**, 284 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -435,7 +435,7 @@ env or a binding.
 |---|---|---|---|
 | `schema` | the composed schema runner — declarations become tables | 7 | — |
 | `sql` | the one typed seam onto D1 | 5 | — |
-| `directory` | accounts, workspaces, placement, enablement, allowances | 37 | — |
+| `directory` | accounts, workspaces, placement, enablement, allowances | 42 | — |
 | `handles` | which binding holds which shard | 4 | — |
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
 | `flags` | what somebody switched, per deployment and per workspace | 10 | — |
@@ -445,10 +445,11 @@ env or a binding.
 | `serve` | the one path every request ends in — both doors | 6 | — |
 | `records` | the generated reads and writes behind a collection | 8 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
-| `billing` | plans, subscriptions, the bill, the ladder | 15 | — |
+| `billing` | plans, subscriptions, the bill, the ladder | 16 | — |
 | `wallet` | OneWallet: the allowance, what was bought, and reserve → settle → release | 22 | — |
 | `catalogue` | the price list an operator edits over the declaration, and what it holds for the people already on a tier | 8 | — |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
+| `gifts` | what an operator gave somebody, put onto a workspace — the one path founding and the console both call | 3 | — |
 | `inbox` | notifications: the policy, the audience, the read | 14 | — |
 | `reach` | the grant resolved for one request, and the subtree it covers | 2 | — |
 | `services` | the lane out to a provider — AI and mail | 8 | — |
@@ -494,7 +495,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**440 of them**, 439 reached by something today.
+**449 of them**, 448 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -960,6 +961,7 @@ its own header, cited by other files, and doing nothing.
 | D45 | A membership is narrowed to part of a workspace, and one filter applies everywhere | 1 |
 | D46 | Five is what a phone's bar holds, not what an app may have | 0 |
 | D47 | One screen draws every moment One cannot show you a screen | 0 |
+| D48 | A gift is a row about a person, not a state on a workspace | 0 |
 <!-- /generated -->
 
 ---
@@ -1063,8 +1065,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 73 | The other half of OneInventory, driven — and the quarantine that was a badge on a screen | shipped |
 | 74 | The foot of a phone is a vignette, and everywhere an app declares is reachable from it | shipped |
 | 75 | A raw ALTER is a 503 on every door, and every standard page wears the curtain | shipped |
+| 76 | A person is a subject, and an operator may give them things | shipped |
 
-**65 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**66 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

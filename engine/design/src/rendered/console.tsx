@@ -12,7 +12,9 @@
  * problem it claimed to solve.
  */
 
-import type { Allowance, EntitlementDef, FlagBook, FlagDef, PlanSpec } from "@engine/kernel";
+import type {
+  Allowance, EntitlementDef, FlagBook, FlagDef, Instant, PlanSpec,
+} from "@engine/kernel";
 import * as React from "react";
 import { UNLIMITED, overdue, resolve, sayDate, sayMoney, settableBy } from "@engine/kernel";
 import { Table } from "@heroui/react";
@@ -40,6 +42,20 @@ export interface ShelfProps {
   readonly plans: readonly PlanSpec[];
   readonly entitlements: Readonly<Record<string, EntitlementDef>>;
   readonly current?: string;
+  /**
+   * THIS PLAN WAS GIVEN, AND NOBODY IS BILLED FOR IT.
+   *
+   * ⚠️ WITHOUT IT THE SHELF PRINTS A PRICE THE WORKSPACE IS NOT PAYING. A comped
+   * workspace read "Max · Your plan · €99 a month" over a card that does not
+   * exist — so the customer most in need of knowing the terms (paid cash, a
+   * friend, a demo about to end) was shown a bill describing somebody else's
+   * arrangement, with a button to manage a subscription there is none of.
+   *
+   * ⚠️ AND THE TERM IS THE HALF THAT MATTERS. "Free" is not news; "free until
+   * the first of December" is the sentence somebody has to act on, and it is the
+   * one a price list can never say.
+   */
+  readonly given?: { readonly until?: Instant | null } | null;
   readonly onChoose: (planId: string) => void;
 }
 
@@ -70,8 +86,9 @@ export function useMoney(): (minor: number, currency: string) => string {
   );
 }
 
-export function Shelf({ plans, entitlements, current, onChoose }: ShelfProps) {
+export function Shelf({ plans, entitlements, current, given, onChoose }: ShelfProps) {
   const money = useMoney();
+  const shownAs = useShown();
   /* ⚠️ The parking plan is where somebody who never chose lands. It is shown —
      hiding it would make the screen disagree with the plan they are on. */
   const shown = [...plans].sort((a, b) => a.order - b.order);
@@ -101,8 +118,16 @@ export function Shelf({ plans, entitlements, current, onChoose }: ShelfProps) {
           <AmountRow
             key={plan.id}
             label={plan.name}
-            under="Your plan"
-            amount={money(plan.price, plan.currency)}
+            under={given
+              ? (given.until
+                ? `Given, and free until ${sayDate(shownAs, given.until, "long")}`
+                : "Given, and nothing is billed for it")
+              : "Your plan"}
+            /* ⚠️ THE PRICE IS NOT WHAT IS HAPPENING, so a given plan reads
+               "Free". The catalogue's own figure stays true of the plan and
+               false of this workspace, and printing it here is the one place
+               that difference reaches somebody. */
+            amount={given ? "Free" : money(plan.price, plan.currency)}
             /* ⚠️ NO CHEVRON: there is nowhere to go from the one you are on, and
                a row that promises something and does nothing is worse than a row
                that promises nothing. */

@@ -109,6 +109,31 @@ describe("a plan gift landing", () => {
     expect(gift!.spent).toBe(0);
   });
 
+  /**
+   * ⚠️ THE DATED ONE FIRST, because the alternative is an operator watching the
+   * gift they put a term on lapse unused while the person runs on the one that
+   * never ends — and then asking why the term did nothing.
+   */
+  it("spends the gift with a term before the open-ended one", async () => {
+    const email = someone();
+    const tenant = await workspace("commercial");
+    await give(db(), {
+      email, kind: "plan", planId: "max", why: "Forever", by: "op@4dl.app",
+    }, NOW);
+    const dated = await give(db(), {
+      email, kind: "plan", planId: "max", until: "2026-12-01T00:00:00.000Z",
+      why: "Until December", by: "op@4dl.app",
+    }, NOW);
+
+    const done = await applyPlanGift(db(), tenant, email, PLANS, NOW);
+    expect(typeof done === "string" ? done : done.gift.id).toBe(dated.id);
+    /* ⚠️ AND THE TERM REACHES THE SUBSCRIPTION, which is what the nightly pass
+       reads to end it — see `sweepAllowances`. Left off, a year of cash is a
+       tier kept for ever because nothing was watching. */
+    const sub = await subscriptionFor(db(), tenant, MEMBERSHIP);
+    expect(sub?.compedUntil).toBe("2026-12-01T00:00:00.000Z");
+  });
+
   it("picks the gift the workspace can actually use", async () => {
     const email = someone();
     const tenant = await workspace("personal");

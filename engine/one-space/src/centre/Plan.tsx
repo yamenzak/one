@@ -40,6 +40,11 @@ export function Plan() {
             plans={data.plans}
             entitlements={data.entitlements}
             current={data.plan?.id ?? undefined}
+            /* ⚠️ WHETHER ANYBODY IS PAYING FOR THIS. Without it the shelf printed
+               the catalogue's price over a workspace with no card — so a cash
+               customer, a friend and a demo about to end all read a bill
+               describing somebody else's arrangement. */
+            given={data.given}
             /*
               ⚠️ CHOOSING OPENS A PAGE STRIPE OWNS, AND GRANTS NOTHING. The
               plan is stamped only when a signed event says the money moved —

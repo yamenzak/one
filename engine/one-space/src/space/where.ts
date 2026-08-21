@@ -132,6 +132,15 @@ export type Where =
   | { readonly at: "console" }
   | { readonly at: "tenants" }
   /**
+   * EVERYBODY WHO HAS SIGNED IN HERE.
+   *
+   * ⚠️ THE CONSOLE COULD SEE EVERY WORKSPACE AND NOBODY IN ONE. A person is the
+   * subject of half the support a deployment ever does — who are they, where do
+   * they belong, what were they promised — and answering any of it meant
+   * knowing a workspace first and reading its roster.
+   */
+  | { readonly at: "accounts" }
+  /**
    * ⚠️ ONE WORKSPACE, FROM THE OPERATOR'S SIDE. The list answered "who is here"
    * and then every other question about a workspace was a tray hanging off a
    * table cell — which is a screen's worth of facts squeezed into a popover, and
@@ -139,6 +148,16 @@ export type Where =
    * (DESIGN.md §3).
    */
   | { readonly at: "tenant"; readonly id: string }
+  /**
+   * ONE PERSON, WHICH IS THE SUBJECT THE CONSOLE COULD NOT SEE.
+   *
+   * ⚠️ IT IS ADDRESSED BY EMAIL AND NOT BY ID, and that is not a shortcut. A
+   * gift is made to an ADDRESS before there is an account to point at — a demo,
+   * a friend, somebody who paid cash last week — so the screen has to open on
+   * somebody who does not exist here yet, and an id-shaped address could not
+   * name them.
+   */
+  | { readonly at: "account"; readonly email: string }
   /**
    * ⚠️ WHAT THIS DEPLOYMENT SELLS, WHICH IS NOT WHAT ITS CODE DECLARES. The
    * declaration decides which plans exist and which keys each one prices; the
@@ -282,7 +301,7 @@ export const atConsoleScreen = (
  * between them is the whole of the explanation.
  */
 export const OFTEN: readonly WorkspacePart[] = ["people", "money"];
-export const OF_CONSOLE = ["tenants", "catalogue", "ai", "keys", "switches", "maintenance", "telling", "works", "shards", "stores", "pass"] as const;
+export const OF_CONSOLE = ["tenants", "accounts", "catalogue", "ai", "keys", "switches", "maintenance", "telling", "works", "shards", "stores", "pass"] as const;
 
 /**
  * ⚠️ AND WHAT IS INSIDE THE AI AREA. Listed here rather than inside the screen
@@ -351,7 +370,8 @@ const isAiPart = (v: string): v is AiPart => (OF_AI as readonly string[]).includ
  * screen simply reads as somebody's workspace.
  */
 export const isConsole = (where: Where): boolean =>
-  where.at === "console" || where.at === "tenant" || OPERATOR_PARTS.includes(where.at);
+  where.at === "console" || where.at === "tenant" || where.at === "account"
+  || OPERATOR_PARTS.includes(where.at);
 
 /** Whether a path is OneSpace's at all — the page under it renders otherwise. */
 export const inSpace = (path: string): boolean =>
@@ -417,6 +437,12 @@ export function parseWhere(path: string): Where {
     if (part === undefined) return { at: "console" };
     if (!isConsolePart(part)) return { at: "console" };
     if (part === "tenants" && tail[1]) return { at: "tenant", id: tail[1] };
+    /* ⚠️ THE ADDRESS IS THE SEGMENT, DECODED. An email in a path is percent-
+       encoded by every browser that writes one, and a screen handed `a%40b.com`
+       would look up an account nobody has. */
+    if (part === "accounts" && tail[1]) {
+      return { at: "account", email: decodeURIComponent(tail[1]) };
+    }
     if (part === "switches" && tail[1]) return { at: "switch", id: tail[1] };
     /*
       ⚠️ ONE AREA NESTS, AND IT NESTS IN THE ADDRESS RATHER THAN IN A SCREEN.
@@ -461,6 +487,7 @@ export function pathOf(where: Where): string {
       return `${SPACE}/console/ai/models${where.lane ? `/${where.lane}` : ""}`;
     case "gateway": case "finding": return `${SPACE}/console/ai/${where.at}`;
     case "tenant": return `${SPACE}/console/tenants/${where.id}`;
+    case "account": return `${SPACE}/console/accounts/${encodeURIComponent(where.email)}`;
     case "switch": return `${SPACE}/console/switches/${where.id}`;
     case "plan": return `${SPACE}/w/${where.slug}/plan`;
     /* ⚠️ THE PAGE IS IN THE ADDRESS TOO. Settings descend, and an area that only
@@ -525,6 +552,7 @@ export function above(where: Where): Where | null {
     case "gateway": case "finding": return { at: "ai" };
     case "actions": return where.app ? { at: "actions" } : { at: "ai" };
     case "tenant": return { at: "tenants" };
+    case "account": return { at: "accounts" };
     case "switch": return { at: "switches" };
     case "plan": return { at: "money", slug: where.slug };
     case "settings":
@@ -580,6 +608,12 @@ export const nameOf = (where: Where): string => {
       guesses. What each one now says is what is behind it.
     */
     case "tenants": return "Workspaces";
+    /* ⚠️ "Accounts", NOT "People". The workspace centre owns People — its own
+       roster — and two of that word in one address grammar is the collision
+       every naming rule here exists to prevent. `account` is already the word
+       for a person's own record everywhere else in this codebase. */
+    case "accounts": return "Accounts";
+    case "account": return "Somebody";
     case "catalogue": return "Price list";
     case "tenant": return "Workspace";
     case "ai": return "AI";

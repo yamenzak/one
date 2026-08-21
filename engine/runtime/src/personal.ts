@@ -217,6 +217,21 @@ export interface IdentityDeps {
    * like a catalogue with nothing in it.
    */
   readonly plans?: () => readonly PlanSpec[];
+  /**
+   * ⚠️ WHAT A WORKSPACE IS ON, AND WHETHER ANYBODY IS PAYING FOR IT. Injected
+   * for the reason `needsAttention` is: the subscription table belongs to a
+   * module a deployment may not have applied, and reading it from `me.who` —
+   * the one call every door makes before it draws anything — made a deployment
+   * without it answer `no such table` to everybody.
+   *
+   * ⚠️ AND IT CARRIES THE GIFT, NOT ONLY THE TIER. A workspace on Max beside one
+   * paying for Max is two rows a person cannot tell apart, and only one of them
+   * has a card that can decline and a term that can end.
+   */
+  readonly membership?: (directory: Db, tenantId: TenantId) => Promise<{
+    readonly planId: string | null;
+    readonly given: { readonly at: string; readonly until: string | null } | null;
+  } | null>;
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -621,9 +636,17 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
              OTHER. Awaited one after the other this walk would cost two round
              trips per workspace on the read every door makes at boot; run
              concurrently it costs one query's latency however many there are. */
-          const [member, unseen] = await Promise.all([
+          const [member, unseen, sub] = await Promise.all([
             memberFor(ctx.shardOf(t), t.id, accountId),
             unseenCount(ctx.shardOf(t), t.id, accountId),
+            /* ⚠️ AND WHAT IT IS ON, ASKED RATHER THAN READ — the same seam
+               `needsAttention` uses and for the same reason. The subscription
+               table is a module a deployment may not have applied, and reading
+               it from here made `me.who` throw `no such table` on one that had
+               not — on the call every door makes before it can draw anything. */
+            deps.membership
+              ? deps.membership(ctx.directory, t.id)
+              : Promise.resolve(null),
           ]);
           /* ⚠️ Only where it is worth saying. A badge on every row is texture;
              one on the workspace that stopped paying is why somebody looked. */
@@ -640,6 +663,12 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
                screen somebody lands on. */
             kind: t.kind,
             legalName: t.legalName,
+            /* ⚠️ THE TIER AND WHETHER IT WAS GIVEN. `plan` alone would put a
+               workspace on Max beside one paying for Max with nothing telling
+               them apart — and only one of the two has a card that can decline
+               and a term that can end. */
+            plan: sub?.planId ?? null,
+            given: sub?.given ?? null,
             platformRole: member?.platformRole ?? null,
             appRoles: member?.appRoles ?? {},
             apps,

@@ -56,7 +56,7 @@ import {
   collectOwed, dueForAllowance, dueForTopUp, noteTopUpAttempt, noteTopUpFailed, owe,
   renewAllowance, walletOf, MILLI,
 } from "./wallet.js";
-import { compedSubscriptions } from "./billing.js";
+import { MEMBERSHIP, compedSubscriptions, endComp } from "./billing.js";
 import { column, table, type Db } from "./sql.js";
 import { type LogReader } from "./gateway.js";
 import { dropItem, ensureInstance, listModels, putItem, type Account } from "./cloudflare.js";
@@ -1064,8 +1064,29 @@ export async function sweepAllowances(deps: SweepDeps): Promise<{ touched: numbe
 
   let granted = 0;
   const said: string[] = [];
+  /* ⚠️ THE LOBBY, WHICH A DEPLOYMENT WITH NO CATALOGUE HAS NONE OF. Nothing to
+     put a lapsed comp back onto is not a reason to strip its plan — leaving it
+     where it is keeps a workspace working on a deployment that is mid-setup. */
+  const parking = plans.find((p) => p.parking) ?? null;
 
   for (const one of await compedSubscriptions(deps.directory)) {
+    /*
+      ⚠️ ENDING A LAPSED TERM IS THE SAME PASS AS RENEWING A LIVE ONE, and it has
+      to come first. Renewing the allowance of a comp whose year ran out in
+      March would hand out another month of credits on a tier nobody agreed to
+      keep paying for — quietly, every month, for as long as nobody looked.
+
+      ⚠️ AND A TERM IS THE UNCOMMON CASE. Most comps are open-ended: a friend, a
+      demo account, a deployment with no payment rail at all.
+    */
+    if (one.until && one.until <= now.toISOString()) {
+      if (!parking) continue;
+      if (await endComp(deps.directory, one.tenantId, MEMBERSHIP, parking.id, now)) {
+        said.push(`${one.tenantId}: given plan ended`);
+        granted++;
+      }
+      continue;
+    }
     if (!await dueForAllowance(deps.directory, one.tenantId, now)) continue;
     const credits = await renewAllowance(deps.directory, one.tenantId, plans, now);
     granted++;

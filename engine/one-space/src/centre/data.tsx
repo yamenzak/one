@@ -135,6 +135,15 @@ export interface HoldingLine {
 export interface MoneyView {
   readonly plan: { readonly id: string; readonly name: string; readonly kind: string } | null;
   readonly status: string | null;
+  /**
+   * ⚠️ WHEN IT WAS GIVEN, AND `null` WHEN IT WAS BOUGHT. The two look identical
+   * on every screen without it — and only one of them has an invoice behind it,
+   * a card that can decline, and a subscription there is anything to manage.
+   */
+  readonly given: {
+    readonly at: import("@engine/kernel").Instant;
+    readonly until: import("@engine/kernel").Instant | null;
+  } | null;
   readonly plans: readonly import("@engine/kernel").PlanSpec[];
   readonly packs: readonly import("@engine/kernel").PackDef[];
   readonly entitlements: Readonly<Record<string, import("@engine/kernel").EntitlementDef>>;

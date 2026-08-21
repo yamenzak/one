@@ -37,7 +37,7 @@ import {
   webhookSecret,
   operatorOps, permissionsResolver, personalOps, pusherOver, schemaFor, sendMail, serve,
   settleBindings,
-  sessionIdFrom, shardFor, subscriptionFor, whoIs,
+  MEMBERSHIP, sessionIdFrom, shardFor, subscriptionFor, whoIs,
   type Bucket, type Db, type MailDeps, type Mailer, type TenantRow,
   configOf,
   DEFAULT_MULTIPLIER,
@@ -1771,6 +1771,18 @@ const handler = async (env: Env) => {
            an id with no plan behind it is an empty entitlement set — so the
            application resolves the plan from here rather than from the row. */
         plans: () => PLANS,
+        /* ⚠️ AND WHAT EACH WORKSPACE IS ON, through the same seam
+           `needsAttention` uses. A given workspace says so on the screen
+           somebody LANDS on rather than only on a billing page they may never
+           open — which is the whole point of giving one. */
+        membership: async (db, tenantId) => {
+          const sub = await subscriptionFor(db, tenantId, MEMBERSHIP);
+          if (!sub) return null;
+          return {
+            planId: sub.planId,
+            given: sub.compedAt ? { at: sub.compedAt, until: sub.compedUntil } : null,
+          };
+        },
       }),
       /*
         ⚠️ THE OPERATOR OPERATIONS RIDE THE PERSONAL LANE, on the operator door

@@ -40,6 +40,7 @@ export type ConsolePartId = ConsolePart;
    every other row had a mark. */
 const GLYPH: Readonly<Record<ConsolePartId, string>> = {
   tenants: "workspace",
+  accounts: "people",
   catalogue: "bank",
   ai: "sparkle",
   keys: "key",
@@ -61,7 +62,11 @@ const GLYPH: Readonly<Record<ConsolePartId, string>> = {
  * prominence to the rare one (DESIGN.md §3). Three runs, and the gap between them
  * is the whole of the explanation.
  */
-const DAILY: readonly ConsolePartId[] = ["tenants", "catalogue", "works"];
+/* ⚠️ `accounts` IS DAILY, BESIDE `tenants`. They are the two halves of the same
+   question — who is here and what have they got — and half the support a
+   deployment does starts with a person's address rather than a workspace's
+   name. */
+const DAILY: readonly ConsolePartId[] = ["tenants", "accounts", "catalogue", "works"];
 const ONCE: readonly ConsolePartId[] = ["keys", "telling"];
 /**
  * ⚠️ THE MIDDLE IS WHAT IS LEFT, NEVER A THIRD LIST. Three hand-written lists is
@@ -239,6 +244,22 @@ export function ConsoleTenant({ id }: { readonly id: string }) {
   return (
     <React.Suspense fallback={<Working says="Opening the console" />}>
       <Tenant id={id} />
+    </React.Suspense>
+  );
+}
+
+/** ⚠️ The same chunk, for the same reason: one person is opened from the account
+    list, which is already in it. */
+const Account = React.lazy(() => import("../console/parts.js")
+  .then((m) => ({ default: m.OneAccount })));
+
+export function ConsoleAccount({ email, onGo }: {
+  readonly email: string;
+  readonly onGo: (tenantId: string) => void;
+}) {
+  return (
+    <React.Suspense fallback={<Working says="Opening the console" />}>
+      <Account email={email} onGo={onGo} />
     </React.Suspense>
   );
 }

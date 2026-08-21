@@ -592,22 +592,6 @@ export async function spendGift(db: Db, id: string): Promise<boolean> {
 }
 
 /**
- * ⚠️ THE OLDEST LIVE ONE, because a gift with a term should be spent before an
- * open-ended one — otherwise the thing that expires sits unused and the operator
- * who set a date watches it lapse while the person is on the gift that never
- * ends.
- */
-export async function nextGift(
-  db: Db, email: string, kind: GiftKind, now: string,
-): Promise<Gift | null> {
-  const gifts = await giftsFor(db, email);
-  const live = gifts.filter((g) => g.kind === kind && giftIsLive(g, now));
-  if (!live.length) return null;
-  const dated = live.filter((g) => g.until).sort((a, b) => (a.until! < b.until! ? -1 : 1));
-  return dated[0] ?? live[live.length - 1]!;
-}
-
-/**
  * ⚠️ WHAT THE ACCOUNT ROW SAYS PLUS WHAT IS STILL WAITING IN A GIFT, and the two
  * are added rather than compared. A plan gift confers the right to found the
  * workspace it is for; counting only `commercial_granted` would refuse somebody

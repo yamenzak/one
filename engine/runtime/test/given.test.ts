@@ -19,8 +19,7 @@ import { giftIsLive, giftOver, giftedWorkspaces } from "@engine/kernel";
 import type { AccountId } from "@engine/kernel";
 import { applySchema } from "../src/schema.js";
 import {
-  DIRECTORY_SCHEMA, commercialAllowanceFor, giftsFor, give, nextGift, spendGift, stopGift,
-  upsertAccount,
+  DIRECTORY_SCHEMA, commercialAllowanceFor, giftsFor, give, spendGift, stopGift, upsertAccount,
 } from "../src/directory.js";
 import type { Db } from "../src/sql.js";
 
@@ -165,43 +164,6 @@ describe("a gift made before they arrive", () => {
       why: "Sorry about Tuesday", by: "op@4dl.app",
     }, NOW);
     expect(await giftsFor(db(), email)).toHaveLength(1);
-  });
-});
-
-describe("which gift is spent first", () => {
-  /**
-   * ⚠️ THE DATED ONE, because the alternative is an operator watching the gift
-   * they put a term on lapse unused while the person runs on the one that never
-   * ends — and then asking why the term did nothing.
-   */
-  it("is the one with a term, before the open-ended one", async () => {
-    const email = someone();
-    await give(db(), {
-      email, kind: "plan", planId: "max", why: "Forever", by: "op@4dl.app",
-    }, NOW);
-    const dated = await give(db(), {
-      email, kind: "plan", planId: "max", until: LATER, why: "Until December", by: "op@4dl.app",
-    }, NOW);
-
-    const next = await nextGift(db(), email, "plan", NOW.toISOString());
-    expect(next?.id).toBe(dated.id);
-  });
-
-  it("ignores a kind that was not asked for", async () => {
-    const email = someone();
-    await give(db(), {
-      email, kind: "credits", credits: 100, why: "Goodwill", by: "op@4dl.app",
-    }, NOW);
-    expect(await nextGift(db(), email, "plan", NOW.toISOString())).toBe(null);
-  });
-
-  it("answers nothing where every gift is over", async () => {
-    const email = someone();
-    const gift = await give(db(), {
-      email, kind: "plan", planId: "max", why: "Trial", by: "op@4dl.app",
-    }, NOW);
-    await stopGift(db(), gift.id, NOW);
-    expect(await nextGift(db(), email, "plan", NOW.toISOString())).toBe(null);
   });
 });
 

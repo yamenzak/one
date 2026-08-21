@@ -390,6 +390,15 @@ export interface Belonging {
   readonly apps?: readonly string[];
   /** ⚠️ Only where it is worth saying — see `me.who`. */
   readonly attention?: boolean;
+  /** What this workspace is on. Absent on a deployment that sells nothing. */
+  readonly plan?: string | null;
+  /**
+   * ⚠️ WHETHER ANYBODY IS PAYING FOR IT, ON THE LIST SOMEBODY LANDS ON. A
+   * workspace that was given is one of the few facts worth a chip in a list of
+   * names — it has no card, it may have a term, and the person holding it should
+   * not have to open a billing screen to learn either.
+   */
+  readonly given?: { readonly at: string; readonly until: string | null } | null;
   /** ⚠️ Unread notes in this workspace — see `me.who`. */
   readonly unseen?: number;
 }

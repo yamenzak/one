@@ -1415,3 +1415,52 @@ ended; an apology or a fault code on a page a person reached by typing; a
 "contact support" with no address behind it; or a third component that means
 "a centred panel" — that is a `Group` inside a `Center`, which is why `Sheet` is
 gone.
+
+## D48 — A gift is a row about a person, not a state on a workspace
+
+**Every way of handing something out already existed, one workspace at a time.**
+An operator could comp a plan with no Stripe in the path, put credits in a
+wallet, and grant an address a count of businesses. Each of the three began by
+knowing a WORKSPACE — so giving a friend a top tier meant finding one of theirs
+first, and giving one to somebody who had none meant waiting for them to make it
+and coming back. The decision itself was recorded nowhere: the money did not move
+through us, so the only trace was whatever somebody typed in a support thread.
+
+**So the gift is written before it is applied.** A row names an address, what
+(a plan × N workspaces, or credits), until when, why, and which operator. The
+plan on the workspace and the credits in the wallet are what it PRODUCES. The
+other order — change the workspace and remember why — cannot answer "what has
+this person been given" from anywhere, which is the question that brings somebody
+to the console.
+
+**It is made to an ADDRESS, and that is the common case rather than an edge.** A
+demo account, a friend and a customer who paid cash last week have no account row
+to point at; the id is stamped when they first ask for a code. A ledger keyed on
+the account would answer nothing for exactly the people the feature exists for.
+
+**A plan gift confers the right to found, counted with the bare allowance rather
+than beside it.** Two numbers would mean an operator giving somebody a workspace
+at a commercial tier ALSO having to remember to raise their commercial count —
+and forgetting is a person refused the thing they were just given, silently, as
+"no allowance left".
+
+**The term binds the PLAN, not only the gift.** A year of cash buys a year, so
+the gift's date travels onto the subscription and the nightly pass returns a
+lapsed one to the lobby. Bounding only when the gift may be SPENT would give a
+cash customer the tier for ever, which makes the date a control that does
+nothing.
+
+**And the workspace can tell.** A comped workspace read its tier's catalogue
+price and was offered a button to manage a subscription that does not exist — so
+the customer most in need of knowing the terms was shown a bill describing
+somebody else's arrangement. `given` travels on the workspace's own read now, and
+the shelf says "Given, and free until the first of December" where it printed
+€99.
+
+**Therefore never:** a gift applied with nothing recording who decided or why; a
+gift that can only reach a workspace founded after it; a plan comped under an app
+id, when one plan covers every product; a spend that reads before it writes, which
+hands out one extra exactly when somebody double-presses; a commercial tier put
+on a personal workspace, where the kind gates refuse what the plan grants; a
+console that can change what a person holds and cannot list the people; or a
+priced row over a workspace with no card behind it.

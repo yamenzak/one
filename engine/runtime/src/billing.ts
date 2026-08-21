@@ -66,6 +66,21 @@ export const BILLING_SCHEMA: SchemaModule = {
     `CREATE TABLE IF NOT EXISTS credit_ledger (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, app_id TEXT, at TEXT NOT NULL, delta INTEGER NOT NULL, reason TEXT NOT NULL, ref TEXT);`,
     `CREATE INDEX IF NOT EXISTS ix_credit_ledger_tenant ON credit_ledger (tenant_id, at);`,
   ],
+  /*
+    ⚠️ WHEN A GIVEN PLAN STOPS BEING GIVEN, AND IT IS ON THE SUBSCRIPTION RATHER
+    THAN ON THE GIFT. A gift's own term decides whether it may still be SPENT; the
+    workspace it was spent on has to know when its tier ends — and asking the
+    ledger would mean asking which of a person's gifts comped this workspace,
+    which nothing records and which a second workspace makes ambiguous.
+
+    ⚠️ NULL IS OPEN-ENDED, WHICH IS EVERY COMP MADE BEFORE THIS COLUMN AND MOST
+    OF THEM AFTER. Friends and family have no term; a year of cash and a
+    fortnight of demo do.
+
+    ⚠️ DECLARED RATHER THAN ALTERED — `columns` is reconciled against the live
+    table and a raw `ALTER` is not; see `refuseSql`.
+  */
+  columns: { subscription: { comped_until: "TEXT" } },
 };
 
 /* --------------------------------------------------------------- the rows --- */
@@ -78,6 +93,8 @@ export interface SubRow {
   readonly pastDueAt: Instant | null;
   /** ⚠️ Set when an operator granted this plan. Cleared the moment money moves. */
   readonly compedAt: Instant | null;
+  /** ⚠️ When the gift behind it ends. Null is open-ended — see the schema. */
+  readonly compedUntil: Instant | null;
   readonly overrides: Readonly<Record<string, Allowance>>;
   readonly adjustments: Readonly<Record<string, Allowance>>;
 }
@@ -89,6 +106,7 @@ const asSub = (r: Record<string, unknown>): SubRow => ({
   status: r.status as SubStatus,
   pastDueAt: (r.past_due_at as Instant | null) ?? null,
   compedAt: (r.comped_at as Instant | null) ?? null,
+  compedUntil: (r.comped_until as Instant | null) ?? null,
   overrides: JSON.parse((r.overrides_json as string | null) ?? "{}") as Record<string, Allowance>,
   adjustments: JSON.parse((r.adjustments_json as string | null) ?? "{}") as Record<string, Allowance>,
 });
@@ -145,14 +163,22 @@ export async function subscribe(
  */
 export async function compPlan(
   db: Db, tenantId: TenantId, appId: AppId, planId: string, now = new Date(),
+  /**
+   * ⚠️ WHEN IT ENDS, AND ABSENT IS FOR EVER. A comp made by hand has no term —
+   * an operator putting somebody on a tier decides when to take them off it. A
+   * comp made from a gift carries the gift's, so a year of cash is a year rather
+   * than a tier somebody keeps because nothing was watching.
+   */
+  until: string | null = null,
 ): Promise<void> {
   const at = now.toISOString();
   await db.prepare(
-    `INSERT INTO subscription (tenant_id, app_id, plan_id, status, at, past_due_at, trial_ends_at, comped_at, overrides_json, adjustments_json)
-     VALUES (?, ?, ?, 'active', ?, NULL, NULL, ?, '{}', '{}')
+    `INSERT INTO subscription (tenant_id, app_id, plan_id, status, at, past_due_at, trial_ends_at, comped_at, comped_until, overrides_json, adjustments_json)
+     VALUES (?, ?, ?, 'active', ?, NULL, NULL, ?, ?, '{}', '{}')
      ON CONFLICT(tenant_id, app_id) DO UPDATE SET plan_id = excluded.plan_id,
-       status = 'active', past_due_at = NULL, comped_at = excluded.comped_at`)
-    .bind(tenantId, appId, planId, at, at).run();
+       status = 'active', past_due_at = NULL, comped_at = excluded.comped_at,
+       comped_until = excluded.comped_until`)
+    .bind(tenantId, appId, planId, at, at, until).run();
 }
 
 /**
@@ -162,12 +188,43 @@ export async function compPlan(
  */
 export async function compedSubscriptions(
   db: Db,
-): Promise<readonly { readonly tenantId: TenantId; readonly planId: string }[]> {
+): Promise<readonly {
+  readonly tenantId: TenantId; readonly planId: string; readonly until: string | null;
+}[]> {
   const rows = await db.prepare(
-    `SELECT tenant_id, plan_id FROM subscription
+    `SELECT tenant_id, plan_id, comped_until FROM subscription
      WHERE comped_at IS NOT NULL AND status = 'active'`)
-    .all<{ tenant_id: string; plan_id: string }>();
-  return rows.results.map((r) => ({ tenantId: r.tenant_id as TenantId, planId: r.plan_id }));
+    .all<{ tenant_id: string; plan_id: string; comped_until: string | null }>();
+  return rows.results.map((r) => ({
+    tenantId: r.tenant_id as TenantId, planId: r.plan_id,
+    /* ⚠️ THE TERM TRAVELS WITH THE ROW, because the pass that renews these is
+       also the one that has to END the ones whose term has passed — see
+       `sweepAllowances`. Asked separately it would be a second query per comped
+       workspace on a nightly walk over all of them. */
+    until: r.comped_until ?? null,
+  }));
+}
+
+/**
+ * A GIVEN PLAN'S TERM HAS PASSED, SO THE WORKSPACE GOES BACK TO THE LOBBY.
+ *
+ * ⚠️ THE LOBBY AND NOT A LOCKED DOOR. Parking is where a workspace lands before
+ * it ever paid and after a trial ends; it is the difference between "your year
+ * is up, here is how to keep it" and a product that stops. The records stay, the
+ * balance stays, and the tier is what lapses.
+ *
+ * ⚠️ AND IT CLEARS BOTH STAMPS. A row left `comped_at` with a parking plan would
+ * read as a workspace somebody was given the free tier, which is a sentence with
+ * nothing behind it — and `compedSubscriptions` would carry it for ever.
+ */
+export async function endComp(
+  db: Db, tenantId: TenantId, appId: AppId, parkingId: string, now = new Date(),
+): Promise<boolean> {
+  const done = await db.prepare(
+    `UPDATE subscription SET plan_id = ?, comped_at = NULL, comped_until = NULL, at = ?
+     WHERE tenant_id = ? AND app_id = ? AND comped_at IS NOT NULL`)
+    .bind(parkingId, now.toISOString(), tenantId, appId).run();
+  return (done.meta?.changes ?? 0) > 0;
 }
 
 /** ⚠️ The anchor every rung of the ladder is measured from. Set once, cleared on payment. */

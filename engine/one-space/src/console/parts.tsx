@@ -35,6 +35,8 @@ import { Switch } from "./Switch.js";
 import { Switches } from "./Switches.js";
 import { Telling } from "./Telling.js";
 import { Tenants } from "./Tenants.js";
+import { Accounts } from "./Accounts.js";
+import { OneAccount } from "./OneAccount.js";
 import { Works } from "./Works.js";
 import { OneTenant } from "./OneTenant.js";
 import type { AiPart, ConsolePart, Where } from "../space/where.js";
@@ -49,6 +51,8 @@ export function ConsoleParts({ part, app, lane, onGo }: {
 }) {
   switch (part) {
     case "tenants": return <Tenants onGo={(id) => onGo({ at: "tenant", id })} />;
+    case "accounts":
+      return <Accounts onGo={(email) => onGo({ at: "account", email })} />;
     case "ai": return <Ai onGo={onGo} />;
     case "models": return <Models where={{ at: "models", ...(lane ? { lane } : {}) }} onGo={onGo} />;
     case "gateway": return <Gateway onGo={onGo} />;
@@ -87,6 +91,10 @@ export function ConsoleParts({ part, app, lane, onGo }: {
  * it back in the bundle every visitor downloads, which is what this file is for.
  */
 export { OneTenant };
+
+/** ⚠️ THE SAME CHUNK AGAIN — one person is opened from the account list and from
+    the roster of a workspace, both of which are already in here. */
+export { OneAccount };
 
 /** ⚠️ THE SAME CHUNK AGAIN, and for the same reason as `OneTenant`: a flag is
     opened from the switch list and from nowhere else, so a separate chunk would

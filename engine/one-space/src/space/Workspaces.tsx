@@ -80,11 +80,17 @@ export function Workspaces({ onGo }: { readonly onGo: (to: Where) => void }) {
                    failed payment is one about to stop working. Two chips on one
                    row would make the reader rank them, which is this row's job
                    rather than theirs. */
+                /* ⚠️ AND `given` SITS BETWEEN THEM. It outranks a count for the
+                   same reason arrears do — it is a fact about whether this
+                   workspace keeps working — and is outranked by arrears, which
+                   are about to stop it. */
                 aside={w.attention
                   ? <Chip color="warning" variant="soft"><Chip.Label>Needs attention</Chip.Label></Chip>
-                  : (w.unseen ?? 0) > 0
-                    ? <Chip color="accent" variant="soft"><Chip.Label>{w.unseen}</Chip.Label></Chip>
-                    : undefined}
+                  : w.given
+                    ? <Chip variant="soft"><Chip.Label>Given</Chip.Label></Chip>
+                    : (w.unseen ?? 0) > 0
+                      ? <Chip color="accent" variant="soft"><Chip.Label>{w.unseen}</Chip.Label></Chip>
+                      : undefined}
                 onOpen={() => open(w.slug)}
               />
             ))}

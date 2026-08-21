@@ -109,6 +109,23 @@ export function moneyOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         /* ⚠️ THE PLAN IS THE WORKSPACE'S; the products are what it reaches. */
         plan: plan ? { id: plan.id, name: plan.name, kind: plan.kind } : null,
         status: sub?.status ?? null,
+        /*
+          ⚠️ WHETHER ANYBODY IS PAYING FOR THIS, WHICH THE SCREEN COULD NOT ASK.
+          A comped workspace was told it was on Max and offered a button to
+          manage a subscription that does not exist — so the one customer who
+          most needs to know the terms (a cash customer, a friend, a demo about
+          to end) was the one shown a billing screen describing somebody else's
+          arrangement.
+
+          ⚠️ THE STAMP AND NOT THE GIFT. `comped_at` is on the subscription and
+          is true of every given plan however it was given — by this stage's
+          ledger, or by an operator comping the workspace directly. Reading the
+          `given` row instead would leave the second kind looking like a
+          subscription, which is the state this closes.
+        */
+        given: sub?.compedAt
+          ? { at: sub.compedAt, until: sub.compedUntil }
+          : null,
         plans: ctx.plans,
         /* ⚠️ Every key the workspace could hold — the platform's and every
            enabled product's — so the shelf can say what a tier changes. */
