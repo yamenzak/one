@@ -57,7 +57,7 @@ const app = (vaultSecret: string | null = "test-vault-secret") => serve({
   shardOf: () => shard(),
   personal: personalOps({
     secret: SECRET,
-    appId: "hello",
+    sells: () => ["hello"],
     deliver: async (to, code) => {
       if (mailBroken) throw new Error("no email provider is configured");
       sent.push({ to, code });
@@ -357,7 +357,7 @@ describe("making a workspace", () => {
   it("creates it, places it, and makes the founder somebody who can run it", async () => {
     const cookie = await signIn("sam@example.com");
     const made = await post("setup", "/api/me.tenant.create",
-      { slug: "northwind", name: "Northwind", country: "DE" }, cookie);
+      { slug: "northwind", name: "Northwind", country: "DE", apps: ["hello"] }, cookie);
     expect(made.status).toBe(200);
 
     const tenant = await tenantBySlug(directory(), "northwind");
@@ -388,9 +388,9 @@ describe("making a workspace", () => {
   it("cannot be started from inside somebody else's workspace", async () => {
     const cookie = await signIn("sam@example.com");
     await post("setup", "/api/me.tenant.create",
-      { slug: "northwind", name: "Northwind", country: "DE" }, cookie);
+      { slug: "northwind", name: "Northwind", country: "DE", apps: ["hello"] }, cookie);
     const out = await post("northwind", "/api/me.tenant.create",
-      { slug: "second", name: "Second", country: "DE" }, cookie);
+      { slug: "second", name: "Second", country: "DE", apps: ["hello"] }, cookie);
     expect(out.status).toBe(404);
   });
 
@@ -400,7 +400,7 @@ describe("making a workspace", () => {
     const cookie = await signIn("sam@example.com");
     for (const slug of ["admin", "setup", "acme", "www"]) {
       const out = await post("setup", "/api/me.tenant.create",
-        { slug, name: "Nope", country: "DE" }, cookie);
+        { slug, name: "Nope", country: "DE", apps: ["hello"] }, cookie);
       expect(out.status).toBe(400);
     }
   });
@@ -408,10 +408,10 @@ describe("making a workspace", () => {
   it("refuses a slug somebody already holds", async () => {
     const first = await signIn("sam@example.com");
     await post("setup", "/api/me.tenant.create",
-      { slug: "northwind", name: "Northwind", country: "DE" }, first);
+      { slug: "northwind", name: "Northwind", country: "DE", apps: ["hello"] }, first);
     const second = await signIn("alex@example.com");
     const out = await post("setup", "/api/me.tenant.create",
-      { slug: "northwind", name: "Also", country: "FR" }, second);
+      { slug: "northwind", name: "Also", country: "FR", apps: ["hello"] }, second);
     expect(out.status).toBe(409);
   });
 
@@ -422,7 +422,7 @@ describe("making a workspace", () => {
     await noteShardApp(directory(), "global-1", "hello");
     const cookie = await signIn("sam@example.com");
     await post("setup", "/api/me.tenant.create",
-      { slug: "sunset", name: "Sunset", country: "AE" }, cookie);
+      { slug: "sunset", name: "Sunset", country: "AE", apps: ["hello"] }, cookie);
     expect((await tenantBySlug(directory(), "sunset"))?.residency).toBe("global");
   });
 });
@@ -436,7 +436,7 @@ describe("inviting a colleague", () => {
   const found = async () => {
     const cookie = await signIn("sam@example.com");
     await post("setup", "/api/me.tenant.create",
-      { slug: "northwind", name: "Northwind", country: "DE" }, cookie);
+      { slug: "northwind", name: "Northwind", country: "DE", apps: ["hello"] }, cookie);
     const tenant = (await tenantBySlug(directory(), "northwind"))!;
     return { cookie, tenant };
   };
@@ -588,7 +588,7 @@ describe("a person's own records", () => {
   const workspace = async () => {
     const boss = await signIn("sam@example.com");
     await post("setup", "/api/me.tenant.create",
-      { slug: "northwind", name: "Northwind", country: "DE" }, boss);
+      { slug: "northwind", name: "Northwind", country: "DE", apps: ["hello"] }, boss);
     await post("northwind", "/api/member.invite",
       { email: "alex@example.com", platformRole: "customer", appRoles: { hello: "reader" } }, boss);
     const theirs = await signIn("alex@example.com");
@@ -772,7 +772,7 @@ describe("leaving", () => {
   it("refuses to let the last person who can run it walk out", async () => {
     const cookie = await signIn("sam@example.com");
     await post("setup", "/api/me.tenant.create",
-      { slug: "northwind", name: "Northwind", country: "DE" }, cookie);
+      { slug: "northwind", name: "Northwind", country: "DE", apps: ["hello"] }, cookie);
     const out = await post("setup", "/api/me.leave", { slug: "northwind" }, cookie);
     expect(out.status).toBe(409);
   });
@@ -780,7 +780,7 @@ describe("leaving", () => {
   it("lets somebody else leave, and they stop being a member", async () => {
     const mine = await signIn("sam@example.com");
     await post("setup", "/api/me.tenant.create",
-      { slug: "northwind", name: "Northwind", country: "DE" }, mine);
+      { slug: "northwind", name: "Northwind", country: "DE", apps: ["hello"] }, mine);
     const tenant = (await tenantBySlug(directory(), "northwind"))!;
     await post("northwind", "/api/member.invite",
       { email: "alex@example.com", platformRole: "staff", appRoles: { hello: "writer" } }, mine);
@@ -902,7 +902,7 @@ describe("turning push on", () => {
     await makePushKeys(directory(), "https://one.test", false);
     const cookie = await signIn("sam@example.com");
     await post("setup", "/api/me.tenant.create",
-      { slug: "northwind", name: "Northwind", country: "DE" }, cookie);
+      { slug: "northwind", name: "Northwind", country: "DE", apps: ["hello"] }, cookie);
     const tenant = (await tenantBySlug(directory(), "northwind"))!;
     const me = (await directory().prepare(`SELECT id FROM account WHERE email = ?`)
       .bind("sam@example.com").first<{ id: string }>())!;
@@ -989,9 +989,9 @@ describe("the inbox across every workspace", () => {
 
   const two = async (cookie: string) => {
     await post("setup", "/api/me.tenant.create",
-      { slug: "northwind", name: "Northwind", country: "DE" }, cookie);
+      { slug: "northwind", name: "Northwind", country: "DE", apps: ["hello"] }, cookie);
     await post("setup", "/api/me.tenant.create",
-      { slug: "contoso", name: "Contoso", country: "DE" }, cookie);
+      { slug: "contoso", name: "Contoso", country: "DE", apps: ["hello"] }, cookie);
   };
 
   /*
@@ -1056,7 +1056,7 @@ describe("the inbox across every workspace", () => {
     await two(cookie);
     const theirs = await signIn("alex@example.com");
     await post("setup", "/api/me.tenant.create",
-      { slug: "fabrikam", name: "Fabrikam", country: "DE" }, theirs);
+      { slug: "fabrikam", name: "Fabrikam", country: "DE", apps: ["hello"] }, theirs);
 
     expect((await post("setup", "/api/me.seen", { slug: "fabrikam" }, cookie)).status).toBe(404);
     expect((await post("setup", "/api/me.seen", { slug: "nope" }, cookie)).status).toBe(404);

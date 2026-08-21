@@ -3032,6 +3032,51 @@
       "impl": "scripts/seen.test.mjs",
       "proves": "the deploy gate ",
       "fails": "~400 MB of browser, its system libraries and every pixel assertion put back in front of shipping in one line, by somebody fixing a red run for a reason that looked good at the time"
+    },
+    {
+      "id": "a-platform-operation-never-replaces-an-apps-own",
+      "protects": "D51",
+      "stage": "79",
+      "status": "live",
+      "impl": "runtime/src/compose.ts",
+      "proves": "would replace an operation this app",
+      "fails": "a product's own route answering the platform's handler at the same address — the merge wins silently, so the list of things on a workspace's shelves becomes the list of products it has switched on, with no error anywhere"
+    },
+    {
+      "id": "a-workspace-is-never-founded-empty",
+      "protects": "D51",
+      "stage": "79",
+      "status": "live",
+      "impl": "runtime/src/personal.ts",
+      "proves": "Choose at least one",
+      "fails": "a name and an address with nothing to open — reachable, payable and empty for ever, because the screen that would add a product is inside the workspace"
+    },
+    {
+      "id": "the-last-product-cannot-be-switched-off",
+      "protects": "D51",
+      "stage": "79",
+      "status": "live",
+      "impl": "runtime/src/member-ops.ts",
+      "proves": "NEVER THE LAST ONE",
+      "fails": "a workspace its own owner cannot reach, with the bill still running — nothing is on, so the screen that would switch something back on is not drawn"
+    },
+    {
+      "id": "a-field-never-exceeds-its-mark-budget",
+      "protects": "D50",
+      "stage": "78",
+      "status": "live",
+      "impl": "design/src/scene/scene.ts",
+      "proves": "MARKS",
+      "fails": "half a megabyte of markup parsed before the first paint of every screen, on the device least able to afford it — a cost a motion setting cannot reach, because it is there whether anything moves or not"
+    },
+    {
+      "id": "the-world-moves-only-where-it-was-earned",
+      "protects": "D50",
+      "stage": "78",
+      "status": "live",
+      "impl": "design/src/tokens/motion.ts",
+      "proves": "earned",
+      "fails": "a viewport-sized repaint on the main thread for as long as a screen is open, competing with the scroll, on a phone that never asked for it"
     }
   ]
 }

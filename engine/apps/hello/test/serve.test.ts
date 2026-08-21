@@ -145,6 +145,15 @@ describe("what the manifest produced", () => {
     expect(surfaceOfComposed(compose(HELLO)).map((r) => `${r.method} ${r.path}`)).toEqual([
       "POST /api/ai.word",
       "GET /api/ai.wording",
+      /* ⚠️ WHICH PRODUCTS THIS WORKSPACE HAS, AND THE TWO SWITCHES. They arrive
+         in every app because a decision about the WORKSPACE is made from
+         wherever somebody is standing — filing them under one product means the
+         way to add your second is to already have it.
+         ⚠️ AND THEY ARE `app.*` BECAUSE `product.*` SHADOWED A REAL COLLECTION —
+         see `refuseShadowing` in `compose.ts`. */
+      "POST /api/app.add",
+      "GET /api/app.list",
+      "POST /api/app.remove",
       /* ⚠️ The workspace's OWN identity, mounted in every product — one brand
          across the apps under one roof, edited from wherever somebody is. */
       /* ⚠️ The icon is its own operation, not a field on `brand.write` — it is

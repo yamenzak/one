@@ -23,8 +23,9 @@
  * `null` and the root's crown says so by having no leave control at all.
  */
 
+import * as React from "react";
 import {
-  Band, CROWN, Layout, LeaveChip, Over, Spacer, placeFace, sentence, whoFace,
+  Band, CROWN, Layout, LeaveChip, Over, Spacer, Working, placeFace, sentence, whoFace,
 } from "@engine/design";
 import type { FaceOf, Sky } from "@engine/design";
 import type { Belonging, Me } from "../api.js";
@@ -35,7 +36,6 @@ import { Workspaces } from "./Workspaces.js";
 import { OneWorkspace } from "./Workspace.js";
 import { WorkspacePart } from "./Part.js";
 import { Preferences } from "../centre/Preferences.js";
-import { Formats } from "./Formats.js";
 import { Agreed } from "./Agreed.js";
 import {
   ConsoleAccount, ConsoleHome, ConsolePart, ConsoleSwitch, ConsoleTenant,
@@ -69,11 +69,45 @@ import {
  * own, which no other list holds.
  */
 export const SPACE_SCREENS: readonly Where["at"][] = [
-  "home", "you", "inbox", "told", "data", "prefs", "formats", "agreed", "workspaces", "workspace",
+  "home", "you", "inbox", "told", "data", "prefs", "formats", "looks", "agreed",
+  "workspaces", "workspace",
   ...OF_WORKSPACE_SCREEN,
   "console", "tenant",
   ...OF_CONSOLE,
 ];
+
+/**
+ * ⚠️ THE TWO PREFERENCE SCREENS ARE A CHUNK, AND THE BUDGET IS WHAT SAID SO.
+ * Both are opened once by anybody who opens them at all — how dates are written,
+ * and how much moves — and between them they carry a country table and the whole
+ * device-capability rule. Behind an `import()` they cost a fetch to the few who
+ * go looking and nothing to everybody else; static, they pushed the entry chunk
+ * over the ceiling `vite.config.ts` holds, which is a guard doing its job.
+ *
+ * ⚠️ ONE IMPORT FOR BOTH, DELIBERATELY — the same rule the console follows.
+ * Somebody who opens one of these is usually about to open the other, and split
+ * per screen they pay a fetch each time.
+ *
+ * ⚠️ THE WAIT IS SHOWN RATHER THAN LEFT BLANK. A null fallback is a screen that
+ * appears to have failed for as long as the chunk takes to arrive.
+ */
+const HowYouRead = React.lazy(() => import("./Formats.js")
+  .then((m) => ({ default: m.Formats })));
+
+/**
+ * ⚠️ A CHUNK OF ITS OWN, AND THE BUDGET IS WHAT SAID SO. `Looks` is the one
+ * account screen that carries the whole device-capability rule, and it is opened
+ * once by anybody who opens it at all — so behind an `import()` it costs a fetch
+ * to the few who go looking and nothing to everybody else. Static, it pushed the
+ * entry chunk a kilobyte over the ceiling `vite.config.ts` holds, which is a
+ * guard doing exactly its job.
+ *
+ * ⚠️ THE WAIT IS SHOWN RATHER THAN LEFT BLANK — the same rule the console
+ * follows. A null fallback is a screen that appears to have failed for as long
+ * as the chunk takes to arrive.
+ */
+const LookAndMotion = React.lazy(() => import("./Looks.js")
+  .then((m) => ({ default: m.Looks })));
 
 export function OneSpace({ path, onGo, onClose }: {
   readonly path: string;
@@ -355,7 +389,16 @@ function Inside({ where, onGo }: {
     case "data": return <Data />;
     /* ⚠️ YOUR OWN PREFERENCES, ACROSS EVERY PRODUCT — no slug, because they are
        not a workspace's. The same split as `told` against `notices`. */
-    case "formats": return <Formats />;
+    case "formats": return (
+      <React.Suspense fallback={<Working says="Opening" />}>
+        <HowYouRead />
+      </React.Suspense>
+    );
+    case "looks": return (
+      <React.Suspense fallback={<Working says="Opening" />}>
+        <LookAndMotion />
+      </React.Suspense>
+    );
     case "agreed": return <Agreed />;
     case "prefs": return <Preferences where={where} onGo={onGo} />;
     case "workspaces": return <Workspaces onGo={onGo} />;

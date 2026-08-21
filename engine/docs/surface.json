@@ -259,6 +259,27 @@
         "permission": "member:manage"
       },
       {
+        "id": "app.list",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/app.list",
+        "permission": "tenant:manage"
+      },
+      {
+        "id": "app.add",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/app.add",
+        "permission": "tenant:manage"
+      },
+      {
+        "id": "app.remove",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/app.remove",
+        "permission": "tenant:manage"
+      },
+      {
         "id": "brand.read",
         "kind": "read",
         "method": "GET",
@@ -611,6 +632,16 @@
       "kind": "read",
       "needs": "session",
       "doors": null,
+      "proof": null
+    },
+    {
+      "id": "me.products",
+      "kind": "read",
+      "needs": "session",
+      "doors": [
+        "setup",
+        "account"
+      ],
       "proof": null
     },
     {

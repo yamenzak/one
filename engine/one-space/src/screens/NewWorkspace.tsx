@@ -16,7 +16,7 @@
  * made to the business — so it is theirs to declare.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, Form } from "@heroui/react";
 import type { Problem } from "@engine/kernel";
 /* ⚠️ Aliased — this screen's state is called `problem` too. See SignIn. */
@@ -25,7 +25,16 @@ import { PROBLEMS } from "../problems.js";
 import { api } from "../api.js";
 import { byName } from "../countries.js";
 import { accountUrl, here, tenantUrl, type Where } from "../door.js";
-import { Arrival, AsideRoute, Lookup, SPACE, TextInput, Trouble } from "@engine/design";
+import {
+  Arrival, AsideRoute, Group, Lookup, SPACE, TextInput, ToggleRow, Trouble, appFace,
+} from "@engine/design";
+
+/** What this deployment offers — read, never written down here. See `me.products`. */
+interface Product {
+  readonly id: string;
+  readonly name: string;
+  readonly mark: string;
+}
 
 /** ⚠️ From the name, but only until somebody types their own — a slug that
     silently follows the name is a slug that changes under an edit. */
@@ -39,6 +48,33 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
   const [country, setCountry] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<Problem | null>(null);
+
+  /*
+    ⚠️ `null` UNTIL IT IS KNOWN, AND THE CARD IS NOT DRAWN UNTIL THEN. An empty
+    array seeded as a starting value renders "no products" as a fact for the
+    length of the round trip — a wrong answer wearing a loading state's excuse.
+  */
+  const [products, setProducts] = useState<readonly Product[] | null>(null);
+  /* ⚠️ `null` UNTIL THE CATALOGUE ARRIVES, FOR THE SAME REASON AS THE LIST ABOVE.
+     An empty array here is a claim — "nothing is ticked" — made before there is
+     anything to tick, and the button reads it as a form somebody left blank. */
+  const [want, setWant] = useState<readonly string[] | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      const out = await api.get<{ items: readonly Product[] }>("me.products");
+      if (!out.ok) return;
+      setProducts(out.value.items);
+      /*
+        ⚠️ THE FIRST ONE IS TICKED, AND ONLY WHERE THERE IS A CHOICE TO MAKE.
+        Every workspace needs at least one product, so an empty form is a form
+        whose primary action refuses — and a deployment with one product has
+        nothing to decide, so the card below stands down entirely rather than
+        asking a question with one answer.
+      */
+      setWant(out.value.items.slice(0, 1).map((p) => p.id));
+    })();
+  }, []);
 
   const countries = useMemo(() => byName(), []);
   const address = chosen ? slug : slugFrom(name);
@@ -57,6 +93,7 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
     if (!name.trim()) fields["name"] = "Give the workspace a name";
     if (!addressOk) fields["slug"] = "Letters, numbers and hyphens only";
     if (!country) fields["country"] = "Say where the business is";
+    if (!want?.length) fields["apps"] = "Choose at least one";
     if (Object.keys(fields).length) {
       setProblem(raise(PROBLEMS, "platform.invalid", {}, { fields }));
       return;
@@ -64,7 +101,7 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
     setBusy(true);
     setProblem(null);
     const out = await api.post<{ slug: string }>("me.tenant.create", {
-      name: name.trim(), slug: address, country,
+      name: name.trim(), slug: address, country, apps: want ?? [],
     });
     setBusy(false);
     if (!out.ok) return setProblem(out.problem);
@@ -138,6 +175,38 @@ export function NewWorkspace({ where }: { readonly where: Where }) {
             ? "Records for this workspace stay in the EU."
             : "This decides where the workspace's records are kept."}
         />
+
+        {/*
+          ⚠️ THE PRODUCTS, AND ONLY WHERE THERE IS A CHOICE. This deployment used
+          to found every workspace with one hardcoded product whatever anybody
+          came for, and the only way to change it afterwards was to ask us.
+
+          ⚠️ ONE PRODUCT MEANS NO CARD. A question with a single answer, already
+          ticked, is a step somebody has to read to discover it is not a step.
+          ⚠️ AND NOTHING IS DRAWN WHILE THE LIST IS UNKNOWN — see `products`.
+        */}
+        {products && products.length > 1 ? (
+          <Group
+            label="What is it for?"
+            under="You can add or remove these later, in the workspace's settings"
+          >
+            {products.map((p) => (
+              <ToggleRow
+                key={p.id}
+                /* ⚠️ THE PRODUCT'S OWN FACE, not a category glyph — a list of
+                   products under identical cogs is a list where the label is the
+                   only thing telling them apart. */
+                face={appFace(p.id, p.mark)}
+                label={p.name}
+                value={want?.includes(p.id) ?? false}
+                isDisabled={busy}
+                onChange={(on) => setWant((held) => (on
+                  ? [...(held ?? []), p.id]
+                  : (held ?? []).filter((id) => id !== p.id)))}
+              />
+            ))}
+          </Group>
+        ) : null}
 
         {/* ⚠️ Live at rest, like every other primary here. Disabled until three
             fields are right, it is a grey slab for the whole time somebody is

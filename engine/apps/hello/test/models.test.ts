@@ -101,7 +101,7 @@ const app = () => serve({
   shardOf: () => shard(),
   personal: {
     ...personalOps({
-      secret: "test-secret", appId: "hello",
+      secret: "test-secret", sells: () => ["hello"],
       deliver: async (to, code) => { sent.push({ to, code }); },
       deliverExport: async () => undefined,
     }),

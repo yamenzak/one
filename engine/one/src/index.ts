@@ -35,6 +35,7 @@ import {
   applyEvent, becomeCommercial, markCancelled, markPaid, markPastDue, renewAllowance, stripeKey,
   subscribe, topUp, verifySignature,
   webhookSecret,
+  disableApp, enableApp,
   operatorOps, permissionsResolver, personalOps, pusherOver, schemaFor, sendMail, serve,
   settleBindings,
   MEMBERSHIP, sessionIdFrom, shardFor, subscriptionFor, whoIs,
@@ -75,6 +76,22 @@ const APPS: Readonly<Record<string, () => AppSpec>> = {
   hello: once(() => under(LEGAL, hello())),
   inventory: once(() => under(LEGAL, inventory())),
 };
+
+/**
+ * WHICH OF THEM ANYBODY MAY SWITCH ON FOR THEMSELVES.
+ *
+ * ⚠️ THIS WAS ONE ID, HARDCODED, AND IT DECIDED EVERY WORKSPACE EVER MADE.
+ * Founding took `deps.appId` — the string `"hello"` — so a person who came for
+ * one product founded a workspace holding a different one, and the only way to
+ * change it afterwards was to ask an operator to do it in the console. The
+ * catalogue was two products and the door offered one.
+ *
+ * ⚠️ IT IS A LIST OF ITS OWN RATHER THAN `Object.keys(APPS)`, because "served"
+ * and "offered" are different questions. A product mid-build stays mounted and
+ * answering for the workspaces an operator put it in, and comes out of THIS list
+ * — one line, in review, rather than an unmounting that breaks them.
+ */
+const SELLS: readonly string[] = ["inventory", "hello"];
 
 /**
  * ONE MEMBERSHIP — WHAT THIS DEPLOYMENT SELLS, IN ONE LIST.
@@ -1538,6 +1555,31 @@ const handler = async (env: Env) => {
     roots: { root: env.ROOT },
     apps: APPS,
     /*
+      ⚠️ WHAT ANYBODY MAY SWITCH ON FOR THEMSELVES, WHICH IS EVERY PRODUCT THIS
+      DEPLOYMENT SERVES. It is a separate list from `apps` on purpose — the day
+      one of them is half-built, it comes out of here and stays mounted for the
+      workspaces an operator put it in.
+
+      ⚠️ AND THE SCHEMA IS ALREADY APPLIED, WHICH IS WHY THIS IS SAFE TO OFFER.
+      Every product's tables are built on every shard at boot, so switching one
+      on is a row in `tenant_app` and nothing else — no migration on a person's
+      request, and no window where the product is on and its tables are not.
+    */
+    products: {
+      sells: () => SELLS,
+      switchOn: async (tenantId, appId, now) => {
+        const app = APPS[appId]?.();
+        const tenant = await tenantById(directory, tenantId as never);
+        if (!app || !tenant) return;
+        await enableApp(
+          directory, shardFor(env as never, tenant.shardId),
+          tenantId as never, appId as never, schemaFor(app), applySchema, now,
+        );
+      },
+      switchOff: (tenantId, appId, now) =>
+        disableApp(directory, tenantId as never, appId as never, now),
+    },
+    /*
       ⚠️ WHO WE ARE, FOR THE TILES THAT WEAR OUR MARK. A personal workspace is
       not trading under anybody's name, so it installs as ours — and there is no
       honest way to draw that from a hostname, which is why a deployment that
@@ -1692,7 +1734,7 @@ const handler = async (env: Env) => {
     personal: {
       ...personalOps({
         secret: env.AUTH_SECRET,
-        appId: "hello",
+        sells: () => SELLS,
         documents: LEGAL.documents,
         /* ⚠️ ASKED AT THE DOOR THE PERSON IS STANDING AT. On the account centre
            only what binds the PERSON is owed; at a workspace's own door the

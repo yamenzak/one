@@ -188,8 +188,23 @@ export interface IdentityDeps {
    * letter comes to link somewhere nobody is served.
    */
   readonly deliverExport: (to: string, token: string) => Promise<void>;
-  /** Which role a workspace's founder gets. Derived from the app, not named. */
-  readonly appId: string;
+  /**
+   * WHICH PRODUCTS THIS DEPLOYMENT OFFERS AT FOUNDING, IN THE ORDER TO SHOW THEM.
+   *
+   * ⚠️ THIS WAS ONE HARDCODED ID, AND EVERY WORKSPACE EVER MADE GOT IT. A person
+   * who wanted one product founded a workspace holding a different one, with no
+   * screen anywhere able to change it — only an operator could, through the
+   * console, on request. A deployment that serves several products and can only
+   * hand out the first is not multi-product; it is one product with the others
+   * built.
+   *
+   * ⚠️ IT IS A LIST RATHER THAN THE WHOLE REGISTRY, because "what this
+   * deployment SERVES" and "what somebody may start with" are different
+   * questions. A product still being built is mounted, reachable and answering
+   * for the workspaces an operator put it in, and it has no business on a
+   * stranger's first screen.
+   */
+  readonly sells: () => readonly string[];
   /**
    * ⚠️ WHETHER THIS ADDRESS RUNS THE DEPLOYMENT (D18), injected for the same
    * reason the console injects it: an operator is outside every workspace, so
@@ -726,6 +741,32 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
 
     /* ---------------------------------------------------- a new workspace --- */
 
+    /**
+     * WHAT THIS DEPLOYMENT SELLS, FOR THE SCREEN THAT ASKS SOMEBODY TO CHOOSE.
+     *
+     * ⚠️ THE MANIFEST'S OWN WORDS, NEVER A SECOND LIST. A catalogue written
+     * beside the wizard is a catalogue that is right on the day it is written
+     * and describes a retired product a year later — and the one thing it would
+     * be describing is what somebody is about to commit a workspace to.
+     *
+     * ⚠️ AND IT IS `session` RATHER THAN `nobody`, because it is only ever read
+     * by somebody who is already signing up. A public list of products is a
+     * thing to publish deliberately, on a page written for it, not a side effect
+     * of a wizard's data needs.
+     */
+    "me.products": {
+      kind: "read", needs: "session", beforeAccepting: true,
+      doors: ["setup", "account"],
+      async run(ctx): Promise<unknown> {
+        return {
+          items: deps.sells()
+            .map((id) => ctx.app(id))
+            .filter((a): a is NonNullable<typeof a> => !!a)
+            .map((a) => ({ id: a.id, name: a.name, mark: a.mark })),
+        };
+      },
+    },
+
     "me.tenant.create": {
       kind: "write", needs: "session",
       /* ⚠️ ONE PLACE A WORKSPACE IS MADE. Offered on a workspace's own door, it
@@ -746,23 +787,51 @@ export function personalOps(deps: IdentityDeps): PersonalBook {
         }
         if (!/^[A-Z]{2}$/.test(country)) return ctx.fail("platform.invalid");
 
-        const app = ctx.app(deps.appId);
-        if (!app) return ctx.fail("platform.unavailable");
+        /*
+          ⚠️ WHAT THEY ASKED FOR, NARROWED TO WHAT IS ON OFFER — never the other
+          way round. Taking the ids from the body and trusting them would let
+          anybody found a workspace holding a product this deployment does not
+          sell, which is an app id in a table with no manifest behind it and a
+          workspace whose every screen 404s.
+
+          ⚠️ AND THE ORDER IS THE CATALOGUE'S, so two people who ticked the same
+          boxes get the same workspace. A list built from the request is a list
+          somebody can reorder, and the first product decides the landing screen.
+        */
+        const offered = deps.sells();
+        const asked = new Set(
+          Array.isArray(input.apps) ? input.apps.map((a) => String(a)) : [],
+        );
+        const chosen = offered.filter((id) => asked.has(id));
+
+        /* ⚠️ AT LEAST ONE, AND SAID AS A FIELD. A workspace with no product is a
+           name, an address and nothing to open — reachable, payable, and empty
+           for ever, because the screen that would add one is inside it. */
+        if (!chosen.length) {
+          return ctx.fail("platform.invalid", {}, { fields: { apps: "Choose at least one" } });
+        }
+
         /* ⚠️ Workspace authority is the PLATFORM'S to give — `found` makes the
            creator an `owner` regardless of any app. What the app declares is
            the role they hold INSIDE it (D15). */
-        const role = foundingAppRole(app.access);
-        if (!role) return ctx.fail("platform.unavailable");
+        const roles: Record<string, string> = {};
+        for (const id of chosen) {
+          const app = ctx.app(id);
+          if (!app) return ctx.fail("platform.unavailable");
+          const role = foundingAppRole(app.access);
+          if (!role) return ctx.fail("platform.unavailable");
+          roles[id] = role;
+        }
 
         const made = await createTenant(ctx.directory, {
-          slug, name, country, where: residencyFor(country), apps: [deps.appId],
+          slug, name, country, where: residencyFor(country), apps: chosen as never,
         }, ctx.now);
         if (made === "slug_taken") return ctx.fail("platform.conflict");
         if (made === "nowhere_to_put_it") return ctx.fail("platform.unavailable");
 
         const accountId = ctx.session!.accountId;
         await found(ctx.shardOf(made.tenant), made.tenant.id, accountId,
-          ctx.email ?? "", { [deps.appId]: role }, ctx.now);
+          ctx.email ?? "", roles, ctx.now);
         await noteBelonging(ctx.directory, accountId, made.tenant.id, ctx.now);
         /*
           ⚠️ AND ANYTHING WAITING FOR THIS ADDRESS LANDS NOW. An operator gives a

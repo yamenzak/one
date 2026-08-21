@@ -157,7 +157,7 @@ function build() {
       withVaultField: withVault.map(asOp),
     },
     personal: Object.entries(personalOps({
-      secret: "probe", appId: "probe", deliver: async () => {},
+      secret: "probe", sells: () => ["probe"], deliver: async () => {},
       deliverExport: async () => {},
     })).map(([id, op]) => ({
       id, kind: op.kind, needs: op.needs,

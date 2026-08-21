@@ -1497,3 +1497,75 @@ guard it no longer runs is worse than no registry.
 file in a package with no command that runs it, which is a deleted test wearing a
 filename; a suffix applied to a suite that needs no browser, which quietly takes
 a real check out of CI; or a guard registered as CI-run when it is not.
+
+## D50 — Ambient motion is earned; essential motion is assumed
+
+**Two kinds of motion, and only one of them is free.** A screen arriving, a page
+travelling, a mark playing its character under a finger: each is a few hundred
+milliseconds of `transform` and `opacity` on a handful of elements, run by the
+compositor on its own thread, and each CARRIES MEANING — where a screen came
+from, that a press registered. The world's marks are the other kind: endless,
+full-screen, and never composited. They beat in SMIL inside a `<pattern>`, which
+is the only thing that repaints in one, and a repaint inside a paint server
+invalidates the whole fill — so every frame re-rasterises a tile and repaints a
+viewport-sized rect on the main thread, for as long as the screen is open,
+competing with the scroll.
+
+**So `motionFor` is the one decision, and it answers in two tiers.** Essential is
+assumed unless motion is refused; ambient is earned. A fine pointer is the entry
+condition, because a mid-range phone reports eight cores and cannot report a
+mouse; memory and cores only VETO, and their silence is not a refusal — a rule
+that turns into a browser test is a rule about the wrong thing. Nothing overrides
+an operating system that asked for less motion, because for some people that is
+not a preference.
+
+**A budget binds whether anything moves.** A still field is still a string the
+browser parses and a tree it rasterises, on the first paint of every screen. The
+TILE shrinks rather than the cell: growing the cell changes the drawing, while a
+smaller tile is the same picture repeating sooner. What a repeat costs is a
+symmetry somebody might find on a wide screen.
+
+**And the switch is reachable.** Every keyframe answered `data-reduce-motion` and
+nothing set it; `applyAppearance` read a value nothing wrote. Both are on one
+screen now, kept on the device rather than the account — the same person wants a
+different answer on a phone in sun and a desktop at night — and it says which
+fact about the hardware decided, because a still world under a control saying
+"Automatic" teaches nobody anything.
+
+**Therefore never:** a permanent full-screen repaint nobody asked for; a second
+implementation of "may this move"; a field whose cost is bounded only by a motion
+setting, which is the half that setting cannot reach; a device rule that fails
+open; or a preference honoured everywhere and reachable nowhere.
+
+## D51 — A workspace is founded with the products somebody chose
+
+**One hardcoded id decided every workspace ever made.** Founding took
+`deps.appId` — the string `"hello"` — so a person who came for one product
+founded a workspace holding a different one, and the only way to change it was to
+ask an operator to do it in the console. A deployment that serves several
+products and can only hand out the first is one product with the others built.
+
+**What is SERVED and what is SOLD are different lists.** The registry holds what
+this deployment can run; `sells` holds what anybody may switch on for themselves.
+A product still being built stays mounted, reachable and answering for the
+workspaces an operator put it in, and comes out of the second list in one line
+rather than by an unmounting that breaks them.
+
+**At least one, always.** A workspace with no product is a name and an address
+with nothing to open — reachable, payable and empty for ever, because the screen
+that would add one is inside it. The same rule at the other end: the last product
+cannot be switched off, and off is never gone. What ends is reachability; the
+records stay and the schema stays applied, because erasing on a toggle would make
+an accidental tap the most destructive control in the product.
+
+**And the first name for those operations deleted a real one.** Platform
+operations are merged OVER an app's generated CRUD, deliberately, so an app
+cannot redeclare "invite a colleague" — which means a platform id equal to a
+generated one replaces it, silently, and the route goes on answering the wrong
+thing at the right address. `product.list` took over a workspace's list of things
+on shelves. `compose` refuses a shadowing id now rather than resolving it.
+
+**Therefore never:** a default nobody chose standing in for a decision; a
+catalogue written beside a wizard instead of read from the manifests; a workspace
+founded with nothing in it, or emptied down to nothing; a toggle that erases; or
+a platform operation that wins a name collision quietly.

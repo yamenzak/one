@@ -38,7 +38,7 @@ const app = () => serve({
   shardOf: () => shard(),
   now: () => clock,
   personal: personalOps({
-    secret: "test-secret", appId: "hello",
+    secret: "test-secret", sells: () => ["hello"],
     deliver: async (to, code) => { sent.push({ to, code }); },
     deliverExport: async () => undefined,
   }),
@@ -111,7 +111,7 @@ beforeEach(async () => {
 async function studio() {
   const owner = await signIn("sam@example.com");
   await post("setup", "/api/me.tenant.create",
-    { slug: "eastwind", name: "Eastwind", country: "DE" }, owner);
+    { slug: "eastwind", name: "Eastwind", country: "DE", apps: ["hello"] }, owner);
   await post("eastwind", "/api/member.invite",
     { email: "alex@example.com", platformRole: "customer", appRoles: { hello: "reader" } }, owner);
   const buyer = await signIn("alex@example.com");

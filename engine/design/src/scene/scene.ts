@@ -293,6 +293,28 @@ export const DENSITY = {
 
 export type Density = keyof typeof DENSITY;
 
+/**
+ * THE MOST NODES A FIELD MAY EVER EMIT.
+ *
+ * ⚠️ DENSITY IS AN INTENT AND THIS IS A CEILING, WHICH IS WHY THERE ARE BOTH. A
+ * screen says how present it wants its world to be; what that costs is the
+ * engine's problem, and a family whose idea of "present" is a fine weave over a
+ * 1400 × 1000 tile spends thousands of nodes to say it. `quiet` is the worst
+ * case rather than the cheapest — a lattice fills what it is given, so asking for
+ * LESS of the family makes the cells smaller and there are more of them.
+ *
+ * ⚠️ 600 IS WHERE THE STRING STOPS BEING THE PICTURE'S COST AND STARTS BEING THE
+ * PAGE'S. Measured, one family at a time, at the density a list screen asks for:
+ * the fine lattice unbounded is 2,820 placements and 504 KB of markup, which the
+ * browser parses in full before it can paint anything; at this ceiling it is 588
+ * and 133 KB. Every other family is already under it and is untouched.
+ *
+ * ⚠️ AND NOTHING ABOUT THE WORLD READS DIFFERENTLY AT THE CEILING. The tile
+ * repeats sooner — a symmetry somebody might find on a wide screen — against
+ * half a megabyte on every screen including the phone.
+ */
+export const MARKS = 600;
+
 /* ----------------------------------------------------------------- render --- */
 
 /**
@@ -407,8 +429,35 @@ export function render(scene: Scene): Rendered {
   */
   const lattice = family.tiles?.[0];
   const cell = lattice ? lattice.cell * Math.sqrt(density) : 0;
-  const cols = lattice ? Math.max(1, Math.round(want.w / cell)) : 0;
-  const rows = lattice ? Math.max(1, Math.round(want.h / cell)) : 0;
+  const wide = lattice ? Math.max(1, Math.round(want.w / cell)) : 0;
+  const tall = lattice ? Math.max(1, Math.round(want.h / cell)) : 0;
+
+  /*
+    ⚠️ THE BUDGET BINDS WHETHER ANYTHING MOVES, and that is the half a motion
+    setting cannot reach. A still field is still a string the browser parses and
+    a tree it rasterises: a lattice fine enough to read as a weave over a
+    1400 × 1000 tile is thousands of nodes, and the cost lands on the first paint
+    of every screen — on the device least able to afford it, before anybody has
+    seen anything.
+
+    ⚠️ THE TILE SHRINKS, NEVER THE CELL. Growing the cell to spend fewer nodes
+    changes the DRAWING — a truchet is scale more than it is anything else, and a
+    coarser weave is a different family — while a smaller tile is the same
+    picture repeating sooner. The repeat is the price, and it is the right one:
+    the pattern is the same at every size, so what a repeat costs is a symmetry
+    somebody might notice on a wide screen, against a field that would otherwise
+    be half a megabyte.
+
+    ⚠️ AND IT IS A NUMBER OF WHOLE CELLS, for the reason the lattice exists: a
+    tile that is not a whole number of cells puts a row of half-cells down every
+    seam, which is a ruled line across the page at the one pitch the eye is best
+    at finding.
+  */
+  const per = family.tiles?.length ?? 0;
+  const over = per && wide * tall * per > MARKS
+    ? Math.sqrt(MARKS / (wide * tall * per)) : 1;
+  const cols = lattice ? Math.max(1, Math.floor(wide * over)) : 0;
+  const rows = lattice ? Math.max(1, Math.floor(tall * over)) : 0;
   const tile = lattice ? { w: cols * cell, h: rows * cell } : want;
 
   for (const t of family.tiles ?? []) {
@@ -426,8 +475,13 @@ export function render(scene: Scene): Rendered {
   if (family.drawn) marks.push(family.drawn(palette, r, tile));
 
   const megapixels = (tile.w * tile.h) / 1_000_000;
+  /* ⚠️ THE SAME BUDGET, SHARED WITH WHAT THE LATTICE ALREADY SPENT. A family can
+     have both, and two budgets counted separately is a field that passes each
+     and blows the sum. */
+  let left = Math.max(0, MARKS - marks.length);
   for (const speck of family.specks ?? []) {
-    const count = Math.round(speck.per * megapixels * density);
+    const count = Math.min(left, Math.round(speck.per * megapixels * density));
+    left -= count;
     for (const [x, y] of scatter(r, tile.w, tile.h, count)) {
       const v = pick(r, speck.variants);
       const beat = beatOf(v);

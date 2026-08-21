@@ -124,6 +124,17 @@ export function You({ onGo }: { readonly onGo: (to: Where) => void }) {
           under="Dates, times, numbers and measurements, everywhere"
           onOpen={() => onGo({ at: "formats" })}
         />
+        {/* ⚠️ ON THIS DEVICE, AND THE LINE SAYS SO. Every other row here follows
+            the person into every workspace and onto every screen they open; the
+            theme and the motion stay on the machine they were chosen on, which
+            is a difference somebody has to be told rather than discover by
+            setting it once and finding it undone on their phone. */}
+        <NavRow
+          icon={glyphOf("sun")}
+          label={nameOf({ at: "looks" })}
+          under="Theme and how much moves — on this device"
+          onOpen={() => onGo({ at: "looks" })}
+        />
         <NavRow
           icon={glyphOf("cog")}
           label="Your preferences"

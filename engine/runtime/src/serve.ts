@@ -120,6 +120,22 @@ export interface Wiring {
   readonly roots: Roots;
   /** ⚠️ A thunk per app, so composing one does not compose the others (D4). */
   readonly apps: Readonly<Record<string, () => AppSpec>>;
+  /**
+   * WHICH OF THEM A WORKSPACE MAY SWITCH ON FOR ITSELF, AND THE TWO SWITCHES.
+   *
+   * ⚠️ `apps` IS WHAT THIS DEPLOYMENT CAN RUN AND THIS IS WHAT IT OFFERS, and
+   * they are different lists on purpose. A product still being built is mounted,
+   * reachable, and answering for the workspaces an operator put it in; it has no
+   * business on a stranger's first screen.
+   *
+   * ⚠️ ABSENT IS A DEPLOYMENT THAT OFFERS NOTHING TO CHOOSE, which the product
+   * operations report as an empty catalogue rather than as a failure.
+   */
+  readonly products?: {
+    readonly sells: () => readonly string[];
+    readonly switchOn: (tenantId: string, appId: string, now: Date) => Promise<void>;
+    readonly switchOff: (tenantId: string, appId: string, now: Date) => Promise<void>;
+  };
   readonly directory: Db;
   /**
    * ⚠️ THE BUCKET A WORKSPACE'S FILES ARE IN — the one the reconciler made for
@@ -1017,6 +1033,8 @@ export async function performOperation(
     permissionsIn: who.permissionsIn,
     appOf: (appId) => wiring.apps[appId]?.() ?? null,
     enabledApps: located.apps,
+    /* ⚠️ THE CATALOGUE AND THE TWO SWITCHES, RESOLVED — see `Wiring.products`. */
+    ...(wiring.products ? { products: wiring.products } : {}),
     /* ⚠️ THE SAME MAP `check` WAS HANDED, above. */
     flags,
     /*

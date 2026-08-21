@@ -41,7 +41,7 @@ const app = () => serve({
   installable: { name: "One", mark: "◇" },
   personal: {
     ...personalOps({
-      secret: "test-secret", appId: "hello",
+      secret: "test-secret", sells: () => ["hello"],
       deliver: async (to, code) => { sent.push({ to, code }); },
       deliverExport: async () => undefined,
       isOperator: (email) => email === OPERATOR,
@@ -95,7 +95,7 @@ const SLUG = "harbourside";
 async function workspace(): Promise<string> {
   const cookie = await signIn("sam@example.com");
   const made = await post("setup", "/api/me.tenant.create",
-    { slug: SLUG, name: "Harbourside", country: "DE" }, cookie);
+    { slug: SLUG, name: "Harbourside", country: "DE", apps: ["hello"] }, cookie);
   expect(made.status).toBe(200);
   return cookie;
 }
@@ -150,7 +150,7 @@ describe("a new workspace", () => {
   it("is personal, whatever the body says", async () => {
     const cookie = await signIn("sam@example.com");
     await post("setup", "/api/me.tenant.create",
-      { slug: SLUG, name: "Harbourside", country: "DE", kind: "commercial" }, cookie);
+      { slug: SLUG, name: "Harbourside", country: "DE", kind: "commercial", apps: ["hello"] }, cookie);
     expect((await tenantBySlug(directory(), SLUG))?.kind).toBe("personal");
   });
 
@@ -279,7 +279,7 @@ describe("becoming a business", () => {
       { slug: SLUG, legalName: "H GmbH" }, cookie)).status).toBe(200);
 
     await post("setup", "/api/me.tenant.create",
-      { slug: "harbourside-two", name: "Harbourside Two", country: "DE" }, cookie);
+      { slug: "harbourside-two", name: "Harbourside Two", country: "DE", apps: ["hello"] }, cookie);
     expect((await post("setup", "/api/me.tenant.commercial",
       { slug: "harbourside-two", legalName: "H Two GmbH" }, cookie)).status).toBe(402);
   });
@@ -552,7 +552,7 @@ describe("a database of one workspace's own", () => {
 
     const other = await signIn("kim@example.com");
     await post("setup", "/api/me.tenant.create",
-      { slug: "harbourside-three", name: "Third", country: "DE" }, other);
+      { slug: "harbourside-three", name: "Third", country: "DE", apps: ["hello"] }, other);
 
     expect((await post("admin", "/api/op.shard.dedicate",
       { shard: "eu-1", slug: SLUG }, ops)).status).toBe(409);

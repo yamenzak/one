@@ -53,7 +53,7 @@ const app = () => serve({
   shardOf: () => shard(),
   personal: {
     ...personalOps({
-      secret: "test-secret", appId: "hello",
+      secret: "test-secret", sells: () => ["hello"],
       deliver: async (to, code) => { sent.push({ to, code }); },
       deliverExport: async () => undefined,
     }),
@@ -130,7 +130,7 @@ beforeEach(async () => {
   ops = await signIn("ops@example.com");
   owner = await signIn("sam@example.com");
   await post("setup", "/api/me.tenant.create",
-    { slug: "eastgate", name: "Eastgate", country: "DE" }, owner);
+    { slug: "eastgate", name: "Eastgate", country: "DE", apps: ["hello"] }, owner);
 });
 
 /* --------------------------------------------------------------- the door --- */
@@ -484,7 +484,7 @@ describe("what the console can change", () => {
     const flag = "note-search";
     const eastgate = (await tenantBySlug(directory(), "eastgate"))!.id;
     expect((await post("setup", "/api/me.tenant.create",
-      { slug: "westgate", name: "Westgate", country: "DE" }, owner)).status).toBe(200);
+      { slug: "westgate", name: "Westgate", country: "DE", apps: ["hello"] }, owner)).status).toBe(200);
     const westgate = (await tenantBySlug(directory(), "westgate"))!.id;
 
     for (const at of [eastgate, westgate]) {

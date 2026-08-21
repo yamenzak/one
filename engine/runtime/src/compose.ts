@@ -418,15 +418,40 @@ export function compose(app: AppSpec): Composed {
       byId.set(opId, crudFor(spec, verb, app.id, app.reach?.label.many.toLowerCase() ?? "places"));
     }
   }
-  /* ⚠️ THE ROSTER IS THE PLATFORM'S AND EVERY APP HAS IT (see `member-ops.ts`).
-     Added before the app's own, so an app cannot shadow "invite a colleague"
-     with something that skips the two doors bounding it. The package rail
-     (D16) rides the same rule: what a purchase grants is not an app's to
-     redeclare. */
-  for (const [id, resolved] of Object.entries(memberOps(app))) byId.set(id, resolved);
-  for (const [id, resolved] of Object.entries(packageOps(app))) byId.set(id, resolved);
-  for (const [id, resolved] of Object.entries(settingOps(app))) byId.set(id, resolved);
-  for (const [id, resolved] of Object.entries(moneyOps(app))) byId.set(id, resolved);
+  /*
+    ⚠️ THE ROSTER IS THE PLATFORM'S AND EVERY APP HAS IT (see `member-ops.ts`).
+    Merged OVER the app's own, so an app cannot shadow "invite a colleague" with
+    something that skips the two doors bounding it. The package rail (D16) rides
+    the same rule: what a purchase grants is not an app's to redeclare.
+
+    ⚠️ WHICH IS ALSO A WAY TO DELETE A PRODUCT'S OWN OPERATION WITHOUT NOTICING.
+    The merge is silent: a platform id equal to a generated one replaces it, the
+    route still answers, and what it answers is the wrong thing. It happened —
+    a platform `product.list` took over the list of things on a workspace's
+    shelves — so the collision is refused here rather than resolved.
+
+    ⚠️ THE APP'S IDS ARE READ BEFORE THE MERGE, because after it there is nothing
+    left to compare against; that is the whole shape of the fault.
+  */
+  const declared = new Set(byId.keys());
+  const shadowed: string[] = [];
+  const put = (from: Readonly<Record<string, Resolved>>) => {
+    for (const [id, resolved] of Object.entries(from)) {
+      if (declared.has(id)) shadowed.push(id);
+      byId.set(id, resolved);
+    }
+  };
+  put(memberOps(app));
+  put(packageOps(app));
+  put(settingOps(app));
+  put(moneyOps(app));
+  if (shadowed.length) {
+    throw new Error(
+      `${app.id}: the platform's ${shadowed.join(", ")} would replace an operation this app `
+      + "declares. Rename the collection, or the platform operation — a merge that wins "
+      + "silently answers the wrong thing at the right address.",
+    );
+  }
   /* ⚠️ ONLY WHERE THE APP DECLARES A GENERATING ACTION — `aiOps` returns nothing
      otherwise. A product with nothing to generate should not answer two routes
      about which model does it. */

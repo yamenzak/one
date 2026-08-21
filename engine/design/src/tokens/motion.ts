@@ -211,48 +211,218 @@ export function useStill(at: React.RefObject<HTMLElement | null>): boolean {
   return still;
 }
 
+/* ------------------------------------------------------------- the budget --- */
+
 /**
- * WHETHER THIS PERSON WANTS LESS MOTION — BOTH SIGNALS, WATCHED.
+ * TWO KINDS OF MOTION, AND ONLY ONE OF THEM IS FREE.
+ *
+ * ⚠️ ESSENTIAL MOTION IS SHORT, ONE-SHOT AND COMPOSITED. A screen arriving, a
+ * page travelling, a mark playing its character under a finger, a chart drawing
+ * itself: each is a few hundred milliseconds of `transform` and `opacity` on a
+ * handful of elements, which the compositor runs on its own thread and the main
+ * thread never sees. It is also the motion that CARRIES MEANING — where a screen
+ * came from, that a press registered — so taking it away costs comprehension.
+ *
+ * ⚠️ AMBIENT MOTION IS ENDLESS AND FULL-SCREEN, AND IT IS NEVER COMPOSITED. The
+ * world's marks beat in SMIL inside a `<pattern>`, which is the only thing that
+ * repaints in one — and a repaint inside a paint server invalidates the whole
+ * fill, so every frame re-rasterises a tile and repaints a viewport-sized rect,
+ * on the main thread, for as long as the screen is open. It costs the same
+ * whether anybody is looking at it or not, and it competes with scrolling.
+ *
+ * ⚠️ SO AMBIENT IS EARNED AND ESSENTIAL IS ASSUMED. A device that has not shown
+ * it can afford a permanent full-screen repaint does not get one; nothing about
+ * the product is missing without it, because a still world is still a world.
+ */
+export interface Motion {
+  /** Arrival, travel, a press, a chart drawing. Assumed unless motion is refused. */
+  readonly essential: boolean;
+  /** The world's marks. Earned, never assumed. */
+  readonly ambient: boolean;
+}
+
+/**
+ * ⚠️ FOUR STATES, AND `auto` IS THE DEFAULT BECAUSE IT IS AN ANSWER. A person
+ * who has never chosen is not asking for the most the device can do; they are
+ * asking for whatever is right on the thing in their hand, which is a different
+ * answer on a phone and a desktop. Storing `calm` on first load makes a choice
+ * for them they then have to undo, exactly as `system` exists to avoid in
+ * `Appearance`.
+ *
+ * ⚠️ AND `full` IS AN OVERRIDE THAT BEATS THE DEVICE TEST, IN ONE DIRECTION ONLY.
+ * Somebody who asks for the world to move gets it wherever they asked; nothing
+ * overrides an operating system that asked for less motion, because for some
+ * people that is not a preference.
+ */
+export type Liveliness = "auto" | "full" | "calm" | "none";
+
+export const LIVELINESS: readonly Liveliness[] = ["auto", "full", "calm", "none"];
+
+/** ⚠️ Prefixed, because a person may have several products on one origin. */
+export const LIVELINESS_KEY = "one:motion";
+
+/**
+ * WHAT THE DEVICE SAID ABOUT ITSELF. A record rather than a set of `navigator`
+ * reads, so the rule below is a pure function somebody can put a table of
+ * devices through — which is the only way a rule about hardware gets tested at
+ * all.
+ */
+export interface Device {
+  /** The operating system asked for less motion. Outranks every other field. */
+  readonly asked: boolean;
+  /** The person asked the network for less. Somebody metering bytes is metering. */
+  readonly saveData: boolean;
+  /** A pointer that hovers — a mouse, and therefore a machine with a fan. */
+  readonly fine: boolean;
+  /** Gigabytes, where the browser says. `null` is "did not say". */
+  readonly memory: number | null;
+  /** Logical cores, where the browser says. `null` is "did not say". */
+  readonly cores: number | null;
+}
+
+/**
+ * ⚠️ THE POINTER IS THE STRONGEST SIGNAL AND THE COUNTS ONLY VETO. A mid-range
+ * phone reports eight cores, so a threshold on cores alone admits exactly the
+ * device this exists to protect; what a phone cannot report is a mouse. So a
+ * fine pointer is the entry condition, and memory and cores are read only to
+ * REFUSE a machine that says it is small.
+ *
+ * ⚠️ AND SILENCE IS NOT A REFUSAL, ON THOSE TWO ONLY. `deviceMemory` is absent
+ * outside Chromium; treating absent as small would make a still world the
+ * permanent answer in two browsers on hardware that is fine — a rule that turns
+ * into a browser test is a rule about the wrong thing.
+ */
+export const earned = (d: Device): boolean =>
+  !d.asked && !d.saveData && d.fine
+  && (d.memory === null || d.memory >= 8)
+  && (d.cores === null || d.cores >= 8);
+
+/** The whole decision, pure, from a choice and a device. */
+export const motionFor = (choice: Liveliness, device: Device): Motion => {
+  /* ⚠️ THE OPERATING SYSTEM IS ABOVE THE PRODUCT'S OWN SWITCH. */
+  if (device.asked || choice === "none") return { essential: false, ambient: false };
+  if (choice === "calm") return { essential: true, ambient: false };
+  if (choice === "full") return { essential: true, ambient: true };
+  return { essential: true, ambient: earned(device) };
+};
+
+const isLiveliness = (v: unknown): v is Liveliness =>
+  v === "auto" || v === "full" || v === "calm" || v === "none";
+
+/**
+ * ⚠️ AN UNREADABLE STORE IS `auto`, NOT A THROW — the same hazard `Appearance`
+ * documents: private browsing and a blocked-cookies setting make `localStorage`
+ * throw on ACCESS, so a naive read takes the application down before it renders.
+ */
+export function livelinessStored(): Liveliness {
+  try {
+    const raw = localStorage.getItem(LIVELINESS_KEY);
+    return isLiveliness(raw) ? raw : "auto";
+  } catch {
+    return "auto";
+  }
+}
+
+export function rememberLiveliness(choice: Liveliness): void {
+  try {
+    if (choice === "auto") localStorage.removeItem(LIVELINESS_KEY);
+    else localStorage.setItem(LIVELINESS_KEY, choice);
+  } catch {
+    /* ⚠️ Swallowed: failing to REMEMBER a preference must never stop it being
+       APPLIED for this visit. */
+  }
+}
+
+/**
+ * ⚠️ READ FRESH RATHER THAN CACHED. A laptop that loses its mouse, a phone that
+ * turns on data saving, and an operating system whose motion setting changes are
+ * all things that happen while the page is open.
+ */
+export function reading(): Device {
+  if (typeof document === "undefined") {
+    return { asked: false, saveData: false, fine: false, memory: null, cores: null };
+  }
+  const media = (q: string) => typeof matchMedia === "function" && matchMedia(q).matches;
+  const nav = navigator as Navigator & {
+    deviceMemory?: number; connection?: { saveData?: boolean };
+  };
+  return {
+    /* ⚠️ BOTH SIGNALS ARE THE OPERATING SYSTEM'S HERE. `data-reduce-motion` is
+       set by `applyLiveliness` from the person's own choice, and reading it back
+       as `asked` would make `none` indistinguishable from the OS's request —
+       which matters, because `full` may override one and never the other. */
+    asked: media("(prefers-reduced-motion: reduce)"),
+    saveData: nav.connection?.saveData === true,
+    fine: media("(pointer: fine)") && media("(hover: hover)"),
+    memory: typeof nav.deviceMemory === "number" ? nav.deviceMemory : null,
+    cores: typeof nav.hardwareConcurrency === "number" ? nav.hardwareConcurrency : null,
+  };
+}
+
+/**
+ * Stamp the document so the stylesheet can answer, and keep it stamped.
+ *
+ * ⚠️ ONLY `none` REACHES CSS, AND THAT IS THE WHOLE OF WHAT CSS CAN DECIDE. The
+ * ambient half is SMIL, which no rule can switch off — it is decided where the
+ * drawing is MADE (`useScenery`). Stamping a third state here would be a
+ * selector that looks like it controls the world and controls nothing.
+ *
+ * ⚠️ ON `documentElement`, NOT ON A WRAPPER — overlays are portalled to
+ * `document.body`, outside whatever the application renders into.
+ */
+export function applyLiveliness(choice: Liveliness = livelinessStored()): void {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  if (choice === "none") root.setAttribute("data-reduce-motion", "true");
+  else root.removeAttribute("data-reduce-motion");
+}
+
+/**
+ * WHAT MAY MOVE, WATCHED.
+ *
+ * ⚠️ READ SYNCHRONOUSLY. Starting permissive and correcting in an effect renders
+ * one moving world and throws it away, which is a second field built and
+ * discarded on the slowest device in the fleet — the device the correction was
+ * for.
+ */
+export function useMotion(): Motion {
+  const read = () => motionFor(livelinessStored(), reading());
+  const [motion, setMotion] = React.useState(read);
+  React.useEffect(() => {
+    const again = () => setMotion(read());
+    /* ⚠️ THE ATTRIBUTE IS WATCHED AS WELL AS THE MEDIA, because the switch that
+       writes it is a control on a settings screen and somebody who moves it must
+       not have to reload to be believed. */
+    const on = new MutationObserver(again);
+    on.observe(document.documentElement, {
+      attributes: true, attributeFilter: ["data-reduce-motion"],
+    });
+    const watched = ["(prefers-reduced-motion: reduce)", "(pointer: fine)", "(hover: hover)"]
+      .map((q) => (typeof matchMedia === "function" ? matchMedia(q) : null));
+    for (const m of watched) m?.addEventListener("change", again);
+    return () => {
+      on.disconnect();
+      for (const m of watched) m?.removeEventListener("change", again);
+    };
+  }, []);
+  return motion;
+}
+
+/**
+ * WHETHER THIS PERSON WANTS LESS MOTION.
+ *
+ * ⚠️ A PROJECTION OF `useMotion`, WHICH IS WHY IT IS ONE LINE. Two
+ * implementations of "may this move" is how a screen comes to hold still while
+ * the world under it goes on breathing.
  *
  * ⚠️ IT IS HERE RATHER THAN IN `frame/`, BECAUSE THE THINGS THAT NEED IT ARE NOT
  * ALL FRAMES. `Page` asks so it can bake a still world; the opening asks so it
  * can hold one line instead of cycling them. A hook about a PREFERENCE living
  * beside one of its callers is how a `parts/` file comes to import a `frame/`
  * one, which is the direction that eventually closes a cycle.
- *
- * ⚠️ AND IT EXISTS AT ALL BECAUSE A SCENE'S MARKS BEAT IN SMIL, WHICH IS THE ONLY THING
- * THAT REPAINTS INSIDE A `<pattern>`. Everything else in this system answers
- * `prefers-reduced-motion` and a `data-reduce-motion` ancestor through CSS, for
- * free; a beat cannot, so the drawing is made without one instead. That means
- * the answer has to be known at RENDER, and it has to be watched — somebody who
- * turns motion off in the product's own settings must not have to reload to be
- * believed.
- *
- * ⚠️ AND IT IS READ SYNCHRONOUSLY. Starting at `false` and correcting in an
- * effect would render one moving world and then throw it away, which is a second
- * two-hundred-kilobyte string built for nothing on the slowest device.
  */
 export function useStillness(): boolean {
-  const read = () => {
-    if (typeof document === "undefined") return false;
-    const asked = typeof matchMedia === "function"
-      && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    /* ⚠️ The in-app switch can only make it MORE still — see `useStill`. */
-    return asked || document.documentElement.getAttribute("data-reduce-motion") === "true";
-  };
-  const [still, setStill] = React.useState(read);
-  React.useEffect(() => {
-    const on = new MutationObserver(() => setStill(read()));
-    on.observe(document.documentElement, {
-      attributes: true, attributeFilter: ["data-reduce-motion"],
-    });
-    const media = typeof matchMedia === "function"
-      ? matchMedia("(prefers-reduced-motion: reduce)") : null;
-    const again = () => setStill(read());
-    media?.addEventListener("change", again);
-    return () => { on.disconnect(); media?.removeEventListener("change", again); };
-  }, []);
-  return still;
+  return !useMotion().essential;
 }
 
 /**

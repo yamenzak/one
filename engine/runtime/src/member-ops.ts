@@ -60,6 +60,24 @@ export interface PlatformCtx extends Ctx {
   /** Which products this workspace has switched on. */
   readonly enabledApps: readonly string[];
   /**
+   * WHICH PRODUCTS A WORKSPACE MAY SWITCH ON FOR ITSELF, AND THE TWO SWITCHES.
+   *
+   * ⚠️ HERE RATHER THAN IN THE OPERATION, for the same reason `appOf` is: the
+   * catalogue and the enable path are the DEPLOYMENT'S, and an operation that
+   * reached for them directly would make every product able to enable every
+   * other. It arrives resolved, like everything else on this context.
+   *
+   * ⚠️ AND IT IS OPTIONAL, SO A DEPLOYMENT THAT SERVES ONE PRODUCT NEED NOT
+   * ANSWER. Absent means nothing is on offer, which the operations report as an
+   * empty catalogue rather than as a failure — a deployment with one product has
+   * nothing to choose between, and a screen saying so is better than a refusal.
+   */
+  readonly products?: {
+    readonly sells: () => readonly string[];
+    readonly switchOn: (tenantId: TenantId, appId: string, now: Date) => Promise<void>;
+    readonly switchOff: (tenantId: TenantId, appId: string, now: Date) => Promise<void>;
+  };
+  /**
    * ⚠️ EVERY DECLARED FLAG, ALREADY RESOLVED — the SAME map the gate read for
    * this request (`resolveFlags`, once, in the locator). A surface that resolved
    * its own would be a second answer to "is this on", and the two differ on
@@ -590,6 +608,86 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         return { id: String(input.id) };
       },
       { why: "It takes access away, which only a person weighs." }),
+
+    /* ------------------------------------------------------- the products --- */
+
+    /*
+      ⚠️ `app.*` RATHER THAN `product.*`, AND THE FIRST NAME SHADOWED A REAL
+      PRODUCT. Every platform operation here is merged over the app's own
+      generated CRUD — deliberately, so an app cannot redeclare "invite a
+      colleague" — and OneInventory declares a collection called `product`. So
+      `product.list` replaced its own list of things on shelves with this list of
+      switched-on products, at the same address, with no error anywhere.
+      `refuseShadowing` in `compose.ts` makes the next one a build failure.
+    */
+
+    /**
+     * WHAT THIS WORKSPACE HAS SWITCHED ON, AND WHAT ELSE IT COULD.
+     *
+     * ⚠️ THE PAIR IS THE SCREEN. A list of what is on is a status; a list of what
+     * is on BESIDE what is available is a decision somebody can make. Answering
+     * only the first is why the way to add a product was to ask us.
+     *
+     * ⚠️ AND IT IS MOUNTED IN EVERY PRODUCT, like the brand above and for the
+     * same reason: a decision about the WORKSPACE is made from wherever somebody
+     * happens to be standing, and filing it under one product means the way to
+     * add your second is to already have it.
+     */
+    "app.list": op("app.list", "read", "tenant:manage",
+      "The products this workspace has, and the ones it could add.",
+      async (ctx) => ({
+        items: (ctx.products?.sells() ?? [])
+          .map((id) => ctx.appOf(id))
+          .filter((a): a is AppSpec => !!a)
+          .map((a) => ({
+            id: a.id,
+            name: a.name,
+            mark: a.mark,
+            on: ctx.enabledApps.includes(a.id),
+            /* ⚠️ THE LAST ONE CANNOT BE TURNED OFF, AND THE SCREEN IS TOLD
+               RATHER THAN LEFT TO WORK IT OUT. A workspace with nothing switched
+               on has no screens — including the one that would switch something
+               back on — so it is a door that locks from the inside. */
+            last: ctx.enabledApps.length === 1 && ctx.enabledApps[0] === a.id,
+          })),
+      })),
+
+    "app.add": op("app.add", "write", "tenant:manage", "Switch a product on.",
+      async (ctx, input) => {
+        const id = String(input.id ?? "");
+        /* ⚠️ ON OFFER, NOT MERELY SERVED. The registry holds what this deployment
+           can run; `sells` holds what anybody may switch on for themselves. */
+        if (!ctx.products?.sells().includes(id) || !ctx.appOf(id)) {
+          return ctx.fail("platform.not_found");
+        }
+        /* ⚠️ ALREADY ON IS A SUCCESS, NOT A CONFLICT. The control is a switch and
+           a switch that refuses the position it is already in is a screen that
+           shows an error for agreeing with it. */
+        if (!ctx.enabledApps.includes(id)) {
+          await ctx.products.switchOn(ctx.tenantId as TenantId, id, new Date(ctx.now));
+        }
+        return { id };
+      },
+      { why: "It changes what a workspace is, and what it will be charged for." }),
+
+    "app.remove": op("app.remove", "write", "tenant:manage", "Switch a product off.",
+      async (ctx, input) => {
+        const id = String(input.id ?? "");
+        if (!ctx.enabledApps.includes(id)) return { id };
+        /* ⚠️ NEVER THE LAST ONE — see `app.list`. A workspace with nothing on
+           is unreachable by its own owner, and the bill goes on running. */
+        if (ctx.enabledApps.length === 1) return ctx.fail("platform.conflict");
+        /*
+          ⚠️ OFF IS NOT GONE, AND THE COPY MUST NEVER SAY OTHERWISE. What ends is
+          reachability: the records stay, the schema stays applied, and switching
+          it back on returns everything. Erasing on a toggle would make an
+          accidental tap the most destructive control in the product.
+        */
+        if (!ctx.products) return ctx.fail("platform.not_found");
+        await ctx.products.switchOff(ctx.tenantId as TenantId, id, new Date(ctx.now));
+        return { id };
+      },
+      { why: "It takes a product away from everybody here, which only a person weighs." }),
 
     /*
       ⚠️ THE WORKSPACE'S BRAND, NOT THIS APP'S — see `branding.ts`. The operation

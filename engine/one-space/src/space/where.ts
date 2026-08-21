@@ -84,6 +84,11 @@ export type Where =
   | { readonly at: "prefs"; readonly app?: string; readonly area?: string }
   /** ⚠️ Not a product's setting — how THIS PERSON reads every product. */
   | { readonly at: "formats" }
+  /* ⚠️ THE DEVICE'S OWN, WHICH IS WHY IT IS BESIDE `formats` AND NOT UNDER IT.
+     Both are about how something READS rather than what it is; the difference is
+     that a format follows the person into every workspace and a theme stays on
+     the screen it was chosen on. */
+  | { readonly at: "looks" }
   | { readonly at: "agreed" }
   | { readonly at: "workspaces" }
   /** One workspace: what it includes, and the way into everything about it. */
@@ -391,6 +396,7 @@ export function parseWhere(path: string): Where {
   if (head === "told") return { at: "told" };
   if (head === "data") return { at: "data" };
   if (head === "formats") return { at: "formats" };
+  if (head === "looks") return { at: "looks" };
   if (head === "agreed") return { at: "agreed" };
   if (head === "prefs") {
     const [app, area] = tail;
@@ -476,6 +482,7 @@ export function pathOf(where: Where): string {
     case "told": return `${SPACE}/told`;
     case "data": return `${SPACE}/data`;
     case "formats": return `${SPACE}/formats`;
+    case "looks": return `${SPACE}/looks`;
     case "agreed": return `${SPACE}/agreed`;
     case "prefs":
       return `${SPACE}/prefs${where.app ? `/${where.app}` : ""}${where.app && where.area ? `/${where.area}` : ""}`;
@@ -530,6 +537,7 @@ export function above(where: Where): Where | null {
     case "home": return null;
     case "you": case "inbox": case "workspaces": case "console": return { at: "home" };
     case "formats": return { at: "you" };
+    case "looks": return { at: "you" };
     case "agreed": return { at: "you" };
     /* ⚠️ How you are told is a detail of YOU, so leaving it goes back there
        rather than to the root — the crown's arrow has to agree with how
@@ -578,6 +586,7 @@ export const nameOf = (where: Where): string => {
     case "told": return "How you are told";
     case "data": return "Your data";
     case "formats": return "Dates and numbers";
+    case "looks": return "Look and motion";
     case "agreed": return "What you agreed to";
     case "prefs": return "Your preferences";
     case "workspaces": return "Workspaces";

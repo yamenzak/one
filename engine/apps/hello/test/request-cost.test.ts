@@ -46,7 +46,7 @@ const app = () => serve({
   shardOf: () => onShard.db,
   personal: {
     ...personalOps({
-      secret: "test-secret", appId: "hello",
+      secret: "test-secret", sells: () => ["hello"],
       deliver: async (to, code) => { sent.push({ to, code }); },
       deliverExport: async () => undefined,
     }),
@@ -103,7 +103,7 @@ beforeAll(async () => {
     { email: "sam@example.com", code: codeFor("sam@example.com") }));
   slug = "fastwork";
   const made = await post("setup", "/api/me.tenant.create",
-    { slug, name: "Fast", country: "DE" }, cookie);
+    { slug, name: "Fast", country: "DE", apps: ["hello"] }, cookie);
   expect(made.status, await made.clone().text()).toBe(200);
 
   /* ⚠️ Warmed once: the first request of any isolate pays the boot, which has

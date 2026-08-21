@@ -2,7 +2,7 @@ import * as React from "react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  seedShapes, runtimeCss, brandCss, applyAppearance, Presenting,
+  seedShapes, runtimeCss, brandCss, applyAppearance, applyLiveliness, Presenting,
 } from "@engine/design";
 import "./styles.css";
 import { ONE_ACCENT } from "./brand.js";
@@ -30,6 +30,18 @@ import { SessionProvider, useSession } from "./session.js";
  * paint; this keeps it stamped when the device changes at sunset.
  */
 applyAppearance();
+
+/*
+  ⚠️ THE MOTION SETTING, STAMPED THE SAME WAY AND FOR THE SAME REASON. Every
+  keyframe in the design system answers `data-reduce-motion`, and until there was
+  a screen to write it the attribute was read by everything and set by nothing —
+  a preference honoured everywhere and reachable nowhere.
+
+  ⚠️ IT ONLY EVER WRITES THE `none` CASE. Whether the WORLD moves is not a CSS
+  question — a beat is SMIL, which no rule can switch off — so it is decided
+  where the drawing is made, by `useMotion`, per screen. See `motionFor`.
+*/
+applyLiveliness();
 
 /*
   ⚠️ WHAT EVERY SCREEN MEASURED, HANDED OVER BEFORE THE FIRST ONE DRAWS.

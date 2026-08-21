@@ -38,7 +38,7 @@ all of it is refused, gated, audited and erasable on the same terms as everythin
 an app writes itself.
 
 <!-- generated: node scripts/inventory.mjs surface -->
-**39 operations for declaring nothing.** A roster, an inbox and its
+**42 operations for declaring nothing.** A roster, an inbox and its
 two-level policy, the workspace's brand, the package rail it sells with, its
 settings, its bill, and the one bootstrap read every screen stands on.
 
@@ -58,6 +58,9 @@ settings, its bill, and the one bootstrap read every screen stands on.
 | `role.save` | write | `member:manage` |
 | `role.remove` | write | `member:manage` |
 | `member.remove` | write | `member:manage` |
+| `app.list` | read | `tenant:manage` |
+| `app.add` | write | `tenant:manage` |
+| `app.remove` | write | `tenant:manage` |
 | `brand.read` | read | `tenant:manage` |
 | `brand.write` | write | `tenant:manage` |
 | `brand.icon` | write | `tenant:manage` |
@@ -150,6 +153,7 @@ they are in, leaving one, taking a copy, deleting themselves.
 | `me.prove.code` | write | session | *every door* |
 | `me.prove` | write | session | *every door* |
 | `me.who` | read | session | *every door* |
+| `me.products` | read | session | `setup` `account` |
 | `me.tenant.create` | write | session | `setup` `account` |
 | `me.tenant.commercial` | write | session | `setup` `account` `tenant` |
 | `me.leave` | write | session | *every door* |
@@ -917,6 +921,11 @@ its own header, cited by other files, and doing nothing.
 | `a-slow-lane-has-a-command-that-runs-it` | D49 | a `.seen.` file excluded from `test` by name and reachable by no command — a deleted test wearing a filename, green for ever |
 | `the-fast-lane-does-not-pick-up-a-browser-suite` | D49 | the deploy paying for the browser AND `pnpm engine:seen` running it a second time, because a second config in the same package was never given the exclusion |
 | `the-deploy-gate-opens-no-browser` | D49 | ~400 MB of browser, its system libraries and every pixel assertion put back in front of shipping in one line, by somebody fixing a red run for a reason that looked good at the time |
+| `a-platform-operation-never-replaces-an-apps-own` | D51 | a product's own route answering the platform's handler at the same address — the merge wins silently, so the list of things on a workspace's shelves becomes the list of products it has switched on, with no error anywhere |
+| `a-workspace-is-never-founded-empty` | D51 | a name and an address with nothing to open — reachable, payable and empty for ever, because the screen that would add a product is inside the workspace |
+| `the-last-product-cannot-be-switched-off` | D51 | a workspace its own owner cannot reach, with the bill still running — nothing is on, so the screen that would switch something back on is not drawn |
+| `a-field-never-exceeds-its-mark-budget` | D50 | half a megabyte of markup parsed before the first paint of every screen, on the device least able to afford it — a cost a motion setting cannot reach, because it is there whether anything moves or not |
+| `the-world-moves-only-where-it-was-earned` | D50 | a viewport-sized repaint on the main thread for as long as a screen is open, competing with the scroll, on a phone that never asked for it |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -973,6 +982,8 @@ its own header, cited by other files, and doing nothing.
 | D47 | One screen draws every moment One cannot show you a screen | 0 |
 | D48 | A gift is a row about a person, not a state on a workspace | 0 |
 | D49 | A browser test does not gate a deploy | 4 |
+| D50 | Ambient motion is earned; essential motion is assumed | 2 |
+| D51 | A workspace is founded with the products somebody chose | 3 |
 <!-- /generated -->
 
 ---
@@ -1078,8 +1089,10 @@ that names no stage, so this list cannot grow by forgetting.
 | 75 | A raw ALTER is a 503 on every door, and every standard page wears the curtain | shipped |
 | 76 | A person is a subject, and an operator may give them things | shipped |
 | 77 | A browser test does not gate a deploy | shipped |
+| 78 | Ambient motion is earned, and a field has a budget | shipped |
+| 79 | A workspace is founded with the products somebody chose | shipped |
 
-**67 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**69 shipped, 10 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

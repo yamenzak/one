@@ -42,7 +42,7 @@ const app = () => serve({
   shardOf: () => shard(),
   personal: {
     ...personalOps({
-      secret: "test-secret", appId: "hello",
+      secret: "test-secret", sells: () => ["hello"],
       deliver: async (to, code) => { sent.push({ to, code }); },
       deliverExport: async () => undefined,
     }),
@@ -114,7 +114,7 @@ beforeEach(async () => {
   ops = await signIn("ops@example.com");
   owner = await signIn("sam@example.com");
   await post("setup", "/api/me.tenant.create",
-    { slug: "northgate", name: "Northgate", country: "DE" }, owner);
+    { slug: "northgate", name: "Northgate", country: "DE", apps: ["hello"] }, owner);
 });
 
 /* ---------------------------------------------------------------- derived --- */

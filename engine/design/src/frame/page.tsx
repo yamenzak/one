@@ -12,7 +12,7 @@ import type { Sky, World } from "../tokens/ambience.js";
 import { skyWorld, worldCss } from "../tokens/ambience.js";
 import { BAND_PAD, GUTTER, NAV_SPACE, SAFE_TOP, WIDTH } from "../tokens/metrics.js";
 import type { Width } from "../tokens/metrics.js";
-import { transition, useStillness } from "../tokens/motion.js";
+import { transition, useMotion } from "../tokens/motion.js";
 import type { Density } from "../scene/index.js";
 
 /* ------------------------------------------------------------------ bleed --- */
@@ -121,10 +121,18 @@ export function useScenery(
   readonly field: React.ReactNode;
 } {
   const night = useNight();
-  /* ⚠️ A SCENE'S MARKS BEAT IN SMIL, WHICH NO MEDIA QUERY CAN SWITCH OFF — so
-     the answer has to be known when the drawing is made rather than after. Both
-     signals, and the drawing is simply made without them. */
-  const still = useStillness();
+  /*
+    ⚠️ A SCENE'S MARKS BEAT IN SMIL, WHICH NO MEDIA QUERY CAN SWITCH OFF — so
+    the answer has to be known when the drawing is MADE rather than after.
+
+    ⚠️ AND IT IS THE AMBIENT HALF OF THE BUDGET, NOT THE ESSENTIAL ONE. A beat
+    inside a `<pattern>` repaints a viewport-sized fill on the main thread for as
+    long as the screen is open, which is the one thing in this product that costs
+    the same whether anybody is looking at it or not — so it is EARNED, and a
+    device that has not earned it gets a still world rather than no world. See
+    `motionFor`.
+  */
+  const still = !useMotion().ambient;
   const scene = world ?? (!sky || sky === "plain"
     ? null
     : skyWorld(sky as Exclude<Sky, "plain">, seedling ?? sky));

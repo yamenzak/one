@@ -33,7 +33,7 @@ const app = () => serve({
   directory: directory(),
   shardOf: () => shard(),
   personal: personalOps({
-    secret: "test-secret", appId: "hello",
+    secret: "test-secret", sells: () => ["hello"],
     deliver: async (to, code) => { sent.push({ to, code }); },
     deliverExport: async () => undefined,
   }),
@@ -106,7 +106,7 @@ beforeEach(async () => {
 async function studio() {
   const owner = await signIn("sam@example.com");
   await post("setup", "/api/me.tenant.create",
-    { slug: "westgate", name: "Westgate", country: "DE" }, owner);
+    { slug: "westgate", name: "Westgate", country: "DE", apps: ["hello"] }, owner);
   await post("westgate", "/api/member.invite",
     { email: "alex@example.com", platformRole: "customer", appRoles: { hello: "reader" } }, owner);
   const customer = await signIn("alex@example.com");
