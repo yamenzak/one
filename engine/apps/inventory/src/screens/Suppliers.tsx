@@ -93,7 +93,7 @@ export function Suppliers({
         does={{ op: "supplier.create", label: "Add one", icon: glyphOf("add"), onDo: onNew }}
         isNothing={(rows) => rows.length === 0}
         nothing={{
-          icon: glyphOf("box"),
+          icon: glyphOf("people"),
           says: "No suppliers yet",
           under: "Add one, or import a spreadsheet with a supplier column and they appear here",
         }}
@@ -105,7 +105,10 @@ export function Suppliers({
             {rows.map((row) => (
               <NavRow
                 key={row.id}
-                icon={glyphOf("box")}
+                /* ⚠️ NOT A BOX. A supplier is somebody a person rings, and the
+                   box is the mark this product uses for a thing on a shelf —
+                   which is what the row is a way of NOT looking at. */
+                icon={glyphOf("people")}
                 label={row.name}
                 under={under(row, standingDays)}
                 /* ⚠️ HOW MANY PRODUCTS NAME THEM, because a supplier nothing
