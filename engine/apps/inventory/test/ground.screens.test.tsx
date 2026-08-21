@@ -13,9 +13,10 @@
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
+import { ready } from "@engine/design";
 import { describe, expect, it } from "vitest";
 import { INVENTORY } from "../src/index.js";
-import { INVENTORY_ROUTES, InventoryScreen } from "../src/screens/index.js";
+import { INVENTORY_ROUTES, InventoryScreen, Scan, type Seen } from "../src/screens/index.js";
 import { LINES, PLACES, EMPTY_PLACE } from "../src/screens/sample.js";
 
 const html = (route: string) => renderToStaticMarkup(<InventoryScreen route={route} />);
@@ -120,5 +121,86 @@ describe("the location tree", () => {
       expect(out, below.name).not.toContain(`>${below.lines} lines<`);
     }
     expect(out).toContain(`>${site?.lines} lines<`);
+  });
+});
+
+/**
+ * WHAT A SCAN TURNED OUT TO BE DECIDES THE WHOLE SCREEN.
+ *
+ * ⚠️ THREE OUTCOMES, THREE DIFFERENT ACTS, and the one that matters most is the
+ * one nobody designs: a code this workspace has never seen. Answering it is what
+ * teaches the catalogue, so a screen that treated it as a failure would make the
+ * product's main gesture look broken on the day somebody starts.
+ */
+describe("the scan screen", () => {
+  const seen = (of: Partial<Seen>): Seen => ({
+    found: false, kind: "gtin", value: "05000112637922", ours: "",
+    product: "", name: "", tracking: "", unit: "", pack: 1,
+    lot: "", expiry: "", needs: "", ...of,
+  });
+
+  const drawn = (of: Seen | null) => renderToStaticMarkup(
+    <Scan
+      of={ready(of)}
+      products={[{ id: "t-glove", label: "Nitrile gloves, blue" }]}
+      onRead={() => undefined}
+      onOpen={() => undefined}
+      onPlace={() => undefined}
+      onLearn={() => undefined}
+      again={() => undefined}
+    />,
+  );
+
+  it("asks what an unknown code is, rather than refusing it", () => {
+    const out = drawn(seen({}));
+    expect(out).toContain("What is this?");
+    expect(out).toContain("Attach this code");
+  });
+
+  it("shows a known product and offers to open it", () => {
+    const out = drawn(seen({ found: true, name: "Nitrile gloves, blue", product: "t-glove" }));
+    expect(out).toContain("Nitrile gloves, blue");
+    expect(out).toContain("Open it");
+  });
+
+  /* ⚠️ A SHELF LABEL IS A DESTINATION, NOT A RESULT — the session goes there,
+     which is what turns a two-hour count into forty minutes. */
+  it("treats one of our own shelf labels as somewhere to go", () => {
+    const out = drawn(seen({ ours: "location", kind: "ours", value: "ONE-L-4K2P" }));
+    expect(out).toContain("Go to this place");
+    expect(out).toContain("ONE-L-4K2P");
+  });
+
+  /*
+    ⚠️ THE PACK LEVEL IS SAID ONLY WHERE IT IS NOT ONE. On a single box it is
+    noise on every row; where it is ten it is the difference between adding one
+    carton and adding ten gloves.
+  */
+  it("says how many a carton holds, and says nothing for a single box", () => {
+    expect(drawn(seen({ found: true, pack: 10, unit: "glove" }))).toContain("10 glove");
+    expect(drawn(seen({ found: true, pack: 1, unit: "glove" }))).not.toContain("This one holds");
+  });
+
+  /* ⚠️ WHAT THE LABEL DID NOT CARRY, SAID BEFORE THE SCREEN THAT WILL ASK FOR
+     IT. A plain barcode on a batched product means two questions are coming. */
+  it("says what a poor label is missing", () => {
+    const out = drawn(seen({ found: true, tracking: "batched", needs: "lot,expiry" }));
+    expect(out).toContain("does not carry the lot or the expiry");
+  });
+
+  /* ⚠️ NOTHING SCANNED YET IS NOT AN EMPTY STATE — the camera above is the whole
+     screen at that moment, and a "nothing here" card under a live viewfinder
+     reads as a fault rather than as a beginning. */
+  it("draws no empty state before anything has been scanned", () => {
+    const out = drawn(null);
+    expect(out).toContain("Whatever you scan will appear here");
+    expect(out).not.toContain("What is this?");
+  });
+
+  /* ⚠️ AND THE FIELD IS ALWAYS THERE. Most warehouse scanners are keyboard
+     wedges: they type into whatever has the caret and press Enter, so a visible
+     field IS the hardware integration. */
+  it("always offers the typed lane, camera or no camera", () => {
+    expect(drawn(null)).toContain('name="code"');
   });
 });

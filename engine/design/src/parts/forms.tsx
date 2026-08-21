@@ -104,12 +104,36 @@ export interface TextInputProps extends Said {
   readonly autoComplete?: string;
   /** ⚠️ One per screen. Two fields both claiming the caret is a race. */
   readonly autoFocus?: boolean;
+  /**
+   * ⚠️ WHAT ENTER MEANS, WHERE THE FIELD HAS ONE OBVIOUS NEXT STEP. A search
+   * box, a code to look up, a name to add — every one of them is a field
+   * somebody types into and presses Enter, and without this the key does
+   * nothing at all, which reads as a control that ignored them.
+   *
+   * ⚠️ AND IT IS WHAT MAKES A HANDHELD SCANNER WORK WITH NO CODE AT ALL. Most
+   * warehouse scanners are keyboard wedges: they type the code into whatever
+   * has the caret and press Enter. A field that answers Enter is a scanner
+   * integration; one that does not is a device that appears to be broken.
+   */
+  readonly onSubmit?: () => void;
 }
 
 export function TextInput({
-  value, onChange, kind = "text", placeholder, before, after, name, autoComplete, autoFocus, ...p
+  value, onChange, kind = "text", placeholder, before, after, name, autoComplete,
+  autoFocus, onSubmit, ...p
 }: TextInputProps) {
   const pending = value === undefined;
+  /* ⚠️ ON THE INPUT RATHER THAN ON A `<form>`. Nothing in this product is a form
+     element — the submit is a control the screen's shape places — so a form
+     wrapped round one field would be a second submit path with its own
+     navigation behaviour. */
+  const enter = onSubmit
+    ? (e: React.KeyboardEvent) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      onSubmit();
+    }
+    : undefined;
   return (
     <TextField
       fullWidth
@@ -124,11 +148,11 @@ export function TextInput({
       {before || after ? (
         <InputGroup>
           {before ? <InputGroup.Prefix>{before}</InputGroup.Prefix> : null}
-          <InputGroup.Input autoFocus={autoFocus} autoComplete={autoComplete} placeholder={placeholder} />
+          <InputGroup.Input autoFocus={autoFocus} autoComplete={autoComplete} placeholder={placeholder} onKeyDown={enter} />
           {after ? <InputGroup.Suffix>{after}</InputGroup.Suffix> : null}
         </InputGroup>
       ) : (
-        <Input autoFocus={autoFocus} autoComplete={autoComplete} placeholder={placeholder} />
+        <Input autoFocus={autoFocus} autoComplete={autoComplete} placeholder={placeholder} onKeyDown={enter} />
       )}
       <Tail help={p.help} error={p.error} />
     </TextField>

@@ -22,6 +22,7 @@ import * as React from "react";
 import { ready, trouble, waiting, type Loaded } from "@engine/design";
 import type { Problem } from "@engine/kernel";
 import { INVENTORY } from "../index.js";
+import { Scan, type Seen } from "./Scan.js";
 import { Stock } from "./Stock.js";
 import { Thing, type Movement } from "./Thing.js";
 import { Where } from "./Where.js";
@@ -333,7 +334,11 @@ const WHERE = (api: Door) => function WhereHere({ go, at }: Mounted) {
   const places = world.places.status === "ready" && world.stock.status === "ready"
     ? placesOf(world.places.data.items, world.stock.data.items)
     : [];
-  const place = places.find((p) => p.id === id);
+  /* ⚠️ AN ID OR ONE OF OUR OWN LABELS. A printed shelf label is what the camera
+     reads, and it is the only address a person standing in front of a rack has —
+     so the screen resolves either rather than making the scanner look a row id
+     up first. */
+  const place = places.find((p) => p.id === id || p.code === id);
 
   const rows = both(world.stock, world.kinds, (stock, kinds) =>
     linesOf(stock.items, places, kinds.items).filter((l) => l.where === id));
@@ -349,6 +354,69 @@ const WHERE = (api: Door) => function WhereHere({ go, at }: Mounted) {
       onOpen={(line) => go(`/thing/${line.id}`)}
       onLabel={() => undefined}
       onCopy={(value) => { void navigator.clipboard?.writeText(value); }}
+    />
+  );
+};
+
+/**
+ * SCANNING — the one screen that both reads and writes on the same gesture.
+ *
+ * ⚠️ THE RESOLVE IS NOT `useAsked`, AND THAT IS THE WHOLE DIFFERENCE. Every other
+ * container here fetches when it mounts; this one fetches when somebody points a
+ * camera at something, so what holds the answer is the last read rather than a
+ * dependency. Wired as an effect it would re-run on every render and re-resolve
+ * a code nobody scanned again.
+ *
+ * ⚠️ AND THE YEAR GOES WITH THE CODE. A six-digit expiry has its century
+ * inferred from a window around now — the DEVICE's now, for the same reason a
+ * shelf life is counted in local days.
+ */
+const SCAN = (api: Door) => function ScanHere({ go }: Mounted) {
+  const [of, set] = React.useState<Loaded<Seen | null>>(ready(null));
+  const [last, setLast] = React.useState("");
+  const kinds = useAsked<{ items: readonly Row[] }>(() => api.get("product.list"));
+
+  const resolve = React.useCallback((raw: string) => {
+    setLast(raw);
+    set(waiting());
+    void api.get<Seen>("code.resolve", {
+      raw,
+      /* ⚠️ A STRING, BECAUSE THE READ DOOR TAKES A QUERY. The platform coerces
+         it against the declared number; sending it as one would be a second
+         encoding of the same value. */
+      year: String(new Date().getFullYear()),
+    }).then((got) => { set(got.ok ? ready(got.value) : trouble(got.problem)); });
+  }, [api]);
+
+  const learn = React.useCallback((product: string) => {
+    void api.post<{ value: string }>("code.learn", {
+      raw: last, year: new Date().getFullYear(), product, source: "scanned",
+    }).then((got) => {
+      /* ⚠️ RE-RESOLVED RATHER THAN PATCHED IN PLACE. The screen then shows what
+         the NEXT scan of this code will show, which is the thing somebody is
+         actually checking when they attach one. */
+      if (got.ok) resolve(last);
+      else set(trouble(got.problem));
+    });
+  }, [api, last, resolve]);
+
+  const products = kinds.of.status === "ready"
+    ? kinds.of.data.items.map((row) => ({ id: text(row.id), label: text(row.name) }))
+    : [];
+
+  return (
+    <Scan
+      title={nameOf("/scan")}
+      of={of}
+      products={products}
+      onRead={resolve}
+      onOpen={(product) => go(`/thing/${product}`)}
+      /* ⚠️ THE LABEL'S OWN CODE, NOT A ROW ID. The place screen resolves it —
+         which is what makes a printed shelf label work on a device that has
+         never seen this workspace's location table. */
+      onPlace={(code) => go(`/where/${code}`)}
+      onLearn={learn}
+      again={() => { if (last) resolve(last); }}
     />
   );
 };
@@ -387,6 +455,7 @@ export function mount({ register, api }: Mounting): void {
     ["/", STOCK(api)],
     ["/thing", THING(api)],
     ["/where", WHERE(api)],
+    ["/scan", SCAN(api)],
     ["/start", START()],
   ];
   for (const [route, screen] of screens) {

@@ -23,14 +23,15 @@ import * as React from "react";
 import { ready, type Loaded } from "@engine/design";
 import { INVENTORY } from "../index.js";
 import { LINES, PLACES, EMPTY_PLACE, type Line, type Place } from "./sample.js";
+import { Scan, type Seen } from "./Scan.js";
 import { Start } from "./Start.js";
 import { Stock } from "./Stock.js";
 import { Thing, type Movement } from "./Thing.js";
 import { Where } from "./Where.js";
 
-export { Start, Stock, Thing, Where };
+export { Scan, Start, Stock, Thing, Where };
 export * from "./sample.js";
-export type { Movement };
+export type { Movement, Seen };
 
 const nothing = () => undefined;
 
@@ -50,6 +51,18 @@ const HELD = new Set([
   "product:read", "product:write", "location:read", "location:write",
   "stock:read", "stock:move", "stock:adjust", "ledger:read",
 ]);
+
+/**
+ * ⚠️ A CODE THIS WORKSPACE HAS NEVER SEEN, which is the state the whole learning
+ * path exists for and the one a real database would take four hours of data
+ * entry to reach. The carrier brought a lot and an expiry, so the card shows
+ * what a good label buys even before anybody knows what the product is.
+ */
+const SCANNED: Seen = {
+  found: false, kind: "gs1", value: "05000112637922", ours: "",
+  product: "", name: "", tracking: "", unit: "", pack: 1,
+  lot: "A5B7", expiry: "2027-03-31", needs: "",
+};
 
 /**
  * ⚠️ ONE PRODUCT'S HISTORY, AND IT IS A DISAGREEMENT RATHER THAN A TIDY LIST.
@@ -137,6 +150,24 @@ export function InventoryScreen({ route, onGo }: {
           again={nothing}
           back={() => go("/")}
           onTake={nothing}
+        />
+      );
+    /* ⚠️ THE GROUND SHOWS THE ANSWER RATHER THAN THE CAMERA'S FIRST SECOND. A
+       viewfinder photographs as a black rectangle with no permission behind it,
+       so what is worth looking at here is the card under it — and the state that
+       matters most is the one nobody designs: a code this workspace has never
+       seen. */
+    case "/scan":
+      return (
+        <Scan
+          title={title}
+          of={ready(SCANNED)}
+          products={LINES.map((l) => ({ id: l.product, label: l.name }))}
+          onRead={nothing}
+          onOpen={() => go("/thing")}
+          onPlace={() => go("/where")}
+          onLearn={nothing}
+          again={nothing}
         />
       );
     case "/start":

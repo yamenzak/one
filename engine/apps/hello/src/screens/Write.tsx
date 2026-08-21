@@ -24,7 +24,8 @@
 import * as React from "react";
 import {
   Agree, Choice, DateInput, Dial, Field, Grid, Lookup, LongText, MoneyInput,
-  NumberInput, OneOf, Screen, Section, Stack, Tags, TextInput, TimeInput, notice,
+  NumberInput, OneOf, Reveal, Screen, Section, Stack, Tags, TextInput, TimeInput,
+  Viewfinder, notice,
 } from "@engine/design";
 import { HELLO } from "../index.js";
 import { NOTES } from "./sample.js";
@@ -58,6 +59,7 @@ export function Write({ title, onBack, onSave }: {
   const [audience, setAudience] = React.useState<string | null>("everybody");
   const [topics, setTopics] = React.useState<readonly string[]>(["week 33"]);
   const [publish, setPublish] = React.useState(false);
+  const [reference, setReference] = React.useState("");
 
   /* ⚠️ THE REFUSAL IS THE CALLER'S WORDS AND IT APPEARS UNDER THE FIELD THAT WAS
      REFUSED — never in a summary at the top, which makes somebody scroll to find
@@ -158,6 +160,43 @@ export function Write({ title, onBack, onSave }: {
               format={{ style: "unit", unit: "percent" }}
               help="It goes on the note, so a reader knows how much to lean on it"
             />
+          </Stack>
+        </Section>
+
+        {/*
+          ⚠️ A NOTE CAN CARRY A REFERENCE, AND THAT IS WHERE THE CAMERA LIVES IN
+          THIS APP. A serial number off the back of a machine, an ISBN, a ticket
+          — the kind of string somebody would otherwise squint at and mistype.
+
+          ⚠️ AND IT IS BEHIND A DISCLOSURE ON PURPOSE. The component starts the
+          camera when it MOUNTS, so a viewfinder rendered open on a note form
+          turns the phone's light on for somebody who came here to type.
+        */}
+        <Section label="A reference">
+          <Stack space="roomy">
+            <TextInput
+              label="Reference"
+              value={reference}
+              onChange={setReference}
+              placeholder="A serial number, an ISBN, a ticket"
+              help="Whatever is printed on the thing this note is about"
+              name="reference"
+            />
+            <Reveal label="Scan it instead">
+              <Viewfinder
+                says="Point it at the code on the thing"
+                onRead={(code) => {
+                  setReference(code);
+                  notice.ok("Scanned.");
+                }}
+                /* ⚠️ THE WAY IN THAT ALWAYS WORKS, and here it is the field
+                   directly above — so the fallback is not a second screen. */
+                onType={() => {
+                  document.querySelector<HTMLInputElement>('input[name="reference"]')?.focus();
+                }}
+                typeLabel="Type it above"
+              />
+            </Reveal>
           </Stack>
         </Section>
 

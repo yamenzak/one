@@ -18,6 +18,7 @@ import {
   type AppSpec,
 } from "@engine/kernel";
 import { LADDER, MOVES, applyMove, refuseMove, type Move } from "./ledger.js";
+import { CODE_KINDS, readScan, stillNeeded, unread } from "./code.js";
 
 /* ------------------------------------------------------------ collections --- */
 
@@ -131,6 +132,65 @@ const location = collection({
        code it is holding. */
     code: field.text({ label: "Label", holds: "none", max: 64 }),
     note: field.long({ label: "Note", holds: "none", max: 2_000 }),
+  },
+});
+
+/**
+ * EVERY CODE THAT NAMES A PRODUCT — and the reason the catalogue teaches itself.
+ *
+ * ⚠️ A PRODUCT HAS MANY CODES AND THE APP NEVER PREFERS ONE. A glove box carries
+ * an EAN-13; the carton of ten carries a different one; the manufacturer's part
+ * number is on the invoice; the ward sticks its own label on the shelf. All four
+ * resolve to the same product, and which one somebody happens to scan is a fact
+ * about what they are holding rather than a decision the product gets to make.
+ *
+ * ⚠️ `pack` IS WHY THIS IS A TABLE RATHER THAN A COLUMN ON THE PRODUCT. Scan a
+ * carton and add 1, or scan a carton and add 10 — the difference between a right
+ * number and a wrong one, with nothing on screen to tell them apart. The code
+ * knows which, because the code is printed on one of them.
+ *
+ * ⚠️ AND AN UNKNOWN CODE IS LEARNED, WHICH IS MOST OF THE ONBOARDING TAX GONE.
+ * Scan something nobody has seen → "what is this?" → pick or create → the code
+ * belongs to that product for ever, and the second scan is instant. Nobody types
+ * in eight hundred barcodes.
+ */
+const code = collection({
+  id: "code",
+  label: { one: "Code", many: "Codes" },
+  scope: { of: "tenant" },
+  permission: "product",
+  retention: null,
+  onClose: { then: "purge" },
+  /* ⚠️ Cached, never queued: a code is READ in a basement all day and written
+     about once per product per lifetime. */
+  offline: "cache",
+  fields: {
+    product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
+    /* ⚠️ NORMALISED, WHICH IS THE WHOLE OF THE MATCHING. An EAN-13 off a box and
+       the `(01)` of the DataMatrix on the same box differ by a leading zero;
+       stored as they were scanned they are two products, and the workspace ends
+       up with a duplicate nobody can see is a duplicate. See `asGtin`. */
+    value: field.text({ label: "Code", required: true, holds: "none", max: 64 }),
+    kind: field.enum({
+      label: "Kind", required: true, holds: "none",
+      values: [...CODE_KINDS],
+    }),
+    /* ⚠️ HOW MANY BASE UNITS THE THING THIS CODE IS PRINTED ON HOLDS. `1` is the
+       ordinary case and the carton is the reason the column exists.
+
+       ⚠️ `pack` RATHER THAN `level`, AND THE RENAME IS NOT COSMETIC. `level` is
+       a key elsewhere in this platform — a setting's authority is `tenant` or
+       `person` — and `scripts/keys.test.mjs` refuses a screen printing a field
+       by that name, correctly, because everywhere else it would be showing
+       somebody the code. */
+    pack: field.number({ label: "How many it holds", holds: "none", min: 1 }),
+    /* ⚠️ WHERE IT CAME FROM, because a code somebody scanned once at speed and a
+       code that arrived in a supplier's file deserve different amounts of trust
+       when two of them disagree. */
+    source: field.enum({
+      label: "Learned from", holds: "none",
+      values: ["scanned", "typed", "imported", "ai-assisted"],
+    }),
   },
 });
 
@@ -387,6 +447,206 @@ const adjust = operation<MoveInput, { id: string; quantity: number }>({
   },
 });
 
+/* ------------------------------------------------------- the resolution rule --- */
+
+interface Resolving { raw: string; year: number }
+
+/**
+ * ⚠️ WHAT A SCAN RESOLVED TO, AND `found: false` IS A FIRST-CLASS ANSWER RATHER
+ * THAN A 404. An unknown code is the ordinary case on the day a workspace starts
+ * — it is what the learning path is FOR — so answering it as a refusal would
+ * make the most common outcome of the product's main gesture look like a fault.
+ */
+const resolveOut = {
+  found: field.bool({ label: "Known", holds: "none" }),
+  /* What the string turned out to be, whether or not anything holds it. */
+  kind: field.text({ label: "Kind", holds: "none" }),
+  value: field.text({ label: "Code", holds: "none" }),
+  /* ⚠️ SET ONLY FOR ONE OF OUR OWN LABELS — a shelf, a batch, a unit. It is what
+     lets the camera MOVE the session instead of adding stock to it. */
+  ours: field.text({ label: "Names", holds: "none" }),
+  product: field.text({ label: "Product", holds: "none" }),
+  name: field.text({ label: "Name", holds: "none" }),
+  tracking: field.text({ label: "Tracked as", holds: "none" }),
+  unit: field.text({ label: "Counted in", holds: "none" }),
+  pack: field.number({ label: "How many it holds", holds: "none" }),
+  /* ⚠️ WHATEVER THE CARRIER ALSO CARRIED — see `readScan`. A DataMatrix arrives
+     with these and an EAN-13 does not, and the screen is a function of which. */
+  lot: field.text({ label: "Lot", holds: "none" }),
+  expiry: field.day({ label: "Expires", holds: "none" }),
+  /* ⚠️ WHAT THE SCREEN MUST STILL ASK FOR, computed here rather than there. Two
+     surfaces will scan — receiving and counting — and each deciding for itself
+     is how one of them comes to record a batch with no expiry. */
+  needs: field.text({ label: "Still needs", holds: "none" }),
+} as const;
+
+interface Resolved {
+  found: boolean; kind: string; value: string; ours: string;
+  product: string; name: string; tracking: string; unit: string; pack: number;
+  lot: string; expiry: string; needs: string;
+}
+
+/**
+ * ⚠️ THE YEAR COMES FROM THE DEVICE, for the same reason the day does. A six-
+ * digit expiry has its century inferred from a window around NOW, and a server
+ * in another year — on New Year's Eve, in the other direction — would read a
+ * label differently from the phone that is looking at it.
+ *
+ * ⚠️ AND IT IS COERCED RATHER THAN TRUSTED. A read takes its input from the
+ * QUERY, so every value arrives as a string however it was declared — and the
+ * century arithmetic on `"2026"` happens to work through JavaScript's own
+ * coercion, which is luck rather than a design and would stop being either the
+ * day somebody compared it to a number.
+ */
+const yearIn = (of: unknown): number => Math.trunc(Number(of));
+const resolve = operation<Resolving, Resolved>({
+  id: "code.resolve",
+  kind: "read",
+  summary: "Say what a scanned code is",
+  input: {
+    raw: field.text({ label: "Code", required: true, holds: "none", max: 256 }),
+    year: field.number({ label: "This year", required: true, holds: "none" }),
+  },
+  output: resolveOut,
+  permission: "product:read",
+  idempotency: { mode: "none" },
+  fails: ["inventory.unreadable", "platform.invalid"],
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const year = yearIn(input.year);
+    if (!Number.isFinite(year) || year < 2000 || year > 2200) {
+      /* ⚠️ REFUSED RATHER THAN DEFAULTED TO THIS SERVER'S YEAR. A century window
+         drawn around the wrong year reads a genuinely expired lot as current,
+         and a silent fallback is exactly how nobody finds out. */
+      return c.fail("platform.invalid", {}, { fields: { year: "Say what year it is where you are" } });
+    }
+    const of = readScan(input.raw, year);
+    /* ⚠️ `return` RATHER THAN A BARE CALL, and it is not a style choice: a
+       `never` returning method does not narrow the union after the block unless
+       the flow visibly ends, so without it every read below is against
+       `Scanned | Unread`. */
+    if (unread(of)) {
+      return c.fail("inventory.unreadable", {}, { fields: { raw: WHY[of.why] } });
+    }
+
+    const none: Resolved = {
+      found: false, kind: of.kind, value: of.value, ours: of.ours ?? "",
+      product: "", name: "", tracking: "", unit: "", pack: 1,
+      lot: of.lot ?? "", expiry: of.expiry ?? "", needs: "",
+    };
+    /* ⚠️ ONE OF OUR OWN LABELS IS NOT LOOKED UP HERE. It names a shelf, a batch
+       or a unit — three different collections — and answering it from the
+       product table would mean this operation quietly returned nothing for the
+       most reliable code in the workspace. The caller reads `ours` and goes to
+       the right screen. */
+    if (of.ours) return none;
+
+    const db = c.db as Db;
+    const held = await db.prepare(
+      `SELECT c.pack AS pack, c.kind AS kind, p.id AS product, p.name AS name,
+              p.tracking AS tracking, p.unit AS unit
+         FROM code c JOIN product p ON p.id = c.product
+        WHERE c.tenant_id = ? AND c.value = ?`)
+      .bind(c.tenantId, of.value)
+      .first<{ pack: number | null; kind: string; product: string; name: string;
+        tracking: string; unit: string }>();
+
+    if (!held) return none;
+
+    return {
+      ...none,
+      found: true,
+      /* ⚠️ THE ROW'S KIND WINS OVER THE READER'S, because the row may know more
+         — a person who typed this in said it was a national code, and no camera
+         could have told. */
+      kind: held.kind || of.kind,
+      product: held.product,
+      name: held.name,
+      tracking: held.tracking,
+      unit: held.unit,
+      pack: held.pack ?? 1,
+      needs: stillNeeded(held.tracking, of).join(","),
+    };
+  },
+});
+
+/**
+ * A CODE NOBODY HAD SEEN, ATTACHED TO A PRODUCT FOR EVER.
+ *
+ * ⚠️ THE SECOND SCAN IS INSTANT, AND THAT IS THE WHOLE FEATURE. Nobody types in
+ * eight hundred barcodes; they scan what they are already holding, say what it
+ * is once, and the catalogue is built by the work rather than before it.
+ *
+ * ⚠️ AND A CODE MAY NAME ONLY ONE PRODUCT. Learning a second owner for a string
+ * makes every future scan of it ambiguous, and the resolver would answer with
+ * whichever row it happened to read first — a wrong product, confidently, for
+ * ever. Refused rather than replaced: the code on the shelf did not change, so
+ * one of the two answers is a mistake somebody has to look at.
+ */
+const learn = operation<
+  { raw: string; year: number; product: string; pack?: number; source?: string },
+  { value: string }
+>({
+  id: "code.learn",
+  kind: "write",
+  summary: "Attach a code to a product",
+  input: {
+    raw: field.text({ label: "Code", required: true, holds: "none", max: 256 }),
+    year: field.number({ label: "This year", required: true, holds: "none" }),
+    product: field.text({ label: "Product", required: true, holds: "none" }),
+    pack: field.number({ label: "How many it holds", holds: "none", min: 1 }),
+    source: field.text({ label: "Learned from", holds: "none" }),
+  },
+  output: { value: field.text({ label: "Code", holds: "none" }) },
+  permission: "product:write",
+  /* ⚠️ Queued offline like every other write in this app, so a code learned in
+     the back of a warehouse is not a code learned twice. */
+  idempotency: { mode: "key" },
+  emits: ["code.learned"],
+  outcome: { message: "Learned.", tone: "success", invalidates: ["code.list"] },
+  fails: ["inventory.unreadable", "inventory.taken"],
+  audit: (input) => ({ subject: input.product, verb: "learned a code for" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    /* ⚠️ A WRITE'S INPUT IS JSON, SO THE YEAR ARRIVES AS THE NUMBER IT WAS SENT
+       as — but it goes through the same door as the read's for one reason: two
+       readings of the same label would be two answers to when it expires. */
+    const of = readScan(input.raw, yearIn(input.year));
+    if (unread(of)) {
+      return c.fail("inventory.unreadable", {}, { fields: { raw: WHY[of.why] } });
+    }
+    /* ⚠️ ONE OF OUR OWN IS NOT LEARNABLE. `ONE-L-…` is a shelf we printed;
+       attaching it to a product would make the camera add stock where it should
+       have moved the session, and the label is not the manufacturer's to reuse. */
+    if (of.ours) {
+      return c.fail("inventory.unreadable", {}, { fields: { raw: "That is one of our own labels" } });
+    }
+
+    const db = c.db as Db;
+    const taken = await db.prepare(
+      `SELECT product FROM code WHERE tenant_id = ? AND value = ?`)
+      .bind(c.tenantId, of.value).first<{ product: string }>();
+    if (taken && taken.product !== input.product) c.fail("inventory.taken");
+    if (taken) return { value: of.value };
+
+    await db.prepare(
+      `INSERT INTO code (id, tenant_id, product, value, kind, pack, source, at, by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(`cod_${c.tenantId}_${of.value}`, c.tenantId, input.product, of.value,
+        of.kind, input.pack ?? 1, input.source ?? "scanned", c.now, c.accountId ?? null)
+      .run();
+
+    return { value: of.value };
+  },
+});
+
+/** ⚠️ The reader's three refusals, in the words the person reads. */
+const WHY: Readonly<Record<"empty" | "check" | "gs1", string>> = {
+  empty: "Nothing was scanned",
+  check: "That barcode did not read cleanly — scan it again",
+  gs1: "That label is damaged or half-read — scan it again",
+};
+
 /**
  * WHAT A NEW PRODUCT STARTS AS — the workspace's answer, not the form's.
  *
@@ -483,8 +743,8 @@ export const INVENTORY: AppSpec = defineApp({
     locations: { label: "Locations", withheld: "quota" },
   },
 
-  collections: [product, location, stock, ledger],
-  operations: [receive, take, adjust, starts],
+  collections: [product, code, location, stock, ledger],
+  operations: [receive, take, adjust, starts, resolve, learn],
 
   /*
     ⚠️ THE SCREENS THIS STAGE ACTUALLY HAS. A declared screen with nothing
@@ -495,6 +755,15 @@ export const INVENTORY: AppSpec = defineApp({
   screens: [
     { id: "stock", route: "/", label: "Stock", nav: "primary", icon: "box",
       permission: "stock:read" },
+    /* ⚠️ A PRIMARY DESTINATION, BECAUSE IT IS THE GESTURE THE PRODUCT IS FOR.
+       Filed under Stock as a button it would be one press further away than
+       typing, which is the whole thing scanning exists to beat.
+
+       ⚠️ AND `plain`, DELIBERATELY. The camera fills the screen, and an ambience
+       behind a live video is a pattern nobody sees competing with the one thing
+       somebody is looking at. */
+    { id: "scan", route: "/scan", label: "Scan", nav: "primary", icon: "search",
+      permission: "product:read" },
     /* ⚠️ `etch` — ruled geometry, which is what a shelf is. Seeded on the
        location, so every shelf in the workspace has a ground of its own. */
     { id: "location", route: "/where", label: "A location", nav: "none", icon: "pin",
@@ -528,6 +797,27 @@ export const INVENTORY: AppSpec = defineApp({
       title: "Somebody else moved this",
       detail: "The number changed while you were working. Look again.",
       tone: "warning",
+    },
+    /*
+      ⚠️ A BAD READ IS RETRYABLE AND SAYS SO, because the fix is almost always to
+      point the camera again. Reported against the code itself rather than over
+      the screen: the sentence belongs where the string is.
+    */
+    "inventory.unreadable": {
+      status: 422, retryable: true, tone: "warning",
+      title: "That code did not read",
+      detail: "Scan it again, or type it in.",
+    },
+    /*
+      ⚠️ A CODE NAMES ONE PRODUCT. Learning a second owner makes every future
+      scan of that string ambiguous, and the resolver would answer with whichever
+      row it read first — a wrong product, confidently, for ever. The code on the
+      shelf did not change, so one of the two answers is a mistake to look at.
+    */
+    "inventory.taken": {
+      status: 409, retryable: false, tone: "warning",
+      title: "That code belongs to something else",
+      detail: "Open the product it is on and check which one is right.",
     },
   },
 
