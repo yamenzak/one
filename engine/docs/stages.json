@@ -317,7 +317,7 @@
     },
     {
       "n": 59,
-      "status": "planned",
+      "status": "shipped",
       "title": "A write says it worked — the sentence the operation declared, and the reads it made stale",
       "ends": "`OperationSpec.outcome` reaches the browser and is applied by the one door: a successful write raises its declared message in its declared tone exactly once, and every operation it names in `invalidates` is re-read rather than left showing what was true before the press."
     }

@@ -453,6 +453,42 @@
       "fails": "a copy of a workspace's records on every device that ever opened it, for a promise the manifest never made"
     },
     {
+      "id": "what-a-declaration-says-about-an-operation-reaches-the-browser",
+      "protects": "D17",
+      "stage": "54",
+      "status": "live",
+      "impl": "apps/hello/test/centre-ops.test.ts",
+      "proves": "carries what a phone may hold and what a write says",
+      "fails": "the page holds no manifest, so a payload that stops carrying these leaves every write silent and every phone unable to hold one, with the browser's own suite still green"
+    },
+    {
+      "id": "a-write-says-the-sentence-its-operation-declared",
+      "protects": "D12",
+      "stage": "59",
+      "status": "live",
+      "impl": "one-space/test/outcome.test.ts",
+      "proves": "says the sentence the operation declared, once",
+      "fails": "a successful write is silent, or two screens calling one operation say two different things about what just happened"
+    },
+    {
+      "id": "a-write-that-failed-says-nothing",
+      "protects": "D12",
+      "stage": "59",
+      "status": "live",
+      "impl": "one-space/test/outcome.test.ts",
+      "proves": "says nothing when it did not work",
+      "fails": "\"Published.\" over a refusal — the worst sentence this seam can produce, and one `if` away in every hand-written version"
+    },
+    {
+      "id": "a-write-names-the-reads-it-made-stale",
+      "protects": "D12",
+      "stage": "59",
+      "status": "live",
+      "impl": "one-space/test/outcome.test.ts",
+      "proves": "names the reads it made stale",
+      "fails": "a list somewhere else in the product goes on showing what was true before the press, until somebody navigates away and back"
+    },
+    {
       "id": "a-notification-nobody-can-receive-is-refused",
       "protects": "D12",
       "stage": "1",

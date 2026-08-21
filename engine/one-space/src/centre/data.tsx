@@ -11,11 +11,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type {
-  AreaBook, DocumentBook, Instant, NotificationBook, Offline, ScreenSpec, SettingBook, NeedBook,
-  SubProcessorBook,
+  AreaBook, DocumentBook, Instant, NotificationBook, Offline, Outcome, ScreenSpec, SettingBook,
+  NeedBook, SubProcessorBook,
 } from "@engine/kernel";
-import { ready, trouble, waiting, type Loaded } from "@engine/design";
-import { api } from "../api.js";
+import { notice, ready, trouble, waiting, type Loaded } from "@engine/design";
+import { api, whenWritten } from "../api.js";
 
 /* ----------------------------------------------------------------- shapes --- */
 
@@ -40,6 +40,8 @@ export interface CentreApp {
   readonly sellable: readonly string[];
   /** ⚠️ What a phone may do with each of its operations with no signal. */
   readonly offline?: Readonly<Record<string, Offline>>;
+  /** ⚠️ What each write says when it worked, and what it makes stale. */
+  readonly outcomes?: Readonly<Record<string, Outcome>>;
 }
 
 export interface CentreView {
@@ -246,3 +248,30 @@ export const forget = (id?: string): void => {
 };
 
 export const useCentre = () => useLoad<CentreView>("centre.view");
+
+/**
+ * WHAT A WRITE SAYS, AND WHAT IT MAKES STALE — installed once, here.
+ *
+ * ⚠️ HERE RATHER THAN IN THE DOOR, because both halves belong to this file's
+ * neighbours: the sentence is the design system's to draw and the held answers
+ * are this file's to drop. The door knows WHEN a write worked and must not learn
+ * what a toast is.
+ *
+ * ⚠️ AND AT MODULE SCOPE, DELIBERATELY. Every screen imports this file, so the
+ * install happens once and nobody has to remember it in a provider — which is
+ * the failure mode the whole seam exists to avoid: a confirmation that works on
+ * the screens somebody wired and is silent on the rest.
+ */
+whenWritten((outcome) => {
+  /* ⚠️ THE TONE DECIDES THE CHANNEL. A `warning` outcome shown as a success is
+     the product telling somebody that something went well when the operation
+     said otherwise. `neutral` and `info` are ordinary confirmations. */
+  const say = outcome.tone === "danger" ? notice.fail
+    : outcome.tone === "warning" ? notice.warn
+      : notice.ok;
+  say(outcome.message);
+  /* ⚠️ THE READS THE WRITE MADE STALE, WHEREVER THEY ARE. A screen re-reads
+     itself; this is for the answers ELSEWHERE that the same write changed, which
+     is the half no screen can do for itself. */
+  for (const id of outcome.invalidates ?? []) forget(id);
+});

@@ -166,12 +166,7 @@ export interface OperationSpec<I = unknown, O = unknown> {
   readonly tool?: ToolPolicy;
   /** The events it raises. The inbox, webhooks and recognition all read this. */
   readonly emits?: readonly string[];
-  /**
-   * DEFER(engine-59) stage:59 — what a write says when it worked, and what it
-   * makes stale. Declared by four of the reference app's operations and read by
-   * nothing, so every successful write in the product is silent and every list
-   * behind one is a round trip out of date.
-   */
+  /** What it says when it worked, and what it makes stale — see `outcomeBook`. */
   readonly outcome?: Outcome;
   readonly fails?: readonly string[];
   /**
@@ -223,6 +218,22 @@ const derivable = (op: AnyOperation): boolean =>
   "id" in op.input || (op.idempotency.mode === "natural" && op.idempotency.key in op.input);
 
 export const isTool = (op: AnyOperation): boolean => op.tool === undefined || op.tool === true;
+
+/**
+ * ⚠️ WHAT EVERY WRITE SAYS WHEN IT WORKED, IN ONE MAP THE BROWSER CAN BE HANDED.
+ * The page holds no manifest (D17), so a confirmation written in the screen that
+ * pressed the button is a sentence the declaration cannot see — and two screens
+ * calling one operation are then two answers to what just happened.
+ *
+ * ⚠️ AND ONLY WHERE ONE WAS DECLARED. A default the platform invented would put
+ * a sentence under every generated verb in a product, which is a toast on every
+ * keystroke of an autosaving screen; silence is what an operation that has not
+ * said anything means.
+ */
+export const outcomeBook = (
+  ops: readonly AnyOperation[],
+): Readonly<Record<string, Outcome>> =>
+  Object.fromEntries(ops.filter((o) => o.outcome).map((o) => [o.id, o.outcome!]));
 
 /**
  * The route an operation answers on.

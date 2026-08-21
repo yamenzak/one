@@ -16,7 +16,7 @@
  */
 
 import type { AppSpec, TenantId } from "@engine/kernel";
-import { PUBLIC, offlineBook, sellableKeys } from "@engine/kernel";
+import { PUBLIC, offlineBook, outcomeBook, sellableKeys } from "@engine/kernel";
 import { tenantById } from "./directory.js";
 import { memberFor, rolesFor } from "./membership.js";
 import type { PlatformCtx } from "./member-ops.js";
@@ -67,6 +67,13 @@ const publicFace = (
     with nothing saying so.
   */
   offline: offlineBook(a.collections),
+  /*
+    ⚠️ WHAT A WRITE SAYS WHEN IT WORKED, AND WHAT IT MADE STALE. Both belong to
+    the operation rather than to whichever screen pressed the button: two screens
+    calling one operation would otherwise be two answers to what just happened,
+    and the list a write invalidates is often on neither of them.
+  */
+  outcomes: outcomeBook(a.operations),
 });
 
 export function centreOps(app: AppSpec): Readonly<Record<string, Resolved>> {

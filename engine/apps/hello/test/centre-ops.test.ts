@@ -192,3 +192,40 @@ describe("the money view", () => {
     expect(seen.wallet.spendable).toBe(0);
   });
 });
+
+/* -------------------------------------------------------------------- centre --- */
+
+describe("the centre's bootstrap", () => {
+  /**
+   * ⚠️ THE BOOK LEAVES THE SERVER, WHICH IS THE HALF A BROWSER TEST CANNOT SEE.
+   * `one-space` proves the door APPLIES what it was handed; nothing there proves
+   * anything hands it over, and a payload that quietly stopped carrying these
+   * two would leave every write in the product silent again with the door's own
+   * suite still green.
+   */
+  it("carries what a phone may hold and what a write says", async () => {
+    const { owner } = await studio();
+
+    const seen = await (await get("westgate", "/api/centre.view", owner)).json() as {
+      apps: readonly {
+        offline?: Record<string, string>;
+        outcomes?: Record<string, { message: string; invalidates?: readonly string[] }>;
+      }[];
+    };
+    const hello = seen.apps[0]!;
+
+    /* ⚠️ A note may be written with no signal and a check-in may be read
+       without one — the two halves of `offline`, both declared and both here. */
+    expect(hello.offline?.["note.create"]).toBe("queue");
+    expect(hello.offline?.["note.list"]).toBe("cache");
+    expect(hello.offline?.["check-in.create"]).toBeUndefined();
+    expect(hello.offline?.["check-in.list"]).toBe("cache");
+
+    /* ⚠️ And what a declared write says when it worked. */
+    expect(hello.outcomes?.["note.publish"]?.message).toBe("Published.");
+    expect(hello.outcomes?.["note.publish"]?.invalidates).toEqual(["note.list"]);
+    /* ⚠️ Absent for an operation that declared nothing, because silence is what
+       that means. */
+    expect(hello.outcomes?.["note.start"]).toBeUndefined();
+  });
+});

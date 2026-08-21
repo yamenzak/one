@@ -14,7 +14,8 @@
  */
 
 import {
-  newId, problem, type Instant, type Offline, type Presentation, type Problem,
+  newId, problem,
+  type Instant, type Offline, type Outcome, type Presentation, type Problem,
 } from "@engine/kernel";
 import { PROBLEMS } from "./problems.js";
 import { flush, hold, keyOf, recall, remember, waiting } from "./offline.js";
@@ -74,12 +75,38 @@ const NOT_AN_EXPIRY = new Set(["me.code", "me.session", "me.who"]);
  */
 let policy: Readonly<Record<string, Offline>> = {};
 
+/**
+ * WHAT A WRITE SAYS WHEN IT WORKED, AND WHAT IT MADE STALE.
+ *
+ * ⚠️ THE OPERATION'S, NEVER THE SCREEN'S. A confirmation written where the
+ * button is means two screens calling one operation are two answers to what just
+ * happened — and the reads a write invalidates are usually on neither of them,
+ * which is why every one of those lists was a round trip out of date until
+ * somebody navigated away and back.
+ */
+let outcomes: Readonly<Record<string, Outcome>> = {};
+
+/**
+ * ⚠️ RAISED THROUGH A SEAM RATHER THAN HERE. This file is the door; a toast
+ * belongs to the design system and forgetting a held read belongs to whatever
+ * holds them, and importing either would point the dependency the wrong way.
+ * One handler, installed once, exactly as an expired session is.
+ */
+let onWritten: ((outcome: Outcome) => void) | null = null;
+export const whenWritten = (run: (outcome: Outcome) => void): void => { onWritten = run; };
+
 /** ⚠️ Every enabled product's book merged into one, because the door answers by
     operation id and an operation belongs to exactly one of them. */
 const learn = (centre: unknown): void => {
-  const apps = (centre as { apps?: readonly { offline?: Record<string, Offline> }[] }).apps;
+  const apps = (centre as {
+    apps?: readonly {
+      offline?: Record<string, Offline>;
+      outcomes?: Record<string, Outcome>;
+    }[];
+  }).apps;
   if (!apps) return;
   offlinePolicy(Object.assign({}, ...apps.map((a) => a.offline ?? {})) as Record<string, Offline>);
+  outcomes = Object.assign({}, ...apps.map((a) => a.outcomes ?? {})) as Record<string, Outcome>;
 };
 
 export const offlinePolicy = (book: Readonly<Record<string, Offline>>): void => {
@@ -243,6 +270,14 @@ async function call<T>(
       not work rather than as a missing line.
     */
     if (id === "centre.view") learn(value);
+    /*
+      ⚠️ ONCE, AND ONLY WHERE THE OPERATION DECLARED ONE. Silence is what an
+      operation that has said nothing means; a default the platform invented
+      would put a toast under every generated verb, which on an autosaving screen
+      is one per keystroke.
+    */
+    const said = method === "POST" ? outcomes[id] : undefined;
+    if (said) onWritten?.(said);
     /* ⚠️ KEPT ONLY WHERE THE COLLECTION SAID SO. Keeping every answer would put
        a copy of a workspace's records on every device that ever opened it, for
        a capability nobody declared. */

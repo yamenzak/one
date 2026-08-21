@@ -381,7 +381,7 @@ and a manifest that does not compose refuses to boot.
 | `infra` | what a product needs underneath it, and what each kind can promise | 11 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 8 | — |
 | `collection` | what a thing an app keeps is — and the six operations it gets for free | 18 | — |
-| `operation` | one declaration carrying every cross-cutting concern (D12) | 9 | — |
+| `operation` | one declaration carrying every cross-cutting concern (D12) | 10 | — |
 | `access` | permissions, roles, and what an app may never claim | 15 | 1 |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
 | `manifest` | the whole app, and the composition that refuses a broken one | 9 | — |
@@ -406,7 +406,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**268 of them**, 263 reached by something today.
+**269 of them**, 264 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -610,6 +610,10 @@ its own header, cited by other files, and doing nothing.
 | `a-queue-refuses-rather-than-dropping-what-it-holds` | D12 | somebody's morning of counting is discarded to make room for the next scan, at the moment nobody can see it happen |
 | `an-answer-from-this-device-says-how-old-it-is` | D12 | last week's stock is drawn as today's, with nothing on the screen able to date it |
 | `nothing-is-held-or-kept-that-a-collection-did-not-declare` | D12 | a copy of a workspace's records on every device that ever opened it, for a promise the manifest never made |
+| `what-a-declaration-says-about-an-operation-reaches-the-browser` | D17 | the page holds no manifest, so a payload that stops carrying these leaves every write silent and every phone unable to hold one, with the browser's own suite still green |
+| `a-write-says-the-sentence-its-operation-declared` | D12 | a successful write is silent, or two screens calling one operation say two different things about what just happened |
+| `a-write-that-failed-says-nothing` | D12 | "Published." over a refusal — the worst sentence this seam can produce, and one `if` away in every hand-written version |
+| `a-write-names-the-reads-it-made-stale` | D12 | a list somewhere else in the product goes on showing what was true before the press, until somebody navigates away and back |
 | `a-notification-nobody-can-receive-is-refused` | D12 | a message switched on in the policy screen that never arrives, so people stop trusting the ones that do |
 | `a-switch-nothing-is-behind-is-refused` | D12 | somebody turning on a control that does nothing, and no longer watching for the problem it promised to solve |
 | `everything-sold-is-withheld-somewhere` | D12 | money taken for a capability every customer already has, failing in the generous direction so nobody reports it |
@@ -877,12 +881,12 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 117 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 120 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
 | D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 4 |
-| D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 4 |
+| D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 5 |
 | D18 | The operator stands outside every workspace, and the console is a door rather than a role | 8 |
 | D19 | An AI action declares a lane and a letterhead; the operator binds the model, and words narrow downward | 3 |
 | D20 | OneSpace is one surface presented over the product, reachable from every door, and it is a route | 3 |
@@ -999,9 +1003,9 @@ that names no stage, so this list cannot grow by forgetting.
 | 56 | A family takes a hue — one declared per product, never written at a call site | **planned** |
 | 57 | Records move between workspaces — a garage becomes a business and its history goes with it | **planned** |
 | 58 | An operation's ceiling is in force — calls per minute, per caller, refused rather than declared | **planned** |
-| 59 | A write says it worked — the sentence the operation declared, and the reads it made stale | **planned** |
+| 59 | A write says it worked — the sentence the operation declared, and the reads it made stale | shipped |
 
-**43 shipped, 16 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**44 shipped, 15 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---
