@@ -23,6 +23,7 @@ import * as React from "react";
 import { ready, type Loaded } from "@engine/design";
 import { INVENTORY } from "../index.js";
 import { LINES, PLACES, EMPTY_PLACE, type Line, type Place } from "./sample.js";
+import { Count, type Change, type Counted, type Uncovered } from "./Count.js";
 import { Receive } from "./Receive.js";
 import { Scan, type Seen } from "./Scan.js";
 import { Start } from "./Start.js";
@@ -30,9 +31,9 @@ import { Stock } from "./Stock.js";
 import { Thing, type Batch, type Movement } from "./Thing.js";
 import { Where } from "./Where.js";
 
-export { Receive, Scan, Start, Stock, Thing, Where };
+export { Count, Receive, Scan, Start, Stock, Thing, Where };
 export * from "./sample.js";
-export type { Batch, Movement, Seen };
+export type { Batch, Change, Counted, Movement, Seen, Uncovered };
 
 const nothing = () => undefined;
 
@@ -97,6 +98,35 @@ const BATCHES: readonly Batch[] = [
     days: 4, opened: true },
   { id: "b2", lot: "C1144", on: "2027-03-31", by: "printed", standing: "fine",
     days: 222, opened: false },
+];
+
+/**
+ * ⚠️ A COUNT MID-FLIGHT, WITH ONE OF EACH KIND OF DISAGREEMENT IN IT. A session
+ * where everything agrees photographs as a list of correct numbers and teaches
+ * nothing; what a person has to be able to read at a glance is a shelf that is
+ * short, one that has more than anybody thought, and one nobody has found at all.
+ */
+const COUNTED: readonly Counted[] = [
+  { id: "t-glove", name: "Nitrile gloves, blue", unit: "glove", found: 1_180, expected: 1_200 },
+  { id: "t-screw", name: "Screws, M4 × 20", unit: "box", found: 140, expected: 137 },
+  { id: "t-tape", name: "Masking tape, 50 mm", unit: "roll", found: 6, expected: null },
+];
+
+const CHANGES: readonly Change[] = [
+  { product: "t-glove", name: "Nitrile gloves, blue", was: 1_200, found: 1_180, delta: -20 },
+  { product: "t-paper", name: "A4 paper", was: 5, found: 0, delta: -5 },
+  { product: "t-screw", name: "Screws, M4 × 20", was: 137, found: 140, delta: 3 },
+];
+
+/**
+ * ⚠️ A SHELF NOBODY HAS EVER COUNTED, ONE COUNTED YEARS AGO, AND ONE DONE TODAY.
+ * The first two are different problems and the third is what a covered shelf
+ * looks like — a list where everything is stale teaches nothing about the order.
+ */
+const UNCOUNTED: readonly Uncovered[] = [
+  { location: "p-b2", name: "B2", days: null },
+  { location: "p-a3", name: "A3 — flammables", days: 412 },
+  { location: "p-bench", name: "Bench", days: 0 },
 ];
 
 /** ⚠️ Everything at or below a place, which is what a tree row promises. */
@@ -203,6 +233,25 @@ export function InventoryScreen({ route, onGo }: {
           onForget={nothing}
           onReceive={nothing}
           onUndo={nothing}
+        />
+      );
+    case "/count":
+      return (
+        <Count
+          title={title}
+          place={{ id: "p-a1", name: "Rack A · A1" }}
+          blind={false}
+          onBlind={nothing}
+          counting
+          of={ready(COUNTED)}
+          changes={CHANGES}
+          stutter="That code read three times in two seconds — check it is three things"
+          uncounted={UNCOUNTED}
+          onGo={nothing}
+          onRead={nothing}
+          onStart={nothing}
+          onClose={nothing}
+          again={nothing}
         />
       );
     case "/start":

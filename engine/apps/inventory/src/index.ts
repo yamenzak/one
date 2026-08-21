@@ -22,6 +22,7 @@ import {
   type Move,
 } from "./ledger.js";
 import { CODE_KINDS, readScan, stillNeeded, unread } from "./code.js";
+import { settleCount, type Change } from "./count.js";
 
 /* ------------------------------------------------------------ collections --- */
 
@@ -247,6 +248,69 @@ const batch = collection({
        with the same printed date are used oldest-received first. */
     received: field.day({ label: "Received", holds: "none" }),
     note: field.long({ label: "Note", holds: "none", max: 2_000 }),
+  },
+});
+
+/**
+ * ONE SHELF BEING COUNTED — open until somebody closes it.
+ *
+ * ⚠️ THE SESSION IS THE SCOPE, AND THE SCOPE IS WHAT PREVENTS DOUBLE COUNTING.
+ * You cannot tell one generic barcode from another and you do not need to:
+ * everything scanned while this is open belongs to this shelf, and the same code
+ * thirty times is thirty items. You do not count a shelf twice for the reason
+ * you never did on paper — you ticked the shelf off.
+ *
+ * ⚠️ AND `blind` IS A REAL CHOICE RATHER THAN A PREFERENCE. Hiding the expected
+ * number gives better data and catches errors an informed count reads straight
+ * past; showing it is faster. Auditors insist on blind, which is why it is per
+ * SESSION and cannot be changed once counting has started.
+ */
+const count = collection({
+  id: "count",
+  label: { one: "Count", many: "Counts" },
+  scope: { of: "tenant" },
+  permission: "stock",
+  retention: null,
+  onClose: { then: "purge" },
+  offline: "queue",
+  /* ⚠️ Opened and closed by their own operations — a session that could be
+     created by hand is a session with no shelf and no clock on it. */
+  without: ["create", "update", "delete"],
+  fields: {
+    location: field.ref({ label: "Where", required: true, holds: "none", to: "location" }),
+    /* ⚠️ EMPTY MEANS OPEN. A separate status column would be a second answer to
+       the same question, and the two would disagree the first time a close half
+       failed. */
+    closed: field.instant({ label: "Closed", holds: "none" }),
+    blind: field.bool({ label: "Blind", holds: "none" }),
+    /* ⚠️ THE DEVICE'S OWN DAY, kept so coverage can say "counted three weeks
+       ago" in the calendar the person counting was standing in. */
+    day: field.day({ label: "On", required: true, holds: "none" }),
+  },
+});
+
+/**
+ * WHAT ONE SESSION FOUND — a running total per thing, per shelf.
+ *
+ * ⚠️ IT IS NOT THE BALANCE AND MUST NEVER BE READ AS ONE. Until the session is
+ * closed this is what somebody has scanned so far; the shelf still holds
+ * whatever `stock` says. Confusing the two would make a half-finished count
+ * visible to everybody else as fact.
+ */
+const tally = collection({
+  id: "tally",
+  label: { one: "Tally", many: "Tallies" },
+  scope: { of: "tenant" },
+  permission: "stock",
+  retention: null,
+  onClose: { then: "purge" },
+  offline: "queue",
+  without: ["create", "update", "delete"],
+  fields: {
+    count: field.ref({ label: "Count", required: true, holds: "none", to: "count" }),
+    product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
+    batch: field.ref({ label: "Batch", holds: "none", to: "batch" }),
+    quantity: field.number({ label: "How many", required: true, holds: "none", min: 0 }),
   },
 });
 
@@ -1113,6 +1177,292 @@ const undo = operation<{ movement: string; day: string }, Moved>({
   },
 });
 
+/* --------------------------------------------------------------- counting --- */
+
+/**
+ * OPENING A SHELF FOR COUNTING.
+ *
+ * ⚠️ TWO SESSIONS ON ONE SHELF IS DOUBLE COUNTING, so the second is REFUSED and
+ * told who has it. That is not a technicality: the whole design prevents double
+ * counting by scope rather than by identity, and two open scopes over one shelf
+ * removes the only thing holding it up.
+ */
+const openCount = operation<
+  { location: string; blind?: boolean; day: string }, { id: string }
+>({
+  id: "count.open",
+  kind: "write",
+  summary: "Start counting a shelf",
+  input: {
+    location: field.text({ label: "Where", required: true, holds: "none" }),
+    blind: field.bool({ label: "Blind", holds: "none" }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+  },
+  output: { id: field.text({ label: "Count", holds: "none" }) },
+  permission: "stock:move",
+  idempotency: { mode: "key" },
+  emits: ["count.opened"],
+  outcome: { message: "Counting.", tone: "success", invalidates: ["count.list"] },
+  fails: ["platform.not_found", "inventory.counting"],
+  audit: (input) => ({ subject: input.location, verb: "started counting" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+
+    const where = await db.prepare(
+      `SELECT id FROM location WHERE id = ? AND tenant_id = ?`)
+      .bind(input.location, c.tenantId).first<{ id: string }>();
+    if (!where) return c.fail("platform.not_found");
+
+    const busy = await db.prepare(
+      `SELECT id, at FROM count
+        WHERE tenant_id = ? AND location = ? AND closed IS NULL LIMIT 1`)
+      .bind(c.tenantId, input.location).first<{ id: string; at: string }>();
+    /* ⚠️ THE REFUSAL CARRIES WHEN, because "somebody is counting this" is
+       actionable and "somebody was counting this three weeks ago" is a session
+       to close. The person is not named here — the audit row has that, and a
+       refusal that printed an account id would be showing somebody the code. */
+    if (busy) return c.fail("inventory.counting", { since: busy.at });
+
+    const id = `cnt_${c.now}_${input.location}`;
+    await db.prepare(
+      `INSERT INTO count (id, tenant_id, location, blind, day, at, by)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, c.tenantId, input.location, input.blind ? 1 : 0, input.day,
+        c.now, c.accountId ?? null).run();
+    return { id };
+  },
+});
+
+/**
+ * ONE MORE OF SOMETHING, ON THE SHELF BEING COUNTED.
+ *
+ * ⚠️ IT ADDS RATHER THAN SETS. The same code thirty times is thirty items —
+ * that is the entire counting gesture, and a call that replaced the running
+ * total would record one of them.
+ *
+ * ⚠️ AND IT WRITES NOTHING TO THE BALANCE. A tally is what somebody has scanned
+ * so far; the shelf still holds whatever the ledger says until the session
+ * closes. Anything else makes a half-finished count visible to everybody as
+ * fact.
+ */
+const tallyUp = operation<
+  { count: string; raw: string; year: number; quantity?: number },
+  { product: string; quantity: number }
+>({
+  id: "count.tally",
+  kind: "write",
+  summary: "Record one more of something",
+  input: {
+    count: field.text({ label: "Count", required: true, holds: "none" }),
+    raw: field.text({ label: "Code", required: true, holds: "none", max: 256 }),
+    year: field.number({ label: "This year", required: true, holds: "none" }),
+    quantity: field.number({ label: "How many", holds: "none" }),
+  },
+  output: {
+    product: field.text({ label: "Product", holds: "none" }),
+    quantity: field.number({ label: "Counted so far", holds: "none" }),
+  },
+  permission: "stock:move",
+  idempotency: { mode: "key" },
+  emits: ["count.tallied"],
+  fails: [
+    "platform.not_found", "inventory.unreadable", "inventory.closed",
+    "inventory.needsLot",
+  ],
+  audit: (input) => ({ subject: input.count, verb: "counted" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+
+    const session = await db.prepare(
+      `SELECT closed FROM count WHERE id = ? AND tenant_id = ?`)
+      .bind(input.count, c.tenantId).first<{ closed: string | null }>();
+    if (!session) return c.fail("platform.not_found");
+    /* ⚠️ A CLOSED SESSION IS REFUSED RATHER THAN REOPENED. Its differences have
+       already become corrections in the history; adding to it afterwards would
+       make those corrections describe a count that no longer exists. */
+    if (session.closed) return c.fail("inventory.closed");
+
+    const of = readScan(input.raw, yearIn(input.year));
+    if (unread(of)) {
+      return c.fail("inventory.unreadable", {}, { fields: { raw: WHY[of.why] } });
+    }
+    if (of.ours) {
+      return c.fail("inventory.unreadable", {}, { fields: { raw: "That is a place, not a thing" } });
+    }
+
+    const known = await db.prepare(
+      `SELECT c.product AS product, c.pack AS pack, p.tracking AS tracking
+         FROM code c JOIN product p ON p.id = c.product
+        WHERE c.tenant_id = ? AND c.value = ?`)
+      .bind(c.tenantId, of.value)
+      .first<{ product: string; pack: number | null; tracking: string }>();
+    /* ⚠️ AN UNKNOWN CODE IS REFUSED HERE, AND ONLY HERE. Receiving invents a
+       product because the thing is physically arriving; a COUNT that invented
+       one would put a phantom on a shelf and then correct the balance to match
+       it. What somebody does with an unknown code mid-count is put it aside. */
+    if (!known) return c.fail("platform.not_found");
+
+    /*
+      ⚠️ A BATCHED PRODUCT IS COUNTED PER DELIVERY OR NOT AT ALL. The shelf holds
+      it as one row per lot, so a tally against the product alone would compare a
+      single number against two — and the close would report BOTH lots as wrong
+      and the product as newly appeared. Refusing is the only honest answer: the
+      lot is printed on the box the person is holding.
+    */
+    let batch: string | null = null;
+    if (known.tracking === "batched") {
+      if (!of.lot) return c.fail("inventory.needsLot");
+      const found = await db.prepare(
+        `SELECT id FROM batch WHERE tenant_id = ? AND product = ? AND lot = ?`)
+        .bind(c.tenantId, known.product, of.lot).first<{ id: string }>();
+      /* ⚠️ A LOT NOBODY RECEIVED IS NOT INVENTED EITHER — same reason. It is on
+         the shelf and not in the system, which is a receipt somebody missed. */
+      if (!found) return c.fail("platform.not_found");
+      batch = found.id;
+    }
+
+    const many = Math.abs(input.quantity ?? 1) * Math.max(1, known.pack ?? 1);
+    const id = `tly_${input.count}_${known.product}_${batch ?? ""}`;
+
+    /* ⚠️ ONE STATEMENT, ADDING. A read then a write is a race two people
+       counting the same aisle would both win, and the symptom is a tally quietly
+       short by one person's work. */
+    await db.prepare(
+      `INSERT INTO tally (id, tenant_id, count, product, batch, quantity, at, by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (id) DO UPDATE SET quantity = quantity + ?, edited_at = ?`)
+      .bind(id, c.tenantId, input.count, known.product, batch, many, c.now,
+        c.accountId ?? null, many, c.now).run();
+
+    const now = await db.prepare(
+      `SELECT quantity FROM tally WHERE id = ? AND tenant_id = ?`)
+      .bind(id, c.tenantId).first<{ quantity: number }>();
+
+    return { product: known.product, quantity: now?.quantity ?? many };
+  },
+});
+
+/**
+ * WHAT CLOSING THIS COUNT WOULD CHANGE — read before it is done.
+ *
+ * ⚠️ THE SAME FUNCTION ANSWERS THE PREVIEW AND PERFORMS THE CLOSE, which is what
+ * makes the preview trustworthy. Two implementations of "what will this do" is
+ * how a screen comes to promise what a handler does not deliver.
+ */
+async function differences(c: Ctx, session: string, location: string) {
+  const db = c.db as Db;
+  const found = await db.prepare(
+    `SELECT product, batch, quantity FROM tally WHERE tenant_id = ? AND count = ?`)
+    .bind(c.tenantId, session)
+    .all<{ product: string; batch: string | null; quantity: number }>();
+  const held = await db.prepare(
+    `SELECT product, batch, quantity FROM stock WHERE tenant_id = ? AND location = ?`)
+    .bind(c.tenantId, location)
+    .all<{ product: string; batch: string | null; quantity: number }>();
+
+  const as = (rows: { product: string; batch: string | null; quantity: number }[]) =>
+    rows.map((r) => ({ product: r.product, batch: r.batch ?? "", quantity: r.quantity }));
+
+  return settleCount(as(found.results), as(held.results));
+}
+
+const differs = operation<{ count: string }, { items: readonly Change[] }>({
+  id: "count.differences",
+  kind: "read",
+  summary: "What closing this count would change",
+  input: { count: field.text({ label: "Count", required: true, holds: "none" }) },
+  output: { items: field.json({ label: "Differences", holds: "none" }) },
+  permission: "stock:read",
+  idempotency: { mode: "none" },
+  fails: ["platform.not_found"],
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const session = await db.prepare(
+      `SELECT location FROM count WHERE id = ? AND tenant_id = ?`)
+      .bind(input.count, c.tenantId).first<{ location: string }>();
+    if (!session) return c.fail("platform.not_found");
+    return { items: await differences(c, input.count, session.location) };
+  },
+});
+
+/**
+ * CLOSING THE SHELF.
+ *
+ * ⚠️ A COUNT NEVER SILENTLY OVERWRITES. Every disagreement becomes a CORRECTION
+ * in the history naming the session that caused it — so the line reads "we
+ * thought 40 · counted 37 · corrected −3 on 21 August, count #14, by Ana", which
+ * is the difference between an inventory somebody can audit and one they can
+ * only believe.
+ *
+ * ⚠️ AND EVERYTHING THE COUNT DID NOT FIND GOES TO ZERO. That is what counting
+ * IS, and it is why closing is explicit and why the differences are readable
+ * first: a session somebody abandoned half way through empties the rest of the
+ * rack, and nothing but a person looking can tell the two apart.
+ */
+const closeCount = operation<
+  { count: string; day: string }, { changed: number }
+>({
+  id: "count.close",
+  kind: "write",
+  summary: "Close the shelf and correct what disagrees",
+  input: {
+    count: field.text({ label: "Count", required: true, holds: "none" }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+  },
+  output: { changed: field.number({ label: "Lines corrected", holds: "none" }) },
+  /* ⚠️ `stock:adjust`, NOT `stock:move`. Closing a count writes corrections, and
+     the whole reason those are a separate grant is that somebody who takes
+     things all day must never be able to make a number agree with what they
+     took. Counting is open to everybody; SETTLING it is not. */
+  permission: "stock:adjust",
+  idempotency: { mode: "key" },
+  emits: ["count.closed", "stock.adjusted"],
+  outcome: { message: "Counted.", tone: "success", invalidates: ["stock.list", "count.list"] },
+  fails: ["platform.not_found", "inventory.closed", "inventory.short", "inventory.moved"],
+  audit: (input) => ({ subject: input.count, verb: "closed the count on" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+
+    const session = await db.prepare(
+      `SELECT location, closed FROM count WHERE id = ? AND tenant_id = ?`)
+      .bind(input.count, c.tenantId).first<{ location: string; closed: string | null }>();
+    if (!session) return c.fail("platform.not_found");
+    if (session.closed) return c.fail("inventory.closed");
+
+    const changes = await differences(c, input.count, session.location);
+    for (const change of changes) {
+      /* ⚠️ THROUGH THE ONE FUNCTION THAT MOVES A BALANCE, like every other write
+         in this app. A close that wrote `stock` itself would be a second place
+         the number can change, and the ledger would stop being the whole story. */
+      await stockMove(c, "adjusted", {
+        product: change.product,
+        location: session.location,
+        ...(change.batch ? { batch: change.batch } : {}),
+        quantity: change.delta,
+        day: input.day,
+        capture: "scanned",
+        /* ⚠️ THE REASON IS THE SESSION, and it is why `adjusted` demands one:
+           an unexplained correction is the number changing by itself. */
+        reason: `Counted ${change.found}, was ${change.was}`,
+        against: input.count,
+      });
+    }
+
+    /* ⚠️ CLOSED LAST. A session marked closed before its corrections land is one
+       whose differences can never be applied and can never be read again. */
+    await db.prepare(
+      `UPDATE count SET closed = ?, edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ? AND closed IS NULL`)
+      .bind(c.now, c.now, c.accountId ?? null, input.count, c.tenantId).run();
+
+    return { changed: changes.length };
+  },
+});
+
 /**
  * WHAT A NEW PRODUCT STARTS AS — the workspace's answer, not the form's.
  *
@@ -1209,8 +1559,11 @@ export const INVENTORY: AppSpec = defineApp({
     locations: { label: "Locations", withheld: "quota" },
   },
 
-  collections: [product, code, location, batch, stock, ledger],
-  operations: [receive, take, adjust, arrive, undo, starts, resolve, learn, open, due],
+  collections: [product, code, location, batch, count, tally, stock, ledger],
+  operations: [
+    receive, take, adjust, arrive, undo, starts, resolve, learn, open, due,
+    openCount, tallyUp, differs, closeCount,
+  ],
 
   /*
     ⚠️ THE SCREENS THIS STAGE ACTUALLY HAS. A declared screen with nothing
@@ -1235,6 +1588,12 @@ export const INVENTORY: AppSpec = defineApp({
        is a thing they do once. Two jobs, two doors — and the nav is what tells
        somebody which one they are in, which matters because one of them writes. */
     { id: "receive", route: "/receive", label: "Receive", nav: "primary", icon: "add",
+      permission: "stock:move" },
+    /* ⚠️ A COUNT IS A JOB SOMEBODY SPENDS AN AFTERNOON ON, so it is a
+       destination rather than a mode. `stock:move` because counting is open to
+       everybody — it is SETTLING one that needs `stock:adjust`, which the
+       operation asks for rather than the nav. */
+    { id: "count", route: "/count", label: "Count", nav: "primary", icon: "check",
       permission: "stock:move" },
     /* ⚠️ `etch` — ruled geometry, which is what a shelf is. Seeded on the
        location, so every shelf in the workspace has a ground of its own. */
@@ -1307,6 +1666,37 @@ export const INVENTORY: AppSpec = defineApp({
       status: 409, retryable: false, tone: "warning",
       title: "That cannot be taken back",
       detail: "Undo is for the last thing you just did. Correct it instead, and say why.",
+    },
+    /*
+      ⚠️ TWO SESSIONS ON ONE SHELF IS DOUBLE COUNTING, and the refusal carries
+      WHEN rather than who: "somebody is counting this" is actionable, and
+      "somebody was counting this three weeks ago" is a session to close.
+    */
+    "inventory.counting": {
+      status: 409, retryable: false, tone: "warning",
+      title: "Somebody is already counting this shelf",
+      detail: "It was opened at {since}. Close that count before starting another.",
+    },
+    /*
+      ⚠️ A CLOSED COUNT IS FINISHED. Its differences have already become
+      corrections in the history, and adding to it afterwards would make those
+      corrections describe a count that no longer exists.
+    */
+    "inventory.closed": {
+      status: 409, retryable: false, tone: "warning",
+      title: "That count is closed",
+      detail: "Start another one to count the shelf again.",
+    },
+    /*
+      ⚠️ A BATCHED PRODUCT IS COUNTED PER DELIVERY OR NOT AT ALL. The shelf holds
+      it as one row per lot, so a tally against the product alone would make the
+      close report both lots as wrong and the product as newly appeared. The lot
+      is printed on the box the person is holding.
+    */
+    "inventory.needsLot": {
+      status: 422, retryable: true, tone: "warning",
+      title: "This one is counted by delivery",
+      detail: "Scan the label with the lot number on it, or the square code.",
     },
     "inventory.taken": {
       status: 409, retryable: false, tone: "warning",

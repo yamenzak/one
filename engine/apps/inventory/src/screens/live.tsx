@@ -22,6 +22,8 @@ import * as React from "react";
 import { ready, trouble, waiting, type Loaded } from "@engine/design";
 import type { Problem } from "@engine/kernel";
 import { INVENTORY } from "../index.js";
+import { coverage, stuttering } from "../count.js";
+import { Count, type Change, type Counted, type Uncovered } from "./Count.js";
 import { Receive } from "./Receive.js";
 import { Scan, type Seen } from "./Scan.js";
 import { Stock } from "./Stock.js";
@@ -567,6 +569,170 @@ const RECEIVE = (api: Door) => function ReceiveHere() {
 };
 
 /**
+ * A COUNT SESSION — one shelf, open until somebody closes it.
+ *
+ * ⚠️ THE SESSION IS HELD HERE AND NOT IN THE ADDRESS, and that is deliberate:
+ * counting is a job somebody is IN, and a route carrying the session id would
+ * make the back button leave it half done with nothing saying so. The shelf is
+ * the address of the work; the session is the state of it.
+ *
+ * ⚠️ AND THE TALLY IS RE-READ AFTER EVERY SCAN RATHER THAN COUNTED HERE. Two
+ * people counting one aisle is the ordinary case, and a running total kept in
+ * this component would be one person's half of it.
+ */
+const COUNT = (api: Door) => function CountHere() {
+  const world = useWorld(api);
+  const [place, setPlace] = React.useState<{ id: string; name: string } | null>(null);
+  const [session, setSession] = React.useState("");
+  const [blind, setBlind] = React.useState(false);
+  const [stutter, setStutter] = React.useState<string | undefined>(undefined);
+  const today = dayHere();
+
+  /* ⚠️ WHEN EACH CODE WAS LAST READ, IN A REF. It is a property of this device's
+     trigger finger rather than of the workspace, and re-rendering on every scan
+     to store a timestamp would make the list flicker while somebody works. */
+  const beats = React.useRef<Record<string, number[]>>({});
+
+  const places = world.places.status === "ready" && world.stock.status === "ready"
+    ? placesOf(world.places.data.items, world.stock.data.items)
+    : [];
+
+  const tallies = useAsked<{ items: readonly Row[] }>(
+    () => api.get("tally.list"), [session]);
+  const differences = useAsked<{ items: readonly Row[] }>(
+    () => (session
+      ? api.get("count.differences", { count: session })
+      : Promise.resolve({ ok: true as const, value: { items: [] } })),
+    [session]);
+
+  const named = new Map(
+    world.kinds.status === "ready"
+      ? world.kinds.data.items.map((row) => [text(row.id), row])
+      : [],
+  );
+  const held = new Map(
+    world.stock.status === "ready" && place
+      ? world.stock.data.items
+        .filter((row) => text(row.location) === place.id)
+        .map((row) => [text(row.product), num(row.quantity)])
+      : [],
+  );
+
+  const rows: Loaded<readonly Counted[]> = tallies.of.status === "ready"
+    ? ready(tallies.of.data.items
+      .filter((row) => text(row.count) === session)
+      .map((row): Counted => {
+        const of = named.get(text(row.product));
+        return {
+          id: text(row.id),
+          name: of ? text(of.name) : "—",
+          unit: of ? text(of.unit) || "item" : "item",
+          found: num(row.quantity),
+          /* ⚠️ WITHHELD RATHER THAN HIDDEN ON A BLIND COUNT. A number sent to the
+             browser and not drawn is a number in the page source. */
+          expected: blind ? null : held.get(text(row.product)) ?? 0,
+        };
+      }))
+    : tallies.of;
+
+  /*
+    ⚠️ DERIVED FROM THE SESSIONS RATHER THAN STORED ON THE SHELF. A "last
+    counted" column on `location` would be a second answer to a question the
+    count table already holds — and the two would disagree the first time a close
+    half failed.
+  */
+  const sessions = useAsked<{ items: readonly Row[] }>(() => api.get("count.list"));
+  const lastCounted: Record<string, string> = {};
+  if (sessions.of.status === "ready") {
+    for (const row of sessions.of.data.items) {
+      if (!text(row.closed)) continue;
+      const at = text(row.location);
+      const on = text(row.day);
+      if (!lastCounted[at] || lastCounted[at] < on) lastCounted[at] = on;
+    }
+  }
+  const uncounted: readonly Uncovered[] = coverage(
+    places.map((p) => ({ id: p.id, name: p.name })), lastCounted, today,
+  ).map((c) => ({ location: c.location, name: c.name, days: c.days }));
+
+  const changes: readonly Change[] = differences.of.status === "ready"
+    ? differences.of.data.items.map((row): Change => ({
+      product: text(row.product),
+      name: named.get(text(row.product)) ? text(named.get(text(row.product))?.name) : "—",
+      was: num(row.was),
+      found: num(row.found),
+      delta: num(row.delta),
+    }))
+    : [];
+
+  const read = (raw: string) => {
+    /* ⚠️ THE SHELF FIRST, ALWAYS. A location code scanned mid-count is somebody
+       who has walked to the next rack — so it ends this session's scope rather
+       than being counted onto it. */
+    void api.get<Seen>("code.resolve", { raw, year: String(new Date().getFullYear()) })
+      .then((got) => {
+        if (!got.ok) return;
+        if (got.value.ours === "location") {
+          const found = places.find((p) => p.code === got.value.value || p.id === got.value.value);
+          if (found) { setPlace({ id: found.id, name: found.name }); setSession(""); }
+          return;
+        }
+        if (got.value.ours || !session) return;
+
+        /* ⚠️ FLAGGED, NEVER BLOCKED — a trigger held against a pallet of
+           identical boxes is also three reads in two seconds, and it is three
+           boxes. */
+        const now = Date.now();
+        const was = beats.current[raw] ?? [];
+        setStutter(stuttering(was, now)
+          ? "That code read three times in two seconds — check it is three things"
+          : undefined);
+        beats.current[raw] = [...was, now].slice(-4);
+
+        void api.post("count.tally", { count: session, raw, year: new Date().getFullYear() })
+          .then((done) => { if (done.ok) { tallies.again(); differences.again(); } });
+      });
+  };
+
+  return (
+    <Count
+      title={nameOf("/count")}
+      place={place}
+      blind={blind}
+      onBlind={setBlind}
+      counting={Boolean(session)}
+      of={rows}
+      changes={changes}
+      stutter={stutter}
+      uncounted={uncounted}
+      onRead={read}
+      onGo={(location) => {
+        const found = places.find((p) => p.id === location);
+        if (found) { setPlace({ id: found.id, name: found.name }); setSession(""); }
+      }}
+      onStart={() => {
+        if (!place) return;
+        void api.post<{ id: string }>("count.open", {
+          location: place.id, blind, day: today,
+        }).then((got) => { if (got.ok) setSession(got.value.id); });
+      }}
+      onClose={() => {
+        if (!session) return;
+        void api.post("count.close", { count: session, day: today }).then((got) => {
+          if (!got.ok) return;
+          /* ⚠️ THE SESSION ENDS HERE RATHER THAN BEING RE-READ. It is closed, and
+             a screen still offering to count onto it would be offering something
+             the operation now refuses. */
+          setSession("");
+          world.again();
+        });
+      }}
+      again={() => { tallies.again(); differences.again(); sessions.again(); world.again(); }}
+    />
+  );
+};
+
+/**
  * ⚠️ THE GUIDE IS TICKED BY EVENTS THIS WORKSPACE HAS ACTUALLY RAISED, and until
  * the platform answers that question the honest state is nothing crossed off —
  * never a step ticked because a screen guessed.
@@ -602,6 +768,7 @@ export function mount({ register, api }: Mounting): void {
     ["/where", WHERE(api)],
     ["/scan", SCAN(api)],
     ["/receive", RECEIVE(api)],
+    ["/count", COUNT(api)],
     ["/start", START()],
   ];
   for (const [route, screen] of screens) {

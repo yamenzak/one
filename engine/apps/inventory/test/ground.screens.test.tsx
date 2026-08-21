@@ -17,7 +17,8 @@ import { ready } from "@engine/design";
 import { describe, expect, it } from "vitest";
 import { INVENTORY } from "../src/index.js";
 import {
-  INVENTORY_ROUTES, InventoryScreen, Receive, Scan, type Seen,
+  Count, INVENTORY_ROUTES, InventoryScreen, Receive, Scan,
+  type Seen, type Uncovered,
 } from "../src/screens/index.js";
 import { LINES, PLACES, EMPTY_PLACE } from "../src/screens/sample.js";
 
@@ -318,5 +319,123 @@ describe("receiving", () => {
     const rich = drawn({ id: "p-a1", name: "A1" },
       seen({ found: true, tracking: "batched", lot: "A5B7", expiry: "2027-03-31", needs: "" }));
     expect(rich).not.toContain('name="lot"');
+  });
+});
+
+/**
+ * THE COUNT SESSION.
+ *
+ * ⚠️ CLOSING ONE IS THE ONLY GESTURE IN THIS PRODUCT THAT TAKES NUMBERS AWAY —
+ * everything the session did not find goes to zero — so what is asserted here is
+ * that a person sees the differences BEFORE they agree to them, and that the
+ * blind choice is honoured rather than merely offered.
+ */
+describe("counting a shelf", () => {
+  const out = renderToStaticMarkup(<InventoryScreen route="/count" />);
+
+  it("shows what was found beside what we thought", () => {
+    expect(out).toContain("Nitrile gloves, blue");
+    /* ⚠️ THE FIGURE GOES THROUGH `Num`, WHICH IS WHY THIS ASSERTS ON THE MARKUP
+       RATHER THAN THE SENTENCE. The first version looked for "We think 1200" and
+       found it — the expected number was interpolated into a template string and
+       printed ungrouped beside a counted "1,180", two number systems on one row
+       in the one place a reader compares hardest. */
+    expect(out).toContain("We think <span");
+    expect(out).toContain(">1,200</span>");
+  });
+
+  /* ⚠️ THE DIFFERENCES ARE ON THE PAGE, not only inside the sheet. "Are you
+     sure?" over a list of four numbers is a question somebody can answer; over
+     nothing it is a formality people press through. */
+  it("puts the disagreements on the page before anybody agrees to them", () => {
+    /* ⚠️ ASSERTED ON THE GROUPED FIGURES, which is how the first version of this
+       test found a real defect: the expected number was interpolated into a
+       template string and printed "1200" beside a counted "1,180" — two number
+       systems on one row, in the one place a reader compares hardest. */
+    expect(out).toContain("We thought <span");
+    expect(out).toContain(">1,180</span>");
+    expect(out).toContain("Everything not counted goes to zero");
+  });
+
+  /* ⚠️ SAID, NEVER BLOCKED. A trigger held against a pallet of identical boxes
+     is three reads in two seconds and it is three boxes. */
+  it("says when a code read three times in two seconds", () => {
+    expect(out).toContain("read three times in two seconds");
+  });
+
+  /*
+    ⚠️ A BLIND COUNT WITHHOLDS THE EXPECTED NUMBER RATHER THAN HIDING IT. A
+    number sent to the browser and not drawn is a number in the page source, and
+    a blind count somebody can read is not a blind count.
+  */
+  it("withholds the expected number on a blind count", () => {
+    const dark = renderToStaticMarkup(
+      <Count
+        place={{ id: "p-a1", name: "A1" }}
+        blind
+        onBlind={() => undefined}
+        counting
+        of={ready([
+          { id: "t1", name: "Nitrile gloves, blue", unit: "glove", found: 1_180, expected: null },
+        ])}
+        changes={[]}
+        uncounted={[]}
+        onRead={() => undefined}
+        onGo={() => undefined}
+        onStart={() => undefined}
+        onClose={() => undefined}
+        again={() => undefined}
+      />,
+    );
+    expect(dark).toContain("1,180");
+    expect(dark).not.toContain("We think");
+  });
+
+  /* ⚠️ AND THE DOCKED ACT IS THE ONE THAT ADDS. A button that destroys a
+     shelf's numbers on one press is the control somebody hits with a glove on. */
+  it("does not dock the close", () => {
+    expect(out).not.toContain(">Start counting<");
+    expect(out).toContain(">Close the shelf<");
+  });
+});
+
+/**
+ * ⚠️ AND THE HALF OF A STOCKTAKE NOBODY BUILDS. Missing a shelf entirely is far
+ * commoner than counting one twice and much more damaging: its number is simply
+ * the last one anybody wrote down, and it goes on being trusted.
+ */
+describe("which shelves nobody has counted", () => {
+  const idle = (uncounted: readonly Uncovered[]) => renderToStaticMarkup(
+    <Count
+      place={null}
+      blind={false}
+      onBlind={() => undefined}
+      counting={false}
+      of={ready([])}
+      changes={[]}
+      uncounted={uncounted}
+      onRead={() => undefined}
+      onStart={() => undefined}
+      onClose={() => undefined}
+      onGo={() => undefined}
+      again={() => undefined}
+    />,
+  );
+
+  it("says never rather than a very large number of days", () => {
+    const out = idle([
+      { location: "b2", name: "B2", days: null },
+      { location: "a3", name: "A3", days: 412 },
+    ]);
+    expect(out).toContain("Never counted");
+    expect(out).toContain("Counted 412 days ago");
+  });
+
+  /* ⚠️ NOT DURING A SESSION. A list of other shelves in front of somebody
+     mid-count is the one thing that could make them walk away from the one they
+     are standing at. */
+  it("is absent while a count is open", () => {
+    const out = renderToStaticMarkup(<InventoryScreen route="/count" />);
+    expect(out).not.toContain("Nobody has counted these");
   });
 });
