@@ -525,8 +525,15 @@ export function Segmented({ value, onChange, options, ...p }: Omit<Said, "help" 
          last segment cut off, in the one place a filter is most likely to
          appear. Below `sm` the group fills and the segments share it; from `sm`
          it goes back to being content-sized, because a filter stretched across a
-         desktop panel is a control pretending to be a toolbar. */
-      className="w-full flex-wrap sm:w-auto sm:flex-nowrap"
+         desktop panel is a control pretending to be a toolbar.
+
+         ⚠️ `self-start` IS WHAT MAKES `w-auto` MEAN ANYTHING HERE. A card lays
+         its children out in a column and a column stretches them, so an auto
+         width is still the card's width — measured at 976px inside a desk-wide
+         card, with the library's own `justify-center` then floating four
+         segments in the middle of a thousand pixels of nothing. The intent
+         above was written and did not happen. */
+      className="w-full flex-wrap sm:w-auto sm:flex-nowrap sm:self-start"
     >
       {options.map((o, i) => (
         <ToggleButton key={o.id} id={o.id} className="grow basis-0 sm:grow-0 sm:basis-auto">

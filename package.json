@@ -17,7 +17,8 @@
     "engine:dev": "turbo run dev --filter='./engine/*'",
     "engine:test": "turbo run test --filter='./engine/*' --filter='./engine/apps/*'",
     "engine:typecheck": "turbo run typecheck --filter='./engine/*' --filter='./engine/apps/*'",
-    "engine:gate": "node engine/scripts/gate.mjs"
+    "engine:gate": "node engine/scripts/gate.mjs",
+    "engine:shots": "turbo run shots --filter='./engine/apps/*'"
   },
   "devDependencies": {
     "turbo": "^2.5.9",

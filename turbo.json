@@ -68,6 +68,17 @@
       "dependsOn": ["^build", "@engine/space#build"],
       "outputs": ["coverage/**"]
     },
+    // ⚠️ AND THE PHOTOGRAPHS, WHICH NEED IT MOST OF ALL. A stale stylesheet
+    // makes a sweep measure the wrong product and it usually SAYS so, because
+    // some assertion moves; a stale stylesheet makes a shots run produce
+    // convincing pictures of the previous design filed under the current names,
+    // and nothing anywhere disagrees. It has already happened once: a fix to a
+    // shared control was photographed unchanged, because the class it added was
+    // never compiled.
+    "@engine/inventory#shots": {
+      "dependsOn": ["^build", "@engine/space#build"],
+      "cache": false
+    },
     // The reference app runs the same sweep over its own routes, so it needs
     // the same stylesheet — one guard asked of one product is the one that gets
     // waived.
