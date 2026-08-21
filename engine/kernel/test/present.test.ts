@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { Instant } from "../src/primitives.js";
+import { dayPlus, daysBetween, type Day, type Instant } from "../src/primitives.js";
 import {
   DEFAULT_PRESENTATION, SHOW, byDay, dayIn, readAmount, refusePresentation,
   sayAmount, sayBytes, sayDate, sayMoment, sayMoney, sayNumber, sayTime, sayWhen, shownAs,
@@ -370,5 +370,39 @@ describe("what is refused", () => {
     const bad = { locale: "!!!", numeric: "!!!", zone: "UTC", dateOrder: "dmy", clock: "24", units: "metric" } as const;
     expect(() => sayDate(bad, at("2026-08-05T10:00:00.000Z"))).not.toThrow();
     expect(() => sayNumber(bad, 12)).not.toThrow();
+  });
+});
+
+/**
+ * CALENDAR ARITHMETIC — the pair every product needs and none should write.
+ *
+ * ⚠️ A DAY HAS NO TIME IN IT, WHICH IS THE ONLY REASON THESE ARE EXACT. Doing
+ * either of them on an instant is off by one across a clock change: a shelf life
+ * comes out 23 or 25 hours, `Math.floor` takes a day off it or adds one, and the
+ * reading somebody gets is "expires tomorrow" for a box that expired this
+ * morning. Both ends here are midnight UTC and no local clock is consulted.
+ */
+describe("moving and measuring calendar days", () => {
+  it("moves a date forwards and back", () => {
+    expect(dayPlus("2026-08-21" as Day, 7)).toBe("2026-08-28");
+    expect(dayPlus("2026-08-21" as Day, -21)).toBe("2026-07-31");
+  });
+
+  /* ⚠️ Across a month, a year and a leap day — the three places a naive
+     subtraction and a calendar disagree. */
+  it("crosses a month, a year and a leap day", () => {
+    expect(dayPlus("2026-08-31" as Day, 1)).toBe("2026-09-01");
+    expect(dayPlus("2026-12-31" as Day, 1)).toBe("2027-01-01");
+    expect(dayPlus("2028-02-28" as Day, 1)).toBe("2028-02-29");
+    expect(daysBetween("2028-02-28" as Day, "2028-03-01" as Day)).toBe(2);
+    expect(daysBetween("2027-02-28" as Day, "2027-03-01" as Day)).toBe(1);
+  });
+
+  /* ⚠️ SIGNED, because "four days ago" and "in four days" are one question and
+     only one of the answers is a problem. */
+  it("counts in both directions and inverts the move", () => {
+    expect(daysBetween("2026-08-21" as Day, "2026-08-25" as Day)).toBe(4);
+    expect(daysBetween("2026-08-25" as Day, "2026-08-21" as Day)).toBe(-4);
+    expect(daysBetween("2026-08-21" as Day, dayPlus("2026-08-21" as Day, 90))).toBe(90);
   });
 });

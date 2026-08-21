@@ -94,6 +94,14 @@ const product = collection({
     /* ⚠️ Days after opening, which is one of three clocks that can end a
        batch — see `effectiveExpiry`. */
     openDays: field.number({ label: "Days once opened", holds: "none", min: 0, max: 3_650 }),
+    /*
+      ⚠️ SOMETHING RECEIVED BEFORE ANYBODY SAID WHAT IT WAS. The worst outcome in
+      this product is a delivery that went unrecorded because a form demanded a
+      field the person did not have — so an unknown code becomes a row named
+      after itself, and this is what makes that row FINDABLE rather than a
+      silent pile of numbered things nobody ever looks at.
+    */
+    unnamed: field.bool({ label: "Not named yet", holds: "none" }),
   },
 });
 
@@ -398,7 +406,9 @@ interface MoveInput {
  * here, not the exotic one — `SELECT` then `UPDATE` is a race they both win, and
  * the symptom is a balance that is quietly short by exactly one person's work.
  */
-async function stockMove(ctx: Ctx, move: Move, input: MoveInput): Promise<{ id: string; quantity: number }> {
+async function stockMove(
+  ctx: Ctx, move: Move, input: MoveInput,
+): Promise<{ id: string; quantity: number; movement: string }> {
   const db = ctx.db as Db;
   const step = applyMove(move, input.quantity);
 
@@ -461,21 +471,29 @@ async function stockMove(ctx: Ctx, move: Move, input: MoveInput): Promise<{ id: 
         ctx.accountId ?? null).run();
   }
 
+  /* ⚠️ THE MOVEMENT'S OWN ID IS ANSWERED, WHICH IS WHAT MAKES UNDO REACHABLE.
+     Without it every caller would have to go and find the row it just wrote by
+     guessing at a timestamp — and "the last thing you just did" is precisely
+     what a person means when they press take-back. */
+  const movement = `led_${ctx.now}_${id}`;
   await db.prepare(
     `INSERT INTO ledger
       (id, tenant_id, move, product, location, batch, delta, day, reason, capture,
        against, at, by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(`led_${ctx.now}_${id}`, ctx.tenantId, move, input.product, input.location, batch,
+    .bind(movement, ctx.tenantId, move, input.product, input.location, batch,
       step, input.day, input.reason ?? null, input.capture, input.against ?? null,
       ctx.now, ctx.accountId ?? null).run();
 
-  return { id, quantity: now };
+  return { id, quantity: now, movement };
 }
 
 const moveOutput = {
   id: field.text({ label: "Line", holds: "none" }),
   quantity: field.number({ label: "How many now", holds: "none" }),
+  /* ⚠️ THE LEDGER ROW THIS WROTE. It is what `stock.undo` takes, so a caller
+     never has to find the movement it just made. */
+  movement: field.text({ label: "Movement", holds: "none" }),
 } as const;
 
 /**
@@ -485,7 +503,9 @@ const moveOutput = {
  * they become indistinguishable in the history, and a shrinkage report over that
  * history is a list of numbers nobody can explain.
  */
-const receive = operation<MoveInput, { id: string; quantity: number }>({
+type Moved = { id: string; quantity: number; movement: string };
+
+const receive = operation<MoveInput, Moved>({
   id: "stock.receive",
   kind: "write",
   summary: "Put stock on a shelf",
@@ -503,7 +523,7 @@ const receive = operation<MoveInput, { id: string; quantity: number }>({
   handler: (ctx, input) => stockMove(ctx as Ctx, "received", input),
 });
 
-const take = operation<MoveInput, { id: string; quantity: number }>({
+const take = operation<MoveInput, Moved>({
   id: "stock.take",
   kind: "write",
   summary: "Take stock off a shelf",
@@ -524,7 +544,7 @@ const take = operation<MoveInput, { id: string; quantity: number }>({
  * those says only that the product is not trusted. The field is optional on the
  * others because "received" and "taken" explain themselves.
  */
-const adjust = operation<MoveInput, { id: string; quantity: number }>({
+const adjust = operation<MoveInput, Moved>({
   id: "stock.adjust",
   kind: "write",
   summary: "Correct a number that was wrong",
@@ -875,6 +895,225 @@ const WHY: Readonly<Record<"empty" | "check" | "gs1", string>> = {
 };
 
 /**
+ * RECEIVING SOMETHING — the whole gesture, whatever we already know about it.
+ *
+ * ⚠️ ONE OPERATION RATHER THAN THREE CALLS, and the reason is what happens when
+ * the second one fails. Putting an unknown delivery away is: make a product,
+ * attach its code, open a batch, move the balance — and a client doing that in
+ * sequence on a warehouse phone leaves a nameless product with no code the first
+ * time the signal drops. One write also means ONE queued item offline, which is
+ * the difference between replaying a delivery and replaying a third of one.
+ *
+ * ⚠️ TAKE IT NOW, NAME IT LATER. An unknown code is received against a row named
+ * after itself and marked `unnamed`; the worst outcome in this product is
+ * somebody not recording something because a form demanded a field they did not
+ * have. Whoever looks after the catalogue names it afterwards, and until then
+ * the thing is on the shelf and in the system.
+ *
+ * ⚠️ AND THE PACK LEVEL IS APPLIED HERE RATHER THAN BY THE SCREEN. "Scan a
+ * carton, add ten" is the commonest wrong number in inventory work, and the code
+ * on the box already knew — a screen multiplying it would be one of the two
+ * surfaces that scan each doing its own arithmetic.
+ */
+interface Arriving {
+  raw: string; location: string; quantity: number; day: string; year: number;
+  capture?: string; lot?: string; expiry?: string;
+}
+
+const arrive = operation<
+  Arriving, { id: string; quantity: number; movement: string; product: string }
+>({
+  id: "stock.arrive",
+  kind: "write",
+  summary: "Put something on a shelf, known or not",
+  input: {
+    raw: field.text({ label: "Code", required: true, holds: "none", max: 256 }),
+    location: field.text({ label: "Where", required: true, holds: "none" }),
+    /* ⚠️ IN THE UNIT THE CODE IMPLIES — one carton is one here, and the pack
+       level turns it into ten. A caller sending the multiplied number would
+       double it. */
+    quantity: field.number({ label: "How many", required: true, holds: "none" }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+    year: field.number({ label: "This year", required: true, holds: "none" }),
+    capture: field.text({ label: "Recorded by", holds: "none" }),
+    lot: field.text({ label: "Lot", holds: "none" }),
+    expiry: field.day({ label: "Expires", holds: "none" }),
+  },
+  output: {
+    ...moveOutput,
+    product: field.text({ label: "Product", holds: "none" }),
+  },
+  permission: "stock:move",
+  idempotency: { mode: "key" },
+  emits: ["stock.received", "product.created"],
+  outcome: { message: "Received.", tone: "success", invalidates: ["stock.list", "ledger.list"] },
+  fails: ["inventory.unreadable", "inventory.short", "inventory.moved", "platform.not_found"],
+  audit: (input) => ({ subject: input.raw, verb: "received" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const of = readScan(input.raw, yearIn(input.year));
+    if (unread(of)) {
+      return c.fail("inventory.unreadable", {}, { fields: { raw: WHY[of.why] } });
+    }
+    /* ⚠️ A SHELF LABEL IS NOT A THING TO RECEIVE. It moves the session, and a
+       screen that sent one here is a screen with a bug — refused rather than
+       filed as a product called `ONE-L-4K2P`. */
+    if (of.ours) {
+      return c.fail("inventory.unreadable", {}, { fields: { raw: "That is a place, not a thing" } });
+    }
+
+    const known = await db.prepare(
+      `SELECT c.product AS product, c.pack AS pack, p.tracking AS tracking
+         FROM code c JOIN product p ON p.id = c.product
+        WHERE c.tenant_id = ? AND c.value = ?`)
+      .bind(c.tenantId, of.value)
+      .first<{ product: string; pack: number | null; tracking: string }>();
+
+    let product = known?.product ?? "";
+    let tracking = known?.tracking ?? "";
+    const pack = Math.max(1, known?.pack ?? 1);
+
+    if (!product) {
+      /* ⚠️ THE WORKSPACE'S OWN DEFAULTS, NOT THIS FILE'S. What a new product
+         starts as is a setting somebody chose; a `??` here would be a second
+         answer, and it would MASK the platform failing to apply theirs. */
+      tracking = String(await c.setting("inventory.default_tracking"));
+      const unit = String(await c.setting("inventory.default_unit"));
+      product = `prd_${c.tenantId}_${of.value}`;
+      await db.prepare(
+        `INSERT INTO product (id, tenant_id, name, tracking, unit, unnamed, at, by)
+          VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+          ON CONFLICT (id) DO NOTHING`)
+        .bind(product, c.tenantId, of.value, tracking, unit, c.now, c.accountId ?? null)
+        .run();
+      await db.prepare(
+        `INSERT INTO code (id, tenant_id, product, value, kind, pack, source, at, by)
+          VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
+          ON CONFLICT (id) DO NOTHING`)
+        .bind(`cod_${c.tenantId}_${of.value}`, c.tenantId, product, of.value, of.kind,
+          input.capture ?? "scanned", c.now, c.accountId ?? null)
+        .run();
+    }
+
+    /*
+      ⚠️ THE BATCH IS FOUND OR MADE, AND ONLY WHERE THE PRODUCT EARNS ONE. Two
+      deliveries with the same lot ARE the same delivery — a second row would
+      split one lot's balance in two and give a recall two answers.
+    */
+    let batch: string | undefined;
+    const lot = (input.lot ?? of.lot ?? "").trim();
+    const printed = input.expiry ?? of.expiry ?? "";
+    if (tracking === "batched" && (lot || printed)) {
+      batch = `bat_${product}_${lot || printed}`;
+      await db.prepare(
+        `INSERT INTO batch (id, tenant_id, product, lot, printed, received, at, by)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT (id) DO NOTHING`)
+        .bind(batch, c.tenantId, product, lot || null, printed || null, input.day,
+          c.now, c.accountId ?? null)
+        .run();
+    }
+
+    const done = await stockMove(c, "received", {
+      product,
+      location: input.location,
+      ...(batch ? { batch } : {}),
+      quantity: Math.abs(input.quantity) * pack,
+      day: input.day,
+      capture: input.capture ?? "scanned",
+    });
+    return { ...done, product };
+  },
+});
+
+/**
+ * UNDOING THE LAST THING YOU DID, WITHOUT ASKING ANYBODY.
+ *
+ * ⚠️ THE WORST OUTCOME IN THIS PRODUCT IS SOMEBODY NOT RECORDING SOMETHING, and
+ * a person who cannot take back a mis-scan is a person who stops scanning. Undo
+ * is what makes recording feel free — so it is here rather than behind a
+ * manager, and it is `stock:move` rather than `stock:adjust`.
+ *
+ * ⚠️ AND IT IS A MOVEMENT, NEVER A DELETION. The wrong number stays visible with
+ * what cancelled it beside it, which is the difference between an inventory
+ * somebody can audit and one they can only believe.
+ *
+ * ⚠️ THREE CONDITIONS, AND EACH IS THE LINE BETWEEN A SLIP AND A REVISION.
+ * Yours, because undoing somebody else's work without telling them is not an
+ * undo. The LAST one on that line, because anything since means the number
+ * people are working from has moved on. And recent, because a receipt from
+ * yesterday morning can still be the last movement on a shelf nobody touches —
+ * and taking that back a day later is a revision, which is what a correction
+ * with a reason on it is for.
+ */
+const UNDO_MINUTES = 60;
+
+const undo = operation<{ movement: string; day: string }, Moved>({
+  id: "stock.undo",
+  kind: "write",
+  summary: "Take back the last thing you recorded",
+  input: {
+    movement: field.text({ label: "Movement", required: true, holds: "none" }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+  },
+  output: moveOutput,
+  permission: "stock:move",
+  idempotency: { mode: "key" },
+  emits: ["stock.undone"],
+  outcome: { message: "Taken back.", tone: "success", invalidates: ["stock.list", "ledger.list"] },
+  fails: ["platform.not_found", "inventory.late", "inventory.short", "inventory.moved"],
+  audit: (input) => ({ subject: input.movement, verb: "took back" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+
+    const of = await db.prepare(
+      `SELECT move, product, location, batch, delta, at, by FROM ledger
+        WHERE id = ? AND tenant_id = ?`)
+      .bind(input.movement, c.tenantId)
+      .first<{ move: string; product: string; location: string; batch: string | null;
+        delta: number; at: string; by: string | null }>();
+    if (!of) return c.fail("platform.not_found");
+
+    /* ⚠️ AN UNDO IS NOT ITSELF UNDOABLE. Two of them facing each other is a
+       balance that oscillates and a history nobody can read. */
+    if (of.move === "undone") return c.fail("inventory.late");
+    if (!c.accountId || of.by !== c.accountId) return c.fail("inventory.late");
+
+    const age = (Date.parse(c.now) - Date.parse(of.at)) / 60_000;
+    if (!Number.isFinite(age) || age > UNDO_MINUTES) return c.fail("inventory.late");
+
+    /* ⚠️ THE LAST ONE ON THIS LINE. Asked as "is there anything newer" rather
+       than by comparing a balance: two movements that cancel out would leave the
+       number where it started, and undoing into that silently discards
+       somebody's work. */
+    const since = await db.prepare(
+      `SELECT id FROM ledger
+        WHERE tenant_id = ? AND product = ? AND location = ? AND batch IS ? AND at > ?
+        LIMIT 1`)
+      .bind(c.tenantId, of.product, of.location, of.batch ?? null, of.at)
+      .first<{ id: string }>();
+    if (since) return c.fail("inventory.late");
+
+    return stockMove(c, "undone", {
+      product: of.product,
+      location: of.location,
+      ...(of.batch ? { batch: of.batch } : {}),
+      /* ⚠️ THE EXACT OPPOSITE OF WHAT IT CANCELS, taken from the row rather than
+         recomputed. A quantity worked out again from the same inputs is a second
+         chance to get it wrong. */
+      quantity: -of.delta,
+      day: input.day,
+      capture: "typed",
+      /* ⚠️ NAMING WHAT IT CANCELS IS WHAT MAKES IT ONE-SHOT — the check above
+         reads this column, so a second undo of the same movement finds itself. */
+      against: input.movement,
+    });
+  },
+});
+
+/**
  * WHAT A NEW PRODUCT STARTS AS — the workspace's answer, not the form's.
  *
  * ⚠️ AN OPERATION RATHER THAN THE SCREEN READING THE SETTING, because both
@@ -971,7 +1210,7 @@ export const INVENTORY: AppSpec = defineApp({
   },
 
   collections: [product, code, location, batch, stock, ledger],
-  operations: [receive, take, adjust, starts, resolve, learn, open, due],
+  operations: [receive, take, adjust, arrive, undo, starts, resolve, learn, open, due],
 
   /*
     ⚠️ THE SCREENS THIS STAGE ACTUALLY HAS. A declared screen with nothing
@@ -991,6 +1230,12 @@ export const INVENTORY: AppSpec = defineApp({
        somebody is looking at. */
     { id: "scan", route: "/scan", label: "Scan", nav: "primary", icon: "search",
       permission: "product:read" },
+    /* ⚠️ ITS OWN DESTINATION RATHER THAN A MODE OF THE SCAN SCREEN. Receiving is
+       a job somebody does for twenty minutes with a trolley beside them; asking
+       is a thing they do once. Two jobs, two doors — and the nav is what tells
+       somebody which one they are in, which matters because one of them writes. */
+    { id: "receive", route: "/receive", label: "Receive", nav: "primary", icon: "add",
+      permission: "stock:move" },
     /* ⚠️ `etch` — ruled geometry, which is what a shelf is. Seeded on the
        location, so every shelf in the workspace has a ground of its own. */
     { id: "location", route: "/where", label: "A location", nav: "none", icon: "pin",
@@ -1051,6 +1296,17 @@ export const INVENTORY: AppSpec = defineApp({
       status: 409, retryable: false, tone: "warning",
       title: "That one is already open",
       detail: "It was opened on {on}. Opening it again would extend its shelf life.",
+    },
+    /*
+      ⚠️ ONE REFUSAL FOR EVERY REASON AN UNDO IS NO LONGER AN UNDO — not yours,
+      not the last one, or long enough ago that the number people are working
+      from has moved on. They are one sentence because the ANSWER is one
+      sentence: this is a correction now, and a correction says why.
+    */
+    "inventory.late": {
+      status: 409, retryable: false, tone: "warning",
+      title: "That cannot be taken back",
+      detail: "Undo is for the last thing you just did. Correct it instead, and say why.",
     },
     "inventory.taken": {
       status: 409, retryable: false, tone: "warning",

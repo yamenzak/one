@@ -22,6 +22,7 @@ import * as React from "react";
 import { ready, trouble, waiting, type Loaded } from "@engine/design";
 import type { Problem } from "@engine/kernel";
 import { INVENTORY } from "../index.js";
+import { Receive } from "./Receive.js";
 import { Scan, type Seen } from "./Scan.js";
 import { Stock } from "./Stock.js";
 import { Thing, type Batch, type Movement } from "./Thing.js";
@@ -469,6 +470,103 @@ const SCAN = (api: Door) => function ScanHere({ go }: Mounted) {
 };
 
 /**
+ * RECEIVING — one session, one shelf, and one write per thing.
+ *
+ * ⚠️ THE PLACE SURVIVES BETWEEN SCANS AND THE THING DOES NOT, which is the whole
+ * shape of the work. A location code moves the session; a product code fills the
+ * row and is cleared the moment it is recorded, so the next scan cannot land on
+ * the last one's quantity.
+ *
+ * ⚠️ AND THE WHOLE GESTURE IS ONE OPERATION — see `stock.arrive`. Making a
+ * product, attaching its code, opening a batch and moving the balance from four
+ * calls out here would leave a nameless product with no code the first time the
+ * signal drops, and four queued items offline instead of one.
+ */
+const RECEIVE = (api: Door) => function ReceiveHere() {
+  const world = useWorld(api);
+  const [place, setPlace] = React.useState<{ id: string; name: string } | null>(null);
+  const [seen, setSeen] = React.useState<Seen | null>(null);
+  const [last, setLast] = React.useState("");
+  /* ⚠️ THE MOVEMENT THAT CAN STILL BE TAKEN BACK. Held rather than looked up:
+     undo is about the thing you JUST did, and asking the server which that was
+     is a round trip in front of a button whose whole value is being instant. */
+  const [undoable, setUndoable] = React.useState<string | null>(null);
+  const [busy, setBusy] = React.useState(false);
+  const today = dayHere();
+
+  const places = world.places.status === "ready" && world.stock.status === "ready"
+    ? placesOf(world.places.data.items, world.stock.data.items)
+    : [];
+
+  const read = React.useCallback((raw: string) => {
+    setLast(raw);
+    void api.get<Seen>("code.resolve", { raw, year: String(new Date().getFullYear()) })
+      .then((got) => {
+        if (!got.ok) { setSeen(null); return; }
+        /* ⚠️ A SHELF LABEL MOVES THE SESSION RATHER THAN BECOMING A ROW. It is
+           the highest-leverage behaviour in the whole flow: point at a shelf,
+           scan, scan, scan, point at the next shelf. */
+        if (got.value.ours === "location") {
+          const found = places.find((p) => p.code === got.value.value || p.id === got.value.value);
+          if (found) { setPlace({ id: found.id, name: found.name }); setSeen(null); }
+          return;
+        }
+        if (got.value.ours) return;
+        setSeen(got.value);
+      });
+  }, [api, places]);
+
+  return (
+    <Receive
+      title={nameOf("/receive")}
+      place={place}
+      seen={seen}
+      busy={busy}
+      onRead={read}
+      onForget={() => { setSeen(null); }}
+      onUndo={undoable
+        ? () => {
+          void api.post("stock.undo", { movement: undoable, day: today }).then((got) => {
+            if (!got.ok) return;
+            /* ⚠️ THE OFFER GOES THE MOMENT IT IS TAKEN. An undo is not itself
+               undoable, and a button that would now be refused is worse than no
+               button at all. */
+            setUndoable(null);
+            world.again();
+          });
+        }
+        : undefined}
+      onReceive={({ quantity, lot, expiry }) => {
+        if (!place || !seen) return;
+        setBusy(true);
+        void api.post<{ movement: string }>("stock.arrive", {
+          raw: last,
+          location: place.id,
+          quantity,
+          day: today,
+          year: new Date().getFullYear(),
+          capture: "scanned",
+          ...(lot ? { lot } : {}),
+          ...(expiry ? { expiry } : {}),
+        }).then((got) => {
+          setBusy(false);
+          if (!got.ok) return;
+          /* ⚠️ CLEARED SO THE NEXT SCAN STARTS CLEAN. A screen still showing the
+             last thing is a screen where somebody presses "Add it" twice. */
+          setSeen(null);
+          setLast("");
+          world.again();
+          /* ⚠️ THE MOVEMENT IT JUST WROTE, ANSWERED BY THE OPERATION. That is
+             what makes the take-back button honest rather than a guess at which
+             row to reverse. */
+          setUndoable(got.value.movement);
+        });
+      }}
+    />
+  );
+};
+
+/**
  * ⚠️ THE GUIDE IS TICKED BY EVENTS THIS WORKSPACE HAS ACTUALLY RAISED, and until
  * the platform answers that question the honest state is nothing crossed off —
  * never a step ticked because a screen guessed.
@@ -503,6 +601,7 @@ export function mount({ register, api }: Mounting): void {
     ["/thing", THING(api)],
     ["/where", WHERE(api)],
     ["/scan", SCAN(api)],
+    ["/receive", RECEIVE(api)],
     ["/start", START()],
   ];
   for (const [route, screen] of screens) {

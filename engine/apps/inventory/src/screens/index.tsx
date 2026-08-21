@@ -23,13 +23,14 @@ import * as React from "react";
 import { ready, type Loaded } from "@engine/design";
 import { INVENTORY } from "../index.js";
 import { LINES, PLACES, EMPTY_PLACE, type Line, type Place } from "./sample.js";
+import { Receive } from "./Receive.js";
 import { Scan, type Seen } from "./Scan.js";
 import { Start } from "./Start.js";
 import { Stock } from "./Stock.js";
 import { Thing, type Batch, type Movement } from "./Thing.js";
 import { Where } from "./Where.js";
 
-export { Scan, Start, Stock, Thing, Where };
+export { Receive, Scan, Start, Stock, Thing, Where };
 export * from "./sample.js";
 export type { Batch, Movement, Seen };
 
@@ -186,6 +187,22 @@ export function InventoryScreen({ route, onGo }: {
           onPlace={() => go("/where")}
           onLearn={nothing}
           again={nothing}
+        />
+      );
+    /* ⚠️ MID-FLOW, WITH THE INTERESTING SCAN IN IT. A receive screen photographed
+       at step one is a camera and nothing else; what is worth looking at is a
+       code nobody has seen sitting over a shelf that is already set, which is
+       the state rule 3 exists for. */
+    case "/receive":
+      return (
+        <Receive
+          title={title}
+          place={{ id: "p-a1", name: "Rack A · A1" }}
+          seen={SCANNED}
+          onRead={nothing}
+          onForget={nothing}
+          onReceive={nothing}
+          onUndo={nothing}
         />
       );
     case "/start":

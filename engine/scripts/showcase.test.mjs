@@ -122,9 +122,6 @@ const ELSEWHERE = {
   Ropa: "the processing record — OneSpace's Trust area, unmounted",
 
   /* --- arguments, not gaps --- */
-  Steps: "a progress row is for a sequence of PAGES. Every flow in this deployment " +
-    "is one page, and putting it on hello's form printed the three step labels " +
-    "directly above three section headings reading exactly the same words",
   SecretInput: "nothing an APP stores is a credential — the kernel has no `secret` " +
     "field kind, and the keys an operator pastes are the console's, which is OneSpace's",
 

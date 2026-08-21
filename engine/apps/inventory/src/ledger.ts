@@ -52,10 +52,23 @@ export const promotes = (from: Tracking, to: Tracking): boolean =>
  * "somebody wrote the number down wrong twice" become the same report, and the
  * one measure that says whether the system is being used at all is gone.
  */
-export const MOVES = ["received", "taken", "adjusted"] as const;
+/**
+ * ⚠️ AND `undone` IS A FOURTH RATHER THAN A NEGATIVE `received`, for exactly the
+ * same reason. Somebody scanning the wrong shelf and pressing undo is not a
+ * consumption; folded into `taken` it would show up in every usage report as
+ * stock that went out, and the shrinkage number nobody can explain would be
+ * partly made of people correcting themselves within a minute.
+ */
+export const MOVES = ["received", "taken", "adjusted", "undone"] as const;
 export type Move = typeof MOVES[number];
 
-/** ⚠️ Signed, because a ledger of resulting balances cannot be replayed. */
+/**
+ * ⚠️ Signed, because a ledger of resulting balances cannot be replayed.
+ *
+ * ⚠️ `adjusted` AND `undone` TAKE THE SIGN THEY WERE GIVEN. A correction may go
+ * either way, and an undo is by definition the exact opposite of one particular
+ * movement — the caller has that number and this function does not.
+ */
 export const applyMove = (move: Move, quantity: number): number =>
   (move === "taken" ? -Math.abs(quantity) : move === "received" ? Math.abs(quantity) : quantity);
 

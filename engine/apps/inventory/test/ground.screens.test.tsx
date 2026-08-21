@@ -16,7 +16,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ready } from "@engine/design";
 import { describe, expect, it } from "vitest";
 import { INVENTORY } from "../src/index.js";
-import { INVENTORY_ROUTES, InventoryScreen, Scan, type Seen } from "../src/screens/index.js";
+import {
+  INVENTORY_ROUTES, InventoryScreen, Receive, Scan, type Seen,
+} from "../src/screens/index.js";
 import { LINES, PLACES, EMPTY_PLACE } from "../src/screens/sample.js";
 
 const html = (route: string) => renderToStaticMarkup(<InventoryScreen route={route} />);
@@ -241,5 +243,80 @@ describe("a batched product's deliveries", () => {
   */
   it("offers to record an opening only where one has not happened", () => {
     expect(out.match(/>Opened</g)?.length).toBe(2);
+  });
+});
+
+/**
+ * RECEIVING — the flow that decides whether anybody records anything.
+ *
+ * ⚠️ THE WORST OUTCOME IN THIS PRODUCT IS SOMEBODY NOT RECORDING SOMETHING
+ * because a form demanded a field they did not have, and every assertion here is
+ * one of the places that nearly happens: an unknown code, a missing lot, a
+ * quantity that carried over from the last item.
+ */
+describe("receiving", () => {
+  const seen = (of: Partial<Seen>): Seen => ({
+    found: false, kind: "gtin", value: "05000112637922", ours: "",
+    product: "", name: "", tracking: "", unit: "", pack: 1,
+    lot: "", expiry: "", needs: "", ...of,
+  });
+
+  const drawn = (place: { id: string; name: string } | null, of: Seen | null) =>
+    renderToStaticMarkup(
+      <Receive
+        place={place}
+        seen={of}
+        onRead={() => undefined}
+        onForget={() => undefined}
+        onReceive={() => undefined}
+      />,
+    );
+
+  /* ⚠️ THE SHELF FIRST, BECAUSE EVERYTHING AFTER IT LANDS THERE. A session with
+     no place is a session about to put twenty things nowhere. */
+  it("asks for the shelf before anything else", () => {
+    const out = drawn(null, null);
+    expect(out).toContain("Scan a shelf label to begin");
+    /* ⚠️ ASSERTED ON THE ACT, NOT ON THE WORDS. "How many" is a STEP label and is
+       correctly on the page from the first frame — the progress row's whole job
+       is showing what is coming. What must not be there yet is the button. */
+    expect(out).not.toContain(">Add it<");
+  });
+
+  it("keeps the shelf under the name once it has one", () => {
+    expect(drawn({ id: "p-a1", name: "Rack A · A1" }, null)).toContain("Rack A · A1");
+  });
+
+  /*
+    ⚠️ TAKE IT NOW, NAME IT LATER — the plan's third rule, and the one this whole
+    screen is shaped around. An unknown code is receivable; a screen that
+    insisted on a name first is a screen that loses the delivery.
+  */
+  it("receives something nobody has named", () => {
+    const out = drawn({ id: "p-a1", name: "A1" }, seen({}));
+    expect(out).toContain("Something new");
+    expect(out).toContain("Put it away now and name it later");
+    expect(out).toContain("Add it");
+  });
+
+  /* ⚠️ THE PACK LEVEL IS SAID, because "scan a carton, record one" is the
+     commonest wrong number in inventory work. */
+  it("says what a carton holds", () => {
+    const out = drawn({ id: "p-a1", name: "A1" }, seen({ found: true, pack: 10, unit: "glove" }));
+    expect(out).toContain("10 glove");
+    expect(out).toContain("Scanning it adds that many");
+  });
+
+  /* ⚠️ ONLY WHAT THE LABEL DID NOT CARRY. A DataMatrix arrives with both, and
+     asking again would make the good label worthless. */
+  it("asks for a lot only where the label did not carry one", () => {
+    const asked = drawn({ id: "p-a1", name: "A1" },
+      seen({ found: true, tracking: "batched", needs: "lot,expiry" }));
+    expect(asked).toContain('name="lot"');
+    expect(asked).toContain('name="expiry"');
+
+    const rich = drawn({ id: "p-a1", name: "A1" },
+      seen({ found: true, tracking: "batched", lot: "A5B7", expiry: "2027-03-31", needs: "" }));
+    expect(rich).not.toContain('name="lot"');
   });
 });
