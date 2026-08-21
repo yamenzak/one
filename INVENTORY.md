@@ -259,8 +259,16 @@ the `settings` guard enforces).
 |---|---|
 | `apps/inventory/test/*.test.ts` | the pure halves — 193 tests over ten files |
 | `apps/inventory/test/ground.screens.test.tsx` | every declared screen renders, and says the true thing — 97 |
-| `one/test/inventory.test.ts` | the golden path through the **real worker** — 13 |
-| `one/test/inventory-deep.test.ts` | batches, items, kits, the rail, the night — 18 |
+| `apps/inventory/test/geometry.screens.test.tsx` | every declared screen MEASURED, in real Chromium, at a phone and a desk — 56 |
+| `one/test/inventory.test.ts` | the golden path through the **real worker** — 16 |
+| `one/test/inventory-deep.test.ts` | batches, items, kits, the rail, the night — 19 |
+
+⚠️ **AND THE GEOMETRY SWEEP IS THE ONE NOTHING ELSE COULD REPLACE.** Every other
+guard in this repository reads SOURCE — which class was written, which component
+was composed — and a screen that pushes a phone sideways or a button too small to
+hit are computed values, produced between a stylesheet, a flex container and four
+components that each did something defensible. It found that `ROW.tap` calls 44px
+non-negotiable while every button in the library shipped 40.
 
 ⚠️ **THE TWO INTEGRATION SUITES ARE THE ONES THAT FOUND THINGS.** Fifty
 operations were composed, typechecked, guarded and green without one of them ever

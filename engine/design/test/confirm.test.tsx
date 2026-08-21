@@ -15,7 +15,7 @@
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { MOUNT, harness } from "./opening.harness.js";
-import { PHONE, stylesheet } from "../src/measure/index.js";
+import { PHONE, stillness, stylesheet } from "../src/measure/index.js";
 
 let browser: Browser;
 let css: string;
@@ -43,9 +43,11 @@ const opened = async () => {
   /* ⚠️ Waited for by ROLE, which is half the assertion: a drawer that lost the
      role would time out here rather than pass quietly. */
   await p.waitForSelector("[role='alertdialog']");
-  /* ⚠️ And after it has finished arriving — a sheet measured mid-slide is
-     measured somewhere it never rests. */
-  await p.waitForTimeout(500);
+  /* ⚠️ AND AFTER IT HAS FINISHED ARRIVING — a sheet measured mid-slide is
+     measured somewhere it never rests. Waited for by MOTION rather than by a
+     number of milliseconds: `sleep 500` is a guess about a machine, and under a
+     parallel run with three other browsers open it is a wrong one. */
+  await stillness(p, "[role='alertdialog']");
   return p;
 };
 

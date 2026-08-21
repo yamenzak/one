@@ -75,6 +75,14 @@
       "dependsOn": ["^build", "@engine/space#build"],
       "outputs": ["coverage/**"]
     },
+    // ⚠️ AND THE SPACE MEASURES ITS OWN FRAME, so it needs its own stylesheet —
+    // the one case where the edge is to the package's OWN build. Turbo has no
+    // way to express that, and it does not need to: the task depends on the
+    // build task of the same package, which it already orders.
+    "@engine/space#test": {
+      "dependsOn": ["^build", "@engine/space#build"],
+      "outputs": ["coverage/**"]
+    },
     "@kova/api#test": {
       "dependsOn": ["^build", "@kova/app#build"],
       "outputs": ["coverage/**"]

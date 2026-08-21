@@ -2926,6 +2926,15 @@
       "impl": "apps/hello/test/geometry.screens.test.tsx",
       "proves": "does not push the page sideways on ${name}",
       "fails": "a layout fault in the app every new screen is tried in first, which is then copied into a product before anything measures it"
+    },
+    {
+      "id": "the-frame-is-measured-with-the-screen-inside-it",
+      "protects": "D7",
+      "stage": "19",
+      "status": "live",
+      "impl": "one-space/test/geometry.test.tsx",
+      "proves": "does not push the page sideways on ${name}",
+      "fails": "the half of every screen a product cannot opt out of — the world, the hem, the nav, the crown, the room reserved for the island — measured by nothing, so a screen that fits on its own is still pushed sideways by the chrome around it"
     }
   ]
 }

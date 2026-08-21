@@ -184,9 +184,19 @@ describe("the line, while you wait", () => {
     const first = await said(p);
     expect(first.state, "it starts already leaving").toBe("here");
 
-    /* ⚠️ Sampled in the middle of the fade, which is the frame a cross-dissolve
-       would have two sentences in. */
-    await p.waitForTimeout(SAID.hold + SAID.fade / 2);
+    /*
+      ⚠️ WAITED FOR BY STATE, NOT BY A CLOCK. `sleep(hold + fade/2)` samples the
+      middle of the fade on an idle machine and misses it entirely on a busy one
+      — the fade is over by the time the timer fires, the state reads `here`
+      again, and the failure is about the runner rather than about the product.
+      Polling for `gone` asserts the same thing and cannot drift.
+    */
+    await p.waitForFunction(
+      () => {
+        const el = document.querySelector("[data-said]") as HTMLElement;
+        return el.dataset["said"] === "gone" && Number(getComputedStyle(el).opacity) < 0.9;
+      },
+      undefined, { timeout: 10_000 });
     const leaving = await said(p);
     expect(leaving.state, "the line never leaves").toBe("gone");
     expect(leaving.text, "the words changed before they had faded out")

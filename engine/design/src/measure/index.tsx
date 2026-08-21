@@ -198,3 +198,49 @@ export async function geometryOf(
     await page.close();
   }
 }
+
+/* ------------------------------------------------------------- when it is --- */
+
+/**
+ * WAIT UNTIL A THING HAS STOPPED MOVING, RATHER THAN FOR A NUMBER OF
+ * MILLISECONDS.
+ *
+ * ⚠️ A `waitForTimeout` IS A GUESS ABOUT A MACHINE, AND IT IS WRONG UNDER LOAD.
+ * "Sleep 500ms, the sheet will have arrived" holds until something else is using
+ * the processor — and then the sheet is measured mid-slide, at a position it
+ * never rests in, and the failure is about the runner rather than the product.
+ * That is the flake this repository already refuses to answer with `retry`:
+ * a retry is what a suite has instead of isolation, and for a moving thing
+ * isolation means waiting for the MOTION rather than for the clock.
+ *
+ * ⚠️ TWO AGREEING FRAMES, NOT ONE. A single sample can land on the pause between
+ * two stages of a sequence; two consecutive frames at the same position is the
+ * cheapest reading of "it has settled" that a stage boundary cannot pass.
+ */
+export async function stillness(
+  page: { evaluate: <T>(fn: (arg: string) => T, arg: string) => Promise<T> },
+  selector: string,
+  patience = 5_000,
+): Promise<void> {
+  const settled = await page.evaluate((sel: string) => new Promise<boolean>((done) => {
+    const of = () => {
+      const el = document.querySelector(sel);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return `${Math.round(r.top)}:${Math.round(r.left)}:${Math.round(r.width)}:${Math.round(r.height)}`;
+    };
+    let last: string | null = null;
+    let same = 0;
+    const started = Date.now();
+    const tick = () => {
+      const now = of();
+      if (now !== null && now === last) same += 1; else same = 0;
+      last = now;
+      if (same >= 2) { done(true); return; }
+      if (Date.now() - started > 5_000) { done(false); return; }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }), selector);
+  if (!settled) throw new Error(`${selector} never stopped moving within ${patience}ms`);
+}
