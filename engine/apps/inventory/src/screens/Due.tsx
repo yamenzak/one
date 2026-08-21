@@ -124,29 +124,54 @@ export function Due({ title, of, services, again, onOpen, onItem }: DueProps) {
             )
             : null}
 
-          <Section label="Expiring">
+          {/*
+            ⚠️ SOON AND LATER ARE TWO SECTIONS, because one called "Expiring"
+            held both and a tin of solvent good for 528 days sat under a heading
+            that says act on this. The screen's job is the first list; the second
+            is the plan behind it, and a section that over-promises urgency
+            costs the one above it the attention it is for.
+
+            ⚠️ AND THE SPLIT IS WHAT THE INK ALREADY SAID. `soon` is drawn in
+            warning either way; naming it in a heading means the distinction is
+            not carried by colour alone.
+          */}
+          <Section label="Expiring soon">
             <Group>
-              {rows.filter((r) => r.standing !== "gone").map((row) => (
+              {rows.filter((r) => r.standing === "soon").map((row) => (
                 <AmountRow
                   key={row.id}
                   label={row.name}
                   under={under(row)}
-                  amount={(
-                    <span data-ink={row.standing === "soon" ? "warning" : undefined}>
-                      {on(row)}
-                    </span>
-                  )}
+                  amount={<span data-ink="warning">{on(row)}</span>}
                   onOpen={() => { onOpen(row); }}
                 />
               ))}
               {/* ⚠️ SAID WHERE IT IS TRUE. An absent section is indistinguishable
                   from one that failed to load, and "nothing expiring" is a real
                   answer to the question somebody arrived with. */}
-              {rows.some((r) => r.standing !== "gone")
+              {rows.some((r) => r.standing === "soon")
                 ? null
-                : <NoteRow>Nothing else expiring</NoteRow>}
+                : <NoteRow>Nothing expiring soon</NoteRow>}
             </Group>
           </Section>
+
+          {rows.some((r) => r.standing === "fine")
+            ? (
+              <Section label="Later">
+                <Group>
+                  {rows.filter((r) => r.standing === "fine").map((row) => (
+                    <AmountRow
+                      key={row.id}
+                      label={row.name}
+                      under={under(row)}
+                      amount={on(row)}
+                      onOpen={() => { onOpen(row); }}
+                    />
+                  ))}
+                </Group>
+              </Section>
+            )
+            : null}
 
           <Section label="Due for a service">
             <Group>

@@ -21,7 +21,7 @@
 import * as React from "react";
 import {
   Choice, ControlRow, Group, LongText, NoteRow, Screen, Section, Stat, StatRow,
-  Steps, glyphOf, type Option,
+  Steps, type Option,
 } from "@engine/design";
 
 /** One row, as the preview answered it. See `Planned` — this is its wire shape. */
@@ -152,8 +152,16 @@ export function Import({
         a button somebody presses to find out; "Add 412 products" is a decision
         they have already made by the time their thumb lands.
       */
+      /*
+        ⚠️ AND IT CARRIES NO GLYPH, WHICH IS THE HALF THE COMMENT ABOVE NEEDS.
+        The crown draws a labelled button where there is no icon and an
+        icon-only one where there is — so a tick over "Import 412" put the
+        number in a tooltip on every desktop, and "Nothing to do" became a
+        greyed tick with no reason on it. A label that is only a verb can afford
+        a glyph; one that is the decision cannot.
+      */
       does={done
-        ? { op: "product.import", label: "Import another", icon: glyphOf("add"), onDo: onAgain }
+        ? { op: "product.import", label: "Import another", onDo: onAgain }
         : seen
           ? {
             op: "product.import",
@@ -165,7 +173,6 @@ export function Import({
             label: seen.tally.new + seen.tally.update === 0
               ? "Nothing to do"
               : `Import ${seen.tally.new + seen.tally.update}`,
-            icon: glyphOf("check"),
             onDo: onImport,
             disabled: busy || seen.tally.new + seen.tally.update === 0,
           }
@@ -175,7 +182,6 @@ export function Import({
           : {
             op: "product.preview",
             label: "See what it would do",
-            icon: glyphOf("search"),
             onDo: onSee,
             disabled: busy || text.trim() === "",
           }}

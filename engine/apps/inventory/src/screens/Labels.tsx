@@ -308,7 +308,10 @@ export function Labels({
           <Section label="Which">
             <Group>
               <Picks
-                label="Choose"
+                /* ⚠️ THE NOUN, NOT "CHOOSE". The section above already says
+                   Which, so a group headed "Choose" is the screen saying the
+                   same thing twice and naming neither list. */
+                label={SUBJECTS.find((one) => one.id === subject)?.label ?? "Which"}
                 value={[...picked]}
                 onChange={(next) => { onPicked(next); }}
                 options={rows.map((row) => ({

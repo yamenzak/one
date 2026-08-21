@@ -13,7 +13,7 @@
  */
 
 import {
-  AmountRow, Group, NavRow, NoteRow, Screen, Section, Timeline, useFigures, useShown,
+  AmountRow, FieldRow, Group, NavRow, NoteRow, Screen, Section, Timeline, useFigures, useShown,
   type Loaded, type Moment,
 } from "@engine/design";
 import { Button } from "@heroui/react";
@@ -154,18 +154,33 @@ export function Thing({
       isNothing={() => false}
       then={(moves) => (
         <>
+          {/*
+            ⚠️ FACTS WITH THEIR NAMES ON, NOT TWO GREY SENTENCES. These are the
+            three things somebody came to this screen to check — who makes it,
+            how it is tracked, and the level it is watched against — and drawn
+            as notes they wore the ink the interface uses for asides, on the one
+            card that is the subject. A note explains a fact; it is not one.
+
+            ⚠️ AND THE LEVEL KEEPS THE NAME IT WAS ENTERED UNDER. The field is
+            "Tell me below" everywhere it is typed, so a row reading "Told below
+            400" was the same setting under a second name — recognisable only to
+            whoever wrote both.
+          */}
           <Group label="Now">
-            <NoteRow>
-              {line.brand ? `${line.brand} · ` : ""}
-              {line.tracking === "counted" ? "Counted" : SAID_TRACKING[line.tracking]}
-            </NoteRow>
+            {line.brand ? <FieldRow label="Brand" value={line.brand} /> : null}
+            <FieldRow
+              label="Tracking"
+              value={line.tracking === "counted" ? "Counted" : SAID_TRACKING[line.tracking]}
+            />
             {line.par !== undefined
               ? (
-                <NoteRow>
-                  {line.quantity < line.par
-                    ? <span data-ink="warning">Below the level you asked to be told at</span>
-                    : `Told below ${line.par}`}
-                </NoteRow>
+                <FieldRow
+                  label="Tell me below"
+                  value={line.par}
+                  {...(line.quantity < line.par
+                    ? { under: <span data-ink="warning">There is less than that on the shelf</span> }
+                    : {})}
+                />
               )
               : null}
           </Group>
@@ -185,13 +200,29 @@ export function Thing({
                          between a date somebody believes and one they check. */
                       under={BY[b.by] ?? b.by}
                       amount={<span data-ink={INK[b.standing]}>{saysDays(b.days)}</span>}
-                      /* ⚠️ OPENING IS OFFERED ONCE AND THEN SAID. A second
-                         opening would restart a shelf life, which the operation
-                         refuses — so the control disappears rather than
-                         becoming a button that argues. */
-                      aside={b.opened ? undefined : (
-                        <Button size="sm" variant="ghost" onPress={() => { onOpen(b.id); }}>
-                          Opened
+                      /*
+                        ⚠️ OPENING IS OFFERED ONCE AND THEN SAID, AND THE SLOT
+                        STAYS EITHER WAY. `AmountRow`'s own contract is that a
+                        control is on every row of its list or on none — because
+                        everything after the label packs right, so a row missing
+                        its control has its DATE where the others have a button.
+                        Dropping it on opened rows made the middle column jump,
+                        on the one list where three dates are read against each
+                        other.
+
+                        ⚠️ AND THE LABEL IS THE VERB. "Opened" on a button that
+                        opens is the state written on the control that leaves it
+                        — the one place a person cannot tell whether they are
+                        reading a fact or pressing one.
+                      */
+                      aside={(
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          isDisabled={b.opened}
+                          onPress={() => { onOpen(b.id); }}
+                        >
+                          {b.opened ? "Opened" : "Open"}
                         </Button>
                       )}
                     />

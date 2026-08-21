@@ -271,11 +271,20 @@ describe("a batched product's deliveries", () => {
 
   /*
     ⚠️ AND OPENING IS OFFERED ONCE. A second opening restarts a shelf life —
-    the most dangerous write in this product — so the control disappears rather
+    the most dangerous write in this product — so the control is refused rather
     than becoming a button that argues.
+
+    ⚠️ IT IS DISABLED RATHER THAN ABSENT, and the reason is the column beside
+    it. `AmountRow` packs everything after the label to the right, so a row with
+    no control put its DATE where the other rows have a button — on the one list
+    where three dates are read against each other. The slot stays; what changes
+    is whether it can be pressed and what it says.
   */
   it("offers to record an opening only where one has not happened", () => {
-    expect(out.match(/>Opened</g)?.length).toBe(2);
+    expect(out.match(/>Open</g)?.length).toBe(2);
+    expect(out.match(/>Opened</g)?.length).toBe(1);
+    /* ⚠️ AND THE REFUSED ONE IS REALLY REFUSED, not merely relabelled. */
+    expect(out.match(/data-disabled="true"/g)?.length).toBe(1);
   });
 });
 
@@ -1092,7 +1101,26 @@ describe("what runs out", () => {
   it("says so where there is nothing in a section", () => {
     const out = running(DATED_LIST, []);
     expect(out).toContain("Nothing due");
-    expect(running([{ ...DATED_LIST[1]! }], [])).toContain("Nothing else expiring");
+    expect(running([{ ...DATED_LIST[1]! }], [])).toContain("Nothing expiring soon");
+  });
+
+  /*
+    ⚠️ SOON AND LATER ARE SEPARATE HEADINGS, and this is what says so. One
+    section called "Expiring" held both, so a tin good for another eighteen
+    months sat under a heading that means act on this — and the screen's first
+    list, which somebody actually has to work through, was buried under it.
+  */
+  it("keeps what is soon apart from what is merely dated", () => {
+    const later: Dated = {
+      id: "b-3", product: "p-ipa", name: "Isopropanol 99%, 1 L", which: "Lot C0922",
+      on: "2028-01-31", standing: "fine", days: 528, by: "printed",
+    };
+    const out = running([...DATED_LIST, later], []);
+    expect(out).toContain("Expiring soon");
+    expect(out).toContain("Later");
+    /* ⚠️ AND THE LATER ONE IS ABSENT WHEN THERE IS NONE, rather than an empty
+       heading — the section is the answer to a question nobody asked here. */
+    expect(running(DATED_LIST, [])).not.toContain("Later");
   });
 
   /* ⚠️ AND NOTHING AT ALL IS THE EMPTY SCREEN, which needs BOTH lists empty —
