@@ -333,8 +333,10 @@ difference between a screen that is hidden and a screen that is not reachable.
 - **The GHS pictograms are named, not drawn.** The decant label prints a named
   diamond and says so. Regulated artwork is a legal document; a hand-drawn
   approximation of one is worse than an honest gap. (Task #210.)
-- **A list is the fifty most recent rows of a collection** — no filter, no
-  cursor, no count. `DEFER(engine-62)`.
+- **A list does not aggregate.** It narrows, pages and counts (engine 62), but
+  "how much did each job use" is a group-by, and a group-by is a query language
+  arriving through a door that deliberately has none. The reports compute their
+  own.
 - **The getting-started guide cannot be ticked**, because nothing answers which
   declared events a workspace has raised. `DEFER(engine-63)`.
 - **A screen can be gated on a permission and not on an entitlement**, so `/work`
