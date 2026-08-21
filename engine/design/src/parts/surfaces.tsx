@@ -164,7 +164,7 @@ export function Group({ label, under, face, at, sky, seedling, does, children }:
       <>
         {label ? (
           <div className={`flex flex-col ${SPACE.hair} ${ROW.pad}`}>
-            <h3 className={TYPE.section}>{label}</h3>
+            <h3 className={TYPE.group}>{label}</h3>
             {under ? <p className={TYPE.note}>{under}</p> : null}
           </div>
         ) : null}
@@ -194,7 +194,7 @@ export function Group({ label, under, face, at, sky, seedling, does, children }:
         <div className={`flex items-center ${ROW.gap}`}>
           {face ? <Face of={face} name={label} size="chip" /> : null}
           <div className={`flex min-w-0 flex-col ${SPACE.hair}`}>
-            <h2 className={TYPE.section}>{label}</h2>
+            <h2 className={TYPE.group}>{label}</h2>
             {under ? <p className={TYPE.note}>{under}</p> : null}
           </div>
         </div>

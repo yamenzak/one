@@ -475,6 +475,14 @@ export interface CrownClaim {
   readonly back?: () => void;
   readonly leave?: "back" | "dismiss";
   readonly title: string;
+  /**
+   * ⚠️ THE LINE UNDER THE NAME, AND A SUB-PAGE HAS NOWHERE ELSE TO PUT IT. A
+   * destination under a standing shell crown draws its own heading and its own
+   * `under` in the content; a sub-page draws neither, so a fact its screen
+   * declared — how much is on the shelf, which rack it is on — is simply lost
+   * unless it travels with the name.
+   */
+  readonly under?: string;
   readonly also: readonly Slot[];
   readonly does?: CrownProps["does"];
 }
@@ -509,7 +517,8 @@ export function crownFor(claim: CrownClaim | null, product: {
         Shell was a back arrow, two action chips and nothing saying where you
         were — until you scrolled, on a page that often has nothing to scroll.
       */
-      back: claim.back, leave: claim.leave, name: claim.title, collapses: false,
+      back: claim.back, leave: claim.leave, name: claim.title, under: claim.under,
+      collapses: false,
       also: claim.also.slice(0, 2) as unknown as readonly [Slot, Slot],
       does: claim.does,
     };
@@ -553,7 +562,7 @@ export function useCrownSocket(claim: CrownClaim): boolean {
   /* ⚠️ PRIMITIVES ONLY. A signature over the callbacks would change on every
      render of the caller and republish forever. */
   const sig = JSON.stringify([
-    claim.title, Boolean(claim.back), claim.leave,
+    claim.title, claim.under, Boolean(claim.back), claim.leave,
     claim.also.map((a) => [a.id, a.label, Boolean(a.dot)]),
     claim.does ? [claim.does.label, Boolean(claim.does.disabled), claim.does.tone] : null,
   ]);
@@ -562,6 +571,7 @@ export function useCrownSocket(claim: CrownClaim): boolean {
     const now = () => latest.current;
     return {
       title: now().title,
+      under: now().under,
       leave: now().leave,
       back: now().back ? () => now().back?.() : undefined,
       also: now().also.map((a) => ({ ...a, onDo: () => {

@@ -13,7 +13,7 @@
  */
 
 import {
-  AmountRow, Group, NavRow, NoteRow, Screen, Section, Timeline, useShown,
+  AmountRow, Group, NavRow, NoteRow, Screen, Section, Timeline, useFigures, useShown,
   type Loaded, type Moment,
 } from "@engine/design";
 import { Button } from "@heroui/react";
@@ -127,13 +127,18 @@ export function Thing({
      the database's spelling shown to somebody who told us how they write a
      date. */
   const shown = useShown();
+  /* ⚠️ THE SAME FIGURE THE LIST DREW. A quantity built into a string with `${}`
+     skips the grouping every other number in the product wears, so the shelf
+     that said "1,200" opens onto a page that says "1200" — which reads as two
+     values rather than as one badly formatted. */
+  const figures = useFigures();
 
   return (
     <Screen
       shape="detail"
       title={line.name}
       /* ⚠️ A FACT UNDER THE NAME, NOT A DESCRIPTION OF THE SCREEN. */
-      under={`${line.quantity} ${line.unit} · ${line.whereName}`}
+      under={`${figures.grouped(line.quantity)} ${line.unit} · ${line.whereName}`}
       back={back}
       does={{ op: "stock.take", label: "Take some", onDo: onTake }}
       of={history}

@@ -89,6 +89,18 @@ export const TYPE = {
   title: "font-mark text-[1.75rem] font-semibold tracking-[-0.025em] leading-tight text-balance",
   /** What this part of the screen is. */
   section: "font-mark text-xl font-semibold tracking-[-0.015em] text-balance",
+  /**
+   * ⚠️ WHAT ONE BLOCK INSIDE A PART IS, AND IT IS THE THIRD RANK BECAUSE THERE
+   * ARE THREE. A screen is named, a section of it is named, and a card inside
+   * that section is named — and a heading that does not outrank what it heads is
+   * a heading doing no work. Two of the three sharing a size is a screen that
+   * reads as three pages stacked, whichever two they are.
+   *
+   * ⚠️ THE MARK FACE AND SEMIBOLD ARE WHAT KEEP IT A HEADING. At the same size
+   * as `label` it would be indistinguishable from the name of the control under
+   * it, and a card would appear to start with one of its own rows.
+   */
+  group: "font-mark text-base font-semibold tracking-[-0.01em] text-balance",
   /** Prose. `text-pretty` is what stops a two-line paragraph orphaning a word. */
   body: "text-base leading-relaxed text-pretty",
   /** Names a control or a value. Not a heading — it labels something beside it. */

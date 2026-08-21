@@ -491,7 +491,16 @@ export function Screen<T = unknown>({
     the crown and the shell's stands down) or somewhere you ARE (it has none, so
     the shell's crown stands and this hands it the actions).
   */
-  const socketed = useCrownSocket({ back: out, leave: how, title: name, also: trail, does: act });
+  /* ⚠️ A STRING ONLY, BECAUSE THE CLAIM IS COMPARED BY VALUE. `useCrownSocket`
+     signs its claim over primitives so a caller re-rendering does not republish
+     forever, and an element has no stable signature. Every `under` in the
+     product is a sentence; a screen that wants markup there wants a block in the
+     content, not a line in the chrome. */
+  const socketed = useCrownSocket({
+    back: out, leave: how, title: name,
+    under: typeof sub === "string" ? sub : undefined,
+    also: trail, does: act,
+  });
   const ownCrown = !socketed;
   /* ⚠️ A DESTINATION'S NAME IS A HEADING, NOT CHROME. With the shell's crown
      standing there is nothing to collapse into, so the name belongs in the

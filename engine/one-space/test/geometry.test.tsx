@@ -11,23 +11,36 @@
  * ⚠️ `Ground` IS WHAT THE DEPLOYMENT ACTUALLY MOUNTS, so this is the real
  * arrangement rather than a fixture of one. It is the same `Shell` call
  * `centre/Product.tsx` makes for a live product, with a real manifest.
+ *
+ * ⚠️ AND IT IS MOUNTED RATHER THAN RENDERED TO A STRING. A sub-page hands its
+ * name, its way back and its actions to the shell's crown from a layout effect,
+ * and a static render runs no effects — so the crown, which is the one bar on
+ * every screen, would be measured on none of them.
  */
 
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DESK, PHONE, geometryOf, stylesheet, tooSmall } from "@engine/design/measuring";
+import { DESK, PHONE, geometryOf, mounted, stylesheet, tooSmall } from "@engine/design/measuring";
 import { HELLO } from "@engine/hello";
-import { Ground } from "../src/Ground.js";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 let browser: Browser;
 let css: string;
-beforeAll(async () => { css = stylesheet(); browser = await chromium.launch(); }, 120_000);
+let code: string;
+beforeAll(async () => {
+  css = stylesheet();
+  code = await mounted(join(HERE, "ground.mount.tsx"));
+  browser = await chromium.launch();
+}, 180_000);
 afterAll(async () => { await browser?.close(); });
 
 const ROUTES = HELLO.screens.map((s) => s.route);
 
 const at = (route: string, viewport: { width: number; height: number }) =>
-  geometryOf(browser, <Ground route={route} />, css, viewport);
+  geometryOf(browser, { code, route }, css, viewport);
 
 describe("a screen inside the frame", () => {
   for (const route of ROUTES) {

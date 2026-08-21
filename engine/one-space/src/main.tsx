@@ -5,6 +5,7 @@ import {
   seedShapes, runtimeCss, brandCss, applyAppearance, Presenting,
 } from "@engine/design";
 import "./styles.css";
+import { ONE_ACCENT } from "./brand.js";
 import { App } from "./App.js";
 import { SHAPES } from "./shapes.js";
 import { Reading } from "./legal.js";
@@ -46,9 +47,6 @@ seedShapes(SHAPES);
   is missing does not throw, it simply does not animate. `scripts/motion.test.mjs`
   asserts the set now.
 */
-/** One's own colour: a true neutral, so nothing derived from it carries a hue. */
-const MONO = "oklch(0.62 0 0)";
-
 const sky = document.createElement("style");
 sky.textContent = [
   /* ⚠️ THE DESIGN SYSTEM'S OWN, IN ONE CALL — see `runtimeCss`. It was eleven
@@ -74,7 +72,7 @@ sky.textContent = [
     a workspace's branding goes through means it lands in the same place, in the
     same order, and a tenant's own choice still wins after it.
   */
-  brandCss({ accent: MONO }),
+  brandCss({ accent: ONE_ACCENT }),
 ].join("\n");
 document.head.append(sky);
 

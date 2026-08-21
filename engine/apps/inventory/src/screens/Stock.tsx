@@ -19,7 +19,7 @@
  */
 
 import {
-  ActionRow, AmountRow, Group, Num, Screen, Tree, Unit, glyphOf,
+  ActionRow, AmountRow, Group, Num, Screen, Tree, Unit, glyphOf, useFigures,
   type Branch, type Loaded,
 } from "@engine/design";
 import type { Tone } from "@engine/kernel";
@@ -78,6 +78,10 @@ export function Stock({
   title, of, places, here, total, more, again, onGo, onOpen, onAdd, onMore,
 }: StockProps) {
   const now = Date.now();
+  /* ⚠️ THE SAME FIGURE EVERY OTHER NUMBER WEARS. A count built into a string
+     with `${}` skips the grouping, so a list of eleven hundred says "1100 of
+     2140" under rows that say "1,100". */
+  const figures = useFigures();
 
   return (
     <Screen
@@ -153,7 +157,7 @@ export function Stock({
                 <ActionRow
                   icon={glyphOf("box")}
                   label="Show more"
-                  under={`${lines.length} of ${total}`}
+                  under={`${figures.grouped(lines.length)} of ${figures.grouped(total)}`}
                   onDo={onMore}
                 />
               )

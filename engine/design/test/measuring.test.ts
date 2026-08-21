@@ -37,4 +37,13 @@ describe("what the geometry harness puts in the document", () => {
     expect(css).toContain('[data-ink="danger"]');
     expect(css).toContain("@keyframes");
   });
+
+  /* ⚠️ AND THE DEPLOYMENT'S OWN COLOUR AFTER THE FRAMEWORK'S DEFAULT, in that
+     order — the last `--brand` in the document is the one that applies, and a
+     harness carrying only the default measures a navy product nobody serves. */
+  it("ends on the deployment's brand, not the framework's default", () => {
+    const brands = [...css.matchAll(/--brand:\s*([^;]+);/g)].map((m) => m[1]!.trim());
+    expect(brands.length).toBeGreaterThan(1);
+    expect(brands.at(-1)).toBe("oklch(0.62 0 0)");
+  });
 });

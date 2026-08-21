@@ -21,20 +21,36 @@
  * ⚠️ THE MEASURING IS THE PACKAGE'S AND THE ROUTES ARE THE PRODUCT'S. A copy of
  * `geometryOf` here would be a second answer to what counts as off-canvas, and
  * the exemptions are the whole subtlety — see there.
+ *
+ * ⚠️ AND IN THE FRAME, MOUNTED FOR REAL. A screen measured on its own leaves out
+ * the half a product cannot opt out of — the crown, the nav, the room reserved
+ * for the island — and a screen rendered to a STRING leaves out everything an
+ * effect puts there, which for a sub-page is its entire crown. Six of these
+ * nineteen are sub-pages, so a third of the product would be measured with the
+ * one bar somebody always sees missing from the page.
  */
 
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DESK, FINGER, PHONE, geometryOf, stylesheet, tooSmall } from "@engine/design/measuring";
-import { INVENTORY_ROUTES, InventoryScreen } from "../src/screens/index.js";
+import { DESK, FINGER, PHONE, geometryOf, mounted, stylesheet, tooSmall } from "@engine/design/measuring";
+import { INVENTORY_ROUTES } from "../src/screens/index.js";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 let browser: Browser;
 let css: string;
-beforeAll(async () => { css = stylesheet(); browser = await chromium.launch(); }, 120_000);
+let code: string;
+beforeAll(async () => {
+  css = stylesheet();
+  code = await mounted(join(HERE, "..", "shots", "mount.tsx"));
+  browser = await chromium.launch();
+}, 180_000);
 afterAll(async () => { await browser?.close(); });
 
 const at = (route: string, viewport: { width: number; height: number }) =>
-  geometryOf(browser, <InventoryScreen route={route} />, css, viewport);
+  geometryOf(browser, { code, route }, css, viewport);
 
 describe("every screen, at a phone width", () => {
   for (const route of INVENTORY_ROUTES) {

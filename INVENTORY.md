@@ -259,10 +259,23 @@ the `settings` guard enforces).
 |---|---|
 | `apps/inventory/test/*.test.ts` | the pure halves — 193 tests over ten files |
 | `apps/inventory/test/ground.screens.test.tsx` | every declared screen renders, and says the true thing — 97 |
-| `apps/inventory/test/geometry.screens.test.tsx` | every declared screen MEASURED, in real Chromium, at a phone and a desk — 56 |
+| `apps/inventory/test/geometry.screens.test.tsx` | every declared screen MEASURED, in real Chromium, in the frame, at a phone and a desk — 56 |
 | `apps/inventory/test/acts.screens.test.tsx` | every primary action names the operation it calls, and it is real — 31 |
 | `one/test/inventory.test.ts` | the golden path through the **real worker** — 16 |
 | `one/test/inventory-deep.test.ts` | batches, items, kits, the rail, the night — 19 |
+
+**And a photograph of every screen, which is NOT part of `test`:**
+`pnpm --filter @engine/inventory shots` writes `shots-out/<look>/<screen>.png` —
+nineteen screens at a phone and a desk, in light and in dark, from the same
+ground data the suites use. It takes minutes and answers no question with a pass
+or a fail, so it runs when images are wanted rather than on every push; what it
+asserts is only that each file exists and is not blank.
+
+⚠️ **BOTH THE SWEEP AND THE SHOTS MOUNT THE PRODUCT RATHER THAN RENDERING IT TO
+A STRING.** A sub-page hands its name, its way back and its actions UP to the
+shell's crown from a layout effect, and a static render runs no effects — so the
+six screens somebody navigates INTO were measured and photographed with nothing
+at all saying where they were. `shots/mount.tsx` is the entry both bundle.
 
 ⚠️ **AND THE GEOMETRY SWEEP IS THE ONE NOTHING ELSE COULD REPLACE.** Every other
 guard in this repository reads SOURCE — which class was written, which component

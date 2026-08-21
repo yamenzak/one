@@ -40,9 +40,11 @@ import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderToStaticMarkup } from "react-dom/server";
+import { build } from "vite";
 import type { Browser } from "playwright";
 import type { ReactNode } from "react";
 import { runtimeCss } from "../frame/runtime.js";
+import { brandCss } from "../tokens/theme.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SPA = join(HERE, "..", "..", "..", "one-space", "dist", "assets");
@@ -73,7 +75,32 @@ export const DESK = { width: 1280, height: 900, deviceScaleFactor: 1 } as const;
  * every wrap is somebody else's. `runtimeCss` is the same string the deployment
  * mounts.
  */
-export const stylesheet = (): string => `${built()}\n${runtimeCss()}`;
+export const stylesheet = (): string => `${built()}\n${runtimeCss()}\n${deploymentBrand()}`;
+
+/**
+ * ⚠️ AND THE DEPLOYMENT'S OWN COLOUR LAST, WHICH IS WHERE IT LANDS IN THE
+ * DOCUMENT. `GROUND_CSS` ships a blue as the colour a deployment has before
+ * anybody chooses; One's is a true neutral, and every tier, surface and ambience
+ * is a `color-mix` with it — so a harness without it measures and photographs a
+ * navy product that nobody is served.
+ *
+ * ⚠️ READ FROM THE FILE RATHER THAN IMPORTED, because the deployment depends on
+ * every app and an app's sweep importing the deployment would be a cycle. A
+ * second copy of the value here is how the two come to disagree, so it REFUSES
+ * rather than falling back — a photograph of the wrong product is the failure
+ * this is here to prevent, and it looks entirely convincing.
+ */
+const deploymentBrand = (): string => {
+  const at = join(HERE, "..", "..", "..", "one-space", "src", "brand.ts");
+  const found = /ONE_ACCENT\s*=\s*"([^"]+)"/.exec(readFileSync(at, "utf8"));
+  if (!found) {
+    throw new Error(
+      `no \`ONE_ACCENT = "…"\` in ${at}. The harness reads the deployment's own `
+      + `colour from that line — without it every measurement and every `
+      + `photograph is of the framework's default brand.`);
+  }
+  return brandCss({ accent: found[1] as string });
+};
 
 /** ⚠️ Absent is a build that has not run — a harness measuring nothing must say so. */
 const built = (): string => {
@@ -109,6 +136,111 @@ export const pageFor = (markup: string, css: string, theme: "dark" | "light" = "
   + `</head><body>${markup}</body></html>`;
 
 export const html = (node: ReactNode): string => renderToStaticMarkup(node);
+
+/* ------------------------------------------------------------- for real --- */
+
+/**
+ * A SCREEN THAT HAS ACTUALLY RUN, RATHER THAN ONE RENDERED TO A STRING.
+ *
+ * ⚠️ AN EFFECT IS INVISIBLE TO `renderToStaticMarkup`, AND THE CROWN IS AN
+ * EFFECT. A sub-page hands its name, its way back and its actions UP to the
+ * shell's crown from a layout effect (`useCrownSocket`) — so rendered statically
+ * it draws neither its own crown nor a heading, and every screen somebody
+ * navigated INTO photographs and measures with nothing saying where they are.
+ * Six of OneInventory's nineteen are that shape.
+ *
+ * ⚠️ SO THE PAGE RUNS THE PRODUCT. Vite is already here — it is what vitest runs
+ * on — the bundle is a few hundred milliseconds, and what the browser executes
+ * is the component that ships rather than a paraphrase of it.
+ */
+export interface Live {
+  /** The IIFE from `mounted`. */
+  readonly code: string;
+  /** ⚠️ What to show, read by the mount file off `window`. */
+  readonly route: string;
+}
+
+export const isLive = (what: ReactNode | Live): what is Live =>
+  typeof what === "object" && what !== null && "code" in what && "route" in what;
+
+const made = new Map<string, string>();
+
+/**
+ * ⚠️ BUILT ONCE PER ENTRY, and keyed by it. The bundle does not change between
+ * tests, and a second caller wanting a different component must not be handed
+ * the first one's — which is what a single cached string did.
+ */
+export async function mounted(entry: string): Promise<string> {
+  const held = made.get(entry);
+  if (held) return held;
+  const out = await build({
+    logLevel: "silent",
+    /*
+      ⚠️ NO PROJECT CONFIG, SO THE BUILD IS THE SAME ONE WHEREVER IT IS RUN FROM.
+      Vite loads the nearest `vite.config.ts` by default, which for the
+      deployment carries the entry-size budget every visitor's download is
+      measured against — and a harness bundle is ONE unsplit IIFE of everything,
+      so it fails that budget by construction and takes the sweep down with a
+      message about a chunk nobody ships. A test that cannot run in one package
+      and can in another is a test whose result is about the directory.
+    */
+    configFile: false,
+    /* ⚠️ THE SAME JSX SETTING THE SUITES USE. Vite's esbuild handles `.tsx` on
+       its own; the React plugin exists for fast refresh, which a build that runs
+       once and is thrown away has no use for. */
+    esbuild: { jsx: "automatic" },
+    /*
+      ⚠️ REACT READS `process.env.NODE_ENV`, AND A BARE PAGE HAS NO `process`.
+      Vite's app build defines this for you; a library build does not, so the
+      bundle throws `process is not defined` before it draws anything — an empty
+      page and a test that times out waiting for an element, with nothing saying
+      why. Development, because a failure in the harness should say what it was.
+    */
+    define: { "process.env.NODE_ENV": JSON.stringify("development") },
+    build: {
+      write: false,
+      lib: { entry, formats: ["iife"], name: "Harness", fileName: () => "h.js" },
+    },
+  });
+  const chunks = Array.isArray(out) ? out[0]! : out;
+  const code = (chunks as { output: { code?: string }[] }).output
+    .map((o) => o.code ?? "").join("\n");
+  made.set(entry, code);
+  return code;
+}
+
+/**
+ * ⚠️ THE ROUTE GOES IN BEFORE THE BUNDLE, so the mount file can read it on its
+ * first line. Passing it afterwards would mean every mount file needing a
+ * re-render hook, which is a second mechanism for the one thing this has to do.
+ */
+const pageMounting = (live: Live, css: string, theme: "dark" | "light"): string =>
+  `<!doctype html><html data-theme="${theme}" data-reduce-motion="true">`
+  + `<head><meta charset="utf-8">`
+  + `<style>${css}</style>`
+  + `<style>html,body{margin:0;padding:0}</style>`
+  + `</head><body><div id="root"></div>`
+  + `<script>window.__ROUTE=${JSON.stringify(live.route)}</script>`
+  + `<script>${live.code}</script></body></html>`;
+
+/**
+ * ⚠️ WAITED FOR, NOT ASSUMED. A bundle that threw draws nothing, and a page
+ * measured empty reports no overflow and no small controls — a green sweep of a
+ * blank document, which is the failure this whole harness exists to catch.
+ */
+async function show(
+  page: { setContent: (html: string) => Promise<void>;
+    waitForFunction: (fn: () => boolean, arg?: unknown, opts?: { timeout: number }) => Promise<unknown> },
+  what: ReactNode | Live, css: string, theme: "dark" | "light",
+): Promise<void> {
+  if (!isLive(what)) {
+    await page.setContent(pageFor(html(what), css, theme));
+    return;
+  }
+  await page.setContent(pageMounting(what, css, theme));
+  await page.waitForFunction(
+    () => (document.getElementById("root")?.children.length ?? 0) > 0, undefined, { timeout: 20_000 });
+}
 
 /* ------------------------------------------------------------- what it is --- */
 
@@ -172,12 +304,12 @@ export const tooSmall = (targets: Geometry["targets"]): Geometry["targets"] =>
  * right on a fast machine.
  */
 export async function geometryOf(
-  browser: Browser, node: ReactNode, css: string,
+  browser: Browser, what: ReactNode | Live, css: string,
   viewport: { width: number; height: number },
 ): Promise<Geometry> {
   const page = await browser.newPage({ viewport });
   try {
-    await page.setContent(pageFor(html(node), css));
+    await show(page, what, css, "dark");
     await page.evaluate(() => new Promise((go) => requestAnimationFrame(() => go(null))));
     return await page.evaluate((width) => {
       const spill = Math.max(0, document.documentElement.scrollWidth - width);
@@ -219,6 +351,44 @@ export async function geometryOf(
         .filter((t) => t.width > 0 && t.height > 0);
       return { spill, worst, targets };
     }, viewport.width);
+  } finally {
+    await page.close();
+  }
+}
+
+/* ---------------------------------------------------------- what it looks --- */
+
+/**
+ * ONE PHOTOGRAPH OF ONE SCREEN, AT ONE WIDTH, IN ONE THEME.
+ *
+ * ⚠️ THE SAME DOCUMENT THE MEASURING USES, WHICH IS THE WHOLE POINT OF IT BEING
+ * HERE. A second way to put a screen in a browser is a second answer to which
+ * stylesheet ships — and the image is the one artefact nobody diffs, so a shot
+ * taken through a slightly different page is a convincing photograph of a
+ * product that does not exist.
+ *
+ * ⚠️ THE VIEWPORT, NOT THE WHOLE PAGE. A `fullPage` capture unpins everything
+ * that is `sticky` or `fixed` — the dock lands wherever the document ends and
+ * reads as a control overlapping the text above it. What is being photographed
+ * is what somebody sees, and somebody sees a viewport.
+ *
+ * ⚠️ AND IT RETURNS THE PATH IT WROTE, so a caller can assert a file exists
+ * rather than trusting a run that printed encouraging lines.
+ */
+export async function shoot(
+  browser: Browser, what: ReactNode | Live, css: string,
+  viewport: { width: number; height: number },
+  theme: "dark" | "light",
+  to: string,
+): Promise<string> {
+  const page = await browser.newPage({ viewport });
+  try {
+    await show(page, what, css, theme);
+    /* ⚠️ A frame, for the same reason the measuring waits for one: fonts and the
+       ambience layer both land after the first paint. */
+    await page.evaluate(() => new Promise((go) => requestAnimationFrame(() => go(null))));
+    await page.screenshot({ path: to });
+    return to;
   } finally {
     await page.close();
   }
