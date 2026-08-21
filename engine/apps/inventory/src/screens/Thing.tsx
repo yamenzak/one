@@ -135,7 +135,7 @@ export function Thing({
       /* ⚠️ A FACT UNDER THE NAME, NOT A DESCRIPTION OF THE SCREEN. */
       under={`${line.quantity} ${line.unit} · ${line.whereName}`}
       back={back}
-      does={{ label: "Take some", onDo: onTake }}
+      does={{ op: "stock.take", label: "Take some", onDo: onTake }}
       of={history}
       again={again}
       /*

@@ -80,7 +80,7 @@ export function Kit({
          a button somebody presses to find out why. The missing list above it is
          the answer it would have given. */
       does={state === "open" && !short
-        ? { label: "It is complete", onDo: onBuild }
+        ? { op: "kit.build", label: "It is complete", onDo: onBuild }
         : undefined}
       of={of}
       again={again}
@@ -175,7 +175,7 @@ export function Kit({
                   <Confirm
                     trigger={<Button slot="trigger" variant="secondary">Break it up</Button>}
                     title="Break this kit up?"
-                    act={{ label: "Break it up", tone: "danger", onDo: onBreak }}
+                    act={{ op: "kit.break", label: "Break it up", tone: "danger", onDo: onBreak }}
                   >
                     {members.length
                       ? `${members.length} item${members.length === 1 ? "" : "s"} go back to the shelf, and this kit is finished.`

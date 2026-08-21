@@ -82,9 +82,9 @@ export function Run({
     is the control a thumb finds first.
   */
   const does = state === "open"
-    ? { label: "It has finished", onDo: () => { setEnding(true); } }
+    ? { op: "process.end", label: "It has finished", onDo: () => { setEnding(true); } }
     : state === "ended"
-      ? { label: "Release it", onDo: onRelease, disabled: busy === true }
+      ? { op: "process.release", label: "Release it", onDo: onRelease, disabled: busy === true }
       : undefined;
 
   return (

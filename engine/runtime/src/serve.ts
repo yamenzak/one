@@ -20,11 +20,11 @@
  */
 
 import type {
-  AppSpec, Caller, CollectionSpec, DeploymentLegal, DocumentBook, DocumentDef, Door, Kind, PackDef,
-  PlanSpec, Problem, Resolved as _Resolved, Roots, Standing, TenantId,
+  AnyOperation, AppSpec, Ask, Caller, CollectionSpec, DeploymentLegal, DocumentBook, DocumentDef,
+  Door, Kind, PackDef, PlanSpec, Problem, Resolved as _Resolved, Roots, Standing, TenantId,
 } from "@engine/kernel";
 import {
-  IN_GOOD_STANDING, LEGAL_INDEX, LEGAL_PATH, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, check,
+  IN_GOOD_STANDING, LEGAL_INDEX, LEGAL_PATH, PLATFORM_PROBLEMS, PROOF_WINDOW_MS, blockedBy, check,
   checkAll, doorFor, newId, passagesOf, problem, resolveFlags,
 } from "@engine/kernel";
 import { compose, type Composed, type Resolved as ResolvedOp } from "./compose.js";
@@ -933,8 +933,16 @@ export async function performOperation(
       : NO_SWITCHES)),
   );
 
-  const refused = check({
-    op: op.spec,
+  /*
+    ⚠️ ONE ASK, BUILT ONCE, ANSWERING BOTH QUESTIONS. This request's own gate is
+    the first caller; what ELSE this caller could do is the second, and a screen
+    asking that separately would be a second opinion about access — which is the
+    exact fault this whole seam exists to make impossible. Every input is already
+    settled in memory by the locator, so asking about fifty operations costs
+    fifty pure walks and no query.
+  */
+  const askFor = (spec: AnyOperation): Ask => ({
+    op: spec,
     caller,
     standing: located.standing ?? IN_GOOD_STANDING,
     kind: located.kind ?? "personal",
@@ -951,6 +959,8 @@ export async function performOperation(
     now: now.toISOString(),
     catalog,
   });
+
+  const refused = check(askFor(op.spec));
   if (refused) {
     await recordOutcome(located, who, op, input, { ok: false, problem: refused.problem.code }, now);
     return { kind: "refused", problem: refused.problem };
@@ -983,6 +993,14 @@ export async function performOperation(
     enabledApps: located.apps,
     /* ⚠️ THE SAME MAP `check` WAS HANDED, above. */
     flags,
+    /*
+      ⚠️ WHAT ELSE THIS CALLER COULD DO, THROUGH THE SAME WALK THE GATE JUST
+      RAN. A screen that decided for itself which controls to draw would be a
+      second opinion about access, and the two disagree the first time either
+      changes — so this is the gate answering, one operation at a time, from the
+      Ask it already built.
+    */
+    mayCall: (spec) => blockedBy(askFor(spec)),
     email: who.email ?? null,
     /*
       ⚠️ THE SEAM TO THE VAULT, AND IT IS ABSENT WHEN NO SECRET IS BOUND. A

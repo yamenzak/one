@@ -28,6 +28,7 @@
 
 import * as React from "react";
 import { Button, Drawer, Dropdown, Label, Modal, Popover, Toast } from "@heroui/react";
+import { sayGate, useGate } from "../parts/gated.js";
 
 /* ------------------------------------------------------------------- tray --- */
 
@@ -159,9 +160,18 @@ export function Confirm({ trigger, title, children, act, cancel = "Cancel" }: {
     readonly onDo: () => void;
     /** `danger` for the irreversible; default for the merely consequential. */
     readonly tone?: "danger" | "primary";
+    /**
+     * ⚠️ WHAT IT CALLS, AND THIS IS THE CONTROL THAT MOST NEEDS IT. A
+     * confirmation is the one a person has already decided on: reading the
+     * question, meaning it, pressing through — and then being told the plan does
+     * not include it. Naming the operation lets the gate answer before the
+     * question is even asked (`useGate`).
+     */
+    readonly op?: string;
   };
   readonly cancel?: string;
 }) {
+  const stopped = useGate(act.op);
   return (
     /*
       ⚠️ A SHEET, LIKE EVERY OTHER INTERRUPTION IN THIS PRODUCT. It was an
@@ -194,9 +204,18 @@ export function Confirm({ trigger, title, children, act, cancel = "Cancel" }: {
                 force the footer into a column, which is restyling a component
                 behind the theme's back (D7) to solve a problem it does not
                 have. */}
+            {/* ⚠️ AND THE REASON SITS IN THE BODY RATHER THAN THE FOOTER. A
+                footer lays its actions in a ROW, so a line of prose in it is a
+                third column squeezed between two buttons. */}
+            {stopped ? <Drawer.Body>{sayGate(stopped)}</Drawer.Body> : null}
             <Drawer.Footer>
               <Button slot="close" variant="tertiary">{cancel}</Button>
-              <Button slot="close" variant={act.tone ?? "danger"} onPress={act.onDo}>
+              <Button
+                slot="close"
+                variant={act.tone ?? "danger"}
+                isDisabled={Boolean(stopped)}
+                onPress={act.onDo}
+              >
                 {act.label}
               </Button>
             </Drawer.Footer>

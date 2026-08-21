@@ -135,6 +135,7 @@ export function Receive({
       under={place ? place.name : "Scan a shelf label to begin"}
       does={seen
         ? {
+          op: "stock.receive",
           label: "Add it",
           onDo: () => { onReceive({ quantity: many, lot, expiry }); },
           disabled: busy === true || many <= 0 || Boolean(short),

@@ -44,7 +44,7 @@ export function Where({
          it is shows in the tree above it and in the name people gave it. */
       under={place.lines === 1 ? "1 line" : `${place.lines} lines`}
       back={back}
-      does={{ label: "Print a label", onDo: onLabel }}
+      does={{ op: "product.label", label: "Print a label", onDo: onLabel }}
       of={of}
       again={again}
       isNothing={(lines) => lines.length === 0 && below.length === 0}

@@ -388,7 +388,7 @@ and a manifest that does not compose refuses to boot.
 | `collection` | what a thing an app keeps is — and the six operations it gets for free | 18 | — |
 | `operation` | one declaration carrying every cross-cutting concern (D12) | 10 | — |
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
-| `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
+| `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | — |
 | `manifest` | the whole app, and the composition that refuses a broken one | 13 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 17 | — |
 | `credit` | metered work: the reserve, the rate, the ceiling | 15 | — |
@@ -411,7 +411,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**277 of them**, 273 reached by something today.
+**277 of them**, 274 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -892,6 +892,9 @@ its own header, cited by other files, and doing nothing.
 | `every-control-is-big-enough-for-a-finger` | D7 | `ROW.tap` calling 44px non-negotiable while every button ships 40, 36 above the breakpoint and 32 for `sm` — the rule true of the rows and false of the things people press, in a product used one-handed |
 | `the-reference-app-is-measured-too` | D7 | a layout fault in the app every new screen is tried in first, which is then copied into a product before anything measures it |
 | `the-frame-is-measured-with-the-screen-inside-it` | D7 | the half of every screen a product cannot opt out of — the world, the hem, the nav, the crown, the room reserved for the island — measured by nothing, so a screen that fits on its own is still pushed sideways by the chrome around it |
+| `the-gate-answers-before-a-control-is-drawn` | D15 | a primary action drawn, pressed and answered 402 — the refusal landing as a toast over whatever the person just filled in, and the work gone |
+| `an-act-names-the-operation-it-calls` | D15 | one act with no `op`, which renders and works on every tier that happens to be allowed and gives the one that is not the old behaviour with nothing saying so |
+| `a-blocked-control-says-which-gate-stopped-it` | D7 | one sentence for all nine gates, which is a boolean wearing a name — "you cannot yet" and "your plan does not include this" are different controls |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -905,7 +908,7 @@ its own header, cited by other files, and doing nothing.
 | D4 | Composition is lazy: a request composes the app it is for, and no other | 3 |
 | D5 | Storage is placed, not owned. The directory carries every cross-tenant fact | 13 |
 | D6 | Jurisdiction is a workspace fact, derived from the business's country | 5 |
-| D7 | HeroUI v3 is the component layer, and its components are not restyled | 63 |
+| D7 | HeroUI v3 is the component layer, and its components are not restyled | 64 |
 | D8 | Declarations are typed object literals; not decorators, not a custom format | 3 |
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
@@ -913,7 +916,7 @@ its own header, cited by other files, and doing nothing.
 | D12 | Every cross-cutting concern is a field on a declaration, never a call site | 137 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
-| D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
+| D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 7 |
 | D16 | A package is a role with a clock: timed grants on the membership, resolved by the same resolver | 4 |
 | D17 | The tenant centre is one bundle for every product, and declarations reach the page as data | 6 |
 | D18 | The operator stands outside every workspace, and the console is a door rather than a role | 8 |
@@ -961,9 +964,8 @@ nothing yet.
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `kernel/src/package.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `runtime/src/jobs.ts` | 1 |
 | **41** — A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have | `kernel/src/brand.ts` | 1 |
-| **42** — A screen asks the gate before it draws a control, rather than after it is pressed | `kernel/src/gate.ts` | 1 |
 
-**5 declarations** are built and reached by nothing, each waiting on a
+**4 declarations** are built and reached by nothing, each waiting on a
 stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one
 that names no stage, so this list cannot grow by forgetting.
 <!-- /generated -->
@@ -1014,7 +1016,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 39 | The documentation is two generated pages — what exists, derived from the engine; and how to add to it, which no generator can derive | shipped |
 | 40 | An app ships a screen — a product's browser half is a chunk of its own, loaded when its workspace opens it, drawing that workspace's own records through the door it is handed | shipped |
 | 41 | A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have | **planned** |
-| 42 | A screen asks the gate before it draws a control, rather than after it is pressed | **planned** |
+| 42 | A screen asks the gate before it draws a control, rather than after it is pressed | shipped |
 | 43 | Hello's remaining screens reach the workspace's own records — the report against its target, and writing a note | **planned** |
 | 44 | A one-off purchase — a credit pack, and becoming a business — through the same checkout | shipped |
 | 45 | A plan is edited from the console, and everybody already on it keeps what they were sold | shipped |
@@ -1047,7 +1049,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 72 | An operation's declared input is checked at the door, and `now` is one type | shipped |
 | 73 | The other half of OneInventory, driven — and the quarantine that was a badge on a screen | shipped |
 
-**59 shipped, 14 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**60 shipped, 13 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

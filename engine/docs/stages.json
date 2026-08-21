@@ -222,8 +222,9 @@
     },
     {
       "n": 42,
-      "status": "planned",
-      "title": "A screen asks the gate before it draws a control, rather than after it is pressed"
+      "status": "shipped",
+      "title": "A screen asks the gate before it draws a control, rather than after it is pressed",
+      "ends": "`blockedBy` was declared in the kernel and called by nothing, so a control the gate would refuse was drawn, pressed, and failed — the refusal arriving as a toast over a form somebody had already filled in. The Ask is now built ONCE per request and asked twice: for this request's own gate, and for what else this caller could do. `centre.view` carries the second answer as `may`, only for what is BLOCKED (absent means allowed, which is also where a client that forgets the field lands), and every input is settled in memory by the locator so fifty operations cost fifty pure walks and no query. On the page it arrives through a CONTEXT rather than a prop — a prop is a thing every screen in every product has to remember to pass, and the one that forgets is not visibly different. An act names the OPERATION it calls rather than a verdict, so a screen never restates the gate's question in its own words; `Screen`'s primary and `Confirm`'s act both read it, and the words per gate are the design system's (`STOPPED`) rather than each screen's."
     },
     {
       "n": 43,

@@ -153,9 +153,10 @@ export function Import({
         they have already made by the time their thumb lands.
       */
       does={done
-        ? { label: "Import another", icon: glyphOf("add"), onDo: onAgain }
+        ? { op: "product.import", label: "Import another", icon: glyphOf("add"), onDo: onAgain }
         : seen
           ? {
+            op: "product.import",
             label: seen.tally.new + seen.tally.update === 0
               ? "Nothing to import"
               : `Import ${seen.tally.new + seen.tally.update} products`,
@@ -163,7 +164,11 @@ export function Import({
             onDo: onImport,
             disabled: busy || seen.tally.new + seen.tally.update === 0,
           }
+          /* ⚠️ THE PREVIEW IS ITS OWN OPERATION AND ITS OWN GATE. Naming the
+             import here would grey out the one control that costs nothing and
+             is the whole reason somebody trusts what happens next. */
           : {
+            op: "product.preview",
             label: "See what it would do",
             icon: glyphOf("search"),
             onDo: onSee,

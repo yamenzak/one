@@ -87,7 +87,7 @@ export function Stock({
          thumb on a phone, in the crown on a desktop, inside the empty state when
          there is nothing yet. A screen that placed it would be a screen that
          placed it differently from the next one. */
-      does={{ label: "Add stock", onDo: onAdd }}
+      does={{ op: "stock.receive", label: "Add stock", onDo: onAdd }}
       of={of}
       again={again}
       isNothing={(lines) => lines.length === 0}

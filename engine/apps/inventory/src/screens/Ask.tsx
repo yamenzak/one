@@ -67,7 +67,7 @@ export function Ask({ title, of, lines, onAsk, again }: AskProps) {
       shape="decision"
       title={title}
       under="Ask about the stock the way you would ask a colleague"
-      does={{ label: "Ask", onDo: () => { ask(question); }, disabled: !question.trim() }}
+      does={{ op: "stock.ask", label: "Ask", onDo: () => { ask(question); }, disabled: !question.trim() }}
     >
       <TextInput
         label="What do you want to know"

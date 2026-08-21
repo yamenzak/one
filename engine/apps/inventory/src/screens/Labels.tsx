@@ -205,7 +205,8 @@ export function Labels({
       shape="list"
       title={title}
       under="Print what a camera can read, and what a person can read"
-      does={{ label: "Print", onDo: onPrint, disabled: busy === true || picked.length === 0 }}
+      does={{ op: "product.label", label: "Print", onDo: onPrint,
+        disabled: busy === true || picked.length === 0 }}
       of={of}
       again={again}
       isNothing={(rows) => rows.length === 0}

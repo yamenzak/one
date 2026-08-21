@@ -68,7 +68,7 @@ export function Work({ title, of, jobs, again, onRun, onJob, onStart }: WorkProp
       shape="list"
       title={title}
       under="Runs and the jobs that consume what they release"
-      does={{ label: "Start a run", onDo: onStart }}
+      does={{ op: "process.open", label: "Start a run", onDo: onStart }}
       of={of}
       again={again}
       isNothing={(rows) => rows.length === 0 && jobs.length === 0}

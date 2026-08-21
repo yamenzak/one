@@ -11,8 +11,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type {
-  AreaBook, DocumentBook, GuideBook, Instant, MilestoneBook, NotificationBook, Offline, Outcome,
-  ScreenSpec, SettingBook, NeedBook, SubProcessorBook,
+  AreaBook, DocumentBook, Gate, GuideBook, Instant, MilestoneBook, NotificationBook, Offline,
+  Outcome, ScreenSpec, SettingBook, NeedBook, SubProcessorBook,
 } from "@engine/kernel";
 import { notice, ready, trouble, waiting, type Loaded } from "@engine/design";
 import { api, whenWritten } from "../api.js";
@@ -45,6 +45,13 @@ export interface CentreApp {
   readonly offline?: Readonly<Record<string, Offline>>;
   /** ⚠️ What each write says when it worked, and what it makes stale. */
   readonly outcomes?: Readonly<Record<string, Outcome>>;
+  /**
+   * ⚠️ WHICH GATE WOULD STOP AN OPERATION, FOR THIS CALLER — the server's own
+   * walk, so a control a screen draws and a route the gate refuses cannot come
+   * apart. ABSENT MEANS ALLOWED: only what is blocked travels, which is also
+   * where a client that forgets the field lands.
+   */
+  readonly may?: Readonly<Record<string, Gate>>;
 }
 
 export interface CentreView {

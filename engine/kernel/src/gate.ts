@@ -206,7 +206,10 @@ export function check(ask: Ask): Refused | null {
  * plan does not include this" want different controls: one is disabled, the
  * other is an upsell.
  */
-/* DEFER(engine-42) stage:42 — no screen asks before drawing: a control the gate
-   would refuse is drawn, pressed, and fails — so the refusal arrives as a toast
-   over a form somebody has already filled in. */
+/*
+  ⚠️ ASKED PER OPERATION, ONCE PER REQUEST, FROM THE ASK THE GATE ALREADY BUILT.
+  Every input is settled in memory by the time this runs, so answering for fifty
+  operations is fifty pure walks and no query — which is what makes it affordable
+  to send the whole verdict set down with the boot read (`may`).
+*/
 export const blockedBy = (ask: Ask): Gate | null => check(ask)?.at ?? null;

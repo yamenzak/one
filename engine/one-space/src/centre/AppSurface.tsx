@@ -10,7 +10,7 @@
  */
 
 import * as React from "react";
-import { Group, NoteRow, RowsWaiting, Section, Stack, appFace } from "@engine/design";
+import { Allowed, Group, NoteRow, RowsWaiting, Section, Stack, appFace } from "@engine/design";
 import { screensOf } from "../apps.js";
 import { routeIn } from "./route.js";
 import { beneath, screenFor } from "@engine/kernel";
@@ -101,7 +101,18 @@ export function AppSurface({ app, route, onGo }: {
 
   const Mounted = declared && asked ? MOUNTS.get(`${app.id}${declared.route}`) : undefined;
   if (Mounted) {
-    return <Mounted app={app} go={go} at={beneath(declared?.route ?? "/", route)} />;
+    return (
+      /*
+        ⚠️ WHAT THE GATE WOULD REFUSE, PUT WHERE EVERY CONTROL CAN REACH IT. It
+        is provided here rather than threaded through each screen's props
+        because the fault a prop produces is silent: the one screen somebody
+        forgot draws a control that still fails after the press, which is the
+        whole thing this mechanism exists to stop.
+      */
+      <Allowed may={app.may}>
+        <Mounted app={app} go={go} at={beneath(declared?.route ?? "/", route)} />
+      </Allowed>
+    );
   }
   if (!asked) return <RowsWaiting />;
 

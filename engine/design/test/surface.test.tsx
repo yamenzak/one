@@ -15,13 +15,16 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { area, field, flag, notification, setting, type Channel, type FieldSpec } from "@engine/kernel";
+import {
+  GATE_ORDER, area, field, flag, notification, setting, type Channel, type FieldSpec,
+} from "@engine/kernel";
 import { Settings, settingsShown } from "../src/rendered/settings.js";
 import { Shown } from "../src/rendered/edit.js";
 import { NotificationPolicy, policyShown } from "../src/rendered/policy.js";
 import { Shelf, saying } from "../src/rendered/console.js";
 import { Storage, Wallet } from "../src/rendered/money.js";
 import { Shell, reachable } from "../src/frame/shell.js";
+import { Allowed, sayGate } from "../src/parts/gated.js";
 import { ControlRow, Group, NavRow, ToggleRow } from "../src/parts/surfaces.js";
 import { SettledSwitch } from "../src/parts/settle.js";
 import { ModelLine } from "../src/rendered/ai.js";
@@ -1276,5 +1279,66 @@ describe("a switch has something to press", () => {
     expect(inputs(
       <ToggleRow label="Email me" value onChange={() => undefined} />,
     )).toBe(1);
+  });
+});
+
+/* ------------------------------------------------------------ what may be --- */
+
+/*
+  ⚠️ THE ONE THING A SCREEN IS FOR, ASKED ABOUT BEFORE IT IS DRAWN. A primary
+  that is drawn, pressed and refused puts the answer in a toast over whatever the
+  person just filled in — so `Screen` reads the verdict the boot already carried
+  and says so on the control instead.
+
+  ⚠️ AND THE VERDICT REACHES IT THROUGH A CONTEXT RATHER THAN A PROP. A prop is a
+  thing every screen in every product has to remember to pass, and the one that
+  forgets is not visibly different — it just goes on drawing a button that fails.
+*/
+describe("a control the gate would refuse", () => {
+  const withAct = (op: string) => (
+    <Screen shape="board" title="A board" does={{ op, label: "Do the thing", onDo: () => {} }}>
+      <div>nothing</div>
+    </Screen>
+  );
+
+  it("is drawn, disabled, and says which gate stopped it", () => {
+    const html = renderToStaticMarkup(
+      <Allowed may={{ "thing.do": "entitlement" }}>{withAct("thing.do")}</Allowed>);
+    expect(html).toContain("Do the thing");
+    expect(html).toContain(sayGate("entitlement"));
+    expect(html, "the control is still pressable").toContain("disabled");
+  });
+
+  /* ⚠️ AND A DIFFERENT GATE IS A DIFFERENT SENTENCE. "You cannot yet" and "your
+     plan does not include this" are different controls, and a mechanism that
+     said one thing for all nine would be a boolean wearing a name. */
+  it("says something else when a different gate stopped it", () => {
+    const html = renderToStaticMarkup(
+      <Allowed may={{ "thing.do": "quota" }}>{withAct("thing.do")}</Allowed>);
+    expect(html).toContain(sayGate("quota"));
+    expect(html).not.toContain(sayGate("entitlement"));
+  });
+
+  /* ⚠️ ABSENT MEANS ALLOWED, WHICH IS THE ONLY SAFE DIRECTION FOR A SURFACE.
+     Drawing a control the server refuses costs a wasted press; hiding one it
+     would have allowed costs a feature somebody paid for and cannot find. */
+  it("is untouched when no gate names it", () => {
+    const html = renderToStaticMarkup(
+      <Allowed may={{ "other.thing": "credits" }}>{withAct("thing.do")}</Allowed>);
+    expect(html).toContain("Do the thing");
+    for (const gate of GATE_ORDER) expect(html, gate).not.toContain(sayGate(gate));
+  });
+
+  /* ⚠️ AND A SCREEN THAT NAMES NOTHING BEHAVES EXACTLY AS IT DID. The field is
+     optional, so every act written before this existed is unchanged. */
+  it("leaves an act that names no operation alone", () => {
+    const html = renderToStaticMarkup(
+      <Allowed may={{ "thing.do": "entitlement" }}>
+        <Screen shape="board" title="A board" does={{ label: "Do the thing", onDo: () => {} }}>
+          <div>nothing</div>
+        </Screen>
+      </Allowed>);
+    expect(html).toContain("Do the thing");
+    expect(html).not.toContain(sayGate("entitlement"));
   });
 });

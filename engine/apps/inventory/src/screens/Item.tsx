@@ -123,9 +123,9 @@ export function Item({
          retired object has nothing to offer, and a docked button that argued
          would be worse than none. */
       does={of.life === "held"
-        ? { label: "Give it to somebody", onDo: () => { setIssuing(true); } }
+        ? { op: "unit.issue", label: "Give it to somebody", onDo: () => { setIssuing(true); } }
         : of.life === "issued"
-          ? { label: "Take it back", onDo: onReturn }
+          ? { op: "unit.return", label: "Take it back", onDo: onReturn }
           : undefined}
       of={history}
       again={again}

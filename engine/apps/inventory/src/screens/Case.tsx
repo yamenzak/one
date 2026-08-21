@@ -69,7 +69,7 @@ export function Case({
       under={label ? ref : state === "closed" ? "Closed" : "Open"}
       back={back}
       does={state === "open"
-        ? { label: "Close it", onDo: onClose, disabled: busy === true }
+        ? { op: "job.close", label: "Close it", onDo: onClose, disabled: busy === true }
         : undefined}
       of={of}
       again={again}

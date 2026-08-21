@@ -15,7 +15,7 @@
  * allow, because both read the same sets.
  */
 
-import type { Allowance, AppSpec, TenantId } from "@engine/kernel";
+import type { Allowance, AnyOperation, AppSpec, Gate, TenantId } from "@engine/kernel";
 import { PUBLIC, included, offlineBook, outcomeBook, sellableKeys } from "@engine/kernel";
 import { tenantById } from "./directory.js";
 import { memberFor, rolesFor } from "./membership.js";
@@ -27,6 +27,7 @@ const publicFace = (
   a: AppSpec, permissions: readonly string[], roles: readonly string[],
   flags: Readonly<Record<string, boolean>>,
   allowance: (key: string) => Allowance,
+  mayCall: (spec: AnyOperation) => Gate | null,
 ) => ({
   id: a.id,
   name: a.name,
@@ -91,6 +92,24 @@ const publicFace = (
     and the list a write invalidates is often on neither of them.
   */
   outcomes: outcomeBook(a.operations),
+  /*
+    ⚠️ WHICH GATE WOULD STOP EACH OPERATION, FOR THIS CALLER, RIGHT NOW — and it
+    is the SAME walk the request's own gate ran. Without it a screen decides for
+    itself which controls to draw, which is a second opinion about access: the
+    control is drawn, pressed, and fails, so the refusal arrives as a toast over
+    a form somebody has already filled in.
+
+    ⚠️ THE GATE, NOT A BOOLEAN. "You cannot yet" and "your plan does not include
+    this" want different controls — one is disabled and the other is an offer —
+    and a screen handed `false` can only draw the first.
+
+    ⚠️ ONLY WHAT IS BLOCKED TRAVELS. Fifty operations is fifty keys on every
+    boot, almost all of them `null`; absent means allowed, which is also the
+    reading a client that forgets the field falls into.
+  */
+  may: Object.fromEntries(a.operations
+    .map((o) => [o.id, mayCall(o)] as const)
+    .filter(([, gate]) => gate !== null)),
 });
 
 export function centreOps(app: AppSpec): Readonly<Record<string, Resolved>> {
@@ -127,6 +146,9 @@ export function centreOps(app: AppSpec): Readonly<Record<string, Resolved>> {
              resolving its own plan would be a second answer to what a workspace
              bought, and the two differ on exactly the key nobody has touched. */
           ctx.allowance,
+          /* ⚠️ AND THE SAME WALK, so a control a screen draws and a route the
+             gate refuses cannot come apart. */
+          ctx.mayCall,
         )));
 
       return {

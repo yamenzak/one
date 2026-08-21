@@ -164,6 +164,7 @@ export function Scan({
   */
   const does = said?.name
     ? {
+      op: "stock.receive",
       label: "Add it",
       onDo: () => { onAdd(said); },
       disabled: busy === true,

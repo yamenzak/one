@@ -523,6 +523,30 @@ describe("what the plan opens", () => {
     expect(ids).toContain("import");
   });
 
+  /*
+    ⚠️ AND THE CONTROLS ARE ANSWERED FOR TOO, WHICH IS THE OTHER HALF. A screen
+    that survives the plan filter can still hold a control the gate would refuse
+    — this workspace has work orders and no run rail — and a product that draws
+    it anyway puts the refusal in a toast over whatever was just filled in. The
+    verdict comes from the same walk the request's own gate ran.
+  */
+  it("says which gate would stop a control, before it is drawn", async () => {
+    const res = await at("/api/centre.view", { headers: { cookie } });
+    const body = await res.json() as {
+      apps: { id: string; may: Record<string, string> }[];
+    };
+    const may = body.apps.find((a) => a.id === "inventory")?.may ?? {};
+    /* ⚠️ `processes` IS FALSE ON THIS TIER, so the run rail's own operations are
+       the entitlement gate — named, rather than reported as a bare `false`,
+       because "your plan does not include this" and "you cannot yet" are
+       different controls. */
+    expect(may["process.open"]).toBe("entitlement");
+    /* ⚠️ AND WHAT IS ALLOWED IS ABSENT RATHER THAN `null`. Fifty operations is
+       fifty keys on every boot, almost all of them nothing. */
+    expect(may["stock.receive"]).toBeUndefined();
+    expect(may["product.create"]).toBeUndefined();
+  });
+
   /* ⚠️ AND EVERY SCREEN WITHOUT A GATE STILL TRAVELS. A filter that quietly
      dropped an ungated screen would pass both assertions above. */
   it("leaves every ungated screen alone", async () => {

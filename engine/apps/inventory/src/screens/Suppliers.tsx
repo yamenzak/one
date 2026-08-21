@@ -81,7 +81,7 @@ export function Suppliers({
         under="Who things come from, and how long they take"
         of={of}
         again={again}
-        does={{ label: "Add a supplier", icon: glyphOf("add"), onDo: onNew }}
+        does={{ op: "supplier.create", label: "Add a supplier", icon: glyphOf("add"), onDo: onNew }}
         isNothing={(rows) => rows.length === 0}
         nothing={{
           icon: glyphOf("box"),

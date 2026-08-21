@@ -65,9 +65,14 @@ const NOT_A_GATE = new Set(["now", "catalog", "workspace"]);
 /* ------------------------------------------------- what the path hands it --- */
 
 const SERVE = read("runtime/src/serve.ts");
-const call = SERVE.match(/\bcheck\(\{([\s\S]*?)\n\s*\}\);/)?.[1];
+/* ⚠️ THE ASK IS BUILT ONCE AND ASKED TWICE — for this request's own gate, and
+   for what ELSE the caller could do (`mayCall`, which a screen reads before it
+   draws a control). So the subject here is the BUILDER rather than the call: a
+   guard pinned to `check({ … })` reported green about a literal that had moved
+   into a closure a few lines up. */
+const call = SERVE.match(/const askFor = \(spec: AnyOperation\): Ask => \(\{([\s\S]*?)\n\s*\}\);/)?.[1];
 if (!call) {
-  fail("runtime/src/serve.ts: no `check({ … })` to read.\n"
+  fail("runtime/src/serve.ts: no `askFor` to read.\n"
     + "       Every request ends in one gate call. If it has moved, move this with it — "
     + "a guard that cannot find its subject reports green about anything.");
 }

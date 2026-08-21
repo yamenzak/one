@@ -91,7 +91,9 @@ export function Count({
          its own card behind a confirmation that shows the differences — see
          below. A docked button that destroyed a shelf's numbers on one press is
          the control somebody hits with a glove on. */
-      does={place && !counting ? { label: "Start counting", onDo: onStart } : undefined}
+      does={place && !counting
+        ? { op: "count.open", label: "Start counting", onDo: onStart }
+        : undefined}
       of={of}
       again={again}
       isNothing={(rows) => counting && rows.length === 0}
@@ -201,7 +203,7 @@ export function Count({
                     /* ⚠️ `danger`, BECAUSE THIS IS THE ONE GESTURE IN THE PRODUCT
                        THAT TAKES NUMBERS AWAY. Everything the count did not find
                        goes to zero, and no other write here can say that. */
-                    act={{ label: "Close it", tone: "danger", onDo: onClose }}
+                    act={{ op: "count.close", label: "Close it", tone: "danger", onDo: onClose }}
                   >
                     {changes.length
                       ? `${changes.length} line${changes.length === 1 ? "" : "s"} will be corrected, and anything on this shelf the count did not find goes to zero.`

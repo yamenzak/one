@@ -225,6 +225,8 @@ export interface CrownProps {
     readonly onDo: () => void;
     readonly tone?: "danger";
     readonly disabled?: boolean;
+    /** ⚠️ Why it is disabled, where there is a reason — see `Slot.why`. */
+    readonly why?: string;
     /**
      * ⚠️ WIDE SCREENS ONLY, FOR THE ACT THAT IS DOCKED BELOW `md`. A `Screen`
      * hands the same act to this crown and to a bar above the thumb and shows
@@ -258,6 +260,13 @@ export interface Slot {
   /** ⚠️ Reserved for a primary that destroys. Rare, and never a default. */
   readonly tone?: "danger";
   readonly disabled?: boolean;
+  /**
+   * ⚠️ WHY IT IS DISABLED, WHERE THERE IS A REASON WORTH GIVING. A greyed
+   * control with no explanation is the product declining and refusing to say
+   * what would change it — and up here there is room for a tooltip and no room
+   * for a line of prose, so the reason goes in the one place a crown has.
+   */
+  readonly why?: string;
 }
 
 export function Crown({
@@ -395,7 +404,10 @@ export function Crown({
                NOT. An `isIconOnly` button handed no icon is a 44px empty
                lozenge — which typechecks, renders, and is unpressable-looking.
                The label is the accessible name either way. */
-            <Hint says={does.label} when={Boolean(does.icon)}>
+            /* ⚠️ THE REASON BEATS THE NAME. A disabled control's label is
+               already visible or already its `aria-label`; what is not knowable
+               without being told is why pressing it would do nothing. */
+            <Hint says={does.why ?? does.label} when={Boolean(does.icon) || Boolean(does.why)}>
               <Button
                 className={does.wide ? "hidden md:flex" : undefined}
                 isIconOnly={Boolean(does.icon)}

@@ -260,6 +260,7 @@ the `settings` guard enforces).
 | `apps/inventory/test/*.test.ts` | the pure halves — 193 tests over ten files |
 | `apps/inventory/test/ground.screens.test.tsx` | every declared screen renders, and says the true thing — 97 |
 | `apps/inventory/test/geometry.screens.test.tsx` | every declared screen MEASURED, in real Chromium, at a phone and a desk — 56 |
+| `apps/inventory/test/acts.screens.test.tsx` | every primary action names the operation it calls, and it is real — 31 |
 | `one/test/inventory.test.ts` | the golden path through the **real worker** — 16 |
 | `one/test/inventory-deep.test.ts` | batches, items, kits, the rail, the night — 19 |
 

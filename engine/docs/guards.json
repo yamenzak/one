@@ -2935,6 +2935,33 @@
       "impl": "one-space/test/geometry.test.tsx",
       "proves": "does not push the page sideways on ${name}",
       "fails": "the half of every screen a product cannot opt out of — the world, the hem, the nav, the crown, the room reserved for the island — measured by nothing, so a screen that fits on its own is still pushed sideways by the chrome around it"
+    },
+    {
+      "id": "the-gate-answers-before-a-control-is-drawn",
+      "protects": "D15",
+      "stage": "42",
+      "status": "live",
+      "impl": "one/test/inventory.test.ts",
+      "proves": "says which gate would stop a control, before it is drawn",
+      "fails": "a primary action drawn, pressed and answered 402 — the refusal landing as a toast over whatever the person just filled in, and the work gone"
+    },
+    {
+      "id": "an-act-names-the-operation-it-calls",
+      "protects": "D15",
+      "stage": "42",
+      "status": "live",
+      "impl": "apps/inventory/test/acts.screens.test.tsx",
+      "proves": "is named on every act",
+      "fails": "one act with no `op`, which renders and works on every tier that happens to be allowed and gives the one that is not the old behaviour with nothing saying so"
+    },
+    {
+      "id": "a-blocked-control-says-which-gate-stopped-it",
+      "protects": "D7",
+      "stage": "42",
+      "status": "live",
+      "impl": "design/test/surface.test.tsx",
+      "proves": "says something else when a different gate stopped it",
+      "fails": "one sentence for all nine gates, which is a boolean wearing a name — \"you cannot yet\" and \"your plan does not include this\" are different controls"
     }
   ]
 }

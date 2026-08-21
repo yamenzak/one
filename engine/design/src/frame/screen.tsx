@@ -34,6 +34,8 @@ import { Button } from "@heroui/react";
 import { Band, Page } from "./page.js";
 import { PageCrown, useCrownSocket, type Slot } from "./crown.js";
 import { Docked } from "./chrome.js";
+import { sayGate, useGate } from "../parts/gated.js";
+import { TYPE } from "../tokens/type.js";
 import { Spacer } from "../parts/arrange.js";
 import { Title } from "../parts/heads.js";
 import type { Width } from "../tokens/metrics.js";
@@ -125,6 +127,24 @@ export interface Act {
   /** ⚠️ Reserved for a primary that destroys. Rare, and never a default. */
   readonly tone?: "danger";
   readonly disabled?: boolean;
+  /**
+   * WHAT IT CALLS — the operation's id.
+   *
+   * ⚠️ THE ONE THING A SCREEN IS FOR IS ALSO THE WORST ONE TO OFFER AND REFUSE.
+   * A primary that is drawn, pressed and answered 402 puts the refusal in a
+   * toast over whatever the person just filled in — so naming the operation lets
+   * the frame ask the gate BEFORE it draws, from the verdicts the boot read
+   * already carried (`Allowed`, `useGate`).
+   *
+   * ⚠️ THE OPERATION RATHER THAN THE VERDICT, so a screen never restates the
+   * gate's question in its own words. It says what it calls; the platform says
+   * whether that would work.
+   *
+   * ⚠️ DISABLED AND EXPLAINED, NOT ABSENT. A screen whose one action has
+   * silently vanished is a screen that looks broken; `sayGate` is the line under
+   * it, and the words are the design system's rather than each screen's.
+   */
+  readonly op?: string;
 }
 
 /* ------------------------------------------------------------------ frame --- */
@@ -446,7 +466,23 @@ export function Screen<T = unknown>({
     gets new copy.
   */
   const trail = [also[0], also[1]].filter(Boolean) as readonly Slot[];
-  const act = where === "act" && does ? { ...does, wide: true } : undefined;
+  /*
+    ⚠️ ASKED ONCE, HERE, FOR BOTH HALVES OF THE ACT. The crown draws it above
+    `md` and the dock below, and a verdict resolved twice is two chances to
+    resolve it differently. Absent `op` reads as allowed — every screen that has
+    not yet named what its primary calls behaves exactly as it did.
+  */
+  const stopped = useGate(does?.op);
+  /* ⚠️ A BLOCKED ACT IS A DISABLED ACT WITH A REASON, and the fold happens once
+     here so the crown and the dock cannot disagree about it. */
+  const act = where === "act" && does
+    ? {
+      ...does,
+      wide: true,
+      disabled: does.disabled || Boolean(stopped),
+      ...(stopped ? { why: sayGate(stopped) } : {}),
+    }
+    : undefined;
 
   /*
     ⚠️ A CROWN ABOVE US TAKES THIS ONE — see `useCrownSocket`. Inside a `Shell`
@@ -542,15 +578,24 @@ export function Screen<T = unknown>({
       {where === "act" && does && !socketed
         ? (
           <Docked width={preset.width}>
-            <Button
-              className="w-full"
-              variant={does.tone === "danger" ? "danger" : "primary"}
-              isDisabled={does.disabled}
-              onPress={does.onDo}
-            >
-              {does.icon}
-              {does.label}
-            </Button>
+            {/* ⚠️ THE REASON IS WRITTEN OUT DOWN HERE, not put in a tooltip. This
+                is the phone half of the act, and a phone has no hover — so the
+                one place the explanation could hide is the one place nobody on
+                this half of the breakpoint can reach. */}
+            <div className={`flex flex-col ${SPACE.hair}`}>
+              <Button
+                className="w-full"
+                variant={does.tone === "danger" ? "danger" : "primary"}
+                isDisabled={does.disabled || Boolean(stopped)}
+                onPress={does.onDo}
+              >
+                {does.icon}
+                {does.label}
+              </Button>
+              {stopped
+                ? <span className={`${TYPE.note} text-center`}>{sayGate(stopped)}</span>
+                : null}
+            </div>
           </Docked>
         )
         : null}

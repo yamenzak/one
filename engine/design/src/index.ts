@@ -14,6 +14,7 @@ export * from "./tokens/theme.js";
 export * from "./tokens/ambience.js";
 export * from "./parts/face.js";
 export * from "./parts/beside.js";
+export * from "./parts/gated.js";
 export * from "./parts/surfaces.js";
 export * from "./parts/pick-file.js";
 /*

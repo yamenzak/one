@@ -16,7 +16,10 @@
  * context is passed only to them.
  */
 
-import type { Allowance, AppSpec, Channel, CollectionSpec, PackDef, PlanSpec, RoleRegistry, TenantId, Theme } from "@engine/kernel";
+import type {
+  Allowance, AnyOperation, AppSpec, Channel, CollectionSpec, Gate, PackDef, PlanSpec,
+  RoleRegistry, TenantId, Theme,
+} from "@engine/kernel";
 import { PUBLIC, SURFACES, refusePolicy, seatsUsed, withinQuota } from "@engine/kernel";
 import { brandingOf, setBranding } from "./branding.js";
 import { LEAST_SIDE, MOST_BYTES, MOST_SIDE, forgetIcon, hasIcon, setIcon } from "./icon.js";
@@ -63,6 +66,18 @@ export interface PlatformCtx extends Ctx {
    * yes, and the product then offers a destination its own route refuses.
    */
   readonly flags: Readonly<Record<string, boolean>>;
+  /**
+   * ⚠️ WHICH GATE WOULD STOP THIS OPERATION FOR THIS CALLER, or `null` for none —
+   * the SAME walk the request's own gate ran, from the same Ask. A screen
+   * deciding for itself which controls to draw is a second opinion about access,
+   * and the day the two differ is the day a product offers a button that answers
+   * 402 (`blockedBy`, D15).
+   *
+   * ⚠️ IT REPORTS THE GATE RATHER THAN A BOOLEAN, because "you cannot yet" and
+   * "your plan does not include this" want different controls: one is disabled
+   * and the other is an offer.
+   */
+  readonly mayCall: (spec: AnyOperation) => Gate | null;
   readonly email: string | null;
   readonly allowance: (key: string) => Allowance;
   /**
