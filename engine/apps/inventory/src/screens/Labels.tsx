@@ -21,9 +21,12 @@
 
 import * as React from "react";
 import {
-  Code, Group, Label, LabelSheet, LabelText, NoteRow, Picks, Screen, Section,
-  Segmented, glyphOf, type Loaded,
+  Group, NoteRow, Picks, Screen, Section, Segmented, glyphOf, type Loaded,
 } from "@engine/design";
+/* ⚠️ A SUBPATH, DELIBERATELY. The QR encoder is Reed-Solomon and mask
+   arithmetic that only a printed label needs; in the entry it is weight every
+   visitor to every door downloads before anything is drawn. */
+import { Code, Label, LabelSheet, LabelText } from "@engine/design/labels";
 import { GHS, hazardContradictions, hazardOf, isHazardous } from "../hazard.js";
 
 /** One thing that can be labelled, whatever kind it is. */

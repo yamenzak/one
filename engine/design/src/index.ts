@@ -16,8 +16,13 @@ export * from "./parts/face.js";
 export * from "./parts/beside.js";
 export * from "./parts/surfaces.js";
 export * from "./parts/pick-file.js";
-export * from "./parts/qr.js";
-export * from "./parts/labels.js";
+/*
+  ⚠️ LABELS ARE A SUBPATH AND NOT PART OF THE ENTRY: `@engine/design/labels`.
+  A QR encoder is about four kilobytes of Reed-Solomon and mask arithmetic that
+  every visitor to every door would otherwise download before anything is drawn,
+  to render a symbol that appears on one screen in one product. Importing it
+  from the sheet keeps it in that screen's chunk.
+*/
 export * from "./parts/viewfinder.js";
 export * from "./parts/permission.js";
 export * from "./parts/state.js";

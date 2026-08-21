@@ -131,8 +131,9 @@
     },
     {
       "n": 24,
+      "status": "shipped",
       "title": "A workspace composes its own roles out of one app's keys",
-      "status": "planned"
+      "ends": "`custom_role` was applied, read by `permissionsFor` and written by nothing \u2014 a table, a resolver and a refusal rule with no way to reach any of them. `role.list`, `role.save` and `role.remove` are the three that make it real. `beyond_you` is the one to read twice: a workspace composing a role out of keys its author does not hold is the shortest path from \u201cI can manage people\u201d to \u201cI can do anything\u201d \u2014 make the role, assign it to yourself \u2014 and `saveRole` is the only writer that reaches the check. A role somebody still holds may not be deleted: the registry would stop carrying it, `permissionsFor` would resolve it to nothing, and they would keep their seat and be able to do nothing at all with no screen saying why."
     },
     {
       "n": 25,

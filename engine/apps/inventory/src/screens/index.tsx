@@ -30,6 +30,7 @@ import { Work, type Jobs, type Runs } from "./Work.js";
 import { Due, type Dated } from "./Due.js";
 import { Labels, type Labelled } from "./Labels.js";
 import { Reports, type Reported } from "./Reports.js";
+import { WORDS } from "../words.js";
 import { Count, type Change, type Counted, type Uncovered } from "./Count.js";
 import { Item, type Kept } from "./Item.js";
 import { Kit, type Member, type Missing } from "./Kit.js";
@@ -664,7 +665,16 @@ export function InventoryScreen({ route, onGo }: {
         />
       );
     case "/start":
-      return <Start title={title} done={DONE} counts={COUNTS} held={HELD} onGo={go} />;
+      return (
+        <Start
+          title={title}
+          /* ⚠️ A CLINIC RATHER THAN THE PLAIN ONE, because the profile is the
+             thing this screen makes visible and the default says nothing about
+             it. */
+          said={WORDS.clinic.said}
+          done={DONE} counts={COUNTS} held={HELD} onGo={go}
+        />
+      );
     /* ⚠️ THE DEFAULT IS THE APP'S FIRST DECLARED SCREEN, not a blank. An
        unrecognised route rendering nothing is the same picture as a page that
        failed to load, and only one of them gets reported. */

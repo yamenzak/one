@@ -192,11 +192,13 @@ export type RoleRefusal = "id" | "declared" | "undeclared_permission" | "beyond_
  * would grant nothing; `beyond_you` is the escalation. Collapsed into
  * "invalid", the last one reads as a bug in the form.
  */
-/* DEFER(engine-24) stage:24 — `custom_role` is read by `permissionsFor` and
-   written by nothing, so no request reaches this yet. The rule matters the day
-   one does: `beyond_you` is the escalation check, and a workspace composing a
-   role out of keys its author does not hold is how somebody grants themselves
-   more than they have. */
+/*
+  ⚠️ `beyond_you` IS THE ESCALATION AND IT IS THE ONE TO READ TWICE. A workspace
+  composing a role out of keys its author does not hold is the shortest path
+  there is from "I can manage people" to "I can do anything": make the role,
+  assign it to yourself, and the ceiling is gone. `saveRole` is the only writer
+  that reaches this, and it is why that write is guarded rather than validated.
+*/
 export function refuseRole(
   role: CustomRole, declared: RoleRegistry, known: ReadonlySet<string>, author: ReadonlySet<string>,
 ): RoleRefusal | null {
@@ -251,10 +253,42 @@ export const seatsUsed = (members: readonly Membership[], counts: readonly strin
 
 /* -------------------------------------------------------------- the spec --- */
 
+/**
+ * A BUNDLE A WORKSPACE CAN ADOPT AS ONE OF ITS OWN ROLES.
+ *
+ * ⚠️ IT IS A STARTING POINT, NOT A ROLE. A declared role is the app's and every
+ * workspace has it; a preset is a shape the app knows about — "the person on the
+ * floor in a kitchen", "the one who signs for a sterilisation load" — that a
+ * workspace COPIES into a role of its own and then owns. The difference matters
+ * the day the app ships a new key: a declared role gains it everywhere, and a
+ * role somebody adopted does not, because it is theirs.
+ *
+ * ⚠️ AND IT IS THE ONLY HONEST WAY A PRODUCT CAN SHAPE ACCESS TO A SETTING. What
+ * an app knows is that a clinic and a basement want different people to be able
+ * to release a load; what it may not do is write a workspace's roles for it,
+ * which is a governance act under `member:manage` — a different authority from
+ * the one that edits a product's settings. So the app OFFERS and the workspace
+ * ADOPTS, through the same bounded write anybody composing a role goes through.
+ */
+export interface RolePreset {
+  /** The id the adopted role gets. A slug — see `roleIdOk`. */
+  readonly id: string;
+  readonly name: string;
+  /** What this person does all day, in one line. It is the row. */
+  readonly said: string;
+  readonly permissions: readonly string[];
+}
+
 export interface AccessSpec {
   /** The app's OWN keys. Naming a platform key here is refused — see below. */
   readonly permissions: readonly string[];
   readonly roles: RoleRegistry;
+  /**
+   * ⚠️ SHAPES A WORKSPACE CAN START FROM, and the reason they are not roles is
+   * above. Every key one names must be one this app declares — a preset
+   * granting nothing is a bundle somebody adopts and then wonders about.
+   */
+  readonly presets?: readonly RolePreset[];
   /**
    * The app role a workspace's creator gets. Absent, the first declared role —
    * stated so a manifest's role order is visibly load-bearing.

@@ -22,7 +22,10 @@ import { brandingOf, setBranding } from "./branding.js";
 import { LEAST_SIDE, MOST_BYTES, MOST_SIDE, forgetIcon, hasIcon, setIcon } from "./icon.js";
 import { noteInvitation, tenantById } from "./directory.js";
 import { inboxOf, markSeen, policyOf, preferenceOf, setPolicy, setPreference, unseenCount } from "./inbox.js";
-import { invite, membersOf, remove, rolesFor, setAppRole, setPlatformRole } from "./membership.js";
+import {
+  customRolesOf, dropRole, invite, membersOf, remove, rolesFor, saveRole, setAppRole,
+  setPlatformRole,
+} from "./membership.js";
 import type { Ctx, Resolved } from "./compose.js";
 import type { Db } from "./sql.js";
 import type { Found } from "./search.js";
@@ -346,6 +349,110 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
            drawing for a channel something can send on — see `PlatformCtx`. */
         available: ctx.channels,
       })),
+
+    /*
+      ⚠️ A WORKSPACE'S OWN ROLES, AND THEY COMPOSE ONE APP'S KEYS. The platform's
+      four offices are not composable — a fifth kind of "who runs this place" is
+      a governance question rather than a bundle — and a role spanning two
+      products would be a name that means something different depending on which
+      one is looking at it.
+
+      ⚠️ THE DECLARED ONES COME WITH THEM, marked, because a screen offering to
+      make a role has to show what already exists — and `registryWith` lets the
+      app's own win, so a workspace redefining `keeper` writes a row that
+      resolves to nothing and reports success.
+    */
+    "role.list": op("role.list", "read", "member:read", "This workspace's own roles.",
+      async (ctx, input) => {
+        const appId = String(input.app ?? app.id);
+        const spec = appId === app.id ? app : ctx.appOf(appId);
+        if (!spec) return ctx.fail("platform.not_found");
+        return {
+          items: await customRolesOf(ctx.db, ctx.tenantId as TenantId, appId),
+          /* ⚠️ WHAT THE APP ITSELF DECLARES, so the editor can refuse a name
+             before the door does — and so somebody can see what a bundle would
+             have to differ from to be worth making. */
+          declared: Object.entries(spec.access.roles)
+            .map(([id, permissions]) => ({ id, permissions })),
+          /* ⚠️ EVERY KEY THIS APP HAS, because a role is composed out of them and
+             a picker with nothing to pick from is a screen that cannot be used.
+             Plus what the CALLER holds, which is the ceiling — see `beyond_you`. */
+          permissions: spec.access.permissions,
+          yours: [...await ctx.permissionsIn(appId)],
+          /* ⚠️ THE SHAPES THE APP KNOWS ABOUT, so a workspace starts from one
+             rather than from an empty list of forty keys. Adopting one goes
+             through `role.save` like anything else, which is what keeps the
+             escalation check in one place. */
+          presets: spec.access.presets ?? [],
+        };
+      }),
+
+    /*
+      ⚠️ ONE OPERATION FOR MAKING AND CHANGING, because the refusals are the same
+      four and a workspace editing a role it made is the ordinary case. What it
+      is NOT is a way past the ceiling: `beyond_you` refuses a role composed out
+      of keys the author does not hold, which is otherwise the shortest path
+      from "I can manage people" to "I can do anything" — make the role, assign
+      it to yourself.
+    */
+    "role.save": op("role.save", "write", "member:manage", "Make or change a role.",
+      async (ctx, input) => {
+        const appId = String(input.app ?? app.id);
+        const spec = appId === app.id ? app : ctx.appOf(appId);
+        if (!spec) return ctx.fail("platform.not_found");
+
+        const permissions = Array.isArray(input.permissions)
+          ? input.permissions.map((one) => String(one))
+          : [];
+        const out = await saveRole(
+          ctx.db, ctx.tenantId as TenantId,
+          {
+            id: String(input.id ?? ""), app: appId,
+            name: String(input.name ?? "").trim() || String(input.id ?? ""),
+            permissions,
+          },
+          spec.access.roles,
+          new Set(spec.access.permissions),
+          await ctx.permissionsIn(appId),
+          ctx.now,
+        );
+
+        if (out === "id") {
+          return ctx.fail("platform.invalid", {},
+            { fields: { id: "Letters, numbers and dashes, starting with a letter" } });
+        }
+        if (out === "declared") {
+          return ctx.fail("platform.conflict", {},
+            { fields: { id: "This app already has a role with that name" } });
+        }
+        if (out === "undeclared_permission") {
+          return ctx.fail("platform.invalid", {},
+            { fields: { permissions: "One of those is not something this app can do" } });
+        }
+        /* ⚠️ THE ESCALATION, AND IT IS ITS OWN REFUSAL RATHER THAN "INVALID". A
+           person told their input is invalid looks for a typo; a person told
+           they cannot grant what they do not hold knows to ask somebody. */
+        if (out === "beyond_you") return ctx.fail("platform.forbidden");
+        return out;
+      },
+      { why: "It composes what somebody may do, which only a person weighs." }),
+
+    "role.remove": op("role.remove", "write", "member:manage", "Delete a role.",
+      async (ctx, input) => {
+        const appId = String(input.app ?? app.id);
+        const out = await dropRole(
+          ctx.db, ctx.tenantId as TenantId, appId, String(input.id ?? ""));
+        if (out === "no_such_role") return ctx.fail("platform.not_found");
+        /* ⚠️ REFUSED WHILE SOMEBODY HOLDS IT, never cascaded. Their membership
+           names it, the registry stops carrying it, and they keep their seat and
+           can do nothing at all — with no screen anywhere saying why. */
+        if (out === "in_use") {
+          return ctx.fail("platform.conflict", {},
+            { fields: { id: "Somebody still has this role. Move them off it first" } });
+        }
+        return { id: String(input.id) };
+      },
+      { why: "It takes access away, which only a person weighs." }),
 
     "member.remove": op("member.remove", "write", "member:manage", "Remove somebody.",
       async (ctx, input) => {

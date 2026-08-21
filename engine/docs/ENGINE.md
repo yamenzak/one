@@ -38,7 +38,7 @@ all of it is refused, gated, audited and erasable on the same terms as everythin
 an app writes itself.
 
 <!-- generated: node scripts/inventory.mjs surface -->
-**32 operations for declaring nothing.** A roster, an inbox and its
+**35 operations for declaring nothing.** A roster, an inbox and its
 two-level policy, the workspace's brand, the package rail it sells with, its
 settings, its bill, and the one bootstrap read every screen stands on.
 
@@ -52,6 +52,9 @@ settings, its bill, and the one bootstrap read every screen stands on.
 | `inbox.preference` | write | *the session* |
 | `inbox.policy` | write | `tenant:manage` |
 | `inbox.settings` | read | *the session* |
+| `role.list` | read | `member:read` |
+| `role.save` | write | `member:manage` |
+| `role.remove` | write | `member:manage` |
 | `member.remove` | write | `member:manage` |
 | `brand.read` | read | `tenant:manage` |
 | `brand.write` | write | `tenant:manage` |
@@ -382,7 +385,7 @@ and a manifest that does not compose refuses to boot.
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 8 | — |
 | `collection` | what a thing an app keeps is — and the six operations it gets for free | 18 | — |
 | `operation` | one declaration carrying every cross-cutting concern (D12) | 10 | — |
-| `access` | permissions, roles, and what an app may never claim | 15 | 1 |
+| `access` | permissions, roles, and what an app may never claim | 15 | — |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
 | `manifest` | the whole app, and the composition that refuses a broken one | 12 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 16 | — |
@@ -406,7 +409,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**275 of them**, 270 reached by something today.
+**275 of them**, 271 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -428,7 +431,7 @@ env or a binding.
 | `locate` | who is asking, where they are, and what they hold | 2 | — |
 | `flags` | what somebody switched, per deployment and per workspace | 10 | — |
 | `identity` | sign-in codes, sessions, tokens, proof | 27 | — |
-| `membership` | the roster and what each member may do | 12 | — |
+| `membership` | the roster and what each member may do | 15 | — |
 | `compose` | a manifest becomes a live surface of operations | 2 | — |
 | `serve` | the one path every request ends in — both doors | 6 | — |
 | `records` | the generated reads and writes behind a collection | 6 | — |
@@ -480,7 +483,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**422 of them**, 421 reached by something today.
+**425 of them**, 424 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -507,7 +510,7 @@ its own header, cited by other files, and doing nothing.
 | Rule | Declared in | In force through |
 |---|---|---|
 | `claimsPlatform` | `access` | composition |
-| `refuseRole` | `access` | deferred to stage 24 |
+| `refuseRole` | `access` | runtime |
 | `undeclared` | `access` | composition |
 | `unholdable` | `access` | composition |
 | `refuseCatalogue` | `ai` | runtime |
@@ -939,13 +942,12 @@ nothing yet.
 | Waiting on | Where | How many |
 |---|---|---|
 | **23** — Mail that leaves the process — a letter, its variables, and a provider | `kernel/src/notify.ts` | 1 |
-| **24** — A workspace composes its own roles out of one app's keys | `kernel/src/access.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `kernel/src/package.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `runtime/src/jobs.ts` | 1 |
 | **41** — A workspace's brand reaches the screen — the surfaces it picked, and only the ones its products have | `kernel/src/brand.ts` | 1 |
 | **42** — A screen asks the gate before it draws a control, rather than after it is pressed | `kernel/src/gate.ts` | 1 |
 
-**6 declarations** are built and reached by nothing, each waiting on a
+**5 declarations** are built and reached by nothing, each waiting on a
 stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one
 that names no stage, so this list cannot grow by forgetting.
 <!-- /generated -->
@@ -978,7 +980,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 21 | Payment — a workspace subscribes, and only a signed event stamps the plan | shipped |
 | 22 | OneSpace — `id`, `admin` and `setup` merge into one address off the workspace root | **planned** |
 | 23 | Mail that leaves the process — a letter, its variables, and a provider | **planned** |
-| 24 | A workspace composes its own roles out of one app's keys | **planned** |
+| 24 | A workspace composes its own roles out of one app's keys | shipped |
 | 25 | Agreements — versioned documents, an acceptance per person per version, and the wall until there is one | shipped |
 | 26 | The vault is opened — consent, who looked, your data, and an erasure that shreds | shipped |
 | 27 | The AI lane runs — a catalogue that syncs itself, one door out to every provider, a charge built on what the call really cost, and a nightly check against the bill we are sent | shipped |
@@ -1026,7 +1028,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 64 | Itemised things — one object for its whole life, and the kits composed of them | shipped |
 | 63 | The guide and the milestones are ticked by what a workspace has actually done | **planned** |
 
-**52 shipped, 18 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**53 shipped, 17 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

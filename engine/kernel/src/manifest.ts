@@ -22,6 +22,7 @@
 import type { AccessSpec } from "./access.js";
 import {
   PLATFORM_PERMISSIONS, PLATFORM_PERSONAL, PLATFORM_ROLES, claimsPlatform, foundingAppRole,
+  roleIdOk,
   undeclared, unholdable,
 } from "./access.js";
 import type { Lane } from "./ai.js";
@@ -372,6 +373,29 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
      workspace managers (D15). The fix is deletion, so it is its own refusal. */
   for (const key of claimsPlatform(spec.access)) {
     at("permission", `"${key}" is the platform's — an app may name it on a surface, never declare or bundle it`);
+  }
+  /*
+    ⚠️ A PRESET IS OFFERED TO A WORKSPACE AND HAS TO BE ADOPTABLE. One naming a
+    key this app does not declare is refused by `refuseRole` at the door — so it
+    is a bundle drawn on a screen, offered, pressed, and refused with a sentence
+    about somebody else's mistake.
+
+    ⚠️ AND ITS ID MAY NOT BE A DECLARED ROLE'S. `registryWith` lets the app's own
+    roles win, so adopting one would write a row that resolves to nothing and
+    report success.
+  */
+  for (const preset of spec.access.presets ?? []) {
+    if (!roleIdOk(preset.id)) {
+      at("preset", `"${preset.id}" is not a role id — letters, numbers and dashes`);
+    }
+    if (spec.access.roles[preset.id]) {
+      at("preset", `"${preset.id}" is already a role this app declares, so adopting it would do nothing`);
+    }
+    for (const key of preset.permissions) {
+      if (!spec.access.permissions.includes(key)) {
+        at("preset", `"${preset.id}" bundles "${key}", which this app does not declare`);
+      }
+    }
   }
   for (const why of unreachable(spec.operations,
     { ...PLATFORM_ROLES, ...spec.access.roles }, PLATFORM_PERSONAL)) {

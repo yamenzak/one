@@ -25,6 +25,7 @@ import {
    reading and the precedence rules are the SCREEN's — a label is printed there,
    and a contradiction reported where nothing prints is a warning nobody sees. */
 import { SIGNALS } from "./hazard.js";
+import { PROFILES, wordsFor, type Words } from "./words.js";
 import { dailyIn, lossesIn, reorder, toldIn, usageIn } from "./report.js";
 import { CODE_KINDS, readScan, stillNeeded, unread } from "./code.js";
 import { settleCount, type Change } from "./count.js";
@@ -3437,7 +3438,10 @@ const traceJob = operation<
  * must still honour them: the platform resolves the value, the caller is told
  * only the consequence.
  */
-const starts = operation<Record<string, never>, { tracking: string; unit: string }>({
+const starts = operation<
+  Record<string, never>,
+  { tracking: string; unit: string; profile: string; words: Words }
+>({
   id: "product.start",
   kind: "read",
   summary: "What a new product starts as here",
@@ -3445,6 +3449,14 @@ const starts = operation<Record<string, never>, { tracking: string; unit: string
   output: {
     tracking: field.text({ label: "Tracked as", holds: "none" }),
     unit: field.text({ label: "Counted in", holds: "none" }),
+    /*
+      ⚠️ THE PROFILE AND ITS WORDS TRAVEL TOGETHER, because a screen given only
+      the id would map it to nouns itself — a second copy of the vocabulary,
+      drifting from this one the day a profile is added. What crosses is the
+      answer, and the mapping stays in `words.ts` where it can be tested.
+    */
+    profile: field.text({ label: "What this is for", holds: "none" }),
+    words: field.json({ label: "What things are called", holds: "none" }),
   },
   permission: "product:write",
   idempotency: { mode: "none" },
@@ -3454,9 +3466,14 @@ const starts = operation<Record<string, never>, { tracking: string; unit: string
        platform resolves it; a default here would be a second answer to what a
        workspace switched on, and it would MASK the platform failing to apply
        the declared one. */
+    const profile = String(await c.setting("inventory.profile"));
     return {
       tracking: String(await c.setting("inventory.default_tracking")),
       unit: String(await c.setting("inventory.default_unit")),
+      profile,
+      /* ⚠️ A PROFILE A LATER BUILD REMOVED READS AS THE PLAIN ONE, never as a
+         screen with `undefined` where its headings go. */
+      words: wordsFor(profile),
     };
   },
 });
@@ -3864,6 +3881,68 @@ export const INVENTORY: AppSpec = defineApp({
         "product:read", "location:read", "stock:read", "ledger:read", "process:read",
       ],
     },
+    /*
+      ⚠️ SHAPES A WORKSPACE STARTS FROM, AND THIS IS WHAT A PROFILE IS ACTUALLY
+      FOR. The three declared roles are the app's and every workspace has them;
+      these are the jobs this product knows exist in the settings it serves, and
+      a workspace COPIES one into a role of its own and then owns it.
+
+      ⚠️ THE BASEMENT IS THE ONE TO READ. `alone` holds no `process:*` key at
+      all, so the Work destination is not DRAWN for somebody on it — which is the
+      difference between a screen that is hidden and a screen that is not
+      reachable, and it is why a profile that only seeded defaults was less than
+      the help beside it described.
+
+      ⚠️ AND NONE OF THEM CAN BE ADOPTED BY SOMEBODY WHO DOES NOT HOLD THE KEYS.
+      `refuseRole`'s `beyond_you` is checked on the write, not here — a preset is
+      an offer, and the ceiling is the person pressing the button.
+    */
+    presets: [
+      {
+        id: "alone", name: "On your own",
+        said: "One person, one store room. No runs, no releases, no history to read.",
+        permissions: [
+          "product:read", "product:write", "location:read", "location:write",
+          "stock:read", "stock:move", "stock:adjust",
+        ],
+      },
+      {
+        id: "floor", name: "On the floor",
+        said: "Takes things and counts them. Cannot correct a number or read the history.",
+        permissions: ["product:read", "location:read", "stock:read", "stock:move"],
+      },
+      {
+        id: "goods-in", name: "Goods in",
+        said: "Receives deliveries and names what nobody has seen before.",
+        permissions: [
+          "product:read", "product:write", "location:read", "stock:read", "stock:move",
+        ],
+      },
+      {
+        id: "auditor", name: "Counts and checks",
+        said: "Counts, settles a count, and reads every movement. Runs nothing.",
+        permissions: [
+          "product:read", "location:read", "stock:read", "stock:move", "stock:adjust",
+          "ledger:read",
+        ],
+      },
+      {
+        id: "operator", name: "Runs the machine",
+        said: "Loads and ends a run. Somebody else signs for what comes out.",
+        permissions: [
+          "product:read", "location:read", "stock:read", "stock:move",
+          "process:read", "process:run",
+        ],
+      },
+      {
+        id: "signs-off", name: "Signs it off",
+        said: "Releases a load, fails one, and calls one back. The judgement the rail exists for.",
+        permissions: [
+          "product:read", "location:read", "stock:read", "ledger:read",
+          "process:read", "process:run", "process:release",
+        ],
+      },
+    ],
     founding: "keeper",
     /* ⚠️ Seats count PLATFORM staff — a person is on the team or they are not,
        however many products the team uses. */
@@ -4229,15 +4308,27 @@ export const INVENTORY: AppSpec = defineApp({
       is SHOWN and never what is POSSIBLE, so a garage that grows into a business
       turns things on and nothing is migrated.
     */
-    /* DEFER(engine-24) stage:24 — a profile's real work is composing the
-       workspace's roles out of this app's keys, so that a basement's screens are
-       not REACHABLE rather than merely hidden. Until that lands it is saved and
-       read by nothing, which is less than the help beside it describes. */
+    /*
+      ⚠️ IT SEEDS AND IT DOES NOT GOVERN, AND THAT SPLIT IS DELIBERATE. What a
+      new product starts as and which words this workspace uses are settings, at
+      `tenant:manage`. WHO MAY DO WHAT is a governance act at `member:manage`,
+      and the two are different authorities on purpose — a product setting that
+      quietly rewrote a roster's permissions would be a product update minting
+      access.
+
+      ⚠️ SO THE ROLES ARE `access.presets`, ADOPTED FROM THE PEOPLE SCREEN. That
+      is where a basement's Work destination actually stops being reachable —
+      `alone` holds no `process:*` key, so the nav does not draw it — and it goes
+      through the same bounded write anybody composing a role goes through.
+    */
     "inventory.profile": setting({
       id: "inventory.profile", level: "tenant", area: "stock",
       field: field.enum({
         label: "What this is for", holds: "none",
-        values: ["home", "clinic", "hospital", "workshop", "kitchen", "lab", "warehouse", "office"],
+        /* ⚠️ THE LIST IS `words.ts`'s, because every one of them has to have a
+           vocabulary — a value declared here and missing there is a workspace
+           whose headings quietly fall back to somebody else's. */
+        values: [...PROFILES],
       }),
       fallback: "home", needs: "tenant:manage",
       help: "It sets the defaults and the words. Everything stays available.",

@@ -29,7 +29,8 @@ import { useState } from "react";
 import { PLATFORM_ROLES, sayDate, type Instant } from "@engine/kernel";
 import { Button, Card, Chip } from "@heroui/react";
 import {
-  Await, Choice, Confirm, Group, Listing, Menu, Nothing, RowsWaiting, Screen, Stack, TextInput, Tray,
+  Await, Choice, Confirm, FieldRow, Group, Listing, Menu, NavRow, NoteRow, Nothing, Picks,
+  RowsWaiting, Screen, Stack, TextInput, Tray,
   glyphOf, notice, sentence, useMoney, useShown, whoFace,
 } from "@engine/design";
 import { api } from "../api.js";
@@ -51,12 +52,26 @@ export function People({ view }: { readonly view: CentreView }) {
      everything (DESIGN.md §5). One tray, opened by the list. */
   const [opened, setOpened] = useState<MemberLine | null>(null);
   const [inviting, setInviting] = useState(false);
+  /*
+    ⚠️ ROLES ARE A CROWN CHIP RATHER THAN A SECOND LIST ON THIS SCREEN. A roster
+    and a list of roles are two lists about two different things, and a screen
+    with both has decided neither is the subject — the roster is who works here,
+    which is what somebody opens People for.
+
+    ⚠️ AND IT IS BESIDE THE ROSTER RATHER THAN ITS OWN AREA, because a role only
+    ever exists to be assigned to somebody two rows away. An area of its own is
+    a destination people visit once and then cannot find again.
+  */
+  const [roles, setRoles] = useState(false);
 
   return (
     <>
       <Screen
         shape="list"
         does={manage ? { label: "Invite somebody", onDo: () => setInviting(true) } : undefined}
+        also={manage
+          ? [{ id: "roles", label: "Roles", icon: glyphOf("key"), onDo: () => setRoles(true) }]
+          : undefined}
         of={members.of}
         again={members.again}
         isNothing={(d) => d.items.length === 0}
@@ -133,6 +148,16 @@ export function People({ view }: { readonly view: CentreView }) {
           view={view}
           onClose={() => setInviting(false)}
           onDone={() => { members.again(); setInviting(false); }}
+        />
+      ) : null}
+      {roles ? (
+        <RolesTray
+          view={view}
+          onClose={() => setRoles(false)}
+          /* ⚠️ THE ROSTER IS RE-READ TOO, because a role somebody adopted is a
+             role the member trays can now offer — and a picker that has not
+             heard about it is a screen promising less than the door allows. */
+          onDone={() => { members.again(); }}
         />
       ) : null}
       {opened ? (
@@ -355,5 +380,225 @@ function AppHoldings({ app, member }: { readonly app: CentreApp; readonly member
         </Group>
       )}
     />
+  );
+}
+
+/* ------------------------------------------------------------------ roles --- */
+
+/** One of the workspace's own roles, as `role.list` answers it. */
+interface RoleLine {
+  readonly id: string;
+  readonly name: string;
+  readonly permissions: readonly string[];
+}
+
+interface RoleBook {
+  readonly items: readonly RoleLine[];
+  readonly declared: readonly { readonly id: string; readonly permissions: readonly string[] }[];
+  readonly permissions: readonly string[];
+  /** ⚠️ The caller's own keys IN THIS APP. It is the ceiling — see `beyond_you`. */
+  readonly yours: readonly string[];
+  readonly presets: readonly {
+    readonly id: string; readonly name: string; readonly said: string;
+    readonly permissions: readonly string[];
+  }[];
+}
+
+/**
+ * THE WORKSPACE'S OWN ROLES, PER PRODUCT.
+ *
+ * ⚠️ PER PRODUCT BECAUSE A ROLE COMPOSES ONE APP'S KEYS. A role spanning two
+ * products would be a name that means something different depending on which one
+ * is looking at it, and the platform's four offices are not composable at all —
+ * a fifth kind of "who runs this place" is a governance question rather than a
+ * bundle.
+ *
+ * ⚠️ AND A PRESET IS A STARTING POINT, NOT A ROLE. What the app declares belongs
+ * to the app and every workspace has it; what somebody adopts here is theirs, and
+ * stays what they made it the day the product ships a new key.
+ */
+function RolesTray({ view, onDone, onClose }: {
+  readonly view: CentreView;
+  readonly onDone: () => void;
+  readonly onClose: () => void;
+}) {
+  const [app, setApp] = useState(view.apps[0]?.id ?? "");
+  /* ⚠️ THE APP IS PART OF THE KEY, so switching products re-reads rather than
+     redrawing the last one's roles under the new one's name. */
+  const book = useLoad<RoleBook>("role.list", { app });
+  const [editing, setEditing] = useState<RoleLine | null>(null);
+
+  return (
+    <Tray isOpen onOpenChange={(open) => { if (!open) onClose(); }} title="Roles">
+      <Stack space="roomy">
+        {/* ⚠️ ONLY WHERE THERE IS A CHOICE. A workspace with one product would
+            otherwise read a picker with one option, which is a control that
+            cannot do anything. */}
+        {view.apps.length > 1
+          ? (
+            <Choice
+              label="In"
+              value={app}
+              onChange={(v) => { if (v) { setApp(v); setEditing(null); } }}
+              options={view.apps.map((a) => ({ id: a.id, label: a.name }))}
+            />
+          )
+          : null}
+
+        <Await
+          of={book.of}
+          again={book.again}
+          waiting={<RowsWaiting rows={3} />}
+          then={(said) => (editing
+            ? (
+              <RoleEditor
+                app={app}
+                role={editing}
+                book={said}
+                onBack={() => setEditing(null)}
+                onDone={() => { setEditing(null); book.again(); onDone(); }}
+              />
+            )
+            : (
+              <Stack space="roomy">
+                <Group label="Yours" under="Roles this workspace made, and can change">
+                  {said.items.map((r) => (
+                    <NavRow
+                      key={r.id}
+                      label={r.name}
+                      under={`${r.permissions.length} of ${said.permissions.length}`}
+                      onOpen={() => setEditing(r)}
+                    />
+                  ))}
+                  {/* ⚠️ SAID WHERE IT IS TRUE. An absent list is indistinguishable
+                      from one that failed to load. */}
+                  {said.items.length ? null : <NoteRow>None yet</NoteRow>}
+                </Group>
+
+                {/*
+                  ⚠️ THE PRESETS ARE THE WAY IN, and starting from an empty list of
+                  forty keys is the way nobody uses. Each says what that person
+                  does all day rather than which permissions it holds — the keys
+                  are on the next screen, where somebody is changing them.
+                */}
+                <Group label="Start from" under="Shapes this product knows about">
+                  {said.presets.filter((p) => !said.items.some((r) => r.id === p.id)).map((p) => (
+                    <NavRow
+                      key={p.id}
+                      label={p.name}
+                      under={p.said}
+                      onOpen={() => setEditing({
+                        id: p.id, name: p.name, permissions: p.permissions,
+                      })}
+                    />
+                  ))}
+                  <NavRow
+                    label="Something else"
+                    under="Start with nothing and pick what they may do"
+                    onOpen={() => setEditing({ id: "", name: "", permissions: [] })}
+                  />
+                </Group>
+
+                {/* ⚠️ WHAT THE APP ITSELF DECLARES, SHOWN AND NOT EDITABLE. A
+                    workspace cannot redefine one — `registryWith` lets the app's
+                    own win, so a row that tried would resolve to nothing — and
+                    seeing them is how somebody decides a bundle is worth making
+                    at all. */}
+                <Group label="The product's own" under="Every workspace has these">
+                  {said.declared.map((r) => (
+                    <FieldRow
+                      key={r.id}
+                      label={sentence(r.id)}
+                      value={`${r.permissions.length} of ${said.permissions.length}`}
+                    />
+                  ))}
+                </Group>
+              </Stack>
+            ))}
+        />
+      </Stack>
+    </Tray>
+  );
+}
+
+/**
+ * ⚠️ THE CEILING IS DRAWN, NOT ONLY ENFORCED. A key the person composing this
+ * role does not hold themselves is offered disabled with a reason — because
+ * `role.save` refuses it (`beyond_you`), and a picker that offered it silently
+ * would be a form whose submit is the first thing that tells anybody.
+ *
+ * ⚠️ AND THAT REFUSAL IS THE ESCALATION CHECK, not a nicety: composing a role
+ * out of keys you do not hold and assigning it to yourself is the shortest path
+ * from "I can manage people" to "I can do anything".
+ */
+function RoleEditor({ app, role, book, onBack, onDone }: {
+  readonly app: string;
+  readonly role: RoleLine;
+  readonly book: RoleBook;
+  readonly onBack: () => void;
+  readonly onDone: () => void;
+}) {
+  const [id, setId] = useState(role.id);
+  const [name, setName] = useState(role.name);
+  const [keys, setKeys] = useState<readonly string[]>(role.permissions);
+  const yours = new Set(book.yours);
+  const existing = book.items.some((r) => r.id === role.id) && role.id !== "";
+
+  const save = async () => {
+    const out = await api.post("role.save", { app, id, name, permissions: keys });
+    if (!out.ok) { notice.fail(out.problem.title); return; }
+    notice.ok(`${name} can do ${keys.length} of ${book.permissions.length} things.`);
+    onDone();
+  };
+
+  const drop = async () => {
+    const out = await api.post("role.remove", { app, id: role.id });
+    if (!out.ok) { notice.fail(out.problem.title); return; }
+    notice.ok(`${role.name} is gone.`);
+    onDone();
+  };
+
+  return (
+    <Stack space="roomy">
+      <TextInput
+        label="Name" value={name} onChange={setName}
+        help="What this person is called here."
+      />
+      <TextInput
+        label="Id" value={id} onChange={setId} disabled={existing}
+        help="Letters, numbers and dashes. It never changes once somebody holds it."
+      />
+      <Picks
+        label="They may"
+        value={[...keys]}
+        onChange={setKeys}
+        options={book.permissions.map((k) => ({
+          id: k,
+          label: sentence(k.replace(":", " · ")),
+          ...(yours.has(k) ? {} : { help: "You cannot grant this — you do not hold it" }),
+        }))}
+      />
+      <Stack space="snug">
+        <Button
+          variant="primary"
+          isDisabled={!id.trim() || !name.trim() || keys.some((k) => !yours.has(k))}
+          onPress={() => void save()}
+        >
+          {existing ? "Save" : "Make this role"}
+        </Button>
+        {existing
+          ? (
+            <Confirm
+              trigger={<Button variant="danger-soft">Delete this role</Button>}
+              title={`Delete ${role.name}?`}
+              act={{ label: "Delete", onDo: () => void drop() }}
+            >
+              Anybody still holding it has to be moved off it first.
+            </Confirm>
+          )
+          : null}
+        <Button variant="ghost" onPress={onBack}>Back to the list</Button>
+      </Stack>
+    </Stack>
   );
 }

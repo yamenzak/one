@@ -24,9 +24,12 @@
  * shorter first step.
  */
 
-import type { AccountId, Grant, Membership, RoleRegistry, TenantId } from "@engine/kernel";
+import type {
+  AccountId, Grant, Membership, RoleRefusal, RoleRegistry, TenantId,
+} from "@engine/kernel";
 import {
-  PLATFORM_ROLES, canAssign, newId, permissionsFor, registryWith, seatsUsed, wouldStrand,
+  PLATFORM_ROLES, canAssign, newId, permissionsFor, refuseRole, registryWith, seatsUsed,
+  wouldStrand,
 } from "@engine/kernel";
 import type { SchemaModule } from "./schema.js";
 import type { Db } from "./sql.js";
@@ -93,6 +96,84 @@ export async function rolesFor(
   return registryWith(declared, rows.results.map((r) => ({
     id: r.id, app: appId, name: r.id, permissions: JSON.parse(r.permissions_json) as string[],
   })));
+}
+
+/** One of a workspace's own roles, as a screen and a caller need it. */
+export interface RoleRow {
+  readonly id: string;
+  readonly app: string;
+  readonly name: string;
+  readonly permissions: readonly string[];
+}
+
+export const customRolesOf = async (
+  db: Db, tenantId: TenantId, appId: string,
+): Promise<readonly RoleRow[]> => {
+  const rows = await db.prepare(
+    `SELECT id, app, name, permissions_json FROM custom_role
+      WHERE tenant_id = ? AND app = ? ORDER BY name`)
+    .bind(tenantId, appId)
+    .all<{ id: string; app: string; name: string; permissions_json: string }>();
+  return rows.results.map((r) => ({
+    id: r.id as string, app: r.app as string, name: r.name as string,
+    permissions: JSON.parse(r.permissions_json as string) as string[],
+  }));
+};
+
+/**
+ * MAKE OR CHANGE ONE OF A WORKSPACE'S OWN ROLES.
+ *
+ * ⚠️ `beyond_you` IS THE ESCALATION AND IT IS THE WHOLE REASON THIS IS GUARDED.
+ * A workspace composing a role out of keys its author does not hold is somebody
+ * granting themselves more than they have — make the role, assign it to
+ * yourself, and the ceiling is gone. `refuseRole` is where that is checked and
+ * this is the only writer that reaches it.
+ *
+ * ⚠️ AND A DECLARED NAME MAY NOT BE TAKEN. `registryWith` lets the app’s own
+ * roles win, so a workspace redefining `keeper` would write a row that resolves
+ * to nothing — silently, with the editor reporting success.
+ */
+export async function saveRole(
+  db: Db, tenantId: TenantId, role: RoleRow,
+  declared: RoleRegistry, known: ReadonlySet<string>, author: ReadonlySet<string>,
+  now = new Date(),
+): Promise<RoleRow | RoleRefusal> {
+  /* ⚠️ EXISTING IS EDITABLE AND `declared` STILL IS NOT. `refuseRole` refuses an
+     id that already exists as a DECLARED role; one that exists as this
+     workspace’s own is the ordinary edit, so the check runs against the
+     declared registry alone. */
+  const why = refuseRole(
+    { id: role.id, app: role.app, name: role.name, permissions: role.permissions },
+    declared, known, author,
+  );
+  if (why) return why;
+
+  await db.prepare(
+    `INSERT INTO custom_role (id, tenant_id, app, name, permissions_json, at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET name = excluded.name,
+       permissions_json = excluded.permissions_json, at = excluded.at`)
+    .bind(role.id, tenantId, role.app, role.name,
+      JSON.stringify([...role.permissions]), now.toISOString()).run();
+  return role;
+}
+
+/**
+ * ⚠️ A ROLE SOMEBODY HOLDS MAY NOT BE DELETED. Their membership names it, the
+ * registry stops carrying it, and `permissionsFor` resolves it to nothing — so
+ * they keep their seat, keep the workspace on their list, and can do nothing at
+ * all, with no screen anywhere saying why. Refused rather than cascaded: taking
+ * everybody off a role is a decision about people, not a side effect of tidying.
+ */
+export async function dropRole(
+  db: Db, tenantId: TenantId, appId: string, id: string,
+): Promise<"ok" | "in_use" | "no_such_role"> {
+  const held = (await membersOf(db, tenantId)).some((m) => m.appRoles[appId] === id);
+  if (held) return "in_use";
+  const out = await db.prepare(
+    `DELETE FROM custom_role WHERE id = ? AND tenant_id = ? AND app = ?`)
+    .bind(id, tenantId, appId).run();
+  return (out.meta?.changes ?? 0) > 0 ? "ok" : "no_such_role";
 }
 
 /* ----------------------------------------------------------------- joining --- */

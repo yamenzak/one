@@ -6,7 +6,8 @@
   "description": "The browser half: the shell, the sky, and every screen the platform renders from a declaration. HeroUI v3, router-free \u2014 an app brings its own.",
   "exports": {
     ".": "./src/index.ts",
-    "./vite": "./vite.ts"
+    "./vite": "./vite.ts",
+    "./labels": "./src/parts/labels.tsx"
   },
   "types": "./src/index.ts",
   "scripts": {

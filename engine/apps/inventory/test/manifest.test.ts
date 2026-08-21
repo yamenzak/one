@@ -11,6 +11,7 @@
 import { describe, expect, it } from "vitest";
 import { refuseApp } from "@engine/kernel";
 import { INVENTORY } from "../src/index.js";
+import { PROFILES, WORDS, wordsFor } from "../src/words.js";
 
 describe("the manifest", () => {
   it("composes with nothing outstanding", () => {
@@ -129,6 +130,90 @@ describe("what the nightly sweep tells people", () => {
     expect(BOOK["process.pending"]?.needs).toBe("process:release");
     for (const def of Object.values(BOOK)) {
       expect(INVENTORY.access.permissions, def.id).toContain(def.needs);
+    }
+  });
+});
+
+/**
+ * WHAT A PROFILE ACTUALLY DOES, WHICH IS TWO THINGS AND NOT THREE.
+ *
+ * ⚠️ IT SEEDS AND IT DOES NOT GOVERN. What a new product starts as, and the
+ * words — both settings, at `tenant:manage`. Who may do what is a governance act
+ * at `member:manage`, and a product setting that quietly rewrote a roster's
+ * permissions would be a product update minting access. So the app OFFERS shapes
+ * and the workspace adopts them, through the same bounded write anybody
+ * composing a role goes through.
+ */
+describe("what this workspace is for", () => {
+  it("has a vocabulary for every profile it offers", () => {
+    const field = INVENTORY.settings?.["inventory.profile"]?.field;
+    expect(field?.values).toEqual([...PROFILES]);
+    for (const profile of PROFILES) {
+      expect(WORDS[profile]?.said.length, profile).toBeGreaterThan(10);
+      expect(WORDS[profile]?.place.length, profile).toBeGreaterThan(2);
+    }
+  });
+
+  /* ⚠️ AND A PROFILE A LATER BUILD REMOVED READS AS THE PLAIN ONE, never as a
+     screen with `undefined` where its headings go. A setting is a stored
+     string. */
+  it("reads an unknown profile as the plain one", () => {
+    expect(wordsFor("bakery")).toEqual(WORDS.home);
+    expect(wordsFor(null)).toEqual(WORDS.home);
+    expect(wordsFor("clinic")).toEqual(WORDS.clinic);
+  });
+});
+
+/**
+ * THE SHAPES A WORKSPACE CAN START FROM.
+ *
+ * ⚠️ THE BASEMENT IS THE ONE TO READ. `alone` holds no `process:*` key, so the
+ * Work destination is not DRAWN for somebody on it — which is the difference
+ * between a screen that is hidden and a screen that is not reachable, and it is
+ * the whole of what a profile that only seeded defaults was missing.
+ */
+describe("the roles a workspace can adopt", () => {
+  const PRESETS = INVENTORY.access.presets ?? [];
+
+  it("offers a shape for the basement that cannot reach the regulated half", () => {
+    const alone = PRESETS.find((p) => p.id === "alone");
+    expect(alone).toBeDefined();
+    expect(alone!.permissions.some((k) => k.startsWith("process:"))).toBe(false);
+    expect(alone!.permissions).toContain("stock:adjust");
+  });
+
+  /*
+    ⚠️ AND THE PRODUCT'S SHARPEST ACCESS RULE SURVIVES EVERY PRESET. Somebody on
+    the floor takes things all day; the moment they can also make a number agree
+    with what they took, the history stops being evidence.
+  */
+  it("never bundles taking with correcting for somebody on the floor", () => {
+    const floor = PRESETS.find((p) => p.id === "floor");
+    expect(floor!.permissions).toContain("stock:move");
+    expect(floor!.permissions).not.toContain("stock:adjust");
+  });
+
+  /* ⚠️ LOADING A MACHINE IS ORDINARY WORK; SAYING ITS OUTPUT MAY BE USED IS THE
+     JUDGEMENT THE RAIL EXISTS FOR. A preset bundling both would hand the whole
+     release rail to whoever presses start. */
+  it("keeps running a machine apart from signing for it", () => {
+    const operator = PRESETS.find((p) => p.id === "operator");
+    expect(operator!.permissions).toContain("process:run");
+    expect(operator!.permissions).not.toContain("process:release");
+    expect(PRESETS.find((p) => p.id === "signs-off")!.permissions).toContain("process:release");
+  });
+
+  /* ⚠️ EVERY KEY IS ONE THIS APP DECLARES, AND EVERY ID IS ADOPTABLE. Composition
+     already refuses either; said out loud because a preset that cannot be
+     adopted is a row somebody presses and is refused with a sentence about
+     somebody else's mistake. */
+  it("offers nothing that could not be adopted", () => {
+    for (const preset of PRESETS) {
+      expect(INVENTORY.access.roles[preset.id], preset.id).toBeUndefined();
+      for (const key of preset.permissions) {
+        expect(INVENTORY.access.permissions, `${preset.id}/${key}`).toContain(key);
+      }
+      expect(preset.said.length, preset.id).toBeGreaterThan(15);
     }
   });
 });

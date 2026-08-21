@@ -1620,15 +1620,27 @@ const LABELS = (api: Door) => function LabelsHere() {
  * has this workspace raised, and how many times". Every workspace therefore sees
  * three unticked steps for ever, including one that has done all three.
  */
-const START = () => function StartHere({ app, go }: Mounted) {
+const START = (api: Door) => function StartHere({ app, go }: Mounted) {
   /* ⚠️ WHAT THIS PERSON HOLDS COMES WITH THE PRODUCT, NOT FROM A SECOND
      REQUEST. The centre already resolved it to draw the nav; narrowing `app`
      here is the seam working as designed — what crosses it is data, and the
      narrowing is the app's, right where it uses one. */
   const held = (app as { readonly permissions?: readonly string[] }).permissions ?? [];
+  /* ⚠️ THE WORKSPACE'S OWN WORDS, WHICH IS WHAT A PROFILE IS. Asked rather than
+     mapped here: a container turning `clinic` into a sentence would be a second
+     copy of the vocabulary, drifting from `words.ts` the day a profile is
+     added. */
+  const starts = useAsked<{ words: { said: string } }>(() => api.get("product.start"));
 
   return (
-    <Start title={nameOf("/start")} done={[]} counts={{}} held={new Set(held)} onGo={go} />
+    <Start
+      title={nameOf("/start")}
+      said={starts.of.status === "ready" ? starts.of.data.words.said : ""}
+      done={[]}
+      counts={{}}
+      held={new Set(held)}
+      onGo={go}
+    />
   );
 };
 
@@ -1656,7 +1668,7 @@ export function mount({ register, api }: Mounting): void {
     ["/due", DUE(api)],
     ["/labels", LABELS(api)],
     ["/reports", REPORTS(api)],
-    ["/start", START()],
+    ["/start", START(api)],
   ];
   for (const [route, screen] of screens) {
     if (declared.has(route)) register(INVENTORY.id, route, screen);

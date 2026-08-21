@@ -217,6 +217,13 @@ describe("what the manifest produced", () => {
       "GET /api/package.held",
       "GET /api/package.list",
       "POST /api/package.revoke",
+      /* ⚠️ A WORKSPACE'S OWN ROLES — see stage 24. `custom_role` was applied,
+         read by `permissionsFor` and written by nothing; these three are what
+         make it reachable, and they arrive in every app because a role composing
+         ONE app's keys is a question every product has. */
+      "GET /api/role.list",
+      "POST /api/role.remove",
+      "POST /api/role.save",
       "GET /api/setting.read",
       "POST /api/setting.write",
       /* ⚠️ ASKING FOR A DATABASE OF ITS OWN, which is the half of isolation that

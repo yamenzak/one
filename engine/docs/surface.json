@@ -210,6 +210,27 @@
         "path": "/api/inbox.settings"
       },
       {
+        "id": "role.list",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/role.list",
+        "permission": "member:read"
+      },
+      {
+        "id": "role.save",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/role.save",
+        "permission": "member:manage"
+      },
+      {
+        "id": "role.remove",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/role.remove",
+        "permission": "member:manage"
+      },
+      {
         "id": "member.remove",
         "kind": "write",
         "method": "POST",

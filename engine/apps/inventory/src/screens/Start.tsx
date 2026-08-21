@@ -32,8 +32,15 @@ const LADDER: readonly { readonly id: string; readonly label: string; readonly u
   { id: "itemised", label: "Itemised", under: "One object with a serial number and a service date of its own" },
 ];
 
-export function Start({ title, done, counts, held, onGo }: {
+export function Start({ title, said, done, counts, held, onGo }: {
   readonly title?: string;
+  /**
+   * ⚠️ WHAT THIS WORKSPACE IS FOR, IN ITS OWN WORDS — the profile, made visible.
+   * A setting that changed only what a form defaults to is one nobody can tell
+   * they set; this is the line that says a clinic is reading a clinic's product
+   * rather than somebody else's, and it is the first thing on the first screen.
+   */
+  readonly said: string;
   /** What this workspace has actually done — the events that tick a step. */
   readonly done: readonly string[];
   /** How many times each, for a milestone that waits for fifty. */
@@ -42,7 +49,11 @@ export function Start({ title, done, counts, held, onGo }: {
   readonly onGo: (route: string) => void;
 }) {
   return (
-    <Screen shape="board" title={title}>
+    /* ⚠️ THE PROFILE'S OWN LINE IS THE SCREEN'S `under`, which is where a FACT
+       about the subject goes. A setting that changed only what a form defaults
+       to is one nobody can tell they set; this is what says a clinic is reading
+       a clinic's product rather than somebody else's. */
+    <Screen shape="board" title={title} under={said}>
       <Stack space="roomy">
         {/* ⚠️ NO QUICK-ACTION ROW ABOVE THIS, AND THE FIRST DRAFT HAD ONE. Every
             step below already carries the control that does it, so a row of
