@@ -653,6 +653,78 @@ describe("switching a product off for a workspace", () => {
       body: JSON.stringify({ tenant: tenantId, app: "hello", on: false }),
     })).status).toBe(404);
   });
+
+  /* ----------------------------------------------- and the owner's own --- */
+
+  /**
+   * ⚠️ THE SAME TWO SWITCHES, FROM INSIDE, WHICH IS THE HALF THAT DID NOT EXIST.
+   * `enableApp` and `disableApp` were the operator's alone, so a workspace that
+   * wanted a different product had to ask us — a support conversation for a
+   * decision the customer is entitled to make about their own workspace.
+   */
+  const listApps = () => at(slug, "/api/app.list", { headers: { cookie } })
+    .then(async (r) => [r.status, await r.json()] as const);
+
+  const switchApp = (on: boolean, id: string) => at(slug, `/api/app.${on ? "add" : "remove"}`, {
+    method: "POST", headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
+
+  it("lists what is on beside what could be added", async () => {
+    const [status, said] = await listApps();
+    expect(status).toBe(200);
+    const items = (said as { items: { id: string; on: boolean; last: boolean }[] }).items;
+    /* ⚠️ BOTH PRODUCTS, one on and one not — a list of only what is switched on
+       is a status, and the pair is what makes it a decision. */
+    expect(items.map((a) => [a.id, a.on]))
+      .toEqual([["inventory", false], ["hello", true]]);
+    /* ⚠️ AND THE SCREEN IS TOLD WHICH ONE IS THE LAST, so it can disable that
+       switch rather than let it be pressed and refused. */
+    expect(items.find((a) => a.id === "hello")?.last).toBe(true);
+  });
+
+  /**
+   * ⚠️ THE WHOLE POINT, END TO END: an owner adds a product and its routes start
+   * answering at their own door, with no operator anywhere in it.
+   */
+  it("adds a product, and the product answers", async () => {
+    expect((await at(slug, "/api/product.list", { headers: { cookie } })).status).toBe(404);
+
+    expect((await switchApp(true, "inventory")).status).toBe(200);
+    expect((await at(slug, "/api/product.list", { headers: { cookie } })).status).toBe(200);
+
+    /* ⚠️ AND THE LAST-ONE FLAG MOVED WITH IT. With two on, neither is the last,
+       so both switches are live. */
+    const [, said] = await listApps();
+    expect((said as { items: { last: boolean }[] }).items.every((a) => !a.last)).toBe(true);
+  });
+
+  it("removes one, and keeps the records behind it", async () => {
+    expect((await switchApp(false, "inventory")).status).toBe(200);
+    expect((await at(slug, "/api/product.list", { headers: { cookie } })).status).toBe(404);
+
+    /* ⚠️ OFF IS NOT GONE. Switching it back on returns everything — a toggle
+       that erased would be the most destructive control in the product. */
+    expect((await switchApp(true, "inventory")).status).toBe(200);
+    expect((await at(slug, "/api/product.list", { headers: { cookie } })).status).toBe(200);
+    await switchApp(false, "inventory");
+  });
+
+  /**
+   * ⚠️ A WORKSPACE CANNOT EMPTY ITSELF. With nothing switched on it has no
+   * screens — including the one that would switch something back on — so it is a
+   * door that locks from the inside, with the bill still running.
+   */
+  it("refuses to switch off the only product it has", async () => {
+    expect((await switchApp(false, "hello")).status).toBe(409);
+    expect((await at(slug, "/api/note.list", { headers: { cookie } })).status).toBe(200);
+  });
+
+  /* ⚠️ THE REGISTRY HOLDS WHAT THIS DEPLOYMENT CAN RUN; `sells` holds what
+     anybody may switch on for themselves. An id in neither is not found. */
+  it("refuses a product this deployment does not sell", async () => {
+    expect((await switchApp(true, "nonesuch")).status).toBe(404);
+  });
 });
 
 /* ------------------------------------------------------- one membership --- */

@@ -20,7 +20,9 @@ import type {
   Allowance, AnyOperation, AppSpec, Channel, CollectionSpec, Gate, PackDef, PlanSpec,
   RoleRegistry, TenantId, Theme,
 } from "@engine/kernel";
-import { PUBLIC, SURFACES, refusePolicy, seatsUsed, withinQuota } from "@engine/kernel";
+import {
+  PUBLIC, SURFACES, foundingAppRole, refusePolicy, seatsUsed, withinQuota,
+} from "@engine/kernel";
 import { brandingOf, setBranding } from "./branding.js";
 import { LEAST_SIDE, MOST_BYTES, MOST_SIDE, forgetIcon, hasIcon, setIcon } from "./icon.js";
 import { noteInvitation, tenantById } from "./directory.js";
@@ -657,7 +659,8 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         const id = String(input.id ?? "");
         /* ⚠️ ON OFFER, NOT MERELY SERVED. The registry holds what this deployment
            can run; `sells` holds what anybody may switch on for themselves. */
-        if (!ctx.products?.sells().includes(id) || !ctx.appOf(id)) {
+        const app = ctx.appOf(id);
+        if (!ctx.products?.sells().includes(id) || !app) {
           return ctx.fail("platform.not_found");
         }
         /* ⚠️ ALREADY ON IS A SUCCESS, NOT A CONFLICT. The control is a switch and
@@ -665,6 +668,38 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
            shows an error for agreeing with it. */
         if (!ctx.enabledApps.includes(id)) {
           await ctx.products.switchOn(ctx.tenantId as TenantId, id, new Date(ctx.now));
+        }
+
+        /*
+          ⚠️ AND WHOEVER SWITCHED IT ON CAN USE IT, WHICH TOOK A ROUND TRIP TO
+          LEARN. Enabling a product is a row in the directory and nothing else —
+          it says the workspace HAS the product, not that anybody in it may open
+          one. Without this the owner presses the switch, the nav gains a
+          product, and its every route answers 403 to the person who added it.
+
+          ⚠️ THEM ALONE, THOUGH, AND NOT THE WHOLE ROSTER. Roles are granted by
+          name through the roster, one person at a time, bounded by what the
+          assigner holds; handing a new product to ten people because one of them
+          switched it on would be a grant nobody made. This is the same rule
+          founding follows — the founder gets the app's founding role — applied
+          at the other moment a workspace gains a product.
+        */
+        const me = ctx.accountId
+          ? await memberFor(ctx.db, ctx.tenantId as TenantId, ctx.accountId as never)
+          : null;
+        const role = foundingAppRole(app.access);
+        if (me && role && !me.appRoles[id]) {
+          await setAppRole(
+            ctx.db, ctx.tenantId as TenantId, me.id, id, role,
+            /* ⚠️ THE ROLE'S OWN KEYS AS THE GRANTER'S, AND THIS IS THE ONE PLACE
+               THAT IS RIGHT. `canAssign` bounds a grant by what the assigner
+               already holds IN THAT PRODUCT — and nobody holds anything in a
+               product switched on a moment ago, so the ordinary rule would make
+               the first role in a new product ungrantable by anybody, for ever.
+               What bounds it instead is `tenant:manage`, checked at the door. */
+            new Set(app.access.roles[role] ?? []),
+            app.access.roles,
+          );
         }
         return { id };
       },

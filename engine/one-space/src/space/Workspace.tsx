@@ -35,6 +35,7 @@ const GLYPH: Readonly<Record<WorkspacePart, string>> = {
   people: "people",
   money: "money",
   packages: "package",
+  apps: "apps",
   settings: "settings",
   brand: "star",
   notices: "bell",

@@ -347,11 +347,20 @@ export function reading(): Device {
     deviceMemory?: number; connection?: { saveData?: boolean };
   };
   return {
-    /* ⚠️ BOTH SIGNALS ARE THE OPERATING SYSTEM'S HERE. `data-reduce-motion` is
-       set by `applyLiveliness` from the person's own choice, and reading it back
-       as `asked` would make `none` indistinguishable from the OS's request —
-       which matters, because `full` may override one and never the other. */
-    asked: media("(prefers-reduced-motion: reduce)"),
+    /*
+      ⚠️ THE ATTRIBUTE COUNTS AS ASKING, AND LEAVING IT OUT BROKE THE CURTAIN.
+      `data-reduce-motion` is how a PAGE switches its own ambience off — `REDUCED`
+      is exported for exactly that, and a harness sets it to prove the opening
+      holds one line. Reading only the media query left every CSS rule honouring
+      it while everything decided at RENDER went on moving, which is the split
+      this whole budget exists to close.
+
+      ⚠️ SO `none` AND THE OPERATING SYSTEM ARE ONE ANSWER HERE, and that is
+      harmless: `none` already means both tiers off, so there is nothing `full`
+      could override that it should be allowed to.
+    */
+    asked: media("(prefers-reduced-motion: reduce)")
+      || document.documentElement.getAttribute("data-reduce-motion") === "true",
     saveData: nav.connection?.saveData === true,
     fine: media("(pointer: fine)") && media("(hover: hover)"),
     memory: typeof nav.deviceMemory === "number" ? nav.deviceMemory : null,

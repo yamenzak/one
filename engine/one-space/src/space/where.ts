@@ -98,6 +98,15 @@ export type Where =
   /** What this workspace SELLS — its own catalogue, not what it pays us. */
   | { readonly at: "packages"; readonly slug: string }
   /**
+   * WHICH PRODUCTS THIS WORKSPACE HAS SWITCHED ON.
+   *
+   * ⚠️ `apps`, NOT `products`, AND THE NEIGHBOUR IS WHY. `packages` one line up
+   * is what this workspace SELLS to its own customers; this is what it BOUGHT
+   * from the deployment. Two rows a word apart, meaning opposite sides of the
+   * same workspace's trade, is a menu somebody has to open to tell apart.
+   */
+  | { readonly at: "apps"; readonly slug: string }
+  /**
    * ⚠️ ONE PRODUCT'S PRICE LIST. A bill is read monthly and a plan is changed
    * once a year, so the catalogue is a screen the bill's own row opens rather
    * than four catalogues stacked under a total (DESIGN.md §3).
@@ -256,7 +265,7 @@ export type Where =
   | { readonly at: "telling" };
 
 /** Every screen a workspace has, in the order its own screen lists them. */
-export const OF_WORKSPACE = ["people", "money", "packages", "settings", "brand", "notices", "wording", "trying", "trust"] as const;
+export const OF_WORKSPACE = ["people", "money", "packages", "apps", "settings", "brand", "notices", "wording", "trying", "trust"] as const;
 
 /**
  * EVERY SCREEN THAT IS ANSWERED BY `WorkspacePart`, DERIVED.
@@ -357,7 +366,7 @@ export const partsFor = (role: string | null): readonly WorkspacePart[] => {
   /* ⚠️ `brand` is here because it is what a business's own customers see — a
      staff member changing the colour on every screen in the workspace is not a
      staff decision. */
-  const OWNED: readonly WorkspacePart[] = ["money", "packages", "wording", "trying", "notices", "brand"];
+  const OWNED: readonly WorkspacePart[] = ["money", "packages", "apps", "wording", "trying", "notices", "brand"];
   return OF_WORKSPACE.filter((p) => runs || !OWNED.includes(p));
 };
 
@@ -594,6 +603,7 @@ export const nameOf = (where: Where): string => {
     case "people": return "People";
     case "money": return "Money";
     case "packages": return "Packages";
+    case "apps": return "Apps";
     case "plan": return "Plans";
     case "settings": return "Settings";
     case "notices": return "What everybody is told";

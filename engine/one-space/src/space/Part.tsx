@@ -18,6 +18,7 @@ import { useCentre } from "../centre/data.js";
 import { People } from "../centre/People.js";
 import { Money } from "../centre/Money.js";
 import { Packages } from "../centre/Packages.js";
+import { Apps } from "../centre/Apps.js";
 import { Plan } from "../centre/Plan.js";
 import { SettingsArea } from "../centre/SettingsArea.js";
 import { Trust } from "../centre/Trust.js";
@@ -67,6 +68,8 @@ export function WorkspacePart({ part, slug, app, area, id, onGo }: {
     /* ⚠️ NO APP ID: THERE IS ONE MEMBERSHIP, so there is one catalogue. */
     case "plan": return <Plan />;
     case "packages": return <Packages view={view} />;
+    /* ⚠️ WHAT THIS WORKSPACE HAS, not what it sells — see `Apps`. */
+    case "apps": return <Apps view={view} />;
     /* ⚠️ THE WORKSPACE'S SETTINGS ONLY. A person's own preferences are `prefs`,
        under YOU — see `where.ts`. */
     case "settings":
