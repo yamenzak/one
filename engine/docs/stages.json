@@ -372,9 +372,9 @@
     },
     {
       "n": 62,
-      "status": "planned",
+      "status": "shipped",
       "title": "A list narrows and pages — the generated read answers past the first fifty, and says how many there are",
-      "ends": "The generated `list` takes a filter over declared fields, a cursor and a count, so a screen can ask for one shelf's lines and for the next page of them; the browser is told the total rather than inferring it from a full page. Until then every list in every product is the fifty most recent rows of a whole collection, silently — a workspace with two hundred products sees fifty and nothing says so, which is the failure class this repo's guards exist to refuse."
+      "ends": "The generated `list` takes a filter over declared fields, a cursor and a count. `where` is equality over what the collection declares — a comparison language would be a query language arriving over the wire, and equality answers “this shelf's lines”, which is what a screen asks. The cursor is `(at, id)` rather than an offset, because rows arrive at the TOP: an offset of fifty on a collection that gained three since the first page steps over three the reader has never seen, silently. And the total is the collection's, counted over the same `WHERE` and WITHOUT the cursor, so it does not fall as somebody reads — a page of fifty out of two hundred was indistinguishable from a collection of fifty, and the screen drawing it said “fifty products” with complete confidence. The count runs BESIDE the page rather than before it, so the latency budget's `depth` is unchanged and only its trip count moved, 11 → 12, on purpose."
     },
     {
       "n": 64,

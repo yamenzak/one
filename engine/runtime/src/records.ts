@@ -212,15 +212,128 @@ export async function readOne(
   return row ?? null;
 }
 
+/**
+ * WHAT A LIST WAS ASKED FOR.
+ *
+ * ⚠️ EVERY FIELD OF IT IS OPTIONAL AND THE DEFAULT IS WHAT THIS ALWAYS DID —
+ * fifty rows, newest first, the whole collection. A widening that changed the
+ * default would change every screen in every product at once.
+ */
+export interface Asking {
+  /** Bounded by `MOST_ROWS`, because a caller can ask for anything. */
+  readonly limit?: number;
+  /** ⚠️ Equality over DECLARED fields only — see `narrow`. */
+  readonly where?: Readonly<Record<string, unknown>>;
+  /** The `next` of the previous page, opaque to the caller. */
+  readonly after?: string;
+}
+
+export interface Listed {
+  readonly items: readonly Record<string, unknown>[];
+  /**
+   * ⚠️ HOW MANY THERE ARE, WHICH IS THE HALF THAT WAS MISSING. A page of fifty
+   * out of two hundred is indistinguishable from a collection of fifty, and the
+   * screen drawing it says "fifty products" with total confidence. Counting is a
+   * second statement and it is worth it: a list that cannot say what it is a
+   * list OF is a list that lies by omission.
+   */
+  readonly total: number;
+  /** ⚠️ `null` at the end, so "is there more" is an answer rather than a guess. */
+  readonly next: string | null;
+}
+
+/**
+ * ⚠️ FIFTY BY DEFAULT AND TWO HUNDRED AT MOST. The ceiling is not tidiness: a
+ * caller asking for everything is a worker holding a whole collection in memory
+ * to serialise it, and the one that does it is always the biggest workspace.
+ */
+export const MOST_ROWS = 200;
+
+/**
+ * ⚠️ THE FILTER IS EQUALITY OVER DECLARED FIELDS, AND NOTHING ELSE. A comparison
+ * language would be a query language arriving over the wire; equality answers
+ * "this shelf's lines" and "this product's deliveries", which is what a screen
+ * asks. Anything undeclared is DROPPED rather than refused — a client sending a
+ * field this build removed should get the list, not an error about a name.
+ *
+ * ⚠️ AND `id` IS ALLOWED THOUGH NO COLLECTION DECLARES IT, because the platform
+ * writes that column into every table and a caller narrowing to one row is
+ * asking a legitimate question.
+ */
+const narrow = (
+  spec: CollectionSpec, where: Readonly<Record<string, unknown>> | undefined,
+): { readonly sql: string; readonly bound: readonly unknown[] } => {
+  const parts: string[] = [];
+  const bound: unknown[] = [];
+  for (const [name, value] of Object.entries(where ?? {})) {
+    if (name !== "id" && !(name in spec.fields)) continue;
+    if (value === undefined) continue;
+    parts.push(`${column(name)} = ?`);
+    bound.push(normalise(value));
+  }
+  return { sql: parts.map((p) => ` AND ${p}`).join(""), bound };
+};
+
+/**
+ * A PAGE OF A COLLECTION, AND HOW MANY THERE ARE.
+ *
+ * ⚠️ THE CURSOR IS `(at, id)` RATHER THAN AN OFFSET, and the difference is
+ * whether the second page can miss a row. Rows are newest-first and new rows
+ * arrive at the top, so an offset of fifty on a collection that gained three
+ * records since the first page skips three the reader has never seen — silently,
+ * in a product whose whole job is saying what is there.
+ *
+ * ⚠️ AND IT IS `at` PLUS `id` BECAUSE `at` IS NOT UNIQUE. An import writes eight
+ * hundred rows inside one millisecond; keyed on the instant alone the page
+ * boundary either repeats them or steps over them.
+ */
 export async function list(
-  db: Db, spec: CollectionSpec, scope: string, limit = 50,
-): Promise<readonly Record<string, unknown>[]> {
+  db: Db, spec: CollectionSpec, scope: string, asking: Asking = {},
+): Promise<Listed> {
   const erase = eraseBy(spec);
-  const sql = erase
-    ? `SELECT * FROM ${table(spec.id)} WHERE ${column(erase.column)} = ? ORDER BY at DESC LIMIT ?`
-    : `SELECT * FROM ${table(spec.id)} ORDER BY at DESC LIMIT ?`;
-  const rows = await db.prepare(sql).bind(...(erase ? [scope, limit] : [limit])).all();
-  return rows.results;
+  const want = Math.min(MOST_ROWS, Math.max(1, Math.trunc(asking.limit ?? 50)));
+  const filter = narrow(spec, asking.where);
+
+  const scoped = erase ? `${column(erase.column)} = ?` : "1 = 1";
+  const where = `${scoped}${filter.sql}`;
+  const bound = [...(erase ? [scope] : []), ...filter.bound];
+
+  /* ⚠️ A PIPE, BECAUSE NEITHER HALF CAN CONTAIN ONE. An instant is ISO text and
+     an id is a prefix and alphanumerics; a separator either of them could hold
+     would split the cursor in the wrong place on exactly one row in a million. */
+  const [cutAt, cutId] = (asking.after ?? "").split("|");
+  const past = asking.after ? ` AND (at < ? OR (at = ? AND id < ?))` : "";
+
+  /*
+    ⚠️ THE COUNT AND THE PAGE GO TOGETHER, NOT ONE AFTER THE OTHER. Neither needs
+    the other's answer, and a database round trip taken in SEQUENCE is a round
+    trip added to the chain — which is the number the latency budget measures and
+    the one somebody on a warehouse phone feels (D36). Awaited in order, this
+    charged every list in every product an extra hop for a number.
+
+    ⚠️ AND THE COUNT IGNORES THE CURSOR, deliberately. A total narrowed by the
+    page boundary would fall as somebody read, which is worse than no total.
+  */
+  const [counted, rows] = await Promise.all([
+    db.prepare(`SELECT COUNT(*) AS n FROM ${table(spec.id)} WHERE ${where}`)
+      .bind(...bound).first<{ n: number }>(),
+    db.prepare(
+      `SELECT * FROM ${table(spec.id)} WHERE ${where}${past}
+        ORDER BY at DESC, id DESC LIMIT ?`)
+      .bind(...bound, ...(asking.after ? [cutAt, cutAt, cutId] : []), want + 1).all(),
+  ]);
+
+  /* ⚠️ ONE MORE THAN ASKED FOR IS HOW "IS THERE ANOTHER PAGE" IS ANSWERED
+     WITHOUT A SECOND QUERY — and a `next` handed back on the last page is a
+     screen with a button that fetches nothing. */
+  const more = rows.results.length > want;
+  const items = more ? rows.results.slice(0, want) : rows.results;
+  const last = items.at(-1);
+  return {
+    items,
+    total: Number(counted?.n ?? items.length),
+    next: more && last ? `${String(last.at)}|${String(last.id)}` : null,
+  };
 }
 
 /* ----------------------------------------------------------------- erase --- */

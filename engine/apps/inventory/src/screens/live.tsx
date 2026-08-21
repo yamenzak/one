@@ -119,13 +119,72 @@ function useAsked<T>(run: () => Promise<Got<T>>, on: readonly unknown[] = []) {
  * trip in front of every screen — and a screen that waits twice on a warehouse
  * phone waits about a second.
  *
- * DEFER(engine-62) stage:62 — the generated `list` answers the fifty most recent
- * rows of a whole collection: no filter, no cursor, no count. A workspace with
- * two hundred products can only ever see fifty of them, and nothing says so.
- * Narrowing to a location and paging past the first page are both that stage.
+ * ⚠️ THE SHELF PAGES AND THE OTHER TWO DO NOT, AND THAT IS A DECISION. A
+ * workspace has thousands of stock lines and tens of places; the tree has to be
+ * whole to be drawn at all, and the catalogue is read to turn a product id into
+ * a name on a row. Both are bounded by what a plan sells, and the shelf is the
+ * one that is not.
  */
+/**
+ * A LIST THAT KNOWS IT IS A PAGE.
+ *
+ * ⚠️ THE ROWS ACCUMULATE AND THE TOTAL DOES NOT. Asking for the next page
+ * REPLACING what is on screen is a list that scrolls backwards; asking for it
+ * and adding to the count is a total that grows as somebody reads. What is
+ * accumulated is the rows; `total` is the collection's, answered fresh by every
+ * page and identical on all of them.
+ *
+ * ⚠️ AND A NARROWING RESETS THE WALK. A cursor is a position in one ordering of
+ * one filter — carried across a change of filter it points into a list that no
+ * longer exists, and the second page comes back empty. `on` is the effect's
+ * dependency AND the reset, which is what stops those two drifting apart.
+ */
+interface Page { readonly items: readonly Row[]; readonly total: number; readonly next: string | null }
+
+function usePaged(run: (after: string | null) => Promise<Got<Page>>, on: readonly unknown[] = []) {
+  const [of, set] = React.useState<Loaded<readonly Row[]>>(waiting());
+  const [total, setTotal] = React.useState(0);
+  const [next, setNext] = React.useState<string | null>(null);
+  const [tick, again] = React.useReducer((n: number) => n + 1, 0);
+
+  React.useEffect(() => {
+    let live = true;
+    set(waiting());
+    setNext(null);
+    void run(null).then((got) => {
+      if (!live) return;
+      if (!got.ok) { set(trouble(got.problem)); return; }
+      set(ready(got.value.items));
+      setTotal(got.value.total);
+      setNext(got.value.next);
+    });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick, ...on]);
+
+  /* ⚠️ ADDED TO WHAT IS THERE, and only while the page it was asked for is
+     still the one on screen — a `more` that landed after a refresh would splice
+     yesterday's rows into today's list. */
+  const more = React.useCallback(() => {
+    if (!next) return;
+    const asked = next;
+    void run(asked).then((got) => {
+      if (!got.ok) return;
+      set((was) => (was.status === "ready" ? ready([...was.data, ...got.value.items]) : was));
+      setTotal(got.value.total);
+      setNext((now) => (now === asked ? got.value.next : now));
+    });
+  }, [next, run]);
+
+  return { of, total, more: next !== null, onMore: more, again };
+}
+
 function useWorld(api: Door) {
-  const stock = useAsked<{ items: readonly Row[] }>(() => api.get("stock.list"));
+  /* ⚠️ THE SHELF IS THE ONE LIST THAT PAGES, because it is the one a workspace
+     has thousands of rows in. The tree and the catalogue are read whole to draw
+     the nav and to name a line, and both are bounded by what a plan sells. */
+  const stock = usePaged((after) => api.get<Page>("stock.list",
+    after ? { after } : {}));
   const places = useAsked<{ items: readonly Row[] }>(() => api.get("location.list"));
   const kinds = useAsked<{ items: readonly Row[] }>(() => api.get("product.list"));
 
@@ -133,7 +192,17 @@ function useWorld(api: Door) {
     stock.again(); places.again(); kinds.again();
   }, [stock, places, kinds]);
 
-  return { stock: stock.of, places: places.of, kinds: kinds.of, again };
+  return {
+    stock: stock.of.status === "ready"
+      ? ready({ items: stock.of.data })
+      : stock.of as Loaded<{ items: readonly Row[] }>,
+    lines: stock.total,
+    more: stock.more,
+    onMore: stock.onMore,
+    places: places.of,
+    kinds: kinds.of,
+    again,
+  };
 }
 
 /* ------------------------------------------------------------- the shapes --- */
@@ -310,6 +379,15 @@ const STOCK = (api: Door) => function StockHere({ go }: Mounted) {
       of={rows}
       places={places}
       here={here}
+      /* ⚠️ THE COLLECTION'S OWN COUNT, NOT THE PAGE'S. `rows.length` is what is
+         drawn; `lines` is what there is, and the gap between them is the whole
+         reason the screen can say so. */
+      total={world.lines}
+      /* ⚠️ AND NOT WHILE THE READER HAS NARROWED. The count and the cursor are
+         both about the unfiltered list; offering another page under a filter
+         would append rows the filter then hides. */
+      more={world.more && here === null}
+      onMore={world.onMore}
       again={world.again}
       onGo={setHere}
       onOpen={(line) => go(`/thing/${line.id}`)}
@@ -366,6 +444,9 @@ const THING = (api: Door) => function ThingHere({ go, at }: Mounted) {
         of={ready([])}
         places={places}
         here={null}
+        total={0}
+        more={false}
+        onMore={() => undefined}
         again={world.again}
         onGo={() => undefined}
         onOpen={() => undefined}
@@ -1185,9 +1266,11 @@ const verdictOf = (v: unknown): Covered["verdict"] =>
  * costs is one more read, and it is on the job's own screen where somebody
  * actually needs the answer.
  *
- * DEFER(engine-62) stage:62 — a count of what a job used, per job, is exactly the
- * aggregate the generated `list` cannot express. Until it can, a list row that
- * promised a doubt count would be N reads or a lie.
+ * ⚠️ AND A LIST DOES NOT AGGREGATE, BY CONSTRUCTION. A generated read answers
+ * rows and a total; a count of what each job USED is a group-by, which is a
+ * query language arriving through a door that deliberately has none. The row
+ * shows the job; the answer is one read away on the job's own screen, where
+ * somebody is asking for it.
  */
 const WORK = (api: Door) => function WorkHere({ go }: Mounted) {
   const today = dayHere();

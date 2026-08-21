@@ -19,7 +19,9 @@ import {
 } from "../src/directory.js";
 import { BILLING_SCHEMA } from "../src/billing.js";
 import { applySchema, refuseSql, schemaFor, stampOf, statementsFor } from "../src/schema.js";
-import { erase, list, put, readOne, unreachableByErasure } from "../src/records.js";
+import {
+  MOST_ROWS, erase, list, put, readOne, unreachableByErasure,
+} from "../src/records.js";
 import { bindingFor, shardFor, unbound } from "../src/handles.js";
 import type { Db } from "../src/sql.js";
 
@@ -455,13 +457,129 @@ describe("forgetting a workspace", () => {
     expect(done.find((d) => d.table === "note")?.rows).toBe(1);
     /* The invoice stays, because its declaration said why it outlives them. */
     expect(done.find((d) => d.table === "receipt")).toBeUndefined();
-    expect(await list(db, receipt, "ten_a")).toHaveLength(1);
+    expect((await list(db, receipt, "ten_a")).items).toHaveLength(1);
     /* And nobody else's rows moved. */
-    expect(await list(db, note, "ten_b")).toHaveLength(1);
+    expect((await list(db, note, "ten_b")).items).toHaveLength(1);
   });
 });
 
 /* ----------------------------------------------------------------- handles --- */
+
+/* ------------------------------------------------------------------ pages --- */
+
+/**
+ * ⚠️ A LIST THAT CANNOT SAY WHAT IT IS A LIST OF LIES BY OMISSION. Fifty rows
+ * out of two hundred is indistinguishable from a collection of fifty, and the
+ * screen drawing it says "fifty products" with complete confidence — in a
+ * product whose entire purpose is answering how many there are.
+ */
+describe("a page of a collection", () => {
+  const db = () => env.DIRECTORY as unknown as Db;
+
+  /** ⚠️ Written one at a time, because `at` is what the cursor walks. */
+  const fill = async (n: number, scope = "ten_a") => {
+    for (let i = 0; i < n; i++) {
+      await put(db(), note, scope, { title: `Note ${i}` }, null,
+        new Date(Date.UTC(2026, 0, 1, 0, 0, i)));
+    }
+  };
+
+  beforeEach(async () => {
+    await applySchema(db(), [schemaFor(app("paged"))]);
+    await db().exec(`DELETE FROM note;`);
+  });
+
+  /*
+    ⚠️ THE DEFAULT IS WHAT IT ALWAYS DID, which is the half that matters most. A
+    widening that changed what a caller asking nothing receives would change
+    every screen in every product at once.
+  */
+  it("answers fifty newest-first when it is asked nothing", async () => {
+    await fill(3);
+    const said = await list(db(), note, "ten_a");
+    expect(said.items).toHaveLength(3);
+    expect(said.total).toBe(3);
+    /* ⚠️ Nothing more, so `next` is an answer rather than a guess. */
+    expect(said.next).toBeNull();
+    expect(String(said.items[0]?.title)).toBe("Note 2");
+  });
+
+  /*
+    ⚠️ THE TOTAL IS OF THE COLLECTION, NOT OF THE PAGE. Counted with the cursor
+    it would fall as somebody read — a list of two hundred that says two hundred,
+    then a hundred and fifty, then a hundred.
+  */
+  it("says how many there are, whatever page it hands over", async () => {
+    await fill(7);
+    const first = await list(db(), note, "ten_a", { limit: 3 });
+    expect(first.items).toHaveLength(3);
+    expect(first.total).toBe(7);
+    expect(first.next).not.toBeNull();
+
+    const second = await list(db(), note, "ten_a",
+      { limit: 3, ...(first.next ? { after: first.next } : {}) });
+    expect(second.total).toBe(7);
+    expect(second.items.map((r) => r.title)).toEqual(["Note 3", "Note 2", "Note 1"]);
+  });
+
+  /*
+    ⚠️ AND THE PAGES DO NOT OVERLAP OR SKIP. That is the whole reason the cursor
+    is `(at, id)` rather than an offset: rows arrive at the TOP, so an offset of
+    fifty on a collection that gained three since the first page steps over three
+    the reader has never seen.
+  */
+  it("walks the whole collection exactly once", async () => {
+    await fill(10);
+    const seen: string[] = [];
+    let after: string | null = null;
+    for (let page = 0; page < 10; page++) {
+      const said: Awaited<ReturnType<typeof list>> = await list(db(), note, "ten_a",
+        { limit: 4, ...(after ? { after } : {}) });
+      seen.push(...said.items.map((r) => String(r.title)));
+      after = said.next;
+      if (!after) break;
+    }
+    expect(seen).toHaveLength(10);
+    expect(new Set(seen).size).toBe(10);
+  });
+
+  /* ⚠️ AND IT IS BOUNDED. A caller asking for everything is a worker holding a
+     whole collection in memory, and the one that does it is the biggest
+     workspace. */
+  it("refuses to hand over more than the ceiling", async () => {
+    await fill(5);
+    const said = await list(db(), note, "ten_a", { limit: 10_000 });
+    expect(said.items.length).toBeLessThanOrEqual(MOST_ROWS);
+  });
+
+  /*
+    ⚠️ NARROWING IS EQUALITY OVER DECLARED FIELDS, and an undeclared name is
+    DROPPED rather than refused — a client sending a field this build removed
+    should get the list, not an error about a name it cannot fix.
+  */
+  it("narrows to a declared field, and ignores one nothing declares", async () => {
+    await put(db(), note, "ten_a", { title: "Kept", done: true });
+    await put(db(), note, "ten_a", { title: "Open", done: false });
+
+    const done = await list(db(), note, "ten_a", { where: { done: true } });
+    expect(done.items).toHaveLength(1);
+    expect(done.total).toBe(1);
+    expect(String(done.items[0]?.title)).toBe("Kept");
+
+    const all = await list(db(), note, "ten_a", { where: { invented: "x" } });
+    expect(all.items).toHaveLength(2);
+  });
+
+  /* ⚠️ AND NARROWING NEVER REACHES PAST THE SCOPE. A filter is a convenience
+     over the caller's own rows; one that could widen them would be the row-level
+     scope with an override. */
+  it("cannot narrow its way into somebody else's rows", async () => {
+    await put(db(), note, "ten_b", { title: "Theirs" });
+    const said = await list(db(), note, "ten_a", { where: { title: "Theirs" } });
+    expect(said.items).toHaveLength(0);
+    expect(said.total).toBe(0);
+  });
+});
 
 describe("finding the database a tenant is on", () => {
   it("derives the binding from the shard id", () => {

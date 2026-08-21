@@ -768,6 +768,13 @@ export function InventoryScreen({ route, onGo }: {
           of={lines}
           places={PLACES}
           here={here}
+          /* ⚠️ MORE THAN IS DRAWN, DELIBERATELY. The one state worth
+             photographing here is a page that is not the whole list — a ground
+             where the two numbers agree photographs the case the footer never
+             appears in. */
+          total={214}
+          more
+          onMore={nothing}
           again={nothing}
           onGo={setHere}
           onOpen={() => go("/thing")}

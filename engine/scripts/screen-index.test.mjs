@@ -17,7 +17,7 @@
  * list of screens is a third place the answer lives.
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -28,6 +28,16 @@ const ROOT = join(ENGINE, "..");
 let bad = 0;
 const fail = (m) => { console.error(`BAD  ${m}`); bad++; };
 const ok = (m) => console.log(`ok   ${m}`);
+
+/**
+ * ⚠️ `--write` REWRITES THE LINE NUMBERS, AND NOTHING ELSE. A guard that only
+ * refuses makes the index a thing somebody hand-counts after every edit, which
+ * is the same instruction that let every other product document rot — so the
+ * repair is one command, exactly as the generated documents are. What it does
+ * NOT touch is which screens are listed or what they are called: a row is a
+ * decision, and a script inventing one would be the map writing itself.
+ */
+const WRITING = process.argv.includes("--write");
 
 /**
  * ⚠️ ONE ENTRY PER PRODUCT, AND A NEW APP MEANS A NEW ENTRY. Deriving the
@@ -44,6 +54,27 @@ const INDEXED = [
     under: "apps/inventory/src",
   },
 ];
+
+/** What a screen or a container declaration looks like at the start of a line. */
+const declares = (line) =>
+  /^export (function|const) [A-Z]/.test(line) || /^const [A-Z_]+ = \(api: /.test(line);
+
+/**
+ * ⚠️ THE NEAREST DECLARATION TO WHERE THE INDEX POINTED, which is what "it
+ * moved" means: an edit above a component shifts it by a few lines, and the one
+ * it shifted to is the closest one either side. Guessing the FIRST declaration
+ * in the file instead would silently repoint every stale row at the same
+ * function.
+ */
+const nearest = (lines, at) => {
+  const from = Number(at) - 1;
+  for (let step = 0; step < lines.length; step++) {
+    for (const i of [from - step, from + step]) {
+      if (i >= 0 && i < lines.length && declares(lines[i])) return i;
+    }
+  }
+  return -1;
+};
 
 /* ⚠️ Comments quote routes, so they are blanked before anything is matched. */
 const strip = (s) => s
@@ -70,7 +101,9 @@ for (const one of INDEXED) {
     continue;
   }
 
-  const text = readFileSync(doc, "utf8");
+  let text = readFileSync(doc, "utf8");
+  /** Every `file:line` this pass wants moved, applied together at the end. */
+  const moved = [];
   /* ⚠️ THE TABLE ROWS ONLY. Prose elsewhere in the document naturally mentions
      `/labels` and `/import`; a match on the whole file would pass a document
      whose table had been deleted. */
@@ -108,15 +141,35 @@ for (const one of INDEXED) {
       const lines = readFileSync(path, "utf8").split("\n");
       const line = lines[Number(at) - 1] ?? "";
       /* Either an exported screen, or one of the containers that mount them. */
-      if (!/^export (function|const) [A-Z]/.test(line) && !/^const [A-Z_]+ = \(api: /.test(line)) {
-        fail(`screen-index: ${one.doc} points at ${ref}:${at}, which is not a declaration.\n`
-          + `       Found: ${line.trim().slice(0, 60) || "(blank)"}\n`
-          + `       The component moved and the index did not.`);
+      if (!declares(line)) {
+        /*
+          ⚠️ MOVED IS REPAIRED; GONE IS REFUSED. A declaration that shifted by
+          three lines is arithmetic and `--write` does it. One that no longer
+          exists under any name is a screen somebody deleted, and inventing a
+          line for it would be the index agreeing with itself about a file that
+          draws nothing.
+        */
+        const found = lines.findIndex(declares) >= 0
+          ? nearest(lines, at)
+          : -1;
+        if (WRITING && found >= 0) {
+          moved.push([`${ref}:${at}`, `${ref}:${found + 1}`]);
+        } else {
+          fail(`screen-index: ${one.doc} points at ${ref}:${at}, which is not a declaration.\n`
+            + `       Found: ${line.trim().slice(0, 60) || "(blank)"}\n`
+            + `       The component moved and the index did not.`
+            + `${found >= 0 ? " Run with --write." : ""}`);
+        }
       }
       checked++;
     }
   }
 
+  if (moved.length) {
+    for (const [was, now] of moved) text = text.split(`\`${was}\``).join(`\`${now}\``);
+    writeFileSync(doc, text);
+    ok(`screen-index: ${one.doc} — moved ${moved.length} reference(s)`);
+  }
   if (!bad) {
     ok(`screen-index: ${one.doc} — ${declared.length} screen(s), `
       + `${checked} file:line reference(s), every one of them true`);

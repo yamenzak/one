@@ -147,9 +147,16 @@ describe("what a read costs", () => {
       statement, `switchesFor`), it starts beside the identity so it adds no
       DEPTH, and a deployment whose products declare no flag never runs it. This
       app declares one, so this measurement pays for it.
+
+      ⚠️ AND THE TWELFTH IS THE TOTAL, WHICH IS WORTH A QUERY. A page of fifty
+      out of two hundred was indistinguishable from a collection of fifty, and
+      the screen drawing it said "fifty products" with complete confidence — in a
+      product whose entire purpose is answering how many there are. It runs
+      BESIDE the page rather than before it, so `depth` is unchanged at three:
+      what this buys is a trip, not a wait.
     */
     expect(at.depth, `depth ${at.depth}, trips ${at.trips}`).toBeLessThanOrEqual(3);
-    expect(at.trips, `depth ${at.depth}, trips ${at.trips}`).toBeLessThanOrEqual(11);
+    expect(at.trips, `depth ${at.depth}, trips ${at.trips}`).toBeLessThanOrEqual(12);
   });
 
   /* ⚠️ AND A SECOND READ IS NOT DEARER THAN THE FIRST. Anything held per

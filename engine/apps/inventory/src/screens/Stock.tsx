@@ -19,7 +19,7 @@
  */
 
 import {
-  AmountRow, Group, Num, Screen, Tree, Unit, glyphOf,
+  ActionRow, AmountRow, Group, Num, Screen, Tree, Unit, glyphOf,
   type Branch, type Loaded,
 } from "@engine/design";
 import type { Tone } from "@engine/kernel";
@@ -31,10 +31,19 @@ export interface StockProps {
   readonly places: readonly Place[];
   /** Where the reader is in the tree. `null` is the whole workspace. */
   readonly here: string | null;
+  /**
+   * ⚠️ HOW MANY THERE ARE, WHICH IS NOT `of.length`. A list is a page, and a
+   * page that cannot say what it is a page OF is a screen claiming a workspace
+   * has fifty products.
+   */
+  readonly total: number;
+  /** ⚠️ Whether there is another page — an answer, never a guess at the count. */
+  readonly more: boolean;
   readonly again: () => void;
   readonly onGo: (id: string | null) => void;
   readonly onOpen: (line: Line) => void;
   readonly onAdd: () => void;
+  readonly onMore: () => void;
 }
 
 /**
@@ -66,7 +75,7 @@ const toneOf = (line: Line): Tone => {
 };
 
 export function Stock({
-  title, of, places, here, again, onGo, onOpen, onAdd,
+  title, of, places, here, total, more, again, onGo, onOpen, onAdd, onMore,
 }: StockProps) {
   const now = Date.now();
 
@@ -132,6 +141,23 @@ export function Stock({
                 onOpen={() => onOpen(line)}
               />
             ))}
+            {/*
+              ⚠️ WHAT THIS IS A PAGE OF, SAID WHERE THE PAGE ENDS. A list that
+              hands over fifty of two hundred and says nothing is a screen
+              claiming a workspace has fifty products — in a product whose entire
+              purpose is answering how many there are. It appears only when there
+              is more, because "12 of 12" is a sentence about arithmetic.
+            */}
+            {more
+              ? (
+                <ActionRow
+                  icon={glyphOf("box")}
+                  label="Show more"
+                  under={`${lines.length} of ${total}`}
+                  onDo={onMore}
+                />
+              )
+              : null}
           </Group>
         </>
       )}

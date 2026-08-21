@@ -21,6 +21,7 @@ import {
   type Seen, type Uncovered,
 } from "../src/screens/index.js";
 import { LINES, PLACES, EMPTY_PLACE } from "../src/screens/sample.js";
+import { Stock } from "../src/screens/Stock.js";
 import { Ask, type Answer } from "../src/screens/Ask.js";
 import { Item, type Kept } from "../src/screens/Item.js";
 import type { Guess } from "../src/screens/Scan.js";
@@ -1467,5 +1468,48 @@ describe("the suppliers", () => {
      bringing it in fills this screen. */
   it("points an empty list at the import", () => {
     expect(listing([])).toContain("import a spreadsheet");
+  });
+});
+
+/* ------------------------------------------------------------------- pages --- */
+
+describe("a list that is a page", () => {
+  /*
+    ⚠️ A LIST THAT CANNOT SAY WHAT IT IS A LIST OF LIES BY OMISSION. Fifty rows
+    out of two hundred is indistinguishable from a collection of fifty, and the
+    screen drawing it says "fifty products" with complete confidence — in a
+    product whose entire purpose is answering how many there are.
+  */
+  const stocking = (total: number, more: boolean) =>
+    renderToStaticMarkup(
+      <Stock
+        title="Stock"
+        of={ready(LINES)}
+        places={PLACES}
+        here={null}
+        total={total}
+        more={more}
+        onMore={() => undefined}
+        again={() => undefined}
+        onGo={() => undefined}
+        onOpen={() => undefined}
+        onAdd={() => undefined}
+      />,
+    );
+
+  it("says what it is a page of, and offers the rest", () => {
+    const out = stocking(214, true);
+    expect(out).toContain("Show more");
+    expect(out).toContain(`${LINES.length} of 214`);
+  });
+
+  /*
+    ⚠️ AND SAYS NOTHING WHEN THERE IS NOTHING MORE. "12 of 12" is a sentence
+    about arithmetic, and a button that fetches nothing is worse than no button.
+  */
+  it("says nothing when the page is the whole list", () => {
+    const out = stocking(LINES.length, false);
+    expect(out).not.toContain("Show more");
+    expect(out).not.toContain(" of ");
   });
 });

@@ -434,7 +434,7 @@ env or a binding.
 | `membership` | the roster and what each member may do | 15 | — |
 | `compose` | a manifest becomes a live surface of operations | 2 | — |
 | `serve` | the one path every request ends in — both doors | 6 | — |
-| `records` | the generated reads and writes behind a collection | 6 | — |
+| `records` | the generated reads and writes behind a collection | 7 | — |
 | `settings` | reading and writing a workspace's own switches | 5 | — |
 | `billing` | plans, subscriptions, the bill, the ladder | 15 | — |
 | `wallet` | OneWallet: the allowance, what was bought, and reserve → settle → release | 22 | — |
@@ -483,7 +483,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**425 of them**, 424 reached by something today.
+**426 of them**, 425 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -1027,14 +1027,14 @@ that names no stage, so this list cannot grow by forgetting.
 | 69 | Labels — a QR from nothing, a printable sheet, and the decant label a hazard needs | shipped |
 | 70 | Reports — what went, what was wrong, what to buy, and how much of it anybody wrote down | shipped |
 | 67 | A screen can be gated on an entitlement, the way an operation already is | **planned** |
-| 62 | A list narrows and pages — the generated read answers past the first fifty, and says how many there are | **planned** |
+| 62 | A list narrows and pages — the generated read answers past the first fifty, and says how many there are | shipped |
 | 64 | Itemised things — one object for its whole life, and the kits composed of them | shipped |
 | 63 | The guide and the milestones are ticked by what a workspace has actually done | **planned** |
 | 71 | The spreadsheet somebody already has — the import, and the supplier it names | shipped |
 | 72 | An operation's declared input is checked at the door, and `now` is one type | shipped |
 | 73 | The other half of OneInventory, driven — and the quarantine that was a badge on a screen | shipped |
 
-**56 shipped, 17 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**57 shipped, 16 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

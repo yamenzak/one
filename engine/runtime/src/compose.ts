@@ -22,11 +22,14 @@ import type {
   AnyOperation, AppSpec, CollectionSpec, CrudVerb, Gate, Permission, ProblemCatalog,
 } from "@engine/kernel";
 import {
-  PLATFORM_PROBLEMS, eraseBy, eventFor, offlineFor, operationsFor, permissionFor, routeFor,
+  PLATFORM_PROBLEMS, eraseBy, eventFor, field, offlineFor, operationsFor, permissionFor,
+  routeFor,
 } from "@engine/kernel";
 import { tableFor } from "@engine/kernel";
 import type { Db } from "./sql.js";
-import { list, patch, put, readOne, type VaultSeam, type WriteRefusal } from "./records.js";
+import {
+  MOST_ROWS, list, patch, put, readOne, type VaultSeam, type WriteRefusal,
+} from "./records.js";
 import { memberOps } from "./member-ops.js";
 import { packageOps } from "./packages.js";
 import { settingOps } from "./settings.js";
@@ -202,7 +205,22 @@ function crudFor(spec: CollectionSpec, verb: CrudVerb, appId: string): Resolved 
     id,
     kind,
     summary: verbSummary(spec, verb),
-    input: verb === "create" || verb === "update" ? spec.fields : {},
+    /*
+      ⚠️ A LIST TAKES THREE, AND THEY ARE THE ONLY GENERATED INPUTS THAT ARE NOT
+      THE COLLECTION'S OWN FIELDS. `where` is equality over declared fields —
+      narrowed and sanitised by `records.ts`, so what arrives here is a blob and
+      what reaches SQL is a column name the declaration carries. `after` is the
+      previous page's `next`, opaque. `limit` is bounded on the way in.
+    */
+    input: verb === "create" || verb === "update"
+      ? spec.fields
+      : verb === "list"
+        ? {
+          limit: field.number({ label: "How many", holds: "none", min: 1, max: MOST_ROWS }),
+          after: field.text({ label: "After", holds: "none", max: 120 }),
+          where: field.json({ label: "Narrowed to", holds: "none" }),
+        }
+        : {},
     output: {},
     permission: permissionFor(spec, verb),
     /*
@@ -253,7 +271,24 @@ function refuse(ctx: Pick<Ctx, "fail">, done: WriteRefusal, spec: CollectionSpec
   const run = async (ctx: Ctx, input: Record<string, unknown>): Promise<unknown> => {
     const scope = scopeOf(spec, ctx);
     switch (verb) {
-      case "list": return { items: await list(ctx.db, spec, scope) };
+      case "list": {
+        /*
+          ⚠️ THE THREE THINGS A LIST CAN BE ASKED, AND EVERY ONE IS OPTIONAL. The
+          default is what this always did — fifty rows, newest first, the whole
+          collection — so a screen that asks nothing gets exactly what it got
+          before. What is new is that it can ask, and that it is TOLD the total:
+          a page of fifty out of two hundred was indistinguishable from a
+          collection of fifty, and the screen drawing it said "fifty products"
+          with complete confidence.
+        */
+        return list(ctx.db, spec, scope, {
+          ...(input.limit === undefined ? {} : { limit: Number(input.limit) }),
+          ...(typeof input.after === "string" ? { after: input.after } : {}),
+          ...(input.where && typeof input.where === "object"
+            ? { where: input.where as Record<string, unknown> }
+            : {}),
+        });
+      }
       case "read": {
         const row = await readOne(ctx.db, spec, scope, String(input.id ?? ""));
         if (!row) ctx.fail("platform.not_found");
