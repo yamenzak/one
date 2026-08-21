@@ -3549,6 +3549,24 @@ export const INVENTORY: AppSpec = defineApp({
        operation asks for rather than the nav. */
     { id: "count", route: "/count", label: "Count", nav: "primary", icon: "check",
       permission: "stock:move" },
+    /*
+      ⚠️ THE FIFTH AND LAST PRIMARY, AND IT IS THE ONE A BASEMENT NEVER OPENS.
+      Runs and jobs are the regulated half of this product — a workshop tracking
+      work orders, a clinic releasing sterilisation loads — and nobody storing
+      paint in a garage.
+
+      DEFER(engine-67) stage:67 — a screen can be gated on a permission and not on
+      an ENTITLEMENT, so this is drawn for anybody holding `process:read` even on
+      a plan that does not include runs. The operations behind it refuse
+      correctly and the screen reports the refusal, which is honest and is still
+      a destination somebody was offered and cannot use.
+    */
+    { id: "work", route: "/work", label: "Work", nav: "primary", icon: "list",
+      permission: "process:read" },
+    { id: "run", route: "/run", label: "A run", nav: "none", icon: "check",
+      permission: "process:read" },
+    { id: "case", route: "/case", label: "A job", nav: "none", icon: "note",
+      permission: "process:read" },
     /* ⚠️ `etch` — ruled geometry, which is what a shelf is. Seeded on the
        location, so every shelf in the workspace has a ground of its own. */
     { id: "location", route: "/where", label: "A location", nav: "none", icon: "pin",

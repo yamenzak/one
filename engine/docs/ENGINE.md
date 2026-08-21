@@ -1015,11 +1015,12 @@ that names no stage, so this list cannot grow by forgetting.
 | 61 | A product's screens reach each other — the route is the app's, the prefix is the platform's | shipped |
 | 65 | A model can be shown something — the vision lane carries a picture, and the reserve counts it | shipped |
 | 66 | The release rail — a run ends, a person releases, and a late result may contradict neither | shipped |
+| 67 | A screen can be gated on an entitlement, the way an operation already is | **planned** |
 | 62 | A list narrows and pages — the generated read answers past the first fifty, and says how many there are | **planned** |
 | 64 | Itemised things — one object for its whole life, and the kits composed of them | shipped |
 | 63 | The guide and the milestones are ticked by what a workspace has actually done | **planned** |
 
-**49 shipped, 17 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**49 shipped, 18 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

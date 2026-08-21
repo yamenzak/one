@@ -28,6 +28,9 @@ import { Item, SAID, type Kept } from "./Item.js";
 import { Kit, KIT_SAID, type Member, type Missing } from "./Kit.js";
 import { Receive, keyOf, type Noted } from "./Receive.js";
 import { Ask, type Answer } from "./Ask.js";
+import { Case, type Used } from "./Case.js";
+import { Run, type Covered } from "./Run.js";
+import { Work, type Jobs, type Runs } from "./Work.js";
 import { Scan, type Guess, type Seen } from "./Scan.js";
 import { Stock } from "./Stock.js";
 import { Thing, type Batch, type Movement, type Piece } from "./Thing.js";
@@ -1130,6 +1133,220 @@ const ASK = (api: Door) => function AskHere() {
   );
 };
 
+/* ---------------------------------------------------------------- the work --- */
+
+const RUN_STATES: readonly Runs["state"][] =
+  ["open", "ended", "released", "failed", "recalled"];
+const runStateOf = (v: unknown): Runs["state"] =>
+  RUN_STATES.includes(v as Runs["state"]) ? (v as Runs["state"]) : "open";
+
+const VERDICTS: readonly Covered["verdict"][] = ["pending", "released", "failed", "lifted"];
+const verdictOf = (v: unknown): Covered["verdict"] =>
+  VERDICTS.includes(v as Covered["verdict"]) ? (v as Covered["verdict"]) : "pending";
+
+/**
+ * RUNS AND JOBS.
+ *
+ * ⚠️ THE DOUBT ON A JOB ROW IS NOT ASKED FOR HERE, AND THAT IS DELIBERATE.
+ * `job.trace` is a join per job; running it for every row of a list would put N
+ * queries behind one screen. What the list shows is the job; what the doubt
+ * costs is one more read, and it is on the job's own screen where somebody
+ * actually needs the answer.
+ *
+ * DEFER(engine-62) stage:62 — a count of what a job used, per job, is exactly the
+ * aggregate the generated `list` cannot express. Until it can, a list row that
+ * promised a doubt count would be N reads or a lie.
+ */
+const WORK = (api: Door) => function WorkHere({ go }: Mounted) {
+  const today = dayHere();
+  const runs = useAsked<{ items: readonly Row[] }>(() => api.get("process.list"));
+  const jobs = useAsked<{ items: readonly Row[] }>(() => api.get("job.list"));
+  const items = useAsked<{ items: readonly Row[] }>(() => api.get("process-item.list"));
+
+  const inRun = new Map<string, number>();
+  if (items.of.status === "ready") {
+    for (const row of items.of.data.items) {
+      const at = text(row.process);
+      inRun.set(at, (inRun.get(at) ?? 0) + 1);
+    }
+  }
+
+  const rows: Loaded<readonly Runs[]> = runs.of.status === "ready"
+    ? ready(runs.of.data.items.map((row): Runs => ({
+      id: text(row.id),
+      kind: text(row.kind),
+      machine: text(row.machine),
+      state: runStateOf(row.state),
+      started: text(row.started),
+      items: inRun.get(text(row.id)) ?? 0,
+    })))
+    : runs.of;
+
+  const cases: readonly Jobs[] = jobs.of.status === "ready"
+    ? jobs.of.data.items.map((row): Jobs => ({
+      id: text(row.id),
+      ref: text(row.ref),
+      label: text(row.label),
+      state: text(row.state) === "closed" ? "closed" : "open",
+      opened: text(row.opened),
+      /* ⚠️ NOT ASKED FOR — see the DEFER above. Zero here is "not looked at",
+         which the row draws as no note rather than as a clean bill. */
+      doubted: 0,
+    }))
+    : [];
+
+  return (
+    <Work
+      title={nameOf("/work")}
+      of={rows}
+      jobs={cases}
+      again={() => { runs.again(); jobs.again(); items.again(); }}
+      onRun={(id) => go(`/run/${id}`)}
+      onJob={(id) => go(`/case/${id}`)}
+      onStart={() => {
+        /* ⚠️ THE KIND IS THE WORKSPACE'S OWN WORD and the run screen is where it
+           is named — starting one with a placeholder would put "New run" in a
+           record somebody signs against. */
+        void api.post<{ id: string }>("process.open", { kind: "New run", day: today })
+          .then((got) => { if (got.ok) go(`/run/${got.value.id}`); });
+      }}
+    />
+  );
+};
+
+const RUN = (api: Door) => function RunHere({ go, at }: Mounted) {
+  const id = at[0] ?? "";
+  const today = dayHere();
+  const [busy, setBusy] = React.useState(false);
+  const runs = useAsked<{ items: readonly Row[] }>(() => api.get("process.list"));
+  const items = useAsked<{ items: readonly Row[] }>(() => api.get("process-item.list"));
+  const batches = useAsked<{ items: readonly Row[] }>(() => api.get("batch.list"));
+  const world = useWorld(api);
+
+  const row = runs.of.status === "ready"
+    ? runs.of.data.items.find((r) => text(r.id) === id)
+    : undefined;
+
+  const named = new Map(
+    world.kinds.status === "ready"
+      ? world.kinds.data.items.map((k) => [text(k.id), text(k.name)])
+      : [],
+  );
+  const lot = new Map(
+    batches.of.status === "ready"
+      ? batches.of.data.items.map((b) => [text(b.id), b])
+      : [],
+  );
+  const stock = new Map<string, number>();
+  if (world.stock.status === "ready") {
+    for (const line of world.stock.data.items) {
+      const of = text(line.batch);
+      if (of) stock.set(of, (stock.get(of) ?? 0) + num(line.quantity));
+    }
+  }
+
+  const covered: Loaded<readonly Covered[]> = items.of.status === "ready"
+    ? ready(items.of.data.items
+      .filter((r) => text(r.process) === id)
+      .map((r): Covered => {
+        const of = lot.get(text(r.batch));
+        return {
+          batch: text(r.batch),
+          lot: of ? text(of.lot) : "",
+          name: of ? named.get(text(of.product)) ?? "—" : "—",
+          verdict: verdictOf(r.verdict),
+          reason: text(r.reason),
+          quantity: stock.get(text(r.batch)) ?? 0,
+        };
+      }))
+    : items.of;
+
+  const after = () => { runs.again(); items.again(); batches.again(); world.again(); };
+  const did = (op: string, input: unknown) => {
+    setBusy(true);
+    void api.post(op, input).then((got) => { setBusy(false); if (got.ok) after(); });
+  };
+
+  return (
+    <Run
+      of={covered}
+      kind={row ? text(row.kind) : "—"}
+      machine={row ? text(row.machine) : ""}
+      state={runStateOf(row?.state)}
+      started={row ? text(row.started) : ""}
+      ended={row ? text(row.ended) : ""}
+      released={row ? text(row.released) : ""}
+      evidence={row ? text(row.evidence) : ""}
+      busy={busy}
+      again={after}
+      back={() => go("/work")}
+      onEnd={(evidence) => { did("process.end", { process: id, evidence }); }}
+      onRelease={() => { did("process.release", { process: id, day: today }); }}
+      onFail={(reason) => { did("process.fail", { process: id, reason }); }}
+      onRecall={(reason) => { did("process.recall", { process: id, reason }); }}
+      onLift={(batch, reason) => { did("process.lift", { process: id, batch, reason }); }}
+    />
+  );
+};
+
+/**
+ * ONE JOB, AND ITS TRACE IS THE SERVER'S.
+ *
+ * ⚠️ `job.trace` IS ASKED FOR RATHER THAN ASSEMBLED HERE, which is the whole
+ * reason it exists. Whether a lot is in doubt is a join across the ledger, the
+ * batches and the runs — done in the browser it would be three lists and a
+ * guess, and the guess would be about the one question the screen is for.
+ */
+const CASE = (api: Door) => function CaseHere({ go, at }: Mounted) {
+  const id = at[0] ?? "";
+  const today = dayHere();
+  const [busy, setBusy] = React.useState(false);
+  const jobs = useAsked<{ items: readonly Row[] }>(() => api.get("job.list"));
+  const trace = useAsked<{ items: readonly Row[] }>(
+    () => (id
+      ? api.get("job.trace", { job: id })
+      : Promise.resolve({ ok: true as const, value: { items: [] } })),
+    [id]);
+
+  const row = jobs.of.status === "ready"
+    ? jobs.of.data.items.find((r) => text(r.id) === id)
+    : undefined;
+
+  const used: Loaded<readonly Used[]> = trace.of.status === "ready"
+    ? ready(trace.of.data.items.map((r): Used => ({
+      movement: text(r.movement),
+      product: text(r.product),
+      name: text(r.name),
+      quantity: num(r.quantity),
+      lot: text(r.lot),
+      at: text(r.at),
+      doubt: text(r.doubt),
+    })))
+    : trace.of;
+
+  return (
+    <Case
+      of={used}
+      ref={row ? text(row.ref) : "—"}
+      label={row ? text(row.label) : ""}
+      state={row && text(row.state) === "closed" ? "closed" : "open"}
+      opened={row ? text(row.opened) : ""}
+      closed={row ? text(row.closed) : ""}
+      busy={busy}
+      again={() => { jobs.again(); trace.again(); }}
+      back={() => go("/work")}
+      onClose={() => {
+        setBusy(true);
+        void api.post("job.close", { job: id, day: today }).then((got) => {
+          setBusy(false);
+          if (got.ok) jobs.again();
+        });
+      }}
+      onOpenProduct={(product) => go(`/thing/${product}`)}
+    />
+  );
+};
+
 /**
  * ⚠️ THE GUIDE IS TICKED BY EVENTS THIS WORKSPACE HAS ACTUALLY RAISED, and until
  * the platform answers that question the honest state is nothing crossed off —
@@ -1168,6 +1385,9 @@ export function mount({ register, api }: Mounting): void {
     ["/receive", RECEIVE(api)],
     ["/count", COUNT(api)],
     ["/ask", ASK(api)],
+    ["/work", WORK(api)],
+    ["/run", RUN(api)],
+    ["/case", CASE(api)],
     ["/item", ITEM(api)],
     ["/kit", KIT(api)],
     ["/start", START()],

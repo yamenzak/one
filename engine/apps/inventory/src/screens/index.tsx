@@ -24,6 +24,9 @@ import { ready, type Loaded } from "@engine/design";
 import { INVENTORY } from "../index.js";
 import { LINES, PLACES, EMPTY_PLACE, type Line, type Place } from "./sample.js";
 import { Ask, type Answer } from "./Ask.js";
+import { Case, type Used } from "./Case.js";
+import { Run, type Covered } from "./Run.js";
+import { Work, type Jobs, type Runs } from "./Work.js";
 import { Count, type Change, type Counted, type Uncovered } from "./Count.js";
 import { Item, type Kept } from "./Item.js";
 import { Kit, type Member, type Missing } from "./Kit.js";
@@ -34,11 +37,11 @@ import { Stock } from "./Stock.js";
 import { Thing, type Batch, type Movement } from "./Thing.js";
 import { Where } from "./Where.js";
 
-export { Ask, Count, Item, Kit, Receive, Scan, Start, Stock, Thing, Where };
+export { Ask, Case, Count, Item, Kit, Receive, Run, Scan, Start, Stock, Thing, Where, Work };
 export * from "./sample.js";
 export type {
-  Answer, Batch, Change, Counted, Guess, Kept, Member, Missing, Movement, Noted,
-  Seen, Uncovered,
+  Answer, Batch, Change, Counted, Covered, Guess, Jobs, Kept, Member, Missing,
+  Movement, Noted, Runs, Seen, Uncovered, Used,
 };
 
 const nothing = () => undefined;
@@ -216,6 +219,63 @@ const NOTED: readonly Noted[] = [
   { code: "04012345678901", name: "Isopropanol 99%, 1 L", quantity: 4,
     lot: "C0921", expiry: "2028-01-31" },
   { code: "", name: "Screws, M4 × 20", quantity: 2, lot: "", expiry: "" },
+];
+
+/**
+ * ⚠️ A DAY WITH ALL FIVE STANDINGS IN IT, because the screen is a triage list and
+ * a list where everything is fine teaches nothing about the order. The one
+ * waiting to be released is the only row anybody has to act on, and it is what
+ * this fixture exists to put at the top.
+ */
+const RUNNING: readonly Runs[] = [
+  { id: "r-2", kind: "Autoclave 134°C", machine: "Autoclave 1", state: "ended",
+    started: "2026-08-21", items: 6 },
+  { id: "r-1", kind: "Autoclave 134°C", machine: "Autoclave 2", state: "open",
+    started: "2026-08-21", items: 4 },
+  { id: "r-0", kind: "Annual calibration", machine: "Torque bench", state: "released",
+    started: "2026-08-14", items: 2 },
+  { id: "r-x", kind: "Autoclave 134°C", machine: "Autoclave 1", state: "recalled",
+    started: "2026-08-07", items: 5 },
+];
+
+/**
+ * ⚠️ A JOB THAT ACQUIRED A CONCERN AFTER IT CLOSED, which is the whole reason the
+ * trace is a query. Nothing about the job changed; a recall landed on a lot it
+ * used, and the LIST learned it.
+ */
+const CASES: readonly Jobs[] = [
+  { id: "j-2", ref: "WO-4471", label: "Bay 3 service", state: "open",
+    opened: "2026-08-21", doubted: 0 },
+  { id: "j-1", ref: "WO-4468", label: "Bay 1 service", state: "closed",
+    opened: "2026-08-07", doubted: 2 },
+];
+
+/**
+ * ⚠️ ONE OF EACH VERDICT, INCLUDING THE ONE THAT HAS TO BE EXACT. "Unfrozen —
+ * still not released" is the whole quarantine rule in four words, and a fixture
+ * without it photographs a screen that never has to say the difficult thing.
+ */
+const COVERED: readonly Covered[] = [
+  { batch: "b-1", lot: "A5B7", name: "Instrument tray, minor", verdict: "released",
+    reason: "", quantity: 4 },
+  { batch: "b-2", lot: "C0921", name: "Instrument tray, minor", verdict: "failed",
+    reason: "Indicator did not turn", quantity: 2 },
+  { batch: "b-3", lot: "C1144", name: "Gauze packs", verdict: "lifted",
+    reason: "Re-wrapped and queued for the next cycle", quantity: 12 },
+  { batch: "b-4", lot: "D0102", name: "Forceps set", verdict: "pending",
+    reason: "", quantity: 1 },
+];
+
+/** ⚠️ Two lines in question out of five — the state the screen is for. */
+const USED: readonly Used[] = [
+  { movement: "u-5", product: "t-tray", name: "Instrument tray, minor", quantity: 1,
+    lot: "C0921", at: "2026-08-07T09:20:00.000Z", doubt: "held" },
+  { movement: "u-4", product: "t-gauze", name: "Gauze packs", quantity: 6,
+    lot: "C1144", at: "2026-08-07T09:22:00.000Z", doubt: "not released" },
+  { movement: "u-3", product: "t-glove", name: "Nitrile gloves, blue", quantity: 4,
+    lot: "", at: "2026-08-07T09:24:00.000Z", doubt: "" },
+  { movement: "u-2", product: "t-swab", name: "Swabs", quantity: 10,
+    lot: "", at: "2026-08-07T09:25:00.000Z", doubt: "" },
 ];
 
 /** ⚠️ Everything at or below a place, which is what a tree row promises. */
@@ -411,6 +471,58 @@ export function InventoryScreen({ route, onGo }: {
           onTake={nothing}
           onBuild={nothing}
           onBreak={nothing}
+        />
+      );
+    /* ⚠️ THE DAY WITH SOMETHING WAITING IN IT. A run that finished and nobody has
+       released is the one row on this screen that is waiting for a person. */
+    case "/work":
+      return (
+        <Work
+          title={title}
+          of={ready(RUNNING)}
+          jobs={CASES}
+          again={nothing}
+          onRun={() => go("/run")}
+          onJob={() => go("/case")}
+          onStart={nothing}
+        />
+      );
+    /* ⚠️ FINISHED AND UNRELEASED, with one of every verdict below it — the state
+       where the screen has to say the difficult thing about a lifted item. */
+    case "/run":
+      return (
+        <Run
+          of={ready(COVERED)}
+          kind="Autoclave 134°C"
+          machine="Autoclave 1"
+          state="ended"
+          started="2026-08-21"
+          ended="2026-08-21T07:40:00.000Z"
+          released=""
+          evidence="Printout 4471 · Indicator lot 22B"
+          again={nothing}
+          back={() => go("/work")}
+          onEnd={nothing}
+          onRelease={nothing}
+          onFail={nothing}
+          onRecall={nothing}
+          onLift={nothing}
+        />
+      );
+    /* ⚠️ CLOSED, AND IN DOUBT — the state that proves the trace is a query. */
+    case "/case":
+      return (
+        <Case
+          of={ready(USED)}
+          ref="WO-4468"
+          label="Bay 1 service"
+          state="closed"
+          opened="2026-08-07"
+          closed="2026-08-07"
+          again={nothing}
+          back={() => go("/work")}
+          onClose={nothing}
+          onOpenProduct={() => go("/thing")}
         />
       );
     case "/start":

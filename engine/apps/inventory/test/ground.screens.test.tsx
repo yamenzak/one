@@ -25,6 +25,9 @@ import { Ask, type Answer } from "../src/screens/Ask.js";
 import { Item, type Kept } from "../src/screens/Item.js";
 import type { Guess } from "../src/screens/Scan.js";
 import { keyOf, type Noted } from "../src/screens/Receive.js";
+import { Case, type Used } from "../src/screens/Case.js";
+import { Run, type Covered } from "../src/screens/Run.js";
+import { Work, type Jobs, type Runs } from "../src/screens/Work.js";
 import { Kit, type Member, type Missing } from "../src/screens/Kit.js";
 
 const html = (route: string) => renderToStaticMarkup(<InventoryScreen route={route} />);
@@ -51,6 +54,11 @@ describe("OneInventory draws every screen it declares", () => {
        item" or "A kit", which is what a nav has to call them. */
     "/item": "Hammer drill, 18 V",
     "/kit": "Minor surgery tray",
+    /* ⚠️ AND THE TWO THE REGULATED HALF ADDS. A run is named by what kind of run
+       it is; a job by what it is for. Neither is "A run" or "A job", which is
+       what a nav has to call them. */
+    "/run": "Autoclave 134°C",
+    "/case": "Bay 1 service",
   };
 
   it("renders something for every declared route", () => {
@@ -809,5 +817,190 @@ describe("a photographed delivery note", () => {
   it("is not offered before a shelf is scanned", () => {
     expect(receiving(null, null)).not.toContain("Photograph the delivery note");
     expect(receiving(AT, null)).toContain("Photograph the delivery note");
+  });
+});
+
+/**
+ * A RUN THAT FINISHED AND NOBODY RELEASED.
+ *
+ * ⚠️ IT IS THE ONE ROW IN THE PRODUCT THAT IS WAITING FOR A PERSON, and the whole
+ * rail is worth nothing if the screen does not say so. "Finished" is what the
+ * machine did; a load sitting in an autoclave that reads as done is exactly the
+ * outcome the gap between ending and releasing exists to prevent.
+ */
+describe("the work screen", () => {
+  const RUNS_LIST: readonly Runs[] = [
+    { id: "r-2", kind: "Autoclave 134°C", machine: "Autoclave 1", state: "ended",
+      started: "2026-08-21", items: 6 },
+    { id: "r-1", kind: "Annual calibration", machine: "Bench", state: "released",
+      started: "2026-08-14", items: 2 },
+  ];
+
+  const working = (runs: readonly Runs[], jobs: readonly Jobs[] = []) =>
+    renderToStaticMarkup(
+      <Work
+        of={ready(runs)}
+        jobs={jobs}
+        again={() => undefined}
+        onRun={() => undefined}
+        onJob={() => undefined}
+        onStart={() => undefined}
+      />,
+    );
+
+  it("puts what is waiting for somebody in its own section", () => {
+    const out = working(RUNS_LIST);
+    expect(out).toContain("Waiting for somebody");
+    expect(out).toContain("6 in it");
+  });
+
+  /* ⚠️ AND SAYS NOTHING ABOUT WAITING WHERE NOTHING IS. A permanent section
+     headed "waiting" that is always empty is a heading people stop reading. */
+  it("says nothing about waiting where nothing is", () => {
+    const out = working(RUNS_LIST.filter((r) => r.state !== "ended"));
+    expect(out).not.toContain("Waiting for somebody");
+  });
+
+  /*
+    ⚠️ A JOB THAT ACQUIRED A CONCERN SAYS SO IN THE LIST. Nothing about the job
+    changed — a recall landed on a lot it used — and the whole point of reading
+    it backwards is that the list learns it too.
+  */
+  it("marks a job whose consumption is now in doubt", () => {
+    const out = working(RUNS_LIST, [
+      { id: "j-1", ref: "WO-4468", label: "Bay 1", state: "closed",
+        opened: "2026-08-07", doubted: 2 },
+    ]);
+    expect(out).toContain("2 of what it used is in doubt");
+    expect(out).toContain('data-ink="danger"');
+  });
+});
+
+/**
+ * THE RELEASE LADDER, ON A SCREEN.
+ *
+ * ⚠️ "UNFROZEN — STILL NOT RELEASED" IS THE RULE IN FOUR WORDS, and anything
+ * shorter reads as "fine now", which is precisely what it is not. A tray whose
+ * steriliser failed is not sterile because somebody pressed a button, and the
+ * only place that can be said is the row.
+ */
+describe("one run", () => {
+  const COVER: readonly Covered[] = [
+    { batch: "b-1", lot: "A5B7", name: "Tray", verdict: "released", reason: "", quantity: 4 },
+    { batch: "b-2", lot: "C0921", name: "Tray", verdict: "failed",
+      reason: "Indicator did not turn", quantity: 2 },
+    { batch: "b-3", lot: "C1144", name: "Gauze", verdict: "lifted",
+      reason: "Re-wrapped", quantity: 12 },
+  ];
+
+  const running = (state: RunState) =>
+    renderToStaticMarkup(
+      <Run
+        of={ready(COVER)}
+        kind="Autoclave 134°C"
+        machine="Autoclave 1"
+        state={state}
+        started="2026-08-21"
+        ended="2026-08-21T07:40:00.000Z"
+        released=""
+        evidence="Printout 4471"
+        again={() => undefined}
+        back={() => undefined}
+        onEnd={() => undefined}
+        onRelease={() => undefined}
+        onFail={() => undefined}
+        onRecall={() => undefined}
+        onLift={() => undefined}
+      />,
+    );
+
+  /* ⚠️ ENDING IS NOT RELEASING, AND THE SCREEN SAYS IT IN WORDS. */
+  it("says a finished run has released nothing", () => {
+    const out = running("ended");
+    expect(out).toContain("nobody has released it");
+    expect(out).toContain("Release it");
+  });
+
+  it("offers to finish an open one, and to release nothing", () => {
+    const out = running("open");
+    expect(out).toContain("It has finished");
+    expect(out).not.toContain("Release it");
+  });
+
+  /* ⚠️ THE LIFTED ROW SAYS BOTH HALVES. Unfrozen is the good news and still not
+     released is the one that matters. */
+  it("says a lifted item is unfrozen and still not released", () => {
+    expect(running("ended")).toContain("Unfrozen — still not released");
+  });
+
+  /* ⚠️ AND UNFREEZING IS OFFERED ONLY ON WHAT IS FROZEN — anything else is a
+     release arriving through the wrong door. */
+  it("offers to unfreeze only what is frozen", () => {
+    expect(running("ended").match(/Unfreeze<\/span>|>Unfreeze</g)?.length).toBe(1);
+  });
+
+  /* ⚠️ FAILING AND CALLING BACK ARE THE SAME CARD IN TWO STANDINGS, and the
+     difference between them is an inconvenience and a phone call. */
+  it("fails what nobody relied on, and calls back what somebody did", () => {
+    expect(running("ended")).toContain("Fail it");
+    expect(running("ended")).toContain("Nothing has been released");
+    expect(running("released")).toContain("Call it back");
+    expect(running("released")).toContain("cannot be frozen");
+  });
+});
+
+type RunState = "open" | "ended" | "released" | "failed" | "recalled";
+
+/**
+ * A JOB READ BACKWARDS.
+ *
+ * ⚠️ THE DOUBT IS THE ANSWER AND IT GOES FIRST. Somebody opening a closed job is
+ * almost always opening it because they were told to — putting the two lines in
+ * question under a list of everything the job used is putting the answer under
+ * the working.
+ */
+describe("one job", () => {
+  const USED_LIST: readonly Used[] = [
+    { movement: "u-2", product: "t-tray", name: "Tray", quantity: 1, lot: "C0921",
+      at: "2026-08-07T09:20:00.000Z", doubt: "held" },
+    { movement: "u-1", product: "t-glove", name: "Gloves", quantity: 4, lot: "",
+      at: "2026-08-07T09:24:00.000Z", doubt: "" },
+  ];
+
+  const casing = (used: readonly Used[], state: "open" | "closed" = "closed") =>
+    renderToStaticMarkup(
+      <Case
+        of={ready(used)}
+        ref="WO-4468"
+        label="Bay 1 service"
+        state={state}
+        opened="2026-08-07"
+        closed={state === "closed" ? "2026-08-07" : ""}
+        again={() => undefined}
+        back={() => undefined}
+        onClose={() => undefined}
+        onOpenProduct={() => undefined}
+      />,
+    );
+
+  it("puts what is in doubt above what it used", () => {
+    const out = casing(USED_LIST);
+    expect(out.indexOf("In doubt")).toBeLessThan(out.indexOf("What it used"));
+    expect(out).toContain("That lot is frozen");
+  });
+
+  /* ⚠️ AND "NOTHING IS IN DOUBT" IS A REAL ANSWER. An absent section is
+     indistinguishable from one that failed to load. */
+  it("says so when nothing it used is in question", () => {
+    const out = casing(USED_LIST.filter((u) => !u.doubt));
+    expect(out).toContain("Nothing it used is in question");
+    expect(out).not.toContain("In doubt");
+  });
+
+  /* ⚠️ A CLOSED JOB IS STILL READ, and saying so is the point: closing is not
+     archiving, and the trace keeps answering long after the work finished. */
+  it("says a closed job keeps answering", () => {
+    expect(casing(USED_LIST)).toContain("a recall next month");
+    expect(casing(USED_LIST, "open")).toContain("Close it");
   });
 });
