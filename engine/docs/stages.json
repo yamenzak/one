@@ -346,6 +346,12 @@
       "ends": "`process`, `process-item` and `job` are collections nothing writes by hand. Ending a run and releasing what it produced are separate acts under separate grants, because a green light is not a qualification. A quarantine freezes stock the chokepoint then REFUSES a take from, and lifts to needs-work — `release-ladder.test.mjs` fails on a release with no compare-and-set and on a lift that writes `released`. A late result that contradicts what is recorded is refused and names both facts; a late failure on a released run is a recall, which freezes what it can reach and NAMES what it cannot. And a job's trace is a query rather than a stored status, so a job correct on Tuesday acquires a concern on Thursday without anything about the job changing."
     },
     {
+      "n": 68,
+      "status": "shipped",
+      "title": "A night\u2019s work can tell somebody \u2014 a job raises events, and the nightly sweep uses it",
+      "ends": "`JobCtx` carries `tell` and `setting`, so a per-tenant job reaches the same inbox a request does \u2014 the same audience-by-permission, the same channel resolution, the same workspace numbers \u2014 and `eventsOf` counts a job\u2019s `emits`, so a notification about something nobody was present for composes. The runner refuses an undeclared event and `refuseJob` refuses `emits` on a deployment-scope job, because a note is filed in a workspace. OneInventory\u2019s expiry sweep is the first: it tells about CROSSINGS rather than states \u2014 `crossedOn` is arithmetic, so nothing is remembered, a repeat run names the same batches, and nobody is told the same thing every morning for a month. `job-tells.test.mjs` fails on a job that declares an event and never raises it."
+    },
+    {
       "n": 67,
       "status": "planned",
       "title": "A screen can be gated on an entitlement, the way an operation already is",

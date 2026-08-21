@@ -1081,6 +1081,19 @@ async function sweepDeps(env: Env): Promise<SweepDeps> {
     shards: SHARDS.map((s) => shardFor(env as never, s.id)),
     /* ⚠️ So the last rung takes the OBJECTS and not only the rows. */
     bucketFor: (where) => bucketIn(where.residency),
+    /*
+      ⚠️ HOW A NIGHT'S WORK REACHES THE PEOPLE IT IS ABOUT, and it is the same
+      inbox a request writes to — the same audience-by-permission, the same
+      per-person channel preference, the same push lane. Without it a sweep that
+      finds stock expiring on Thursday can only write the number into a run
+      record, where the one person who reads it is an operator looking at
+      somebody else's shelf.
+
+      ⚠️ `pusher` ALONE, LIKE THE REQUEST SIDE. There is no `mailer` wired
+      anywhere yet, and naming a channel this deployment cannot send on is what
+      `availableChannels` exists to prevent.
+    */
+    notify: { pusher: pusherOver(directory) },
     /* ⚠️ BY ID, because a move's TARGET shard has no workspace on it yet and
        `shardOf` resolves through the tenant. */
     shardById: (id) => {

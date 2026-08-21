@@ -27,6 +27,7 @@ import { Ask, type Answer } from "./Ask.js";
 import { Case, type Used } from "./Case.js";
 import { Run, type Covered } from "./Run.js";
 import { Work, type Jobs, type Runs } from "./Work.js";
+import { Due, type Dated } from "./Due.js";
 import { Count, type Change, type Counted, type Uncovered } from "./Count.js";
 import { Item, type Kept } from "./Item.js";
 import { Kit, type Member, type Missing } from "./Kit.js";
@@ -37,7 +38,9 @@ import { Stock } from "./Stock.js";
 import { Thing, type Batch, type Movement } from "./Thing.js";
 import { Where } from "./Where.js";
 
-export { Ask, Case, Count, Item, Kit, Receive, Run, Scan, Start, Stock, Thing, Where, Work };
+export {
+  Ask, Case, Count, Due, Item, Kit, Receive, Run, Scan, Start, Stock, Thing, Where, Work,
+};
 export * from "./sample.js";
 export type {
   Answer, Batch, Change, Counted, Covered, Guess, Jobs, Kept, Member, Missing,
@@ -219,6 +222,30 @@ const NOTED: readonly Noted[] = [
   { code: "04012345678901", name: "Isopropanol 99%, 1 L", quantity: 4,
     lot: "C0921", expiry: "2028-01-31" },
   { code: "", name: "Screws, M4 × 20", quantity: 2, lot: "", expiry: "" },
+];
+
+/**
+ * ⚠️ ONE GONE, ONE GOING, ONE FINE — and the middle one is out of date because it
+ * was OPENED, not because of the date printed on it. That row is the reason the
+ * screen says which clock won: a box with a 2028 date on it that somebody opened
+ * last month is the answer people find surprising, and a fixture without one
+ * teaches the wrong thing about the column.
+ */
+const DATED: readonly Dated[] = [
+  { id: "b-1", product: "p-milk", name: "Milk, 2 L", which: "Lot 4471",
+    on: "2026-08-19", standing: "gone", days: -2, by: "printed" },
+  { id: "b-2", product: "p-lube", name: "Cutting fluid, 5 L", which: "Lot C0921",
+    on: "2026-08-27", standing: "soon", days: 6, by: "opened" },
+  { id: "b-3", product: "p-ipa", name: "Isopropanol 99%, 1 L", which: "Lot C0922",
+    on: "2028-01-31", standing: "fine", days: 528, by: "printed" },
+];
+
+/* ⚠️ A SERVICE THAT IS ALREADY OVERDUE, because that is the row somebody has to
+   book somebody else for — and it is a different working day from a carton of
+   milk, which is why it is not in the list above. */
+const SERVICES: readonly Dated[] = [
+  { id: "u-1", product: "p-ext", name: "Fire extinguisher, CO₂ 5 kg",
+    which: "Serial FX-88231", on: "2026-08-11", standing: "gone", days: -10, by: "" },
 ];
 
 /**
@@ -471,6 +498,22 @@ export function InventoryScreen({ route, onGo }: {
           onTake={nothing}
           onBuild={nothing}
           onBreak={nothing}
+        />
+      );
+    /*
+      ⚠️ THE THREE STANDINGS AT ONCE, BECAUSE THE SCREEN IS A TRIAGE LIST. One
+      already out of date, one inside the window, one that is simply dated — and
+      a service beside them, which is the whole reason the sections are apart.
+    */
+    case "/due":
+      return (
+        <Due
+          title={title}
+          of={ready(DATED)}
+          services={SERVICES}
+          again={nothing}
+          onOpen={() => go("/thing")}
+          onItem={() => go("/item")}
         />
       );
     /* ⚠️ THE DAY WITH SOMETHING WAITING IN IT. A run that finished and nobody has

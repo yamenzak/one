@@ -14,11 +14,11 @@
  */
 
 import {
-  area, collection, defineApp, field, newId, operation, setting,
+  area, collection, defineApp, field, job as declareJob, newId, operation, setting,
   type AppSpec,
 } from "@engine/kernel";
 import {
-  LADDER, MOVES, applyMove, daysLeft, effectiveExpiry, refuseMove, standingOf,
+  LADDER, MOVES, applyMove, crossedOn, daysLeft, effectiveExpiry, refuseMove, standingOf,
   type Move,
 } from "./ledger.js";
 import { CODE_KINDS, readScan, stillNeeded, unread } from "./code.js";
@@ -2812,11 +2812,14 @@ const askInWords = operation<
 
 /* -------------------------------------------------------------- the rail --- */
 
-interface Running { id: string; state: Run; }
+/* ⚠️ `kind` COMES BACK WITH THE STANDING BECAUSE EVERY NOTE THIS RAIL SENDS
+   NAMES IT. A summary filled from an id tells somebody that "prc_01J…" needs
+   releasing, which is a sentence nobody can act on without opening the app. */
+interface Running { id: string; state: Run; kind: string; }
 
 const runIn = async (c: Ctx, id: string): Promise<Running> => {
   const of = await (c.db as Db).prepare(
-    `SELECT id, state FROM process WHERE id = ? AND tenant_id = ?`)
+    `SELECT id, state, kind FROM process WHERE id = ? AND tenant_id = ?`)
     .bind(id, c.tenantId).first<Running>();
   if (!of) return c.fail("platform.not_found");
   return of;
@@ -2917,7 +2920,7 @@ const loadRun = operation<{ process: string; batch: string }, { items: number }>
  * has decided that a green light is a qualification.
  */
 const endRun = operation<
-  { process: string; evidence?: string }, { state: string }
+  { process: string; evidence?: string }, { state: string; kind: string }
 >({
   id: "process.end",
   kind: "write",
@@ -2926,7 +2929,14 @@ const endRun = operation<
     process: field.text({ label: "Run", required: true, holds: "none" }),
     evidence: field.text({ label: "Evidence", holds: "none", max: 200 }),
   },
-  output: { state: field.text({ label: "Standing", holds: "none" }) },
+  output: {
+    state: field.text({ label: "Standing", holds: "none" }),
+    /* ⚠️ THE ANSWER CARRIES THE RUN'S NAME BECAUSE THE NOTE DOES. A dispatch
+       fills its template from the input and the ANSWER, and the input here is an
+       id — so without this the person told a load needs releasing is told that
+       "prc_01J…" needs releasing. */
+    kind: field.text({ label: "What it is", holds: "none" }),
+  },
   permission: "process:run",
   entitlement: "processes",
   idempotency: { mode: "key" },
@@ -2948,7 +2958,7 @@ const endRun = operation<
 
     /* ⚠️ SAID PLAINLY, BECAUSE THE SCREEN HAS TO SAY IT. A run that finished and
        reads as done is the failure this whole rail exists to prevent. */
-    return { state: "ended" };
+    return { state: "ended", kind: run.kind };
   },
 });
 
@@ -3024,7 +3034,7 @@ const releaseRun = operation<
  * held batch.
  */
 const failRun = operation<
-  { process: string; reason: string }, { frozen: number }
+  { process: string; reason: string }, { frozen: number; kind: string }
 >({
   id: "process.fail",
   kind: "write",
@@ -3033,7 +3043,11 @@ const failRun = operation<
     process: field.text({ label: "Run", required: true, holds: "none" }),
     reason: field.text({ label: "Why", required: true, holds: "none", max: 200 }),
   },
-  output: { frozen: field.number({ label: "Frozen", holds: "none" }) },
+  output: {
+    frozen: field.number({ label: "Frozen", holds: "none" }),
+    /* ⚠️ Named, so the note reads "Autoclave 2 failed" rather than an id. */
+    kind: field.text({ label: "What it is", holds: "none" }),
+  },
   permission: "process:release",
   entitlement: "processes",
   idempotency: { mode: "key" },
@@ -3048,7 +3062,7 @@ const failRun = operation<
     if (!input.reason.trim()) {
       return c.fail("platform.invalid", {}, { fields: { reason: "Say what went wrong" } });
     }
-    return { frozen: await freeze(c, run.id, input.reason.trim(), "failed") };
+    return { frozen: await freeze(c, run.id, input.reason.trim(), "failed"), kind: run.kind };
   },
 });
 
@@ -3059,7 +3073,8 @@ const failRun = operation<
  * recall is happening.
  */
 const recallRun = operation<
-  { process: string; reason: string }, { frozen: number; gone: readonly string[] }
+  { process: string; reason: string },
+  { frozen: number; gone: readonly string[]; kind: string }
 >({
   id: "process.recall",
   kind: "write",
@@ -3073,6 +3088,8 @@ const recallRun = operation<
     /* ⚠️ NAMED, NOT COUNTED. "Six could not be reached" is a number; the lots
        are what somebody rings a customer about. */
     gone: field.json({ label: "Could not be reached", holds: "none" }),
+    /* ⚠️ Named, so the note reads "Autoclave 2 was called back". */
+    kind: field.text({ label: "What it is", holds: "none" }),
   },
   permission: "process:release",
   entitlement: "processes",
@@ -3090,7 +3107,7 @@ const recallRun = operation<
     }
     const reach = reachedIn(await membersOf(c, run.id));
     const frozen = await freeze(c, run.id, input.reason.trim(), "recalled");
-    return { frozen, gone: reach.gone };
+    return { frozen, gone: reach.gone, kind: run.kind };
   },
 });
 
@@ -3414,6 +3431,163 @@ const starts = operation<Record<string, never>, { tracking: string; unit: string
   },
 });
 
+/* ------------------------------------------------------------ the morning --- */
+
+/**
+ * WHAT CROSSED A LINE WHILE NOBODY WAS LOOKING.
+ *
+ * ⚠️ AN EXPIRY NOBODY IS TOLD ABOUT IS MOST OF THE REASON NOBODY RECORDS ONE.
+ * `batch.due` and `unit.due` have answered on demand since the day they were
+ * written, and answering on demand means a person has to already suspect. The
+ * whole value of writing a date on a delivery is that something else remembers
+ * it — otherwise the product has asked somebody to type in a fact and then made
+ * them responsible for reading it back.
+ *
+ * ⚠️ IT TELLS ABOUT CROSSINGS, NEVER ABOUT STATES — see `crossedOn`. A sweep
+ * that announced the LIST would announce the same twelve boxes every morning
+ * until they expired, and the third morning is when somebody switches the
+ * product's notifications off for good.
+ *
+ * ⚠️ AND ONE NOTE PER PASS, NOT ONE PER BOX. A pharmacy crossing forty lots in a
+ * night would otherwise fill an inbox with forty rows nobody can act on
+ * individually — the number and the soonest are what a person needs to decide
+ * whether to walk to the store room, and the list is on the screen the note
+ * links to.
+ */
+interface Crossing {
+  readonly name: string;
+  readonly on: string;
+}
+
+/* ⚠️ THE PLURAL IS COMPOSED HERE, BECAUSE `interpolate` HAS NO PLURAL RULE AND
+   should not grow one for this. "1 things expire soon" is the kind of sentence
+   that makes a person trust nothing else on the screen. */
+const many = (n: number, one: string, more: string): string =>
+  `${n} ${n === 1 ? one : more}`;
+
+/* ⚠️ SOONEST FIRST, AND THE NOTE NAMES ONLY THAT ONE. It is the row that decides
+   whether somebody goes and looks now or after lunch. */
+const first = (of: readonly Crossing[]): Crossing =>
+  [...of].sort((a, b) => (a.on < b.on ? -1 : a.on > b.on ? 1 : 0))[0]!;
+
+const expirySweep = declareJob({
+  id: "inventory.expiry",
+  label: "What runs out",
+  why: "Tells whoever looks after the stock what has just entered its warning window, what went out of date overnight, and what is due for a service.",
+  /*
+    ⚠️ EARLY MORNING UTC, WHICH IS A COMPROMISE AND IS SAID TO BE ONE. A
+    workspace's day starts wherever it is standing, and the platform has no
+    per-workspace timezone to run against; 05:00 UTC is before the working day
+    across Europe, the Gulf and India, and is the evening before in the Americas
+    — which errs towards telling somebody early rather than after they have
+    already used the box.
+  */
+  schedule: "0 5 * * *",
+  scope: "per-tenant",
+  /*
+    ⚠️ RETRY, AND IT IS SAFE BECAUSE THE ANSWER IS ARITHMETIC. `crossedOn` reads
+    the dates and remembers nothing, so a second attempt in the same pass names
+    exactly the same batches — the only cost of a retry is a repeated note in the
+    narrow case where the first attempt failed after telling somebody, and that
+    is strictly better than a crossing nobody hears about at all.
+  */
+  onFail: { then: "retry", times: 3 },
+  rerunnable: true,
+  emits: ["batch.expiring", "batch.expired", "unit.service_due"],
+  budgetSeconds: 30,
+  async work(ctx) {
+    const db = ctx.db as Db;
+    /*
+      ⚠️ THE DAY IS THE SWEEP'S OWN, AND THIS IS THE ONE PLACE IN THE PRODUCT
+      WHERE IT CANNOT BE THE DEVICE'S. Every other expiry question is asked by
+      somebody standing in front of a shelf and carries their local date;
+      nobody is standing here. UTC is therefore named rather than assumed, and
+      it is why the schedule above sits before the working day rather than at
+      midnight.
+    */
+    const today = ctx.now.slice(0, 10);
+    /* ⚠️ THE WORKSPACE'S OWN NUMBERS, NOT A CONSTANT. Three days for a kitchen,
+       ninety for a pharmacy — and the declared fallback is the platform's, so
+       the `||` here is against a blank row rather than a second answer. */
+    const warn = Math.trunc(Number(await ctx.setting?.("inventory.warn_days"))) || 30;
+    const service = Math.trunc(Number(await ctx.setting?.("inventory.service_days"))) || 30;
+
+    const soon: Crossing[] = [];
+    const gone: Crossing[] = [];
+
+    const batches = await db.prepare(
+      `SELECT b.printed AS printed, b.opened AS opened, b.received AS received,
+              p.name AS name, p.openDays AS openDays
+         FROM batch b JOIN product p ON p.id = b.product
+        WHERE b.tenant_id = ?`)
+      .bind(ctx.tenantId)
+      .all<{ printed: string | null; opened: string | null; received: string | null;
+        name: string; openDays: number | null }>();
+
+    for (const row of batches.results) {
+      /* ⚠️ THE SAME COMPOSITION `batch.due` READS, and it has to be: a sweep
+         that only looked at the printed date would say nothing about a box
+         opened last month with a 2028 date on it, which is the case the three
+         clocks exist for. */
+      const ends = effectiveExpiry({
+        printed: row.printed,
+        opened: row.opened && row.openDays ? { on: row.opened, days: row.openDays } : null,
+      });
+      if (!ends) continue;
+      const crossed = crossedOn({ on: ends.on, since: row.received }, today, warn);
+      if (crossed === "soon") soon.push({ name: row.name, on: ends.on });
+      else if (crossed === "gone") gone.push({ name: row.name, on: ends.on });
+    }
+
+    const services: Crossing[] = [];
+    const units = await db.prepare(
+      /* ⚠️ RETIRED ONES ARE OUT, exactly as `unit.due` leaves them out. A
+         condemned machine is never due for service, and a note about one is a
+         note that cannot be acted on. */
+      `SELECT u.due AS due, p.name AS name
+         FROM unit u JOIN product p ON p.id = u.product
+        WHERE u.tenant_id = ? AND u.due IS NOT NULL AND u.life <> 'retired'`)
+      .bind(ctx.tenantId)
+      .all<{ due: string; name: string }>();
+
+    for (const row of units.results) {
+      /* ⚠️ NO `since` HERE — see `crossedOn`. A service interval is set once and
+         counted forward, so its window always opens while the machine is
+         already standing here. */
+      if (crossedOn({ on: row.due }, today, service)) services.push({ name: row.name, on: row.due });
+    }
+
+    if (soon.length) {
+      await ctx.tell?.("batch.expiring", {
+        count: many(soon.length, "thing", "things"), name: first(soon).name,
+        on: first(soon).on, days: String(warn),
+      });
+    }
+    if (gone.length) {
+      await ctx.tell?.("batch.expired", {
+        count: many(gone.length, "thing", "things"), name: first(gone).name, on: first(gone).on,
+      });
+    }
+    if (services.length) {
+      await ctx.tell?.("unit.service_due", {
+        count: many(services.length, "item", "items"),
+        name: first(services).name, on: first(services).on,
+      });
+    }
+
+    const touched = soon.length + gone.length + services.length;
+    /* ⚠️ THE DETAIL IS WHAT AN OPERATOR READS WHEN SOMEBODY SAYS THEY WERE NOT
+       TOLD. "0 workspaces" and "told nobody, nothing crossed" look identical in
+       a console that only reports a count. */
+    return {
+      touched,
+      detail: touched
+        ? `${soon.length} soon, ${gone.length} out of date, ${services.length} for service`
+        : "nothing crossed",
+    };
+  },
+});
+
 /* --------------------------------------------------------------- the rest --- */
 
 export const INVENTORY: AppSpec = defineApp({
@@ -3590,6 +3764,19 @@ export const INVENTORY: AppSpec = defineApp({
        ⚠️ AND `sparkle`, WHICH IS RESERVED FOR EXACTLY THIS. It is the one mark
        in the product that means a model made something, and this is the one
        surface whose whole content a model made. */
+    /*
+      ⚠️ WHERE EVERY NOTE THE NIGHT SENDS LANDS, AND IT HAD TO EXIST BEFORE THEY
+      COULD. `batch.due` and `unit.due` answered per product and per item, so
+      "what runs out" was a question the product could answer and had nowhere to
+      show — and a notification pointing at a screen that does not show what it
+      is about is the dead-link failure one level up, where nothing catches it.
+
+      ⚠️ SECONDARY, BECAUSE IT IS READ WHEN SOMETHING SAYS TO READ IT. Making it
+      a sixth primary would take a thumb-reachable slot from a gesture somebody
+      performs fifty times a day and give it to a list they open twice a week.
+    */
+    { id: "due", route: "/due", label: "Running out", nav: "secondary", icon: "alert",
+      permission: "stock:read" },
     { id: "ask", route: "/ask", label: "Ask", nav: "secondary", icon: "sparkle",
       permission: "stock:read", sky: "glow" },
     { id: "start", route: "/start", label: "Getting started", nav: "secondary", icon: "star",
@@ -3850,6 +4037,114 @@ export const INVENTORY: AppSpec = defineApp({
       fallback: "item", needs: "tenant:manage",
       help: "Most places count boxes. A pharmacy counts tablets.",
     }),
+  },
+
+  /* ⚠️ THE ONE JOB, AND IT IS WHAT MAKES A RECORDED EXPIRY WORTH RECORDING. */
+  jobs: { "inventory.expiry": expirySweep },
+
+  /*
+    ⚠️ THE AUDIENCE IS A PERMISSION, NEVER A ROLE. A workspace that makes a role
+    of its own — "night supervisor" — must still be told, and a book addressed to
+    `keeper` stops reaching anybody the moment somebody does that, silently,
+    with the dispatch reporting success over an empty audience.
+
+    ⚠️ AND EVERY `link` IS A DECLARED ROUTE. Four of Scena's pointed at a screen
+    that did not exist and an integration test was PINNING the bug — it passed
+    for as long as nothing rendered a notification, which is the whole of the
+    time before anybody could have noticed.
+  */
+  notifications: {
+    /*
+      ⚠️ NO PUSH, DELIBERATELY, AND IT IS THE LINE BETWEEN THE TWO EXPIRY TYPES.
+      Something entering a thirty-day window is worth knowing before the end of
+      the day; it is not worth a phone lighting up, and a product that treats it
+      that way has taught somebody to ignore the one that matters.
+    */
+    "batch.expiring": {
+      id: "batch.expiring", label: "Expiring soon",
+      summary: "{count} expiring soon — {name} first, on {on}",
+      category: "activity", author: "theirs", tone: "warning", icon: "alert",
+      needs: "stock:read",
+      on: "batch.expiring",
+      link: "/due",
+      variables: ["count", "name", "on", "days"],
+      channels: ["inbox", "email"],
+    },
+    /* ⚠️ AND THIS ONE DOES INTERRUPT, because it is already too late to plan
+       around and the next thing that happens is somebody using it. */
+    "batch.expired": {
+      id: "batch.expired", label: "Something has expired",
+      summary: "{count} out of date — {name} on {on}",
+      category: "activity", author: "theirs", tone: "danger", icon: "alert",
+      needs: "stock:read",
+      on: "batch.expired",
+      link: "/due",
+      variables: ["count", "name", "on"],
+      channels: ["inbox", "email", "push"],
+    },
+    /*
+      ⚠️ ITS OWN TYPE RATHER THAN A SECOND EXPIRY, and the reason is that a
+      person can silence one without silencing the other. An extinguisher's
+      inspection and a carton of cream are the same arithmetic and completely
+      different working days.
+    */
+    "unit.service_due": {
+      id: "unit.service_due", label: "A service is due",
+      summary: "{count} due for a service — {name} first, on {on}",
+      category: "activity", author: "theirs", tone: "warning", icon: "tag",
+      needs: "stock:read",
+      on: "unit.service_due",
+      link: "/due",
+      variables: ["count", "name", "on"],
+      channels: ["inbox", "email", "push"],
+    },
+    /*
+      ⚠️ `action`, AND IT MAY NOT BE SILENCED — `refusePolicy` refuses a
+      preference that leaves one with no interrupting channel. A load that
+      finished and nobody released is stock nobody may use sitting in a machine,
+      and the only person who can end that state is the one being told.
+
+      ⚠️ ADDRESSED TO `process:release` RATHER THAN `process:read`. Telling the
+      person who loaded the autoclave that it needs releasing is telling somebody
+      who cannot release it — which is how a queue of "somebody should do
+      something" notes trains a whole workspace to scroll past them.
+    */
+    "process.pending": {
+      id: "process.pending", label: "A run needs releasing",
+      summary: "{kind} has finished and nobody has released it",
+      category: "action", author: "theirs", tone: "warning", icon: "list",
+      needs: "process:release",
+      on: "process.ended",
+      link: "/work",
+      variables: ["kind", "who"],
+      channels: ["inbox", "email", "push"],
+    },
+    "process.failed": {
+      id: "process.failed", label: "A run failed",
+      summary: "{kind} failed — {reason}",
+      category: "activity", author: "theirs", tone: "danger", icon: "alert",
+      needs: "process:read",
+      on: "process.failed",
+      link: "/work",
+      variables: ["kind", "reason", "who"],
+      channels: ["inbox", "email", "push"],
+    },
+    /*
+      ⚠️ AN `action` TOO, AND IT IS THE SHARPEST ONE IN THE PRODUCT. A recall
+      names what could not be frozen because it was already used — those are
+      people, and somebody has to ring them. A preference that could mute this
+      would be a way to miss it silently.
+    */
+    "process.recalled": {
+      id: "process.recalled", label: "Called back",
+      summary: "{kind} was called back — {reason}",
+      category: "action", author: "theirs", tone: "danger", icon: "alert",
+      needs: "process:read",
+      on: "process.recalled",
+      link: "/work",
+      variables: ["kind", "reason", "who"],
+      channels: ["inbox", "email", "push"],
+    },
   },
 
   /* ⚠️ EVERY STEP IS TICKED BY AN EVENT THIS APP ACTUALLY RAISES. A step whose

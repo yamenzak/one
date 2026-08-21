@@ -167,3 +167,56 @@ export const standingOf = (on: string, today: string, warnDays: number): Standin
 /** ⚠️ Signed, because "four days ago" and "in four days" are one question. */
 export const daysLeft = (on: string, today: string): number =>
   daysBetween(today as Day, on as Day);
+
+
+/**
+ * WHAT CROSSED A LINE TODAY — the one question a nightly sweep may ask.
+ *
+ * ⚠️ A SWEEP THAT TELLS PEOPLE ABOUT A STATE TELLS THEM EVERY MORNING FOR A
+ * MONTH, and the third morning is the one where somebody switches notifications
+ * off. What is worth an interruption is the CROSSING — the day a box entered the
+ * warning window, and the day it went out of date. A state belongs on a list, on
+ * a screen, where looking at it is somebody's decision.
+ *
+ * ⚠️ SO THE ANSWER IS ARITHMETIC AND NOTHING IS REMEMBERED. No column to write,
+ * no row to keep in step with an expiry somebody corrects, and a sweep run twice
+ * in one day names exactly the same things both times — which is what makes the
+ * job honestly re-runnable rather than re-runnable with an apology.
+ *
+ * ⚠️ AND `since` IS WHY A SHORT-DATED DELIVERY IS NOT SILENTLY SKIPPED. Cream
+ * with three days on it, in a workspace warning thirty days ahead, has no day on
+ * which it crosses from outside the window to inside — it arrives inside. An
+ * exact match would file the batch most worth mentioning under nothing at all,
+ * so the crossing day is the LATER of "the window opened" and "we got it".
+ *
+ * ⚠️ IT IS OPTIONAL BECAUSE A SERVICE INTERVAL IS NOT A DELIVERY. A due date is
+ * set once and counted forward, so its window always opens while the machine is
+ * already here; anchoring it on a row's own edit date would re-announce an
+ * inspection every time somebody fixed a typo on the item.
+ *
+ * ⚠️ MINUS ONE IS `gone`, NOT ZERO. `standingOf` calls the printed day itself
+ * `soon` — a box that expires today is usable today under every regime that
+ * governs one — so out-of-date begins the morning after.
+ *
+ * ⚠️ AND A MISSED PASS IS A CROSSING NOBODY HEARS ABOUT. That is the cost of
+ * remembering nothing, and it is why the run record is the thing to watch: a job
+ * that has gone quiet is the failure the scheduler exists to make visible, and
+ * this is that failure wearing a shelf's clothes.
+ */
+export const crossedOn = (
+  of: { readonly on: string; readonly since?: string | null },
+  today: string,
+  warnDays: number,
+): "soon" | "gone" | null => {
+  const left = daysBetween(today as Day, of.on as Day);
+  if (left === -1) return "gone";
+  /* ⚠️ Anything already gone crossed on some earlier day and is the screen's
+     business now. Saying it again every morning is the noise this exists to
+     avoid. */
+  if (left < 0) return null;
+  const opens = addDays(of.on, -warnDays);
+  /* ⚠️ LEXICOGRAPHIC IS CHRONOLOGICAL ON `YYYY-MM-DD`, which is the whole reason
+     every date in this product is stored that way. */
+  const entered = of.since && of.since > opens ? of.since : opens;
+  return today === entered ? "soon" : null;
+};

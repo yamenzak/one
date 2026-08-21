@@ -205,6 +205,15 @@ export const beneath = (route: string, path: string): readonly string[] => {
 export const eventsOf = (spec: AppSpec): readonly string[] => [...new Set([
   ...spec.operations.flatMap((o) => o.emits ?? []),
   ...spec.collections.flatMap(eventsFor),
+  /*
+    ⚠️ AND THE ONES NOBODY IS PRESENT FOR. The whole reason a night's work is
+    worth doing is that it finds something before a person would — stock that
+    expires on Thursday, a service that is due. Left out here, every
+    notification the sweep exists to send is refused at composition as waiting
+    for an event nothing raises, and the only way to ship one is to attach it to
+    an unrelated operation somebody happens to perform.
+  */
+  ...Object.values(spec.jobs ?? {}).flatMap((j) => j.emits ?? []),
 ])];
 
 /**

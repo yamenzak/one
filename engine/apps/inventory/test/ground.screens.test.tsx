@@ -29,6 +29,7 @@ import { Case, type Used } from "../src/screens/Case.js";
 import { Run, type Covered } from "../src/screens/Run.js";
 import { Work, type Jobs, type Runs } from "../src/screens/Work.js";
 import { Kit, type Member, type Missing } from "../src/screens/Kit.js";
+import { Due, sayDays, type Dated } from "../src/screens/Due.js";
 
 const html = (route: string) => renderToStaticMarkup(<InventoryScreen route={route} />);
 
@@ -1002,5 +1003,98 @@ describe("one job", () => {
   it("says a closed job keeps answering", () => {
     expect(casing(USED_LIST)).toContain("a recall next month");
     expect(casing(USED_LIST, "open")).toContain("Close it");
+  });
+});
+
+describe("what runs out", () => {
+  const DATED_LIST: readonly Dated[] = [
+    { id: "b-2", product: "p-lube", name: "Cutting fluid, 5 L", which: "Lot C0921",
+      on: "2026-08-27", standing: "soon", days: 6, by: "opened" },
+    { id: "b-1", product: "p-milk", name: "Milk, 2 L", which: "Lot 4471",
+      on: "2026-08-19", standing: "gone", days: -2, by: "printed" },
+  ];
+
+  const SERVICE_LIST: readonly Dated[] = [
+    { id: "u-1", product: "p-ext", name: "Fire extinguisher", which: "Serial FX-88231",
+      on: "2026-08-11", standing: "gone", days: -10, by: "" },
+  ];
+
+  const running = (
+    rows: readonly Dated[] = DATED_LIST, services: readonly Dated[] = SERVICE_LIST,
+  ) =>
+    renderToStaticMarkup(
+      <Due
+        title="Running out"
+        of={ready(rows)}
+        services={services}
+        again={() => undefined}
+        onOpen={() => undefined}
+        onItem={() => undefined}
+      />,
+    );
+
+  /*
+    ⚠️ OUT OF DATE ABOVE EVERYTHING, EVEN WHEN ITS DATE IS NOT THE SOONEST. Those
+    rows are a rule rather than a plan — nothing there may be used — and a list
+    ordered purely by date buries them under whatever was recorded with an older
+    date and is perfectly fine.
+  */
+  it("puts what is already out of date above what is going", () => {
+    const out = running();
+    expect(out.indexOf("Out of date")).toBeLessThan(out.indexOf("Expiring"));
+    expect(out.indexOf("Milk, 2 L")).toBeLessThan(out.indexOf("Cutting fluid, 5 L"));
+  });
+
+  /*
+    ⚠️ AND IT SAYS WHICH CLOCK WON. A shelf that says "expires Tuesday" and
+    cannot say why is a shelf nobody trusts — and a box printed 2028 that
+    somebody opened last month is out next week, which is the answer people find
+    surprising often enough for the column to earn its width.
+  */
+  it("says why a date is the date", () => {
+    expect(running()).toContain("since it was opened");
+    expect(running()).toContain("printed on it");
+  });
+
+  /* ⚠️ THE DAYS IN WORDS RATHER THAN AS A SIGNED NUMBER. "−2" is arithmetic;
+     "2 days ago" is what somebody reads at arm's length in a cold store. */
+  it("says the days in words", () => {
+    expect(running()).toContain("2 days ago");
+    expect(running()).toContain("in 6 days");
+    expect(sayDays(0)).toBe("today");
+    expect(sayDays(-1)).toBe("yesterday");
+    expect(sayDays(1)).toBe("tomorrow");
+  });
+
+  /*
+    ⚠️ A SERVICE IS NOT AN EXPIRY AND STAYS IN ITS OWN SECTION. An extinguisher's
+    inspection and a carton of cream are the same arithmetic and completely
+    different working days; mixed into one list somebody reads every row to find
+    out which kind of problem they are looking at.
+  */
+  it("keeps a service apart from an expiry", () => {
+    const out = running();
+    expect(out).toContain("Due for a service");
+    expect(out.indexOf("Expiring")).toBeLessThan(out.indexOf("Due for a service"));
+    /* ⚠️ AND NEVER SAYS A CLOCK WON. "Printed on it" over an inspection date is
+       a sentence that is simply not true. */
+    expect(running([], SERVICE_LIST)).not.toContain("printed on it");
+  });
+
+  /* ⚠️ AN EMPTY SECTION IS SAID, because an absent one is indistinguishable
+     from one that failed to load — and "nothing due" is a real answer to the
+     question somebody arrived with. */
+  it("says so where there is nothing in a section", () => {
+    const out = running(DATED_LIST, []);
+    expect(out).toContain("Nothing due");
+    expect(running([{ ...DATED_LIST[1]! }], [])).toContain("Nothing else expiring");
+  });
+
+  /* ⚠️ AND NOTHING AT ALL IS THE EMPTY SCREEN, which needs BOTH lists empty —
+     a screen drawing "nothing running out" over an overdue extinguisher is the
+     worst answer this surface could give. */
+  it("is only empty when both clocks are", () => {
+    expect(running([], [])).toContain("Nothing running out");
+    expect(running([], SERVICE_LIST)).not.toContain("Nothing running out");
   });
 });

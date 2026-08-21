@@ -33,6 +33,7 @@ import { Run, type Covered } from "./Run.js";
 import { Work, type Jobs, type Runs } from "./Work.js";
 import { Scan, type Guess, type Seen } from "./Scan.js";
 import { Stock } from "./Stock.js";
+import { Due, type Dated } from "./Due.js";
 import { Thing, type Batch, type Movement, type Piece } from "./Thing.js";
 import { Where } from "./Where.js";
 import { Start } from "./Start.js";
@@ -148,6 +149,13 @@ const TRACKING: readonly Tracking[] = ["listed", "counted", "batched", "itemised
 const trackingOf = (v: unknown): Tracking =>
   TRACKING.includes(v as Tracking) ? (v as Tracking) : "counted";
 
+/* ⚠️ NARROWED RATHER THAN CAST, LIKE EVERY OTHER ANSWER CROSSING THIS SEAM. An
+   unrecognised standing draws as `fine`, which is the honest reading of a value
+   this build does not know — inventing a warning would put an alarm on a screen
+   over a string nobody can explain. */
+const standingIn = (v: unknown): Dated["standing"] =>
+  v === "gone" || v === "soon" ? v : "fine";
+
 /**
  * ⚠️ A PLACE'S LINE COUNT IS DERIVED, INCLUDING WHAT IS BELOW IT. A tree row
  * offering "41 lines" that turns out to mean only what is directly on the rack —
@@ -211,6 +219,22 @@ function linesOf(
     };
   });
 }
+
+/**
+ * ⚠️ A LINE ID OR A PRODUCT ID, BECAUSE BOTH ARE LINKED FROM. A row on the stock
+ * list is one product on one shelf and carries a line id; every OTHER screen
+ * that points here — the ledger, a job's trace, what runs out — knows the
+ * product and nothing about which shelf. Resolving only the first made those
+ * links land on the platform's not-found refusal, which reads as a deleted
+ * record rather than as a link built out of the wrong id.
+ *
+ * ⚠️ AND THE BIGGEST LINE WINS WHERE A PRODUCT IS ON SEVERAL SHELVES. Any choice
+ * is arbitrary and this one is at least stable and explicable: it is the shelf
+ * somebody means when they say "have we got any".
+ */
+const pick = (lines: readonly Line[], id: string): Line | undefined =>
+  lines.find((l) => l.id === id)
+  ?? [...lines.filter((l) => l.product === id)].sort((a, b) => b.quantity - a.quantity)[0];
 
 const movesOf = (rows: readonly Row[], places: readonly Place[]): readonly Movement[] => {
   const named = new Map(places.map((p) => [p.id, p.name]));
@@ -314,7 +338,7 @@ const THING = (api: Door) => function ThingHere({ go, at }: Mounted) {
     : [];
 
   const line = both(world.stock, world.kinds, (stock, kinds) =>
-    linesOf(stock.items, places, kinds.items).find((l) => l.id === id));
+    pick(linesOf(stock.items, places, kinds.items), id));
 
   /* ⚠️ THE MOVEMENTS OF THIS PRODUCT, WHEREVER THEY HAPPENED — not of this
      LINE. A line is a product on one shelf; a correction made after somebody
@@ -1348,6 +1372,74 @@ const CASE = (api: Door) => function CaseHere({ go, at }: Mounted) {
 };
 
 /**
+ * RUNNING OUT — where every note the nightly sweep sends lands.
+ *
+ * ⚠️ THE ARITHMETIC IS THE OPERATIONS', NOT THIS FILE'S, and both of them are
+ * asked. How many days counts as "soon" is a `tenant:manage` setting a person on
+ * the floor cannot read, so a container working it out here would hard-code a
+ * number or show everybody the same wrong list — and it would have to do it
+ * twice, because an expiry and a service interval are different settings.
+ *
+ * ⚠️ AND THE TWO ASKS ARE THE SAME TWO THE JOB MAKES. `batch.due` with no
+ * product is the whole workspace, which is exactly what a note about the whole
+ * workspace has to be able to show.
+ */
+const DUE = (api: Door) => function DueHere({ go }: Mounted) {
+  const today = dayHere();
+  const dated = useAsked<{ items: readonly Row[] }>(
+    () => api.get("batch.due", { today }), [today]);
+  const serviced = useAsked<{ items: readonly Row[] }>(
+    () => api.get("unit.due", { today }), [today]);
+
+  const rows: Loaded<readonly Dated[]> = dated.of.status === "ready"
+    ? ready(dated.of.data.items.map((row): Dated => ({
+      id: text(row.id),
+      product: text(row.product),
+      name: text(row.name),
+      /* ⚠️ THE LOT, BECAUSE THAT IS WHAT A RECALL NAMES AND WHAT SOMEBODY READS
+         OFF THE BOX. Two deliveries of one product are two rows here and the
+         product's name alone cannot tell them apart. */
+      which: text(row.lot) ? `Lot ${text(row.lot)}` : "",
+      on: text(row.on),
+      standing: standingIn(row.standing),
+      days: num(row.days),
+      by: text(row.by),
+    })))
+    : dated.of;
+
+  const services: readonly Dated[] = serviced.of.status === "ready"
+    ? serviced.of.data.items.map((row): Dated => ({
+      id: text(row.id),
+      product: text(row.product),
+      name: text(row.name),
+      which: text(row.serial) ? `Serial ${text(row.serial)}` : text(row.code),
+      on: text(row.on),
+      standing: standingIn(row.standing),
+      days: num(row.days),
+      /* ⚠️ EMPTY, BECAUSE A SERVICE HAS ONE CLOCK. The three-way "which clock
+         won" is what an expiry needs; saying "printed on it" over an inspection
+         date would be a sentence that is simply not true. */
+      by: "",
+    }))
+    : [];
+
+  return (
+    <Due
+      title={nameOf("/due")}
+      of={rows}
+      services={services}
+      again={() => { dated.again(); serviced.again(); }}
+      /* ⚠️ THE PRODUCT, NEVER THE BATCH. A row here is one delivery and there
+         is no screen for one; the product's is where its deliveries are listed,
+         and `THING` resolves a product id as well as a line id for exactly
+         this. */
+      onOpen={(row) => go(`/thing/${row.product}`)}
+      onItem={(row) => go(`/item/${row.id}`)}
+    />
+  );
+};
+
+/**
  * ⚠️ THE GUIDE IS TICKED BY EVENTS THIS WORKSPACE HAS ACTUALLY RAISED, and until
  * the platform answers that question the honest state is nothing crossed off —
  * never a step ticked because a screen guessed.
@@ -1390,6 +1482,7 @@ export function mount({ register, api }: Mounting): void {
     ["/case", CASE(api)],
     ["/item", ITEM(api)],
     ["/kit", KIT(api)],
+    ["/due", DUE(api)],
     ["/start", START()],
   ];
   for (const [route, screen] of screens) {

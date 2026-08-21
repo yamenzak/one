@@ -56,6 +56,49 @@ export interface JobCtx {
   /** Epoch ms after which the run should stop and report what it did. */
   readonly deadline: number;
   readonly now: string;
+  /**
+   * TELL SOMEBODY WHAT THE NIGHT FOUND.
+   *
+   * ⚠️ A FACT NOBODY IS TOLD ABOUT IS MOST OF THE REASON NOBODY RECORDS ONE. A
+   * sweep that works out which stock expires on Thursday and writes the number
+   * into a run record has produced a report for an operator about a customer's
+   * shelf — the person who has to move the stock is not reading the nightly
+   * console, and the whole point of knowing an expiry early is that somebody
+   * acts before it.
+   *
+   * ⚠️ IT RAISES AN EVENT; IT DOES NOT ADDRESS A PERSON. Who is told is the
+   * notification's `to`, resolved against permissions like every other note —
+   * a job that picked its own audience would be a second answer to "who should
+   * know", diverging from the one the manifest checked.
+   *
+   * ⚠️ AND THE EVENT MUST BE ONE THIS JOB DECLARES (`emits`). The runner
+   * refuses anything else rather than filing it, because a job raising an
+   * undeclared event is a notification the manifest could not have checked —
+   * unaddressed, unlinked, and silently reaching nobody.
+   *
+   * ⚠️ ABSENT MEANS THIS DEPLOYMENT CANNOT TELL ANYBODY — no inbox wired, a
+   * test harness calling the body directly. That is a state rather than a
+   * fault, and it is why a body reads `ctx.tell?.(…)`.
+   */
+  readonly tell?: (event: string, values: Record<string, unknown>) => Promise<void>;
+  /**
+   * WHAT THIS WORKSPACE SWITCHED ON — the same resolution a handler reads.
+   *
+   * ⚠️ A NIGHT'S WORK IS GOVERNED BY THE SAME NUMBERS THE DAY'S IS. "How many
+   * days counts as soon" is a decision about a business — three for a kitchen,
+   * ninety for a pharmacy — and a sweep that could not read it would either
+   * hard-code one or query the settings table by hand, which is a second
+   * implementation of a resolution with a declared fallback under it.
+   *
+   * ⚠️ TENANT LEVEL ONLY, BECAUSE A JOB HAS NO PERSON. A personal preference
+   * asked for with no account resolves to its fallback rather than to somebody
+   * else's answer, which is what the runner passes and why this cannot quietly
+   * read the wrong row.
+   *
+   * ⚠️ ABSENT WHERE THE RUNNER HAS NO APP TO RESOLVE AGAINST — a platform job,
+   * a test harness. A body reads `ctx.setting?.(…)` and falls back in the open.
+   */
+  readonly setting?: (id: string) => Promise<unknown>;
 }
 
 /** What a run reports. `touched` is the count the console shows. */
@@ -95,6 +138,19 @@ export interface JobDef {
    * act however it is configured.
    */
   readonly destroys?: { readonly floorDays: number };
+  /**
+   * WHAT IT TELLS PEOPLE ABOUT, DECLARED — never discovered from the body.
+   *
+   * ⚠️ THE SAME RULE AN OPERATION FOLLOWS (D12), AND FOR THE SAME REASON. A
+   * notification names the event that raises it, and the manifest refuses one
+   * that waits for an event nothing raises. So a job's events have to be
+   * readable without running it, or every notification a night's work exists to
+   * send would be refused at composition as unraisable.
+   *
+   * ⚠️ AND THE RUNNER ENFORCES IT BOTH WAYS: an event named here is what
+   * `ctx.tell` will accept, and nothing else.
+   */
+  readonly emits?: readonly string[];
   /** Seconds. A run that would exceed it stops and continues next time. */
   readonly budgetSeconds?: number;
   /** ⚠️ Whether a second run may start while one is going. Default is no. */
@@ -269,7 +325,8 @@ export const dueNow = (cron: string, lastRun: Date | null, now: Date): boolean =
 
 export type JobRefusal =
   | "unparseable_schedule" | "no_reason" | "destroys_without_a_floor"
-  | "unknown_failure_notification" | "retries_forever" | "no_work" | "never_fires";
+  | "unknown_failure_notification" | "retries_forever" | "no_work" | "never_fires"
+  | "tells_nobody";
 
 export interface JobProblem { readonly job: string; readonly why: JobRefusal; readonly detail: string }
 
@@ -301,6 +358,17 @@ export function refuseJob(def: JobDef, notifications: readonly string[]): readon
   if (def.onFail.then === "tell" && !notifications.includes(def.onFail.notification)) {
     at("unknown_failure_notification",
       `tells "${def.onFail.notification}" on failure, which is not a notification`);
+  }
+  /*
+    ⚠️ A NOTE IS FILED IN A WORKSPACE, SO A DEPLOYMENT-WIDE JOB CANNOT SEND ONE.
+    It has the directory and no tenant, and there is no inbox at that level —
+    the audience of every notification is resolved through membership. Left
+    unchecked this is a declaration that composes, passes `unraisable` on the
+    strength of its own `emits`, and tells nobody for the life of the product.
+  */
+  if (def.scope === "deployment" && (def.emits?.length ?? 0) > 0) {
+    at("tells_nobody",
+      `raises ${def.emits!.join(", ")} across the whole deployment, and a note is filed in a workspace`);
   }
   if (def.onFail.then === "retry" && def.onFail.times > 10) {
     at("retries_forever", `${def.onFail.times} retries of something nobody is waiting for`);

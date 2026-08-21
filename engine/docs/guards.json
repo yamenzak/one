@@ -2757,6 +2757,15 @@
       "fails": "an expiry read off a blurred label committed as a fact — a perfectly valid date that nothing anywhere will ever question"
     },
     {
+      "id": "a-job-that-says-it-tells-people-tells-people",
+      "protects": "D12",
+      "stage": "68",
+      "status": "live",
+      "impl": "scripts/job-tells.test.mjs",
+      "proves": "declares it emits",
+      "fails": "a nightly sweep whose notification composes, appears on the policy screen and is offered as a preference, while nobody is ever told anything"
+    },
+    {
       "id": "a-quarantine-lifts-to-needs-work-and-never-to-good-to-go",
       "protects": "D12",
       "stage": "66",

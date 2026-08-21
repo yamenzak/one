@@ -28,9 +28,16 @@
  */
 
 import type {
-  AppSpec, Instant, JobBook, JobDef, PackDef, PlanSpec, TenantId,
+  AppSpec, Channel, Instant, JobBook, JobDef, PackDef, PlanSpec, TenantId,
 } from "@engine/kernel";
 import { UNLIMITED, isSearchable } from "@engine/kernel";
+
+/* ⚠️ THE SAME DISPATCH A REQUEST USES, aliased because `tell` is already the
+   name of the failure route on `SweepDeps` and two things called `tell` in one
+   file is how a failure report ends up in a customer's inbox. */
+import { tell as tellAbout } from "./dispatch.js";
+import { availableChannels, type NotifyDeps } from "./services.js";
+import { settingsFor } from "./settings.js";
 
 import { erase, readOne } from "./records.js";
 import {
@@ -127,6 +134,16 @@ export interface SweepDeps {
   readonly scheduleOf?: (jobId: string) => string | undefined;
   /** ⚠️ `onFail: tell` — where a failure is reported. */
   readonly tell?: (notification: string, detail: string) => Promise<void>;
+  /**
+   * ⚠️ HOW A NIGHT'S WORK REACHES THE PEOPLE IT CONCERNS. Not the same thing as
+   * `tell` above, which reports a job that BROKE to an operator: this carries
+   * what a job FOUND into the workspace it found it in, through the same inbox,
+   * the same audience-by-permission and the same channel resolution a request
+   * uses. Absent is a deployment with no inbox wired — every test harness, and
+   * a `wrangler dev` before push has a keypair — and a job then simply has no
+   * `ctx.tell`.
+   */
+  readonly notify?: NotifyDeps;
   /**
    * ⚠️ THE ACCOUNT CREDENTIAL, WHICH IS NOT THE GATEWAY'S. This one reads the
    * model catalogue; the gateway's runs models. A deployment holding only the
@@ -692,22 +709,91 @@ export const jobBookFor = (deps: SweepDeps): JobBook => ({
 });
 
 /**
+ * WHICH APP EACH JOB CAME FROM.
+ *
+ * ⚠️ THE BOOK ABOVE FLATTENS EVERY PRODUCT INTO ONE MAP AND LOSES THIS, which
+ * is correct for running them — a runner has no reason to care — and is exactly
+ * what a job telling somebody needs. A notification is looked up in ITS APP'S
+ * book: its audience, its link and its copy are the app's, and dispatching
+ * against the wrong one finds no type at all and files nothing, quietly.
+ *
+ * ⚠️ THE PLATFORM'S OWN ARE ABSENT, and that is the deployment-scope refusal
+ * one level down. They have no app, they run over the directory, and a note is
+ * filed in a workspace.
+ */
+export const jobAppsFor = (deps: SweepDeps): Readonly<Record<string, AppSpec>> =>
+  Object.fromEntries(Object.values(deps.apps).flatMap((of) => {
+    const spec = of();
+    return Object.keys(spec.jobs ?? {}).map((id) => [id, spec] as const);
+  }));
+
+/**
  * ⚠️ THE FAN-OUT LIST IS THE DIRECTORY'S (D5). Every workspace this deployment
  * serves, minus the closed ones — a per-tenant job walking a closed workspace is
  * work against records the erasure job is on its way to destroy.
  */
-export const runnerFor = (deps: SweepDeps): RunnerDeps => ({
-  directory: deps.directory,
-  shardOf: deps.shardOf,
-  now: deps.now,
-  scheduleOf: deps.scheduleOf,
-  tell: deps.tell,
-  tenants: async () => {
-    const rows = await deps.directory.prepare(
-      `SELECT id FROM tenant WHERE closed_at IS NULL`).all<{ id: string }>();
-    return rows.results.map((r) => r.id as TenantId);
-  },
-});
+export const runnerFor = (deps: SweepDeps): RunnerDeps => {
+  const of = jobAppsFor(deps);
+  /* ⚠️ RESOLVED ONCE PER PASS, NOT PER NOTE. `availableChannels` asks whether
+     push is live, which is a read; a sweep raising a note per expiring batch
+     would ask it once per batch per workspace. */
+  let channels: Promise<readonly Channel[]> | null = null;
+
+  return ({
+    directory: deps.directory,
+    shardOf: deps.shardOf,
+    now: deps.now,
+    scheduleOf: deps.scheduleOf,
+    tell: deps.tell,
+    ...(deps.notify
+      ? {
+        telling: async ({ jobId, tenantId, db, event, values }) => {
+          const app = of[jobId];
+          /* ⚠️ A PLATFORM JOB HAS NO APP BOOK TO LOOK IN. It cannot reach here
+             — `refuseJob` refuses `emits` on a deployment-scope job — and the
+             day one is per-tenant, silence is not the answer. */
+          if (!app) throw new Error(`${jobId} raised "${event}" and belongs to no app`);
+          channels ??= availableChannels(deps.notify!);
+          await tellAbout(db, {
+            app,
+            tenantId,
+            events: [event],
+            input: values,
+            answer: {},
+            /* ⚠️ NOBODY ACTED, SO NOBODY IS EXCLUDED. `audienceFor` leaves the
+               actor out of their own notification, which is right for a person
+               and wrong for a clock — everyone who holds the permission needs
+               to hear what the night found. */
+            actor: null,
+            actorName: null,
+            channels: await channels,
+            ...(deps.notify!.pusher ? { pusher: deps.notify!.pusher } : {}),
+          });
+        },
+      }
+      : {}),
+    /*
+      ⚠️ THE SAME RESOLUTION A HANDLER READS, THROUGH THE SAME FUNCTION. A sweep
+      governed by different numbers from the screen is a product that warns at
+      thirty days and shows a list drawn at ninety, with nothing anywhere saying
+      which is the workspace's answer.
+
+      ⚠️ AND NO ACCOUNT, BECAUSE A JOB IS NOT A PERSON. `settingsFor` reads
+      personal rows only when given an id, so a tenant job resolves personal
+      settings to their declared fallback rather than to whoever happened to be
+      first in the table.
+    */
+    settings: async ({ jobId, tenantId, db }) => {
+      const app = of[jobId];
+      return app ? settingsFor(db, tenantId, app, null) : {};
+    },
+    tenants: async () => {
+      const rows = await deps.directory.prepare(
+        `SELECT id FROM tenant WHERE closed_at IS NULL`).all<{ id: string }>();
+      return rows.results.map((r) => r.id as TenantId);
+    },
+  });
+};
 
 /**
  * CARRY EVERY MOVE THAT IS IN FLIGHT, AND CLEAR EVERY SOURCE THAT HAS DRAINED.

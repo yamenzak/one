@@ -11,7 +11,7 @@
 import { describe, expect, it } from "vitest";
 import { dayPlus, type Day } from "@engine/kernel";
 import {
-  applyMove, daysLeft, effectiveExpiry, promotes, refuseMove, standingOf,
+  applyMove, crossedOn, daysLeft, effectiveExpiry, promotes, refuseMove, standingOf,
 } from "../src/ledger.js";
 
 /* ⚠️ The kernel's day arithmetic, asserted here because this app is the reason
@@ -174,5 +174,95 @@ describe("where a batch stands", () => {
     expect(found?.on).toBe("2026-08-21");
     expect(found?.by).toBe("opened");
     expect(standingOf(found?.on ?? "", TODAY, 30)).toBe("soon");
+  });
+});
+
+/* ------------------------------------------------------------- the morning --- */
+
+/**
+ * WHAT THE NIGHTLY SWEEP IS ALLOWED TO SAY.
+ *
+ * ⚠️ EVERY ASSERTION HERE IS ABOUT SOMEBODY BEING TOLD ONCE. A sweep that
+ * announced a STATE would announce the same twelve boxes every morning until
+ * they expired, and the third morning is when a person switches the product's
+ * notifications off — after which the one that mattered arrives and is not read.
+ * "It crossed today" is what makes the difference, and it is arithmetic rather
+ * than a column, which is the only reason the job is honestly re-runnable.
+ */
+describe("what crossed a line today", () => {
+  /* ⚠️ THE ORDINARY CASE, AND IT HAPPENS ON EXACTLY ONE DAY. Thirty days out
+     with a thirty-day window: today, and never again. */
+  it("names a batch on the day it enters the window, and not after", () => {
+    expect(crossedOn({ on: "2026-09-20" }, "2026-08-21", 30)).toBe("soon");
+    expect(crossedOn({ on: "2026-09-20" }, "2026-08-22", 30)).toBeNull();
+    expect(crossedOn({ on: "2026-09-20" }, "2026-08-20", 30)).toBeNull();
+  });
+
+  /*
+    ⚠️ THE ONE TO READ TWICE. Cream with three days on it, in a workspace that
+    warns thirty days ahead, has no day on which it crosses from outside the
+    window to inside — it arrives inside. An exact match on `expiry − warnDays`
+    would file the batch most worth mentioning under nothing at all, silently,
+    for every short-dated delivery the business ever takes.
+  */
+  it("names a short-dated delivery on the day it arrives", () => {
+    expect(crossedOn({ on: "2026-08-24", since: "2026-08-21" }, "2026-08-21", 30)).toBe("soon");
+    /* ⚠️ AND ONLY ON THAT DAY. The morning after, it is the screen's business. */
+    expect(crossedOn({ on: "2026-08-24", since: "2026-08-21" }, "2026-08-22", 30)).toBeNull();
+  });
+
+  /* ⚠️ AND A DELIVERY THAT ARRIVED LONG BEFORE ITS WINDOW OPENS IS UNAFFECTED BY
+     `since` — the later of the two anchors is the crossing, so an old box still
+     crosses on the day the window reaches it. */
+  it("ignores a receipt older than the window", () => {
+    expect(crossedOn({ on: "2026-09-20", since: "2026-01-04" }, "2026-08-21", 30)).toBe("soon");
+  });
+
+  /*
+    ⚠️ OUT OF DATE BEGINS THE MORNING AFTER, NOT ON THE DAY. `standingOf` calls
+    the printed day itself `soon` because every regime that governs a shelf life
+    says the date on the label is the last good day — and the two functions
+    disagreeing about that would put "expired" on a screen over a box whose label
+    says otherwise, on the one day somebody is holding it.
+  */
+  it("calls it gone the day after, never on the day", () => {
+    /* ⚠️ NOT `gone`, AND NOT ANYTHING. It crossed into the window a month ago,
+       so today it is on the screen and nobody is told again — which is the
+       assertion that matters: the ONE thing it must not say today is that the
+       box has expired while the label in somebody's hand says otherwise. */
+    expect(crossedOn({ on: "2026-08-21" }, "2026-08-21", 30)).toBeNull();
+    expect(crossedOn({ on: "2026-08-21" }, "2026-08-22", 30)).toBe("gone");
+    /* ⚠️ AND A DELIVERY THAT ARRIVED TODAY WITH TODAY'S DATE ON IT IS `soon`,
+       which is the same rule from the other side — it entered the window and
+       the window has not closed. */
+    expect(crossedOn({ on: "2026-08-21", since: "2026-08-21" }, "2026-08-21", 30))
+      .toBe("soon");
+  });
+
+  /* ⚠️ AND SAYS NOTHING ABOUT WHAT WENT LONG AGO. A box out of date since April
+     crossed in April; naming it again every morning for four months is the noise
+     this whole shape exists to avoid. */
+  it("says nothing about what expired long ago", () => {
+    expect(crossedOn({ on: "2026-04-01" }, "2026-08-21", 30)).toBeNull();
+  });
+
+  /* ⚠️ THE WINDOW IS THE WORKSPACE'S — three days for a kitchen, ninety for a
+     pharmacy — so the crossing DAY moves with it. */
+  it("crosses on a day the workspace's own window decides", () => {
+    expect(crossedOn({ on: "2026-08-24" }, "2026-08-21", 3)).toBe("soon");
+    expect(crossedOn({ on: "2026-08-24" }, "2026-08-21", 2)).toBeNull();
+    expect(crossedOn({ on: "2026-11-19" }, "2026-08-21", 90)).toBe("soon");
+  });
+
+  /*
+    ⚠️ ASKING TWICE IN ONE DAY GIVES THE SAME ANSWER, which is what `rerunnable`
+    on the sweep is claiming. Nothing is written and nothing is remembered, so a
+    retry after a failed pass names exactly the same batches rather than a
+    different set — and a job that dares not be re-run is a job nobody re-runs
+    after a failure.
+  */
+  it("answers the same both times, because it remembers nothing", () => {
+    const asked = { on: "2026-09-20", since: "2026-01-04" };
+    expect(crossedOn(asked, "2026-08-21", 30)).toBe(crossedOn(asked, "2026-08-21", 30));
   });
 });

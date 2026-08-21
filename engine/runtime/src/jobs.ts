@@ -20,7 +20,7 @@
  * that gets slower with every shard and times out at the size where it matters.
  */
 
-import type { AppId, Instant, JobBook, JobDef, TenantId } from "@engine/kernel";
+import type { AppId, Instant, JobBook, JobCtx, JobDef, TenantId } from "@engine/kernel";
 import { dueForPurge, dueNow, newId, nextRun, scheduleOk } from "@engine/kernel";
 import type { SchemaModule } from "./schema.js";
 import type { Db } from "./sql.js";
@@ -157,6 +157,38 @@ export interface RunnerDeps {
   readonly scheduleOf?: (jobId: string) => string | undefined;
   /** ⚠️ `onFail: tell` — the notification the declaration names. */
   readonly tell?: (notification: string, detail: string) => Promise<void>;
+  /**
+   * ⚠️ HOW A JOB REACHES A PERSON, AND IT IS A DIFFERENT THING FROM `tell`
+   * ABOVE. That one reports a job that BROKE, to an operator. This one carries
+   * what a job FOUND into the workspace it found it in — which is the ordinary
+   * case, and the reason a nightly sweep is worth running at all.
+   *
+   * ⚠️ IT IS HANDED THE WORKSPACE'S DATABASE RATHER THAN RESOLVING ONE. The
+   * runner already has it open; a second lookup per note would be a shard
+   * resolution per row on a job whose whole shape is many rows per workspace.
+   *
+   * ⚠️ ABSENT IS A DEPLOYMENT WITH NO INBOX WIRED, which is what every test
+   * harness is. `ctx.tell` is then absent too, so a body reads `ctx.tell?.(…)`
+   * and the sweep does its work either way.
+   */
+  readonly telling?: (of: {
+    readonly jobId: string;
+    readonly tenantId: TenantId;
+    readonly db: Db;
+    readonly event: string;
+    readonly values: Record<string, unknown>;
+  }) => Promise<void>;
+  /**
+   * ⚠️ WHAT ONE WORKSPACE SWITCHED ON, FOR THE APP THIS JOB BELONGS TO. Resolved
+   * by the deployment because only it can map a job back to a manifest — see
+   * `jobAppsFor`. Absent is a runner with no app book, which is every test
+   * harness and every platform job.
+   */
+  readonly settings?: (of: {
+    readonly jobId: string;
+    readonly tenantId: TenantId;
+    readonly db: Db;
+  }) => Promise<Readonly<Record<string, unknown>>>;
   readonly now?: () => Date;
 }
 
@@ -179,6 +211,50 @@ async function inFlight(db: Db, jobId: string): Promise<boolean> {
     `SELECT id FROM job_run WHERE job_id = ? AND ended_at IS NULL LIMIT 1`).bind(jobId).first();
   return row !== null;
 }
+
+/**
+ * WHAT ONE WORKSPACE'S PASS IS HANDED BEYOND ITS DATABASE — or nothing.
+ *
+ * ⚠️ AN UNDECLARED EVENT IS REFUSED RATHER THAN FILED, and that is the half
+ * that makes `emits` mean something. The manifest checks a notification against
+ * what the app declares it raises; a body free to raise anything would be a
+ * body raising events no notification listens to — a `tell` that returns
+ * cleanly, tells nobody, and cannot be told apart from one that worked.
+ *
+ * ⚠️ AND THE REFUSAL IS A THROW, which the per-workspace catch turns into a
+ * named line in the run record. Nothing is waiting for this, so the only place
+ * it can be seen is the console — silence there is the failure mode.
+ *
+ * ⚠️ THE SETTINGS ARE READ ONCE PER WORKSPACE, NOT PER ASK. The promise is the
+ * memo, exactly as it is on the request side: a body reading three settings in a
+ * loop over four hundred rows would otherwise run twelve hundred queries.
+ */
+const handed = (
+  deps: RunnerDeps, def: JobDef, tenantId: TenantId, db: Db,
+): Pick<JobCtx, "tell" | "setting"> => {
+  const raises = def.emits ?? [];
+  let asked: Promise<Readonly<Record<string, unknown>>> | null = null;
+  return {
+    ...(deps.telling && raises.length
+      ? {
+        tell: async (event: string, values: Record<string, unknown>) => {
+          if (!raises.includes(event)) {
+            throw new Error(`${def.id} raised "${event}", which it does not declare`);
+          }
+          await deps.telling!({ jobId: def.id, tenantId, db, event, values });
+        },
+      }
+      : {}),
+    ...(deps.settings
+      ? {
+        setting: async (id: string) => {
+          asked ??= deps.settings!({ jobId: def.id, tenantId, db });
+          return (await asked)[id];
+        },
+      }
+      : {}),
+  };
+};
 
 /**
  * RUN ONE JOB, WHATEVER ITS SCOPE, RECORDING WHAT HAPPENED.
@@ -224,7 +300,7 @@ export async function runJob(
          never fatal — see the erasure sweep, which made the same choice. */
       if (!db) { refused.push(tenantId); continue; }
       try {
-        const out = await def.work({ db, tenantId, deadline, now: at });
+        const out = await def.work({ db, tenantId, deadline, now: at, ...handed(deps, def, tenantId, db) });
         touched += out.touched;
         done++;
         if (out.detail && out.touched) said.push(`${tenantId}: ${out.detail}`);

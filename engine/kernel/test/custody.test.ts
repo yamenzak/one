@@ -545,6 +545,25 @@ describe("work nobody is waiting for", () => {
     const { work: _drop, ...bodyless } = sweep;
     expect(refuseJob(bodyless as never, ["ops.job_failed"]).map((p) => p.why)).toEqual(["no_work"]);
   });
+
+  /*
+    ⚠️ A NOTE IS FILED IN A WORKSPACE, SO A DEPLOYMENT-WIDE JOB CANNOT SEND ONE.
+    It holds the directory and no tenant, and every notification's audience is
+    resolved through membership — so `emits` there is a declaration that
+    composes, satisfies the notification waiting for it, and tells nobody for the
+    life of the product. Per-tenant is the only scope that can reach a person.
+  */
+  it("refuses a deployment-wide job that says it tells people", () => {
+    expect(refuseJob(
+      { ...sweep, scope: "deployment", emits: ["stock.low"] }, ["ops.job_failed"],
+    ).map((p) => p.why)).toEqual(["tells_nobody"]);
+    expect(refuseJob(
+      { ...sweep, emits: ["stock.low"] }, ["ops.job_failed"],
+    )).toEqual([]);
+    /* ⚠️ AND A DEPLOYMENT JOB THAT TELLS NOBODY IS FINE, which is most of them —
+       the refusal is about the declaration, not about the scope. */
+    expect(refuseJob({ ...sweep, scope: "deployment" }, ["ops.job_failed"])).toEqual([]);
+  });
 });
 
 /* ⚠️ THE SCHEDULE HAS TO BE COMPUTABLE OR IT IS A LABEL. Every job declared a
