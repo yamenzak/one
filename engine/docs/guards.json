@@ -2739,6 +2739,15 @@
       "fails": "a number the ledger cannot rebuild — the balance is plausible, the screen redraws, and every report over that line stops adding up, permanently"
     },
     {
+      "id": "an-objects-standing-changes-only-where-the-shelf-changes-with-it",
+      "protects": "D12",
+      "stage": "64",
+      "status": "live",
+      "impl": "scripts/item-life.test.mjs",
+      "proves": "routed through the balance",
+      "fails": "a shelf that goes on claiming a drill which is in somebody's van, so every count afterwards \"finds\" it missing and corrects a number that was right"
+    },
+    {
       "id": "a-movement-refuses-rather-than-landing-on-zero",
       "protects": "D12",
       "stage": "60",

@@ -27,7 +27,7 @@ import { Button, Separator } from "@heroui/react";
 import {
   Banknote, Bell, Building2, Calendar, CheckCheck, Circle, ClipboardList, Clock, Cog, Coins, Database,
   Boxes, ChartColumn, FileText, House, Inbox as InboxGlyph, Mail, MapPin, NotebookPen, Package, Plus, Search,
-  Power, Shield, Sparkles, Star, Sun, TriangleAlert, UserRound, Users,
+  Power, Shield, Sparkles, Star, Sun, Tag, TriangleAlert, UserRound, Users,
 } from "lucide-react";
 /* ⚠️ OURS, BECAUSE THEIR MOTION IS INSIDE THEM — see `marks.tsx`. A bell rings
    by its clapper and a calendar turns its days over; neither is a transform on
@@ -68,6 +68,10 @@ const GLYPHS: Readonly<Record<string, React.ReactNode>> = {
      the CATALOGUE entry (a stack of them); `box` is one object somebody picks
      up, and `pin` is where it lives. */
   box: <Package />, pin: <MapPin />,
+  /* ⚠️ AND ONE NAMED OBJECT IS NEITHER OF THOSE. `box` is a thing on a shelf and
+     there may be forty of it; a tag is the label that says WHICH one — the whole
+     difference between a quantity and an object with a history. */
+  tag: <Tag />,
   money: <Coins />, coins: <Coins />, bank: <Banknote />,
   settings: <Cog />, cog: <Cog />,
   trust: <ShieldMark />, shield: <ShieldMark />,
@@ -178,7 +182,7 @@ export const STILL: readonly string[] = [
     in an inventory the mark for a location is on nearly every row of nearly every
     screen: a character there is a list that twitches wherever a thumb lands.
   */
-  "box", "pin",
+  "box", "pin", "tag",
   /*
     ⚠️ `power` IS STILL FOR `alert`'S REASON, AND IT IS THE SAME DECISION. This
     is the mark on the row that shuts every door — it is already the only item on

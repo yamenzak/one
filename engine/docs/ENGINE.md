@@ -864,6 +864,7 @@ its own header, cited by other files, and doing nothing.
 | `every-design-guard-is-named-in-the-design-language` | D12 | DESIGN.md §8 typed by hand and five guards missing from it — the sharpest being `metrics`, which holds card padding, the spacing scale, the page gutter and the floor under a pressable row, so the section answering “is spacing enforced?” did not mention the guard enforcing spacing |
 | `a-gate-is-never-handed-a-constant` | D12 | a gate whose input nothing supplies — `flags: located.flags ?? {}` where no deployment ever set it, so every request carried an empty map, the console wrote rows only the console read back, and switching a flag changed nothing anywhere with every suite green |
 | `a-balance-moves-in-one-place-and-the-history-moves-with-it` | D12 | a number the ledger cannot rebuild — the balance is plausible, the screen redraws, and every report over that line stops adding up, permanently |
+| `an-objects-standing-changes-only-where-the-shelf-changes-with-it` | D12 | a shelf that goes on claiming a drill which is in somebody's van, so every count afterwards "finds" it missing and corrects a number that was right |
 | `a-movement-refuses-rather-than-landing-on-zero` | D12 | a mis-scan, a wrong shelf or a count that was already wrong is silently absorbed, and the only evidence any of them happened is gone |
 | `a-shelf-life-is-counted-in-local-days` | D12 | stock expires a day late west of Greenwich — the direction that matters, on medicine and food |
 | `an-expiry-says-which-clock-ended-it` | D12 | a shelf that says “expires Tuesday” and cannot say why, which is a shelf nobody acts on |
@@ -885,7 +886,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 124 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 125 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -1011,9 +1012,10 @@ that names no stage, so this list cannot grow by forgetting.
 | 60 | OneInventory exists — the model, the one chokepoint that moves a balance, and the arithmetic under both | shipped |
 | 61 | A product's screens reach each other — the route is the app's, the prefix is the platform's | shipped |
 | 62 | A list narrows and pages — the generated read answers past the first fifty, and says how many there are | **planned** |
+| 64 | Itemised things — one object for its whole life, and the kits composed of them | shipped |
 | 63 | The guide and the milestones are ticked by what a workspace has actually done | **planned** |
 
-**46 shipped, 17 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**47 shipped, 17 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

@@ -24,6 +24,8 @@ import { ready, type Loaded } from "@engine/design";
 import { INVENTORY } from "../index.js";
 import { LINES, PLACES, EMPTY_PLACE, type Line, type Place } from "./sample.js";
 import { Count, type Change, type Counted, type Uncovered } from "./Count.js";
+import { Item, type Kept } from "./Item.js";
+import { Kit, type Member, type Missing } from "./Kit.js";
 import { Receive } from "./Receive.js";
 import { Scan, type Seen } from "./Scan.js";
 import { Start } from "./Start.js";
@@ -31,9 +33,11 @@ import { Stock } from "./Stock.js";
 import { Thing, type Batch, type Movement } from "./Thing.js";
 import { Where } from "./Where.js";
 
-export { Count, Receive, Scan, Start, Stock, Thing, Where };
+export { Count, Item, Kit, Receive, Scan, Start, Stock, Thing, Where };
 export * from "./sample.js";
-export type { Batch, Change, Counted, Movement, Seen, Uncovered };
+export type {
+  Batch, Change, Counted, Kept, Member, Missing, Movement, Seen, Uncovered,
+};
 
 const nothing = () => undefined;
 
@@ -129,6 +133,51 @@ const UNCOUNTED: readonly Uncovered[] = [
   { location: "p-bench", name: "Bench", days: 0 },
 ];
 
+/**
+ * ⚠️ ONE OBJECT WITH A LIFE ON IT, AND IT IS OUT WITH SOMEBODY. An item sitting
+ * on a shelf with nothing booked photographs as a name and a blank card; what
+ * this screen exists for is the drill somebody borrowed, the inspection that is
+ * overdue and the count of services beside them.
+ */
+const KEPT: Kept = {
+  id: "u-drill", code: "ONE-U-4K2PX9M", name: "Hammer drill, 18 V",
+  product: "t-drill", serial: "DW-884213", life: "issued",
+  where: "Van 2 · Rack", holder: "Ana Ruiz", issued: "2026-08-11",
+  due: "2026-08-18", standing: "gone", days: -3, services: 4,
+  retired: "", note: "",
+};
+
+/**
+ * ⚠️ ONE MOVEMENT PER ACT, WHICH IS WHAT AN OBJECT'S HISTORY IS. It came in, it
+ * went out, it came back, it went out again — the same four verbs a quantity
+ * has, over one thing, which is the whole claim of the itemised rung.
+ */
+const ITEM_HISTORY: readonly Movement[] = [
+  { id: "i3", move: "taken", delta: -1, at: "2026-08-11T06:50:00.000Z",
+    who: "Ana", where: "Van 2 · Rack", reason: "Issued to Ana Ruiz", capture: "typed" },
+  { id: "i2", move: "received", delta: 1, at: "2026-07-30T15:20:00.000Z",
+    who: "Dana", where: "Van 2 · Rack", reason: "Back from Ana Ruiz", capture: "typed" },
+  { id: "i1", move: "received", delta: 1, at: "2026-05-04T08:00:00.000Z",
+    who: "Dana", where: "Van 2 · Rack", capture: "scanned" },
+];
+
+/**
+ * ⚠️ A TRAY MID-ASSEMBLY, WITH BOTH KINDS OF WRONG IN IT AT ONCE. One thing
+ * missing and one thing in it that does not belong is the state the check exists
+ * for — a complete tray photographs as a tidy list and teaches nothing about
+ * which half of the screen a person reads first.
+ */
+const MEMBERS: readonly Member[] = [
+  { id: "u-scissors", name: "Scissors, straight", code: "ONE-U-8J1QW4", stray: false },
+  { id: "u-forceps", name: "Forceps, 14 cm", code: "ONE-U-2M7RT0", stray: false },
+  { id: "u-probe", name: "Probe, blunt", code: "ONE-U-5D3KL8", stray: true },
+];
+
+const MISSING: readonly Missing[] = [
+  { product: "t-clamp", name: "Clamp, curved", want: 2, have: 0 },
+  { product: "t-forceps", name: "Forceps, 14 cm", want: 2, have: 1 },
+];
+
 /** ⚠️ Everything at or below a place, which is what a tree row promises. */
 const under = (places: readonly Place[], here: string | null): ReadonlySet<string> => {
   const held = new Set<string>();
@@ -195,10 +244,15 @@ export function InventoryScreen({ route, onGo }: {
           line={LINES[0] as Line}
           history={ready(HISTORY)}
           batches={BATCHES}
+          /* ⚠️ EMPTY, BECAUSE THIS ONE IS A BATCHED PRODUCT. A counted or
+             batched thing has a number and no named ones — the ground draws the
+             product it has rather than a mixture no rung produces. */
+          pieces={[]}
           again={nothing}
           back={() => go("/")}
           onTake={nothing}
           onOpen={nothing}
+          onPiece={nothing}
         />
       );
     /* ⚠️ THE GROUND SHOWS THE ANSWER RATHER THAN THE CAMERA'S FIRST SECOND. A
@@ -252,6 +306,44 @@ export function InventoryScreen({ route, onGo }: {
           onStart={nothing}
           onClose={nothing}
           again={nothing}
+        />
+      );
+    /* ⚠️ THE ONE THAT IS OUT AND OVERDUE, because a held item with nothing
+       booked is a name and two blank rows. Every act this screen has is decided
+       by the standing, so the ground shows the standing that has the most. */
+    case "/item":
+      return (
+        <Item
+          of={KEPT}
+          history={ready(ITEM_HISTORY)}
+          again={nothing}
+          back={() => go("/thing")}
+          onIssue={nothing}
+          onReturn={nothing}
+          onServe={nothing}
+          onRetire={nothing}
+        />
+      );
+    /* ⚠️ MID-ASSEMBLY, SHORT ONE THING AND HOLDING ONE THAT DOES NOT BELONG. A
+       complete tray is a tidy list; this is the state the check exists for. */
+    case "/kit":
+      return (
+        <Kit
+          title={title}
+          name="Minor surgery tray"
+          code="ONE-K-7QP2XL9"
+          state="open"
+          built=""
+          where="Theatre 1 · Store"
+          of={ready(MEMBERS)}
+          missing={MISSING}
+          again={nothing}
+          back={() => go("/thing")}
+          onRead={nothing}
+          onOpen={() => go("/item")}
+          onTake={nothing}
+          onBuild={nothing}
+          onBreak={nothing}
         />
       );
     case "/start":

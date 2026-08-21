@@ -13,7 +13,7 @@
  */
 
 import {
-  AmountRow, Group, NoteRow, Screen, Section, Timeline, glyphOf, useShown,
+  AmountRow, Group, NavRow, NoteRow, Screen, Section, Timeline, useShown,
   type Loaded, type Moment,
 } from "@engine/design";
 import { Button } from "@heroui/react";
@@ -50,15 +50,35 @@ export interface Batch {
   readonly opened: boolean;
 }
 
+/**
+ * ONE NAMED THING OF THIS PRODUCT — an item, or a kit.
+ *
+ * ⚠️ ONE SHAPE FOR BOTH, BECAUSE THE ROW IS THE SAME ROW. An itemised product's
+ * objects and an assembled one's kits are both "the individual ones of this",
+ * and a product is never both — the rung decides which list this is, so a second
+ * component would be the same component with a different heading.
+ */
+export interface Piece {
+  readonly id: string;
+  /** Our own label, which is what somebody reads off the thing in their hand. */
+  readonly label: string;
+  readonly under: string;
+}
+
 export interface ThingProps {
   readonly line: Line;
   readonly history: Loaded<readonly Movement[]>;
   /** ⚠️ Empty for anything that is not `batched` — most products. */
   readonly batches: readonly Batch[];
+  /** ⚠️ Empty unless the product is `itemised` or `assembled`. */
+  readonly pieces: readonly Piece[];
   readonly again: () => void;
   readonly back: () => void;
   readonly onTake: () => void;
   readonly onOpen: (batch: string) => void;
+  readonly onPiece: (id: string) => void;
+  /** ⚠️ Offered only on an `assembled` product — see `kit.assemble`. */
+  readonly onAssemble?: () => void;
 }
 
 /*
@@ -101,7 +121,7 @@ const CAPTURED: Readonly<Record<string, string>> = {
 };
 
 export function Thing({
-  line, history, batches, again, back, onTake, onOpen,
+  line, history, batches, pieces, again, back, onTake, onOpen, onPiece, onAssemble,
 }: ThingProps) {
   /* ⚠️ THE READER'S OWN CONVENTIONS. A stored instant printed as it is stored is
      the database's spelling shown to somebody who told us how they write a
@@ -118,6 +138,15 @@ export function Thing({
       does={{ label: "Take some", onDo: onTake }}
       of={history}
       again={again}
+      /*
+        ⚠️ AN EMPTY HISTORY IS NEVER THIS SCREEN'S NOTHING, and without saying so
+        the default takes the page. `of` is the MOVEMENTS, so a product somebody
+        added five minutes ago — no receipts yet — rendered an empty state where
+        its name, its level, its deliveries and its ladder rung should be. The
+        screen has plenty on it; what is empty is one section, and it says so in
+        one line below.
+      */
+      isNothing={() => false}
       then={(moves) => (
         <>
           <Group label="Now">
@@ -167,6 +196,34 @@ export function Thing({
             )
             : null}
 
+          {/*
+            ⚠️ THE NAMED ONES, WHERE THERE ARE ANY. A counted product has a
+            number and nothing else to show; an itemised one has objects with
+            lives, and this is the only door to them — so the section is absent
+            rather than empty on everything below that rung.
+          */}
+          {pieces.length || onAssemble
+            ? (
+              <Section label={line.tracking === "assembled" ? "Kits" : "Items"}>
+                <Group
+                  does={onAssemble
+                    ? <Button variant="secondary" onPress={onAssemble}>Start a kit</Button>
+                    : undefined}
+                >
+                  {pieces.map((piece) => (
+                    <NavRow
+                      key={piece.id}
+                      label={piece.label}
+                      under={piece.under}
+                      onOpen={() => { onPiece(piece.id); }}
+                    />
+                  ))}
+                  {pieces.length ? null : <NoteRow>None of them yet</NoteRow>}
+                </Group>
+              </Section>
+            )
+            : null}
+
           <Section label="History">
             {moves.length
               ? (
@@ -191,7 +248,6 @@ export function Thing({
           </Section>
         </>
       )}
-      nothing={{ icon: glyphOf("box"), says: "Nothing has moved yet" }}
     />
   );
 }

@@ -24,10 +24,12 @@ import type { Problem } from "@engine/kernel";
 import { INVENTORY } from "../index.js";
 import { coverage, stuttering } from "../count.js";
 import { Count, type Change, type Counted, type Uncovered } from "./Count.js";
+import { Item, SAID, type Kept } from "./Item.js";
+import { Kit, KIT_SAID, type Member, type Missing } from "./Kit.js";
 import { Receive } from "./Receive.js";
 import { Scan, type Seen } from "./Scan.js";
 import { Stock } from "./Stock.js";
-import { Thing, type Batch, type Movement } from "./Thing.js";
+import { Thing, type Batch, type Movement, type Piece } from "./Thing.js";
 import { Where } from "./Where.js";
 import { Start } from "./Start.js";
 import type { Line, Place, Tracking } from "./sample.js";
@@ -295,6 +297,10 @@ const THING = (api: Door) => function ThingHere({ go, at }: Mounted) {
   /* ⚠️ THE WHOLE HISTORY, FILTERED HERE — see the DEFER above. The generated
      list cannot be asked for one product's movements. */
   const history = useAsked<{ items: readonly Row[] }>(() => api.get("ledger.list"));
+  /* ⚠️ ASKED FOR EVERY PRODUCT AND USED BY TWO RUNGS, for the same reason. Which
+     of them this product has is decided below, from its own rung. */
+  const items = useAsked<{ items: readonly Row[] }>(() => api.get("unit.list"));
+  const kits = useAsked<{ items: readonly Row[] }>(() => api.get("kit.list"));
 
   const places = world.places.status === "ready" && world.stock.status === "ready"
     ? placesOf(world.places.data.items, world.stock.data.items)
@@ -344,12 +350,50 @@ const THING = (api: Door) => function ThingHere({ go, at }: Mounted) {
     }))
     : [];
 
+  /*
+    ⚠️ THE NAMED ONES OF THIS PRODUCT, AND WHICH LIST IT IS COMES FROM THE RUNG.
+    An itemised product has objects and an assembled one has kits; nothing is
+    both, so asking for the list a product cannot have would be a request whose
+    answer is always empty.
+  */
+  const tracking = line.status === "ready" ? line.data?.tracking : undefined;
+  const pieces: readonly Piece[] = tracking === "itemised"
+    ? (items.of.status === "ready" ? items.of.data.items : [])
+      .filter((row) => text(row.product) === of)
+      .map((row): Piece => ({
+        id: text(row.id),
+        label: text(row.code) || text(row.serial) || "Unlabelled",
+        under: text(row.holder)
+          ? `With ${text(row.holder)}`
+          : SAID[lifeOf(row.life)],
+      }))
+    : tracking === "assembled"
+      ? (kits.of.status === "ready" ? kits.of.data.items : [])
+        .filter((row) => text(row.product) === of)
+        .map((row): Piece => ({
+          id: text(row.id),
+          label: text(row.code) || "Unlabelled",
+          under: KIT_SAID[stateOf(row.state)],
+        }))
+      : [];
+
   return (
     <Thing
       line={line.status === "ready" && line.data ? line.data : EMPTY_LINE}
       history={moves}
       batches={batches}
-      again={() => { world.again(); history.again(); dated.again(); }}
+      pieces={pieces}
+      onPiece={(id) => go(tracking === "assembled" ? `/kit/${id}` : `/item/${id}`)}
+      /* ⚠️ OFFERED ONLY WHERE A KIT IS A THING THIS PRODUCT HAS. The operation
+         refuses a kit of anything not on that rung, so a button anywhere else
+         would be one that can only argue. */
+      onAssemble={tracking === "assembled"
+        ? () => {
+          void api.post<{ id: string }>("kit.assemble", { product: of, day: today })
+            .then((got) => { if (got.ok) go(`/kit/${got.value.id}`); });
+        }
+        : undefined}
+      again={() => { world.again(); history.again(); dated.again(); items.again(); kits.again(); }}
       back={() => go("/")}
       /* ⚠️ NOT WIRED YET, AND SAYING SO IS THE HONEST STATE. Taking stock is its
          own screen with a quantity and a place in it (OI-6). */
@@ -733,6 +777,206 @@ const COUNT = (api: Door) => function CountHere() {
 };
 
 /**
+ * ONE OBJECT — reachable by its row id or by the label printed on it.
+ *
+ * ⚠️ THE LABEL IS AN ADDRESS, WHICH IS WHY BOTH RESOLVE HERE. Somebody standing
+ * in a store room has the code in their hand and nothing else; making the
+ * scanner look up a row id first would put a round trip between the camera and
+ * the screen it is supposed to open.
+ */
+const ITEM = (api: Door) => function ItemHere({ go, at }: Mounted) {
+  const id = at[0] ?? "";
+  const today = dayHere();
+  const world = useWorld(api);
+  const items = useAsked<{ items: readonly Row[] }>(() => api.get("unit.list"));
+  const history = useAsked<{ items: readonly Row[] }>(() => api.get("ledger.list"));
+  /* ⚠️ THE STANDING IS THE OPERATION'S, NOT THIS FILE'S. How many days counts as
+     "soon" for a service is a setting a person on the floor cannot read, so a
+     container working it out here would hard-code a number or show everybody the
+     same wrong answer. */
+  const dated = useAsked<{ items: readonly Row[] }>(
+    () => api.get("unit.due", { today }), [today]);
+
+  const places = world.places.status === "ready" && world.stock.status === "ready"
+    ? placesOf(world.places.data.items, world.stock.data.items)
+    : [];
+  const named = new Map(places.map((p) => [p.id, p.name]));
+  const kinds = new Map(
+    world.kinds.status === "ready"
+      ? world.kinds.data.items.map((row) => [text(row.id), text(row.name)])
+      : [],
+  );
+  const standing = new Map(
+    dated.of.status === "ready"
+      ? dated.of.data.items.map((row) => [text(row.id), row])
+      : [],
+  );
+
+  const row = items.of.status === "ready"
+    ? items.of.data.items.find((r) => text(r.id) === id || text(r.code) === id)
+    : undefined;
+
+  const of: Kept = row
+    ? {
+      id: text(row.id),
+      code: text(row.code),
+      name: kinds.get(text(row.product)) ?? "—",
+      product: text(row.product),
+      serial: text(row.serial),
+      life: lifeOf(row.life),
+      where: named.get(text(row.location)) ?? "",
+      holder: text(row.holder),
+      issued: text(row.issued),
+      due: text(row.due),
+      standing: text(standing.get(text(row.id))?.standing),
+      days: num(standing.get(text(row.id))?.days),
+      services: num(row.services),
+      retired: text(row.retired),
+      note: text(row.note),
+    }
+    : EMPTY_ITEM;
+
+  /* ⚠️ THE MOVEMENTS OF THIS OBJECT, WHICH THE LEDGER NAMES IN `against`. Every
+     act on an item moves the balance through the same chokepoint as a box of
+     gloves, so the history is one query and one vocabulary — see `stockMove`. */
+  const moves: Loaded<readonly Movement[]> = history.of.status === "ready"
+    ? ready(movesOf(
+      history.of.data.items.filter((r) => text(r.against) === of.id), places))
+    : history.of;
+
+  const after = () => { items.again(); history.again(); dated.again(); world.again(); };
+
+  return (
+    <Item
+      of={of}
+      history={moves}
+      again={after}
+      back={() => go(of.product ? `/thing/${of.product}` : "/")}
+      onIssue={(holder) => {
+        void api.post("unit.issue", { unit: of.id, holder, day: today })
+          .then((got) => { if (got.ok) after(); });
+      }}
+      onReturn={() => {
+        void api.post("unit.return", { unit: of.id, day: today })
+          .then((got) => { if (got.ok) after(); });
+      }}
+      onServe={({ next, note }) => {
+        void api.post("unit.serve", {
+          unit: of.id, day: today, ...(next ? { next } : {}), ...(note ? { note } : {}),
+        }).then((got) => { if (got.ok) after(); });
+      }}
+      onRetire={(reason) => {
+        void api.post("unit.retire", { unit: of.id, day: today, reason })
+          .then((got) => { if (got.ok) after(); });
+      }}
+    />
+  );
+};
+
+const LIVES: readonly Kept["life"][] = ["held", "issued", "retired"];
+const lifeOf = (v: unknown): Kept["life"] =>
+  LIVES.includes(v as Kept["life"]) ? (v as Kept["life"]) : "held";
+
+/** ⚠️ What the screen draws while its subject is arriving — see `EMPTY_LINE`. */
+const EMPTY_ITEM: Kept = {
+  id: "", code: "", name: "", product: "", serial: "", life: "held",
+  where: "", holder: "", issued: "", due: "", standing: "", days: 0,
+  services: 0, retired: "", note: "",
+};
+
+/**
+ * ONE KIT — and the check is the server's, not this file's.
+ *
+ * ⚠️ `kit.check` ANSWERS BOTH THE SCREEN AND THE BUILD, which is what makes the
+ * missing list trustworthy. A container that worked out what was short from a
+ * member list would be a second implementation of "is this complete", and the
+ * two would disagree the first time a recipe line was edited.
+ */
+const KIT = (api: Door) => function KitHere({ go, at }: Mounted) {
+  const id = at[0] ?? "";
+  const today = dayHere();
+  const world = useWorld(api);
+  const kits = useAsked<{ items: readonly Row[] }>(() => api.get("kit.list"));
+  const checked = useAsked<{ members: readonly Row[]; short: readonly Row[] }>(
+    () => (id
+      ? api.get("kit.check", { kit: id })
+      : Promise.resolve({ ok: true as const, value: { members: [], short: [] } })),
+    [id]);
+
+  const places = world.places.status === "ready" && world.stock.status === "ready"
+    ? placesOf(world.places.data.items, world.stock.data.items)
+    : [];
+  const named = new Map(places.map((p) => [p.id, p.name]));
+  const kinds = new Map(
+    world.kinds.status === "ready"
+      ? world.kinds.data.items.map((row) => [text(row.id), text(row.name)])
+      : [],
+  );
+
+  const row = kits.of.status === "ready"
+    ? kits.of.data.items.find((r) => text(r.id) === id || text(r.code) === id)
+    : undefined;
+
+  const members: Loaded<readonly Member[]> = checked.of.status === "ready"
+    ? ready(checked.of.data.members.map((m): Member => ({
+      id: text(m.id), name: text(m.name), code: text(m.code),
+      stray: m.stray === true,
+    })))
+    : checked.of;
+
+  const missing: readonly Missing[] = checked.of.status === "ready"
+    ? checked.of.data.short.map((s): Missing => ({
+      product: text(s.product), name: text(s.name),
+      want: num(s.want), have: num(s.have),
+    }))
+    : [];
+
+  const after = () => { kits.again(); checked.again(); world.again(); };
+
+  return (
+    <Kit
+      title={nameOf("/kit")}
+      name={row ? kinds.get(text(row.product)) ?? "—" : "—"}
+      code={row ? text(row.code) : ""}
+      state={stateOf(row?.state)}
+      built={row ? text(row.built) : ""}
+      where={row ? named.get(text(row.location)) ?? "" : ""}
+      of={members}
+      missing={missing}
+      again={after}
+      back={() => go("/")}
+      onRead={(raw) => {
+        /* ⚠️ THE SCAN RESOLVES TO ONE OF OUR OWN LABELS AND NOTHING ELSE HERE. A
+           product barcode names a type, and a type cannot be put into a tray —
+           what goes in is one object, which is what our label names. */
+        void api.get<Seen>("code.resolve", { raw, year: String(new Date().getFullYear()) })
+          .then((got) => {
+            if (!got.ok || got.value.ours !== "unit") return;
+            void api.post("kit.put", { kit: id, unit: got.value.value })
+              .then((done) => { if (done.ok) after(); });
+          });
+      }}
+      onOpen={(unit) => go(`/item/${unit}`)}
+      onTake={(unit) => {
+        void api.post("kit.take", { kit: id, unit }).then((got) => { if (got.ok) after(); });
+      }}
+      onBuild={() => {
+        void api.post("kit.build", { kit: id, day: today })
+          .then((got) => { if (got.ok) after(); });
+      }}
+      onBreak={() => {
+        void api.post("kit.break", { kit: id }).then((got) => { if (got.ok) after(); });
+      }}
+    />
+  );
+};
+
+type KitState = "open" | "built" | "broken";
+const STATES: readonly KitState[] = ["open", "built", "broken"];
+const stateOf = (v: unknown): KitState =>
+  STATES.includes(v as KitState) ? (v as KitState) : "open";
+
+/**
  * ⚠️ THE GUIDE IS TICKED BY EVENTS THIS WORKSPACE HAS ACTUALLY RAISED, and until
  * the platform answers that question the honest state is nothing crossed off —
  * never a step ticked because a screen guessed.
@@ -769,6 +1013,8 @@ export function mount({ register, api }: Mounting): void {
     ["/scan", SCAN(api)],
     ["/receive", RECEIVE(api)],
     ["/count", COUNT(api)],
+    ["/item", ITEM(api)],
+    ["/kit", KIT(api)],
     ["/start", START()],
   ];
   for (const [route, screen] of screens) {

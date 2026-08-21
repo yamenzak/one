@@ -21,6 +21,8 @@ import {
   type Seen, type Uncovered,
 } from "../src/screens/index.js";
 import { LINES, PLACES, EMPTY_PLACE } from "../src/screens/sample.js";
+import { Item, type Kept } from "../src/screens/Item.js";
+import { Kit, type Member, type Missing } from "../src/screens/Kit.js";
 
 const html = (route: string) => renderToStaticMarkup(<InventoryScreen route={route} />);
 
@@ -41,6 +43,11 @@ describe("OneInventory draws every screen it declares", () => {
   const SUBJECT: Readonly<Record<string, string>> = {
     "/thing": LINES[0]?.name ?? "",
     "/where": PLACES.find((p) => p.id === EMPTY_PLACE)?.name ?? "",
+    /* ⚠️ AND THE TWO NAMED ONES, for the same reason. An item's heading is the
+       product it is one of, and a kit's is the tray it is — neither is "An
+       item" or "A kit", which is what a nav has to call them. */
+    "/item": "Hammer drill, 18 V",
+    "/kit": "Minor surgery tray",
   };
 
   it("renders something for every declared route", () => {
@@ -437,5 +444,166 @@ describe("which shelves nobody has counted", () => {
   it("is absent while a count is open", () => {
     const out = renderToStaticMarkup(<InventoryScreen route="/count" />);
     expect(out).not.toContain("Nobody has counted these");
+  });
+});
+
+/**
+ * ONE OBJECT, AND THE ACT ITS STANDING MAKES.
+ *
+ * ⚠️ THE PRIMARY ACT IS A FUNCTION OF THE STANDING AND THERE IS NEVER MORE THAN
+ * ONE. A screen offering both "give it to somebody" and "take it back" puts the
+ * wrong one under the thumb half the time; a retired object offering either is
+ * a button that can only argue. None of that is visible to a compiler — every
+ * arrangement renders perfectly well.
+ */
+describe("one item", () => {
+  const kept = (of: Partial<Kept>): Kept => ({
+    id: "u1", code: "ONE-U-4K2PX9M", name: "Hammer drill, 18 V", product: "t-drill",
+    serial: "DW-884213", life: "held", where: "Van 2 · Rack", holder: "", issued: "",
+    due: "", standing: "", days: 0, services: 0, retired: "", note: "", ...of,
+  });
+
+  const drawn = (of: Kept) => renderToStaticMarkup(
+    <Item
+      of={of}
+      history={ready([])}
+      again={() => undefined}
+      back={() => undefined}
+      onIssue={() => undefined}
+      onReturn={() => undefined}
+      onServe={() => undefined}
+      onRetire={() => undefined}
+    />,
+  );
+
+  it("offers to give out what is on the shelf, and nothing else", () => {
+    const out = drawn(kept({ life: "held" }));
+    expect(out).toContain("Give it to somebody");
+    expect(out).not.toContain("Take it back");
+  });
+
+  it("offers to take back what is out, and names who has it", () => {
+    const out = drawn(kept({ life: "issued", holder: "Ana Ruiz", issued: "2026-08-11" }));
+    expect(out).toContain("Take it back");
+    expect(out).toContain("Ana Ruiz");
+    expect(out).not.toContain("Give it to somebody");
+  });
+
+  /* ⚠️ A RETIRED OBJECT HAS NOTHING TO OFFER, and the reason is on the screen
+     rather than only in the history — somebody arriving at it is asking why. */
+  it("offers a retired one neither, and says why it went", () => {
+    const out = drawn(kept({ life: "retired", retired: "2026-06-02", note: "Dropped" }));
+    expect(out).not.toContain("Give it to somebody");
+    expect(out).not.toContain("Take it back");
+    expect(out).toContain("Dropped");
+  });
+
+  /* ⚠️ AND RETIRING IS OFFERED ONLY WHERE IT IS POSSIBLE. Something out with
+     somebody has to come back first — the operation refuses it, so a button
+     for it would be one that only ever argues. */
+  it("offers to retire only what is on the shelf", () => {
+    expect(drawn(kept({ life: "held" }))).toContain("Retire it");
+    expect(drawn(kept({ life: "issued", holder: "Ana" }))).not.toContain("Retire it");
+  });
+
+  /*
+    ⚠️ THE SERVICE DATE WEARS THE ONE CHANNEL A MONOCHROME INTERFACE HAS LEFT,
+    and an overdue inspection is the whole reason the asset rung exists. The ink
+    is an attribute on a span: dropping it renders a perfectly ordinary row in
+    which nothing is wrong with anything.
+  */
+  it("marks an overdue service, and says so in days", () => {
+    const out = drawn(kept({ due: "2026-08-18", standing: "gone", days: -3 }));
+    expect(out).toContain('data-ink="danger"');
+    expect(out).toContain("3 days ago");
+  });
+
+  /* ⚠️ AND NOTHING BOOKED IS SAID RATHER THAN LEFT BLANK. An empty row reads as
+     a screen that failed to load one. */
+  it("says when nothing is booked", () => {
+    expect(drawn(kept({}))).toContain("Nothing is booked");
+  });
+});
+
+/**
+ * ONE KIT, AND THE TWO KINDS OF WRONG IT CAN BE.
+ *
+ * ⚠️ SHORT AND STRAY ARE NOT THE SAME SEVERITY, and the screen has to say both.
+ * Short means the tray cannot do its job, so the act that would call it complete
+ * is ABSENT rather than disabled — a button that can only refuse is a button
+ * somebody presses to find out why. A stray is worth seeing every time and is
+ * never a reason to strand anybody.
+ */
+describe("one kit", () => {
+  const drawn = (of: {
+    state?: "open" | "built" | "broken";
+    members?: readonly Member[];
+    missing?: readonly Missing[];
+  }) => renderToStaticMarkup(
+    <Kit
+      name="Minor surgery tray"
+      code="ONE-K-7QP2XL9"
+      state={of.state ?? "open"}
+      built=""
+      where="Theatre 1 · Store"
+      of={ready(of.members ?? [])}
+      missing={of.missing ?? []}
+      again={() => undefined}
+      back={() => undefined}
+      onRead={() => undefined}
+      onOpen={() => undefined}
+      onTake={() => undefined}
+      onBuild={() => undefined}
+      onBreak={() => undefined}
+    />,
+  );
+
+  const CLAMP: Member = { id: "u1", name: "Clamp, curved", code: "ONE-U-1", stray: false };
+  const PROBE: Member = { id: "u9", name: "Probe, blunt", code: "ONE-U-9", stray: true };
+
+  it("offers to finish a complete one", () => {
+    expect(drawn({ members: [CLAMP] })).toContain("It is complete");
+  });
+
+  it("withholds that while anything is missing, and says what", () => {
+    const out = drawn({
+      members: [CLAMP],
+      missing: [{ product: "t-scissors", name: "Scissors, straight", want: 1, have: 0 }],
+    });
+    expect(out).not.toContain("It is complete");
+    expect(out).toContain("Scissors, straight");
+    expect(out).toContain("Still needed");
+  });
+
+  /* ⚠️ AND A PARTIAL LINE SAYS HOW MANY OF HOW MANY. "Missing forceps" sends
+     somebody looking for two when one is already in the tray. */
+  it("says how many of a line are already in it", () => {
+    const out = drawn({ missing: [{ product: "t-f", name: "Forceps", want: 2, have: 1 }] });
+    expect(out).toContain("1 of 2 in it");
+  });
+
+  /* ⚠️ THE STRAY IS SAID ON ITS OWN ROW rather than counted in a summary — the
+     person is holding the tray and has to take one particular thing out. */
+  it("marks what does not belong, on the row it does not belong on", () => {
+    const out = drawn({ members: [CLAMP, PROBE] });
+    expect(out).toContain("Does not belong in this kit");
+    /* ⚠️ AND IT DOES NOT BLOCK. A studio may have a reason; refusing over one is
+       how a rule gets worked around. */
+    expect(out).toContain("It is complete");
+  });
+
+  /* ⚠️ TAKING SOMETHING OUT OF A BUILT KIT UN-BUILDS IT, and saying so before
+     somebody presses is what stops it being a surprise. */
+  it("warns that opening a built kit undoes the claim", () => {
+    expect(drawn({ state: "built", members: [CLAMP] }))
+      .toContain("Taking anything out makes it incomplete again");
+  });
+
+  /* ⚠️ A BROKEN KIT IS FINISHED. Offering to break it again, or to take
+     something out of it, would be offering what the operation refuses. */
+  it("offers nothing on one that was broken up", () => {
+    const out = drawn({ state: "broken", members: [CLAMP] });
+    expect(out).not.toContain("Break it up");
+    expect(out).not.toContain("Take out");
   });
 });

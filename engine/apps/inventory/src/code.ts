@@ -43,7 +43,7 @@ export const CODE_KINDS = [
 ] as const;
 
 /** Which of OUR OWN things a code names. Prefixed, so a camera knows at once. */
-export type OursOf = "location" | "batch" | "unit" | "product";
+export type OursOf = "location" | "batch" | "unit" | "product" | "kit";
 
 /**
  * ⚠️ THE PACK LEVEL IS PART OF WHAT RESOLVED, NOT A SEPARATE QUESTION. The same
@@ -86,10 +86,10 @@ export const unread = (of: Scanned | Unread): of is Unread => "why" in of;
  * decision, on a phone, in a basement.
  */
 const OURS: Readonly<Record<string, OursOf>> = {
-  L: "location", B: "batch", U: "unit", P: "product",
+  L: "location", B: "batch", U: "unit", P: "product", K: "kit",
 };
 
-const MINE = /^ONE-([LBUP])-([0-9A-Z-]{2,32})$/;
+const MINE = /^ONE-([LBUPK])-([0-9A-Z-]{2,32})$/;
 
 /* ------------------------------------------------------------------- gtin --- */
 

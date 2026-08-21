@@ -14,7 +14,7 @@
  */
 
 import {
-  area, collection, defineApp, field, operation, setting,
+  area, collection, defineApp, field, newId, operation, setting,
   type AppSpec,
 } from "@engine/kernel";
 import {
@@ -23,6 +23,10 @@ import {
 } from "./ledger.js";
 import { CODE_KINDS, readScan, stillNeeded, unread } from "./code.js";
 import { settleCount, type Change } from "./count.js";
+import {
+  KITS, LIVES, checkKit, refuseAct, refuseKitAct, shelfStep, wantsIn,
+  type Act, type KitState, type Life, type Short,
+} from "./items.js";
 
 /* ------------------------------------------------------------ collections --- */
 
@@ -103,6 +107,17 @@ const product = collection({
       silent pile of numbered things nobody ever looks at.
     */
     unnamed: field.bool({ label: "Not named yet", holds: "none" }),
+    /*
+      ⚠️ WHAT ONE OF THESE IS SUPPOSED TO CONTAIN — the standard tray, the
+      standard tool kit — and it lives on the TYPE rather than on each assembled
+      one. A recipe re-typed per tray is a recipe that drifts, and the whole
+      point of a kit check is that every tray is measured against the same list.
+
+      ⚠️ AND IT IS COPIED ONTO THE KIT WHEN ONE IS ASSEMBLED. A tray put together
+      in March is complete or not against the list it was assembled under — a
+      recipe edited since must never make a finished kit retrospectively wrong.
+    */
+    recipe: field.json({ label: "What a kit holds", holds: "none" }),
   },
 });
 
@@ -252,6 +267,126 @@ const batch = collection({
 });
 
 /**
+ * ONE OBJECT, FOR ITS WHOLE LIFE.
+ *
+ * ⚠️ THIS IS WHERE THE LADDER STOPS BEING ABOUT QUANTITIES. A number answers
+ * "how many"; an item answers "which one, who has it, when was it last serviced,
+ * and is it still fit to use". A forklift, a fire extinguisher, a laptop and a
+ * surgical clamp are the same shape, and it is one rung rather than a second
+ * product.
+ *
+ * ⚠️ AND ITS LABEL IS OURS, WHICH IS WHAT MAKES A SECOND SCAN DETECTABLE. Every
+ * other code in this workspace names a TYPE — one glove box's barcode is every
+ * glove box's barcode — so the same code twice is two things. Ours names this
+ * object, so the same label twice during a count is the same object counted
+ * twice, and the app can say so.
+ *
+ * ⚠️ NOTHING HERE IS EDITABLE BY HAND, for the reason `stock` is not. `life` and
+ * `location` are what the balance is made of: a generated update setting a unit
+ * to `retired` would take an object off the shelf in one table and leave it on
+ * in the other, with no movement saying why.
+ */
+const unit = collection({
+  id: "unit",
+  /* ⚠️ "Item" IS THE WORD A PERSON READS. `unit` is the schema's name and it is
+     the one the plan uses; a person's "unit" is what a quantity is counted in,
+     which is a different thing on the same screen. */
+  label: { one: "Item", many: "Items" },
+  scope: { of: "tenant" },
+  permission: "stock",
+  retention: null,
+  onClose: { then: "purge" },
+  offline: "queue",
+  without: ["create", "update", "delete"],
+  /* ⚠️ THE MAKER'S SERIAL, BECAUSE IT IS WHAT A WARRANTY CLAIM AND A RECALL BOTH
+     NAME. Ours is scanned, never typed; theirs is read off a plate by somebody
+     on the phone to a supplier. */
+  searchable: ["serial"],
+  fields: {
+    product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
+    /* ⚠️ WHERE IT LIVES WHEN IT IS OURS AND ON A SHELF. It keeps its place while
+       it is out with somebody, which is what makes "take it back" a gesture
+       rather than a question about which rack it came from. */
+    location: field.ref({ label: "Where", holds: "none", to: "location" }),
+    /* ⚠️ WHICH DELIVERY IT CAME OUT OF, where the product also keeps lots. A
+       recall names a lot, and an itemised recall has to reach the objects. */
+    batch: field.ref({ label: "Batch", holds: "none", to: "batch" }),
+    kit: field.ref({ label: "In the kit", holds: "none", to: "kit" }),
+    /* ⚠️ OURS, `ONE-U-…`, AND IT IS THE IDENTITY. Minted when the object is
+       received and never re-issued — a re-used label is two objects with one
+       history. */
+    code: field.text({ label: "Label", holds: "none", max: 64 }),
+    serial: field.text({ label: "Serial", holds: "none", max: 120 }),
+    life: field.enum({
+      label: "Standing", required: true, holds: "none", values: [...LIVES],
+    }),
+    /*
+      ⚠️ WHO HAS IT, AND IT IS SOMEBODY'S NAME. Declared `contact` so it reaches
+      the processing record, the export and the retention clock — a workspace
+      holding "Ana Ruiz has the drill" is holding a fact about a person, whatever
+      the column is called.
+
+      ⚠️ AND IT IS TEXT RATHER THAN A REFERENCE TO AN ACCOUNT, because most of
+      the people things are issued to are not in the system: a contractor, an
+      agency nurse, a driver. A reference would make the honest record the one
+      nobody can write.
+    */
+    holder: field.text({ label: "With", holds: "contact", max: 120 }),
+    issued: field.day({ label: "Out since", holds: "none" }),
+    /* ⚠️ THE NEXT SERVICE OR CALIBRATION, and it is the whole of the "asset"
+       case — a thing nobody ever counts and everybody has to maintain. */
+    due: field.day({ label: "Next service", holds: "none" }),
+    services: field.number({ label: "Services", holds: "none", min: 0 }),
+    acquired: field.day({ label: "Acquired", holds: "none" }),
+    retired: field.day({ label: "Retired", holds: "none" }),
+    note: field.long({ label: "Note", holds: "none", max: 2_000 }),
+  },
+});
+
+/**
+ * A COMPOSED GROUP WITH A LIFE OF ITS OWN — a surgery tray, a tool kit.
+ *
+ * ⚠️ A KIT IS NOT A PACK, AND THE LINE IS CLEAN. A pack is N of the SAME product
+ * and is a unit of measure with no identity; a kit is a group of DIFFERENT things
+ * that has identity and a lifecycle. A box of ten gloves is a pack. A tray is a
+ * kit.
+ *
+ * ⚠️ AND IT IS `kit` RATHER THAN THE PLAN'S `set`, deliberately. "Set" is what
+ * the modelling calls it, and it is also a verb, a JavaScript built-in and the
+ * second half of every `useState` line in this app's screens — three chances for
+ * the reader to misparse the word that names the record.
+ *
+ * ⚠️ THE RECIPE IS COPIED HERE FROM THE PRODUCT AT ASSEMBLY. A tray put together
+ * in March is complete or not against the list it was assembled under; measuring
+ * it against a recipe edited since would make a finished kit retrospectively
+ * wrong, which is a claim nobody made.
+ */
+const kit = collection({
+  id: "kit",
+  label: { one: "Kit", many: "Kits" },
+  scope: { of: "tenant" },
+  permission: "stock",
+  retention: null,
+  onClose: { then: "purge" },
+  offline: "queue",
+  without: ["create", "update", "delete"],
+  fields: {
+    product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
+    location: field.ref({ label: "Where", holds: "none", to: "location" }),
+    code: field.text({ label: "Label", holds: "none", max: 64 }),
+    state: field.enum({
+      label: "Standing", required: true, holds: "none", values: [...KITS],
+    }),
+    /* ⚠️ THE SNAPSHOT, NOT A POINTER — see the header. */
+    recipe: field.json({ label: "What it holds", holds: "none" }),
+    /* ⚠️ WHEN SOMEBODY CLAIMED IT WAS COMPLETE. The audit row says who; this is
+       what a person reads on the tray's own screen. */
+    built: field.day({ label: "Built", holds: "none" }),
+    note: field.long({ label: "Note", holds: "none", max: 2_000 }),
+  },
+});
+
+/**
  * ONE SHELF BEING COUNTED — open until somebody closes it.
  *
  * ⚠️ THE SESSION IS THE SCOPE, AND THE SCOPE IS WHAT PREVENTS DOUBLE COUNTING.
@@ -311,6 +446,15 @@ const tally = collection({
     product: field.ref({ label: "Product", required: true, holds: "none", to: "product" }),
     batch: field.ref({ label: "Batch", holds: "none", to: "batch" }),
     quantity: field.number({ label: "How many", required: true, holds: "none", min: 0 }),
+    /*
+      ⚠️ WHICH OBJECT, AND IT IS HOW "ALREADY COUNTED" IS POSSIBLE AT ALL. Every
+      other code names a TYPE — one glove box's barcode is every glove box's —
+      so the same code twice is two things and must be. Ours names one object, so
+      an itemised thing tallies as a row PER ITEM: the row id carries the item,
+      the insert does nothing on conflict, and a second scan of the same label
+      is a refusal rather than a silent two.
+    */
+    unit: field.ref({ label: "Item", holds: "none", to: "unit" }),
   },
 });
 
@@ -984,6 +1128,9 @@ interface Arriving {
   capture?: string; lot?: string; expiry?: string;
 }
 
+/** ⚠️ How many labelled objects one scan may mint — see the refusal below. */
+const MOST_AT_ONCE = 100;
+
 const arrive = operation<
   Arriving, { id: string; quantity: number; movement: string; product: string }
 >({
@@ -1079,11 +1226,44 @@ const arrive = operation<
         .run();
     }
 
+    const total = Math.abs(input.quantity) * pack;
+
+    /*
+      ⚠️ AN ITEMISED DELIVERY BECOMES ONE ROW PER OBJECT, LABELLED, HERE. It is
+      the moment identity is created and there is no second chance at it: a
+      workspace that received forty drills as a number and wants them itemised
+      afterwards has forty objects with no history and no way to tell them apart.
+
+      ⚠️ AND THE LABEL IS MINTED WITH THE ROW. "If we made it, we label it" —
+      ours is the only code that names THIS object rather than its type, which is
+      what makes a second scan during a count detectably the same thing.
+    */
+    if (tracking === "itemised") {
+      /* ⚠️ REFUSED RATHER THAN CAPPED. A hundred labelled objects from one scan
+         is already a big delivery; a thousand is a typed quantity with a zero
+         too many, and silently minting them leaves a workspace to delete them
+         one at a time. */
+      if (total > MOST_AT_ONCE) {
+        return c.fail("platform.invalid", {}, {
+          fields: { quantity: `Receive up to ${MOST_AT_ONCE} at a time` },
+        });
+      }
+      for (let made = 0; made < total; made++) {
+        const id = newId("unt", new Date(c.now));
+        await db.prepare(
+          `INSERT INTO unit
+            (id, tenant_id, product, location, batch, code, life, acquired, services, at, by)
+            VALUES (?, ?, ?, ?, ?, ?, 'held', ?, 0, ?, ?)`)
+          .bind(id, c.tenantId, product, input.location, batch ?? null, ourLabel("U", id),
+            input.day, c.now, c.accountId ?? null).run();
+      }
+    }
+
     const done = await stockMove(c, "received", {
       product,
       location: input.location,
       ...(batch ? { batch } : {}),
-      quantity: Math.abs(input.quantity) * pack,
+      quantity: total,
       day: input.day,
       capture: input.capture ?? "scanned",
     });
@@ -1246,6 +1426,55 @@ const openCount = operation<
  * closes. Anything else makes a half-finished count visible to everybody as
  * fact.
  */
+/**
+ * COUNTING ONE NAMED OBJECT.
+ *
+ * ⚠️ THE ROW IS KEYED ON THE OBJECT, WHICH IS THE WHOLE MECHANISM. A tally of an
+ * itemised product is one row per item rather than a running total, so a second
+ * scan of the same label inserts nothing and the operation can say "you have
+ * already counted that one" — the app's only true statement about sameness.
+ * Settling sums the rows per product and per lot, so nothing downstream changes.
+ *
+ * ⚠️ AND AN OBJECT RECORDED AS OUT IS REFUSED RATHER THAN COUNTED. It is in the
+ * counter's hand and the system says somebody else has it: that is a real
+ * disagreement worth stopping for, and the fix — take it back — is one press.
+ * Counting it silently would put the balance and the object's own record into
+ * permanent contradiction.
+ */
+async function tallyItem(
+  c: Ctx, session: string, code: string,
+): Promise<{ product: string; quantity: number }> {
+  const db = c.db as Db;
+  const of = await db.prepare(
+    `SELECT id, product, batch, life FROM unit WHERE tenant_id = ? AND code = ?`)
+    .bind(c.tenantId, code)
+    .first<{ id: string; product: string; batch: string | null; life: Life }>();
+  if (!of) return c.fail("platform.not_found");
+  if (of.life !== "held") {
+    return c.fail("inventory.wrongLife", {
+      why: of.life === "retired"
+        ? "This one was retired"
+        : "It is recorded as out with somebody",
+    });
+  }
+
+  const id = `tly_${session}_${of.id}`;
+  const done = await db.prepare(
+    `INSERT INTO tally (id, tenant_id, count, product, batch, unit, quantity, at, by)
+      VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+      ON CONFLICT (id) DO NOTHING`)
+    .bind(id, c.tenantId, session, of.product, of.batch, of.id, c.now,
+      c.accountId ?? null).run();
+  if (!done.meta?.changes) return c.fail("inventory.already");
+
+  const now = await db.prepare(
+    `SELECT COALESCE(SUM(quantity), 0) AS n FROM tally
+      WHERE tenant_id = ? AND count = ? AND product = ?`)
+    .bind(c.tenantId, session, of.product).first<{ n: number }>();
+
+  return { product: of.product, quantity: now?.n ?? 1 };
+}
+
 const tallyUp = operation<
   { count: string; raw: string; year: number; quantity?: number },
   { product: string; quantity: number }
@@ -1268,7 +1497,7 @@ const tallyUp = operation<
   emits: ["count.tallied"],
   fails: [
     "platform.not_found", "inventory.unreadable", "inventory.closed",
-    "inventory.needsLot",
+    "inventory.needsLot", "inventory.already", "inventory.wrongLife",
   ],
   audit: (input) => ({ subject: input.count, verb: "counted" }),
   async handler(ctx, input) {
@@ -1288,6 +1517,15 @@ const tallyUp = operation<
     if (unread(of)) {
       return c.fail("inventory.unreadable", {}, { fields: { raw: WHY[of.why] } });
     }
+
+    /*
+      ⚠️ ONE OF OUR OWN LABELS ON AN OBJECT IS THE ONE CODE THAT CANNOT BE
+      COUNTED TWICE, and it is the only real uniqueness in the whole product.
+      Every other code names a TYPE — one glove box's barcode is every glove
+      box's — so the same code thirty times is thirty items and must be. Ours
+      names THIS object, so the same label twice is a mistake the app can see.
+    */
+    if (of.ours === "unit") return tallyItem(c, input.count, of.value);
     if (of.ours) {
       return c.fail("inventory.unreadable", {}, { fields: { raw: "That is a place, not a thing" } });
     }
@@ -1463,6 +1701,655 @@ const closeCount = operation<
   },
 });
 
+/* ------------------------------------------------------------------ items --- */
+
+/**
+ * OUR OWN LABEL FOR ONE OF OUR OWN THINGS.
+ *
+ * ⚠️ IT IS DERIVED FROM THE ROW'S ID, WHICH IS WHAT MAKES IT UNIQUE WITHOUT A
+ * LOOKUP. A minted label is the identity of a physical object for the rest of
+ * that object's life, so two of them naming one row — or one naming two — is a
+ * history that cannot be untangled afterwards. A hash would be shorter and would
+ * collide; the id is already unique, and uppercasing it is injective.
+ */
+const ourLabel = (of: "U" | "K", id: string): string =>
+  `ONE-${of}-${id.slice(id.indexOf("_") + 1).toUpperCase()}`;
+
+/** One object as this app holds it — the columns every act below reads. */
+interface Item {
+  id: string; product: string; location: string | null; batch: string | null;
+  life: Life; kit: string | null; services: number | null;
+}
+
+/**
+ * ⚠️ BY ITS ROW ID OR BY THE LABEL PRINTED ON IT, AND BOTH ARE ADDRESSES. A
+ * person standing in a store room has the code in their hand and nothing else;
+ * making every caller look a row id up first would put a round trip between the
+ * camera and the act, on a phone, for the gesture the product is fastest at.
+ * Ours is unique within a workspace by construction — see `ourLabel`.
+ */
+const itemIn = async (c: Ctx, of: string): Promise<Item> => {
+  const db = c.db as Db;
+  const held = await db.prepare(
+    `SELECT id, product, location, batch, life, kit, services FROM unit
+      WHERE tenant_id = ? AND (id = ? OR code = ?)`)
+    .bind(c.tenantId, of, of).first<Item>();
+  if (!held) return c.fail("platform.not_found");
+  return held;
+};
+
+/**
+ * ISSUING, TAKING BACK AND RETIRING — the balance and the object, in that order.
+ *
+ * ⚠️ THE SHELF MOVES FIRST AND THE OBJECT SECOND, WHICH IS THE OPPOSITE OF WHAT
+ * IT LOOKS LIKE IT SHOULD BE. The balance can REFUSE — there is nothing on that
+ * shelf to take — and a refusal after the object was already marked out would
+ * leave a drill recorded as issued by an operation that reported failure.
+ *
+ * ⚠️ AND IF SOMEBODY BEATS US TO THE OBJECT, THE MOVEMENT IS TAKEN BACK RATHER
+ * THAN LEFT. Two people issuing one drill is the ordinary case in a busy store;
+ * the compare-and-set is what makes the second one lose, and a movement without
+ * the state change it belongs to is a shelf that quietly lost an item.
+ */
+async function actOnItem(
+  c: Ctx, of: Item, act: Act, day: string, where: string | null,
+  set: () => Promise<{ meta?: { changes?: number } }>,
+): Promise<{ movement: string }> {
+  const step = shelfStep(act);
+  /* ⚠️ AN OBJECT WITH NO PLACE STILL MOVES THROUGH ITS LIFE. Refusing to record
+     who took the extinguisher because nobody said which cupboard it lives in is
+     the form-demanded-a-field failure this product is built against. */
+  const at = where ?? of.location;
+  let movement = "";
+
+  if (step !== 0 && at) {
+    const done = await stockMove(c, step < 0 ? "taken" : "received", {
+      product: of.product, location: at,
+      ...(of.batch ? { batch: of.batch } : {}),
+      quantity: 1, day, capture: "typed", against: of.id,
+    });
+    movement = done.movement;
+  }
+
+  const out = await set();
+  if (!out.meta?.changes) {
+    if (movement && at) {
+      await stockMove(c, "undone", {
+        product: of.product, location: at,
+        ...(of.batch ? { batch: of.batch } : {}),
+        quantity: -step, day, capture: "typed", against: movement,
+      });
+    }
+    return c.fail("inventory.moved");
+  }
+  return { movement };
+}
+
+/* ⚠️ ONE REFUSAL SHAPE FOR EVERY ACT, and the sentence comes from the pure rule
+   rather than from each handler — two spellings of "it is already out with
+   somebody" is how a screen and a door come to disagree about what is possible. */
+const refuse = (c: Ctx, life: Life, act: Act): void => {
+  const why = refuseAct(life, act);
+  if (why) c.fail("inventory.wrongLife", { why });
+};
+
+const issue = operation<
+  { unit: string; holder: string; day: string }, { movement: string }
+>({
+  id: "unit.issue",
+  kind: "write",
+  summary: "Give an item to somebody",
+  input: {
+    unit: field.text({ label: "Item", required: true, holds: "none" }),
+    /* ⚠️ REQUIRED, BECAUSE "OUT" WITH NOBODY NAMED IS LOST. The whole value of
+       issuing over taking is that somebody can be asked for it back. */
+    holder: field.text({ label: "With", required: true, holds: "contact", max: 120 }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+  },
+  output: { movement: field.text({ label: "Movement", holds: "none" }) },
+  permission: "stock:move",
+  idempotency: { mode: "key" },
+  emits: ["unit.issued", "stock.taken"],
+  outcome: { message: "Issued.", tone: "success", invalidates: ["unit.list", "stock.list"] },
+  fails: ["platform.not_found", "platform.invalid", "inventory.wrongLife", "inventory.short", "inventory.moved"],
+  audit: (input) => ({ subject: input.unit, verb: "issued" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const of = await itemIn(c, input.unit);
+    refuse(c, of.life, "issue");
+    const holder = input.holder.trim();
+    if (!holder) {
+      return c.fail("platform.invalid", {}, { fields: { holder: "Say who has it" } });
+    }
+
+    return actOnItem(c, of, "issue", input.day, null, () => db.prepare(
+      `UPDATE unit SET life = 'issued', holder = ?, issued = ?, edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ? AND life = 'held'`)
+      .bind(holder, input.day, c.now, c.accountId ?? null, of.id, c.tenantId).run());
+  },
+});
+
+/**
+ * ⚠️ IT MAY COME BACK SOMEWHERE ELSE, AND THAT IS THE ORDINARY CASE. A drill
+ * borrowed from the van rack is put on the bench; a screen that could only
+ * return it where it started would make somebody either lie or not record it.
+ */
+const giveBack = operation<
+  { unit: string; day: string; location?: string }, { movement: string }
+>({
+  id: "unit.return",
+  kind: "write",
+  summary: "Take an item back",
+  input: {
+    unit: field.text({ label: "Item", required: true, holds: "none" }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+    location: field.text({ label: "Where", holds: "none" }),
+  },
+  output: { movement: field.text({ label: "Movement", holds: "none" }) },
+  permission: "stock:move",
+  idempotency: { mode: "key" },
+  emits: ["unit.returned", "stock.received"],
+  outcome: { message: "Back.", tone: "success", invalidates: ["unit.list", "stock.list"] },
+  fails: ["platform.not_found", "inventory.wrongLife", "inventory.short", "inventory.moved"],
+  audit: (input) => ({ subject: input.unit, verb: "took back" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const of = await itemIn(c, input.unit);
+    refuse(c, of.life, "return");
+
+    const back = input.location?.trim() || of.location;
+    if (back && back !== of.location) {
+      const where = await db.prepare(
+        `SELECT id FROM location WHERE id = ? AND tenant_id = ?`)
+        .bind(back, c.tenantId).first<{ id: string }>();
+      if (!where) return c.fail("platform.not_found");
+    }
+
+    return actOnItem(c, of, "return", input.day, back, () => db.prepare(
+      /* ⚠️ THE HOLDER IS CLEARED, NOT KEPT AS "WHO HAD IT LAST". The history says
+         who had it; a live column still naming somebody is a screen that tells a
+         colleague to go and ask a person who gave it back last month. */
+      `UPDATE unit SET life = 'held', holder = NULL, issued = NULL, location = ?,
+              edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ? AND life = 'issued'`)
+      .bind(back, c.now, c.accountId ?? null, of.id, c.tenantId).run());
+  },
+});
+
+/**
+ * ⚠️ A SERVICE IS RECORDED WHEREVER THE THING IS. A van is serviced on the road
+ * and a machine is calibrated in place; demanding it be back on our shelf first
+ * would make the honest record the harder one to write.
+ *
+ * ⚠️ AND THE NEXT DATE IS GIVEN RATHER THAN COMPUTED. An interval is a fact
+ * about a regime — annual, six-monthly, every 500 hours — and inventing one from
+ * a default would print a confident date nobody chose on a fire extinguisher.
+ */
+const serve = operation<
+  { unit: string; day: string; next?: string; note?: string }, { services: number }
+>({
+  id: "unit.serve",
+  kind: "write",
+  summary: "Record a service or calibration",
+  input: {
+    unit: field.text({ label: "Item", required: true, holds: "none" }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+    next: field.day({ label: "Next service", holds: "none" }),
+    note: field.text({ label: "Note", holds: "none", max: 2_000 }),
+  },
+  output: { services: field.number({ label: "Services", holds: "none" }) },
+  permission: "stock:move",
+  idempotency: { mode: "key" },
+  emits: ["unit.served"],
+  outcome: { message: "Recorded.", tone: "success", invalidates: ["unit.list", "unit.due"] },
+  fails: ["platform.not_found", "inventory.wrongLife"],
+  audit: (input) => ({ subject: input.unit, verb: "serviced" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const of = await itemIn(c, input.unit);
+    refuse(c, of.life, "serve");
+
+    await db.prepare(
+      /* ⚠️ THE COUNT IS INCREMENTED IN THE STATEMENT rather than read and
+         written. Two people recording the same machine's service is rare and a
+         read-then-write loses one of them silently, which is the class of bug
+         this file refuses everywhere else. */
+      `UPDATE unit SET services = COALESCE(services, 0) + 1, due = ?, note = COALESCE(?, note),
+              edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ? AND life <> 'retired'`)
+      .bind(input.next ?? null, input.note?.trim() || null, c.now, c.accountId ?? null,
+        of.id, c.tenantId).run();
+
+    return { services: (of.services ?? 0) + 1 };
+  },
+});
+
+/**
+ * ⚠️ RETIRING IS THE END, AND IT DEMANDS A REASON. "Dropped", "failed
+ * calibration", "sold" and "stolen" are four different facts about a business,
+ * and an object that left the shelf with none of them recorded is shrinkage
+ * nobody can explain.
+ *
+ * ⚠️ AND IT IS `stock:adjust` RATHER THAN `stock:move`. It takes a number off a
+ * shelf with no counterparty — which is the shape of every correction, and the
+ * reason those are a separate grant.
+ */
+const retire = operation<
+  { unit: string; day: string; reason: string }, { movement: string }
+>({
+  id: "unit.retire",
+  kind: "write",
+  summary: "Take an item out of service for good",
+  input: {
+    unit: field.text({ label: "Item", required: true, holds: "none" }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+    reason: field.text({ label: "Why", required: true, holds: "none", max: 200 }),
+  },
+  output: { movement: field.text({ label: "Movement", holds: "none" }) },
+  permission: "stock:adjust",
+  idempotency: { mode: "key" },
+  emits: ["unit.retired", "stock.taken"],
+  outcome: { message: "Retired.", tone: "warning", invalidates: ["unit.list", "stock.list"] },
+  fails: ["platform.not_found", "platform.invalid", "inventory.wrongLife", "inventory.short", "inventory.moved"],
+  audit: (input) => ({ subject: input.unit, verb: "retired" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const of = await itemIn(c, input.unit);
+    refuse(c, of.life, "retire");
+    if (!input.reason.trim()) {
+      return c.fail("platform.invalid", {}, { fields: { reason: "Say why it is going" } });
+    }
+
+    return actOnItem(c, of, "retire", input.day, null, () => db.prepare(
+      /* ⚠️ AND IT LEAVES ITS KIT. A tray holding a condemned instrument that
+         still reads complete is the one outcome the kit check exists for. */
+      `UPDATE unit SET life = 'retired', retired = ?, kit = NULL, note = ?,
+              edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ? AND life = 'held'`)
+      .bind(input.day, input.reason.trim(), c.now, c.accountId ?? null, of.id, c.tenantId)
+      .run());
+  },
+});
+
+/**
+ * WHAT NEEDS SERVICING — the asset half of the ladder.
+ *
+ * ⚠️ ITS OWN THRESHOLD, NOT THE EXPIRY ONE. "Tell me thirty days before" is a
+ * sensible answer for a shelf life and a useless one for a fire extinguisher: an
+ * annual inspection needs booking weeks out, and a kitchen that wants three days'
+ * notice on cream does not want three days' notice on the extinguisher.
+ */
+interface Serviceable {
+  id: string; code: string; product: string; name: string; serial: string;
+  on: string; standing: string; days: number;
+}
+
+const dueService = operation<{ today: string }, { items: readonly Serviceable[] }>({
+  id: "unit.due",
+  kind: "read",
+  summary: "What needs servicing, and when",
+  input: { today: field.day({ label: "Today", required: true, holds: "none" }) },
+  output: { items: field.json({ label: "Items", holds: "none" }) },
+  permission: "stock:read",
+  idempotency: { mode: "none" },
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const warn = Math.trunc(Number(await c.setting("inventory.service_days"))) || 30;
+
+    const rows = await db.prepare(
+      /* ⚠️ RETIRED ONES ARE OUT. A condemned machine is never due for service,
+         and leaving it in would put a permanent overdue row at the top of the
+         one list somebody is supposed to be able to clear. */
+      `SELECT u.id AS id, u.code AS code, u.serial AS serial, u.due AS due,
+              u.product AS product, p.name AS name
+         FROM unit u JOIN product p ON p.id = u.product
+        WHERE u.tenant_id = ? AND u.due IS NOT NULL AND u.life <> 'retired'`)
+      .bind(c.tenantId)
+      .all<{ id: string; code: string | null; serial: string | null; due: string;
+        product: string; name: string }>();
+
+    const items = rows.results.map((row): Serviceable => ({
+      id: row.id,
+      code: row.code ?? "",
+      product: row.product,
+      name: row.name,
+      serial: row.serial ?? "",
+      on: row.due,
+      standing: standingOf(row.due, input.today, warn),
+      days: daysLeft(row.due, input.today),
+    }));
+
+    items.sort((a, b) => a.days - b.days);
+    return { items };
+  },
+});
+
+/* ------------------------------------------------------------------- kits --- */
+
+interface Kit {
+  id: string; product: string; location: string | null; state: KitState;
+  recipe: string | null;
+}
+
+const kitIn = async (c: Ctx, id: string): Promise<Kit> => {
+  const of = await (c.db as Db).prepare(
+    `SELECT id, product, location, state, recipe FROM kit WHERE id = ? AND tenant_id = ?`)
+    .bind(id, c.tenantId).first<Kit>();
+  if (!of) return c.fail("platform.not_found");
+  return of;
+};
+
+/* ⚠️ THE SAME WALK ANSWERS THE CHECK AND GATES THE BUILD, for the reason
+   `differences` answers a count's preview and performs its close: two
+   implementations of "is this complete" is how a screen comes to promise what a
+   door refuses. */
+async function weighKit(c: Ctx, of: Kit) {
+  const db = c.db as Db;
+  const members = await db.prepare(
+    `SELECT u.id AS id, u.product AS product, u.code AS code, p.name AS name
+       FROM unit u JOIN product p ON p.id = u.product
+      WHERE u.tenant_id = ? AND u.kit = ?`)
+    .bind(c.tenantId, of.id)
+    .all<{ id: string; product: string; code: string | null; name: string }>();
+
+  let recipe: unknown = [];
+  /* ⚠️ A MALFORMED SNAPSHOT IS READ AS EMPTY RATHER THAN THROWN ON. It was
+     written by somebody editing a product months ago; a tray that cannot be
+     opened at all is worse than one checked against the lines that parse. */
+  try { recipe = of.recipe ? JSON.parse(of.recipe) : []; } catch { recipe = []; }
+  const wants = wantsIn(recipe);
+  const { short, stray } = checkKit(wants, members.results);
+
+  /* ⚠️ A MISSING PRODUCT HAS NO MEMBER TO TAKE A NAME FROM, which is the whole
+     reason this second read exists. "1 of prd_019a…" is a row nobody can act on;
+     "1 × Clamp" is the thing to go and find. */
+  const named = await namesFor(c, short.map((s) => s.product));
+
+  return {
+    members: members.results.map((m) => ({
+      id: m.id, product: m.product, name: m.name, code: m.code ?? "",
+      /* ⚠️ THE STRAYS ARE MARKED ON THE MEMBER ROW rather than listed apart. The
+         person is looking at a tray and has to take one thing out of it. */
+      stray: stray.includes(m.id),
+    })),
+    short: short.map((s) => ({ ...s, name: named.get(s.product) ?? s.product })),
+    stray,
+  };
+}
+
+const namesFor = async (c: Ctx, ids: readonly string[]) => {
+  const named = new Map<string, string>();
+  if (!ids.length) return named;
+  const db = c.db as Db;
+  const rows = await db.prepare(
+    `SELECT id, name FROM product WHERE tenant_id = ? AND id IN (${ids.map(() => "?").join(",")})`)
+    .bind(c.tenantId, ...ids).all<{ id: string; name: string }>();
+  for (const row of rows.results) named.set(row.id, row.name);
+  return named;
+};
+
+const assemble = operation<
+  { product: string; location?: string; day: string }, { id: string; code: string }
+>({
+  id: "kit.assemble",
+  kind: "write",
+  summary: "Start putting a kit together",
+  input: {
+    product: field.text({ label: "Product", required: true, holds: "none" }),
+    location: field.text({ label: "Where", holds: "none" }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+  },
+  output: {
+    id: field.text({ label: "Kit", holds: "none" }),
+    code: field.text({ label: "Label", holds: "none" }),
+  },
+  permission: "stock:move",
+  idempotency: { mode: "key" },
+  emits: ["kit.assembled"],
+  outcome: { message: "Started.", tone: "success", invalidates: ["kit.list"] },
+  fails: ["platform.not_found", "platform.invalid"],
+  audit: (input) => ({ subject: input.product, verb: "started a kit of" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const of = await db.prepare(
+      `SELECT id, tracking, recipe FROM product WHERE id = ? AND tenant_id = ?`)
+      .bind(input.product, c.tenantId)
+      .first<{ id: string; tracking: string; recipe: string | null }>();
+    if (!of) return c.fail("platform.not_found");
+    /* ⚠️ THE LADDER IS THE SPINE, so a kit of something nobody marked
+       `assembled` is refused rather than quietly made. The rung is what says
+       this product's instances are composed of other things. */
+    if (of.tracking !== "assembled") {
+      return c.fail("platform.invalid", {}, {
+        fields: { product: "Mark this product as assembled first" },
+      });
+    }
+
+    const id = newId("kit", new Date(c.now));
+    await db.prepare(
+      `INSERT INTO kit (id, tenant_id, product, location, code, state, recipe, at, by)
+        VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?)`)
+      .bind(id, c.tenantId, input.product, input.location ?? null, ourLabel("K", id),
+        of.recipe ?? null, c.now, c.accountId ?? null).run();
+
+    return { id, code: ourLabel("K", id) };
+  },
+});
+
+const putIn = operation<{ kit: string; unit: string }, { members: number }>({
+  id: "kit.put",
+  kind: "write",
+  summary: "Put an item into a kit",
+  input: {
+    kit: field.text({ label: "Kit", required: true, holds: "none" }),
+    unit: field.text({ label: "Item", required: true, holds: "none" }),
+  },
+  output: { members: field.number({ label: "In it", holds: "none" }) },
+  permission: "stock:move",
+  idempotency: { mode: "key" },
+  emits: ["kit.filled"],
+  outcome: { message: "In.", tone: "success", invalidates: ["kit.list", "unit.list"] },
+  fails: ["platform.not_found", "inventory.wrongKit", "inventory.wrongLife", "inventory.inKit"],
+  audit: (input) => ({ subject: input.kit, verb: "filled" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const of = await kitIn(c, input.kit);
+    const why = refuseKitAct(of.state, "put");
+    if (why) return c.fail("inventory.wrongKit", { why });
+
+    const item = await itemIn(c, input.unit);
+    /* ⚠️ A RETIRED OR ISSUED OBJECT CANNOT BE IN A TRAY. One is condemned and the
+       other is in somebody's van; either way the tray would claim to hold
+       something it does not. */
+    if (item.life !== "held") {
+      return c.fail("inventory.wrongLife", {
+        why: item.life === "retired" ? "This one was retired" : "It is out with somebody",
+      });
+    }
+    /* ⚠️ AND IT MAY BE IN ONE KIT ONLY. Moving it silently would empty another
+       tray that still reads complete — refused, and the refusal names the kit so
+       somebody can go and take it out on purpose. */
+    if (item.kit && item.kit !== of.id) return c.fail("inventory.inKit");
+    if (item.kit === of.id) return { members: await memberCount(c, of.id) };
+
+    await db.prepare(
+      `UPDATE unit SET kit = ?, edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ? AND kit IS NULL AND life = 'held'`)
+      .bind(of.id, c.now, c.accountId ?? null, item.id, c.tenantId).run();
+
+    return { members: await memberCount(c, of.id) };
+  },
+});
+
+const memberCount = async (c: Ctx, kitId: string): Promise<number> => {
+  const of = await (c.db as Db).prepare(
+    `SELECT COUNT(*) AS n FROM unit WHERE tenant_id = ? AND kit = ?`)
+    .bind(c.tenantId, kitId).first<{ n: number }>();
+  return of?.n ?? 0;
+};
+
+/**
+ * ⚠️ TAKING SOMETHING OUT OF A BUILT KIT UN-BUILDS IT, and that is the rule worth
+ * the whole record. Somebody needs the clamp, and refusing them would make the
+ * app the thing standing between a person and their work — but the CLAIM must not
+ * survive it, because a tray missing an instrument that still reads "complete" is
+ * exactly what a kit check exists to prevent.
+ */
+const takeOut = operation<{ kit: string; unit: string }, { members: number }>({
+  id: "kit.take",
+  kind: "write",
+  summary: "Take an item out of a kit",
+  input: {
+    kit: field.text({ label: "Kit", required: true, holds: "none" }),
+    unit: field.text({ label: "Item", required: true, holds: "none" }),
+  },
+  output: { members: field.number({ label: "In it", holds: "none" }) },
+  permission: "stock:move",
+  idempotency: { mode: "key" },
+  emits: ["kit.emptied"],
+  outcome: { message: "Out.", tone: "success", invalidates: ["kit.list", "unit.list"] },
+  fails: ["platform.not_found", "inventory.wrongKit"],
+  audit: (input) => ({ subject: input.kit, verb: "took from" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const of = await kitIn(c, input.kit);
+    const why = refuseKitAct(of.state, "take");
+    if (why) return c.fail("inventory.wrongKit", { why });
+
+    await db.prepare(
+      `UPDATE unit SET kit = NULL, edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ? AND kit = ?`)
+      .bind(c.now, c.accountId ?? null, input.unit, c.tenantId, of.id).run();
+
+    if (of.state === "built") {
+      await db.prepare(
+        `UPDATE kit SET state = 'open', built = NULL, edited_at = ?, edited_by = ?
+          WHERE id = ? AND tenant_id = ?`)
+        .bind(c.now, c.accountId ?? null, of.id, c.tenantId).run();
+    }
+
+    return { members: await memberCount(c, of.id) };
+  },
+});
+
+interface Weighed {
+  members: readonly { id: string; product: string; name: string; code: string; stray: boolean }[];
+  short: readonly (Short & { name: string })[];
+}
+
+const checking = operation<{ kit: string }, Weighed>({
+  id: "kit.check",
+  kind: "read",
+  summary: "What a kit is missing, and what does not belong",
+  input: { kit: field.text({ label: "Kit", required: true, holds: "none" }) },
+  output: {
+    members: field.json({ label: "In it", holds: "none" }),
+    short: field.json({ label: "Missing", holds: "none" }),
+  },
+  permission: "stock:read",
+  idempotency: { mode: "none" },
+  fails: ["platform.not_found"],
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const { members, short } = await weighKit(c, await kitIn(c, input.kit));
+    return { members, short };
+  },
+});
+
+/**
+ * ⚠️ A BUILD IS A CLAIM WITH A NAME AND A TIME ON IT, which is why it is refused
+ * when anything is short. "This tray is complete" said over a tray missing a
+ * clamp is the failure the whole record exists to prevent — and the refusal names
+ * how many lines are missing, because the person is standing in front of the
+ * tray and the next thing they do is go and find them.
+ *
+ * ⚠️ A STRAY IS REPORTED AND NEVER REFUSED, and the asymmetry is deliberate.
+ * Short means the kit cannot do its job; an extra means somebody may have a
+ * reason, and stranding them over it is how a rule gets worked around.
+ */
+const build = operation<{ kit: string; day: string }, { stray: number }>({
+  id: "kit.build",
+  kind: "write",
+  summary: "Say a kit is complete",
+  input: {
+    kit: field.text({ label: "Kit", required: true, holds: "none" }),
+    day: field.day({ label: "On", required: true, holds: "none" }),
+  },
+  output: { stray: field.number({ label: "Does not belong", holds: "none" }) },
+  permission: "stock:move",
+  idempotency: { mode: "key" },
+  emits: ["kit.built"],
+  outcome: { message: "Built.", tone: "success", invalidates: ["kit.list"] },
+  fails: ["platform.not_found", "inventory.wrongKit", "inventory.incomplete"],
+  audit: (input) => ({ subject: input.kit, verb: "built" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const of = await kitIn(c, input.kit);
+    const why = refuseKitAct(of.state, "build");
+    if (why) return c.fail("inventory.wrongKit", { why });
+
+    const { short, stray } = await weighKit(c, of);
+    if (short.length) {
+      return c.fail("inventory.incomplete", { missing: String(short.length) });
+    }
+
+    await db.prepare(
+      `UPDATE kit SET state = 'built', built = ?, edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ? AND state = 'open'`)
+      .bind(input.day, c.now, c.accountId ?? null, of.id, c.tenantId).run();
+
+    return { stray: stray.length };
+  },
+});
+
+/**
+ * ⚠️ BREAKING A KIT UP IS AN END RATHER THAN AN EMPTYING. Its members go back to
+ * being items on a shelf and the record stays as what it was — a kit that could
+ * be re-opened is an identity somebody re-uses, so a tray recorded as sterile in
+ * March would be the same record as the one assembled in August.
+ */
+const breakUp = operation<{ kit: string }, { released: number }>({
+  id: "kit.break",
+  kind: "write",
+  summary: "Break a kit up",
+  input: { kit: field.text({ label: "Kit", required: true, holds: "none" }) },
+  output: { released: field.number({ label: "Items freed", holds: "none" }) },
+  permission: "stock:move",
+  idempotency: { mode: "key" },
+  emits: ["kit.broken"],
+  outcome: { message: "Broken up.", tone: "warning", invalidates: ["kit.list", "unit.list"] },
+  fails: ["platform.not_found", "inventory.wrongKit"],
+  audit: (input) => ({ subject: input.kit, verb: "broke up" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const of = await kitIn(c, input.kit);
+    const why = refuseKitAct(of.state, "break");
+    if (why) return c.fail("inventory.wrongKit", { why });
+
+    const released = await memberCount(c, of.id);
+    await db.prepare(
+      `UPDATE unit SET kit = NULL, edited_at = ?, edited_by = ?
+        WHERE tenant_id = ? AND kit = ?`)
+      .bind(c.now, c.accountId ?? null, c.tenantId, of.id).run();
+    await db.prepare(
+      `UPDATE kit SET state = 'broken', edited_at = ?, edited_by = ?
+        WHERE id = ? AND tenant_id = ? AND state <> 'broken'`)
+      .bind(c.now, c.accountId ?? null, of.id, c.tenantId).run();
+
+    return { released };
+  },
+});
+
 /**
  * WHAT A NEW PRODUCT STARTS AS — the workspace's answer, not the form's.
  *
@@ -1559,10 +2446,12 @@ export const INVENTORY: AppSpec = defineApp({
     locations: { label: "Locations", withheld: "quota" },
   },
 
-  collections: [product, code, location, batch, count, tally, stock, ledger],
+  collections: [product, code, location, batch, unit, kit, count, tally, stock, ledger],
   operations: [
     receive, take, adjust, arrive, undo, starts, resolve, learn, open, due,
     openCount, tallyUp, differs, closeCount,
+    issue, giveBack, serve, retire, dueService,
+    assemble, putIn, takeOut, checking, build, breakUp,
   ],
 
   /*
@@ -1601,6 +2490,14 @@ export const INVENTORY: AppSpec = defineApp({
       permission: "location:read", sky: "etch" },
     { id: "product", route: "/thing", label: "A product", nav: "none", icon: "box",
       permission: "product:read" },
+    /* ⚠️ ONE OBJECT, AND IT IS A DESTINATION RATHER THAN A SHEET. Its history is
+       the point of it — where it has been, who had it, when it was serviced —
+       and a life somebody has to hold a sheet open to read is a life nobody
+       reads. */
+    { id: "unit", route: "/item", label: "An item", nav: "none", icon: "tag",
+      permission: "stock:read" },
+    { id: "kit", route: "/kit", label: "A kit", nav: "none", icon: "layers",
+      permission: "stock:read" },
     /* ⚠️ `glow` — pure light, no marks, which is what an arrival wants. */
     { id: "start", route: "/start", label: "Getting started", nav: "secondary", icon: "star",
       permission: "product:read", sky: "glow" },
@@ -1703,6 +2600,61 @@ export const INVENTORY: AppSpec = defineApp({
       title: "That code belongs to something else",
       detail: "Open the product it is on and check which one is right.",
     },
+    /*
+      ⚠️ ONE REFUSAL FOR EVERY ACT AN OBJECT'S STANDING FORBIDS, and the sentence
+      comes from the rule rather than from each handler. Issuing something
+      already out, taking back something nobody took and retiring something in
+      somebody's van are three mistakes with three fixes — so the WHY is the
+      variable and the shape is one.
+    */
+    "inventory.wrongLife": {
+      status: 409, retryable: false, tone: "warning",
+      title: "Not while it is where it is",
+      detail: "{why}.",
+    },
+    /*
+      ⚠️ THE ONLY TRUE STATEMENT THIS PRODUCT CAN MAKE ABOUT SAMENESS. Every
+      other code names a type, so the same code twice is two things; ours names
+      one object, so the same label twice is the same object — and saying so is
+      the whole reason an itemised thing carries a label of ours.
+    */
+    "inventory.already": {
+      status: 409, retryable: false, tone: "warning",
+      title: "You have counted that one",
+      detail: "It is already on this shelf's list. Nothing was added.",
+    },
+    /*
+      ⚠️ A BUILD IS A CLAIM SOMEBODY PUTS THEIR NAME TO. "This tray is complete"
+      said over a tray missing an instrument is the failure the whole record
+      exists to prevent, so the refusal names how many lines are short — the
+      person is standing in front of it and the next thing they do is go and
+      find them.
+    */
+    "inventory.incomplete": {
+      status: 409, retryable: false, tone: "warning",
+      title: "Something is missing",
+      detail: "{missing} of the things this kit holds are not in it yet.",
+    },
+    /*
+      ⚠️ AN OBJECT IS IN ONE KIT OR NONE. Moving it silently would empty another
+      tray that still reads complete — which is the same lie as a build over a
+      missing instrument, arriving from the other direction.
+    */
+    "inventory.inKit": {
+      status: 409, retryable: false, tone: "warning",
+      title: "It is in another kit",
+      detail: "Take it out of that one first.",
+    },
+    /*
+      ⚠️ A KIT THAT WAS BROKEN UP IS FINISHED, and its identity is not re-used —
+      a tray recorded as sterile in March must never be the same record as one
+      assembled in August.
+    */
+    "inventory.wrongKit": {
+      status: 409, retryable: false, tone: "warning",
+      title: "Not while it is where it is",
+      detail: "{why}.",
+    },
   },
 
   settingAreas: {
@@ -1753,6 +2705,18 @@ export const INVENTORY: AppSpec = defineApp({
       field: field.number({ label: "Tell me this many days before", holds: "none", min: 0, max: 3_650 }),
       fallback: 30, needs: "tenant:manage",
       help: "A kitchen wants three. A pharmacy wants ninety.",
+    }),
+    /*
+      ⚠️ ITS OWN THRESHOLD, AND SHARING THE EXPIRY ONE WOULD BE WRONG IN BOTH
+      DIRECTIONS. A kitchen wants three days' notice on cream and three days on a
+      fire extinguisher is useless — an annual inspection has to be booked weeks
+      out. One number for two clocks makes one of them a list nobody can act on.
+    */
+    "inventory.service_days": setting({
+      id: "inventory.service_days", level: "tenant", area: "stock",
+      field: field.number({ label: "Tell me before a service", holds: "none", min: 0, max: 3_650 }),
+      fallback: 30, needs: "tenant:manage",
+      help: "An annual inspection wants booking weeks out.",
     }),
     "inventory.default_unit": setting({
       id: "inventory.default_unit", level: "tenant", area: "stock",
