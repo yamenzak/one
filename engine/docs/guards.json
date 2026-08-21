@@ -2872,6 +2872,33 @@
       "impl": "kernel/test/manifest.test.ts",
       "proves": "does not let a screen stand in for a gate",
       "fails": "an entitlement sold, gated by a missing nav row and by nothing else, so every operation behind it stays callable by anybody who knows the name"
+    },
+    {
+      "id": "a-checklist-is-ticked-by-what-happened",
+      "protects": "D12",
+      "stage": "63",
+      "status": "live",
+      "impl": "one/test/inventory.test.ts",
+      "proves": "ticks a step from the operation that did it",
+      "fails": "three unticked steps for ever, shown to a workspace that finished all three last week — and a screen ticking them instead would leave them undone for anybody who did the same thing from the API or from a second screen"
+    },
+    {
+      "id": "a-congratulation-is-said-once",
+      "protects": "D12",
+      "stage": "63",
+      "status": "live",
+      "impl": "one/test/inventory.test.ts",
+      "proves": "congratulates once and then stops",
+      "fails": "recognition repeated on every load, which is not recognition but furniture — and then the one that matters is not read either"
+    },
+    {
+      "id": "a-step-only-the-clock-can-complete-is-refused",
+      "protects": "D12",
+      "stage": "63",
+      "status": "live",
+      "impl": "kernel/test/declarations.test.ts",
+      "proves": "refuses a step only a job can complete",
+      "fails": "a checklist item nobody can take, passing composition because a nightly sweep does raise the event — the tally counts what people did, so the step sits unticked with nothing anywhere saying why"
     }
   ]
 }

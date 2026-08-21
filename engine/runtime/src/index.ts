@@ -45,6 +45,7 @@ export * from "./money-ops.js";
 export * from "./ai-ops.js";
 export * from "./ai-run.js";
 export * from "./centre-ops.js";
+export * from "./progress.js";
 export * from "./ai-actions.js";
 export * from "./operator.js";
 export * from "./config.js";

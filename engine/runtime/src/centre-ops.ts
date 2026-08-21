@@ -61,6 +61,13 @@ const publicFace = (
      provisions from, carried to the Data & Trust screen — a privacy notice
      whose "where is it kept" half is derived rather than written. */
   needs: a.needs ?? {},
+  /* ⚠️ THE CHECKLIST AND WHAT IS WORTH CONGRATULATING, WITH EVERY OTHER
+     DECLARATIVE SLICE. What is TICKED is a separate read (`guide.view`), because
+     the rules never change and the progress changes on every write — sending
+     both together would put a per-workspace count inside the payload every
+     screen caches. */
+  guide: a.guide ?? {},
+  milestones: a.milestones ?? {},
   permissions,
   /* ⚠️ The role NAMES — declared and this workspace's own — so the People
      screen offers real choices and the gate never has to refuse a typo. */

@@ -112,10 +112,18 @@ export const reached = (
 
 export type GuideRefusal =
   | "step_nothing_raises" | "milestone_nothing_raises" | "dead_step_link"
-  | "step_needs_undeclared" | "help_without_a_screen";
+  | "step_needs_undeclared" | "help_without_a_screen"
+  | "step_only_a_clock_raises" | "milestone_only_a_clock_raises";
 
 export interface GuideProblem { readonly of: string; readonly why: GuideRefusal; readonly detail: string }
 
+/**
+ * ⚠️ `counted` IS THE SMALLER LIST, AND THE DIFFERENCE IS THE POINT. Everything
+ * an app raises is `emitted`; what a WORKSPACE'S TALLY records is what its
+ * people did, which excludes the clock. A checklist ticked by a nightly sweep
+ * would credit somebody with a step they never took, and a step on such an
+ * event would sit unticked for ever while composition said it was fine.
+ */
 export function refuseGuide(
   guide: GuideBook,
   milestones: MilestoneBook,
@@ -124,6 +132,7 @@ export function refuseGuide(
   routes: readonly string[],
   permissions: readonly string[],
   screens: readonly string[],
+  counted: readonly string[] = emitted,
 ): readonly GuideProblem[] {
   const out: GuideProblem[] = [];
   const at = (of: string, why: GuideRefusal, detail: string) => out.push({ of, why, detail });
@@ -131,6 +140,9 @@ export function refuseGuide(
   for (const s of Object.values(guide)) {
     if (!emitted.includes(s.done)) {
       at(s.id, "step_nothing_raises", `completed by "${s.done}", which nothing raises — it can never be ticked`);
+    } else if (!counted.includes(s.done)) {
+      at(s.id, "step_only_a_clock_raises",
+        `completed by "${s.done}", which only a job raises — nobody can do it, so it never ticks`);
     }
     if (!routes.includes(s.link)) at(s.id, "dead_step_link", `sends them to ${s.link}, which is not a screen`);
     if (s.needs && !permissions.includes(s.needs)) {
@@ -140,6 +152,9 @@ export function refuseGuide(
   for (const m of Object.values(milestones)) {
     if (!emitted.includes(m.on)) {
       at(m.id, "milestone_nothing_raises", `waits for "${m.on}", which nothing raises`);
+    } else if (!counted.includes(m.on)) {
+      at(m.id, "milestone_only_a_clock_raises",
+        `waits for "${m.on}", which only a job raises — it is never counted, so it never arrives`);
     }
   }
   for (const id of orphanHelp(help, screens)) {

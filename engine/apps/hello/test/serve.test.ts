@@ -170,6 +170,11 @@ describe("what the manifest produced", () => {
       "GET /api/flag.people",
       "POST /api/flag.person",
       "POST /api/flag.set",
+      /* ⚠️ AND A PAIR PER PRODUCT THAT HAS A CHECKLIST. The book is declared;
+         these two answer how far THIS workspace has got and record a
+         congratulation as said, which is what stops it repeating. */
+      "POST /api/guide.seen",
+      "GET /api/guide.view",
       /* ⚠️ ONE PAIR PER PRODUCT THAT GENERATES — `aiOps` answers nothing for an
          app with no action, so these appear the day a manifest declares one and
          not before. Named for the product, because the model a workspace picks

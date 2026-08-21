@@ -40,6 +40,7 @@ import { aiOps } from "./ai-ops.js";
 import { searchOps } from "./search-ops.js";
 import { noteGone, noteWritten } from "./search.js";
 import { centreOps } from "./centre-ops.js";
+import { progressOps } from "./progress.js";
 
 /* ------------------------------------------------------------------ shape --- */
 
@@ -399,6 +400,12 @@ export function compose(app: AppSpec): Composed {
      query, which reads as a broken search rather than an absent one. */
   for (const [id, resolved] of Object.entries(searchOps(app))) byId.set(id, resolved);
   for (const [id, resolved] of Object.entries(centreOps(app))) byId.set(id, resolved);
+  /* ⚠️ ONLY WHERE THERE IS A CHECKLIST OR SOMETHING TO CONGRATULATE. An app
+     declaring neither would answer two routes about a guide it does not have —
+     an empty checklist reads as one that is broken rather than absent. */
+  if (Object.keys(app.guide ?? {}).length || Object.keys(app.milestones ?? {}).length) {
+    for (const [id, resolved] of Object.entries(progressOps(app))) byId.set(id, resolved);
+  }
   /* ⚠️ ONLY WHERE THERE IS SOMETHING TO CONSENT TO. An app that declares no
      purposes and no vault fields would otherwise answer eight routes about
      facts it does not hold, and a consent sheet with nothing on it reads as a

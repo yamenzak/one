@@ -233,6 +233,7 @@ if (what === "guards") {
     ["member-ops", "the roster's own operations"],
     ["money-ops", "the bill and the balance, as a read"],
     ["centre-ops", "the one bootstrap read the tenant door stands on"],
+    ["progress", "what a workspace has done, counted — and the checklist ticked from it"],
     ["personal", "the operations about yourself, on every door"],
     ["installable", "the manifest and the icon a workspace is installed as"],
     ["platform-schema", "the platform's own tables, in dependency order, listed once"],

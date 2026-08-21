@@ -11,8 +11,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type {
-  AreaBook, DocumentBook, Instant, NotificationBook, Offline, Outcome, ScreenSpec, SettingBook,
-  NeedBook, SubProcessorBook,
+  AreaBook, DocumentBook, GuideBook, Instant, MilestoneBook, NotificationBook, Offline, Outcome,
+  ScreenSpec, SettingBook, NeedBook, SubProcessorBook,
 } from "@engine/kernel";
 import { notice, ready, trouble, waiting, type Loaded } from "@engine/design";
 import { api, whenWritten } from "../api.js";
@@ -32,6 +32,9 @@ export interface CentreApp {
   readonly processors: SubProcessorBook;
   /** ⚠️ Where its records actually sit — see `WhereItLives`. */
   readonly needs: NeedBook;
+  /** ⚠️ The checklist and the milestones. What is TICKED is `guide.view`. */
+  readonly guide: GuideBook;
+  readonly milestones: MilestoneBook;
   /** What THIS caller may do in this app, resolved by the one resolver (D15). */
   readonly permissions: readonly string[];
   /** The role names on offer — declared and this workspace's own. */

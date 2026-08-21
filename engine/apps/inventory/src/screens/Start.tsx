@@ -16,6 +16,7 @@
 import {
   Faq, Grid, Guide, Help, Milestones, Screen, Section, Stack, StepRow, glyphOf,
 } from "@engine/design";
+import { reached } from "@engine/kernel";
 import { INVENTORY } from "../index.js";
 
 /**
@@ -32,7 +33,7 @@ const LADDER: readonly { readonly id: string; readonly label: string; readonly u
   { id: "itemised", label: "Itemised", under: "One object with a serial number and a service date of its own" },
 ];
 
-export function Start({ title, said, done, counts, held, onGo }: {
+export function Start({ title, said, done, counts, already, held, onGo }: {
   readonly title?: string;
   /**
    * ⚠️ WHAT THIS WORKSPACE IS FOR, IN ITS OWN WORDS — the profile, made visible.
@@ -45,6 +46,12 @@ export function Start({ title, said, done, counts, held, onGo }: {
   readonly done: readonly string[];
   /** How many times each, for a milestone that waits for fifty. */
   readonly counts: Readonly<Record<string, number>>;
+  /**
+   * ⚠️ WHICH CONGRATULATIONS HAVE ALREADY BEEN SAID. Recognition repeated on
+   * every load is not recognition, it is furniture — so a milestone shown once
+   * is recorded and never drawn again.
+   */
+  readonly already: readonly string[];
   readonly held: ReadonlySet<string>;
   readonly onGo: (route: string) => void;
 }) {
@@ -77,9 +84,15 @@ export function Start({ title, said, done, counts, held, onGo }: {
           </Stack>
         </Section>
 
-        <Section label="What you have reached">
-          <Milestones book={INVENTORY.milestones ?? {}} counts={counts} already={[]} />
-        </Section>
+        {/* ⚠️ AND THE SECTION GOES WITH IT. `Milestones` draws nothing when
+            there is nothing fresh, and a heading over nothing is a promise the
+            page does not keep — which is most of the time, because most of the
+            time nobody has just reached anything. */}
+        {reached(INVENTORY.milestones ?? {}, counts, already).length ? (
+          <Section label="What you have reached">
+            <Milestones book={INVENTORY.milestones ?? {}} counts={counts} already={already} />
+          </Section>
+        ) : null}
 
         <Grid min="20rem" space="roomy">
           <Section label="About stock">

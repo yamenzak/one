@@ -303,7 +303,7 @@ container in `src/screens/live.tsx`, and rendered over a sample world by
 | `/ask` | Ask | secondary | `stock:read` | `screens/Ask.tsx:55` | `screens/live.tsx:1130` |
 | `/import` | Import | secondary | `product:write` | `screens/Import.tsx:131` | `screens/live.tsx:1587` |
 | `/suppliers` | Suppliers | secondary | `product:write` | `screens/Suppliers.tsx:73` | `screens/live.tsx:1714` |
-| `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:35` | `screens/live.tsx:1785` |
+| `/start` | Getting started | secondary | `product:read` | `screens/Start.tsx:36` | `screens/live.tsx:1785` |
 
 ### The surfaces that are not routes
 
@@ -332,6 +332,9 @@ product — a workshop tracking work orders, a clinic releasing sterilisation lo
 — and nobody storing paint in a garage. The `alone` preset holds no `process:*`
 key at all, so the destination is not drawn for somebody on it, which is the
 difference between a screen that is hidden and a screen that is not reachable.
+And the plan gates it too (engine 67): on a tier with neither runs nor work
+orders the screen never leaves the server, so the fifth slot goes back to the
+four a garage actually uses.
 
 ---
 
@@ -344,5 +347,3 @@ difference between a screen that is hidden and a screen that is not reachable.
   "how much did each job use" is a group-by, and a group-by is a query language
   arriving through a door that deliberately has none. The reports compute their
   own.
-- **The getting-started guide cannot be ticked**, because nothing answers which
-  declared events a workspace has raised. `DEFER(engine-63)`.

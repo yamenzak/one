@@ -1275,6 +1275,20 @@
         "onClose": "tenant_id: delete"
       },
       {
+        "table": "tenant_event",
+        "export": null,
+        "why": "how many times a workspace has done a thing, with nobody named",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "tenant_milestone",
+        "export": null,
+        "why": "which congratulations a workspace has already been shown",
+        "onForget": [],
+        "onClose": "tenant_id: delete"
+      },
+      {
         "table": "media",
         "export": "The files you uploaded",
         "why": null,

@@ -364,6 +364,28 @@ describe("the checklist", () => {
     expect(why).toContain("step_nothing_raises");
   });
 
+  /*
+    ⚠️ AND A STEP ONLY THE CLOCK CAN COMPLETE IS THE SAME FAULT ONE LEVEL DOWN.
+    The event IS raised — by a nightly job — so the check above passes, and the
+    step then sits unticked for ever because the tally counts what people did.
+    A checklist credited to a sweep would be worse: somebody told they had
+    finished a step they never took.
+  */
+  it("refuses a step only a job can complete", () => {
+    const why = refuseGuide(
+      { brand: steps.brand }, {}, {}, ["brand.set"], ["/settings"], [], [], [],
+    ).map((p) => p.why);
+    expect(why).toContain("step_only_a_clock_raises");
+    expect(why).not.toContain("step_nothing_raises");
+  });
+
+  it("refuses a milestone only a job can reach", () => {
+    const book = { nightly: { id: "nightly", label: "A hundred nights", said: "Steady.",
+      on: "stock.expiring", tone: "info" as const, icon: "star" } };
+    const why = refuseGuide({}, book, {}, ["stock.expiring"], [], [], [], []).map((p) => p.why);
+    expect(why).toContain("milestone_only_a_clock_raises");
+  });
+
   it("refuses a step that sends somebody to a screen that does not exist", () => {
     const why = refuseGuide({ invite: steps.invite }, {}, {}, ["member.invited"], ["/members"],
       ["member:manage"], []).map((p) => p.why);

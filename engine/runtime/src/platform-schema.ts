@@ -44,6 +44,7 @@ import { SEARCH_SCHEMA } from "./search.js";
 import { MEDIA_SCHEMA } from "./storage.js";
 import { ICON_SCHEMA } from "./icon.js";
 import { SETTING_SCHEMA } from "./settings.js";
+import { PROGRESS_SCHEMA } from "./progress.js";
 import { VAULT_SCHEMA } from "./vault.js";
 
 /** What the DIRECTORY holds: one row per account, workspace, subscription, run. */
@@ -101,6 +102,10 @@ export const DIRECTORY_MODULES: readonly SchemaModule[] = [
 export const SHARD_MODULES: readonly SchemaModule[] = [
   MEMBERSHIP_SCHEMA, PACKAGE_SCHEMA, SETTING_SCHEMA, AI_ACTION_SCHEMA,
   AUDIT_SCHEMA, REPLAY_SCHEMA, INBOX_SCHEMA, VAULT_SCHEMA,
+  /* ⚠️ BESIDE THE RECORDS THE EVENTS ARE ABOUT. What a workspace has done is the
+     workspace's, so it moves with it and goes when it goes — a tally in the
+     directory would be a checklist that survived the workspace it described. */
+  PROGRESS_SCHEMA,
   /* ⚠️ BESIDE THE RECORDS THE FILES BELONG TO. A workspace's media ledger on the
      shard is what makes its erasure one pass over one database — and what keeps
      an EU workspace's file index in the EU with everything else of theirs. */

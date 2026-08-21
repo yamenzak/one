@@ -532,3 +532,68 @@ describe("what the plan opens", () => {
     }
   });
 });
+
+/*
+  ⚠️ THE CHECKLIST IS TICKED BY WHAT HAPPENED, AND THIS SUITE HAS ALREADY DONE
+  ALL THREE. A step ticked by a screen is a step that stays undone when somebody
+  does the same thing from the API or from an import — which is the state this
+  product shipped in: three unticked steps for ever, including for a workspace
+  that had finished.
+
+  ⚠️ ASSERTED AFTER THE GOLDEN PATH RATHER THAN BY RAISING EVENTS BY HAND. What
+  is being checked is that the ORDINARY operations count, so anything that
+  reached the tally another way would prove nothing.
+*/
+describe("how far this workspace has got", () => {
+  /*
+    ⚠️ THE THREE ARE DONE INSIDE THE TEST, not left to the specs above. Every
+    test in this pool gets its own storage stacked on `beforeAll`, so a tally
+    filled by a sibling is not there — and a suite written the other way passes
+    or fails on which file ran first.
+  */
+  const theThree = async () => {
+    const place = idOf(await write("location.create", { name: "A guide shelf", kind: "shelf" }));
+    const product = idOf(await write("product.create", {
+      name: "A guide consumable", unit: "item", tracking: "counted",
+    }));
+    await write("stock.receive", {
+      product, location: place, quantity: 4, day: TODAY, capture: "typed",
+    });
+  };
+
+  it("ticks a step from the operation that did it", async () => {
+    await theThree();
+
+    const said = await read("guide.view");
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+    const counts = said.body.counts as Record<string, number>;
+    expect(counts["location.created"]).toBeGreaterThan(0);
+    expect(counts["product.created"]).toBeGreaterThan(0);
+    expect(counts["stock.received"]).toBeGreaterThan(0);
+    /* ⚠️ AND `steps` IS WHAT IS LEFT, so all three done is an empty list. */
+    expect(said.body.steps).toEqual([]);
+    expect(said.body.done).toHaveLength(3);
+  });
+
+  /* ⚠️ A MILESTONE IS SAID ONCE, and the record of having said it is what stops
+     it — not the screen remembering. */
+  it("congratulates once and then stops", async () => {
+    await theThree();
+    const first = await read("guide.view");
+    const fresh = first.body.fresh as { id: string }[];
+    expect(fresh.map((m) => m.id)).toContain("first-stock");
+
+    expect((await write("guide.seen", { milestone: "first-stock" })).status).toBe(200);
+
+    const again = await read("guide.view");
+    expect((again.body.fresh as { id: string }[]).map((m) => m.id)).not.toContain("first-stock");
+    expect(again.body.said).toContain("first-stock");
+  });
+
+  /* ⚠️ AND ONLY A MILESTONE THIS APP DECLARES. Writing whatever arrives would
+     make the table a list of strings a caller chose. */
+  it("refuses a congratulation nothing declares", async () => {
+    const said = await write("guide.seen", { milestone: "invented" });
+    expect(said.status).toBe(404);
+  });
+});

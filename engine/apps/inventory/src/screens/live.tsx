@@ -1849,15 +1849,21 @@ const SUPPLIERS = (api: Door) => function SuppliersHere() {
 };
 
 /**
- * ⚠️ THE GUIDE IS TICKED BY EVENTS THIS WORKSPACE HAS ACTUALLY RAISED, and until
- * the platform answers that question the honest state is nothing crossed off —
- * never a step ticked because a screen guessed.
+ * ⚠️ THE GUIDE IS TICKED BY EVENTS THIS WORKSPACE HAS ACTUALLY RAISED, never by
+ * a screen deciding a step looks done. `guide.view` is the platform's one answer
+ * — a tally of what happened — so a product that added a fourth way to receive
+ * stock ticks the same step from all four, and the API ticks it too.
  *
- * DEFER(engine-63) stage:63 — `guide` and `milestones` are declared per app and
- * rendered from the manifest, but no operation answers "which of these events
- * has this workspace raised, and how many times". Every workspace therefore sees
- * three unticked steps for ever, including one that has done all three.
+ * ⚠️ AND A MILESTONE IS MARKED SEEN AFTER IT IS DRAWN, not while it is being
+ * computed. A read that recorded the congratulation would spend it on a page
+ * somebody loaded and closed.
  */
+interface Far {
+  readonly counts: Readonly<Record<string, number>>;
+  readonly fresh: readonly { readonly id: string }[];
+  readonly said: readonly string[];
+}
+
 const START = (api: Door) => function StartHere({ app, go }: Mounted) {
   /* ⚠️ WHAT THIS PERSON HOLDS COMES WITH THE PRODUCT, NOT FROM A SECOND
      REQUEST. The centre already resolved it to draw the nav; narrowing `app`
@@ -1869,13 +1875,37 @@ const START = (api: Door) => function StartHere({ app, go }: Mounted) {
      copy of the vocabulary, drifting from `words.ts` the day a profile is
      added. */
   const starts = useAsked<{ words: { said: string } }>(() => api.get("product.start"));
+  const far = useAsked<Far>(() => api.get("guide.view"));
+  const got = far.of.status === "ready" ? far.of.data : null;
+
+  /* ⚠️ ONE CALL PER MILESTONE, ONCE, AND THE SCREEN DOES NOT WAIT FOR IT. The
+     congratulation is already on the page; what the write buys is that it is not
+     there again tomorrow, so a failure costs a repeat rather than a blank. */
+  const fresh = got?.fresh ?? [];
+  const marked = React.useRef(new Set<string>());
+  React.useEffect(() => {
+    for (const one of fresh) {
+      if (marked.current.has(one.id)) continue;
+      marked.current.add(one.id);
+      void api.post("guide.seen", { milestone: one.id });
+    }
+  }, [fresh]);
 
   return (
     <Start
       title={nameOf("/start")}
       said={starts.of.status === "ready" ? starts.of.data.words.said : ""}
-      done={[]}
-      counts={{}}
+      /* ⚠️ THE EVENTS, NOT THE STEPS. `Guide` ticks a step whose `done` is in
+         this list, so handing it step ids would tick nothing and look correct. */
+      done={Object.keys(got?.counts ?? {})}
+      counts={got?.counts ?? {}}
+      /*
+        ⚠️ WHILE IT IS LOADING, EVERYTHING IS "ALREADY SAID". `[]` would draw
+        every reached milestone for the length of the round trip and then take
+        them away — a congratulation that flickers, which is worse than one that
+        arrives a beat late.
+      */
+      already={got ? got.said : Object.keys(INVENTORY.milestones ?? {})}
       held={new Set(held)}
       onGo={go}
     />

@@ -50,6 +50,7 @@ const declaresAFlag = (wiring: Wiring): boolean =>
     return !!book && Object.keys(book).length > 0;
   });
 import { tell } from "./dispatch.js";
+import { noteEvents } from "./progress.js";
 import { answerMcp } from "./mcp.js";
 import type { PlatformCtx } from "./member-ops.js";
 import { keyFor, record, remember, seen, entryFor } from "./audit.js";
@@ -1145,6 +1146,14 @@ export async function performOperation(
       record, because a note about a change that did not land is worse than no
       note. Only on the way out of a SUCCESS: a refusal raises nothing.
     */
+    /*
+      ⚠️ AND WHAT HAPPENED IS COUNTED, WHETHER OR NOT ANYBODY IS TOLD. `told`
+      returns early when an event has no audience — correct for an inbox, wrong
+      for a checklist, which asks whether the workspace has ever done the thing.
+      Recorded here rather than inside `told` so the two cannot be confused
+      again.
+    */
+    await happened(located, composed.app, op, now);
     await told(wiring, located, composed.app, who, op, input, answer, now);
     return { kind: "ok", answer };
   } catch (thrown) {
@@ -1246,6 +1255,26 @@ async function answerPersonal(
  * ⚠️ AND THE CATCH SAYS SO. A swallowed failure here is an inbox that quietly
  * stops filling, which is the exact shape this whole path exists to end.
  */
+/**
+ * ⚠️ A TALLY IS A CONSEQUENCE, LIKE A NOTE, SO IT MAY NOT FAIL THE REQUEST. The
+ * write has landed and been recorded by the time this runs; a full table here
+ * answering 500 would tell somebody their change failed after it worked.
+ *
+ * ⚠️ AND THE CATCH SAYS SO, because the symptom of a swallowed failure is a
+ * checklist that never ticks — which is the exact state this path exists to end.
+ */
+const happened = async (
+  located: Located, app: AppSpec, op: _Op, now: Date,
+): Promise<void> => {
+  const events = op.spec.emits ?? [];
+  if (!events.length) return;
+  try {
+    await noteEvents(located.db, located.tenantId as TenantId, app.id, events, now);
+  } catch (why) {
+    console.error(`[progress] ${op.id} raised ${events.join(", ")} and nothing counted it`, why);
+  }
+};
+
 const told = async (
   wiring: Wiring, located: Located, app: AppSpec, who: Who, op: _Op,
   input: Record<string, unknown>, answer: unknown, now: Date,

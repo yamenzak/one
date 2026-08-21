@@ -359,6 +359,8 @@ before an app is resolved draws on them.
 | `vault_consent` | What you consented to | `subject_id: delete` | `tenant_id: delete` |
 | `vault_grant` | Who you let read them | `subject_id: delete`<br>`grantee: anonymise` | `tenant_id: delete` |
 | `vault_look` | Who looked, and when | `subject_id: delete`<br>`grantee: anonymise` | `tenant_id: delete` |
+| `tenant_event` | — *how many times a workspace has done a thing, with nobody named* | — | `tenant_id: delete` |
+| `tenant_milestone` | — *which congratulations a workspace has already been shown* | — | `tenant_id: delete` |
 | `media` | The files you uploaded | `subject_id: delete` | `tenant_id: delete` |
 | `search_item` | — *which records are in the index, and never what they say* | — | kept |
 
@@ -387,7 +389,7 @@ and a manifest that does not compose refuses to boot.
 | `operation` | one declaration carrying every cross-cutting concern (D12) | 10 | — |
 | `access` | permissions, roles, and what an app may never claim | 15 | — |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
-| `manifest` | the whole app, and the composition that refuses a broken one | 12 | — |
+| `manifest` | the whole app, and the composition that refuses a broken one | 13 | — |
 | `entitlement` | what a plan includes, and the allowance algebra over it | 17 | — |
 | `credit` | metered work: the reserve, the rate, the ceiling | 15 | — |
 | `dunning` | the ladder from past due to erased | 5 | — |
@@ -409,7 +411,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**276 of them**, 272 reached by something today.
+**277 of them**, 273 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -469,6 +471,7 @@ env or a binding.
 | `member-ops` | the roster's own operations | 1 | — |
 | `money-ops` | the bill and the balance, as a read | 1 | — |
 | `centre-ops` | the one bootstrap read the tenant door stands on | 1 | — |
+| `progress` | what a workspace has done, counted — and the checklist ticked from it | 6 | — |
 | `personal` | the operations about yourself, on every door | 2 | — |
 | `installable` | the manifest and the icon a workspace is installed as | 6 | — |
 | `platform-schema` | the platform's own tables, in dependency order, listed once | 2 | — |
@@ -483,7 +486,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**426 of them**, 425 reached by something today.
+**432 of them**, 431 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -882,6 +885,9 @@ its own header, cited by other files, and doing nothing.
 | `a-screen-is-offered-only-on-a-plan-that-includes-it` | D17 | a nav slot spent on a destination the plan does not include, whose only answer when pressed is the refusal its own operations raise — and there are five of them |
 | `a-screen-cannot-be-gated-on-a-key-no-plan-sells` | D12 | a screen absent on every tier with the declaration reading as though it were there, which produces no complaint from anybody |
 | `hiding-a-screen-is-not-withholding-a-capability` | D12 | an entitlement sold, gated by a missing nav row and by nothing else, so every operation behind it stays callable by anybody who knows the name |
+| `a-checklist-is-ticked-by-what-happened` | D12 | three unticked steps for ever, shown to a workspace that finished all three last week — and a screen ticking them instead would leave them undone for anybody who did the same thing from the API or from a second screen |
+| `a-congratulation-is-said-once` | D12 | recognition repeated on every load, which is not recognition but furniture — and then the one that matters is not read either |
+| `a-step-only-the-clock-can-complete-is-refused` | D12 | a checklist item nobody can take, passing composition because a nightly sweep does raise the event — the tally counts what people did, so the step sits unticked with nothing anywhere saying why |
 <!-- /generated -->
 
 ### And how well each decision is defended
@@ -900,7 +906,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 134 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 137 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -1032,12 +1038,12 @@ that names no stage, so this list cannot grow by forgetting.
 | 67 | A screen can be gated on an entitlement, the way an operation already is | shipped |
 | 62 | A list narrows and pages — the generated read answers past the first fifty, and says how many there are | shipped |
 | 64 | Itemised things — one object for its whole life, and the kits composed of them | shipped |
-| 63 | The guide and the milestones are ticked by what a workspace has actually done | **planned** |
+| 63 | The guide and the milestones are ticked by what a workspace has actually done | shipped |
 | 71 | The spreadsheet somebody already has — the import, and the supplier it names | shipped |
 | 72 | An operation's declared input is checked at the door, and `now` is one type | shipped |
 | 73 | The other half of OneInventory, driven — and the quarantine that was a badge on a screen | shipped |
 
-**58 shipped, 15 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**59 shipped, 14 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

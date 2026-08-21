@@ -239,6 +239,19 @@ export const eventsOf = (spec: AppSpec): readonly string[] => [...new Set([
 ])];
 
 /**
+ * WHAT A PERSON CAN CAUSE — everything above except the clock's own.
+ *
+ * ⚠️ A CHECKLIST IS TICKED BY WHAT SOMEBODY DID, and a nightly sweep finding an
+ * expiring batch is not something they did. The tally the guide reads counts
+ * operation raises only, so a step on a job-only event would sit unticked for
+ * ever with nothing anywhere saying why — see `refuseGuide`.
+ */
+export const eventsDone = (spec: AppSpec): readonly string[] => [...new Set([
+  ...spec.operations.flatMap((o) => o.emits ?? []),
+  ...spec.collections.flatMap(eventsFor),
+])];
+
+/**
  * ⚠️ THE VAULT KEY IS DERIVED FROM WHERE THE FIELD IS, never declared beside it.
  * Two names for one fact is how a field ends up pointing at a vault entry that
  * does not exist — a pointer column with nothing behind it, which reads on the
@@ -646,7 +659,7 @@ export function refuseApp(spec: AppSpec): readonly Refusal[] {
 
   for (const p of refuseGuide(
     spec.guide ?? {}, spec.milestones ?? {}, spec.help ?? {},
-    events, routes, permissions, spec.screens.map((s) => s.id),
+    events, routes, permissions, spec.screens.map((s) => s.id), eventsDone(spec),
   )) {
     at(`guide ${p.of}`, `${p.why}: ${p.detail}`);
   }

@@ -288,6 +288,16 @@ export const HOLDINGS: readonly HeldBy[] = [
   { table: "ai_run", person: [], why: "a workspace's own AI spending", workspace: its() },
 
   /*
+    ⚠️ WHAT THE WORKSPACE HAS DONE, COUNTED — and nobody's in particular. The row
+    is an event name and a number: it says a workspace has received stock forty
+    times, never who did any of it. That is deliberate rather than incidental —
+    a per-person tally would make a getting-started checklist into a record of
+    which member is slow.
+  */
+  { table: "tenant_event", person: [], why: "how many times a workspace has done a thing, with nobody named", workspace: its() },
+  { table: "tenant_milestone", person: [], why: "which congratulations a workspace has already been shown", workspace: its() },
+
+  /*
     ⚠️ A POINTER, NOT A COPY. The row names which record of which collection is
     in the index and what state it is in; the text itself is re-read from the
     record at flush time and never kept here. So there is nothing of anybody's

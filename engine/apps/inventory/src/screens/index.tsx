@@ -755,7 +755,9 @@ export function InventoryScreen({ route, onGo }: {
              thing this screen makes visible and the default says nothing about
              it. */
           said={WORDS.clinic.said}
-          done={DONE} counts={COUNTS} held={HELD} onGo={go}
+          /* ⚠️ NOTHING SAID YET, so the ground shows the recognition rather
+             than the absence of it — the state worth photographing. */
+          done={DONE} counts={COUNTS} already={[]} held={HELD} onGo={go}
         />
       );
     /* ⚠️ THE DEFAULT IS THE APP'S FIRST DECLARED SCREEN, not a blank. An
