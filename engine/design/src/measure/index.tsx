@@ -20,7 +20,8 @@
  * the classes it finds written down, so a stylesheet compiled for the harness
  * would be a different stylesheet from the one that ships — and a spacing rule
  * verified against CSS nobody serves is worth nothing. `dist/assets/index-*.css`
- * is what the browser gets.
+ * is what the browser gets — AND `runtimeCss()`, which is the other half the
+ * deployment injects at boot. See `stylesheet`.
  *
  * ⚠️ AND IT IS A `.tsx` RATHER THAN A `.mjs` BECAUSE IT COMPOSES REAL
  * COMPONENTS. A specimen assembled out of hand-written HTML would measure the
@@ -41,6 +42,7 @@ import { fileURLToPath } from "node:url";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { Browser } from "playwright";
 import type { ReactNode } from "react";
+import { runtimeCss } from "../frame/runtime.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SPA = join(HERE, "..", "..", "..", "one-space", "dist", "assets");
@@ -60,8 +62,21 @@ export const PHONE = { width: 390, height: 844, deviceScaleFactor: 1 } as const;
  */
 export const DESK = { width: 1280, height: 900, deviceScaleFactor: 1 } as const;
 
+/**
+ * WHAT THE BROWSER ACTUALLY HAS: the built stylesheet AND what the deployment
+ * injects at boot.
+ *
+ * ⚠️ THE BUILT CSS ALONE IS A DIFFERENT DOCUMENT. The type face, the grounds,
+ * the tones and every motion rule are put in by `main.tsx` at runtime because
+ * they derive from an accent — so a harness reading `dist` measures a page with
+ * no face, where the fallback stack has different metrics and every height and
+ * every wrap is somebody else's. `runtimeCss` is the same string the deployment
+ * mounts.
+ */
+export const stylesheet = (): string => `${built()}\n${runtimeCss()}`;
+
 /** ⚠️ Absent is a build that has not run — a harness measuring nothing must say so. */
-export const stylesheet = (): string => {
+const built = (): string => {
   const css = readdirSync(SPA).filter((f) => f.startsWith("index-") && f.endsWith(".css"));
   if (css.length !== 1) {
     throw new Error(
@@ -76,9 +91,19 @@ export const stylesheet = (): string => {
  * ⚠️ THE THEME IS STAMPED, because `data-theme` is what selects dark and nothing
  * in a server-rendered fragment stamps it. Measured undressed, every token falls
  * back and the numbers are a different product's.
+ *
+ * ⚠️ AND MOTION IS STOOD DOWN, BECAUSE WHAT IS UNDER TEST IS WHERE THINGS REST.
+ * A block arrives translated half a rem, staggered by its position, and holds
+ * that offset until its delay elapses — so a screen measured while it is
+ * arriving reports a rhythm of 26 and 29 where the scale says 24, and the
+ * numbers depend on how fast the machine is. That is the `waitForTimeout` fault
+ * one layer down: a reading taken at a position the product never holds still
+ * in. It is also not a fiction — it is exactly the document somebody with
+ * reduced motion is served.
  */
-export const pageFor = (markup: string, css: string): string =>
-  `<!doctype html><html data-theme="dark"><head><meta charset="utf-8">`
+export const pageFor = (markup: string, css: string, theme: "dark" | "light" = "dark"): string =>
+  `<!doctype html><html data-theme="${theme}" data-reduce-motion="true">`
+  + `<head><meta charset="utf-8">`
   + `<style>${css}</style>`
   + `<style>html,body{margin:0;padding:0}</style>`
   + `</head><body>${markup}</body></html>`;

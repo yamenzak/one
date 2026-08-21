@@ -270,6 +270,11 @@ if (!loose) ok(`kinds: nothing animates outside the three named ways`);
  *
  * ⚠️ AND THE IMPORT BEING PRESENT IS WHAT MADE IT INVISIBLE. It read as wired at
  * a glance, in the one file anybody would check.
+ *
+ * ⚠️ THE JOIN IS `runtimeCss`, AND THE DEPLOYMENT MOUNTING IT IS THE OTHER HALF.
+ * A complete join nobody calls fails in precisely the way this guard exists to
+ * catch, so both are asserted: every exported stylesheet is in the list, and the
+ * entry point puts the list in the document.
  */
 const WEB_INDEX = readFileSync(join(ENGINE, "design/src/index.ts"), "utf8");
 const exported = new Set();
@@ -279,22 +284,29 @@ for (const file of filesIn("design/src", /\.tsx?$/)) {
   }
 }
 
+const RUNTIME = join(ENGINE, "design/src/frame/runtime.ts");
+const runtimeSrc = readFileSync(RUNTIME, "utf8");
+/* ⚠️ In the JOIN, not in the import — the import is what looked right. */
+const runtimeJoin = /\[([\s\S]*?)\]\s*\.join\(/.exec(runtimeSrc)?.[1] ?? "";
+
 let unmounted = 0;
-for (const entry of filesIn("one-space/src", /^main\.tsx$/)) {
-  const src = readFileSync(entry, "utf8");
-  /* ⚠️ In the JOIN, not in the import — the import is what looked right. */
-  const join_ = /\.join\(["'`]\\n["'`]\)/.test(src)
-    ? /=\s*\[([\s\S]*?)\]\.join/.exec(src)?.[1] ?? ""
-    : "";
-  for (const id of exported) {
-    if (!WEB_INDEX.includes("export * from")) continue;
-    if (!join_.includes(id)) {
-      unmounted++;
-      fail(`${rel(entry)}: \`${id}\` is exported by @engine/design and never injected.\n` +
-           `       A stylesheet that is not in the join does not throw — it simply does not\n` +
-           `       apply, which looks exactly like a decision nobody made.`);
-    }
+for (const id of exported) {
+  if (!WEB_INDEX.includes("export * from")) continue;
+  if (!runtimeJoin.includes(id)) {
+    unmounted++;
+    fail(`design/src/frame/runtime.ts: \`${id}\` is exported by @engine/design and never injected.\n` +
+         `       A stylesheet that is not in the join does not throw — it simply does not\n` +
+         `       apply, which looks exactly like a decision nobody made.`);
   }
+}
+
+/* ⚠️ AND SOMEBODY HAS TO MOUNT IT. A complete list nothing calls is the same
+   silence with a tidier file. */
+for (const entry of filesIn("one-space/src", /^main\.tsx$/)) {
+  if (readFileSync(entry, "utf8").includes("runtimeCss()")) continue;
+  unmounted++;
+  fail(`${rel(entry)}: the entry point never calls \`runtimeCss()\`, so none of the\n` +
+       `       ${exported.size} shared stylesheet(s) reach the document.`);
 }
 if (!unmounted) ok(`mounted: all ${exported.size} shared stylesheet(s) reach the document`);
 

@@ -2,11 +2,7 @@ import * as React from "react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  ARRIVE_MOTION, BLOCK_MOTION, CHART_MOTION, DOOR_MOTION, FACE_CSS, GLYPH_MOTION, GROUND_CSS,
-  OPENING_MOTION, TONE_CSS, TRAVEL_MOTION, seedShapes,
-  ambienceStylesheet,
-  brandCss,
-  applyAppearance, Presenting,
+  seedShapes, runtimeCss, brandCss, applyAppearance, Presenting,
 } from "@engine/design";
 import "./styles.css";
 import { App } from "./App.js";
@@ -55,9 +51,11 @@ const MONO = "oklch(0.62 0 0)";
 
 const sky = document.createElement("style");
 sky.textContent = [
-  FACE_CSS, GROUND_CSS, ambienceStylesheet(), ARRIVE_MOTION, BLOCK_MOTION, DOOR_MOTION,
-  CHART_MOTION, TONE_CSS,
-  GLYPH_MOTION, TRAVEL_MOTION, OPENING_MOTION,
+  /* ⚠️ THE DESIGN SYSTEM'S OWN, IN ONE CALL — see `runtimeCss`. It was eleven
+     constants listed here, which meant the geometry harnesses measured the built
+     stylesheet alone: no type face, no ground, no tone, and therefore somebody
+     else's text metrics on every screen. */
+  runtimeCss(),
   /*
     ⚠️ ONE'S OWN BRAND, AND IT IS MONOCHROME. `GROUND_CSS` ships a blue as the
     colour a deployment has before anybody chooses — right for a framework,
