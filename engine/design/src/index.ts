@@ -16,6 +16,8 @@ export * from "./parts/face.js";
 export * from "./parts/beside.js";
 export * from "./parts/surfaces.js";
 export * from "./parts/pick-file.js";
+export * from "./parts/qr.js";
+export * from "./parts/labels.js";
 export * from "./parts/viewfinder.js";
 export * from "./parts/permission.js";
 export * from "./parts/state.js";

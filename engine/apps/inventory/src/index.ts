@@ -21,6 +21,10 @@ import {
   LADDER, MOVES, applyMove, crossedOn, daysLeft, effectiveExpiry, refuseMove, standingOf,
   type Move,
 } from "./ledger.js";
+/* ⚠️ ONLY THE TWO WORDS, BECAUSE THE MANIFEST DECLARES AND DOES NOT DECIDE. The
+   reading and the precedence rules are the SCREEN's — a label is printed there,
+   and a contradiction reported where nothing prints is a warning nobody sees. */
+import { SIGNALS } from "./hazard.js";
 import { CODE_KINDS, readScan, stillNeeded, unread } from "./code.js";
 import { settleCount, type Change } from "./count.js";
 import { guessedIn, notedIn, readJson, type Noted } from "./reading.js";
@@ -101,6 +105,31 @@ const product = collection({
     labelText: field.long({ label: "What the label says", holds: "none", max: 4_000 }),
     storage: field.long({ label: "How to store it", holds: "none", max: 2_000 }),
     handling: field.long({ label: "How to handle it", holds: "none", max: 2_000 }),
+    /*
+      ⚠️ THE CLASSIFICATION, AND IT EXISTS BECAUSE OF DECANTING. Pour solvent
+      from a 20 L drum into a 500 ml bottle and that bottle is a container of a
+      hazardous substance with no label on it — the supplier's stayed on the
+      drum. This is what the decant label is printed FROM, and without it the
+      product can record a chemical and cannot label one.
+
+      ⚠️ A LIST OF GHS CODES, COPIED OFF A SAFETY DATA SHEET. Never inferred from
+      a name and never committed by a model — see `hazard.ts` and §6.2: a
+      classification is a legal declaration, and a guess wearing one is worse
+      than a blank field, which at least looks blank.
+    */
+    hazards: field.json({ label: "Hazards", holds: "none" }),
+    /* ⚠️ ONE WORD OR NEITHER, AND IT IS NOT DERIVABLE FROM THE DIAMONDS. The
+       same pictogram carries Danger in one category and Warning in another, so
+       an app computing it would be an app classifying a substance. */
+    signal: field.enum({
+      label: "Signal word", holds: "none", values: [...SIGNALS],
+      labels: { danger: "Danger", warning: "Warning" },
+    }),
+    /* ⚠️ THE H AND P STATEMENTS AS THEY ARE PRINTED. Text rather than codes,
+       because what goes on the bottle is the sentence — "Causes severe skin
+       burns" — and a reader holding it cannot look H314 up. */
+    hazardText: field.long({ label: "Hazard statements", holds: "none", max: 2_000 }),
+    precautions: field.long({ label: "Precautions", holds: "none", max: 2_000 }),
     /* ⚠️ Days after opening, which is one of three clocks that can end a
        batch — see `effectiveExpiry`. */
     openDays: field.number({ label: "Days once opened", holds: "none", min: 0, max: 3_650 }),
@@ -1882,7 +1911,7 @@ const closeCount = operation<
  * history that cannot be untangled afterwards. A hash would be shorter and would
  * collide; the id is already unique, and uppercasing it is injective.
  */
-const ourLabel = (of: "U" | "K", id: string): string =>
+const ourLabel = (of: "L" | "P" | "U" | "K", id: string): string =>
   `ONE-${of}-${id.slice(id.indexOf("_") + 1).toUpperCase()}`;
 
 /** One object as this app holds it — the columns every act below reads. */
@@ -3431,6 +3460,74 @@ const starts = operation<Record<string, never>, { tracking: string; unit: string
   },
 });
 
+/* ------------------------------------------------------------- the labels --- */
+
+/**
+ * A LABEL FOR SOMETHING THAT HAD NONE.
+ *
+ * ⚠️ A SHELF HAS NO MANUFACTURER, SO ITS CODE IS ALWAYS OURS — and until
+ * something minted one, `location.code` was a column nothing ever filled. That
+ * is not a cosmetic gap: the camera moving the session when it sees a place is
+ * the single highest-leverage behaviour in the counting flow, and it cannot
+ * happen for a shelf nobody has labelled.
+ *
+ * ⚠️ MINTED WHEN IT IS PRINTED, NOT WHEN THE ROW IS CREATED. A workspace with
+ * four hundred locations has not printed four hundred labels, and a code on a
+ * shelf nothing is stuck to is a code that resolves to a place somebody cannot
+ * find. The act of printing is the act of labelling.
+ *
+ * ⚠️ AND IT IS NEVER RE-ISSUED. `COALESCE` on a non-empty code, so a second
+ * print of the same shelf gives the same string — a re-used label is two places
+ * with one history, and a re-numbered one is a printed sticker on a wall that
+ * now points at nothing.
+ */
+const mintLabels = (
+  id: string, of: "L" | "P", table: "location" | "product", permission: string,
+) => operation<{ ids: readonly string[] }, { items: readonly { id: string; code: string }[] }>({
+  id,
+  kind: "write",
+  summary: `Give ${table === "location" ? "places" : "products"} a label of ours`,
+  input: { ids: field.json({ label: "Which", required: true, holds: "none" }) },
+  output: { items: field.json({ label: "Labels", holds: "none" }) },
+  permission,
+  idempotency: { mode: "key" },
+  emits: [`${table}.labelled`],
+  outcome: { message: "Labelled.", tone: "success", invalidates: [`${table}.list`] },
+  fails: ["platform.invalid"],
+  audit: (input) => ({ subject: `${(input.ids ?? []).length} row(s)`, verb: "labelled" }),
+  async handler(ctx, input) {
+    const c = ctx as Ctx;
+    const db = c.db as Db;
+    const ids = Array.isArray(input.ids) ? input.ids.map((one) => String(one)) : [];
+    if (!ids.length) {
+      return c.fail("platform.invalid", {}, { fields: { ids: "Choose something to label" } });
+    }
+
+    const out: { id: string; code: string }[] = [];
+    for (const one of ids) {
+      /* ⚠️ ONE AT A TIME AND SCOPED, because a list of ids arrives from a
+         browser. A single statement with an `IN` would label whatever the caller
+         named, in whichever workspace it happened to live. */
+      const row = await db.prepare(
+        `SELECT id, code FROM ${table} WHERE id = ? AND tenant_id = ?`)
+        .bind(one, c.tenantId).first<{ id: string; code: string | null }>();
+      if (!row) continue;
+      const code = row.code || ourLabel(of, row.id);
+      if (!row.code) {
+        await db.prepare(
+          `UPDATE ${table} SET code = ?, edited_at = ?, edited_by = ?
+            WHERE id = ? AND tenant_id = ? AND (code IS NULL OR code = '')`)
+          .bind(code, c.now, c.accountId ?? null, row.id, c.tenantId).run();
+      }
+      out.push({ id: row.id, code });
+    }
+    return { items: out };
+  },
+});
+
+const labelPlaces = mintLabels("location.label", "L", "location", "location:write");
+const labelThings = mintLabels("product.label", "P", "product", "product:write");
+
 /* ------------------------------------------------------------ the morning --- */
 
 /**
@@ -3691,6 +3788,7 @@ export const INVENTORY: AppSpec = defineApp({
     identify, readLabel, readNote, askInWords,
     openRun, loadRun, endRun, releaseRun, failRun, recallRun, liftHold, lateResult,
     openJob, closeJob, traceJob,
+    labelPlaces, labelThings,
   ],
 
   /*
@@ -3777,6 +3875,19 @@ export const INVENTORY: AppSpec = defineApp({
     */
     { id: "due", route: "/due", label: "Running out", nav: "secondary", icon: "alert",
       permission: "stock:read" },
+    /*
+      ⚠️ SECONDARY, AND IT IS A DESTINATION RATHER THAN A BUTTON ON FOUR OTHER
+      SCREENS. Labelling is a session — somebody stands at a printer with a roll
+      of stock and does forty of them — and a print button on each subject's own
+      screen would make that forty round trips through four different lists.
+
+      ⚠️ `location:read` IS THE FLOOR, not `location:write`. Anybody may look at
+      the sheet; MINTING a code is what the two operations behind it ask for, and
+      a screen gated on the stronger grant would hide the item tags — which need
+      no minting at all — from everybody who cannot edit the catalogue.
+    */
+    { id: "labels", route: "/labels", label: "Labels", nav: "secondary", icon: "tag",
+      permission: "location:read" },
     { id: "ask", route: "/ask", label: "Ask", nav: "secondary", icon: "sparkle",
       permission: "stock:read", sky: "glow" },
     { id: "start", route: "/start", label: "Getting started", nav: "secondary", icon: "star",

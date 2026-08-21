@@ -866,6 +866,7 @@ its own header, cited by other files, and doing nothing.
 | `a-balance-moves-in-one-place-and-the-history-moves-with-it` | D12 | a number the ledger cannot rebuild — the balance is plausible, the screen redraws, and every report over that line stops adding up, permanently |
 | `an-objects-standing-changes-only-where-the-shelf-changes-with-it` | D12 | a shelf that goes on claiming a drill which is in somebody's van, so every count afterwards "finds" it missing and corrects a number that was right |
 | `a-model-fills-anything-and-commits-nothing` | D19 | an expiry read off a blurred label committed as a fact — a perfectly valid date that nothing anywhere will ever question |
+| `a-label-is-minted-once-and-never-re-issued` | D12 | the sticker somebody put on a shelf in March resolves to nothing, and the count that walks past it finds an unlabelled place |
 | `a-job-that-says-it-tells-people-tells-people` | D12 | a nightly sweep whose notification composes, appears on the policy screen and is offered as a preference, while nobody is ever told anything |
 | `a-quarantine-lifts-to-needs-work-and-never-to-good-to-go` | D12 | a tray whose steriliser failed reading as released for the length of its shelf life, and being used on somebody |
 | `a-movement-refuses-rather-than-landing-on-zero` | D12 | a mis-scan, a wrong shelf or a count that was already wrong is silently absorbed, and the only evidence any of them happened is gone |
@@ -889,7 +890,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 127 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 128 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -1017,12 +1018,13 @@ that names no stage, so this list cannot grow by forgetting.
 | 65 | A model can be shown something — the vision lane carries a picture, and the reserve counts it | shipped |
 | 66 | The release rail — a run ends, a person releases, and a late result may contradict neither | shipped |
 | 68 | A night’s work can tell somebody — a job raises events, and the nightly sweep uses it | shipped |
+| 69 | Labels — a QR from nothing, a printable sheet, and the decant label a hazard needs | shipped |
 | 67 | A screen can be gated on an entitlement, the way an operation already is | **planned** |
 | 62 | A list narrows and pages — the generated read answers past the first fifty, and says how many there are | **planned** |
 | 64 | Itemised things — one object for its whole life, and the kits composed of them | shipped |
 | 63 | The guide and the milestones are ticked by what a workspace has actually done | **planned** |
 
-**50 shipped, 18 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**51 shipped, 18 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

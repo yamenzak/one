@@ -28,6 +28,7 @@ import { Case, type Used } from "./Case.js";
 import { Run, type Covered } from "./Run.js";
 import { Work, type Jobs, type Runs } from "./Work.js";
 import { Due, type Dated } from "./Due.js";
+import { Labels, type Labelled } from "./Labels.js";
 import { Count, type Change, type Counted, type Uncovered } from "./Count.js";
 import { Item, type Kept } from "./Item.js";
 import { Kit, type Member, type Missing } from "./Kit.js";
@@ -39,7 +40,8 @@ import { Thing, type Batch, type Movement } from "./Thing.js";
 import { Where } from "./Where.js";
 
 export {
-  Ask, Case, Count, Due, Item, Kit, Receive, Run, Scan, Start, Stock, Thing, Where, Work,
+  Ask, Case, Count, Due, Item, Kit, Labels, Receive, Run, Scan, Start, Stock, Thing,
+  Where, Work,
 };
 export * from "./sample.js";
 export type {
@@ -222,6 +224,25 @@ const NOTED: readonly Noted[] = [
   { code: "04012345678901", name: "Isopropanol 99%, 1 L", quantity: 4,
     lot: "C0921", expiry: "2028-01-31" },
   { code: "", name: "Screws, M4 × 20", quantity: 2, lot: "", expiry: "" },
+];
+
+/**
+ * ⚠️ A CLASSIFIED SUBSTANCE AND AN ORDINARY ONE, because the decant label has to
+ * look right with and without diamonds. The first is what a workshop actually
+ * pours into a bottle; the second is the case where a hazard section would be an
+ * empty band across a 62 mm label if the layout assumed one.
+ */
+const TO_LABEL: readonly Labelled[] = [
+  {
+    id: "p-ipa", name: "Isopropanol 99%", code: "ONE-P-7QP2XL9", under: "Reagent grade",
+    hazards: ["GHS02", "GHS07"], signal: "danger",
+    hazardText: "Highly flammable liquid and vapour. Causes serious eye irritation.",
+    precautions: "Keep away from heat. Wear eye protection. IF IN EYES: rinse cautiously.",
+  },
+  {
+    id: "p-oil", name: "Cutting fluid, 5 L", code: "ONE-P-4K2PB81", under: "Workshop",
+    hazards: [], signal: "", hazardText: "", precautions: "",
+  },
 ];
 
 /**
@@ -505,6 +526,28 @@ export function InventoryScreen({ route, onGo }: {
       already out of date, one inside the window, one that is simply dated — and
       a service beside them, which is the whole reason the sections are apart.
     */
+    /*
+      ⚠️ THE DECANT SHAPE, WITH A REAL CLASSIFICATION ON IT. A ground drawing the
+      plain tag would photograph the easy half — the whole reason this screen
+      exists is the bottle somebody poured solvent into, and a fixture without a
+      signal word and two diamonds teaches nothing about the label that matters.
+    */
+    case "/labels":
+      return (
+        <Labels
+          title={title}
+          of={ready(TO_LABEL)}
+          subject="thing"
+          onSubject={nothing}
+          picked={TO_LABEL.map((one) => one.id)}
+          onPicked={nothing}
+          template="decant"
+          onTemplate={nothing}
+          today="2026-08-21"
+          again={nothing}
+          onPrint={nothing}
+        />
+      );
     case "/due":
       return (
         <Due

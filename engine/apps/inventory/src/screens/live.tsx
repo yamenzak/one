@@ -22,6 +22,7 @@ import * as React from "react";
 import { ready, trouble, waiting, type Loaded } from "@engine/design";
 import type { Problem } from "@engine/kernel";
 import { INVENTORY } from "../index.js";
+import { hazardsIn, signalIn } from "../hazard.js";
 import { coverage, stuttering } from "../count.js";
 import { Count, type Change, type Counted, type Uncovered } from "./Count.js";
 import { Item, SAID, type Kept } from "./Item.js";
@@ -34,6 +35,7 @@ import { Work, type Jobs, type Runs } from "./Work.js";
 import { Scan, type Guess, type Seen } from "./Scan.js";
 import { Stock } from "./Stock.js";
 import { Due, type Dated } from "./Due.js";
+import { Labels, type Labelled, type Subject, type Template } from "./Labels.js";
 import { Thing, type Batch, type Movement, type Piece } from "./Thing.js";
 import { Where } from "./Where.js";
 import { Start } from "./Start.js";
@@ -1440,6 +1442,135 @@ const DUE = (api: Door) => function DueHere({ go }: Mounted) {
 };
 
 /**
+ * LABELS — the sheet, and the codes it mints on the way to the printer.
+ *
+ * ⚠️ PRINTING IS WHAT MINTS A CODE, so the button is a WRITE before it is a
+ * print. A place with no label is a place the camera cannot move a count to, and
+ * minting one at creation would fill a workspace with four hundred codes on
+ * shelves nothing is stuck to — a string that resolves to somewhere nobody can
+ * find is worse than a blank column.
+ *
+ * ⚠️ AND THE BROWSER'S PRINT DIALOGUE IS THE LAST STEP, DELIBERATELY. Which
+ * printer, which roll, how many copies and whether to scale are all questions
+ * the operating system already asks better than a form could — and the sheet on
+ * screen is the same components at the same millimetres, so what it shows is
+ * what comes out.
+ */
+const LABELS = (api: Door) => function LabelsHere() {
+  const today = dayHere();
+  const [subject, setSubject] = React.useState<Subject>("place");
+  const [template, setTemplate] = React.useState<Template>("tag");
+  const [picked, setPicked] = React.useState<readonly string[]>([]);
+  const [busy, setBusy] = React.useState(false);
+
+  const world = useWorld(api);
+  const items = useAsked<{ items: readonly Row[] }>(() => api.get("unit.list"));
+  const kits = useAsked<{ items: readonly Row[] }>(() => api.get("kit.list"));
+
+  const places = world.places.status === "ready" && world.stock.status === "ready"
+    ? placesOf(world.places.data.items, world.stock.data.items)
+    : [];
+  const named = new Map(places.map((p) => [p.id, p.name]));
+  const kinds = new Map(
+    world.kinds.status === "ready"
+      ? world.kinds.data.items.map((row) => [text(row.id), row])
+      : [],
+  );
+
+  /* ⚠️ ONE SHAPE FOR FOUR SUBJECTS, ASSEMBLED HERE. The screen draws labels and
+     has no business knowing that a shelf's second line is its trail and an
+     item's is its serial — what crosses is a row a label can be printed from. */
+  const rowsOf = (): Loaded<readonly Labelled[]> => {
+    const bare = { hazards: [] as readonly string[], signal: "" as const,
+      hazardText: "", precautions: "" };
+    if (subject === "place") {
+      return world.places.status === "ready"
+        ? ready(world.places.data.items.map((row): Labelled => ({
+          id: text(row.id), name: text(row.name), code: text(row.code),
+          under: text(row.within) ? named.get(text(row.within)) ?? "" : "", ...bare,
+        })))
+        : world.places;
+    }
+    if (subject === "thing") {
+      return world.kinds.status === "ready"
+        ? ready(world.kinds.data.items.map((row): Labelled => ({
+          id: text(row.id), name: text(row.name), code: text(row.code),
+          under: text(row.brand),
+          hazards: hazardsIn(row.hazards),
+          signal: signalIn(row.signal),
+          hazardText: text(row.hazardText),
+          precautions: text(row.precautions),
+        })))
+        : world.kinds;
+    }
+    if (subject === "item") {
+      return items.of.status === "ready"
+        ? ready(items.of.data.items.map((row): Labelled => ({
+          id: text(row.id),
+          name: text(kinds.get(text(row.product))?.name) || "—",
+          code: text(row.code),
+          under: text(row.serial) ? `Serial ${text(row.serial)}` : "",
+          ...bare,
+        })))
+        : items.of;
+    }
+    return kits.of.status === "ready"
+      ? ready(kits.of.data.items.map((row): Labelled => ({
+        id: text(row.id),
+        name: text(kinds.get(text(row.product))?.name) || "—",
+        code: text(row.code),
+        under: text(row.location) ? named.get(text(row.location)) ?? "" : "",
+        ...bare,
+      })))
+      : kits.of;
+  };
+
+  return (
+    <Labels
+      title={nameOf("/labels")}
+      of={rowsOf()}
+      subject={subject}
+      onSubject={(next) => {
+        setSubject(next);
+        /* ⚠️ THE CHOICE IS CLEARED WITH THE SUBJECT, because an id from the
+           previous list is an id in another table — a sheet that kept it would
+           print nothing and say nothing about why. */
+        setPicked([]);
+        if (next !== "thing") setTemplate("tag");
+      }}
+      picked={picked}
+      onPicked={setPicked}
+      template={template}
+      onTemplate={setTemplate}
+      today={today}
+      busy={busy}
+      /* ⚠️ EVERY LIST THIS SCREEN CAN DRAW, because the retry belongs to the
+         SCREEN and the screen does not know which of four asks failed. Refreshing
+         only the current subject would leave the other three showing a stale
+         refusal the moment somebody switched. */
+      again={() => { world.again(); items.again(); kits.again(); }}
+      onPrint={() => {
+        const mint = subject === "place" ? "location.label"
+          : subject === "thing" ? "product.label" : null;
+        /* ⚠️ THE MINT COMES BACK BEFORE THE DIALOGUE OPENS. Printing first and
+           minting after would put a sheet of blank symbols in somebody's hand,
+           and they would only find out at the shelf. */
+        if (!mint) { window.print(); return; }
+        setBusy(true);
+        void api.post(mint, { ids: picked }).then((got) => {
+          setBusy(false);
+          if (!got.ok) return;
+          world.again();
+          /* ⚠️ AFTER THE REPAINT, so the sheet carries the codes that were just
+             minted rather than the blanks it was drawn with. */
+          requestAnimationFrame(() => { window.print(); });
+        });
+      }}
+    />
+  );
+};
+
+/**
  * ⚠️ THE GUIDE IS TICKED BY EVENTS THIS WORKSPACE HAS ACTUALLY RAISED, and until
  * the platform answers that question the honest state is nothing crossed off —
  * never a step ticked because a screen guessed.
@@ -1483,6 +1614,7 @@ export function mount({ register, api }: Mounting): void {
     ["/item", ITEM(api)],
     ["/kit", KIT(api)],
     ["/due", DUE(api)],
+    ["/labels", LABELS(api)],
     ["/start", START()],
   ];
   for (const [route, screen] of screens) {

@@ -352,6 +352,12 @@
       "ends": "`JobCtx` carries `tell` and `setting`, so a per-tenant job reaches the same inbox a request does \u2014 the same audience-by-permission, the same channel resolution, the same workspace numbers \u2014 and `eventsOf` counts a job\u2019s `emits`, so a notification about something nobody was present for composes. The runner refuses an undeclared event and `refuseJob` refuses `emits` on a deployment-scope job, because a note is filed in a workspace. OneInventory\u2019s expiry sweep is the first: it tells about CROSSINGS rather than states \u2014 `crossedOn` is arithmetic, so nothing is remembered, a repeat run names the same batches, and nobody is told the same thing every morning for a month. `job-tells.test.mjs` fails on a job that declares an event and never raises it."
     },
     {
+      "n": 69,
+      "status": "shipped",
+      "title": "Labels \u2014 a QR from nothing, a printable sheet, and the decant label a hazard needs",
+      "ends": "`@engine/design` draws a QR itself (ISO/IEC 18004, byte mode, level M, versions 1\u201310) \u2014 hand-written, and only defensible because `qr.test.ts` DECODES what it produces with a reader that shares no code with it: unmasks, reads the format bits back, de-interleaves, checks every Reed-Solomon syndrome is zero, parses the payload. One symbology for everything we print, because two encoders are two ways for a tag to come out unscannable. `LabelSheet`/`Label`/`LabelText` are the one place in the system measured in millimetres, because a label has a physical size and a screen does not. OneInventory declares a GHS classification on a product and prints the decant label a decanted bottle legally needs \u2014 signal word, hazards, statements verbatim \u2014 says plainly that the diamond is not the regulated pictogram, and reports a classification that contradicts itself where the label is printed rather than refusing it. Printing a place or a product MINTS its code, and `label-once.test.mjs` fails on any statement that could re-issue one."
+    },
+    {
       "n": 67,
       "status": "planned",
       "title": "A screen can be gated on an entitlement, the way an operation already is",

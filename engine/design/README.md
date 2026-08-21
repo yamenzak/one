@@ -167,11 +167,11 @@ part that is not. Refresh with `node engine/scripts/docs.test.mjs --write`.
 | `tokens/` | colour, type, spacing, motion, the chrome and hem rules | 67 |
 | `scene/` | the ambience engine — families, marks, the world behind a screen | 1 |
 | `frame/` | page, shape, crown, nav, dock, overlays — what wraps a screen | 56 |
-| `parts/` | rows, cards, lists, controls, the four outcomes | 155 |
+| `parts/` | rows, cards, lists, controls, the four outcomes | 173 |
 | `rendered/` | whole surfaces drawn from a kernel declaration | 53 |
 | `chart/` | the data vocabulary — a number as a shape | 39 |
 
-**371 exports.** Every one is reachable as `import { … } from "@engine/design"`;
+**389 exports.** Every one is reachable as `import { … } from "@engine/design"`;
 there is no deep import, and a guard says so.
 
 ### `tokens/`
@@ -209,11 +209,13 @@ there is no deep import, and a guard says so.
 - `parts/face.tsx` — `appFace`, `Face`, `FaceKind`, `FaceOf`, `FaceProps`, `FaceSize`, `faceUri`, `ONE_FACE`, `Orb`, `placeFace`, `whoFace`, `worldFor`
 - `parts/forms.tsx` — `Agree`, `Choice`, `CodeEntry`, `DateInput`, `Dates`, `Dial`, `LongText`, `Lookup`, `MoneyInput`, `NumberInput`, `NumberInputProps`, `OneOf`, `Option`, `PeriodId`, `PeriodInput`, `PERIODS`, `Picks`, `Said`, `SearchInput`, `SecretInput`, `Segmented`, `spanOf`, `Tags`, `Tail`, `TextInput`, `TextInputProps`, `TimeInput`
 - `parts/heads.tsx` — `Balance`, `distinguishing`, `Figure`, `Prose`, `Section`, `SectionTitle`, `Title`
+- `parts/labels.tsx` — `Code`, `CodeProps`, `Label`, `LabelProps`, `LabelSheet`, `LabelSheetProps`, `LabelText`
 - `parts/listing.tsx` — `Col`, `Listing`, `ListingProps`, `Paged`
 - `parts/logo.tsx` — `Lockup`, `LockupProps`
 - `parts/opening.tsx` — `Opening`, `OpeningProps`
 - `parts/permission.tsx` — `Permission`, `PermissionRow`, `PermissionRowProps`
 - `parts/pick-file.tsx` — `asDataUrl`, `PickFile`, `PickFileProps`
+- `parts/qr.ts` — `Cell`, `checkBytes`, `codewordsFor`, `Drawn`, `formatBits`, `qrMatrix`, `qrPath`, `QUIET_MODULES`, `sizeOf`, `versionBits`, `VERSIONS`
 - `parts/recall.tsx` — `Block`, `seedShapes`, `shapeFor`, `ShapeWaiting`, `useRecalledShape`
 - `parts/said.tsx` — `Amount`, `Clock`, `Dated`, `machineHere`, `Num`, `Presenting`, `Size`, `Unit`, `useAmount`, `useDay`, `useDays`, `useFigures`, `useShown`, `When`
 - `parts/settle.tsx` — `SettledProps`, `SettledSwitch`

@@ -30,6 +30,7 @@ import { Run, type Covered } from "../src/screens/Run.js";
 import { Work, type Jobs, type Runs } from "../src/screens/Work.js";
 import { Kit, type Member, type Missing } from "../src/screens/Kit.js";
 import { Due, sayDays, type Dated } from "../src/screens/Due.js";
+import { Labels, type Labelled } from "../src/screens/Labels.js";
 
 const html = (route: string) => renderToStaticMarkup(<InventoryScreen route={route} />);
 
@@ -1096,5 +1097,111 @@ describe("what runs out", () => {
   it("is only empty when both clocks are", () => {
     expect(running([], [])).toContain("Nothing running out");
     expect(running([], SERVICE_LIST)).not.toContain("Nothing running out");
+  });
+});
+
+describe("the label sheet", () => {
+  const HAZARDOUS: Labelled = {
+    id: "p-ipa", name: "Isopropanol 99%", code: "ONE-P-7QP2XL9", under: "Reagent grade",
+    hazards: ["GHS02", "GHS07"], signal: "danger",
+    hazardText: "Highly flammable liquid and vapour.",
+    precautions: "Keep away from heat.",
+  };
+  const PLAIN: Labelled = {
+    id: "p-oil", name: "Cutting fluid, 5 L", code: "ONE-P-4K2PB81", under: "Workshop",
+    hazards: [], signal: "", hazardText: "", precautions: "",
+  };
+
+  const sheet = (
+    rows: readonly Labelled[], template: "tag" | "decant" | "opened" = "decant",
+    subject: "place" | "thing" | "item" | "kit" = "thing",
+  ) =>
+    renderToStaticMarkup(
+      <Labels
+        title="Labels"
+        of={ready(rows)}
+        subject={subject}
+        onSubject={() => undefined}
+        picked={rows.map((one) => one.id)}
+        onPicked={() => undefined}
+        template={template}
+        onTemplate={() => undefined}
+        today="2026-08-21"
+        again={() => undefined}
+        onPrint={() => undefined}
+      />,
+    );
+
+  /*
+    ⚠️ THE DECANT LABEL IS THE WHOLE REASON THIS SCREEN EXISTS. Pour solvent from
+    a drum into a bottle and that bottle needs its own label — the signal word,
+    the hazards and the statements, verbatim.
+  */
+  it("puts the signal word, the hazards and the statements on a decant label", () => {
+    const out = sheet([HAZARDOUS]);
+    expect(out).toContain("DANGER");
+    expect(out).toContain("Flammable");
+    expect(out).toContain("Highly flammable liquid and vapour.");
+    expect(out).toContain("Keep away from heat.");
+  });
+
+  /*
+    ⚠️ AND IT SAYS WHAT IT IS NOT. The nine GHS marks are published artwork with
+    an exact geometry; the diamond here names the hazard and makes no claim to be
+    the pictogram. A product that let somebody assume otherwise would be one
+    whose labels fail an inspection.
+  */
+  it("says the diamond is not the regulated pictogram", () => {
+    expect(sheet([HAZARDOUS])).toContain("not the regulated pictogram");
+    /* ⚠️ SAID ONLY WHERE THERE IS A CLASSIFICATION — a disclaimer on a sheet of
+       shelf tags is a sentence that trains people to skip disclaimers. */
+    expect(sheet([PLAIN])).not.toContain("not the regulated pictogram");
+  });
+
+  /*
+    ⚠️ THE PRECEDENCE RULE IS REPORTED WHERE THE LABEL IS PRINTED, which is the
+    only surface that can — the editor is generated from the declaration and
+    knows nothing about GHS. "Harmful" beside "Acutely toxic" tells a reader the
+    harm is minor while the diamond next to it says it can kill.
+  */
+  it("names a classification that contradicts itself", () => {
+    const out = sheet([{ ...HAZARDOUS, hazards: ["GHS06", "GHS07"] }]);
+    expect(out).toContain("Worth a second look");
+    expect(out).toContain("the stronger one stands alone");
+    /* ⚠️ AND NAMES WHICH PRODUCT, because a sheet of forty with one wrong is
+       otherwise a hunt. */
+    expect(out).toContain("Isopropanol 99%");
+  });
+
+  /* ⚠️ A CLEAN CLASSIFICATION SAYS NOTHING. A warning on every product is a
+     warning nobody reads by the second day. */
+  it("says nothing about a classification that holds together", () => {
+    expect(sheet([HAZARDOUS])).not.toContain("Worth a second look");
+    expect(sheet([PLAIN])).not.toContain("Worth a second look");
+  });
+
+  /*
+    ⚠️ THE DECANT SHAPE IS OFFERED FOR PRODUCTS AND NOWHERE ELSE. A shelf has no
+    classification and a tool has no statements; a template list offering all
+    three everywhere produces a mostly-empty 62 mm label for a rack.
+  */
+  it("offers the decant shape only where there is something to classify", () => {
+    expect(sheet([PLAIN], "tag", "thing")).toContain("Decant");
+    expect(sheet([PLAIN], "tag", "place")).not.toContain("Decant");
+  });
+
+  /* ⚠️ A CODE IS PRINTED IN WORDS AS WELL AS IN THE SYMBOL. A camera fails — a
+     cracked lens, a dead battery, a label under frost — and the string is what
+     somebody types into the search box instead. */
+  it("prints the code as text beside the symbol", () => {
+    expect(sheet([PLAIN], "tag")).toContain("ONE-P-4K2PB81");
+  });
+
+  /* ⚠️ AND MINTING IS SAID BEFORE THE BUTTON IS PRESSED. Printing is what gives
+     a place its code, and somebody choosing four hundred shelves should know
+     that is what the button does before it does it four hundred times. */
+  it("says that printing is what mints a label", () => {
+    expect(sheet([PLAIN], "tag", "place")).toContain("gets one when you print");
+    expect(sheet([PLAIN], "tag", "item")).not.toContain("gets one when you print");
   });
 });

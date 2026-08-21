@@ -2757,6 +2757,15 @@
       "fails": "an expiry read off a blurred label committed as a fact — a perfectly valid date that nothing anywhere will ever question"
     },
     {
+      "id": "a-label-is-minted-once-and-never-re-issued",
+      "protects": "D12",
+      "stage": "69",
+      "status": "live",
+      "impl": "scripts/label-once.test.mjs",
+      "proves": "UPDATE \u2026 SET code",
+      "fails": "the sticker somebody put on a shelf in March resolves to nothing, and the count that walks past it finds an unlabelled place"
+    },
+    {
       "id": "a-job-that-says-it-tells-people-tells-people",
       "protects": "D12",
       "stage": "68",
