@@ -24,8 +24,6 @@ export interface HelpDef {
   /** The screen it explains. It is how help finds its way to the right page. */
   readonly screen: string;
   readonly body: string;
-  /** Search terms a person would actually type, in their words rather than ours. */
-  readonly terms?: readonly string[];
 }
 
 export type HelpBook = Readonly<Record<string, HelpDef>>;

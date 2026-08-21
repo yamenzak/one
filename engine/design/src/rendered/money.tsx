@@ -21,7 +21,7 @@ import { Credits } from "../parts/credits.js";
 import { Num, useShown } from "../parts/said.js";
 import { Balance } from "../parts/heads.js";
 import { Choice, NumberInput, TextInput } from "../parts/forms.js";
-import { Tray } from "../frame/overlay.js";
+import { Confirm, Tray } from "../frame/overlay.js";
 import { AmountRow, ControlRow, FieldRow, Group, NavRow, NoteRow } from "../parts/surfaces.js";
 import { TYPE } from "../tokens/type.js";
 import { SPACE } from "../tokens/metrics.js";
@@ -367,6 +367,13 @@ export interface JobShown {
   readonly scope: string;
   /** Days below which it refuses to delete, when it deletes at all. */
   readonly destroys?: number;
+  /**
+   * ⚠️ PRESENT ONLY WHEN A SECOND RUN IS NOT SAFE, and it is the sentence saying
+   * why. Absent is the ordinary case, so a console of safe jobs carries no row
+   * about safety at all — and the one job that is not safe is the one that says
+   * so, above the button that would do it.
+   */
+  readonly rerunnable?: string;
 }
 
 export interface JobRun {
@@ -527,12 +534,29 @@ function JobTray({ job, last, onRun, onSchedule, onClose }: {
       isOpen
       onOpenChange={(is) => { if (!is) onClose(); }}
       title={job.label}
+      /*
+        ⚠️ A JOB THAT IS NOT SAFE TO RUN TWICE ASKS FIRST, AND THE SENTENCE IS
+        THE DECLARATION'S OWN. Every job on this console was equally one press
+        away, including the ones whose manifest says in writing what a second
+        pass would do — which is the shape of a control that offers no
+        difference between the reversible and the not.
+      */
       actions={onRun
-        ? (
-          <Button variant="primary" isPending={busy} onPress={() => void run()}>
-            Run it now
-          </Button>
-        )
+        ? job.rerunnable
+          ? (
+            <Confirm
+              trigger={<Button slot="trigger" variant="primary" isPending={busy}>Run it now</Button>}
+              title="Run it again?"
+              act={{ label: "Run it", onDo: () => { void run(); } }}
+            >
+              {job.rerunnable}
+            </Confirm>
+          )
+          : (
+            <Button variant="primary" isPending={busy} onPress={() => void run()}>
+              Run it now
+            </Button>
+          )
         : undefined}
     >
       <Stack space="roomy">
@@ -589,6 +613,18 @@ function JobTray({ job, last, onRun, onSchedule, onClose }: {
                 label="Deletes"
                 value={<span data-ink="warning">Yes</span>}
                 under={`Never anything newer than ${job.destroys} days`}
+              />
+            )
+            : null}
+          {/* ⚠️ SAID ONLY WHEN IT IS NOT SAFE. A row reading "safe to run twice"
+              on every job is the same noise as "started by: the schedule" — it
+              is on the row that is different or it is on none. */}
+          {job.rerunnable
+            ? (
+              <FieldRow
+                label="Twice"
+                value={<span data-ink="warning">Not safe</span>}
+                under={job.rerunnable}
               />
             )
             : null}

@@ -983,6 +983,15 @@ export function operatorOps(input: OperatorDeps): PersonalBook {
           moved: moved[id] !== undefined && moved[id] !== def.schedule,
           scope: def.scope,
           destroys: def.destroys?.floorDays,
+          /*
+            ⚠️ ONLY WHEN IT IS NOT SAFE, so the row that carries this is the one
+            worth reading. `rerunnable` is a statement about consequences rather
+            than a switch — a scheduled retry happens either way — and the one
+            moment it decides anything is somebody pressing "run it now" over a
+            pass that already ran this morning. Declared, it reached no screen,
+            which made every job on the console equally safe to press.
+          */
+          ...(def.rerunnable === true ? {} : { rerunnable: def.rerunnable.why }),
         }]));
         return { book: shown, runs: await runsOf(ctx.directory, book, 50) };
       },

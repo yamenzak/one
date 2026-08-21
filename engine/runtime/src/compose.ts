@@ -21,7 +21,9 @@
 import type {
   AnyOperation, AppSpec, CollectionSpec, CrudVerb, Gate, Permission, ProblemCatalog,
 } from "@engine/kernel";
-import { PLATFORM_PROBLEMS, eraseBy, eventFor, operationsFor, permissionFor, routeFor } from "@engine/kernel";
+import {
+  PLATFORM_PROBLEMS, eraseBy, eventFor, offlineFor, operationsFor, permissionFor, routeFor,
+} from "@engine/kernel";
 import { tableFor } from "@engine/kernel";
 import type { Db } from "./sql.js";
 import { list, patch, put, readOne, type VaultSeam, type WriteRefusal } from "./records.js";
@@ -181,7 +183,20 @@ function crudFor(spec: CollectionSpec, verb: CrudVerb, appId: string): Resolved 
     input: verb === "create" || verb === "update" ? spec.fields : {},
     output: {},
     permission: permissionFor(spec, verb),
-    idempotency: { mode: "none" },
+    /*
+      ⚠️ A WRITE A PHONE MAY HOLD IS A WRITE THAT CAN ARRIVE TWICE, and the
+      declaration that permits the first is what makes the second safe. A queued
+      call cannot know whether its first attempt landed — the ANSWER went
+      missing, not the request — so it asks again, and with `none` a shelf
+      counted once in a basement is counted twice when the signal comes back.
+      Derived from `offline` rather than declared beside it, because two fields
+      that have to agree are two fields that will not.
+
+      ⚠️ AND IT CHANGES NOTHING ONLINE. `mode: "key"` with no `idempotency-key`
+      header resolves no replay key at all, so an ordinary call behaves exactly
+      as it did — the header is the browser's, attached only to what it held.
+    */
+    idempotency: offlineFor(spec, verb) === "queue" ? { mode: "key" } : { mode: "none" },
     /* ⚠️ Only a create counts against a ceiling. An update of an existing record
        does not consume another one, and charging for it would make editing a
        note cost the same as making one. */

@@ -288,6 +288,7 @@ covered.
 |---|---|---|
 | A declaration reaching nobody | `surface` | a mechanism built, wired, tested, with nowhere anybody could look |
 | A rule reaching nothing | `rules` | a refusal argued for in its own header and called by nothing |
+| A FIELD reaching nothing | `declarations` | a manifest sets it, the type accepts it, and the capability it names does not exist — no module to mount and no schema to apply, so nothing anywhere goes red |
 | A capability reaching nothing | `capability` | tables applied on every deploy, a store with tests over it, a document describing the feature, and no address anybody could reach it at |
 | A capability reaching no route | `access`, `services` | tables applied, a store bound, dispatch sites writing rows, no route to reach any of it |
 | Two answers to one question | `rules`, `edit`, `problem` | a lane working out for itself what the kernel already decides |
@@ -302,6 +303,15 @@ covered.
 **"Is this thing wired to anything?"** — DERIVED, and effectively complete. The
 checks walk the declarations themselves, so a declaration added tomorrow is
 covered the day it is added, by nobody.
+
+⚠️ **AND IT WAS NOT COMPLETE UNTIL IT REACHED THE FIELDS.** Every check here
+asked about a MODULE — is it mounted, is it routed, is it reached. A field of a
+declaration is one layer below that: there is nothing to mount and no schema to
+apply, so a field a manifest can set and no lane reads goes red nowhere.
+`declarations`' `read:` section closed it and found six on its first run, one of
+them argued for at length in the file that had stopped reading it. The lesson to
+carry is that "derived and complete" is a claim about a QUESTION, and the
+question can be narrower than the thing it is about.
 
 **"Does this already exist?"** — CURATED, and it is the weaker half. It rests on
 three things and none is a walk over the code:

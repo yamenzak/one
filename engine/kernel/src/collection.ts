@@ -53,20 +53,11 @@ export interface CollectionSpec {
   readonly quota?: string;
   /** The permission prefix. `note` gives `note:read` and `note:write`. */
   readonly permission: string;
-  /** ⚠️ Absent means no history. Present means every version is kept. */
-  readonly versioned?: boolean;
   /**
-   * How a phone treats it with no signal.
-   *
-   * DEFER(engine-54) stage:54 — declared, set by the reference app, and read by
-   * NOTHING. A field a manifest can set and no lane consults is the failure this
-   * framework is a catalogue of, one level below the ones the capability guard
-   * can see: there is no route to mount and no schema to apply, so nothing goes
-   * red. It is here rather than in a sentence because a deferral has to be
-   * findable, and the stage's own exit criterion is the guard that would have
-   * found it.
+   * How a phone treats it with no signal. See `offlineFor` for what each answer
+   * costs and what it obliges.
    */
-  readonly offline?: "cache" | "queue" | "none";
+  readonly offline?: Offline;
   /**
    * ⚠️ WHICH OF ITS OWN FIELDS ARE FINDABLE BY MEANING, AND NOTHING ELSE. Naming
    * them here is the whole declaration: the index, the re-index on every edit,
@@ -87,6 +78,17 @@ export interface CollectionSpec {
 export type CrudVerb = "list" | "read" | "create" | "update" | "delete";
 
 export const CRUD: readonly CrudVerb[] = ["list", "read", "create", "update", "delete"];
+
+/**
+ * WHAT A PHONE DOES WITH NO SIGNAL.
+ *
+ * ⚠️ `none` IS THE DEFAULT AND IT IS THE HONEST ONE. A request that cannot be
+ * made says so. Everything else here is a promise about a device we do not
+ * control, and a promise a collection has not made must never be kept by
+ * accident — answering a read from a stale copy nobody asked for is how a
+ * screen comes to show last week's numbers with no way to tell.
+ */
+export type Offline = "cache" | "queue" | "none";
 
 /* --------------------------------------------------------------- the derived --- */
 
@@ -123,6 +125,49 @@ export const eventsFor = (spec: CollectionSpec): readonly string[] =>
 /** ⚠️ Reads need the read key; anything that changes a record needs write. */
 export const permissionFor = (spec: CollectionSpec, verb: CrudVerb): string =>
   `${spec.permission}:${verb === "list" || verb === "read" ? "read" : "write"}`;
+
+/**
+ * What one generated verb does when the request cannot be made.
+ *
+ * ⚠️ `queue` IMPLIES `cache` ON THE READS, AND THAT IS NOT A CONVENIENCE. A
+ * collection somebody may WRITE with no signal is one they are working in with
+ * no signal, and a write against a list that could not load is a person typing
+ * into a screen that says nothing is there. The two halves are one declaration
+ * because they are one situation.
+ *
+ * ⚠️ AND A QUEUED WRITE IS AN IDEMPOTENT ONE — see `crudFor`. A phone that held
+ * a write in a basement cannot know whether the first attempt landed, so it asks
+ * again; without a key to recognise the repeat, a shelf counted once is counted
+ * twice. The same field that says "this may be written offline" is what makes
+ * the replay safe, so the two cannot be configured apart.
+ */
+export const offlineFor = (spec: CollectionSpec, verb: CrudVerb): Offline => {
+  const policy = spec.offline ?? "none";
+  if (policy === "none") return "none";
+  const reading = verb === "list" || verb === "read";
+  if (reading) return "cache";
+  return policy === "queue" ? "queue" : "none";
+};
+
+/**
+ * ⚠️ EVERY GENERATED VERB'S POLICY, IN ONE MAP THE BROWSER CAN BE HANDED. The
+ * page holds no manifest (D17), so what it knows about an operation is what the
+ * deployment sent it — and a door deciding for itself which calls are safe to
+ * hold would be a second answer to a question the declaration already settles.
+ */
+export const offlineBook = (
+  specs: readonly CollectionSpec[],
+): Readonly<Record<string, Offline>> => {
+  const out: Record<string, Offline> = {};
+  for (const spec of specs) {
+    for (const verb of CRUD) {
+      if ((spec.without ?? []).includes(verb)) continue;
+      const policy = offlineFor(spec, verb);
+      if (policy !== "none") out[`${spec.id}.${verb}`] = policy;
+    }
+  }
+  return out;
+};
 
 /**
  * ⚠️ THE TABLE NAME IS DERIVED AND NEVER DECLARED. An id and a table that can

@@ -96,6 +96,13 @@ const checkIn = collection({
      half a person reads. */
   retention: 730,
   onClose: { then: "purge" },
+  /* ⚠️ THE OTHER HALF OF THE OFFLINE LANE, AND A REFERENCE APP HAS TO CARRY IT.
+     `note` is `queue` — somebody writes one with no signal and it is held; a
+     check-in is somebody's own week, which they read far more often than they
+     write, so what it wants is the last answer rather than a held write. With
+     only `queue` declared anywhere, the cache branch had no instance and no test
+     could reach it — which is how a lane comes to be half wired. */
+  offline: "cache",
   fields: {
     /* ⚠️ THE SCOPE COLUMN IS A DECLARED FIELD AND IS NEVER WRITTEN BY THE
        CALLER. It is declared so erasure can find it and the generated schema can
@@ -710,14 +717,11 @@ export const HELLO: AppSpec = defineApp({
 
   help: {
     "about-notes": { id: "about-notes", title: "About notes", screen: "notes",
-      body: "A note belongs to the workspace. Everybody who can read notes can read all of them.",
-      terms: ["note", "share", "who can see"] },
+      body: "A note belongs to the workspace. Everybody who can read notes can read all of them." },
     "about-publishing": { id: "about-publishing", title: "Publishing", screen: "notes",
-      body: "A draft is yours until you publish it. Publishing tells everybody once and cannot be undone quietly.",
-      terms: ["publish", "draft"] },
+      body: "A draft is yours until you publish it. Publishing tells everybody once and cannot be undone quietly." },
     "about-people": { id: "about-people", title: "Who is here", screen: "people",
-      body: "Invite somebody by email. They join by signing in as that address — there is nothing to accept.",
-      terms: ["invite", "seat"] },
+      body: "Invite somebody by email. They join by signing in as that address — there is nothing to accept." },
   },
 
   /* ⚠️ WHICH SURFACES THIS APP HAS, AND NOT WHO MAY PAINT THEM. The brand is

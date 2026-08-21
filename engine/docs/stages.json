@@ -287,7 +287,7 @@
     },
     {
       "n": 54,
-      "status": "planned",
+      "status": "shipped",
       "title": "A collection's `offline` policy reaches the browser — a write survives no signal, and a read answers without one",
       "ends": "`offline` is read by the runtime and by the browser rather than only declared: `queue` holds a write until there is a connection and replays it once, `cache` answers a read from what was last seen and says how old it is, and `none` is honest about failing. `scripts/declared.test.mjs` fails on any field of a kernel declaration that no lane reads, which is the check that would have found this one."
     },
@@ -308,6 +308,18 @@
       "status": "planned",
       "title": "Records move between workspaces — a garage becomes a business and its history goes with it",
       "ends": "A workspace's records can be handed to another workspace the same account can already reach, with the ledger's provenance carried rather than restamped, refused where the destination's apps do not cover the source's collections, and audited on both sides. Until it exists the only path is an export and an import, which loses who did what and when."
+    },
+    {
+      "n": 58,
+      "status": "planned",
+      "title": "An operation's ceiling is in force — calls per minute, per caller, refused rather than declared",
+      "ends": "`OperationSpec.rate` is read inside `performOperation`, so both doors obey it and neither can forget; a caller past the ceiling is refused with a catalogued problem naming when to try again; and the counter is bounded rather than a row per call."
+    },
+    {
+      "n": 59,
+      "status": "planned",
+      "title": "A write says it worked — the sentence the operation declared, and the reads it made stale",
+      "ends": "`OperationSpec.outcome` reaches the browser and is applied by the one door: a successful write raises its declared message in its declared tone exactly once, and every operation it names in `invalidates` is re-read rather than left showing what was true before the press."
     }
   ]
 }

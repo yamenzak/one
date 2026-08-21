@@ -146,6 +146,159 @@ for (const file of sourcesIn("kernel")) {
 }
 if (!classes) ok("data: the kernel declares no classes");
 
+/* ------------------------------------------------------------------ read --- */
+
+/**
+ * ⚠️ EVERY FIELD A DECLARATION OFFERS IS ONE SOMETHING CONSULTS (D12).
+ *
+ * ⚠️ THIS IS THE LAYER BELOW THE ONE `capability` CAN SEE, AND IT IS WHERE THE
+ * SILENCE IS DEEPEST. That guard asks whether a MODULE is mounted — tables
+ * applied, a store bound, no route. This asks whether a FIELD is read, and a
+ * field nothing reads has no module, no route and no schema, so nothing anywhere
+ * goes red. A manifest sets it, the type accepts it, the console draws around
+ * it, and the capability it names does not exist.
+ *
+ * ⚠️ IT FOUND SIX ON ITS FIRST RUN, AND ONE OF THEM WAS ARGUED FOR AT LENGTH IN
+ * THE FILE THAT HAD STOPPED READING IT. `offline` promised a phone with no
+ * signal; `versioned` promised that every version was kept; `rerunnable`'s own
+ * header said it was going to happen either way. Each was true of the intention
+ * and false of the deployment.
+ *
+ * ⚠️ AND THE ONLY HONEST ANSWERS ARE THE SAME THREE THE RULES GUARD GIVES: wire
+ * it, defer it with a `DEFER(engine-N)` marker so it is in the deferral list
+ * rather than in the silence, or delete it. Two were deleted here, because a
+ * field promising a guarantee nothing keeps is worse than its absence and
+ * re-adding one is a line.
+ *
+ * ⚠️ THE MATCH IS BY NAME, AND WHAT THAT COSTS IS WRITTEN DOWN RATHER THAN
+ * HIDDEN. Resolving which shape a `.field` belongs to needs the compiler, so a
+ * field whose name is unique in the tree is checked exactly and one that shares
+ * a name with a wire type's field is checked loosely — measured: deleting the
+ * only lane that reads `JobDef.rerunnable` leaves this green, because the
+ * console's own `JobShown.rerunnable` carries the same word. That is the
+ * FAVOURABLE direction of the two: it can miss a field going idle, and it
+ * cannot invent one. A guard that reported the other way round would be one
+ * whose findings are argued with.
+ */
+
+/* ⚠️ FOUND BY SHAPE RATHER THAN BY A LIST, so a declaration added tomorrow is
+   checked the day it is written. `Spec` and `Def` are what this tree names a
+   declaration; a shape called neither is a wire type or an answer. */
+const SHAPE = /export interface (\w+(?:Spec|Def))\b[^{]*\{/g;
+
+const shapesIn = (code) => {
+  const out = [];
+  for (const m of code.matchAll(SHAPE)) {
+    let i = m.index + m[0].length, depth = 1, body = "";
+    while (i < code.length && depth > 0) {
+      const c = code[i];
+      if (c === "{") depth++;
+      else if (c === "}") depth--;
+      if (depth > 0) body += c;
+      i++;
+    }
+    /* ⚠️ ONLY THE TOP LEVEL. A field whose type is an inline object would
+       otherwise contribute its own inner names, and `{ of: "tenant" }` would
+       have this guard hunting for a lane that reads `of`. */
+    let d = 0;
+    const fields = [];
+    for (const line of body.split("\n")) {
+      const at = d;
+      for (const c of line) { if ("{([".includes(c)) d++; else if ("})]".includes(c)) d--; }
+      if (at !== 0) continue;
+      const f = line.match(/^\s*(?:readonly\s+)?(\w+)\??\s*:/);
+      if (f) fields.push(f[1]);
+    }
+    out.push({ shape: m[1], body, fields });
+  }
+  return out;
+};
+
+/*
+  ⚠️ A FIELD CARRYING A `DEFER` MARKER IS EXEMPT, AND THE MARKER HAS TO SIT ON
+  THE FIELD. The same three answers the rules guard gives, and the same reason:
+  a capability that does not exist yet is legitimate as long as it is in the
+  deferral list rather than in the silence. Found by walking forward from each
+  marker to the next declared property, because "somewhere in this file" would
+  exempt every field in a file that defers one.
+*/
+const deferredIn = (raw) => {
+  const out = new Set();
+  for (const m of raw.matchAll(/DEFER\(engine-\d+\)/g)) {
+    const after = raw.slice(m.index).match(/\n\s*(?:readonly\s+)?(\w+)\??\s*:/);
+    if (after) out.add(after[1]);
+  }
+  return out;
+};
+
+const shapes = [];
+for (const file of sourcesIn("kernel")) {
+  const raw = readFileSync(file, "utf8");
+  const code = stripTemplates(stripComments(raw));
+  const deferred = deferredIn(raw);
+  for (const s of shapesIn(code)) shapes.push({ ...s, file, deferred });
+}
+
+/*
+  ⚠️ THE LANES ARE WHERE A DECLARATION IS CONSULTED, AND AN APP IS ONE OF THEM.
+  A product's own screen reading `SPEC.guide` is exactly the surface the
+  declaration is for — and it cannot be confused with a manifest SETTING one,
+  because setting is `guide:` and reading is `.guide`.
+*/
+const LANE_DIRS = ["kernel", "runtime", "design", "one-space", "one",
+  ...readdirSync(join(ENGINE, "apps")).map((a) => `apps/${a}`)];
+
+/*
+  ⚠️ THE SHAPE BODIES ARE CUT OUT BEFORE ANYTHING IS SEARCHED, and this is the
+  whole difference between a guard and a decoration. A declaration's own line is
+  a MENTION; what proves it is consulted is a property access somewhere else.
+  Comments and template literals go for the same reason — the rules guard passed
+  two mutations that deleted a rule's only caller because the comment beside the
+  call kept the identifier in the file.
+*/
+const bodies = [];
+for (const dir of LANE_DIRS) {
+  for (const file of sourcesIn(dir)) {
+    let code = stripTemplates(stripComments(readFileSync(file, "utf8")));
+    for (const s of shapes) code = code.split(s.body).join("");
+    bodies.push(code);
+  }
+}
+
+/* ⚠️ Three ways a field is genuinely read, and no fourth: a dot, a bracket, or
+   a destructuring. A bare identifier is not one — that is the mention again. */
+const consulted = (field) => {
+  const dot = new RegExp(`\\.${field}\\b`);
+  const brk = new RegExp(`\\[\\s*["']${field}["']\\s*\\]`);
+  const des = new RegExp(`\\{[^{}]*\\b${field}\\b[^{}]*\\}\\s*=`);
+  return bodies.some((code) => dot.test(code) || brk.test(code) || des.test(code));
+};
+
+/* ⚠️ A FLOOR, BECAUSE A BROKEN MATCHER PRINTS A CONFIDENT GREEN LINE. "No
+   findings" and "nothing was looked at" are the same sentence without a
+   number. */
+const walked = shapes.reduce((n, s) => n + s.fields.length, 0);
+if (shapes.length < 20 || walked < 150) {
+  fail(`read: walked ${shapes.length} shape(s) and ${walked} field(s) — the kernel declares more than that,`
+     + ` so the matcher is broken rather than the tree being clean.`);
+} else {
+  let idle = 0;
+  let waiting = 0;
+  for (const s of shapes) {
+    for (const field of s.fields) {
+      if (consulted(field)) continue;
+      if (s.deferred.has(field)) { waiting++; continue; }
+      idle++;
+      fail(`${rel(s.file)}: \`${s.shape}.${field}\` is declared and no lane reads it (D12).\n`
+         + `       A manifest can set it and nothing happens. Wire it, mark it DEFER(engine-N), or delete it.`);
+    }
+  }
+  if (!idle) {
+    ok(`read: ${walked} declared field(s) across ${shapes.length} shape(s), every one consulted by a lane`
+     + `${waiting ? `, ${waiting} deferred` : ""}`);
+  }
+}
+
 /* ⚠️ A closing line that reads like a pass beside a failure is the shape every
    guard here exists to refuse. */
 console.log(bad

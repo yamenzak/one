@@ -16,6 +16,7 @@ import { createContext, use, useCallback, useEffect, useState } from "react";
 import type { Problem } from "@engine/kernel";
 import { api, whenSessionExpires, type Answer, type Me } from "./api.js";
 import { faceFor, type DoorKind, type Face, type Where } from "./door.js";
+import { forget as forgetHeldHere } from "./offline.js";
 
 export interface Session {
   /** ⚠️ `null` until `/health` answers — see the header. */
@@ -97,6 +98,12 @@ export function SessionProvider({ children }: { readonly children: React.ReactNo
 
   const leave = useCallback(async () => {
     await api.post("me.signout");
+    /* ⚠️ WHAT THIS DEVICE HELD GOES WITH THE SESSION. A phone or a shop tablet
+       is shared, and a cached read is one workspace's records while a queued
+       write carries one person's authority — the next person to sign in must
+       start at nothing. It is here rather than in `offline.ts` because signing
+       out is the only moment that knows a person has finished. */
+    forgetHeldHere();
     setMe("nobody");
   }, []);
 

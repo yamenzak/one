@@ -380,7 +380,7 @@ and a manifest that does not compose refuses to boot.
 | `present` | how a date, a number, a price and a measurement are written for one reader | 17 | — |
 | `infra` | what a product needs underneath it, and what each kind can promise | 11 | — |
 | `field` | what a value is: its kind, its bounds, what it holds, whether it is the app's to keep | 8 | — |
-| `collection` | what a thing an app keeps is — and the six operations it gets for free | 16 | — |
+| `collection` | what a thing an app keeps is — and the six operations it gets for free | 18 | — |
 | `operation` | one declaration carrying every cross-cutting concern (D12) | 9 | — |
 | `access` | permissions, roles, and what an app may never claim | 15 | 1 |
 | `gate` | the eight gates, in the order that decides which sentence somebody reads first | 3 | 1 |
@@ -406,7 +406,7 @@ and a manifest that does not compose refuses to boot.
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**266 of them**, 261 reached by something today.
+**268 of them**, 263 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -605,6 +605,11 @@ its own header, cited by other files, and doing nothing.
 | `no-service-call-is-made-over-fetch` | D3 | a wrong payload becoming a production error where it had been a compile error |
 | `a-declaration-is-a-literal-a-script-can-walk` | D8 | a declaration that has to be executed before it can be read, so every generated surface stops being derivable |
 | `a-library-decides-it-does-not-rule` | D9 | one of our own rules living inside somebody else's package, re-learned from their release notes |
+| `every-field-a-declaration-offers-is-one-something-reads` | D12 | a manifest sets a field, the type accepts it, and the capability it names does not exist — no route to mount and no schema to apply, so nothing anywhere goes red |
+| `a-held-write-is-one-a-replay-can-recognise` | D12 | a shelf counted once in a basement is counted twice when the signal comes back, with nothing anywhere failing |
+| `a-queue-refuses-rather-than-dropping-what-it-holds` | D12 | somebody's morning of counting is discarded to make room for the next scan, at the moment nobody can see it happen |
+| `an-answer-from-this-device-says-how-old-it-is` | D12 | last week's stock is drawn as today's, with nothing on the screen able to date it |
+| `nothing-is-held-or-kept-that-a-collection-did-not-declare` | D12 | a copy of a workspace's records on every device that ever opened it, for a promise the manifest never made |
 | `a-notification-nobody-can-receive-is-refused` | D12 | a message switched on in the policy screen that never arrives, so people stop trusting the ones that do |
 | `a-switch-nothing-is-behind-is-refused` | D12 | somebody turning on a control that does nothing, and no longer watching for the problem it promised to solve |
 | `everything-sold-is-withheld-somewhere` | D12 | money taken for a capability every customer already has, failing in the generous direction so nobody reports it |
@@ -872,7 +877,7 @@ its own header, cited by other files, and doing nothing.
 | D9 | Libraries encode decisions; we write invariants | 3 |
 | D10 | Five primary destinations, maximum | 5 |
 | D11 | The vault is encrypted rows in the shard, keyed by a destroyable salt | 19 |
-| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 112 |
+| D12 | Every cross-cutting concern is a field on a declaration, never a call site | 117 |
 | D13 | The agent surface is derived: every operation is an MCP tool unless it says why not | 4 |
 | D14 | Provider AI calls go through the unified AI binding and its gateway, never direct fetch | 1 |
 | D15 | One membership, two authorities: a platform role for the workspace, a role per app inside it | 5 |
@@ -989,12 +994,14 @@ that names no stage, so this list cannot grow by forgetting.
 | 51 | A collection says `searchable` and becomes findable — the write marks, a pass carries, erasure removes, and one filter is the boundary | shipped |
 | 52 | The words arrive as they are written — one metered run, streamed, and the charge rides the last token | shipped |
 | 53 | A workspace asks to change its jurisdiction, and the ask is the only thing that is new | **planned** |
-| 54 | A collection's `offline` policy reaches the browser — a write survives no signal, and a read answers without one | **planned** |
+| 54 | A collection's `offline` policy reaches the browser — a write survives no signal, and a read answers without one | shipped |
 | 55 | A collection narrows to part of a workspace — a location grant, and one filter the platform composes | **planned** |
 | 56 | A family takes a hue — one declared per product, never written at a call site | **planned** |
 | 57 | Records move between workspaces — a garage becomes a business and its history goes with it | **planned** |
+| 58 | An operation's ceiling is in force — calls per minute, per caller, refused rather than declared | **planned** |
+| 59 | A write says it worked — the sentence the operation declared, and the reads it made stale | **planned** |
 
-**42 shipped, 15 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**43 shipped, 16 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

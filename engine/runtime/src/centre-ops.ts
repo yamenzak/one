@@ -16,7 +16,7 @@
  */
 
 import type { AppSpec, TenantId } from "@engine/kernel";
-import { PUBLIC, sellableKeys } from "@engine/kernel";
+import { PUBLIC, offlineBook, sellableKeys } from "@engine/kernel";
 import { tenantById } from "./directory.js";
 import { memberFor, rolesFor } from "./membership.js";
 import type { PlatformCtx } from "./member-ops.js";
@@ -58,6 +58,15 @@ const publicFace = (
   /* What a package may sell here, so the composer cannot offer a key that
      would be refused at composition. */
   sellable: [...sellableKeys(a)],
+  /*
+    ⚠️ WHAT A PHONE MAY DO WITH NO SIGNAL, PER OPERATION. The door has to hold a
+    write or answer a read from what it last saw, and it cannot work out for
+    itself which calls those are — a door deciding would be a second answer to a
+    question `offline` already settles, and the wrong direction of wrong: a read
+    answered from a stale copy nobody declared cacheable is last week's numbers
+    with nothing saying so.
+  */
+  offline: offlineBook(a.collections),
 });
 
 export function centreOps(app: AppSpec): Readonly<Record<string, Resolved>> {

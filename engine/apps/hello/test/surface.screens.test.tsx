@@ -232,4 +232,40 @@ describe("what the engine hands an app", () => {
        direction and fail every reader who composed them the other way round. */
     expect(idsOf(one).map((o) => o.id)).not.toContain("thing.create");
   });
+
+  /**
+   * ⚠️ A COLLECTION A PHONE MAY WRITE WITH NO SIGNAL GETS IDEMPOTENT WRITES, AND
+   * NOT BY BEING DECLARED TWICE. A held call cannot know whether its first
+   * attempt landed — the ANSWER went missing, not the request — so it asks
+   * again; with `mode: "none"` a shelf counted once in a basement is counted
+   * twice when the signal comes back, and nothing anywhere fails.
+   *
+   * ⚠️ AND THE READS ARE UNTOUCHED. Idempotency is about a repeat that CHANGES
+   * something; putting a replay key on a list would spend a row in the replay
+   * table on every scroll.
+   */
+  it("makes a queued collection's writes recognisable on a replay", () => {
+    const held = new Map(idsOf(bare({
+      collections: [{
+        ...thing({ title: field.text({ label: "Title", holds: "none" }) }),
+        offline: "queue",
+      }],
+    })).map((o) => [o.id, o.spec.idempotency.mode]));
+
+    expect(held.get("thing.create")).toBe("key");
+    expect(held.get("thing.update")).toBe("key");
+    expect(held.get("thing.delete")).toBe("key");
+    expect(held.get("thing.list")).toBe("none");
+
+    /* ⚠️ A `cache` COLLECTION IS NOT ONE A PHONE MAY WRITE, so nothing about its
+       writes changes. The two halves come from one field precisely so they
+       cannot be configured apart. */
+    const cached = new Map(idsOf(bare({
+      collections: [{
+        ...thing({ title: field.text({ label: "Title", holds: "none" }) }),
+        offline: "cache",
+      }],
+    })).map((o) => [o.id, o.spec.idempotency.mode]));
+    expect(cached.get("thing.create")).toBe("none");
+  });
 });

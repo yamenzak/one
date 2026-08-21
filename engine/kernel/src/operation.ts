@@ -166,9 +166,23 @@ export interface OperationSpec<I = unknown, O = unknown> {
   readonly tool?: ToolPolicy;
   /** The events it raises. The inbox, webhooks and recognition all read this. */
   readonly emits?: readonly string[];
+  /**
+   * DEFER(engine-59) stage:59 — what a write says when it worked, and what it
+   * makes stale. Declared by four of the reference app's operations and read by
+   * nothing, so every successful write in the product is silent and every list
+   * behind one is a round trip out of date.
+   */
   readonly outcome?: Outcome;
   readonly fails?: readonly string[];
-  /** Calls per minute, per caller. Absent is the platform's own default. */
+  /**
+   * Calls per minute, per caller. Absent is the platform's own default.
+   *
+   * DEFER(engine-58) stage:58 — declared and read by nothing, so an operation
+   * that names a ceiling has none. It is deferred rather than deleted because
+   * the ceiling is a security control this deployment will need the day a door
+   * opens to strangers (D23), and a control somebody believes is in force is
+   * worse than one nobody has written.
+   */
   readonly rate?: number;
 
   readonly handler: (ctx: unknown, input: I) => Promise<O>;

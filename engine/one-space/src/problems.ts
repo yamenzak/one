@@ -43,6 +43,28 @@ const OWN: ProblemCatalog = {
     title: "Something went wrong",
     detail: "It is not you. Try again, and quote {ref} if it keeps happening.",
   },
+  /*
+    ⚠️ NOT AN ERROR, AND THE TONE IS THE WHOLE OF WHY IT IS HERE. The write was
+    kept and will be sent; what did NOT happen is the server agreeing to it, so
+    reporting success would be this device deciding an answer it never got. A
+    screen that shows this beside the row it belongs to is a person who knows
+    exactly where they stand.
+  */
+  "space.held": {
+    status: 0, retryable: false, tone: "info",
+    title: "Kept on this device",
+    detail: "It will be sent when you are back.",
+  },
+  /*
+    ⚠️ THE ONE ANSWER A QUEUE MUST NEVER GIVE SILENTLY. Dropping the oldest to
+    make room for the newest loses somebody's work at the moment they cannot see
+    it happen, so nothing held is ever discarded and the refusal is loud.
+  */
+  "space.full": {
+    status: 0, retryable: false, tone: "danger",
+    title: "This device is full",
+    detail: "Get back online to send what is waiting before adding more.",
+  },
 };
 
 /** ⚠️ Merged, so one call resolves a platform code and a OneSpace code alike. */

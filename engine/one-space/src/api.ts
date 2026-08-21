@@ -13,10 +13,25 @@
  * one from a status code.
  */
 
-import { newId, problem, type Presentation, type Problem } from "@engine/kernel";
+import {
+  newId, problem, type Instant, type Offline, type Presentation, type Problem,
+} from "@engine/kernel";
 import { PROBLEMS } from "./problems.js";
+import { flush, hold, keyOf, recall, remember, waiting } from "./offline.js";
 
-export interface Ok<T> { readonly ok: true; readonly value: T }
+export interface Ok<T> {
+  readonly ok: true;
+  readonly value: T;
+  /**
+   * ⚠️ WHEN THIS ANSWER WAS TRUE, PRESENT ONLY WHEN IT CAME FROM THIS DEVICE. An
+   * answer from a copy and an answer from the server are the same shape, and
+   * that is exactly why they must not be the same CLAIM. A caller that ignores
+   * this shows what it always showed; one that reads it can say "last seen four
+   * minutes ago", which is the difference between a screen a person trusts and a
+   * number nobody can date.
+   */
+  readonly stale?: Instant;
+}
 export interface No { readonly ok: false; readonly problem: Problem }
 export type Answer<T> = Ok<T> | No;
 
@@ -44,6 +59,71 @@ export const whenSessionExpires = (run: () => void): void => { onExpired = run; 
  * session handler itself calls, so without this a single 401 is a loop.
  */
 const NOT_AN_EXPIRY = new Set(["me.code", "me.session", "me.who"]);
+
+/* ------------------------------------------------------------- no signal --- */
+
+/**
+ * WHAT THIS DEVICE MAY DO WITHOUT A CONNECTION, PER OPERATION.
+ *
+ * ⚠️ HANDED OVER, NEVER DECIDED HERE. It is `offline` on a collection, carried
+ * by `centre.view` — the page holds no manifest (D17), and a door working out
+ * for itself which calls are safe to hold would be a second answer to a question
+ * the declaration already settles. Empty until the centre arrives, which is the
+ * right default: an operation this door knows nothing about is one it does not
+ * hold and does not answer from a copy.
+ */
+let policy: Readonly<Record<string, Offline>> = {};
+
+/** ⚠️ Every enabled product's book merged into one, because the door answers by
+    operation id and an operation belongs to exactly one of them. */
+const learn = (centre: unknown): void => {
+  const apps = (centre as { apps?: readonly { offline?: Record<string, Offline> }[] }).apps;
+  if (!apps) return;
+  offlinePolicy(Object.assign({}, ...apps.map((a) => a.offline ?? {})) as Record<string, Offline>);
+};
+
+export const offlinePolicy = (book: Readonly<Record<string, Offline>>): void => {
+  policy = book;
+  /* ⚠️ THE FIRST CHANCE TO SEND WHAT WAS HELD IS THE MOMENT WE KNOW IT MAY BE
+     SENT. A device that queued yesterday and was opened today has a connection
+     and no `online` event to fire — that event says the state CHANGED. */
+  void send();
+};
+
+/**
+ * ⚠️ WATCHED, NEVER POLLED. `online` is the browser telling us the state
+ * changed; a timer asking every few seconds is the shape `runaway.test.mjs`
+ * refuses, and on a phone it is a radio kept awake for nothing.
+ */
+if (typeof globalThis.addEventListener === "function") {
+  globalThis.addEventListener("online", () => { void send(); });
+}
+
+/** ⚠️ ONE PASS AT A TIME. Two overlapping flushes replay the same entry twice —
+    which the idempotency key survives, and which is still two requests. */
+let sending: Promise<void> | null = null;
+
+export const send = (): Promise<void> => (sending ??= (async () => {
+  try {
+    await flush(async (held) => {
+      const out = await raw(`/api/${held.op}`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json", "idempotency-key": held.key },
+        body: JSON.stringify(held.body ?? {}),
+      });
+      if (!out) return "unreachable";
+      return out.ok ? "sent" : "refused";
+    });
+  } finally { sending = null; }
+})());
+
+export const heldHere = (): number => waiting();
+
+/** ⚠️ `null` FOR A REQUEST THAT NEVER ARRIVED, which is not a status. */
+const raw = async (url: string, init: RequestInit): Promise<Response | null> => {
+  try { return await fetch(url, init); } catch { return null; }
+};
 
 /**
  * WHAT WAS ALREADY ASKED BEFORE THIS FILE EXISTED — see `index.html`.
@@ -102,36 +182,80 @@ async function call<T>(
     ? `?${new URLSearchParams(Object.entries(body as Record<string, string>)).toString()}`
     : "";
 
-  const raw = body instanceof ArrayBuffer || ArrayBuffer.isView(body);
+  const raw_ = body instanceof ArrayBuffer || ArrayBuffer.isView(body);
 
   /* ⚠️ Only a bare GET can have been asked ahead of time — see `early`. */
   const ahead = method === "GET" && !body ? await early(id) : null;
 
-  let res: Response;
-  try {
-    res = ahead ?? await fetch(`/api/${id}${query}`, {
-      method,
-      /* ⚠️ The session is a cookie the runtime sets; `same-origin` is what sends
-         it back, and its absence is a sign-in that appears to work once. */
-      credentials: "same-origin",
-      ...(method === "POST"
-        ? {
-          headers: {
-            "content-type": raw ? contentType ?? "application/octet-stream" : "application/json",
-          },
-          body: raw ? body as BodyInit : JSON.stringify(body ?? {}),
-        }
-        : {}),
-    });
-  } catch {
+  /* ⚠️ ASKED BEFORE THE CALL IS MADE, so the two branches below read one answer
+     rather than each deciding what this operation is. */
+  const how = policy[id] ?? "none";
+  const cacheAt = method === "GET" && how === "cache"
+    ? keyOf(id, body as Record<string, string> | undefined)
+    : null;
+
+  const res = ahead ?? await raw(`/api/${id}${query}`, {
+    method,
+    /* ⚠️ The session is a cookie the runtime sets; `same-origin` is what sends
+       it back, and its absence is a sign-in that appears to work once. */
+    credentials: "same-origin",
+    ...(method === "POST"
+      ? {
+        headers: {
+          "content-type": raw_ ? contentType ?? "application/octet-stream" : "application/json",
+        },
+        body: raw_ ? body as BodyInit : JSON.stringify(body ?? {}),
+      }
+      : {}),
+  });
+
+  if (!res) {
+    /*
+      ⚠️ THE REQUEST NEVER ARRIVED, AND WHAT HAPPENS NEXT IS THE COLLECTION'S
+      DECISION RATHER THAN THIS FILE'S. A `queue` write is held with a key that
+      makes its replay recognisable; a `cache` read is answered from what was
+      last seen, WITH ITS AGE; anything else is what it has always been.
+    */
+    if (method === "POST" && how === "queue") {
+      const key = newId("held");
+      const at = new Date().toISOString();
+      /* ⚠️ A DEVICE THAT CANNOT KEEP IT SAYS SO. Reporting a write as held when
+         nothing holds it is the one lie the whole lane exists to avoid — it is
+         somebody's work, and they would find out weeks later. */
+      if (!hold(id, body, key, at)) return { ok: false, problem: problem(PROBLEMS, "space.full") };
+      return { ok: false, problem: problem(PROBLEMS, "space.held") };
+    }
+    if (cacheAt) {
+      const kept = recall(cacheAt);
+      if (kept) return { ok: true, value: kept.value as T, stale: kept.at };
+    }
     return { ok: false, problem: unreachable() };
   }
 
-  if (res.ok) return { ok: true, value: await res.json() as T };
+  if (res.ok) {
+    const value = await res.json() as T;
+    /*
+      ⚠️ THE CENTRE IS WHERE THE DOOR LEARNS WHAT IT MAY HOLD, AND IT IS LEARNED
+      HERE RATHER THAN BY A SCREEN. `offline` is a collection's declaration and
+      it travels on this one read; a screen installing it would be a place that
+      has to remember, and forgetting is silent — an operation nobody told the
+      door about is simply never held, which reads as an offline lane that does
+      not work rather than as a missing line.
+    */
+    if (id === "centre.view") learn(value);
+    /* ⚠️ KEPT ONLY WHERE THE COLLECTION SAID SO. Keeping every answer would put
+       a copy of a workspace's records on every device that ever opened it, for
+       a capability nobody declared. */
+    if (cacheAt) remember(cacheAt, value, new Date().toISOString());
+    /* ⚠️ A CONNECTION PROVES ITSELF BY ANSWERING, so the pass that empties the
+       queue rides the first call that worked rather than a timer asking. */
+    if (waiting()) void send();
+    return { ok: true, value };
+  }
 
-  const problem = await readProblem(res);
+  const problem_ = await readProblem(res);
   if (res.status === 401 && !NOT_AN_EXPIRY.has(id)) onExpired?.();
-  return { ok: false, problem };
+  return { ok: false, problem: problem_ };
 }
 
 export const api = {
@@ -148,14 +272,11 @@ export const api = {
    * OneSpace that calls `fetch`.
    */
   async health(): Promise<Answer<Health>> {
-    try {
-      /* ⚠️ The page asked this before the bundle loaded — see `early`. */
-      const res = await early("health") ?? await fetch("/health", { credentials: "same-origin" });
-      if (!res.ok) return { ok: false, problem: await readProblem(res) };
-      return { ok: true, value: await res.json() as Health };
-    } catch {
-      return { ok: false, problem: unreachable() };
-    }
+    /* ⚠️ The page asked this before the bundle loaded — see `early`. */
+    const res = await early("health") ?? await raw("/health", { credentials: "same-origin" });
+    if (!res) return { ok: false, problem: unreachable() };
+    if (!res.ok) return { ok: false, problem: await readProblem(res) };
+    return { ok: true, value: await res.json() as Health };
   },
 };
 

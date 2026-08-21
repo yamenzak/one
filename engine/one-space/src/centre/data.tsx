@@ -11,7 +11,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type {
-  AreaBook, DocumentBook, NotificationBook, ScreenSpec, SettingBook, NeedBook, SubProcessorBook,
+  AreaBook, DocumentBook, Instant, NotificationBook, Offline, ScreenSpec, SettingBook, NeedBook,
+  SubProcessorBook,
 } from "@engine/kernel";
 import { ready, trouble, waiting, type Loaded } from "@engine/design";
 import { api } from "../api.js";
@@ -37,6 +38,8 @@ export interface CentreApp {
   readonly roles: readonly string[];
   /** What a package may sell here. */
   readonly sellable: readonly string[];
+  /** ⚠️ What a phone may do with each of its operations with no signal. */
+  readonly offline?: Readonly<Record<string, Offline>>;
 }
 
 export interface CentreView {
@@ -186,10 +189,18 @@ const askedFor = (id: string, input?: Record<string, string>): string =>
 export function useLoad<T>(id: string, input?: Record<string, string>): {
   readonly of: Loaded<T>;
   readonly again: () => void;
+  /**
+   * ⚠️ SET ONLY WHEN THIS DEVICE ANSWERED — see `Ok.stale`. A screen that
+   * ignores it draws what it always drew; one that reads it can say how old the
+   * answer is, which is the whole difference between a number somebody can trust
+   * and one nobody can date.
+   */
+  readonly stale?: Instant;
 } {
   const key = askedFor(id, input);
   const [of, set] = useState<Loaded<T>>(() =>
     (held.has(key) ? ready(held.get(key) as T) : waiting()));
+  const [stale, setStale] = useState<Instant | undefined>(undefined);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -201,7 +212,12 @@ export function useLoad<T>(id: string, input?: Record<string, string>): {
 
     void api.get<T>(id, input).then((got) => {
       if (!live) return;
-      if (got.ok) { held.set(key, got.value); set(ready(got.value)); return; }
+      if (got.ok) {
+        held.set(key, got.value);
+        setStale(got.stale);
+        set(ready(got.value));
+        return;
+      }
       /*
         ⚠️ A FAILED REFRESH OVER DATA WE HAVE IS NOT A REFUSAL SCREEN. Replacing
         a list somebody is reading with "something went wrong" because a poll
@@ -215,7 +231,7 @@ export function useLoad<T>(id: string, input?: Record<string, string>): {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, key, tick]);
 
-  return { of, again: useCallback(() => setTick((n) => n + 1), []) };
+  return { of, again: useCallback(() => setTick((n) => n + 1), []), stale };
 }
 
 /**

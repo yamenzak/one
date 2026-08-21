@@ -408,6 +408,51 @@
       "fails": "one of our own rules living inside somebody else's package, re-learned from their release notes"
     },
     {
+      "id": "every-field-a-declaration-offers-is-one-something-reads",
+      "protects": "D12",
+      "stage": "54",
+      "status": "live",
+      "impl": "scripts/declarations.test.mjs",
+      "proves": "read:",
+      "fails": "a manifest sets a field, the type accepts it, and the capability it names does not exist — no route to mount and no schema to apply, so nothing anywhere goes red"
+    },
+    {
+      "id": "a-held-write-is-one-a-replay-can-recognise",
+      "protects": "D12",
+      "stage": "54",
+      "status": "live",
+      "impl": "apps/hello/test/surface.screens.test.tsx",
+      "proves": "makes a queued collection's writes recognisable on a replay",
+      "fails": "a shelf counted once in a basement is counted twice when the signal comes back, with nothing anywhere failing"
+    },
+    {
+      "id": "a-queue-refuses-rather-than-dropping-what-it-holds",
+      "protects": "D12",
+      "stage": "54",
+      "status": "live",
+      "impl": "one-space/test/offline.test.ts",
+      "proves": "refuses rather than dropping the oldest",
+      "fails": "somebody's morning of counting is discarded to make room for the next scan, at the moment nobody can see it happen"
+    },
+    {
+      "id": "an-answer-from-this-device-says-how-old-it-is",
+      "protects": "D12",
+      "stage": "54",
+      "status": "live",
+      "impl": "one-space/test/offline.test.ts",
+      "proves": "says how old it is",
+      "fails": "last week's stock is drawn as today's, with nothing on the screen able to date it"
+    },
+    {
+      "id": "nothing-is-held-or-kept-that-a-collection-did-not-declare",
+      "protects": "D12",
+      "stage": "54",
+      "status": "live",
+      "impl": "one-space/test/offline.test.ts",
+      "proves": "keeps nothing for an operation the collection did not declare",
+      "fails": "a copy of a workspace's records on every device that ever opened it, for a promise the manifest never made"
+    },
+    {
       "id": "a-notification-nobody-can-receive-is-refused",
       "protects": "D12",
       "stage": "1",
