@@ -101,8 +101,14 @@ export function Ask({ title, of, lines, onAsk, again }: AskProps) {
                         this reads "Read 200 of your 4000 lines" — one grouped
                         figure would be worse still, and here neither was. A
                         count is a number a person compares. */}
+                    {/* ⚠️ THE SENTENCE NAMES ITS SUBJECT. "Read 2 of your 6
+                        lines" leaves who read them to the reader, under a
+                        heading that says The answer — so the caveat that is the
+                        whole reason for the row is the one part that is a
+                        guess. */}
                     <span data-ink="warning">
-                      Read <Num value={answer.looked} /> of your <Num value={lines} /> lines
+                      Answered from <Num value={answer.looked} /> of your{" "}
+                      <Num value={lines} /> lines
                     </span>
                   </NoteRow>
                 )

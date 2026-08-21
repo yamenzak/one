@@ -43,13 +43,13 @@ export interface Line {
 }
 
 export const PLACES: readonly Place[] = [
-  { id: "p-site", name: "Bracken Road", of: null, kind: "site", lines: 112 },
-  { id: "p-store", name: "Main store", of: "p-site", kind: "room", lines: 87 },
+  { id: "p-site", name: "Bracken Road", of: null, kind: "site", lines: 95 },
+  { id: "p-store", name: "Main store", of: "p-site", kind: "room", lines: 70 },
   { id: "p-floor", name: "Shop floor", of: "p-site", kind: "room", lines: 25 },
-  { id: "p-a", name: "Rack A", of: "p-store", kind: "rack", lines: 41 },
+  { id: "p-a", name: "Rack A", of: "p-store", kind: "rack", lines: 24 },
   { id: "p-b", name: "Rack B", of: "p-store", kind: "rack", lines: 46 },
   { id: "p-a1", name: "A1", of: "p-a", kind: "shelf", lines: 12, code: "ONE-L-4K2P" },
-  { id: "p-a2", name: "A2", of: "p-a", kind: "shelf", lines: 17 },
+  { id: "p-a2", name: "A2", of: "p-a", kind: "shelf", lines: 0 },
   { id: "p-a3", name: "A3 — flammables", of: "p-a", kind: "shelf", lines: 12, code: "ONE-L-9WQX" },
   { id: "p-b1", name: "B1", of: "p-b", kind: "shelf", lines: 23 },
   { id: "p-b2", name: "B2", of: "p-b", kind: "shelf", lines: 23 },

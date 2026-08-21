@@ -18,6 +18,7 @@ import {
 } from "@engine/design";
 import { reached } from "@engine/kernel";
 import { INVENTORY } from "../index.js";
+import { LADDER, type Tracking } from "../ledger.js";
 
 /**
  * ⚠️ THE LADDER IN THE ORDER SOMEBODY CLIMBS IT, AND AS INERT ROWS. A `StepRow`
@@ -27,24 +28,41 @@ import { INVENTORY } from "../index.js";
  * change.
  */
 /*
+  ⚠️ ALL FIVE RUNGS, AND THIS BLOCK IS THE ONLY PLACE THE LADDER IS EXPLAINED.
+  It shipped with four: `assembled` was missing, which is the rung nobody would
+  guess exists and the one that cannot be reached afterwards — the moment
+  identity is created is the moment a thing arrives, so a workspace that read
+  this list and chose `itemised` for its kits has no second chance at it.
+
   ⚠️ A MARK EACH, AND THEY ARE THE MARKS THE REST OF THE PRODUCT ALREADY USES
-  FOR THE SAME NOUNS. Four rungs under one `box` is four identical glyphs down
+  FOR THE SAME NOUNS. Five rungs under one `box` is five identical glyphs down
   the side of the one block that exists to tell them apart — the neutral circle's
   failure with an extra step. A kit is `layers` and an item is `tag` in the
-  manifest's own screen list, so a batch and an itemised thing wear those here.
+  manifest's own screen list, so those two are taken; a batch wears `calendar`,
+  because a delivery kept apart from the next one is a date before it is
+  anything else.
 */
-const LADDER: readonly {
-  readonly id: string; readonly label: string; readonly icon: string; readonly under: string;
-}[] = [
-  { id: "listed", label: "Listed", icon: "list",
+/*
+  ⚠️ KEYED BY THE LADDER ITSELF, SO A SIXTH RUNG CANNOT SHIP UNEXPLAINED. This
+  was a hand-written list beside `ledger.ts`'s — two constants named LADDER, one
+  the truth and one the account of it — and it fell a rung behind. A `Record`
+  over `Tracking` makes the omission a type error in the file that owes the
+  sentence.
+*/
+const SAID: Readonly<Record<Tracking, {
+  readonly label: string; readonly icon: string; readonly under: string;
+}>> = {
+  listed: { label: "Listed", icon: "list",
     under: "A thing you keep and never count — a ladder, a drill, a monitor" },
-  { id: "counted", label: "Counted", icon: "box",
+  counted: { label: "Counted", icon: "box",
     under: "A number per place, and where most things start" },
-  { id: "batched", label: "Batched", icon: "layers",
+  batched: { label: "Batched", icon: "calendar",
     under: "Deliveries kept apart, because one of them expires first" },
-  { id: "itemised", label: "Itemised", icon: "tag",
+  itemised: { label: "Itemised", icon: "tag",
     under: "One object with a serial number and a service date of its own" },
-];
+  assembled: { label: "Assembled", icon: "layers",
+    under: "A kit made of itemised things, checked against the list it was built to" },
+};
 
 export function Start({ title, said, done, counts, already, held, onGo }: {
   readonly title?: string;
@@ -92,7 +110,12 @@ export function Start({ title, said, done, counts, already, held, onGo }: {
         <Section label="How much to track">
           <Stack space="roomy">
             {LADDER.map((rung) => (
-              <StepRow key={rung.id} icon={glyphOf(rung.icon)} label={rung.label} under={rung.under} />
+              <StepRow
+                key={rung}
+                icon={glyphOf(SAID[rung].icon)}
+                label={SAID[rung].label}
+                under={SAID[rung].under}
+              />
             ))}
           </Stack>
         </Section>

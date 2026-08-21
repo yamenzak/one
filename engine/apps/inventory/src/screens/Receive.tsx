@@ -240,7 +240,11 @@ export function Receive({
                 )
                 : null}
 
-              <Button variant="ghost" onPress={() => { onForget(); notice.ok("Cleared."); }}>
+              {/* ⚠️ SECONDARY, NOT GHOST. This is the way out of a wrong scan,
+                  and the person reaching for it is already holding the wrong
+                  thing — a ghost at the foot of a card of fields reads as one
+                  more sentence, which is the one moment a control must not. */}
+              <Button variant="secondary" onPress={() => { onForget(); notice.ok("Cleared."); }}>
                 Not that one
               </Button>
             </Group>

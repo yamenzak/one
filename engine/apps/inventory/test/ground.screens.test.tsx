@@ -730,7 +730,9 @@ describe("asking in words", () => {
 
   it("says so when it read fewer lines than the workspace holds", () => {
     const out = drawnAsk({ answer: "I cannot see any.", looked: 200 }, 4_000);
-    expect(out).toContain("Read ");
+    /* ⚠️ THE SENTENCE NAMES ITS SUBJECT. "Read 200 of your 4,000 lines" under
+       a heading that says The answer leaves who read them to the reader. */
+    expect(out).toContain("Answered from ");
     expect(out).toContain('data-ink="warning"');
     /* ⚠️ GROUPED, BECAUSE IT IS A NUMBER SOMEBODY COMPARES. "200 of your 4000"
        puts two figures in two number systems on one line, which is the one

@@ -775,11 +775,19 @@ export function InventoryScreen({ route, onGo }: {
           of={lines}
           places={PLACES}
           here={here}
-          /* ⚠️ MORE THAN IS DRAWN, DELIBERATELY. The one state worth
-             photographing here is a page that is not the whole list — a ground
-             where the two numbers agree photographs the case the footer never
-             appears in. */
-          total={214}
+          /*
+            ⚠️ MORE THAN IS DRAWN, DELIBERATELY. The one state worth
+            photographing here is a page that is not the whole list — a ground
+            where the two numbers agree photographs the case the footer never
+            appears in.
+
+            ⚠️ AND IT IS THE PLACE'S OWN COUNT, not a bigger number. Written by
+            hand it was 214 under a header reading "112 lines" — the same
+            quantity twice, on one screen, disagreeing. A demo is read as a
+            claim about the product.
+          */
+          total={PLACES.find((p) => p.id === here)?.lines
+            ?? PLACES.find((p) => p.of === null)?.lines ?? 0}
           more
           onMore={nothing}
           again={nothing}

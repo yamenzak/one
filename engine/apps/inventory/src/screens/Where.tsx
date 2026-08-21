@@ -41,8 +41,14 @@ export function Where({
       shape="detail"
       title={place.name}
       /* ⚠️ THE COUNT, WHICH IS THE ONE FACT WORTH THE LINE. What KIND of place
-         it is shows in the tree above it and in the name people gave it. */
-      under={place.lines === 1 ? "1 line" : `${place.lines} lines`}
+         it is shows in the tree above it and in the name people gave it.
+
+         ⚠️ AND NOTHING AT ALL WHERE THERE IS NOTHING. "0 lines" over an empty
+         state that already says "Nothing here yet" is the same fact twice, in
+         the two places on the screen that are furthest apart. */
+      {...(place.lines === 0
+        ? {}
+        : { under: place.lines === 1 ? "1 line" : `${place.lines} lines` })}
       back={back}
       does={{ op: "product.label", label: "Print a label", onDo: onLabel }}
       of={of}
