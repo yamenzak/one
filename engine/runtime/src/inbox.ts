@@ -25,8 +25,13 @@
  * looks exactly like a dispatch that worked.
  */
 
-import type { Channel, NotificationBook, Policy, Preference, TenantId } from "@engine/kernel";
-import { channelsFor, inAudience, newId, permissionsFor } from "@engine/kernel";
+import type {
+  Branding, Channel, Kind, Letter, LetterRefusal, NotificationBook, Policy, Preference,
+  TenantId, WhitelabelDef,
+} from "@engine/kernel";
+import {
+  brandedSurfaces, channelsFor, inAudience, mayBrand, newId, permissionsFor, refuseLetter,
+} from "@engine/kernel";
 import type { RoleRegistry } from "@engine/kernel";
 import { membersOf } from "./membership.js";
 import type { SchemaModule } from "./schema.js";
@@ -44,6 +49,12 @@ export const INBOX_SCHEMA: SchemaModule = {
        narrowing are different authorities and must not share a row. */
     `CREATE TABLE IF NOT EXISTS notify_policy (tenant_id TEXT NOT NULL, type TEXT NOT NULL, channels TEXT NOT NULL, PRIMARY KEY (tenant_id, type));`,
     `CREATE TABLE IF NOT EXISTS notify_preference (tenant_id TEXT NOT NULL, account_id TEXT NOT NULL, type TEXT NOT NULL, channels TEXT NOT NULL, PRIMARY KEY (tenant_id, account_id, type));`,
+    /* ⚠️ A THIRD TABLE, BECAUSE A WORKSPACE'S WORDS ARE NOT ITS ROUTING. The two
+       above answer "who is told, on what"; this answers "in whose words", and
+       only for the messages the workspace AUTHORS (`brandable`). Sharing a row
+       with the policy would mean a workspace muting a type also losing the
+       letter it had written for it. */
+    `CREATE TABLE IF NOT EXISTS notify_letter (tenant_id TEXT NOT NULL, type TEXT NOT NULL, subject TEXT NOT NULL, body TEXT NOT NULL, signature TEXT, at TEXT NOT NULL, PRIMARY KEY (tenant_id, type));`,
   ],
 };
 
@@ -233,3 +244,99 @@ const say = (template: string, values: Readonly<Record<string, string>>): string
   template.replace(/\{(\w+)\}/g, (whole, key: string) => values[key] ?? whole);
 
 export { say as interpolate };
+
+/* ---------------------------------------------------------------- letters --- */
+
+/**
+ * WHAT A WORKSPACE WROTE FOR ONE OF ITS OWN MESSAGES.
+ *
+ * ⚠️ READ FOR THE WHOLE DISPATCH AT ONCE. A notification goes to everybody
+ * holding a permission, and asking for the same template once per recipient is a
+ * round trip per member — fine for three people, a request that times out for
+ * five hundred. The same reason `fileNote` inserts together.
+ */
+export async function lettersOf(
+  db: Db, tenantId: TenantId,
+): Promise<Readonly<Record<string, Letter>>> {
+  const rows = await db.prepare(
+    `SELECT type, subject, body, signature FROM notify_letter WHERE tenant_id = ?`)
+    .bind(tenantId).all<{ type: string; subject: string; body: string; signature: string | null }>();
+  return Object.fromEntries((rows.results ?? []).map((r) => [r.type, {
+    subject: r.subject,
+    body: r.body,
+    ...(r.signature ? { signature: r.signature } : {}),
+  }]));
+}
+
+/**
+ * WHOSE LETTER THIS IS, WHICH IS A DIFFERENT QUESTION FROM WHETHER THE
+ * WORKSPACE WROTE ONE.
+ *
+ * ⚠️ THREE THINGS HAVE TO AGREE AND EVERY ONE OF THEM CAN CHANGE AFTERWARDS (D44).
+ * The app has to OFFER the email surface, the workspace has to have ASKED to
+ * brand it, and the workspace has to be the kind that may brand anything at all
+ * — and a stored letter written while all three held would otherwise keep going
+ * out after any of them stopped. Asked at the read, once per dispatch, so the
+ * answer is today's rather than the day the letter was saved.
+ *
+ * ⚠️ AND IT ANSWERS EMPTY RATHER THAN THROWING. The letters are an override; a
+ * workspace whose branding is off gets ours, which is what it had before it ever
+ * wrote one.
+ */
+export const mayWordMail = (
+  app: { readonly whitelabel?: WhitelabelDef }, branding: Branding | null, kind: Kind,
+): boolean => !!app.whitelabel
+  && brandedSurfaces(app.whitelabel, branding, mayBrand(kind)).includes("email");
+
+export async function mailedAs(
+  db: Db, tenantId: TenantId, app: { readonly whitelabel?: WhitelabelDef },
+  branding: Branding | null, kind: Kind,
+): Promise<{
+  readonly letters?: Readonly<Record<string, Letter>>;
+  readonly replyTo?: string;
+}> {
+  /* ⚠️ ONE PREDICATE, ASKED BY THE SEND AND BY THE EDITOR. Two copies is how a
+     screen comes to collect words the dispatch will never use. */
+  if (!mayWordMail(app, branding, kind)) return {};
+  return {
+    letters: await lettersOf(db, tenantId),
+    ...(branding?.replyTo ? { replyTo: branding.replyTo } : {}),
+  };
+}
+
+/**
+ * WRITE ONE, OR SAY WHY NOT.
+ *
+ * ⚠️ THE REFUSAL IS THE POINT OF THIS FUNCTION. A template naming `{coach}`
+ * where the definition offers `{trainer}` renders the brace and the word to
+ * somebody who has no idea what it is — the workspace's own edit, so nothing of
+ * ours fails and nobody of ours is told. Here is the last moment it is still
+ * somebody's mistake rather than somebody's mail.
+ *
+ * ⚠️ AND AN EMPTY LETTER DELETES RATHER THAN STORING A BLANK. "Back to yours" is
+ * what somebody means when they clear the box, and a stored empty subject is a
+ * mail with no subject line.
+ */
+export async function setLetter(
+  db: Db, book: NotificationBook, tenantId: TenantId, type: string,
+  letter: Letter | null, now = new Date(),
+): Promise<readonly LetterRefusal[]> {
+  const def = book[type];
+  if (!def) return ["not_theirs"];
+  if (letter === null || (!letter.subject.trim() && !letter.body.trim())) {
+    await db.prepare(`DELETE FROM notify_letter WHERE tenant_id = ? AND type = ?`)
+      .bind(tenantId, type).run();
+    return [];
+  }
+  const refused = refuseLetter(def, letter);
+  if (refused.length) return refused;
+  await db.prepare(
+    `INSERT INTO notify_letter (tenant_id, type, subject, body, signature, at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT (tenant_id, type) DO UPDATE SET
+       subject = excluded.subject, body = excluded.body,
+       signature = excluded.signature, at = excluded.at`)
+    .bind(tenantId, type, letter.subject, letter.body, letter.signature ?? null,
+      now.toISOString()).run();
+  return [];
+}

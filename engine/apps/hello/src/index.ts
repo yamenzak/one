@@ -608,10 +608,11 @@ export const HELLO: AppSpec = defineApp({
       id: "appearance", label: "Appearance", icon: "star", order: 1,
       said: "How notes look here, and how yours are signed",
     }),
-    email: area({
-      id: "email", label: "Email", icon: "mail", order: 2,
-      said: "Where replies go, and how often you are written to",
-    }),
+    /* ⚠️ NO `email` AREA, AND ITS ABSENCE IS THE POINT. Where a workspace's mail
+       comes back to is one address for the whole workspace, not one per product
+       — `Branding.replyTo` (D22, the same argument the accent settled). A
+       product that declared its own would put a second answer on a second
+       screen, and the two would disagree the first time somebody changed one. */
   },
 
   settings: {
@@ -650,14 +651,6 @@ export const HELLO: AppSpec = defineApp({
       control rather than a text box is proved where the control is, in
       `design/test/surface.test.tsx`.
     */
-    /* DEFER(engine-23) stage:23 — nothing sends a letter, so there is no reply
-       for an address to go to. Declared with the lane rather than after it, so
-       the field kind is exercised by the ground. */
-    "notes.reply_to": {
-      id: "notes.reply_to", level: "tenant", area: "email",
-      field: field.email({ label: "Where replies go", holds: "contact" }),
-      fallback: "", needs: "tenant:manage",
-    },
     "notes.density": {
       id: "notes.density", level: "person", area: "appearance",
       field: field.enum({ label: "Density", holds: "none", values: ["comfortable", "compact"] }),
@@ -669,16 +662,6 @@ export const HELLO: AppSpec = defineApp({
       id: "notes.signature", level: "person", area: "appearance",
       field: field.text({ label: "How you sign a note", holds: "none", max: 60 }),
       fallback: "",
-    },
-    /* DEFER(engine-23) stage:23 — see `notes.reply_to`. A digest is a letter. */
-    "notes.digest": {
-      id: "notes.digest", level: "person", area: "email",
-      field: field.enum({
-        label: "Digest", holds: "none",
-        values: ["off", "daily", "weekly"],
-      }),
-      fallback: "weekly",
-      help: "One message with what was published since the last one.",
     },
   },
 

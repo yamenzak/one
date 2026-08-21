@@ -45,6 +45,14 @@ const headerWord = (text: string): string =>
 export interface Letter {
   readonly from: string;
   readonly to: string;
+  /**
+   * ⚠️ WHERE A REPLY GOES, WHICH IS NOT WHERE THE LETTER CAME FROM. The sender
+   * is the deployment's one verified address; a workspace telling its own staff
+   * something has somewhere it wants the answer, and without this every reply
+   * goes to a mailbox nobody reads. Absent leaves the header off rather than
+   * repeating `from`, which is what a client already assumes.
+   */
+  readonly replyTo?: string;
   readonly subject: string;
   readonly text: string;
   readonly html?: string;
@@ -63,6 +71,7 @@ export function buildMime(letter: Letter, boundary = "one-boundary-0"): string {
   const head = [
     `From: ${letter.from}`,
     `To: ${letter.to}`,
+    ...(letter.replyTo ? [`Reply-To: ${letter.replyTo}`] : []),
     `Subject: ${headerWord(letter.subject)}`,
     "MIME-Version: 1.0",
   ];

@@ -80,6 +80,25 @@ describe("the message", () => {
     expect(both).toContain("--one-boundary-0--");
   });
 
+  /*
+    ⚠️ THE SENDER IS OURS AND THE REPLY IS THEIRS, AND BOTH ARE IN THE MESSAGE.
+    Mail is delivered on the strength of a domain set up to send it, so a
+    workspace can never be the `From:` — and without a `Reply-To:` every answer
+    to everything a business tells its own people lands in a mailbox nobody
+    reads. Absent unless it was asked for: an empty header is a header some
+    clients honour as an address of nothing.
+  */
+  it("puts the workspace's reply address beside our sender", () => {
+    const raw = buildMime({
+      from: "Harbour Works <noreply@4dl.app>", to: "sam@example.com",
+      subject: "s", text: "t", replyTo: "hello@harbour.example",
+    });
+    expect(raw).toContain("From: Harbour Works <noreply@4dl.app>");
+    expect(raw).toContain("Reply-To: hello@harbour.example");
+    expect(buildMime({ from: "a@b.c", to: "d@e.f", subject: "s", text: "t" }))
+      .not.toContain("Reply-To:");
+  });
+
   /* ⚠️ The envelope takes an address; the display name stays in the header. */
   it("takes the address out of a display name", () => {
     expect(bareAddress("One <noreply@4dl.app>")).toBe("noreply@4dl.app");

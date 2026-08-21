@@ -24,10 +24,10 @@
  * catch must not do.
  */
 
-import type { AppSpec, Channel } from "@engine/kernel";
-import { PLATFORM_ROLES } from "@engine/kernel";
+import type { AppSpec, Channel, Letter } from "@engine/kernel";
+import { PLATFORM_ROLES, letterFor } from "@engine/kernel";
 import { audienceFor, fileNote, interpolate } from "./inbox.js";
-import type { Pusher } from "./services.js";
+import type { Mailer, Pusher } from "./services.js";
 import type { Db } from "./sql.js";
 
 /**
@@ -74,6 +74,30 @@ export interface Raised {
    * `push` either, so nothing here has to check twice.
    */
   readonly pusher?: Pusher;
+  /**
+   * ⚠️ ABSENT MEANS THIS DEPLOYMENT SENDS NO MAIL, the same honest state as an
+   * absent `pusher`. `channels` will not carry `email` either, so nothing here
+   * has to check twice.
+   */
+  readonly mailer?: Mailer;
+  /**
+   * ⚠️ WHERE A READER COMES BACK TO, ABSOLUTE. A notification's `link` is a
+   * route — meaningful inside the app and meaningless in an inbox among four
+   * hundred other messages. This is the origin the request arrived on, so a
+   * workspace on its own domain is sent back to its own domain.
+   */
+  readonly origin?: string;
+  /** ⚠️ Its name, because a letter's subject is unfindable without it. */
+  readonly workspace?: string;
+  /** ⚠️ The workspace's own templates, read once for the whole dispatch. */
+  readonly letters?: Readonly<Record<string, Letter>>;
+  /**
+   * ⚠️ WHERE A REPLY GOES, WHICH IS NOT WHERE THE LETTER CAME FROM. The sender
+   * is the deployment's one verified address and has to be; this is the
+   * workspace's own, so a person answering "who took the last box" reaches
+   * somebody rather than a mailbox nobody reads.
+   */
+  readonly replyTo?: string;
 }
 
 /** File a note for everybody an event concerns. Answers how many were told. */
@@ -109,6 +133,47 @@ export async function tell(db: Db, raised: Raised, now = new Date()): Promise<nu
         the deployment can actually deliver, so this reads a decision rather than
         making one.
       */
+      /*
+        ⚠️ MAIL BEFORE PUSH, AND BOTH AFTER THE RECORD. A letter takes a network
+        round trip per recipient and a push takes one too; the order between them
+        is arbitrary, and the order against the FILE is not — an interruption
+        pointing at a record that was never written lands somebody on an empty
+        inbox.
+
+        ⚠️ AND A SEND THAT FAILS IS NOT ALLOWED TO TAKE THE OTHERS WITH IT. One
+        bad address in an audience of forty would otherwise mean thirty-nine
+        people are not told, and the operation that raised the event has already
+        succeeded.
+      */
+      if (raised.mailer) {
+        const wants = audience.filter((one) => one.channels.includes("email"));
+        if (wants.length) {
+          /* ⚠️ NO ORIGIN, NO WAY BACK — and a bare route is worse than none. A
+             `/` in an email is a link to whatever host the reader's client
+             guesses at, so a caller with no request behind it (a job) sends a
+             letter that says what happened and does not pretend to point at
+             it. */
+          const where = raised.origin ? `${raised.origin}${def.link ?? ""}` : "";
+          const mail = letterFor(
+            def, dispatch.values, where,
+            raised.letters?.[def.id] ?? null,
+            raised.workspace ?? "",
+          );
+          await Promise.all(wants.map(async (one) => {
+            try {
+              await raised.mailer!.send({
+                to: one.email, subject: mail.subject, text: mail.text,
+                ...(raised.replyTo ? { replyTo: raised.replyTo } : {}),
+              });
+            } catch (why) {
+              /* ⚠️ NOT LOGGED WITH THE BODY. A letter in a log is a permanent
+                 copy of what a workspace said to somebody. */
+              console.error(`[notify] ${def.id} could not be mailed`, why);
+            }
+          }));
+        }
+      }
+
       if (!raised.pusher) continue;
       const wants = audience.filter((one) => one.channels.includes("push"));
       if (!wants.length) continue;

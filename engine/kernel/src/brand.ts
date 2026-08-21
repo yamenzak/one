@@ -83,6 +83,21 @@ export interface Branding {
    * credited on a page it does not own.
    */
   readonly ourMark?: boolean;
+  /**
+   * WHERE A REPLY GOES, WHICH IS NOT WHERE THE LETTER CAME FROM.
+   *
+   * ⚠️ THE SENDER IS THE DEPLOYMENT'S ONE VERIFIED ADDRESS AND IT HAS TO BE.
+   * Mail is delivered on the strength of a domain that has been set up to send
+   * it, so a workspace cannot be the `From:` — but everything a business tells
+   * its own staff has somewhere it wants the answer, and without this every
+   * reply goes to a mailbox nobody reads.
+   *
+   * ⚠️ AND IT IS THE WORKSPACE'S, NOT AN APP'S, for the reason the accent is
+   * (D22, D44): a business running three of our products has ONE address it
+   * wants replies at, and one per app would give it three with two of them
+   * stale.
+   */
+  readonly replyTo?: string;
 }
 
 /**
@@ -130,11 +145,11 @@ export const brandableOn = (def: WhitelabelDef, allowed: boolean): readonly Surf
   no product, so there is no app to ask whether it has one; this function is for
   the surfaces a PRODUCT owns.
 
-  DEFER(engine-23) stage:23 — and none of those exists yet. `shell` is the
-  platform's and `app-icons` is the workspace's, both resolved where they are
-  served; `email` is the first surface an APP owns, and nothing sends a letter.
-  `documents` and `public` have nothing to draw either. This is the intersection
-  the day one of them does.
+  ⚠️ AND `email` IS THE FIRST SURFACE AN APP OWNS. It is asked once per dispatch
+  by `ownLettersFor`, at the READ rather than at the write: a workspace's own
+  letter, written while the app offered the surface and the workspace had asked
+  for it, must stop going out the day either of those stops being true. A rule
+  applied where a row is saved is a rule that describes the past.
 */
 export const brandedSurfaces = (
   def: WhitelabelDef, branding: Branding | null, allowed: boolean,

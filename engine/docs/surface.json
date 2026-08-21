@@ -319,6 +319,18 @@
         "path": "/api/ai.word"
       },
       {
+        "id": "notify.wording",
+        "kind": "read",
+        "method": "GET",
+        "path": "/api/notify.wording"
+      },
+      {
+        "id": "notify.word",
+        "kind": "write",
+        "method": "POST",
+        "path": "/api/notify.word"
+      },
+      {
         "id": "flag.list",
         "kind": "read",
         "method": "GET",
@@ -1225,6 +1237,13 @@
         "onForget": [
           "account_id: delete"
         ],
+        "onClose": "tenant_id: delete"
+      },
+      {
+        "table": "notify_letter",
+        "export": null,
+        "why": "a workspace's own words for its own messages",
+        "onForget": [],
         "onClose": "tenant_id: delete"
       },
       {

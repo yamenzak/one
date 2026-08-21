@@ -38,7 +38,7 @@ import {
   operatorOps, permissionsResolver, personalOps, pusherOver, schemaFor, sendMail, serve,
   settleBindings,
   sessionIdFrom, shardFor, subscriptionFor, whoIs,
-  type Bucket, type Db, type TenantRow,
+  type Bucket, type Db, type MailDeps, type Mailer, type TenantRow,
   configOf,
   DEFAULT_MULTIPLIER,
   modelsOf,
@@ -1053,6 +1053,70 @@ const missingConfig = (env: Env): readonly string[] =>
   REQUIRED.filter((key) => !String(env[key] ?? "").trim());
 
 /**
+ * THE ONE MAIL LANE, AND EVERY SENDER GOES THROUGH IT.
+ *
+ * ⚠️ THE BINDING IS NAMED IN EXACTLY ONE PLACE, and it is here because this is
+ * where the binding is. `@engine/runtime` builds the message and hands over
+ * three strings; constructing the platform's own envelope type inside the
+ * package would make it unbuildable anywhere that sends nothing — which is every
+ * unit test and every self-host.
+ */
+function mailDeps(env: Env, directory: Db): MailDeps {
+  return {
+    directory,
+    ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
+    ...(env.SEND_EMAIL
+      ? {
+        binding: {
+          send: async (from: string, to: string, raw: string): Promise<void> => {
+            const { EmailMessage } = await import("cloudflare:email");
+            await env.SEND_EMAIL!.send(new EmailMessage(from, to, raw));
+          },
+        },
+      }
+      : {}),
+    environment: env.ENVIRONMENT,
+  };
+}
+
+/**
+ * HOW A NOTIFICATION LEAVES THE PROCESS.
+ *
+ * ⚠️ THE SAME LANE THE SIGN-IN CODE USES, and that is the whole reason it is
+ * built from `sendMail` rather than beside it. A deployment must never be in the
+ * state where one of them sends and the other silently does not — which is what
+ * two paths to a mailbox produce the first time somebody configures one of them.
+ *
+ * ⚠️ AND IT SAYS WHETHER IT CAN SEND, so `availableChannels` never offers a
+ * channel this deployment has switched off. A send that throws into a swallowed
+ * catch is worse than a channel that is not offered: it looks delivered.
+ *
+ * ⚠️ ABSENT IS A DEPLOYMENT WITH NEITHER A BINDING NOR A MOCK, which is what a
+ * self-host is before it configures a sender. The switch is then not drawn at
+ * all, rather than drawn and inert.
+ */
+function mailerFor(env: Env, directory: Db): Mailer | undefined {
+  const deps = mailDeps(env, directory);
+  if (!deps.binding && env.ENVIRONMENT !== "development") return undefined;
+  return {
+    async live() {
+      /* ⚠️ THE CONFIGURED ANSWER, NOT THE BINDING'S EXISTENCE. An operator who
+         switched mail off has said so in one place, and every surface that
+         offers an email switch has to read the same answer. */
+      const provider = await configOf(directory, env.CONFIG_SECRET, "email.provider");
+      return provider !== "off";
+    },
+    async send(mail) {
+      const why = await sendMail(deps, mail);
+      /* ⚠️ A THROW, BECAUSE THE CALLER IS A DISPATCH THAT HAS ALREADY FILED THE
+         RECORD. It catches per recipient, so one bad address does not stop the
+         other thirty-nine being told. */
+      if (why) throw new Error(`mail refused: ${why}`);
+    },
+  };
+}
+
+/**
  * WHAT THE NIGHTLY PASS RUNS ON — and what the console runs one job with.
  *
  * ⚠️ ONE DEFINITION, BECAUSE TWO WOULD DRIFT AND THE DRIFT WOULD BE SILENT. The
@@ -1067,6 +1131,7 @@ const missingConfig = (env: Env): readonly string[] =>
  */
 async function sweepDeps(env: Env): Promise<SweepDeps> {
   const directory = env.DIRECTORY as unknown as Db;
+  const mailer = mailerFor(env, directory);
   /* ⚠️ Read once per pass rather than per job — see `sweepWithOverrides`. */
   const named = await configOf(directory, env.CONFIG_SECRET, "ai.gateway");
   /* ⚠️ READ ONCE PER PASS, LIKE THE GATEWAY'S NAME. The catalogue sync needs it
@@ -1100,7 +1165,15 @@ async function sweepDeps(env: Env): Promise<SweepDeps> {
       anywhere yet, and naming a channel this deployment cannot send on is what
       `availableChannels` exists to prevent.
     */
-    notify: { pusher: pusherOver(directory) },
+    /*
+      ⚠️ AND MAIL IS ITS SIBLING. A sweep that finds stock expiring on Thursday
+      and can only write the number into a run record has told nobody — the one
+      person who reads a run record is an operator looking at somebody else's
+      shelf.
+    */
+    notify: { pusher: pusherOver(directory), ...(mailer ? { mailer } : {}) },
+    /* ⚠️ SO A LETTER CARRIES A WAY BACK. See `SweepDeps.root`. */
+    root: env.ROOT,
     /* ⚠️ BY ID, because a move's TARGET shard has no workspace on it yet and
        `shardOf` resolves through the tenant. */
     shardById: (id) => {
@@ -1391,22 +1464,9 @@ const handler = async (env: Env) => {
   */
   const { gateway, sold } = await settings(env, directory, Date.now());
   const shardOf = (tenant: TenantRow) => shardFor(env as never, tenant.shardId);
-
-  /**
-   * ⚠️ THE ONE PLACE `cloudflare:email` IS NAMED, and it is here because this is
-   * where the binding is. `@engine/runtime` builds the message and hands over
-   * three strings; constructing the platform's own envelope type inside the
-   * package would make it unbuildable anywhere that sends nothing — which is
-   * every unit test and every self-host.
-   */
-  const mailBinding = env.SEND_EMAIL
-    ? {
-      send: async (from: string, to: string, raw: string): Promise<void> => {
-        const { EmailMessage } = await import("cloudflare:email");
-        await env.SEND_EMAIL!.send(new EmailMessage(from, to, raw));
-      },
-    }
-    : undefined;
+  /* ⚠️ Built once. Two calls would be two objects, and `availableChannels` asks
+     one of them whether it is live. */
+  const mailer = mailerFor(env, directory);
 
   /**
    * ⚠️ THE BUCKET FOR THIS WORKSPACE'S JURISDICTION, AND THE RESIDENCY IS IN THE
@@ -1508,6 +1568,10 @@ const handler = async (env: Env) => {
     */
     plans: sold, packs: PACKS, storageRate: STORAGE_CREDITS_PER_GB_MONTH,
     pusher: pusherOver(directory),
+    /* ⚠️ THE SAME LANE THE SIGN-IN CODE GOES OUT ON — see `mailerFor`. Without
+       it a notification reaches an inbox and nowhere else, which for anybody not
+       looking at the app is nowhere. */
+    ...(mailer ? { mailer } : {}),
 
     /*
       ⚠️ HOW A MODEL IS ASKED, AND ITS ABSENCE IS AN ANSWER. With no gateway
@@ -1651,12 +1715,7 @@ const handler = async (env: Env) => {
             where, ctx.now);
         },
         deliver: async (to, code) => {
-          const why = await sendMail({
-            directory,
-            ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
-            ...(mailBinding ? { binding: mailBinding } : {}),
-            environment: env.ENVIRONMENT,
-          }, {
+          const why = await sendMail(mailDeps(env, directory), {
             to,
             subject: `${code} is your sign-in code`,
             /* ⚠️ THE CODE IS IN THE SUBJECT AS WELL AS THE BODY, because that is
@@ -1685,12 +1744,7 @@ const handler = async (env: Env) => {
         */
         deliverExport: async (to, token) => {
           const url = `https://id.${env.ROOT}/space/data?take=${encodeURIComponent(token)}`;
-          const why = await sendMail({
-            directory,
-            ...(env.CONFIG_SECRET ? { configSecret: env.CONFIG_SECRET } : {}),
-            ...(mailBinding ? { binding: mailBinding } : {}),
-            environment: env.ENVIRONMENT,
-          }, {
+          const why = await sendMail(mailDeps(env, directory), {
             to,
             subject: "Your copy is ready",
             /* ⚠️ WHAT IT IS, HOW LONG IT LASTS, AND WHAT TO DO IF IT WAS NOT

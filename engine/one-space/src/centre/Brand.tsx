@@ -42,6 +42,18 @@ const MARK = field.text({
   help: "One or two characters. Your initial if you leave it",
 });
 
+/**
+ * ⚠️ WHERE A REPLY GOES, WHICH IS NOT WHERE THE LETTER CAME FROM. Mail is
+ * delivered on the strength of a domain set up to send it, so the `From:` is the
+ * deployment's one verified address and cannot be a workspace's — but everything
+ * a business tells its own people has somewhere it wants the answer, and without
+ * this every reply lands in a mailbox nobody reads.
+ */
+const REPLY = field.email({
+  label: "Where replies go", holds: "contact",
+  help: "Left empty, a reply goes nowhere anybody reads",
+});
+
 /** What `brand.read` answers. */
 interface BrandAnswer {
   readonly kind: Kind;
@@ -49,6 +61,7 @@ interface BrandAnswer {
     readonly theme: Theme;
     readonly surfaces: readonly string[];
     readonly ourMark?: boolean;
+    readonly replyTo?: string;
   } | null;
   readonly surfaces: readonly string[];
   /** ⚠️ Whether there is one and how big — never the bytes, which the browser
@@ -118,6 +131,7 @@ export function Editor({ name, slug, answer, again }: {
   const [surfaces, setSurfaces] = React.useState<readonly string[]>(
     answer.branding?.surfaces ?? [],
   );
+  const [replyTo, setReplyTo] = React.useState(answer.branding?.replyTo ?? "");
   const [icon, setIcon] = React.useState(answer.icon ?? null);
   const [sending, setSending] = React.useState(false);
 
@@ -175,8 +189,13 @@ export function Editor({ name, slug, answer, again }: {
   const write = async (next: {
     readonly theme?: Theme;
     readonly surfaces?: readonly string[];
+    readonly replyTo?: string;
   }): Promise<Problem | null> => {
-    const body = { theme: next.theme ?? theme, surfaces: next.surfaces ?? surfaces };
+    const body = {
+      theme: next.theme ?? theme,
+      surfaces: next.surfaces ?? surfaces,
+      replyTo: next.replyTo ?? replyTo,
+    };
     const out = await api.post("brand.write", body);
     /* ⚠️ THE WHOLE REFUSAL, NOT ITS TITLE. `refuseTheme` answers "that pair is
        too close to read" with a detail saying which two — narrowing it to one
@@ -184,6 +203,7 @@ export function Editor({ name, slug, answer, again }: {
     if (!out.ok) return out.problem;
     setTheme(body.theme);
     setSurfaces(body.surfaces);
+    setReplyTo(body.replyTo);
     notice.ok("Saved.");
     again();
     return null;
@@ -308,6 +328,34 @@ export function Editor({ name, slug, answer, again }: {
           />
         ))}
       </Group>
+
+      {/*
+        ⚠️ ONLY WHERE A PRODUCT HERE ACTUALLY SENDS MAIL — the same rule as the
+        surfaces above it, answered by the server. An address collected from a
+        workspace whose products send nothing is a field that changes nothing.
+
+        ⚠️ AND IT IS UNDER THE SWITCH RATHER THAN BESIDE IT, because that is what
+        it does: a reply address takes effect where a workspace's email is theirs,
+        so a card offering it with the switch off would collect an address and
+        quietly not use it.
+      */}
+      {answer.surfaces.includes("email")
+        ? (
+          <Group
+            label="Email"
+            under={surfaces.includes("email")
+              ? "What your people write back to"
+              : "Turn Email on above and this is what replies go to"}
+          >
+            <EditRow
+              spec={REPLY}
+              name="replyTo"
+              value={replyTo}
+              onSave={(value) => write({ replyTo: String(value ?? "") })}
+            />
+          </Group>
+        )
+        : null}
     </Stack>
   );
 }

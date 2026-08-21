@@ -28,7 +28,7 @@
  */
 
 import type {
-  AppSpec, Channel, Instant, JobBook, JobDef, PackDef, PlanSpec, TenantId,
+  AppSpec, Channel, Instant, JobBook, JobDef, Letter, PackDef, PlanSpec, TenantId,
 } from "@engine/kernel";
 import { UNLIMITED, isSearchable } from "@engine/kernel";
 
@@ -36,6 +36,7 @@ import { UNLIMITED, isSearchable } from "@engine/kernel";
    name of the failure route on `SweepDeps` and two things called `tell` in one
    file is how a failure report ends up in a customer's inbox. */
 import { tell as tellAbout } from "./dispatch.js";
+import { mailedAs } from "./inbox.js";
 import { availableChannels, type NotifyDeps } from "./services.js";
 import { settingsFor } from "./settings.js";
 
@@ -45,7 +46,7 @@ import {
 } from "./directory.js";
 import { forgetWorkspace } from "./dossier.js";
 import { bytesUsed, eraseObjects, type Bucket, type Where } from "./storage.js";
-import { forgetBranding } from "./branding.js";
+import { brandingOf, forgetBranding } from "./branding.js";
 import { forgetIcon } from "./icon.js";
 import { dueForErasure, run, runDue, type RunnerDeps } from "./jobs.js";
 import { apply, type ApplyDeps } from "./resources.js";
@@ -144,6 +145,15 @@ export interface SweepDeps {
    * `ctx.tell`.
    */
   readonly notify?: NotifyDeps;
+  /**
+   * ⚠️ THE WORKSPACE ZONE, SO A LETTER CARRIES A WAY BACK. A note filed in an
+   * inbox is one press from the thing it is about; the same note as an email
+   * arrives among four hundred others and its `link` is a route that means
+   * nothing outside the app. Absent is a deployment that sends no mail, and the
+   * letter then says what happened without offering a door — which is worse than
+   * a link and better than a broken one.
+   */
+  readonly root?: string;
   /**
    * ⚠️ THE ACCOUNT CREDENTIAL, WHICH IS NOT THE GATEWAY'S. This one reads the
    * model catalogue; the gateway's runs models. A deployment holding only the
@@ -738,6 +748,39 @@ export const runnerFor = (deps: SweepDeps): RunnerDeps => {
      push is live, which is a read; a sweep raising a note per expiring batch
      would ask it once per batch per workspace. */
   let channels: Promise<readonly Channel[]> | null = null;
+  /* ⚠️ ONE LOOKUP PER WORKSPACE, HELD FOR THE PASS. What a letter needs beyond
+     the note itself — whose name is in the subject, and which origin to send
+     somebody back to — is one directory row, and a nightly sweep raises many
+     notes per workspace. */
+  const said = new Map<string, Promise<{ workspace?: string; origin?: string;
+    letters?: Readonly<Record<string, Letter>> }>>();
+
+  /* ⚠️ KEYED BY WORKSPACE AND APP, because whether a letter wears the
+     workspace's name is the APP's `whitelabel` question — two products in one
+     workspace can answer it differently, and a memo on the workspace alone
+     would give the second one the first one's answer. */
+  const addressed = (tenantId: TenantId, db: Db, app: AppSpec) => {
+    const key = `${tenantId}:${app.id}`;
+    const held = said.get(key);
+    if (held) return held;
+    const asking = (async () => {
+      const tenant = await tenantById(deps.directory, tenantId);
+      return {
+        ...(tenant ? { workspace: tenant.name } : {}),
+        ...(tenant && deps.root ? { origin: `https://${tenant.slug}.${deps.root}` } : {}),
+        /* ⚠️ ONLY WHERE THE WORKSPACE'S BRAND REACHES ITS MAIL — the same
+           question the request side asks, through the same function. Two
+           answers to "may this letter wear their name" is how a night's mail
+           comes to be branded where a day's is not. */
+        ...(tenant
+          ? await mailedAs(db, tenantId, app,
+            await brandingOf(deps.directory, tenantId), tenant.kind)
+          : {}),
+      };
+    })();
+    said.set(key, asking);
+    return asking;
+  };
 
   return ({
     directory: deps.directory,
@@ -768,6 +811,12 @@ export const runnerFor = (deps: SweepDeps): RunnerDeps => {
             actorName: null,
             channels: await channels,
             ...(deps.notify!.pusher ? { pusher: deps.notify!.pusher } : {}),
+            /* ⚠️ RESOLVED ONCE PER WORKSPACE PER PASS, not once per note. A
+               sweep raising forty expiries for one workspace would otherwise
+               look its name up forty times to put it in forty subjects. */
+            ...(deps.notify!.mailer
+              ? { mailer: deps.notify!.mailer, ...await addressed(tenantId, db, app) }
+              : {}),
           });
         },
       }

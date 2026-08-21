@@ -16,6 +16,7 @@ import {
   BILLING_SCHEMA, DIRECTORY_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA, MEMBERSHIP_SCHEMA,
   addShard, applySchema, audienceFor, createTenant, fileNote, found, inboxOf,
   markSeen, noteShardApp, openAccount, invite, setPolicy, setPreference, unseenCount,
+  lettersOf, setLetter,
   MOCK_ALLOWED, availableChannels, generate, mockProvider, tell, type Db, type Provider,
   topUp, walletOf,
   type PushNote,
@@ -260,6 +261,121 @@ describe("a note that leaves the process", () => {
     expect(await tell(shard(), raise("note.review_asked"))).toBe(2);
     expect(sent).toHaveLength(0);
     expect(await unseenCount(shard(), tenantId, "acc_alex")).toBe(1);
+  });
+
+  /* ------------------------------------------------------------- by mail --- */
+
+  /*
+    ⚠️ THE SAME SHAPE ONE CHANNEL OVER, AND FOR THE SAME REASON. The inbox is
+    where somebody FINDS what they were told; mail is how they learn there is
+    anything to find. Without it a nightly sweep that discovers stock expiring on
+    Thursday has told nobody who is not already looking at the app — which on a
+    Thursday night is nobody.
+  */
+  const posted: { to: string; subject: string; text: string }[] = [];
+  const mailer = { async send(mail: { to: string; subject: string; text: string }) { posted.push(mail); } };
+  beforeEach(() => { posted.length = 0; });
+
+  it("mails everybody the type offers email to, and links them back", async () => {
+    await roster();
+    await tell(shard(), {
+      ...raise("note.published"), mailer,
+      origin: "https://harbour.t.example", workspace: "Harbour Works",
+    });
+    expect(posted.map((m) => m.to).sort()).toEqual(["alex@example.com", "sam@example.com"]);
+    /* ⚠️ THE WORKSPACE IS IN THE SUBJECT AND THE WAY BACK IS ABSOLUTE. A letter
+       arrives among four hundred others with neither the context an inbox row
+       sits in nor a route that means anything outside the app. */
+    expect(posted[0]!.subject).toContain("Harbour Works");
+    expect(posted[0]!.text).toContain("https://harbour.t.example/");
+    /* ⚠️ Filled, never `{who}` — a template that reaches somebody unfilled is
+       the one failure the whole variable rule exists to prevent. */
+    expect(posted[0]!.subject).not.toMatch(/\{[a-z]/);
+  });
+
+  /* ⚠️ A PERSON WHO SWITCHED EMAIL OFF IS NOT MAILED, and the row is still
+     filed. `channelsFor` has already decided. */
+  it("respects somebody who turned email off for themselves", async () => {
+    await roster();
+    await setPreference(shard(), tenantId, "acc_alex", "note.published", ["inbox"]);
+    await tell(shard(), { ...raise("note.published"), mailer, workspace: "Harbour Works" });
+    expect(posted.map((m) => m.to)).toEqual(["sam@example.com"]);
+    expect(await unseenCount(shard(), tenantId, "acc_alex")).toBe(1);
+  });
+
+  /*
+    ⚠️ AND ONE BAD ADDRESS DOES NOT TAKE THE OTHERS WITH IT. The operation that
+    raised the event has already succeeded and the records are already written;
+    a throw here would mean thirty-nine people are not told because of the
+    fortieth, with nothing anywhere saying which one it was.
+  */
+  it("keeps going when one send fails", async () => {
+    await roster();
+    const angry = {
+      async send(mail: { to: string; subject: string; text: string }) {
+        if (mail.to.startsWith("alex")) throw new Error("no such mailbox");
+        posted.push(mail);
+      },
+    };
+    await tell(shard(), { ...raise("note.published"), mailer: angry, workspace: "Harbour Works" });
+    expect(posted.map((m) => m.to)).toEqual(["sam@example.com"]);
+    expect(await unseenCount(shard(), tenantId, "acc_alex")).toBe(1);
+  });
+
+  /*
+    ⚠️ THE WORKSPACE'S OWN WORDS, WHERE IT MAY HAVE THEM — and the store is what
+    makes `refuseLetter` more than a rule for a lane that does not exist. A
+    template naming a variable the notification never declared is an email with
+    `{coach}` in it, and it is refused where it is SAVED.
+  */
+  it("sends the workspace's own letter, and refuses one it could not fill", async () => {
+    await roster();
+    const book = HELLO.notifications ?? {};
+    expect(await setLetter(shard(), book, tenantId, "note.published",
+      { subject: "{who} wrote something", body: "Have a look at {title}." })).toEqual([]);
+
+    await tell(shard(), {
+      ...raise("note.published"), mailer,
+      origin: "https://harbour.t.example", workspace: "Harbour Works",
+      letters: await lettersOf(shard(), tenantId),
+    });
+    expect(posted[0]!.subject).toBe("Sam wrote something");
+    expect(posted[0]!.text).toContain("Have a look at Q3 plan.");
+
+    expect(await setLetter(shard(), book, tenantId, "note.published",
+      { subject: "Hi {coach}", body: "Hello" })).toContain("unknown_variable");
+    /* ⚠️ AND THE REFUSED ONE DID NOT LAND, so the good letter is still there. */
+    expect((await lettersOf(shard(), tenantId))["note.published"]?.subject)
+      .toBe("{who} wrote something");
+  });
+
+  /*
+    ⚠️ AND A CALLER WITH NO REQUEST BEHIND IT SENDS NO LINK AT ALL. A nightly
+    sweep has no origin to give, and `/` in an email is a link to whatever host
+    the reader's client guesses at — so the letter says what happened and does
+    not pretend to point at it. A missing half is omitted rather than printed
+    empty, because a subject opening with a dash reads as a template that broke.
+  */
+  it("offers no way back where there is no origin to offer", async () => {
+    await roster();
+    await tell(shard(), { ...raise("note.published"), mailer, workspace: "Harbour Works" });
+    expect(posted[0]!.text.trim()).toBe(posted[0]!.text);
+    expect(posted[0]!.text).not.toContain("\n\n/");
+    expect(posted[0]!.subject.startsWith("Harbour Works — ")).toBe(true);
+
+    posted.length = 0;
+    await tell(shard(), { ...raise("note.published"), mailer });
+    expect(posted[0]!.subject.startsWith(" — ")).toBe(false);
+  });
+
+  /* ⚠️ CLEARING IT IS "BACK TO YOURS", not a stored blank — a stored empty
+     subject is a mail with no subject line. */
+  it("goes back to ours when the workspace clears its letter", async () => {
+    await roster();
+    const book = HELLO.notifications ?? {};
+    await setLetter(shard(), book, tenantId, "note.published", { subject: "Mine", body: "Mine" });
+    await setLetter(shard(), book, tenantId, "note.published", null);
+    expect(await lettersOf(shard(), tenantId)).toEqual({});
   });
 });
 

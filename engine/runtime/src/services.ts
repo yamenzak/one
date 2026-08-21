@@ -104,6 +104,8 @@ export interface TellInput {
 
 export interface MailInput {
   readonly to: string;
+  /** ⚠️ Where a reply goes, which is not where the letter came from — see `Letter`. */
+  readonly replyTo?: string;
   readonly subject: string;
   readonly text: string;
   readonly html?: string;
@@ -426,6 +428,18 @@ export const mockProvider = (environment: string): Provider => ({
 
 export interface Mailer {
   send(mail: MailInput): Promise<void>;
+  /**
+   * ⚠️ WHETHER IT CAN SEND RIGHT NOW, ASKED RATHER THAN INFERRED FROM THE
+   * BINDING — the same question `Pusher` answers, for the same reason. A
+   * deployment can have the binding and have mail switched OFF in its config, or
+   * have no sender address configured; offering the switch in that state is a
+   * control that does nothing, and a send that throws into a swallowed catch is
+   * worse, because it looks delivered.
+   *
+   * ⚠️ ABSENT MEANS YES. A harness that hands a mailer wants it used, and making
+   * every test implement a predicate would be ceremony for one bit.
+   */
+  live?(): Promise<boolean>;
 }
 
 /**
@@ -477,7 +491,7 @@ export interface NotifyDeps {
  */
 export const availableChannels = async (deps: NotifyDeps): Promise<readonly Channel[]> => {
   const out: Channel[] = ["inbox"];
-  if (deps.mailer) out.push("email");
+  if (deps.mailer && (await deps.mailer.live?.() ?? true)) out.push("email");
   if (deps.pusher && await deps.pusher.live()) out.push("push");
   return out;
 };

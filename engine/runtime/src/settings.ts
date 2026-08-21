@@ -19,9 +19,11 @@
 
 import type { AppSpec, TenantId } from "@engine/kernel";
 import {
-  PUBLIC, checkSome, disclose, mayIsolate, refusePrompt, resolve, valueOf,
+  PUBLIC, brandable, checkSome, disclose, mayIsolate, refusePrompt, resolve, valueOf,
 } from "@engine/kernel";
 import { actionsOf, word, wordingOf } from "./ai-actions.js";
+import { lettersOf, mayWordMail, setLetter } from "./inbox.js";
+import { brandingOf } from "./branding.js";
 import {
   deploymentFlags, flagCounts, flagPeople, setPersonFlag, setTenantFlag, tenantFlags,
 } from "./flags.js";
@@ -170,6 +172,84 @@ export function settingOps(app: AppSpec): Readonly<Record<string, Resolved>> {
         }
         await word(ctx.db, ctx.tenantId as TenantId, target.id, action.id, text, new Date(ctx.now));
         return { action: action.id };
+      }),
+
+    /*
+      ⚠️ AND THE SAME QUESTION FOR A NOTIFICATION, WHICH IS WHERE IT MATTERS
+      MOST. An AI prompt in a workspace's own words reaches its own staff; a
+      notification in its own words reaches its CUSTOMERS, and it goes out by
+      mail with the workspace's name on it. `brandable` is what decides whether
+      the workspace may rewrite one at all — a message from US to the business
+      ("your payment failed") wearing the business's own voice tells its staff
+      their own company is chasing them for a bill they have never heard of.
+    */
+    "notify.wording": op("notify.wording", "read", "What each message says, and in whose words.",
+      async (ctx, input) => {
+        if (!ctx.accountId) return ctx.fail("platform.unauthorized");
+        const target = targetOf(ctx, input);
+        if (!target) return ctx.fail("platform.not_found");
+        const theirs = await lettersOf(ctx.db, ctx.tenantId as TenantId);
+        /*
+          ⚠️ WHETHER A LETTER WRITTEN HERE WOULD ACTUALLY GO OUT, ASKED BY THE
+          SAME FUNCTION THE SEND ASKS (`mayWordMail`). The app has to offer the
+          email surface, the workspace has to have switched it on, and it has to
+          be the kind that may brand anything — and a workspace whose email is
+          still ours can write a letter nothing will ever use. That is the
+          editor-over-nothing shape this repository keeps finding, so the answer
+          carries the fact and the screen says it.
+        */
+        const tenant = await tenantById(ctx.directory, ctx.tenantId as TenantId);
+        const used = mayWordMail(
+          target, await brandingOf(ctx.directory, ctx.tenantId as TenantId),
+          tenant?.kind ?? "personal");
+        return {
+          used,
+          items: Object.values(target.notifications ?? {})
+            .filter((def) => brandable(def))
+            .map((def) => ({
+              id: def.id,
+              label: def.label,
+              /* ⚠️ THE `label`, NOT THE `summary`. A catalogue of TYPES has
+                 nothing to fill a template with, so listing the summary here
+                 would show `{name} invited you` to somebody choosing what to
+                 rewrite. */
+              declared: def.summary,
+              variables: def.variables,
+              letter: theirs[def.id] ?? null,
+            })),
+        };
+      }),
+
+    "notify.word": op("notify.word", "write", "Put a message in your own words.",
+      async (ctx, input) => {
+        if (!ctx.accountId) return ctx.fail("platform.unauthorized");
+        const target = targetOf(ctx, input);
+        if (!target) return ctx.fail("platform.not_found");
+        /* ⚠️ Workspace authority — this is what its customers read, not one
+           person's preference. */
+        const mine = await ctx.permissionsIn(target.id);
+        if (!mine.has("tenant:manage")) return ctx.fail("platform.forbidden");
+
+        const type = String(input.type ?? "");
+        if (!(target.notifications ?? {})[type]) return ctx.fail("platform.not_found");
+        const letter = input.letter === null || input.letter === undefined
+          ? null
+          : {
+            subject: String((input.letter as Record<string, unknown>).subject ?? ""),
+            body: String((input.letter as Record<string, unknown>).body ?? ""),
+            ...((input.letter as Record<string, unknown>).signature
+              ? { signature: String((input.letter as Record<string, unknown>).signature) }
+              : {}),
+          };
+        /* ⚠️ THE REFUSAL IS THE POINT. A template naming a variable the
+           notification never declares is an email with `{coach}` in it, sent to
+           a customer — and here is the last moment it is still somebody's
+           mistake rather than somebody's mail. */
+        const refused = await setLetter(
+          ctx.db, target.notifications ?? {}, ctx.tenantId as TenantId, type, letter,
+          new Date(ctx.now));
+        if (refused.length) return ctx.fail("platform.invalid", { detail: refused.join(", ") });
+        return { type };
       }),
 
     /*

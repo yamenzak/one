@@ -271,6 +271,7 @@ export const HOLDINGS: readonly HeldBy[] = [
   { table: "replay", person: [], why: "an idempotency key, not a record about anybody",
     workspace: its() },
   { table: "notify_policy", person: [], why: "a workspace's own routing", workspace: its() },
+  { table: "notify_letter", person: [], why: "a workspace's own words for its own messages", workspace: its() },
   { table: "custom_role", person: [], why: "a workspace's own roles", workspace: its() },
   { table: "package", person: [], why: "a workspace's own catalogue", workspace: its() },
   { table: "purchase", person: [], workspace: its(),

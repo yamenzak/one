@@ -64,7 +64,8 @@ import { brandingOf } from "./branding.js";
 import { keep } from "./vault.js";
 import { iconPng, iconSvg, webManifest, type Installable, type Installer } from "./installable.js";
 import { iconOf } from "./icon.js";
-import { availableChannels, type Pusher } from "./services.js";
+import { mailedAs } from "./inbox.js";
+import { availableChannels, type Mailer, type Pusher } from "./services.js";
 import { settingsFor } from "./settings.js";
 import type { Db } from "./sql.js";
 import { generatorFor, streamerFor } from "./ai-run.js";
@@ -176,12 +177,18 @@ export interface Wiring {
    * ⚠️ HOW A NOTIFICATION LEAVES THE PROCESS. Absent is honest and is the state
    * of a deployment with no push keypair: `availableChannels` then leaves `push`
    * out, so the switch is never offered rather than offered and inert.
-   *
-   * ⚠️ AND `mailer` IS ITS SIBLING AND IS DELIBERATELY NOT HERE YET. Wiring one
-   * without the other would make `availableChannels` answer for a channel this
-   * deployment cannot send on — which is the exact thing it exists to prevent.
    */
   readonly pusher?: Pusher;
+  /**
+   * ⚠️ ITS SIBLING, AND ABSENT IS THE SAME HONEST STATE. A deployment with no
+   * sender configured binds nothing here, `availableChannels` leaves `email`
+   * out, and the switch is never offered rather than offered and inert.
+   *
+   * ⚠️ WIRED FROM `sendMail`, NEVER BESIDE IT. The sign-in code and a
+   * notification go out through one lane, so a deployment cannot be in the state
+   * where one of them sends and the other silently does not.
+   */
+  readonly mailer?: Mailer;
   /**
    * ⚠️ WHAT A VERIFIED PAYMENT DOES, HANDED IN. The webhook is answered here
    * because it must be answered before any door resolves a workspace — Stripe
@@ -1172,7 +1179,7 @@ export async function performOperation(
       again.
     */
     await happened(located, composed.app, op, now);
-    await told(wiring, located, composed.app, who, op, input, answer, now);
+    await told(wiring, located, composed.app, who, op, input, answer, now, at);
     return { kind: "ok", answer };
   } catch (thrown) {
     if (thrown instanceof Refused) {
@@ -1296,6 +1303,7 @@ const happened = async (
 const told = async (
   wiring: Wiring, located: Located, app: AppSpec, who: Who, op: _Op,
   input: Record<string, unknown>, answer: unknown, now: Date,
+  at: { readonly origin: string },
 ): Promise<void> => {
   const events = op.spec.emits ?? [];
   if (!events.length) return;
@@ -1304,6 +1312,12 @@ const told = async (
       app, tenantId: located.tenantId, events, input,
       answer: (answer ?? {}) as Record<string, unknown>,
       actor: who.accountId ?? null, actorName: who.email ?? null,
+      /* ⚠️ THE ORIGIN THIS REQUEST ARRIVED ON, so a workspace on its own domain
+         is sent back to its own domain. A constant would mail everybody the
+         root's address, which for a custom-domain workspace is a hostname their
+         staff have never seen. */
+      origin: at.origin,
+      ...(located.name ? { workspace: located.name } : {}),
       /*
         ⚠️ WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER, ASKED RATHER THAN ASSUMED.
         This was the literal `["inbox"]` under a note saying a channel leaving
@@ -1314,6 +1328,23 @@ const told = async (
       */
       channels: await availableChannels(wiring),
       ...(wiring.pusher ? { pusher: wiring.pusher } : {}),
+      /* ⚠️ READ ONCE FOR THE WHOLE DISPATCH, and only where there is a lane to
+         use them on. A deployment that sends no mail should not pay a query per
+         write for words nothing will read. */
+      ...(wiring.mailer
+        ? {
+          mailer: wiring.mailer,
+          /* ⚠️ ONLY WHERE THE WORKSPACE'S BRAND REACHES ITS MAIL. `mailedAs`
+             asks all three questions — the app offers the surface, the workspace
+             asked for it, the workspace is the kind that may — at the read
+             rather than at the write, so a letter written while they all held
+             stops applying the day one of them stops. */
+          ...await mailedAs(
+            located.db, located.tenantId as TenantId, app,
+            await brandingOf(wiring.directory, located.tenantId as TenantId),
+            located.kind ?? "personal"),
+        }
+        : {}),
     }, now);
   } catch (why) {
     console.error(`[notify] ${op.id} raised ${events.join(", ")} and nobody was told`, why);

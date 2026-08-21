@@ -290,6 +290,48 @@ describe("a workspace's brand", () => {
   });
 
   /*
+    ⚠️ ONE REPLY ADDRESS, ON THE SCREEN A BUSINESS ALREADY EDITS ITS IDENTITY ON
+    (D44). The sender is the deployment's verified address and has to be, so this
+    is the only half of a letter's envelope a workspace owns — and without it
+    every answer to everything it tells its own people lands in a mailbox nobody
+    reads.
+
+    ⚠️ AND IT SAYS WHAT IT DEPENDS ON RATHER THAN GOING QUIET. It takes effect
+    where the workspace's email is its own, so a card offering it with that
+    switch off would collect an address and never use it.
+  */
+  it("takes a reply address, and says what it is waiting on", () => {
+    const out = html(
+      <Editor name="Harbourside" slug="harbourside" answer={commercial} again={() => {}} />,
+    );
+    expect(out).toContain("Where replies go");
+    expect(out).toContain("Turn Email on above");
+
+    const on = html(
+      <Editor
+        name="Harbourside" slug="harbourside"
+        answer={{ ...commercial, branding: { ...commercial.branding, surfaces: ["shell", "email"] } }}
+        again={() => {}}
+      />,
+    );
+    expect(on).toContain("What your people write back to");
+  });
+
+  /* ⚠️ AND NOT OFFERED AT ALL WHERE NO PRODUCT HERE SENDS MAIL. An address
+     collected from a workspace whose apps send nothing is a field that changes
+     nothing anywhere. */
+  it("does not ask for one where nothing here sends mail", () => {
+    const out = html(
+      <Editor
+        name="Harbourside" slug="harbourside"
+        answer={{ ...commercial, surfaces: ["shell"] }}
+        again={() => {}}
+      />,
+    );
+    expect(out).not.toContain("Where replies go");
+  });
+
+  /*
     ⚠️ A PERSONAL WORKSPACE GETS THE OFFER, AND IT IS ONE WAY. The sentence over
     the button is what somebody reads; a confirmation afterwards about something
     already decided is a speed bump.

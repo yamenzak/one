@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  channelsFor, inAudience, refusePolicy, refuseLetter, unknownVariables, brandable,
+  channelsFor, inAudience, letterFor, refusePolicy, refuseLetter, unknownVariables, brandable,
   unraisable, unaddressable, deadLinks, notification, type NotificationDef, type Channel,
 } from "../src/notify.js";
 import { area, refuseSetting, refuseSettings, disclose, valueOf, settingsOn, areasOn, settingsIn, setting } from "../src/setting.js";
@@ -148,6 +148,57 @@ describe("a workspace rewriting a message", () => {
     expect(unknownVariables(invited, letter)).toEqual(["coach"]);
     expect(refuseLetter(invited, letter)).toContain("unknown_variable");
     expect(refuseLetter(invited, { subject: "Hello {name}", body: "Join {workspace}" })).toEqual([]);
+  });
+});
+
+/* ---------------------------------------------------------------- by mail --- */
+
+describe("what a notification becomes when it leaves the process", () => {
+  const values = { name: "Sam", workspace: "Harbour Works" };
+  const where = "https://harbour.t.example/people";
+
+  /*
+    ⚠️ THE DEFAULT NAMES THE WORKSPACE AND CARRIES AN ABSOLUTE WAY BACK. An inbox
+    row sits in a surface that already says whose it is and is one press from the
+    thing it is about; a letter arrives among four hundred others with neither.
+  */
+  it("names the workspace and links somewhere a reader can go", () => {
+    const out = letterFor(invited, values, where, null, "Harbour Works");
+    expect(out.subject).toContain("Harbour Works");
+    expect(out.text).toContain(where);
+    /* ⚠️ Filled, never `{name}` — a template reaches nobody unfilled. */
+    expect(out.subject).not.toMatch(/\{[a-z]/);
+    expect(out.text).not.toMatch(/\{[a-z]/);
+  });
+
+  it("uses the workspace's own words where it has them", () => {
+    const own = { subject: "{workspace}: you are invited", body: "Hello {name}, come in." };
+    const out = letterFor(invited, values, where, own, "Harbour Works");
+    expect(out.subject).toBe("Harbour Works: you are invited");
+    expect(out.text).toContain("Hello Sam, come in.");
+    expect(out.text).toContain(where);
+  });
+
+  /*
+    ⚠️ AND ASKS AGAIN RATHER THAN TRUSTING THE ROW. A stored template can be
+    written by one version of the rule and read by a newer one — a message that
+    became ours after somebody rewrote it would otherwise keep going out in their
+    words, which is the one failure this whole distinction exists to prevent.
+  */
+  it("ignores a stored template for a message that is ours", () => {
+    const ours: NotificationDef = { ...invited, author: "ours" };
+    const own = { subject: "Nothing to worry about", body: "Ignore this" };
+    const out = letterFor(ours, values, where, own, "Harbour Works");
+    expect(out.subject).not.toContain("Nothing to worry about");
+  });
+
+  /* ⚠️ AND A TEMPLATE THAT WOULD SEND `{coach}` TO SOMEBODY IS NOT USED. It is
+     refused where it is saved; this is what happens if one is already stored. */
+  it("falls back rather than mailing a brace", () => {
+    const own = { subject: "Hi {coach}", body: "Hello" };
+    const out = letterFor(invited, values, where, own, "Harbour Works");
+    expect(out.subject).not.toContain("{coach}");
+    expect(out.subject).toContain("Harbour Works");
   });
 });
 

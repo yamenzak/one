@@ -38,7 +38,7 @@ all of it is refused, gated, audited and erasable on the same terms as everythin
 an app writes itself.
 
 <!-- generated: node scripts/inventory.mjs surface -->
-**35 operations for declaring nothing.** A roster, an inbox and its
+**37 operations for declaring nothing.** A roster, an inbox and its
 two-level policy, the workspace's brand, the package rail it sells with, its
 settings, its bill, and the one bootstrap read every screen stands on.
 
@@ -68,6 +68,8 @@ settings, its bill, and the one bootstrap read every screen stands on.
 | `setting.read` | read | *the session* |
 | `ai.wording` | read | *the session* |
 | `ai.word` | write | *the session* |
+| `notify.wording` | read | *the session* |
+| `notify.word` | write | *the session* |
 | `flag.list` | read | *the session* |
 | `flag.people` | read | *the session* |
 | `flag.person` | write | *the session* |
@@ -354,6 +356,7 @@ before an app is resolved draws on them.
 | `inbox` | Your notifications | `account_id: delete` | `tenant_id: delete` |
 | `notify_policy` | — *a workspace's own routing* | — | `tenant_id: delete` |
 | `notify_preference` | What you asked to be told about | `account_id: delete` | `tenant_id: delete` |
+| `notify_letter` | — *a workspace's own words for its own messages* | — | `tenant_id: delete` |
 | `vault_subject` | Your vault | `subject_id: delete` | `tenant_id: delete` |
 | `vault_fact` | The facts held encrypted for you | `subject_id: delete` | `tenant_id: delete` |
 | `vault_consent` | What you consented to | `subject_id: delete` | `tenant_id: delete` |
@@ -398,20 +401,20 @@ and a manifest that does not compose refuses to boot.
 | `door` | the five doors, and which host is which | 2 | — |
 | `setting` | a switch a workspace owns, and the page it lives on | 9 | — |
 | `flag` | a switch WE own, with a date it stops being one | 8 | — |
-| `notify` | what somebody is told, through which channel, and who may narrow it | 12 | 1 |
+| `notify` | what somebody is told, through which channel, and who may narrow it | 13 | — |
 | `problem` | the one refusal shape, and the platform's own catalogue | 6 | — |
 | `tone` | the voice — the rules a written string has to pass | 1 | — |
 | `vault` | the facts that are not an app's to keep (D11) | 9 | — |
 | `legal` | documents, purposes, sub-processors, the record of processing | 11 | — |
 | `guide` | help, onboarding, the milestones a workspace passes | 5 | — |
 | `job` | scheduled work, and the record that it ran | 7 | — |
-| `brand` | which surfaces a workspace may put its own mark on | 10 | 1 |
+| `brand` | which surfaces a workspace may put its own mark on | 10 | — |
 | `mark` | the logo as geometry, so the browser and the Worker draw one shape | 7 | — |
 | `ai` | a generating action: its lane, its prompt, its ceiling | 17 | — |
 | `mcp` | an operation projected as a tool an agent may call | 3 | — |
 | `signin` | the shape of a sign-in code — the four facts the server and the page must agree on | 4 | — |
 
-**277 of them**, 274 reached by something today.
+**278 of them**, 277 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/kernel"`.
 <!-- /generated -->
 
@@ -442,7 +445,7 @@ env or a binding.
 | `wallet` | OneWallet: the allowance, what was bought, and reserve → settle → release | 22 | — |
 | `catalogue` | the price list an operator edits over the declaration, and what it holds for the people already on a tier | 8 | — |
 | `packages` | granting, revoking and expiring a bought bundle | 8 | — |
-| `inbox` | notifications: the policy, the audience, the read | 10 | — |
+| `inbox` | notifications: the policy, the audience, the read | 14 | — |
 | `services` | the lane out to a provider — AI and mail | 8 | — |
 | `stripe` | the card lane: a page Stripe owns, a signature that proves an event is theirs, and the ladder one moves | 11 | — |
 | `config` | what the deployment was told — the credentials it holds, encrypted under a key its database has never seen | 6 | — |
@@ -486,7 +489,7 @@ env or a binding.
 | `media-ops` | upload, list, fetch and delete — generated for any app with a media field | 2 | — |
 | `resources` | wanted → created → bound → live → draining → gone, and the reaper | 9 | — |
 
-**432 of them**, 431 reached by something today.
+**436 of them**, 435 reached by something today.
 Read the file for why each exists; every one is `import { … } from "@engine/runtime"`.
 <!-- /generated -->
 
@@ -542,10 +545,10 @@ its own header, cited by other files, and doing nothing.
 | `missingDocuments` | `legal` | runtime |
 | `refuseLegal` | `legal` | composition |
 | `refuseApp` | `manifest` | composition |
-| `refuseLetter` | `notify` | deferred to stage 23 |
+| `refuseLetter` | `notify` | runtime |
 | `refusePolicy` | `notify` | runtime |
 | `unaddressable` | `notify` | composition |
-| `unknownVariables` | `notify` | deferred to stage 23 |
+| `unknownVariables` | `notify` | runtime |
 | `unraisable` | `notify` | composition |
 | `refuseOperation` | `operation` | composition |
 | `unreachable` | `operation` | composition |
@@ -947,6 +950,7 @@ its own header, cited by other files, and doing nothing.
 | D41 | The page asks before the bundle arrives | 0 |
 | D42 | The route decides the direction, the world decides the gesture | 0 |
 | D43 | The skeleton is the screen somebody saw last time | 0 |
+| D44 | The sender is the deployment's, the reply and the words are the workspace's | 0 |
 <!-- /generated -->
 
 ---
@@ -962,12 +966,10 @@ nothing yet.
 <!-- generated: node scripts/inventory.mjs waiting -->
 | Waiting on | Where | How many |
 |---|---|---|
-| **23** — Mail that leaves the process — a letter, its variables, and a provider | `kernel/src/brand.ts` | 1 |
-| **23** — Mail that leaves the process — a letter, its variables, and a provider | `kernel/src/notify.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `kernel/src/package.ts` | 1 |
 | **35** — A workspace runs its own retention ladder against its own customers, and ours freezes it | `runtime/src/jobs.ts` | 1 |
 
-**4 declarations** are built and reached by nothing, each waiting on a
+**2 declarations** are built and reached by nothing, each waiting on a
 stage it names in a `DEFER` marker. `scripts/capability.test.mjs` fails on one
 that names no stage, so this list cannot grow by forgetting.
 <!-- /generated -->
@@ -999,7 +1001,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 20 | Workspaces — personal or commercial, one brand, one installable, a shard of their own | shipped |
 | 21 | Payment — a workspace subscribes, and only a signed event stamps the plan | shipped |
 | 22 | OneSpace — `id`, `admin` and `setup` merge into one address off the workspace root | **planned** |
-| 23 | Mail that leaves the process — a letter, its variables, and a provider | **planned** |
+| 23 | Mail that leaves the process — a letter, its variables, and a provider | shipped |
 | 24 | A workspace composes its own roles out of one app's keys | shipped |
 | 25 | Agreements — versioned documents, an acceptance per person per version, and the wall until there is one | shipped |
 | 26 | The vault is opened — consent, who looked, your data, and an erasure that shreds | shipped |
@@ -1051,7 +1053,7 @@ that names no stage, so this list cannot grow by forgetting.
 | 72 | An operation's declared input is checked at the door, and `now` is one type | shipped |
 | 73 | The other half of OneInventory, driven — and the quarantine that was a badge on a screen | shipped |
 
-**61 shipped, 12 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
+**62 shipped, 11 planned.** A stage cannot be shipped while a `DEFER(engine-N)` marker names it — `scripts/docs.test.mjs` fails the build if one does, which is the only reason this table can be read instead of the code.
 <!-- /generated -->
 
 ---

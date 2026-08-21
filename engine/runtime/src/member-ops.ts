@@ -527,11 +527,23 @@ export function memberOps(app: AppSpec): Readonly<Record<string, Resolved>> {
           theme: (input.theme ?? {}) as Theme,
           surfaces: Array.isArray(input.surfaces) ? input.surfaces.map(String) : [],
           ...(typeof input.ourMark === "boolean" ? { ourMark: input.ourMark } : {}),
+          /* ⚠️ WHERE A REPLY GOES IS THE WORKSPACE'S, NOT AN APP'S (D22) — the
+             same argument as the accent, and the reason no product declares a
+             `reply_to` setting of its own. */
+          ...(input.replyTo === undefined ? {} : { replyTo: String(input.replyTo) }),
         }, new Date(ctx.now));
-        /* ⚠️ Three refusals and three different things to do next: become a
-           business, pick a readable pair, or ask for a surface that exists. */
+        /* ⚠️ Four refusals and four different things to do next: become a
+           business, pick a readable pair, ask for a surface that exists, or
+           write an address somebody could actually reply to. */
         if (done === "not_commercial") {
           return ctx.fail("platform.commercial_required", { workspace: tenant.name });
+        }
+        /* ⚠️ AGAINST THE FIELD, because that is the only place it means
+           anything — "invalid" over a card of four controls does not say which
+           one the server would not take. */
+        if (done === "not_an_address") {
+          return ctx.fail("platform.invalid", {},
+            { fields: { replyTo: "That is not an email address." } });
         }
         if (done === "unreadable" || done === "not_a_surface") return ctx.fail("platform.invalid");
         return done;

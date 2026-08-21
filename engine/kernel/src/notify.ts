@@ -19,10 +19,12 @@
  * preferences — they are requests for something only that person can do, and a
  * product that lets them be muted has built a way to miss them silently.
  *
- * Layer 2. Imports primitives.
+ * Layer 2. Imports primitives and problem — `say` is the one interpolation,
+ * and a second one here would be a second answer to what a variable looks like.
  */
 
 import type { Tone } from "./primitives.js";
+import { say } from "./problem.js";
 
 /* ------------------------------------------------------------------ shape --- */
 
@@ -169,10 +171,13 @@ export const unknownVariables = (def: NotificationDef, letter: Letter): readonly
     .map((m) => m[1]!)
     .filter((n) => !def.variables.includes(n)))];
 
-/* DEFER(engine-23) stage:23 — nothing sends a letter yet, so this is a rule for
-   a lane that does not exist. It is not dead: the moment mail leaves the
-   process, a letter interpolating a variable its notification never declares is
-   an email with `{coach}` in it, sent to a customer. */
+/**
+ * ⚠️ THE VARIABLE A TEMPLATE NAMES AND THE NOTIFICATION DOES NOT IS THE ONE A
+ * CUSTOMER READS. It is the tenant's own edit, so nothing of ours fails and
+ * nobody of ours is told — the brace and the word simply arrive in somebody's
+ * inbox. Refused at the door where the template is saved, which is the only
+ * place it can still be somebody's mistake rather than somebody's mail.
+ */
 export function refuseLetter(def: NotificationDef, letter: Letter): readonly LetterRefusal[] {
   const out: LetterRefusal[] = [];
   if (!brandable(def)) out.push("not_theirs");
@@ -241,3 +246,68 @@ export const deadLinks = (book: NotificationBook, routes: readonly string[]): re
     .map((d) => `${d.id} → ${d.link}`);
 
 export const notification = (def: NotificationDef): NotificationDef => def;
+
+/* ---------------------------------------------------------------- by mail --- */
+
+/**
+ * WHAT ONE NOTIFICATION BECOMES WHEN IT LEAVES THE PROCESS.
+ *
+ * ⚠️ AN EMAIL IS NOT AN INBOX ROW WITH A SUBJECT ON IT (D44). The row sits in a
+ * surface that already says which workspace it belongs to and is one press from
+ * the thing it is about; a letter arrives among four hundred others with no
+ * context at all, so it carries the workspace's name and an ABSOLUTE way back.
+ * A notification whose link a reader cannot follow is a notification that has
+ * told them to go and look for something.
+ *
+ * ⚠️ AND THE WORKSPACE'S OWN WORDS ARE USED ONLY WHERE THEY MAY BE. `ours` is a
+ * message from us to the business — "your payment failed", "somebody asked to
+ * erase their data" — and a business rewriting those is a business rewriting our
+ * side of a conversation with its own staff. Asked here rather than trusted from
+ * the store, because a row can be written by an older version of a rule and read
+ * by a newer one.
+ *
+ * ⚠️ IT IS PURE, AND EVERY INPUT IS ALREADY SETTLED. The values, the address and
+ * the template are resolved by the caller; what this decides is which words go
+ * out, which is a question with one right answer and no I/O in it.
+ */
+export interface Mailed {
+  readonly subject: string;
+  readonly text: string;
+}
+
+export function letterFor(
+  def: NotificationDef,
+  values: Readonly<Record<string, string>>,
+  /** ⚠️ Absolute. A relative path in an email is a path to nowhere. */
+  where: string,
+  /** The workspace's own template, or nothing. */
+  own: Letter | null,
+  /** ⚠️ Whose name is over the door — the workspace's, for a letter it authors. */
+  from: string,
+): Mailed {
+  const fill = (text: string) => say(text, values);
+  const usable = own !== null && refuseLetter(def, own).length === 0;
+
+  if (usable) {
+    return {
+      subject: fill(own.subject),
+      text: [fill(own.body), own.signature ? fill(own.signature) : "", where]
+        .filter(Boolean).join("\n\n"),
+    };
+  }
+
+  /*
+    ⚠️ THE DEFAULT NAMES THE WORKSPACE IN THE SUBJECT, and that is what makes a
+    letter findable. "Three things are running out" is a sentence about nothing
+    somebody can act on until they know whose stock it is, and a person in four
+    workspaces gets the same subject from all of them.
+  */
+  /* ⚠️ AND A MISSING HALF IS OMITTED RATHER THAN PRINTED EMPTY. A caller with
+     no origin to give — a job running on no request — would otherwise send a
+     subject opening with a dash and a body ending in a blank line, which reads
+     as a template that failed rather than as a message with less in it. */
+  return {
+    subject: [from, fill(def.summary)].filter(Boolean).join(" — "),
+    text: [fill(def.summary), where].filter(Boolean).join("\n\n"),
+  };
+}

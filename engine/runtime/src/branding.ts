@@ -30,6 +30,10 @@ export const BRANDING_SCHEMA: SchemaModule = {
   id: "branding",
   statements: [
     `CREATE TABLE IF NOT EXISTS tenant_branding (tenant_id TEXT PRIMARY KEY, theme_json TEXT NOT NULL, surfaces_json TEXT NOT NULL, our_mark INTEGER NOT NULL DEFAULT 1, at TEXT NOT NULL);`,
+    /* ⚠️ ADDED RATHER THAN PUT IN THE CREATE, because the table already exists
+       on every deployment that has run. A column in a `CREATE TABLE IF NOT
+       EXISTS` is a column no live database ever gets. */
+    `ALTER TABLE tenant_branding ADD COLUMN reply_to TEXT;`,
   ],
 };
 
@@ -44,13 +48,16 @@ export const BRANDING_SCHEMA: SchemaModule = {
 export async function brandingOf(db: Db, tenantId: TenantId): Promise<Branding | null> {
   try {
     const row = await db.prepare(
-      `SELECT theme_json, surfaces_json, our_mark FROM tenant_branding WHERE tenant_id = ?`)
-      .bind(tenantId).first<{ theme_json: string; surfaces_json: string; our_mark: number }>();
+      `SELECT theme_json, surfaces_json, our_mark, reply_to FROM tenant_branding WHERE tenant_id = ?`)
+      .bind(tenantId).first<{
+        theme_json: string; surfaces_json: string; our_mark: number; reply_to: string | null;
+      }>();
     if (!row) return null;
     return {
       theme: JSON.parse(row.theme_json) as Theme,
       surfaces: JSON.parse(row.surfaces_json) as readonly Surface[],
       ourMark: !!row.our_mark,
+      ...(row.reply_to ? { replyTo: row.reply_to } : {}),
     };
   } catch {
     /*
@@ -63,7 +70,11 @@ export async function brandingOf(db: Db, tenantId: TenantId): Promise<Branding |
   }
 }
 
-export type BrandRefusal = "not_commercial" | "unreadable" | "not_a_surface";
+/* ⚠️ FOUR REFUSALS, FOUR DIFFERENT THINGS TO DO NEXT. A bad reply address and an
+   unreadable colour pair are both "invalid" to a route and nothing alike to the
+   person holding the screen, so they are never one word. */
+export type BrandRefusal =
+  | "not_commercial" | "unreadable" | "not_a_surface" | "not_an_address";
 
 /**
  * Set a workspace's brand.
@@ -82,25 +93,36 @@ export async function setBranding(
   db: Db,
   tenantId: TenantId,
   kind: Kind,
-  wants: { readonly theme: Theme; readonly surfaces: readonly string[]; readonly ourMark?: boolean },
+  wants: {
+    readonly theme: Theme; readonly surfaces: readonly string[];
+    readonly ourMark?: boolean; readonly replyTo?: string;
+  },
   now = new Date(),
 ): Promise<Branding | BrandRefusal> {
   if (!mayBrand(kind)) return "not_commercial";
   if (refuseTheme(wants.theme).length) return "unreadable";
   if (wants.surfaces.some((s) => !SURFACES.includes(s as Surface))) return "not_a_surface";
 
+  /* ⚠️ AN ADDRESS OR NOTHING — a reply going somewhere unreachable is worse
+     than one going to a mailbox somebody chose not to read, because the sender
+     is told it arrived. */
+  const replyTo = (wants.replyTo ?? "").trim();
+  if (replyTo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo)) return "not_an_address";
+
   const branding: Branding = {
     theme: wants.theme,
     surfaces: wants.surfaces as readonly Surface[],
     ourMark: wants.ourMark ?? true,
+    ...(replyTo ? { replyTo } : {}),
   };
   await db.prepare(
-    `INSERT INTO tenant_branding (tenant_id, theme_json, surfaces_json, our_mark, at)
-     VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO tenant_branding (tenant_id, theme_json, surfaces_json, our_mark, reply_to, at)
+     VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(tenant_id) DO UPDATE SET theme_json = excluded.theme_json,
-       surfaces_json = excluded.surfaces_json, our_mark = excluded.our_mark, at = excluded.at`)
+       surfaces_json = excluded.surfaces_json, our_mark = excluded.our_mark,
+       reply_to = excluded.reply_to, at = excluded.at`)
     .bind(tenantId, JSON.stringify(branding.theme), JSON.stringify(branding.surfaces),
-      branding.ourMark ? 1 : 0, now.toISOString()).run();
+      branding.ourMark ? 1 : 0, branding.replyTo ?? null, now.toISOString()).run();
   return branding;
 }
 

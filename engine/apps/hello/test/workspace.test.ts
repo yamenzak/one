@@ -128,7 +128,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   sent.length = 0;
   for (const t of ["membership", "custom_role", "note", "check_in", "audit", "replay",
-    "notify_policy", "notify_preference"]) {
+    "notify_policy", "notify_preference", "notify_letter"]) {
     await shard().exec(`DELETE FROM ${t};`);
   }
   for (const t of ["tenant_branding", "invited", "belongs", "tenant_app", "tenant",
@@ -409,6 +409,118 @@ describe("a business's own identity", () => {
       expect(svg, `${door} is wearing a workspace's colour`).not.toContain("#101014");
       expect(svg, `${door} is wearing a workspace's letter`).not.toContain(">H<");
     }
+  });
+
+  /*
+    ⚠️ THE SENDER IS OURS AND THE REPLY IS THEIRS. Mail is delivered on the
+    strength of a domain set up to send it, so a workspace can never be the
+    `From:` — and without this every answer to everything a business tells its
+    own people lands in a mailbox nobody reads.
+
+    ⚠️ ONE ADDRESS FOR THE WORKSPACE, NOT ONE PER PRODUCT (D22) — the same
+    argument as the accent, and the reason no app declares a `reply_to` setting
+    of its own.
+  */
+  it("takes one reply address for the whole workspace, or refuses it", async () => {
+    const cookie = await asBusiness();
+    expect((await post(SLUG, "/api/brand.write",
+      { theme: READABLE, surfaces: ["shell", "email"], replyTo: "hello@harbour.example" },
+      cookie)).status).toBe(200);
+
+    const read = await (await get(SLUG, "/api/brand.read", cookie)).json() as
+      { branding: { replyTo?: string } | null };
+    expect(read.branding?.replyTo).toBe("hello@harbour.example");
+
+    /* ⚠️ AGAINST THE FIELD, because "invalid" over a card of four controls does
+       not say which one the server would not take. */
+    const no = await post(SLUG, "/api/brand.write",
+      { theme: READABLE, surfaces: ["shell", "email"], replyTo: "hello at harbour" }, cookie);
+    expect(no.status).toBe(400);
+    expect((await no.json() as { problem: { fields?: Record<string, string> } })
+      .problem.fields?.replyTo).toBeTruthy();
+    /* ⚠️ And the refused one did not land. */
+    expect((await brandingOf(directory(), (await tenantBySlug(directory(), SLUG))!.id))?.replyTo)
+      .toBe("hello@harbour.example");
+  });
+});
+
+/* ------------------------------------------------------------- its letters --- */
+
+/**
+ * WHAT A WORKSPACE'S OWN MESSAGES SAY.
+ *
+ * ⚠️ THE EDITOR IS OFFERED ONLY WHERE THE LETTER WOULD ACTUALLY GO OUT, and that
+ * is three conditions deep: the app has to offer the email surface, the
+ * workspace has to have switched it on, and it has to be the kind that may brand
+ * anything at all. A screen collecting words the dispatch silently drops is the
+ * shape every guard in this repository exists to catch, so `used` is asked by
+ * the SAME function the send asks.
+ */
+describe("a workspace's own letters", () => {
+  const LETTER = { subject: "{who} wrote something", body: "Have a look at {title}." };
+
+  it("says the letters are ours until this workspace's email is its own", async () => {
+    const cookie = await workspace();
+    const before = await (await get(SLUG, "/api/notify.wording?app=hello", cookie)).json() as
+      { used: boolean; items: { id: string }[] };
+    /* ⚠️ THE TYPES ARE STILL LISTED. A personal workspace can see what the
+       product says; what it cannot do is have that said in its own words, and
+       an empty list would read as "this product sends nothing". */
+    expect(before.items.map((i) => i.id).sort())
+      .toEqual(["note.published", "note.review_asked"]);
+    expect(before.used).toBe(false);
+
+    await comp(1);
+    await post("setup", "/api/me.tenant.commercial", { slug: SLUG, legalName: "H GmbH" }, cookie);
+    /* ⚠️ COMMERCIAL IS NOT ENOUGH — the workspace still has to ASK for the
+       email surface, which is the half a check on the kind alone would miss. */
+    await post(SLUG, "/api/brand.write", { theme: READABLE, surfaces: ["shell"] }, cookie);
+    const asked = await (await get(SLUG, "/api/notify.wording?app=hello", cookie)).json() as
+      { used: boolean };
+    expect(asked.used).toBe(false);
+
+    await post(SLUG, "/api/brand.write",
+      { theme: READABLE, surfaces: ["shell", "email"] }, cookie);
+    const now = await (await get(SLUG, "/api/notify.wording?app=hello", cookie)).json() as
+      { used: boolean };
+    expect(now.used).toBe(true);
+  });
+
+  it("stores a letter, refuses a variable the message never carries, and clears back", async () => {
+    const cookie = await workspace();
+    expect((await post(SLUG, "/api/notify.word",
+      { app: "hello", type: "note.published", letter: LETTER }, cookie)).status).toBe(200);
+
+    const mine = await (await get(SLUG, "/api/notify.wording?app=hello", cookie)).json() as
+      { items: { id: string; letter: { subject: string } | null }[] };
+    expect(mine.items.find((i) => i.id === "note.published")!.letter?.subject)
+      .toBe("{who} wrote something");
+
+    /* ⚠️ THE REFUSAL IS THE POINT. A template naming `{coach}` is an email with
+       a brace in it, sent to somebody who has no idea what it is — and here is
+       the last moment it is still somebody's mistake rather than somebody's
+       mail. */
+    expect((await post(SLUG, "/api/notify.word",
+      { app: "hello", type: "note.published", letter: { subject: "Hi {coach}", body: "x" } },
+      cookie)).status).toBe(400);
+
+    expect((await post(SLUG, "/api/notify.word",
+      { app: "hello", type: "note.published", letter: null }, cookie)).status).toBe(200);
+    const back = await (await get(SLUG, "/api/notify.wording?app=hello", cookie)).json() as
+      { items: { id: string; letter: unknown }[] };
+    expect(back.items.find((i) => i.id === "note.published")!.letter).toBe(null);
+  });
+
+  /* ⚠️ WORKSPACE AUTHORITY, BECAUSE THIS IS WHAT ITS PEOPLE READ — not one
+     member's preference. Checked in the handler, not by hiding the screen. */
+  it("is not a member's to rewrite", async () => {
+    const cookie = await workspace();
+    await post(SLUG, "/api/member.invite",
+      { email: "alex@example.com", platformRole: "customer", appRoles: { hello: "reader" } },
+      cookie);
+    const theirs = await signIn("alex@example.com");
+    expect((await post(SLUG, "/api/notify.word",
+      { app: "hello", type: "note.published", letter: LETTER }, theirs)).status).toBe(403);
   });
 });
 

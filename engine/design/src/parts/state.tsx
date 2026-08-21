@@ -50,6 +50,26 @@ export const waiting = <T,>(): Loaded<T> => ({ status: "waiting" });
 export const trouble = <T,>(problem: Problem): Loaded<T> => ({ status: "trouble", problem });
 export const ready = <T,>(data: T): Loaded<T> => ({ status: "ready", data });
 
+/**
+ * TWO ANSWERS READ AS ONE.
+ *
+ * ⚠️ A SCREEN THAT ASKS TWO QUESTIONS STILL HAS ONE EMPTY STATE. Awaited
+ * separately, two loads draw two headings over two skeletons, then two "nothing
+ * here" sentences stacked — which is a page that looks half-broken rather than a
+ * page with nothing on it. Joined, the screen has one waiting, one trouble and
+ * one nothing, which is what every other screen in the product has.
+ *
+ * ⚠️ TROUBLE WINS OVER WAITING, and the FIRST trouble is the one reported. A
+ * screen cannot act on two failures at once, and showing a skeleton beside a
+ * failure says the page is still coming when half of it never will.
+ */
+export const both = <A, B>(a: Loaded<A>, b: Loaded<B>): Loaded<readonly [A, B]> => {
+  if (a.status === "trouble") return trouble(a.problem);
+  if (b.status === "trouble") return trouble(b.problem);
+  if (a.status === "waiting" || b.status === "waiting") return waiting();
+  return ready([a.data, b.data] as const);
+};
+
 /* ------------------------------------------------------------------ await --- */
 
 export interface AwaitProps<T> {

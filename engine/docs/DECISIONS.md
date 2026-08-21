@@ -1251,3 +1251,47 @@ count, block height, kept under the address.
 placeholder. ⚠️ **And the outer box is fixed rather than composed**: everything
 inside a skeleton is an approximation, and approximations add up to a column
 sixty pixels short, which is the jump again.
+
+---
+
+## D44 — The sender is the deployment's, the reply and the words are the workspace's
+
+Mail is delivered on the strength of a domain that has been set up to send it, so
+every letter leaves from the deployment's one verified address and no workspace is
+ever the `From:`. What a workspace owns is the other three halves of a letter: the
+`Reply-To:`, the subject, and the words — where the notification declares itself
+`theirs` and the workspace's brand actually reaches its mail. Decided 2026-08-21.
+
+**Why.** A business tells its own people things through our product, and a letter
+that arrives from us, in our words, with replies going to a mailbox nobody reads,
+is three separate failures wearing one envelope. But the first of them cannot be
+fixed: sending as `harbour.example` means holding their DNS, and the alternative
+— sending as them without it — is what makes mail bounce.
+
+**The reply address is the WORKSPACE's, not an app's**, for the reason the accent
+is (D22): a business running three of our products has one address it wants
+answers at, and one per product would be three with two of them stale. So no app
+declares a `reply_to` setting; `Branding.replyTo` is the one field, on the one
+screen a business already edits its identity on.
+
+**A letter is used only where all three conditions hold, asked at the SEND.** The
+app has to offer the `email` surface, the workspace has to have switched it on,
+and it has to be the kind that may brand anything at all — and every one of those
+can change after a letter was written. Asked at the read, a stored letter stops
+applying the day one of them stops; trusted from the store, it goes on wearing a
+business's name after they stopped being a business.
+
+**And the editor says so before anybody types.** `notify.wording` answers `used`
+from the same predicate the dispatch asks (`mayWordMail`), so a workspace whose
+mail is still ours is told that on the screen rather than after the send. A
+screen collecting words the dispatch silently drops is this repository's
+signature failure and it does not get a new instance here.
+
+**Therefore never:** a `From:` that is not the deployment's verified sender; a
+reply address declared per app; a letter applied because it is in the table,
+without asking whether the workspace may still have one; a wording editor that
+does not say whether its words will be used; a template variable the notification
+never declares reaching the send — it is refused where the template is SAVED,
+which is the last moment it is somebody's mistake rather than somebody's mail; a
+failed send that takes the rest of the audience down with it, or that is logged
+with the letter's body in it.

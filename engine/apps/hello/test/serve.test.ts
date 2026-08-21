@@ -216,6 +216,13 @@ describe("what the manifest produced", () => {
       "POST /api/note.share",
       "GET /api/note.start",
       "POST /api/note.update",
+      /* ⚠️ AND A PAIR PER PRODUCT FOR THE WORDS ITS MESSAGES GO OUT IN. Only
+         the ones this app AUTHORS are listed by the read — a message from us to
+         the business is not the business's to rewrite — and the write refuses a
+         template naming a variable the notification never declared, which is the
+         difference between somebody's mistake and somebody's mail. */
+      "POST /api/notify.word",
+      "GET /api/notify.wording",
       "POST /api/package.archive",
       "POST /api/package.create",
       "POST /api/package.grant",
